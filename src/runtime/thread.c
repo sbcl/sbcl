@@ -418,10 +418,12 @@ unregister_thread(struct thread *th,
                   init_thread_data __attribute__((unused)) *scribble)
 {
     int lock_ret;
+    void sync_close_region(struct alloc_region *, int, int);
 
     block_blockable_signals(0);
-    ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
-    ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
+    sync_close_region(&th->mixed_tlab, PAGE_TYPE_MIXED, 0);
+    // unboxed is not used.
+    // sync_close_region(&th->unboxed_tlab, PAGE_TYPE_UNBOXED, 0);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);
 #else

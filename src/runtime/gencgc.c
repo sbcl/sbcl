@@ -908,17 +908,14 @@ static inline boolean region_closed_p(struct alloc_region* region) {
 #endif
 
 static void
-gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_region)
+gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_region, int unlock)
 {
     page_index_t first_page;
     page_index_t last_page;
     page_index_t i;
-    int ret;
 
     /* Check that the region is in a reset state. */
-    gc_assert(region_closed_p(alloc_region));
-    INSTRUMENTING(ret = mutex_acquire(&free_pages_lock), et_allocator_mutex_acq);
-    gc_assert(ret);
+    gc_dcheck(region_closed_p(alloc_region));
     first_page = alloc_start_page(page_type, 0);
 
     INSTRUMENTING(
@@ -953,8 +950,10 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         set_page_scan_start_offset(i,
             addr_diff(page_address(i), alloc_region->start_addr));
     }
-    ret = mutex_release(&free_pages_lock);
-    gc_assert(ret);
+    if (unlock) {
+        int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
+        gc_assert(ret);
+    }
 
     /* If the first page was only partial, don't check whether it's
      * zeroed (it won't be) and don't zero it (since the parts that
@@ -1071,10 +1070,6 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
     page_bytes_t orig_first_page_bytes_used = page_bytes_used(first_page);
     gc_assert(alloc_region->start_addr == page_base + orig_first_page_bytes_used);
 
-    int ret;
-    INSTRUMENTING(ret = mutex_acquire(&free_pages_lock), et_allocator_mutex_acq);
-    gc_assert(ret);
-
     // Mark the region as closed on its first page.
     page_table[first_page].type &= ~(OPEN_REGION_PAGE_FLAG);
 
@@ -1148,22 +1143,14 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
         reset_page_flags(next_page);
         next_page++;
     }
-    ret = mutex_release(&free_pages_lock);
-    gc_assert(ret);
-
-    /* alloc_region is per-thread, we're ok to do this unlocked */
     gc_set_region_empty(alloc_region);
 }
 
 /* Allocate a possibly large object. */
 void *
-gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region)
+gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region, int unlock)
 {
     page_index_t first_page, last_page;
-    int ret;
-
-    INSTRUMENTING(ret = mutex_acquire(&free_pages_lock), et_allocator_mutex_acq);
-    gc_assert(ret);
 
     first_page = alloc_start_page(page_type, 1);
     // FIXME: really we want to try looking for space following the highest of
@@ -1194,8 +1181,6 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region)
         page_table[page].gen = gc_alloc_generation;
     }
 
-    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
-
     // Store a filler so that a linear heap walk does not try to examine
     // these pages cons-by-cons (or whatever they happen to look like).
     // A concurrent walk would probably crash anyway, and most certainly
@@ -1222,8 +1207,11 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region)
     bytes_allocated += nbytes;
     generations[gc_alloc_generation].bytes_allocated += nbytes;
 
-    ret = mutex_release(&free_pages_lock);
-    gc_assert(ret);
+    if (unlock) {
+        int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
+        gc_assert(ret);
+    }
+    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
 
     /* Add the region to the new_areas if requested. */
     if (BOXED_PAGE_FLAG & page_type)
@@ -1260,7 +1248,6 @@ gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
         lose("Heap exhausted, game over.");
     }
     else {
-        /* FIXME: assert free_pages_lock held */
         (void)mutex_release(&free_pages_lock);
 #ifndef LISP_FEATURE_WIN32
         gc_assert(get_pseudo_atomic_atomic(thread));
@@ -1436,7 +1423,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
 void *
 gc_alloc_with_region(struct alloc_region *region, sword_t nbytes, int page_type)
 {
-    if (nbytes>=LARGE_OBJECT_SIZE) {
+    if (nbytes >= LARGE_OBJECT_SIZE) {
         /* If this is a normal GC - as opposed to "final" GC just prior to saving
          * a core, then we should never copy a large object (not that that's the best
          * strategy always, because it entirely precludes defragmenting those objects).
@@ -1444,7 +1431,7 @@ gc_alloc_with_region(struct alloc_region *region, sword_t nbytes, int page_type)
          * because genesis does not use large-object pages. So cold-init could fail,
          * depending on whether objects in the cold core are sufficiently large that
          * they ought to have gone on large object pages if they could have. */
-        return gc_alloc_large(nbytes, page_type, region);
+        return gc_alloc_large(nbytes, page_type, region, 0);
     }
 
     void *new_obj = region->free_pointer;
@@ -1458,7 +1445,7 @@ gc_alloc_with_region(struct alloc_region *region, sword_t nbytes, int page_type)
     /* Else not enough free space in the current region: retry with a
      * new region. */
     ensure_region_closed(region, page_type);
-    gc_alloc_new_region(nbytes, page_type, region);
+    gc_alloc_new_region(nbytes, page_type, region, 0);
     new_obj = region->free_pointer;
     new_free_pointer = (char*)new_obj + nbytes;
     gc_assert(new_free_pointer <= region->end_addr);
@@ -4720,7 +4707,6 @@ static void gc_allocate_ptes()
  * The check for a GC trigger is only performed when the current
  * region is full, so in most cases it's not needed. */
 
-#define PERMIT_ALLOC_LARGE 16 // any bit that does not conflict with PAGE_TYPE_*
 int gencgc_alloc_profiler;
 static NO_SANITIZE_MEMORY lispobj*
 lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
@@ -4796,21 +4782,24 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
             }
         }
     }
+    int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
+    gc_assert(ret);
     if (largep)
-        new_obj = gc_alloc_large(nbytes, page_type, region);
+        new_obj = gc_alloc_large(nbytes, page_type, region, 1);
     else {
         ensure_region_closed(region, page_type);
-        gc_alloc_new_region(nbytes, page_type, region);
+        gc_alloc_new_region(nbytes, page_type, region, 1);
         new_obj = region->free_pointer;
         new_free_pointer = (char*)new_obj + nbytes;
         gc_assert(new_free_pointer <= (char*)region->end_addr);
         region->free_pointer = new_free_pointer;
         // Refill now if the region is almost empty.
         // This can often avoid the next Lisp -> C -> Lisp round-trip.
-        if (addr_diff(region->end_addr, region->free_pointer) <= 4 * N_WORD_BYTES) {
+        if (addr_diff(region->end_addr, region->free_pointer) <= 4 * N_WORD_BYTES
+            && TryEnterCriticalSection(&free_pages_lock)) {
             ensure_region_closed(region, page_type);
             // Request > 4 words, forcing a new page to be claimed.
-            gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region);
+            gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region, 1);
         }
     }
 
@@ -4888,29 +4877,33 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
  * either the free page lock or code allocation lock.
  * Normally this is guaranteed by pseudo-atomic, but in the interest of simplicity,
  * these are plain foreign calls without aid of a vop. */
-static void close_region_helper(struct alloc_region *region, int pt)
+void sync_close_region(struct alloc_region *region, int pt, int block_signals)
 {
     sigset_t savedmask;
     int result;
-    block_blockable_signals(&savedmask);
+    if (block_signals) block_blockable_signals(&savedmask);
     if (pt == PAGE_TYPE_CODE) {
         result = mutex_acquire(&code_allocator_lock);
         gc_assert(result);
     }
+    result = mutex_acquire(&free_pages_lock);
+    gc_assert(result);
     ensure_region_closed(region, pt);
+    result = mutex_release(&free_pages_lock);
+    gc_assert(result);
     if (pt == PAGE_TYPE_CODE) {
         result = mutex_release(&code_allocator_lock);
         gc_assert(result);
     }
-    thread_sigmask(SIG_SETMASK, &savedmask, 0);
+    if (block_signals) thread_sigmask(SIG_SETMASK, &savedmask, 0);
 }
 void close_thread_region() {
     __attribute__((unused)) struct thread *self = get_sb_vm_thread();
     struct alloc_region *region = TLAB(&self->mixed_tlab);
-    close_region_helper(region, PAGE_TYPE_MIXED);
+    sync_close_region(region, PAGE_TYPE_MIXED, 1);
 }
 void close_code_region() {
-    close_region_helper(&code_region, PAGE_TYPE_CODE);
+    sync_close_region(&code_region, PAGE_TYPE_CODE, 1);
 }
 
 #ifdef LISP_FEATURE_SPARC
