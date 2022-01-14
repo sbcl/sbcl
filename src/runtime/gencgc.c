@@ -3688,7 +3688,7 @@ conservative_stack_scan(struct thread* th,
      * sigcontext, though there could, in theory be if it performs
      * GC while handling an interruption */
 
-    void (*context_method)(os_context_register_t) =
+    __attribute__((unused)) void (*context_method)(os_context_register_t) =
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         gen == 0 ? sticky_preserve_pointer : (void (*)(os_context_register_t))preserve_pointer;
 #else

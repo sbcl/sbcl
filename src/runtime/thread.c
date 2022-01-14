@@ -419,46 +419,25 @@ unregister_thread(struct thread *th,
 {
     int lock_ret;
 
-    /* Kludge: Changed the order of some steps between the safepoint/
-     * non-safepoint versions of this code.  Can we unify this more?
-     */
-#ifdef LISP_FEATURE_SB_SAFEPOINT
-
     block_blockable_signals(0);
     ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
     ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
+#ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);
-    lock_ret = thread_mutex_lock(&all_threads_lock);
-    gc_assert(lock_ret == 0);
-    unlink_thread(th);
-    lock_ret = thread_mutex_unlock(&all_threads_lock);
-    gc_assert(lock_ret == 0);
-
 #else
-
-    /* Block GC */
-    block_blockable_signals(0);
     /* This state change serves to "acknowledge" any stop-the-world
      * signal received while the STOP_FOR_GC signal is blocked */
     set_thread_state(th, STATE_DEAD, 1);
-
+#endif
     /* SIG_STOP_FOR_GC is blocked and GC might be waiting for this
      * thread, but since we are either exiting lisp code as a lisp
      * thread that is dying, or exiting lisp code to return to
      * former status as a C thread, it won't wait long. */
     lock_ret = thread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
-
-    /* FIXME: this nests the free_pages_lock inside the all_threads_lock.
-     * There's no reason for that, so closing of regions should be done
-     * sooner to eliminate an ordering constraint. */
-    ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
-    ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
     unlink_thread(th);
-    thread_mutex_unlock(&all_threads_lock);
+    lock_ret = thread_mutex_unlock(&all_threads_lock);
     gc_assert(lock_ret == 0);
-
-#endif
 
     arch_os_thread_cleanup(th);
 
