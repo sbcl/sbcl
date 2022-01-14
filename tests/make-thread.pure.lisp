@@ -69,7 +69,7 @@
                              (when (= (get-lisp-obj-address (%code-entry-point obj i)) word)
                                (return (setq obj (%code-entry-point obj i))))))
                           #-(or c-stack-is-control-stack arm64) ; i.e. does this backend have LRAs
-                          ((= (logand (sap-ref-word (int-sap (logandc2 word sb-vm:lowtag-mask)) 0)
+                          ((= (logand (sb-sys:sap-ref-word (int-sap (logandc2 word sb-vm:lowtag-mask)) 0)
                                       sb-vm:widetag-mask) sb-vm:return-pc-widetag)
                            (setq obj (%make-lisp-obj word)))))
                        ;; interior pointers to objects that contain instructions are OK,

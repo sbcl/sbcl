@@ -200,6 +200,7 @@
               sb-int:*n-bytes-freed-or-purified*
               sb-disassem::*disassem-inst-space*
               sb-disassem::*assembler-routines-by-addr*
+              ,(maybe "SB-VM" "*BINDING-STACK-POINTER*")
               ,(maybe "SB-THREAD" "*JOINABLE-THREADS*")
               ,(maybe "SB-THREAD" "*STARTING-THREADS*")
               ,(maybe "SB-THREAD" "*SPROF-DATA*")
