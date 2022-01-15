@@ -1420,8 +1420,23 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
  * This entry point is only for use within the GC itself.
  * The Lisp region overflow handler either directly calls gc_alloc_large
  * or closes and opens a region if the allocation is small */
+
+/* TODO: The following objects should be allocated to BOXED pages instead of MIXED pages:
+ * - CONS, VALUE-CELL, (COMPLEX INTEGER), RATIO, ARRAY headers
+ * - simple-vector that is neither weak nor hashing
+ * - wholly-boxed instances
+ * These pointer-containing objects MUST NOT be allocated to BOXED pages:
+ * - weak-pointer (requires deferred scavenge)
+ * - hash-table vector and weak vector (complicated)
+ * - closure and funcallable-instance (contains untagged pointer)
+ * - symbol (contains encoded pointer)
+ * - fdefn (contains untagged pointer)
+ *
+ * Each BOXED page can be linearly scanned without calling type-specific methods
+ * when processing the root set
+ */
 void *
-gc_alloc_with_region(struct alloc_region *region, sword_t nbytes, int page_type)
+gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
 {
     if (nbytes >= LARGE_OBJECT_SIZE) {
         /* If this is a normal GC - as opposed to "final" GC just prior to saving
@@ -1590,7 +1605,8 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
  *
  */
 lispobj
-copy_possibly_large_object(lispobj object, sword_t nwords, int page_type)
+copy_possibly_large_object(lispobj object, sword_t nwords,
+                           struct alloc_region* region, int page_type)
 {
     page_index_t first_page;
 
@@ -1619,14 +1635,14 @@ copy_possibly_large_object(lispobj object, sword_t nwords, int page_type)
 
         return object;
     }
-    return gc_general_copy_object(object, nwords, page_type);
+    return gc_general_copy_object(object, nwords, region, page_type);
 }
 
 /* to copy unboxed objects */
 lispobj
 copy_unboxed_object(lispobj object, sword_t nwords)
 {
-    return gc_general_copy_object(object, nwords, PAGE_TYPE_UNBOXED);
+    return gc_general_copy_object(object, nwords, &unboxed_region, PAGE_TYPE_UNBOXED);
 }
 
 /*

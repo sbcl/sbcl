@@ -21,36 +21,21 @@
 #include "code.h"
 
 #ifdef LISP_FEATURE_GENCGC
-#include "gencgc-alloc-region.h"
-/* TODO: The following objects should be allocated to BOXED pages instead of MIXED pages:
- * - CONS, VALUE-CELL, (COMPLEX INTEGER), RATIO, ARRAY headers
- * - simple-vector that is neither weak nor hashing
- * - wholly-boxed instances
- * These pointer-containing objects MUST NOT be allocated to BOXED pages:
- * - weak-pointer (requires deferred scavenge)
- * - hash-table vector and weak vector (complicated)
- * - closure and funcallable-instance (contains untagged pointer)
- * - symbol (contains encoded pointer)
- * - fdefn (contains untagged pointer)
- *
- * Each BOXED page can be linearly scanned without calling type-specific methods
- * when processing the root set
- */
-static inline void *
-gc_general_alloc(sword_t nbytes, int page_type)
-{
-    void *gc_alloc_with_region(struct alloc_region*,sword_t,int);
-    struct alloc_region* r = 0;
-    switch (page_type) {
-    case PAGE_TYPE_MIXED: r = &mixed_region; break;
-    case PAGE_TYPE_CODE: r = &code_region; break;
-    case PAGE_TYPE_UNBOXED: r = &unboxed_region; break;
-    }
-    if (r) return gc_alloc_with_region(r, nbytes, page_type);
-    lose("bad page type: %d", page_type);
-}
+#define copy_object(object, nwords) \
+  gc_general_copy_object(object, nwords, &mixed_region, PAGE_TYPE_MIXED)
+void *gc_general_alloc(struct alloc_region*,sword_t,int);
+lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
+                                   struct alloc_region*, int page_type);
 #else
-extern void *gc_general_alloc(sword_t nbytes,int page_type);
+#define copy_object(object, nwords) gc_general_copy_object(object, nwords, 0, 0)
+void *gc_general_alloc(void*,sword_t,int);
+lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
+                                   void*, int page_type);
+#define mixed_region dummy_region
+#define unboxed_region dummy_region
+#define code_region dummy_region
+// this has to be a variable because we take address-of
+extern int dummy_region;
 #endif
 
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \
@@ -72,12 +57,12 @@ extern void *gc_general_alloc(sword_t nbytes,int page_type);
 
 extern uword_t gc_copied_nwords;
 static inline lispobj
-gc_general_copy_object(lispobj object, size_t nwords, int page_type)
+gc_general_copy_object(lispobj object, size_t nwords, void* region, int page_type)
 {
     CHECK_COPY_PRECONDITIONS(object, nwords);
 
     /* Allocate space. */
-    lispobj *new = gc_general_alloc(nwords*N_WORD_BYTES, page_type);
+    lispobj *new = gc_general_alloc(region, nwords*N_WORD_BYTES, page_type);
     NOTE_TRANSPORTING(object, new,  nwords);
 
     /* Copy the object. */
@@ -89,11 +74,11 @@ gc_general_copy_object(lispobj object, size_t nwords, int page_type)
 // Like above but copy potentially fewer words than are allocated.
 // ('old_nwords' can be, but does not have to be, smaller than 'nwords')
 static inline lispobj
-gc_copy_object_resizing(lispobj object, long nwords, int page_type,
+gc_copy_object_resizing(lispobj object, long nwords, void* region, int page_type,
                         int old_nwords)
 {
     CHECK_COPY_PRECONDITIONS(object, nwords);
-    lispobj *new = gc_general_alloc(nwords*N_WORD_BYTES, page_type);
+    lispobj *new = gc_general_alloc(region, nwords*N_WORD_BYTES, page_type);
     NOTE_TRANSPORTING(object, new, old_nwords);
     memcpy(new, native_pointer(object), old_nwords*N_WORD_BYTES);
     return make_lispobj(new, lowtag_of(object));
@@ -126,8 +111,6 @@ extern void gc_common_init();
 extern boolean test_weak_triggers(int (*)(lispobj), void (*)(lispobj));
 
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);
-lispobj  copy_object(lispobj object, sword_t nwords);
-lispobj  copy_possibly_large_object(lispobj object, sword_t nwords, int page_type);
 
 lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);
