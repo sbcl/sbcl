@@ -321,10 +321,6 @@ allocation_trap_p(os_context_t * context)
     return 0;
 }
 
-#ifndef mixed_region
-#define mixed_region gc_alloc_region[0]
-#endif
-
 static int
 handle_allocation_trap(os_context_t * context)
 {
@@ -377,15 +373,6 @@ handle_allocation_trap(os_context_t * context)
 
 #if INLINE_ALLOC_DEBUG
     fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
-    if ((((unsigned long)mixed_region.end_addr + size) / GENCGC_PAGE_BYTES) ==
-        (((unsigned long)mixed_region.end_addr) / GENCGC_PAGE_BYTES)) {
-      fprintf(stderr,"*** possibly bogus trap allocation of %d bytes at %p\n",
-              size, (void*)target_ptr);
-      fprintf(stderr, "    dynamic_space_free_pointer: %p, mixed_region.end_addr %p\n",
-              dynamic_space_free_pointer, mixed_region.end_addr);
-    }
-    fprintf(stderr, "Ready to alloc\n");
-    fprintf(stderr, "free_pointer = %p\n", dynamic_space_free_pointer);
 #endif
 
     /*
