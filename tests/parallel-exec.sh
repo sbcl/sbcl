@@ -24,7 +24,6 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   --noinform --core ../output/sbcl.core \
   --no-userinit --no-sysinit --noprint --disable-debugger $* << EOF
 (pop *posix-argv*)
-(setf (extern-alien "gc_allocate_dirty" char) 1)
 (require :sb-posix)
 (require :sb-sprof)
 (let ((*evaluator-mode* :compile))
@@ -67,7 +66,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                (list int1 int2 int3))))
       (dolist (pn (directory "$logdir/*.*"))
         (with-open-file (f pn)
-          (let ((legend "GC: time-to-stw"))
+          (let ((legend "GC: stw_delay"))
             (loop
              (let ((line (read-line f nil)))
                (unless line (return))

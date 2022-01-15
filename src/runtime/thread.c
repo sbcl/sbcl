@@ -279,10 +279,10 @@ static void summarize_gc_stats(void) {
     // and number of pages,bytes copied on average per GC cycle.
     if (show_gc_stats && n_gcs_done)
         fprintf(stderr,
-                "\nGC: time-to-stw=%ld,%ld,%ld \u00B5s (min,avg,max) pause=%ld,%ld,%ld \u00B5s over %d GCs\n",
+                "\nGC: stw_delay=%ld,%ld,%ld \u00B5s (min,avg,max) pause=%ld,%ld,%ld \u00B5s (sum=%ld) over %d GCs\n",
                 stw_min_duration/1000, stw_sum_duration/n_gcs_done/1000, stw_max_duration/1000,
                 gc_min_duration/1000, gc_sum_duration/n_gcs_done/1000, gc_max_duration/1000,
-                n_gcs_done);
+                gc_sum_duration/1000, n_gcs_done);
 }
 void reset_gc_stats() { // after sb-posix:fork
     stw_min_duration = LONG_MAX; stw_max_duration = stw_sum_duration = 0;

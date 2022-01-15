@@ -1,4 +1,7 @@
-(setf (extern-alien "gc_allocate_dirty" char) 1)
+#+(and linux sb-thread 64-bit)
+(sb-alien:alien-funcall (sb-alien:extern-alien
+                         "reset_gc_stats"
+                         (function sb-alien:void)))
 
 (load "test-util.lisp")
 (load "assertoid.lisp")
