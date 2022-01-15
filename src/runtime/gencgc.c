@@ -1181,6 +1181,8 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region,
         page_table[page].gen = gc_alloc_generation;
     }
 
+    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
+
     // Store a filler so that a linear heap walk does not try to examine
     // these pages cons-by-cons (or whatever they happen to look like).
     // A concurrent walk would probably crash anyway, and most certainly
@@ -1211,7 +1213,6 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region,
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
     }
-    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
 
     /* Add the region to the new_areas if requested. */
     if (BOXED_PAGE_FLAG & page_type)
