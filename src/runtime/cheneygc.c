@@ -56,7 +56,6 @@ lispobj *new_space_free_pointer;
 char gc_coalesce_string_literals = 0;
 
 boolean gc_active_p = 0;
-int dummy_region;
 
 static void scavenge_newspace(void);
 
@@ -82,12 +81,12 @@ gc_general_alloc(__attribute__((unused)) void* ignore,
 }
 
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords) {
-    return copy_object(object,nwords);
+    return gc_copy_object(object, nwords, 0, 0);
 }
 lispobj  copy_possibly_large_object(lispobj object, sword_t nwords,
                                     __attribute__((unused)) void* region,
                                     __attribute__((unused)) int page_type) {
-    return copy_object(object,nwords);
+    return gc_copy_object(object, nwords, 0, 0);
 }
 
 /*

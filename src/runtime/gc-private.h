@@ -21,21 +21,17 @@
 #include "code.h"
 
 #ifdef LISP_FEATURE_GENCGC
-#define copy_object(object, nwords) \
-  gc_general_copy_object(object, nwords, &mixed_region, PAGE_TYPE_MIXED)
 void *gc_general_alloc(struct alloc_region*,sword_t,int);
 lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
                                    struct alloc_region*, int page_type);
 #else
-#define copy_object(object, nwords) gc_general_copy_object(object, nwords, 0, 0)
 void *gc_general_alloc(void*,sword_t,int);
 lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
                                    void*, int page_type);
-#define mixed_region dummy_region
-#define unboxed_region dummy_region
-#define code_region dummy_region
-// this has to be a variable because we take address-of
-extern int dummy_region;
+#define mixed_region 0
+#define unboxed_region 0
+#define code_region 0
+#define cons_region 0
 #endif
 
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \
@@ -57,7 +53,7 @@ extern int dummy_region;
 
 extern uword_t gc_copied_nwords;
 static inline lispobj
-gc_general_copy_object(lispobj object, size_t nwords, void* region, int page_type)
+gc_copy_object(lispobj object, size_t nwords, void* region, int page_type)
 {
     CHECK_COPY_PRECONDITIONS(object, nwords);
 

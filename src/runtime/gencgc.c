@@ -865,13 +865,13 @@ set_alloc_start_page(unsigned int page_type, int large, page_index_t page)
 }
 #include "private-cons.inc"
 
-static inline boolean region_closed_p(struct alloc_region* region) {
+static inline boolean __attribute__((unused)) region_closed_p(struct alloc_region* region) {
     return !region->start_addr;
 }
 #define ASSERT_REGIONS_CLOSED() \
-    gc_assert(!((uintptr_t)mixed_region.start_addr \
-               |(uintptr_t)unboxed_region.start_addr \
-               |(uintptr_t)code_region.start_addr))
+    gc_assert(!((uintptr_t)gc_alloc_region[0].start_addr \
+               |(uintptr_t)gc_alloc_region[1].start_addr \
+               |(uintptr_t)gc_alloc_region[2].start_addr))
 
 /* Find a new region with room for at least the given number of bytes.
  *
@@ -1635,14 +1635,14 @@ copy_possibly_large_object(lispobj object, sword_t nwords,
 
         return object;
     }
-    return gc_general_copy_object(object, nwords, region, page_type);
+    return gc_copy_object(object, nwords, region, page_type);
 }
 
 /* to copy unboxed objects */
 lispobj
 copy_unboxed_object(lispobj object, sword_t nwords)
 {
-    return gc_general_copy_object(object, nwords, &unboxed_region, PAGE_TYPE_UNBOXED);
+    return gc_copy_object(object, nwords, unboxed_region, PAGE_TYPE_UNBOXED);
 }
 
 /*
@@ -2800,9 +2800,9 @@ static void newspace_full_scavenge(generation_index_t generation)
 
 static void gc_close_all_regions()
 {
-    ensure_region_closed(&code_region, PAGE_TYPE_CODE);
-    ensure_region_closed(&unboxed_region, PAGE_TYPE_UNBOXED);
-    ensure_region_closed(&mixed_region, PAGE_TYPE_MIXED);
+    ensure_region_closed(code_region, PAGE_TYPE_CODE);
+    ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
+    ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
 }
 
 /* Do a complete scavenge of the newspace generation. */
@@ -4705,9 +4705,9 @@ static void gc_allocate_ptes()
 
     /* Initialize gc_alloc. */
     gc_alloc_generation = 0;
-    gc_init_region(&mixed_region);
-    gc_init_region(&unboxed_region);
-    gc_init_region(&code_region);
+    gc_init_region(mixed_region);
+    gc_init_region(unboxed_region);
+    gc_init_region(code_region);
 }
 
 
@@ -4873,7 +4873,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
     int result = mutex_acquire(&code_allocator_lock);
     gc_assert(result);
     struct code *code =
-        (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, &code_region, nbytes, PAGE_TYPE_CODE, th);
+        (void*)lisp_alloc(nbytes >= LARGE_OBJECT_SIZE, code_region, nbytes, PAGE_TYPE_CODE, th);
     result = mutex_release(&code_allocator_lock);
     gc_assert(result);
     THREAD_JIT(0);
@@ -4919,7 +4919,7 @@ void close_thread_region() {
     sync_close_region(region, PAGE_TYPE_MIXED, 1);
 }
 void close_code_region() {
-    sync_close_region(&code_region, PAGE_TYPE_CODE, 1);
+    sync_close_region(code_region, PAGE_TYPE_CODE, 1);
 }
 
 #ifdef LISP_FEATURE_SPARC
