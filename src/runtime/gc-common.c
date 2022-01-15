@@ -662,8 +662,8 @@ DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
 DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
 DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
 static sword_t scav_symbol(lispobj *where, lispobj header) {
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
     struct symbol* s = (void*)where;
     scavenge(&s->value, 2); // picks up the value and info slots
     lispobj name = decode_symbol_name(s->name);
@@ -680,8 +680,10 @@ static sword_t scav_symbol(lispobj *where, lispobj header) {
     // some pointer data. 64 bits of hash is way more than enough.
     scavenge(&s->fdefn, indicated_nwords - 4);
     return 1 + (indicated_nwords|1); // round to odd, then add 1 for the header
-}
+#else
+    return scav_tiny_boxed(where, header);
 #endif
+}
 
 static inline int array_header_nwords(lispobj header) {
     unsigned char rank = (header >> ARRAY_RANK_POSITION);

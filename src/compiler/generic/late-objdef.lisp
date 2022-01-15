@@ -70,7 +70,7 @@
     #-(or x86 x86-64 arm64) (return-pc "return_pc_header" "return_pc_header" "lose")
 
     (value-cell "boxed")
-    (symbol #-compact-symbol "tiny_boxed" #+compact-symbol "symbol"
+    (symbol "symbol"
             "tiny_boxed") ; trans and size are always like tiny_boxed
     ;; Can't transport characters as "other" pointer objects.
     ;; It should be a cons cell half which would go through trans_list()
