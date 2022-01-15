@@ -4207,7 +4207,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
                      bytes_freed >> WORD_SHIFT, pct_freed*100.0);
     write(2, buffer, n);
     }
-    gc_copied_nwords = gc_pinned_nwords = gc_pin_count = 0;
+    gc_copied_nwords = gc_pinned_nwords = 0;
 #endif
 
     /* Reset the alloc_start_page for generation. */
