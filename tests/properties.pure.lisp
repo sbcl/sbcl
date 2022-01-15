@@ -20,7 +20,10 @@
   (assert (= (length (symbol-plist symbol)) 6))
   (remprop symbol 'foo)
   (assert (not (get symbol 'foo))))
-(mapc #'test-symbol '(foo :keyword || t nil))
+(dolist (s '(foo :keyword || t nil))
+  (let ((save (symbol-plist s)))
+    (unwind-protect (test-symbol s)
+      (setf (symbol-plist s) save))))
 ;;; In early 0.7 versions on non-x86 ports, setting the property list
 ;;; of 'NIL would trash (CDR NIL), due to a screwup in the low-level
 ;;; layout of SYMBOL. (There are several low-level punnish tricks used

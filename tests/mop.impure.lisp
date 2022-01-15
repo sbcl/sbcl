@@ -20,6 +20,13 @@
   (:use "CL" "SB-MOP" "ASSERTOID" "TEST-UTIL"))
 
 (in-package "MOP-TEST")
+
+;;; AMOP says these are the defaults
+(with-test (:name :standard-direct-superclasses)
+  (assert (equal (list (find-class 'standard-object))
+                 (sb-mop:class-direct-superclasses (make-instance 'standard-class))))
+  (assert (equal (list (find-class 'sb-mop:funcallable-standard-object))
+                 (sb-mop:class-direct-superclasses (make-instance 'sb-mop:funcallable-standard-class)))))
 
 ;;; Readers for Class Metaobjects (pp. 212--214 of AMOP)
 (defclass red-herring (forward-ref) ())

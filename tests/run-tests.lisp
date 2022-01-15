@@ -343,10 +343,10 @@
   (loop for x in (cdr globaldb-summary) for y in (cdr (tersely-summarize-globaldb))
         for index from 0
         unless (equal x y)
-        do (let ((*print-pretty* nil))
-             (warn "Mismatch on element index ~D of globaldb snapshot: diffs=~S"
-                   index (list (set-difference x y)
-                               (set-difference y x))))))
+     do (let ((*print-pretty* nil))
+          (error "Mismatch on element index ~D of globaldb snapshot: diffs=~S"
+                 index (list (set-difference x y)
+                             (set-difference y x))))))
 
 (defun pure-runner (files test-fun log)
   (unless files
