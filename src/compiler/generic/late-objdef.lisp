@@ -53,13 +53,10 @@
     (complex-double-float "unboxed")
 
     (code-header "code_header")
-    ;; For all 3 function subtypes, the transporter is "lose"
-    ;; because functions are not OTHER pointer objects.
-    ;; The scavenge function for fun-header is basically "lose",
-    ;; but it's only defined on non-x86 platforms for some reason.
-    ;; The sizer is "lose" because it's an error if a function is encountered
-    ;; in a heap scan.
-    (simple-fun ,(or #+(or x86 x86-64) "lose" "fun_header") "lose" "lose")
+    ;; For simple-fun, all three methods are "lose": "scav" is because you can't
+    ;; encounter a simple-fun in heap scanning; "trans" is because it's not an OTHER pointer,
+    ;; and "size" is because you can't take the size of a simple-fun by itself.
+    (simple-fun "lose")
     ;; The closure scavenge function needs to know if the "self" slot
     ;; has pointer nature though it be fixnum tagged, as on x86.
     ;; The sizer is short_boxed.

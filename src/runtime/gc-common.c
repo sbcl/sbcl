@@ -394,16 +394,6 @@ scav_closure(lispobj *where, lispobj header)
     return 1 + payload_words;
 }
 #endif
-
-#if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-static sword_t
-scav_fun_header(lispobj *where, lispobj object)
-{
-    lose("attempted to scavenge a function header where=%p object=%"OBJ_FMTX,
-         where, object);
-    return 0; /* bogus return value to satisfy static type checking */
-}
-#endif /* LISP_FEATURE_X86 */
 
 /*
  * instances
