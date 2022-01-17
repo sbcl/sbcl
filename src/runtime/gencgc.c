@@ -1181,8 +1181,6 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region,
         page_table[page].gen = gc_alloc_generation;
     }
 
-    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
-
     // Store a filler so that a linear heap walk does not try to examine
     // these pages cons-by-cons (or whatever they happen to look like).
     // A concurrent walk would probably crash anyway, and most certainly
@@ -1193,7 +1191,11 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region,
     // Anyway it's best if the new page resembles a valid object ASAP.
     uword_t nwords = nbytes >> WORD_SHIFT;
     lispobj* addr = (lispobj*)page_address(first_page);
+    if (unlock)
+        THREAD_JIT(0);
     *addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    if (unlock) // avoid enabling while GCing
+        THREAD_JIT(1);
 
     os_vm_size_t scan_start_offset = 0;
     for (page = first_page; page < last_page; ++page) {
@@ -1213,6 +1215,7 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region,
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
     }
+    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
 
     /* Add the region to the new_areas if requested. */
     if (BOXED_PAGE_FLAG & page_type)
