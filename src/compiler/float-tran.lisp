@@ -581,7 +581,7 @@
            'single-float))
 (deftransform expt ((x y) (double-float double-float) double-float)
   `(%pow x y))
-(deftransform expt ((x y) (single-float integer) double-float)
+(deftransform expt ((x y) (single-float integer) single-float)
   `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
     'single-float))
 (deftransform expt ((x y) (double-float integer) double-float)
