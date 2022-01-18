@@ -235,7 +235,7 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             // do this only if object is definitely not in dynamic space.
             else if (immobile_space_p(ptr)) {
-            immobile_obj:
+              immobile_obj: ;
                 lispobj *base = base_pointer(ptr);
                 int genbits = immobile_obj_gen_bits(base);
                 // The VISITED bit is masked out. Don't re-enliven visited.
