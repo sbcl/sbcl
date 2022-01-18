@@ -351,19 +351,6 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
     }
     printf("%d total words not copied.\n", total_words_not_copied);
 }
-
-
-/* weak pointers */
-
-sword_t
-scav_weak_pointer(lispobj *where, lispobj object)
-{
-    /* Do not let GC scavenge the value slot of the weak pointer */
-    /* (that is why it is a weak pointer).  Note:  we could use */
-    /* the scav_unboxed method here. */
-
-    return WEAK_POINTER_NWORDS;
-}
 
 lispobj *
 search_dynamic_space(void *pointer)

@@ -76,7 +76,7 @@
     (character "immediate")
     (sap "unboxed")
     (unbound-marker "immediate")
-    (weak-pointer "weak_pointer" "weak_pointer" "boxed")
+    (weak-pointer "weak_pointer" "tiny_mixed" "boxed")
     (instance "instance" "lose" "instance")
     (fdefn "fdefn")
 

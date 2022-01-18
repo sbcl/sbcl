@@ -1104,25 +1104,13 @@ DEF_SPECIALIZED_VECTOR(vector_long_float, length * LONG_FLOAT_SIZE)
 DEF_SPECIALIZED_VECTOR(vector_complex_long_float, length * (2 * LONG_FLOAT_SIZE))
 #endif
 
-static lispobj
-trans_weak_pointer(lispobj object)
+sword_t
+scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
 {
-    lispobj copy;
-    gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
-
-    /* Need to remember where all the weak pointers are that have */
-    /* been transported so they can be fixed up in a post-GC pass. */
-
-    copy = gc_copy_object(object, WEAK_POINTER_NWORDS, mixed_region, PAGE_TYPE_MIXED);
-#ifndef LISP_FEATURE_GENCGC
-    struct weak_pointer *wp = (struct weak_pointer *) native_pointer(copy);
-
-    gc_dcheck(widetag_of(&wp->header)==WEAK_POINTER_WIDETAG);
-    /* Push the weak pointer onto the list of weak pointers. */
-    if (weak_pointer_breakable_p(wp))
-        add_to_weak_pointer_chain(wp);
-#endif
-    return copy;
+    struct weak_pointer * wp = (struct weak_pointer*)where;
+    // If wp->next is non-NULL then it's already in the weak pointer chain.
+    if (!wp->next && weak_pointer_breakable_p(wp)) add_to_weak_pointer_chain(wp);
+    return WEAK_POINTER_NWORDS;
 }
 
 void smash_weak_pointers(void)
@@ -1843,7 +1831,6 @@ size_lose(lispobj *where)
  */
 
 sword_t scav_code_header(lispobj *object, lispobj header);
-sword_t scav_weak_pointer(lispobj *where, lispobj object);
 #include "genesis/gc-tables.h"
 
 /* Find the code object for the given pc, or return NULL on

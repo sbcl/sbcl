@@ -188,7 +188,8 @@
                 (or #+immobile-code :immobile :static)))))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
-(with-test (:name :bug-529014 :skipped-on (not :gencgc))
+#+gencgc ; sb-ext: symbol was removed for cheneygc
+(with-test (:name :bug-529014)
   (loop for i from 0 to sb-vm:+pseudo-static-generation+
      do (assert (= (sb-ext:generation-bytes-consed-between-gcs i)
                    (truncate (sb-ext:bytes-consed-between-gcs)
@@ -307,7 +308,8 @@
 ;;; an accumulation of pages in generation 1 each with 2 objects' worth
 ;;; of bytes, and the remainder waste. Because the waste was not accounted
 ;;; for, it did not trigger GC enough to avoid heap exhaustion.
-(with-test (:name :smallobj-auto-gc-trigger)
+(with-test (:name :smallobj-auto-gc-trigger
+                  :skipped-on :cheneygc) ; test doesn't test anything
   ;; Ensure that these are compiled functions because the interpreter
   ;; would make lots of objects of various sizes which is insufficient
   ;; to provoke the bug.
