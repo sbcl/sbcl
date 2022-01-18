@@ -311,7 +311,7 @@ static inline boolean bitmap_logbitp(unsigned int index, struct bitmap bitmap)
  * but seems only to be a problem in fullcgc)
  */
 
-extern char* gc_card_mark;
+extern unsigned char* gc_card_mark;
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
 #define NON_FAULTING_STORE(operation, addr) { operation; }
 #else
@@ -331,18 +331,29 @@ extern char* gc_card_mark;
 #define OS_VM_PROT_JIT_ALL OS_VM_PROT_ALL
 #endif
 
+// The low bit of 0 implies "marked". So CARD_MARKED and STICKY_MARK
+// are both considered marked. All bits of UNMARKED are 1s, so that when
+// implementing multiple cards per page, the expression
+//   "~*(uword_t*)&gc_card_mark[first]"
+// will be 0 if all of the next N cards are clean (not marked),
+// or 1 if any is unclean (marked),
+// where N is N_WORD_BYTES and 'first' is the first card to check.
+#define CARD_MARKED 0
+#define STICKY_MARK 2
+#define CARD_UNMARKED 0xff
+
 /* This is used by the fault handler, and potentially during GC */
 static inline void unprotect_page_index(page_index_t page_index)
 {
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
     int card = page_to_card_index(page_index);
-    if (gc_card_mark[card] == 1) gc_card_mark[card] = 0; // NEVER CHANGE '2' to '0'
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    if (gc_card_mark[card] == STICKY_MARK) return; // STICKY is stronger than MARKED
 #else
     os_protect(page_address(page_index), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_ALL);
     unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
     __sync_fetch_and_or(pflagbits, WP_CLEARED_FLAG);
-    SET_PAGE_PROTECTED(page_index, 0);
 #endif
+    gc_card_mark[card] = CARD_MARKED;
 }
 
 static inline void protect_page(void* page_addr,

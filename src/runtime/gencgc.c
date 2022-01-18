@@ -159,7 +159,7 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
-char *gc_card_mark;
+unsigned char *gc_card_mark;
 lispobj gc_object_watcher;
 int gc_traceroot_criterion;
 // Filtered pins include code but not simple-funs,
@@ -261,7 +261,8 @@ page_ends_contiguous_block_p(page_index_t page_index,
 
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
  * scan_start of zero, to optimize page_ends_contiguous_block_p().
- * Clear all the flags that don't pertain to a free page */
+ * Clear all the flags that don't pertain to a free page.
+ * Particularly the 'need_zerofill' bit has to remain unchanged */
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
@@ -2330,56 +2331,54 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(void *addr)
     if (found) gc_mark_obj(compute_lispobj(found));
     return found != 0;
 }
-#define STICKY_MARK 2
-static inline void sticky_mark_large_object(page_index_t page, lispobj word)
-{
-    /* Given that 'page' holds a large object, if 'word' is the correctly-tagged
-     * pointer to the base of a simple-vector, then set the sticky mark on any
-     * already-marked page of the object */
-    lispobj* scan_start = page_scan_start(page);
-    switch (widetag_of(scan_start)) {
-    case CODE_HEADER_WIDETAG:
-        /* Stores to code are done pseudo-atomically with affecting the card mark.
-         * Therefore we don't need to do anything else. The "next" store
-         * won't create an old->young pointer, since it already happened */
-        return;
-    case SIMPLE_VECTOR_WIDETAG:
-        if (word != make_lispobj(scan_start, OTHER_POINTER_LOWTAG)) return;
-        generation_index_t gen = page_table[page].gen;
-        // FIXME: maybe use the vector's size (in case of shrinkage)
-        // rather than the allocation region's extent ?
-        while (1) {
-            if (!PAGE_WRITEPROTECTED_P(page)) SET_PAGE_PROTECTED(page, STICKY_MARK);
-            if (page_ends_contiguous_block_p(page, gen)) return;
-            ++page;
-        }
-    }
-}
+/* Additional logic for soft marks: any word that is potentially a
+ * tagged pointer to a page being written must preserve the mark regardless
+ * of what update_writeprotection() thinks. That's because the mark is set
+ * prior to storing. If GC occurs in between setting the mark and storing,
+ * then resetting the mark would be wrong if the subsequent store
+ * creates an old->young pointer.
+ * Mark stickiness is checked only once per invocation of collect_garbge(),
+ * so it when scanning interrupt contexts for generation 0 but not higher gens.
+ * Also note the two scenarios:
+ * (1) tagged pointer to a large simple-vector, but we scan card-by-card
+ *     for specifically the marked cards.  This has to be checked first
+ *     so as not to fail to see subsequent cards if the first is marked.
+ * (2) tagged pointer to an object that marks only the page containing
+ *     the object base.
+ * And note a subtle point: only an already-marked card can acquire stick
+ * status. So we can ignore any unmarked (a/k/a WRITEPROTECTED_P) card
+ * regardless of a context register pointing to it, because if a mark was not
+ * stored, then the pointer was not stored. Without examining the next few
+ * instructions, there's no reason even to suppose that a store occurs.
+ * It seems like the stop-for-GC handler must be enforcing that GC sees things
+ * stored in the correct order for out-of-order memory models */
 __attribute__((unused)) static void sticky_preserve_pointer(os_context_register_t word)
 {
-    /* Additional logic for soft marks: any word that is potentially a
-     * tagged pointer to a page being written must preserve the mark regardless
-     * of what update_writeprotection() thinks. That's because the mark is set
-     * prior to storing. If GC occurs in between setting the mark and storing,
-     * then resetting the mark would be wrong if the subsequent store
-     * creates an old->young pointer.
-     * Mark stickiness is checked only once per invocation of collect_garbge(),
-     * so it when scanning interrupt contexts for generation 0 but not higher gens.
-     * Also note the two scenarios:
-     * (1) tagged pointer to a large simple-vector, but we scan card-by-card
-     * for specifically the marked cards.  This has to be checked first
-     * so as not to fail to see subsequent cards if the first is marked.
-     * (2) tagged pointer to an object that marks only the page containing
-     * the object base */
     if (is_lisp_pointer(word)) {
         page_index_t page = find_page_index((void*)word);
         if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
             && (word & (GENCGC_PAGE_BYTES - 1)) < page_bytes_used(page)
+            && page_table[page].gen != 0
             && plausible_tag_p(word)) { // "plausible" is good enough
-            if (page_single_obj_p(page))
-                sticky_mark_large_object(page, word);
-            else if (gc_card_mark[addr_to_card_index((void*)word)] == 0) {
-                SET_PAGE_PROTECTED(page, STICKY_MARK);
+            if (page_single_obj_p(page)) {
+                /* if 'word' is the correctly-tagged pointer to the base of a SIMPLE-VECTOR,
+                 * then set the sticky mark on every marked page. The only other large
+                 * objects are CODE (writes to which are pseudo-atomic),
+                 * and BIGNUM (which aren't on boxed pages) */
+                lispobj* scan_start = page_scan_start(page);
+                if  (widetag_of(scan_start) == SIMPLE_VECTOR_WIDETAG
+                     && (uword_t)word == make_lispobj(scan_start, OTHER_POINTER_LOWTAG)) {
+                    generation_index_t gen = page_table[page].gen;
+                    while (1) {
+                        long card = page_to_card_index(page);
+                        if (gc_card_mark[card]==CARD_MARKED) gc_card_mark[card]=STICKY_MARK;
+                        if (page_ends_contiguous_block_p(page, gen)) return;
+                        ++page;
+                    }
+                }
+            } else if (gc_card_mark[addr_to_card_index((void*)word)] == 0) {
+                long card = page_to_card_index(page);
+                if (gc_card_mark[card]==CARD_MARKED) gc_card_mark[card]=STICKY_MARK;
             }
         }
     }
@@ -4691,7 +4690,7 @@ gc_init(void)
 
 int gc_card_table_nbits;
 long gc_card_table_mask;
-char *gc_card_mark;
+unsigned char *gc_card_mark;
 
 static void __attribute__((unused)) gcbarrier_patch_code_range(uword_t start, void* limit)
 {
