@@ -2722,7 +2722,12 @@ static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t g
             lispobj* start = (void*)page_address(page);
             lispobj* end = start + page_words_used(page);
             int potentially_ok_to_wp =
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
                 (gc_card_mark[page_to_card_index(page)] == STICKY_MARK) ? 0 : 1;
+#else
+            1;
+#endif
+
             int protectp = descriptors_scavenge(start, end, gen, potentially_ok_to_wp);
             if (protectp == !marked) {
                 // Either was marked and remains so, OR was and is clean
