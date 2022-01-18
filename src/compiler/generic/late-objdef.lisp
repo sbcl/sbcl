@@ -38,6 +38,8 @@
 (defconstant large-object-size (* 4 gencgc-page-bytes)))
 
 ;;; Keep this (mostly) lined up with 'early-objdef' for sanity's sake!
+;;; The "transport" function is used only if the object is an OTHER-POINTER
+;;; (which goes through the dispatch table).
 #+sb-xc-host
 (defparameter *scav/trans/size*
  (mapcar
@@ -68,7 +70,7 @@
 
     (value-cell "boxed")
     (symbol "symbol"
-            "tiny_boxed") ; trans and size are always like tiny_boxed
+            "tiny_mixed" "tiny_boxed") ; trans and size respectively
     ;; Can't transport characters as "other" pointer objects.
     ;; It should be a cons cell half which would go through trans_list()
     (character "immediate")

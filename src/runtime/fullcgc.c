@@ -577,6 +577,9 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                         code->boxed_size = 0;
                         code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
                                      | CODE_HEADER_WIDETAG;
+                        /* This memset() is needed for strictly boxed pages,
+                         * but probably not for other page types. No big deal.
+                         * fullcgc isn't really used much */
                         memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
                     })
                 }

@@ -27,14 +27,15 @@ struct alloc_region {
     void  *start_addr;
 };
 
-// One region for each of PAGE_TYPE_{MIXED,UNBOXED,CODE}
-// CONS is not used yet. We distinguish at the call sites
-// between PAGE_TYPE_MIXED and BOXED, but they are the same for now.
-extern struct alloc_region  gc_alloc_region[3];
+// One region for each of page type. CONS is equivalent to BOXED for now
+// but later it may be the case that each page of cons cells has
+// room reserved at its end for tricolor marking of its contents.
+extern struct alloc_region  gc_alloc_region[4];
 #define mixed_region   (&gc_alloc_region[0])
 #define unboxed_region (&gc_alloc_region[1])
 #define code_region    (&gc_alloc_region[2])
-#define cons_region    mixed_region
+#define boxed_region   (&gc_alloc_region[3])
+#define cons_region    boxed_region
 
 extern generation_index_t from_space, new_space;
 extern int gencgc_alloc_profiler;

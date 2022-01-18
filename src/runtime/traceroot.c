@@ -937,6 +937,7 @@ static boolean finding_leaf_p(lispobj weak_pointers)
     return 0; // this is the expected (and optimal) case
 }
 
+extern void gc_close_all_regions();
 /* Find any shortest path from a thread or tenured object
  * to each of the specified objects.
  */
@@ -988,7 +989,7 @@ static int trace_paths(void (*context_scanner)(),
         }
         ++i;
     } while (weak_pointers != NIL);
-    ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
+    gc_close_all_regions();
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
 #if TRACEROOT_USE_ABSL_HASHMAP
     absl_hashmap_destroy(inverted_heap);

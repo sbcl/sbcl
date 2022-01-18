@@ -456,7 +456,8 @@ write_generation_stats(FILE *file)
 
     /* Print the heap stats. */
     fprintf(file,
-            "Gen  Boxed   Code    Raw  LgBox LgCode  LgRaw  Pin       Alloc     Waste        Trig   Dirty GCs Mem-age\n");
+            "Gen  Boxed    Raw   Code  Mixed  LgRaw LgCode  LgMix  "
+            "Pin       Alloc     Waste        Trig   Dirty GCs Mem-age\n");
 
     generation_index_t i, begin, end;
     // Print from the lowest gen that has any allocated pages.
@@ -468,36 +469,41 @@ write_generation_stats(FILE *file)
 
     for (i = begin; i <= end; i++) {
         page_index_t page;
-        // page kinds: small {boxed,code,unboxed}, large {boxed,code,unboxed}
-        page_index_t pagect[6], pinned_cnt = 0;
+        // page kinds: small {boxed,unboxed,code,mixed} and then large of same
+        page_index_t pagect[8], pinned_cnt = 0;
 
         memset(pagect, 0, sizeof pagect);
         for (page = 0; page < next_free_page; page++)
             if (!page_free_p(page) && page_table[page].gen == i) {
-                int column = 0;
+                int column;
                 switch (page_table[page].type & PAGE_TYPE_MASK) {
+                case PAGE_TYPE_BOXED: column = 0; break;
                 case PAGE_TYPE_UNBOXED: column = 1; break;
                 case PAGE_TYPE_CODE: column = 2; break;
+                case PAGE_TYPE_MIXED: column = 3; break;
+                default: lose("Invalid page type %x", page_table[page].type);
                 }
-                if (page_single_obj_p(page)) column += 3;
+                if (page_single_obj_p(page)) column += 4;
                 pagect[column]++;
                 if (page_table[page].pinned) pinned_cnt++;
             }
         struct generation* gen = &generations[i];
         gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
-        page_index_t tot_pages, n_dirty;
+        gc_assert(pagect[4] == 0); // should not be anything in large boxed
+        page_index_t tot_pages, n_dirty    ;
         tot_pages = count_generation_pages(i, &n_dirty);
         gc_assert(tot_pages ==
-                  pagect[0] + pagect[1] + pagect[2] + pagect[3] + pagect[4] + pagect[5]);
+                  pagect[0] + pagect[1] + pagect[2] + pagect[3] +
+                  pagect[4] + pagect[5] + pagect[6] + pagect[7]);
         fprintf(file,
-                " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
+                " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 " %4"PAGE_INDEX_FMT
                 " %11"OS_VM_SIZE_FMT
                 " %9"OS_VM_SIZE_FMT
                 " %11"OS_VM_SIZE_FMT,
                 i,
-                pagect[0], pagect[2], pagect[1], pagect[3], pagect[5], pagect[4],
+                pagect[0], pagect[1], pagect[2], pagect[3], pagect[5], pagect[6], pagect[7],
                 pinned_cnt,
                 (uintptr_t)gen->bytes_allocated,
                 (uintptr_t)npage_bytes(tot_pages) - generations[i].bytes_allocated,
@@ -726,13 +732,13 @@ static generation_index_t gc_alloc_generation;
 void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
     page_index_t i, j;
 
-    // If allocating boxed pages to gen0 (or scratch which becomes gen0) then
+    // If allocating mixed pages to gen0 (or scratch which becomes gen0) then
     // this allocation is potentially going to be extended by lisp (if it happens to
     // pick up the tail of the page as its next available region)
-    // and we really have to zeroize the page. Otherwise, if not boxed or allocating
+    // and we really have to zeroize the page. Otherwise, if not mixed or allocating
     // memory that is entirely within GC, then lisp will never use parts of the page.
     // So we can avoid pre-zeroing all codes pages, all unboxed pages,
-    // and all boxed pages allocated to gen>=1.
+    // all strictly boxed pages, and all mixed pages allocated to gen>=1.
 
 #ifdef LISP_FEATURE_DARWIN_JIT
     /* Must always zero, as it may need changing the protection bits. */
@@ -741,8 +747,8 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
     boolean usable_by_lisp =
         gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION
                                      && from_space == 0);
-    boolean must_zero = ((page_type & BOXED_PAGE_FLAG) != 0 && usable_by_lisp
-                         && !is_code(page_type)) || page_type == 0;
+    boolean must_zero =
+        (page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0;
 #endif
 
     if (gc_allocate_dirty) { // For testing only
@@ -833,8 +839,8 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
  * unboxed objects the whole page never needs scavenging or
  * write-protecting. */
 
-/* We use three regions for the current newspace generation. */
-struct alloc_region gc_alloc_region[3];
+/* We use four regions for the current newspace generation. */
+struct alloc_region gc_alloc_region[4];
 
 static page_index_t
   alloc_start_pages[8], // one for each value of PAGE_TYPE_x
@@ -871,7 +877,8 @@ static inline boolean __attribute__((unused)) region_closed_p(struct alloc_regio
 #define ASSERT_REGIONS_CLOSED() \
     gc_assert(!((uintptr_t)gc_alloc_region[0].start_addr \
                |(uintptr_t)gc_alloc_region[1].start_addr \
-               |(uintptr_t)gc_alloc_region[2].start_addr))
+               |(uintptr_t)gc_alloc_region[2].start_addr \
+               |(uintptr_t)gc_alloc_region[3].start_addr))
 
 /* Find a new region with room for at least the given number of bytes.
  *
@@ -1151,6 +1158,8 @@ void *
 gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region, int unlock)
 {
     page_index_t first_page, last_page;
+    // Large BOXED would seem to serve no purpose beyond MIXED
+    if (page_type == PAGE_TYPE_BOXED) page_type = PAGE_TYPE_MIXED;
 
     first_page = alloc_start_page(page_type, 1);
     // FIXME: really we want to try looking for space following the highest of
@@ -1625,6 +1634,8 @@ copy_possibly_large_object(lispobj object, sword_t nwords,
     if (page_single_obj_p(first_page) &&
         (nbytes >= LARGE_OBJECT_SIZE || (rounded - nbytes < rounded / 128))) {
 
+        // Large BOXED would seem to serve no purpose beyond MIXED
+        if (page_type == PAGE_TYPE_BOXED) page_type = PAGE_TYPE_MIXED;
         os_vm_size_t bytes_freed =
           adjust_obj_ptes(first_page, nwords, new_space,
                           SINGLE_OBJECT_FLAG | page_type);
@@ -1851,8 +1862,11 @@ maybe_adjust_large_object(lispobj* where, page_index_t first_page, sword_t nword
     int page_type;
 
     /* Check whether it's a vector or bignum object. */
+    /* There is no difference between MIXED and BOXED for large objects,
+     * because in any event we'll use the large simple-vector optimization
+     * for root scavenging if applicable. */
     lispobj widetag = widetag_of(where);
-    if (widetag == SIMPLE_VECTOR_WIDETAG) // TODO: choose MIXED or BOXED
+    if (widetag == SIMPLE_VECTOR_WIDETAG)
         page_type = SINGLE_OBJECT_FLAG | PAGE_TYPE_MIXED;
 #ifndef LISP_FEATURE_UBSAN
     else if (specialized_vector_widetag_p(widetag) || widetag == BIGNUM_WIDETAG)
@@ -2065,12 +2079,25 @@ void visit_freed_objects(char __attribute__((unused)) *start,
 }
 
 static void deposit_filler(uword_t addr, sword_t nbytes) {
-    gc_assert(nbytes >= 0);
-    if (nbytes > 0) {
-        sword_t nwords = nbytes >> WORD_SHIFT;
-        visit_freed_objects((char*)addr, nbytes);
-        gc_assert((nwords - 1) <= 0x7FFFFF);
-        *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    if (!nbytes) return;
+    gc_assert(nbytes > 0);
+    sword_t nwords = nbytes >> WORD_SHIFT;
+    visit_freed_objects((char*)addr, nbytes);
+    gc_assert((nwords - 1) <= 0x7FFFFF);
+    *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    page_index_t page = find_page_index((void*)addr);
+    if (page_table[page].type == PAGE_TYPE_BOXED) {
+        page_index_t last_page = find_page_index((char*)addr + nbytes - 1);
+        /* Strictly boxed cards are scanned without respect to object boundaries,
+         * so we might need to clobber all pointers that formerly occupied the bytes.
+         * This step can be skipped if the space to be cleared does not span cards,
+         * because in that case descriptor_scavenge() correctly jumps over the filler.
+         * There is conceivably a way to avoid memsetting by ensuring that other
+         * cards containing a portion of this filler each have their own
+         * FILLER_WIDETAG at the start. But this doesn't happen often */
+        if (last_page > page) {
+            memset((char*)addr+N_WORD_BYTES, 0, nbytes-N_WORD_BYTES);
+        }
     }
 }
 
@@ -2653,6 +2680,72 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
         SET_PAGE_PROTECTED(i, 1);
 }
 
+/* Special treatment for strictly boxed pages improves on the general case as follows:
+ * - It can skip determining the extent of the contiguous block up front,
+ *   instead just blasting through the cards as it sees them.
+ * - If only a subset of cards in a contiguous block are dirty, the scan
+ *   can be restricted to that subset. We don't need to align at object boundaries.
+ * - It is not necessary to invoke a scavenge method specific to each object type.
+ * - new write-protection status can be recomputed as we go.
+ * This combination of aspects will be especially beneficial if cards are
+ * are much smaller than they currently are (like 1K)
+
+ * We have two choices for object traversal: walk object-by-object,
+ * or card-by-card just blasting through the words looking for pointers.
+ * But the latter can fail on a card-spanning object if care is not taken.
+ * Example: Suppose the card size is 1K, and an instance has 200 slots.
+ * The instance consumes around 1600 bytes (@ 8 bytes/word), which conceivably
+ * could use 3 cards: header + 10 slots on the end of the first card,
+ * 128 slots on the next, and the remainder on the final card. The soft write
+ * barrier marks only the card with the header, so we don't know exactly
+ * which card contains a modified pointer. Therefore, in all cases when using
+ * card-by-card scan that disregards object boundaries, we have to assume
+ * that 1 card beyond any marked card contains part of a marked object,
+ * if that next card has the same scan start as its predecessor.
+ * But where to stop scanning under this assumption? We shouldn't assume
+ * that any marked card implies scanning an unbounded number of cards.
+ * Therefore, a big instance should not be put on a purely boxed card.
+ * (And granted, a massive instance will go on single-object pages.)
+ * The other purely boxed objects are cons-sized, so they don't have a problem.
+ * And (SETF SVREF) does mark an exact card, so it's all good.
+ * Also, the hardware write barrier does not have this concern.
+ */
+static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t gen)
+{
+    extern int descriptors_scavenge(lispobj *start, lispobj* end,
+                                    generation_index_t gen, int ok_to_wp);
+    gc_dcheck(compacting_p());
+    int prev_marked = 0;
+    while (1) {
+        int marked = !PAGE_WRITEPROTECTED_P(page);
+        if (marked || prev_marked) {
+            lispobj* start = (void*)page_address(page);
+            lispobj* end = start + page_words_used(page);
+            int potentially_ok_to_wp =
+                (gc_card_mark[page_to_card_index(page)] == STICKY_MARK) ? 0 : 1;
+            int protectp = descriptors_scavenge(start, end, gen, potentially_ok_to_wp);
+            if (protectp == !marked) {
+                // Either was marked and remains so, OR was and is clean
+                // (but was scanned because of prev_marked).  So, nothing to do.
+            } else if (protectp) { // was marked, is clean
+                protect_page(start, page);
+            } else {
+                // Was not marked, got scanned because of prev_marked, and is dirty.
+                // This arises with a card-spanning object whose header on the previous card.
+                gc_card_mark[page_to_card_index(page)] = 0;
+            }
+        }
+        if (page_ends_contiguous_block_p(page, gen)) return page;
+        ++page;
+        /* prev_marked matters only for soft marks. If a card's predecessor is marked,
+         * it might mean that the old->young pointer is on the allegedly clean card,
+         * which will become marked as per above */
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        prev_marked = marked;
+#endif
+    }
+}
+
 /* Scavenge all generations from FROM to TO, inclusive, except for
  * new_space which needs special handling, as new objects may be
  * added which are not checked here - use scavenge_newspace generation.
@@ -2715,6 +2808,8 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
                         update_large_vector_writeprotection(i);
                     }
                 }
+            } else if (page_table[i].type == PAGE_TYPE_BOXED) {
+                i = scan_boxed_root_page(i, generation);
             } else {
                 page_index_t last_page;
                 boolean write_protected = 1;
@@ -2802,9 +2897,10 @@ static void newspace_full_scavenge(generation_index_t generation)
     record_new_regions_below = 1 + page_table_pages;
 }
 
-static void gc_close_all_regions()
+void gc_close_all_regions()
 {
     ensure_region_closed(code_region, PAGE_TYPE_CODE);
+    ensure_region_closed(boxed_region, PAGE_TYPE_BOXED);
     ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
     ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
 }
@@ -4710,6 +4806,7 @@ static void gc_allocate_ptes()
     /* Initialize gc_alloc. */
     gc_alloc_generation = 0;
     gc_init_region(mixed_region);
+    gc_init_region(boxed_region);
     gc_init_region(unboxed_region);
     gc_init_region(code_region);
 }
@@ -5387,7 +5484,6 @@ void gc_load_corefile_ptes(int card_table_nbits,
        Adding the executable bit here avoids calling pthread_jit_write_protect_np */
     os_protect((os_vm_address_t)STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, OS_VM_PROT_ALL);
 #endif
-
 }
 
 /* Prepare the array of corefile_ptes for save */

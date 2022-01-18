@@ -136,16 +136,16 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
  *  PRINT-LARGE-UNBOXED
  */
 
-//#define PAGE_TYPE_BOXED        1 // #b001
+#define PAGE_TYPE_BOXED        1 // #b001
 #define PAGE_TYPE_UNBOXED      2 // #b010
 #define PAGE_TYPE_MIXED        3 // #b011
 #define PAGE_TYPE_CONS         5 // #b101
 #define PAGE_TYPE_CODE         7 // #b111
 #define OPEN_REGION_PAGE_FLAG  8
 
-// Temporarily make cons exactly the same as MIXED
+// Temporarily make cons exactly the same as BOXED
 #undef PAGE_TYPE_CONS
-#define PAGE_TYPE_CONS PAGE_TYPE_MIXED
+#define PAGE_TYPE_CONS PAGE_TYPE_BOXED
 
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \
