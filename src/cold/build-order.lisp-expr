@@ -613,13 +613,7 @@
  ("src/code/target-format" :not-host)
 
  ("src/code/late-globaldb" :not-host)
- ("src/code/redblack" :not-host)
- ;; This file, which must be last, contains sanity-checks of the cross-compile.
- ;; The inputs and outputs of certain functions (currently just SXHASH) are stored
- ;; in global symbols. Relying on the fact that data are easily dumped as constants
- ;; (assuming we don't have a genesis bug), the forms in this file can audit
- ;; whether things came out right.
- ("src/code/last-file" :not-host))
+ ("src/code/redblack" :not-host))
 
 ;;; make-target-2 build steps
 (("src/code/early-ntrace" ; lets PCL hook into tracing

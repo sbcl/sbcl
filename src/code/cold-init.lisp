@@ -78,6 +78,30 @@
         *suppress-print-errors* nil
         *current-level-in-print* 0))
 
+(defun xc-sanity-checks ()
+  ;; Verify on startup that some constants were dumped reflecting the
+  ;; correct action of our vanilla-host-compatible functions.  For
+  ;; now, just SXHASH is checked.
+
+  ;; Parallelized build doesn't get the full set of data because the
+  ;; side effect of data recording when invoking compile-time
+  ;; functions aren't propagated back to process that forked the
+  ;; children doing the grunt work.
+  (let ((sxhash-crosscheck
+          '#.(let (pairs)
+               ;; De-duplicate, which reduces the list from ~8000 entries to ~1000 entries.
+               ;; But make sure that any key which isolated repeated has the same value
+               ;; at each repetition.
+               (dolist (pair sb-c::*sxhash-crosscheck* (coerce pairs 'simple-vector))
+                 (let ((found (assoc (car pair) pairs)))
+                   (if found
+                       (aver (= (cdr found) (cdr pair)))
+                       (push pair pairs)))))))
+    (loop for (object . hash) across sxhash-crosscheck
+          unless (= (sxhash object) hash)
+            do (error "SXHASH computed wrong answer for ~S. Got ~x should be ~x"
+                      object hash (sxhash object)))))
+
 ;;; called when a cold system starts up
 (defun !cold-init ()
   "Give the world a shove and hope it spins."
@@ -269,6 +293,8 @@
       (logically-readonlyize (sb-c::sc-load-costs sc))
       (logically-readonlyize (sb-c::sc-move-vops sc))
       (logically-readonlyize (sb-c::sc-move-costs sc))))
+
+  (show-and-call xc-sanity-checks)
 
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
