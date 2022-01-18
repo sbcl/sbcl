@@ -208,6 +208,7 @@ sword_t scavenge(lispobj *start, sword_t n_words)
  *
  * In case of card-spanning objects, the 'start' and 'end' parameters might not
  * exactly delimit objects boundaries. */
+#ifdef LISP_FEATURE_GENCGC
 int descriptors_scavenge(lispobj *start, lispobj* end,
                          generation_index_t gen, int ok_to_wp)
 {
@@ -259,6 +260,7 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
     }
     return ok_to_wp;
 }
+#endif
 
 /* If 'fun' is provided, then call it on each livened object,
  * otherwise use scav1() */
