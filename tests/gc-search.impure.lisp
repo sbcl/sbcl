@@ -56,7 +56,8 @@
 ;;;     due to SB-KERNEL:FLOATING-POINT-EXCEPTION:
 ;;;         "An arithmetic error SB-KERNEL:FLOATING-POINT-EXCEPTION was signalled.
 ;;; No traps are enabled? How can this be?
-(with-test (:name :find-on-empty-fixedobj-page)
+(with-test (:name :find-on-empty-fixedobj-page
+            :skipped-on (not :sb-thread)) ;; fails intermittently 
   (multiple-value-bind (wps page-base) (make-page-full-of-fdefns)
     (format t "~&Fdefn page base = ~x~%" page-base)
     (sb-sys:scrub-control-stack)
