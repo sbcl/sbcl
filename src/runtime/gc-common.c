@@ -1108,8 +1108,29 @@ sword_t
 scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
 {
     struct weak_pointer * wp = (struct weak_pointer*)where;
-    // If wp->next is non-NULL then it's already in the weak pointer chain.
-    if (!wp->next && weak_pointer_breakable_p(wp)) add_to_weak_pointer_chain(wp);
+    /* If wp->next is non-NULL then it's already in the weak pointer chain.
+     * If it is, then even if wp->value is now known to be live,
+     * we can't fix (or don't need to fix) the slot, because removing
+     * from a singly-linked-list is an O(n) operation */
+    if (!wp->next) {
+        lispobj pointee = wp->value;
+        // A broken weak-pointer's value slot has unbound-marker
+        // which does not satisfy is_lisp_pointer().
+        int breakable = is_lisp_pointer(pointee) && (from_space_p(pointee)
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+         || (immobile_space_p(pointee) &&
+             immobile_obj_gen_bits(base_pointer(pointee)) == from_space)
+#endif
+            );
+        if (breakable) { // Pointee could potentially be garbage.
+            // But it might already have been deemed live and forwarded.
+            if (forwarding_pointer_p(native_pointer(pointee))) {
+                wp->value = forwarding_pointer_value(native_pointer(pointee));
+                return WEAK_POINTER_NWORDS;
+            }
+            add_to_weak_pointer_chain(wp);
+        }
+    }
     return WEAK_POINTER_NWORDS;
 }
 

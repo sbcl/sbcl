@@ -212,19 +212,6 @@ static inline void assign_generation(lispobj* obj, generation_index_t gen)
 #define WEAK_POINTER_CHAIN_END (void*)(intptr_t)-1
 #define WEAK_POINTER_NWORDS ALIGN_UP(WEAK_POINTER_SIZE,2)
 
-static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
-{
-    lispobj pointee = wp->value;
-    // A broken weak-pointer's value slot has unbound-marker
-    // which does not satisfy is_lisp_pointer().
-    return is_lisp_pointer(pointee) && (from_space_p(pointee)
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-         || (immobile_space_p(pointee) &&
-             immobile_obj_gen_bits(base_pointer(pointee)) == from_space)
-#endif
-            );
-}
-
 static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     /* Link 'wp' into weak_pointer_chain using its 'next' field.
      * We ensure that 'next' is always NULL when the weak pointer isn't
