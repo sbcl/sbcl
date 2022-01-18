@@ -519,7 +519,10 @@
                                     (type #'proclaim-type)
                                     (ftype #'proclaim-ftype))
                             ctype type :declared)))
-             (push raw-form *queued-proclaims*)))
+             #-sb-xc-host
+             (push raw-form *queued-proclaims*)
+             #+sb-xc-host
+             (error "Type system not yet initialized.")))
         (freeze-type
          #-sb-fluid
          (map-args #'process-freeze-type-declaration))

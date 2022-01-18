@@ -246,8 +246,12 @@
   ;; now that the type system is definitely initialized, fixup UNKNOWN
   ;; types that have crept in.
   (show-and-call !fixup-type-cold-init)
-  ;; run the PROCLAIMs.
-  (show-and-call !late-proclaim-cold-init)
+
+  ;; We run through queued-up type and ftype proclaims that were made
+  ;; before the type system was initialized, and (since it is now
+  ;; initalized) reproclaim them..
+  (mapcar #'proclaim sb-c::*queued-proclaims*)
+  (makunbound 'sb-c::*queued-proclaims*)
 
   (show-and-call !loader-cold-init)
   (show-and-call os-cold-init-or-reinit)

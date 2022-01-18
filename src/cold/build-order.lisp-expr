@@ -596,10 +596,6 @@
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; target macros and DECLAIMs installed at build-the-cross-compiler time
 
- ;; FIXME: here? earlier?  can probably be as late as possible.  Also
- ;; maybe call it FORCE-DELAYED-PROCLAIMS?
- ("src/compiler/late-proclaim")
-
  ("src/code/setf")
  ("src/code/macros")
  ("src/code/loop")
