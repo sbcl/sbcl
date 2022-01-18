@@ -171,7 +171,6 @@
  ("src/code/early-time" :c-headers)
 
  ("src/code/misc" :c-headers)
- ("src/code/early-defclass")
  ("src/code/target-error" :not-host)
  ("src/code/target-extensions" :not-host)
 
