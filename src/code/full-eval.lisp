@@ -77,8 +77,8 @@
          :format-arguments format-arguments))
 
 (defmacro nconc-2 (a b)
-  (let ((tmp (sb-xc:gensym))
-        (tmp2 (sb-xc:gensym)))
+  (let ((tmp (gensym))
+        (tmp2 (gensym)))
     `(let ((,tmp ,a)
            (,tmp2 ,b))
        (if ,tmp

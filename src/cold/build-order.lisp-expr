@@ -620,8 +620,6 @@
   "src/code/defpackage"
   "src/code/target-lflist")
 
- #+sb-eval ("src/code/full-eval")
-
  #+sb-fasteval
  ("src/interpreter/macros"
   "src/interpreter/checkfuns"
@@ -684,6 +682,8 @@
   "src/pcl/precom1"
   "src/pcl/precom2"
   "src/code/ntrace")
+
+  #+sb-eval ("src/code/full-eval")
 
  ("src/code/setf-funs"
   ;; miscellaneous functionality which depends on CLOS
