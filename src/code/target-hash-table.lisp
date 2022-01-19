@@ -415,9 +415,7 @@ Examples:
     but results are undefined if a thread writes to the hash-table
     concurrently with another reader or writer. If T, all concurrent accesses
     are safe, but note that CLHS 3.6 (Traversal Rules and Side Effects)
-    remains in force. See also: SB-EXT:WITH-LOCKED-HASH-TABLE. This keyword
-    argument is experimental, and may change incompatibly or be removed in the
-    future."
+    remains in force. See also: SB-EXT:WITH-LOCKED-HASH-TABLE."
   (declare (type (or function symbol) test))
   (declare (type unsigned-byte size))
   (multiple-value-bind (kind test test-fun hash-fun)
