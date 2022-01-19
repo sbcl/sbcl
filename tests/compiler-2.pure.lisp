@@ -3562,3 +3562,15 @@
               (apply x 1 2 y)))))
     (assert (equal (funcall f #'list '(3)) '(1 2 3)))
     (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :local-fun-type-check-eliminatetion)
+  (let ((fun (checked-compile '(lambda ()
+                                (flet ((f (x)
+                                         (declare (fixnum x))
+                                         (1+ x)))
+                                  (declare (inline f))
+                                  (funcall
+                                   (the (function (&optional fixnum)) #'f)
+                                   10))))))
+    (assert (= (sb-kernel:code-n-entries (sb-kernel:fun-code-header fun))
+               1))))

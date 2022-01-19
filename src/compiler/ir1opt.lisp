@@ -2750,6 +2750,17 @@
                             (cast-asserted-type cast))
            (delete-cast cast)
            t)
+          ((and (fun-type-p (cast-asserted-type cast))
+                (let ((uses (lvar-uses value)))
+                  (when (ref-p uses)
+                    (let ((fun (ref-leaf uses)))
+                      (when (and (functional-p fun)
+                                 (functional-entry-fun fun))
+                        ;; FIXME: is it important to compute this once?
+                        (csubtypep (definition-type (functional-entry-fun fun))
+                                   (cast-asserted-type cast)))))))
+           (delete-cast cast)
+           t)
           ((listp (lvar-uses value))
            ;; Turn (the vector (if x y #())) into
            ;; (if x (the vector y) #())
