@@ -1568,7 +1568,13 @@ necessary, since type inference may take arbitrarily long to converge.")
          (fasl-note-dumpable-instance constant fasl)
          t)
         (t
-         (let* ((name (write-to-string constant :level 1 :length 2))
+         ;; Allow dumping objects that can't be printed
+         ;; Non-invocation of PRINT-OBJECT is tested by 'mlf.impure-cload.lisp'.
+         (let* ((name #+sb-xc-host 'blobby ; the name means nothing
+                      #-sb-xc-host
+                      (format nil "the-~A-formerly-known-as-~X"
+                              (type-of constant)
+                              (get-lisp-obj-address constant)))
                 (info (if init-form
                           (list constant name init-form)
                           (list constant))))
