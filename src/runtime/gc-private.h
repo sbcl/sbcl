@@ -364,7 +364,7 @@ static inline void protect_page(void* page_addr,
      * It is explicitly zeroed on pages marked as free though.
      */
 #endif
-    gc_card_mark[addr_to_card_index(page_addr)] = 1;
+    gc_card_mark[addr_to_card_index(page_addr)] = CARD_UNMARKED;
 }
 
 // Two helpers to avoid invoking the memory fault signal handler.

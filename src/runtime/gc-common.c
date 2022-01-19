@@ -202,15 +202,15 @@ sword_t scavenge(lispobj *start, sword_t n_words)
  * are allowed. Object headers and immediates are ignored, except that:
  *   - compact instance headers fix the layout
  *   - filler_widetag causes skipping of its payload.
- * Recompute 'ok_to_wp' if it was 1, and return the new value.
- * The initial value of 'ok_to_wp' is determined by whether the card is sticky-marked.
- * If ok_to_wp started as 0, then the card can't possibly become OK to write-protect.
+ * Recompute 'dirty' and return the new value as the logical OR of its initial
+ * value (determined by whether the card is sticky-marked) and whether
+ * any old->young pointer is seen.
  *
  * In case of card-spanning objects, the 'start' and 'end' parameters might not
  * exactly delimit objects boundaries. */
 #ifdef LISP_FEATURE_GENCGC
 int descriptors_scavenge(lispobj *start, lispobj* end,
-                         generation_index_t gen, int ok_to_wp)
+                         generation_index_t gen, int dirty)
 {
     lispobj *where;
     for (where = start; where < end; where++) {
@@ -256,9 +256,10 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
             if (header_widetag(ptr) == FILLER_WIDETAG) where += ptr >> N_WIDETAG_BITS;
             continue;
         }
-        if (pointee_gen < gen || pointee_gen > PSEUDO_STATIC_GENERATION) ok_to_wp = 0;
+        // Dear lord, I hate the numbering scheme with SCRATCH_GENERATION higher than everything
+        if (pointee_gen < gen || pointee_gen == (1+PSEUDO_STATIC_GENERATION)) dirty = 1;
     }
-    return ok_to_wp;
+    return dirty;
 }
 #endif
 

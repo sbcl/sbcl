@@ -2581,43 +2581,23 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
     return 0;
 }
 
-/* Is this page holding a normal (non-weak, non-hashtable) large-object
- * simple-vector? */
-static inline boolean large_simple_vector_p(page_index_t page) {
-    if (!page_single_obj_p(page))
-        return 0;
+/* Decide if this single-object page holds a normal simple-vector.
+ * "Normal" now includes non-weak address-insensitive k/v vectors */
+static inline boolean large_scannable_vector_p(page_index_t page) {
     lispobj header = *(lispobj *)page_address(page);
-    // For hash-table vectors which are neither weak nor address-sensitive,
-    // it certainly would be possible to treat the vector as an ordinary vector,
-    // though we'd lose out on the optimization that scans only below the
-    // high-water mark which is in general a good thing.  Perhaps if the
-    // ratio of HWM to total size warrants it, we should prefer to use the
-    // large_simple_vector optimization instead.
-    return ordinary_simple_vector_p(header);
-}
-
-void update_large_vector_writeprotection(page_index_t page)
-{
-    if (!ENABLE_PAGE_PROTECTION) return;
-
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    // If the page is either already protected (byte = 1),
-    // or not protected and referenced from the stack (byte = 2) then do nothing.
-    if (gc_card_mark[page_to_card_index(page)]) return;
-#else
-    /* Same idea as in update_writeprotection */
-    if (PAGE_WRITEPROTECTED_P(page) || page_table[page].pinned) return;
-#endif
-    /* Since this is a SIMPLE-VECTOR, there are no raw words as elements,
-     * nor complications such as untagged fdefn pointers or LAYOUT pointers.
-     * Therefore this scan for young objects is 100% precise */
-    lispobj *where = (lispobj*)page_address(page);
-    lispobj *limit = where + page_words_used(page);
-    generation_index_t gen = page_table[page].gen;
-    for ( ; where < limit; ++where) {
-        if (is_lisp_pointer(*where) && !ptr_ok_to_writeprotect(*where, gen)) return;
+    if (header_widetag(header) == SIMPLE_VECTOR_WIDETAG) {
+        int mask = (flag_VectorWeak | flag_VectorAddrHashing) << ARRAY_FLAGS_POSITION;
+        if (header & mask) return 0;
+        if (vector_flagp(header, VectorHashing)) {
+            lispobj* data = ((struct vector*)page_address(page))->data;
+            // If not very full, use the normal path.
+            // The exact boundary here doesn't matter too much.
+            if (KV_PAIRS_HIGH_WATER_MARK(data) < (int)(GENCGC_PAGE_BYTES/N_WORD_BYTES))
+                return 0;
+        }
+        return 1;
     }
-    protect_page(page_address(page), page);
+    return 0;
 }
 
 /* Attempt to re-protect code from first_page to last_page inclusive.
@@ -2645,6 +2625,13 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
     for (i = first_page; i <= last_page; i++)
         SET_PAGE_PROTECTED(i, 1);
 }
+
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+# define sticky_marked_p(page) (gc_card_mark[page_to_card_index(page)] == STICKY_MARK)
+#else
+# define sticky_marked_p(page) 0
+#endif
+extern int descriptors_scavenge(lispobj *, lispobj*, generation_index_t, int);
 
 /* Special treatment for strictly boxed pages improves on the general case as follows:
  * - It can skip determining the extent of the contiguous block up front,
@@ -2678,32 +2665,22 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
  */
 static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t gen)
 {
-    extern int descriptors_scavenge(lispobj *start, lispobj* end,
-                                    generation_index_t gen, int ok_to_wp);
-    gc_dcheck(compacting_p());
     int prev_marked = 0;
     while (1) {
         int marked = !PAGE_WRITEPROTECTED_P(page);
         if (marked || prev_marked) {
             lispobj* start = (void*)page_address(page);
             lispobj* end = start + page_words_used(page);
-            int potentially_ok_to_wp =
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-                (gc_card_mark[page_to_card_index(page)] == STICKY_MARK) ? 0 : 1;
-#else
-            1;
-#endif
-
-            int protectp = descriptors_scavenge(start, end, gen, potentially_ok_to_wp);
-            if (protectp == !marked) {
+            int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
+            if (dirty == marked) {
                 // Either was marked and remains so, OR was and is clean
                 // (but was scanned because of prev_marked).  So, nothing to do.
-            } else if (protectp) { // was marked, is clean
+            } else if (!dirty) { // was marked, is clean
                 protect_page(start, page);
             } else {
                 // Was not marked, got scanned because of prev_marked, and is dirty.
                 // This arises with a card-spanning object whose header on the previous card.
-                gc_card_mark[page_to_card_index(page)] = 0;
+                gc_card_mark[page_to_card_index(page)] = CARD_MARKED;
             }
         }
         if (page_ends_contiguous_block_p(page, gen)) return page;
@@ -2714,6 +2691,23 @@ static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t g
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         prev_marked = marked;
 #endif
+    }
+}
+
+/* Large vectors are scanned just like strictly boxed root pages,
+ * but even easier because there is no looking back 1 card */
+static page_index_t scan_vector_root_page(page_index_t page, generation_index_t gen)
+{
+    while (1) {
+        int marked = !PAGE_WRITEPROTECTED_P(page);
+        if (marked) {
+            lispobj* start = (void*)page_address(page);
+            lispobj* end = start + page_words_used(page);
+            int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
+            if (!dirty) protect_page(start, page);
+        }
+        if (page_ends_contiguous_block_p(page, gen)) return page;
+        ++page;
     }
 }
 
@@ -2745,6 +2739,7 @@ static void
 scavenge_root_gens(generation_index_t from, generation_index_t to)
 {
     page_index_t i;
+    gc_dcheck(compacting_p());
 
     for (i = 0; i < next_free_page; i++) {
         generation_index_t generation = page_table[i].gen;
@@ -2757,30 +2752,10 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
             /* This should be the start of a region */
             gc_assert(page_starts_contiguous_block_p(i));
 
-            if (large_simple_vector_p(i)) {
-                /* Scavenge only the written pages of a large vector.
-                 * There are no other large objects of special interest.
-                 * Bignums are non-pointer objects, so aren't roots.
-                 * INSTANCE and CLOSURE are theoretically capable of being
-                 * large, but the compiler can't create them.
-                 * Code is for practical purposes read-only after creation
-                 * (other than assigning to simple-fun-name and documentation),
-                 * and scavenging skips the unboxed portion anyway.
-                 * The only potential improvement would be to deal better
-                 * with large hash-table storage vectors. */
-                if (!PAGE_WRITEPROTECTED_P(i)) {
-                    scavenge((lispobj*)page_address(i) + 2, GENCGC_PAGE_WORDS - 2);
-                    update_large_vector_writeprotection(i);
-                }
-                while (!page_ends_contiguous_block_p(i, generation)) {
-                    ++i;
-                    if (!PAGE_WRITEPROTECTED_P(i)) {
-                        scavenge((lispobj*)page_address(i), page_words_used(i));
-                        update_large_vector_writeprotection(i);
-                    }
-                }
-            } else if (page_table[i].type == PAGE_TYPE_BOXED) {
+            if (page_table[i].type == PAGE_TYPE_BOXED) {
                 i = scan_boxed_root_page(i, generation);
+            } else if (page_single_obj_p(i) && large_scannable_vector_p(i)) {
+                i = scan_vector_root_page(i, generation);
             } else {
                 page_index_t last_page;
                 boolean write_protected = 1;
