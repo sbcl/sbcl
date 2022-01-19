@@ -5028,6 +5028,7 @@ int gencgc_handle_wp_violation(void* fault_addr)
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     lose("misuse of mprotect() on dynamic space @ %p", fault_addr);
 #else
+    if (gc_active_p && compacting_p()) lose("unexpected WP fault @ %p during GC", fault_addr);
     gc_assert(!is_code(page_table[page_index].type));
     // There can not be an open region. gc_close_region() does not attempt
     // to flip that bit atomically. Other threads in the wp violation handler
