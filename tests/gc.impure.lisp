@@ -445,3 +445,34 @@
   ;; (actually a closure around a closure) then the weak pointer won't survive.
   ;; Was broken in https://sourceforge.net/p/sbcl/sbcl/ci/04296434
   (assert (weak-pointer-value *wp-for-signal-handler-gc-test*)))
+
+;;; We can be certain that the marked status pertains to exactly one
+;;; object by ensuring that it can not share pages with other objects.
+(defvar *vvv* (make-array
+               (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
+(gc)
+#+gencgc
+(with-test (:name :page-protected-p)
+  (if (= (sb-kernel:generation-of *vvv*) 0) (gc))
+  (assert (= (sb-kernel:generation-of *vvv*) 1))
+  (assert (sb-kernel:page-protected-p *vvv*))
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (assert (not (find 1 marks))))
+  (setf (svref *vvv* (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes))
+        (gensym))
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (assert (eql (bit marks 1) 1))) ; should be marked
+  (gc)
+  ;; Depending whether the gensym was promoted (it's now in gen1)
+  ;; the vector is or isn't marked on one of its cards.
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (ecase (sb-kernel:generation-of
+            (svref *vvv* (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes)))
+      (0
+       (assert (eql (bit marks 1) 1))) ; should be marked
+      (1
+       (assert (eql (bit marks 1) 0))))) ; should not be marked
+  (setf (svref *vvv* (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes)) 0)
+  (gc)
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (assert (not (find 1 marks)))))

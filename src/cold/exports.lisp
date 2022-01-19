@@ -2062,7 +2062,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "GET-CLOSURE-LENGTH" "GET-HEADER-DATA"
            "FUNCTION-HEADER-WORD"
            "INSTANCE-HEADER-WORD"
-           "GET-LISP-OBJ-ADDRESS" "GENERATION-OF"
+           "GET-LISP-OBJ-ADDRESS" "GENERATION-OF" "OBJECT-CARD-MARKS"
            "LOWTAG-OF" "WIDETAG-OF" "WIDETAG="
            "HAIRY-DATA-VECTOR-REF"
            "HAIRY-DATA-VECTOR-REF/CHECK-BOUNDS"  "HAIRY-DATA-VECTOR-SET"

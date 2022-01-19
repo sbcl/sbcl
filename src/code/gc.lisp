@@ -376,7 +376,7 @@ Note: currently changes to this value are lost when saving core."
 ;; A small amount of backward-compatibility in case anyone uses
 ;; the -CARD- size. Of couse, it's about to become different
 ;; from the -PAGE- size, so any code that uses this is probably wrong.
-(define-symbol-macro gencgc-card-bytes gencgc-page-bytes)
+(define-symbol-macro sb-vm:gencgc-card-bytes sb-vm:gencgc-page-bytes)
 
 (define-symbol-macro sb-vm:dynamic-space-end
     (+ (dynamic-space-size) sb-vm:dynamic-space-start))
@@ -422,14 +422,28 @@ statistics are appended to it."
     (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
 
 (export 'page-protected-p)
-(defun page-protected-p (object) ; OBJECT must be pinned by caller
-  (let ((card-index
-         (logand (ash (get-lisp-obj-address object)
-                      (- (integer-length (1- sb-vm:gencgc-page-bytes))))
-                 (sb-alien:extern-alien "gc_card_table_mask" sb-alien:int))))
-    (eql 1 (sb-sys:sap-ref-8
-            (sb-alien:extern-alien "gc_card_mark" sb-sys:system-area-pointer)
-            card-index))))
+(macrolet ((addr->mark (addr)
+             `(sap-ref-8 (extern-alien "gc_card_mark" system-area-pointer)
+                         (logand (ash ,addr (- (integer-length (1- sb-vm:gencgc-card-bytes))))
+                                 (extern-alien "gc_card_table_mask" int)))))
+  (defun page-protected-p (object) ; OBJECT must be pinned by caller
+    (eql #xff (addr->mark (get-lisp-obj-address object))))
+  (defun object-card-marks (obj)
+    (aver (eq (heap-allocated-p obj) :dynamic))
+    ;; Return a bit-vector with a 1 for each marked card the object is on
+    ;; and a 0 for each unmarked card.
+    (with-pinned-objects (obj)
+      (let* ((base (logandc2 (get-lisp-obj-address obj) sb-vm:lowtag-mask))
+             (last (+ base (1- (primitive-object-size obj))))
+             (aligned-base (logandc2 base (1- sb-vm:gencgc-card-bytes)))
+             (aligned-last (logandc2 last (1- sb-vm:gencgc-card-bytes)))
+             (result (make-array (1+ (truncate (- aligned-last aligned-base)
+                                               sb-vm:gencgc-card-bytes))
+                                 :element-type 'bit)))
+        (loop for addr from aligned-base to aligned-last by sb-vm:gencgc-card-bytes
+              for i from 0
+              do (setf (aref result i) (if (eql (addr->mark addr) 0) 1 0)))
+        result))))
 
 (macrolet ((def (slot doc &optional adjustable)
              `(progn
