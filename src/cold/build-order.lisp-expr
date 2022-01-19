@@ -341,7 +341,7 @@
 
  ("src/code/format-directive")
 
- ("src/code/host-c-call")
+ ("src/code/c-call")
 
  #+os-provides-dlopen ("src/code/foreign-load" :not-host)
  #+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)

@@ -8,8 +8,8 @@
 ;;;; files for more information.
 
 (in-package "SB-ALIEN")
-
-(/show0 "host-c-call.lisp 12")
+
+;;;; C string support.
 
 (define-alien-type-class (c-string :include pointer :include-args (to))
   (external-format :default :type keyword)
@@ -138,5 +138,3 @@
              (simple-string
               (string-to-c-string ,value
                                   (c-string-external-format ,type)))))))
-
-(/show0 "host-c-call.lisp end of file")
