@@ -569,8 +569,6 @@
  ("src/code/external-formats/enc-basic" :not-host)
  #+sb-unicode ("src/code/external-formats/enc-ucs" :not-host) ; win32 needs this
 
- #+sb-eval ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
-
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/{arch}/arith
 
  #-(or x86 x86-64) ("src/compiler/generic/sanctify" :not-host)
@@ -621,6 +619,8 @@
   ;; since the host has a package of that name.
   "src/code/defpackage"
   "src/code/target-lflist")
+
+ #+sb-eval ("src/code/full-eval")
 
  #+sb-fasteval
  ("src/interpreter/macros"

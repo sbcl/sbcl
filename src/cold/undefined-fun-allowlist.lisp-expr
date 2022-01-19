@@ -119,6 +119,9 @@
   sb-sequence:substitute
   sb-sequence:substitute-if
   sb-sequence:substitute-if-not)
+ #+sb-eval
+ (sb-eval:eval-in-environment
+  sb-eval:eval-in-native-environment)
  ;; Fast interpreter
  #+sb-fasteval
  (sb-interpreter:%fun-ftype
