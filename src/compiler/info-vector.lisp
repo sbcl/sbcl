@@ -663,7 +663,8 @@ This is interpreted as
   (flet ((check (plist)
            (and (evenp (length plist))
                 (loop for (indicator value) on plist by #'cddr
-                      always (typep indicator 'info-number))))
+                      always (progn #+host-quirks-ccl value ; shut up the host
+                                    (typep indicator 'info-number)))))
          (add-length-prefix (list) ; computers count better than people
            (cons (1+ (length list)) list)))
     (unless (and (check (first lists))

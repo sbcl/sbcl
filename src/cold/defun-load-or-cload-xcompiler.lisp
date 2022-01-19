@@ -101,6 +101,8 @@
 ;;; or not at all if you've otherwise defined this.
 (defvar *target-sbcl-version* (read-from-file "version.lisp-expr"))
 
+#+ccl (declaim (ftype function warn-when-cl-snapshot-diff)) ; silly compiler
+
 ;;; Either load or compile-then-load the cross-compiler into the
 ;;; cross-compilation host Common Lisp.
 (defun load-or-cload-xcompiler (load-or-cload-stem)

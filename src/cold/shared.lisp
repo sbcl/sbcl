@@ -693,6 +693,7 @@
 (defparameter *host-quirks*
   (or #+cmu  '(:host-quirks-cmu)
       #+ecl  '(:host-quirks-ecl)
+      #+ccl  '(:host-quirks-ccl)
       #+sbcl '(:host-quirks-sbcl))) ; not so much a "quirk", but consistent anyway
 
 ;;; Execute function FN in an environment appropriate for compiling the

@@ -48,6 +48,7 @@
                 (n-data-words  ; Space for internal jump tables if needed
                  (loop for ((category . data) . label)
                        across (asmstream-constant-vector asmstream)
+                       do (progn #+host-quirks-ccl label) ; shut up the host
                        when (eq category :jump-table) sum (length data))))
             (emit (asmstream-data-section asmstream)
                   `(.lispword ,(+ n-extra-words n-data-words 1))
