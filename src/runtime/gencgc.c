@@ -245,7 +245,7 @@ page_ends_contiguous_block_p(page_index_t page_index,
 #ifdef DEBUG
     boolean safe_answer =
            (/* page doesn't fill block */
-            (page_word_used(page_index) < GENCGC_PAGE_WORDS)
+            (page_words_used(page_index) < GENCGC_PAGE_WORDS)
             /* page is last allocated page */
             || ((page_index + 1) >= next_free_page)
             /* next page contains no data */
@@ -4657,7 +4657,6 @@ gc_init(void)
 
 int gc_card_table_nbits;
 long gc_card_table_mask;
-unsigned char *gc_card_mark;
 
 static void __attribute__((unused)) gcbarrier_patch_code_range(uword_t start, void* limit)
 {
