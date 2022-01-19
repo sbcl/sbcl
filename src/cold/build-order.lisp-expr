@@ -427,6 +427,7 @@
  ("src/compiler/{arch}/alloc")
  ("src/compiler/{arch}/call")
  ("src/compiler/{arch}/nlx")
+ ("src/compiler/generic/late-nlx")
  ("src/compiler/{arch}/show")
  ("src/compiler/{arch}/array")
  ("src/compiler/generic/type-error")
