@@ -211,10 +211,19 @@ lwpid_t sb_GetTID() { return lwp_gettid(); }
 #define sb_GetTID() 0
 #endif
 
+/* Our futex-based lisp mutex needs an OS-assigned unique ID.
+ * Why not use pthread_self? I think the reason is that that on linux,
+ * the TID is 4 bytes, and the futex lock word is 4 bytes.
+ * If the unique ID needed 8 bytes, there could be spurious aliasing
+ * that would make the code behave incorrectly. */
 static int get_nonzero_tid()
 {
     int tid = sb_GetTID();
-    gc_dcheck(tid != 0);
+#ifdef LISP_FEATURE_SB_FUTEX
+    // If no futexes, don't need or want to assert that the TID is valid.
+    // (macOS etc)
+    gc_assert(tid != 0);
+#endif
     return tid;
 }
 
