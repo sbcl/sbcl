@@ -128,7 +128,6 @@
 
  ("src/code/ansi-stream" :not-host)
  ("src/code/restart" :not-host)
- ("src/code/early-print" :not-host)
  ("src/code/early-pprint" :not-host)
  ("src/code/early-impl" :not-host)
 
@@ -283,7 +282,6 @@
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and PROCLAIM, defined in "src/compiler/proclaim"
  ("src/code/defstruct"  :c-headers)
- ("src/code/target-defstruct" :not-host)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
  ;; machinery) before we can set its superclasses here.
@@ -530,10 +528,12 @@
  ("src/code/query"  :not-host)
  ("src/code/sort"  :not-host)
  ("src/code/final" :not-host)
- ("src/code/pprint" :not-host)
  ("src/code/reader" :not-host) ; needs "code/readtable"
  ("src/code/print" :not-host)
+ ("src/code/pprint" :not-host)
 
+
+ ("src/code/target-defstruct"  :not-host)
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  ("src/code/target-pathname"   :not-host)
  #-win32 ("src/code/unix-pathname"     :not-host)
