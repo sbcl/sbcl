@@ -530,7 +530,7 @@
  ("src/code/query"  :not-host)
  ("src/code/sort"  :not-host)
  ("src/code/final" :not-host)
- ("src/code/pprint" :not-host) ; defines WITH-PRETTY-STREAM needed by 'print'
+ ("src/code/pprint" :not-host)
  ("src/code/reader" :not-host) ; needs "code/readtable"
  ("src/code/print" :not-host)
 

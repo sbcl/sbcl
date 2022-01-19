@@ -1526,7 +1526,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
 (defpackage* "SB-PRETTY"
   (:documentation "private: implementation of pretty-printing")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL")
-  (:export "PRETTY-STREAM" "PRETTY-STREAM-P"
+  (:export "OUTPUT-PRETTY-OBJECT"
+           "PRETTY-STREAM" "PRETTY-STREAM-P"
            "PPRINT-DISPATCH-TABLE"
            "*PPRINT-QUOTE-WITH-SYNTACTIC-SUGAR*"
            "!PPRINT-COLD-INIT"))

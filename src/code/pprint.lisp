@@ -1503,6 +1503,15 @@ line break."
          `(named-lambda ,(format nil "~A-P" handler) (x)
             ,(sb-c::source-transform-typep 'x specifier)))))
 
+
+;;;; Interface seen by regular (ugly) printer.
+
+;;; OUTPUT-PRETTY-OBJECT is called by OUTPUT-OBJECT when
+;;; *PRINT-PRETTY* is true.
+(defun output-pretty-object (stream fun object)
+  (with-pretty-stream (stream)
+    (funcall fun stream object)))
+
 (defun !pprint-cold-init ()
   (/show0 "entering !PPRINT-COLD-INIT")
   ;; Kludge: We set *STANDARD-PP-D-TABLE* to a new table even though
