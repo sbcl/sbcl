@@ -942,86 +942,59 @@
   (:arg-types unsigned-num (:constant (satisfies abs-add-sub-immediate-p)))
   (:info y))
 
-(defmacro define-conditional-vop (tran cond unsigned &optional no-constant)
+(defmacro define-conditional-vop (tran signed unsigned)
   `(progn
-     ,@(loop for (suffix cost signed constant) in
+     ,@(loop for (suffix cost signed-p) in
              '((/fixnum 4 t)
-               (-c/fixnum 3 t t)
                (/signed 6 t)
-               (-c/signed 5 t t)
-               (/unsigned 6 nil)
-               (-c/unsigned 5 nil t))
-             for value = (if (eq suffix '-c/fixnum)
-                             '(fixnumize y)
-                             'y)
-             unless (and constant
-                         no-constant)
+               (/unsigned 6 nil))
              collect
              `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)" tran suffix))
                            ,(intern (format nil "~:@(FAST-CONDITIONAL~A~)" suffix)))
                 (:translate ,tran)
-                (:conditional ,(if signed cond unsigned))
+                (:conditional ,(if signed-p signed unsigned))
                 (:generator ,cost
-                  ,(if constant
-                       `(let ((value ,value))
-                          (if (minusp value)
-                              (inst cmn x (abs value))
-                              (if (add-sub-immediate-p value)
-                                  (inst cmp x value)
-                                  (inst cmn x (ldb (byte n-word-bits 0) (- value))))))
-                       `(inst cmp x ,value)))))))
+                  (inst cmp x y))))
+
+     (define-vop (,(symbolicate "FAST-IF-" tran "-INTEGER/C") )
+       (:translate ,tran)
+       (:args (x :scs (any-reg signed-reg unsigned-reg)))
+       (:arg-types (:or tagged-num signed-num unsigned-num)
+                   (:constant (or signed-word word)))
+       (:info y)
+       (:policy :fast-safe)
+       ,(if (eq signed unsigned)
+            `(:conditional ,signed)
+            `(:conditional
+              :after-sc-selection
+              (if (sc-is x unsigned-reg)
+                  ,unsigned
+                  ,signed)))
+       (:generator 2
+         (let ((y (if (sc-is x any-reg)
+                      (fixnumize y)
+                      y)))
+           (flet ((try (constant negate)
+                    (when (add-sub-immediate-p constant)
+                      (if negate
+                          (inst cmn x constant)
+                          (inst cmp x constant))
+                      t)))
+             (or (try y nil)
+                 (try (ldb (byte 64 0) (- y)) t)
+                 (inst cmp x (load-immediate-word tmp-tn y)))))))))
 
 (define-conditional-vop < :lt :lo)
 (define-conditional-vop > :gt :hi)
-(define-conditional-vop eql :eq :eq t)
+(define-conditional-vop eql :eq :eq)
 
-(define-vop (fast-eql-integer/c)
-  (:args (x :scs (any-reg signed-reg unsigned-reg)))
-  (:arg-types (:or tagged-num signed-num unsigned-num)
-              (:constant signed-word))
-  (:info y)
-  (:translate eql)
-  (:policy :fast-safe)
-  (:conditional :eq)
-  (:generator 3
-    (let* ((abs-y (abs y))
-           (constant (if (sc-is x any-reg)
-                         (ash abs-y n-fixnum-tag-bits)
-                         abs-y))
-           (constant (if (add-sub-immediate-p constant)
-                         constant
-                         (load-immediate-word tmp-tn constant))))
-      (if (minusp y)
-          (inst cmn x constant)
-          (inst cmp x constant)))))
-
-;;; EQL/FIXNUM is funny because the first arg can be of any type, not
-;;; just a known fixnum.
-
-;;; These versions specify a fixnum restriction on their first arg.
-;;; We have also generic-eql/fixnum VOPs which are the same, but have
-;;; no restriction on the first arg and a higher cost.  The reason for
-;;; doing this is to prevent fixnum specific operations from being
-;;; used on word integers, spuriously consing the argument.
-
-(define-vop (fast-eql/fixnum)
-  (:args (x :scs (any-reg))
-         (y :scs (any-reg)))
-  (:arg-types tagged-num tagged-num)
-  (:note "inline fixnum comparison")
-  (:translate eql)
-  (:conditional :eq)
-  (:policy :fast-safe)
-  (:generator 4
-    (inst cmp x y)))
-
-(define-vop (generic-eql/fixnum fast-eql/fixnum)
+(define-vop (generic-eql/fixnum fast-if-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg))
          (y :scs (any-reg)))
   (:arg-types * tagged-num)
   (:variant-cost 7))
 
-(define-vop (generic-eql-c/fixnum fast-eql-integer/c)
+(define-vop (generic-eql-c/fixnum fast-if-eql-integer/c)
   (:args (x :scs (any-reg descriptor-reg)))
   (:arg-types * (:constant (satisfies fixnum-add-sub-immediate-p)))
   (:variant-cost 6))

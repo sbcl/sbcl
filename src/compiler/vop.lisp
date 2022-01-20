@@ -732,7 +732,8 @@
   (targets nil :type (or null (simple-array (unsigned-byte 16) 1)))
   (optimizer nil :type (or null function))
   (optional-results nil :type list)
-  move-vop-p)
+  move-vop-p
+  (after-sc-selection nil :type (or null function) :read-only t))
 (declaim (inline vop-name))
 (defun vop-name (vop)
   (declare (type vop vop))

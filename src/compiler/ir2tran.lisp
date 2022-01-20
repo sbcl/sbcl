@@ -640,6 +640,10 @@
                (register-drop-thru alternative)
                (vop branch node block (block-label alternative))))
           (t
+           (when (equal flags '(:after-sc-selection))
+             ;; To be fixed up by VOP-INFO-AFTER-SC-SELECTION
+             (setf flags (list :after-sc-selection))
+             (setf info-args (append info-args flags)))
            (emit-template node block template args nil info-args)
            (vop branch-if if block (block-label consequent) not-p flags)
            (if (drop-thru-p if alternative)

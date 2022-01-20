@@ -733,7 +733,9 @@
         ((vop-info-move-args info)
          (emit-arg-moves vop))
         (t
-         (coerce-vop-operands vop))))))
+         (coerce-vop-operands vop)))
+      (when (vop-info-after-sc-selection info)
+        (funcall (vop-info-after-sc-selection info) vop)))))
 
 ;;; If TN is in a number stack SC, make all the right annotations.
 ;;; Note that this should be called after TN has been referenced,
