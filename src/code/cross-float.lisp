@@ -13,6 +13,14 @@
 
 (in-package "SB-IMPL")
 
+#+host-quirks-ecl
+(eval-when (:compile-toplevel)
+  (when (member (cl:lisp-implementation-version) ; in case more than 1 bad version
+                '("21.2.1")
+                :test #'string=)
+    (format t "~&Enabling PRINT-OBJECT workaround~%")
+    (pushnew :buggy-print-object *features*)))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
 (defun single-float-bits (target-flonum)
@@ -27,6 +35,7 @@
 (defun double-float-high-bits (x)
   (ash (double-float-bits x) -32))
 
+#-buggy-print-object
 (flet ((output-part (x stream)
          (typecase x
            (single-float
@@ -913,6 +922,7 @@
 ;;; Canonicalize and write out the memoization table. Order it by function,
 ;;; then number of arguments, then each argument's value. Rational precedes
 ;;; single-float which precedes double-float, then order by bits.
+#-buggy-print-object
 (defun dump-math-memoization-table (table stream)
   (format stream ";;; This file is machine-generated. DO NOT EDIT~2%")
   (format stream ":DEFAULT~%(~%")
