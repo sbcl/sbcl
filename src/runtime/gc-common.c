@@ -386,30 +386,38 @@ scav_fun_pointer(lispobj *where, lispobj object)
     lispobj copy;
     int widetag = widetag_of(fun);
     // object may be a simple-fun header, a funcallable instance, or closure
-    if (widetag != SIMPLE_FUN_WIDETAG) {
-        // funcallable-instance might have all descriptor slots
-        // except for the trampoline, which points to an asm routine.
-        // This is not true for self-contained trampoline GFs though.
-        int page_type = PAGE_TYPE_MIXED;
-        void* region = mixed_region;
-        if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
-            struct layout* layout = (void*)native_pointer(funinstance_layout(FUNCTION(object)));
-            if (layout && (layout->flags & STRICTLY_BOXED_FLAG)) // 'flags' is a raw slot
-                page_type = PAGE_TYPE_BOXED, region = boxed_region;
-        }
-        copy = gc_copy_object(object, 1+SHORT_BOXED_NWORDS(*fun), region, page_type);
-    } else {
+    if (widetag == SIMPLE_FUN_WIDETAG) {
         uword_t offset = (HeaderValue(*fun) & FUN_HEADER_NWORDS_MASK) * N_WORD_BYTES;
         /* Transport the whole code object */
         struct code *code = trans_code((struct code *) ((uword_t) fun - offset));
-        copy  = make_lispobj((char*)code + offset, FUN_POINTER_LOWTAG);
+        copy = make_lispobj((char*)code + offset, FUN_POINTER_LOWTAG);
+    } else {
+        int page_type = PAGE_TYPE_MIXED;
+        void* region = mixed_region;
+        if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
+            /* funcallable-instance might have all descriptor slots
+             * except for the trampoline, which points to an asm routine.
+             * This is not true for self-contained trampoline GFs though. */
+            struct layout* layout = (void*)native_pointer(funinstance_layout(FUNCTION(object)));
+            if (layout && (layout->flags & STRICTLY_BOXED_FLAG)) // 'flags' is a raw slot
+                page_type = PAGE_TYPE_BOXED, region = boxed_region;
+        } else {
+            /* Closures can always go on strictly boxed pages even though the
+             * underlying function is (possibly) an untagged pointer.
+             * When a closure is scavenged as a root, it can't need to fix the
+             * value in closure->fun because that function has to be _older_ than
+             * (or the same gen as) the closure. So if it's older, then it's not
+             * in from_space. But what if it's the same? It's still not in
+             * from_space, because the closure and its function have
+             * generation >= (1+from_space) to be generational roots */
+            page_type = PAGE_TYPE_BOXED, region = boxed_region;
+        }
+        copy = gc_copy_object(object, 1+SHORT_BOXED_NWORDS(*fun), region, page_type);
     }
-
     if (copy != object) { // large code won't undergo physical copy
         set_forwarding_pointer(fun, copy);
         *where = copy;
     }
-
     CHECK_COPY_POSTCONDITIONS(copy, FUN_POINTER_LOWTAG);
     return 1;
 }
