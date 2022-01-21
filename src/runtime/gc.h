@@ -39,4 +39,46 @@ extern int sb_sprof_enabled;
 
 extern os_vm_size_t bytes_consed_between_gcs;
 
+#define VERIFY_VERBOSE    1
+#define VERIFY_PRE_GC     2
+#define VERIFY_POST_GC    4
+/* AGGRESSIVE = always call valid_lisp_pointer_p() on pointers. */
+#define VERIFY_AGGRESSIVE 8
+#define VERIFY_TAGS       16
+/* QUICK = skip most tests. This is intended for use when GC is believed
+ * to be correct per se (i.e. not for debugging GC), and so the verify
+ * pass executes more quickly */
+#define VERIFY_QUICK      32
+/* FINAL = warn about pointers from heap space to non-heap space.
+ * Such pointers would normally be ignored and do not get flagged as failure.
+ * This can be used in conjunction with QUICK, AGGRESSIVE, or neither. */
+#define VERIFY_FINAL      64
+#define VERIFY_DONT_LOSE  128
+
+/* VERIFYING_foo indicates internal state, not a caller's option */
+/* GENERATIONAL implies formatted objects, but there are ranges of objects
+ * that are not generational - static, readonly, and metaspace -
+ * so there are no page protection checks performed for pointers from objects
+ * in such ranges */
+#define VERIFYING_GENERATIONAL 256
+/* UNFORMATTED implies that this is not a range of objects
+ * but rather a range of pointers such as a binding stack, TLS,
+ * lisp signal handler array, or other similar array */
+#define VERIFYING_UNFORMATTED 512
+
+int verify_heap(uword_t flags);
+#ifdef LISP_FEATURE_GENCGC
+#define MAX_ERR_OBJS 5
+struct verify_state {
+    lispobj* object_addr;
+    lispobj object_header;
+    uword_t flags;
+    generation_index_t object_gen;
+    generation_index_t min_pointee_gen;
+    int nerrors;
+    lispobj err_objs[5];
+};
+void dump_spaces(struct verify_state*, char *reason);
+#endif
+
 #endif /* _GC_H_ */
