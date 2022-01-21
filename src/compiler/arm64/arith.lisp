@@ -1001,34 +1001,32 @@
 
 (macrolet ((define-logtest-vops ()
              `(progn
-                ,@(loop for suffix in '(/fixnum -c/fixnum
-                                        /signed -c/signed
-                                        /unsigned -c/unsigned)
-                        for cost in '(4 3 6 5 6 5)
-                        for arg-types in '(nil
-                                           (tagged-num
-                                            (:constant
-                                             (satisfies fixnum-encode-logical-immediate)))
-                                           nil
-                                           (signed-num
-                                            (:constant
-                                             (satisfies encode-logical-immediate)))
-                                           nil
-                                           (unsigned-num
-                                            (:constant (satisfies encode-logical-immediate))))
+                ,@(loop for suffix in '(/fixnum /signed /unsigned)
+                        for cost in '(4 6 6)
                         collect
                         `(define-vop (,(symbolicate "FAST-LOGTEST" suffix)
                                       ,(symbolicate "FAST-CONDITIONAL" suffix))
                            (:translate logtest)
                            (:conditional :ne)
-                           ,@(and arg-types
-                                  `((:arg-types ,@arg-types)))
                            (:generator ,cost
-                                       (inst tst x
-                                             ,(if (eq suffix '-c/fixnum)
-                                                  '(fixnumize y)
-                                                  'y))))))))
+                             (inst tst x y)))))))
   (define-logtest-vops))
+
+(define-vop (fast-logtest-c)
+  (:translate logtest)
+  (:args (x :scs (any-reg signed-reg unsigned-reg)))
+  (:arg-types (:or tagged-num signed-num unsigned-num)
+              (:constant (or signed-word word)))
+  (:info y)
+  (:policy :fast-safe)
+  (:conditional :ne)
+  (:generator 2
+    (let ((y (if (sc-is x any-reg)
+                 (fixnumize y)
+                 y)))
+      (if (encode-logical-immediate y)
+          (inst tst x y)
+          (inst tst x (load-immediate-word tmp-tn y))))))
 
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))
