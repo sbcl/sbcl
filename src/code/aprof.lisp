@@ -64,7 +64,8 @@
 
 (defpackage #:sb-aprof
   (:use #:cl #:sb-ext #:sb-alien #:sb-sys #:sb-int #:sb-kernel)
-  (:export #:aprof-run #:aprof-show #:aprof-reset)
+  (:export #:aprof-run #:aprof-show #:aprof-reset
+           #:aprof-start #:patch-all-code)
   (:import-from #:sb-di #:valid-lisp-pointer-p)
   (:import-from #:sb-vm #:thread-reg)
   (:import-from #:sb-x86-64-asm
