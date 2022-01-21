@@ -452,7 +452,7 @@
                (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
 (gc)
 #+gencgc
-(with-test (:name :page-protected-p :fails-on :x86)
+(with-test (:name :page-protected-p :broken-on :x86)
   (if (= (sb-kernel:generation-of *vvv*) 0) (gc))
   (assert (= (sb-kernel:generation-of *vvv*) 1))
   (assert (sb-kernel:page-protected-p *vvv*))
