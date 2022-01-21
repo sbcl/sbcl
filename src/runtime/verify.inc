@@ -192,7 +192,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         lispobj* pfdefn = code->constants + code_n_funs(code) * CODE_SLOTS_PER_SIMPLE_FUN;
         lispobj* end = pfdefn + code_n_named_calls(code);
         for ( ; pfdefn < end ; ++pfdefn)
-            if (*pfdefn) CHECK(*pfdefn | OTHER_POINTER_LOWTAG, pdefn);
+            if (*pfdefn) CHECK(*pfdefn | OTHER_POINTER_LOWTAG, pfdefn);
         }
 #endif
         for (i=2; i <nheader_words; ++i) CHECK(object[i], object+i);
