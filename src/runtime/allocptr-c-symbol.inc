@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 #ifdef LISP_FEATURE_CHENEYGC
 #define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
 #define get_alloc_pointer() (dynamic_space_free_pointer)

@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 #ifdef LISP_FEATURE_USE_SYS_MMAP
 
 ///

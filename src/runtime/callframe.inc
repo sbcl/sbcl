@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 struct call_frame {
         struct call_frame *old_cont;
         lispobj saved_lra;

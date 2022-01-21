@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 static int
 is_in_stack_space(lispobj ptr)
 {

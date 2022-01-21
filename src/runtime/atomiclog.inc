@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 #define EVENTBUFMAX 10000
 extern uword_t *eventdata;
 extern int n_logevents;

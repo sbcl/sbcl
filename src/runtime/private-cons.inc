@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 /* GC private-use list allocator.
  *
  * A private-use list is a list of private-uses conses,
