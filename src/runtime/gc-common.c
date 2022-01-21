@@ -248,7 +248,8 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
 #endif
         }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        else if (instanceoid_widetag_p(ptr) && ((ptr >>= 32) != 0)) goto immobile_obj;
+        else if (instanceoid_widetag_p(ptr & WIDETAG_MASK) && ((ptr >>= 32) != 0))
+            goto immobile_obj;
 #endif
         else {
             // Advancing by the filler payload count causes 'where' to be exactly

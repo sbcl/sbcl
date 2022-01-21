@@ -20,7 +20,7 @@ void test_adjust_obj_ptes()
 {
     void shrink_obj_test(int ending_size, int created_type,
                          struct page *expected_result);
-    char card_table[1];
+    unsigned char card_table[1];
 
     // Mock out the dynamic space. Always allocate one extra page in
     // the page table as a sentinel.
@@ -55,7 +55,7 @@ void test_adjust_obj_ptes()
             for (gen=0; gen < NUM_GENERATIONS; ++gen)
               generations[gen].bytes_allocated = 0;
             bytes_allocated = 0;
-            void *result = gc_alloc_large(request, PAGE_TYPE_UNBOXED, &test_region);
+            void *result = gc_alloc_large(request, PAGE_TYPE_UNBOXED, &test_region, 0);
 
             // Assert some things about the reference object.
             gc_assert(result == (void*)DYNAMIC_SPACE_START);
@@ -98,7 +98,7 @@ void shrink_obj_test(int ending_size, int initial_type,
                 // Start with a fresh page table
                 page_table = calloc(1+page_table_pages, sizeof(struct page));
                 from_space = gc_alloc_generation = 2;
-                void *result = gc_alloc_large(initial_size, initial_type, &test_region);
+                void *result = gc_alloc_large(initial_size, initial_type, &test_region, 0);
                 // We're in trouble if pages other than expected were gotten
                 gc_assert(result == (void*)DYNAMIC_SPACE_START);
 
@@ -137,6 +137,8 @@ void run_gencgc_tests()
     // Assert that INSTANCE_WIDETAG is 1 bit different from FUNCALLABLE_INSTANCE
     gc_assert((INSTANCE_WIDETAG | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER))
               == FUNCALLABLE_INSTANCE_WIDETAG);
+    gc_assert(instanceoid_widetag_p(INSTANCE_WIDETAG));
+    gc_assert(instanceoid_widetag_p(FUNCALLABLE_INSTANCE_WIDETAG));
     test_adjust_obj_ptes();
 }
 

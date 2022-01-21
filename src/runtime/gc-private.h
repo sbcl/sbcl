@@ -425,7 +425,7 @@ static inline int instance_length(lispobj header)
 #else
 #  define FUNINSTANCE_SELECTOR_BIT_NUMBER 2
 #endif
-static inline boolean instanceoid_widetag_p(int widetag) {
+static inline boolean instanceoid_widetag_p(unsigned char widetag) {
     return (widetag | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER)) == FUNCALLABLE_INSTANCE_WIDETAG;
 }
 static inline int instanceoid_length(lispobj header) {
