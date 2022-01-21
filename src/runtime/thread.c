@@ -207,6 +207,16 @@ int sb_GetTID() { return syscall(SYS_gettid); }
 #elif defined __DragonFly__
 #include <sys/lwp.h>
 lwpid_t sb_GetTID() { return lwp_gettid(); }
+#elif defined __FreeBSD__
+#include <sys/thr.h>
+int sb_GetTID()
+{
+    long id;
+    thr_self(&id);
+    // man thr_self(2) says: the thread identifier is an integer in the range
+    // from PID_MAX + 2 (100001) to INT_MAX. So casting to int is safe.
+    return (int)id;
+}
 #else
 #define sb_GetTID() 0
 #endif
