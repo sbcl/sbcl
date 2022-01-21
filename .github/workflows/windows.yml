@@ -7,21 +7,31 @@ jobs:
 
     runs-on: windows-latest    
 
+    defaults:
+      run:
+        shell: msys2 {0}
+
     steps:
     - uses: actions/checkout@v1
+    - uses: msys2/setup-msys2@v2
+      with:
+        install: mingw-w64-x86_64-gcc make diffutils git
+
     - name: install host sbcl
+      shell: pwsh
       run: |
         cinst sbcl -source tools-for-build
-        echo "/c/Program Files/Steel Bank Common Lisp/1.4.14" | Out-File -Append $env:GITHUB_PATH
     - name: build
       env:
         SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
       run: |
-        bash ./make.sh --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
+        PATH=$PATH:"/c/Program Files/Steel Bank Common Lisp/1.4.14"
+        export PATH
+        ./make.sh --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
     - name: make installer
       run: |
-        bash ./make-windows-installer.sh
-        bash -c "mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer"
+        ./make-windows-installer.sh
+        mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer
     - name: save installer
       uses: actions/upload-artifact@v1
       with:
@@ -29,10 +39,10 @@ jobs:
         path: sbcl-windows-installer
     - name: tests
       working-directory: tests
-      run: bash ./run-tests.sh
+      run: ./run-tests.sh
     - name: ansi-tests
       working-directory: tests
-      run: bash ./ansi-tests.sh
+      run: ./ansi-tests.sh
         
       
     
