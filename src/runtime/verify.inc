@@ -258,7 +258,6 @@ static int verify_range(lispobj start, lispobj* end, struct verify_state* state)
             ++where;
         }
         return 0;
-
     }
     while (where < end) {
         int widetag = is_header(*where) ? header_widetag(*where) : LIST_POINTER_LOWTAG;
