@@ -381,7 +381,8 @@ int verify_heap(uword_t flags)
 #endif
     if (verbose)
         fprintf(stderr, " [static]");
-    if (verify(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
+    // Just don't worry about NIL, it's seldom the problem
+    // if (verify(NIL_SYMBOL_SLOTS_START, (lispobj*)NIL_SYMBOL_SLOTS_END, &state, 0)) goto out;
     if (verify(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, &state, 0)) goto out;
     if (verbose)
         fprintf(stderr, " [dynamic]");
@@ -391,7 +392,7 @@ int verify_heap(uword_t flags)
     if (verbose && state.nerrors==0) fprintf(stderr, " passed\n");
  out:
     if (state.nerrors && !(flags & VERIFY_DONT_LOSE)) {
-        dump_spaces(&state, "verify failed");
+        // dump_spaces(&state, "verify failed");
         lose("Verify failed: %d errors", state.nerrors);
     }
     return state.nerrors;
@@ -431,7 +432,7 @@ void gc_show_pte(lispobj obj)
 #include <stdio.h>
 
 static int n_dumps;
-static void dump_immobile(lispobj* where, lispobj* end, FILE*f)
+__attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, FILE*f)
 {
     while (where < end) {
         fprintf(f, "%"OBJ_FMTX": %"OBJ_FMTX"\n", (uword_t)where, *where);
@@ -500,7 +501,9 @@ void dump_spaces(struct verify_state* state, char *reason)
                         fprintf(f, " %06x: %"OBJ_FMTX, (int)(uword_t)(where+i) & 0xffffff, word);
                     else
                         fprintf(f, "   %04x: %"OBJ_FMTX, (int)(uword_t)(where+i) & 0xffff, word);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
                     if (i == 0 && header_widetag(word) == INSTANCE_WIDETAG) word >>= 32;
+#endif
                     if (is_lisp_pointer(word)
                         && (find_page_index((void*)word)>=0 || immobile_space_p(word)))
                         fprintf(f, " (g%d)", gc_gen_of(word, 0xff));
