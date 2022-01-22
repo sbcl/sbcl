@@ -3881,7 +3881,7 @@ III. initially undefined function references (alphabetically):
               (cold-cons
                (cold-intern gf-name)
                (vector-in-core
-                (loop for (class qual lambda-list fun source-loc)
+                (loop for (class quals lambda-list fun source-loc)
                       ;; Methods must be sorted because we invoke
                       ;; only the first applicable one.
                       in (stable-sort methods #'> ; highest depthoid first
@@ -3890,8 +3890,8 @@ III. initially undefined function references (alphabetically):
                       collect
                       (vector-in-core
                        (list (cold-intern
-                              (and (null qual) (predicate-for-specializer class)))
-                             (cold-intern qual)
+                              (and (null quals) (predicate-for-specializer class)))
+                             quals
                              (acond ((gethash class *cold-layouts*)
                                      (->wrapper (cold-layout-descriptor it)))
                                     (t

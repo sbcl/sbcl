@@ -166,7 +166,7 @@
   (dovector (method (nreverse (cdr (assoc gf-name *!trivial-methods*))))
     ;; METHOD is a vector:
     ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
-    (let ((qualifier   (svref method 1))
+    (let ((qualifiers  (svref method 1))
           (specializer (svref method 2))
           (fmf         (svref method 3))
           (lambda-list (svref method 4))
@@ -186,7 +186,7 @@
                   (values (list (find-class specializer)) '(:arg-info (1)))))
              (load-defmethod
               'standard-method gf-name
-              (if qualifier (list qualifier)) specializers lambda-list
+              qualifiers specializers lambda-list
               `(:function
                 ,(let ((mf (%make-method-function fmf)))
                    (setf (%funcallable-instance-fun mf)

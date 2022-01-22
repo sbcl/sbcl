@@ -2866,19 +2866,6 @@ bootstrapping.
 
   (/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
 
-;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument
-;;; into the 'real' arguments. This is where the syntax of DEFMETHOD
-;;; is really implemented.
-(defun parse-defmethod (cdr-of-form)
-  (declare (list cdr-of-form))
-  (let ((qualifiers ())
-        (spec-ll ()))
-    (loop (if (and (car cdr-of-form) (atom (car cdr-of-form)))
-              (push (pop cdr-of-form) qualifiers)
-              (return (setq qualifiers (nreverse qualifiers)))))
-    (setq spec-ll (pop cdr-of-form))
-    (values qualifiers spec-ll cdr-of-form)))
-
 (defun parse-specializers (generic-function specializers)
   (declare (list specializers))
   (flet ((parse (spec)
@@ -2899,46 +2886,6 @@ bootstrapping.
   (def 1 extract-lambda-list)
   (def 2 extract-specializer-names))
 
-(define-condition specialized-lambda-list-error
-    (reference-condition simple-program-error)
-  ()
-  (:default-initargs :references '((:ansi-cl :section (3 4 3)))))
-
-(defun specialized-lambda-list-error (format-control &rest format-arguments)
-  (error 'specialized-lambda-list-error
-         :format-control format-control
-         :format-arguments format-arguments))
-
-;; Return 3 values:
-;; - the bound variables, without defaults, supplied-p vars, or &AUX vars.
-;; - the lambda list without specializers.
-;; - just the specializers
-(defun parse-specialized-lambda-list (arglist)
-  (binding* (((llks specialized optional rest key aux)
-              (parse-lambda-list
-               arglist
-               :context 'defmethod
-               :accept (lambda-list-keyword-mask
-                        '(&optional &rest &key &allow-other-keys &aux))
-               :silent t         ; never signal &OPTIONAL + &KEY style-warning
-               :condition-class 'specialized-lambda-list-error))
-             (required (mapcar (lambda (x) (if (listp x) (car x) x)) specialized))
-             (specializers (mapcar (lambda (x) (if (listp x) (cadr x) t)) specialized)))
-    (check-lambda-list-names
-     llks required optional rest key aux nil nil
-     :context "a method lambda list" :signal-via #'specialized-lambda-list-error)
-    (values (append required
-                    (mapcar #'parse-optional-arg-spec optional)
-                    rest
-                    ;; Preserve keyword-names when given as (:KEYWORD var)
-                    (mapcar (lambda (x)
-                              (if (typep x '(cons cons))
-                                  (car x)
-                                  (parse-key-arg-spec x)))
-                            key))
-            (make-lambda-list llks nil required optional rest key aux)
-            specializers)))
-
 (setq **boot-state** 'early)
 
 ;;; FIXME: In here there was a #-CMU definition of SYMBOL-MACROLET
