@@ -50,8 +50,8 @@ static void note_failure(lispobj thing, lispobj *where, struct verify_state *sta
     if (state->object_addr) {
         lispobj obj = compute_lispobj(state->object_addr);
         page_index_t pg = find_page_index(state->object_addr);
-        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%ld) sees %s\n",
-                (void*)thing, (uword_t)where, obj, pg, str);
+        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%d) sees %s\n",
+                (void*)thing, (uword_t)where, obj, (int)pg, str);
         // Record this in state->err_objs if possible
         int i;
         for(i=0; i<MAX_ERR_OBJS; ++i)
@@ -326,7 +326,7 @@ static int verify(lispobj start, lispobj* end, struct verify_state* state, int f
  * You might want to use that as a deciding factor for dump the heap
  * to a file (which takes time, and generally isn't needed).
  * But if a particular verification fails, then do dump it */
-int verify_heap(uword_t flags)
+int verify_heap(int flags)
 {
     int verbose = gencgc_verbose | ((flags & VERIFY_VERBOSE) != 0);
 

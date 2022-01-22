@@ -2689,7 +2689,7 @@ static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t g
         }
 #else
         if (!PAGE_WRITEPROTECTED_P(page)) {
-            int dirty = descriptors_scavenge(start, limit, gen, 0);
+            int dirty = descriptors_scavenge(start, end, gen, 0);
             if (!dirty) protect_page(start, page);
         }
 #endif
