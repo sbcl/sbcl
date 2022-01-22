@@ -718,12 +718,11 @@ static void record_pc(char* pc, unsigned int index, boolean sizedp)
     // Wasn't the point of code serial# that you don't store
     // code blob pointers into the various profiling buffers? (FIXME?)
     if (code) {
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        page_index_t page = find_page_index(&v->data[index]);
-        // technically this only needs to be unprotected if the generation
-        // of the code is younger, but the KISS principle pertains.
-        if (page >= 0) unprotect_page_index(page);
-#endif
+        /* If the first of the two stores is at an even index, then the second
+         * "notice" call is redundant because it will certainly be on the same card.
+         * Doing both calls is future-proof though. */
+        notice_pointer_store(&v->data[index]);
+        notice_pointer_store(&v->data[index+1]);
         v->data[index] = make_lispobj(code, OTHER_POINTER_LOWTAG);
         v->data[index+1] = make_fixnum((lispobj)pc - (lispobj)code);
     } else {

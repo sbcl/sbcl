@@ -611,7 +611,6 @@ pscav(lispobj *addr, long nwords, boolean constant)
 }
 
 extern void dump_space_to_file(lispobj* where, lispobj* limit, char* pathname);
-extern void verify_heap(int);
 int
 purify(lispobj static_roots, lispobj read_only_roots)
 {

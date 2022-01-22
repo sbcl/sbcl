@@ -2573,7 +2573,9 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
     page_index_t page;
     for (page = first_page; page <= last_page; ++page)
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        protect_page(page_address(page), page); // just do it, there's zero overhead
+        // Don't worry, the cards are all clean - if any card mark was sticky,
+        // then we would have bailed out as the first thing (way up above).
+        gc_card_mark[addr_to_card_index(page_address(page))] = CARD_UNMARKED;
 #else
         // Try to avoid a system call
         if (!PAGE_WRITEPROTECTED_P(page)) protect_page(page_address(page), page);
@@ -2665,32 +2667,34 @@ extern int descriptors_scavenge(lispobj *, lispobj*, generation_index_t, int);
  */
 static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t gen)
 {
-    int prev_marked = 0;
+    __attribute__((unused)) int prev_marked = 0;
     while (1) {
-        int marked = !PAGE_WRITEPROTECTED_P(page);
+        lispobj* start = (void*)page_address(page);
+        lispobj* end = start + page_words_used(page);
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        long card = addr_to_card_index(start);
+        int marked = gc_card_mark[card] != CARD_UNMARKED;
         if (marked || prev_marked) {
-            lispobj* start = (void*)page_address(page);
-            lispobj* end = start + page_words_used(page);
             int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
-            if (dirty == marked) {
-                // Either was marked and remains so, OR was and is clean
-                // (but was scanned because of prev_marked).  So, nothing to do.
-            } else if (!dirty) { // was marked, is clean
-                protect_page(start, page);
-            } else {
-                // Was not marked, got scanned because of prev_marked, and is dirty.
-                // This arises with a card-spanning object whose header on the previous card.
-                gc_card_mark[page_to_card_index(page)] = CARD_MARKED;
-            }
+            /* Card can go from marked to unmarked (just like with physical protection),
+             * but also unmarked to marked, if transferring the card mark from the object's
+             * header card to a cell in that object on a later card.
+             * Lisp is given leeway because marking the header is easier. So the
+             * algorithm accepts either way on input, but makes its output canonical.
+             * (similar in spirit to Postel's Law) */
+            gc_card_mark[card] =
+              (gc_card_mark[card] != STICKY_MARK) ? (dirty ? CARD_MARKED : CARD_UNMARKED) :
+              STICKY_MARK;
+            prev_marked = marked;
         }
+#else
+        if (!PAGE_WRITEPROTECTED_P(page)) {
+            int dirty = descriptors_scavenge(start, limit, gen, 0);
+            if (!dirty) protect_page(start, page);
+        }
+#endif
         if (page_ends_contiguous_block_p(page, gen)) return page;
         ++page;
-        /* prev_marked matters only for soft marks. If a card's predecessor is marked,
-         * it might mean that the old->young pointer is on the allegedly clean card,
-         * which will become marked as per above */
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        prev_marked = marked;
-#endif
     }
 }
 
@@ -2698,17 +2702,21 @@ static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t g
  * but even easier because there is no looking back 1 card */
 static page_index_t scan_vector_root_page(page_index_t page, generation_index_t gen)
 {
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
+    return scan_boxed_root_page(page, gen);
+#else
     while (1) {
-        int marked = !PAGE_WRITEPROTECTED_P(page);
-        if (marked) {
-            lispobj* start = (void*)page_address(page);
+        lispobj* start = (void*)page_address(page);
+        long card = addr_to_card_index(start);
+        if (gc_card_mark[card] != CARD_UNMARKED) {
             lispobj* end = start + page_words_used(page);
             int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
-            if (!dirty) protect_page(start, page);
+            if (!dirty) gc_card_mark[card] = CARD_UNMARKED;
         }
         if (page_ends_contiguous_block_p(page, gen)) return page;
         ++page;
     }
+#endif
 }
 
 /* Scavenge all generations from FROM to TO, inclusive, except for

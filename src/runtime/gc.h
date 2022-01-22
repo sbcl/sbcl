@@ -66,7 +66,7 @@ extern os_vm_size_t bytes_consed_between_gcs;
  * lisp signal handler array, or other similar array */
 #define VERIFYING_UNFORMATTED 512
 
-int verify_heap(uword_t flags);
+int verify_heap(int flags);
 #ifdef LISP_FEATURE_GENCGC
 #define MAX_ERR_OBJS 5
 struct verify_state {

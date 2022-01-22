@@ -330,26 +330,20 @@ extern unsigned char* gc_card_mark;
 #define STICKY_MARK 2
 #define CARD_UNMARKED 0xff
 
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
 /* This is used by the fault handler, and potentially during GC */
 static inline void unprotect_page_index(page_index_t page_index)
 {
-    int card = page_to_card_index(page_index);
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    if (gc_card_mark[card] == STICKY_MARK) return; // STICKY is stronger than MARKED
-#else
     os_protect(page_address(page_index), GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_ALL);
     unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
     __sync_fetch_and_or(pflagbits, WP_CLEARED_FLAG);
-#endif
-    gc_card_mark[card] = CARD_MARKED;
+    gc_card_mark[page_to_card_index(page_index)] = CARD_MARKED;
 }
 
 static inline void protect_page(void* page_addr,
                                 __attribute__((unused)) page_index_t page_index)
 {
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
     os_protect((void *)page_addr, GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_READ);
-
     /* Note: we never touch the write_protected_cleared bit when protecting
      * a page. Consider two random threads that reach their SIGSEGV handlers
      * concurrently, each checking why it got a write fault. One thread wins
@@ -363,9 +357,9 @@ static inline void protect_page(void* page_addr,
      * But nothing is really gained by resetting the cleared flag.
      * It is explicitly zeroed on pages marked as free though.
      */
-#endif
     gc_card_mark[addr_to_card_index(page_addr)] = CARD_UNMARKED;
 }
+#endif
 
 // Two helpers to avoid invoking the memory fault signal handler.
 // For clarity, distinguish between words which *actually* need to frob
@@ -373,23 +367,29 @@ static inline void protect_page(void* page_addr,
 // but are forced to call mprotect() because it's the only choice.
 // Unlike with NON_FAULTING_STORE, in this case we actually do want to record that
 // the ensuing store toggles the WP bit without invoking the fault handler.
-static inline void ensure_ptr_word_writable(void* addr) {
+static inline void notice_pointer_store(void* addr) {
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    int card = addr_to_card_index(addr);
+    // STICKY is stronger than MARKED. Only change if UNMARKED.
+    if (gc_card_mark[card] == CARD_UNMARKED) gc_card_mark[card] = CARD_MARKED;
+#else
     page_index_t index = find_page_index(addr);
     gc_assert(index >= 0);
     if (PAGE_WRITEPROTECTED_P(index)) unprotect_page_index(index);
+#endif
 }
 static inline void ensure_non_ptr_word_writable(__attribute__((unused)) void* addr)
 {
-  // don't need to do anything if not using hardware page protection
+  // there's nothing to "ensure" if using software card marks
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
-    ensure_ptr_word_writable(addr);
+    notice_pointer_store(addr);
 #endif
 }
 
 #else
 
 /* cheneygc */
-#define ensure_ptr_word_writable(dummy)
+#define notice_pointer_store(dummy)
 #define ensure_non_ptr_word_writable(dummy)
 #define NON_FAULTING_STORE(operation, addr) operation
 

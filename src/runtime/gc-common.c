@@ -1689,7 +1689,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                 cons->cdr = hash_table->culled_values;
                 cons->car = val;
                 lispobj list = make_lispobj(cons, LIST_POINTER_LOWTAG);
-                ensure_ptr_word_writable(&hash_table->culled_values);
+                notice_pointer_store(&hash_table->culled_values);
                 hash_table->culled_values = list;
                 // ensure this cons doesn't get smashed into (0 . 0) by full gc
                 if (!compacting_p()) gc_mark_obj(list);
@@ -1720,7 +1720,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
             cons->cdr = hash_table->smashed_cells;
             // Lisp code must atomically pop the list whereas this C code
             // always wins and does not need compare-and-swap.
-            ensure_ptr_word_writable(&hash_table->smashed_cells);
+            notice_pointer_store(&hash_table->smashed_cells);
             hash_table->smashed_cells = make_lispobj(cons, LIST_POINTER_LOWTAG);
             // ensure this cons doesn't get smashed into (0 . 0) by full gc
             if (!compacting_p()) gc_mark_obj(hash_table->smashed_cells);
