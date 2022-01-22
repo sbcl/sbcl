@@ -1,5 +1,37 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.2.0:
+  * incompatible change: DEFINE-ALIEN-CALLBACK, which has never been exported
+    from a public package, has been deleted.  It is superseded by
+    SB-ALIEN:DEFINE-ALIEN-CALLABLE.
+  * minor incompatible change: compiler warnings are emitted on more
+    provably-erroneous code involving sequence functions on specialized
+    arrays.
+  * platform support:
+    ** support getting thread IDs on FreeBSD.  (thanks to Felix Lange)
+    ** faster function call sequence on arm64.
+    ** the built-in buffer size for file streams is increased to 8KB.
+  * enhancement: provide a restart for method lambda list mismatches that
+    fmakunbounds the generic function.
+  * enhancement: provide a USE-VALUE restart around type errors signalled from
+    (SETF SLOT-VALUE).
+  * enhancement: when UPDATE-INSTANCE-FOR-DIFFERENT-CLASS (or -REDEFINED-)
+    undergoes a non-local exit, restore the instance to its original state.
+    (thanks to Michał phoe Herda)
+  * enhancement: the :SYNCHRONIZED keyword argument to MAKE-HASH-TABLE is no
+    longer experimental.
+  * bug fix: fix an erroneous compiler tranform for (EXPT SINGLE-FLOAT
+    INTEGER).  (lp#1958061, thanks to Vasily Postnicov)
+  * bug fix: disassembly of closures is more likely to show the relevant code
+    if more than one closure closes over the same environment.  (lp#1956870,
+    reported by Michał phoe Herda)
+  * bug fix: RUN-PROGRAM with :IF-EXISTS :APPEND no longer signals an error if
+    the output does not exist.  (lp#1958569, thanks to Ingo Krabbe)
+  * optimization: reorder basic blocks to have loop code fall through more
+    often.  (thanks to Hayley Patton)
+  * optimization: sequences larger than the buffer size are written to streams
+    without going through a buffering stage.  (reported by Philipp Marek)
+
 changes in sbcl-2.2.0 relative to sbcl-2.1.11:
   * platform support:
     ** support for FreeBSD on 64-bit arm platforms has been added.
