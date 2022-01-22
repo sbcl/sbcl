@@ -91,8 +91,7 @@
             ;; for a normal LOAD-DEFMETHOD.
             nil ',name ',specializer ',qualifiers ',unspecialized-ll
             ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
-            (named-lambda (fast-method ,name
-                                       (,specializer ,@(if (eq name 'print-object) '(t))))
+            (named-lambda (fast-method ,name ,@qualifiers ,specializers)
                 (.pv. .next-method-call. .arg0. ,@(cdr unspecialized-ll)
                  ;; Rebind specialized arg with unchecked type assertion.
                  &aux (,(car unspecialized-ll) (truly-the ,specializer .arg0.)))
