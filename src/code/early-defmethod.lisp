@@ -82,33 +82,36 @@
       (parse-defmethod args)
     (multiple-value-bind (parameters unspecialized-ll specializers)
         (parse-specialized-lambda-list lambda-list)
-      (declare (ignore parameters))
-      (let ((specializer (first specializers)))
-        (multiple-value-bind (forms decls)
-            (parse-body body nil) ; Note: disallowing docstring
-          `(!trivial-defmethod
-            ;; An extra NIL in front puts the GF name is the same position it would be in
-            ;; for a normal LOAD-DEFMETHOD.
-            nil ',name ',specializer ',qualifiers ',unspecialized-ll
-            ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
-            (named-lambda (fast-method ,name ,@qualifiers ,specializers)
-                (.pv. .next-method-call. .arg0. ,@(cdr unspecialized-ll)
-                 ;; Rebind specialized arg with unchecked type assertion.
-                 &aux (,(car unspecialized-ll) (truly-the ,specializer .arg0.)))
-              (declare (ignore .pv. .next-method-call.)
-                       (ignorable ,(car unspecialized-ll)))
-              ,@decls
-              ;; Fail at compile-time if any fancy slot access would happen, if compiled
-              ;; by the eventual implementation.
-              ;; (SETF SLOT-VALUE) is not a legal macro name, so transform it as a
-              ;; an ignorable function that uses a legal macro name.
-              (macrolet ,(mapcar (lambda (f)
-                                   `(,f (&rest args)
-                                        (declare (ignore args))
-                                        (error "can't use ~A in trivial method" ',f)))
-                                 '(slot-boundp slot-value %set-slot-value call-next-method))
-                (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
-                  (declare (inline (setf slot-value)) (ignorable #'(setf slot-value)))
-                  (block ,name ,@forms))))
-            ;; Why is SOURCE-LOC needed? Lambdas should know their location.
-            (sb-c:source-location)))))))
+      (multiple-value-bind (forms decls)
+          (parse-body body nil) ; Note: disallowing docstring
+        `(!trivial-defmethod
+          ;; An extra NIL in front puts the GF name is the same position it would be in
+          ;; for a normal LOAD-DEFMETHOD.
+          nil ',name ',(first specializers) ',qualifiers ',unspecialized-ll
+          ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
+          (named-lambda (fast-method ,name ,@qualifiers ,specializers)
+              (.pv. .next-method-call. ,@unspecialized-ll
+               ;; Rebind arguments, asserting specialized types. (unchecked)
+               &aux ,@(mapcar (lambda (parameter specializer)
+                                `(,parameter (truly-the ,specializer ,parameter)))
+                              parameters specializers))
+            (declare (ignore .pv. .next-method-call.))
+            (declare ,@(mapcar (lambda (parameter specializer)
+                                 (declare (ignore specializer))
+                                 `(ignorable ,parameter))
+                               parameters specializers))
+            ,@decls
+            ;; Fail at compile-time if any fancy slot access would happen, if compiled
+            ;; by the eventual implementation.
+            ;; (SETF SLOT-VALUE) is not a legal macro name, so transform it as a
+            ;; an ignorable function that uses a legal macro name.
+            (macrolet ,(mapcar (lambda (f)
+                                 `(,f (&rest args)
+                                      (declare (ignore args))
+                                      (error "can't use ~A in trivial method" ',f)))
+                               '(slot-boundp slot-value %set-slot-value call-next-method))
+              (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
+                (declare (inline (setf slot-value)) (ignorable #'(setf slot-value)))
+                (block ,name ,@forms))))
+          ;; Why is SOURCE-LOC needed? Lambdas should know their location.
+          (sb-c:source-location))))))
