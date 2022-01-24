@@ -784,7 +784,7 @@
       (if (zerop x)
           x
           (dispatch :me
-                    (make-flonum (realnumify x)
+                    (make-flonum (funcall #':me (realnumify x))
                                  (pick-result-format x))))))
 
   (intercept (*) (&rest args)
