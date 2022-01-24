@@ -915,32 +915,17 @@
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison"))
 
-(define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (satisfies fixnum-abs-add-sub-immediate-p)))
-  (:info y))
-
 (define-vop (fast-conditional/signed fast-conditional)
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:note "inline (signed-byte 64) comparison"))
 
-(define-vop (fast-conditional-c/signed fast-conditional/signed)
-  (:args (x :scs (signed-reg)))
-  (:arg-types signed-num (:constant (satisfies abs-add-sub-immediate-p)))
-  (:info y))
-
 (define-vop (fast-conditional/unsigned fast-conditional)
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 64) comparison"))
-
-(define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
-  (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num (:constant (satisfies abs-add-sub-immediate-p)))
-  (:info y))
 
 (defmacro define-conditional-vop (tran signed unsigned)
   `(progn
@@ -1038,27 +1023,18 @@
 (defun %logbitp (integer index)
   (logbitp index integer))
 
-(define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
+(define-vop ()
   (:translate %logbitp)
+  (:policy :fast-safe)
+  (:args (x :scs (any-reg signed-reg unsigned-reg)))
+  (:info y)
+  (:arg-types (:or tagged-num signed-num unsigned-num) (:constant (mod #.n-word-bits)))
   (:conditional :ne)
-  (:arg-types tagged-num (:constant (mod #.n-word-bits)))
-  (:generator 4
-    (inst tst x (ash 1 (min (+ y n-fixnum-tag-bits)
-                            (1- n-word-bits))))))
-
-(define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
-  (:translate %logbitp)
-  (:conditional :ne)
-  (:arg-types signed-num (:constant (mod #.n-word-bits)))
-  (:generator 5
-    (inst tst x (ash 1 y))))
-
-(define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
-  (:translate %logbitp)
-  (:conditional :ne)
-  (:arg-types unsigned-num (:constant (mod #.n-word-bits)))
-  (:generator 5
-    (inst tst x (ash 1 y))))
+  (:generator 2
+    (inst tst x (ash 1 (min (if (sc-is x any-reg)
+                                (+ y n-fixnum-tag-bits)
+                                y)
+                         (1- n-word-bits))))))
 
 ;; Specialised mask-signed-field VOPs.
 (define-vop (mask-signed-field-word/c)
