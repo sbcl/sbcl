@@ -216,4 +216,7 @@
                 ;; compiler (i.e. making the registry a slot of the fasl-output struct)
                 (clear-specialized-array-registry)))
              (format t "~&~50t ~f~%" total-time))
-           (sb-c::dump/restore-interesting-types 'write))))))
+           (sb-c::dump/restore-interesting-types 'write)))
+     (sb-kernel::write-structure-definitions-as-text
+      (sb-cold:stem-object-path "defstructs.lisp-expr"
+                                '(:extra-artifact) :target-compile)))))

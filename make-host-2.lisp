@@ -162,49 +162,6 @@ Sample output
 ;;; cold init if it wasn't.)
 (load "tests/type.after-xc.lisp")
 
-(in-package "SB-IMPL")
-
-;;; Inform genesis of all defstructs
-(with-open-file (output (sb-cold:stem-object-path "defstructs.lisp-expr"
-                                                  '(:extra-artifact) :target-compile)
-                        :direction :output :if-exists :supersede)
-  (dolist (root '(structure-object function))
-    (dolist (pair (let ((subclassoids (classoid-subclasses (find-classoid root))))
-                    (if (listp subclassoids)
-                        subclassoids
-                        (flet ((pred (x y)
-                                 (or (string< x y)
-                                     (and (string= x y)
-                                          (let ((xpn (package-name (cl:symbol-package x)))
-                                                (ypn (package-name (cl:symbol-package y))))
-                                            (string< xpn ypn))))))
-                          (sort (%hash-table-alist subclassoids)
-                                #'pred
-                                ;; pair = (#<classoid> . #<layout>)
-                                :key (lambda (pair) (classoid-name (car pair))))))))
-      (let* ((wrapper (cdr pair))
-             (dd (wrapper-info wrapper)))
-        (cond
-          (dd
-           (let* ((*print-pretty* nil) ; output should be insensitive to host pprint
-                  (*print-readably* t)
-                  (classoid-name (classoid-name (car pair)))
-                  (*package* (cl:symbol-package classoid-name)))
-             (format output "~/sb-ext:print-symbol-with-prefix/ ~S (~%"
-                     classoid-name
-                     (list* (the (unsigned-byte 16) (wrapper-flags wrapper))
-                            (wrapper-depthoid wrapper)
-                            (map 'list #'sb-kernel::wrapper-classoid-name
-                                 (wrapper-inherits wrapper))))
-             (dolist (dsd (dd-slots dd) (format output ")~%"))
-               (format output "  (~d ~S ~S)~%"
-                       (sb-kernel::dsd-bits dsd)
-                       (dsd-name dsd)
-                       (dsd-accessor-name dsd)))))
-          (t
-           (error "Missing DD for ~S" pair))))))
-  (format output ";; EOF~%"))
-
 ;;; If you're experimenting with the system under a cross-compilation
 ;;; host which supports CMU-CL-style SAVE-LISP, this can be a good
 ;;; time to run it. The resulting core isn't used in the normal build,
