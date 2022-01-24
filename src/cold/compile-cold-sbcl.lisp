@@ -110,6 +110,7 @@
 
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 
+(read-undefined-fun-allowlist)
 (defun parallel-make-host-2 (max-jobs)
   (let ((subprocess-count 0)
         (subprocess-list nil)

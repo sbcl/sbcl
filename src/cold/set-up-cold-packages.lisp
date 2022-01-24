@@ -490,10 +490,11 @@
   (load (find-bootstrap-file "^exports.lisp"))
   (create-target-packages *package-data-list*))
 
-(with-open-file (data (find-bootstrap-file "^undefined-fun-allowlist.lisp-expr"))
-  (let ((*readtable* *xc-readtable*))
-    (dolist (name (apply #'append (read data)))
-      (setf (gethash name *undefined-fun-allowlist*) t))))
+(defun read-undefined-fun-allowlist ()
+  (with-open-file (data (find-bootstrap-file "^undefined-fun-allowlist.lisp-expr"))
+    (let ((*readtable* *xc-readtable*))
+      (dolist (name (apply #'append (read data)))
+        (setf (gethash name *undefined-fun-allowlist*) t)))))
 
 (defvar *asm-package-use-list*
   '("SB-ASSEM" "SB-DISASSEM"
