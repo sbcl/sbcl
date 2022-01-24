@@ -1262,7 +1262,7 @@ void add_to_weak_vector_list(lispobj* vector, lispobj header)
     if (!(header & WEAK_VECTOR_VISITED_BIT)) {
         weak_vectors = (struct cons*)gc_private_cons((uword_t)vector,
                                                      (uword_t)weak_vectors);
-        *vector |= WEAK_VECTOR_VISITED_BIT;
+        NON_FAULTING_STORE(*vector |= WEAK_VECTOR_VISITED_BIT, vector);
     }
 }
 

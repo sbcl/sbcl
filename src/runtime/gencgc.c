@@ -4611,7 +4611,11 @@ int gencgc_handle_wp_violation(void* fault_addr)
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     lose("misuse of mprotect() on dynamic space @ %p", fault_addr);
 #else
-    if (gc_active_p && compacting_p()) lose("unexpected WP fault @ %p during GC", fault_addr);
+    // This assertion is almost always correct, but what about a page-spanning
+    // object with part on a writable page and part on a physically-protected page?
+    // Some of the scavenge functions might not take care to avoid rewriting an
+    // unchanged word. So they can fault even though they didn't need to store at all.
+    // if (gc_active_p && compacting_p()) lose("unexpected WP fault @ %p during GC", fault_addr);
     gc_assert(!is_code(page_table[page_index].type));
     // There can not be an open region. gc_close_region() does not attempt
     // to flip that bit atomically. Other threads in the wp violation handler
