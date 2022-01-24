@@ -201,9 +201,8 @@
               sb-ext:*gc-run-time*
               sb-kernel::*gc-epoch*
               sb-int:*n-bytes-freed-or-purified*
-              sb-disassem::*disassem-inst-space*
-              sb-disassem::*assembler-routines-by-addr*
               ,(maybe "SB-VM" "*BINDING-STACK-POINTER*")
+              ,(maybe "SB-VM" "*CONTROL-STACK-POINTER*")
               ,(maybe "SB-THREAD" "*JOINABLE-THREADS*")
               ,(maybe "SB-THREAD" "*STARTING-THREADS*")
               ,(maybe "SB-THREAD" "*SPROF-DATA*")
@@ -450,6 +449,8 @@
         (sb-impl::disable-stepping)
         (sb-int:unencapsulate 'open 'open-guard)
         (when actually-pure
+          (setq sb-disassem::*disassem-inst-space* nil
+                sb-disassem::*assembler-routines-by-addr* nil)
           (compare-symbol-values global-symbol-values)
           (compare-gf-summary gf-summary)
           (globaldb-cleanup initial-packages globaldb-summary)
