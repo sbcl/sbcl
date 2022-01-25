@@ -736,17 +736,6 @@ of specialized arrays is supported."
                ,@decls
                (tagbody ,@forms))))))))
 
-;;; We need this constant to be dumped in such a way that genesis can directly
-;;; compute the symbol-value in cold load, and not defer the reference until
-;;; *!cold-toplevels* are evaluated. That's because GROW-HASH-TABLE calls REPLACE
-;;; which calls VECTOR-REPLACE which tries to reference the array of functions,
-;;; which had better not be deferred, or all hell breaks loose. It's actually
-;;; tricky to call any function in any file that has its toplevel forms evaluated
-;;; later than the current file, because you don't generally know whether code
-;;; blobs in that other file have had their L-T-V fixups patched in.
-(defconstant-eqx +blt-copier-for-widetag+ #.(make-array 32 :initial-element nil)
-  #'equalp)
-
 (macrolet ((%ref (accessor-getter extra-params)
              `(funcall (,accessor-getter array) array index ,@extra-params))
            (define (accessor-name slow-accessor-name accessor-getter
@@ -858,7 +847,7 @@ of specialized arrays is supported."
                         collect `(setf (svref ,symbol ,widetag)
                                        (,deffer ,saetp ,check-form))))))
   (defun !hairy-data-vector-reffer-init ()
-    (!blt-copiers-cold-init +blt-copier-for-widetag+)
+    (!blt-copiers-cold-init)
     (define-reffers %%data-vector-reffers%% define-reffer
       (progn)
       #'slow-hairy-data-vector-ref)
@@ -1178,19 +1167,21 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
-(defun !blt-copiers-cold-init (array)
-  (macrolet ((init ()
-               `(progn
-                  ,@(loop for saetp across *specialized-array-element-type-properties*
-                          when (and (not (member (saetp-specifier saetp) '(t nil)))
-                                    (<= (saetp-n-bits saetp) n-word-bits))
-                            collect `(setf (svref array ,(ash (- (saetp-typecode saetp) 128) -2))
-                                           #',(intern (format nil "UB~D-BASH-COPY"
-                                                              (saetp-n-bits saetp))
-                                                      "SB-KERNEL"))))))
-      (init)))
-
-(defmacro blt-copier-for-widetag (x) `(aref +blt-copier-for-widetag+ (ash (- ,x 128) -2)))
+(defun !blt-copiers-cold-init ()
+  (let ((array (make-array 32 :initial-element nil)))
+    (macrolet ((init ()
+                 `(progn
+                    ,@(loop for saetp across *specialized-array-element-type-properties*
+                            when (and (not (member (saetp-specifier saetp) '(t nil)))
+                                      (<= (saetp-n-bits saetp) n-word-bits))
+                              collect `(setf (svref array ,(ash (- (saetp-typecode saetp) 128) -2))
+                                             #',(intern (format nil "UB~D-BASH-COPY"
+                                                                (saetp-n-bits saetp))
+                                                        "SB-KERNEL"))))))
+      (init))
+    (setf (fdefinition 'blt-copier-for-widetag)
+          (lambda (x)
+            (aref array (ash (- x 128) -2))))))
 
 (defun extend-vector (vector min-extension)
   (declare (optimize speed)
