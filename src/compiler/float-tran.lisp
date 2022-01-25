@@ -334,6 +334,17 @@
         most-negative-single-float most-positive-single-float)
   (frob %double-float double-float
         most-negative-double-float most-positive-double-float))
+
+(defoptimizer (float derive-type) ((number prototype))
+  (let ((type (lvar-type prototype)))
+    (unless (or (csubtypep type (specifier-type 'double-float))
+                (csubtypep type (specifier-type 'single-float)))
+      (handler-case
+          (type-union
+           (one-arg-derive-type number #'%single-float-derive-type-aux #'%single-float)
+           (one-arg-derive-type number #'%double-float-derive-type-aux #'%double-float))
+        (type-error ()
+          nil)))))
 
 ;;;; float contagion
 
