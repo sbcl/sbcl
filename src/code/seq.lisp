@@ -747,10 +747,10 @@
                             :start2 start2 :end2 (truly-the index (+ start2 nelts)))
                    (return-from replace))
                  (let ((copier (sb-vm::blt-copier-for-widetag tag1)))
-                   (when (functionp copier)
+                   (when copier
                      ;; these copiers figure out which direction to step.
                      ;; arg order is FROM, TO which is the opposite of REPLACE.
-                     (funcall copier data2 start2 data1 start1 nelts)
+                     (funcall (truly-the function copier) data2 start2 data1 start1 nelts)
                      (return-from replace))))
                ;; General case is just like the code emitted by TRANSFORM-REPLACE
                ;; but using the getter and setter.

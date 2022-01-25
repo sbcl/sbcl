@@ -1206,8 +1206,8 @@ of specialized arrays is supported."
                      (truly-the simple-vector old-data)
                      :start2 old-start :end2 old-end)
             (let ((copier (blt-copier-for-widetag widetag)))
-              (if (functionp copier)
-                  (funcall copier old-data old-start new-data 0 old-length)
+              (if copier
+                  (funcall (truly-the function copier) old-data old-start new-data 0 old-length)
                   (replace new-data old-data :start2 old-start :end2 old-end))))
         (setf (%array-data vector) new-data
               (%array-available-elements vector) new-length
