@@ -160,40 +160,37 @@
 
 (defun !install-cross-compiled-methods (gf-name &key except)
   (assert (generic-function-p (fdefinition gf-name)))
-  ;; Reversing installs less-specific methods first,
-  ;; so that if perchance we crash mid way through the loop,
-  ;; there is (hopefully) at least some installed method that works.
-  (dovector (method (nreverse (cdr (assoc gf-name *!trivial-methods*))))
-    ;; METHOD is a vector:
-    ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
-    (let ((qualifiers  (svref method 1))
-          (specializer (svref method 2))
-          (fmf         (svref method 3))
-          (lambda-list (svref method 4))
-          (source-loc  (svref method 5)))
-      (when (sb-kernel::wrapper-p specializer)
-        (setq specializer (wrapper-classoid-name specializer)))
-      (unless (member specializer except)
-        (multiple-value-bind (specializers arg-info)
-               (case gf-name
-                 (print-object
-                  (values (list (find-class specializer) (find-class t))
-                          '(:arg-info (2))))
-                 ((make-load-form close)
-                  (values (list (find-class specializer))
-                          '(:arg-info (1 . t))))
-                 (t
-                  (values (list (find-class specializer)) '(:arg-info (1)))))
-             (load-defmethod
-              'standard-method gf-name
-              qualifiers specializers lambda-list
-              `(:function
-                ,(let ((mf (%make-method-function fmf)))
-                   (setf (%funcallable-instance-fun mf)
-                         (method-function-from-fast-function fmf arg-info))
-                   mf)
-                plist ,arg-info simple-next-method-call t)
-              source-loc))))))
+  (dolist (method (cdr (assoc gf-name *!deferred-methods* :test #'equal)))
+    (destructuring-bind (qualifiers specializers fmf lambda-list source-loc)
+        method
+      (unless (member (first specializers) except)
+        (let ((arg-info
+                (if (equal gf-name '(setf documentation))
+                    '(:arg-info (3))
+                    (case gf-name
+                      (print-object
+                       '(:arg-info (2)))
+                      ((make-load-form close)
+                       '(:arg-info (1 . t)))
+                      ((documentation)
+                       '(:arg-info (2)))
+                      (t
+                       '(:arg-info (1)))))))
+          (load-defmethod
+           'standard-method gf-name
+           qualifiers (mapcar (lambda (x)
+                                (if (typep x '(cons (eql eql) (cons t null)))
+                                    (intern-eql-specializer (constant-form-value (second x)))
+                                    (find-class x)))
+                              specializers)
+           lambda-list
+           `(:function
+             ,(let ((mf (%make-method-function fmf)))
+                (setf (%funcallable-instance-fun mf)
+                      (method-function-from-fast-function fmf arg-info))
+                mf)
+             plist ,arg-info simple-next-method-call t)
+           source-loc))))))
 (!install-cross-compiled-methods 'make-load-form :except '(wrapper))
 
 (defmethod make-load-form ((class class) &optional env)

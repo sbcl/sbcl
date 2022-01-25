@@ -411,8 +411,8 @@ Value of +SLOT-UNBOUND+ is unspecified, and should not be relied to be
 of any particular type, but it is guaranteed to be suitable for EQ
 comparison.")
 
-#.(prog1 `(progn ,@*!documentation-methods*)
-    (setq *!documentation-methods* nil))
+(!install-cross-compiled-methods 'documentation)
+(!install-cross-compiled-methods '(setf documentation))
 
 (dolist (args (prog1 *!docstrings* (makunbound '*!docstrings*)))
   (apply #'(setf documentation) args))

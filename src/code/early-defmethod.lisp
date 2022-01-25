@@ -65,53 +65,41 @@
 
 ;;;; Rudimentary DEFMETHOD
 
-;;; This stub ensures that:
-;;; - Argument specializations are stored in a way that permits an extremely simple
-;;;   single-dispatch implementation with correct behavior of MAKE-LOAD-FORM and
-;;;   PRINT-OBJECT. Subject to not needing method combination or CALL-NEXT-METHOD,
-;;;   exactly one primary method is chosen respecting class precedence order.
-;;; - The simple methods can be installed later by the full CLOS implementation.
-;;;   They play nice by using the same call signature for the "fast function"
-;;; Qualified methods do not take effect until real methods are defined.
-
-(sb-xc:defmacro defmethod (&whole form name &rest args)
+;;; This expander avoids the use of the rest of CLOS in order to help
+;;; with bootstrapping.
+(sb-xc:defmacro defmethod (name &rest args)
   (check-designator name 'defmethod)
-  (when (member name '((setf documentation) documentation) :test 'equal)
-    (return-from defmethod `(push ',form *!documentation-methods*)))
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     (multiple-value-bind (parameters unspecialized-ll specializers)
         (parse-specialized-lambda-list lambda-list)
       (multiple-value-bind (forms decls)
           (parse-body body nil) ; Note: disallowing docstring
-        `(!trivial-defmethod
-          ;; An extra NIL in front puts the GF name is the same position it would be in
-          ;; for a normal LOAD-DEFMETHOD.
-          nil ',name ',(first specializers) ',qualifiers ',unspecialized-ll
+        `(!early-load-method 'standard-method
+          ',name ',qualifiers ',specializers ',unspecialized-ll
           ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
           (named-lambda (fast-method ,name ,@qualifiers ,specializers)
-              (.pv. .next-method-call. ,@unspecialized-ll
-               ;; Rebind arguments, asserting specialized types. (unchecked)
-               &aux ,@(mapcar (lambda (parameter specializer)
-                                `(,parameter (truly-the ,specializer ,parameter)))
-                              parameters specializers))
-            (declare (ignore .pv. .next-method-call.))
-            (declare ,@(mapcar (lambda (parameter specializer)
-                                 (declare (ignore specializer))
-                                 `(ignorable ,parameter))
-                               parameters specializers))
+              (.pv. .next-method-call. ,@unspecialized-ll)
             ,@decls
-            ;; Fail at compile-time if any fancy slot access would happen, if compiled
-            ;; by the eventual implementation.
-            ;; (SETF SLOT-VALUE) is not a legal macro name, so transform it as a
-            ;; an ignorable function that uses a legal macro name.
-            (macrolet ,(mapcar (lambda (f)
-                                 `(,f (&rest args)
-                                      (declare (ignore args))
-                                      (error "can't use ~A in trivial method" ',f)))
-                               '(slot-boundp slot-value %set-slot-value call-next-method))
-              (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
-                (declare (inline (setf slot-value)) (ignorable #'(setf slot-value)))
-                (block ,name ,@forms))))
-          ;; Why is SOURCE-LOC needed? Lambdas should know their location.
+            (declare (ignore .pv. .next-method-call.))
+            ;; Rebind arguments, asserting specialized types. (unchecked)
+            (let ,(mapcar (lambda (parameter specializer)
+                            `(,parameter (truly-the ,specializer ,parameter)))
+                   parameters specializers)
+              (declare ,@(mapcar (lambda (parameter specializer)
+                                   (declare (ignore specializer))
+                                   `(ignorable ,parameter))
+                                 parameters specializers))
+              ;; Fail at compile-time if any fancy slot access would happen, if compiled
+              ;; by the eventual implementation.
+              ;; (SETF SLOT-VALUE) is not a legal macro name, so transform it as a
+              ;; an ignorable function that uses a legal macro name.
+              (macrolet ,(mapcar (lambda (f)
+                                   `(,f (&rest args)
+                                        (declare (ignore args))
+                                        (error "can't use ~A in initial method" ',f)))
+                                 '(slot-boundp slot-value %set-slot-value call-next-method))
+                (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
+                  (declare (inline (setf slot-value)) (ignorable #'(setf slot-value)))
+                  (block ,(fun-name-block-name name) ,@forms)))))
           (sb-c:source-location))))))

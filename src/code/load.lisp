@@ -1216,13 +1216,17 @@
 (define-fop 18 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
-;; This FOP is only encountered in cross-compiled FASLs for cold load,
-;; and is a no-op except in cold load. A developer may want to load a
-;; cross-compiled FASL into a running system, and this FOP doesn't
-;; have to do anything, as the system can load top level forms and
-;; will define the function normally.
+;;; This FOP is only encountered in cross-compiled FASLs for cold load,
+;;; and is a no-op except in cold load. A developer may want to load a
+;;; cross-compiled FASL into a running system, and this FOP doesn't
+;;; have to do anything, as the system can load top level forms and
+;;; will define the function normally.
 (define-fop 74 :not-host (fop-fset (name fn) nil)
   (declare (ignore name fn)))
+
+;;; Like FOP-FSET, but for method definitions.
+(define-fop 75 :not-host (fop-mset (name qualifiers specializer fn) nil)
+  (declare (ignore name qualifiers specializer fn)))
 
 ;;; Modify a slot of the code boxed constants.
 (define-fop 19 (fop-alter-code ((:operands index) code value) nil)

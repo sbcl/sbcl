@@ -1122,7 +1122,7 @@ core and return a descriptor to it."
 ;;; to the host's COLD-LAYOUT proxy for that layout.
 (defvar *cold-layout-by-addr*)
 
-;;; Trivial methods [sic] require that we sort possible methods by the depthoid.
+;;; Initial methods require that we sort possible methods by the depthoid.
 ;;; Most of the objects printed in cold-init are ordered hierarchically in our
 ;;; type lattice; the major exceptions are ARRAY and VECTOR at depthoid -1.
 ;;; Of course we need to print VECTORs because a STRING is a vector,
@@ -2095,15 +2095,6 @@ core and return a descriptor to it."
             (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
     fdefn))
 
-;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.
-(defun cold-defmethod (method-class name &rest stuff)
-  (declare (ignore method-class))
-  (let ((gf (assoc name *cold-methods*)))
-    (unless gf
-      (setq gf (cons name nil))
-      (push gf *cold-methods*))
-    (push stuff (cdr gf))))
-
 (defun attach-classoid-cells-to-symbols (hashtable)
   (when (plusp (hash-table-count *classoid-cells*))
     (aver (gethash 'sb-kernel::classoid-cell *cold-layouts*))
@@ -2584,7 +2575,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (if (not args)
           (push fun *!cold-toplevels*)
           (case fun
-            (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
             ((sb-impl::%defconstant)
              (destructuring-bind (name val . rest) args
                (cold-set name (if (symbolp val) (cold-intern val) val))
@@ -2637,6 +2627,51 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (let ((fn (pop-stack))
         (name (pop-stack)))
     (cold-fset name fn)))
+
+(define-cold-fop (fop-mset)
+  (let ((fn (pop-stack))
+        (specializers (pop-stack))
+        (qualifiers (pop-stack))
+        (name (pop-stack)))
+    ;; Methods that are qualified or are specialized on more than
+    ;; one argument do not work on start-up, since our start-up
+    ;; implementation of method dispatch is single dispatch only.
+    (when (and (null qualifiers)
+               (= 1 (count-if-not (lambda (x) (eq x t)) (host-object-from-core specializers))))
+      (push (list (cold-car specializers) fn)
+            (cdr (or (assoc name *cold-methods*)
+                     (car (push (list name) *cold-methods*))))))))
+
+;;; Order all initial methods so that the first one whose guard
+;;; returns T is the most specific method. LAYOUT-DEPTHOID is a valid
+;;; sort key for this because we don't have multiple inheritance in
+;;; the system object type lattice.
+(defun sort-initial-methods ()
+  (cold-set
+   'sb-pcl::*!initial-methods*
+   (list-to-core
+    (loop for (gf-name . methods) in *cold-methods*
+          collect
+          (cold-cons
+           (cold-intern gf-name)
+           (vector-in-core
+            (loop for (class fun)
+                    ;; Methods must be sorted because we invoke
+                    ;; only the first applicable one.
+                    in (stable-sort methods #'> ; highest depthoid first
+                                    :key (lambda (method)
+                                           (class-depthoid (warm-symbol (car method)))))
+                  collect
+                  (vector-in-core
+                   (let ((class-symbol (warm-symbol class)))
+                     (list (cold-intern
+                            (predicate-for-specializer class-symbol))
+                           (acond ((gethash class-symbol *cold-layouts*)
+                                   (->wrapper (cold-layout-descriptor it)))
+                                  (t
+                                   (aver (predicate-for-specializer class-symbol))
+                                   class))
+                           fun))))))))))
 
 (define-cold-fop (fop-fdefn)
   (ensure-cold-fdefn (pop-stack)))
@@ -3869,38 +3904,8 @@ III. initially undefined function references (alphabetically):
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
 
-      ;;; Order all trivial methods so that the first one whose guard
-      ;;; returns T is the most specific method. LAYOUT-DEPTHOID is a valid
-      ;;; sort key for this because we don't have multiple inheritance in
-      ;;; the system object type lattice.
-      (cold-set
-       'sb-pcl::*!trivial-methods*
-       (list-to-core
-        (loop for (gf-name . methods) in *cold-methods*
-              collect
-              (cold-cons
-               (cold-intern gf-name)
-               (vector-in-core
-                (loop for (class quals lambda-list fun source-loc)
-                      ;; Methods must be sorted because we invoke
-                      ;; only the first applicable one.
-                      in (stable-sort methods #'> ; highest depthoid first
-                                      :key (lambda (method)
-                                             (class-depthoid (car method))))
-                      collect
-                      (vector-in-core
-                       (list (cold-intern
-                              (and (null quals) (predicate-for-specializer class)))
-                             quals
-                             (acond ((gethash class *cold-layouts*)
-                                     (->wrapper (cold-layout-descriptor it)))
-                                    (t
-                                     (aver (predicate-for-specializer class))
-                                     (cold-intern class)))
-                             fun
-                             lambda-list source-loc))))))))
-
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
+      (sort-initial-methods)
       (resolve-deferred-known-funs)
       (resolve-static-call-fixups)
       (foreign-symbols-to-core)

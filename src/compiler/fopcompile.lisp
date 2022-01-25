@@ -181,13 +181,8 @@
        (and (typep form '(cons (eql quote) (cons t null)))
             (constant-fopcompilable-p (constant-form-value form)))
        (and (listp form)
-            (let ((function (car form)))
-              ;; Certain known functions have a special way of checking
-              ;; their fopcompilability in the cross-compiler.
-              (or (member function '(sb-pcl::!trivial-defmethod))
-                  ;; allow DEFCONSTANT only if the value form is ok
-                  (and (member function '(sb-impl::%defconstant))
-                       (fopcompilable-p (third form))))))))
+            (and (eq (first form) 'sb-impl::%defconstant)
+                 (fopcompilable-p (third form))))))
 ) ; end FLET
 
 (defun let-fopcompilable-p (operator args)

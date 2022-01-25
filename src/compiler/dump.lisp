@@ -1231,25 +1231,25 @@
          (entries (sb-c::ir2-component-entries 2comp))
          (nfuns (length entries))
          (code-handle
-          ;; fill in the placeholder elements of constants
-          ;; with the NAME, ARGLIST, TYPE, INFO slots of each simple-fun.
-          (let ((constants (sb-c:ir2-component-constants 2comp))
-                (wordindex (+ sb-vm:code-constants-offset
-                              (* sb-vm:code-slots-per-simple-fun nfuns))))
-            (dolist (entry entries)
-              ;; Process in reverse order of ENTRIES.
-              ;; See also MAKE-CORE-COMPONENT which does the same thing.
-              (decf wordindex sb-vm:code-slots-per-simple-fun)
-              (setf (aref constants (+ wordindex sb-vm:simple-fun-name-slot))
-                    `(:constant ,(sb-c::entry-info-name entry))
-                    (aref constants (+ wordindex sb-vm:simple-fun-arglist-slot))
-                    `(:constant ,(sb-c::entry-info-arguments entry))
-                    (aref constants (+ wordindex sb-vm:simple-fun-source-slot))
-                    `(:constant ,(sb-c::entry-info-form/doc entry))
-                    (aref constants (+ wordindex sb-vm:simple-fun-info-slot))
-                    `(:constant ,(sb-c::entry-info-type/xref entry))))
-            (dump-code-object component code-segment code-length fixups
-                              alloc-points file)))
+           ;; fill in the placeholder elements of constants
+           ;; with the NAME, ARGLIST, TYPE, INFO slots of each simple-fun.
+           (let ((constants (sb-c:ir2-component-constants 2comp))
+                 (wordindex (+ sb-vm:code-constants-offset
+                               (* sb-vm:code-slots-per-simple-fun nfuns))))
+             (dolist (entry entries)
+               ;; Process in reverse order of ENTRIES.
+               ;; See also MAKE-CORE-COMPONENT which does the same thing.
+               (decf wordindex sb-vm:code-slots-per-simple-fun)
+               (setf (aref constants (+ wordindex sb-vm:simple-fun-name-slot))
+                     `(:constant ,(sb-c::entry-info-name entry))
+                     (aref constants (+ wordindex sb-vm:simple-fun-arglist-slot))
+                     `(:constant ,(sb-c::entry-info-arguments entry))
+                     (aref constants (+ wordindex sb-vm:simple-fun-source-slot))
+                     `(:constant ,(sb-c::entry-info-form/doc entry))
+                     (aref constants (+ wordindex sb-vm:simple-fun-info-slot))
+                     `(:constant ,(sb-c::entry-info-type/xref entry))))
+             (dump-code-object component code-segment code-length fixups
+                               alloc-points file)))
          (fun-index nfuns))
 
     (dolist (entry entries)
@@ -1259,13 +1259,25 @@
         ;; When cross compiling, if the entry is a DEFUN, then we also
         ;; dump a FOP-FSET so that the cold loader can instantiate the
         ;; definition at cold-load time, allowing forward references
-        ;; to functions in top-level forms.
+        ;; to functions in top-level forms. If the entry is a
+        ;; DEFMETHOD, we dump a FOP-MSET so that the cold loader
+        ;; recognizes the method definition.
         #+sb-xc-host
         (let ((name (sb-c::entry-info-name entry)))
-          (when (sb-c::legal-fun-name-p name)
-            (dump-object name file)
-            (dump-push entry-handle file)
-            (dump-fop 'fop-fset file)))
+          (cond ((sb-c::legal-fun-name-p name)
+                 (dump-object name file)
+                 (dump-push entry-handle file)
+                 (dump-fop 'fop-fset file))
+                ((and (listp name)
+                      (eq (first name) 'sb-pcl::fast-method))
+                 (let ((method (second name))
+                       (qualifiers (butlast (cddr name)))
+                       (specializers (first (last name))))
+                   (dump-object method file)
+                   (dump-object qualifiers file)
+                   (dump-object specializers file)
+                   (dump-push entry-handle file)
+                   (dump-fop 'fop-mset file)))))
         (setf (gethash entry (fasl-output-entry-table file)) entry-handle)
         (let ((old (gethash entry (fasl-output-patch-table file))))
           (when old

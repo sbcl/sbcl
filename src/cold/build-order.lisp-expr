@@ -55,7 +55,7 @@
  ;; host and target very early.
  ("src/code/primordial-extensions" :c-headers)
  ("src/code/cold-init-helper-macros" :c-headers)
- ("src/code/trivial-defmethod" :not-host)
+ ("src/code/initial-method" :not-host)
 
  ;; ASAP we replace the host's backquote reader with our own, to avoid leaking
  ;; details of the host into the target. This is not a concern in make-host-2
