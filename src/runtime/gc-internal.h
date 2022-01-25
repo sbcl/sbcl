@@ -51,9 +51,9 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 #define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, insts) - FUN_POINTER_LOWTAG)
 #endif
 
-// For x86[-64], a simple-fun or closure's "self" slot is a fixum
+// For x86[-64], arm64, a simple-fun or closure's "self" slot is a fixum
 // On other backends, it is a lisp ointer.
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM64)
 #define FUN_SELF_FIXNUM_TAGGED 1
 #else
 #define FUN_SELF_FIXNUM_TAGGED 0

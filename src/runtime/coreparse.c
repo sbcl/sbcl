@@ -496,8 +496,8 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             continue;
         case CLOSURE_WIDETAG:
             fix_fun_header_layout(where, adj);
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-            // For x86[-64], the closure fun appears to be a fixnum,
+#if FUN_SELF_FIXNUM_TAGGED
+            // For x86[-64], arm64, the closure fun appears to be a fixnum,
             // and might need adjustment unless pointing to immobile code.
             // Then fall into the general case; where[1] won't get re-adjusted
             // because it doesn't satisfy is_lisp_pointer().
