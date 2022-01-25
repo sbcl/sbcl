@@ -465,16 +465,13 @@
                (setq product (* product (the index dim)))
                (incf rank))))))
 
-(defconstant-eqx +widetag->element-type+
-    #.(let ((a (make-array 32 :initial-element 0)))
-        (dovector (saetp *specialized-array-element-type-properties* a)
-          (let ((tag (saetp-typecode saetp)))
-            (setf (aref a (ash (- tag #x80) -2)) (saetp-specifier saetp)))))
-  #'equalp)
-
 (declaim (inline widetag->element-type))
 (defun widetag->element-type (widetag)
-  (svref +widetag->element-type+ (- (ash widetag -2) 32)))
+  (svref #.(let ((a (make-array 32 :initial-element 0)))
+             (dovector (saetp *specialized-array-element-type-properties* a)
+               (let ((tag (saetp-typecode saetp)))
+                 (setf (aref a (ash (- tag #x80) -2)) (saetp-specifier saetp)))))
+         (- (ash widetag -2) 32)))
 
 (defun initial-contents-error (content-length length)
   (error "There are ~W elements in the :INITIAL-CONTENTS, but ~
@@ -1032,24 +1029,25 @@ of specialized arrays is supported."
 
 ;;;; miscellaneous array properties
 
-(macrolet ((widetag->type (accessor)
-             (let ((table
-                    ;; Using unbound-marker for empty elements would be preferable,
-                    ;; but I'd either need a cross-compiler proxy for unbound-marker,
-                    ;; or else wrap a LOAD-TIME-VALUE on the table construction form
-                    ;; which might introduce more order-sensitivity to self-build.
-                    (sb-xc:make-array 32 ;:initial-element (make-unbound-marker)
-                                      :initial-element 0)))
-               (dovector (saetp *specialized-array-element-type-properties*)
-                 (setf (aref table (ash (- (saetp-typecode saetp) 128) -2))
-                       (funcall accessor saetp)))
-               `(aref ,table (- (ash (array-underlying-widetag array) -2) 32)))))
 (defun array-element-ctype (array)
   ;; same as (SPECIFIER-TYPE (ARRAY-ELEMENT-TYPE ARRAY)) but more efficient
-  (widetag->type saetp-ctype))
+  (svref #.(let ((table
+                   ;; Using unbound-marker for empty elements would be preferable,
+                   ;; but I'd either need a cross-compiler proxy for unbound-marker,
+                   ;; or else wrap a LOAD-TIME-VALUE on the table construction form
+                   ;; which might introduce more order-sensitivity to self-build.
+                   (sb-xc:make-array 32 ;:initial-element (make-unbound-marker)
+                                     :initial-element 0)))
+             (dovector (saetp *specialized-array-element-type-properties*)
+               (setf (aref table (ash (- (saetp-typecode saetp) 128) -2))
+                     (saetp-ctype saetp)))
+             table)
+         (- (ash (array-underlying-widetag array) -2) 32)))
+
 (defun array-element-type (array)
   "Return the type of the elements of the array"
-  (truly-the (or list symbol) (widetag->type saetp-specifier))))
+  (truly-the (or list symbol)
+             (widetag->element-type (array-underlying-widetag array))))
 
 (defun array-rank (array)
   "Return the number of dimensions of ARRAY."
