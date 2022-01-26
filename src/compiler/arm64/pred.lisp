@@ -121,8 +121,10 @@
             :load-if (sc-case y
                        ((any-reg descriptor-reg))
                        (immediate
-                        (not (and (integerp (tn-value y))
-                                  (abs-add-sub-immediate-p (fixnumize (tn-value y))))))
+                        (not (or
+                              (eql (tn-value y) 0f0)
+                              (and (integerp (tn-value y))
+                                   (abs-add-sub-immediate-p (fixnumize (tn-value y)))))))
                        (t t))))
   (:conditional :eq)
   (:policy :fast-safe)
@@ -130,7 +132,10 @@
   (:generator 6
     (let ((value (sc-case y
                    (immediate
-                    (fixnumize (tn-value y)))
+                    (let ((value (tn-value y)))
+                     (if (eql value 0f0)
+                         single-float-widetag
+                         (fixnumize (tn-value y)))))
                    (t y))))
       (cond ((or (not (integerp value))
                  (add-sub-immediate-p value))
