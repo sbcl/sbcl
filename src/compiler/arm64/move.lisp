@@ -117,8 +117,12 @@
        (load-immediate-word y (fixnumize val)))
       (character
        (let* ((codepoint (char-code val))
-              (encoded-character (dpb codepoint (byte 24 8) character-widetag)))
-         (load-immediate-word y encoded-character)))
+              (tagged (dpb codepoint (byte 24 8) character-widetag)))
+         (load-immediate-word y tagged)))
+      (single-float
+       (let* ((bits (single-float-bits val))
+              (tagged (dpb bits (byte 32 32) single-float-widetag)))
+         (load-immediate-word y tagged)))
       (symbol
        (load-symbol y val)))))
 

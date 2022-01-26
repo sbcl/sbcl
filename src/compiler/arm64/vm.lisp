@@ -258,7 +258,10 @@
     (symbol
      (if (static-symbol-p value)
          immediate-sc-number
-         nil))))
+         nil))
+    ((eql $0.0)
+     ;; Can be encoded in a single instruction
+     immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
