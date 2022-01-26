@@ -3952,7 +3952,7 @@ extern int finalizer_thread_runflag;
  * We stop collecting at gencgc_oldest_gen_to_gc, even if this is less than
  * last_gen (oh, and note that by default it is NUM_GENERATIONS-1) */
 long tot_gc_nsec;
-void
+void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 collect_garbage(generation_index_t last_gen)
 {
     THREAD_JIT(0);
