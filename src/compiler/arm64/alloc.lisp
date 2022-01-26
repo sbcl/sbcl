@@ -13,10 +13,10 @@
 
 (define-vop (list)
   (:args (things :more t :scs (descriptor-reg any-reg control-stack constant immediate)))
-  (:temporary (:scs (descriptor-reg)) ptr)
+  (:temporary (:scs (descriptor-reg)) ptr temp)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
-  (:temporary (:sc non-descriptor-reg) pa-flag temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
