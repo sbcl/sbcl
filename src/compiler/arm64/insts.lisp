@@ -2438,7 +2438,8 @@
   (:printer fp-data-processing-1 ((op #b0)))
   (:emitter
    (cond ((or (sc-is rd complex-double-reg complex-single-reg)
-              (sc-is rn complex-double-reg complex-single-reg)))
+              (sc-is rn complex-double-reg complex-single-reg))
+          (break "Implement"))
          ((and (fp-register-p rd)
                (fp-register-p rn))
           (assert (and (eq (tn-sc rd) (tn-sc rn))) (rd rn)
@@ -2630,6 +2631,47 @@
          (size ,size))
      (inst s-orr rd rn rn size)))
 
+(def-emitter simd-scalar-three-same
+    (#b01 2 30)
+  (u 1 29)
+  (#b11110 5 24)
+  (size 2 22)
+  (#b1 1 21)
+  (rm 5 16)
+  (opc 5 11)
+  (#b1 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction-format (simd-scalar-three-same 32
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
+  (op3 :field (byte 2 30) :value #b1)
+  (u :field (byte 1 29))
+  (op4 :field (byte 5 24) :value #b11110)
+  (size :field (byte 2 22))
+  (op5 :field (byte 1 21) :value #b1)
+  (rm :fields (list (byte 1 30) (byte 5 16)) :type 'simd-reg)
+  (op :field (byte 5 11))
+  (op6 :field (byte 1 10) :value #b1)
+  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
+
+(define-instruction cmeq (segment rd rn rm &optional size)
+  (:printer simd-three-same ((u #b1)  (op #b10001)))
+  (:emitter
+   (multiple-value-bind (size q)
+       (ecase size
+         (:8b (values 0 0))
+         (:16b (values 0 1)))
+     (emit-simd-three-same segment
+                           q
+                           1
+                           size
+                           (reg-offset rm)
+                           #b10001
+                           (reg-offset rn)
+                           (reg-offset rd)))))
+
 ;;;
 
 (def-emitter simd-extract
@@ -2789,6 +2831,27 @@
       (:s 1)
       (:d 2))
     #b00011
+    (reg-offset rn)
+    (reg-offset rd))))
+
+(define-instruction uminv (segment rd sized rn sizen)
+  (:printer simd-across-lanes  ((u 1) (op #b11010)
+                                      (rd nil :type 'vhsd)))
+  (:emitter
+   (emit-simd-across-lanes
+    segment
+    (ecase sizen
+      (:8b 0)
+      (:16b 1)
+      (:4h 0)
+      (:8h 1)
+      (:4s 1))
+    1
+    (ecase sized
+      (:b 0)
+      (:h 1)
+      (:s #b10))
+    #b11010
     (reg-offset rn)
     (reg-offset rd))))
 
