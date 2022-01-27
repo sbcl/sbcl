@@ -663,8 +663,7 @@
          '(error))))
     (assert (= count 1))))
 
-(with-test (:name :properly-tagged-p-internal
-            :fails-on (not (or :x86 :x86-64 :arm64)))
+(with-test (:name :properly-tagged-p-internal)
   ;; Pick a code component that has a ton of restarts.
   (let* ((code (sb-kernel:fun-code-header #'sb-impl::update-package-with-variance))
          (n (sb-kernel:code-n-entries code)))
@@ -677,8 +676,13 @@
                                                    (function int unsigned unsigned))
                                      ptr base)
                       1)))
-          ;; Test that there are exactly n-entries properly tagged interior pointers.
-          (assert (= (loop for ptr from (+ base (* 2 sb-vm:n-word-bytes))
+          ;; For architectures that don't use LRAs, there are exactly 'n-entries'
+          ;; properly tagged interior pointers. For those which do use LRAs,
+          ;; there are at least that many, because we allow pointing to LRAs,
+          ;; but they aren't enumerable so we don't know the actual count.
+          (assert (#+(or x86 x86-64 arm64) =
+                   #-(or x86 x86-64 arm64) >
+                     (loop for ptr from (+ base (* 2 sb-vm:n-word-bytes))
                            below limit count (properly-tagged-p ptr))
                      n))
           ;; Verify that the binary search algorithm for simple-fun-index works.
