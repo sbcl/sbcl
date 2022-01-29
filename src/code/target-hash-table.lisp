@@ -177,6 +177,8 @@
 
 ;;;; user-defined hash table tests
 
+(define-load-time-global *user-hash-table-tests* nil)
+
 (defun register-hash-table-test (name hash-fun)
   (declare (symbol name) (function hash-fun))
   (unless (fboundp name)

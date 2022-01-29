@@ -236,7 +236,6 @@
 
  ("src/code/list"   :not-host)
  ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
- ("src/code/fdefinition"    :not-host)
  ("src/code/coerce" :not-host)
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
@@ -526,6 +525,7 @@
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
+ ("src/code/fdefinition"       :not-host)
  ("src/code/query"  :not-host)
  ("src/code/sort"  :not-host)
  ("src/code/final" :not-host)
