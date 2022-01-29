@@ -107,7 +107,7 @@ distinct from the global value. Can also be SETF."
 
 (defun symbol-function (symbol)
   "Return SYMBOL's current function definition. Settable with SETF."
-  (%coerce-name-to-fun symbol symbol-fdefn))
+  (%coerce-name-to-fun symbol (symbol-fdefn symbol)))
 
 ;; I think there are two bugs here.
 ;; Per CLHS "SETF may be used with symbol-function to replace a global

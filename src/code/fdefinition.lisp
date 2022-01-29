@@ -142,29 +142,27 @@
     (unless (eq :declared (info :function :where-from name))
       (clear-info :function :type name))))
 
-;;; Return the fdefn-fun of NAME's fdefinition including any encapsulations.
-;;; LOOKUP-FN, defaulting to FIND-FDEFN, specifies how to lookup the fdefn.
-;;; As a special case it can be given as SYMBOL-FDEFN which is slightly quicker.
-;;; This is the core of the implementation of the standard FDEFINITION function,
-;;; but as we've defined FDEFINITION, that strips encapsulations.
-(defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn)
-                                    strictly-functionp)
-  ;; Whoa! We were getting a warning from the *host* here -
-  ;;   "Abbreviated type declaration: (BOOLEAN SB-IMPL::STRICTLY-FUNCTIONP)."
-  ;; I guess it's because we hand it a lambda and it doesn't like our style?
+;;; Return the fdefn-fun of NAME's fdefinition including any
+;;; encapsulations. FDEFN can be provided explicitly. As a special
+;;; case it can be computed with SYMBOL-FDEFN which is slightly
+;;; quicker.  This is the core of the implementation of the standard
+;;; FDEFINITION function, but as we've defined FDEFINITION, that
+;;; strips encapsulations.
+(defun %coerce-name-to-fun (name &optional (fdefn (find-fdefn name))
+                                           strictly-functionp)
   (declare (type boolean strictly-functionp))
-  `(let* ((name ,name) (fdefn (,lookup-fn name)) f)
-     (if (and fdefn
-              (setq f (fdefn-fun (truly-the fdefn fdefn)))
-                ;; If STRICTLY-FUNCTIONP is true, we make sure not to return an error
-                ;; trampoline. This extra check ensures that full calls such as
-                ;; (MAPCAR 'OR '()) signal an error that OR isn't a function.
-                ;; This accords with the non-requirement that macros store strictly
-                ;; a function in the symbol that names them. In many implementations,
-                ;; (FUNCTIONP (SYMBOL-FUNCTION 'OR)) => NIL. We want to pretend that.
-              ,@(if strictly-functionp '((not (macro/special-guard-fun-p f)))))
-         f
-         (retry-%coerce-name-to-fun name ,strictly-functionp))))
+  (let (f)
+    (if (and fdefn
+             (setq f (fdefn-fun fdefn))
+             ;; If STRICTLY-FUNCTIONP is true, we make sure not to return an error
+             ;; trampoline. This extra check ensures that full calls such as
+             ;; (MAPCAR 'OR '()) signal an error that OR isn't a function.
+             ;; This accords with the non-requirement that macros store strictly
+             ;; a function in the symbol that names them. In many implementations,
+             ;; (FUNCTIONP (SYMBOL-FUNCTION 'OR)) => NIL. We want to pretend that.
+             (not (and strictly-functionp (macro/special-guard-fun-p f))))
+        f
+        (retry-%coerce-name-to-fun name strictly-functionp))))
 
 ;;; If %COERCE-NAME-TO-FUN fails, continue here.
 ;;; LOOKUP-FN, being more about speed than semantics, is irrelevant.
@@ -211,14 +209,14 @@
   (declare (explicit-check))
   (etypecase callable
     (function callable)
-    (symbol (%coerce-name-to-fun callable symbol-fdefn t))))
+    (symbol (%coerce-name-to-fun callable (symbol-fdefn callable) t))))
 
 ;;; Behaves just like %COERCE-CALLABLE-TO-FUN but has an ir2-convert optimizer.
 (defun %coerce-callable-for-call (callable)
   (declare (explicit-check))
   (etypecase callable
     (function callable)
-    (symbol (%coerce-name-to-fun callable symbol-fdefn t))))
+    (symbol (%coerce-name-to-fun callable (symbol-fdefn callable) t))))
 
 
 ;;;; definition encapsulation
