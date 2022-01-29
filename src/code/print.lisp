@@ -699,7 +699,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; For each character, the value of the corresponding element is the
 ;;; lowest base in which that character is a digit.
 (defconstant-eqx +digit-bases+
-  #.(let ((a (sb-xc:make-array 128 ; FIXME
+  #.(let ((a (sb-xc:make-array base-char-code-limit
                                :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 8)
                                :initial-element 36)))
