@@ -64,8 +64,6 @@
      (define-function-name-syntax ,name (,var) ,@body)
      (pushnew ',name sb-pcl::*internal-pcl-generalized-fun-name-symbols*)))
 
-(pushnew 'sb-pcl::slot-accessor sb-pcl::*internal-pcl-generalized-fun-name-symbols*)
-
 (define-internal-pcl-function-name-syntax sb-pcl::slot-accessor (list)
   (when (= (length list) 4)
     (destructuring-bind (class slot rwb) (cdr list)
