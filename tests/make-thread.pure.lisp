@@ -139,8 +139,10 @@
 (test-util:with-test (:name :expected-gc-roots
                       :skipped-on (or :interpreter (not :pauseless-threadstart)))
   (let ((list
-         (delete (sb-kernel:fun-code-header #'actually-get-stack-roots)
-                 (tryit :print nil))))
+          (delete-if (lambda (x)
+                       (or (eq x #'actually-get-stack-roots)
+                           (eq x (sb-kernel:fun-code-header #'actually-get-stack-roots))))
+                     (tryit :print nil))))
     ;; should be not many things pointed to by the stack
     (assert (< (length list) #+x86    38   ; more junk, I don't know why
                              #+x86-64 30   ; less junk, I don't know why
