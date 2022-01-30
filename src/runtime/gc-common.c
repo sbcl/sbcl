@@ -413,24 +413,21 @@ scav_fun_pointer(lispobj *where, lispobj object)
             page_type = PAGE_TYPE_BOXED, region = boxed_region;
         }
         copy = gc_copy_object(object, 1+SHORT_BOXED_NWORDS(*fun), region, page_type);
-    }
-    if (copy != object) { // large code won't undergo physical copy
+        gc_assert(copy != object);
         set_forwarding_pointer(fun, copy);
-        *where = copy;
     }
+    if (copy != object) *where = copy;
     CHECK_COPY_POSTCONDITIONS(copy, FUN_POINTER_LOWTAG);
     return 1;
 }
 
-static lispobj
-trans_code_header(lispobj object)
+static lispobj trans_code_blob(lispobj object)
 {
-    struct code *ncode = trans_code((struct code *) native_pointer(object));
-    return make_lispobj(ncode, OTHER_POINTER_LOWTAG);
+    return make_lispobj(trans_code((struct code *)native_pointer(object)),
+                        OTHER_POINTER_LOWTAG);
 }
 
-static sword_t
-size_code_header(lispobj *where)
+static sword_t size_code_blob(lispobj *where)
 {
     return code_total_nwords((struct code*)where);
 }
@@ -1861,7 +1858,7 @@ size_lose(lispobj *where)
  * initialization
  */
 
-sword_t scav_code_header(lispobj *object, lispobj header);
+sword_t scav_code_blob(lispobj *object, lispobj header);
 #include "genesis/gc-tables.h"
 
 /* Find the code object for the given pc, or return NULL on

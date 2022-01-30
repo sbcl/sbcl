@@ -21,7 +21,7 @@
 ;;;;     existence of slots, and whether they should be scavenged, is
 ;;;;     not automatically propagated. Thus e.g. if you add a
 ;;;;     SIMPLE-FUN-DEBUG-INFO slot holding a tagged object which needs
-;;;;     to be GCed, you need to tweak scav_code_header() and
+;;;;     to be GCed, you need to tweak scav_code_blob() and
 ;;;;     verify_space() in gencgc.c, and the corresponding code in gc.c.
 ;;;;   * Various code (e.g. STATIC-FSET in genesis.lisp) is hard-wired
 ;;;;     to know the name of the last slot of the object the code works

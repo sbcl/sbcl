@@ -54,7 +54,7 @@
     (complex-single-float "unboxed")
     (complex-double-float "unboxed")
 
-    (code-header "code_header")
+    (code-header "code_blob")
     ;; For simple-fun, all three methods are "lose": "scav" is because you can't
     ;; encounter a simple-fun in heap scanning; "trans" is because it's not an OTHER pointer,
     ;; and "size" is because you can't take the size of a simple-fun by itself.

@@ -479,7 +479,7 @@ void gc_show_pte(lispobj obj)
     printf("unimplemented\n");
 }
 
-sword_t scav_code_header(lispobj *where, lispobj header)
+sword_t scav_code_blob(lispobj *where, lispobj header)
 {
     struct code *code = (struct code *) where;
     sword_t n_header_words = code_header_words(code);

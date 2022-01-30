@@ -387,7 +387,7 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
     int pointerish = !leaf_obj_widetag_p(widetag_of(ptr));
     int bits = (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG);
     // enlivening makes the object appear as if written, so that
-    // scav_code_header won't skip it, thus ensuring we transitively
+    // scav_code_blob won't skip it, thus ensuring we transitively
     // scavenge + enliven newspace objects.
     if (widetag_of(ptr) == CODE_HEADER_WIDETAG)
         bits |= OBJ_WRITTEN_FLAG;
@@ -654,7 +654,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
             int n_words, gen;
             for ( ; obj < limit ; obj += n_words ) {
                 lispobj header = *obj;
-                // scav_code_header will do nothing if the object isn't
+                // scav_code_blob will do nothing if the object isn't
                 // marked as written.
                 if (genmask >> (gen=immobile_obj_gen_bits(obj)) & 1) {
                     if (gen == new_space) { set_visited(obj); }
@@ -803,7 +803,7 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
 {
     lispobj *begin, *end, word = *obj;
     unsigned char widetag = header_widetag(word);
-    if (widetag == CODE_HEADER_WIDETAG) { // usual case. Like scav_code_header()
+    if (widetag == CODE_HEADER_WIDETAG) { // usual case. Like scav_code_blob()
         return header_rememberedp(word);
     } else if (widetag == FDEFN_WIDETAG ||
                widetag == FUNCALLABLE_INSTANCE_WIDETAG) {

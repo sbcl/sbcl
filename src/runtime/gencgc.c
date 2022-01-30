@@ -5050,7 +5050,7 @@ generation_index_t gc_gen_of(lispobj obj, int defaultval) {
 
 /* Return 1 if 'a' is strictly younger than 'b'.
  * This asserts that 'a' is pinned if in 'from_space' because it is
- * specifically a helper function for scav_code_header(), where this is
+ * specifically a helper function for scav_code_blob(), where this is
  * called after scavenging the header. So if something didn't get moved
  * out of from_space, then it must have been pinned.
  * So don't call this for anything except that use-case. */
@@ -5064,7 +5064,7 @@ static inline boolean obj_gen_lessp(lispobj obj, generation_index_t b)
     return ((a==SCRATCH_GENERATION) ? from_space : a) < b;
 }
 
-sword_t scav_code_header(lispobj *object, lispobj header)
+sword_t scav_code_blob(lispobj *object, lispobj header)
 {
     struct code* code = (struct code*)object;
     if (filler_obj_p(object)) goto done; /* it's not code at all */
