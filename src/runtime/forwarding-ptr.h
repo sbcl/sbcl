@@ -39,9 +39,8 @@ forwarding_pointer_value(lispobj *pointer) {
     return pointer[0];
 #endif
 }
-static inline lispobj
-set_forwarding_pointer(lispobj *pointer, lispobj newspace_copy) {
-  // The object at 'pointer' might already have been forwarded,
+static inline void set_forwarding_pointer(lispobj *addr, lispobj newspace_copy) {
+  // The object at 'addr' might already have been forwarded,
   // but that's ok. Such occurs primarily when dealing with
   // code components, because code can be forwarded by scavenging any
   // pointer to a function that resides within the code.
@@ -51,12 +50,11 @@ set_forwarding_pointer(lispobj *pointer, lispobj newspace_copy) {
   // that we're operating on a not-yet-forwarded object here.
 #ifdef LISP_FEATURE_GENCGC
     gc_dcheck(compacting_p());
-    pointer[0]=0x01;
-    pointer[1]=newspace_copy;
+    addr[0] = 0x01;
+    addr[1] = newspace_copy;
 #else
-    pointer[0]=newspace_copy;
+    addr[0] = newspace_copy;
 #endif
-    return newspace_copy;
 }
 
 /// Chase the pointer in 'word' if it points to a forwarded object.
