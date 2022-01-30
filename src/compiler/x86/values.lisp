@@ -56,15 +56,22 @@
 ;;; bogus SC that reflects the costs of the memory-to-memory moves for each
 ;;; operand, but this seems unworthwhile.
 (define-vop (push-values)
-  (:args (vals :more t
-               :scs (descriptor-reg)))
+  (:args (vals :more t :scs (descriptor-reg any-reg immediate constant)))
   (:results (start :from :load) (count))
   (:info nvals)
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:vop-var vop)
   (:generator 20
     (move start esp-tn)                 ; WARN pointing 1 below
-    (do ((val vals (tn-ref-across val)))
-        ((null val))
-      (inst push (encode-value-if-immediate (tn-ref-tn val))))
+    (do ((tn-ref vals (tn-ref-across tn-ref)))
+        ((null tn-ref))
+      (let ((tn (tn-ref-tn tn-ref)))
+        (inst push (sc-case tn
+                     (constant
+                      (load-constant vop tn temp)
+                      temp)
+                     (t
+                      (encode-value-if-immediate tn))))))
     (inst mov count (fixnumize nvals))))
 
 ;;; Push a list of values on the stack, returning Start and Count as used in

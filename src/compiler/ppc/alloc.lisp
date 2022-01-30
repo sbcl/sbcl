@@ -13,7 +13,7 @@
 
 ;;;; LIST and LIST*
 (define-vop (list)
-  (:args (things :more t))
+  (:args (things :more t :scs (any-reg descriptor-reg zero null control-stack)))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)

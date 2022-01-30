@@ -396,7 +396,7 @@
             (inst lea result (ea list-pointer-lowtag alloc)))))))
 
 (define-vop (list)
-  (:args (things :more t :scs (descriptor-reg constant immediate)))
+  (:args (things :more t :scs (descriptor-reg any-reg constant immediate)))
   (:temporary (:sc unsigned-reg) ptr temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)

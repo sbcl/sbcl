@@ -189,7 +189,7 @@
 
 ;;;; CONS, LIST and LIST*
 (define-vop (list)
-  (:args (things :more t))
+  (:args (things :more t :scs (descriptor-reg any-reg control-stack)))
   (:temporary (:sc unsigned-reg) ptr temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
   (:info star cons-cells)

@@ -443,7 +443,7 @@
 ;;;
 ;;; If the TN is an unused result TN, then we don't actually emit the
 ;;; move; we just change to the right kind of TN.
-(defun emit-coerce-vop (op dest-tn scs before)
+(defun emit-coerce-vop (op dest-tn scs before &optional load-scs)
   (declare (type tn-ref op) (type sc-vector scs) (type (or vop null) before)
            (type (or tn null) dest-tn))
   (let* ((op-tn (tn-ref-tn op))
@@ -467,7 +467,7 @@
                        (cond
                          ((not write-p)
                           (or
-                           (coerce-from-constant op temp)
+                           (coerce-from-constant op temp load-scs)
                            (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp
                                                                      op)
                                           res)
@@ -499,26 +499,38 @@
 ;;; specified VOP. Dest-TN is the destination TN if we are doing a
 ;;; move or move-arg, and is NIL otherwise. This is only used for
 ;;; efficiency notes.
-(defun coerce-some-operands (ops dest-tn load-scs before)
+(defun coerce-some-operands (ops dest-tn load-scs before
+                             &optional more-load-scs)
   (declare (type (or tn-ref null) ops) (list load-scs)
            (type (or tn null) dest-tn) (type (or vop null) before))
   (do ((op ops (tn-ref-across op))
        (scs load-scs (cdr scs)))
-      ((null scs))
-    (let ((tn (tn-ref-tn op)))
+      ((null op))
+
+    (let* (more
+           (scs (cond (scs
+                       (car scs))
+                      (more-load-scs
+                       (setf more t)
+                       more-load-scs)
+                      (t
+                       (return))))
+           (tn (tn-ref-tn op)))
       (unless (or (eq (tn-kind tn) :unused)
-                  (svref (car scs)
+                  (svref scs
                          (sc-number (tn-sc tn))))
-        (emit-coerce-vop op dest-tn (car scs) before))))
+        (emit-coerce-vop op dest-tn scs before (and more
+                                                    more-load-scs)))))
   (values))
 
 ;;; Emit coerce VOPs for the args and results, as needed.
 (defun coerce-vop-operands (vop)
   (declare (type vop vop))
   (let ((info (vop-info vop)))
-    (coerce-some-operands (vop-args vop) nil (vop-info-arg-load-scs info) vop)
+    (coerce-some-operands (vop-args vop) nil (vop-info-arg-load-scs info) vop
+                          (vop-info-more-arg-load-scs info))
     (coerce-some-operands (vop-results vop) nil (vop-info-result-load-scs info)
-                          (vop-next vop)))
+                          (vop-next vop) nil))
   (values))
 
 ;;; Iterate over the more operands to a call VOP, emitting move-arg
@@ -603,14 +615,21 @@
                                                   ,most-positive-fixnum)))
              (template-or-lose 'sb-vm::move-from-fixnum-1))))))
 
-(defun coerce-from-constant (x-tn-ref y)
+(defun coerce-from-constant (x-tn-ref y &optional load-scs)
   (when (and (sc-is y sb-vm::descriptor-reg sb-vm::control-stack)
              (tn-ref-type x-tn-ref))
     (multiple-value-bind (constantp value) (type-singleton-p (tn-ref-type x-tn-ref))
       (when constantp
-        (change-tn-ref-tn x-tn-ref
-                          (make-constant-tn (find-constant value) t))
-        t))))
+        (let* ((constant (find-constant value))
+               (sc (constant-sc constant)))
+          (when (or (not load-scs)
+                    ;; This is a more-arg-load-scs
+                    ;; Because more args do not have a generic load
+                    ;; sequence it can't handle aribtrary constants or
+                    ;; immediates.
+                    (svref load-scs (sc-number sc)))
+            (change-tn-ref-tn x-tn-ref (make-constant-tn constant t))
+            t))))))
 
 (defun split-ir2-block (vop)
   (cond ((vop-next vop)

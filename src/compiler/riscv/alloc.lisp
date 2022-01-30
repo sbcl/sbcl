@@ -13,7 +13,7 @@
 
 
 (define-vop (list)
-  (:args (things :more t))
+  (:args (things :more t :scs (any-reg descriptor-reg control-stack)))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)

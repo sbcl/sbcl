@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 (define-vop (list)
-  (:args (things :more t :scs (control-stack)))
+  (:args (things :more t :scs (any-reg descriptor-reg null control-stack)))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (any-reg)) temp)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)

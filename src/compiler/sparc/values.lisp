@@ -62,7 +62,7 @@
 ;;; memory-to-memory moves for each operand, but this seems
 ;;; unworthwhile.
 (define-vop (push-values)
-  (:args (vals :more t))
+  (:args (vals :more t :scs (descriptor-reg any-reg control-stack)))
   (:results (start :scs (any-reg) :from :load)
             (count :scs (any-reg)))
   (:info nvals)
@@ -75,7 +75,7 @@
         ((null val))
       (let ((tn (tn-ref-tn val)))
         (sc-case tn
-          (descriptor-reg
+          ((descriptor-reg any-reg)
            (storew tn start i))
           (control-stack
            (load-stack-tn temp tn)

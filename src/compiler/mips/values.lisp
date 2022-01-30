@@ -63,7 +63,7 @@
 ;;;
 (define-vop (push-values)
   (:args
-   (vals :more t))
+   (vals :more t :scs (descriptor-reg any-reg control-stack)))
   (:results
    (start :scs (any-reg))
    (count :scs (any-reg)))
@@ -81,7 +81,7 @@
         ((null val))
       (let ((tn (tn-ref-tn val)))
         (sc-case tn
-          (descriptor-reg
+          ((descriptor-reg any-reg)
            (storew tn start-temp i))
           (control-stack
            (load-stack-tn temp tn)

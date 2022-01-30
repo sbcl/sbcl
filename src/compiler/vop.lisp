@@ -705,6 +705,7 @@
   ;; operand SC restriction.
   (arg-load-scs nil :type list)
   (result-load-scs nil :type list)
+  (more-arg-load-scs nil :type (or null sc-vector))
   ;; a function that emits assembly code for a use of this VOP when it
   ;; is called with the VOP structure. This is null if this VOP has no
   ;; specified generator (i.e. if it exists only to be inherited by

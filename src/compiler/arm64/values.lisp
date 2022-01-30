@@ -59,7 +59,7 @@
 ;;; operand, but this seems unworthwhile.
 ;;;
 (define-vop (push-values)
-  (:args (vals :more t))
+  (:args (vals :more t :scs (descriptor-reg any-reg immediate control-stack constant)))
   (:results (start :scs (any-reg) :from :load)
             (count :scs (any-reg)))
   (:info nvals)
@@ -72,7 +72,7 @@
       (flet ((load-tn (tn-ref)
                (let ((tn (tn-ref-tn tn-ref)))
                  (sc-case tn
-                   (descriptor-reg
+                   ((descriptor-reg any-reg)
                     tn)
                    ((immediate constant)
                     (cond ((eql (tn-value tn) 0)

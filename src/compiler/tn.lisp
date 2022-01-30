@@ -263,6 +263,23 @@
               (setf (tn-leaf res) constant)
               res)))))
 
+;;; Extracted from above
+(defun constant-sc (constant)
+  (if (leaf-info constant)
+      (tn-sc (leaf-info constant))
+      (multiple-value-bind (immed null-offset)
+          (immediate-constant-sc (constant-value constant))
+        (if null-offset
+            immed
+            (let ((boxed (or (not immed)
+                             (boxed-immediate-sc-p immed))))
+              (cond (boxed
+                     (if immed
+                         (svref *backend-sc-numbers* immed)
+                         (sc-or-lose 'constant)))
+                    (t
+                     (sc-or-lose 'constant))))))))
+
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))
          (sc (svref *backend-sc-numbers*

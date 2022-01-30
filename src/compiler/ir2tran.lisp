@@ -528,23 +528,10 @@
              (unless (eq locs results)
                (move-results-coerced node block results locs))))
           (:unknown
-           (let ((locs (loop for tn in results
-                             collect (cond #+(or x86 x86-64 arm64)
-                                           ((eq (tn-kind tn) :constant)
-                                            tn)
-                                           ((and
-                                             #-(or x86 x86-64 arm64)
-                                             (neq (tn-kind tn) :constant)
-                                             (equal (primitive-type-scs (tn-primitive-type tn))
-                                                    `(,sb-vm:descriptor-reg-sc-number)))
-                                            tn)
-                                           ((let ((new (make-normal-tn *backend-t-primitive-type*)))
-                                              (emit-move node block tn new)
-                                              new))))))
-             (vop* push-values node block
-                   ((reference-tn-list locs nil))
-                   ((reference-tn-list (ir2-lvar-locs 2lvar) t))
-                   (length results))))))))
+           (vop* push-values node block
+                 ((reference-tn-list results nil))
+                 ((reference-tn-list (ir2-lvar-locs 2lvar) t))
+                 (length results)))))))
   (values))
 
 ;;; CAST
@@ -2050,30 +2037,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
     ;; allocating as one huge chunk (instead, doing a cons at a time), in theory it can better
     ;; utilize free memory. But really, if you have a statically written LIST call with so many
     ;; args that it exhausts the heap, you should probably rethink your coding style.
-    (let* ((allow-const
-            ;; The backend either does or doesn't allow constants in the "more" arg.
-            ;; Determine that once only. Only x86-64 specifies any SCs as yet.
-            (and #.(let ((scs
-                          (operand-parse-scs
-                           (vop-parse-more-args (gethash 'list *backend-parsed-vops*)))))
-                     ;; MAKE-CONSTANT-TN could produce either SC, so ensure both are present.
-                     (and (member 'sb-vm::constant scs)
-                          (member 'sb-vm::immediate scs)
-                          t))
-                 ;; FIXME: this is terribly wrong that in high debug
-                 ;; settings we can't allow constants at the IR2 level.
-                 ;; But two UNWIND-TO-FRAME-AND-CALL tests fail when
-                 ;; constants are allowed. Somehow we're affecting
-                 ;; semantics. It's baffling.
-                 (policy node (< debug 3))))
-           (refs (reference-tn-list
+    (let* ((refs (reference-tn-list
                   (mapcar (lambda (arg)
-                            (cond ((and allow-const (constant-lvar-p arg))
-                                   (emit-constant (lvar-value arg)))
-                                  (t
-                                   (let ((tn (make-normal-tn *backend-t-primitive-type*)))
-                                     (emit-move node block (lvar-tn node block arg) tn)
-                                     tn))))
+                            (lvar-tn node block arg))
                           args)
                   nil))
            (lvar (node-lvar node))

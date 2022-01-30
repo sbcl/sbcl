@@ -1182,25 +1182,26 @@
       (compute-costs-and-restrictions-list (vop-parse-args parse) t)
     (multiple-value-bind (result-costs result-scs)
         (compute-costs-and-restrictions-list (vop-parse-results parse) nil)
-      `(
-        :cost ,(vop-parse-cost parse)
+      (multiple-value-bind (more-arg-costs more-arg-scs)
+          (and (vop-parse-more-args parse)
+               (compute-loading-costs-if-any (vop-parse-more-args parse) t))
+          `(:cost ,(vop-parse-cost parse)
 
-        :arg-costs ',arg-costs
-        :arg-load-scs ',arg-scs
-        :result-costs ',result-costs
-        :result-load-scs ',result-scs
+            :arg-costs ',arg-costs
+            :arg-load-scs ',arg-scs
+            :result-costs ',result-costs
+            :result-load-scs ',result-scs
 
-        :more-arg-costs
-        ',(if (vop-parse-more-args parse)
-              (compute-loading-costs-if-any (vop-parse-more-args parse) t)
-              nil)
+            :more-arg-costs ',more-arg-costs
+            :more-arg-load-scs ',(unless (eq more-arg-costs +no-loads+)
+                                   (substitute-if nil #'listp more-arg-scs))
 
-        :more-result-costs
-        ',(if (vop-parse-more-results parse)
-              (compute-loading-costs-if-any (vop-parse-more-results parse) nil)
-              nil)
-        :optional-results ',(loop for name in (vop-parse-optional-results parse)
-                                collect (position name (vop-parse-results parse) :key #'operand-parse-name))))))
+            :more-result-costs
+            ',(if (vop-parse-more-results parse)
+                  (compute-loading-costs-if-any (vop-parse-more-results parse) nil)
+                  nil)
+            :optional-results ',(loop for name in (vop-parse-optional-results parse)
+                                      collect (position name (vop-parse-results parse) :key #'operand-parse-name)))))))
 
 ;;;; operand checking and stuff
 
