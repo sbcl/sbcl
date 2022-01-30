@@ -88,7 +88,7 @@ case "$HOST_TYPE" in
            INIT="-noinit"
            CORE="-core"
            ;;
-    sbcl)  LISP="${SBCL_XC_HOST:-sbcl}"
+    sbcl)  LISP="${SBCL_XC_HOST%% *}"
            INIT="--no-sysinit --no-userinit"
            CORE="--core"
            ;;
