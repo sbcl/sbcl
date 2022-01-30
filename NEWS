@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.2.0:
+changes in sbcl-2.2.1 relative to sbcl-2.2.0:
   * incompatible change: DEFINE-ALIEN-CALLBACK, which has never been exported
     from a public package, has been deleted.  It is superseded by
     SB-ALIEN:DEFINE-ALIEN-CALLABLE.
