@@ -2744,7 +2744,7 @@ static page_index_t scan_vector_root_page(page_index_t page, generation_index_t 
  * One complication is when the newspace is the top temp. generation.
  */
 static void
-scavenge_root_gens(generation_index_t from, generation_index_t to)
+scavenge_root_gens(generation_index_t from)
 {
     page_index_t i;
     gc_dcheck(compacting_p());
@@ -2752,10 +2752,14 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
     for (i = 0; i < next_free_page; i++) {
         generation_index_t generation = page_table[i].gen;
         if (page_boxed_p(i)
+            /* Not sure why word_used is checked. Probably because reset_page_flags()
+             * does not change the page's gen to an unused number. Perhaps it should */
             && (page_words_used(i) != 0)
-            && (generation != new_space)
             && (generation >= from)
-            && (generation <= to)) {
+            /* Yet another reason it's bad that SCRATCH_GENERATION is numerically
+             * higher than PSEUDO_STATIC: we wouldn't need this '<=' test if SCRATCH
+             * were numerically lowest */
+            && (generation <= PSEUDO_STATIC_GENERATION)) {
 
             /* This should be the start of a region */
             gc_assert(page_starts_contiguous_block_p(i));
@@ -3692,7 +3696,12 @@ garbage_collect_generation(generation_index_t generation, int raise,
     // number reassigned to that generation if applicable.
     scavenge_immobile_roots(generation+1, SCRATCH_GENERATION);
 
-    scavenge_root_gens(generation+1, PSEUDO_STATIC_GENERATION);
+    // When collecting gen0, ordinarily the roots would be gen1 and higher,
+    // but if gen0 is getting raised to 1 on this cycle, then we skip roots in gen1
+    // because we'll eventually examine all of gen1 as part of newspace.
+    // Similarly for higher generations. So if raising, the minimum root gen is
+    // always the collected generation + 2, otherwise it's the collected + 1.
+    scavenge_root_gens(generation+1+raise);
     scavenge_pinned_ranges();
     /* The Lisp start function is stored in the core header, not a static
      * symbol. It is passed to gc_and_save() in this C variable */
