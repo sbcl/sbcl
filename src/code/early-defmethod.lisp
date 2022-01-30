@@ -103,3 +103,12 @@
                   (declare (inline (setf slot-value)) (ignorable #'(setf slot-value)))
                   (block ,(fun-name-block-name name) ,@forms)))))
           (sb-c:source-location))))))
+
+(define-source-context defmethod (name &rest stuff)
+  (let ((arg-pos (position-if #'listp stuff)))
+    (if arg-pos
+        `(defmethod ,name ,@(subseq stuff 0 arg-pos)
+           ,(handler-case
+                (nth-value 2 (parse-specialized-lambda-list (elt stuff arg-pos)))
+              (error () "<illegal syntax>")))
+        `(defmethod ,name "<illegal syntax>"))))
