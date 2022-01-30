@@ -731,7 +731,10 @@
                (and (ref-p use)
                     (let ((var (ref-leaf use)))
                       (and (global-var-p var)
-                           (eq (global-var-kind var) :global-function)))))
+                           (eq (global-var-kind var) :global-function))))
+               ;; It's supposed to be slow, so who cares it can't
+               ;; stack allocate something.
+               (policy use (= speed 0)))
         ;; FIXME: For the first leg (lambda-bind (lambda-var-home ...))
         ;; would be a far better description, but since we use
         ;; *COMPILER-ERROR-CONTEXT* for muffling we can't -- as that node
