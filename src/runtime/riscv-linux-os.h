@@ -6,4 +6,6 @@ typedef long os_context_register_t;
 
 #include "arch-os-generic.inc"
 
+#define OS_CONTEXT_PC(context) context->uc_mcontext.__gregs[0]
+
 #endif /* _RISCV_LINUX_OS_H */

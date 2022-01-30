@@ -62,12 +62,6 @@ os_context_register_addr(os_context_t *context, int offset)
 }
 
 os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return &(context->si_regs.pc);
-}
-
-os_context_register_t *
 os_context_npc_addr(os_context_t *context)
 {
     return &(context->si_regs.npc);

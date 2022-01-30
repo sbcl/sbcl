@@ -159,9 +159,6 @@ os_context_register_addr(os_context_t *context, int offset);
 os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset);
 
-/* Given a signal context, return the address for storage of the
- * program counter for that context. */
-os_context_register_t *os_context_pc_addr(os_context_t *context);
 #ifdef ARCH_HAS_NPC_REGISTER
 os_context_register_t *os_context_npc_addr(os_context_t *context);
 #endif
@@ -241,4 +238,7 @@ extern char *os_get_runtime_executable_path();
 
 extern int os_reported_page_size;
 
+// Opaque context accessor
+uword_t os_context_pc(os_context_t*);
+void set_os_context_pc(os_context_t*, uword_t);
 #endif

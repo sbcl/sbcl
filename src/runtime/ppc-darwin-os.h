@@ -24,4 +24,6 @@ typedef ppc_saved_state_t ppc_ss_struct_t;
 
 #endif /* __DARWIN_UNIX03 */
 
+#define OS_CONTEXT_PC(context) context->uc_mcontext->PPC_DARWIN_REGIFY(ss).PPC_DARWIN_REGIFY(srr0)
+
 #endif /* _PPC_DARWIN_OS_H */

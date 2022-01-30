@@ -79,15 +79,13 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 void
 arch_skip_instruction(os_context_t *context)
 {
-    char** pcptr;
-    pcptr = (char**) os_context_pc_addr(context);
-    *pcptr += 4;
+    OS_CONTEXT_PC(context) += 4;
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)(*os_context_pc_addr(context)+4);
+    return (unsigned char *)(OS_CONTEXT_PC(context)+4);
 }
 
 
@@ -208,7 +206,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
     /* not sure how we ensure that we get the breakpoint reinstalled
      * after doing this -dan */
-    unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
     unsigned int *next_pc;
     int op = orig_inst >> 26;
     int sub_op = (orig_inst & 0x7fe) >> 1;  /* XL-form sub-opcode */
@@ -282,7 +280,7 @@ allocation_trap_p(os_context_t * context)
      *   TO = #b00001 for LGT
      *        #b00101 for LGE
      */
-    unsigned *pc = (unsigned int *) *os_context_pc_addr(context);
+    unsigned *pc = (unsigned int *)OS_CONTEXT_PC(context);
     unsigned inst = *pc;
     unsigned opcode = inst >> 26;
     unsigned src = (inst >> 11) & 0x1f;
@@ -333,7 +331,7 @@ handle_allocation_trap(os_context_t * context)
     if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
         record_backtrace_from_context(context, thread);
     fake_foreign_function_call(context);
-    unsigned int *pc = (unsigned int *) (*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
 
     /*
      * Go back and look at the add/addi instruction.  The second src arg
@@ -424,7 +422,7 @@ handle_allocation_trap(os_context_t * context)
     undo_fake_foreign_function_call(context);
 
     // Skip 2 instructions: the trap, and the writeback of free pointer
-    (*os_context_pc_addr(context)) = (uword_t)(pc + 2);
+    OS_CONTEXT_PC(context) = (uword_t)(pc + 2); // ('pc' is of type int*)
     return 1; // handled
 }
 #endif
@@ -523,7 +521,7 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (uword_t)handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) = (uword_t)handle_fun_end_breakpoint(context);
 }
 
 void
@@ -533,17 +531,17 @@ arch_handle_after_breakpoint(os_context_t *context)
     os_flush_icache((os_vm_address_t) skipped_break_addr,
                     sizeof(unsigned int));
     skipped_break_addr = NULL;
-    *(unsigned int *)*os_context_pc_addr(context)
-        = displaced_after_inst;
+    // This writes an instruction, NOT assigns to the pc.
+    *(unsigned int *)OS_CONTEXT_PC(context) = displaced_after_inst;
     *os_context_sigmask_addr(context)= orig_sigmask;
-    os_flush_icache((os_vm_address_t) *os_context_pc_addr(context),
+    os_flush_icache((os_vm_address_t) OS_CONTEXT_PC(context),
                     sizeof(unsigned int));
 }
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned int code = *((uint32_t *)(*os_context_pc_addr(context)));
+    unsigned int code = *(uint32_t *)OS_CONTEXT_PC(context);
     int register_offset = code >> 8 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);
@@ -561,7 +559,7 @@ static void dump_cpu_state(char *reason, os_context_t* context)
     pthread_sigmask(0, 0, &cur_sigset); sigset_tostring(&cur_sigset, buf, sizeof buf);
     fprintf(stderr, " curmask=%s\n", buf);
     fprintf(stderr, "  $pc=%16lx  $lr=%16lx $ctr=%16lx  $cr=%16lx\n",
-            *os_context_pc_addr(context),
+            OS_CONTEXT_PC(context),
             *os_context_lr_addr(context),
             *os_context_ctr_addr(context),
             *os_context_cr_addr(context));
@@ -578,7 +576,7 @@ static void dump_cpu_state(char *reason, os_context_t* context)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-  uword_t pc = *os_context_pc_addr(context);
+  uword_t pc = OS_CONTEXT_PC(context);
   unsigned int code = *(uint32_t*)pc;
 
 #ifdef LISP_FEATURE_SIGILL_TRAPS
@@ -586,7 +584,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         if (code == 0x7C0002A6) { // allocation region overflow trap
             // there is an actual trap instruction located 2 instructions later.
             // pretend the trap happened there.
-            *os_context_pc_addr(context) = pc + 8;
+            OS_CONTEXT_PC(context) = pc + 8;
             if (handle_allocation_trap(context)) return;
         }
         if (code == 0x7C2002A6) { // pending interrupt

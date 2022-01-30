@@ -258,7 +258,7 @@ static int NO_SANITIZE_MEMORY
 gather_trace_from_context(struct thread* thread, os_context_t* context,
                           struct trace* trace, int limit)
 {
-    uword_t pc = *os_context_pc_addr(context);
+    uword_t pc = os_context_pc(context);
     int len = 1;
     STORE_PC(*trace, 0, pc);
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64

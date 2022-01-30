@@ -218,7 +218,7 @@ resignal_to_lisp_thread(int signal, os_context_t *context)
         corruption_warning_and_maybe_lose
 #ifdef LISP_FEATURE_SB_THREAD
             ("Received signal %d @ %lx in non-lisp"THREAD_ID_LABEL", resignaling to a lisp thread.",
-             signal, *os_context_pc_addr(context), THREAD_ID_VALUE);
+             signal, os_context_pc(context), THREAD_ID_VALUE);
 #else
             ("Received signal %d in non-lisp thread, resignaling to a lisp thread.", signal);
 #endif
@@ -316,7 +316,7 @@ void dump_eventlog()
 }
 static void record_signal(int sig, void* context)
 {
-    event3("sig%d @%p in %d", sig, (void*)*os_context_pc_addr(context),
+    event3("sig%d @%p in %d", sig, (void*)os_context_pc(context),
            (int)get_sb_vm_thread()->os_kernel_tid);
 }
 #define RECORD_SIGNAL(sig,ctxt) if(sig!=SIGSEGV)record_signal(sig,ctxt);
@@ -817,7 +817,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 
     oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));
 
-    access_control_frame_pointer(th)[1] = *os_context_pc_addr(context);
+    access_control_frame_pointer(th)[1] = os_context_pc(context);
     access_control_frame_pointer(th)[0] = oldcont;
     access_control_stack_pointer(th) = csp + 2;
 }
@@ -881,7 +881,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
     access_control_frame_pointer(th)[2] =
         (lispobj)(*os_context_register_addr(context, reg_CODE));
 #else
-    access_control_frame_pointer(th)[1] = *os_context_pc_addr(context);
+    access_control_frame_pointer(th)[1] = os_context_pc(context);
 #endif
 #endif
 }
@@ -1543,7 +1543,7 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 #endif
         )
         corruption_warning_and_maybe_lose("Signal %d received (PC: %p)", signal,
-                                          *os_context_pc_addr(context));
+                                          os_context_pc(context));
 #endif
     interrupt_handle_now(signal, info, context);
     RESTORE_ERRNO;
@@ -1636,7 +1636,7 @@ arrange_return_to_c_function(os_context_t *context,
      *    c. calls the function
      */
 
-    *register_save_area = *os_context_pc_addr(context);
+    *register_save_area = os_context_pc(context);
     *(register_save_area + 1) = function;
     *(register_save_area + 2) = *os_context_register_addr(context,reg_EDI);
     *(register_save_area + 3) = *os_context_register_addr(context,reg_ESI);
@@ -1646,8 +1646,7 @@ arrange_return_to_c_function(os_context_t *context,
     *(register_save_area + 7) = *os_context_register_addr(context,reg_EAX);
     *(register_save_area + 8) = *context_eflags_addr(context);
 
-    *os_context_pc_addr(context) =
-      (os_context_register_t) funptr;
+    set_os_context_pc(context, (os_context_register_t) funptr);
     *os_context_register_addr(context,reg_ECX) =
       (os_context_register_t) register_save_area;
 #else
@@ -1671,7 +1670,7 @@ arrange_return_to_c_function(os_context_t *context,
     *(sp-4)=*os_context_register_addr(context,reg_EAX);
     *(sp-3)=*context_eflags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_EBP);
-    *(sp-1)=*os_context_pc_addr(context);
+    *(sp-1)=os_context_pc(context);
 
 #endif
 
@@ -1698,7 +1697,7 @@ arrange_return_to_c_function(os_context_t *context,
     *(sp-4)=*os_context_register_addr(context,reg_RAX);
     *(sp-3)=*context_eflags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_RBP);
-    *(sp-1)=*os_context_pc_addr(context);
+    *(sp-1)=os_context_pc(context);
 
     *os_context_register_addr(context,reg_RDI) =
         (os_context_register_t)function; /* function */
@@ -1712,7 +1711,7 @@ arrange_return_to_c_function(os_context_t *context,
 #ifdef LISP_FEATURE_X86
 
 #if !defined(LISP_FEATURE_DARWIN)
-    *os_context_pc_addr(context) = (os_context_register_t)funptr;
+    set_os_context_pc(context, (os_context_register_t)funptr);
     *os_context_register_addr(context,reg_ECX) = 0;
     *os_context_register_addr(context,reg_EBP) = (os_context_register_t)(sp-2);
 #ifdef __NetBSD__
@@ -1724,14 +1723,14 @@ arrange_return_to_c_function(os_context_t *context,
 #endif /* LISP_FEATURE_DARWIN */
 
 #elif defined(LISP_FEATURE_X86_64)
-    *os_context_pc_addr(context) = (os_context_register_t)funptr;
+    set_os_context_pc(context, (os_context_register_t)funptr);
     *os_context_register_addr(context,reg_RCX) = 0;
     *os_context_register_addr(context,reg_RBP) = (os_context_register_t)(sp-2);
     *os_context_register_addr(context,reg_RSP) = (os_context_register_t)(sp-18);
 #else
     /* this much of the calling convention is common to all
        non-x86 ports */
-    *os_context_pc_addr(context) = (os_context_register_t)(unsigned long)code;
+    set_os_context_pc(context, (os_context_register_t)(unsigned long)code);
     *os_context_register_addr(context,reg_NARGS) = 0;
 #ifdef reg_LIP
     *os_context_register_addr(context,reg_LIP) =
@@ -1741,8 +1740,7 @@ arrange_return_to_c_function(os_context_t *context,
         (os_context_register_t)(unsigned long)access_control_frame_pointer(th);
 #endif
 #ifdef ARCH_HAS_NPC_REGISTER
-    *os_context_npc_addr(context) =
-        4 + *os_context_pc_addr(context);
+    *os_context_npc_addr(context) = 4 + os_context_pc(context);
 #endif
 #if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)
     *os_context_register_addr(context,reg_CODE) =
@@ -1805,7 +1803,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
        addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
         fake_foreign_function_call(context);
         lose("Control stack exhausted, fault: %p, PC: %p",
-             addr, (void*)*os_context_pc_addr(context));
+             addr, (void*)os_context_pc(context));
     }
     else if(addr >= CONTROL_STACK_GUARD_PAGE(th) &&
             addr < CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) {
@@ -1816,17 +1814,17 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         if (gc_active_p) {
             fake_foreign_function_call(context);
             lose("Control stack exhausted with gc_active_p, fault: %p, PC: %p",
-                 addr, (void*)*os_context_pc_addr(context));
+                 addr, (void*)os_context_pc(context));
         }
         if (arch_pseudo_atomic_atomic(context)) {
             fake_foreign_function_call(context);
             lose("Control stack exhausted while pseudo-atomic, fault: %p, PC: %p",
-                 addr, (void*)*os_context_pc_addr(context));
+                 addr, (void*)os_context_pc(context));
         }
         if (lose_on_corruption_p) {
             fake_foreign_function_call(context);
             lose("Control stack exhausted, fault: %p, PC: %p",
-                 addr, (void*)*os_context_pc_addr(context));
+                 addr, (void*)os_context_pc(context));
         }
         if (!th->state_word.control_stack_guard_page_protected)
             lose("control_stack_guard_page_protected NIL");
@@ -2086,7 +2084,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 
     /* To allow debugging memory faults in signal handlers and such. */
 #ifdef ARCH_HAS_STACK_POINTER
-    char* pc = (char*)*os_context_pc_addr(context);
+    char* pc = (char*)os_context_pc(context);
     struct code* code = (struct code*)component_ptr_from_pc(pc);
     unsigned int offset = code ? pc - (char*)code : 0;
     if (offset)
@@ -2102,7 +2100,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
             *os_context_sp_addr(context), THREAD_ID_VALUE);
 #else
     corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p)",
-                                      addr, *os_context_pc_addr(context));
+                                      addr, (void*)os_context_pc(context));
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -2132,7 +2130,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     extern void memory_fault_emulation_trap(void);
     undo_fake_foreign_function_call(context);
     void **sp = (void **)*os_context_sp_addr(context);
-    *--sp = (void *)*os_context_pc_addr(context);
+    *--sp = (void *)os_context_pc(context);
     *--sp = addr;
 #  ifdef LISP_FEATURE_X86
     /* KLUDGE: x86-linux sp_addr doesn't affect the CPU on return */
@@ -2140,8 +2138,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 #  else
     *((void **)os_context_sp_addr(context)) = sp;
 #  endif
-    *os_context_pc_addr(context) =
-        (os_context_register_t)memory_fault_emulation_trap;
+    set_os_context_pc(context, (os_context_register_t)memory_fault_emulation_trap);
     /* We exit here, letting the signal handler return, picking up at
      * memory_fault_emulation_trap (in target-assem.S), which will
      * trap, and the handler calls the function below, where we
@@ -2154,7 +2151,7 @@ handle_memory_fault_emulation_trap(os_context_t *context)
 {
     void **sp = (void **)*os_context_sp_addr(context);
     void *addr = *sp++;
-    *os_context_pc_addr(context) = (os_context_register_t)*sp++;
+    set_os_context_pc(context, (os_context_register_t)*sp++);
 #  ifdef LISP_FEATURE_X86
     /* KLUDGE: x86-linux sp_addr doesn't affect the CPU on return */
     *((void **)os_context_register_addr(context, reg_ESP)) = sp;

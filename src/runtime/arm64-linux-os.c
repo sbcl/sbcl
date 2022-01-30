@@ -60,12 +60,6 @@ os_context_register_addr(os_context_t *context, int offset)
 }
 
 os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return (os_context_register_t *)&(context->uc_mcontext.pc);
-}
-
-os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
     return os_context_register_addr(context, reg_LR);

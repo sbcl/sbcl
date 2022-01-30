@@ -82,7 +82,7 @@ lispobj find_code(os_context_t *context)
         return code - HeaderValue(header)*sizeof(lispobj);
 #else
     lispobj codeptr =
-        (lispobj)component_ptr_from_pc((char *)(*os_context_pc_addr(context)));
+        (lispobj)component_ptr_from_pc((char *)os_context_pc(context));
 
     if (codeptr == 0)
         return NIL;
@@ -94,7 +94,7 @@ lispobj find_code(os_context_t *context)
 static long compute_offset(os_context_t *context, lispobj code)
 {
   if (code != NIL) {
-        uword_t pc = *os_context_pc_addr(context);
+        uword_t pc = os_context_pc(context);
         struct code *codeptr = (struct code *)native_pointer(code);
         uword_t code_start = (uword_t)code_text_start(codeptr);
         int offset;

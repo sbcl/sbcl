@@ -9,6 +9,8 @@
  * files for more information.
  */
 
+#define _GNU_SOURCE /* for REG_RAX etc. from sys/ucontext */
+
 #include <stdio.h>
 
 #include "sbcl.h"
@@ -196,7 +198,7 @@ void arch_skip_instruction(os_context_t *context)
     long code;
 
     /* Get and skip the Lisp interrupt code. */
-    code = *(char*)(*os_context_pc_addr(context))++;
+    code = *(char*)(OS_CONTEXT_PC(context)++);
     switch (code)
         {
         case trap_Error:
@@ -206,7 +208,7 @@ void arch_skip_instruction(os_context_t *context)
         case trap_UninitializedLoad:
             // Skip 1 byte. We can't encode that the internal_error_nargs is 1
             // because it is not an SC+OFFSET that follows the trap code.
-            *os_context_pc_addr(context) += 1;
+            OS_CONTEXT_PC(context) += 1;
             break;
         case trap_Breakpoint:           /* not tested */
         case trap_FunEndBreakpoint: /* not tested */
@@ -230,14 +232,13 @@ void arch_skip_instruction(os_context_t *context)
         }
 
     FSHOW((stderr,
-           "/[arch_skip_inst resuming at %x]\n",
-           *os_context_pc_addr(context)));
+           "/[arch_skip_inst resuming at %x]\n", OS_CONTEXT_PC(context)));
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
-    return 1 + (unsigned char *)(*os_context_pc_addr(context));
+    return 1 + (unsigned char *)OS_CONTEXT_PC(context);
 }
 
 boolean
@@ -296,7 +297,7 @@ unsigned int  single_step_save3;
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int*)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int*)OS_CONTEXT_PC(context);
 
     /* Put the original instruction back. */
     arch_remove_breakpoint(pc, orig_inst);
@@ -317,23 +318,22 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     single_stepping = pc;
 
 #ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-    *os_context_pc_addr(context) = (os_context_register_t)((char *)pc - 9);
+    OS_CONTEXT_PC(context) = (os_context_register_t)((char *)pc - 9);
 #endif
 }
 
 void
 arch_handle_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) -= BREAKPOINT_WIDTH;
+    OS_CONTEXT_PC(context) -= BREAKPOINT_WIDTH;
     handle_breakpoint(context);
 }
 
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) -= BREAKPOINT_WIDTH;
-    *os_context_pc_addr(context) =
-        (uword_t)handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) -= BREAKPOINT_WIDTH;
+    OS_CONTEXT_PC(context) = (uword_t)handle_fun_end_breakpoint(context);
 }
 
 void
@@ -358,10 +358,8 @@ restore_breakpoint_from_single_step(os_context_t * context)
     *context_eflags_addr(context) &= ~0x100;
 #endif
     /* Re-install the breakpoint if possible. */
-    if (((char *)*os_context_pc_addr(context) >
-         (char *)single_stepping) &&
-        ((char *)*os_context_pc_addr(context) <=
-         (char *)single_stepping + BREAKPOINT_WIDTH)) {
+    if (((char *)OS_CONTEXT_PC(context) > (char *)single_stepping) &&
+        ((char *)OS_CONTEXT_PC(context) <= (char *)single_stepping + BREAKPOINT_WIDTH)) {
         fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
     } else {
         arch_install_breakpoint(single_stepping);
@@ -378,7 +376,7 @@ sigtrap_handler(int __attribute__((unused)) signal,
 {
 #ifdef LISP_FEATURE_INT1_BREAKPOINTS
     // ICEBP instruction = handle-pending-interrupt following pseudo-atomic
-    if (((unsigned char*)*os_context_pc_addr(context))[-1] == 0xF1)
+    if (((unsigned char*)OS_CONTEXT_PC(context))[-1] == 0xF1)
         return interrupt_handle_pending(context);
 #endif
 
@@ -398,16 +396,16 @@ sigtrap_handler(int __attribute__((unused)) signal,
      * 'kind' value (eg trap_Cerror). For error-trap and Cerror-trap a
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
-    trap = *(unsigned char *)(*os_context_pc_addr(context));
+    trap = *(unsigned char *)OS_CONTEXT_PC(context);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (trap == trap_UndefinedFunction) {
         // The interrupted PC pins this fdefn. Sigtrap is delivered on the ordinary stack,
         // not the alternate stack.
         // (FIXME: an interior pointer to an fdefn _should_ pin it, but doesn't)
-        lispobj* fdefn = (lispobj*)(*os_context_pc_addr(context) & ~LOWTAG_MASK);
+        lispobj* fdefn = (lispobj*)(OS_CONTEXT_PC(context) & ~LOWTAG_MASK);
         if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
             // Return to undefined-tramp
-            *os_context_pc_addr(context) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
+            OS_CONTEXT_PC(context) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
             // with RAX containing the FDEFN
             *os_context_register_addr(context,reg_RAX) =
                 make_lispobj(fdefn, OTHER_POINTER_LOWTAG);
@@ -422,15 +420,15 @@ void
 sigill_handler(int __attribute__((unused)) signal,
                siginfo_t __attribute__((unused)) *siginfo,
                os_context_t *context) {
-    unsigned char* pc = (void*)*os_context_pc_addr(context);
+    unsigned char* pc = (void*)OS_CONTEXT_PC(context);
 #ifndef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     if (*(unsigned short *)pc == UD2_INST) {
-        *os_context_pc_addr(context) += 2;
+        OS_CONTEXT_PC(context) += 2;
         return sigtrap_handler(signal, siginfo, context);
     }
     // Interrupt if overflow (INTO) raises SIGILL in 64-bit mode
     if (*(unsigned char *)pc == INTO_INST) {
-        *os_context_pc_addr(context) += 1;
+        OS_CONTEXT_PC(context) += 1;
         return sigtrap_handler(signal, siginfo, context);
     }
 #endif

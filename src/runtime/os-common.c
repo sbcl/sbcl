@@ -314,3 +314,13 @@ gc_managed_addr_p(lispobj addr)
     }
     return 0;
 }
+
+uword_t os_context_pc(os_context_t* context) {
+    return OS_CONTEXT_PC(context);
+}
+void set_os_context_pc(os_context_t* context, uword_t pc) {
+    OS_CONTEXT_PC(context) = pc;
+}
+os_context_register_t* os_context_pc_addr(os_context_t* context) {
+    return (os_context_register_t*)&(OS_CONTEXT_PC(context));
+}

@@ -60,15 +60,6 @@ os_context_fpregister_addr(os_context_t *context, int offset)
     return &ctx->sc_fpregs[offset];
 }
 
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    /* Why do I get all the silly ports? -- CSR, 2002-08-11 */
-    mcontext_t *mctx = &context->uc_mcontext;
-    struct sigcontext *ctx = (struct sigcontext *)mctx;
-    return &ctx->sc_pc;
-}
-
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {
@@ -113,7 +104,7 @@ os_context_bd_cause(os_context_t *context)
     extern boolean arch_insn_with_bdelay_p(unsigned int insn);
 
     os_vm_address_t addr
-        = (os_vm_address_t)(unsigned int)*os_context_pc_addr(context);
+        = (os_vm_address_t)(unsigned int)OS_CONTEXT_PC(context);
     unsigned int insn = *(unsigned int *)addr;
 
     if (arch_insn_with_bdelay_p(insn))

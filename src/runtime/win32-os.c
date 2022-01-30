@@ -1041,17 +1041,17 @@ static int
 handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
 {
 #ifdef LISP_FEATURE_UD2_BREAKPOINTS
-    if (((unsigned short *)*os_context_pc_addr(ctx))[0] != 0x0b0f)
+    if (((unsigned short *)OS_CONTEXT_PC(ctx))[0] != 0x0b0f)
         return -1;
 #endif
 
     /* Unlike some other operating systems, Win32 leaves EIP
      * pointing to the breakpoint instruction. */
-    (*os_context_pc_addr(ctx)) += TRAP_CODE_WIDTH;
+    OS_CONTEXT_PC(ctx) += TRAP_CODE_WIDTH;
 
     /* Now EIP points just after the INT3 byte and aims at the
      * 'kind' value (eg trap_Cerror). */
-    unsigned trap = *(unsigned char *)(*os_context_pc_addr(ctx));
+    unsigned trap = *(unsigned char *)OS_CONTEXT_PC(ctx);
 
 #ifdef LISP_FEATURE_SB_THREAD
     /* Before any other trap handler: gc_safepoint ensures that

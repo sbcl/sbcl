@@ -33,7 +33,7 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
     unsigned int *pc;
     int rs1;
 
-    pc = (unsigned int *)(*os_context_pc_addr(context));
+    pc = (unsigned int *)OS_CONTEXT_PC(context);
 
     /* On the sparc, we have to decode the instruction. */
 
@@ -81,7 +81,7 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
 
 void arch_skip_instruction(os_context_t *context)
 {
-    *os_context_pc_addr(context) = *os_context_npc_addr(context);
+    OS_CONTEXT_PC(context) = *os_context_npc_addr(context);
     /* Note that we're doing integer arithmetic here, not pointer. So
      * the value that the return value of os_context_npc_addr() points
      * to will be incremented by 4, not 16.
@@ -91,7 +91,7 @@ void arch_skip_instruction(os_context_t *context)
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)(*os_context_pc_addr(context) + 4);
+    return (unsigned char *)(OS_CONTEXT_PC(context) + 4);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
@@ -158,7 +158,7 @@ static unsigned int *skipped_break_addr, displaced_after_inst;
 
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
     unsigned int *npc = (unsigned int *)(*os_context_npc_addr(context));
 
   /*  orig_sigmask = context->sigmask;
@@ -182,7 +182,7 @@ static int pseudo_atomic_trap_p(os_context_t *context)
     int result;
 
 
-    pc = (unsigned int*) *os_context_pc_addr(context);
+    pc = (unsigned int*) OS_CONTEXT_PC(context);
     badinst = *pc;
     result = 0;
 
@@ -221,8 +221,8 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(context);
-    *os_context_npc_addr(context) = *os_context_pc_addr(context) + 4;
+    OS_CONTEXT_PC(context) = (int) handle_fun_end_breakpoint(context);
+    *os_context_npc_addr(context) = OS_CONTEXT_PC(context) + 4;
 }
 
 void
@@ -231,15 +231,15 @@ arch_handle_after_breakpoint(os_context_t *context)
     *skipped_break_addr = trap_Breakpoint;
     os_flush_icache(skipped_break_addr, sizeof(unsigned int));
     skipped_break_addr = NULL;
-    *(unsigned long *)*os_context_pc_addr(context) = displaced_after_inst;
+    *(unsigned long *)OS_CONTEXT_PC(context) = displaced_after_inst;
     /* context->sigmask = orig_sigmask; */
-    os_flush_icache((os_vm_address_t) *os_context_pc_addr(context), sizeof(unsigned int));
+    os_flush_icache((os_vm_address_t)OS_CONTEXT_PC(context), sizeof(unsigned int));
 }
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned int code = *((uint32_t *)(*os_context_pc_addr(context)));
+    unsigned int code = *(uint32_t *)OS_CONTEXT_PC(context);
     int register_offset = code >> 8 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);

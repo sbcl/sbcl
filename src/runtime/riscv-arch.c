@@ -34,17 +34,12 @@ void arch_skip_instruction(os_context_t *context)
 {
     /* KLUDGE: Other platforms check for trap codes and skip inlined
      * trap/error parameters.  We should too. */
-
-    /* Note that we're doing integer arithmetic here, not pointer. So
-     * the value that the return value of os_context_pc_addr() points
-     * to will be incremented by 4, not 16.
-     */
-    *os_context_pc_addr(context) += 4;
+    OS_CONTEXT_PC(context) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char*)(*os_context_pc_addr(context) + 5);
+    return (unsigned char*)(OS_CONTEXT_PC(context) + 5);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
@@ -102,14 +97,14 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (long) handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) = (long) handle_fun_end_breakpoint(context);
 }
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
     unsigned char register_offset =
-      *((unsigned char *)(*os_context_pc_addr(context)) + 5);
+      *((unsigned char *)(OS_CONTEXT_PC(context)) + 5);
     handle_single_step_trap(context, trap, register_offset);
     /* KLUDGE: arch_skip_instruction() only skips one instruction, and
      * there is a following word to deal with as well, so skip
@@ -121,14 +116,14 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 void
 sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
 
     if (trap_instruction != 0x100073) {
         lose("Unrecognized trap instruction %08x in sigtrap_handler()",
              trap_instruction);
     }
 
-    uint32_t code = *((uint32_t *)(4 + *os_context_pc_addr(context)));
+    uint32_t code = *((uint32_t *)(4 + OS_CONTEXT_PC(context)));
 
     if (code == trap_PendingInterrupt) {
       arch_skip_instruction(context);

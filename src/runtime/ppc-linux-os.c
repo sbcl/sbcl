@@ -71,16 +71,6 @@ os_context_register_addr(os_context_t *context, int offset)
 }
 
 os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-#if defined(GLIBC231_STYLE_UCONTEXT)
-    return &((context->uc_mcontext.regs)->nip);
-#elif defined(GLIBC232_STYLE_UCONTEXT)
-    return &((context->uc_mcontext.uc_regs->gregs)[PT_NIP]);
-#endif
-}
-
-os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
 #if defined(GLIBC231_STYLE_UCONTEXT)

@@ -8,4 +8,6 @@ static inline os_context_t *arch_os_get_context(void **void_context) {
    return (os_context_t *) (*void_context);
 }
 
+#define OS_CONTEXT_PC(context) context->uc_mcontext.__gregs[_REG_PC]
+
 #endif /* _SPARC_BSD_OS_H */

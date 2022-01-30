@@ -270,7 +270,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
     } else
 #endif
     {
-        pc = *os_context_pc_addr(context);
+        pc = os_context_pc(context);
         info->frame =
             (struct call_frame *)(uword_t)
                 (*os_context_register_addr(context, reg_CFP));
@@ -574,7 +574,7 @@ void backtrace_from_fp(void *fp, int nframes, int start) {
 
 void backtrace_from_context(os_context_t *context, int nframes) {
     void *fp = (void *)os_context_frame_pointer(context);
-    print_backtrace_frame((void *)*os_context_pc_addr(context), fp, 0, stdout);
+    print_backtrace_frame((void *)os_context_pc(context), fp, 0, stdout);
     backtrace_from_fp(fp, nframes - 1, 1);
 }
 

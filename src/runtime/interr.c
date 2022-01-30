@@ -216,7 +216,7 @@ char *internal_error_descriptions[] = {INTERNAL_ERROR_NAMES};
 char internal_error_nargs[] = INTERNAL_ERROR_NARGS;
 
 void skip_internal_error (os_context_t *context) {
-    unsigned char *ptr = (unsigned char *)*os_context_pc_addr(context);
+    unsigned char *ptr = (unsigned char *)os_context_pc(context);
 
 #ifdef LISP_FEATURE_ARM64
     uint32_t trap_instruction = *(uint32_t *)(ptr - 4);
@@ -226,7 +226,7 @@ void skip_internal_error (os_context_t *context) {
     ptr++; // skip the byte indicating the kind of trap
 
     if (code > sizeof(internal_error_nargs)) {
-        printf("Unknown error code %d at %p\n", code, (void*)*os_context_pc_addr(context));
+        printf("Unknown error code %d at %p\n", code, (void*)os_context_pc(context));
     }
     int nargs = internal_error_nargs[code];
 
@@ -244,7 +244,7 @@ void skip_internal_error (os_context_t *context) {
 #ifdef LISP_FEATURE_ARM64
     ptr=PTR_ALIGN_UP(ptr, 4);
 #endif
-    *((unsigned char **)os_context_pc_addr(context)) = ptr;
+    set_os_context_pc(context, (os_context_register_t)ptr);
 
 }
 
@@ -322,7 +322,7 @@ describe_internal_error(os_context_t *context)
     unsigned char *ptr = arch_internal_error_arguments(context);
     char count;
     int position;
-    void * pc = (void*)*os_context_pc_addr(context);
+    void * pc = (void*)os_context_pc(context);
     unsigned char code;
 
 #ifdef LISP_FEATURE_ARM64

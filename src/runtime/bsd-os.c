@@ -281,7 +281,7 @@ memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     os_restore_tls_segment_register(context);
 #endif
 
-    FSHOW((stderr, "Memory fault at: %p, PC: %p\n", fault_addr, *os_context_pc_addr(context)));
+    FSHOW((stderr, "Memory fault at: %p, PC: %p\n", fault_addr, OS_CONTEXT_PC(context)));
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     if (handle_safepoint_violation(context, fault_addr)) return;

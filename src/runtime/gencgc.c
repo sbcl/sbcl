@@ -3164,7 +3164,7 @@ preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_regi
     proc(*os_context_register_addr(c,reg_EBX));
     proc(*os_context_register_addr(c,reg_ESI));
     proc(*os_context_register_addr(c,reg_EDI));
-    proc(*os_context_pc_addr(c));
+    proc(os_context_pc(c));
 #elif defined LISP_FEATURE_X86_64
     proc(*os_context_register_addr(c,reg_RAX));
     proc(*os_context_register_addr(c,reg_RCX));
@@ -3180,7 +3180,7 @@ preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_regi
     proc(*os_context_register_addr(c,reg_R13));
     proc(*os_context_register_addr(c,reg_R14));
     proc(*os_context_register_addr(c,reg_R15));
-    proc(*os_context_pc_addr(c));
+    proc(os_context_pc(c));
 #else
     #error "preserve_context_registers needs to be tweaked for non-x86 Darwin"
 #endif

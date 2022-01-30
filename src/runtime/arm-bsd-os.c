@@ -99,12 +99,6 @@ os_context_register_addr(os_context_t *context, int offset)
 #endif
 
 os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return os_context_register_addr(context, reg_PC);
-}
-
-os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
     return os_context_register_addr(context, reg_LR);
@@ -137,8 +131,8 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
-    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
+    unsigned int code = *((unsigned char *)(4+OS_CONTEXT_PC(context)));
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
 
     if (trap_instruction != 0xe7ffdefe) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler()",

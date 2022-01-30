@@ -32,9 +32,9 @@ os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *contex
 
 void arch_skip_instruction(os_context_t *context)
 {
-    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
     unsigned code = trap_instruction >> 5 & 0xFF;
-    *os_context_pc_addr(context) += 4;
+    OS_CONTEXT_PC(context) += 4;
     switch (code)
     {
     case trap_Error:
@@ -47,7 +47,7 @@ void arch_skip_instruction(os_context_t *context)
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)*os_context_pc_addr(context);
+    return (unsigned char *)OS_CONTEXT_PC(context);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
@@ -106,7 +106,7 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (uword_t) handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) = (uword_t) handle_fun_end_breakpoint(context);
 }
 
 void
@@ -119,11 +119,11 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    uint32_t trap_instruction = *((uint32_t *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
     unsigned code = trap_instruction >> 5 & 0xFF;
     if ((trap_instruction >> 21) != 0x6A1) {
         lose("Unrecognized trap instruction %08x in sigtrap_handler() (PC: %p)",
-             trap_instruction, (void*) *os_context_pc_addr(context));
+             trap_instruction, (void*)OS_CONTEXT_PC(context));
     }
 
     handle_trap(context, code);
@@ -131,7 +131,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL at %p.", (void*) *os_context_pc_addr(context));
+    lose("Unhandled SIGILL at %p.", (void*)OS_CONTEXT_PC(context));
 }
 
 void arch_install_interrupt_handlers()

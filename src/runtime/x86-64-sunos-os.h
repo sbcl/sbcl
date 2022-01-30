@@ -6,4 +6,6 @@ typedef long os_context_register_t;
 
 #include "arch-os-generic.inc"
 
+#define OS_CONTEXT_PC(context) context->uc_mcontext.gregs[REG_RIP]
+
 #endif /* _X86_64_SOLARIS_OS_H */

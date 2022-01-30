@@ -410,8 +410,7 @@ print_context(os_context_t *context)
     printf("DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
 #endif
 #ifndef REG_PC
-    printf("PC:\t\t  0x%08lx\n",
-           (unsigned long)(*os_context_pc_addr(context)));
+    printf("PC:\t\t  0x%08lx\n", (unsigned long)os_context_pc(context));
 #endif
 }
 
@@ -511,7 +510,7 @@ sigint_handler(int __attribute__((unused)) signal,
                void *context)
 {
     extern void ldb_monitor();
-    fprintf(stderr, "\nSIGINT hit at %p\n", (void*)*os_context_pc_addr(context));
+    fprintf(stderr, "\nSIGINT hit at %p\n", (void*)os_context_pc(context));
     ldb_monitor();
     fprintf(stderr, "Returning to lisp (if you're lucky).\n");
 }

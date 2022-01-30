@@ -90,7 +90,7 @@ void arch_skip_instruction(os_context_t *context)
     int code;
 
     /* Get and skip the Lisp interrupt code. */
-    code = *(char*)(*os_context_pc_addr(context))++;
+    code = *(char*)(OS_CONTEXT_PC(context)++);
     switch (code)
         {
         case trap_Error:
@@ -119,14 +119,13 @@ void arch_skip_instruction(os_context_t *context)
         }
 
     FSHOW((stderr,
-           "/[arch_skip_inst resuming at %x]\n",
-           *os_context_pc_addr(context)));
+           "/[arch_skip_inst resuming at %x]\n", OS_CONTEXT_PC(context)));
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
-    return 1 + (unsigned char *)(*os_context_pc_addr(context));
+    return 1 + (unsigned char *)(OS_CONTEXT_PC(context));
 }
 
 boolean
@@ -181,7 +180,7 @@ unsigned int  single_step_save3;
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int*)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int*)OS_CONTEXT_PC(context);
 
     /* Put the original instruction back. */
     arch_remove_breakpoint(pc, orig_inst);
@@ -202,7 +201,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     single_stepping = pc;
 
 #ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-    *os_context_pc_addr(context) = (os_context_register_t)((char *)pc - 9);
+    OS_CONTEXT_PC(context) = (os_context_register_t)((char *)pc - 9);
 #endif
 }
 
@@ -219,10 +218,8 @@ restore_breakpoint_from_single_step(os_context_t * context)
     *context_eflags_addr(context) &= ~0x100;
 #endif
     /* Re-install the breakpoint if possible. */
-    if (((char *)*os_context_pc_addr(context) >
-         (char *)single_stepping) &&
-        ((char *)*os_context_pc_addr(context) <=
-         (char *)single_stepping + BREAKPOINT_WIDTH)) {
+    if (((char *)OS_CONTEXT_PC(context) > (char *)single_stepping) &&
+        ((char *)OS_CONTEXT_PC(context) <= (char *)single_stepping + BREAKPOINT_WIDTH)) {
         fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
     } else {
         arch_install_breakpoint(single_stepping);
@@ -235,16 +232,15 @@ restore_breakpoint_from_single_step(os_context_t * context)
 void
 arch_handle_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) -= BREAKPOINT_WIDTH;
+    OS_CONTEXT_PC(context) -= BREAKPOINT_WIDTH;
     handle_breakpoint(context);
 }
 
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) -= BREAKPOINT_WIDTH;
-    *os_context_pc_addr(context) =
-        (int)handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) -= BREAKPOINT_WIDTH;
+    OS_CONTEXT_PC(context) = (int)handle_fun_end_breakpoint(context);
 }
 
 void
@@ -287,20 +283,20 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
      * 'kind' value (eg trap_Cerror). For error-trap and Cerror-trap a
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
-    trap = *(unsigned char *)(*os_context_pc_addr(context));
+    trap = *(unsigned char *)OS_CONTEXT_PC(context);
     handle_trap(context, trap);
 }
 
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 #ifndef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-    if (*((unsigned short *)*os_context_pc_addr(context)) == UD2_INST) {
-        *os_context_pc_addr(context) += 2;
+    if (*(unsigned short *)OS_CONTEXT_PC(context) == UD2_INST) {
+        OS_CONTEXT_PC(context) += 2;
         return sigtrap_handler(signal, siginfo, context);
     }
 #endif
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL at %p.", (void*)*os_context_pc_addr(context));
+    lose("Unhandled SIGILL at %p.", (void*)OS_CONTEXT_PC(context));
 }
 #endif /* not LISP_FEATURE_WIN32 */
 

@@ -25,17 +25,6 @@ os_context_sp_addr(os_context_t *context)
 }
 #endif
 
-
-int *
-os_context_pc_addr(os_context_t *context)
-{
-#if defined(LISP_FEATURE_NETBSD)
-    return &(_UC_MACHINE_PC(context));
-#elif defined(LISP_FEATURE_OPENBSD)
-    return &context->sc_frame.srr0;
-#endif
-}
-
 int *
 os_context_lr_addr(os_context_t *context)
 {

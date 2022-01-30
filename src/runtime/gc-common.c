@@ -2325,6 +2325,10 @@ scavenge_control_stack(struct thread *th)
 
 static int boxed_registers[] = BOXED_REGISTERS;
 
+// Nothing usees os_context_pc_addr any more, except ACCESS_INTERIOR_POINTER_pc.
+// I didn't see a good way to remove that one.
+extern os_context_register_t* os_context_pc_addr(os_context_t*);
+
 /* The GC has a notion of an "interior pointer" register, an unboxed
  * register that typically contains a pointer to inside an object
  * referenced by another pointer.  The most obvious of these is the

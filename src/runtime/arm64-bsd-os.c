@@ -71,12 +71,6 @@ os_context_register_addr(os_context_t *context, int regno)
     }
 }
 
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return (&context->sc_elr);
-}
-
 os_context_register_t   *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
@@ -107,12 +101,6 @@ os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
     return (os_context_register_t *)&(context->uc_mcontext.__gregs[offset]);
-}
-
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return os_context_register_addr(context, 32);
 }
 
 os_context_register_t *
@@ -151,12 +139,6 @@ os_context_register_addr(os_context_t *context, int offset)
 }
 
 os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return os_context_register_addr(context, 32);
-}
-
-os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
     return os_context_register_addr(context, reg_LR);
@@ -188,12 +170,6 @@ os_context_register_addr(os_context_t *context, int regno)
         case reg_NSP:   return (os_context_register_t*)(&context->uc_mcontext->__ss.__sp);
         default:        return (os_context_register_t*)(&context->uc_mcontext->__ss.__x[regno]);
     }
-}
-
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return (os_context_register_t*)(&context->uc_mcontext->__ss.__pc);
 }
 
 os_context_register_t   *
