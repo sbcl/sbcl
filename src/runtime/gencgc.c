@@ -2630,8 +2630,6 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
 
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
 # define sticky_marked_p(page) (gc_card_mark[page_to_card_index(page)] == STICKY_MARK)
-#else
-# define sticky_marked_p(page) 0
 #endif
 extern int descriptors_scavenge(lispobj *, lispobj*, generation_index_t, int);
 
@@ -2668,20 +2666,20 @@ extern int descriptors_scavenge(lispobj *, lispobj*, generation_index_t, int);
 static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t gen)
 {
     __attribute__((unused)) int prev_marked = 0;
-    while (1) {
+    do {
         lispobj* start = (void*)page_address(page);
         lispobj* end = start + page_words_used(page);
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         long card = addr_to_card_index(start);
         int marked = gc_card_mark[card] != CARD_UNMARKED;
+        /* Cards can change from marked to unmarked (just like with physical protection),
+         * but also unmarked to marked, if transferring the card mark from the object's
+         * header card to a cell in that object on a later card.
+         * Lisp is given leeway because marking the header is easier. So the
+         * algorithm accepts either way on input, but makes its output canonical.
+         * (similar in spirit to Postel's Law) */
         if (marked || prev_marked) {
             int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
-            /* Card can go from marked to unmarked (just like with physical protection),
-             * but also unmarked to marked, if transferring the card mark from the object's
-             * header card to a cell in that object on a later card.
-             * Lisp is given leeway because marking the header is easier. So the
-             * algorithm accepts either way on input, but makes its output canonical.
-             * (similar in spirit to Postel's Law) */
             gc_card_mark[card] =
               (gc_card_mark[card] != STICKY_MARK) ? (dirty ? CARD_MARKED : CARD_UNMARKED) :
               STICKY_MARK;
@@ -2693,9 +2691,9 @@ static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t g
             if (!dirty) protect_page(start, page);
         }
 #endif
-        if (page_ends_contiguous_block_p(page, gen)) return page;
         ++page;
-    }
+    } while (!page_ends_contiguous_block_p(page-1, gen));
+    return page;
 }
 
 /* Large vectors are scanned just like strictly boxed root pages,
@@ -2705,7 +2703,7 @@ static page_index_t scan_vector_root_page(page_index_t page, generation_index_t 
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
     return scan_boxed_root_page(page, gen);
 #else
-    while (1) {
+    do {
         lispobj* start = (void*)page_address(page);
         long card = addr_to_card_index(start);
         if (gc_card_mark[card] != CARD_UNMARKED) {
@@ -2713,10 +2711,10 @@ static page_index_t scan_vector_root_page(page_index_t page, generation_index_t 
             int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
             if (!dirty) gc_card_mark[card] = CARD_UNMARKED;
         }
-        if (page_ends_contiguous_block_p(page, gen)) return page;
         ++page;
-    }
+    } while (!page_ends_contiguous_block_p(page-1, gen));
 #endif
+    return page;
 }
 
 /* Scavenge all generations from FROM to TO, inclusive, except for
@@ -2746,51 +2744,54 @@ static page_index_t scan_vector_root_page(page_index_t page, generation_index_t 
 static void
 scavenge_root_gens(generation_index_t from)
 {
-    page_index_t i;
+    page_index_t i = 0;
+    page_index_t limit = next_free_page;
     gc_dcheck(compacting_p());
 
-    for (i = 0; i < next_free_page; i++) {
+    while (i < limit) {
         generation_index_t generation = page_table[i].gen;
-        if (page_boxed_p(i)
+        if (!page_boxed_p(i)
             /* Not sure why word_used is checked. Probably because reset_page_flags()
              * does not change the page's gen to an unused number. Perhaps it should */
-            && (page_words_used(i) != 0)
-            && (generation >= from)
+            || !page_words_used(i)
+            || (generation < from)
             /* Yet another reason it's bad that SCRATCH_GENERATION is numerically
              * higher than PSEUDO_STATIC: we wouldn't need this '<=' test if SCRATCH
              * were numerically lowest */
-            && (generation <= PSEUDO_STATIC_GENERATION)) {
+            || (generation > PSEUDO_STATIC_GENERATION)) {
+            ++i;
+            continue;
+        }
 
-            /* This should be the start of a region */
-            gc_assert(page_starts_contiguous_block_p(i));
+        /* This should be the start of a region */
+        gc_assert(page_starts_contiguous_block_p(i));
 
-            if (page_table[i].type == PAGE_TYPE_BOXED) {
-                i = scan_boxed_root_page(i, generation);
-            } else if (page_single_obj_p(i) && large_scannable_vector_p(i)) {
-                i = scan_vector_root_page(i, generation);
-            } else {
-                page_index_t last_page;
-                boolean write_protected = 1;
-                /* Now work forward until the end of the region */
-                for (last_page = i; ; last_page++) {
-                    write_protected = write_protected && PAGE_WRITEPROTECTED_P(last_page);
-                    if (page_ends_contiguous_block_p(last_page, generation))
-                        break;
-                }
-                if (!write_protected) {
-                    lispobj* start = (lispobj*)page_address(i);
-                    lispobj* limit =
-                        (lispobj*)page_address(last_page) + page_words_used(last_page);
-                    heap_scavenge(start, limit);
-                    /* Now scan the pages and write protect those that
-                     * don't have pointers to younger generations. */
-                    if (is_code(page_table[i].type))
-                        update_code_writeprotection(i, last_page, start, limit);
-                    else
-                        update_writeprotection(i, last_page, start, limit);
-                }
-                i = last_page;
+        if (page_table[i].type == PAGE_TYPE_BOXED) {
+            i = scan_boxed_root_page(i, generation);
+        } else if (page_single_obj_p(i) && large_scannable_vector_p(i)) {
+            i = scan_vector_root_page(i, generation);
+        } else {
+            page_index_t last_page;
+            boolean write_protected = 1;
+            /* Now work forward until the end of the region */
+            for (last_page = i; ; last_page++) {
+                write_protected = write_protected && PAGE_WRITEPROTECTED_P(last_page);
+                if (page_ends_contiguous_block_p(last_page, generation))
+                    break;
             }
+            if (!write_protected) {
+                lispobj* start = (lispobj*)page_address(i);
+                lispobj* limit =
+                    (lispobj*)page_address(last_page) + page_words_used(last_page);
+                heap_scavenge(start, limit);
+                /* Now scan the pages and write protect those that
+                 * don't have pointers to younger generations. */
+                if (is_code(page_table[i].type))
+                    update_code_writeprotection(i, last_page, start, limit);
+                else
+                    update_writeprotection(i, last_page, start, limit);
+            }
+            i = 1 + last_page;
         }
     }
 }
