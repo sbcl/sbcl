@@ -184,7 +184,8 @@
               do
               #+darwin
               (when (eql i variadic)
-                (setf (arg-state-num-register-args arg-state) +max-register-args+))
+                (setf (arg-state-num-register-args arg-state) +max-register-args+
+                      (arg-state-fp-registers arg-state) +max-register-args+))
               (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state))))
       (values (make-normal-tn *fixnum-primitive-type*)
               (arg-state-stack-frame-size arg-state)
