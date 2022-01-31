@@ -5,7 +5,10 @@
 (define-load-time-global *!initial-parsed-types* nil)
 (!cold-init-forms
  (dovector (saetp sb-vm:*specialized-array-element-type-properties*)
-   (setf (sb-vm:saetp-ctype saetp) (specifier-type (sb-vm:saetp-specifier saetp))))
+   (setf (sb-vm:saetp-ctype saetp) (specifier-type (sb-vm:saetp-specifier saetp)))
+   #-sb-xc-host
+   (setf (aref sb-vm::*saetp-widetag-ctype* (ash (- (sb-vm:saetp-typecode saetp) 128) -2))
+         (sb-vm:saetp-ctype saetp)))
   ;; This seems so weird and random. I really wanted to remove it, but
   ;; adding the :BUILTIN property makes sense because without it, the type
   ;; does not have a unique parse. Probably a missing entry in one of the

@@ -1029,19 +1029,11 @@ of specialized arrays is supported."
 
 ;;;; miscellaneous array properties
 
+(define-load-time-global *saetp-widetag-ctype* (make-array 32 :initial-element (make-unbound-marker)))
+
 (defun array-element-ctype (array)
   ;; same as (SPECIFIER-TYPE (ARRAY-ELEMENT-TYPE ARRAY)) but more efficient
-  (svref #.(let ((table
-                   ;; Using unbound-marker for empty elements would be preferable,
-                   ;; but I'd either need a cross-compiler proxy for unbound-marker,
-                   ;; or else wrap a LOAD-TIME-VALUE on the table construction form
-                   ;; which might introduce more order-sensitivity to self-build.
-                   (sb-xc:make-array 32 ;:initial-element (make-unbound-marker)
-                                     :initial-element 0)))
-             (dovector (saetp *specialized-array-element-type-properties*)
-               (setf (aref table (ash (- (saetp-typecode saetp) 128) -2))
-                     (saetp-ctype saetp)))
-             table)
+  (svref (load-time-value *saetp-widetag-ctype*)
          (- (ash (array-underlying-widetag array) -2) 32)))
 
 (defun array-element-type (array)
