@@ -202,14 +202,9 @@
 
   (setq sb-c::*queued-proclaims* nil) ; needed before any proclaims are run
 
-  (loop with *package* = *package* ; rebind to self, as if by LOAD
-        for index-in-cold-toplevels from 0
-        for toplevel-thing in (prog1 *!cold-toplevels*
-                                 (makunbound '*!cold-toplevels*))
-        do
-      #+sb-show
-      (when (zerop (mod index-in-cold-toplevels 1000))
-        (/show index-in-cold-toplevels))
+  (/show0 "calling cold toplevel forms and fixups")
+  (let ((*package* *package*)) ; rebind to self, as if by LOAD
+    (dolist (toplevel-thing *!cold-toplevels*)
       (typecase toplevel-thing
         (function
          (funcall toplevel-thing))
@@ -224,7 +219,7 @@
         ((cons (eql :begin-file))
          (unless (!c-runtime-noinform-p) (print (cdr toplevel-thing))))
         (t
-         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*"))))
+         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
   (unless (!c-runtime-noinform-p) (terpri))
 
