@@ -540,6 +540,7 @@ ldb_monitor(void)
     int ambig;
 
     printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
+    if (gc_active_p) printf("(GC in progress)\n");
     if (!ldb_in) {
 #ifndef LISP_FEATURE_WIN32
         ldb_in = fopen("/dev/tty","r+");
