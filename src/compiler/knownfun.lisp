@@ -89,9 +89,10 @@
                             (type-specifier ctype)
                             ctype)))
     (dolist (name names)
-      (block ignore
-        (unless overwrite-fndb-silently
-          (let ((old-fun-info (info :function :info name)))
+      (let ((old-fun-info (info :function :info name))
+            inherit)
+        (block ignore
+          (unless overwrite-fndb-silently
             (when old-fun-info
               ;; This is handled as an error because it's generally a bad
               ;; thing to blow away all the old optimization stuff. It's
@@ -106,22 +107,35 @@
                   (cerror "Go ahead, overwrite it."
                           "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
                           old-fun-info name)
+                (continue ()
+                  :report "Inherit templates and optimizers"
+                  (setf inherit t))
                 (ignore ()
-                  (return-from ignore))))))
-        (setf (info :function :type name) type-to-store)
-        (setf (info :function :where-from name) :declared)
-        (setf (info :function :kind name) :function)
-        (setf (info :function :info name)
-              (make-fun-info :attributes attributes
-                             :derive-type derive-type
-                             :optimizer optimizer
-                             :result-arg result-arg
-                             :call-type-deriver call-type-deriver
-                             :annotation annotation))
-        (if location
-            (setf (getf (info :source-location :declaration name) 'defknown)
-                  location)
-            (remf (info :source-location :declaration name) 'defknown)))))
+                  (return-from ignore)))))
+          (setf (info :function :type name) type-to-store)
+          (setf (info :function :where-from name) :declared)
+          (setf (info :function :kind name) :function)
+          (cond (inherit
+                 (when optimizer
+                   (setf (fun-info-optimizer old-fun-info) optimizer))
+                 (when derive-type
+                   (setf (fun-info-derive-type old-fun-info) derive-type))
+                 (setf (fun-info-attributes old-fun-info) attributes
+                       (fun-info-result-arg old-fun-info) result-arg
+                       (fun-info-annotation old-fun-info) annotation
+                       (fun-info-call-type-deriver old-fun-info) call-type-deriver))
+                (t
+                 (setf (info :function :info name)
+                       (make-fun-info :attributes attributes
+                                      :derive-type derive-type
+                                      :optimizer optimizer
+                                      :result-arg result-arg
+                                      :call-type-deriver call-type-deriver
+                                      :annotation annotation))))
+          (if location
+              (setf (getf (info :source-location :declaration name) 'defknown)
+                    location)
+              (remf (info :source-location :declaration name) 'defknown))))))
   names)
 
 
