@@ -22,7 +22,7 @@
 ;;; a "#." so that the defining form remains toplevel.
 ;;; If called with OPTIMISTIC = T then we're trying to return NIL or T
 ;;; from the VOP-EXISTSP macroexpander, and if NIL then we decide later.
-#-sb-xc
+#-(and sb-xc (not sb-devel))
 (progn
   (defvar *vop-not-existsp* nil)
   ;;; This function is invoked after compiling the cross-compiler
