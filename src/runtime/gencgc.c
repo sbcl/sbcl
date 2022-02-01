@@ -4251,7 +4251,7 @@ static void __attribute__((unused)) gcbarrier_patch_code_range(uword_t start, vo
         where += OBJECT_SIZE(*where, where);
     }
 }
-static void gc_allocate_ptes()
+void gc_allocate_ptes()
 {
     page_index_t i;
 
@@ -5167,6 +5167,19 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
     }
 done:
     return code_total_nwords(code);
+}
+
+// For the standalone ldb monitor
+void recompute_gen_bytes_allocated() {
+    page_index_t page;
+    int gen;
+    for (gen=0; gen<NUM_GENERATIONS; ++gen)
+        generations[gen].bytes_allocated = 0;
+    for (page=0; page<next_free_page; ++page)
+        generations[page_table[page].gen].bytes_allocated += page_bytes_used(page);
+    bytes_allocated = 0;
+    for (gen=0; gen<NUM_GENERATIONS; ++gen)
+        bytes_allocated += generations[gen].bytes_allocated;
 }
 
 #include "verify.inc"

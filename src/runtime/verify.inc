@@ -322,6 +322,7 @@ static int verify(lispobj start, lispobj* end, struct verify_state* state, int f
     return result;
 }
 
+extern void save_gc_crashdump(char *, uword_t);
 /* Return the number of verification errors found.
  * You might want to use that as a deciding factor for dump the heap
  * to a file (which takes time, and generally isn't needed).
@@ -456,6 +457,7 @@ static int dump_completely_p(lispobj* obj, struct verify_state* state)
         if (state->err_objs[i] == (uword_t)obj) return 1;
     return 0;
 }
+/* Dump spaces as human-readable text (hexadecimal) */
 void dump_spaces(struct verify_state* state, char *reason)
 {
     char path[100];
@@ -546,4 +548,22 @@ void dump_spaces(struct verify_state* state, char *reason)
     }
     fclose(f);
     fprintf(stderr, "%s: wrote [%s]\n", reason, path);
+}
+
+int dump_and_verify_heap(int flags)
+{
+    if (gencgc_verbose>1) {
+        dump_spaces(0, flags & VERIFY_POST_GC ? "post-GC" : "pre-GC");
+#if 0
+        if (n_gcs == snapshot_this_gc_cycle) {
+            char pathname[128];
+            sprintf(pathname, "gc-%d-%d-%d-%s.bin",
+                    getpid(), n_gcs, from_space,
+                    flags & VERIFY_POST_GC ? "post" : "pre");
+            save_gc_crashdump(pathname, (uword_t)__builtin_frame_address(0));
+            fprintf(stderr, "Wrote [%s]\n", pathname);
+        }
+#endif
+    }
+    return verify_heap(flags);
 }

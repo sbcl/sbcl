@@ -75,24 +75,6 @@ char *sbcl_runtime;
  * helper functions for dealing with command line args
  */
 
-void *
-successful_malloc(size_t size)
-{
-    void* result = malloc(size);
-    if (0 == result) {
-        lose("malloc failure");
-    } else {
-        return result;
-    }
-    return (void *) NULL; /* dummy value: return something ... */
-}
-
-char *
-copied_string(char *string)
-{
-    return strcpy(successful_malloc(1+strlen(string)), string);
-}
-
 static char *
 copied_existing_filename_or_null(char *filename)
 {

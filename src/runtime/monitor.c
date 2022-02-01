@@ -20,6 +20,7 @@
 #endif
 #include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "runtime.h"
 #include "parse.h"
@@ -55,12 +56,128 @@ static int ldb_in_fd = -1;
 
 typedef int cmd(char **ptr);
 
+struct crash_preamble {
+    uword_t static_start;
+    uword_t static_nbytes;
+    uword_t dynspace_start;
+    long dynspace_npages;
+    int card_size;
+    int card_table_nbits;
+    int nthreads;
+    int tls_size;
+};
+struct crash_thread_preamble {
+    uword_t address;
+    uword_t has_context;
+    uword_t control_stack_nbytes;
+    uword_t binding_stack_nbytes;
+};
+
+#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
+void save_gc_crashdump(char *pathname,
+                       uword_t approx_stackptr_at_gc_start)
+{
+    int fd = open(pathname, O_WRONLY|O_CREAT, 0666);
+    struct thread* th;
+    int nthreads = 0;
+    for_each_thread(th) ++nthreads;
+    fprintf(stderr, "save: %d threads\n", nthreads);
+    struct crash_preamble preamble;
+    unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
+    gc_assert(nbytes_heap == ((uword_t)dynamic_space_free_pointer - DYNAMIC_SPACE_START));
+    int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
+    preamble.static_start = STATIC_SPACE_START;
+    preamble.static_nbytes = (uword_t)static_space_free_pointer - STATIC_SPACE_START;
+    preamble.dynspace_start = DYNAMIC_SPACE_START;
+    preamble.dynspace_npages = next_free_page;
+    preamble.card_size = GENCGC_PAGE_BYTES;
+    preamble.card_table_nbits = gc_card_table_nbits;
+    preamble.nthreads = nthreads;
+    preamble.tls_size = nbytes_tls;
+    // write the preamble and static space
+    write(fd, &preamble, sizeof preamble);
+    write(fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
+    // write the dynamic-space, PTEs, card table
+    write(fd, (char*)DYNAMIC_SPACE_START, nbytes_heap);
+    write(fd, page_table, sizeof (struct page) * next_free_page);
+    write(fd, gc_card_mark, 1+gc_card_table_mask);
+    struct crash_thread_preamble thread_preamble;
+    for_each_thread(th) {
+        int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+        os_context_t* threadcontext = nth_interrupt_context(0, th);
+        uword_t sp;
+        if (ici)
+            sp = *os_context_register_addr(threadcontext, reg_SP);
+        else {
+            if (th != get_sb_vm_thread()) {
+              char msg[] = "No stackptr for crash dump\n";
+              write(2, msg, sizeof msg-1);
+              _exit(1);
+            }
+            sp = approx_stackptr_at_gc_start;
+        }
+        int nbytes_control_stack =
+            (char*)th->control_stack_end - (char*)sp; // grows downward
+        int nbytes_binding_stack =
+            (char*)th->binding_stack_pointer - (char*)th->binding_stack_start; // grows upward
+        thread_preamble.address = (uword_t)th;
+        thread_preamble.has_context = ici != 0; // boolean for have context or not
+        thread_preamble.control_stack_nbytes = nbytes_control_stack;
+        thread_preamble.binding_stack_nbytes = nbytes_binding_stack;
+        // write the preamble
+        write(fd, &thread_preamble, sizeof thread_preamble);
+        // write 0 or 1 contexts, control-stack, binding-stack, TLS
+        if (ici) write(fd, threadcontext, sizeof (os_context_t));
+        write(fd, (char*)sp, nbytes_control_stack);
+        write(fd, th->binding_stack_start, nbytes_binding_stack);
+        write(fd, th, nbytes_tls);
+    }
+    write(fd, "SB.Crash", 8); // trailing signature
+    close(fd);
+}
+#endif
+
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
 static cmd grab_sigs_cmd;
 static cmd kill_cmd;
+
+static int save_cmd(char **ptr) {
+#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
+    extern void gc_stop_the_world(), gc_start_the_world(), gc_close_all_regions();
+    char *name  = parse_token(ptr);
+    if (!name) {
+        fprintf(stderr, "Need filename\n");
+        return 1;
+    }
+    gc_stop_the_world();
+    // It might make sense for each thread's stop-for-gc handler to close its region
+    // versus doing this loop
+    struct thread *th;
+    for_each_thread(th) {
+        ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
+        ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
+    }
+    gc_close_all_regions();
+    save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
+    gc_start_the_world();
+#else
+    fprintf(stderr, "Unimplemented\n");
+#endif
+    return 0;
+}
+
+#ifdef STANDALONE
+static int verify_cmd(char **ptr) {
+    gencgc_verbose = 1;
+    verify_heap(0);
+}
+static int gc_cmd(char **ptr) {
+    collect_garbage(6);
+}
+#endif
 
 static struct cmd {
     char *cmd, *help;
@@ -89,6 +206,11 @@ static struct cmd {
     {"quit", "Quit.", quit_cmd},
     {"regs", "Display current Lisp registers.", regs_cmd},
     {"search", "Search heap for object.", search_cmd},
+    {"save", "Produce crashdump", save_cmd},
+#ifdef STANDALONE
+    {"verify", "Check heap invariants", verify_cmd},
+    {"gc", "Collect garbage", gc_cmd},
+#endif
     {NULL, NULL, NULL}
 };
 
@@ -531,6 +653,7 @@ grab_sigs_cmd(char __attribute__((unused)) **ptr)
     return 0;
 }
 
+extern boolean gc_active_p;
 void
 ldb_monitor(void)
 {
@@ -597,3 +720,173 @@ monitor_or_something()
 {
     ldb_monitor();
 }
+
+#ifdef STANDALONE
+#include <errno.h>
+#include "core.h"
+#include "gencgc-private.h"
+struct lisp_startup_options lisp_startup_options;
+
+void unwind_binding_stack() { lose("Can't unwind binding stack"); }
+FILE *prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
+                      size_t *runtime_size) {
+    lose("Can't prepare_to_save");
+}
+boolean save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size,
+                                   int application_type) {
+    lose("Can't save_runtime_to_filehandle");
+}
+boolean save_to_filehandle(FILE *file, char *filename, lispobj init_function,
+                           boolean make_executable,
+                           boolean save_runtime_options,
+                           int core_compression_level) {
+    lose("Can't save_to_filehandle");
+}
+
+static size_t checked_read(int fd, void* buf, size_t n)
+{
+    size_t result = read(fd, buf, n);
+    if (result != n) { lose("read failed, errno=%d", errno); }
+    return result;
+}
+
+char *pagetypedesc(int type)
+{
+    static char what[4];
+    switch (type) {
+    case PAGE_TYPE_CODE: return "code";
+    case PAGE_TYPE_BOXED: return "boxed";
+    case PAGE_TYPE_UNBOXED: return "raw";
+    case PAGE_TYPE_MIXED: return "mixed";
+    default: snprintf(what, 4, "%d", type); return what;
+    }
+}
+
+extern void gc_allocate_ptes();
+extern void recompute_gen_bytes_allocated();
+extern void print_generation_stats();
+extern struct thread *alloc_thread_struct(void*,lispobj);
+
+int load_crashdump(char* pathname)
+{
+    int fd;
+    os_context_t *contexts[10], *context;
+    struct thread* threads = 0;
+    struct thread dummy;
+    fd = open(pathname, O_RDONLY);
+    if (fd < 0) {
+        fprintf(stderr, "can't open %s\n", pathname);
+        exit(1);
+    }
+    struct crash_preamble preamble;
+    struct crash_thread_preamble thread_preamble;
+    checked_read(fd, &preamble, sizeof preamble);
+    printf("static==%lx size=%x\n", preamble.static_start, preamble.static_nbytes);
+    printf("heap_start=%lx npages=%d\n", preamble.dynspace_start, preamble.dynspace_npages);
+    if (preamble.card_size != GENCGC_PAGE_BYTES)
+        lose("Can't verify snapshot: memory parameters differ");
+    gc_card_table_nbits = preamble.card_table_nbits;
+    gc_allocate_ptes();
+    next_free_page = preamble.dynspace_npages;
+    checked_read(fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
+    static_space_free_pointer = (lispobj*)(STATIC_SPACE_START + preamble.static_nbytes);
+    DYNAMIC_SPACE_START = preamble.dynspace_start;
+    long dynspace_nbytes = preamble.dynspace_npages * GENCGC_PAGE_BYTES;
+    dynamic_space_free_pointer = (void*)(DYNAMIC_SPACE_START + dynspace_nbytes);
+    char* dynspace = os_validate(0, (char*)preamble.dynspace_start,
+                                 DEFAULT_DYNAMIC_SPACE_SIZE, 0, 0);
+    if (dynspace != (char*)preamble.dynspace_start)
+        lose("Didn't map dynamic space where expected: %p vs %p",
+             dynspace, (char*)preamble.dynspace_start);
+    checked_read(fd, (char*)DYNAMIC_SPACE_START, dynspace_nbytes);
+    fprintf(stderr, "snapshot: %ld pages in use (%ld bytes)\n",
+            next_free_page, dynspace_nbytes);
+    checked_read(fd, page_table, sizeof (struct page) * next_free_page);
+    recompute_gen_bytes_allocated();
+    checked_read(fd, gc_card_mark, 1+gc_card_table_mask);
+    print_generation_stats();
+    fprintf(stderr, "%d threads:\n", (int)preamble.nthreads);
+    int i;
+    for(i=0; i<(int)preamble.nthreads; ++i) {
+        struct thread* th = alloc_thread_struct(0, 0);
+        // Push it on the front
+        th->prev = 0;
+        th->next = threads;
+        if (threads) threads->prev = th;
+        threads = th;
+        checked_read(fd, &thread_preamble, sizeof thread_preamble);
+        uword_t* stackptr = (uword_t*)((char*)th->control_stack_end - thread_preamble.control_stack_nbytes);
+        if (thread_preamble.has_context) {
+            context = contexts[i] = malloc(sizeof (os_context_t));
+            nth_interrupt_context(0, th) = context;
+            checked_read(fd, context, sizeof (os_context_t));
+            *os_context_sp_addr(context) = (uword_t)stackptr;
+        }
+        checked_read(fd, stackptr, thread_preamble.control_stack_nbytes);
+        checked_read(fd, th->binding_stack_start, thread_preamble.binding_stack_nbytes);
+        // Skip over the initial words of the thread structure that was saved
+        // in the file, so that binding_stack_start remains as is in the
+        // newly allocated structure. The last word is the only one we want to keep.
+        int skip = sizeof dummy-N_WORD_BYTES;
+        checked_read(fd, &dummy, skip);
+        checked_read(fd, &th->lisp_thread, preamble.tls_size-skip);
+        write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(thread_preamble.has_context), th);
+        struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
+        lispobj name = instance->name;
+        fprintf(stderr, "thread @ %p originally %p, %d bind_stk words, %d val_stk words '%s'\n",
+                th, (void*)thread_preamble.address,
+                (int)(thread_preamble.binding_stack_nbytes>>WORD_SHIFT),
+                (int)(thread_preamble.control_stack_nbytes>>WORD_SHIFT),
+                (widetag_of(native_pointer(name)) == SIMPLE_BASE_STRING_WIDETAG) ? (char*)name+1 : 0);
+        // Scan thread stack looking for words which could be valid pointers,
+        // but don't find an object when the heap is scanned.
+        // Realizing that failure to find isn't necessarily an error,
+        // there's nothing that we can do except show some information.
+        int nwords = thread_preamble.control_stack_nbytes>>WORD_SHIFT, wordindex;
+        int n_definitely_valid = 0, n_dangling = 0;
+        for (wordindex = 0; wordindex < nwords; ++wordindex) {
+            lispobj word = stackptr[wordindex];
+            if (DYNAMIC_SPACE_START <= word && word < DYNAMIC_SPACE_START + dynamic_space_size
+                && (is_lisp_pointer(word) ||
+                    is_code(page_table[find_page_index((void*)word)].type))) {
+                lispobj* found = search_dynamic_space((void*)word);
+                if (found) {
+                    page_index_t ind = find_page_index(found);
+                    fprintf(stderr, "   sp[%5d] = %"OBJ_FMTX" -> %p (g%d,%s)\n",
+                            wordindex, word, found,
+                            page_table[ind].gen, pagetypedesc(page_table[ind].type));
+                    ++n_definitely_valid;
+                } else {
+                    fprintf(stderr, " ! sp[%5d] = %"OBJ_FMTX" (not found)\n",
+                            wordindex, word);
+                    ++n_dangling;
+                }
+            }
+        }
+        fprintf(stderr, "%d valid pointers", n_definitely_valid);
+        if (n_dangling) fprintf(stderr, " (%d dangling)", n_dangling);
+        putc('\n', stderr);
+    }
+    char signature[8];
+    checked_read(fd, signature, 8);
+    gc_assert(!strncmp(signature, "SB.Crash", 8));
+    gc_assert(read(fd, signature, 1) == 0);
+    close(fd);
+}
+
+int main(int argc, char *argv[], char **envp)
+{
+    extern void calc_asm_routine_bounds();
+    if (argc != 2) {
+        fprintf(stderr, "Usage: ldb crashdump\n");
+        return 1;
+    }
+    boolean have_hardwired_spaces = os_preinit(argv, envp);
+    allocate_lisp_dynamic_space(have_hardwired_spaces);
+    gc_init();
+    load_crashdump(argv[1]);
+    calc_asm_routine_bounds();
+    gencgc_verbose = 1;
+    ldb_monitor();
+}
+#endif

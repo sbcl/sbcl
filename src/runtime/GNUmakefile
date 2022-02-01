@@ -92,6 +92,10 @@ LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
 targets: $(TARGET) $(OBJTARGET) sbcl.mk
 
+LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o,$(OBJS))
+ldb: $(LIBSBCL)
+	$(CC) -DSTANDALONE -I. -o ldb monitor.c $(LDB_OBJS) $(LIBS)
+
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
 	$(SBCL_PAXCTL) $@
@@ -169,7 +173,7 @@ TAGS tags: $(SRCS) $(HEADERS) $(INC)
 	@etags --language=c $(SRCS) $(HEADERS) $(INC) || true
 
 clean:
-	-rm -f *.[do] $(TARGET) sbcl.h core *.tmp $(OS_CLEAN_FILES) libsbcl.a shrinkwrap-sbcl* sbcl.mk
+	-rm -f *.[do] $(TARGET) ldb sbcl.h core *.tmp $(OS_CLEAN_FILES) libsbcl.a shrinkwrap-sbcl* sbcl.mk
 
 %.d: %.c sbcl.h
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
