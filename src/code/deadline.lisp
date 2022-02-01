@@ -50,7 +50,6 @@
 
 (declaim (inline seconds-to-maybe-internal-time))
 (defun seconds-to-maybe-internal-time (seconds)
-  (declare (optimize (speed 3)))
   (typecase seconds
     ((integer 0 #.internal-seconds-limit)
      (locally ; FIXME compiler should learn to figure that out
