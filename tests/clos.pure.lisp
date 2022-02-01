@@ -144,3 +144,11 @@
                               `(lambda (x)
                                  (slot-makunbound x 'l))
     ((#\a) (condition 'sb-pcl::missing-slot))))
+
+
+(with-test (:name :illegal-class-name)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (find-class x))
+   (('(t)) (condition 'sb-kernel::illegal-class-name-error))))

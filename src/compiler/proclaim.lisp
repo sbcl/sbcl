@@ -77,7 +77,7 @@
   ;; but DEFCLASS only accepts non-NIL symbols.
   (if (or (not (legal-class-name-p name))
           (and (null name) (not allow-nil)))
-      (error 'illegal-class-name-error :name name)
+      (error 'sb-kernel::illegal-class-name-error :name name)
       name))
 
 ;;; This is called to do something about SETF functions that overlap
