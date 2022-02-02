@@ -100,7 +100,7 @@ void save_gc_crashdump(char *pathname,
     preamble.static_nbytes = (uword_t)static_space_free_pointer - STATIC_SPACE_START;
     preamble.dynspace_start = DYNAMIC_SPACE_START;
     preamble.dynspace_npages = next_free_page;
-    preamble.card_size = GENCGC_PAGE_BYTES;
+    preamble.card_size = GENCGC_CARD_BYTES;
     preamble.card_table_nbits = gc_card_table_nbits;
     preamble.nthreads = nthreads;
     preamble.tls_size = nbytes_tls;
@@ -813,7 +813,7 @@ int load_gc_crashdump(char* pathname)
     if (preamble.signature != CRASH_PREAMBLE_SIGNATURE)
         lose("Can't load crashdump: bad header (have %lx, expect %lx)",
              preamble.signature, CRASH_PREAMBLE_SIGNATURE);
-    if (preamble.card_size != GENCGC_PAGE_BYTES)
+    if (preamble.card_size != GENCGC_CARD_BYTES)
         lose("Can't load crashdump: memory parameters differ");
     gc_card_table_nbits = preamble.card_table_nbits;
     gc_allocate_ptes();

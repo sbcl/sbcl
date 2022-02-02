@@ -1467,3 +1467,13 @@ We could try a few things to mitigate this:
 (defvar *!cold-allocation-patch-point*)
 (loop for (code . points) in *!cold-allocation-patch-point*
       do (setf (gethash code *allocation-patch-points*) points))
+
+(defun gctablesize (heap-size-gb page-size cards-per-page)
+  (let* ((card-size (/ page-size cards-per-page))
+         (heap-size (* heap-size-gb (expt 1024 3)))
+         (npages (/ heap-size page-size))
+         (ncards (/ heap-size card-size))
+         (pte-nbytes (* 8 npages)))
+    (format t " PTE bytes: ~8D~%" pte-nbytes)
+    (format t "card bytes: ~8D~%" ncards)
+    (format t "     total: ~8D~%" (+ pte-nbytes ncards))))

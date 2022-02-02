@@ -25,22 +25,13 @@
 ;;; be necessary any more.
 (defconstant +backend-page-bytes+ #+win32 65536 #-win32 32768)
 
-;;; The size in bytes of GENCGC cards, i.e. the granularity at which
-;;; writes to old generations are logged.
-;;; The size is a trade-off between efficiency of the allocator
-;;; and efficiency of scanning. Generally a card-marking GC will use cards
-;;; that are fairly small - The JVM used to use 512, I don't know if it still does.
-;;; I've heard of as small as 64 bytes being used in academic papers.
-;;; SBCL however has a problem with small sizes for two reasons:
-;;; (1) the size in which we claim memory in the slow-path allocator is exactly
-;;; the card size times a multiplier that does not work very well, and in fact
-;;; will work worse once I checkin a change to improve concurrency within the
-;;; slow path (2) heap scans can't begin at an arbitrary card because it might
-;;; the middle of a partly-boxed object. So we need to distinguish between
-;;; *strictly* boxed pages, and mixed-tagged/raw-word pages.
-;;; Alternatively, GC could try to skip over the cards at the start of a contiguous
-;;; block until it gets to the cards that are actully marked.
-(defconstant gencgc-page-bytes 16384)
+;;; The size in bytes of GENCGC pages. A page is the smallest amount of memory
+;;; that a thread can claim for a thread-local region, and also determines
+;;; the granularity at which we can find the start of a sequence of objects.
+(defconstant gencgc-page-bytes 32768)
+;;; The divisor relative to page-bytes which computes the granularity
+;;; at which writes to old generations are logged.
+(defconstant cards-per-page 32)
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding

@@ -132,8 +132,10 @@
                (ecase n-word-bits
                  (32 (expt 2 29))
                  (64 (expt 2 30)))))
+         #-soft-card-marks (defconstant cards-per-page 1)
+         (defconstant gencgc-card-bytes (/ gencgc-page-bytes cards-per-page))
          (defconstant gencgc-card-shift
-           (integer-length (1- sb-vm:gencgc-page-bytes)))
+           (integer-length (1- gencgc-card-bytes)))
          ;; This is a constant during build, but a different value
          ;; can be patched directly into the affected machine code
          ;; when the core is loaded based on dynamic-space-size.
@@ -141,8 +143,8 @@
          ;; but firstly there's probably no difference, and secondly it's better
          ;; to be safe than sorry - using too many bits rather than too few.
          (defconstant gencgc-card-table-index-nbits
-           (integer-length (1- (ceiling sb-vm::default-dynamic-space-size
-                                        sb-vm::gencgc-page-bytes))))
+           (integer-length (1- (ceiling default-dynamic-space-size
+                                        gencgc-card-bytes))))
          (defconstant gencgc-card-table-index-mask
            (1- (ash 1 gencgc-card-table-index-nbits)))))))
 

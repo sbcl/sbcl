@@ -3065,10 +3065,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (format t "#define ~A ~A~A /* 0x~X */~%" name value suffix value))))
     (terpri))
 
+  ;; backend-page-bytes doesn't really mean much any more.
+  ;; It's the granularity at which we can map the core file pages.
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
-  #+gencgc ; value never needed in Lisp, so therefore not a defconstant
-  (format t "#define GENCGC_CARD_SHIFT ~D~%"
-            (1- (integer-length sb-vm:gencgc-page-bytes)))
+  #+gencgc ; values never needed in Lisp, so therefore not a defconstant
+  (format t "#define CARDS_PER_PAGE ~D~%#define GENCGC_CARD_SHIFT ~D~%"
+          sb-vm::cards-per-page ; this is the "GC" page, not "backend" page
+          sb-vm::gencgc-card-shift)
 
   (let ((size #+cheneygc (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)
               #+gencgc sb-vm::default-dynamic-space-size))
@@ -3951,6 +3954,40 @@ III. initially undefined function references (alphabetically):
           (write-makefile-features stream)))
       (write-c-headers c-header-dir-name))))
 
+(defun write-mark-array-operators (stream &optional (ncards sb-vm::cards-per-page))
+  #-soft-card-marks
+  (progn
+    (aver (= ncards 1))
+    (format stream "static inline int cardseq_all_marked_nonsticky(long card) {
+    return gc_card_mark[card] == CARD_MARKED;~%}~%")
+    (format stream "static inline int cardseq_any_marked(long card) {
+    return gc_card_mark[card] != CARD_UNMARKED;~%}~%")
+    (format stream "static inline int cardseq_any_sticky_mark(long card) {
+    return gc_card_mark[card] == STICKY_MARK;~%}~%"))
+  #+soft-card-marks
+  ;; In general we have to be wary of wraparound of the card index bits
+  ;; - see example in comment above the definition of addr_to_card_index() -
+  ;; but it's OK to treat marks as linearly addressable within a page.
+  ;; The 'card' argument as supplied to these predicates will be
+  ;; a page-aligned card, i.e. the first card for its page.
+  (let* ((n-markwords
+          ;; This is how many words (of N_WORD_BYTES) of marks there are for the
+          ;; cards on a page.
+          (cond ((and (= sb-vm:n-word-bytes 8) (= ncards 32)) 4)
+                ((and (= sb-vm:n-word-bytes 8) (= ncards 16)) 2)
+                ((and (= sb-vm:n-word-bytes 8) (= ncards 8)) 1)
+                (t (error "bad cards-per-page"))))
+         (indices (loop for i below n-markwords collect i)))
+    (format stream "static inline int cardseq_all_marked_nonsticky(long card) {
+    uword_t* mark = (uword_t*)&gc_card_mark[card];
+    return (~{mark[~d]~^ | ~}) == 0;~%}~%" indices)
+    (format stream "static inline int cardseq_any_marked(long card) {
+    uword_t* mark = (uword_t*)&gc_card_mark[card];
+    return (~{mark[~d]~^ & ~}) != (uword_t)-1;~%}~%" indices)
+    (format stream "static inline int cardseq_any_sticky_mark(long card) {
+    uword_t* mark = (uword_t*)&gc_card_mark[card];
+    return ~{word_has_stickymark(mark[~d])~^ || ~};~%}~%" indices)))
+
 (defun write-c-headers (c-header-dir-name)
   (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard
                `(actually-out-to ,name (lambda (stream) ,@body))))
@@ -3988,6 +4025,7 @@ III. initially undefined function references (alphabetically):
         (out-to "regnames" (write-regnames-h stream))
         (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb-vm::write-gc-tables stream))
+        (out-to "cardmarks" (write-mark-array-operators stream))
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))
         (let ((structs (sort (copy-list sb-vm:*primitive-objects*) #'string<

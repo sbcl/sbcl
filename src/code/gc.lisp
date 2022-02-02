@@ -373,11 +373,6 @@ Note: currently changes to this value are lost when saving core."
 #+gencgc
 (progn
 
-;; A small amount of backward-compatibility in case anyone uses
-;; the -CARD- size. Of couse, it's about to become different
-;; from the -PAGE- size, so any code that uses this is probably wrong.
-(define-symbol-macro sb-vm:gencgc-card-bytes sb-vm:gencgc-page-bytes)
-
 (define-symbol-macro sb-vm:dynamic-space-end
     (+ (dynamic-space-size) sb-vm:dynamic-space-start))
 

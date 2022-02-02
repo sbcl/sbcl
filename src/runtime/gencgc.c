@@ -197,8 +197,7 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
 #endif
 
 /* Calculate the start address for the given page number. */
-inline char *
-page_address(page_index_t page_num)
+inline char *page_address(page_index_t page_num)
 {
     return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
 }
@@ -267,7 +266,24 @@ static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
     page_table[page].write_protected_cleared = page_table[page].pinned = 0;
-    SET_PAGE_PROTECTED(page,0);
+    // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
+    //    page_table[page].gen = 0;
+    assign_page_card_marks(page, CARD_MARKED);
+}
+
+/* SIMD-within-a-register algorithms
+ *
+ * from https://graphics.stanford.edu/~seander/bithacks.html
+ */
+static inline uword_t word_haszero(uword_t word) {
+  return ((word - 0x0101010101010101LL) & ~word & 0x8080808080808080LL) != 0;
+}
+static inline uword_t word_has_stickymark(uword_t word) {
+  return word_haszero(word ^ 0x0202020202020202LL);
+}
+#include "genesis/cardmarks.h"
+int page_cards_all_marked_nonsticky(page_index_t page) {
+    return cardseq_all_marked_nonsticky(page_to_card_index(page));
 }
 
 /// External function for calling from Lisp.
@@ -378,17 +394,20 @@ os_vm_size_t gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
 
 /* Count the number of pages in the given generation.
  * Additionally, if 'n_write_protected' is non-NULL, then assign
- * into *n_write_protected the count of write-protected pages.
+ * into *n_write_protected the count of marked cards.
  */
 static page_index_t
 count_generation_pages(generation_index_t generation, page_index_t* n_dirty)
 {
     page_index_t i, total = 0, dirty = 0;
+    int j;
 
     for (i = 0; i < next_free_page; i++)
         if (!page_free_p(i) && (page_table[i].gen == generation)) {
             total++;
-            if (!PAGE_WRITEPROTECTED_P(i)) dirty++;
+            long card = page_to_card_index(i);
+            for (j=0; j<CARDS_PER_PAGE; ++j, ++card)
+                dirty += gc_card_mark[card] != CARD_UNMARKED;
         }
     if (n_dirty) *n_dirty = dirty;
     return total;
@@ -1296,12 +1315,10 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
      * it shifts each field to the right to line them all up at bit index 0 to
      * test that 1 bit, which is a literal rendering of the user-written code.
      */
-    boolean result =
+    int bits_match =
            page_table[index].type == type
         && page_table[index].gen == gen
-        && !PAGE_WRITEPROTECTED_P(index)
         && !page_table[index].pinned;
-    return result;
 #else
     /* Test all 4 conditions above as a single comparison against a mask.
      * (The C compiler doesn't understand how to do that)
@@ -1323,8 +1340,8 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
      * The flags reside at 1 byte prior to 'gen' in the page structure.
      */
     int bits_match = ((*(int16_t*)(&page_table[index].gen-1) & 0xFF9F) == ((gen<<8)|type));
-    return bits_match && !PAGE_WRITEPROTECTED_P(index);
 #endif
+    return bits_match && page_cards_all_marked_nonsticky(index);
 }
 
 /* Search for at least nbytes of space, possibly picking up any
@@ -1382,8 +1399,9 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
             first_page++;
             continue;
         }
-
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
         gc_dcheck(!PAGE_WRITEPROTECTED_P(first_page));
+#endif
         /* page_free_p() can legally be used at index 'page_table_pages'
          * because the array dimension is 1+page_table_pages */
         for (last_page = first_page+1;
@@ -1395,7 +1413,9 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
              * otherwise, lossage would routinely occur in the fault handler) */
             bytes_found += GENCGC_PAGE_BYTES;
             gc_dcheck(!page_words_used(last_page));
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
             gc_dcheck(!PAGE_WRITEPROTECTED_P(last_page));
+#endif
         }
 
         if (bytes_found > most_bytes_found) {
@@ -1539,7 +1559,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
         gc_assert(page_table[page].type == old_allocated); \
         gc_assert(page_table[page].gen == from_space); \
         gc_assert(page_scan_start_offset(page) == npage_bytes(page-first_page)); \
-        gc_assert(!PAGE_WRITEPROTECTED_P(page)); \
+        gc_assert(page_cards_all_marked_nonsticky(page)); \
         page_table[page].gen = new_gen; \
         page_table[page].type = new_allocated
 
@@ -1572,7 +1592,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
            page_table[page].type == old_allocated &&
            page_scan_start_offset(page) == npage_bytes(page - first_page)) {
         // These pages are part of oldspace, which was un-write-protected.
-        gc_assert(!PAGE_WRITEPROTECTED_P(page));
+        gc_assert(page_cards_all_marked_nonsticky(page));
 
         /* Zeroing must have been done before shrinking the object.
          * (It is strictly necessary for correctness with objects other
@@ -2055,15 +2075,27 @@ static void deposit_filler(uword_t addr, sword_t nbytes) {
     *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
     page_index_t page = find_page_index((void*)addr);
     if (page_table[page].type == PAGE_TYPE_BOXED) {
-        page_index_t last_page = find_page_index((char*)addr + nbytes - 1);
         /* Strictly boxed cards are scanned without respect to object boundaries,
          * so we might need to clobber all pointers that formerly occupied the bytes.
-         * This step can be skipped if the space to be cleared does not span cards,
-         * because in that case descriptor_scavenge() correctly jumps over the filler.
-         * There is conceivably a way to avoid memsetting by ensuring that other
-         * cards containing a portion of this filler each have their own
-         * FILLER_WIDETAG at the start. But this doesn't happen often */
-        if (last_page > page) {
+         * If the range falls within 1 card, then we don't need to clear anything,
+         * because the scanning routine can see the filler object and skip over it. */
+        char* limit = (char*)addr + nbytes;
+        if (find_page_index(limit-1) == page) { // single page
+            long unsigned last_card = addr_to_card_index(limit-1);
+            /* Within 1 page, put fillers at the start of each card.
+             * The sizes of the extra fillers don't have to sum up to the total size,
+             * because although they serve the vital purpose of getting descriptors_scavenge()
+             * to skip the the leading portion of the card they're on, those pseudo-objects
+             * can never be visited in a normal heap walk. The final filler has to be the
+             * correct size, so any algorithm that achieves that is fine */
+            while (addr_to_card_index((char*)addr) != last_card) {
+                addr = ALIGN_DOWN(addr, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
+                nwords = (limit - (char*)addr) >> WORD_SHIFT;
+                *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+            }
+        } else {
+            /* If more than 1 page, just do the obvious thing - zeroize all the words.
+             * I've never seen this case happen, so it's not worth optimizing for */
             memset((char*)addr+N_WORD_BYTES, 0, nbytes-N_WORD_BYTES);
         }
     }
@@ -2338,14 +2370,15 @@ __attribute__((unused)) static void sticky_preserve_pointer(os_context_register_
                     generation_index_t gen = page_table[page].gen;
                     while (1) {
                         long card = page_to_card_index(page);
-                        if (gc_card_mark[card]==CARD_MARKED) gc_card_mark[card]=STICKY_MARK;
+                        int i;
+                        for(i=0; i<CARDS_PER_PAGE; ++i)
+                            if (gc_card_mark[card+i]==CARD_MARKED) gc_card_mark[card+i]=STICKY_MARK;
                         if (page_ends_contiguous_block_p(page, gen)) return;
                         ++page;
                     }
                 }
-            } else if (gc_card_mark[addr_to_card_index((void*)word)] == 0) {
-                long card = page_to_card_index(page);
-                if (gc_card_mark[card]==CARD_MARKED) gc_card_mark[card]=STICKY_MARK;
+            } else if (gc_card_mark[addr_to_card_index((void*)word)] == CARD_MARKED) {
+                gc_card_mark[addr_to_card_index((void*)word)] = STICKY_MARK;
             }
         }
     }
@@ -2498,7 +2531,7 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
      * instruction issued when the mutator resumes might create the witness,
      * and it thinks it already marked a card */
     for (page = first_page; page <= last_page; ++page)
-        if (gc_card_mark[page_to_card_index(page)] == STICKY_MARK) return 0;
+        if (cardseq_any_sticky_mark(page_to_card_index(page))) return 0;
 #else
     /* Skip if any page is pinned.
      * The 'pinned' check is sort of bogus but sort of necessary,
@@ -2571,15 +2604,16 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
         where += nwords;
     }
     page_index_t page;
-    for (page = first_page; page <= last_page; ++page)
+    for (page = first_page; page <= last_page; ++page) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         // Don't worry, the cards are all clean - if any card mark was sticky,
         // then we would have bailed out as the first thing (way up above).
-        gc_card_mark[addr_to_card_index(page_address(page))] = CARD_UNMARKED;
+        assign_page_card_marks(page, CARD_UNMARKED);
 #else
         // Try to avoid a system call
         if (!PAGE_WRITEPROTECTED_P(page)) protect_page(page_address(page), page);
 #endif
+    }
     return 0;
 }
 
@@ -2624,14 +2658,14 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
             break;
         }
     }
-    for (i = first_page; i <= last_page; i++)
-        SET_PAGE_PROTECTED(i, 1);
+    for (i = first_page; i <= last_page; i++) assign_page_card_marks(i, CARD_UNMARKED);
 }
 
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-# define sticky_marked_p(page) (gc_card_mark[page_to_card_index(page)] == STICKY_MARK)
+# define card_stickymarked_p(x) (gc_card_mark[x] == STICKY_MARK)
 #endif
 extern int descriptors_scavenge(lispobj *, lispobj*, generation_index_t, int);
+int root_boxed_words_scanned, root_vector_words_scanned, root_mixed_words_scanned;
 
 /* Special treatment for strictly boxed pages improves on the general case as follows:
  * - It can skip determining the extent of the contiguous block up front,
@@ -2663,31 +2697,40 @@ extern int descriptors_scavenge(lispobj *, lispobj*, generation_index_t, int);
  * And (SETF SVREF) does mark an exact card, so it's all good.
  * Also, the hardware write barrier does not have this concern.
  */
+#define WORDS_PER_CARD (GENCGC_CARD_BYTES/N_WORD_BYTES)
 static page_index_t scan_boxed_root_page(page_index_t page, generation_index_t gen)
 {
     __attribute__((unused)) int prev_marked = 0;
     do {
         lispobj* start = (void*)page_address(page);
-        lispobj* end = start + page_words_used(page);
+        lispobj* limit = start + page_words_used(page);
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         long card = addr_to_card_index(start);
-        int marked = gc_card_mark[card] != CARD_UNMARKED;
         /* Cards can change from marked to unmarked (just like with physical protection),
          * but also unmarked to marked, if transferring the card mark from the object's
          * header card to a cell in that object on a later card.
          * Lisp is given leeway because marking the header is easier. So the
          * algorithm accepts either way on input, but makes its output canonical.
          * (similar in spirit to Postel's Law) */
-        if (marked || prev_marked) {
-            int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
-            gc_card_mark[card] =
-              (gc_card_mark[card] != STICKY_MARK) ? (dirty ? CARD_MARKED : CARD_UNMARKED) :
-              STICKY_MARK;
-            prev_marked = marked;
+        if (prev_marked || cardseq_any_marked(card)) {
+            int j;
+            for (j=0; j<CARDS_PER_PAGE; ++j, ++card, start += WORDS_PER_CARD) {
+                int marked = gc_card_mark[card] != CARD_UNMARKED;
+                if (marked || prev_marked) {
+                    lispobj* end = start + WORDS_PER_CARD;
+                    if (end > limit) end = limit;
+                    int dirty = descriptors_scavenge(start, end, gen, card_stickymarked_p(card));
+                    root_boxed_words_scanned += end - start;
+                    gc_card_mark[card] =
+                      (gc_card_mark[card] != STICKY_MARK) ? (dirty ? CARD_MARKED : CARD_UNMARKED) :
+                      STICKY_MARK;
+                    prev_marked = marked;
+                }
+            }
         }
 #else
         if (!PAGE_WRITEPROTECTED_P(page)) {
-            int dirty = descriptors_scavenge(start, end, gen, 0);
+            int dirty = descriptors_scavenge(start, limit, gen, 0);
             if (!dirty) protect_page(start, page);
         }
 #endif
@@ -2706,15 +2749,24 @@ static page_index_t scan_vector_root_page(page_index_t page, generation_index_t 
     do {
         lispobj* start = (void*)page_address(page);
         long card = addr_to_card_index(start);
-        if (gc_card_mark[card] != CARD_UNMARKED) {
-            lispobj* end = start + page_words_used(page);
-            int dirty = descriptors_scavenge(start, end, gen, sticky_marked_p(page));
-            if (!dirty) gc_card_mark[card] = CARD_UNMARKED;
+        if (cardseq_any_marked(card)) {
+            lispobj* limit = start + page_words_used(page);
+            int j;
+            for (j=0; j<CARDS_PER_PAGE; ++j, ++card, start += WORDS_PER_CARD) {
+                if (gc_card_mark[card] != CARD_UNMARKED) {
+                    lispobj* end = start + WORDS_PER_CARD;
+                    if (end > limit) end = limit;
+                    int dirty = descriptors_scavenge(start, end, gen,
+                                                     card_stickymarked_p(card));
+                    root_vector_words_scanned += end - start;
+                    if (!dirty) gc_card_mark[card] = CARD_UNMARKED;
+                }
+            }
         }
         ++page;
     } while (!page_ends_contiguous_block_p(page-1, gen));
-#endif
     return page;
+#endif
 }
 
 /* Scavenge all generations from FROM to TO, inclusive, except for
@@ -2772,17 +2824,19 @@ scavenge_root_gens(generation_index_t from)
             i = scan_vector_root_page(i, generation);
         } else {
             page_index_t last_page;
-            boolean write_protected = 1;
+            int marked = 0;
             /* Now work forward until the end of the region */
             for (last_page = i; ; last_page++) {
-                write_protected = write_protected && PAGE_WRITEPROTECTED_P(last_page);
+                long card_index = page_to_card_index(last_page);
+                marked = marked || cardseq_any_marked(card_index);
                 if (page_ends_contiguous_block_p(last_page, generation))
                     break;
             }
-            if (!write_protected) {
+            if (marked) {
                 lispobj* start = (lispobj*)page_address(i);
                 lispobj* limit =
                     (lispobj*)page_address(last_page) + page_words_used(last_page);
+                root_mixed_words_scanned += limit - start;
                 heap_scavenge(start, limit);
                 /* Now scan the pages and write protect those that
                  * don't have pointers to younger generations. */
@@ -2831,7 +2885,7 @@ static void newspace_full_scavenge(generation_index_t generation)
     for (i = 0; i < next_free_page; i++) {
         if ((page_table[i].gen == generation) && page_boxed_p(i)
             && (page_words_used(i) != 0)
-            && !PAGE_WRITEPROTECTED_P(i)) {
+            && cardseq_any_marked(page_to_card_index(i))) {
             page_index_t last_page;
 
             /* The scavenge will start at the scan_start_offset of
@@ -2959,8 +3013,12 @@ unprotect_oldspace(void)
 
     for (i = 0; i < next_free_page; i++) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        /* Why does this even matter? Obviously it did for physical protection
+         * (storing the forwarding pointers shouldn't fault)
+         * but there's no physical protection, so ... why bother?
+         * But I tried removing it and got assertion failures */
         if (page_words_used(i) && page_table[i].gen == from_space)
-            SET_PAGE_PROTECTED(i, 0);
+            assign_page_card_marks(i, CARD_MARKED);
 #else
         if ((page_words_used(i) != 0)
             && (page_table[i].gen == from_space)) {
@@ -3029,7 +3087,7 @@ free_oldspace(void)
             reset_page_flags(last_page);
             set_page_bytes_used(last_page, 0);
             /* Should already be unprotected by unprotect_oldspace(). */
-            gc_assert(!PAGE_WRITEPROTECTED_P(last_page));
+            gc_assert(page_cards_all_marked_nonsticky(last_page));
             last_page++;
         }
         while ((last_page < next_free_page)
@@ -3105,12 +3163,16 @@ write_protect_generation_pages(generation_index_t generation)
     page_index_t page;
     for (page = 0; page < next_free_page; ++page) {
         if (page_table[page].gen == generation && page_boxed_p(page)
-            && page_words_used(page)
+            && page_words_used(page)) {
+            long card = page_to_card_index(page);
+            int j;
             // must not touch a card referenced from the control stack
             // because the next instruction executed by user code
             // might store an old->young pointer.
-            && gc_card_mark[page_to_card_index(page)] != STICKY_MARK)
-            SET_PAGE_PROTECTED(page, 1);
+            // There's probably a clever SIMD-in-a-register algorithm for this...
+            for (j=0; j<CARDS_PER_PAGE; ++j, card++)
+                if (gc_card_mark[card] != STICKY_MARK) gc_card_mark[card] = CARD_UNMARKED;
+        }
     }
 #else
     page_index_t start = 0, end;
@@ -3880,8 +3942,13 @@ garbage_collect_generation(generation_index_t generation, int raise,
                      gc_pin_count, gc_pinned_nwords,
                      bytes_freed >> WORD_SHIFT, pct_freed*100.0);
     write(2, buffer, n);
+    n = snprintf(buffer, sizeof buffer,
+                 "root word counts: %d + %d + %d\n", root_boxed_words_scanned,
+                 root_vector_words_scanned, root_mixed_words_scanned);
+    write(2, buffer, n);
     }
     gc_copied_nwords = gc_pinned_nwords = 0;
+    root_boxed_words_scanned = root_vector_words_scanned = root_mixed_words_scanned = 0;
 #endif
 
     /* Reset the alloc_start_page for generation. */
@@ -4147,10 +4214,14 @@ collect_garbage(generation_index_t last_gen)
     }
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     {
+    // Turn sticky cards marks to the regular mark.
     page_index_t page;
-    for (page=0; page<next_free_page; ++page)
-        if (gc_card_mark[page_to_card_index(page)] == STICKY_MARK)
-            gc_card_mark[page_to_card_index(page)] = 0;
+    for (page=0; page<next_free_page; ++page) {
+        long card = page_to_card_index(page);
+        int j;
+        for (j=0; j<CARDS_PER_PAGE; ++j, ++card)
+            if (gc_card_mark[card] == STICKY_MARK) gc_card_mark[card] = CARD_MARKED;
+    }
     }
 #endif
 
@@ -4325,7 +4396,7 @@ void gc_allocate_ptes()
 
     // Sure there's a fancier way to round up to a power-of-2
     // but this is executed exactly once, so KISS.
-    while (num_gc_cards < page_table_pages) { ++nbits; num_gc_cards <<= 1; }
+    while (num_gc_cards < page_table_pages*CARDS_PER_PAGE) { ++nbits; num_gc_cards <<= 1; }
     // 2 Gigacards should suffice for now. That would span 2TiB of memory
     // using 1Kb card size, or more if larger card size.
     gc_assert(nbits < 32);
@@ -4354,7 +4425,6 @@ void gc_allocate_ptes()
     gc_card_mark = calloc(num_gc_cards, 1);
     if (gc_card_mark == NULL)
         lose("failed to calloc() %ld bytes", num_gc_cards);
-
 
     gc_common_init();
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
@@ -5015,7 +5085,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         page_index_t p;
         for (p = 0; p < next_free_page; ++p)
-            if (page_words_used(p)) SET_PAGE_PROTECTED(p, 1);
+            if (page_words_used(p)) assign_page_card_marks(p, CARD_UNMARKED);
 #else
         // coreparse can avoid hundreds to thousands of mprotect() calls by
         // treating the whole range from the corefile as protectable, except

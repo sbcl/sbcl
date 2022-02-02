@@ -83,7 +83,7 @@ static struct cons* private_cons_impl()
         if (PRIVATE_CONS_DEBUG)
             fprintf(stderr, "GC-private page @ %p\n", page_header);
         gc_assert(last_page == page);
-        gc_assert(!PAGE_WRITEPROTECTED_P(page));
+        gc_dcheck(page_cards_all_marked_nonsticky(page));
         page_table[page].gen = 0;
         page_table[page].type = PAGE_TYPE_UNBOXED;
         zero_dirty_pages(page, page, 0);

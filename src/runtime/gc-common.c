@@ -503,6 +503,7 @@ static inline lispobj copy_instance(lispobj object)
 #ifdef LISP_FEATURE_GENCGC
     struct layout* layout = (void*)native_pointer(instance_layout(INSTANCE(object)));
     struct bitmap bitmap;
+    const int words_per_card = GENCGC_CARD_BYTES>>WORD_SHIFT;
     if (layout) {
         generation_index_t layout_gen = 0;
 # ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -516,7 +517,7 @@ static inline lispobj copy_instance(lispobj object)
             && (bitmap = get_layout_bitmap(layout)).bits[0] == 0
             && bitmap.nwords == 1)
             page_type = PAGE_TYPE_UNBOXED, region = unboxed_region;
-        else if (original_length < (int)GENCGC_PAGE_WORDS &&
+        else if (original_length < words_per_card &&
                  (layout->flags & STRICTLY_BOXED_FLAG)) // 'flags' is a raw slot
             page_type = PAGE_TYPE_BOXED, region = boxed_region;
     }

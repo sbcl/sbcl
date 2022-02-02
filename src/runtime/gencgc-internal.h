@@ -133,14 +133,16 @@ extern struct page *page_table;
 #endif
 
 /* When computing a card index we never subtract the heap base, which simplifies
- * code generation. Because there is no alignment constraint beyond being card-aligned,
- * the low bits can wraparound from all 1s to all 0s such that lowest numbered
+ * code generation. The heap base is guaranteed to be GC-page-aligned.
+ * The low bits can wraparound from all 1s to all 0s such that lowest numbered
  * page index in linear order may have a higher card index.
- * As a small example of the distinction between page index and card index:
- *   heap base = 0xEB00, card size = 256 bytes, total cards = 8, mask = #b111
+ * Two small examples of the distinction between page index and card index.
+ * For both examples: heap base = 0xEB00, page-size = 256b, npages = 8.
  *
+ * Scenario A:
+ *   CARDS_PER_PAGE = 1, card-size = 256b, ncards = 8, right-shift = 8, mask = #b111
  *     page     page      card
- *    index     addr     index
+ *    index     base     index
  *       0      EB00        3
  *       1      EC00        4
  *       2      ED00        5
@@ -149,14 +151,31 @@ extern struct page *page_table;
  *       5      F000        0
  *       6      F100        1
  *       7      F200        2
+ *
+ * Scenario B:
+ *   CARDS_PER_PAGE = 2, card-size = 128b, ncards = 16, right-shift = 7, mask = #b1111
+ *     page     page            card
+ *    index     base         indices
+ *       0      EB00, EB80      6, 7
+ *       1      EC00, EC80      8, 9
+ *       2      ED00, ED80    10, 11
+ *       3      EE00, EE80    12, 13
+ *       4      EF00, EF80    14, 15
+ *       5      F000, F080      0, 1
+ *       6      F100, F180      2, 3
+ *       7      F200, F280      4, 5
+ *
  */
 extern unsigned char *gc_card_mark;
 extern long gc_card_table_mask;
 #define addr_to_card_index(addr) ((((uword_t)addr)>>GENCGC_CARD_SHIFT) & gc_card_table_mask)
 #define page_to_card_index(n) addr_to_card_index(page_address(n))
+
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
 #define PAGE_WRITEPROTECTED_P(n) (gc_card_mark[page_to_card_index(n)] & 1)
 #define SET_PAGE_PROTECTED(n,val) gc_card_mark[page_to_card_index(n)] =\
       (val?CARD_UNMARKED:CARD_MARKED)
+#endif
 
 struct __attribute__((packed)) corefile_pte {
   uword_t sso; // scan start offset

@@ -67,6 +67,7 @@ extern os_vm_size_t bytes_consed_between_gcs;
 #define VERIFYING_UNFORMATTED 512
 
 int verify_heap(int flags);
+int dump_and_verify_heap(int flags);
 #ifdef LISP_FEATURE_GENCGC
 #define MAX_ERR_OBJS 5
 struct verify_state {

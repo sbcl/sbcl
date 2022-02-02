@@ -330,6 +330,11 @@ extern unsigned char* gc_card_mark;
 #define STICKY_MARK 2
 #define CARD_UNMARKED 0xff
 
+// "assign" as the operation name is a little clearer than "set"
+// which tends to be synonymous with setting a bit to 1.
+#define assign_page_card_marks(page, val) \
+  memset(gc_card_mark+page_to_card_index(page), val, CARDS_PER_PAGE)
+
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
 /* This is used by the fault handler, and potentially during GC */
 static inline void unprotect_page_index(page_index_t page_index)

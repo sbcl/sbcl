@@ -32,6 +32,26 @@ static boolean card_markedp(void* addr)
     return gc_card_mark[addr_to_card_index(addr)] != CARD_UNMARKED;
 }
 
+char *page_card_mark_string(page_index_t page, char *result)
+{
+    long card = addr_to_card_index(page_address(page));
+    if (cardseq_all_marked_nonsticky(card))
+        result[0] = '*', result[1] = 0;
+    else if (!cardseq_any_marked(card))
+        result[0] = '-', result[1] = 0;
+    else {
+        int i;
+        for(i=0; i<CARDS_PER_PAGE; ++i)
+        switch (gc_card_mark[card+i]) {
+        case CARD_MARKED: result[i] = '*'; break;
+        case CARD_UNMARKED: result[i] = '-'; break;
+        case STICKY_MARK: result[i] = 'S'; break;
+        }
+        result[CARDS_PER_PAGE] = 0;
+    }
+    return result;
+}
+
 #define PRINT_HEADER_ON_FAILURE 2048
 
 // Check a single pointer. Return 1 if we should stop verifying due to too many errors.
@@ -50,8 +70,8 @@ static void note_failure(lispobj thing, lispobj *where, struct verify_state *sta
     if (state->object_addr) {
         lispobj obj = compute_lispobj(state->object_addr);
         page_index_t pg = find_page_index(state->object_addr);
-        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%d) sees %s\n",
-                (void*)thing, (uword_t)where, obj, (int)pg, str);
+        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%ld) sees %s\n",
+                (void*)thing, (uword_t)where, obj, pg, str);
         // Record this in state->err_objs if possible
         int i;
         for(i=0; i<MAX_ERR_OBJS; ++i)
@@ -403,6 +423,7 @@ int verify_heap(int flags)
 
 void gc_show_pte(lispobj obj)
 {
+    char marks[1+CARDS_PER_PAGE];
     page_index_t page = find_page_index((void*)obj);
     if (page>=0) {
         printf("page %"PAGE_INDEX_FMT" base %p gen %d type %x ss %p used %x",
@@ -410,8 +431,7 @@ void gc_show_pte(lispobj obj)
                page_scan_start(page), page_bytes_used(page));
         if (page_starts_contiguous_block_p(page)) printf(" startsblock");
         if (page_ends_contiguous_block_p(page, page_table[page].gen)) printf(" endsblock");
-        if (!PAGE_WRITEPROTECTED_P(page)) printf(" dirty");
-        printf("\n");
+        printf(" (%s)\n", page_card_mark_string(page, marks));
         return;
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -490,8 +510,9 @@ void dump_spaces(struct verify_state* state, char *reason)
                 page_table[firstpage].type, page_table[firstpage].gen);
         page_index_t p;
         for (p = firstpage; p <= lastpage; ++p) {
+            char marks[1+CARDS_PER_PAGE];
             putc((p == firstpage) ? '(' : ' ', f);
-            fprintf(f, card_markedp(page_address(p))?"~WP":"WP");
+            fprintf(f, "%s", page_card_mark_string(p, marks));
         }
         fprintf(f, ")\n");
         lispobj *where = base;
@@ -518,10 +539,12 @@ void dump_spaces(struct verify_state* state, char *reason)
                 }
             } else {
                 int min_gen = 8;
-                int touched = ' ';
+                int prefix = ' ';
                 if (widetag_of(where)==CODE_HEADER_WIDETAG && header_rememberedp(*where))
-                    touched = '*';
-                fprintf(f, "%c%06x: %"OBJ_FMTX, touched, (int)(uword_t)where & 0xffffff, *where);
+                    prefix = '#';
+                else if (gc_card_mark[addr_to_card_index(where)]!=CARD_UNMARKED)
+                    prefix = '|';
+                fprintf(f, "%c%06x: %"OBJ_FMTX, prefix, (int)(uword_t)where & 0xffffff, *where);
                 int i;
                 int boxed_nwords = nwords;
                 // This is just a heuristic guess of pointee generation.
