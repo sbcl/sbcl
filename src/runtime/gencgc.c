@@ -3425,6 +3425,21 @@ static void scan_explicit_pins(__attribute__((unused)) struct thread* th)
     }
 }
 
+/* Given the slightly asymmetric formulation of page_ends_contiguous_block_p()
+ * you might think that it could cause the next page's assertion about start_block_p()
+ * to fail, but it does not seem to. That's really weird! */
+__attribute__((unused)) static void check_contiguity()
+{
+      page_index_t first = 0;
+      while (first < next_free_page) {
+        if (!page_words_used(first)) { ++first; continue; }
+        gc_assert(page_starts_contiguous_block_p(first));
+        page_index_t last = first;
+        while (!page_ends_contiguous_block_p(last, page_table[first].gen)) ++last;
+        first = last + 1;
+      }
+}
+
 int show_gc_generation_throughput = 0;
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
@@ -3714,7 +3729,10 @@ garbage_collect_generation(generation_index_t generation, int raise,
     /* If SB-SPROF was used, enliven all pages of code.
      * Note that some objects may have already been transported off the page.
      * Despite the extra scan, it is more efficient than scanning all trace buffers
-     * and potentially updating them and/or invalidating hashes */
+     * and potentially updating them and/or invalidating hashes.
+     * This really wants a better algorithm. Each code blob could have one byte
+     * indicating whether it is present in any trace buffer; the SIGPROF handler
+     * can update that byte. */
     if (sb_sprof_enabled) {
         page_index_t first = 0;
         while (first < next_free_page) {
@@ -3727,6 +3745,22 @@ garbage_collect_generation(generation_index_t generation, int raise,
             page_index_t last = first;
             while (!page_ends_contiguous_block_p(last, from_space)) ++last;
             // [first,last] are inclusive bounds on a code range
+            /* FIXME: should 'where' be initialized to page_scan_start()? I think so,
+             * because ends_contiguous_block(page-1) does NOT imply
+             * starts_contiguous_block(page). This is very unfortunate.
+             * I've seen things such as the following:
+             * page base: 0x20000  0x21000  0x22000
+             *      used:    1000       10        0
+             *       ss:  0x20000  0x20000  0x21010
+             * where the first two pages were opened together and then closed
+             * after consuming all of the first + 0x10 bytes more, and then the next
+             * page extends the region (so not to waste the entire rest of the second
+             * page), pointing its scan_start to the end of the range that was updated
+             * into the page table. In that scenario, ends_p() is true of the page
+             * based at 0x21000 but starts_p() is false of the next page,
+             * because its scan start is an earlier page than itself.
+             * How does this assertion NOT fail sometimes? Yet, it does not. */
+            gc_assert(page_starts_contiguous_block_p(first));
             lispobj* where = (lispobj*)page_address(first);
             lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
             while (where < limit) {
@@ -3736,6 +3770,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
                 } else {
                     sword_t nwords = sizetab[widetag_of(where)](where);
                     if (widetag_of(where) == CODE_HEADER_WIDETAG
+                        && where[1] != 0 /* has at least one boxed word */
                         && code_serialno((struct code*)where) != 0) {
                         lispobj ptr = make_lispobj(where, OTHER_POINTER_LOWTAG);
                         scavenge(&ptr, 1);
