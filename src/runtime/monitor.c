@@ -57,6 +57,7 @@ static int ldb_in_fd = -1;
 typedef int cmd(char **ptr);
 
 struct crash_preamble {
+    uword_t signature;
     uword_t static_start;
     uword_t static_nbytes;
     uword_t dynspace_start;
@@ -65,6 +66,9 @@ struct crash_preamble {
     int card_table_nbits;
     int nthreads;
     int tls_size;
+    lispobj lisp_package_vector;
+    int sprof_enabled;
+    int pin_dynspace_code;
 };
 struct crash_thread_preamble {
     uword_t address;
@@ -73,10 +77,15 @@ struct crash_thread_preamble {
     uword_t binding_stack_nbytes;
 };
 
+// Prevent some mixups in case you add fields to the crash dump
+const int CRASH_PREAMBLE_SIGNATURE =
+    (sizeof (struct crash_preamble) << 16) | sizeof (struct crash_thread_preamble);
+
 #if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
 void save_gc_crashdump(char *pathname,
                        uword_t approx_stackptr_at_gc_start)
 {
+    extern int pin_all_dynamic_space_code;
     int fd = open(pathname, O_WRONLY|O_CREAT, 0666);
     struct thread* th;
     int nthreads = 0;
@@ -86,6 +95,7 @@ void save_gc_crashdump(char *pathname,
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
     gc_assert(nbytes_heap == ((uword_t)dynamic_space_free_pointer - DYNAMIC_SPACE_START));
     int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
+    preamble.signature = CRASH_PREAMBLE_SIGNATURE;
     preamble.static_start = STATIC_SPACE_START;
     preamble.static_nbytes = (uword_t)static_space_free_pointer - STATIC_SPACE_START;
     preamble.dynspace_start = DYNAMIC_SPACE_START;
@@ -94,6 +104,9 @@ void save_gc_crashdump(char *pathname,
     preamble.card_table_nbits = gc_card_table_nbits;
     preamble.nthreads = nthreads;
     preamble.tls_size = nbytes_tls;
+    preamble.lisp_package_vector = lisp_package_vector;
+    preamble.sprof_enabled = sb_sprof_enabled;
+    preamble.pin_dynspace_code = pin_all_dynamic_space_code;
     // write the preamble and static space
     write(fd, &preamble, sizeof preamble);
     write(fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
@@ -175,7 +188,15 @@ static int verify_cmd(char **ptr) {
     verify_heap(0);
 }
 static int gc_cmd(char **ptr) {
-    collect_garbage(6);
+    int last_gen = 0;
+    extern generation_index_t verify_gens;
+    extern boolean pre_verify_gen_0;
+    if (more_p(ptr)) parse_number(ptr, &last_gen);
+    gencgc_verbose = 2;
+    pre_verify_gen_0 = 1;
+    verify_gens = 0;
+    collect_garbage(last_gen);
+    return 0;
 }
 #endif
 
@@ -767,7 +788,7 @@ extern void recompute_gen_bytes_allocated();
 extern void print_generation_stats();
 extern struct thread *alloc_thread_struct(void*,lispobj);
 
-int load_crashdump(char* pathname)
+int load_gc_crashdump(char* pathname)
 {
     int fd;
     os_context_t *contexts[10], *context;
@@ -783,8 +804,17 @@ int load_crashdump(char* pathname)
     checked_read(fd, &preamble, sizeof preamble);
     printf("static==%lx size=%x\n", preamble.static_start, preamble.static_nbytes);
     printf("heap_start=%lx npages=%d\n", preamble.dynspace_start, preamble.dynspace_npages);
+    // pin_dynspace_code is for display only. It gets recomputed as the
+    // logical OR of all threads' values of *GC-PIN-CODE-PAGES*.
+    printf("sprof_enabled=%d pin_dynspace_code=%d packages=%p\n",
+           preamble.sprof_enabled, preamble.pin_dynspace_code,
+           (void*)preamble.lisp_package_vector);
+    sb_sprof_enabled = preamble.sprof_enabled;
+    if (preamble.signature != CRASH_PREAMBLE_SIGNATURE)
+        lose("Can't load crashdump: bad header (have %lx, expect %lx)",
+             preamble.signature, CRASH_PREAMBLE_SIGNATURE);
     if (preamble.card_size != GENCGC_PAGE_BYTES)
-        lose("Can't verify snapshot: memory parameters differ");
+        lose("Can't load crashdump: memory parameters differ");
     gc_card_table_nbits = preamble.card_table_nbits;
     gc_allocate_ptes();
     next_free_page = preamble.dynspace_npages;
@@ -816,12 +846,12 @@ int load_crashdump(char* pathname)
         threads = th;
         checked_read(fd, &thread_preamble, sizeof thread_preamble);
         uword_t* stackptr = (uword_t*)((char*)th->control_stack_end - thread_preamble.control_stack_nbytes);
+        context = contexts[i] = malloc(sizeof (os_context_t));
+        nth_interrupt_context(0, th) = context;
         if (thread_preamble.has_context) {
-            context = contexts[i] = malloc(sizeof (os_context_t));
-            nth_interrupt_context(0, th) = context;
             checked_read(fd, context, sizeof (os_context_t));
-            *os_context_sp_addr(context) = (uword_t)stackptr;
         }
+        *os_context_sp_addr(context) = (uword_t)stackptr;
         checked_read(fd, stackptr, thread_preamble.control_stack_nbytes);
         checked_read(fd, th->binding_stack_start, thread_preamble.binding_stack_nbytes);
         // Skip over the initial words of the thread structure that was saved
@@ -830,7 +860,7 @@ int load_crashdump(char* pathname)
         int skip = sizeof dummy-N_WORD_BYTES;
         checked_read(fd, &dummy, skip);
         checked_read(fd, &th->lisp_thread, preamble.tls_size-skip);
-        write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(thread_preamble.has_context), th);
+        write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(1), th);
         struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
         lispobj name = instance->name;
         fprintf(stderr, "thread @ %p originally %p, %d bind_stk words, %d val_stk words '%s'\n",
@@ -852,9 +882,11 @@ int load_crashdump(char* pathname)
                 lispobj* found = search_dynamic_space((void*)word);
                 if (found) {
                     page_index_t ind = find_page_index(found);
+#if 0
                     fprintf(stderr, "   sp[%5d] = %"OBJ_FMTX" -> %p (g%d,%s)\n",
                             wordindex, word, found,
                             page_table[ind].gen, pagetypedesc(page_table[ind].type));
+#endif
                     ++n_definitely_valid;
                 } else {
                     fprintf(stderr, " ! sp[%5d] = %"OBJ_FMTX" (not found)\n",
@@ -872,6 +904,7 @@ int load_crashdump(char* pathname)
     gc_assert(!strncmp(signature, "SB.Crash", 8));
     gc_assert(read(fd, signature, 1) == 0);
     close(fd);
+    all_threads = threads;
 }
 
 int main(int argc, char *argv[], char **envp)
@@ -884,7 +917,7 @@ int main(int argc, char *argv[], char **envp)
     boolean have_hardwired_spaces = os_preinit(argv, envp);
     allocate_lisp_dynamic_space(have_hardwired_spaces);
     gc_init();
-    load_crashdump(argv[1]);
+    load_gc_crashdump(argv[1]);
     calc_asm_routine_bounds();
     gencgc_verbose = 1;
     ldb_monitor();
