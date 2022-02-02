@@ -21,7 +21,7 @@ void test_find_freeish()
     gc_card_table_mask = 1;
     gc_card_mark = card_table;
     card_table[0] = CARD_MARKED;
-    
+
     page_table_pages = MAX_PAGES_FOR_TEST;
     page_table = calloc(1+page_table_pages, sizeof(struct page));
     DYNAMIC_SPACE_START = 0x8000000;

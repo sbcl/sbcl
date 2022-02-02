@@ -45,7 +45,7 @@ include genesis/Makefile.features
 # Config-foo file for setup foo, then arrange for Config to be a
 # symlink to Config-foo.
 # Commonly used variables in Config are: ARCH_SRC, ASSEM_SRC, GC_SRC,
-# OS_SRC, OS_LIBS, OS_CLEAN_FILES
+# OS_SRC, OS_LIBS
 DISABLE_PIE=yes
 include Config
 
@@ -173,7 +173,7 @@ TAGS tags: $(SRCS) $(HEADERS) $(INC)
 	@etags --language=c $(SRCS) $(HEADERS) $(INC) || true
 
 clean:
-	-rm -f *.[do] $(TARGET) ldb sbcl.h core *.tmp $(OS_CLEAN_FILES) libsbcl.a shrinkwrap-sbcl* sbcl.mk
+	-rm -f *.[do] $(TARGET) ldb unit-tests sbcl.h core *.tmp libsbcl.a shrinkwrap-sbcl* sbcl.mk
 
 %.d: %.c sbcl.h
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
