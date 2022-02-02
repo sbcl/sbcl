@@ -2,6 +2,52 @@
 
 #define MAX_PAGES_FOR_TEST 20
 
+/* A newly opened region must not start on a page that has 0 bytes available.
+ * The effect of that was to cause start_addr to be the next page's address,
+ * where the OPEN_REGION_PAGE_FLAG was already set on each page in the region
+ * including the one that was completely full. This caused a failure when
+ * closing the region because find_page_index(start_addr) was not the *first*
+ * page on which the open flag should be removed.
+ * Strangely, the assertion that caught this was far removed from the
+ * point of failure, in conservative_root_p().
+ * It got broken in rev 400b724a8daf and then fixed in rev 07dc4b4e0f
+ * but the test case itself became buggy some time thereafter
+ * due to the minimum legal code component size being larger
+ */
+void test_find_freeish()
+{
+    unsigned char card_table[1];
+    gc_card_table_nbits = 1;
+    gc_card_table_mask = 1;
+    gc_card_mark = card_table;
+    card_table[0] = CARD_MARKED;
+    
+    page_table_pages = MAX_PAGES_FOR_TEST;
+    page_table = calloc(1+page_table_pages, sizeof(struct page));
+    DYNAMIC_SPACE_START = 0x8000000;
+
+    struct alloc_region r;
+    long tot_bytes = 0;
+    gc_init_region(&r);
+    int i;
+    for(i=0; i<100;++i) {
+        int chunk = N_WORD_BYTES*40;
+        gc_alloc_new_region(chunk, PAGE_TYPE_BOXED, &r, 0);
+        tot_bytes += chunk;
+        r.free_pointer = (char*)r.free_pointer + chunk;
+        int count_open_region_pages = 0, j;
+        for (j = 0; j < MAX_PAGES_FOR_TEST; ++j)
+            if (page_table[j].type & OPEN_REGION_PAGE_FLAG) ++count_open_region_pages;
+        gc_assert(count_open_region_pages == 1);
+        ensure_region_closed(&r, PAGE_TYPE_BOXED);
+        gc_assert(bytes_allocated == tot_bytes);
+    }
+    free(page_table);
+    page_table = 0;
+    DYNAMIC_SPACE_START = 0;
+    printf("alloc_new_region: PASS\n");
+}
+
 /* Testing approach for adjust_obj_ptes():
  * - Allocate a large object that is a smidgen smaller or larger
  *   than an integral number of pages (for varying values of "smidgen").
@@ -73,6 +119,7 @@ void test_adjust_obj_ptes()
             shrink_obj_test(request, PAGE_TYPE_MIXED, expected_result);
             shrink_obj_test(request, PAGE_TYPE_UNBOXED, expected_result);
         }
+    printf("adjust_obj_ptes: PASS\n");
 }
 
 void shrink_obj_test(int ending_size, int initial_type,
@@ -139,6 +186,7 @@ void run_gencgc_tests()
               == FUNCALLABLE_INSTANCE_WIDETAG);
     gc_assert(instanceoid_widetag_p(INSTANCE_WIDETAG));
     gc_assert(instanceoid_widetag_p(FUNCALLABLE_INSTANCE_WIDETAG));
+    test_find_freeish();
     test_adjust_obj_ptes();
 }
 
