@@ -44,7 +44,15 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        "bug-1180102.impure"
                        "gethash-concurrency.impure"
                        "arith-slow.pure"))
+(defvar *filter* nil)
 (defun choose-order (tests)
+  (when *filter*
+    (let (strings)
+       (with-open-file (file *filter*)
+         (loop (let ((line (read-line file nil)))
+                 (if line (push line strings) (return)))))
+       (setq tests (remove-if (lambda (x) (not (find x strings :test #'string=)))
+                              tests))))
   (sort tests
         (lambda (a b)
           (let ((posn-a (or (position a *slow-tests* :test #'string=)
@@ -222,6 +230,9 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
           (format t "~A~%" filename))
         (format t "==== Logs are in $logdir ====~%")
         (exit :code 1)))))
+(when (string= (car *posix-argv*) "--filter")
+  (setq *filter* (cadr *posix-argv*))
+  (setq *posix-argv* (cddr *posix-argv*)))
 (if (= (length *posix-argv*) 1)
     ;; short form - all files, argument N is the number of parallel tasks
     (let ((jobs (parse-integer (car *posix-argv*))))
