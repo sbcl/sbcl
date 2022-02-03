@@ -442,11 +442,15 @@ Examples:
              (values 3 'equalp #'equalp #'equalp-hash))
             (t
              (dolist (info *user-hash-table-tests*
-                      (if hash-function
-                          (if (functionp test)
-                              (values -1 test test nil)
-                              (values -1 test (%coerce-callable-to-fun test) nil))
-                          (error "Unknown :TEST for MAKE-HASH-TABLE: ~S" test)))
+                      (flet ((proper-name (fun &aux (name (%fun-name fun)))
+                               (if (and (symbolp name) (fboundp name) (eq (symbol-function name) fun))
+                                   name
+                                   fun)))
+                        (if hash-function
+                            (if (functionp test)
+                                (values -1 (proper-name test) test nil)
+                                (values -1 test (%coerce-callable-to-fun test) nil))
+                            (error "Unknown :TEST for MAKE-HASH-TABLE: ~S" test))))
                (destructuring-bind (test-name test-fun hash-fun) info
                  (when (or (eq test test-name) (eq test test-fun))
                    (return (values -1 test-name test-fun hash-fun)))))))
