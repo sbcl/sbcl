@@ -444,7 +444,7 @@ Examples:
              (dolist (info *user-hash-table-tests*
                       (if hash-function
                           (if (functionp test)
-                              (values -1 (%fun-name test) test nil)
+                              (values -1 test test nil)
                               (values -1 test (%coerce-callable-to-fun test) nil))
                           (error "Unknown :TEST for MAKE-HASH-TABLE: ~S" test)))
                (destructuring-bind (test-name test-fun hash-fun) info
