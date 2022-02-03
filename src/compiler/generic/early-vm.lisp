@@ -162,6 +162,10 @@
 ;;; which can be expressed in 8 bits.
 (defconstant short-header-max-words #x7fff)
 
+#+gencgc
+(defconstant max-conses-per-page
+  (floor gencgc-page-bytes (* 2 sb-vm:n-word-bytes)))
+
 ;;; Amount to righ-shift an instance header to get the length.
 ;;; Similar consideration as above with regard to use of generation# byte.
 (defconstant instance-length-shift 10)

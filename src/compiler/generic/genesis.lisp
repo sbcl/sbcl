@@ -188,8 +188,8 @@
                                     #+darwin-jit 1))
 
 (defstruct page
-  (type nil :type (member nil :code :mixed))
-  (bytes-used 0)
+  (type nil :type (member nil :code :list :mixed))
+  (words-used 0)
   scan-start) ; byte offset from base of the space
 
 ;;; a GENESIS-time representation of a memory space (e.g. read-only
@@ -204,6 +204,7 @@
   ;; the gspace contents as a BIGVEC
   (data (make-bigvec) :type bigvec :read-only t)
   (page-table nil) ; for dynamic space
+  (cons-region) ; (word-index . limit)
   ;; lists of holes created by the allocator to segregate code from data.
   ;; Doesn't matter for cheneygc; does for gencgc.
   ;; Each free-range is (START . LENGTH) in words.
@@ -409,95 +410,106 @@
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
 
-;; Special case for dynamic space code/data segregation
+(defconstant min-usable-hole-size 10) ; semi-arbitrary constant to speed up the allocator
+;; Place conses and code on their respective page type.
 #+gencgc
-(defun dynamic-space-claim-n-words (gspace n-words page-type)
-  (let* ((words-per-page (/ sb-vm:gencgc-page-bytes sb-vm:n-word-bytes))
-         (holder (ecase page-type
-                   (:code (gspace-code-free-ranges gspace))
-                   (:mixed (gspace-non-code-free-ranges gspace))))
-         (found (find-if (lambda (x) (>= (cdr x) n-words))
-                         (cdr holder)))) ; dummy cons cell simplifies writeback
-    (labels ((alignedp (word-index) ; T if WORD-INDEX aligns to a GC page boundary
-               (not (logtest (* word-index sb-vm:n-word-bytes)
-                             (1- sb-vm:gencgc-page-bytes))))
-             (page-index (word-index)
-               (values (floor word-index words-per-page)))
-             (pte (index) ; create on demand
-               (or (aref (gspace-page-table gspace) index)
-                   (setf (aref (gspace-page-table gspace) index) (make-page))))
-             (assign-page-types (page-type start-word-index count)
-               ;; CMUCL incorrectly warns that the result of ADJUST-ARRAY
-               ;; must not be discarded.
-               #+host-quirks-cmu (declare (notinline adjust-array))
-               (let ((start-page (page-index start-word-index))
-                     (end-page (page-index (+ start-word-index (1- count)))))
-                 (unless (> (length (gspace-page-table gspace)) end-page)
-                   (adjust-array (gspace-page-table gspace) (1+ end-page)
-                                 :initial-element nil))
-                 (loop for page-index from start-page to end-page
-                       for pte = (pte page-index)
-                       do (if (null (page-type pte))
-                              (setf (page-type pte) page-type)
-                              (assert (eq (page-type pte) page-type))))))
-             (note-it (start-word-index)
-               (let* ((start-page (page-index start-word-index))
-                      (end-word-index (+ start-word-index n-words))
-                      (end-page (page-index (1- end-word-index))))
-                 ;; pages from start to end (exclusive) must be full
-                 (loop for index from start-page below end-page
-                       do (setf (page-bytes-used (pte index)) sb-vm:gencgc-page-bytes))
-                 ;; Compute the difference between the word-index at the start of
-                 ;; end-page and the end-word.
-                 (setf (page-bytes-used (pte end-page))
-                       (* sb-vm:n-word-bytes
-                          (- end-word-index (* end-page words-per-page))))
-                 ;; update the scan start of any page without it set
-                 (loop for index from start-page to end-page
-                       do (let ((pte (pte index)))
-                            (unless (page-scan-start pte)
-                              (setf (page-scan-start pte) start-word-index)))))
-               start-word-index)
-             (get-frontier-page-type ()
-               (page-type (pte (page-index (1- (gspace-free-word-index gspace)))))))
-      (when found ; Case 1: always try to backfill first if possible
+(defun dynamic-space-claim-n-words (gspace n-words page-type
+                                    &aux (words-per-page
+                                          (/ sb-vm:gencgc-page-bytes sb-vm:n-word-bytes)))
+  (labels ((alignedp (word-index) ; T if WORD-INDEX aligns to a GC page boundary
+             (not (logtest (* word-index sb-vm:n-word-bytes)
+                           (1- sb-vm:gencgc-page-bytes))))
+           (page-index (word-index)
+             (values (floor word-index words-per-page)))
+           (pte (index) ; create on demand
+             (or (aref (gspace-page-table gspace) index)
+                 (setf (aref (gspace-page-table gspace) index) (make-page))))
+           (assign-page-type (page-type start-word-index count)
+             ;; CMUCL incorrectly warns that the result of ADJUST-ARRAY
+             ;; must not be discarded.
+             #+host-quirks-cmu (declare (notinline adjust-array))
+             (let ((start-page (page-index start-word-index))
+                   (end-page (page-index (+ start-word-index (1- count)))))
+               (unless (> (length (gspace-page-table gspace)) end-page)
+                 (adjust-array (gspace-page-table gspace) (1+ end-page)
+                               :initial-element nil))
+               (loop for page-index from start-page to end-page
+                     for pte = (pte page-index)
+                     do (if (null (page-type pte))
+                            (setf (page-type pte) page-type)
+                            (assert (eq (page-type pte) page-type))))))
+           (note-words-used (start-word-index)
+             (let* ((start-page (page-index start-word-index))
+                    (end-word-index (+ start-word-index n-words))
+                    (end-page (page-index (1- end-word-index))))
+               ;; pages from start to end (exclusive) must be full
+               (loop for index from start-page below end-page
+                     do (setf (page-words-used (pte index)) words-per-page))
+               ;; Compute the difference between the word-index at the start of
+               ;; end-page and the end-word.
+               (setf (page-words-used (pte end-page))
+                     (- end-word-index (* end-page words-per-page)))
+               ;; update the scan start of any page without it set
+               (loop for index from start-page to end-page
+                     do (let ((pte (pte index)))
+                          (unless (page-scan-start pte)
+                            (setf (page-scan-start pte) start-word-index)))))
+             start-word-index)
+           (get-frontier-page-type ()
+             (page-type (pte (page-index (1- (gspace-free-word-index gspace))))))
+           (realign-frontier ()
+             ;; Align the frontier to a page, putting the empty space onto a free list
+             (let* ((free-ptr (gspace-free-word-index gspace))
+                    (avail (- (align-up free-ptr words-per-page) free-ptr))
+                    (other-type (get-frontier-page-type)) ; before extending frontier
+                    (word-index (gspace-claim-n-words gspace avail)))
+               ;; the space we got should be exactly what we thought it should be
+               (aver (= word-index free-ptr))
+               (aver (alignedp (gspace-free-word-index gspace)))
+               (aver (= (gspace-free-word-index gspace) (+ free-ptr avail)))
+               (when (>= avail min-usable-hole-size)
+                 ;; allocator is first-fit; space goes to the tail of the other freelist.
+                 (nconc (ecase other-type
+                          (:code  (gspace-code-free-ranges gspace))
+                          (:mixed (gspace-non-code-free-ranges gspace)))
+                        (list (cons word-index avail)))))))
+    (when (eq page-type :list) ; Claim whole pages at a time
+      (let* ((region
+              (or (gspace-cons-region gspace)
+                  (progn
+                    (unless (alignedp (gspace-free-word-index gspace))
+                      (realign-frontier))
+                    (let ((word-index (gspace-claim-n-words gspace words-per-page)))
+                      (assign-page-type page-type word-index sb-vm:cons-size)
+                      (let ((pte (pte (page-index word-index))))
+                        (setf (page-scan-start pte) word-index))
+                      (setf (gspace-cons-region gspace)
+                            (cons word-index
+                                  (+ word-index (* (1- sb-vm::max-conses-per-page)
+                                                   sb-vm:cons-size))))))))
+             (result (car region)))
+        (incf (page-words-used (pte (page-index result))) sb-vm:cons-size)
+        (when (= (incf (car region) sb-vm:cons-size) (cdr region))
+          (setf (gspace-cons-region gspace) nil))
+        (return-from dynamic-space-claim-n-words result)))
+    (let* ((holder (ecase page-type
+                     (:code (gspace-code-free-ranges gspace))
+                     (:mixed (gspace-non-code-free-ranges gspace))))
+           (found (find-if (lambda (x) (>= (cdr x) n-words))
+                           (cdr holder)))) ; dummy cons cell simplifies writeback
+      (when found ; always try to backfill holes first if possible
         (let ((word-index (car found)))
-          (if (zerop (decf (cdr found) n-words))
-              (rplacd holder (delete found (cdr holder) :count 1))
+          (if (< (decf (cdr found) n-words) min-usable-hole-size) ; discard this hole now?
+              (rplacd holder (delete found (cdr holder) :count 1)) ; yup
               (incf (car found) n-words))
-          (return-from dynamic-space-claim-n-words (note-it word-index))))
-      (when (or (alignedp (gspace-free-word-index gspace))
-                (eq (get-frontier-page-type) page-type))
-        ;; Case 2: extend the frontier
-        (let ((word-index (gspace-claim-n-words gspace n-words)))
-          ;; could optimize this out if we don't go onto a new page
-          (assign-page-types page-type word-index n-words)
-          (return-from dynamic-space-claim-n-words (note-it word-index))))
-      ;; Align the frontier to a page, add some more pages for good measure,
-      ;; and stuff that empty space onto a free list. Then start a new new page.
-      (let* ((free-ptr (gspace-free-word-index gspace))
-             ;; avoid waste by always giving some more slack to the other
-             ;; type of page before starting a new page
-             (reserve-extra-pages 4) ; a random heuristic
-             (reserve (+ (- (align-up free-ptr words-per-page) free-ptr)
-                         (* words-per-page reserve-extra-pages)))
-             (other-type (get-frontier-page-type)) ; before extending frontier
-             (word-index (gspace-claim-n-words gspace reserve)))
-        ;; the space we got should be exactly what we thought it should be
-        (aver (= word-index free-ptr))
-        (aver (alignedp (gspace-free-word-index gspace)))
-        (aver (= (gspace-free-word-index gspace) (+ free-ptr reserve)))
-        ;; those pages all have the other type (the one we don't want)
-        (assign-page-types other-type word-index reserve)
-        ;; allocator is first-fit; space goes to the tail of the other freelist.
-        (nconc (ecase other-type
-                 (:code  (gspace-code-free-ranges gspace))
-                 (:mixed (gspace-non-code-free-ranges gspace)))
-               (list (cons word-index reserve))))
-      ;; Reduced to case 2 now
+          (return-from dynamic-space-claim-n-words (note-words-used word-index))))
+      ;; Avoid switching between :CODE and :MIXED on a page
+      (unless (or (alignedp (gspace-free-word-index gspace))
+                  (eq (get-frontier-page-type) page-type))
+        (realign-frontier))
       (let ((word-index (gspace-claim-n-words gspace n-words)))
-        (assign-page-types page-type word-index n-words)
-        (note-it word-index)))))
+        (assign-page-type page-type word-index n-words)
+        (note-words-used word-index)))))
 
 (defun gspace-claim-n-bytes (gspace specified-n-bytes &optional (page-type :mixed))
   (declare (ignorable page-type))
@@ -796,6 +808,11 @@
 
 ;;;; copying simple objects into the cold core
 
+(defun cold-simple-vector-p (obj)
+  (and (= (descriptor-lowtag obj) sb-vm:other-pointer-lowtag)
+       (= (logand (read-bits-wordindexed obj 0) sb-vm:widetag-mask)
+          sb-vm:simple-vector-widetag)))
+
 (declaim (inline cold-vector-len))
 (defun cold-vector-len (vector)
   #+ubsan (ash (read-bits-wordindexed vector 0) (- -32 sb-vm:n-fixnum-tag-bits))
@@ -952,14 +969,14 @@ core and return a descriptor to it."
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
 (defun cold-cons (car cdr &optional (gspace *dynamic*))
-  (let ((dest (allocate-object gspace 2 sb-vm:list-pointer-lowtag)))
+  (let ((cons (allocate-object gspace 2 sb-vm:list-pointer-lowtag)))
     (let* ((objs (gspace-objects gspace))
            (n (1- (length objs))))
       (when objs
         (setf (aref objs n) (list (aref objs n)))))
-    (write-wordindexed dest sb-vm:cons-car-slot car)
-    (write-wordindexed dest sb-vm:cons-cdr-slot cdr)
-    dest))
+    (write-wordindexed cons sb-vm:cons-car-slot car)
+    (write-wordindexed cons sb-vm:cons-cdr-slot cdr)
+    cons))
 (defun list-to-core (list)
   (let ((head *nil-descriptor*)
         (tail nil))
@@ -1248,6 +1265,7 @@ core and return a descriptor to it."
   ;; types in the IS-A vector. They may vary in length due to the bitmap word count.
   ;; But we can at least assert that there is one less thing to worry about.
   (aver (<= depthoid sb-kernel::layout-id-vector-fixed-capacity))
+  (aver (cold-simple-vector-p inherits))
   (let* ((fixed-words (sb-kernel::type-dd-length sb-vm:layout))
          (bitmap-words (ceiling (1+ (integer-length bitmap)) sb-vm:n-word-bits))
          (result (allocate-struct (+ fixed-words bitmap-words)
@@ -3627,13 +3645,14 @@ III. initially undefined function references (alphabetically):
          (sizeof-corefile-pte (+ sb-vm:n-word-bytes sizeof-usage))
          (pte-bytes (round-up (* sizeof-corefile-pte n-ptes) sb-vm:n-word-bytes))
          (n-code 0)
+         (n-cons 0)
          (n-mixed 0)
          (ptes (make-bigvec)))
     (expand-bigvec ptes pte-bytes)
     (dotimes (page-index n-ptes)
       (let* ((pte-offset (* page-index sizeof-corefile-pte))
              (pte (aref (gspace-page-table gspace) page-index))
-             (usage (/ (page-bytes-used pte) sb-vm:n-word-bytes))
+             (usage (page-words-used pte))
              (sso (if (plusp usage)
                       (- (* page-index sb-vm:gencgc-page-bytes)
                          (* (page-scan-start pte) sb-vm:n-word-bytes))
@@ -3641,6 +3660,7 @@ III. initially undefined function references (alphabetically):
              (type-bits (if (plusp usage)
                             (ecase (page-type pte)
                               (:code  (incf n-code)  #b111)
+                              (:list  (incf n-cons)  #b101)
                               (:mixed (incf n-mixed) #b011))
                             0)))
         (setf (bvref-word ptes pte-offset) (logior sso type-bits))
@@ -3653,7 +3673,8 @@ III. initially undefined function references (alphabetically):
                          '#'(setf bvref-32))))
           (funcall (setter) usage ptes (+ pte-offset sb-vm:n-word-bytes)))))
     (when verbose
-      (format t "movable dynamic space: ~d boxed pages, ~d code pages~%" n-mixed n-code))
+      (format t "movable dynamic space: ~d + ~d + ~d cons/code/mixed pages~%"
+              n-cons n-code n-mixed))
     (force-output core-file)
     (let ((posn (file-position core-file)))
       (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
