@@ -495,7 +495,7 @@
     (incf (gethash (complex 1.0f0 0.0f0) table))
     (incf (gethash (complex 1.0d0 0.0d0) table))
     (assert (= 5 (gethash 1 table)))
-    (assert (eq '= (hash-table-test table)))))
+    (assert (eq #'= (hash-table-test table)))))
 
 (defstruct rslotty a
   (uword 0 :type word)
