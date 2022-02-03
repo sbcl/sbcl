@@ -1076,8 +1076,10 @@
                            (type-specifier (sb-vm:saetp-ctype saetp))
                            'upgraded-array-element-type
                            eltype)))
-                   ((not (ctypep value eltype-type))
-                    ;; this case will not cause an error at runtime, but
+                   ((multiple-value-bind (typep surep)
+                        (ctypep value eltype-type)
+                      (and (not typep) surep))
+                    ;; This case will not cause an error at runtime, but
                     ;; it's still worth STYLE-WARNing about.
                     (compiler-style-warn 'initial-element-mismatch-style-warning
                                          :format-control "~S is not a ~S."

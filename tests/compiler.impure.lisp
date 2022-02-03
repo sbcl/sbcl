@@ -3071,8 +3071,33 @@
 
 (declaim (ftype (function () (member #.*entry-info-type-struct*)) entry-info-type-func))
 
-
 (with-test (:name :dump-entry-info-type)
   (ctu:file-compile
    "(lambda () (entry-info-type-func))"
    :load t))
+
+(deftype member-abc () '(member #\a #\b #\c))
+(with-test (:name (make-array :initial-element style-warning))
+  (multiple-value-bind (warnp failp)
+      (ctu:file-compile
+       "(defun make-... (len) (make-array len :element-type '(or member-abc condition) :initial-element #\\e))")
+    (assert warnp)
+    (assert (not failp))))
+
+(let ((false #\a)
+      (true #\z))
+  (defun is-probability? (inp)
+    (and (characterp inp) (char<= false inp true)))
+  (deftype probability () '(satisfies is-probability?)))
+(with-test (:name (make-array :initial-element satisfies))
+  (multiple-value-bind (warnp failp)
+      (ctu:file-compile
+       "(defun make-... (len) (make-array len :element-type '(or probability condition) :initial-element #\\e))")
+    (assert (not warnp))
+    (assert (not failp))))
+(with-test (:name (make-sequence :initial-element satisfies))
+  (multiple-value-bind (warnp failp)
+      (ctu:file-compile
+       "(defun make-... (len) (make-sequence '(simple-array (or probability condition) (*)) len :initial-element #\\e))")
+    (assert (not warnp))
+    (assert (not failp))))
