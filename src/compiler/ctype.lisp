@@ -1144,7 +1144,8 @@ and no value was provided for it." name))))))))))
           ((eq cast-context :ftype)
            (warn condition
                  :format-control
-                 "~@<Derived type of ~S is ~2I~_~S, ~
+                 "~@<Derived type of ~/sb-impl:print-type-specifier/ is ~
+                    ~2I~_~/sb-impl:print-type-specifier/, ~
                     ~I~_conflicting with the declared function return type ~
                     ~2I~_~/sb-impl:print-type-specifier/.~@:>"
                  :format-arguments (list detail dtype atype)))
@@ -1159,7 +1160,8 @@ and no value was provided for it." name))))))))))
                        :format-arguments (list (constant-form-value detail) atype))
                  (warn condition
                        :format-control
-                       "~@<Derived type of ~S is ~2I~_~S, ~
+                       "~@<Derived type of ~/sb-impl:print-type-specifier/ is ~
+                            ~2I~_~/sb-impl:print-type-specifier/, ~
                             ~I~_conflicting with its asserted type ~
                             ~2I~_~/sb-impl:print-type-specifier/.~@:>"
                        :format-arguments (list detail dtype atype)))))
