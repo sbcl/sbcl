@@ -1079,7 +1079,7 @@
 (defknown hash-table-rehash-threshold (hash-table) (single-float ($0.0) $1.0)
   (foldable flushable))
 (defknown hash-table-size (hash-table) index (flushable))
-(defknown hash-table-test (hash-table) symbol (foldable flushable))
+(defknown hash-table-test (hash-table) function-designator (foldable flushable))
 (defknown (sxhash psxhash) (t) hash-code (foldable flushable))
 (defknown hash-table-equalp (hash-table hash-table) boolean (foldable flushable))
 (defknown sb-impl::install-hash-table-lock (hash-table) sb-thread:mutex ())
