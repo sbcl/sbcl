@@ -369,7 +369,7 @@
 ;;; or slow paths are being taken for each element type.  See the
 ;;; READ-SEQUENCE tests above for more information.
 ;;;
-;;; (trace sb-impl::output-unsigned-byte-full-buffered sb-impl::output-signed-byte-full-buffered sb-impl::output-raw-bytes)
+;;; (trace sb-impl::output-unsigned-byte-full-buffered sb-impl::output-signed-byte-full-buffered)
 
 (with-test (:name (write-sequence type-error))
   (let ((pathname (scratch-file-name))

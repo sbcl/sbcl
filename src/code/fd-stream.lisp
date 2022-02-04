@@ -463,14 +463,6 @@
                     (if (= errno sb-unix:ewouldblock)
                         (buffer-output stream thing start end)
                         (simple-stream-perror +write-failed+ stream errno)))))))))
-
-;;; Deprecated -- can go away after 1.1 or so. Deprecated because
-;;; this is not something we want to export. Nikodemus thinks the
-;;; right thing is to support a low-level non-stream like IO layer,
-;;; akin to java.nio.
-(define-deprecated-function :final "1.0.8.16" output-raw-bytes write-sequence
-    (stream thing &optional start end)
-  (write-or-buffer-output stream thing (or start 0) (or end (length thing))))
 
 ;;;; output routines and related noise
 
@@ -789,7 +781,7 @@
 
 ;;; the routine to use to output a string. If the stream is
 ;;; unbuffered, slam the string down the file descriptor, otherwise
-;;; use OUTPUT-RAW-BYTES to buffer the string. Update charpos by
+;;; use BUFFER-OUTPUT to buffer the string. Update charpos by
 ;;; checking to see where the last newline was.
 (defun fd-sout (stream thing start end)
   (declare (type fd-stream stream) (type string thing))

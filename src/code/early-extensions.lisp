@@ -1205,13 +1205,6 @@ NOTE: This interface is experimental and subject to change."
 ;;; - SOCKINT::WIN32-IOCTL                         since 1.2.10 (03/2015)    -> Late: 08/2015
 ;;; - SOCKINT::WIN32-SETSOCKOPT                    since 1.2.10 (03/2015)    -> Late: 08/2015
 ;;; - SOCKINT::WIN32-GETSOCKOPT                    since 1.2.10 (03/2015)    -> Late: 08/2015
-;;;
-;;; - SB-C::MERGE-TAIL-CALLS (policy)              since 1.0.53.74 (11/2011) -> Late: 11/2012
-;;;
-;;; LATE:
-;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy) since 1.0.19.7            -> Final: anytime
-;;; - SB-C::STACK-ALLOCATE-VECTOR (policy)         since 1.0.19.7            -> Final: anytime
-;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy)    since 1.0.19.7            -> Final: anytime
 
 (defun setup-function-in-final-deprecation
     (software version name replacement-spec)
