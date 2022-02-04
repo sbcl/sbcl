@@ -2628,7 +2628,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 
            "STRING>=*" "STRING>*" "STRING=*" "STRING<=*"
            "STRING<*" "STRING/=*" "%SVSET"
-           "%SP-STRING-COMPARE" "%SETNTH" "%SETELT"
+           "%SP-STRING-COMPARE" "%SP-STRING="
+           "%SETNTH" "%SETELT"
            "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
            "%SET-FDEFINITION" "%SCHARSET"
            "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"

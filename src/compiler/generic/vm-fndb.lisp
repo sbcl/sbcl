@@ -98,6 +98,10 @@
   (simple-string index (or null index) simple-string index (or null index))
   (values index fixnum)
   (foldable flushable))
+(defknown %sp-string=
+  (simple-string index (or null index) simple-string index (or null index))
+  boolean
+  (foldable flushable))
 
 (defknown sb-impl::number-sxhash (number) hash-code (foldable flushable))
 (defknown %sxhash-string (string) hash-code (foldable flushable))

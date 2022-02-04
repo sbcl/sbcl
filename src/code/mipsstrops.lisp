@@ -57,3 +57,24 @@
                (return (values index1
                                (- (char-code char1)
                                   (char-code char2)))))))))))
+
+;;; Doesn't need to return a mismatch index
+(defun %sp-string= (string1 start1 end1 string2 start2 end2)
+  (let* ((end1 (or end1
+                   (length string1)))
+         (end2 (or end2
+                   (length string2)))
+         (len1 (- end1 start1))
+         (len2 (- end2 start2)))
+    (declare (fixnum len1 len2
+                     end1 end2))
+    (cond
+      ((= len1 len2)
+       (do ((index1 start1 (1+ index1))
+            (index2 start2 (1+ index2)))
+           ((= index1 end1) t)
+         (declare (fixnum index1 index2))
+         (let ((char1 (schar string1 index1))
+               (char2 (schar string2 index2)))
+           (if (char/= char1 char2)
+               (return nil))))))))

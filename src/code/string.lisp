@@ -175,7 +175,7 @@
                                  (rotatef string1 string2)
                                  t)))
                  (char-loop character base-char))))))
-    (zerop (nth-value 1 (%sp-string-compare string1 start1 end1 string2 start2 end2)))))
+    (%sp-string= string1 start1 end1 string2 start2 end2)))
 
 (defun string/=* (string1 string2 start1 end1 start2 end2)
   (with-two-strings string1 string2 start1 end1 offset1 start2 end2

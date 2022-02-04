@@ -958,17 +958,18 @@
         (t
          (give-up-ir1-transform))))
 
-(macrolet ((def (name test index)
-             `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
-                                   (simple-string simple-string t t t t) *)
-                `(multiple-value-bind (index diff)
-                     (%sp-string-compare string1 start1 end1 string2 start2 end2)
-                   (declare (ignorable index))
-                   (if (,',test diff 0)
-                       ,,(if index ''index t)
-                       nil)))))
-  (def string=* = nil) ; FIXME: this xform looks counterproductive.
-  (def string/=* /= t))
+(deftransform string=*
+    ((string1 string2 start1 end1 start2 end2) (simple-string simple-string t t t t) *)
+  `(%sp-string= string1 start1 end1 string2 start2 end2))
+
+(deftransform string/=*
+    ((string1 string2 start1 end1 start2 end2) (simple-string simple-string t t t t) *)
+  `(multiple-value-bind (index diff)
+       (%sp-string-compare string1 start1 end1 string2 start2 end2)
+     (declare (ignorable index))
+     (if (,'/= diff 0)
+         ,'index
+         nil)))
 
 (deftransform string/=* ((str1 str2 start1 end1 start2 end2) * * :node node
                          :important nil)
