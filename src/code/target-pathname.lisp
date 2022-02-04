@@ -472,7 +472,7 @@
         (pattern
          ;; A pattern is only matched by an identical pattern.
          (and (pattern-p wild) (pattern= thing wild)))
-        (integer
+        (bignum
          ;; An integer (version number) is matched by :WILD or the
          ;; same integer. This branch will actually always be NIL as
          ;; long as the version is a fixnum.
@@ -480,7 +480,7 @@
 
 ;;; a predicate for comparing two pathname slot component sub-entries
 (defun compare-component (this that)
-  (or (eql this that)
+  (or (eq this that)
       (typecase this
         (simple-string
          (and (simple-string-p that)
@@ -494,7 +494,9 @@
         (cons
          (and (consp that)
               (compare-component (car this) (car that))
-              (compare-component (cdr this) (cdr that)))))))
+              (compare-component (cdr this) (cdr that))))
+        (bignum
+         (eql this that)))))
 
 ;;;; pathname functions
 
