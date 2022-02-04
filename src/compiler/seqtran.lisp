@@ -959,8 +959,13 @@
          (give-up-ir1-transform))))
 
 (deftransform string=*
-    ((string1 string2 start1 end1 start2 end2) (simple-string simple-string t t t t) *)
-  `(%sp-string= string1 start1 end1 string2 start2 end2))
+    ((string1 string2 start1 end1 start2 end2) (simple-base-string simple-base-string t t t t) *)
+  `(simple-base-string= string1 string2 start1 end1 start2 end2))
+
+#+sb-unicode
+(deftransform string=*
+    ((string1 string2 start1 end1 start2 end2) (simple-character-string simple-character-string t t t t) *)
+  `(simple-character-string= string1 string2 start1 end1 start2 end2))
 
 (deftransform string/=*
     ((string1 string2 start1 end1 start2 end2) (simple-string simple-string t t t t) *)

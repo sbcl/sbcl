@@ -1274,7 +1274,21 @@
                      (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
                      (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
   boolean
-  (foldable flushable))
+    (foldable flushable))
+
+(defknown simple-base-string=
+    (simple-base-string simple-base-string
+                        (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
+                        (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
+    boolean
+    (foldable flushable))
+
+(defknown simple-character-string=
+    (simple-character-string simple-character-string
+                             (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
+                             (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
+    boolean
+    (foldable flushable))
 
 ;;;; from the "Eval" chapter:
 
