@@ -1216,3 +1216,21 @@
                               :w 0
                               :opcode-prefix #x0f3a
                               :printer '(:name :tab reg/mem ", " reg ", " imm)))
+
+(define-instruction xsave (segment dst)
+  (:printer ext-reg/mem-no-width ((op '(#xae 4))))
+  (:emitter
+   (aver (not (register-p dst)))
+   (emit-prefixes segment dst nil :do-not-set)
+   (emit-byte segment #x0F)
+   (emit-byte segment #xAE)
+   (emit-ea segment dst 4)))
+
+(define-instruction xrstor (segment dst)
+  (:printer ext-reg/mem-no-width ((op '(#xae 5))))
+  (:emitter
+   (aver (not (register-p dst)))
+   (emit-prefixes segment dst nil :do-not-set)
+   (emit-byte segment #x0F)
+   (emit-byte segment #xAE)
+   (emit-ea segment dst 5)))

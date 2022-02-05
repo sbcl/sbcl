@@ -20,10 +20,29 @@
                            (pop
                             `(inst ,mnemonic (sb-x86-64-asm::get-fpr ,regset ,regno)
                                    (ea ,(+ 8 (* regno fpr-align)) rsp-tn)))))))))
-  ;; Caller will have allocated 512 bytes above the stack-pointer
+  ;; Caller will have allocated 512+64+256 bytes above the stack-pointer
   ;; prior to the CALL. Use that as the save area.
-  (define-assembly-routine (save-ymm) () (do-fprs push :ymm))
-  (define-assembly-routine (restore-ymm) () (do-fprs pop :ymm))
+  (define-assembly-routine (save-ymm) ()
+    (inst push rax-tn)
+    (inst push rdx-tn)
+    (inst mov rax-tn 7)
+    (zeroize rdx-tn)
+    ;; Zero the header
+    (loop repeat 8
+          for i from (+ 512 24) by 8
+          do
+          (inst mov (ea i rsp-tn) rdx-tn))
+    (inst xsave (ea 24 rsp-tn))
+    (inst pop rdx-tn)
+    (inst pop rax-tn))
+  (define-assembly-routine (restore-ymm) ()
+    (inst push rax-tn)
+    (inst push rdx-tn)
+    (inst mov rax-tn 7)
+    (zeroize rdx-tn)
+    (inst xrstor (ea 24 rsp-tn))
+    (inst pop rdx-tn)
+    (inst pop rax-tn))
   ;; As above, but only 256 bytes of the save area are needed, the rest goes to waste.
   (define-assembly-routine (save-xmm (:export fpr-save)) ()
     fpr-save ; KLUDGE: this is element 4 of the entry point vector
