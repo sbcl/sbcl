@@ -159,7 +159,7 @@ static cmd kill_cmd;
 
 static int save_cmd(char **ptr) {
 #if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
-    extern void gc_stop_the_world(), gc_start_the_world(), gc_close_all_regions();
+    extern void gc_stop_the_world(), gc_start_the_world();
     char *name  = parse_token(ptr);
     if (!name) {
         fprintf(stderr, "Need filename\n");
@@ -169,11 +169,8 @@ static int save_cmd(char **ptr) {
     // It might make sense for each thread's stop-for-gc handler to close its region
     // versus doing this loop
     struct thread *th;
-    for_each_thread(th) {
-        ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
-        ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
-    }
-    gc_close_all_regions();
+    for_each_thread(th) { gc_close_thread_regions(th); }
+    gc_close_collector_regions();
     save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
     gc_start_the_world();
 #else
@@ -675,6 +672,7 @@ grab_sigs_cmd(char __attribute__((unused)) **ptr)
 }
 
 extern boolean gc_active_p;
+extern FILE *gc_activitylog_file;
 void
 ldb_monitor(void)
 {
@@ -685,6 +683,7 @@ ldb_monitor(void)
 
     printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
     if (gc_active_p) printf("(GC in progress)\n");
+    if (gc_activitylog_file) fflush(gc_activitylog_file);
     if (!ldb_in) {
 #ifndef LISP_FEATURE_WIN32
         ldb_in = fopen("/dev/tty","r+");

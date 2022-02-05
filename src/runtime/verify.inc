@@ -70,8 +70,8 @@ static void note_failure(lispobj thing, lispobj *where, struct verify_state *sta
     if (state->object_addr) {
         lispobj obj = compute_lispobj(state->object_addr);
         page_index_t pg = find_page_index(state->object_addr);
-        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%ld) sees %s\n",
-                (void*)thing, (uword_t)where, obj, pg, str);
+        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX",pg%d) sees %s\n",
+                (void*)thing, (uword_t)where, obj, (int)pg, str);
         // Record this in state->err_objs if possible
         int i;
         for(i=0; i<MAX_ERR_OBJS; ++i)
@@ -101,9 +101,10 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
         return 0;
     }
     // if (strict_containment && !gc_managed_heap_space_p(thing)) GC_WARN("non-Lisp memory");
-    page_index_t page_index = find_page_index((void*)thing);
-    if (!(page_index >= 0 || immobile_space_p(thing))) return 0; // can't do much with it
-    if ((state->flags & VERIFY_TAGS) && page_index >= 0) {
+    page_index_t source_page_index = find_page_index(where);
+    page_index_t target_page_index = find_page_index((void*)thing);
+    if (!(target_page_index >= 0 || immobile_space_p(thing))) return 0; // can't do much with it
+    if ((state->flags & VERIFY_TAGS) && target_page_index >= 0) {
         if (listp(thing)) {
             FAIL_IF(!(is_cons_half(CONS(thing)->car) && is_cons_half(CONS(thing)->cdr)),
                     "non-cons");
@@ -115,11 +116,11 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
     generation_index_t to_gen = gc_gen_of(thing, ARTIFICIALLY_HIGH_GEN);
     if (to_gen < state->min_pointee_gen) state->min_pointee_gen = to_gen;
     if (state->flags & VERIFY_QUICK) return 0;
-    if (page_index >= 0) {
+    if (target_page_index >= 0) {
         // If it's within the dynamic space it should point to a used page.
-        FAIL_IF(page_free_p(page_index), "free page");
-        FAIL_IF(!(page_table[page_index].type & OPEN_REGION_PAGE_FLAG)
-                && (thing & (GENCGC_PAGE_BYTES-1)) >= page_bytes_used(page_index),
+        FAIL_IF(page_free_p(target_page_index), "free page");
+        FAIL_IF(!(page_table[target_page_index].type & OPEN_REGION_PAGE_FLAG)
+                && (thing & (GENCGC_PAGE_BYTES-1)) >= page_bytes_used(target_page_index),
                 "unallocated space");
     } else {
         // The object pointed to must not have been discarded as garbage.
@@ -143,19 +144,22 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
         if (!header_rememberedp(state->object_header))
             lose("code @ %p (g%d). word @ %p -> %"OBJ_FMTX" (g%d)",
                  state->object_addr, state->object_gen, where, thing, to_gen);
-    } else if ((state->flags & VERIFYING_GENERATIONAL) && to_gen < state->object_gen) {
+    } else if ((state->flags & VERIFYING_GENERATIONAL) && to_gen < state->object_gen
+               && source_page_index >= 0) {
         /* The WP criteria are:
+         *  - CONS marks the exact card since it can't span cards
          *  - SIMPLE-VECTOR marks the card containing the cell with the old->young pointer.
          *  - Everything else marks the object header -OR- the card with the pointer.
          *    (either/or because Lisp marks the header card,
          *     but the collector marks the cell's card.) */
-      int marked = card_markedp(where)
+        int marked = card_markedp(where)
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        || (header_widetag(state->object_header) != SIMPLE_VECTOR_WIDETAG
+        || (state->object_header
+            && header_widetag(state->object_header) != SIMPLE_VECTOR_WIDETAG
             && card_markedp(state->object_addr))
 #endif
         ;
-      FAIL_IF(!marked, "younger obj from WP page");
+        FAIL_IF(!marked, "younger obj from WP page");
     }
     int valid;
     if (state->flags & VERIFY_AGGRESSIVE) // Extreme paranoia mode
@@ -285,7 +289,7 @@ static int verify_range(lispobj start, lispobj* end, struct verify_state* state)
         int widetag = is_header(*where) ? header_widetag(*where) : LIST_POINTER_LOWTAG;
         long nwords = OBJECT_SIZE(*where,where);
         state->object_addr = where;
-        state->object_header = *where;
+        state->object_header = is_cons_half(*where) ? 0 : *where;
         if (state->flags & VERIFYING_GENERATIONAL) {
             page_index_t pg = find_page_index(where);
             state->object_gen = pg >= 0 ? page_table[pg].gen :
@@ -305,7 +309,7 @@ static int verify_range(lispobj start, lispobj* end, struct verify_state* state)
                 }
             }
         }
-        if (is_cons_half(*where)) {
+        if (!state->object_header) {
             if (verify_pointer(where[0], where+0, state) ||
                 verify_pointer(where[1], where+1, state)) break;
         } else if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag))) {
@@ -478,7 +482,7 @@ static int dump_completely_p(lispobj* obj, struct verify_state* state)
     return 0;
 }
 /* Dump spaces as human-readable text (hexadecimal) */
-void dump_spaces(struct verify_state* state, char *reason)
+void hexdump_spaces(struct verify_state* state, char *reason)
 {
     char path[100];
 
@@ -521,7 +525,10 @@ void dump_spaces(struct verify_state* state, char *reason)
             /* If your'e having trouble with a subset of objects, and you can get
              * a reliable reproducer, this predicate can decide which objects to
              * output in full. Generally you don't need that much output */
-            if (dump_completely_p(where, state)) {
+            if (widetag_of(where) == FILLER_WIDETAG) {
+                lispobj* end = where + (1+HeaderValue(*where));
+                fprintf(f, " %06x: fill to %p\n", (int)(uword_t)where & 0xffffff, end);
+            } else if (dump_completely_p(where, state)) {
                 int i;
                 for(i=0;i<nwords;++i) {
                     uword_t word = where[i];
@@ -573,10 +580,10 @@ void dump_spaces(struct verify_state* state, char *reason)
     fprintf(stderr, "%s: wrote [%s]\n", reason, path);
 }
 
-int dump_and_verify_heap(int flags)
+int hexdump_and_verify_heap(int flags)
 {
     if (gencgc_verbose>1) {
-        dump_spaces(0, flags & VERIFY_POST_GC ? "post-GC" : "pre-GC");
+        hexdump_spaces(0, flags & VERIFY_POST_GC ? "post-GC" : "pre-GC");
 #if 0
         if (n_gcs == snapshot_this_gc_cycle) {
             char pathname[128];

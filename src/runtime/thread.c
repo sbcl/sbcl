@@ -437,10 +437,9 @@ unregister_thread(struct thread *th,
                   init_thread_data __attribute__((unused)) *scribble)
 {
     int lock_ret;
-    void sync_close_region(struct alloc_region *, int, int);
 
     block_blockable_signals(0);
-    sync_close_region(&th->mixed_tlab, PAGE_TYPE_MIXED, 0);
+    gc_close_thread_regions(th);
     // unboxed is not used.
     // sync_close_region(&th->unboxed_tlab, PAGE_TYPE_UNBOXED, 0);
 #ifdef LISP_FEATURE_SB_SAFEPOINT

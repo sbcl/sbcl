@@ -177,5 +177,6 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
 extern int simple_fun_index(struct code*, struct simple_fun*);
 
 extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
-
+extern void gc_close_thread_regions(struct thread*);
+extern void gc_close_collector_regions();
 #endif /* _GC_INTERNAL_H_ */

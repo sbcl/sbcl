@@ -480,7 +480,7 @@ We could try a few things to mitigate this:
 ;; Moreover it's probably not safe in the least to walk any thread's
 ;; allocation region, unless the observer and observed aren't consing.
 (defun close-thread-alloc-region ()
-  #+gencgc (alien-funcall (extern-alien "close_thread_region" (function void)))
+  #+gencgc (alien-funcall (extern-alien "close_current_thread_tlab" (function void)))
   nil)
 
 ;;;; MEMORY-USAGE

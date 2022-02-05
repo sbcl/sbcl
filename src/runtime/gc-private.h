@@ -44,9 +44,14 @@ lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
     gc_dcheck(lowtag_of(copy) == lowtag); \
     gc_dcheck(!from_space_p(copy));
 
+#define GC_LOGGING 0
+
 /* For debugging purposes, you can make this macro as complicated as you like,
  * such as checking various other aspects of the object in 'old' */
-#if defined COLLECT_GC_STATS && COLLECT_GC_STATS
+#if GC_LOGGING
+#define NOTE_TRANSPORTING(old, new, nwords) really_note_transporting(old,new,nwords)
+void really_note_transporting(lispobj old,void*new,sword_t nwords);
+#elif defined COLLECT_GC_STATS && COLLECT_GC_STATS
 #define NOTE_TRANSPORTING(old, new, nwords) gc_copied_nwords += nwords
 #else
 #define NOTE_TRANSPORTING(old, new, nwords) /* do nothing */

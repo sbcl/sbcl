@@ -161,6 +161,16 @@ inline void gc_scav_pair(lispobj where[2])
         scav1(where+1, object);
 }
 
+static sword_t scav_lose(lispobj *where, lispobj object)
+{
+    lose("no scavenge function for object %p (widetag %#x)",
+         (void*)object, widetag_of(where));
+
+    return 0; /* bogus return value to satisfy static type checking */
+}
+
+extern FILE *gc_activitylog();
+
 // Scavenge a block of memory from 'start' to 'end'
 // that may contain object headers.
 void heap_scavenge(lispobj *start, lispobj *end)
@@ -169,10 +179,17 @@ void heap_scavenge(lispobj *start, lispobj *end)
 
     for (object_ptr = start; object_ptr < end;) {
         lispobj object = *object_ptr;
-        if (other_immediate_lowtag_p(object))
+        if (GC_LOGGING) fprintf(gc_activitylog(), "o %p\n", object_ptr);
+        if (other_immediate_lowtag_p(object)) {
+#ifdef GC_DEBUG
+            /* This check for scav_lose() isn't strictly necessary,
+             * but a failure here is often clearer than ending up in
+             * scav_lose without knowing the [start,end] */
+            if (scavtab[header_widetag(object)] == scav_lose) lose("Losing @ %p", object_ptr);
+#endif
             /* It's some sort of header object or another. */
             object_ptr += (scavtab[header_widetag(object)])(object_ptr, object);
-        else {  // it's a cons
+        } else {  // it's a cons
             gc_scav_pair(object_ptr);
             object_ptr += 2;
         }
@@ -1830,14 +1847,6 @@ void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
 /*
  * initialization
  */
-
-static sword_t scav_lose(lispobj *where, lispobj object)
-{
-    lose("no scavenge function for object %p (widetag %#x)",
-         (void*)object, widetag_of(where));
-
-    return 0; /* bogus return value to satisfy static type checking */
-}
 
 static lispobj
 trans_lose(lispobj object)
