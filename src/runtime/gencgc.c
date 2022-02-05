@@ -65,6 +65,7 @@
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
                                     int page_type, generation_index_t gen);
+extern FILE *gc_activitylog();
 
 
 /*
@@ -2670,17 +2671,6 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
 #endif
 extern int descriptors_scavenge(lispobj *, lispobj*, generation_index_t, int);
 int root_boxed_words_scanned, root_vector_words_scanned, root_mixed_words_scanned;
-
-FILE *gc_activitylog_file;
-FILE *gc_activitylog()
-{
-    char *pathname = "gc-action.log";
-    if (!gc_activitylog_file) {
-        gc_activitylog_file = fopen(pathname, "w");
-        fprintf(stderr, "opened %s\n", pathname);
-    }
-    return gc_activitylog_file;
-}
 
 /* Special treatment for strictly boxed pages improves on the general case as follows:
  * - It can skip determining the extent of the contiguous block up front,

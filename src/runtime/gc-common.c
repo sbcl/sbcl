@@ -169,7 +169,16 @@ static sword_t scav_lose(lispobj *where, lispobj object)
     return 0; /* bogus return value to satisfy static type checking */
 }
 
-extern FILE *gc_activitylog();
+FILE *gc_activitylog_file;
+FILE *gc_activitylog()
+{
+    char *pathname = "gc-action.log";
+    if (!gc_activitylog_file) {
+        gc_activitylog_file = fopen(pathname, "w");
+        fprintf(stderr, "opened %s\n", pathname);
+    }
+    return gc_activitylog_file;
+}
 
 // Scavenge a block of memory from 'start' to 'end'
 // that may contain object headers.
