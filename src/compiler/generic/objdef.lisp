@@ -528,7 +528,7 @@ during backtrace.
   (profile-data :c-type "uword_t *" :pointer t)
   ;; Thread-local allocation buffers
   #+gencgc (mixed-tlab :c-type "struct alloc_region" :length 4)
-  #+gencgc (unboxed-tlab :c-type "struct alloc_region" :length 4)
+  #+gencgc (cons-tlab :c-type "struct alloc_region" :length 4)
   ;; END of slots to keep near the beginning.
 
   ;; This is the original address at which the memory was allocated,
@@ -653,12 +653,9 @@ during backtrace.
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
-;;; MIXED-REGION is address in static space at which a 'struct alloc_region'
-;;; is overlaid on a lisp vector with element type WORD.
+;;; MIXED-REGION is at the beginning of static space
 #-sb-thread
-(defconstant mixed-region
-  (+ static-space-start
-     (* 2 n-word-bytes))) ; skip the array header
+(defconstant mixed-region static-space-start)
 
 ;;; Start of static objects:
 ;;;

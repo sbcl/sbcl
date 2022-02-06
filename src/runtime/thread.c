@@ -440,8 +440,6 @@ unregister_thread(struct thread *th,
 
     block_blockable_signals(0);
     gc_close_thread_regions(th);
-    // unboxed is not used.
-    // sync_close_region(&th->unboxed_tlab, PAGE_TYPE_UNBOXED, 0);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);
 #else
@@ -1003,7 +1001,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 
 #ifdef LISP_FEATURE_GENCGC
     gc_init_region(&th->mixed_tlab);
-    gc_init_region(&th->unboxed_tlab);
+    gc_init_region(&th->cons_tlab);
 #endif
 #ifdef LISP_FEATURE_SB_THREAD
     /* This parallels the same logic in globals.c for the

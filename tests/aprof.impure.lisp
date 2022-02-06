@@ -97,8 +97,7 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (list* (load-time-value(gensym)) :if-exists x))
 
-(import '(sb-vm::thread-mixed-tlab-slot sb-vm::thread-unboxed-tlab-slot
-          sb-vm::rcx-tn sb-vm::rbp-tn sb-vm::r9-tn sb-vm::r10-tn sb-vm::rsi-tn
+(import '(sb-vm::rcx-tn sb-vm::rbp-tn sb-vm::r9-tn sb-vm::r10-tn sb-vm::rsi-tn
           sb-vm:cons-size sb-vm:n-word-bytes
           sb-vm::ea sb-vm:nil-value
           sb-vm:list-pointer-lowtag sb-vm:bignum-widetag))

@@ -267,9 +267,9 @@
                   (let ((disp (ash (machine-ea-disp ea) (- sb-vm:word-shift))))
                     (awhen (case disp
                             ((#.sb-vm::thread-mixed-tlab-slot
-                              #.sb-vm::thread-unboxed-tlab-slot) :tlab-freeptr)
+                              #.sb-vm::thread-cons-tlab-slot) :tlab-freeptr)
                             ((#.(1+ sb-vm::thread-mixed-tlab-slot)
-                              #.(1+ sb-vm::thread-unboxed-tlab-slot)) :tlab-limit))
+                              #.(1+ sb-vm::thread-cons-tlab-slot)) :tlab-limit))
                       (setq ea it))))
                 (setf (car tail) ea)) ; change the EA
               ;; There can be at most one EA per instruction, so we're done

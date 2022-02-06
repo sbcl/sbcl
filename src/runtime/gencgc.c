@@ -4075,6 +4075,14 @@ generation_index_t small_generation_limit = 1;
 int n_scav_calls[64], n_scav_skipped[64];
 extern int finalizer_thread_runflag;
 
+#ifdef LISP_FEATURE_SB_THREAD
+# define THREAD_ALLOC_REGION(threadvar,slot) &threadvar-> slot ##_tlab
+#else
+# define THREAD_ALLOC_REGION(threadvar,slot) main_thread_ ##slot ##_region
+#define main_thread_mixed_region (struct alloc_region*)STATIC_SPACE_START
+#define main_thread_cons_region (1+main_thread_mixed_region)
+#endif
+
 /* GC all generations newer than last_gen, raising the objects in each
  * to the next older generation - we finish when all generations below
  * last_gen are empty.  Then if last_gen is due for a GC, or if
@@ -4127,13 +4135,10 @@ collect_garbage(generation_index_t last_gen)
      *   in a unithread build.
      * So we need to close them for those two cases.
      */
-#ifdef SINGLE_THREAD_MIXED_REGION
-    ensure_region_closed(SINGLE_THREAD_MIXED_REGION, PAGE_TYPE_MIXED);
-#endif
     struct thread *th;
     for_each_thread(th) {
-        ensure_region_closed(&th->mixed_tlab, PAGE_TYPE_MIXED);
-        ensure_region_closed(&th->unboxed_tlab, PAGE_TYPE_UNBOXED);
+        ensure_region_closed(THREAD_ALLOC_REGION(th,mixed), PAGE_TYPE_MIXED);
+        ensure_region_closed(THREAD_ALLOC_REGION(th,cons), PAGE_TYPE_CONS);
     }
     gc_close_collector_regions();
     if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_gcs, last_gen);
@@ -4598,12 +4603,6 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
     return (new_obj);
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
-# define TLAB(x) x
-#else
-# define TLAB(x) SINGLE_THREAD_MIXED_REGION
-#endif
-
 // Code allocation is always serialized
 #ifdef LISP_FEATURE_WIN32
 CRITICAL_SECTION code_allocator_lock; // threads are mandatory for win32
@@ -4614,14 +4613,11 @@ static pthread_mutex_t code_allocator_lock = PTHREAD_MUTEX_INITIALIZER;
 #define DEFINE_LISP_ENTRYPOINT(name, largep, tlab, page_type) \
 NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = get_sb_vm_thread(); \
-    return lisp_alloc(largep, TLAB(tlab), nbytes, page_type, self); }
+    return lisp_alloc(largep, THREAD_ALLOC_REGION(self,tlab), nbytes, page_type, self); }
 
-DEFINE_LISP_ENTRYPOINT(alloc_unboxed, nbytes >= LARGE_OBJECT_SIZE, &self->unboxed_tlab,
-                       PAGE_TYPE_UNBOXED)
-DEFINE_LISP_ENTRYPOINT(alloc, nbytes >= LARGE_OBJECT_SIZE, &self->mixed_tlab,
-                       PAGE_TYPE_MIXED)
+DEFINE_LISP_ENTRYPOINT(alloc, nbytes >= LARGE_OBJECT_SIZE, mixed, PAGE_TYPE_MIXED)
 // Lists get moved to BOXED pages when copied.
-DEFINE_LISP_ENTRYPOINT(alloc_list, 0, &self->mixed_tlab, PAGE_TYPE_MIXED)
+DEFINE_LISP_ENTRYPOINT(alloc_list, 0, mixed, PAGE_TYPE_MIXED)
 
 lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
 {
@@ -4685,20 +4681,22 @@ void sync_close_regions(int block_signals,
  * these are plain foreign calls without aid of a vop. */
 void close_current_thread_tlab() {
     __attribute__((unused)) struct thread *self = get_sb_vm_thread();
-    sync_close_regions(1, TLAB(&self->mixed_tlab), PAGE_TYPE_MIXED, 0, 0);
+    sync_close_regions(1, THREAD_ALLOC_REGION(self,mixed), PAGE_TYPE_MIXED,
+                          THREAD_ALLOC_REGION(self,cons), PAGE_TYPE_CONS);
 }
 void close_code_region() {
     sync_close_regions(1, code_region, PAGE_TYPE_CODE, 0, 0);
 }
 /* This is called by unregister_thread() with STOP_FOR_GC blocked */
-void gc_close_thread_regions(struct thread*th) {
-    sync_close_regions(0, &th->mixed_tlab, PAGE_TYPE_MIXED, 0, 0);
+void gc_close_thread_regions(struct thread* th) {
+    sync_close_regions(0, &th->mixed_tlab, PAGE_TYPE_MIXED,
+                          &th->cons_tlab, PAGE_TYPE_CONS);
 }
 
 #ifdef LISP_FEATURE_SPARC
 void mixed_region_rollback(sword_t size)
 {
-    struct alloc_region *region = SINGLE_THREAD_MIXED_REGION;
+    struct alloc_region *region = MAIN_THREAD_mixed_region;
     gc_assert(region->free_pointer > region->end_addr);
     region->free_pointer = (char*)region->free_pointer - size;
     gc_assert(region->free_pointer >= region->start_addr
@@ -4985,8 +4983,9 @@ gc_and_save(char *filename, boolean prepend_runtime,
     prepare_for_final_gc();
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
-#ifdef SINGLE_THREAD_MIXED_REGION // clean up static-space object pre-save.
-    gc_init_region(SINGLE_THREAD_MIXED_REGION);
+#ifndef LISP_FEATURE_SB_THREAD // reset the first 8 words of static-space
+    gc_init_region(main_thread_mixed_region);
+    gc_init_region(main_thread_cons_region);
 #endif
     /* All global allocation regions should be empty */
     ASSERT_REGIONS_CLOSED();

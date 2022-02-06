@@ -108,7 +108,7 @@
 ;;; using a single byte displacement from thread-tn
 (eval-when (:compile-toplevel)
   (aver (<= (1+ thread-mixed-tlab-slot) 15))
-  (aver (<= (1+ thread-unboxed-tlab-slot) 15)))
+  (aver (<= (1+ thread-cons-tlab-slot) 15)))
 
 ;;; Access a thread slot at a fixed index. If GPR-TN is provided,
 ;;; then it points to 'struct thread', which is relevant only if
