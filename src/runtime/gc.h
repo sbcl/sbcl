@@ -82,4 +82,7 @@ int verify_heap(int flags);
 int hexdump_and_verify_heap(int flags);
 #endif
 
+page_index_t gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
+                                   int page_type, generation_index_t gen);
+
 #endif /* _GC_H_ */

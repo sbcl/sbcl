@@ -132,6 +132,42 @@ extern struct page *page_table;
 # define WP_CLEARED_FLAG      (1<<6)
 #endif
 
+/* a structure to hold the state of a generation
+ *
+ * CAUTION: If you modify this, make sure to touch up the alien
+ * definition in src/code/gc.lisp accordingly. ...or better yes,
+ * deal with the FIXME there...
+ */
+struct generation {
+    /* the bytes allocated to this generation */
+    os_vm_size_t bytes_allocated;
+
+    /* the number of bytes at which to trigger a GC */
+    os_vm_size_t gc_trigger;
+
+    /* to calculate a new level for gc_trigger */
+    os_vm_size_t bytes_consed_between_gc;
+
+    /* the number of GCs since the last raise */
+    int num_gc;
+
+    /* the number of GCs to run on the generations before raising objects to the
+     * next generation */
+    int number_of_gcs_before_promotion;
+
+    /* the cumulative sum of the bytes allocated to this generation. It is
+     * cleared after a GC on this generations, and update before new
+     * objects are added from a GC of a younger generation. Dividing by
+     * the bytes_allocated will give the average age of the memory in
+     * this generation since its last GC. */
+    os_vm_size_t cum_sum_bytes_allocated;
+
+    /* a minimum average memory age before a GC will occur helps
+     * prevent a GC when a large number of new live objects have been
+     * added, in which case a GC could be a waste of time */
+    double minimum_age_before_gc;
+};
+
 /* When computing a card index we never subtract the heap base, which simplifies
  * code generation. The heap base is guaranteed to be GC-page-aligned.
  * The low bits can wraparound from all 1s to all 0s such that lowest numbered
