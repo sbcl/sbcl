@@ -34,6 +34,7 @@
     `(progn
        (declaim (inline ,function))
        (defun ,function ,args
+         (declare (sb-c:flushable sb-c:%alien-funcall))
          (truly-the ;; avoid checking the result
           ,(type-specifier (fun-type-returns (info :function :type function)))
           (alien-funcall
