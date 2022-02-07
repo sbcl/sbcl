@@ -711,6 +711,8 @@ static inline void zero_range(char* start, char* end) {
 char gc_allocate_dirty = 0;
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
+static const char * const page_type_description[8] =
+  {0, "boxed", "unboxed", "mixed", "?", "cons", "?", "code"};
 
 /* Zero the pages from START to END (inclusive), except for those
  * pages that are known to already zeroed. Mark all pages in the
@@ -754,10 +756,9 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
                 // Non-code unboxed pages won't been seen by lisp allocation routines.
                 lispobj *where = (lispobj*)page_address(i);
                 lispobj *limit = (lispobj*)((char*)where + GENCGC_PAGE_BYTES);
-                char* page_type_description[7] = {"Boxed","Raw","Mixed",0,"Cons",0,"Code"};
                 if (gc_allocate_dirty > 1)
                     fprintf(stderr, "dirtying g%d %s %d (%p..%p) [%d->%d]\n",
-                            gc_alloc_generation, page_type_description[page_type-1],
+                            gc_alloc_generation, page_type_description[page_type],
                             (int)i, where, limit, from_space, new_space);
                 while (where < limit) *where++ = word;
             }
@@ -986,7 +987,16 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
                       et_find_freeish_page);
         page_table[page].gen = gc_alloc_generation;
         page_table[page].type = OPEN_REGION_PAGE_FLAG | page_type;
+#ifdef LISP_FEATURE_DARWIN_JIT
+        zero_dirty_pages(page, page, PAGE_TYPE_CONS); // whatever works
+#else
+        if (!page_words_used(page) && page_table[page].need_zerofill) {
+            // Zero the trailing data
+            char *trailer = page_address(page) + CONS_PAGE_USABLE_BYTES;
+            memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_USABLE_BYTES);
+        }
         set_page_need_to_zero(page, 1); // would normally be set in zero_dirty_pages()
+#endif
         // Don't need to set the scan_start_offset because free pages have it 0
         // (and all cons pages start a new contiguous block)
         gc_dcheck(page_table[page].scan_start_offset_ == 0);
@@ -1141,7 +1151,6 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
  * This is the internal implementation of ensure_region_closed(),
  * and not to be invoked as the interface to closing a region.
  */
-const char *page_type_desc[8] = {0, "boxed", "unboxed", "mixed", "?", "cons", "?", "code"};
 void
 gc_close_region(struct alloc_region *alloc_region, int page_type)
 {
