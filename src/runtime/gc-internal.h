@@ -110,18 +110,7 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
 #define FREE_PAGE_FLAG        0
 #define PAGE_TYPE_MASK        7 // mask out the 'single-object flag'
 #define BOXED_PAGE_FLAG       1
-/* New objects are allocated to PAGE_TYPE_MIXED.
- * PAGE_TYPE_CONS doesn't get stored in the page table, though I am considering
- * doing that. If conses went on segregated pages, then testing for a valid
- * conservative root on a cons page is as simple as seeing whether the address
- * is correctly aligned and lowtagged.
- * Also, we could reserve bytes at the end of each page to act as a mark bitmap
- * which is useful since conses are headerless objects, and one GC strategy
- * demands mark bitmaps which are currently placed in a side table.
- * That would unfortunately complicate the task of allocating a huge list,
- * because hitting the line of demarcation between conses and the mark bits would
- * require chaining the final cons to another page of conses and so on. */
-
+/* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
 /* If you change these constants, then possibly also change the following
  * functions in 'room.lisp':
  *  MAP-CODE-OBJECTS
@@ -136,10 +125,6 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
 #define PAGE_TYPE_CONS         5 // #b101
 #define PAGE_TYPE_CODE         7 // #b111
 #define OPEN_REGION_PAGE_FLAG  8
-
-// Temporarily make cons exactly the same as BOXED
-#undef PAGE_TYPE_CONS
-#define PAGE_TYPE_CONS PAGE_TYPE_BOXED
 
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \

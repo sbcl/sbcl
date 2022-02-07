@@ -275,6 +275,11 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 static int verify_range(lispobj start, lispobj* end, struct verify_state* state)
 {
     lispobj* where = (lispobj*)start;
+    if ((state->flags & VERIFYING_GENERATIONAL) && find_page_index((void*)start)) {
+        page_index_t page = find_page_index((void*)start);
+        if (page_table[page].type == PAGE_TYPE_CONS)
+            gc_assert(page_words_used(page) <=  MAX_CONSES_PER_PAGE*CONS_SIZE);
+    }
     if ((state->flags & VERIFYING_UNFORMATTED)) {
         while (where < end) {
             if (*where != NO_TLS_VALUE_MARKER_WIDETAG) {
@@ -299,6 +304,12 @@ static int verify_range(lispobj start, lispobj* end, struct verify_state* state)
                 // Any page can have a filler on it
                 if (pg >= 0) {
                     // Assert proper page type
+                    if (state->object_header) // is not a cons
+                        gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
+#ifdef LISP_FEATURE_USE_CONS_REGION
+                    else if (page_table[pg].type != PAGE_TYPE_CONS)
+                        gc_assert((where[0] | where[1]) == 0); // "page-filler cons" is OK
+#endif
                     if (widetag == CODE_HEADER_WIDETAG) {
                         if (!is_code(page_table[pg].type))
                             lose("object @ %p is code on non-code page", where);

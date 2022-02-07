@@ -181,6 +181,11 @@
              (inst .skip 8 :long-nop)))
       (emit-label skip-instrumentation))))
 
+;;; An arbitrary marker for the cons primitive-type, not to be confused
+;;; with the CONS-TYPE in our type-algebraic sense. Mostly just informs
+;;; the allocator to use cons_tlab.
+(defconstant +cons-primtype+ list-pointer-lowtag)
+
 ;;; Emit code to allocate an object with a size in bytes given by
 ;;; SIZE into ALLOC-TN. The size may be an integer of a TN.
 ;;; NODE may be used to make policy-based decisions.
@@ -193,7 +198,7 @@
 ;;; 1. what to allocate: type, size, lowtag describe the object
 ;;; 2. where to put the result
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
-(defun allocation (type size lowtag alloc-tn node temp thread-temp)
+(defun allocation (type size lowtag alloc-tn node temp thread-temp &key overflow)
   (declare (ignorable thread-temp))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
@@ -205,19 +210,26 @@
                   (inst push alloc-tn))
                  (t
                   (inst push size)))
-           (invoke-asm-routine 'call (if (eq type 'list) 'list-alloc-tramp 'alloc-tramp) node t)
+           (invoke-asm-routine 'call
+                               (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp)
+                               node t)
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
            (DONE (gen-label))
-           (free-pointer #+sb-thread (thread-slot-ea thread-mixed-tlab-slot #+gs-seg thread-temp)
-                         #-sb-thread (ea mixed-region))
+           (free-pointer #+sb-thread (thread-slot-ea (if (eql type +cons-primtype+)
+                                                         thread-cons-tlab-slot
+                                                         thread-mixed-tlab-slot)
+                                                     #+gs-seg thread-temp)
+                         #-sb-thread (ea (if (eql type +cons-primtype+)
+                                             cons-region mixed-region)))
            (end-addr (ea (sb-x86-64-asm::ea-segment free-pointer)
                          (+ n-word-bytes (ea-disp free-pointer))
                          (ea-base free-pointer))))
       (cond ((typep size `(integer ,large-object-size))
              ;; large objects will never be made in a per-thread region
-             (fallback size)
-             (when (/= lowtag 0) (inst or :byte alloc-tn lowtag)))
+             (cond (overflow (funcall overflow))
+                   (t (fallback size)
+                      (when (/= lowtag 0) (inst or :byte alloc-tn lowtag)))))
             ((and (tn-p size) (location= size alloc-tn))
              (aver (and temp (not (location= temp size))))
              (inst mov temp free-pointer)
@@ -231,8 +243,9 @@
              (assemble (:elsewhere)
                (emit-label NOT-INLINE)
                (inst sub temp alloc-tn) ; new-free-ptr - old-free-ptr = size
-               (fallback temp)
-               (inst jmp DONE)))
+               (cond (overflow (funcall overflow))
+                     (t (fallback temp)
+                        (inst jmp DONE)))))
             (t
              ;; fixed-size allocation whose size fits in an imm32 can be done
              ;; with only one register, the ALLOC-TN. If it doesn't fit in imm32,
@@ -262,10 +275,12 @@
                            (emit-label DONE)))))
              (assemble (:elsewhere)
                (emit-label NOT-INLINE)
-               (fallback size)
-               (when (and (/= lowtag 0) (not temp) (not (tn-p size)))
-                 (inst or :byte alloc-tn lowtag))
-               (inst jmp DONE))))))
+               (cond (overflow (funcall overflow))
+                     (t
+                      (fallback size)
+                      (when (and (/= lowtag 0) (not temp) (not (tn-p size)))
+                        (inst or :byte alloc-tn lowtag))
+                      (inst jmp DONE))))))))
   t)
 
 ;;; Allocate an other-pointer object of fixed NWORDS with a single-word
@@ -312,7 +327,7 @@
                        temp)
                       (t
                        (encode-value-if-immediate ,tn)))))
-                (storew* reg ,list ,slot ,lowtag (not stack-allocate-p) temp))))
+                (storew reg ,list ,slot ,lowtag temp))))
 
 (define-vop (cons)
   (:args (car :scs (any-reg descriptor-reg constant immediate))
@@ -326,11 +341,11 @@
     (let ((stack-allocate-p (node-stack-allocate-p node))
           (nbytes (* cons-size n-word-bytes)))
       (unless stack-allocate-p
-        (instrument-alloc 'list nbytes node (list temp alloc) thread-tn))
+        (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation nbytes 0 alloc)
-            (allocation 'list nbytes 0 alloc node temp thread-tn))
+            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn))
         (store-slot car alloc cons-car-slot 0)
         (store-slot cdr alloc cons-cdr-slot 0)
         (if (location= alloc result)
@@ -349,11 +364,10 @@
   (:translate acons)
   (:policy :fast-safe)
   (:generator 10
-    (let ((stack-allocate-p nil)
-          (nbytes (* cons-size 2 n-word-bytes)))
-      (instrument-alloc 'list nbytes node (list temp alloc) thread-tn)
+    (let ((nbytes (* cons-size 2 n-word-bytes)))
+      (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
       (pseudo-atomic (:thread-tn thread-tn)
-        (allocation 'list nbytes 0 alloc node temp thread-tn)
+        (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
         (store-slot tail alloc cons-cdr-slot 0)
         (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
         (store-slot temp alloc cons-car-slot 0)
@@ -381,11 +395,11 @@
     (let ((stack-allocate-p (node-stack-allocate-p node))
           (nbytes (* cons-size 2 n-word-bytes)))
       (unless stack-allocate-p
-        (instrument-alloc 'list nbytes node (list temp alloc) thread-tn))
+        (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation nbytes 0 alloc)
-            (allocation 'list nbytes 0 alloc node temp thread-tn))
+            (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn))
         (store-slot car alloc cons-car-slot 0)
         (store-slot cadr alloc (+ 2 cons-car-slot) 0)
         (store-slot cddr alloc (+ 2 cons-cdr-slot) 0)
@@ -408,11 +422,11 @@
     (let ((stack-allocate-p (node-stack-allocate-p node))
           (size (* (pad-data-block cons-size) cons-cells)))
       (unless stack-allocate-p
-        (instrument-alloc 'list size node (list ptr temp) thread-tn))
+        (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
         (if stack-allocate-p
             (stack-allocation size list-pointer-lowtag res)
-            (allocation 'list size list-pointer-lowtag res node temp thread-tn))
+            (allocation +cons-primtype+ size list-pointer-lowtag res node temp thread-tn))
         (move ptr res)
         (dotimes (i (1- cons-cells))
           (store-slot (tn-ref-tn things) ptr)
@@ -424,10 +438,9 @@
                (setf things (tn-ref-across things))
                (store-slot (tn-ref-tn things) ptr cons-cdr-slot list-pointer-lowtag))
               (t
-               (storew* nil-value ptr cons-cdr-slot list-pointer-lowtag
-                        (not stack-allocate-p))))))
-    (aver (null (tn-ref-across things)))
-    (move result res)))
+               (storew nil-value ptr cons-cdr-slot list-pointer-lowtag)))
+        (aver (null (tn-ref-across things)))
+        (move result res)))))
 )
 
 ;;;; special-purpose inline allocators
@@ -751,9 +764,9 @@
 
   (define-vop (allocate-list-on-heap)
     (:args (length :scs (any-reg immediate))
-           (element :scs (any-reg descriptor-reg)
-                    :load-if (not (and (sc-is element immediate)
-                                       (eql (tn-value element) 0)))))
+           ;; Too bad we don't have an SC that implies actually a CPU immediate
+           ;; i.e. fits in an imm32 operand
+           (element :scs (any-reg descriptor-reg)))
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum *)
     (:policy :fast-safe)
@@ -764,11 +777,17 @@
       (let ((size (calc-size-in-bytes length tail))
             (entry (gen-label))
             (loop (gen-label))
-            (no-init
-             (and (sc-is element immediate) (eql (tn-value element) 0))))
-        (instrument-alloc 'list size node (list next limit) thread-tn)
+            (leave-pa (gen-label)))
+        (instrument-alloc +cons-primtype+ size node (list next limit) thread-tn)
         (pseudo-atomic (:thread-tn thread-tn)
-         (allocation 'list size list-pointer-lowtag result node limit thread-tn)
+         (allocation +cons-primtype+ size list-pointer-lowtag result node limit thread-tn
+                     :overflow (lambda ()
+                                 ;; Push C call args right-to-left
+                                 (inst push (if (integerp size) (constantize size) size))
+                                 (inst push (if (sc-is element immediate) (tn-value element) element))
+                                 (invoke-asm-routine 'call 'make-list node)
+                                 (inst pop result)
+                                 (inst jmp leave-pa)))
          (compute-end)
          (inst mov next result)
          (inst jmp entry)
@@ -777,12 +796,13 @@
          (emit-label ENTRY)
          (inst mov tail next)
          (inst add next (* 2 n-word-bytes))
-         (unless no-init ; don't bother writing zeros in the CARs
-           (storew element tail cons-car-slot list-pointer-lowtag))
+         (storew element tail cons-car-slot list-pointer-lowtag)
          (inst cmp next limit)
-         (inst jmp :ne loop))
-        (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
-      done)))
+         (inst jmp :ne loop)
+         ;; still pseudo-atomic
+         (storew nil-value tail cons-cdr-slot list-pointer-lowtag)
+         (emit-label leave-pa)))
+      done))) ; label needed by calc-size-in-bytes
 
 #-immobile-space
 (define-vop (make-fdefn)

@@ -1,5 +1,6 @@
 :64-bit
 :gencgc
+:use-cons-region
 :soft-card-marks
 :stack-grows-downward-not-upward
 :c-stack-is-control-stack

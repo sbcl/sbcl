@@ -969,7 +969,8 @@ core and return a descriptor to it."
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
 (defun cold-cons (car cdr &optional (gspace *dynamic*))
-  (let ((cons (allocate-object gspace 2 sb-vm:list-pointer-lowtag)))
+  (let ((cons (allocate-cold-descriptor gspace (ash 2 sb-vm:word-shift)
+                                        sb-vm:list-pointer-lowtag :list)))
     (let* ((objs (gspace-objects gspace))
            (n (1- (length objs))))
       (when objs
@@ -3085,9 +3086,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
   ;; It's the granularity at which we can map the core file pages.
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
   #+gencgc ; values never needed in Lisp, so therefore not a defconstant
+  (progn
+  (format t "#define MAX_CONSES_PER_PAGE ~D~%" sb-vm::max-conses-per-page)
   (format t "#define CARDS_PER_PAGE ~D~%#define GENCGC_CARD_SHIFT ~D~%"
           sb-vm::cards-per-page ; this is the "GC" page, not "backend" page
-          sb-vm::gencgc-card-shift)
+          sb-vm::gencgc-card-shift))
 
   (let ((size #+cheneygc (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)
               #+gencgc sb-vm::default-dynamic-space-size))

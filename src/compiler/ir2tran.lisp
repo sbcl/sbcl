@@ -2045,6 +2045,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
            (lvar (node-lvar node))
            (res (lvar-result-tns lvar (list (specifier-type 'list))))
            (num-conses (- (length args) (if star 1 0))))
+      #+gencgc ;; technically, only required if #+use-cons-region, but OK either way
+      (when (> num-conses sb-vm::max-conses-per-page)
+        (return-from list-ir2-convert-optimizer (ir2-convert-full-call node block)))
       (when (and lvar (lvar-dynamic-extent lvar))
         (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
       ;;; This COND-like expression is unfortunate, but the VOP* macro chokes if the name

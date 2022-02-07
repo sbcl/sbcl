@@ -374,6 +374,13 @@
     (setq working nil)
     (sb-thread:join-thread gc-thread)))
 
+;;; This loop doesn't work for #+use-cons-region (it will run forever)
+;;; because you can't hit the end of a page. Also, it's not clear that it should
+;;; ever have worked, because the check at the bottom of lisp_alloc() for whether
+;;; we're near the end of a page will discard the last few objects in favor of
+;;; returning a brand new region.  I guess as long as the inline allocator is
+;;; always used, it's fine. But the inline code wasn't always used on x86.
+;;; So how did that work?
 (defun use-up-thread-region ()
   ;; cons until the thread-local allocation buffer uses up a page
   (loop
@@ -386,7 +393,12 @@
 (defglobal *go* nil)
 
 #+sb-thread
-(with-test (:name :c-call-save-p :skipped-on :interpreter)
+(with-test (:name :c-call-save-p :skipped-on (or :interpreter
+                                                 :use-cons-region))
+  ;; Surely there's a better way to assert that registers get onto the stack
+  ;; (so they can be seen by GC) than by random hammering on (LIST (LIST ...)).
+  ;; This should probably be in gc-testlib.c. Or better yet: get rid of #+sb-safepoint
+  ;; for #+win32, and store the machine context the same as for #-sb-safepoint.
   (let* ((fun (compile nil '(lambda (a b c d e f g h i j k l m)
                              (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
                              (setq *go* t)

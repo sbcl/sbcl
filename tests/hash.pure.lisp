@@ -31,6 +31,8 @@
   (assert (/= (sxhash #*1010) (sxhash #*0101))))
 
 ;;; This test supposes that no un-accounted-for consing occurs.
+;;; But now that we have to two regions for allocation, it's not necessarily
+;;; the case that any given allocation bumps the mixed-region free pointer.
 (with-test (:name :address-based-hash-counter :skipped-on :interpreter)
   ;; It doesn't particularly matter what ADDRESS-BASED-COUNTER-VAL returns,
   ;; but it's best to verify the assumption that each cons bumps the count
@@ -38,8 +40,9 @@
   ;; hashes.
   (let ((win 0) (n-trials 10) (prev (sb-int:address-based-counter-val)))
     (dotimes (i n-trials)
-      (declare (notinline cons)) ; it's flushable, but don't flush it
-      (cons 1 2)
+      (declare (notinline cons sb-sys:int-sap)) ; it's flushable, but don't flush it
+      #+use-cons-region (sb-sys:int-sap #xf00fa) ; 2 words in mixed-region
+      #-use-cons-region (cons 1 2)
       (let ((ptr (sb-int:address-based-counter-val)))
         (when (= ptr (1+ prev))
           (incf win))

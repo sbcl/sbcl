@@ -655,7 +655,8 @@ during backtrace.
 
 ;;; MIXED-REGION is at the beginning of static space
 #-sb-thread
-(defconstant mixed-region static-space-start)
+(progn (defconstant mixed-region static-space-start)
+       (defconstant cons-region (+ mixed-region (* 4 n-word-bytes))))
 
 ;;; Start of static objects:
 ;;;

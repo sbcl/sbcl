@@ -1281,6 +1281,20 @@ We could try a few things to mitigate this:
                                  data-bits)
                                 (t
                                  code-bits))))
+         ;; If Lisp allocates to cons pages, then this check is always valid.
+         ;; If not, then at first glance we could weaken the check to allow
+         ;; gen0 conses on MIXED pages, but even that is not enough- pinned conses
+         ;; will promote but keep their MIXED page type. So don't bother with this.
+         #+use-cons-region
+         (let* ((flags (slot (deref page-table (find-page-index obj-addr)) 'flags))
+                (type (ldb (byte 5 (+ #+big-endian 3)) flags))
+                (ok (if (consp obj)
+                        (or (= type #b101) ; PAGE_TYPE_CONS
+                            (and (eq (car obj) 0) (eq (cdr obj) 0)))
+                        (/= type #b101))))
+           (unless ok
+             (error "Object @ ~x (gen~D) is on page-type ~b~%"
+                    obj-addr (generation-of obj) type)))
          ;; This is not the most efficient way to update the bit arrays,
          ;; but the simplest and clearest for sure. (The loop could avoided
          ;; if the current page is the same as the previously seen page)

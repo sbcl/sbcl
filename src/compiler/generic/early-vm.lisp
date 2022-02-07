@@ -164,7 +164,8 @@
 
 #+gencgc
 (defconstant max-conses-per-page
-  (floor gencgc-page-bytes (* 2 sb-vm:n-word-bytes)))
+  (floor (* gencgc-page-bytes n-byte-bits)
+         (1+ (* n-word-bytes 2 n-byte-bits)))) ; 1 extra bit per cons
 
 ;;; Amount to righ-shift an instance header to get the length.
 ;;; Similar consideration as above with regard to use of generation# byte.
