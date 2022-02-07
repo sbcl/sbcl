@@ -1,3 +1,8 @@
+
+;;; The layout of FOO must not get promoted from gen0 to gen1.
+;;; Due to random variation, there might be a gc-with-promotion cycle
+;;; just after the defstruct. So prevent that.
+(setf (generation-number-of-gcs-before-promotion 0) 1000000)
 (defstruct foo x)
 (defun get-layouts-for-test ()
   ;; Return a young layout and an old layout

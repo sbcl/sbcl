@@ -81,7 +81,7 @@ void run_cardmark_test(int page_type,
 
     // Assert something about the card indices
     fprintf(stderr, "page = %d, cards = %d and %d\n",
-            find_page_index((void*)instance),
+            (int)find_page_index((void*)instance),
             instance_card, funinstance_card);
     gc_assert(funinstance_card == instance_card+1);
 
@@ -141,6 +141,7 @@ int compact_instance_layout_pointer_test(lispobj arg)
     struct vector* layouts = (void*)native_pointer(arg);
     lispobj young_layout = layouts->data[0];
     lispobj old_layout = layouts->data[1];
+    gc_assert(immobile_obj_generation(native_pointer(young_layout))==0);
     // Don't want sticky marks messing up the test.
     // It suffices to check that there are no register contexts.
     struct thread* self = get_sb_vm_thread();
