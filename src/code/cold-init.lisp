@@ -171,10 +171,6 @@
   (show-and-call sb-kernel::!primordial-type-cold-init)
 
   (show-and-call !type-cold-init)
-  ;; FIXME: It would be tidy to make sure that that these cold init
-  ;; functions are called in the same relative order as the toplevel
-  ;; forms of the corresponding source files.
-
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
 
