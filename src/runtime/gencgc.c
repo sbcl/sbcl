@@ -988,7 +988,11 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         page_table[page].gen = gc_alloc_generation;
         page_table[page].type = OPEN_REGION_PAGE_FLAG | page_type;
 #ifdef LISP_FEATURE_DARWIN_JIT
-        zero_dirty_pages(page, page, PAGE_TYPE_CONS); // whatever works
+        if (!page_words_used(page))
+            /* May need to be remapped from PAGE_TYPE_CODE */
+            zero_dirty_pages(page, page, PAGE_TYPE_CONS); 
+        else
+            set_page_need_to_zero(page, 1);
 #else
         if (!page_words_used(page) && page_table[page].need_zerofill) {
             // Zero the trailing data
