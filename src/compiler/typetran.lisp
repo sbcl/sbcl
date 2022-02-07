@@ -1194,6 +1194,35 @@
                     (error "~a is not a subtype of VECTOR." type)))))
     (simplify type)))
 
+(defun strip-array-dimensions-and-complexity (type)
+  (labels ((process-compound-type (types)
+             (let (array-types)
+               (dolist (type types)
+                 (unless (or (hairy-type-p type)
+                             (sb-kernel::negation-type-p type))
+                   (push (strip type) array-types)))
+               (apply #'type-union array-types)))
+           (strip (type)
+             (cond ((array-type-p type)
+                    (let ((dim (array-type-dimensions type)))
+                      (make-array-type
+                       (if (eq dim '*)
+                           dim
+                           (make-list (length dim)
+                                      :initial-element '*))
+                       :complexp :maybe
+                       :element-type (array-type-element-type type)
+                       :specialized-element-type (array-type-specialized-element-type type))))
+                   ((union-type-p type)
+                    (process-compound-type (union-type-types type)))
+                   ((intersection-type-p type)
+                    (process-compound-type (intersection-type-types type)))
+                   ((member-type-p type)
+                    (process-compound-type
+                     (mapcar #'ctype-of (member-type-members type))))
+                   (t
+                    (error "~a is not a subtype of ARRAY." type)))))
+    (strip type)))
 
 (defun check-coerce (value-type to-type type-specifier node)
   (flet ((fail ()

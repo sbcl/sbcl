@@ -1240,6 +1240,49 @@
                             :displaced-to displaced-to
                             ,@(and displaced-index-offset
                                    '(:displaced-index-offset displacement)))))))
+
+(defoptimizer (adjust-array derive-type) ((array dims &key
+                                                 fill-pointer
+                                                 displaced-to
+                                                 displaced-index-offset
+                                                 &allow-other-keys)
+                                          node)
+  (let* ((array-type (lvar-type array))
+         (complex (conservative-array-type-complexp array-type))
+         (simple (null complex))
+         (complex (eq complex t))
+         (dims (if (constant-lvar-p dims)
+                   (let ((value (lvar-value dims)))
+                     (if (check-array-dimensions value node)
+                         value
+                         (return-from adjust-array-derive-type-optimizer)))
+                   '*)))
+    (unless complex
+      (let ((null (specifier-type 'null)))
+        (flet ((simple (lvar)
+                 (when lvar
+                   (cond ((not (type= (lvar-type lvar) null))
+                          (setf simple nil))
+                         ((not (types-equal-or-intersect (lvar-type lvar) null))
+                          (setf simple nil
+                                complex t))))))
+          (simple fill-pointer)
+          (simple displaced-to)
+          (simple displaced-index-offset))))
+    (let ((int (type-intersection (strip-array-dimensions-and-complexity array-type)
+                                  (make-array-type (if (integerp dims)
+                                                       (list dims)
+                                                       dims)
+                                                   :complexp (cond ((eq complex t))
+                                                                   ((not simple) :maybe))
+                                                   :element-type *wild-type*))))
+      (if (eq int *empty-type*)
+          (let ((*compiler-error-context* node))
+            (setf (combination-kind node) :error)
+            (compiler-warn "New dimensions ~s do not match the rank of ~a"
+                           dims
+                           (type-specifier array-type)))
+          int))))
 
 ;;;; miscellaneous properties of arrays
 
