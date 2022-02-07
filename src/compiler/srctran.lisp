@@ -5096,3 +5096,18 @@
 ;;; is smaller by about the size of an fdefn; and it's faster, so do it.
 (deftransform fboundp ((name) ((constant-arg symbol)))
   `(fdefn-fun (load-time-value (find-or-create-fdefn ',(lvar-value name)) t)))
+
+;;; Remove special bindings with empty bodies
+(deftransform %cleanup-point (() * * :node node)
+  (let ((prev (ctran-use (node-prev (ctran-use (node-prev node))))))
+    (cond ((and (combination-p prev)
+                (eq (combination-fun-source-name prev nil) '%special-bind)
+                (not (node-next node))
+                (block-succ (node-block node))
+                (neq (node-enclosing-cleanup node)
+                     (block-start-cleanup (car (block-succ (node-block node))))))
+           (setf (lexenv-cleanup (node-lexenv node)) nil)
+           (flush-combination prev)
+           nil)
+          (t
+           (give-up-ir1-transform)))))

@@ -91,7 +91,9 @@
   callee-omit-arg-count-check
   ;; If a function is called with two arguments and the first one is a
   ;; constant, then the arguments will be swapped.
-  commutative)
+  commutative
+  ;; Reoptimize this function if the node that follows it gets unlinked.
+  reoptimize-when-unlinking)
 
 (defstruct (fun-info (:copier nil)
                      #-sb-xc-host (:pure t))

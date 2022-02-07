@@ -14,10 +14,18 @@
 
 ;;;; cleanup hackery
 
+(defun delete-lexenv-enclosing-cleanup (lexenv)
+  (declare (type lexenv lexenv))
+  (do ((lexenv2 lexenv
+                (lambda-call-lexenv (lexenv-lambda lexenv2))))
+      ((null lexenv2) nil)
+    (when (lexenv-cleanup lexenv2)
+      (setf (lexenv-cleanup lexenv2) nil))))
+
 (defun lexenv-enclosing-cleanup (lexenv)
   (declare (type lexenv lexenv))
   (do ((lexenv2 lexenv
-               (lambda-call-lexenv (lexenv-lambda lexenv2))))
+                (lambda-call-lexenv (lexenv-lambda lexenv2))))
       ((null lexenv2) nil)
     (awhen (lexenv-cleanup lexenv2)
       (return it))))
@@ -2014,6 +2022,22 @@
             (compiler-notify 'code-deletion-note
                              :format-control "deleting unreachable code"
                              :format-arguments nil)))))
+
+(defun maybe-reoptimize-previous-node (ctran block)
+  (flet ((maybe-reoptimize (node)
+           (when (basic-combination-p node)
+             (let ((fun-info (basic-combination-fun-info node)))
+               (when (and fun-info
+                          (ir1-attributep (fun-info-attributes fun-info)
+                                          reoptimize-when-unlinking))
+                 (reoptimize-node node))))))
+   (case (ctran-kind ctran)
+     (:inside-block
+      (maybe-reoptimize (ctran-use ctran)))
+     (:block-start
+      (dolist (pred (block-pred block))
+        (maybe-reoptimize (block-last block)))))))
+
 ;;; Delete a node from a block, deleting the block if there are no
 ;;; nodes left. We remove the node from the uses of its LVAR.
 ;;;
@@ -2034,6 +2058,7 @@
          (block (ctran-block prev))
          (prev-kind (ctran-kind prev))
          (last (block-last block)))
+    (maybe-reoptimize-previous-node prev block)
     (cond ((or (eq prev-kind :inside-block)
                (and (eq prev-kind :block-start)
                     (not (eq node last))))

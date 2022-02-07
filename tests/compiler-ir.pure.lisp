@@ -267,42 +267,51 @@
 (with-test (:name (:assignment-convert :can-become-let))
   (let ((assignment nil)
         (let nil))
-    (let ((fun (inspect-ir
-                '(lambda (x)
-                  (labels ((id (n)
-                             (+ n n)))
-                    (1+ (if t
-                            (id (read))
-                            (id (+ x x))))))
-                (lambda (component)
-                  (dolist (lambda (sb-c::component-lambdas component))
-                    (dolist (lambda-let (sb-c::lambda-lets lambda))
-                      (when (eq (sb-c::lambda-kind lambda-let) :assignment)
-                        (setf assignment t))
-                      (when (eq (sb-c::lambda-kind lambda-let) :let)
-                        (setf let t))))))))
-      (assert (not assignment))
-      (assert let))))
+    (inspect-ir
+     '(lambda (x)
+       (labels ((id (n)
+                  (+ n n)))
+         (1+ (if t
+                 (id (read))
+                 (id (+ x x))))))
+     (lambda (component)
+       (dolist (lambda (sb-c::component-lambdas component))
+         (dolist (lambda-let (sb-c::lambda-lets lambda))
+           (when (eq (sb-c::lambda-kind lambda-let) :assignment)
+             (setf assignment t))
+           (when (eq (sb-c::lambda-kind lambda-let) :let)
+             (setf let t))))))
+    (assert (not assignment))
+    (assert let)))
 
 ;;; Check assignment conversion of functions which don't return.
 (with-test (:name (:assignment-convert :non-local-exit))
   (let ((assignment nil))
-    (let ((fun (inspect-ir
-                '(lambda (z)
-                  (block hey
-                    (flet ((f (x)
-                             (print x)
-                             (return-from hey (values 'GOOD (+ x x)))))
-                      (values
-                       'BAD
-                       (if (plusp z)
-                           (f z)
-                           (+ 1 (f (+ z z))))))))
-                (lambda (component)
-                  (dolist (lambda (sb-c::component-lambdas component))
-                    (dolist (lambda-let (sb-c::lambda-lets lambda))
-                      (when (eq (sb-c::lambda-kind lambda-let) :assignment)
-                        (setf assignment t))))))))
+    (let* ((*standard-output* (make-broadcast-stream))
+           (fun (inspect-ir
+                 '(lambda (z)
+                   (block hey
+                     (flet ((f (x)
+                              (print x)
+                              (return-from hey (values 'GOOD (+ x x)))))
+                       (values
+                        'BAD
+                        (if (plusp z)
+                            (f z)
+                            (+ 1 (f (+ z z))))))))
+                 (lambda (component)
+                   (dolist (lambda (sb-c::component-lambdas component))
+                     (dolist (lambda-let (sb-c::lambda-lets lambda))
+                       (when (eq (sb-c::lambda-kind lambda-let) :assignment)
+                         (setf assignment t))))))))
       (assert (eq (funcall fun 3) 'GOOD))
       (assert (eq (funcall fun -3) 'GOOD))
       (assert assignment))))
+
+(with-test (:name :empty-special-bindings)
+  (assert (not (find 'sb-c::%special-unbind
+                     (ir-calls
+                      `(lambda ()
+                         (let (*))
+                         10))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))
