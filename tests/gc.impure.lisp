@@ -451,7 +451,7 @@
 
 ;;; We can be certain that the marked status pertains to exactly one
 ;;; object by ensuring that it can not share pages with other objects.
-(defvar *vvv* (make-array
+#+gencgc (defvar *vvv* (make-array
                (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
 (gc)
 #+gencgc

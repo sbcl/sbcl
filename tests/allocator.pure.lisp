@@ -28,6 +28,7 @@
   (let ((fun (checked-compile '(lambda (&rest params) params))))
     (assert (not (large-object-p (apply fun (make-list large-n-conses)))))))
 
+#+gencgc ; can't read-time-eval #.large-n-conses
 (with-test (:name :no-list-on-large-object-pages
                   :skipped-on (:or (:not :gencgc) :ppc :ppc64))
   (let* ((fun (checked-compile
