@@ -2036,7 +2036,7 @@
       (maybe-reoptimize (ctran-use ctran)))
      (:block-start
       (dolist (pred (block-pred block))
-        (maybe-reoptimize (block-last block)))))))
+        (maybe-reoptimize (block-last pred)))))))
 
 ;;; Delete a node from a block, deleting the block if there are no
 ;;; nodes left. We remove the node from the uses of its LVAR.
