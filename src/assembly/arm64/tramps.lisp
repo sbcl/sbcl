@@ -105,7 +105,8 @@
         (map-pairs ldp nsp-tn 64 nl-registers :post-index 80 :delta -16)
         (inst ret)))))))
   (define-alloc-tramp alloc-tramp "alloc")
-  (define-alloc-tramp list-alloc-tramp "alloc_list"))
+  (define-alloc-tramp list-alloc-tramp "alloc_list")
+  (define-alloc-tramp listify-&rest "listify_rest_arg"))
 
 (define-assembly-routine
     (undefined-tramp (:return-style :none))

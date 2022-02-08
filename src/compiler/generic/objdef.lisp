@@ -559,6 +559,7 @@ during backtrace.
 
   #+x86 (tls-cookie)                          ;  LDT index
   #+sb-thread (tls-size)
+  #-(or x86 x86-64) (more-context-count) ; allocator argument passing slot
   ;; For various reasons related to pseudo-atomic and interrupt
   ;; handling, we need to know if the machine context is in Lisp code
   ;; or not.  On non-threaded targets, this is a global variable in

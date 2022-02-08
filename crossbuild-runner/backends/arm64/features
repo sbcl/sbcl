@@ -1,4 +1,5 @@
 :64-bit :gencgc :fp-and-pc-standard-save
+:use-cons-region
 :alien-callbacks
 :unbind-in-unwind
 :compare-and-swap-vops :undefined-fun-restarts

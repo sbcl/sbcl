@@ -571,7 +571,8 @@
     (move result null-tn)
     (inst cbz count DONE)
 
-    (let ((dx-p (node-stack-allocate-p node)))
+    (let ((dx-p (node-stack-allocate-p node))
+          (leave-pa (gen-label)))
       (pseudo-atomic (pa-flag :sync nil :elide-if dx-p)
         ;; Allocate a cons (2 words) for each item.
         (let ((size (cond (dx-p
@@ -582,6 +583,17 @@
           (allocation 'list size list-pointer-lowtag dst
                       :flag-tn pa-flag
                       :stack-allocate-p dx-p
+                      :overflow
+                      (lambda ()
+                        ;; I don't know enough about the calling convention
+                        ;; to pass a second argument to the trampoline.
+                        (storew count thread-tn thread-more-context-count-slot)
+                        (inst mov tmp-tn context)
+                        (load-inline-constant dst `(:fixup listify-&rest :assembly-routine)
+                                              lip)
+                        (inst blr dst)
+                        (inst mov result tmp-tn)
+                        (inst b leave-pa))
                       :lip lip))
         (move result dst)
 
@@ -603,7 +615,8 @@
         (inst b :gt LOOP)
 
         ;; NIL out the last cons.
-        (storew null-tn dst 1 list-pointer-lowtag)))
+        (storew null-tn dst 1 list-pointer-lowtag)
+        (emit-label LEAVE-PA)))
     DONE))
 
 ;;; Return the location and size of the more arg glob created by

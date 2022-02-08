@@ -175,7 +175,8 @@
 (defun allocation (type size lowtag result-tn
                    &key flag-tn
                         stack-allocate-p
-                        (lip (if stack-allocate-p nil (missing-arg))))
+                        (lip (if stack-allocate-p nil (missing-arg)))
+                        overflow)
   (declare (ignorable type lip))
   ;; Normal allocation to the heap.
   (if stack-allocate-p
@@ -191,30 +192,35 @@
         (inst add flag-tn flag-tn (add-sub-immediate size))
         (store-symbol-value flag-tn *allocation-pointer*))
       #+gencgc
-      (let ((alloc (gen-label)) (back-from-alloc (gen-label)))
+      (let ((alloc (gen-label))
+            #+sb-thread (tlab (if (eq type 'list) thread-cons-tlab-slot thread-mixed-tlab-slot))
+            #-sb-thread (region (if (eq type 'list) cons-region mixed-region))
+            (back-from-alloc (gen-label)))
         #-sb-thread
         (progn
           ;; load-pair can't base off null-tn because the displacement
           ;; has to be a multiple of 8
-          (load-immediate-word flag-tn mixed-region)
+          (load-immediate-word flag-tn region)
           (inst ldp result-tn flag-tn (@ flag-tn 0)))
         #+sb-thread
-        (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes thread-mixed-tlab-slot)))
+        (inst ldp tmp-tn flag-tn (@ thread-tn (* n-word-bytes tlab)))
         (inst add result-tn tmp-tn (add-sub-immediate size result-tn))
         (inst cmp result-tn flag-tn)
         (inst b :hi ALLOC)
-        #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- mixed-region nil-value))))
-        #+sb-thread (storew result-tn thread-tn thread-mixed-tlab-slot)
+        #-sb-thread (inst str result-tn (@ null-tn (load-store-offset (- region nil-value))))
+        #+sb-thread (storew result-tn thread-tn tlab)
 
         (emit-label BACK-FROM-ALLOC)
         (inst add result-tn tmp-tn lowtag)
         (assemble (:elsewhere)
           (emit-label ALLOC)
-          (allocation-tramp type
-                            result-tn
-                            size
-                            BACK-FROM-ALLOC
-                            lip)))))
+          (if overflow
+              (funcall overflow)
+              (allocation-tramp type
+                                result-tn
+                                size
+                                BACK-FROM-ALLOC
+                                lip))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)

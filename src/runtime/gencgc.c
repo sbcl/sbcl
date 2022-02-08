@@ -4720,7 +4720,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 
-#ifdef LISP_FEATURE_USE_CONS_REGION
+#ifdef LISP_FEATURE_X86_64
 /* Make a list that couldn't be inline-allocated. Break it up into contiguous
  * blocks of conses not to exceed one GC page each. */
 NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nbytes) {
@@ -4751,7 +4751,10 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nby
     *tail = NIL;
     return result;
 }
+#endif
+
 /* Convert a &MORE context to a list. Split it up like make_list if we have to */
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, sword_t nbytes) {
     // same comment as above in make_list() applies about the scope of pseudo-atomic
     struct thread *self = get_sb_vm_thread();
@@ -4770,7 +4773,6 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, swo
         int n_unrolled_iterations = ncells >> 2;
         struct cons* limit = c + n_unrolled_iterations * 4;
         while (c < limit) {
-            // FIXME: Context obviously has architecture-dependent direction
             c[0].car = context[ 0]; c[0].cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
             c[1].car = context[-1]; c[1].cdr = make_lispobj(c+2, LIST_POINTER_LOWTAG);
             c[2].car = context[-2]; c[2].cdr = make_lispobj(c+3, LIST_POINTER_LOWTAG);
@@ -4781,6 +4783,49 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, swo
         ncells -= n_unrolled_iterations * 4;
         while (ncells--) {
             c->car = *context--;
+            c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            c++;
+        }
+        tail = &((c-1)->cdr);
+        partial_request = CONS_PAGE_USABLE_BYTES;
+    } while (nbytes);
+    *tail = NIL;
+    return result;
+}
+#else
+/* Let's assume that all the rest of the architectures work similarly.
+ * There may be minor variations in how both args get passed */
+NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context) {
+    // same comment as above in make_list() applies about the scope of pseudo-atomic
+    struct thread *self = get_sb_vm_thread();
+    sword_t count = (int)fixnum_value(self->more_context_count);
+    self->more_context_count = 0;
+    sword_t nbytes = count * CONS_SIZE * N_WORD_BYTES;
+    struct alloc_region *region = THREAD_ALLOC_REGION(self, cons);
+    int partial_request = (char*)region->end_addr - (char*)region->free_pointer;
+    gc_assert(nbytes > (sword_t)partial_request);
+    if (partial_request == 0) partial_request = CONS_PAGE_USABLE_BYTES;
+    lispobj result, *tail = &result;
+    do {
+        if (nbytes < partial_request) partial_request = nbytes;
+        struct cons* c = (void*)lisp_alloc(0, region, partial_request, PAGE_TYPE_CONS, self);
+        *tail = make_lispobj((void*)c, LIST_POINTER_LOWTAG);
+        int ncells = partial_request >> (1+WORD_SHIFT);
+        nbytes -= N_WORD_BYTES * 2 * ncells;
+        // Unroll x 4
+        int n_unrolled_iterations = ncells >> 2;
+        struct cons* limit = c + n_unrolled_iterations * 4;
+        while (c < limit) {
+            c[0].car = context[ 0]; c[0].cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
+            c[1].car = context[ 1]; c[1].cdr = make_lispobj(c+2, LIST_POINTER_LOWTAG);
+            c[2].car = context[ 2]; c[2].cdr = make_lispobj(c+3, LIST_POINTER_LOWTAG);
+            c[3].car = context[ 3]; c[3].cdr = make_lispobj(c+4, LIST_POINTER_LOWTAG);
+            c += 4;
+            context += 4;
+        }
+        ncells -= n_unrolled_iterations * 4;
+        while (ncells--) {
+            c->car = *context++;
             c->cdr = make_lispobj(c+1, LIST_POINTER_LOWTAG);
             c++;
         }
