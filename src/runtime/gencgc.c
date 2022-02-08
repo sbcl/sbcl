@@ -945,7 +945,6 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
 
 void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested) never_returns;
 
-const int CONS_PAGE_USABLE_BYTES = MAX_CONSES_PER_PAGE*CONS_SIZE*N_WORD_BYTES;
 static page_index_t find_cons_page(page_index_t restart_page, sword_t nbytes, generation_index_t gen)
 {
     gc_assert(nbytes <= CONS_PAGE_USABLE_BYTES);
@@ -990,7 +989,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
 #ifdef LISP_FEATURE_DARWIN_JIT
         if (!page_words_used(page))
             /* May need to be remapped from PAGE_TYPE_CODE */
-            zero_dirty_pages(page, page, PAGE_TYPE_CONS); 
+            zero_dirty_pages(page, page, PAGE_TYPE_CONS);
         else
             set_page_need_to_zero(page, 1);
 #else

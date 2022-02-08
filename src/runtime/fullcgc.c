@@ -92,8 +92,12 @@ static void* get_free_page() {
  * then one GC page can hold 2K cons cells.
  * One byte marks 8 conses (1 bit per cons), 256 bytes mark 2048 conses.
  * 128 blocks of 256 bytes fit on a 32K GC page. */
-char *suballocator_free_ptr, *suballocator_end_ptr;
+static char *suballocator_free_ptr, *suballocator_end_ptr;
 
+#ifndef LISP_FEATURE_USE_CONS_REGION
+static inline uword_t compute_page_key(lispobj cons) {
+    return ALIGN_DOWN(cons, GENCGC_PAGE_BYTES);
+}
 static void* allocate_cons_mark_bits() {
     int nbytes = GENCGC_PAGE_BYTES / (2 * N_WORD_BYTES) / 8;
     if (suballocator_free_ptr + nbytes > suballocator_end_ptr) {
@@ -104,6 +108,7 @@ static void* allocate_cons_mark_bits() {
     suballocator_free_ptr += nbytes;
     return mem;
 }
+#endif
 
 static void gc_enqueue(lispobj object)
 {
@@ -152,18 +157,20 @@ static lispobj gc_dequeue()
  * for headerless objects (conses) */
 struct hopscotch_table mark_bits;
 
-static inline uword_t compute_page_key(lispobj cons) {
-    return ALIGN_DOWN(cons, GENCGC_PAGE_BYTES);
-}
 static inline int compute_dword_number(lispobj cons) {
     return (cons & (GENCGC_PAGE_BYTES - 1)) >> (1+WORD_SHIFT);
 }
 
 static inline int cons_markedp(lispobj pointer) {
+    unsigned int index = compute_dword_number(pointer);
+#ifdef LISP_FEATURE_USE_CONS_REGION /* all conses must be on cons pages */
+    unsigned char* bits = (unsigned char*)ALIGN_DOWN(pointer, GENCGC_PAGE_BYTES)
+                          + CONS_PAGE_USABLE_BYTES;
+#else
     unsigned char* bits = (unsigned char*)
         hopscotch_get(&mark_bits, compute_page_key(pointer), 0);
     if (!bits) return 0;
-    int index = compute_dword_number(pointer);
+#endif
     return (bits[index / 8] >> (index % 8)) & 1;
 }
 
@@ -219,8 +226,16 @@ void __mark_obj(lispobj pointer)
 #endif
         if (leaf_obj_widetag_p(widetag)) return;
     } else {
+        unsigned int index = compute_dword_number(pointer);
+#ifdef LISP_FEATURE_USE_CONS_REGION /* all conses must be on cons pages */
+        unsigned char* bits = (unsigned char*)ALIGN_DOWN(pointer, GENCGC_PAGE_BYTES)
+                              + CONS_PAGE_USABLE_BYTES;
+#else
+        /* Only _some_ conses are on cons pages depending if they got moved there.
+         * We could use a hybrid of storing mark bits on the page if possible,
+         * or the hash-table if not. However, I'd rather not complicate things.
+         * All architectures should be made to allocate directly on cons pages! */
         uword_t key = compute_page_key(pointer);
-        int index = compute_dword_number(pointer);
         unsigned char* bits = (unsigned char*)hopscotch_get(&mark_bits, key, 0);
         if (!bits) {
             bits = allocate_cons_mark_bits();
@@ -228,6 +243,7 @@ void __mark_obj(lispobj pointer)
         } else if (bits[index / 8] & (1 << (index % 8))) {
             return;
         }
+#endif
         // Mark the cons
         bits[index / 8] |= 1 << (index % 8);
     }
