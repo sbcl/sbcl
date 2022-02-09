@@ -513,6 +513,7 @@
           (cond
             (walk-no-more-p newform)
             ((not (eq form newform))
+             (record-new-source-path form newform)
              (walk-form-internal newform context env))
             ((and (not (consp newform))
                   (or (eql context :eval)
@@ -551,10 +552,8 @@
                                                                  env)))
                           (cond ((eq newnewnewform newnewform)
                                  (if *walk-form-expand-macros-p* newnewform newform))
-                                (*walk-form-preserve-source*
-                                 `(sb-c::with-source-form ,newform
-                                    ,newnewnewform))
-                                (t newnewnewform))))
+                                (t
+                                 (record-new-source-path newform newnewnewform )))))
                        ((and (symbolp fn)
                              (special-operator-p fn))
                         ;; This shouldn't happen, since this walker is now
@@ -568,6 +567,19 @@
                         ;; standard function call.
                         (walk-template
                          newnewform '(call repeat (eval)) context env)))))))))))))
+
+(defun record-new-source-path (old-form new-form)
+  (when (and *walk-form-preserve-source*
+             (boundp 'sb-c::*source-paths*))
+    (let ((path (gethash old-form sb-c::*source-paths*)))
+      (when path
+        (setf (gethash new-form sb-c::*source-paths*) path))))
+  new-form)
+
+(defun recons (old-cons car cdr)
+  (if (and (eq car (car old-cons)) (eq cdr (cdr old-cons)))
+      old-cons
+      (record-new-source-path old-cons (cons car cdr))))
 
 (defun walk-template (form template context env)
   (if (atom template)

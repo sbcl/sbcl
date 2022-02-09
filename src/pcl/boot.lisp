@@ -1789,11 +1789,9 @@ bootstrapping.
                                  (slot-value #'optimize-slot-value)
                                  (set-slot-value #'optimize-set-slot-value)
                                  (slot-boundp #'optimize-slot-boundp))))
-                      `(sb-c::with-source-form ,form
-                        ,(funcall fun form slots required-parameters env)))
+                      (funcall fun form slots required-parameters env))
                     form))
                (t form))))
-
       (let* ((sb-walker::*walk-form-preserve-source* t)
              (walked-lambda (walk-form method-lambda env #'walk-function)))
         ;;; FIXME: the walker's rewriting of the source code causes

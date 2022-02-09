@@ -2794,6 +2794,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 (defpackage* "SB-WALKER"
   (:documentation "internal: a code walker used by PCL")
   (:use "CL" "SB-INT" "SB-EXT")
+  (:shadow "RECONS")
   (:export "DEFINE-WALKER-TEMPLATE"
            "WALK-FORM"
            "*WALK-FORM-EXPAND-MACROS-P*"
