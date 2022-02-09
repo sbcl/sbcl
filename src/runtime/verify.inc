@@ -272,11 +272,11 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
     return 0;
 }
 
-static int verify_range(lispobj start, lispobj* end, struct verify_state* state)
+static int verify_range(lispobj* start, lispobj* end, struct verify_state* state)
 {
-    lispobj* where = (lispobj*)start;
-    if ((state->flags & VERIFYING_GENERATIONAL) && find_page_index((void*)start)) {
-        page_index_t page = find_page_index((void*)start);
+    lispobj* where = start;
+    if (state->flags & VERIFYING_GENERATIONAL && find_page_index(start)>=0) {
+        page_index_t page = find_page_index(start);
         if (page_table[page].type == PAGE_TYPE_CONS)
             gc_assert(page_words_used(page) <=  MAX_CONSES_PER_PAGE*CONS_SIZE);
     }
@@ -352,7 +352,7 @@ static int verify(lispobj start, lispobj* end, struct verify_state* state, int f
 {
     int savedflags = state->flags;
     state->flags |= flags;
-    int result = verify_range(start, end, state);
+    int result = verify_range((lispobj*)start, end, state);
     state->flags = savedflags;
     return result;
 }
