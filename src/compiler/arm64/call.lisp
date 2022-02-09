@@ -585,9 +585,7 @@
                       :stack-allocate-p dx-p
                       :overflow
                       (lambda ()
-                        ;; I don't know enough about the calling convention
-                        ;; to pass a second argument to the trampoline.
-                        (storew count thread-tn thread-more-context-count-slot)
+                        ;; The size will be computed by subtracting from CSP
                         (inst mov tmp-tn context)
                         (load-inline-constant dst `(:fixup listify-&rest :assembly-routine)
                                               lip)

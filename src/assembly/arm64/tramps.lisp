@@ -6,10 +6,12 @@
 (in-package "SB-VM")
 
 #+gencgc
-(macrolet ((define-alloc-tramp (lisp-name c-name)
+(macrolet ((define-alloc-tramp (lisp-name c-name &body process-args)
  `(define-assembly-routine (,lisp-name (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)
-     (:temp nl1 unsigned-reg nl1-offset))
+     (:temp nl1 unsigned-reg nl1-offset)
+     (:temp nl2 unsigned-reg nl2-offset))
+    (declare (ignorable nl1))
   (flet ((reg (offset sc)
            (make-random-tn
             :kind :normal
@@ -51,6 +53,7 @@
                                 (incf offset ,delta)))))
         (map-pairs stp nsp-tn 0 nl-registers :pre-index -80)
         (inst mov nl0 tmp-tn) ;; size
+        (progn ,@process-args)
         #+sb-thread
         (inst stp cfp-tn csp-tn (@ thread-tn (* thread-control-frame-pointer-slot n-word-bytes)))
         #-sb-thread
@@ -58,22 +61,22 @@
           ;; Each of these loads of a fixup loads the address of a linkage table entry,
           ;; that is, if LINKAGE-TABLE-SPACE-START is #xF0200000, then the first load puts
           ;; #xF0200000+something, not the address of current_control_frame_pointer,
-          ;; into register nl1.
+          ;; into register nl2.
           ;; This is kinda dumb because first of all we could have calculated the address
           ;; of the linkage entry instead of loading it. Second, it's unnecessarily
           ;; double-indirect. I wonder if there's a way to remove double-indirection.
           ;; The ohly way I can see doing that is for os_link_runtime() to poke bytes
           ;; into this assembly code in the manner of the system's dynamic loader.
-          (load-inline-constant nl1 '(:fixup "current_control_frame_pointer" :foreign-dataref))
-          (inst ldr nl1 (@ nl1)) ; now load the address of the C variable
-          (inst str cfp-tn (@ nl1))
-          (load-inline-constant nl1 '(:fixup "current_control_stack_pointer" :foreign-dataref))
-          (inst ldr nl1 (@ nl1)) ; "
-          (inst str csp-tn (@ nl1))
-          (load-inline-constant nl1 '(:fixup "foreign_function_call_active" :foreign-dataref))
-          (inst ldr nl1 (@ nl1)) ; "
+          (load-inline-constant nl2 '(:fixup "current_control_frame_pointer" :foreign-dataref))
+          (inst ldr nl2 (@ nl2)) ; now load the address of the C variable
+          (inst str cfp-tn (@ nl2))
+          (load-inline-constant nl2 '(:fixup "current_control_stack_pointer" :foreign-dataref))
+          (inst ldr nl2 (@ nl2)) ; "
+          (inst str csp-tn (@ nl2))
+          (load-inline-constant nl2 '(:fixup "foreign_function_call_active" :foreign-dataref))
+          (inst ldr nl2 (@ nl2)) ; "
           ;; storing NULL ensures at least 1 set bit somewhere in the low 4 bytes
-          (inst str (32-bit-reg null-tn) (@ nl1))) ; (alien variable is 4 bytes, not 8)
+          (inst str (32-bit-reg null-tn) (@ nl2))) ; (alien variable is 4 bytes, not 8)
         ;; Create a new frame
         (inst add csp-tn csp-tn (+ 32 80))
         (inst stp cfp-tn lr-tn (@ csp-tn -112))
@@ -81,8 +84,8 @@
         (map-pairs stp csp-tn -80 lisp-registers)
         (map-pairs stp nsp-tn 0 float-registers :pre-index -512 :delta 32)
 
-        (load-inline-constant nl1 '(:fixup ,c-name :foreign))
-        (inst blr nl1)
+        (load-inline-constant nl2 '(:fixup ,c-name :foreign))
+        (inst blr nl2)
 
         (map-pairs ldp nsp-tn 480 float-registers :post-index 512 :delta -32)
         (map-pairs ldp csp-tn -16 lisp-registers :delta -16)
@@ -94,11 +97,11 @@
         (inst str zr-tn (@ thread-tn (* thread-control-stack-pointer-slot n-word-bytes)))
         #-sb-thread
         (progn
-          ;; We haven't restored NL1 yet, so it's ok to use as a scratch register here.
+          ;; We haven't restored NL2 yet, so it's ok to use as a scratch register here.
           ;; It gets restored just prior to the RET instruction.
-          (load-inline-constant nl1 '(:fixup "foreign_function_call_active" :foreign-dataref))
-          (inst ldr nl1 (@ nl1))
-          (inst str (32-bit-reg zr-tn) (@ nl1)))
+          (load-inline-constant nl2 '(:fixup "foreign_function_call_active" :foreign-dataref))
+          (inst ldr nl2 (@ nl2))
+          (inst str (32-bit-reg zr-tn) (@ nl2)))
 
         (inst mov tmp-tn nl0) ;; result
 
@@ -106,7 +109,8 @@
         (inst ret)))))))
   (define-alloc-tramp alloc-tramp "alloc")
   (define-alloc-tramp list-alloc-tramp "alloc_list")
-  (define-alloc-tramp listify-&rest "listify_rest_arg"))
+  (define-alloc-tramp listify-&rest "listify_rest_arg"
+    (inst sub nl1 csp-tn tmp-tn)))
 
 (define-assembly-routine
     (undefined-tramp (:return-style :none))

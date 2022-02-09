@@ -4793,12 +4793,10 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, swo
 #else
 /* Let's assume that all the rest of the architectures work similarly.
  * There may be minor variations in how both args get passed */
-NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context) {
+NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_bytes) {
     // same comment as above in make_list() applies about the scope of pseudo-atomic
     struct thread *self = get_sb_vm_thread();
-    sword_t count = (int)fixnum_value(self->more_context_count);
-    self->more_context_count = 0;
-    sword_t nbytes = count * CONS_SIZE * N_WORD_BYTES;
+    sword_t nbytes = context_bytes * CONS_SIZE;
     struct alloc_region *region = THREAD_ALLOC_REGION(self, cons);
     int partial_request = (char*)region->end_addr - (char*)region->free_pointer;
     gc_assert(nbytes > (sword_t)partial_request);
