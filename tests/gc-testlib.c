@@ -82,7 +82,7 @@ void run_cardmark_test(int page_type,
     // Assert something about the card indices
     fprintf(stderr, "page = %d, cards = %d and %d\n",
             (int)find_page_index((void*)instance),
-            instance_card, funinstance_card);
+            (int)instance_card, (int)funinstance_card);
     gc_assert(funinstance_card == instance_card+1);
 
     perform_gc(stackptr);
