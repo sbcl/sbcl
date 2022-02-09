@@ -398,6 +398,7 @@
          (when slot1
            (note (lambda (stream)
                    (if (memq (slot-name slot1) '(sb-vm::mixed-tlab
+                                                 sb-vm::cons-tlab
                                                  sb-vm::unboxed-tlab))
                        (format stream "~(~a~).{free-pointer, end-addr}" (slot-name slot1))
                        (format stream "~(~A, ~A~)" (slot-name slot1) (slot-name slot2))))
