@@ -4402,7 +4402,6 @@ gc_init(void)
     memset(&test, 0, sizeof test);
     *pflagbits = WP_CLEARED_FLAG;
     gc_assert(test.write_protected_cleared);
-    gc_assert(leaf_obj_widetag_p(FILLER_WIDETAG));
 }
 
 int gc_card_table_nbits;

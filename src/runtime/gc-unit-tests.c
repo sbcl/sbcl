@@ -16,11 +16,11 @@
  */
 void test_find_freeish()
 {
-    unsigned char card_table[1];
-    gc_card_table_nbits = 1;
-    gc_card_table_mask = 1;
+    unsigned char card_table[256];
+    gc_card_table_nbits = 8;
+    gc_card_table_mask = 0xff;
     gc_card_mark = card_table;
-    card_table[0] = CARD_MARKED;
+    memset(card_table, CARD_MARKED, 256);
 
     page_table_pages = MAX_PAGES_FOR_TEST;
     page_table = calloc(1+page_table_pages, sizeof(struct page));
@@ -66,7 +66,11 @@ void test_adjust_obj_ptes()
 {
     void shrink_obj_test(int ending_size, int created_type,
                          struct page *expected_result);
-    unsigned char card_table[1];
+    unsigned char card_table[256];
+    gc_card_table_nbits = 8;
+    gc_card_table_mask = 0xff;
+    gc_card_mark = card_table;
+    memset(card_table, CARD_MARKED, 256);
 
     // Mock out the dynamic space. Always allocate one extra page in
     // the page table as a sentinel.
@@ -74,9 +78,6 @@ void test_adjust_obj_ptes()
     page_table_pages = MAX_PAGES_FOR_TEST;
     posix_memalign((void**)&DYNAMIC_SPACE_START, GENCGC_PAGE_BYTES,
                    MAX_PAGES_FOR_TEST * GENCGC_PAGE_BYTES);
-    gc_card_table_nbits = 1;
-    gc_card_table_mask = 1;
-    gc_card_mark = card_table;
 
     struct alloc_region test_region;
     int npages, fuzz;
@@ -181,6 +182,11 @@ void run_gencgc_tests()
     // Assert that widetags do not satisfy is_lisp_pointer
     gc_assert(!is_lisp_pointer(CHARACTER_WIDETAG));
     gc_assert(!is_lisp_pointer(SIMPLE_VECTOR_WIDETAG));
+    // Check leafness
+    gc_assert(leaf_obj_widetag_p(FILLER_WIDETAG));
+    gc_assert(leaf_obj_widetag_p(SIMPLE_ARRAY_UNSIGNED_BYTE_8_WIDETAG));
+    gc_assert(leaf_obj_widetag_p(SAP_WIDETAG));
+    gc_assert(leaf_obj_widetag_p(BIGNUM_WIDETAG));
     // Assert that INSTANCE_WIDETAG is 1 bit different from FUNCALLABLE_INSTANCE
     gc_assert((INSTANCE_WIDETAG | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER))
               == FUNCALLABLE_INSTANCE_WIDETAG);
