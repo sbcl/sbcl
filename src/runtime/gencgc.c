@@ -1586,7 +1586,6 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
         gc_assert(page_table[page].type == old_allocated); \
         gc_assert(page_table[page].gen == from_space); \
         gc_assert(page_scan_start_offset(page) == npage_bytes(page-first_page)); \
-        gc_assert(page_cards_all_marked_nonsticky(page)); \
         page_table[page].gen = new_gen; \
         page_table[page].type = new_allocated
 
