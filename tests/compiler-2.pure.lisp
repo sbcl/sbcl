@@ -3574,3 +3574,17 @@
                                    10))))))
     (assert (= (sb-kernel:code-n-entries (sb-kernel:fun-code-header fun))
                1))))
+
+(with-test (:name :%cleanup-point-transform)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b c)
+      (declare ((integer -14 49702337) a)
+               ((integer -5376440588342 5921272101558) b)
+               ((integer 3395101368955 8345185767296289) c))
+      (if (and (< c b) (> a b))
+          (progv nil
+              (list 288230376151711735 c)
+            (restart-bind nil a))
+          c))
+   ((49702337 5921272101558 8345185767296289) 8345185767296289)))
