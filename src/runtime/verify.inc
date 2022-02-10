@@ -42,10 +42,15 @@ char *page_card_mark_string(page_index_t page, char *result)
     else {
         int i;
         for(i=0; i<CARDS_PER_PAGE; ++i)
-        switch (gc_card_mark[card+i]) {
+        switch (gc_card_mark[card+i] & MARK_BYTE_MASK) {
         case CARD_MARKED: result[i] = '*'; break;
         case CARD_UNMARKED: result[i] = '-'; break;
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
         case STICKY_MARK: result[i] = 'S'; break;
+#else
+        case WP_CLEARED_AND_MARKED: result[i] = 'd'; break; // "d" is for dirty
+#endif
+        default: result[i] = '?'; break; // illegal value
         }
         result[CARDS_PER_PAGE] = 0;
     }
@@ -560,7 +565,7 @@ void hexdump_spaces(struct verify_state* state, char *reason)
                 int prefix = ' ';
                 if (widetag_of(where)==CODE_HEADER_WIDETAG && header_rememberedp(*where))
                     prefix = '#';
-                else if (gc_card_mark[addr_to_card_index(where)]!=CARD_UNMARKED)
+                else if (card_dirtyp(addr_to_card_index(where)))
                     prefix = '|';
                 fprintf(f, "%c%06x: %"OBJ_FMTX, prefix, (int)(uword_t)where & 0xffffff, *where);
                 int i;

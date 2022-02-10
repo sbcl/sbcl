@@ -483,7 +483,7 @@
       (loadw temp temp) ; address of gc_card_mark
       (loadw temp temp) ; value of gc_card_mark
       ;; Touch the card mark byte.
-      (inst stbx zero-tn temp card)
+      (inst stbx null-tn temp card)
       ;; set 'written' flag in the code header
       ;; If two threads get here at the same time, they'll write the same byte.
       (let ((byte #+big-endian (- other-pointer-lowtag) #+little-endian (bug "Wat")))

@@ -4048,7 +4048,7 @@ III. initially undefined function references (alphabetically):
         (out-to "regnames" (write-regnames-h stream))
         (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb-vm::write-gc-tables stream))
-        #+gencgc
+        #+soft-card-marks
         (out-to "cardmarks" (write-mark-array-operators stream))
         (out-to "tagnames" (write-tagnames-h stream))
         (out-to "print.inc" (write-c-print-dispatch stream))

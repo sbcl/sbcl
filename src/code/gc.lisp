@@ -420,9 +420,14 @@ statistics are appended to it."
 (macrolet ((addr->mark (addr)
              `(sap-ref-8 (extern-alien "gc_card_mark" system-area-pointer)
                          (logand (ash ,addr (- (integer-length (1- sb-vm:gencgc-card-bytes))))
-                                 (extern-alien "gc_card_table_mask" int)))))
+                                 (extern-alien "gc_card_table_mask" int))))
+           (markedp (val)
+             #+soft-card-marks `(eql ,val 0)
+             ;; With physical protection there are 2 single-bit fields packed in the mark byte.
+             ;; The 0 bit is the card mark bit (inverse of protected-p)
+             #-soft-card-marks `(oddp ,val)))
   (defun page-protected-p (object) ; OBJECT must be pinned by caller
-    (eql #xff (addr->mark (get-lisp-obj-address object))))
+    (not (markedp (addr->mark (get-lisp-obj-address object)))))
   (defun object-card-marks (obj)
     (aver (eq (heap-allocated-p obj) :dynamic))
     ;; Return a bit-vector with a 1 for each marked card the object is on
@@ -437,7 +442,7 @@ statistics are appended to it."
                                  :element-type 'bit)))
         (loop for addr from aligned-base to aligned-last by sb-vm:gencgc-card-bytes
               for i from 0
-              do (setf (aref result i) (if (eql (addr->mark addr) 0) 1 0)))
+              do (setf (aref result i) (if (markedp (addr->mark addr)) 1 0)))
         result))))
 
 (macrolet ((def (slot doc &optional adjustable)

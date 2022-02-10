@@ -50,7 +50,7 @@ void jit_memcpy(void* dst, void* src, size_t n) {
 }
 void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
     THREAD_JIT(0);
-    gc_card_mark[addr_to_card_index(code)] = 0;
+    gc_card_mark[addr_to_card_index(code)] = 1; // CARD_MARKED
     SET_WRITTEN_FLAG(native_pointer(code));
     native_pointer(code)[index] = value;
     THREAD_JIT(1);

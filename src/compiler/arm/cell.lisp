@@ -313,8 +313,7 @@
         (inst ldr temp (@ temp))
         (inst ldr temp (@ temp))
         ;; Touch the card mark byte.
-        (inst mov lip 0)
-        (inst strb lip (@ temp card))
+        (inst strb null-tn (@ temp card))
         ;; set 'written' flag in the code header
         ;; If two threads get here at the same time, they'll write the same byte.
         (let ((byte (- #+little-endian 3 other-pointer-lowtag)))

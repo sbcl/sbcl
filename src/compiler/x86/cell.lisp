@@ -481,7 +481,7 @@
       (inst mov card object)
       (inst shr card gencgc-card-shift)
       (inst and card (make-fixup nil :gc-barrier))
-      (inst mov (make-ea :byte :base table :index card) 0)
+      (inst mov (make-ea :byte :base table :index card) 1) ; CARD_MARKED
       ;; set 'written' flag in the code header
       ;; this doesn't need to use :LOCK because the only other writer
       ;; would be a GCing thread, but we're pseudo-atomic here.

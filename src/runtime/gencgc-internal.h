@@ -110,13 +110,11 @@ struct page {
         /* Whether the page was used at all. This is the only bit that can
          * be 1 on a free page */
         need_zerofill :1,
-        /* This flag is set when the above write_protected flag is
-         * cleared by the SIGBUS handler (or SIGSEGV handler, for some
-         * OSes). This is useful for re-scavenging pages that are
-         * written during a GC. */
-        write_protected_cleared :1,
+        padding :1,
         /* If this page should not be moved during a GC then this flag
-         * is set. It's only valid during a GC for allocated pages. */
+         * is set. It's only valid during a GC for allocated pages,
+         * and only meaningful for pages in the condemned set.
+         * (It can be spuriously 1 on a page in any generation) */
         pinned :1;
 
     /* the generation that this page belongs to. This should be valid
@@ -206,12 +204,6 @@ extern unsigned char *gc_card_mark;
 extern long gc_card_table_mask;
 #define addr_to_card_index(addr) ((((uword_t)addr)>>GENCGC_CARD_SHIFT) & gc_card_table_mask)
 #define page_to_card_index(n) addr_to_card_index(page_address(n))
-
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
-#define PAGE_WRITEPROTECTED_P(n) (gc_card_mark[page_to_card_index(n)] & 1)
-#define SET_PAGE_PROTECTED(n,val) gc_card_mark[page_to_card_index(n)] =\
-      (val?CARD_UNMARKED:CARD_MARKED)
-#endif
 
 struct __attribute__((packed)) corefile_pte {
   uword_t sso; // scan start offset

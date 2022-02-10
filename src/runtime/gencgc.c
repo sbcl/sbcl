@@ -265,9 +265,11 @@ page_ends_contiguous_block_p(page_index_t page_index,
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
-    page_table[page].write_protected_cleared = page_table[page].pinned = 0;
+    page_table[page].pinned = 0;
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
     //    page_table[page].gen = 0;
+    // Free pages are dirty (MARKED) because MARKED is equivalent
+    // to not-write-protected, which is what you want for allocation.
     assign_page_card_marks(page, CARD_MARKED);
 }
 
@@ -275,6 +277,7 @@ static inline void reset_page_flags(page_index_t page) {
  *
  * from https://graphics.stanford.edu/~seander/bithacks.html
  */
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
 static inline uword_t word_haszero(uword_t word) {
   return ((word - 0x0101010101010101LL) & ~word & 0x8080808080808080LL) != 0;
 }
@@ -285,6 +288,7 @@ static inline uword_t word_has_stickymark(uword_t word) {
 int page_cards_all_marked_nonsticky(page_index_t page) {
     return cardseq_all_marked_nonsticky(page_to_card_index(page));
 }
+#endif
 
 /// External function for calling from Lisp.
 page_index_t ext_find_page_index(void *addr) { return find_page_index(addr); }
@@ -371,7 +375,7 @@ count_generation_pages(generation_index_t generation, page_index_t* n_dirty)
             total++;
             long card = page_to_card_index(i);
             for (j=0; j<CARDS_PER_PAGE; ++j, ++card)
-                dirty += gc_card_mark[card] != CARD_UNMARKED;
+                if (card_dirtyp(card)) ++dirty;
         }
     if (n_dirty) *n_dirty = dirty;
     return total;
@@ -903,44 +907,36 @@ static inline boolean __attribute__((unused)) region_closed_p(struct alloc_regio
 #endif
 
 /* Test whether page 'index' can continue a non-large-object region
- * having specified 'gen' and 'allocated' values. */
+ * having specified 'gen' and 'type' values. It must not be pinned
+ * and must be marked but not referenced from the stack */
 static inline boolean
 page_extensible_p(page_index_t index, generation_index_t gen, int type) {
-#ifdef LISP_FEATURE_BIG_ENDIAN /* TODO: implement the simpler test */
-    /* Counterintuitively, gcc prefers to see sequential tests of the bitfields,
-     * versus one test "!(p.write_protected | p.pinned)".
-     * When expressed as separate tests, it figures out that this can be optimized
-     * as an AND. On the other hand, by attempting to *force* it to do that,
-     * it shifts each field to the right to line them all up at bit index 0 to
-     * test that 1 bit, which is a literal rendering of the user-written code.
-     */
-    int bits_match =
+#ifdef LISP_FEATURE_BIG_ENDIAN /* TODO: implement this as single comparison */
+    int attributes_match =
            page_table[index].type == type
         && page_table[index].gen == gen
         && !page_table[index].pinned;
 #else
-    /* Test all 4 conditions above as a single comparison against a mask.
-     * (The C compiler doesn't understand how to do that)
+    /* Test the three 4 conditions above as a single comparison.
      * Any bit that has a 1 in this mask must match the desired input.
-     * Lisp allocates to generation 0 which is never write-protected, so both
-     * WP bits should be zero. Newspace is not write-protected during GC,
-     * however in the case of GC with promotion (raise=1), there may be a page
-     * in the 'to' generation that is currently un-write-protected but with
-     * write_protected_cleared flag = 1 because it was at some point WP'ed.
-     * Those pages are usable, so we do have to mask out the 'cleared' bit.
-     * Also, the 'need_zerofill' bit can have any value.
+     * Ignore the 'need_zerofill' bit.
      *
      *      pin -\   /-- need_zerofill
      *            v v
      * #b11111111_10011111
      *             ^ ^^^^^ -- type
-     *     WP-clr /
+     *  spare bit /
      *
      * The flags reside at 1 byte prior to 'gen' in the page structure.
      */
-    int bits_match = ((*(int16_t*)(&page_table[index].gen-1) & 0xFF9F) == ((gen<<8)|type));
+    int attributes_match =
+        (*(int16_t*)(&page_table[index].gen-1) & 0xFF9F) == ((gen<<8)|type);
 #endif
-    return bits_match && page_cards_all_marked_nonsticky(index);
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    return attributes_match && page_cards_all_marked_nonsticky(index);
+#else
+    return attributes_match && !PAGE_WRITEPROTECTED_P(index);
+#endif
 }
 
 void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested) never_returns;
@@ -1126,6 +1122,10 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
 
     size_t new_area_start = npage_bytes(first_page) + offset;
     int i, c;
+    if (GC_LOGGING) {
+        char* base = page_address(first_page) + offset;
+        fprintf(gc_activitylog(), "enqueue rescan [%p:%p]\n", base, base+size);
+    }
     /* Search backwards for a prior area that this follows from. If
        found this will save adding a new area. */
     for (i = new_areas_index-1, c = 0; (i >= 0) && (c < 8); i--, c++) {
@@ -2400,7 +2400,8 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(void *addr)
  * instructions, there's no reason even to suppose that a store occurs.
  * It seems like the stop-for-GC handler must be enforcing that GC sees things
  * stored in the correct order for out-of-order memory models */
-__attribute__((unused)) static void sticky_preserve_pointer(os_context_register_t word)
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+static void sticky_preserve_pointer(os_context_register_t word)
 {
     if (is_lisp_pointer(word)) {
         page_index_t page = find_page_index((void*)word);
@@ -2434,6 +2435,7 @@ __attribute__((unused)) static void sticky_preserve_pointer(os_context_register_
     }
     preserve_pointer((void*)word);
 }
+#endif
 #endif
 
 /* Pin an unambiguous descriptor object which may or may not be a pointer.
@@ -2531,6 +2533,14 @@ static boolean ptr_ok_to_writeprotect(lispobj ptr, generation_index_t gen)
 #endif
     return 1;
 }
+
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS
+static inline void protect_page(void* page_addr)
+{
+    os_protect((void *)page_addr, GENCGC_PAGE_BYTES, OS_VM_PROT_JIT_READ);
+    gc_card_mark[addr_to_card_index(page_addr)] = CARD_UNMARKED;
+}
+#endif
 
 /* Given a range of pages at least one of which is not WPed (logically or physically,
  * depending on SOFT_CARD_MARKS), scan all those pages for pointers to younger generations.
@@ -2661,7 +2671,7 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
         assign_page_card_marks(page, CARD_UNMARKED);
 #else
         // Try to avoid a system call
-        if (!PAGE_WRITEPROTECTED_P(page)) protect_page(page_address(page), page);
+        if (!PAGE_WRITEPROTECTED_P(page)) protect_page(page_address(page));
 #endif
     }
     return 0;
@@ -2766,7 +2776,7 @@ static page_index_t scan_boxed_root_cards_spanning(page_index_t page, generation
             if (GC_LOGGING) fprintf(gc_activitylog(), "scan_roots spanning %p\n", page_address(page));
             int j;
             for (j=0; j<CARDS_PER_PAGE; ++j, ++card, start += WORDS_PER_CARD) {
-                int marked = gc_card_mark[card] != CARD_UNMARKED;
+                int marked = card_dirtyp(card);
                 if (marked || prev_marked) {
                     lispobj* end = start + WORDS_PER_CARD;
                     if (end > limit) end = limit;
@@ -2782,7 +2792,7 @@ static page_index_t scan_boxed_root_cards_spanning(page_index_t page, generation
 #else
         if (!PAGE_WRITEPROTECTED_P(page)) {
             int dirty = descriptors_scavenge(start, limit, gen, 0);
-            if (!dirty) protect_page(start, page);
+            if (!dirty) protect_page(start);
         }
 #endif
         ++page;
@@ -2809,7 +2819,7 @@ static page_index_t scan_boxed_root_cards_non_spanning(page_index_t page, genera
             lispobj* limit = start + page_words_used(page);
             int j;
             for (j=0; j<CARDS_PER_PAGE; ++j, ++card, start += WORDS_PER_CARD) {
-                if (gc_card_mark[card] != CARD_UNMARKED) {
+                if (card_dirtyp(card)) {
                     lispobj* end = start + WORDS_PER_CARD;
                     if (end > limit) end = limit;
                     int dirty = descriptors_scavenge(start, end, gen,
@@ -3575,7 +3585,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     page_index_t i;
     struct thread *th;
 
-    if (gencgc_verbose >2) fprintf(stderr, "BEGIN gc_gen(%d,%d)\n", generation, raise);
+    if (gencgc_verbose > 2) fprintf(stderr, "BEGIN gc_gen(%d,%d)\n", generation, raise);
 
 #ifdef COLLECT_GC_STATS
     struct timespec t0;
@@ -3794,6 +3804,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #endif
 
     /* Scavenge the Lisp functions of the interrupt handlers */
+    if (GC_LOGGING) fprintf(gc_activitylog(), "begin scavenge sighandlers\n");
     if (compacting_p())
         scavenge(lisp_sig_handlers, NSIG);
     else
@@ -4394,13 +4405,6 @@ gc_init(void)
     extern void safepoint_init(void);
     safepoint_init();
 #endif
-    // Verify that WP_CLEARED_FLAG agrees with the C compiler's bit packing
-    // and that we can compute the correct adddress of the bitfield.
-    struct page test;
-    unsigned char *pflagbits = (unsigned char*)&test.gen - 1;
-    memset(&test, 0, sizeof test);
-    *pflagbits = WP_CLEARED_FLAG;
-    gc_assert(test.write_protected_cleared);
 }
 
 int gc_card_table_nbits;
@@ -4496,9 +4500,12 @@ void gc_allocate_ptes()
     num_gc_cards = 1L << gc_card_table_nbits;
 
     gc_card_table_mask =  num_gc_cards - 1;
-    gc_card_mark = calloc(num_gc_cards, 1);
-    if (gc_card_mark == NULL)
-        lose("failed to calloc() %ld bytes", num_gc_cards);
+    gc_card_mark = successful_malloc(num_gc_cards);
+    /* The mark array used to work "by accident" if the numeric value of CARD_MARKED
+     * is 0 - or equivalently the "WP'ed" state - which is the value that calloc()
+     * fills with. If using malloc() we have to fill with CARD_MARKED,
+     * as I discovered when I changed that to a nonzero value */
+    memset(gc_card_mark, CARD_MARKED, num_gc_cards);
 
     gc_common_init();
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
@@ -4936,58 +4943,53 @@ int gencgc_handle_wp_violation(void* fault_addr)
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     lose("misuse of mprotect() on dynamic space @ %p", fault_addr);
 #else
-    // This assertion is almost always correct, but what about a page-spanning
-    // object with part on a writable page and part on a physically-protected page?
-    // Some of the scavenge functions might not take care to avoid rewriting an
-    // unchanged word. So they can fault even though they didn't need to store at all.
-    // if (gc_active_p && compacting_p()) lose("unexpected WP fault @ %p during GC", fault_addr);
+    // Pages of code are never have MMU-based protection, except on darwin,
+    // where they do, but they are thread-locally-un-protected when creating
+    // objets on those pages.
     gc_assert(!is_code(page_table[page_index].type));
+
     // There can not be an open region. gc_close_region() does not attempt
-    // to flip that bit atomically. Other threads in the wp violation handler
-    // concurrently for the same page are fine because they're all doing
-    // the same bit operations.
+    // to flip that bit atomically. (What does this mean?)
     gc_assert(!(page_table[page_index].type & OPEN_REGION_PAGE_FLAG));
-    if (PAGE_WRITEPROTECTED_P(page_index)) {
-            unprotect_page_index(page_index);
-    } else if (!ignore_memoryfaults_on_unprotected_pages) {
-            unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
-            unsigned char flagbits = __sync_fetch_and_add(pflagbits, 0);
-            /* The only acceptable reason for this signal on a heap
-             * access is that GENCGC write-protected the page.
-             * However, if two CPUs hit a wp page near-simultaneously,
-             * we had better not have the second one lose here if it
-             * does this test after the first one has already set wp=0
-             */
-            if (!(flagbits & WP_CLEARED_FLAG)) {
-                void lisp_backtrace(int frames);
-                lisp_backtrace(10);
-                fprintf(stderr,
-                        "Fault @ %p, page %"PAGE_INDEX_FMT" not marked as write-protected:\n"
-                        "  mixed_region.first_page: %"PAGE_INDEX_FMT","
-                        "  mixed_region.last_page %"PAGE_INDEX_FMT"\n"
-                        "  page.scan_start_offset: %"OS_VM_SIZE_FMT"\n"
-                        "  page.bytes_used: %u\n"
-                        "  page.allocated: %d\n"
-                        "  page.write_protected: %d\n"
-                        "  page.write_protected_cleared: %d\n"
-                        "  page.generation: %d\n",
-                        fault_addr,
-                        page_index,
-                        find_page_index(mixed_region->start_addr),
-                        mixed_region->last_page,
-                        (uintptr_t)page_scan_start_offset(page_index),
-                        page_bytes_used(page_index),
-                        page_table[page_index].type,
-                        PAGE_WRITEPROTECTED_P(page_index),
-                        page_table[page_index].write_protected_cleared,
-                        page_table[page_index].gen);
-                if (!continue_after_memoryfault_on_unprotected_pages)
-                    lose("Feh.");
-            }
+
+    // The collector should almost never incur page faults, but I haven't
+    // found all the trouble spots. It may or may not be worth doing.
+    // See git rev 8a0af65bfd24
+    // if (gc_active_p && compacting_p()) lose("unexpected WP fault @ %p during GC", fault_addr);
+
+    // Because this signal handler can not be interrupted by STOP_FOR_GC,
+    // the only possible state change between reading the mark and deciding how
+    // to proceed is due to another thread also unprotecting the address.
+    // That's fine; in fact it's OK to read a stale value here.
+    // The only harmful case would be where the mark byte says it was
+    // never protected, and the fault occurred nonetheless. That can't happen.
+    unsigned char mark = gc_card_mark[addr_to_card_index(fault_addr)];
+    switch (mark) {
+    case CARD_UNMARKED:
+    case WP_CLEARED_AND_MARKED: // possible data race
+        unprotect_page(fault_addr, WP_CLEARED_AND_MARKED);
+        break;
+    default:
+        if (!ignore_memoryfaults_on_unprotected_pages) {
+            void lisp_backtrace(int frames);
+            lisp_backtrace(10);
+            fprintf(stderr,
+                    "Fault @ %p, page %"PAGE_INDEX_FMT" (~WP) mark=%#x\n"
+                    "  mixed_region.first_page: %"PAGE_INDEX_FMT","
+                    "  .last_page %"PAGE_INDEX_FMT"\n"
+                    "  page.scan_start: %p .words_used: %u .type: %d .gen: %d\n",
+                    fault_addr, page_index, mark,
+                    find_page_index(mixed_region->start_addr),
+                    mixed_region->last_page,
+                    page_scan_start(page_index),
+                    page_words_used(page_index),
+                    page_table[page_index].type,
+                    page_table[page_index].gen);
+            if (!continue_after_memoryfault_on_unprotected_pages) lose("Feh.");
+        }
     }
 #endif
-    /* Don't worry, we can handle it. */
-    return 1;
+    return 1; // Handled
 }
 /* This is to be called when we catch a SIGSEGV/SIGBUS, determine that
  * it's not just a case of the program hitting the write barrier, and
@@ -5012,7 +5014,7 @@ zero_all_free_ranges() /* called only by gc_and_save() */
 /* Things to do before doing a final GC before saving a core (without
  * purify).
  *
- * + Pages in singleton pages aren't moved by the GC, so we need to
+ * + Single-object pages aren't moved by the GC, so we need to
  *   unset that flag from all pages.
  * + The pseudo-static generation isn't normally collected, but it seems
  *   reasonable to collect it at least when saving a core. So move the

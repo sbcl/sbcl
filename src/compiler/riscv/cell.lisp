@@ -482,7 +482,7 @@
       (loadw temp temp) ; value of gc_card_mark (pointer)
       ;; Touch the card mark byte.
       (inst add temp temp card)
-      (inst sb zero-tn temp 0)
+      (inst sb null-tn temp 0)
       ;; set 'written' flag in the code header
       ;; If two threads get here at the same time, they'll write the same byte.
       (let ((byte (- 3 other-pointer-lowtag)))
