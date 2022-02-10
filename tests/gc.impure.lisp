@@ -129,6 +129,7 @@
 #+gencgc
 (with-test (:name :pin-all-code-with-gc-enabled
                   :skipped-on :interpreter)
+  (gc)
   #+sb-thread (sb-thread:join-thread (sb-thread:make-thread #'make-some-objects))
   #-sb-thread (progn (make-some-objects) (sb-sys:scrub-control-stack))
   (sb-sys:with-code-pages-pinned (:dynamic) (gc))
