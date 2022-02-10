@@ -4879,7 +4879,7 @@ void gc_close_thread_regions(struct thread* th) {
 #ifdef LISP_FEATURE_SPARC
 void mixed_region_rollback(sword_t size)
 {
-    struct alloc_region *region = MAIN_THREAD_mixed_region;
+    struct alloc_region *region = main_thread_mixed_region;
     gc_assert(region->free_pointer > region->end_addr);
     region->free_pointer = (char*)region->free_pointer - size;
     gc_assert(region->free_pointer >= region->start_addr
