@@ -339,7 +339,7 @@
 ;;;
 ;;;    NAME-attributes attribute-name*
 ;;;      Return a set of the named attributes.
-(defmacro !def-boolean-attribute (name &rest attribute-names)
+(defmacro !def-boolean-attribute (name &body attribute-names)
   (let ((vector (coerce attribute-names 'vector))
         (constructor (symbolicate name "-ATTRIBUTES"))
         (test-name (symbolicate name "-ATTRIBUTEP")))

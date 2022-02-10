@@ -26,8 +26,8 @@
 
 ;;; Return a VAR structure for NAME, filling in info if it is globally
 ;;; special. If it is losing, we punt with a COMPILER-ERROR.
-(declaim (ftype (sfunction (symbol) lambda-var) varify-lambda-arg))
-(defun varify-lambda-arg (name)
+(declaim (ftype (sfunction (symbol &optional t) lambda-var) varify-lambda-arg))
+(defun varify-lambda-arg (name &optional source-form)
   (case (info :variable :kind name)
     (:special
      (let ((variable (find-free-var name)))
@@ -36,7 +36,8 @@
                         :where-from (leaf-where-from variable)
                         :specvar variable)))
     (t
-     (make-lambda-var :%source-name name))))
+     (make-lambda-var :%source-name name
+                      :source-form source-form))))
 
 ;;; Parse a lambda list into a list of VAR structures, stripping off
 ;;; any &AUX bindings. Each arg name is checked for legality, and

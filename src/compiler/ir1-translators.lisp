@@ -747,7 +747,7 @@ be a lambda expression."
              name :context context :allow-symbol-macro nil)
             (unless (eq context 'let*)
               (funcall names name))
-            (vars (varify-lambda-arg name))
+            (vars (varify-lambda-arg name spec))
             (vals value)))))
     (values (vars) (vals))))
 

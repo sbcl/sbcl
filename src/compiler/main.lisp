@@ -1728,7 +1728,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   (compiler-error-context-handled-conditions ctxt))
                  ;; Is this right? I would think that if lexenv is null
                  ;; we should look at *HANDLED-CONDITIONS*.
-                 ((or ctran null) (lexenv-handled-conditions *lexenv*))))
+                 ((or ctran list) (lexenv-handled-conditions *lexenv*))))
              *handled-conditions*))
        (handle-p (condition type)
          #+sb-xc-host (cl:typep condition type) ; TYPE is a sexpr

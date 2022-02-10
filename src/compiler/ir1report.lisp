@@ -111,7 +111,7 @@
 
 ;;; If true, this is the node which is used as context in compiler warning
 ;;; messages.
-(declaim (type (or null compiler-error-context node
+(declaim (type (or list compiler-error-context node
                    lvar-annotation ctran) *compiler-error-context*))
 (defvar *compiler-error-context* nil)
 
@@ -258,6 +258,7 @@
                             (lvar-annotation-source-path context))
                            ((ctran-p context)
                             (ctran-source-path context))
+                           ((consp context) context)
                            ((boundp '*current-path*)
                             *current-path*)))
                (old
