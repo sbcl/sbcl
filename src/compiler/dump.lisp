@@ -36,7 +36,7 @@
   ;; can get them from the table rather than dumping them again. The
   ;; SIMILAR-TABLE is used for lists and strings, and the EQ-TABLE is
   ;; used for everything else. We use a separate EQ table to avoid
-  ;; performance pathologies with objects for which EQUAL degenerates
+  ;; performance pathologies with objects for which SIMILAR degenerates
   ;; to EQL. Everything entered in the SIMILAR table is also entered in
   ;; the EQ table.
   (similar-table (make-similarity-table) :type hash-table :read-only t)
@@ -434,7 +434,7 @@
 ;;; dumping them. If the object is in the EQ-TABLE, then we push it,
 ;;; otherwise, we do a type dispatch to a type specific dumping
 ;;; function. The type specific branches do any appropriate
-;;; EQUAL-TABLE check and table entry.
+;;; SIMILAR-TABLE check and table entry.
 ;;;
 ;;; When we go to dump the object, we enter it in the CIRCULARITY-TABLE.
 (defun dump-non-immediate-object (x file)
@@ -470,7 +470,7 @@
               (eq-save-object x file))
              (array
               ;; DUMP-ARRAY (and its callees) are responsible for
-              ;; updating the EQ and EQUAL hash tables.
+              ;; updating the EQ and SIMILAR hash tables.
               (dump-array x file))
              (number
               (unless (similar-check-table x file)
@@ -846,7 +846,7 @@
       #+sb-xc-host (bug "Can't dump multi-dim array")))
 
 ;;; Dump the vector object. If it's not simple, then actually dump a
-;;; simple realization of it. But we enter the original in the EQ or EQUAL
+;;; simple realization of it. But we enter the original in the EQ or SIMILAR
 ;;; tables.
 (defun dump-vector (x file)
   (let ((simple-version (if (array-header-p x)
