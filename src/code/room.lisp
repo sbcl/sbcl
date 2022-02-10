@@ -265,7 +265,7 @@
                            #.(if (typep gencgc-page-words '(unsigned-byte 16))
                                  16
                                  32)))
-              (flags (unsigned 8))
+              (flags (unsigned 8)) ; in C this is {type, need_zerofill, pinned}
               (gen (signed 8))))
   #+immobile-space
   (progn
@@ -456,9 +456,9 @@ We could try a few things to mitigate this:
                                                 end-page-bytes-used)
                                              most-positive-word)))))
       (when (sap> end start)
-        ;; The bits in the 5-bit flag field have fixed positions,
+        ;; The bits in the 6-bit 'type' field have fixed positions,
         ;; but the position of the field itself depends on endianness.
-        (let ((flags (ldb #+little-endian (byte 5 0) #+big-endian (byte 5 3)
+        (let ((flags (ldb (byte 6 (+ #+big-endian 2))
                           (slot (deref page-table start-page) 'flags))))
           ;; The GEN slot is declared as (SIGNED 8) which does not satisfy the
           ;; type restriction on the first argument to LOGBITP.

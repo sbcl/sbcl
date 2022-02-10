@@ -34,7 +34,7 @@
 #+gencgc
 (progn
 (defun page-need-to-zero (index)
-  (logbitp #+little-endian 5 #+big-endian 2
+  (logbitp #+little-endian 6 #+big-endian 1
            (slot (deref sb-vm::page-table index) 'sb-vm::flags)))
 (defun test-private-consing ()
   (let ((conses-per-page ; subtract one for the page header cons

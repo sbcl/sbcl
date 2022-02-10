@@ -823,10 +823,10 @@ Experimental: interface subject to change."
                                 (flags (sb-alien:slot page 'sb-vm::flags))
                                 .
                                 #+big-endian
-                                ((type      (ldb (byte 5 3) flags))
+                                ((type      (ldb (byte 6 2) flags))
                                  (dontmove  (logbitp 0 flags)))
                                 #+little-endian
-                                ((type      (ldb (byte 5 0) flags))
+                                ((type      (ldb (byte 6 0) flags))
                                  (dontmove  (logbitp 7 flags))))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)

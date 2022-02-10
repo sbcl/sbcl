@@ -8,8 +8,22 @@
                                                (sb-vm:find-page-index
                                                 (sb-kernel:get-lisp-obj-address x)))
                                'sb-vm::flags))))
-         (logbitp 4 (ldb (byte 5 #+big-endian 3 #+little-endian 0) flags)))))
+         (logbitp 4 ; SINGLE_OBJECT_FLAG
+                  (ldb (byte 6 (+ #+big-endian 2)) flags)))))
 (compile 'large-object-p)
+
+;;; Pseudo-static large objects should retain the single-object flag
+#+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
+(with-test (:name :pseudostatic-large-objects)
+  (sb-vm:map-allocated-objects
+   (lambda (obj type size)
+     (declare (ignore type size))
+     (when (>= (sb-ext:primitive-object-size obj) (* 4 sb-vm:gencgc-page-bytes))
+       (let* ((addr (sb-kernel:get-lisp-obj-address obj))
+              (pte (deref sb-vm:page-table (sb-vm:find-page-index addr))))
+         (when (eq (slot pte 'sb-vm::gen) sb-vm:+pseudo-static-generation+)
+           (assert (large-object-p obj))))))
+   :all))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter large-n-words (/ sb-vm:large-object-size sb-vm:n-word-bytes))

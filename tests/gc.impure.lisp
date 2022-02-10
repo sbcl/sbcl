@@ -268,21 +268,6 @@
                    sb-vm:fixedobj-space-size
                    sb-vm:varyobj-space-size)))))
 
-;;; Pseudo-static large objects should retain the single-object flag
-#+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
-(with-test (:name :pseudostatic-large-objects)
-  (sb-vm:map-allocated-objects
-   (lambda (obj type size)
-     (declare (ignore type size))
-     (when (>= (sb-ext:primitive-object-size obj) (* 4 sb-vm:gencgc-page-bytes))
-       (let* ((addr (sb-kernel:get-lisp-obj-address obj))
-              (pte (deref sb-vm:page-table (sb-vm:find-page-index addr))))
-         (when (eq (slot pte 'sb-vm::gen) sb-vm:+pseudo-static-generation+)
-           (let* ((flags (slot pte 'sb-vm::flags))
-                  (type (ldb (byte 5 (+ #+big-endian 3)) flags)))
-             (assert (logbitp 4 type)))))))
-   :all))
-
 (with-test (:name :unique-code-serialno :skipped-on :interpreter)
   (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))
     (sb-vm:map-allocated-objects

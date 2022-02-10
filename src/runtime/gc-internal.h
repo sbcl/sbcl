@@ -104,28 +104,6 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
     (WEAK_VECTOR_VISITED_BIT | flag_VectorWeak << ARRAY_FLAGS_POSITION | SIMPLE_VECTOR_WIDETAG)); \
   v->header ^= WEAK_VECTOR_VISITED_BIT
 
-/* values for the *_alloc_* parameters, also see the commentary for
- * struct page in gencgc-internal.h. These constants are used in gc-common,
- * so they can't easily be made gencgc-only */
-#define FREE_PAGE_FLAG        0
-#define PAGE_TYPE_MASK        7 // mask out the 'single-object flag'
-#define BOXED_PAGE_FLAG       1
-/* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
-/* If you change these constants, then possibly also change the following
- * functions in 'room.lisp':
- *  MAP-CODE-OBJECTS
- *  PRINT-ALL-CODE
- *  PRINT-LARGE-CODE
- *  PRINT-LARGE-UNBOXED
- */
-
-#define PAGE_TYPE_BOXED        1 // #b001
-#define PAGE_TYPE_UNBOXED      2 // #b010
-#define PAGE_TYPE_MIXED        3 // #b011
-#define PAGE_TYPE_CONS         5 // #b101
-#define PAGE_TYPE_CODE         7 // #b111
-#define OPEN_REGION_PAGE_FLAG  8
-
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \
   (is_header(header)?sizetab[header_widetag(header)](where):CONS_SIZE)

@@ -36,12 +36,12 @@ int gencgc_handle_wp_violation(void *);
 
 #if N_WORD_BITS == 64
   // It's more economical to store scan_start_offset using 4 bytes than 8.
-  // Doing so makes struct page fit in 8 bytes if bytes_used takes 2 bytes.
+  // Doing so makes struct page fit in 8 bytes if words_used takes 2 bytes.
   //   scan_start_offset = 4
-  //   bytes_used        = 2
+  //   words_used        = 2
   //   flags             = 1
   //   gen               = 1
-  // If bytes_used takes 4 bytes, then the above is 10 bytes which is padded to
+  // If words_used takes 4 bytes, then the above is 10 bytes which is padded to
   // 12, which is still an improvement over the 16 that it would have been.
 # define CONDENSED_PAGE_TABLE 1
 #else
@@ -57,6 +57,28 @@ int gencgc_handle_wp_violation(void *);
 #else
   typedef unsigned short page_words_t;
 #endif
+
+/* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
+/* If you change these constants, then possibly also change the following
+ * functions in 'room.lisp':
+ *  MAP-CODE-OBJECTS
+ *  PRINT-ALL-CODE
+ *  PRINT-LARGE-CODE
+ *  PRINT-LARGE-UNBOXED
+ */
+
+// 4 bits for the type, 1 bit for SINGLE_OBJECT, 1 bit for OPEN_REGION
+
+#define PAGE_TYPE_MASK        15 // mask out 'single-object' and 'open-region' flags
+#define PAGE_TYPE_BOXED        1 // #b001
+#define PAGE_TYPE_UNBOXED      2 // #b010
+#define PAGE_TYPE_MIXED        3 // #b011
+#define PAGE_TYPE_CONS         5 // #b101
+#define PAGE_TYPE_CODE         7 // #b111
+#define SINGLE_OBJECT_FLAG    16
+#define OPEN_REGION_PAGE_FLAG 32
+#define FREE_PAGE_FLAG        0
+#define BOXED_PAGE_FLAG       1
 
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently
@@ -93,24 +115,20 @@ struct page {
 
     // !!! If bit positions are changed, be sure to reflect the changes into
     // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
+    // and WALK-DYNAMIC-SPACE.
     unsigned char
         /*
-         * The low 4 bits of 'type' are interpreted as:
+         * The 4 low bits of 'type' are defined by PAGE_TYPE_x constants.
          *  0000 free
          *  ?001 strictly boxed data (pointers, immediates, object headers)
          *  ?010 strictly unboxed data
          *  ?011 mixed boxed/unboxed non-code objects
          *  ?111 code
-         *  1??? open region
-         * The high bit indicates that the page holds part of or the entirety
-         * of a single object and no other objects.
-         * Constants for this field are defined in gc-internal.h, the
-         * xxx_PAGE_FLAG definitions. */
-        type :5,
+         * The next two bits are SINGLE_OBJECT and OPEN_REGION */
+        type :6,
         /* Whether the page was used at all. This is the only bit that can
          * be 1 on a free page */
         need_zerofill :1,
-        padding :1,
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages,
          * and only meaningful for pages in the condemned set.
@@ -124,11 +142,6 @@ struct page {
     generation_index_t gen;
 };
 extern struct page *page_table;
-#ifdef LISP_FEATURE_BIG_ENDIAN
-# define WP_CLEARED_FLAG      (1<<1)
-#else
-# define WP_CLEARED_FLAG      (1<<6)
-#endif
 
 /* a structure to hold the state of a generation
  *
@@ -265,7 +278,6 @@ find_page_index(void *addr)
     return (-1);
 }
 
-#define SINGLE_OBJECT_FLAG (1<<4)
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
 
 static inline boolean pinned_p(lispobj obj, page_index_t page)

@@ -917,20 +917,18 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
         && page_table[index].gen == gen
         && !page_table[index].pinned;
 #else
-    /* Test the three 4 conditions above as a single comparison.
-     * Any bit that has a 1 in this mask must match the desired input.
-     * Ignore the 'need_zerofill' bit.
+    /* Test the three conditions above as a single comparison.
      *
-     *      pin -\   /-- need_zerofill
-     *            v v
-     * #b11111111_10011111
-     *             ^ ^^^^^ -- type
-     *  spare bit /
+     *      pin -\
+     *            v vvvvvv -- type
+     * #b11111111_10111111
+     *             ^
+     *              need_zerofill (ignored)
      *
      * The flags reside at 1 byte prior to 'gen' in the page structure.
      */
     int attributes_match =
-        (*(int16_t*)(&page_table[index].gen-1) & 0xFF9F) == ((gen<<8)|type);
+        (*(int16_t*)(&page_table[index].gen-1) & 0xFFBF) == ((gen<<8)|type);
 #endif
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     return attributes_match && page_cards_all_marked_nonsticky(index);

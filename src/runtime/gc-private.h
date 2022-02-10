@@ -28,11 +28,6 @@ lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
 void *gc_general_alloc(void*,sword_t,int);
 lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
                                    void*, int page_type);
-#define mixed_region 0
-#define boxed_region 0
-#define unboxed_region 0
-#define code_region 0
-#define cons_region 0
 #endif
 
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \
