@@ -4459,13 +4459,15 @@
                 (lvar-use control)
                 (find-constant
                  (cond ((not symbols) new-string)
-                       ((fasl-output-p *compile-object*)
+                       ((producing-fasl-file)
                         (acond ((assoc string (constant-cache *compilation*) :test 'equal)
                                 (cdr it))
                                (t
                                 (let ((new (if symbols
-                                               (sb-format::make-fmt-control-proxy
-                                                new-string symbols)
+                                               (let ((proxy (sb-format::make-fmt-control-proxy
+                                                             new-string symbols)))
+                                                 (maybe-emit-make-load-forms proxy)
+                                                 proxy)
                                                new-string)))
                                   (push (cons string new) (constant-cache *compilation*))
                                   new))))

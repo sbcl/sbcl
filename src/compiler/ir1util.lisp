@@ -2336,9 +2336,7 @@ is :ANY, the function name is not checked."
         ;; may contain those.
         (sb-xc:typep object '(or (unboxed-array (*)) number)))))
 
-;;; Return a LEAF which represents the specified constant object. If
-;;; we are producing a fasl file, make sure that MAKE-LOAD-FORM gets
-;;; used on any parts of the constant that it needs to be.
+;;; Return a LEAF which represents the specified constant object.
 ;;;
 ;;; We are allowed to coalesce things like EQUAL strings and bit-vectors
 ;;; when file-compiling, but not when using COMPILE.
@@ -2448,7 +2446,6 @@ is :ANY, the function name is not checked."
                (and coalescep
                     (get-similar object (similar-constants namespace)))
                (let ((new (make-constant object)))
-                 (maybe-emit-make-load-forms object)
                  (setf (gethash object (eql-constants namespace)) new)
                  (when coalescep
                    (setf (get-similar object (similar-constants namespace)) new))

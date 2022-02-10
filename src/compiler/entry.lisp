@@ -60,7 +60,7 @@
           (leaf-debug-name internal-fun))
     (setf (entry-info-xref info) (pack-xref-data (functional-xref internal-fun)))
     (let* ((inline-expansion (functional-inline-expansion internal-fun))
-           (form  (if (fasl-output-p *compile-object*)
+           (form  (if (producing-fasl-file)
                       ;; If compiling to a file, we only store sources if the STORE-SOURCE
                       ;; quality value is 3. If to memory, any nonzero value will do.
                       (and (policy bind (= store-source-form 3))
@@ -90,8 +90,9 @@ missing MAKE-LOAD-FORM methods?")
                                          (compiler-style-warn
                                           "Can't preserve function source: ~A"
                                           (princ-to-string c)))
-                                       (return nil))))
-                               (constant-value (find-constant inline-expansion)))))
+                                     (return nil))))
+                               (maybe-emit-make-load-forms inline-expansion)
+                               inline-expansion)))
                       (and (policy bind (> store-source-form 0))
                            inline-expansion)))
            (doc (functional-documentation internal-fun)))
@@ -103,8 +104,9 @@ missing MAKE-LOAD-FORM methods?")
         ;; points will be dumped.  If they contain values that need
         ;; make-load-form processing then we need to do it now (bug
         ;; 310132).
-        (setf (entry-info-arguments info)
-              (constant-value (find-constant args))))
+        (when (producing-fasl-file)
+          (maybe-emit-make-load-forms args))
+        (setf (entry-info-arguments info) args))
       ;; Arguably we should not parse/unparse if the type was obtained from
       ;; a proclamation. On the other hand, this preserves exact semantics
       ;; if a later DEFTYPE changes something. Be that as it may, storing
@@ -112,14 +114,15 @@ missing MAKE-LOAD-FORM methods?")
       (let ((spec (type-specifier (leaf-type internal-fun)))
             (result))
         (setf (entry-info-type info)
-              (constant-value
-               (find-constant
-                (if (and (listp spec)
-                         (typep (setq result (third spec))
-                                '(cons (eql values)
-                                  (cons t (cons (eql &optional) null)))))
-                    `(sfunction ,(cadr spec) ,(cadr result))
-                    spec)))))))
+              (let ((type (if (and (listp spec)
+                                   (typep (setq result (third spec))
+                                          '(cons (eql values)
+                                            (cons t (cons (eql &optional) null)))))
+                              `(sfunction ,(cadr spec) ,(cadr result))
+                              spec)))
+                (when (producing-fasl-file)
+                  (maybe-emit-make-load-forms type))
+                type)))))
   (values))
 
 ;;; Replace all references to COMPONENT's non-closure XEPs that appear
