@@ -436,14 +436,11 @@
 ;;; any subparts) are dumpable at all.
 (defun maybe-emit-make-load-forms (constant)
   (declare #-sb-xc-host (inline alloc-xset))
-  (dx-let ((xset (alloc-xset)))
+  (dx-let ((things-processed (alloc-xset)))
     (named-let grovel ((value constant))
-      ;; Unless VALUE is an object which which can't contain other objects,
-      ;; or was visited, or is acccessible in a named constant ...
       (unless (or (dumpable-leaflike-p value)
-                  (xset-member-p value xset)
-                  (gethash value (eql-constants *ir1-namespace*)))
-        (add-to-xset value xset)
+                  (xset-member-p value things-processed))
+        (add-to-xset value things-processed)
         ;; FIXME: shouldn't this be something like SB-XC:TYPECASE ?
         (typecase value
           (cons
