@@ -2200,23 +2200,12 @@
       (ignore-errors (delete-file lisp))
       (ignore-errors (delete-file fasl)))))
 
-;; named and unnamed
-(defconstant +born-to-coalesce+ '.born-to-coalesce.)
-(test-util:with-test (:name (compile compile-file :coalescing symbol))
-  (multiple-value-bind (file-fun core-fun)
-      (compile2 '(lambda ()
-                  (let ((x (cons +born-to-coalesce+ nil))
-                        (y (cons '.born-to-coalesce. nil)))
-                    (list x y))))
-    (assert (= 1 (count-code-constants '.born-to-coalesce. file-fun)))
-    (assert (= 1 (count-code-constants '.born-to-coalesce. core-fun)))))
-
 ;; some things must retain identity under COMPILE, but we want to coalesce them under COMPILE-FILE
 (defun assert-coalescing (constant)
-  (let ((value (copy-seq (symbol-value constant))))
+  (let ((value (copy-seq constant)))
     (multiple-value-bind (file-fun core-fun)
         (compile2 `(lambda ()
-                     (let ((x (cons ,constant nil))
+                     (let ((x (cons ',constant nil))
                            (y (cons ',value nil)))
                        (list x y))))
       (assert (= 1 (count-code-constants value file-fun)))
@@ -2234,17 +2223,14 @@
                      (equal a b)
                      (not (eq a b))))))))
 
-(defconstant +born-to-coalesce2+ "maybe coalesce me!")
 (test-util:with-test (:name (compile compile-file :coalescing string))
-  (assert-coalescing '+born-to-coalesce2+))
+  (assert-coalescing "maybe coalesce me!"))
 
-(defconstant +born-to-coalesce3+ #*01101001011101110100011)
 (test-util:with-test (:name (compile compile-file :coalescing bit-vector))
-  (assert-coalescing '+born-to-coalesce3+))
+  (assert-coalescing #*01101001011101110100011))
 
-(defconstant +born-to-coalesce4+ '(foo bar "zot" 123 (nested "quux") #*0101110010))
 (test-util:with-test (:name (compile compile-file :coalescing :mixed))
-  (assert-coalescing '+born-to-coalesce4+))
+  (assert-coalescing '(foo bar "zot" 123 (nested "quux") #*0101110010)))
 
 (defclass some-constant-thing () ())
 

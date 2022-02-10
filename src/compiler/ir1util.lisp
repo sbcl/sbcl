@@ -2346,42 +2346,8 @@ is :ANY, the function name is not checked."
 ;;;    not strict enough because base-string and character-string can't coalesce.
 ;;;    We deal with this fine, but a real SIMILAR kind of hash-table would be nice.
 ;;;  - arrays other than the handled kinds can be similar.
-;;;
-;;; If SYMBOL is supplied, then we will never try to match OBJECT against
-;;; a constant already present in the FASL-OUTPUT-EQ-TABLE, but we _will_ add
-;;; items to the namespace's EQL table. The reason is extremely subtle:
-;;; * if an anonymous structure constant happens to be EQ to a named constant
-;;;   seen first, but there is no applicable make-load-form-method on the type of
-;;;   the object, we "accidentally" permit the structure lacking a load form
-;;;   to be used (as if dumped) by virtue of the fact that it sees the named constant.
-;;;   I can't imagine that the spec wants that to work as if by magic, when it sure
-;;;   seems like a user error. However, our own code relies on such in a few places:
-;;;    (1) we want to dump #<SB-KERNEL:NAMED-TYPE T> but only after seeing it referenced
-;;;        in the same file as SB-KERNEL:*UNIVERSAL-TYPE*.
-;;;        This occurs where ADD-EQUALITY-CONSTRAINTS calls FIND-CONSTANT.
-;;;    (2) src/code/aprof would get an error
-;;;            "don't know how to dump R13 (default MAKE-LOAD-FORM method called)."
-;;;        in the LIST IR2-converter for
-;;;            (load-time-value `((xor :qword ,p-a-flag ,(get-gpr :qword rbp-offset)) ...))
-;;;        where P-A-FLAG is
-;;;            (defconstant-eqx p-a-flag `(ea 40 ,(get-gpr :qword ...)))
-;;;        But it somehow loses the fact that p-a-flag was a defconstant.
-;;;
-;;; * if within the same file we are willing to coalesce a named constant and
-;;;   unnamed constant (where the unnamed was dumped first), but in a different file
-;;;   we did not see a use of a similar unnamed constant, and went directly to
-;;;   SYMBOL-GLOBAL-VALUE, then two functions which reference the same globally named
-;;;   constant C might end up seeing two different versions of the load-time constant -
-;;;   one whose load-time producing form is `(SYMBOL-VALUE ,C) and one whose
-;;;   producing form is whatever else it was.
-;;;   This would matter only if at load-time, the form which produced C assigns
-;;;   some completely different (not EQ and maybe not even similar) to the symbol.
-;;;   But some weird behavior was definitely observable in user code.
 (defun find-constant (object &optional name
                              &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*)))
-  (when (or #+metaspace (typep object 'sb-vm:layout))
-    (error "Cowardly refusing to FIND-CONSTANT on a LAYOUT"))
-
   (cond
     ;; Pick off some objects that aren't actually constants in user
     ;; code.  These things appear as literals in forms such as
@@ -2425,21 +2391,9 @@ is :ANY, the function name is not checked."
            ;; If the constant is named, always look in the named-constants table first.
            ;; This ensure that there is no chance of referring to the constant at load-time
            ;; through an access path other than `(SYMBOL-GLOBAL-VALUE ,name).
-           ;; Additionally, replace any unnamed constant that is similar to this one
-           ;; with the named constant. (THIS IS VERY SUSPICIOUS)
-           (or (gethash name (named-constants namespace))
-               (let ((new (make-constant object (ctype-of object) name)))
-                 (setf (gethash name (named-constants namespace)) new)
-                 ;; If there was no EQL constant, or an unnamed one, add NEW
-                 (let ((old (gethash object (eql-constants namespace))))
-                   (when (or (not old) (not (leaf-has-source-name-p old)))
-                     (setf (gethash object (eql-constants namespace)) new)))
-                 ;; Same for SIMILAR table, if coalescible
-                 (when coalescep
-                   (let ((old (get-similar object (similar-constants namespace))))
-                     (when (or (not old) (not (leaf-has-source-name-p old)))
-                       (setf (get-similar object (similar-constants namespace)) new))))
-                 new))
+           (ensure-gethash name
+                           (named-constants namespace)
+                           (make-constant object (ctype-of object) name))
            ;; If the constant is anonymous, just make a new constant
            ;; unless it is EQL or similar to an existing leaf.
            (or (gethash object (eql-constants namespace))
