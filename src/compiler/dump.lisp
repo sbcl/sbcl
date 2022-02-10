@@ -466,12 +466,8 @@
                               ((eq x sb-c::*debug-name-ellipsis*) 2)
                               (t (bug "Bogus debug name marker")))))
              (instance
-              (let ((c (gethash x (sb-c::eql-constants sb-c::*ir1-namespace*))))
-                (cond ((and c (sb-c::leaf-has-source-name-p c))
-                       (dump-load-time-symbol-global-value c file))
-                      (t
-                       (dump-structure x file)
-                       (eq-save-object x file)))))
+              (dump-structure x file)
+              (eq-save-object x file))
              (array
               ;; DUMP-ARRAY (and its callees) are responsible for
               ;; updating the EQ and EQUAL hash tables.
