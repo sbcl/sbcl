@@ -28,8 +28,6 @@ CPPFLAGS += -no-cpp-precomp
 
 ifdef LISP_FEATURE_GENCGC
   GC_SRC = fullcgc.c gencgc.c traceroot.c
-else
-  GC_SRC = cheneygc.c
 endif
 
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
