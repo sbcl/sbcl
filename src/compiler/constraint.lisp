@@ -745,7 +745,7 @@
                            (add 'eql var1 var2 nil))
                           ((constant-lvar-p arg2)
                            (add 'eql var1
-                                (find-constant (lvar-value arg2))
+                                (nth-value 1 (lvar-value arg2))
                                 nil))
                           (t
                            (add-test-constraint quick-p

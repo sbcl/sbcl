@@ -545,7 +545,7 @@ new string COUNT long filled with the fill character."
                     string))
         (with-one-string (string start end)
           (do ((index start (1+ index))
-               (cases +character-cases+))
+               (cases #.+character-cases+))
               ((>= index end))
             (declare (optimize (sb-c:insert-array-bounds-checks 0)))
             (let ((char (schar (truly-the (or simple-base-string

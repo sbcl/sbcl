@@ -36,11 +36,14 @@
   ;; can get them from the table rather than dumping them again. The
   ;; SIMILAR-TABLE is used for lists and strings, and the EQ-TABLE is
   ;; used for everything else. We use a separate EQ table to avoid
-  ;; performance pathologies with objects for which SIMILAR degenerates
-  ;; to EQL. Everything entered in the SIMILAR table is also entered in
-  ;; the EQ table.
+  ;; performance pathologies with objects for which SIMILAR
+  ;; degenerates to EQL. Everything entered in the SIMILAR table is
+  ;; also entered in the EQ table. The NAMED-CONSTANT is used for
+  ;; named constants whose references are dumped as load time values
+  ;; of SYMBOL-GLOBAL-VALUE.
   (similar-table (make-similarity-table) :type hash-table :read-only t)
   (eq-table (make-hash-table :test 'eq) :type hash-table :read-only t)
+  (named-constant-table (make-hash-table :test #'eq) :type hash-table :read-only t)
   ;; the INSTANCE table maps dumpable instances to unique IDs for calculating
   ;; a similarity hash of composite objects that contain instances.
   ;; A user-defined hash function can not use address-based hashing, and it is
@@ -620,6 +623,21 @@
     (setf (gethash constant table) handle))
   (values))
 
+;;; Return T iff the constant named by NAME has already been
+;;; dumped. It's been dumped if it's in the NAMED-CONSTANTS table.
+(defun fasl-named-constant-already-dumped-p (name file)
+  (and (gethash name (fasl-output-named-constant-table file)) t))
+
+;;; Use HANDLE whenever we try to dump a constant named NAME. HANDLE
+;;; should have been returned earlier by
+;;; FASL-DUMP-LOAD-TIME-VALUE-LAMBDA.
+(defun fasl-note-handle-for-named-constant (name handle file)
+  (let ((table (fasl-output-named-constant-table file)))
+    (when (gethash name table)
+      (error "named constant ~S already dumped?" name))
+    (setf (gethash name table) handle))
+  (values))
+
 ;;; Note that the specified structure can just be dumped by
 ;;; enumerating the slots.
 (defun fasl-note-dumpable-instance (structure file)
@@ -1081,10 +1099,10 @@
       (dump-integer info fasl-output))
     (incf n)))
 
-(defun dump-load-time-symbol-global-value (constant fasl-output)
-  (dump-object 'symbol-global-value fasl-output)
-  (dump-object (sb-c::leaf-source-name constant) fasl-output)
-  (dump-fop 'fop-funcall fasl-output 1))
+;;; Dump a reference to the constant named by NAME.
+(defun dump-named-constant-reference (name fasl-output)
+  (dump-push (gethash name (fasl-output-named-constant-table fasl-output))
+             fasl-output))
 
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.
@@ -1122,7 +1140,7 @@
                       ;; such a situation arises.
                       (not (member (sb-c::leaf-source-name entry)
                                    sb-c::*hairy-defconstants*)))
-                 (dump-load-time-symbol-global-value entry fasl-output)
+                 (dump-named-constant-reference (sb-c::leaf-source-name entry) fasl-output)
                  (dump-object (sb-c::constant-value entry) fasl-output)))
             (cons
              (ecase (car entry)

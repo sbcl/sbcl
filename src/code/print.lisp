@@ -778,8 +778,8 @@ variable: an unreadable object representing the error is printed instead.")
                      (< (the fixnum (aref bases code)) base))))
 
     (prog ((len (length name))
-           (attributes +character-attributes+)
-           (bases +digit-bases+)
+           (attributes #.+character-attributes+)
+           (bases #.+digit-bases+)
            (base *print-base*)
            (letter-attribute
             (case (readtable-case readtable)

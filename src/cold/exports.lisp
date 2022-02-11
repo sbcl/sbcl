@@ -1214,7 +1214,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "LOAD-FORM-IS-DEFAULT-MLFSS-P"
            "*!LOAD-TIME-VALUES*"
            "OPEN-FASL-OUTPUT"
-           "*!COLD-DEFSYMBOLS*"
            "*!COLD-TOPLEVELS*"
            "COLD-CONS" "COLD-INTERN" "COLD-PUSH"))
 

@@ -628,7 +628,7 @@
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
 ;;; loadtime value, represented by (CONS KEYWORD ..).
-(declaim (special *!cold-toplevels* *!cold-defsymbols* *cold-methods*))
+(declaim (special *!cold-toplevels* *cold-methods*))
 
 
 ;;;; miscellaneous stuff to read and write the core memory
@@ -1098,33 +1098,11 @@ core and return a descriptor to it."
 (defun cold-symbol-value (symbol)
   (let ((val (read-wordindexed (cold-intern symbol) sb-vm:symbol-value-slot)))
     (if (= (descriptor-bits val) sb-vm:unbound-marker-widetag)
-        (unbound-cold-symbol-handler symbol)
+        (error "Symbol value of ~a is unbound." symbol)
         val)))
 (defun cold-fdefn-fun (cold-fdefn)
   (read-wordindexed cold-fdefn sb-vm:fdefn-fun-slot))
 
-(defun unbound-cold-symbol-handler (symbol)
-  (awhen (and (eq (sb-xc:symbol-package symbol) *cl-package*)
-              (find-symbol (string symbol) "SB-XC"))
-    (setq symbol it))
-  (let ((host-val (and (boundp symbol) (symbol-value symbol))))
-    (etypecase host-val
-      (number
-       ;; This case is intended to handle
-       ;; (DEFCONSTANT LEAST-POSITIVE-NORMALIZED-SHORT-FLOAT
-       ;;              LEAST-POSITIVE-NORMALIZED-SINGLE-FLOAT) ; etc
-       ;; Several uses of MOST-POSITIVE-FIXNUM come through here as well
-       ;; due to (DEFCONSTANT mumble-LIMIT most-positive-fixnum).
-       ;; That seems weird but doesn't seem to be a problem.
-       ;; (i.e. why don't we just dump the fixnum?)
-       (number-to-core host-val))
-      (named-type
-       (let ((target-val (ctype-to-core (named-type-name host-val) host-val)))
-          ;; Though it looks complicated to assign cold symbols on demand,
-          ;; it avoids writing code to build the layout of NAMED-TYPE in the
-          ;; way we build other primordial stuff such as layout-of-layout.
-          (cold-set symbol target-val)
-          target-val)))))
 
 ;;;; layouts and type system pre-initialization
 
@@ -2575,41 +2553,34 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (multiple-value-bind (fun args) (pop-args n (fasl-input))
       (if args
           (case fun
-           (symbol-global-value (cold-symbol-value (first args)))
            (values-specifier-type
             (let* ((des (first args))
                    (spec (if (descriptor-p des) (host-object-from-core des) des)))
-              (ctype-to-core spec (funcall fun spec))))
+              (ctype-to-core spec (if (eq spec '*)
+                                      *wild-type*
+                                      (funcall fun spec)))))
            (t (error "Can't FOP-FUNCALL with function ~S in cold load." fun)))
           (let ((counter *load-time-value-counter*))
             (push (cold-list (cold-intern :load-time-value) fun
                              (number-to-core counter)) *!cold-toplevels*)
             (setf *load-time-value-counter* (1+ counter))
-            (make-ltv-patch counter)))))
-
-  (define-cold-fop (fop-funcall-for-effect (n))
-    (multiple-value-bind (fun args) (pop-args n (fasl-input))
-      (if (not args)
-          (push fun *!cold-toplevels*)
-          (case fun
-            ((sb-impl::%defconstant)
-             (destructuring-bind (name val . rest) args
-               (cold-set name (if (symbolp val) (cold-intern val) val))
-               (push (apply #'cold-list (cold-intern fun) (cold-intern name) rest)
-                     *!cold-defsymbols*)))
-            (t
-             (error "Can't FOP-FUNCALL-FOR-EFFECT with function ~S in cold load" fun)))))))
-
-;;; Needed for certain L-T-V lambdas that use the -NO-SKIP variant of funcall.
-#-c-headers-only
-(setf (svref **fop-funs** (get 'fop-funcall-no-skip 'opcode))
-      (svref **fop-funs** (get 'fop-funcall 'opcode)))
+            (make-ltv-patch counter))))))
 
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*
             (allocate-vector sb-vm:simple-vector-widetag
                              *load-time-value-counter*
                              *load-time-value-counter*)))
+
+(define-cold-fop (fop-funcall-for-effect (n))
+  (if (= n 0)
+      (push (pop-stack) *!cold-toplevels*)
+      (error "Can't FOP-FUNCALL-FOR-EFFECT random stuff in cold load")))
+
+;;; Needed for certain L-T-V lambdas that use the -NO-SKIP variant of funcall.
+#-c-headers-only
+(setf (svref **fop-funs** (get 'fop-funcall-no-skip 'opcode))
+      (svref **fop-funs** (get 'fop-funcall 'opcode)))
 
 
 ;;;; cold fops for fixing up circularities
@@ -3850,7 +3821,6 @@ III. initially undefined function references (alphabetically):
            (*ctype-cache* (make-hash-table :test 'equal))
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
            (*cold-layout-by-addr* (make-hash-table :test 'eql)) ; addr -> cold-layout
-           (*!cold-defsymbols* nil)
            (*tls-index-to-symbol* nil)
            ;; '*COLD-METHODS* is never seen in the target, so does not need
            ;; to adhere to the #\! convention for automatic uninterning.
@@ -3920,14 +3890,12 @@ III. initially undefined function references (alphabetically):
       (sb-cold::check-no-new-cl-symbols)
 
       (when (and verbose core-file-name)
-        (format t "~&; SB-Loader: (~D~@{+~D~}) vars/methods/other~%"
-                (length *!cold-defsymbols*)
+        (format t "~&; SB-Loader: (~D~@{+~D~}) methods/other~%"
                 (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
                 (length *!cold-toplevels*)))
 
-      (dolist (symbol '(*!cold-defsymbols* *!cold-toplevels*))
-        (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
-        (makunbound symbol)) ; so no further PUSHes can be done
+      (cold-set '*!cold-toplevels* (list-to-core (nreverse *!cold-toplevels*)))
+      (makunbound '*!cold-toplevels*) ; so no further PUSHes can be done
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (sort-initial-methods)

@@ -409,10 +409,10 @@
 ;;; the declared type for this variable
 (define-info-type (:variable :type)
   :type-spec ctype
-  :default #+sb-xc-host (lambda (x)
-                          (declare (special *universal-type*) (ignore x))
-                          *universal-type*)
-           #-sb-xc-host *universal-type*)
+  :default (lambda (name)
+             (declare (ignore name)
+                      #+sb-xc-host (special *universal-type*))
+             *universal-type*))
 
 ;;; where this type and kind information came from
 (define-info-type (:variable :where-from)

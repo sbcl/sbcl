@@ -1043,13 +1043,13 @@ necessary, since type inference may take arbitrarily long to converge.")
     (return-from convert-and-maybe-compile))
   ;; Don't bother to compile simple objects that just sit there.
   (when (and form (or (symbolp form) (consp form)))
-    (if (and #-sb-xc-host
-             (policy *policy*
+    (if (and (policy *policy*
                  ;; FOP-compiled code is harder to debug.
                  (or (< debug 2)
                      (> space debug)))
              (not (eq (block-compile *compilation*) t))
-             (fopcompilable-p form expand))
+             #+sb-xc-host nil
+             #-sb-xc-host (fopcompilable-p form expand))
         (let ((*fopcompile-label-counter* 0))
           (fopcompile form path nil expand))
         (let ((*lexenv* (make-lexenv
@@ -1611,6 +1611,25 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (setf (cdr circular-ref)
                        (append (cdr circular-ref) (cdr info)))))))
          nil)))))
+
+;;; Arrange for a load time reference to the constant named by NAME to
+;;; get dumped via the load form (SYMBOL-GLOBAL-VALUE ',NAME) if its
+;;; value is a pointer value and no reference to the named constant
+;;; has been dumped yet.
+(defun emit-load-time-constant-reference (name)
+  (let ((fasl-output *compile-object*))
+    (unless (or (sb-xc:typep (symbol-value name) '(or fixnum character symbol))
+                (member name *hairy-defconstants*)
+                (sb-fasl::fasl-named-constant-already-dumped-p name fasl-output))
+      (sb-fasl::fasl-note-handle-for-named-constant
+       name
+       (compile-load-time-value
+        ;; KLUDGE: Inhibit transforms trying to turn
+        ;; (SYMBOL-GLOBAL-VALUE 'X) back into X.
+        `(locally (declare (notinline symbol-global-value))
+           (symbol-global-value ',name))
+        t)
+       fasl-output))))
 
 
 ;;;; COMPILE-FILE

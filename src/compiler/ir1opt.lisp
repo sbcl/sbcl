@@ -73,11 +73,11 @@
         leaf)
     (if (and (ref-p use)
              (constant-p (setf leaf (ref-leaf use))))
-        (constant-value leaf)
+        (values (constant-value leaf) leaf)
         (multiple-value-bind (constantp value) (type-singleton-p type)
           (unless constantp
             (error "~S used on non-constant LVAR ~S" 'lvar-value lvar))
-          value))))
+          (values value (find-constant value))))))
 
 (defun lvar-value-is-nil (lvar)
   (and (constant-lvar-p lvar) (null (lvar-value lvar))))

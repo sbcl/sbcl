@@ -423,6 +423,8 @@
                        (type (type-specifier (info :variable :type name))))
                    `(macro . (the ,type ,expansion))))
                 (:constant
+                 (when (producing-fasl-file)
+                   (emit-load-time-constant-reference name))
                  (find-constant (symbol-value name) name))
                 (t
                  (make-global-var :kind kind

@@ -599,7 +599,7 @@
 ;;; this table, as 42 is EQ to 42 no matter where in the source it
 ;;; appears. GET-SOURCE-PATH and NOTE-SOURCE-PATH functions should be
 ;;; always used to access this table.
-(declaim (hash-table *source-paths*))
+(declaim (type hash-table *source-paths*))
 (defvar *source-paths*)
 
 (defmacro with-source-paths (&body forms)

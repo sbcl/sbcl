@@ -36,15 +36,8 @@
 ;;; since PROCESS-TOPLEVEL-FORM only expands the macros at the first
 ;;; position.
 
-(flet ((setq-fopcompilable-p (args)
-         (loop for (name value) on args by #'cddr
-               always (and (symbolp name)
-                           (member (info :variable :kind name)
-                                   '(:special :global))
-                           (fopcompilable-p value)))))
-
- #-sb-xc-host
- (defun fopcompilable-p (form &optional (expand t))
+#-sb-xc-host
+(defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.
   ;;      (SET '*PACKAGE* (FIND-PACKAGE "CL-USER"))
@@ -125,7 +118,11 @@
                              (every #'fopcompilable-p args)))
                        ;; Allow SETQ only on special or global variables
                        ((setq)
-                        (setq-fopcompilable-p args))
+                        (loop for (name value) on args by #'cddr
+                              always (and (symbolp name)
+                                          (member (info :variable :kind name)
+                                                  '(:special :global))
+                                          (fopcompilable-p value))))
                        ;; The real toplevel form processing has already been
                        ;; done, so EVAL-WHEN handling will be easy.
                        ((eval-when)
@@ -161,30 +158,7 @@
                              (not (macro-function operator)) ; redundant check
                              (every #'fopcompilable-p args)))))))))))
 
- ;; Special version of FOPCOMPILABLE-P which recognizes toplevel calls
- ;; that the cold loader is able to perform in the host to create the
- ;; desired effect upon the target core.
- ;; If an effect should occur "sooner than cold-init",
- ;; this is probably where you need to make it happen.
- #+sb-xc-host
- (defun fopcompilable-p (form &optional (expand t))
-   (declare (ignore expand))
-   (or (and (self-evaluating-p form)
-            (constant-fopcompilable-p form))
-       ;; Arbitrary computed constants aren't supported because we don't know
-       ;; where in FOPCOMPILE's recursion it should stop recursing and just dump
-       ;; whatever the constant piece is. For example in (cons `(a ,(+ 1 2)) (f))
-       ;; the CAR is built wholly from foldable operators but the CDR is not.
-       ;; Constant symbols and QUOTE forms are generally fine to use though.
-       (and (symbolp form)
-            (eq (info :variable :kind form) :constant))
-       (and (typep form '(cons (eql quote) (cons t null)))
-            (constant-fopcompilable-p (constant-form-value form)))
-       (and (listp form)
-            (and (eq (first form) 'sb-impl::%defconstant)
-                 (fopcompilable-p (third form))))))
-) ; end FLET
-
+#-sb-xc-host
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
     (multiple-value-bind (body decls) (parse-body (cdr args) nil)

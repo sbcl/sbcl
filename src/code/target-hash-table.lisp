@@ -470,7 +470,7 @@ Examples:
            ;; FIXME: Original REHASH-THRESHOLD default should be 1.0,
            ;; not 1, to make it easier for the compiler to avoid
            ;; boxing.
-           (rehash-threshold (max +min-hash-table-rehash-threshold+
+           (rehash-threshold (max #.+min-hash-table-rehash-threshold+
                                   (float rehash-threshold $1.0)))) ; always single-float
       (%make-hash-table
        ;; compute flags. The stored KIND bits don't matter for a user-supplied hash
@@ -581,7 +581,7 @@ Examples:
       (%make-hash-table (pack-ht-flags-kind kind)
                         test test-fun hash-fun
                         +min-hash-table-size+
-                        default-rehash-size
+                        #.default-rehash-size
                         $1.0)))) ; rehash threshold
 
 ;;; I guess we might have more than one representation of a table,

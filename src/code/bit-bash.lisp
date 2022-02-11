@@ -44,10 +44,10 @@
   (declare (ignorable source destination expect-bits-per-element))
   #+(and sb-devel (not sb-devel-no-errors))
   `(let ((src-bits-per-element
-          (ash 1 (aref %%simple-array-n-bits-shifts%%
+          (ash 1 (aref #.%%simple-array-n-bits-shifts%%
                        (%other-pointer-widetag ,source))))
          (dst-bits-per-element
-          (ash 1 (aref %%simple-array-n-bits-shifts%%
+          (ash 1 (aref #.%%simple-array-n-bits-shifts%%
                        (%other-pointer-widetag ,destination)))))
     (when (or (/= src-bits-per-element ,expect-bits-per-element)
               (/= dst-bits-per-element ,expect-bits-per-element))

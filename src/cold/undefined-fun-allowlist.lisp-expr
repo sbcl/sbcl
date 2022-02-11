@@ -185,7 +185,6 @@
   sb-c::apply-core-fixups
   sb-c::compiled-debug-info-char-offset
   sb-c::compiled-debug-info-tlf-number
-  sb-c::fopcompilable-p
   sb-c::pack-xref-data
   sb-c::prepare-for-compile
   sb-sys:reinit-internal-real-time))

@@ -33,7 +33,6 @@
 
 ;;; a list of toplevel things set by GENESIS
 (defvar *!cold-toplevels*)
-(defvar *!cold-defsymbols*)  ; "easy" DEFCONSTANTs
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
@@ -77,6 +76,35 @@
         *print-pprint-dispatch* (sb-pretty::make-pprint-dispatch-table #() nil nil)
         *suppress-print-errors* nil
         *current-level-in-print* 0))
+
+;;; Create a stream that works early.
+(defun !make-cold-stderr-stream ()
+  (let ((stderr
+          #-win32 2
+          #+win32 (sb-win32::get-std-handle-or-null sb-win32::+std-error-handle+))
+        (buf (make-string 1 :element-type 'base-char :initial-element #\Space)))
+    (%make-fd-stream
+     :out (lambda (stream ch)
+            (declare (ignore stream))
+            (setf (char buf 0) ch)
+            (sb-unix:unix-write stderr buf 0 1))
+     :sout (lambda (stream string start end)
+             (declare (ignore stream))
+             (flet ((out (s start len)
+                      (when (plusp len)
+                        (setf (char buf 0) (char s (+ start len -1))))
+                      (sb-unix:unix-write stderr s start len)))
+               (if (typep string 'simple-base-string)
+                   (out string start (- end start))
+                   (let ((n (- end start)))
+                     ;; will croak if there is any non-BASE-CHAR in the string
+                     (out (replace (make-array n :element-type 'base-char)
+                                   string :start2 start) 0 n)))))
+     :misc (lambda (stream operation arg1)
+             (declare (ignore stream arg1))
+             (stream-misc-case (operation :default nil)
+               (:charpos ; impart just enough smarts to make FRESH-LINE dtrt
+                (if (eql (char buf 0) #\newline) 0 1)))))))
 
 (defun xc-sanity-checks ()
   ;; Verify on startup that some constants were dumped reflecting the
@@ -179,23 +207,11 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb-kernel::!set-up-structure-object-class)
 
-  ;; Genesis is able to perform some of the work of DEFCONSTANT, but
-  ;; not all of it. It assigns symbol values, but can not manipulate
-  ;; globaldb. Therefore, a subtlety of these macros for bootstrap is
-  ;; that we see each DEFthing twice: once during cold-load and again
-  ;; here.
-  (setq sb-pcl::*!docstrings* nil) ; needed by %DEFCONSTANT
-  (dolist (x *!cold-defsymbols*)
-    (destructuring-bind (fun name source-loc . docstring) x
-      (aver (boundp name)) ; it's a bug if genesis didn't initialize
-      (ecase fun
-        (%defconstant
-         (apply #'%defconstant name (symbol-value name) source-loc docstring)))))
-
   (unless (!c-runtime-noinform-p)
     #+(or x86 x86-64) (format t "[Length(TLFs)=~D]" (length *!cold-toplevels*))
     #-(or x86 x86-64) (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil))
 
+  (setq sb-pcl::*!docstrings* nil) ; needed before any documentation is set
   (setq sb-c::*queued-proclaims* nil) ; needed before any proclaims are run
 
   (/show0 "calling cold toplevel forms and fixups")
@@ -219,10 +235,7 @@
   (/show0 "done with loop over cold toplevel forms and fixups")
   (unless (!c-runtime-noinform-p) (terpri))
 
-  ;; Precise GC seems to think these symbols are live during the final GC
-  ;; which in turn enlivens a bunch of other "*!foo*" symbols.
-  ;; Setting them to NIL helps a little bit.
-  (setq *!cold-defsymbols* nil *!cold-toplevels* nil)
+  (makunbound '*!cold-toplevels*) ; so it gets GC'd
 
   #+win32 (show-and-call reinit-internal-real-time)
 

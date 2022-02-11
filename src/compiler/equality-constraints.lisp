@@ -60,7 +60,7 @@
        (let* ((x (ok-lvar-lambda-var (first args) constraints))
               (second (second args))
               (y (if (constant-lvar-p second)
-                     (find-constant (lvar-value second))
+                     (nth-value 1 (lvar-value second))
                      (ok-lvar-lambda-var second constraints))))
          (when (and x y)
            ;; TODO: inherit constraints

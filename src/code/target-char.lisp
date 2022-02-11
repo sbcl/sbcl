@@ -552,7 +552,7 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
 
 (defmacro with-case-info ((char index-var cases-var
                            &key miss-value
-                                (cases '+character-cases+))
+                                (cases +character-cases+))
                           &body body)
   (let ((code-var (gensym "CODE"))
         (shifted-var (gensym "SHIFTED"))
@@ -562,9 +562,9 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
            (declare (optimize (sb-c:insert-array-bounds-checks 0)))
          (let ((,code-var (char-code ,char)))
            (let* ((,shifted-var (ash ,code-var -6))
-                  (,page-var (if (>= ,shifted-var (length +character-case-pages+))
+                  (,page-var (if (>= ,shifted-var ,(length +character-case-pages+))
                                  (return ,miss-value)
-                                 (aref +character-case-pages+ ,shifted-var))))
+                                 (aref ,+character-case-pages+ ,shifted-var))))
              (if (= ,page-var 255)
                  ,miss-value
                  (let ((,index-var (* (+ (ash ,page-var 6)
@@ -643,11 +643,11 @@ is either numeric or alphabetic."
          (shifted (ash code -6))
          (page (if (>= shifted (length +character-case-pages+))
                    (return-from equal-char-code code)
-                   (aref +character-case-pages+ shifted))))
+                   (aref #.+character-case-pages+ shifted))))
     (if (= page 255)
         code
         (let ((down-code
-                (aref +character-cases+
+                (aref #.+character-cases+
                       (* (+ (ash page 6)
                             (ldb (byte 6 0) code))
                          2))))
