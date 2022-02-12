@@ -61,6 +61,7 @@
 #include "unaligned.h"
 
 #include "gc.h"
+#include "gc-private.h"
 #include "gencgc-internal.h"
 #include <wincrypt.h>
 #include <stdarg.h>
