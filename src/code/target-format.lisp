@@ -397,36 +397,22 @@
                   (format-print-ordinal stream arg)
                   (format-print-cardinal stream arg)))))))
 
-(defconstant +cardinal-ones+
-  #(nil "one" "two" "three" "four" "five" "six" "seven" "eight" "nine"))
-
-(defconstant +cardinal-tens+
+(defconstant-eqx +cardinal-tens+
   #(nil nil "twenty" "thirty" "forty"
-        "fifty" "sixty" "seventy" "eighty" "ninety"))
+        "fifty" "sixty" "seventy" "eighty" "ninety")
+  #'equalp)
 
-(defconstant +cardinal-teens+
+(defconstant-eqx +cardinal-teens+
   #("ten" "eleven" "twelve" "thirteen" "fourteen"  ;;; RAD
-    "fifteen" "sixteen" "seventeen" "eighteen" "nineteen"))
+    "fifteen" "sixteen" "seventeen" "eighteen" "nineteen")
+  #'equalp)
 
-(defconstant +cardinal-periods+
-  #("" " thousand" " million" " billion" " trillion" " quadrillion"
-    " quintillion" " sextillion" " septillion" " octillion" " nonillion"
-    " decillion" " undecillion" " duodecillion" " tredecillion"
-    " quattuordecillion" " quindecillion" " sexdecillion" " septendecillion"
-    " octodecillion" " novemdecillion" " vigintillion"))
-
-(defconstant +ordinal-ones+
-  #(nil "first" "second" "third" "fourth"
-        "fifth" "sixth" "seventh" "eighth" "ninth"))
-
-(defconstant +ordinal-tens+
-  #(nil "tenth" "twentieth" "thirtieth" "fortieth"
-        "fiftieth" "sixtieth" "seventieth" "eightieth" "ninetieth"))
-
-(defun format-print-small-cardinal (stream n)
+(defun format-print-small-cardinal
+    (stream n &aux (.cardinal-ones.
+                    #(nil "one" "two" "three" "four" "five" "six" "seven" "eight" "nine")))
   (multiple-value-bind (hundreds rem) (truncate n 100)
     (when (plusp hundreds)
-      (write-string (svref +cardinal-ones+ hundreds) stream)
+      (write-string (svref .cardinal-ones. hundreds) stream)
       (write-string " hundred" stream)
       (when (plusp rem)
         (write-char #\space stream)))
@@ -436,11 +422,11 @@
               (write-string (svref +cardinal-tens+ tens) stream)
               (when (plusp ones)
                 (write-char #\- stream)
-                (write-string (svref +cardinal-ones+ ones) stream)))
+                (write-string (svref .cardinal-ones. ones) stream)))
              ((= tens 1)
               (write-string (svref +cardinal-teens+ ones) stream))
              ((plusp ones)
-              (write-string (svref +cardinal-ones+ ones) stream)))))))
+              (write-string (svref .cardinal-ones. ones) stream)))))))
 
 (defun format-print-cardinal (stream n)
   (cond ((minusp n)
@@ -451,7 +437,14 @@
         (t
          (format-print-cardinal-aux stream n 0 n))))
 
-(defun format-print-cardinal-aux (stream n period err)
+(defun format-print-cardinal-aux
+    (stream n period err
+     &aux (.cardinal-periods.
+           #("" " thousand" " million" " billion" " trillion" " quadrillion"
+             " quintillion" " sextillion" " septillion" " octillion" " nonillion"
+             " decillion" " undecillion" " duodecillion" " tredecillion"
+             " quattuordecillion" " quindecillion" " sexdecillion" " septendecillion"
+             " octodecillion" " novemdecillion" " vigintillion")))
   (multiple-value-bind (beyond here) (truncate n 1000)
     (unless (<= period 21)
       (error "Number too large to print in English: ~:D" err))
@@ -461,9 +454,15 @@
       (unless (zerop beyond)
         (write-char #\space stream))
       (format-print-small-cardinal stream here)
-      (write-string (svref +cardinal-periods+ period) stream))))
+      (write-string (svref .cardinal-periods. period) stream))))
 
-(defun format-print-ordinal (stream n)
+(defun format-print-ordinal
+    (stream n &aux (.ordinal-ones.
+                    #(nil "first" "second" "third" "fourth"
+                      "fifth" "sixth" "seventh" "eighth" "ninth"))
+                   (.ordinal-tens.
+                    #(nil "tenth" "twentieth" "thirtieth" "fortieth"
+                      "fiftieth" "sixtieth" "seventieth" "eightieth" "ninetieth")))
   (when (minusp n)
     (write-string "negative " stream))
   (let ((number (abs n)))
@@ -478,13 +477,13 @@
                (write-string (svref +cardinal-teens+ ones) stream);;;RAD
                (write-string "th" stream))
               ((and (zerop tens) (plusp ones))
-               (write-string (svref +ordinal-ones+ ones) stream))
+               (write-string (svref .ordinal-ones. ones) stream))
               ((and (zerop ones)(plusp tens))
-               (write-string (svref +ordinal-tens+ tens) stream))
+               (write-string (svref .ordinal-tens. tens) stream))
               ((plusp bot)
                (write-string (svref +cardinal-tens+ tens) stream)
                (write-char #\- stream)
-               (write-string (svref +ordinal-ones+ ones) stream))
+               (write-string (svref .ordinal-ones. ones) stream))
               ((plusp number)
                (write-string "th" stream))
               (t
