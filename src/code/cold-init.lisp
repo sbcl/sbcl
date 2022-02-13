@@ -181,8 +181,10 @@
 
   ;; The readtable needs to be initialized for printing symbols early,
   ;; which is useful for debugging.
-  #+sb-devel
   (!readtable-cold-init)
+  (write-string "Checking symbol printer: ")
+  (write 't)
+  (terpri)
 
   ;; *RAW-SLOT-DATA* is essentially a compile-time constant
   ;; but isn't dumpable as such because it has functions in it.
