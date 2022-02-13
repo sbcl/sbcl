@@ -12,6 +12,9 @@ changes relative to sbcl-2.2.3:
     longer save their entire lexical environment, reducing unnecessary
     memory retention.
   * optimization: faster (< integer fixnum) comparisons (ARM64 and x86-64).
+  * platform support:
+    ** RUN-PROGRAM is faster on Linux and FreeBSD if close_range(2) is
+       available.
 
 changes in sbcl-2.2.3 relative to sbcl-2.2.2:
   * minor incompatible change: SB-THREAD:MUTEX-OWNER may return :THREAD-DEAD

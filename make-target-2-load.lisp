@@ -42,7 +42,10 @@
           ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
           ;; prefix on the corresponding #define is unfortunate.
           :GCC-TLS :USE-SYS-MMAP
-          :OS-PROVIDES-BLKSIZE-T)")) ; only for 'src/runtime/wrap.h'
+          ;; only for 'src/runtime/wrap.h'
+          :OS-PROVIDES-BLKSIZE-T
+          ;; only for src/runtime/run-program.c
+          :OS-PROVIDES-CLOSE-RANGE-WRAPPER)"))
        (public-features
         (cons
          sb-impl::!sbcl-architecture
