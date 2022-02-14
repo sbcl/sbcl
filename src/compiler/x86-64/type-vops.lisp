@@ -278,29 +278,36 @@
 (defmacro bignum-header-for-length (n)
   (logior (ash n n-widetag-bits) bignum-widetag))
 
-(define-vop (signed-byte-64-p type-predicate)
+(define-vop (pointerp)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
+  (:conditional :z)
+  (:policy :fast-safe)
+  (:translate pointerp)
+  (:generator 3
+    (if (location= temp value) (inst sub :dword value 3) (inst lea :dword temp (ea -3 value)))
+    (inst test :byte temp #b11)))
+
+;; A fixnum or single-digit bignum satisfies signed-byte-64-p
+(define-vop (signed-byte-64-p pointerp)
   (:translate signed-byte-64-p)
-  (:generator 45
-    (multiple-value-bind (yep nope)
-        (if not-p
-            (values not-target target)
-            (values target not-target))
-      (case n-fixnum-tag-bits
-        (1 (%lea-for-lowtag-test temp value other-pointer-lowtag)
-           (inst test :byte temp fixnum-tag-mask) ; 0th bit = 1 => fixnum
-           (inst jmp :nz yep)
-           (inst test :byte temp lowtag-mask))
-        (t ;; we'll only examine 1 byte, but moving a :dword is preferable
-           ;; as it doesn't require the CPU to retain the other 7 bytes.
-           (inst mov :dword temp value)
-           (inst test :byte temp fixnum-tag-mask)
-           (inst jmp :e yep)
-           (inst and :byte temp lowtag-mask)
-           (inst cmp :byte temp other-pointer-lowtag)))
-      (inst jmp :ne nope)
-      (inst cmp :qword (ea (- other-pointer-lowtag) value) (bignum-header-for-length 1))
-      (inst jmp (if not-p :ne :e) target))
-    NOT-TARGET))
+  (:conditional :z)
+  (:args-var arg-ref)
+  (:generator 6
+    (inst test :byte value fixnum-tag-mask)
+    (inst jmp :z out) ; good
+    ;; No lowtag test is needed if it's definitely an OTHER-POINTER.
+    ;; Even more cleverness could be imparted here based on arg-ref's type,
+    ;; but SINGLE-FLOAT always has to be ruled out somehow.
+    (let ((ea (cond ((csubtypep (tn-ref-type arg-ref) (specifier-type 'rational))
+                     (ea (- other-pointer-lowtag) value))
+                    (t
+                     (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
+                     (inst test :byte temp lowtag-mask)
+                     (inst jmp :nz out)
+                     (ea temp)))))
+      (inst cmp :qword ea (bignum-header-for-length 1)))
+    OUT))
 
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
@@ -410,16 +417,6 @@
   (define single-float-p single-float-widetag)
   (define characterp character-widetag)
   (define unbound-marker-p unbound-marker-widetag))
-
-(define-vop (pointerp)
-  (:args (value :scs (any-reg descriptor-reg)))
-  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
-  (:conditional :z)
-  (:policy :fast-safe)
-  (:translate pointerp)
-  (:generator 3
-    (if (location= temp value) (inst sub :dword value 3) (inst lea :dword temp (ea -3 value)))
-    (inst test :byte temp #b11)))
 
 ;;; FUNCTIONP, LISTP, %INSTANCEP, %OTHER-POINTER-P produce a flag result
 (macrolet ((define (name lowtag)
