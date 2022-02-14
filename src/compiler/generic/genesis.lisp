@@ -1971,11 +1971,19 @@ core and return a descriptor to it."
     (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
 
   #+x86-64 ; Dump a popular constant
-  (write-wordindexed/raw
-   (make-random-descriptor (logior sb-vm::non-negative-fixnum-mask-constant-wired-address
-                                   sb-vm:list-pointer-lowtag))
-   0
-   sb-vm::non-negative-fixnum-mask-constant)
+  (let ((array
+         ;; Embed the constant in an unboxed array. This shouldn't be necessary,
+         ;; because the start of the scanned space is STATIC_SPACE_OBJECTS_START,
+         ;; but not all uses strictly follow that rule. (They should though)
+         ;; This does not conflict with the 2 alloc regions at the start of the space,
+         ;; because the constant is in word index 10, and the array header is in
+         ;; word index 8, and the two regions are in indices 0 through 7.
+         (make-random-descriptor (logior (- sb-vm::non-negative-fixnum-mask-constant-wired-address
+                                            (* 2 sb-vm:n-word-bytes))
+                                         sb-vm:other-pointer-lowtag))))
+    (write-wordindexed/raw array 0 sb-vm:simple-array-unsigned-byte-64-widetag)
+    (write-wordindexed array 1 (make-fixnum-descriptor 1))
+    (write-wordindexed/raw array 2 sb-vm::non-negative-fixnum-mask-constant))
 
   #+x86
   (progn
