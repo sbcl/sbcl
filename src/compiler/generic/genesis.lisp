@@ -1970,6 +1970,13 @@ core and return a descriptor to it."
    (attach-fdefinitions-to-symbols
     (attach-classoid-cells-to-symbols (make-hash-table :test #'eq))))
 
+  #+x86-64 ; Dump a popular constant
+  (write-wordindexed/raw
+   (make-random-descriptor (logior sb-vm::non-negative-fixnum-mask-constant-wired-address
+                                   sb-vm:list-pointer-lowtag))
+   0
+   sb-vm::non-negative-fixnum-mask-constant)
+
   #+x86
   (progn
     (cold-set 'sb-vm::*fp-constant-0d0* (number-to-core $0d0))

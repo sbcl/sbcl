@@ -309,6 +309,12 @@
       (inst cmp :qword ea (bignum-header-for-length 1)))
     OUT))
 
+;;; Sign bit and fixnum tag bit.
+(defconstant non-negative-fixnum-mask-constant
+  #x8000000000000001)
+(defconstant non-negative-fixnum-mask-constant-wired-address
+  (+ static-space-start (* 10 n-word-bytes)))
+
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
@@ -316,20 +322,17 @@
   (:translate unsigned-byte-64-p)
   (:generator 45
     (let ((not-target (gen-label))
-          (single-word (gen-label))
-          (fixnum (gen-label)))
+          (single-word (gen-label)))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
               (values target not-target))
-        ;; Is it a fixnum?
-        (inst mov temp value)
-        (inst test :byte temp fixnum-tag-mask)
-        (inst jmp :e fixnum)
-
+        ;; Is it a fixnum with the sign bit clear?
+        (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
+        (inst jmp :z yep)
         ;; If not, is it an other pointer?
-        (inst and :byte temp lowtag-mask)
-        (inst cmp :byte temp other-pointer-lowtag)
+        (%lea-for-lowtag-test temp value other-pointer-lowtag)
+        (inst test :byte temp lowtag-mask)
         (inst jmp :ne nope)
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
@@ -349,9 +352,7 @@
         (emit-label single-word)
         ;; Get the single digit.
         (loadw temp value bignum-digits-offset other-pointer-lowtag)
-
         ;; positive implies (unsigned-byte 64).
-        (emit-label fixnum)
         (inst test temp temp)
         (inst jmp (if not-p :s :ns) target)
 
@@ -373,8 +374,13 @@
   (:generator 4
      (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                            hi
-                           (fixnumize hi))))
-       (inst test value (constantize (lognot fixnum-hi))))))
+                           (fixnumize hi)))
+            (mask (lognot fixnum-hi))
+            (constant
+             (if (= (ldb (byte 64 0) mask) non-negative-fixnum-mask-constant)
+                 (ea non-negative-fixnum-mask-constant-wired-address)
+                 (constantize mask))))
+       (inst test value constant))))
 
 (define-vop (test-fixnum-mod-tagged-unsigned)
   (:args (value :scs (any-reg unsigned-reg signed-reg)))

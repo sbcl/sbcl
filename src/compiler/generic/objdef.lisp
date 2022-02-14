@@ -648,6 +648,10 @@ during backtrace.
        ;; prior to the words of NIL.
        ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
        #+(and gencgc (not sb-thread) (not 64-bit)) (ash 8 word-shift)
+       ;; This offset of #x100 has to do with some edge cases where a vop
+       ;; might treat UNBOUND-MARKER as a pointer. So it has an address
+       ;; that is somewhere near NIL which makes it sort of "work"
+       ;; to dereference it. See git rev f1a956a6a771 for more info.
        #+64-bit #x100
        ;; magic padding because of NIL's symbol/cons-like duality
        (* 2 n-word-bytes)
