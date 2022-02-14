@@ -113,7 +113,7 @@ tree structure resulting from the evaluation of EXPRESSION."
               entry-points
               (not (member name entry-points :test #'equal))))))
 
-(flet ((defun-expander (env name lambda-list body snippet)
+(flet ((defun-expander (env name lambda-list body snippet &optional source-form)
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
     #+(and (not sb-doc) sb-xc-host) (setq doc nil)
@@ -147,25 +147,29 @@ tree structure resulting from the evaluation of EXPRESSION."
         (setq inline-thing (list 'quote inline-thing)))
       (when (and extra-info (not (keywordp extra-info)))
         (setq extra-info (list 'quote extra-info)))
-      `(progn
-         (eval-when (:compile-toplevel)
-           (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
-         ,(if (block-compilation-non-entry-point name)
-              `(progn
-                 (sb-c::%refless-defun ,named-lambda)
-                 ',name)
-              `(%defun ',name ,named-lambda
-                       ,@(when (or inline-thing extra-info) `(,inline-thing))
-                       ,@(when extra-info `(,extra-info))))
-         ;; This warning, if produced, comes after the DEFUN happens.
-         ;; When compiling, there's no real difference, but when interpreting,
-         ;; if there is a handler for style-warning that nonlocally exits,
-         ;; it's wrong to have skipped the DEFUN itself, since if there is no
-         ;; function, then the warning ought not to have been issued at all.
-         ,@(when (typep name '(cons (eql setf)))
-             `((eval-when (:compile-toplevel :execute)
-                 (sb-c::warn-if-setf-macro ',name))
-               ',name)))))))
+      (let ((definition
+              (if (block-compilation-non-entry-point name)
+                  `(progn
+                     (sb-c::%refless-defun ,named-lambda)
+                     ',name)
+                  `(%defun ',name ,named-lambda
+                           ,@(when (or inline-thing extra-info) `(,inline-thing))
+                           ,@(when extra-info `(,extra-info))))))
+       `(progn
+          (eval-when (:compile-toplevel)
+            (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
+          ,(if source-form
+               `(sb-c::with-source-form ,source-form ,definition)
+               definition)
+          ;; This warning, if produced, comes after the DEFUN happens.
+          ;; When compiling, there's no real difference, but when interpreting,
+          ;; if there is a handler for style-warning that nonlocally exits,
+          ;; it's wrong to have skipped the DEFUN itself, since if there is no
+          ;; function, then the warning ought not to have been issued at all.
+          ,@(when (typep name '(cons (eql setf)))
+              `((eval-when (:compile-toplevel :execute)
+                  (sb-c::warn-if-setf-macro ',name))
+                ',name))))))))
 
 ;;; This is one of the major places where the semantics of block
 ;;; compilation is handled.  Substitution for global names is totally
@@ -182,8 +186,8 @@ tree structure resulting from the evaluation of EXPRESSION."
     (defun-expander env name lambda-list body nil))
 
   ;; extended defun as used by defstruct
-  (sb-xc:defmacro sb-c:xdefun (&environment env name snippet lambda-list &body body)
-    (defun-expander env name lambda-list body snippet)))
+  (sb-xc:defmacro sb-c:xdefun (&environment env name snippet source-form lambda-list &body body)
+    (defun-expander env name lambda-list body snippet source-form)))
 
 ;;;; DEFCONSTANT, DEFVAR and DEFPARAMETER
 

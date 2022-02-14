@@ -272,7 +272,8 @@
          (constructor-definitions
           (mapcar (lambda (ctor)
                     `(sb-c:xdefun ,(car ctor)
-                       :constructor
+                         :constructor
+                         nil
                        ,@(structure-ctor-lambda-parts dd (cdr ctor))))
                   (dd-constructors dd)))
          (print-method
@@ -312,10 +313,10 @@
            ,@(when (eq expanding-into-code-for :target)
                `(,@(let ((defuns
                           `(,@(awhen (dd-copier-name dd)
-                                `((sb-c:xdefun ,(dd-copier-name dd) :copier (instance)
+                                `((sb-c:xdefun ,(dd-copier-name dd) :copier nil (instance)
                                     (copy-structure (the ,(dd-name dd) instance)))))
                             ,@(awhen (dd-predicate-name dd)
-                                `((sb-c:xdefun ,(dd-predicate-name dd) :predicate (object)
+                                `((sb-c:xdefun ,(dd-predicate-name dd) :predicate nil (object)
                                     (typep object ',(dd-name dd)))))
                             ,@(accessor-definitions dd))))
                      (if (and delayp (not (compiler-layout-ready-p name)))
@@ -2011,18 +2012,13 @@ or they must be declared locally notinline at each call site.~@:>"
         for accessor-name = (dsd-accessor-name dsd)
         unless (accessor-inherited-data accessor-name dd)
         nconc (dx-let ((key (cons dd dsd)))
-                (let ((defuns `(,@(unless (dsd-read-only dsd)
-                                    `((sb-c:xdefun (setf ,accessor-name) :accessor (value instance)
-                                        ,(slot-access-transform :setf '(instance value) key))))
-                                (sb-c:xdefun ,accessor-name :accessor (instance)
-                                  ,(slot-access-transform :read '(instance) key))))
-                      (source-form (and (boundp '*dsd-source-form*)
+                (let ((source-form (and (boundp '*dsd-source-form*)
                                         (cdr (assq dsd *dsd-source-form*)))))
-
-                  (if source-form
-                      `((sb-c::with-source-form ,source-form
-                          (progn ,@defuns)))
-                      defuns)))))
+                  `(,@(unless (dsd-read-only dsd)
+                        `((sb-c:xdefun (setf ,accessor-name) :accessor ,source-form (value instance)
+                            ,(slot-access-transform :setf '(instance value) key))))
+                    (sb-c:xdefun ,accessor-name :accessor ,source-form (instance)
+                      ,(slot-access-transform :read '(instance) key)))))))
 
 ;;;; instances with ALTERNATE-METACLASS
 ;;;;
