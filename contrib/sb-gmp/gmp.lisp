@@ -834,13 +834,9 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 ;;;; SBCL interface and integration installation
 (macrolet ((def (name original)
-             (let ((special (intern (format nil "*~A-FUNCTION*" name))))
-               `(progn
-                  (declaim (type function ,special)
-                           (inline ,name))
-                  (defvar ,special (symbol-function ',original))
-                  (defun ,name (&rest args)
-                    (apply (load-time-value ,special t) args))))))
+             `(progn
+                (declaim (ftype function ,name))
+                (setf (fdefinition ',name) (fdefinition ',original)))))
   (def orig-mul multiply-bignums)
   (def orig-truncate bignum-truncate)
   (def orig-gcd bignum-gcd)
@@ -980,8 +976,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (defun uninstall-gmp-funs ()
   (sb-ext:without-package-locks
       (macrolet ((def (destination source)
-                   `(setf (fdefinition ',destination)
-                          ,(intern (format nil "*~A-FUNCTION*" source)))))
+                   `(setf (fdefinition ',destination) (fdefinition ',source))))
         (def multiply-bignums orig-mul)
         (def bignum-truncate orig-truncate)
         (def bignum-gcd orig-gcd)
