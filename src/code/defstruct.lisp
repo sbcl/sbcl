@@ -2011,11 +2011,18 @@ or they must be declared locally notinline at each call site.~@:>"
         for accessor-name = (dsd-accessor-name dsd)
         unless (accessor-inherited-data accessor-name dd)
         nconc (dx-let ((key (cons dd dsd)))
-                `(,@(unless (dsd-read-only dsd)
-                     `((sb-c:xdefun (setf ,accessor-name) :accessor (value instance)
-                         ,(slot-access-transform :setf '(instance value) key))))
-                  (sb-c:xdefun ,accessor-name :accessor (instance)
-                    ,(slot-access-transform :read '(instance) key))))))
+                (let ((defuns `(,@(unless (dsd-read-only dsd)
+                                    `((sb-c:xdefun (setf ,accessor-name) :accessor (value instance)
+                                        ,(slot-access-transform :setf '(instance value) key))))
+                                (sb-c:xdefun ,accessor-name :accessor (instance)
+                                  ,(slot-access-transform :read '(instance) key))))
+                      (source-form (and (boundp '*dsd-source-form*)
+                                        (cdr (assq dsd *dsd-source-form*)))))
+
+                  (if source-form
+                      `((sb-c::with-source-form ,source-form
+                          (progn ,@defuns)))
+                      defuns)))))
 
 ;;;; instances with ALTERNATE-METACLASS
 ;;;;
