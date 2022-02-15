@@ -563,13 +563,9 @@
              (setf (%array-data array) data)
              (setf (%array-displaced-from array) nil)
              (cond (displaced-to
-                    (let ((offset (or displaced-index-offset 0)))
-                      (when (> (+ offset total-size)
-                               (array-total-size displaced-to))
-                        (error "~S doesn't have enough elements." displaced-to))
-                      (setf (%array-displacement array) offset)
-                      (setf (%array-displaced-p array) t)
-                      (%save-displaced-new-array-backpointer array data)))
+                    (setf (%array-displacement array) (or displaced-index-offset 0))
+                    (setf (%array-displaced-p array) t)
+                    (%save-displaced-new-array-backpointer array data))
                    (t
                     (setf (%array-displaced-p array) nil)))
              (populate-dimensions array dimensions array-rank)
