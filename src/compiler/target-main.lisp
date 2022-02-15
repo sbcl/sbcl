@@ -326,9 +326,6 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 
 ;;;; Coverage helpers
 
-(defun record-code-coverage (namestring cc)
-  (setf (gethash namestring (car *code-coverage-info*)) cc))
-
 (defun clear-code-coverage ()
   (clrhash (car *code-coverage-info*))
   (setf (cdr *code-coverage-info*) nil))

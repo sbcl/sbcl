@@ -1842,18 +1842,12 @@ necessary, since type inference may take arbitrarily long to converge.")
                 (let ((code-coverage-records
                        (code-coverage-records (coverage-metadata *compilation*))))
                   (unless (zerop (hash-table-count code-coverage-records))
-                  ;; Dump the code coverage records into the fasl.
-                   (with-source-paths
-                    (fopcompile `(record-code-coverage
-                                  ',(namestring *compile-file-pathname*)
-                                  ',(let (list)
-                                      (maphash (lambda (k v)
-                                                 (declare (ignore k))
-                                                 (push v list))
-                                               code-coverage-records)
-                                      list))
-                                nil
-                                nil))))
+                    ;; Dump the code coverage records into the fasl.
+                    (sb-fasl::dump-code-coverage-records
+                     (namestring *compile-file-pathname*)
+                     (loop for k being each hash-key of code-coverage-records
+                           collect (cons k +code-coverage-unmarked+))
+                     *compile-object*)))
                 nil)))
       ;; Some errors are sufficiently bewildering that we just fail
       ;; immediately, without trying to recover and compile more of

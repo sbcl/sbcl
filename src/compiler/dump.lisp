@@ -1409,3 +1409,12 @@
             (1+ (wrapper-depthoid obj)) ; non-stack args can't be negative
             (logand flags sb-kernel::layout-flags-mask)
             (wrapper-length obj)))
+
+;;;; code coverage
+
+(defun dump-code-coverage-records (namestring cc file)
+  (declare (type string namestring)
+           (type list cc))
+  (dump-object namestring file)
+  (dump-object cc file)
+  (dump-fop 'fop-record-code-coverage file))

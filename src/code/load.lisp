@@ -1282,6 +1282,12 @@
     (setf (skip-until) nil))
   (values))
 
+;;;; fops for code coverage
+
+(define-fop 120 :not-host (fop-record-code-coverage (namestring cc) nil)
+  (setf (gethash namestring (car *code-coverage-info*)) cc)
+  (values))
+
 ;;; Primordial layouts.
 (macrolet ((frob (&rest specs)
              `(progn

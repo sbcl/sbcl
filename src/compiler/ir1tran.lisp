@@ -193,8 +193,7 @@
             start
             (let ((next (make-ctran))
                   (*allow-instrumenting* nil))
-              (ensure-gethash path (code-coverage-records metadata)
-                              (cons path +code-coverage-unmarked+))
+              (setf (gethash path (code-coverage-records metadata)) t)
               (push (ctran-block start)
                     (gethash path (code-coverage-blocks metadata)))
               (ir1-convert start next nil `(%primitive mark-covered ',path))
