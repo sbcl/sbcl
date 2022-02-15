@@ -660,6 +660,17 @@ void execute_full_sweep_phase()
         fprintf(stderr, " words zeroed]\n");
     }
     hopscotch_destroy(&mark_bits);
+#ifdef LISP_FEATURE_USE_CONS_REGION
+    page_index_t page;
+    for (page = 0; page < next_free_page; ++page)
+        if (page_table[page].type == PAGE_TYPE_CONS) {
+            char* base = page_address(page);
+            char* bits = base + CONS_PAGE_USABLE_BYTES;
+            char* end  = base + GENCGC_PAGE_BYTES;
+            memset(bits, 0, end-bits);
+        }
+#endif
+
     if (sweeplog)
         fflush(sweeplog);
 
