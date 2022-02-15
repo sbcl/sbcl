@@ -429,23 +429,33 @@
   `(error "Can't supply a value for :FILL-POINTER (~S) that is larger ~
            than the~A size of the vector (~S)" ,actual ,adjective ,max))
 
-(declaim (inline %save-displaced-array-backpointer))
+(declaim (inline %save-displaced-array-backpointer
+                 %save-displaced-new-array-backpointer))
 (defun %save-displaced-array-backpointer (array data)
   (flet ((purge (pointers)
            (remove-if (lambda (value)
                         (or (not value) (eq array value)))
                       pointers
                       :key #'weak-pointer-value)))
-    ;; Add backpointer to the new data vector if it has a header.
+    (let ((old-data (%array-data array)))
+      (unless (eq old-data data)
+        ;; Add backpointer to the new data vector if it has a header.
+        (when (array-header-p data)
+          (setf (%array-displaced-from data)
+                (cons (make-weak-pointer array)
+                      (purge (%array-displaced-from data)))))
+        ;; Remove old backpointer, if any.
+        (when (array-header-p old-data)
+          (setf (%array-displaced-from old-data)
+                (purge (%array-displaced-from old-data))))))))
+
+(defun %save-displaced-new-array-backpointer (array data)
+  (flet ((purge (pointers)
+           (remove-if-not #'weak-pointer-value pointers)))
     (when (array-header-p data)
       (setf (%array-displaced-from data)
             (cons (make-weak-pointer array)
-                  (purge (%array-displaced-from data)))))
-    ;; Remove old backpointer, if any.
-    (let ((old-data (%array-data array)))
-      (when (and (neq data old-data) (array-header-p old-data))
-        (setf (%array-displaced-from old-data)
-              (purge (%array-displaced-from old-data)))))))
+                  (purge (%array-displaced-from data)))))))
 
 (defmacro populate-dimensions (header list-or-index rank)
   `(if (listp ,list-or-index)
@@ -559,7 +569,7 @@
                         (error "~S doesn't have enough elements." displaced-to))
                       (setf (%array-displacement array) offset)
                       (setf (%array-displaced-p array) t)
-                      (%save-displaced-array-backpointer array data)))
+                      (%save-displaced-new-array-backpointer array data)))
                    (t
                     (setf (%array-displaced-p array) nil)))
              (populate-dimensions array dimensions array-rank)
