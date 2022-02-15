@@ -1476,28 +1476,12 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
     return most_bytes_found_to-1;
 }
 
-/* Allocate bytes.  All the rest of the special-purpose allocation
- * functions will eventually call this.
+/* Allocate bytes.  The fast path of gc_general_alloc() calls this
+ * when it can't fit in the open region.
  * This entry point is only for use within the GC itself.
  * The Lisp region overflow handler either directly calls gc_alloc_large
- * or closes and opens a region if the allocation is small */
-
-/* TODO: The following objects should be allocated to BOXED pages instead of MIXED pages:
- * - CONS, VALUE-CELL, (COMPLEX INTEGER), RATIO, ARRAY headers
- * - simple-vector that is neither weak nor hashing
- * - wholly-boxed instances
- * These pointer-containing objects MUST NOT be allocated to BOXED pages:
- * - weak-pointer (requires deferred scavenge)
- * - hash-table vector and weak vector (complicated)
- * - closure and funcallable-instance (contains untagged pointer)
- * - symbol (contains encoded pointer)
- * - fdefn (contains untagged pointer)
- *
- * Each BOXED page can be linearly scanned without calling type-specific methods
- * when processing the root set
- */
-void *
-gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
+ * or closes and opens a region if the allocation is small. */
+void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int page_type)
 {
     if (nbytes >= LARGE_OBJECT_SIZE) {
         /* If this is a normal GC - as opposed to "final" GC just prior to saving
@@ -1509,19 +1493,8 @@ gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
          * they ought to have gone on large object pages if they could have. */
         return gc_alloc_large(nbytes, page_type, region, 0);
     }
-
-    void *new_obj = region->free_pointer;
-    void *new_free_pointer = (char*)new_obj + nbytes;
-    /* Check whether there is room in the current alloc region. */
-    if (new_free_pointer <= region->end_addr) {
-        /* If so then allocate from the current alloc region. */
-        region->free_pointer = new_free_pointer;
-        return new_obj;
-    }
-    /* Else not enough free space in the current region: retry with a
-     * new region. */
     ensure_region_closed(region, page_type);
-    new_obj = gc_alloc_new_region(nbytes, page_type, region, 0);
+    void* new_obj = gc_alloc_new_region(nbytes, page_type, region, 0);
     region->free_pointer = (char*)new_obj + nbytes;
     gc_assert(region->free_pointer <= region->end_addr);
     return new_obj;

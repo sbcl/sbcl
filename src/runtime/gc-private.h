@@ -21,7 +21,19 @@
 #include "code.h"
 
 #ifdef LISP_FEATURE_GENCGC
-void *gc_general_alloc(struct alloc_region*,sword_t,int);
+void *collector_alloc_fallback(struct alloc_region*,sword_t,int);
+static inline void* __attribute__((unused))
+gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
+{
+    void *new_obj = region->free_pointer;
+    void *new_free_pointer = (char*)new_obj + nbytes;
+    // Large objects will never fit in a region, so we automatically dtrt
+    if (new_free_pointer <= region->end_addr) {
+        region->free_pointer = new_free_pointer;
+        return new_obj;
+    }
+    return collector_alloc_fallback(region, nbytes, page_type);
+}
 lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
                                    struct alloc_region*, int page_type);
 #else
