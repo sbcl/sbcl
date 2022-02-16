@@ -4,6 +4,9 @@ changes relative to sbcl-2.2.1:
   * platform support: all architectures now share the coverage mark
     instrumentation implementation, meaning that performance now equals
     what had been implemented only on x86 architectures.
+  * enhancement: improved handling of source locations for some classes
+    of compile time and runtime errors.
+  * enhancement: better source locations for structure accessors.
 
 changes in sbcl-2.2.1 relative to sbcl-2.2.0:
   * incompatible change: DEFINE-ALIEN-CALLBACK, which has never been exported
