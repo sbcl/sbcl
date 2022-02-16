@@ -105,11 +105,11 @@
 (defvar *current-path*)
 
 (defun call-with-current-source-form (thunk &rest forms)
-  (let ((*current-path* (when (and (some #'identity forms)
-                                   (boundp '*source-paths*))
-                          (or (some #'get-source-path forms)
-                              (when (boundp '*current-path*)
-                                *current-path*)))))
+  (let ((*current-path* (or (and (some #'identity forms)
+                                 (boundp '*source-paths*)
+                                 (some #'get-source-path forms))
+                            (and (boundp '*current-path*)
+                                 *current-path*))))
     (funcall thunk)))
 
 (defvar *derive-function-types* nil
