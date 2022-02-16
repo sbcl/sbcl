@@ -95,12 +95,13 @@
           (let* ((name (car exp))
                  (args (if (eq name 'cerror) (cddr exp) (cdr exp))))
             (if (member name '(signal error cerror warn))
-                `(with-simple-condition-restarts
-                   ',name
-                   ,(and (eq name 'cerror)
-                         (second exp))
-                   ,(first args)
-                   ,@(rest args))
+                `(sb-c::with-source-form ,expression
+                   (with-simple-condition-restarts
+                     ',name
+                     ,(and (eq name 'cerror)
+                           (second exp))
+                     ,(first args)
+                     ,@(rest args)))
                 expression))
           expression))))
 
