@@ -946,13 +946,13 @@
                (ldb (byte 7 5) i))))))
    nil)
 
-(define-instruction store-coverage-mark (segment path-index)
+(define-instruction store-coverage-mark (segment mark-index)
   (:emitter
    ;; No backpatch is needed to compute the offset into the code header
    ;; because COMPONENT-HEADER-LENGTH is known at this point.
    (let ((offset (+ (component-header-length)
                     n-word-bytes ; skip over jump table word
-                    path-index
+                    mark-index
                     (- other-pointer-lowtag))))
      (inst* segment 'sb sb-vm::null-tn sb-vm::code-tn
-            (the (unsigned-byte 15) offset)))))
+            (the (unsigned-byte 11) offset)))))

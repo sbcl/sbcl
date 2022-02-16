@@ -3017,11 +3017,11 @@
 ;;; code object, having two codepaths is cumbersome and, now that
 ;;; there's no reg-code, STRB needs to load a literal first, which
 ;;; isn't clearly a win compared to using a vector.
-(define-instruction store-coverage-mark (segment path-index temp vector)
+(define-instruction store-coverage-mark (segment mark-index temp vector)
   (:emitter
    ;; No backpatch is needed to compute the offset into the code header
    ;; because COMPONENT-HEADER-LENGTH is known at this point.
-   segment path-index temp vector
+   segment mark-index temp vector
    (flet ((encode-index (offset &optional word)
             (cond
               ((if word
@@ -3042,7 +3042,7 @@
                                           (component-info *component-being-compiled*)))
                                  2)))
             (offset (+ (* sb-vm:vector-data-offset n-word-bytes)
-                       path-index
+                       mark-index
                        (- other-pointer-lowtag)))
             (addr
               (@ vector (encode-index offset))))

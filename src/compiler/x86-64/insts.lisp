@@ -3373,6 +3373,14 @@
 
 ;;; Coverage support
 
+(define-instruction store-coverage-mark (segment mark-index)
+  (:emitter
+   (assemble (segment)
+     (inst mov :byte (rip-relative-ea (segment-origin segment)
+                                      ;; skip over jump table word
+                                      (+ mark-index n-word-bytes))
+           1))))
+
 (defun sb-assem::%mark-used-labels (operand)
   (when (typep operand 'ea)
     (let ((disp (ea-disp operand)))
@@ -3381,22 +3389,6 @@
         (setf (label-usedp disp) t))
        (label+addend
         (setf (label-usedp (label+addend-label disp)) t))))))
-
-(defun sb-c::branch-opcode-p (mnemonic)
-  (case mnemonic
-    ((call ret jmp jrcxz break int iret
-      loop loopz loopnz syscall
-      byte word dword) ; unexplained phenomena
-     t)))
-
-;;; Replace the STATEMENT with an instruction to store a coverage mark
-;;; in the OFFSETth byte beyond LABEL.
-(defun sb-c::replace-coverage-instruction (statement label offset)
-  ;; This is a bit sucky, but the coverage instruction inserter
-  ;; does not receive the benefit of parsing prefixes as keywords,
-  ;; so it has to use the numeric value.
-  (setf (stmt-mnemonic statement) 'mov
-        (stmt-operands statement) `(,+byte-size-prefix+ ,(rip-relative-ea label offset) 1)))
 
 ;;; Assembly optimizer support
 

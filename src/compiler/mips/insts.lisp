@@ -1403,7 +1403,7 @@
              (ldb (byte 16 0) value)))))
   nil)
 
-(define-instruction store-coverage-mark (segment path-index)
+(define-instruction store-coverage-mark (segment mark-index)
   ;; Don't need to annotate the dependence on code-tn, I think?
   (:dependencies (writes :memory))
   (:delay 0)
@@ -1417,7 +1417,7 @@
    ;; by emitting more than 1 CPU instruction from within an emitter.
    (let ((offset (+ (component-header-length)
                     n-word-bytes ; skip over jump table word
-                    path-index
+                    mark-index
                     (- other-pointer-lowtag))))
      (inst* segment 'sb sb-vm::null-tn sb-vm::code-tn
             (the (unsigned-byte 15) offset)))))

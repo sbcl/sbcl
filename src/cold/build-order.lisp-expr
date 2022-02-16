@@ -448,6 +448,7 @@
 
  ("src/compiler/aliencomp")
 
+ ("src/compiler/coverage")
  ("src/compiler/ltv")
  ("src/compiler/gtn")
  ("src/compiler/ltn")

@@ -181,10 +181,7 @@ image."
               (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
                 (incf n-marks)
                 ;; Set the legacy coverage mark for each path it touches
-                ;; One mark byte for x86[-64] corresponds to a union of source paths.
-                ;; For everybody else, one mark is one path.
-                (dolist (path #+(or x86 x86-64) (svref map i)
-                              #-(or x86 x86-64) (list (svref map i)))
+                (dolist (path (svref map i))
                   (let ((found (gethash path path-lookup-table)))
                     (if found
                         (rplacd found t)
@@ -196,9 +193,10 @@ image."
           (dotimes (i (length map))     ; for each recorded mark
             (when (byte-marked-p (aref marks i))
               (incf n-marks)
-              (let ((found (gethash (svref map i) path-lookup-table)))
-                (if found
-                    (rplacd found t))))))))
+              (dolist (path (svref map i))
+                (let ((found (gethash path path-lookup-table)))
+                  (if found
+                      (rplacd found t)))))))))
     (values coverage-records n-marks)))
 
 ) ; end MACROLET

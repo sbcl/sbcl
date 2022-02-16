@@ -37,22 +37,6 @@
   (tagify alloc-tn rsp-tn lowtag)
   (values))
 
-#+nil ; was #+avx2
-(defun avx-registers-used-p ()
-  (or (when (and #+sb-xc-host (boundp '*component-being-compiled*))
-        (let ((comp (component-info *component-being-compiled*)))
-          (or (sb-c::ir2-component-avx2-used-p comp)
-              (flet ((used-p (tn)
-                       (do ((tn tn (sb-c::tn-next tn)))
-                           ((null tn))
-                         (when (sc-is tn ymm-reg
-                                      int-avx2-reg
-                                      double-avx2-reg single-avx2-reg)
-                           (return-from avx-registers-used-p
-                             (setf (sb-c::ir2-component-avx2-used-p comp) t))))))
-                (used-p (sb-c::ir2-component-normal-tns comp))
-                (used-p (sb-c::ir2-component-wired-tns comp))))))))
-
 (defun alloc-unboxed-p (type)
   (case type
     ((unboxed-array

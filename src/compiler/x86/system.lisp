@@ -430,3 +430,10 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
    (move b ebx)
    (move c ecx)
    (move d edx)))
+
+(define-vop (sb-c::mark-covered)
+ (:info index)
+ (:generator 1
+   ;; Can't convert index to a code-relative index until the boxed header length
+   ;; has been determined.
+   (inst store-coverage-mark index)))

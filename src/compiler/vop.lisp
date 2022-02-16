@@ -231,7 +231,9 @@
   (dropped-thru-to nil)
   ;; list of LOCATION-INFO structures describing all the interesting
   ;; (to the debugger) locations in this block
-  (locations nil :type list))
+  (locations nil :type list)
+  ;; reference to list of source paths for coverage
+  (covered-paths-ref (list nil) :type list))
 
 (defprinter (ir2-block :identity t)
   (pushed :test pushed)
@@ -372,7 +374,10 @@
   ;; collect dynamic statistics.)
   #+sb-dyncount
   (dyncount-info nil :type (or null dyncount-info))
-  (avx2-used-p nil))
+  ;; an array of references to lists of original source paths covered
+  ;; for coverage instrumentation.
+  (coverage-map (make-array 0 :fill-pointer 0 :adjustable t)
+                :type vector :read-only t))
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
 ;;; to create each XEP's function entry data structure. ENTRY-INFO

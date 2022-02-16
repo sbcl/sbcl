@@ -557,3 +557,10 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:generator 1
     ;; atomic because the immobile gen# is in the same byte
     (inst and :lock :byte (ea (- 1 other-pointer-lowtag) fdefn) #x7f)))
+
+(define-vop (sb-c::mark-covered)
+ (:info index)
+ (:generator 1
+   ;; Can't convert index to a code-relative index until the boxed header length
+   ;; has been determined.
+   (inst store-coverage-mark index)))

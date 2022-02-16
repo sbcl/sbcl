@@ -169,52 +169,6 @@
     (eq (or answer (info :function :inlinep name)) 'notinline)))
 
 
-;;;; code coverage
-
-;;; Check the policy for whether we should generate code coverage
-;;; instrumentation. If not, just return the original START
-;;; ctran. Otherwise insert code coverage instrumentation after
-;;; START, and return the new ctran.
-(defun instrument-coverage (start mode form
-                            &aux (metadata (coverage-metadata *compilation*)))
-  ;; We don't actually use FORM for anything, it's just convenient to
-  ;; have around when debugging the instrumentation.
-  (declare (ignore form))
-  (if (and metadata
-           (policy *lexenv* (> store-coverage-data 0))
-           *allow-instrumenting*)
-      (let ((path (source-path-original-source *current-path*)))
-        (when mode
-          (push mode path))
-        (if (member (ctran-block start)
-                    (gethash path (code-coverage-blocks metadata)))
-            ;; If this source path has already been instrumented in
-            ;; this block, don't instrument it again.
-            start
-            (let ((next (make-ctran))
-                  (*allow-instrumenting* nil))
-              (setf (gethash path (code-coverage-records metadata)) t)
-              (push (ctran-block start)
-                    (gethash path (code-coverage-blocks metadata)))
-              (ir1-convert start next nil `(%primitive mark-covered ',path))
-              next)))
-      start))
-
-;;; In contexts where we don't have a source location for FORM
-;;; e.g. due to it not being a cons, but where we have a source
-;;; location for the enclosing cons, use the latter source location if
-;;; available. This works pretty well in practice, since many PROGNish
-;;; macroexpansions will just directly splice a block of forms into
-;;; some enclosing form with `(progn ,@body), thus retaining the
-;;; EQness of the conses.
-(defun maybe-instrument-progn-like (start forms form)
-  (or (when (and *allow-instrumenting*
-                 (not (get-source-path form)))
-        (let ((*current-path* (get-source-path forms)))
-          (when *current-path*
-            (instrument-coverage start nil form))))
-      start))
-
 (declaim (start-block find-free-fun find-lexically-apparent-fun
                       ;; needed by ir1-translators
                       find-global-fun))

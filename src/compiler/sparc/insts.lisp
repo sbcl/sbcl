@@ -1974,13 +1974,13 @@ about function addresses and register values.")
        (setf (sap-ref-32 sap offset) value))))
   nil)
 
-(define-instruction store-coverage-mark (segment path-index)
+(define-instruction store-coverage-mark (segment mark-index)
   (:delay 0)
   (:emitter
    ;; This just barely works- INDEX has to fit in (SIGNED-BYTE 13).
    ;; Honestly I don't care about SPARC, and neither should you.
    (let ((offset (+ (component-header-length)
                     n-word-bytes ; skip over jump table word
-                    path-index
+                    mark-index
                     (- other-pointer-lowtag))))
      (inst* segment 'stb sb-vm::null-tn sb-vm::code-tn offset))))

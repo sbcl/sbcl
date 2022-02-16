@@ -2679,7 +2679,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "ASMSTREAM-CONSTANT-VECTOR"
            "APPEND-SECTIONS" "ASSEMBLE-SECTIONS"
            "EMIT" ".ALIGN" ".BYTE" ".LISPWORD" ".SKIP"
-           ".COVERAGE-MARK" ".COMMENT"
+           ".COMMENT"
            "EMIT-ALIGNMENT" "EMIT-BYTE" "EMIT-BACK-PATCH"
            "EMIT-CHOOSER" "DEFINE-BITFIELD-EMITTER"
            "DEFINE-INSTRUCTION" "DEFINE-INSTRUCTION-MACRO"

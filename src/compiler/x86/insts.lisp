@@ -2449,6 +2449,17 @@
          (aver (not (sb-vm::self-referential-code-fixup-p value code)))
          :relative)))))
 
+;;; Coverage support
+
+(define-instruction store-coverage-mark (segment mark-index)
+  (:emitter
+   (let ((offset (+ (component-header-length)
+                    n-word-bytes ; skip over jump table word
+                    mark-index
+                    (- other-pointer-lowtag))))
+     (assemble (segment)
+       (inst mov (make-ea :byte :disp (make-fixup nil :code-object offset)) 1)))))
+
 ;;; Perform exhaustive analysis here because of the extreme degree
 ;;; of confusion I have about what is allowed to reach the instruction
 ;;; emitter as a raw fixup, a fixup wrapped in an EA, a label wrapped
@@ -2469,16 +2480,3 @@
                 (setf (label-usedp offset) t))
                ((consp offset)
                 (setf (label-usedp (car offset)) t))))))))
-
-(defun sb-c::branch-opcode-p (mnemonic)
-  (case mnemonic
-    ((call ret jmp jecxz break int iret
-      loop loopz loopnz syscall
-      byte word dword) ; unexplained phenomena
-     t)))
-
-;;; Replace the STATEMENT with an instruction to store a coverage mark
-;;; in the OFFSETth byte beyond LABEL.
-(defun sb-c::replace-coverage-instruction (statement label offset)
-  (setf (stmt-mnemonic statement) 'mov
-        (stmt-operands statement) `(,(make-ea :byte :disp `(+ ,label ,offset)) 1)))
