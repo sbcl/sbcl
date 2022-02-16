@@ -5474,7 +5474,7 @@ void recompute_gen_bytes_allocated() {
 void really_note_transporting(lispobj old,void*new,sword_t nwords)
 {
     page_index_t p = find_page_index((void*)old);
-    uword_t page_usage_limit = (uword_t)((lispobj*)page_address(p) + page_words_used(p));
+    __attribute__((unused)) uword_t page_usage_limit = (uword_t)((lispobj*)page_address(p) + page_words_used(p));
     gc_assert(old < (uword_t)page_usage_limit); // this helps find bogus pointers
     if (GC_LOGGING)
         fprintf(gc_activitylog(),
