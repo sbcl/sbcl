@@ -139,7 +139,7 @@ void save_gc_crashdump(char *pathname,
     total_npages = VARYOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
     write(fd, varyobj_page_touched_bits, n_bitmap_elts * sizeof (int));
-    write(fd, varyobj_pages, total_npages * sizeof (int));  
+    write(fd, varyobj_pages, total_npages * sizeof (int));
 #endif
     struct crash_thread_preamble thread_preamble;
     for_each_thread(th) {

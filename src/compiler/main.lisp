@@ -1055,11 +1055,11 @@ necessary, since type inference may take arbitrarily long to converge.")
              #-sb-xc-host (fopcompilable-p form expand))
         (let ((*fopcompile-label-counter* 0))
           (fopcompile form path nil expand))
-        (let ((*lexenv* (make-lexenv
-                         :policy *policy*
-                         :handled-conditions *handled-conditions*
-                         :disabled-package-locks *disabled-package-locks*))
-              (tll (ir1-toplevel form path nil)))
+        (let* ((*lexenv* (make-lexenv
+                          :policy *policy*
+                          :handled-conditions *handled-conditions*
+                          :disabled-package-locks *disabled-package-locks*))
+               (tll (ir1-toplevel form path nil)))
           (if (eq (block-compile *compilation*) t)
               (push tll (toplevel-lambdas *compilation*))
               (compile-toplevel (list tll) nil))

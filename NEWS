@@ -7,7 +7,8 @@ changes relative to sbcl-2.2.1:
   * enhancement: improved handling of source locations for some classes
     of compile time and runtime errors.
   * enhancement: better source locations for structure accessors.
-  * bugfix: SB-COVER now always instruments top level forms correctly.
+  * bug fix: SB-COVER now always instruments top level forms correctly.
+  * bug fix: Muffling conditions now works correctly on higher debug settings.
 
 changes in sbcl-2.2.1 relative to sbcl-2.2.0:
   * incompatible change: DEFINE-ALIEN-CALLBACK, which has never been exported

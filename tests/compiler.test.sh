@@ -265,6 +265,15 @@ EOF
 fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
 
 cat > $tmpfilename <<EOF
+    (declaim (optimize debug)
+             (muffle-conditions compiler-note))
+    (defun foo (x y)
+      (declare (optimize speed))
+      (+ x y))
+EOF
+fail_on_condition_during_compile sb-ext:compiler-note $tmpfilename
+
+cat > $tmpfilename <<EOF
     (declaim (muffle-conditions compiler-note))
     (defun foo (x y)
       (declare (unmuffle-conditions compiler-note))
