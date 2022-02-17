@@ -64,6 +64,10 @@ struct crash_preamble {
     long dynspace_npages;
     int card_size;
     int card_table_nbits;
+    // fixedobj data dumped: pages, page table
+    uword_t fixedobj_start, fixedobj_size, fixedobj_free_pointer;
+    // varyobj data dumped: pages, touched_bits, page table
+    uword_t varyobj_start, varyobj_size, varyobj_free_pointer;
     int nthreads;
     int tls_size;
     lispobj lisp_package_vector;
@@ -82,6 +86,7 @@ const int CRASH_PREAMBLE_SIGNATURE =
     (sizeof (struct crash_preamble) << 16) | sizeof (struct crash_thread_preamble);
 
 #if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
+#include "immobile-space.h"
 void save_gc_crashdump(char *pathname,
                        uword_t approx_stackptr_at_gc_start)
 {
@@ -107,6 +112,14 @@ void save_gc_crashdump(char *pathname,
     preamble.lisp_package_vector = lisp_package_vector;
     preamble.sprof_enabled = sb_sprof_enabled;
     preamble.pin_dynspace_code = pin_all_dynamic_space_code;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    preamble.fixedobj_start = FIXEDOBJ_SPACE_START;
+    preamble.fixedobj_size = FIXEDOBJ_SPACE_SIZE;
+    preamble.fixedobj_free_pointer = (uword_t)fixedobj_free_pointer;
+    preamble.varyobj_start = VARYOBJ_SPACE_START;
+    preamble.varyobj_size = VARYOBJ_SPACE_SIZE;
+    preamble.varyobj_free_pointer = (uword_t)varyobj_free_pointer;
+#endif
     // write the preamble and static space
     write(fd, &preamble, sizeof preamble);
     write(fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
@@ -114,6 +127,18 @@ void save_gc_crashdump(char *pathname,
     write(fd, (char*)DYNAMIC_SPACE_START, nbytes_heap);
     write(fd, page_table, sizeof (struct page) * next_free_page);
     write(fd, gc_card_mark, 1+gc_card_table_mask);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    int usage = (uword_t)fixedobj_free_pointer - FIXEDOBJ_SPACE_START;
+    write(fd, (char*)FIXEDOBJ_SPACE_START, usage);
+    int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    write(fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
+    usage = (uword_t)varyobj_free_pointer - VARYOBJ_SPACE_START;
+    write(fd, (char*)VARYOBJ_SPACE_START, usage);
+    total_npages = VARYOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
+    write(fd, varyobj_page_touched_bits, n_bitmap_elts * sizeof (int));
+    write(fd, varyobj_pages, total_npages * sizeof (int));  
+#endif
     struct crash_thread_preamble thread_preamble;
     for_each_thread(th) {
         int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
@@ -183,6 +208,7 @@ static int save_cmd(char **ptr) {
 static int verify_cmd(char **ptr) {
     gencgc_verbose = 1;
     verify_heap(0);
+    return 0;
 }
 static int gc_cmd(char **ptr) {
     int last_gen = 0;
@@ -801,8 +827,8 @@ int load_gc_crashdump(char* pathname)
     struct crash_preamble preamble;
     struct crash_thread_preamble thread_preamble;
     checked_read(fd, &preamble, sizeof preamble);
-    printf("static==%lx size=%x\n", preamble.static_start, preamble.static_nbytes);
-    printf("heap_start=%lx npages=%d\n", preamble.dynspace_start, preamble.dynspace_npages);
+    printf("static==%lx size=%x\n", preamble.static_start, (int)preamble.static_nbytes);
+    printf("heap_start=%lx npages=%d\n", preamble.dynspace_start, (int)preamble.dynspace_npages);
     // pin_dynspace_code is for display only. It gets recomputed as the
     // logical OR of all threads' values of *GC-PIN-CODE-PAGES*.
     printf("sprof_enabled=%d pin_dynspace_code=%d packages=%p\n",
@@ -811,7 +837,7 @@ int load_gc_crashdump(char* pathname)
     sb_sprof_enabled = preamble.sprof_enabled;
     if (preamble.signature != CRASH_PREAMBLE_SIGNATURE)
         lose("Can't load crashdump: bad header (have %lx, expect %lx)",
-             preamble.signature, CRASH_PREAMBLE_SIGNATURE);
+             preamble.signature, (long)CRASH_PREAMBLE_SIGNATURE);
     if (preamble.card_size != GENCGC_CARD_BYTES)
         lose("Can't load crashdump: memory parameters differ");
     gc_card_table_nbits = preamble.card_table_nbits;
@@ -834,6 +860,35 @@ int load_gc_crashdump(char* pathname)
     recompute_gen_bytes_allocated();
     checked_read(fd, gc_card_mark, 1+gc_card_table_mask);
     print_generation_stats();
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    extern void gc_init_immobile(),
+                calc_immobile_space_bounds(),
+                write_protect_immobile_space();
+    gc_assert(preamble.fixedobj_size == FIXEDOBJ_SPACE_SIZE);
+    gc_assert(preamble.varyobj_size == VARYOBJ_SPACE_SIZE);
+    FIXEDOBJ_SPACE_START = preamble.fixedobj_start;
+    VARYOBJ_SPACE_START = preamble.varyobj_start;
+    fixedobj_free_pointer = (lispobj*)preamble.fixedobj_free_pointer;
+    varyobj_free_pointer = (lispobj*)preamble.varyobj_free_pointer;
+    os_validate(0, (char*)FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_SIZE, 0, 0);
+    os_validate(0, (char*)VARYOBJ_SPACE_START, VARYOBJ_SPACE_SIZE, 0, 0);
+    gc_init_immobile(); // allocate the page tables
+    calc_immobile_space_bounds();
+    // Read fixedobj space
+    int usage = (uword_t)fixedobj_free_pointer - FIXEDOBJ_SPACE_START;
+    checked_read(fd, (char*)FIXEDOBJ_SPACE_START, usage);
+    // Always read the whole page table regardless of the current space usage
+    int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    checked_read(fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
+    // Read varyobj space
+    usage = (uword_t)varyobj_free_pointer - VARYOBJ_SPACE_START;
+    checked_read(fd, (char*)VARYOBJ_SPACE_START, usage);
+    total_npages = VARYOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
+    checked_read(fd, varyobj_page_touched_bits, n_bitmap_elts * sizeof (int));
+    checked_read(fd, varyobj_pages, total_npages * sizeof (int));
+    write_protect_immobile_space();
+#endif
     fprintf(stderr, "%d threads:\n", (int)preamble.nthreads);
     int i;
     for(i=0; i<(int)preamble.nthreads; ++i) {
@@ -862,11 +917,14 @@ int load_gc_crashdump(char* pathname)
         write_TLS(FREE_INTERRUPT_CONTEXT_INDEX, make_fixnum(1), th);
         struct thread_instance* instance = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
         lispobj name = instance->name;
+        char* cname = (gc_managed_addr_p(name) &&
+                       widetag_of(native_pointer(name)) == SIMPLE_BASE_STRING_WIDETAG)
+                      ? (char*)name+1 : 0;
         fprintf(stderr, "thread @ %p originally %p, %d bind_stk words, %d val_stk words '%s'\n",
                 th, (void*)thread_preamble.address,
                 (int)(thread_preamble.binding_stack_nbytes>>WORD_SHIFT),
                 (int)(thread_preamble.control_stack_nbytes>>WORD_SHIFT),
-                (widetag_of(native_pointer(name)) == SIMPLE_BASE_STRING_WIDETAG) ? (char*)name+1 : 0);
+                cname);
         // Scan thread stack looking for words which could be valid pointers,
         // but don't find an object when the heap is scanned.
         // Realizing that failure to find isn't necessarily an error,
@@ -880,7 +938,7 @@ int load_gc_crashdump(char* pathname)
                     is_code(page_table[find_page_index((void*)word)].type))) {
                 lispobj* found = search_dynamic_space((void*)word);
                 if (found) {
-                    page_index_t ind = find_page_index(found);
+                    __attribute__((unused)) page_index_t ind = find_page_index(found);
 #if 0
                     fprintf(stderr, "   sp[%5d] = %"OBJ_FMTX" -> %p (g%d,%s)\n",
                             wordindex, word, found,
@@ -904,6 +962,7 @@ int load_gc_crashdump(char* pathname)
     gc_assert(read(fd, signature, 1) == 0);
     close(fd);
     all_threads = threads;
+    return 0;
 }
 
 int main(int argc, char *argv[], char **envp)

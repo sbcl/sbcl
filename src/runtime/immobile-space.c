@@ -1128,7 +1128,7 @@ sweep_immobile_space(int raise)
   sweep_varyobj_pages(raise);
 }
 
-static void gc_init_immobile()
+void gc_init_immobile()
 {
 #ifdef DEBUG
     logfile = stderr;
