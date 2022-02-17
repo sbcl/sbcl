@@ -1047,6 +1047,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                  ;; FOP-compiled code is harder to debug.
                  (or (< debug 2)
                      (> space debug)))
+             ;; The fopcompiler doesn't play nice with coverage data,
+             ;; as then top level forms don't get instrumented.
+             (policy *lexenv* (= store-coverage-data 0))
              (not (eq (block-compile *compilation*) t))
              #+sb-xc-host nil
              #-sb-xc-host (fopcompilable-p form expand))
