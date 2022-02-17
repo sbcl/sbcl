@@ -71,8 +71,9 @@ struct crash_preamble {
     int nthreads;
     int tls_size;
     lispobj lisp_package_vector;
-    int sprof_enabled;
-    int pin_dynspace_code;
+    char sprof_enabled;
+    char pin_dynspace_code;
+    int sizeof_context;
 };
 struct crash_thread_preamble {
     uword_t address;
@@ -112,6 +113,7 @@ void save_gc_crashdump(char *pathname,
     preamble.lisp_package_vector = lisp_package_vector;
     preamble.sprof_enabled = sb_sprof_enabled;
     preamble.pin_dynspace_code = pin_all_dynamic_space_code;
+    preamble.sizeof_context = sizeof (os_context_t);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     preamble.fixedobj_start = FIXEDOBJ_SPACE_START;
     preamble.fixedobj_size = FIXEDOBJ_SPACE_SIZE;
@@ -165,7 +167,7 @@ void save_gc_crashdump(char *pathname,
         // write the preamble
         write(fd, &thread_preamble, sizeof thread_preamble);
         // write 0 or 1 contexts, control-stack, binding-stack, TLS
-        if (ici) write(fd, threadcontext, sizeof (os_context_t));
+        if (ici) write(fd, threadcontext, preamble.sizeof_context);
         write(fd, (char*)sp, nbytes_control_stack);
         write(fd, th->binding_stack_start, nbytes_binding_stack);
         write(fd, th, nbytes_tls);
@@ -900,10 +902,10 @@ int load_gc_crashdump(char* pathname)
         threads = th;
         checked_read(fd, &thread_preamble, sizeof thread_preamble);
         uword_t* stackptr = (uword_t*)((char*)th->control_stack_end - thread_preamble.control_stack_nbytes);
-        context = contexts[i] = malloc(sizeof (os_context_t));
+        context = contexts[i] = malloc(preamble.sizeof_context);
         nth_interrupt_context(0, th) = context;
         if (thread_preamble.has_context) {
-            checked_read(fd, context, sizeof (os_context_t));
+            checked_read(fd, context, preamble.sizeof_context);
         }
         *os_context_sp_addr(context) = (uword_t)stackptr;
         checked_read(fd, stackptr, thread_preamble.control_stack_nbytes);
