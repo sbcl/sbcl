@@ -7,3 +7,8 @@
 (with-test (:name :layoutless-instance-no-crash)
   (f 20)
   (gc))
+
+;;; Don't loop infinitely in mark_obj() on circular lists
+(defvar *foo* (cons nil nil))
+(rplacd *foo* *foo*)
+(with-test (:name :circular-list) (gc :gen 7))

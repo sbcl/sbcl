@@ -240,10 +240,9 @@ void __mark_obj(lispobj pointer)
         if (!bits) {
             bits = allocate_cons_mark_bits();
             hopscotch_insert(&mark_bits, key, (sword_t)bits);
-        } else if (bits[index / 8] & (1 << (index % 8))) {
-            return;
         }
 #endif
+        if (bits[index / 8] & (1 << (index % 8))) return;
         // Mark the cons
         bits[index / 8] |= 1 << (index % 8);
     }
@@ -400,15 +399,12 @@ static void trace_object(lispobj* where)
 
 void prepare_for_full_mark_phase()
 {
-    // FIXME: Estimate how large to create mark_bits based on dynamic space size.
-    // Guess 8 words per object, and X% of the objects are conses.
-    // The problem is guessing how localized the conses are: guess that N conses
-    // will reside on fraction*N different pages, which guides us as to how many
-    // hash table entries are needed.
+#ifndef LISP_FEATURE_USE_CONS_REGION
     hopscotch_create(&mark_bits, HOPSCOTCH_HASH_FUN_DEFAULT,
                      N_WORD_BYTES, /* table values are machine words */
                      65536, /* initial size */
                      0);
+#endif
 
     free_page = page_table_pages;
     suballocator_free_ptr = suballocator_end_ptr = 0;
@@ -659,7 +655,6 @@ void execute_full_sweep_phase()
             fprintf(stderr, "%ld%s", words_zeroed[i], i?"+":"");
         fprintf(stderr, " words zeroed]\n");
     }
-    hopscotch_destroy(&mark_bits);
 #ifdef LISP_FEATURE_USE_CONS_REGION
     page_index_t page;
     for (page = 0; page < next_free_page; ++page)
@@ -669,6 +664,8 @@ void execute_full_sweep_phase()
             char* end  = base + GENCGC_PAGE_BYTES;
             memset(bits, 0, end-bits);
         }
+#else
+    hopscotch_destroy(&mark_bits);
 #endif
 
     if (sweeplog)
