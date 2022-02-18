@@ -2560,24 +2560,34 @@
   (define-trimmer-transform string-trim t t))
 
 
-;;; (partially) constant-fold backq-* functions, or convert to their
-;;; plain CL equivalent (now that they're not needed for pprinting).
+;;; We use this structure to facilitate named constant reference dumping inside
+;;; constant folded backquoted structures.
+#-sb-xc-host
+(defstruct (named-constant-reference
+             (:constructor make-named-constant-reference (name)))
+  (name (missing-arg) :type symbol :read-only t))
 
-;;; There's too much ambiguity around semantics of backquoted expressions
-;;; as pertains to constant-ness, and on top of that, how "folding" affects
-;;; whether any of the elements need a load-time-value of a global
-;;; defconstant that is not trivially dumpable.
-;;; Refer to the test case in backq-const-fold.impure-cload.
+#-sb-xc-host
+(defmethod make-load-form ((object named-constant-reference) &optional environment)
+  (declare (ignore environment))
+  `',(named-constant-reference-name object))
 
-;; Pop constant values from the end, list/list* them if any, and link
-;; the remainder with list* at runtime.
+;;; Pop constant values from the end, list/list* them if any, and link
+;;; the remainder with list* at runtime.
 (defun transform-backq-list-or-list* (function values)
   (let ((gensyms (make-gensym-list (length values)))
         (reverse (reverse values))
         (constants '()))
     (loop while (and reverse
                      (constant-lvar-p (car reverse)))
-          do (push (lvar-value (pop reverse))
+          do (push #+sb-xc-host
+                   (lvar-value (pop reverse))
+                   #-sb-xc-host
+                   (multiple-value-bind (value leaf)
+                       (lvar-value (pop reverse))
+                     (if (leaf-has-source-name-p leaf)
+                         (make-named-constant-reference (leaf-source-name leaf))
+                         value))
                    constants))
     (if (null constants)
         `(lambda ,gensyms

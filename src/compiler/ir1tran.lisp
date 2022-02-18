@@ -441,25 +441,6 @@
             "Objects of type ~/sb-impl:print-type-specifier/ can't be dumped into fasl files."
             (type-of value)))))))
   (values))
-
-;;; A constant is trivially externalizable if it involves no INSTANCE types
-;;; or any un-dumpable object.
-(defun trivially-externalizable-p (constant)
-  (declare #-sb-xc-host (inline alloc-xset))
-  (dx-let ((xset (alloc-xset)))
-    (named-let ok ((value constant))
-      (if (or (dumpable-leaflike-p value) (xset-member-p value xset))
-          t
-          (progn
-            (add-to-xset value xset)
-            (typecase value
-             (cons (and (ok (car value)) (ok (cdr value))))
-             (vector
-              (dotimes (i (length value) t)
-                (unless (ok (aref value i)) (return nil))))
-             (array
-              (dotimes (i (array-total-size value) t)
-                (unless (ok (row-major-aref value i)) (return nil))))))))))
 
 ;;;; some flow-graph hacking utilities
 
