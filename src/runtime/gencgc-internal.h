@@ -70,15 +70,19 @@ int gencgc_handle_wp_violation(void *);
 // 4 bits for the type, 1 bit for SINGLE_OBJECT, 1 bit for OPEN_REGION
 
 #define PAGE_TYPE_MASK        15 // mask out 'single-object' and 'open-region' flags
-#define PAGE_TYPE_BOXED        1 // #b001
-#define PAGE_TYPE_UNBOXED      2 // #b010
+#define PAGE_TYPE_UNBOXED      1 // #b001
+#define PAGE_TYPE_BOXED        2 // #b010
 #define PAGE_TYPE_MIXED        3 // #b011
+/* Small-Mixed pages hold objects that don't span cards. This is relatively easy to
+ * arrange for by adding filler at the end of a card to align prior to the next object,
+ * subject to a maximum allowable waste. Root scavenging can respect card boundaries
+ * and use scavenge functions specific to each object - the best of both worlds */
+#define PAGE_TYPE_SMALL_MIXED  4 // #b100
 #define PAGE_TYPE_CONS         5 // #b101
 #define PAGE_TYPE_CODE         7 // #b111
 #define SINGLE_OBJECT_FLAG    16
 #define OPEN_REGION_PAGE_FLAG 32
 #define FREE_PAGE_FLAG        0
-#define BOXED_PAGE_FLAG       1
 
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently

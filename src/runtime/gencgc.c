@@ -176,20 +176,16 @@ static inline boolean page_free_p(page_index_t page) {
     return (page_table[page].type == FREE_PAGE_FLAG);
 }
 
+static inline boolean boxed_type_p(int type) { return type > 1; }
 static inline boolean page_boxed_p(page_index_t page) {
-    return (page_table[page].type & BOXED_PAGE_FLAG);
+    // ignore SINGLE_OBJECT_FLAG and OPEN_REGION_PAGE_FLAG
+    return boxed_type_p(page_table[page].type & PAGE_TYPE_MASK);
 }
 
 #ifndef LISP_FEATURE_SOFT_CARD_MARKS
-/// Return true if low 4 'type' bits are 0zz1, false otherwise (z = don't-care)
-/// i.e. true of pages which could hold boxed or partially boxed (mixed) objects,
-/// including pages of code.
-static inline boolean page_boxed_no_region_p(page_index_t page) {
-    return (page_table[page].type & 9) == BOXED_PAGE_FLAG;
-}
-
 static inline boolean protect_page_p(page_index_t page, generation_index_t generation) {
-    return (page_boxed_no_region_p(page)
+    return (page_boxed_p(page)
+            && !(page_table[page].type & OPEN_REGION_PAGE_FLAG)
             && (page_words_used(page) != 0)
             && !page_table[page].pinned
             && (page_table[page].gen == generation));
@@ -444,7 +440,7 @@ write_generation_stats(FILE *file)
 
     /* Print the heap stats. */
     fprintf(file,
-            "Gen  Boxed   Cons    Raw   Code  Mixed  LgRaw LgCode  LgMix  "
+            "Gen  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix  "
             "Pin       Alloc     Waste        Trig   Dirty GCs Mem-age\n");
 
     generation_index_t i, begin, end;
@@ -457,8 +453,7 @@ write_generation_stats(FILE *file)
 
     for (i = begin; i <= end; i++) {
         page_index_t page;
-        // page kinds: small {boxed,unboxed,code,mixed} and then large of same
-        page_index_t pagect[8], pinned_cnt = 0;
+        page_index_t pagect[9], pinned_cnt = 0;
 
         memset(pagect, 0, sizeof pagect);
         for (page = 0; page < next_free_page; page++)
@@ -469,11 +464,12 @@ write_generation_stats(FILE *file)
                 case PAGE_TYPE_CONS:    column = 1; break;
                 case PAGE_TYPE_UNBOXED: column = 2; break;
                 case PAGE_TYPE_CODE:    column = 3; break;
-                case PAGE_TYPE_MIXED:   column = 4; break;
-                case SINGLE_OBJECT_FLAG|PAGE_TYPE_UNBOXED: column = 5; break;
-                case SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE:    column = 6; break;
-                case SINGLE_OBJECT_FLAG|PAGE_TYPE_MIXED:   column = 7; break;
-                default: lose("Invalid page type %x", page_table[page].type);
+                case PAGE_TYPE_SMALL_MIXED:   column = 4; break;
+                case PAGE_TYPE_MIXED:   column = 5; break;
+                case SINGLE_OBJECT_FLAG|PAGE_TYPE_UNBOXED: column = 6; break;
+                case SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE:    column = 7; break;
+                case SINGLE_OBJECT_FLAG|PAGE_TYPE_MIXED:   column = 8; break;
+                default: lose("Invalid page type %#x (p%ld)", page_table[page].type, page);
                 }
                 pagect[column]++;
                 if (page_table[page].pinned) pinned_cnt++;
@@ -482,20 +478,16 @@ write_generation_stats(FILE *file)
         gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
         page_index_t tot_pages, n_dirty;
         tot_pages = count_generation_pages(i, &n_dirty);
-        gc_assert(tot_pages ==
-                  pagect[0] + pagect[1] + pagect[2] + pagect[3] +
-                  pagect[4] + pagect[5] + pagect[6] + pagect[7]);
         fprintf(file,
                 " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
-                " %4"PAGE_INDEX_FMT
-                " %11"OS_VM_SIZE_FMT
+                "%7"PAGE_INDEX_FMT"%5d %11"OS_VM_SIZE_FMT
                 " %9"OS_VM_SIZE_FMT
                 " %11"OS_VM_SIZE_FMT,
                 i,
-                pagect[0], pagect[1], pagect[2], pagect[3],
-                pagect[4], pagect[5], pagect[6], pagect[7],
-                pinned_cnt,
+                pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
+                pagect[6], pagect[7], pagect[8],
+                (int)pinned_cnt,
                 (uintptr_t)gen->bytes_allocated,
                 (uintptr_t)npage_bytes(tot_pages) - generations[i].bytes_allocated,
                 (uintptr_t)gen->gc_trigger);
@@ -716,7 +708,7 @@ char gc_allocate_dirty = 0;
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
 static const char * const page_type_description[8] =
-  {0, "boxed", "unboxed", "mixed", "?", "cons", "?", "code"};
+  {0, "unboxed", "boxed", "mixed", "sm_mix", "cons", "?", "code"};
 
 /* Zero the pages from START to END (inclusive), except for those
  * pages that are known to already zeroed. Mark all pages in the
@@ -832,7 +824,7 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
  * write-protecting. */
 
 /* We use five regions for the current newspace generation. */
-struct alloc_region gc_alloc_region[5];
+struct alloc_region gc_alloc_region[6];
 
 static page_index_t
   alloc_start_pages[8], // one for each value of PAGE_TYPE_x
@@ -1224,8 +1216,8 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
         set_alloc_start_page(page_type, 0, next_page-1);
 
         /* Add the region to the new_areas if requested. */
-        if (BOXED_PAGE_FLAG & page_type)
-            add_new_area(first_page,orig_first_page_bytes_used, region_size);
+        if (boxed_type_p(page_type))
+            add_new_area(first_page, orig_first_page_bytes_used, region_size);
 
     } else if (!orig_first_page_bytes_used) {
         /* The first page is completely unused. Unallocate it */
@@ -1315,8 +1307,7 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region,
     INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
 
     /* Add the region to the new_areas if requested. */
-    if (BOXED_PAGE_FLAG & page_type)
-        add_new_area(first_page, 0, nbytes);
+    if (boxed_type_p(page_type)) add_new_area(first_page, 0, nbytes);
 
     // page may have not needed zeroing, but first word was stored,
     // turning the putative object temporarily into a page filler object.
@@ -1645,7 +1636,7 @@ copy_possibly_large_object(lispobj object, sword_t nwords,
 
     /* Check whether it's a large object. */
     first_page = find_page_index((void *)object);
-    gc_assert(first_page >= 0);
+    gc_dcheck(first_page >= 0);
 
     os_vm_size_t nbytes = nwords * N_WORD_BYTES;
     os_vm_size_t rounded = ALIGN_UP(nbytes, GENCGC_PAGE_BYTES);
@@ -1663,8 +1654,7 @@ copy_possibly_large_object(lispobj object, sword_t nwords,
         bytes_allocated -= bytes_freed;
 
         /* Add the region to the new_areas if requested. */
-        if (page_type & BOXED_PAGE_FLAG)
-            add_new_area(first_page, 0, nbytes);
+        if (boxed_type_p(page_type)) add_new_area(first_page, 0, nbytes);
 
         return object;
     }
@@ -1689,6 +1679,8 @@ search_dynamic_space(void *pointer)
     /* The address may be invalid, so do some checks. */
     if ((page_index == -1) || page_free_p(page_index))
         return NULL;
+    // TODO: if the page type is SMALL_MIXED, we can align down to the nearest card
+    // and scan from there.
     if ((page_table[page_index].type & PAGE_TYPE_MASK) == PAGE_TYPE_CONS) {
         int wordindex = ((char*)pointer - page_address(page_index)) >> WORD_SHIFT;
         if (wordindex < page_words_used(page_index))
@@ -2093,8 +2085,12 @@ static void deposit_filler(uword_t addr, sword_t nbytes) {
     gc_assert((nwords - 1) <= 0x7FFFFF);
     *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
     page_index_t page = find_page_index((void*)addr);
+    // - MIXED does not need this because we always scan by object
+    // - SMALL_MIXED does because obliterate_nonpinned_words() uses as
+    //   few fillers as it can to cover all non-live ranges on a page.
     if (page_table[page].type == PAGE_TYPE_BOXED ||
-        page_table[page].type == PAGE_TYPE_CONS) {
+        page_table[page].type == PAGE_TYPE_CONS ||
+        page_table[page].type == PAGE_TYPE_SMALL_MIXED) {
         /* Strictly boxed cards are scanned without respect to object boundaries,
          * so we might need to clobber all pointers that formerly occupied the bytes.
          * If the range falls within 1 card, then we don't need to clear anything,
@@ -2125,8 +2121,7 @@ static void deposit_filler(uword_t addr, sword_t nbytes) {
  * Also ensure that no scan_start_offset points to a page in
  * oldspace that will be freed.
  */
-static void
-wipe_nonpinned_words()
+static void obliterate_nonpinned_words()
 {
     if (!gc_pin_count) return;
 
@@ -2955,6 +2950,7 @@ void gc_close_collector_regions()
     ensure_region_closed(boxed_region, PAGE_TYPE_BOXED);
     ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
     ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
+    ensure_region_closed(small_mixed_region, PAGE_TYPE_SMALL_MIXED);
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
 }
 
@@ -3927,7 +3923,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     gc_dispose_private_pages();
     cull_weak_hash_tables(weak_ht_alivep_funs);
 
-    wipe_nonpinned_words();
+    obliterate_nonpinned_words();
     // Do this last, because until wipe_nonpinned_words() happens,
     // not all page table entries have the 'gen' value updated,
     // which we need to correctly find all old->young pointers.

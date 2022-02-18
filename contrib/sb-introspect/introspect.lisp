@@ -831,7 +831,7 @@ Experimental: interface subject to change."
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
-                                 :boxed (logbitp 0 type)
+                                 :boxed (> (logand type #xf) 1)
                                  :pinned dontmove
                                  :large (logbitp 4 type)
                                  :page index)))
