@@ -460,18 +460,18 @@ If an unsupported TYPE is requested, the function will return NIL.
 (defun find-function-definition-source (function)
   (let* ((debug-info (function-debug-info function))
          (debug-source (debug-info-source debug-info))
-         (debug-fun (debug-info-debug-function function debug-info))
-         (tlf (sb-c::compiled-debug-info-tlf-number debug-info)))
-    (make-definition-source
-     :pathname
-     (when (stringp (debug-source-namestring debug-source))
-       (parse-namestring (debug-source-namestring debug-source)))
-     :character-offset
-     (sb-c::compiled-debug-info-char-offset debug-info)
-     :form-path (if tlf (list tlf))
-     :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
-     :file-write-date (debug-source-created debug-source)
-     :plist (sb-c::debug-source-plist debug-source))))
+         (debug-fun (debug-info-debug-function function debug-info)))
+    (multiple-value-bind (tlf character-offset)
+        (sb-di::debug-fun-tlf-and-offset debug-info debug-fun)
+      (make-definition-source
+       :pathname
+       (when (stringp (debug-source-namestring debug-source))
+         (parse-namestring (debug-source-namestring debug-source)))
+       :character-offset character-offset
+       :form-path (if tlf (list tlf))
+       :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
+       :file-write-date (debug-source-created debug-source)
+       :plist (sb-c::debug-source-plist debug-source)))))
 
 (defun translate-source-location (location)
   (if location

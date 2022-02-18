@@ -191,6 +191,9 @@
   (return-pc-pass (missing-arg) :type sc+offset)
   #-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc+offset)
+  ;; When block compiling a single code object can have multiple top level forms,
+  ;; in that case it's a (cons (pack-tlf-num+offset tlf offset) integer)
+  ;; otherwise just an integer:
   ;; An integer which contains between 4 and 6 varint-encoded fields:
   ;; START-PC -
   ;; The earliest PC in this function at which the environment is properly
@@ -200,7 +203,7 @@
   ;; OFFSET
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
-  (encoded-locs (missing-arg) :type unsigned-byte :read-only t)
+  (encoded-locs (missing-arg) :type (or cons unsigned-byte) :read-only t)
   (next))
 
 (defun cdf-encode-locs (start-pc elsewhere-pc
@@ -231,8 +234,11 @@
     (integer-from-octets bytes)))
 
 (defun cdf-decode-locs (cdf)
-  (let ((encoding (compiled-debug-fun-encoded-locs cdf))
-        (input-pointer 0))
+  (let* ((encoding (compiled-debug-fun-encoded-locs cdf))
+         (encoding (if (consp encoding)
+                       (cdr encoding)
+                       encoding))
+         (input-pointer 0))
     (flet ((decode-varint (&aux (accumulator 0) (shift 0))
              (loop
               (let ((byte (ldb (byte 8 input-pointer) encoding)))
@@ -412,7 +418,7 @@
   (contexts nil :type t :read-only t)
   ;; Packed integers. Also can be a cons of that plus an alist which
   ;; maps SB-C::COMPILED-DEBUG-FUN to SB-DI::COMPILED-DEBUG-FUN instances.
-  (tlf-num+offset (missing-arg) :type (or integer cons)))
+  (tlf-num+offset (missing-arg) :type (or integer cons (eql :multiple))))
 
 ;;; The TLF-NUMBER and CHAR-OFFSET of a compiled-debug-info can each be NIL,
 ;;; but aren't often. However, to allow that, convert NIL to 0 and non-nil

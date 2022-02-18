@@ -2044,14 +2044,26 @@ register."
         (debug-signal 'no-debug-blocks :debug-fun
                       (code-location-debug-fun code-location)))))
 
+(defun debug-fun-tlf-and-offset (debug-info debug-fun)
+  (if (typep (sb-c::compiled-debug-info-tlf-num+offset debug-info)
+             '(or (eql :multiple) (cons (eql :multiple))))
+      (let* ((encoded-locs (sb-c::compiled-debug-fun-encoded-locs debug-fun))
+             (tlf-num+offset (and (consp encoded-locs)
+                                  (car encoded-locs))))
+        (if tlf-num+offset
+            (sb-c::unpack-tlf-num+offset tlf-num+offset)))
+      (values (sb-c::compiled-debug-info-tlf-number debug-info)
+              (sb-c::compiled-debug-info-char-offset debug-info))))
+
 ;;; Returns the number of top level forms before the one containing
 ;;; CODE-LOCATION as seen by the compiler in some compilation unit. (A
 ;;; compilation unit is not necessarily a single file, see the section
 ;;; on debug-sources.)
 (defun code-location-toplevel-form-offset (code-location)
-  (let ((di (compiled-debug-fun-debug-info
-             (code-location-debug-fun code-location))))
-    (sb-c::compiled-debug-info-tlf-number di)))
+  (let ((df (code-location-debug-fun code-location)))
+    (values
+     (debug-fun-tlf-and-offset (compiled-debug-fun-debug-info df)
+                               (compiled-debug-fun-compiler-debug-fun df)))))
 
 ;;; Return the number of the form corresponding to CODE-LOCATION. The
 ;;; form number is derived by a walking the subforms of a top level
@@ -3032,24 +3044,26 @@ register."
   (let* ((d-source (code-location-debug-source location))
          (di (compiled-debug-fun-debug-info
               (code-location-debug-fun location)))
-         (tlf-offset (sb-c::compiled-debug-info-tlf-number di))
-         (char-offset (sb-c::compiled-debug-info-char-offset di))
          (namestring (debug-source-namestring d-source)))
-    ;; FIXME: External format?
-    (with-open-file (f namestring :if-does-not-exist nil)
-      (when f
-        (let ((*readtable* (safe-readtable)))
-          (cond ((eql (debug-source-created d-source) (file-write-date f))
-                 (file-position f char-offset))
-                (t
-                 (format *debug-io*
-                         "~%; File has been modified since compilation:~%;   ~A~@
+    (multiple-value-bind (tlf-offset char-offset)
+        (debug-fun-tlf-and-offset di
+                                  (compiled-debug-fun-compiler-debug-fun
+                                   (code-location-debug-fun location)))
+      ;; FIXME: External format?
+      (with-open-file (f namestring :if-does-not-exist nil)
+        (when f
+          (let ((*readtable* (safe-readtable)))
+            (cond ((eql (debug-source-created d-source) (file-write-date f))
+                   (file-position f char-offset))
+                  (t
+                   (format *debug-io*
+                           "~%; File has been modified since compilation:~%;   ~A~@
                           ; Using form offset instead of character position.~%"
-                         namestring)
-                 (let ((*read-suppress* t))
-                   (loop repeat tlf-offset
-                         do (read f)))))
-          (read f))))))
+                           namestring)
+                   (let ((*read-suppress* t))
+                     (loop repeat tlf-offset
+                           do (read f)))))
+            (read f)))))))
 
 ;;;; PREPROCESS-FOR-EVAL
 

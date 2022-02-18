@@ -660,7 +660,7 @@
 ;;;; debug functions
 
 ;;; Return a C-D-F structure with all the mandatory slots filled in.
-(defun dfun-from-fun (fun)
+(defun dfun-from-fun (fun tlf)
   (declare (type clambda fun))
   (let* ((2env (environment-info (lambda-environment fun)))
          (dispatch (lambda-optional-dispatch fun))
@@ -681,7 +681,22 @@
                       (second name))
                      (t
                       name))
-                   name)))
+                   name))
+         (encoded-locs
+           (cdf-encode-locs
+            (label-position (ir2-environment-environment-start 2env))
+            (label-position (ir2-environment-elsewhere-start 2env))
+            (source-path-form-number (node-source-path (lambda-bind fun)))
+            (label-position (block-label (lambda-block fun)))
+            (when (ir2-environment-closure-save-tn 2env)
+              (tn-sc+offset (ir2-environment-closure-save-tn 2env)))
+            #+unwind-to-frame-and-call-vop
+            (when (ir2-environment-bsp-save-tn 2env)
+              (tn-sc+offset (ir2-environment-bsp-save-tn 2env)))
+            #-fp-and-pc-standard-save
+            (label-position (ir2-environment-lra-saved-pc 2env))
+            #-fp-and-pc-standard-save
+            (label-position (ir2-environment-cfp-saved-pc 2env)))))
     (funcall (compiled-debug-fun-ctor kind)
              :name name
              #-fp-and-pc-standard-save :return-pc
@@ -691,27 +706,21 @@
              #-fp-and-pc-standard-save :old-fp
              #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-old-fp 2env))
              :encoded-locs
-             (cdf-encode-locs
-              (label-position (ir2-environment-environment-start 2env))
-              (label-position (ir2-environment-elsewhere-start 2env))
-              (source-path-form-number (node-source-path (lambda-bind fun)))
-              (label-position (block-label (lambda-block fun)))
-              (when (ir2-environment-closure-save-tn 2env)
-                (tn-sc+offset (ir2-environment-closure-save-tn 2env)))
-              #+unwind-to-frame-and-call-vop
-              (when (ir2-environment-bsp-save-tn 2env)
-                (tn-sc+offset (ir2-environment-bsp-save-tn 2env)))
-              #-fp-and-pc-standard-save
-              (label-position (ir2-environment-lra-saved-pc 2env))
-              #-fp-and-pc-standard-save
-              (label-position (ir2-environment-cfp-saved-pc 2env))))))
+             (if tlf
+                 (cons (pack-tlf-num+offset
+                        tlf
+                        (aref (file-info-positions
+                               (source-info-file-info *source-info*))
+                              tlf))
+                       encoded-locs)
+                 encoded-locs))))
 
 ;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as
 ;;; appropriate.
-(defun compute-1-debug-fun (fun var-locs)
+(defun compute-1-debug-fun (fun var-locs tlf)
   (declare (type clambda fun) (type hash-table var-locs))
-  (let* ((dfun (dfun-from-fun fun))
+  (let* ((dfun (dfun-from-fun fun tlf))
          (actual-level (policy (lambda-bind fun) compute-debug-fun))
          (level (cond #+sb-dyncount
                       (*collect-dynamic-statistics*
@@ -782,14 +791,23 @@
         component-tlf-num)
     (dolist (lambda (component-lambdas component))
       (unless (empty-fun-p lambda)
-       (clrhash var-locs)
-       (let ((tlf-num (source-path-tlf-number
-                       (node-source-path (lambda-bind lambda)))))
-         (if component-tlf-num
-             (aver (or (block-compile *compilation*)
-                       (= component-tlf-num tlf-num)))
-             (setf component-tlf-num tlf-num))
-         (push (compute-1-debug-fun lambda var-locs) dfuns))))
+        (let ((tlf-num (source-path-tlf-number
+                        (node-source-path (lambda-bind lambda)))))
+          (cond ((not component-tlf-num)
+                 (setf component-tlf-num tlf-num))
+                ((= component-tlf-num tlf-num))
+                ((block-compile *compilation*)
+                 (setf component-tlf-num :multiple)
+                 (return))
+                (t
+                 (bug "tlf-num mismatch"))))))
+    (dolist (lambda (component-lambdas component))
+      (unless (empty-fun-p lambda)
+        (clrhash var-locs)
+        (let ((tlf-num (and (eq component-tlf-num :multiple)
+                            (source-path-tlf-number
+                             (node-source-path (lambda-bind lambda))))))
+          (push (compute-1-debug-fun lambda var-locs tlf-num) dfuns))))
     (let* ((sorted (sort dfuns #'< :key #'compiled-debug-fun-offset))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info
@@ -803,12 +821,14 @@
                         (sb-c::entry-info-name (car entries)))
                    (component-name component)))
        :fun-map fun-map
-       :tlf-num+offset (pack-tlf-num+offset
-                        component-tlf-num
-                        (and component-tlf-num
-                             (aref (file-info-positions
-                                    (source-info-file-info *source-info*))
-                                   component-tlf-num)))
+       :tlf-num+offset (if (eq component-tlf-num :multiple)
+                           component-tlf-num
+                           (pack-tlf-num+offset
+                            component-tlf-num
+                            (and component-tlf-num
+                                 (aref (file-info-positions
+                                        (source-info-file-info *source-info*))
+                                       component-tlf-num))))
        :contexts (compact-vector *contexts*)))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
