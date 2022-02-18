@@ -2572,6 +2572,19 @@
   (declare (ignore environment))
   `',(named-constant-reference-name object))
 
+;;; Wrap the value of lvar-value if it comes from a named
+;;; reference. For bootstrap reasons we don't do this during
+;;; cross-compile.
+(defun maybe-wrapped-lvar-value (lvar)
+  #+sb-xc-host
+  (lvar-value lvar)
+  #-sb-xc-host
+  (multiple-value-bind (value leaf)
+      (lvar-value lvar)
+    (if (leaf-has-source-name-p leaf)
+        (make-named-constant-reference (leaf-source-name leaf))
+        value)))
+
 ;;; Pop constant values from the end, list/list* them if any, and link
 ;;; the remainder with list* at runtime.
 (defun transform-backq-list-or-list* (function values)
@@ -2580,14 +2593,7 @@
         (constants '()))
     (loop while (and reverse
                      (constant-lvar-p (car reverse)))
-          do (push #+sb-xc-host
-                   (lvar-value (pop reverse))
-                   #-sb-xc-host
-                   (multiple-value-bind (value leaf)
-                       (lvar-value (pop reverse))
-                     (if (leaf-has-source-name-p leaf)
-                         (make-named-constant-reference (leaf-source-name leaf))
-                         value))
+          do (push (maybe-wrapped-lvar-value (pop reverse))
                    constants))
     (if (null constants)
         `(lambda ,gensyms
@@ -2620,7 +2626,7 @@
     ;; though I doubt it would provide benefit to many real-world scenarios.
     (dolist (elt elts)
       (cond ((constant-lvar-p elt)
-             (push (lvar-value elt) constants))
+             (push (maybe-wrapped-lvar-value elt) constants))
             (t
              (setq constants :fail)
              (return))))

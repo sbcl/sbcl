@@ -15,3 +15,6 @@
 ;;; appropriately.
 (defun foo ()
   `(,+foo+))
+
+(defun bar ()
+  `#(,+foo+))
