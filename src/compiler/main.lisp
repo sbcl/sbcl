@@ -1054,7 +1054,8 @@ necessary, since type inference may take arbitrarily long to converge.")
              #+sb-xc-host nil
              #-sb-xc-host (fopcompilable-p form expand))
         (let ((*fopcompile-label-counter* 0))
-          (fopcompile form path nil expand))
+          #+sb-xc-host (error "unreachable. expand: ~a" expand)
+          #-sb-xc-host (fopcompile form path nil expand))
         (let* ((*lexenv* (make-lexenv
                           :policy *policy*
                           :handled-conditions *handled-conditions*

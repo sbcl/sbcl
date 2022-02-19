@@ -384,7 +384,6 @@
 
  ("src/compiler/debug-dump")
  ("src/compiler/generic/utils" :c-headers)
- ("src/compiler/fopcompile")
 
  ("src/assembly/assemfile" :not-target)
 
@@ -469,6 +468,7 @@
 
  #+sb-dyncount ("src/compiler/dyncount")
  #+sb-dyncount ("src/code/dyncount")
+ ("src/compiler/fopcompile" :not-host)
 
  ("src/code/format-time" :not-host)
 

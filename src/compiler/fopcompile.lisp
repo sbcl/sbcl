@@ -36,7 +36,6 @@
 ;;; since PROCESS-TOPLEVEL-FORM only expands the macros at the first
 ;;; position.
 
-#-sb-xc-host
 (defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.
@@ -158,7 +157,6 @@
                              (not (macro-function operator)) ; redundant check
                              (every #'fopcompilable-p args)))))))))))
 
-#-sb-xc-host
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
     (multiple-value-bind (body decls) (parse-body (cdr args) nil)
@@ -195,26 +193,6 @@
   (and (consp form)
        (member (car form)
                '(lambda named-lambda lambda-with-lexenv))))
-
-;;; Return T if and only if OBJ's nature as an externalizable thing renders
-;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
-;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
-(defun dumpable-leaflike-p (obj)
-  (or (sb-xc:typep obj '(or symbol number character
-                            ;; (ARRAY NIL) is not included in UNBOXED-ARRAY
-                            (or unboxed-array (array nil))
-                            system-area-pointer
-                            #+sb-simd-pack simd-pack
-                            #+sb-simd-pack-256 simd-pack-256))
-      (cl:typep obj 'debug-name-marker)
-      ;; STANDARD-OBJECT layouts use MAKE-LOAD-FORM, but all other layouts
-      ;; have the same status as symbols - composite objects but leaflike.
-      (and (typep obj 'wrapper) (not (layout-for-pcl-obj-p obj)))
-      ;; PACKAGEs are also leaflike.
-      (cl:typep obj 'package)
-      ;; The cross-compiler wants to dump CTYPE instances as leaves,
-      ;; but CLASSOIDs are excluded since they have a MAKE-LOAD-FORM method.
-      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))))
 
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
