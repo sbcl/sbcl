@@ -1036,7 +1036,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; actually compile something. If (BLOCK-COMPILE *COMPILATION*) is T,
 ;;; then we still convert the form, but delay compilation, pushing the result
 ;;; on (TOPLEVEL-LAMBDAS *COMPILATION*) instead.
-(defun convert-and-maybe-compile (form path &optional (expand t))
+(defun convert-and-maybe-compile (form path)
   (declare (list path))
   #+sb-xc-host
   (when sb-cold::*compile-for-effect-only*
@@ -1052,10 +1052,10 @@ necessary, since type inference may take arbitrarily long to converge.")
              (policy *lexenv* (= store-coverage-data 0))
              (not (eq (block-compile *compilation*) t))
              #+sb-xc-host nil
-             #-sb-xc-host (fopcompilable-p form expand))
+             #-sb-xc-host (fopcompilable-p form t))
         (let ((*fopcompile-label-counter* 0))
-          #+sb-xc-host (error "unreachable. expand: ~a" expand)
-          #-sb-xc-host (fopcompile form path nil expand))
+          #+sb-xc-host (error "unreachable")
+          #-sb-xc-host (fopcompile form path nil t))
         (let* ((*lexenv* (make-lexenv
                           :policy *policy*
                           :handled-conditions *handled-conditions*
