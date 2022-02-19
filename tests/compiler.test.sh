@@ -306,6 +306,23 @@ cat > $tmpfilename <<EOF
 EOF
 expect_failed_compile $tmpfilename
 
+cat > $tmpfilename <<EOF
+    (declaim (optimize debug))
+    (locally
+      (declare (muffle-conditions warning))
+      (defun foo () x))
+    (defun bar () x)
+EOF
+expect_failed_compile $tmpfilename
+
+cat > $tmpfilename <<EOF
+    (defun foo ()
+      (locally (declare (muffle-conditions warning))
+        (+ x x))
+      x)
+EOF
+expect_failed_compile $tmpfilename
+
 # This should fail, and fail nicely -- not eg. loop trying to dump
 # references to the unbound variable.
 cat > $tmpfilename <<EOF

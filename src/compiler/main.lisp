@@ -1036,6 +1036,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; actually compile something. If (BLOCK-COMPILE *COMPILATION*) is T,
 ;;; then we still convert the form, but delay compilation, pushing the result
 ;;; on (TOPLEVEL-LAMBDAS *COMPILATION*) instead.
+;;;
+;;; The policy at this time becomes the default policy for compiling
+;;; the form. Any enclosed PROCLAIMs will affect only subsequent
+;;; forms.
 (defun convert-and-maybe-compile (form path)
   (declare (list path))
   #+sb-xc-host

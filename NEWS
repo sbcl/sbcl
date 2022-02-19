@@ -9,6 +9,8 @@ changes relative to sbcl-2.2.1:
   * enhancement: better source locations for structure accessors.
   * bug fix: SB-COVER now always instruments top level forms correctly.
   * bug fix: Muffling conditions now works correctly on higher debug settings.
+  * bug fix: Local muffling declarations now scope correctly with respect to
+    undefined variable warnings.
 
 changes in sbcl-2.2.1 relative to sbcl-2.2.0:
   * incompatible change: DEFINE-ALIEN-CALLBACK, which has never been exported

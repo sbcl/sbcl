@@ -353,8 +353,6 @@
             (type (info :variable :type name))
             (where-from (info :variable :where-from name))
             (deprecation-state (deprecated-thing-p 'variable name)))
-        (when (and (eq kind :unknown) (not deprecation-state))
-          (note-undefined-reference name :variable))
         ;; For deprecated vars, warn about LET and LAMBDA bindings, SETQ, and ref.
         ;; Don't warn again if the name was already seen by the transform
         ;; of SYMBOL[-GLOBAL]-VALUE.
@@ -768,9 +766,14 @@
         ;; error (bug 412, lp#722734): checking for null RESULT is not enough,
         ;; since variables can become dead due to later optimizations.
         (ir1-convert start next result
-                     (if (eq (global-var-kind var) :global)
-                         `(sym-global-val ',name)
-                         `(symeval ',name)))
+                     (case (global-var-kind var)
+                       (:global `(sym-global-val ',name))
+                       (:unknown
+                        (when (not (deprecated-thing-p 'variable name))
+                          (note-undefined-reference name :variable))
+                        `(symeval ',name))
+                       (t
+                        `(symeval ',name))))
         (etypecase var
           (leaf
            (cond
