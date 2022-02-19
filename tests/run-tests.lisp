@@ -409,6 +409,10 @@
                ;; is undone by deleting the package. We're pretty good now about not
                ;; polluting any sort of gobal namespace with compiler metadata
                ;; as long as the function is named by just a symbol or (SETF x).
+               ;; FIXME: probably should shadow DECLAIM, and reject some if not all
+               ;; possible things that could be declaimed.
+               ;; Even the impure tests suffer from a DECLAIM leaking into subsequent
+               ;; tests within the same file, so it's a more general problem.
                (shadow '("DEFMETHOD"
                          "EXIT"
                          ;; Hiding IN-PACKAGE is a good preventative measure.

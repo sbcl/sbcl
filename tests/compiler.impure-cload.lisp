@@ -41,33 +41,6 @@
 (in-package :cl-user)
 (delete-package :bug254)
 
-;;; bug 255
-(defpackage :bug255 (:use :cl))
-(in-package :bug255)
-(declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
-(defvar *1*)
-(defvar *2*)
-(defstruct v a b)
-(defstruct w)
-(defstruct yam (v nil :type (or v null)))
-(defstruct un u)
-(defstruct (bod (:include un)) bo)
-(defstruct (bad (:include bod)) ba)
-(declaim (ftype (function ((or w bad) (or w bad)) (values)) %ufm))
-(defun %ufm (base bound) (froj base bound *1*) (values))
-(declaim (ftype (function ((vector t)) (or w bad)) %pu))
-(defun %pu (pds) (declare (ignore pds)) *2*)
-(defun uu (yam)
-  (declare (ignore yam))
-  (let ((v (yam-v az)))
-    (%ufm v
-          (flet ((project (x) (frob x 0)))
-            (let ((avecname *1*))
-              (multiple-value-prog1
-                  (progn (%pu avecname))
-                (frob)))))))
-(in-package :cl-user)
-(delete-package :bug255)
 
 ;;; bug 148
 (defpackage :bug148 (:use :cl))
@@ -219,7 +192,7 @@
 ;;; bug 291 reported by Nikodemus Siivola (modified version)
 (defstruct line
   (%chars ""))
-(defun update-window-imag (line)
+(defun update-window-imag (line &aux string)
   (tagbody
    TOP
      (if (null line)
@@ -230,7 +203,7 @@
        (let* ((cc (car current))
               (old-line (dis-line-line cc)))
          (if (eq old-line line)
-             (do ((chars (line-%chars line) nil))
+             (do ((chars (and line (line-%chars line)) nil))
                  (())
                (let* ()
                  (multiple-value-call

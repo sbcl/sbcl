@@ -3588,3 +3588,50 @@
             (restart-bind nil a))
           c))
    ((49702337 5921272101558 8345185767296289) 8345185767296289)))
+
+;;; Test from git rev e47ffa8855d4139f88f5982fe4b82a05c3498ed3.
+;;; I have absolutely zero understanding of what this was doing,
+;;; but the are bunch of "undefined variable" warnings, so it can't
+;;; go at toplevel in a .cload test.
+(with-test (:name :bug-226)
+  (with-scratch-file (lisp "lisp")
+    (with-open-file (f lisp :direction :output)
+      (write '(defun bug226 ()
+  (declare (optimize (speed 0) (safety 3) (debug 3)))
+  (flet ((safe-format (stream string &rest r)
+           (unless (ignore-errors (progn
+                                    (apply #'format stream string r)
+                                    t))
+             (format stream "~&foo ~S" string))))
+    (cond
+      ((eq my-result :ERROR)
+       (cond
+         ((ignore-errors (typep condition result))
+          (safe-format t "~&bar ~S" result))
+         (t
+          (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
+             :stream f :readably t))
+    (with-scratch-file (fasl "fasl")
+      (compile-file lisp :output-file fasl))))
+
+;;; I think these tests had to be present in a COMPILE-FILE (as opposed to COMPILE)
+;;; to prove that the bug was fixed.
+;;; Anway it's no longer going to be allowed to have deliberately bad code in '.cload'
+;;; files, because any condition of type warnings or error is considered failure
+;;; of the compile step.
+(with-test (:name :lp-1276282)
+  (with-scratch-file (lisp "lisp")
+    (with-open-file (f lisp :direction :output)
+      ;; from git rev feb31fb6cfc8f89e2d75b5f2cc2ee569ac975033
+      (format f "(lambda () (the string (+ 1 x)))~%")
+      ;; from git rev fbea35e879891723259dfa55589b498228390bb9
+      (format f
+"(lambda ()
+  (macrolet ((x (&rest args)
+               (declare (ignore args))
+               'a))
+    (let (a)
+      (declare (type vector a))
+      (x #.#'list))))~%"))
+    (with-scratch-file (fasl "fasl")
+      (compile-file lisp :output-file fasl))))

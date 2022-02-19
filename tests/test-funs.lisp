@@ -66,7 +66,12 @@
         (start-time (get-internal-real-time)))
     (with-scratch-file (fasl "fasl")
       (let ((*features* (append *features* sb-impl:+internal-features+)))
-        (compile-file file :print nil :output-file fasl))
+        (multiple-value-bind (fasl warnings failure)
+            (compile-file file :print nil :output-file fasl)
+          (declare (ignorable fasl warnings))
+          (when (or #|warnings|# failure) ; FIXME: disallow warnings
+            (push (list :unexpected-failure file :compile-failed) *failures*)
+            (return-from cload-test))))
       (test-util::record-test-elapsed-time "(compile-file)" start-time)
       (load fasl)
       ;; TODO: as above, execute queued tests if within-file concurrency was enabled.

@@ -79,9 +79,6 @@
            (b a))
       (assert* (eql b 13)))))
 
-(setf (symbol-value 'fopcompile-test-foo) 1)
-(assert* (eql fopcompile-test-foo 1))
-
 ;;; Ensure that we're passing sensible environments to macros during
 ;;; fopcompilation. Reported by Samium Gromoff.
 

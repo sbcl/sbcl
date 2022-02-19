@@ -3087,3 +3087,17 @@
        "(defun make-... (len) (make-sequence '(simple-array (or probability condition) (*)) len :initial-element #\\e))")
     (assert (not warnp))
     (assert (not failp))))
+
+;;; Test from git rev 0b39d68b05ef669f812a6bf570126505d931bf96
+;;; I do not understand why, if placed in a '.pure' file, it causes:
+;;;  There is no applicable method for the generic function
+;;;    #<STANDARD-GENERIC-FUNCTION SB-MOP:REMOVE-DIRECT-SUBCLASS (1)>
+;;;  when called with arguments
+;;;    (#<STRUCTURE-CLASS COMMON-LISP:STRUCTURE-OBJECT> NIL).
+;;; when the test runner attempts to purge the classoid namespace
+;;; of test artifacts.
+;;; (It does define structures, but that's supposed to be allowed now)
+(with-test (:name :bug-255)
+  (with-scratch-file (fasl "fasl")
+    (compile-file "bug-255" :output-file fasl))
+  (delete-package :bug255))

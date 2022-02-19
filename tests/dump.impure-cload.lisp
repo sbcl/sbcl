@@ -422,7 +422,7 @@
     (assert (eq (aref pairs 2) 'first))
     (assert (eq (aref pairs 4) 'second))))
 
-(defun int= (a b) (= (the integer x) (the integer b)))
+(defun int= (a b) (= (the integer a) (the integer b)))
 (define-hash-table-test int= sb-impl::number-sxhash)
 (defun get-sync-hash-table () #.(make-hash-table :synchronized t))
 (with-test (:name :dump-hash-tables)
