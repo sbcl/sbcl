@@ -30,7 +30,7 @@
 (defmacro sb-xc:deftype (name lambda-list &body body &environment env)
   "Define a new type, with syntax like DEFMACRO."
   (declare (ignore env))
-  (check-designator name deftype)
+  (check-designator name 'deftype)
   (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body t)
         (acond ((and (not lambda-list) (not decls)

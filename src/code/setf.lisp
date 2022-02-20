@@ -400,7 +400,7 @@
 
 (sb-xc:defmacro define-modify-macro (name lambda-list function &optional doc-string)
   "Creates a new read-modify-write macro like PUSH or INCF."
-  (check-designator name define-modify-macro)
+  (check-designator name 'define-modify-macro)
   (binding* (((nil required optional rest)
               (parse-lambda-list
                lambda-list
@@ -457,7 +457,8 @@
 (sb-xc:defmacro defsetf (access-fn &rest rest)
   "Associates a SETF update function or macro with the specified access
   function or macro. The format is complex. See the manual for details."
-  (check-designator access-fn defsetf "access-function")
+  (check-designator access-fn 'defsetf
+      #'symbolp "symbol" "access-function")
   (typecase rest
     ((cons (and symbol (not null)) (or null (cons string null)))
      `(eval-when (:load-toplevel :compile-toplevel :execute)
@@ -575,7 +576,8 @@
 (sb-xc:defmacro define-setf-expander (access-fn lambda-list &body body)
   "Syntax like DEFMACRO, but creates a setf expander function. The body
   of the definition must be a form that returns five appropriate values."
-  (check-designator access-fn define-setf-expander "access-function")
+  (check-designator access-fn 'define-setf-expander
+      #'symbolp "symbol" "access-function")
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (%defsetf ',access-fn
                ,(make-macro-lambda `(setf-expander ,access-fn) lambda-list body

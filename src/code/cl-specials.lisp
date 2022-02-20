@@ -149,30 +149,6 @@
 
 (in-package "SB-IMPL")
 
-;;; Generate a consistent error message for all the standard
-;;; defining macros when given an invalid NAME argument.
-;;; DEFCLASS has its own thing, which is CHECK-CLASS-NAME.
-;;; [This is possibly the wrong place for this, but it's needed
-;;; earlier than anything else, even primordial-extensions.]
-(defmacro check-designator (name macro &optional (arg-reference "NAME"))
-  (multiple-value-bind (predicate explanation)
-      (case macro
-        ((defun defgeneric defmethod define-compiler-macro)
-         (values 'legal-fun-name-p "function name"))
-        (t
-         (values 'symbolp "symbol")))
-    ;; If we decide that the correct behavior is to actually macroexpand
-    ;; and then fail later, well, I suppose we could express all macros
-    ;; such that they perform their LEGAL-FUN-NAME-P/SYMBOLP check as part
-    ;; of the ordinary code, as in:
-    ;;  (DEFPARAMETER "foo" 3) -> (%defparameter (the symbol '"foo") ...)
-    ;; which seems at least slightly preferable to failing in the
-    ;; internal function that would store the globaldb info.
-    `(unless (,predicate ,name)
-       (error ,(format nil "The ~A argument to ~A, ~~S, is not a ~A."
-                       arg-reference macro explanation)
-              ,name))))
-
 (defmacro defglobal (name value &optional (doc nil docp))
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
 and assigned to NAME both at compile- and load-time, but only if NAME is not
@@ -183,7 +159,7 @@ locally bound, declared special, defined as constants, and neither bound
 nor defined as symbol macros.
 
 See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
-  (check-designator name defglobal)
+  (check-designator name 'defglobal)
   (let ((boundp (make-symbol "BOUNDP")))
     `(progn
        (eval-when (:compile-toplevel)
@@ -203,7 +179,7 @@ Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
 unless it has otherwise been assigned a value.
 
 See also DEFGLOBAL which assigns the VALUE at compile-time too."
-  (check-designator name define-load-time-global)
+  (check-designator name 'define-load-time-global)
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defglobal ',name :eventually nil nil))

@@ -51,7 +51,7 @@ only."
 
 (let ()
   (defmacro sb-xc:defmacro (name lambda-list &body body)
-    (check-designator name defmacro)
+    (check-designator name 'defmacro)
     ;; When we are building the cross-compiler, we could be in a host
     ;; lisp which implements CL macros (e.g. CL:AND) as special
     ;; operators (while still providing a macroexpansion for

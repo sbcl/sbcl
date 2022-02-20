@@ -179,7 +179,7 @@ tree structure resulting from the evaluation of EXPRESSION."
 ;;; functions (effectively turning them into local lexical functions.)
   (sb-xc:defmacro defun (&environment env name lambda-list &body body)
     "Define a function at top level."
-    (check-designator name defun)
+    (check-designator name 'defun #'legal-fun-name-p "function name")
     #+sb-xc-host
     (unless (cl:symbol-package (fun-name-block-name name))
       (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
@@ -196,7 +196,7 @@ tree structure resulting from the evaluation of EXPRESSION."
   compiled into code. If the variable already has a value, and this is not
   EQL to the new value, the code is not portable (undefined behavior). The
   third argument is an optional documentation string for the variable."
-  (check-designator name defconstant)
+  (check-designator name 'defconstant)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (%defconstant ',name ,value (sb-c:source-location)
                    ,@(and docp `(',doc)))))
@@ -280,7 +280,7 @@ tree structure resulting from the evaluation of EXPRESSION."
   SPECIAL and, optionally, initialize it. If the variable already has a
   value, the old value is not clobbered. The third argument is an optional
   documentation string for the variable."
-  (check-designator var defvar)
+  (check-designator var 'defvar)
   ;; Maybe kill docstring, but only under the cross-compiler.
   #+(and (not sb-doc) sb-xc-host) (setq doc nil)
   `(progn
@@ -304,7 +304,7 @@ tree structure resulting from the evaluation of EXPRESSION."
   variable special and sets its value to VAL, overwriting any
   previous value. The third argument is an optional documentation
   string for the parameter."
-  (check-designator var defparameter)
+  (check-designator var 'defparameter)
   ;; Maybe kill docstring, but only under the cross-compiler.
   #+(and (not sb-doc) sb-xc-host) (setq doc nil)
   `(progn
@@ -660,7 +660,8 @@ invoked. In that case it will store into PLACE and start over."
 
 (sb-xc:defmacro define-compiler-macro (name lambda-list &body body)
   "Define a compiler-macro for NAME."
-  (check-designator name define-compiler-macro)
+  (check-designator name 'define-compiler-macro
+      #'legal-fun-name-p "function name")
   (when (and (symbolp name) (special-operator-p name))
     (%program-error "cannot define a compiler-macro for a special operator: ~S"
                     name))

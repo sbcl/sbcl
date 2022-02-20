@@ -68,7 +68,7 @@
 ;;; This expander avoids the use of the rest of CLOS in order to help
 ;;; with bootstrapping.
 (sb-xc:defmacro defmethod (name &rest args)
-  (check-designator name 'defmethod)
+  (check-designator name 'defmethod #'legal-fun-name-p "function name")
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     (multiple-value-bind (parameters unspecialized-ll specializers)

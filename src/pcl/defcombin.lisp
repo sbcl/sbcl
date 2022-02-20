@@ -29,7 +29,7 @@
 ;;;
 (defmacro define-method-combination (&whole form name . args)
   (declare (ignore args))
-  (check-designator name define-method-combination)
+  (check-designator name 'define-method-combination)
   `(progn
      (with-single-package-locked-error
          (:symbol ',name "defining ~A as a method combination"))

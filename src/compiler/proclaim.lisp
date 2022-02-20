@@ -80,6 +80,24 @@
       (error 'sb-kernel::illegal-class-name-error :name name)
       name))
 
+;;; Check that NAME is a valid designator for the defining macro
+;;; MACRO. This is used mostly to give a consistent message for all
+;;; defining forms, except for DEFCLASS, which uses CHECK-CLASS-NAME.
+(defun check-designator (name macro &optional (predicate #'symbolp)
+                                              (what "symbol")
+                                              (arg-reference "NAME"))
+  ;; If we decide that the correct behavior is to actually macroexpand
+  ;; and then fail later, well, I suppose we could express all macros
+  ;; such that they perform their LEGAL-FUN-NAME-P/SYMBOLP check as
+  ;; part of the ordinary code, as in: (DEFPARAMETER "foo" 3) ->
+  ;; (%defparameter (the symbol '"foo") ...)  which seems at least
+  ;; slightly preferable to failing in the internal function that
+  ;; would store the globaldb info.
+  (unless (funcall predicate name)
+    (error (format nil "The ~A argument to ~A, ~~S, is not a ~A."
+                   arg-reference macro what)
+           name)))
+
 ;;; This is called to do something about SETF functions that overlap
 ;;; with SETF macros. Perhaps we should interact with the user to see
 ;;; whether the macro should be blown away, but for now just give a

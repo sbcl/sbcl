@@ -284,7 +284,6 @@
              (values (setf (gethash ,n-key ,n-hash-table) ,default) nil))))))
 
 (defvar *!removable-symbols* nil)
-(push '("SB-INT" check-designator) *!removable-symbols*)
 
 (defun %defconstant-eqx-value (symbol expr eqx)
   (declare (type function eqx))
