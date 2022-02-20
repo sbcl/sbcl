@@ -893,8 +893,9 @@
        (dump-simple-vector simple-version file)
        (eq-save-object x file))
       (t
-       (dump-specialized-vector simple-version file)
-       (eq-save-object x file)))))
+       (unless (similar-check-table x file)
+         (dump-specialized-vector simple-version file)
+         (similar-save-object x file))))))
 
 ;;; Dump a SIMPLE-VECTOR, handling any circularities.
 (defun dump-simple-vector (v file)
