@@ -418,8 +418,8 @@ scav_fun_pointer(lispobj *where, lispobj object)
         struct code *code = trans_code((struct code *) ((uword_t) fun - offset));
         copy = make_lispobj((char*)code + offset, FUN_POINTER_LOWTAG);
     } else {
-        int page_type = PAGE_TYPE_MIXED;
-        void* region = mixed_region;
+        int page_type = PAGE_TYPE_SMALL_MIXED;
+        void* region = small_mixed_region;
         if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
             /* funcallable-instance might have all descriptor slots
              * except for the trampoline, which points to an asm routine.
@@ -523,8 +523,8 @@ static inline lispobj copy_instance(lispobj object)
     lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
     int original_length = instance_length(header);
 
-    void* region = mixed_region;
-    int page_type = PAGE_TYPE_MIXED;
+    void* region = small_mixed_region;
+    int page_type = PAGE_TYPE_SMALL_MIXED;
 
 #ifdef LISP_FEATURE_GENCGC
     struct layout* layout = (void*)native_pointer(instance_layout(INSTANCE(object)));
@@ -584,7 +584,8 @@ static inline lispobj copy_instance(lispobj object)
                instance_length(*base));
 #endif
     } else {
-        copy = gc_copy_object(object, 1 + (original_length|1), region, page_type);
+        int nwords = 1 + (original_length|1);
+        copy = gc_copy_object(object, nwords, region, page_type);
     }
     set_forwarding_pointer(native_pointer(object), copy);
     return copy;
@@ -770,7 +771,7 @@ static lispobj trans_boxed(lispobj object) {
 }
 static lispobj trans_tiny_mixed(lispobj object) {
     return gc_copy_object(object, 1 + TINY_BOXED_NWORDS(*native_pointer(object)),
-                          mixed_region, PAGE_TYPE_MIXED);
+                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
 }
 
 static sword_t scav_symbol(lispobj *where, lispobj header) {
@@ -991,7 +992,8 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
     return FDEFN_SIZE;
 }
 static lispobj trans_fdefn(lispobj object) {
-    return gc_copy_object(object, FDEFN_SIZE, mixed_region, PAGE_TYPE_MIXED);
+    return gc_copy_object(object, FDEFN_SIZE,
+                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
 }
 static sword_t size_fdefn(lispobj __attribute__((unused)) *where) {
     return FDEFN_SIZE;
@@ -1049,7 +1051,7 @@ trans_vector_t(lispobj object)
     if (!length)
         page_type = PAGE_TYPE_UNBOXED, region = unboxed_region;
     else if (v->header & mask)
-        page_type = PAGE_TYPE_MIXED, region = mixed_region;
+        page_type = PAGE_TYPE_SMALL_MIXED, region = small_mixed_region;
     return copy_possibly_large_object(object, ALIGN_UP(length + 2, 2), region, page_type);
 }
 
@@ -1079,7 +1081,7 @@ static inline uword_t NWORDS(uword_t x, uword_t n_bits)
 #ifdef LISP_FEATURE_UBSAN
 // If specialized vectors point to a vector of bits in their first
 // word after the header, they can't be relocated to unboxed pages.
-#define SPECIALIZED_VECTOR_ARGS mixed_region, PAGE_TYPE_MIXED
+#define SPECIALIZED_VECTOR_ARGS small_mixed_region, PAGE_TYPE_SMALL_MIXED
 #else
 #define SPECIALIZED_VECTOR_ARGS unboxed_region, PAGE_TYPE_UNBOXED
 #endif

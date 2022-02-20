@@ -931,27 +931,46 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
 
 void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested) never_returns;
 
-static page_index_t find_cons_page(page_index_t restart_page, sword_t nbytes, generation_index_t gen)
+/* Find a single page for conses or SMALL_MIXED objects.
+ * CONS differs because:
+ * - not all GENCGC_PAGE_BYTES of the page can be used.
+ * - a region can't be extended from one page to the next
+ *   (implied by the preceding restriction).
+ * SMALL_MIXED is similar to cons, but all bytes of the page can be used
+ * for storing objects, subject to the non-card-spaning constraint. */
+static page_index_t find_single_page(int page_type, sword_t nbytes, generation_index_t gen)
 {
-    gc_assert(nbytes <= CONS_PAGE_USABLE_BYTES);
-    page_index_t page = restart_page;
-    sword_t most_bytes_found = 0;
+    page_index_t page = alloc_start_pages[page_type];;
     // Compute the max words that could already be used while satisfying the request.
-    page_words_t usage_allowance = (CONS_SIZE*MAX_CONSES_PER_PAGE) - (nbytes>>WORD_SHIFT);
+    page_words_t usage_allowance =
+        usage_allowance = GENCGC_PAGE_BYTES/N_WORD_BYTES - (nbytes>>WORD_SHIFT);
+    if (page_type == PAGE_TYPE_CONS) {
+        gc_assert(nbytes <= CONS_PAGE_USABLE_BYTES);
+        usage_allowance = (CONS_SIZE*MAX_CONSES_PER_PAGE) - (nbytes>>WORD_SHIFT);
+    }
     for ( ; page < page_table_pages ; ++page) {
         if (page_words_used(page) <= usage_allowance
-            && (page_free_p(page) || page_extensible_p(page, gen, PAGE_TYPE_CONS))) { // win
-            if (page+1 > next_free_page) {
-                next_free_page = page+1;
-                set_alloc_pointer((lispobj)page_address(next_free_page));
-            }
-            return page;
-        }
-        // Does tracking most_bytes_found really achieve anything?
-        sword_t bytes_avail = CONS_PAGE_USABLE_BYTES - page_bytes_used(page);
-        if (bytes_avail > most_bytes_found) most_bytes_found = bytes_avail;
+            && (page_free_p(page) || page_extensible_p(page, gen, page_type))) return page;
     }
-    gc_heap_exhausted_error_or_lose(most_bytes_found, nbytes);
+    /* Compute the "available" space for the lossage message. This is kept out of the
+     * search loop because it's needless overhead. Any free page would have been returned,
+     * so we just have to find the least full page meeting the gen+type criteria */
+    sword_t min_used = GENCGC_PAGE_WORDS;
+    for ( ; page < page_table_pages ; ++page) {
+        if (page_words_used(page) < min_used && page_extensible_p(page, gen, page_type))
+            min_used = page_words_used(page);
+    }
+    sword_t bytes_avail;
+    if (page_type == PAGE_TYPE_CONS) {
+        bytes_avail = CONS_PAGE_USABLE_BYTES - (min_used<<WORD_SHIFT);
+        /* The sentinel value initially in 'least_words_used' exceeds a cons
+         * page's capacity, so clip to 0 instead of showing a negative value
+         * if no page matched on gen+type */
+        if (bytes_avail < 0) bytes_avail = 0;
+    } else {
+        bytes_avail = GENCGC_PAGE_BYTES - (min_used<<WORD_SHIFT);
+    }
+    gc_heap_exhausted_error_or_lose(bytes_avail, nbytes);
 }
 
 static void*
@@ -960,38 +979,46 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
     /* Check that the region is in a reset state. */
     gc_dcheck(region_closed_p(alloc_region));
 
-    if (page_type == PAGE_TYPE_CONS) {
+    if (page_type == PAGE_TYPE_CONS || page_type == PAGE_TYPE_SMALL_MIXED) {
+        // No mutex release, because either this is:
+        //   - not called from Lisp, as in the SMALL_MIXED case
+        //   - called from lisp_alloc() which does its own unlock
         gc_dcheck(!unlock);
-        /* CONS differs because:
-         * - not all GENCGC_PAGE_BYTES of the page can be used.
-         * - a region can't be extended from one page to the next
-         *   (implied by the preceding restriction) */
         page_index_t page;
-        INSTRUMENTING(page = find_cons_page(alloc_start_pages[PAGE_TYPE_CONS],
-                                            nbytes, gc_alloc_generation),
+        INSTRUMENTING(page = find_single_page(page_type, nbytes, gc_alloc_generation),
                       et_find_freeish_page);
+        if (page+1 > next_free_page) {
+            next_free_page = page+1;
+            set_alloc_pointer((lispobj)page_address(next_free_page));
+        }
         page_table[page].gen = gc_alloc_generation;
         page_table[page].type = OPEN_REGION_PAGE_FLAG | page_type;
 #ifdef LISP_FEATURE_DARWIN_JIT
         if (!page_words_used(page))
             /* May need to be remapped from PAGE_TYPE_CODE */
-            zero_dirty_pages(page, page, PAGE_TYPE_CONS);
+            zero_dirty_pages(page, page, page_type);
         else
             set_page_need_to_zero(page, 1);
 #else
-        if (!page_words_used(page) && page_table[page].need_zerofill) {
-            // Zero the trailing data
+        if (page_type == PAGE_TYPE_CONS && !page_words_used(page)
+            && page_table[page].need_zerofill) {
+            // Zero the trailing data (the cons cell mark bits)
             char *trailer = page_address(page) + CONS_PAGE_USABLE_BYTES;
             memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_USABLE_BYTES);
         }
         set_page_need_to_zero(page, 1); // would normally be set in zero_dirty_pages()
 #endif
         // Don't need to set the scan_start_offset because free pages have it 0
-        // (and all cons pages start a new contiguous block)
+        // (and each of these page types starts a new contiguous block)
         gc_dcheck(page_table[page].scan_start_offset_ == 0);
         alloc_region->last_page = page;
         alloc_region->start_addr = page_address(page) + page_bytes_used(page);
-        alloc_region->end_addr = page_address(page) + CONS_PAGE_USABLE_BYTES;
+        if (page_type == PAGE_TYPE_CONS) {
+            alloc_region->end_addr = page_address(page) + CONS_PAGE_USABLE_BYTES;
+        } else {
+            alloc_region->end_addr =
+              (char*)ALIGN_DOWN((uword_t)alloc_region->start_addr, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
+          }
         alloc_region->free_pointer = alloc_region->start_addr;
         gc_assert(find_page_index(alloc_region->start_addr) == page);
         return alloc_region->free_pointer;
@@ -1238,8 +1265,9 @@ void *
 gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region, int unlock)
 {
     page_index_t first_page, last_page;
-    // Large BOXED would seem to serve no purpose beyond MIXED
-    if (page_type == PAGE_TYPE_BOXED) page_type = PAGE_TYPE_MIXED;
+    // Large BOXED would serve no purpose beyond MIXED, and "small large" is illogical.
+    if (page_type == PAGE_TYPE_BOXED || page_type == PAGE_TYPE_SMALL_MIXED)
+        page_type = PAGE_TYPE_MIXED;
 
     first_page = alloc_start_page(page_type, 1);
     // FIXME: really we want to try looking for space following the highest of
@@ -1471,25 +1499,101 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
  * when it can't fit in the open region.
  * This entry point is only for use within the GC itself.
  * The Lisp region overflow handler either directly calls gc_alloc_large
- * or closes and opens a region if the allocation is small. */
-void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int page_type)
+ * or closes and opens a region if the allocation is small.
+ *
+ * There are two general approaches to handling SMALL_MIXED allocations:
+ *  1. always open the alloc region as whole page, but hack up gc_general_alloc
+ *     to avoid spanning cards in the fast case.
+ *  2. open the region as one card, and alter the slow case to try consuming
+ *     the next card on the same page if it can.
+ * Choice 2 is better because choice 1 makes an extra test for page_type
+ * in each call to gc_general_alloc.
+ */
+static void *new_region(struct alloc_region* region, sword_t nbytes, int page_type)
 {
-    if (nbytes >= LARGE_OBJECT_SIZE) {
-        /* If this is a normal GC - as opposed to "final" GC just prior to saving
-         * a core, then we should never copy a large object (not that that's the best
-         * strategy always, because it entirely precludes defragmenting those objects).
-         * But unfortunately we can't assert that only small objects are seen here,
-         * because genesis does not use large-object pages. So cold-init could fail,
-         * depending on whether objects in the cold core are sufficiently large that
-         * they ought to have gone on large object pages if they could have. */
-        return gc_alloc_large(nbytes, page_type, region, 0);
-    }
     ensure_region_closed(region, page_type);
     void* new_obj = gc_alloc_new_region(nbytes, page_type, region, 0);
     region->free_pointer = (char*)new_obj + nbytes;
     gc_assert(region->free_pointer <= region->end_addr);
     return new_obj;
 }
+void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int page_type)
+{
+    /* If this is a normal GC - as opposed to "final" GC just prior to saving
+     * a core, then we should never copy a large object (not that that's the best
+     * strategy always, because it entirely precludes defragmenting those objects).
+     * But unfortunately we can't assert that only small objects are seen here,
+     * because genesis does not use large-object pages. So cold-init could fail,
+     * depending on whether objects in the cold core are sufficiently large that
+     * they ought to have gone on large object pages if they could have. */
+    if (nbytes >= LARGE_OBJECT_SIZE) return gc_alloc_large(nbytes, page_type, region, 0);
+
+    if (page_type != PAGE_TYPE_SMALL_MIXED) return new_region(region, nbytes, page_type);
+
+#define SMALL_MIXED_NWORDS_LIMIT 10
+#define SMALL_MIXED_NBYTES_LIMIT (SMALL_MIXED_NWORDS_LIMIT * N_WORD_BYTES)
+    /* We're want to try to place mix raw/tagged slot objects such that they don't span cards.
+     * There are essentially three cases:
+     * (1) If the object size exceeds one card, we go straight to the MIXED region.
+     * (2) If the object size is <= SMALL_MIXED_NWORDS_LIMIT, we will _always_ place it
+     *     on one card. To do that, just align up to the next card or whole page
+     *     if it would span cards based on the current free_pointer.
+     *     This wastes at most SMALL_MIXED_NWORDS_LIMIT - 2 words, per card.
+     * (3) If the object is larger than that, we will waste at most the threshold number
+     *     of words, but if it would waste more, we use the MIXED region.
+     *     So this case opportunistically uses the subcard region if it can */
+    if ((int)nbytes > (int)GENCGC_CARD_BYTES)
+        return new_region(mixed_region, nbytes, PAGE_TYPE_MIXED);
+    if (!region->start_addr) { // region is not in an open state
+        /* Don't try to request too much, because that might return a brand new page,
+         * when we could have kept going on the same page with small objects.
+         * Better to put the threshold-exceeding object in the MIXED region */
+        int request = nbytes > SMALL_MIXED_NBYTES_LIMIT ? SMALL_MIXED_NBYTES_LIMIT : nbytes;
+        void* new_obj = gc_alloc_new_region(request, page_type, region, 0);
+        char* new_freeptr = (char*)new_obj + nbytes;
+        /* alloc_new_region() ensures that the page it returns has at least 'nbytes' more
+         * but does *not* ensure that there is that much space below the end of the region.
+         * This is a little weird, but doing things this way confines the filler insertion
+         * logic to just here instead of also being also in alloc_new_region.
+         * You could try to put that logic only in alloc_new_region, but doing that has
+         * its own down-side: to call alloc_new_region, you first have to close the region,
+         * which entails extra work in sync'ing the PTE when we don't really need to */
+        if (new_freeptr <= (char*)region->end_addr) {
+            region->free_pointer = new_freeptr;
+            return new_obj;
+        }
+    }
+    __attribute__((unused)) page_index_t page = region->last_page;
+    gc_assert(page_table[page].type & OPEN_REGION_PAGE_FLAG);
+    // Region is open, but card at free_pointer lacks sufficient space.
+    // See if there's another card on the same page.
+    char* page_base = PTR_ALIGN_DOWN(region->start_addr, GENCGC_PAGE_BYTES);
+    char* next_card = PTR_ALIGN_UP(region->free_pointer, GENCGC_CARD_BYTES);
+    if (next_card < page_base + GENCGC_PAGE_BYTES) {
+        int fill_nbytes = next_card - (char*)region->free_pointer;
+        if (fill_nbytes) {
+            int fill_nwords = fill_nbytes >> WORD_SHIFT;
+            /* Object size might strictly exceed SMALL_MIXED_NWORDS_LIMIT.
+             * Never insert that much filler */
+            if (fill_nwords >= SMALL_MIXED_NWORDS_LIMIT)
+                return new_region(mixed_region, nbytes, PAGE_TYPE_MIXED);
+            *(lispobj*)region->free_pointer =
+                (fill_nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+        }
+        region->free_pointer = next_card;
+        region->end_addr = next_card + GENCGC_CARD_BYTES;
+        void* new_obj = next_card;
+        region->free_pointer = (char*)new_obj + nbytes;
+        gc_assert(region->free_pointer <= region->end_addr);
+        return new_obj;
+    }
+    /* Now be careful not to waste too much at the end of the page in the following situation:
+     * page has 20 words more, but we need 24 words. Use the MIXED region because the subcard
+     * region has room for anywhere from 2 to 10 more objects depending on how small */
+    if (nbytes > SMALL_MIXED_NBYTES_LIMIT) page_type = PAGE_TYPE_MIXED, region = mixed_region;
+    return new_region(region, nbytes, page_type);
+}
+
 
 /* Free any trailing pages of the object starting at 'first_page'
  * that are currently unused due to object shrinkage.
@@ -1643,8 +1747,9 @@ copy_possibly_large_object(lispobj object, sword_t nwords,
     if (page_single_obj_p(first_page) &&
         (nbytes >= LARGE_OBJECT_SIZE || (rounded - nbytes < rounded / 128))) {
 
-        // Large BOXED would seem to serve no purpose beyond MIXED
-        if (page_type == PAGE_TYPE_BOXED) page_type = PAGE_TYPE_MIXED;
+        // Large BOXED would serve no purpose beyond MIXED, and "small large" is illogical.
+        if (page_type == PAGE_TYPE_BOXED || page_type == PAGE_TYPE_SMALL_MIXED)
+            page_type = PAGE_TYPE_MIXED;
         os_vm_size_t bytes_freed =
           adjust_obj_ptes(first_page, nwords, new_space,
                           SINGLE_OBJECT_FLAG | page_type);
@@ -1674,21 +1779,25 @@ lispobj *
 search_dynamic_space(void *pointer)
 {
     page_index_t page_index = find_page_index(pointer);
-    lispobj *start;
 
     /* The address may be invalid, so do some checks. */
     if ((page_index == -1) || page_free_p(page_index))
         return NULL;
-    // TODO: if the page type is SMALL_MIXED, we can align down to the nearest card
-    // and scan from there.
-    if ((page_table[page_index].type & PAGE_TYPE_MASK) == PAGE_TYPE_CONS) {
+    int type = page_table[page_index].type & PAGE_TYPE_MASK;
+    if (type == PAGE_TYPE_CONS) {
         int wordindex = ((char*)pointer - page_address(page_index)) >> WORD_SHIFT;
         if (wordindex < page_words_used(page_index))
             return (lispobj*)(page_address(page_index) + ((wordindex >> 1) << (1+WORD_SHIFT)));
         else
-            return 0;
+            return NULL;
     }
-    start = (lispobj *)page_scan_start(page_index);
+    lispobj *start;
+    if (type == PAGE_TYPE_SMALL_MIXED) { // find the nearest card boundary below 'pointer'
+        if ((char*)pointer > page_address(page_index)+page_bytes_used(page_index)) return NULL;
+        start = (lispobj*)ALIGN_DOWN((uword_t)pointer, GENCGC_CARD_BYTES);
+    } else {
+        start = (lispobj *)page_scan_start(page_index);
+    }
     return gc_search_space(start, pointer);
 }
 
@@ -2508,73 +2617,13 @@ static inline void protect_page(void* page_addr)
 }
 #endif
 
-/* Given a range of pages at least one of which is not WPed (logically or physically,
- * depending on SOFT_CARD_MARKS), scan all those pages for pointers to younger generations.
- * If no such pointers are found, then write-protect the range.
- *
- * Care is taken to check for pointers to any open allocation regions,
- * which by design contain younger objects.
- *
- * If we find a word which is a witness for the inability to apply write-protection,
- * then return the address of the object containing the witness pointer.
- * Otherwise return 0. The word address is just for debugging; there are cases
- * where we don't apply write protectection, but nonetheless return 0.
- *
- * This function is still buggy, but not in a fatal way.
- * The issue is that for any kind of weak object - hash-table vector,
- * weak pointer, or weak simple-vector, we skip scavenging the object
- * which might leave some pointers to younger generation objects
- * which will later be smashed when processing weak objects.
- * That is, the referent is non-live. But when we scanned this page range,
- * it looks like it still had the pointer to the younger object.
- * To get this really right, we would have to wait until after weak objects
- * have been processed.
- * It may or may not be possible to get verify_range to croak
- * about suboptimal application of WP. Possibly not, because of the hack
- * for pinned pages without soft card marking (which won't WP).
- *
- * See also 'doc/internals-notes/fdefn-gc-safety' for execution schedules
- * that lead to invariant loss with FDEFNs. This might not be a problem
- * in practice. At least it seems like it never has been.
- */
-static lispobj*
-update_writeprotection(page_index_t first_page, page_index_t last_page,
-                       lispobj* where, lispobj* limit)
+/* Helper function for update_writeprotection.
+ * If the [where,limit) contain an old->young pointer, then return
+ * the address - or approximate address - containing such pointer.
+ * The return value is used as a boolean, but if debugging, you might
+ * want to see the address */
+static lispobj* range_dirty_p(lispobj* where, lispobj* limit, generation_index_t gen)
 {
-    /* Shouldn't be a free page. */
-    gc_dcheck(!page_free_p(first_page)); // Implied by the next assertion
-    gc_assert(page_words_used(first_page) != 0);
-
-    if (!ENABLE_PAGE_PROTECTION) return 0;
-    if (!page_boxed_p(first_page)) return 0;
-
-    {
-    page_index_t page;
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
-    /* If any page is referenced from the stack (mark byte = 2), then we're
-     * can not apply protection even if we see no witness, because the
-     * absence of synchronization between mutator and GC means that the next
-     * instruction issued when the mutator resumes might create the witness,
-     * and it thinks it already marked a card */
-    for (page = first_page; page <= last_page; ++page)
-        if (cardseq_any_sticky_mark(page_to_card_index(page))) return 0;
-#else
-    /* Skip if any page is pinned.
-     * The 'pinned' check is sort of bogus but sort of necessary,
-     * but doesn't completely fix the problem that it tries to, which is
-     * passing a memory address to the OS for it to write into.
-     * An object on a never-written protected page would still fail.
-     * It's probably rare to pass boxed pages to the OS, but it could be
-     * to read fixnums into a simple-vector. */
-    for (page = first_page; page <= last_page; ++page)
-        if (page_table[page].pinned) return 0;
-#endif
-    }
-
-    /* Now we attempt to find any 1 "witness" that the pages should NOT be protected.
-     * If such witness is found, then return without doing anything, otherwise
-     * apply protection to the range. */
-    generation_index_t gen = page_table[first_page].gen;
     while ( where < limit ) {
         lispobj word = *where;
         if (is_cons_half(word)) {
@@ -2629,7 +2678,76 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
         }
         where += nwords;
     }
+    return 0;
+}
+
+/* Given a range of pages at least one of which is not WPed (logically or physically,
+ * depending on SOFT_CARD_MARKS), scan all those pages for pointers to younger generations.
+ * If no such pointers are found, then write-protect the range.
+ *
+ * Care is taken to check for pointers to any open allocation regions,
+ * which by design contain younger objects.
+ *
+ * If we find a word which is a witness for the inability to apply write-protection,
+ * then return the address of the object containing the witness pointer.
+ * Otherwise return 0. The word address is just for debugging; there are cases
+ * where we don't apply write protectection, but nonetheless return 0.
+ *
+ * This function is still buggy, but not in a fatal way.
+ * The issue is that for any kind of weak object - hash-table vector,
+ * weak pointer, or weak simple-vector, we skip scavenging the object
+ * which might leave some pointers to younger generation objects
+ * which will later be smashed when processing weak objects.
+ * That is, the referent is non-live. But when we scanned this page range,
+ * it looks like it still had the pointer to the younger object.
+ * To get this really right, we would have to wait until after weak objects
+ * have been processed.
+ * It may or may not be possible to get verify_range to croak
+ * about suboptimal application of WP. Possibly not, because of the hack
+ * for pinned pages without soft card marking (which won't WP).
+ *
+ * See also 'doc/internals-notes/fdefn-gc-safety' for execution schedules
+ * that lead to invariant loss with FDEFNs. This might not be a problem
+ * in practice. At least it seems like it never has been.
+ */
+static lispobj*
+update_writeprotection(page_index_t first_page, page_index_t last_page,
+                       lispobj* where, lispobj* limit)
+{
+    /* Shouldn't be a free page. */
+    gc_dcheck(!page_free_p(first_page)); // Implied by the next assertion
+    gc_assert(page_words_used(first_page) != 0);
+
+    if (!ENABLE_PAGE_PROTECTION) return 0;
+    if (!page_boxed_p(first_page)) return 0;
+
     page_index_t page;
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    /* If any page is referenced from the stack (mark byte = 2), then we're
+     * can not apply protection even if we see no witness, because the
+     * absence of synchronization between mutator and GC means that the next
+     * instruction issued when the mutator resumes might create the witness,
+     * and it thinks it already marked a card */
+    for (page = first_page; page <= last_page; ++page)
+        if (cardseq_any_sticky_mark(page_to_card_index(page))) return 0;
+#else
+    /* Skip if any page is pinned.
+     * The 'pinned' check is sort of bogus but sort of necessary,
+     * but doesn't completely fix the problem that it tries to, which is
+     * passing a memory address to the OS for it to write into.
+     * An object on a never-written protected page would still fail.
+     * It's probably rare to pass boxed pages to the OS, but it could be
+     * to read fixnums into a simple-vector. */
+    for (page = first_page; page <= last_page; ++page)
+        if (page_table[page].pinned) return 0;
+#endif
+
+    /* Now we attempt to find any 1 "witness" that the pages should NOT be protected.
+     * If such witness is found, then return without doing anything, otherwise
+     * apply protection to the range. */
+    lispobj* witness = range_dirty_p(where,  limit, page_table[first_page].gen);
+    if (witness) return witness;
+
     for (page = first_page; page <= last_page; ++page) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         // Don't worry, the cards are all clean - if any card mark was sticky,
@@ -2801,6 +2919,38 @@ static page_index_t scan_boxed_root_cards_non_spanning(page_index_t page, genera
 #endif
 }
 
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+/* PAGE_TYPE_SMALL_MIXED roots are walked object-by-object to avoid affecting any raw word.
+ * By construction, objects will never span cards */
+static page_index_t scan_mixed_root_cards(page_index_t page, generation_index_t gen)
+{
+    do {
+        lispobj* start = (void*)page_address(page);
+        long card = addr_to_card_index(start);
+        if (cardseq_any_marked(card)) {
+            if (GC_LOGGING) fprintf(gc_activitylog(), "scan_roots subcard mixed %p\n", page_address(page));
+            lispobj* limit = start + page_words_used(page);
+            int j;
+            for (j=0; j<CARDS_PER_PAGE; ++j, ++card, start += WORDS_PER_CARD) {
+                if (card_dirtyp(card)) {
+                    lispobj* end = start + WORDS_PER_CARD;
+                    if (end > limit) end = limit;
+                    // heap_scavenge doesn't take kindly to inverted start+end
+                    if (start < limit) {
+                        heap_scavenge(start,  limit);
+                        if (!card_stickymarked_p(card) && !range_dirty_p(start, limit, gen))
+                            gc_card_mark[card] = CARD_UNMARKED;
+                    } else
+                        gc_card_mark[card] = CARD_UNMARKED;
+                }
+            }
+        }
+        ++page;
+    } while (!page_ends_contiguous_block_p(page-1, gen));
+    return page;
+}
+#endif
+
 /* Scavenge all generations from FROM to TO, inclusive, except for
  * new_space which needs special handling, as new objects may be
  * added which are not checked here - use scavenge_newspace generation.
@@ -2855,6 +3005,10 @@ scavenge_root_gens(generation_index_t from)
         } else if ((page_table[i].type == PAGE_TYPE_CONS) ||
                    (page_single_obj_p(i) && large_scannable_vector_p(i))) {
             i = scan_boxed_root_cards_non_spanning(i, generation);
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+        } else if (page_table[i].type == PAGE_TYPE_SMALL_MIXED) {
+            i = scan_mixed_root_cards(i, generation);
+#endif
         } else {
             page_index_t last_page;
             int marked = 0;
