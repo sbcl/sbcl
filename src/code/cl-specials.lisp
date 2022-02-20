@@ -135,12 +135,6 @@
 
 (declaim (type pathname cl:*default-pathname-defaults*))
 
-(declaim (type (or pathname null)
-                       cl:*load-pathname*
-                       cl:*load-truename*
-                       cl:*compile-file-pathname*
-                       cl:*compile-file-truename*))
-
 ;;; Some functions for which we should *never* (or almost never) bind eagerly
 ;;; to the functional definition.
 ;;; IR2-CONVERT-GLOBAL-VAR won't use a :KNOWN-FUN constant-tn, but will instead

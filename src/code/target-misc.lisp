@@ -120,17 +120,6 @@ the file system."
            (apply #'install-streams (pop *previous-dribble-streams*)))))
   (values))
 
-;;;; some *LOAD-FOO* variables
-
-(defvar *load-print* nil
-  "the default for the :PRINT argument to LOAD")
-
-(defvar *load-verbose* nil
-  ;; Note that CMU CL's default for this was T, and ANSI says it's
-  ;; implementation-dependent. We choose NIL on the theory that it's
-  ;; a nicer default behavior for Unix programs.
-  "the default for the :VERBOSE argument to LOAD")
-
 ;;; DEFmumble helpers
 
 (defun %defglobal (name value source-location &optional (doc nil docp))

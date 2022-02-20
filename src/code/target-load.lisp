@@ -16,10 +16,23 @@
 (defvar *load-source-default-type* "lisp"
   "The source file types which LOAD looks for by default.")
 
+(defvar *load-verbose* nil
+  ;; Note that CMU CL's default for this was T, and ANSI says it's
+  ;; implementation-dependent. We choose NIL on the theory that it's
+  ;; a nicer default behavior for Unix programs.
+  "the default for the :VERBOSE argument to LOAD")
+
+(defvar *load-print* nil
+  "the default for the :PRINT argument to LOAD")
+
 (defvar *load-truename* nil
   "the TRUENAME of the file that LOAD is currently loading")
+
 (defvar *load-pathname* nil
   "the defaulted pathname that LOAD is currently loading")
+
+(declaim (type (or pathname null) *load-truename* *load-pathname*))
+
 
 ;;;; LOAD-AS-SOURCE
 
