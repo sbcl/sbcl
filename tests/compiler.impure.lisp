@@ -2477,10 +2477,7 @@
     (assert (equal type1 (sb-kernel:%simple-fun-type g)))
     (assert (equal type0 (sb-kernel:%simple-fun-type h)))))
 
-;;; I think *CHECK-CONSISTENCY* is confused in the presence of dynamic-extent.
-;;; A simpler example not involving package iteration also fails in COMPILE-FILE:
-;;;   (let ((l (mapcar #'string *features*))) (defun g () l))
-(test-util:with-test (:name :bug-308921 :fails-on :sbcl)
+(test-util:with-test (:name :bug-308921)
   (let ((*check-consistency* t))
     (ctu:file-compile
      `((let ((exported-symbols-alist

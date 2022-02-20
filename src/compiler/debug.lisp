@@ -69,6 +69,7 @@
                  (unless (or (eq block tail)
                              (eq (block-component block) c))
                    (barf "~S is not in ~S." block c)))
+               #+(or)
                (let ((component-outer-loop (component-outer-loop c)))
                  (when (or (loop-blocks component-outer-loop)
                            (loop-inferiors component-outer-loop))
@@ -944,7 +945,7 @@
     (ctran (ctran-block thing))
     (node (node-block thing))
     (component (component-head thing))
-#|    (cloop (loop-head thing))|#
+    (cloop (loop-head thing))
     (integer (ctran-block (num-cont thing)))
     (functional (lambda-block (main-entry thing)))
     (null (error "Bad thing: ~S." thing))
@@ -1394,8 +1395,9 @@ is replaced with replacement."
                (gethash block block-labels)))
         (do-blocks (block component :both)
           (cond ((eq block (component-head component))
-                 (format stream "~a [label=head];"
-                         (block-label block)))
+                 (format stream "~a [label=\"head of component ~a\"];"
+                         (block-label block)
+                         (component-name component)))
                 ((eq block (component-tail component))
                  (format stream "~a [label=tail];"
                          (block-label block)))
