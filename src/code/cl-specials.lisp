@@ -143,50 +143,8 @@
 ;;; situations involving (APPLY ...) which rendered encapsulation impossible.
 (declaim (notinline open compile-file load compile))
 
-;;;; DEFGLOBAL and DEFINE-LOAD-TIME-GLOBAL
-;;;; These have alternate definitions (in cross-misc) which rely on
-;;;; the underlying host DEFVAR when building the cross-compiler.
-
 (in-package "SB-IMPL")
 
-(defmacro defglobal (name value &optional (doc nil docp))
-  "Defines NAME as a global variable that is always bound. VALUE is evaluated
-and assigned to NAME both at compile- and load-time, but only if NAME is not
-already bound.
-
-Global variables share their values between all threads, and cannot be
-locally bound, declared special, defined as constants, and neither bound
-nor defined as symbol macros.
-
-See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
-  (check-designator name 'defglobal)
-  (let ((boundp (make-symbol "BOUNDP")))
-    `(progn
-       (eval-when (:compile-toplevel)
-         (let ((,boundp (boundp ',name)))
-           (%compiler-defglobal ',name :always-bound
-                                (not ,boundp) (unless ,boundp ,value))))
-       (%defglobal ',name
-                   (if (%boundp ',name) (make-unbound-marker) ,value)
-                   (sb-c:source-location)
-                   ,@(and docp `(',doc))))))
-
-(defmacro define-load-time-global (name value &optional (doc nil docp))
-  "Defines NAME as a global variable that is always bound. VALUE is evaluated
-and assigned to NAME at load-time, but only if NAME is not already bound.
-
-Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
-unless it has otherwise been assigned a value.
-
-See also DEFGLOBAL which assigns the VALUE at compile-time too."
-  (check-designator name 'define-load-time-global)
-  `(progn
-     (eval-when (:compile-toplevel)
-       (%compiler-defglobal ',name :eventually nil nil))
-     (%defglobal ',name
-                 (if (%boundp ',name) (make-unbound-marker) ,value)
-                 (sb-c:source-location)
-                 ,@(and docp `(',doc)))))
 
 ;;; Ensure some VM symbols get wired TLS.
 (in-package "SB-VM")

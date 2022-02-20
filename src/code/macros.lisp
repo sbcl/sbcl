@@ -314,6 +314,51 @@ tree structure resulting from the evaluation of EXPRESSION."
                     ,@(and docp
                            `(',doc)))))
 
+(defun %compiler-defvar (var)
+  (proclaim `(special ,var)))
+
+
+;;;; DEFGLOBAL and DEFINE-LOAD-TIME-GLOBAL
+
+(sb-xc:defmacro defglobal (name value &optional (doc nil docp))
+  "Defines NAME as a global variable that is always bound. VALUE is evaluated
+and assigned to NAME both at compile- and load-time, but only if NAME is not
+already bound.
+
+Global variables share their values between all threads, and cannot be
+locally bound, declared special, defined as constants, and neither bound
+nor defined as symbol macros.
+
+See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
+  (check-designator name 'defglobal)
+  (let ((boundp (make-symbol "BOUNDP")))
+    `(progn
+       (eval-when (:compile-toplevel)
+         (let ((,boundp (boundp ',name)))
+           (%compiler-defglobal ',name :always-bound
+                                (not ,boundp) (unless ,boundp ,value))))
+       (%defglobal ',name
+                   (if (%boundp ',name) (make-unbound-marker) ,value)
+                   (sb-c:source-location)
+                   ,@(and docp `(',doc))))))
+
+(sb-xc:defmacro define-load-time-global (name value &optional (doc nil docp))
+  "Defines NAME as a global variable that is always bound. VALUE is evaluated
+and assigned to NAME at load-time, but only if NAME is not already bound.
+
+Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
+unless it has otherwise been assigned a value.
+
+See also DEFGLOBAL which assigns the VALUE at compile-time too."
+  (check-designator name 'define-load-time-global)
+  `(progn
+     (eval-when (:compile-toplevel)
+       (%compiler-defglobal ',name :eventually nil nil))
+     (%defglobal ',name
+                 (if (%boundp ',name) (make-unbound-marker) ,value)
+                 (sb-c:source-location)
+                 ,@(and docp `(',doc)))))
+
 (defun %compiler-defglobal (name always-boundp assign-it-p value)
   (proclaim `(global ,name))
   (when assign-it-p
@@ -324,9 +369,6 @@ tree structure resulting from the evaluation of EXPRESSION."
    (if (eq (info :variable :always-bound name) :always-bound)
        :always-bound
        always-boundp)))
-
-(defun %compiler-defvar (var)
-  (proclaim `(special ,var)))
 
 
 ;;;; various conditional constructs
