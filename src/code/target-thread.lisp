@@ -637,35 +637,32 @@ returns NIL each time."
                         0)))))
          ,@body))))
 
-;;; If you want to pick at runtime what kind of mutex to use, you can replace
-;;; this DEFCONSTANT with a DEFGLOBAL
-(defconstant futex-enabled (or #+sb-futex t))
-
-(defun %try-mutex (mutex new-owner)
+(defun %try-mutex (mutex)
   (declare (type mutex mutex) (optimize (speed 3)))
   (cond #+sb-futex
         (t
          ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
          (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
-                (setf (mutex-%owner mutex) (sb-ext:truly-the thread new-owner))
+                (setf (mutex-%owner mutex) *current-thread*)
                 t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
-               ((eq (mutex-%owner mutex) new-owner)
+               ((eq (mutex-%owner mutex) *current-thread*)
                 (error "Recursive lock attempt ~S." mutex))))
         #-sb-futex
         (t
          (barrier (:read))
          (let ((old (mutex-%owner mutex)))
-           (when (eq new-owner old)
+           (when (eq *current-thread* old)
              (error "Recursive lock attempt ~S." mutex))
            #-sb-thread
            (when old
              (error "Strange deadlock on ~S in an unithreaded build?" mutex))
            (and (not old)
                 ;; Don't even bother to try to CAS if it looks bad.
-                (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))))))
+                (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil
+                                               *current-thread*)))))))
 
 #+sb-thread
-(defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
+(defun %%wait-for-mutex (mutex to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (declare (ignorable to-sec to-usec))
@@ -712,7 +709,7 @@ returns NIL each time."
            ;; Unwinding because futex-wait allows interrupts, wake up another futex
            (with-pinned-objects (mutex)
              (futex-wake (mutex-state-address mutex) 1)))))
-      (setf (mutex-%owner mutex) new-owner)
+      (setf (mutex-%owner mutex) *current-thread*)
       t))
    #-sb-futex
    (t
@@ -722,7 +719,7 @@ returns NIL each time."
                              (barrier (:read))
                              (not (mutex-%owner mutex)))
                            (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil
-                                                         new-owner)))
+                                                         *current-thread*)))
                  do (return-from cas t)
                  else
                  do
@@ -808,14 +805,15 @@ returns NIL each time."
           (futex-wake (mutex-state-address mutex) 1))))))
 
 #+sb-thread
-(defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
+(defun %wait-for-mutex (mutex timeout to-sec to-usec stop-sec stop-usec deadlinep
+                        &aux (self *current-thread*))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (with-deadlocks (self mutex timeout)
     (with-interrupts (check-deadlock))
     (tagbody
      :again
        (return-from %wait-for-mutex
-         (or (%%wait-for-mutex mutex self to-sec to-usec stop-sec stop-usec)
+         (or (%%wait-for-mutex mutex to-sec to-usec stop-sec stop-usec)
              (when deadlinep
                (signal-deadline)
                ;; FIXME: substract elapsed time from timeout...
@@ -826,12 +824,12 @@ returns NIL each time."
 (define-deprecated-function :early "1.0.37.33" get-mutex (grab-mutex)
     (mutex &optional new-owner (waitp t) (timeout nil))
   (declare (ignorable waitp timeout))
-  (let ((new-owner (or new-owner *current-thread*)))
-    (or (%try-mutex mutex new-owner)
-        #+sb-thread
-        (when waitp
-          (multiple-value-call #'%wait-for-mutex
-            mutex new-owner timeout (decode-timeout timeout))))))
+  (when (and new-owner (neq new-owner *current-thread*))
+    (error "GET-MUTEX won't get a mutex on behalf of a different thread"))
+  (or (%try-mutex mutex)
+      #+sb-thread
+      (when waitp
+        (multiple-value-call #'%wait-for-mutex mutex timeout (decode-timeout timeout)))))
 
 (declaim (ftype (sfunction (mutex &key (:waitp t) (:timeout (or null (real 0)))) boolean) grab-mutex))
 (defun grab-mutex (mutex &key (waitp t) (timeout nil))
@@ -870,12 +868,10 @@ Notes:
     directly.
 "
   (declare (ignorable waitp timeout))
-  (let ((self *current-thread*))
-    (or (%try-mutex mutex self)
-        #+sb-thread
-        (when waitp
-          (multiple-value-call #'%wait-for-mutex
-            mutex self timeout (decode-timeout timeout))))))
+  (or (%try-mutex mutex)
+      #+sb-thread
+      (when waitp
+        (multiple-value-call #'%wait-for-mutex mutex timeout (decode-timeout timeout)))))
 
 (declaim (ftype (sfunction (mutex &key (:if-not-owner (member :punt :warn :error :force))) null) release-mutex))
 (defun release-mutex (mutex &key (if-not-owner :punt))
@@ -1057,7 +1053,7 @@ IF-NOT-OWNER is :FORCE)."
            ;; signaling. If we don't unwind it will look like a normal
            ;; return from user perspective.
            (when (and (eq :timeout status) deadlinep)
-             (let ((got-it (%try-mutex mutex me)))
+             (let ((got-it (%try-mutex mutex)))
                (allow-with-interrupts
                  (signal-deadline)
                  (cond (got-it
@@ -1069,10 +1065,9 @@ IF-NOT-OWNER is :FORCE)."
                         (setf status :ok))))))
            ;; Re-acquire the mutex for normal return.
            (when (eq :ok status)
-             (unless (or (%try-mutex mutex me)
+             (unless (or (%try-mutex mutex)
                          (allow-with-interrupts
-                           (%wait-for-mutex mutex me timeout
-                                            to-sec to-usec
+                           (%wait-for-mutex mutex timeout to-sec to-usec
                                             stop-sec stop-usec deadlinep)))
                (setf status :timeout))))
           ;; Unwinding because futex-wait and %wait-for-mutex above
