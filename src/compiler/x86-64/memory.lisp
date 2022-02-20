@@ -51,8 +51,7 @@
     ;; I'd like to measure to see if using a register is actually better.
     ;; If all threads store 0, it might be easier on the CPU's store buffer.
     ;; Otherwise, it has to remember who "wins". 0 makes it indifferent.
-    (inst mov :byte (ea gc-card-table-reg-tn scratch-reg)
-          (or #| #+(or (not sb-thread) gs-seg) |# 0 thread-tn))))
+    (inst mov :byte (ea gc-card-table-reg-tn scratch-reg) 0)))
 
 (defun gen-cell-set (ea value val-temp)
   (sc-case value
