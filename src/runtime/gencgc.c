@@ -469,7 +469,7 @@ write_generation_stats(FILE *file)
                 case SINGLE_OBJECT_FLAG|PAGE_TYPE_UNBOXED: column = 6; break;
                 case SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE:    column = 7; break;
                 case SINGLE_OBJECT_FLAG|PAGE_TYPE_MIXED:   column = 8; break;
-                default: lose("Invalid page type %#x (p%ld)", page_table[page].type, page);
+                default: lose("Invalid page type %#x (p%"PAGE_INDEX_FMT")", page_table[page].type, page);
                 }
                 pagect[column]++;
                 if (page_table[page].pinned) pinned_cnt++;
@@ -956,7 +956,7 @@ static page_index_t find_single_page(int page_type, sword_t nbytes, generation_i
      * search loop because it's needless overhead. Any free page would have been returned,
      * so we just have to find the least full page meeting the gen+type criteria */
     sword_t min_used = GENCGC_PAGE_WORDS;
-    for ( ; page < page_table_pages ; ++page) {
+    for ( page = alloc_start_pages[page_type]; page < page_table_pages ; ++page) {
         if (page_words_used(page) < min_used && page_extensible_p(page, gen, page_type))
             min_used = page_words_used(page);
     }
