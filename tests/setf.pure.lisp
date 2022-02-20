@@ -13,8 +13,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "compiler-test-util.lisp")
-
 (defvar *foo* nil)
 (defun (setf foo) (bar)
     (setf *foo* bar))

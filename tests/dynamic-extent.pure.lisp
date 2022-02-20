@@ -14,7 +14,6 @@
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (invoke-restart 'run-tests::skip-file))
 
-(load "compiler-test-util.lisp")
 (use-package :ctu)
 
 (setq sb-c::*check-consistency* t
