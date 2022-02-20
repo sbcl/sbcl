@@ -376,7 +376,8 @@
   (:arg-types (:constant signed-byte))
   (:policy :fast-safe)
   (:generator 1
-    (inst mov sap (thread-slot-ea n))))
+    #-gs-seg (inst mov sap (if (= n thread-this-slot) thread-tn (thread-slot-ea n)))
+    #+gs-seg (inst mov sap (thread-slot-ea n))))
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
