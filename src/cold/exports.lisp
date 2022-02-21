@@ -2234,7 +2234,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "POINTERP"
            #+(or x86 x86-64) "*PSEUDO-ATOMIC-BITS*"
            "PUNT-PRINT-IF-TOO-LONG"
-           "RANDOM-DOCUMENTATION"
            "READER-IMPOSSIBLE-NUMBER-ERROR"
            "READER-EOF-ERROR"
            "RESTART-DESIGNATOR"

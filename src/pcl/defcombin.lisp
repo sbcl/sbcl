@@ -102,6 +102,17 @@
              documentation)
       (sb-c:source-location))))
 
+(defun random-documentation (name type)
+  (cdr (assoc type (info :random-documentation :stuff name))))
+
+(defun (setf random-documentation) (new-value name type)
+  (let ((pair (assoc type (info :random-documentation :stuff name))))
+    (if pair
+        (setf (cdr pair) new-value)
+        (push (cons type new-value)
+              (info :random-documentation :stuff name))))
+  new-value)
+
 (defun load-short-defcombin (type-name operator ioa doc source-location)
   (let ((info (make-method-combination-info
                :lambda-list '(&optional (order :most-specific-first))
