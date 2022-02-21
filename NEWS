@@ -1,16 +1,22 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.2.1:
-  * platform support: all architectures now share the coverage mark
-    instrumentation implementation, meaning that performance now equals
-    what had been implemented only on x86 architectures.
+  * platform support:
+    ** all architectures now share the coverage mark instrumentation
+       implementation, meaning that performance now equals what had been
+       implemented only on x86 architectures.
+    ** fixed a performance regression on x86-64 from changes in AVX2 register
+       handling.  (lp#1960081, reported by Michael Kappert)
+    ** micro-optimizations in type tests for (SIGNED-BYTE 64).
   * enhancement: improved handling of source locations for some classes
     of compile time and runtime errors.
   * enhancement: better source locations for structure accessors.
   * bug fix: SB-COVER now always instruments top level forms correctly.
-  * bug fix: Muffling conditions now works correctly on higher debug settings.
-  * bug fix: Local muffling declarations now scope correctly with respect to
+  * bug fix: muffling conditions now works correctly on higher debug settings.
+  * bug fix: local muffling declarations now scope correctly with respect to
     undefined variable warnings.
+  * optimization: calls to STRING= can now return NIL more quickly on strings
+    of unequal length.
 
 changes in sbcl-2.2.1 relative to sbcl-2.2.0:
   * incompatible change: DEFINE-ALIEN-CALLBACK, which has never been exported
