@@ -201,7 +201,7 @@
                               (/noshow sub)
                               (when (member class (direct-supers sub) :test #'eq)
                                 (res sub)))))
-                        (res))))
+                        (sort (res) #'string< :key #'classoid-name))))
              `(list ,@(mapcar (lambda (kernel-bic-entry)
                                 (/noshow "setting up" kernel-bic-entry)
                                 (let* ((name (car kernel-bic-entry))
@@ -213,15 +213,15 @@
                                          ',(map 'list #'wrapper-classoid-name
                                                 (reverse (wrapper-inherits (classoid-wrapper class))))
                                          ,(getf (cdr kernel-bic-entry) :prototype-form))))
-                            (remove-if (lambda (kernel-bic-entry)
-                                         (member (first kernel-bic-entry)
-                                                 ;; remove special classes (T and our
-                                                 ;; SYSTEM-CLASSes) from the
-                                                 ;; BUILT-IN-CLASS list
-                                                 '(t function stream sequence
-                                                   file-stream string-stream
-                                                   slot-object)))
-                                       sb-kernel::*builtin-classoids*))))))
+                              (remove-if (lambda (kernel-bic-entry)
+                                           (member (first kernel-bic-entry)
+                                                   ;; remove special classes (T and our
+                                                   ;; SYSTEM-CLASSes) from the
+                                                   ;; BUILT-IN-CLASS list
+                                                   '(t function stream sequence
+                                                     file-stream string-stream
+                                                     slot-object)))
+                                         sb-kernel::*builtin-classoids*))))))
       (frob)))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
