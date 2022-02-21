@@ -17,6 +17,7 @@
   "tests/bug-503095-2.lisp")
  ("compiler.impure.lisp"
   "tests/bad-mlf-test.lisp"
+  "tests/bug-255.lisp"
   "tests/bug204-test.lisp"
   "tests/bug-417.lisp"
   "tests/bug-943953.lisp"
