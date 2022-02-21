@@ -2024,6 +2024,7 @@
 ;; just knowing the type.
 (defknown (setf symbol-plist) (list symbol) list ()
   :derive-type #'result-type-first-arg)
+(defknown (setf documentation) ((or string null) t symbol) (or string null) ())
 (defknown %setnth (unsigned-byte (modifying list) t) t ()
   :derive-type #'result-type-last-arg)
 (defknown %set-fill-pointer ((modifying complex-vector) index) index ()
