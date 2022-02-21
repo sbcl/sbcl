@@ -2485,12 +2485,15 @@
     (when name
       (when (eql offs 0)
         (setq offs nil))
-      (note (cond (note-address-p
-                   (format nil "#x~8,'0x: ~a~@[ +~d~]" address name offs))
-                  (offs
-                   (format nil "~a +~d" name offs))
-                  (t
-                   (string name)))
+      (note (lambda (stream)
+              (cond (note-address-p
+                     (format stream "#x~8,'0x: ~a~@[ +~d~]" address name offs))
+                    (offs
+                     (format stream "~a +~d" name offs))
+                    ((stringp name)
+                     (princ name stream))
+                    (t
+                     (prin1 name stream))))
             dstate))
     name))
 
