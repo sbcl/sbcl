@@ -192,7 +192,7 @@
 
 ;;;; binary operation dispatching utilities
 
-(eval-when (:compile-toplevel :execute)
+(eval-when (:compile-toplevel :execute #+sb-devel :load-toplevel)
 
 ;;; Return NUMBER-DISPATCH forms for rational X float.
 (defun float-contagion (op x y &optional (rat-types '(fixnum bignum ratio)))
