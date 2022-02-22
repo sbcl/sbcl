@@ -146,9 +146,9 @@
 (defun murmur3-fmix32 (h)
   (declare (type (unsigned-byte 32) h))
   (setq h (logxor h (ash h -16)))
-  (setq h (logand (* h #x85ebca6b) most-positive-word))
+  (setq h (logand (* h #x85ebca6b) #.most-positive-word))
   (setq h (logxor h  (ash h -13)))
-  (setq h (logand (* h #xc2b2ae35) most-positive-word))
+  (setq h (logand (* h #xc2b2ae35) #.most-positive-word))
   (logxor h (ash h -16))))
 
 #+64-bit
