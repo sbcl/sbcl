@@ -266,15 +266,19 @@
 
 (defknown (two-arg-* two-arg-+ two-arg-- two-arg-/)
   (number number) number
-  ())
+  (no-verify-arg-count))
+
+(defknown sb-kernel::integer-/-integer
+  (integer integer) rational
+  (no-verify-arg-count unsafely-flushable))
 
 (defknown (two-arg-< two-arg-= two-arg->)
-  (number number) boolean
-  ())
+    (number number) boolean
+    (no-verify-arg-count))
 
 (defknown (two-arg-gcd two-arg-lcm two-arg-and two-arg-ior two-arg-xor two-arg-eqv)
   (integer integer) integer
-  ())
+  (no-verify-arg-count))
 
 (defknown conjugate (number) number
   (movable foldable flushable))
@@ -282,7 +286,7 @@
 (defknown gcd (&rest integer) unsigned-byte
   (movable foldable flushable))
 (defknown sb-kernel::fixnum-gcd (fixnum fixnum) (integer 0 #.(1+ most-positive-fixnum))
-    (movable foldable flushable))
+    (movable foldable flushable no-verify-arg-count))
 
 (defknown lcm (&rest integer) unsigned-byte
     (movable foldable flushable))
@@ -344,7 +348,7 @@
     (movable foldable flushable))
 
 (defknown multiply-fixnums (fixnum fixnum) integer
-  (movable foldable flushable))
+  (movable foldable flushable no-verify-arg-count))
 
 (defknown %signed-multiply-high (sb-vm:signed-word sb-vm:signed-word) sb-vm:signed-word
     (movable foldable flushable))
@@ -1067,8 +1071,9 @@
 (defknown gethash (t hash-table &optional t) (values t boolean)
   (flushable)) ; not FOLDABLE, since hash table contents can change
 (defknown sb-impl::gethash3 (t hash-table t) (values t boolean)
-  (flushable)) ; not FOLDABLE, since hash table contents can change
-(defknown %puthash (t (modifying hash-table) t) t ()
+  (flushable no-verify-arg-count)) ; not FOLDABLE, since hash table contents can change
+(defknown %puthash (t (modifying hash-table) t) t
+  (no-verify-arg-count)
   :derive-type #'result-type-last-arg)
 (defknown remhash (t (modifying hash-table)) boolean ())
 (defknown maphash ((function-designator (t t)) hash-table) null (flushable call))
@@ -1872,10 +1877,11 @@
 (defknown %odd-key-args-error () nil)
 (defknown %unknown-key-arg-error (t t) nil)
 (defknown (%ldb %mask-field) (bit-index bit-index integer) unsigned-byte
-  (movable foldable flushable))
+  (movable foldable flushable no-verify-arg-count))
 (defknown (%dpb %deposit-field) (integer bit-index bit-index integer) integer
-  (movable foldable flushable))
-(defknown %negate (number) number (movable foldable flushable))
+  (movable foldable flushable no-verify-arg-count))
+(defknown %negate (number) number
+  (movable foldable flushable no-verify-arg-count))
 (defknown (%check-bound check-bound) (array index t) index
   (dx-safe))
 (defknown data-vector-ref (simple-array index) t
@@ -1897,10 +1903,10 @@
 (defknown %caller-pc () system-area-pointer (flushable))
 (defknown %with-array-data (array index (or index null))
   (values (simple-array * (*)) index index index)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 (defknown %with-array-data/fp (array index (or index null))
   (values (simple-array * (*)) index index index)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 (defknown %set-symbol-package (symbol t) t ())
 (defknown (%coerce-callable-to-fun %coerce-callable-for-call)
     (function-designator)
@@ -1914,7 +1920,7 @@
 (defknown (%find-position-if %find-position-if-not)
   (function sequence t index sequence-end function)
   (values t (or index null))
-  (call))
+  (call no-verify-arg-count))
 (defknown effective-find-position-test (function-designator function-designator)
   function
   (flushable foldable))
@@ -1925,60 +1931,60 @@
 (defknown (%adjoin %adjoin-eq)
     (t list)
     list
-    (flushable))
+    (flushable no-verify-arg-count))
 
 (defknown (%member %member-eq
            %assoc %assoc-eq %rassoc %rassoc-eq)
     (t list)
     list
-    (foldable flushable))
+    (foldable flushable no-verify-arg-count))
 
 (defknown (%adjoin-key %adjoin-key-eq)
     (t list (function (t)))
     list
-    (flushable call))
+    (flushable call no-verify-arg-count))
 
 (defknown (%member-key %member-key-eq
            %assoc-key %assoc-key-eq %rassoc-key %rassoc-key-eq)
   (t list (function (t)))
   list
-  (foldable flushable call))
+  (foldable flushable call no-verify-arg-count))
 
 (defknown (%assoc-if %assoc-if-not %rassoc-if %rassoc-if-not
            %member-if %member-if-not)
   ((function (t)) list)
   list
-  (foldable flushable call))
+  (foldable flushable call no-verify-arg-count))
 
 (defknown (%assoc-if-key %assoc-if-not-key %rassoc-if-key %rassoc-if-not-key
            %member-if-key %member-if-not-key)
   ((function (t)) list (function (t)))
   list
-  (foldable flushable call))
+  (foldable flushable call no-verify-arg-count))
 
 (defknown (%adjoin-test %adjoin-test-not)
     (t list (function (t t)))
     list
-    (flushable call))
+    (flushable call no-verify-arg-count))
 
 (defknown (%member-test %member-test-not
            %assoc-test %assoc-test-not
            %rassoc-test %rassoc-test-not)
     (t list (function (t t)))
     list
-    (foldable flushable call))
+    (foldable flushable call no-verify-arg-count))
 
 (defknown (%adjoin-key-test %adjoin-key-test-not)
     (t list (function (t)) (function (t t)))
     list
-    (flushable call))
+    (flushable call no-verify-arg-count))
 
 (defknown (%member-key-test %member-key-test-not
            %assoc-key-test %assoc-key-test-not
            %rassoc-key-test %rassoc-key-test-not)
     (t list (function (t)) (function (t t)))
     list
-    (foldable flushable call))
+    (foldable flushable call no-verify-arg-count))
 
 (defknown %check-vector-sequence-bounds (vector index sequence-end)
   index

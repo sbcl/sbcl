@@ -1151,6 +1151,7 @@ and the number of 0 bits if INTEGER is negative."
 ;;; bignum case, we don't bother, since bignum division is expensive,
 ;;; and the test is not very likely to succeed.
 (defun integer-/-integer (x y)
+  (declare (explicit-check))
   (if (and (typep x 'fixnum) (typep y 'fixnum))
       (multiple-value-bind (quo rem) (truncate x y)
         (if (zerop rem)

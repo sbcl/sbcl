@@ -1047,7 +1047,12 @@
          (pass-refs (move-tail-full-call-args node block))
          (old-fp (ir2-environment-old-fp env))
          (return-pc (ir2-environment-return-pc env))
-         (fun-lvar (basic-combination-fun node)))
+         (fun-lvar (basic-combination-fun node))
+         (fun-info (combination-fun-info node))
+         (nargs (if (and fun-info
+                         (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
+                    (list nargs)
+                    nargs)))
     (multiple-value-bind (fun-tn named)
         (fun-lvar-tn node block fun-lvar)
       (cond ((not named)
@@ -1111,7 +1116,12 @@
                                            (standard-arg-location i))))))
            (loc-refs (reference-tn-list locs t))
            (nvals (length locs))
-           (fun-lvar (basic-combination-fun node)))
+           (fun-lvar (basic-combination-fun node))
+           (fun-info (combination-fun-info node))
+           (nargs (if (and fun-info
+                           (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
+                      (list nargs)
+                      nargs)))
       (multiple-value-bind (fun-tn named)
           (fun-lvar-tn node block fun-lvar)
         (cond ((not named)
@@ -1294,8 +1304,11 @@
                        (1- (length (lambda-vars fun))))
                       ((and optional
                             (not (optional-dispatch-more-entry ef)))
-                       (optional-dispatch-max-args ef)))))
-      (unless (and (eql min 0) (not max))
+                       (optional-dispatch-max-args ef))))
+           (fun-info (info :function :info (functional-%source-name ef))))
+      (unless (or (and (eql min 0) (not max))
+                  (and fun-info
+                       (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)))
         (vop verify-arg-count node block
              arg-count-location
              min

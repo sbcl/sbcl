@@ -93,7 +93,10 @@
   ;; constant, then the arguments will be swapped.
   commutative
   ;; Reoptimize this function if the node that follows it gets unlinked.
-  reoptimize-when-unlinking)
+  reoptimize-when-unlinking
+  ;; The function does not verify the arg count and must be always
+  ;; called with the right arguments and can avoid passing NARGS.
+  no-verify-arg-count)
 
 (defstruct (fun-info (:copier nil)
                      #-sb-xc-host (:pure t))

@@ -305,6 +305,8 @@
                            for type in types
                            always (csubtypep (lvar-type arg) type)))
             (setf two-arg typed-two-arg))
+          (setf (combination-fun-info combination)
+                (fun-info-or-lose two-arg))
           (change-ref-leaf
            ref
            (find-free-fun two-arg "rewrite-full-call")))))))

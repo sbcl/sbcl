@@ -719,4 +719,4 @@
   (movable foldable flushable))
 
 (defknown (%unary-truncate %unary-round) (real) integer
-  (movable foldable flushable))
+  (movable foldable flushable no-verify-arg-count))

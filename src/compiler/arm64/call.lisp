@@ -962,7 +962,8 @@
                                                           (@ new-fp ,(* i n-word-bytes)))
                                                    insts))
                                          (storew cfp-tn new-fp ocfp-save-offset))
-                                       '((load-immediate-word nargs-pass (fixnumize nargs)))))
+                                       '((unless (consp nargs)
+                                           (load-immediate-word nargs-pass (fixnumize nargs))))))
                                 ,@(if (eq return :tail)
                                       '((:frob-nfp
                                          (inst add nsp-tn cur-nfp (add-sub-immediate
@@ -972,7 +973,9 @@
                                         (:load-fp
                                          (move cfp-tn (cond ,@(and
                                                                (not variable)
-                                                               '(((<= nargs register-arg-count)
+                                                               '(((<= (if (consp nargs)
+                                                                          (car nargs)
+                                                                          nargs) register-arg-count)
                                                                   csp-tn)))
                                                             (t
                                                              new-fp))))))
