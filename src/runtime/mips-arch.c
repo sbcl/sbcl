@@ -43,9 +43,9 @@ static inline unsigned int
 os_context_insn(os_context_t *context)
 {
     if (os_context_bd_cause(context))
-        return *(unsigned int *)(OS_CONTEXT_PC(context) + INSN_LEN);
+        return *(unsigned int *)((unsigned)OS_CONTEXT_PC(context) + INSN_LEN);
     else
-        return *(unsigned int *)(OS_CONTEXT_PC(context));
+        return *(unsigned int *)((unsigned)OS_CONTEXT_PC(context));
 }
 
 boolean
@@ -112,8 +112,8 @@ next_insn_addr(os_context_t *context, unsigned int inst)
     unsigned int r2 = (inst >> 16) & 0x1f;
     unsigned int r3 = (inst >> 11) & 0x1f;
     unsigned int disp = ((inst&(1<<15)) ? inst | (-1 << 16) : inst&0x7fff) << 2;
-    unsigned int jtgt = (OS_CONTEXT_PC(context) & ~0x0fffffff) | (inst&0x3ffffff) << 2;
-    unsigned int tgt = OS_CONTEXT_PC(context);
+    unsigned int jtgt = ((unsigned)OS_CONTEXT_PC(context) & ~0x0fffffff) | (inst&0x3ffffff) << 2;
+    unsigned int tgt = (unsigned)OS_CONTEXT_PC(context);
 
     switch(opcode) {
     case 0x0: /* jr, jalr */
@@ -124,7 +124,7 @@ next_insn_addr(os_context_t *context, unsigned int inst)
         case 0x09: /* jalr */
             tgt = os_context_register(context, r1);
             *os_context_register_addr(context, r3)
-                = OS_CONTEXT_PC(context) + INSN_LEN;
+                = (unsigned)OS_CONTEXT_PC(context) + INSN_LEN;
             break;
         default:
             tgt += INSN_LEN;
@@ -152,7 +152,7 @@ next_insn_addr(os_context_t *context, unsigned int inst)
             if(os_context_register(context, r1) < 0) {
                 tgt += disp;
                 *os_context_register_addr(context, 31)
-                    = OS_CONTEXT_PC(context) + INSN_LEN;
+                    = (unsigned)OS_CONTEXT_PC(context) + INSN_LEN;
             } else
                 tgt += INSN_LEN;
             break;
@@ -161,7 +161,7 @@ next_insn_addr(os_context_t *context, unsigned int inst)
             if(os_context_register(context, r1) >= 0) {
                 tgt += disp;
                 *os_context_register_addr(context, 31)
-                    = OS_CONTEXT_PC(context) + INSN_LEN;
+                    = (unsigned)OS_CONTEXT_PC(context) + INSN_LEN;
             } else
                 tgt += INSN_LEN;
             break;
@@ -176,7 +176,7 @@ next_insn_addr(os_context_t *context, unsigned int inst)
     case 0x3: /* jal */
         tgt = jtgt;
         *os_context_register_addr(context, 31)
-            = OS_CONTEXT_PC(context) + INSN_LEN;
+            = (unsigned)OS_CONTEXT_PC(context) + INSN_LEN;
         break;
     case 0x4: /* beq */
     case 0x14: /* beql */
@@ -237,16 +237,16 @@ arch_skip_instruction(os_context_t *context)
     OS_CONTEXT_PC(context)
         = (os_context_register_t)
             next_insn_addr(context,
-                *(unsigned int *)(OS_CONTEXT_PC(context)));
+                *(unsigned int *)((unsigned)OS_CONTEXT_PC(context)));
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
     if (os_context_bd_cause(context))
-        return (unsigned char *)(OS_CONTEXT_PC(context) + (INSN_LEN * 2));
+        return (unsigned char *)((unsigned)OS_CONTEXT_PC(context) + (INSN_LEN * 2));
     else
-        return (unsigned char *)(OS_CONTEXT_PC(context) + INSN_LEN);
+        return (unsigned char *)((unsigned)OS_CONTEXT_PC(context) + INSN_LEN);
 }
 
 boolean
@@ -336,7 +336,7 @@ static sigset_t orig_sigmask;
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
+    unsigned int *pc = (unsigned int *)(unsigned)OS_CONTEXT_PC(context);
     unsigned int *next_pc;
 
     orig_sigmask = *os_context_sigmask_addr(context);
@@ -369,7 +369,7 @@ void
 arch_handle_after_breakpoint(os_context_t *context)
 {
     arch_install_breakpoint(skipped_break_addr);
-    arch_remove_breakpoint((unsigned int *)OS_CONTEXT_PC(context),
+    arch_remove_breakpoint((unsigned int *)(unsigned)OS_CONTEXT_PC(context),
                            displaced_after_inst);
     *os_context_sigmask_addr(context) = orig_sigmask;
 }
@@ -377,7 +377,7 @@ arch_handle_after_breakpoint(os_context_t *context)
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned int code = *((uint32_t *)(OS_CONTEXT_PC(context)));
+    unsigned int code = *((uint32_t *)((unsigned)OS_CONTEXT_PC(context)));
     int register_offset = code >> 16 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);
@@ -394,7 +394,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
     handle_trap(context, code);
 }
 
-static void
+__attribute__((unused)) static void
 sigfpe_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     interrupt_handle_now(signal, info, context);
