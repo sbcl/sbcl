@@ -63,11 +63,13 @@ new_space_p(lispobj object)
 #endif
 
 #define mixed_region 0
+#define small_mixed_region 0
 #define boxed_region 0
 #define unboxed_region 0
 #define code_region 0
 #define cons_region 0
 #define PAGE_TYPE_MIXED 0
+#define PAGE_TYPE_SMALL_MIXED 0
 #define PAGE_TYPE_BOXED 0
 #define PAGE_TYPE_UNBOXED 0
 #define PAGE_TYPE_CODE 0
