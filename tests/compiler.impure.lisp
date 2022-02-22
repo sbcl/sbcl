@@ -2281,6 +2281,21 @@
       (test f1 f2)
       (test f1 c2))))
 
+;;;; backq const folding tests
+(test-util:with-test (:name :backq-const-named-reference-folding)
+  (ctu:file-compile
+   `((defconstant +izero+ 0)
+     (defconstant +fzero+ 0f0)
+     (defconstant +dzero+ 0d0)
+     (defparameter *dzero* 0d0)
+     (defun test-1 () `(,+izero+ ,+fzero+ ,+dzero+))
+     (defun test-2 () `(,+izero+ ,+fzero+ ,+dzero+ ,*dzero*))
+     (defun test-3 () (list +izero+ +fzero+ +dzero+)))
+   :load t)
+  (assert (equal (test-1) '(0 0.0 0.0d0)))
+  (assert (equal (test-2) '(0 0.0 0.0d0 0.0d0)))
+  (assert (equal (test-3) '(0 0.0 0.0d0))))
+
 ;;; user-defined satisfies-types cannot be folded
 (deftype mystery () '(satisfies mysteryp))
 (defvar *mystery* nil)

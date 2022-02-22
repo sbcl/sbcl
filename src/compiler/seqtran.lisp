@@ -2570,7 +2570,7 @@
 #-sb-xc-host
 (defmethod make-load-form ((object named-constant-reference) &optional environment)
   (declare (ignore environment))
-  `',(named-constant-reference-name object))
+  (named-constant-reference-name object))
 
 ;;; Wrap the value of lvar-value if it comes from a named
 ;;; reference. For bootstrap reasons we don't do this during
