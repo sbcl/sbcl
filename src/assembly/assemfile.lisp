@@ -36,6 +36,7 @@
         (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
               (*readtable* sb-cold:*xc-readtable*))
           (load (merge-pathnames name (make-pathname :type "lisp")))
+          (resolve-ep-labels (asmstream-code-section asmstream))
           ;; Reserve space for the jump table. The first word of the table
           ;; indicates the total length in words, counting the length word itself
           ;; as a word, and the words comprising jump tables that were registered
@@ -121,6 +122,21 @@
   (loop
     for export in exports
     collect `(push ,(expand-one-export-spec export) *entry-points*)))
+
+;;; Create a placeholder that will later resolve to the label of an entry point.
+;;; This is because we don't know all the names of routines until seeing them.
+;;; This is an alternative to using a fixup. It may generate shorter code.
+(defun sb-vm::entry-point-label (name) `(sb-assem::entry ,name))
+
+(defun resolve-ep-labels (section)
+  (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
+      ((null statement))
+    (binding* ((patch (member-if (lambda (x) (typep x '(cons (eql sb-assem::entry))))
+                                 (stmt-operands statement))
+                      :exit-if-null)
+               (ep (assoc (cadar patch) *entry-points*)))
+      (aver (and ep (= (third ep) 0)))
+      (rplaca patch (second ep)))))
 
 (defun expand-align-option (align)
   (when align
