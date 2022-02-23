@@ -720,9 +720,11 @@
                                for index downfrom -1
                                do (noise `(loadw ,name new-fp ,index)))
                               (noise))
-                   '((if (zerop nargs)
-                         (zeroize rcx)
-                       (inst mov rcx (fixnumize nargs)))))
+                     '((cond ((listp nargs)) ;; no-verify-arg-count
+                             ((zerop nargs)
+                              (zeroize rcx))
+                             (t
+                              (inst mov rcx (fixnumize nargs))))))
                ,@(cond ((eq return :tail)
                         '(;; Python has figured out what frame we should
                           ;; return to so might as well use that clue.

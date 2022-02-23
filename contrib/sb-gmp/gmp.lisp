@@ -872,7 +872,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (mpz-tdiv a b)))
 
 (defun gmp-lcm (a b)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (type integer a b)
            (inline mpz-lcm))
   (if (or (and (typep a 'fixnum)
@@ -892,7 +892,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 ;;; rationals
 (defun gmp-two-arg-+ (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-add))
   (if (and (or (typep x 'ratio)
                (typep y 'ratio))
@@ -903,7 +903,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (orig-two-arg-+ x y)))
 
 (defun gmp-two-arg-- (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-sub))
   (if (and (or (typep x 'ratio)
                (typep y 'ratio))
@@ -914,7 +914,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (orig-two-arg-- x y)))
 
 (defun gmp-two-arg-* (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-mul))
   (if (and (or (typep x 'ratio)
                (typep y 'ratio))
@@ -925,7 +925,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (orig-two-arg-* x y)))
 
 (defun gmp-two-arg-/ (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-div))
   (if (and (rationalp x)
            (rationalp y)

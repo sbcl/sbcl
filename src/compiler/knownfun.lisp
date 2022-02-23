@@ -171,7 +171,7 @@
     (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
-  #-arm64 ;; Needs to be supported by the call VOPs
+  #-(or x86-64 arm64) ;; Needs to be supported by the call VOPs
   (setf attributes (remove 'no-verify-arg-count attributes))
   (multiple-value-bind (type annotation)
       (split-type-info arg-types result-type)

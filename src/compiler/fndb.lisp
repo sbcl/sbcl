@@ -930,7 +930,8 @@
 ;;; express that in this syntax.
 (defknown append (&rest t) t (flushable)
   :call-type-deriver #'append-call-type-deriver)
-(defknown sb-impl::append2 (list t) t (flushable)
+(defknown sb-impl::append2 (list t) t
+  (flushable no-verify-arg-count)
   :call-type-deriver #'append-call-type-deriver)
 
 (defknown copy-list (proper-or-dotted-list) list (flushable))
