@@ -714,6 +714,9 @@ static const char * const page_type_description[8] =
  * pages that are known to already zeroed. Mark all pages in the
  * ranges as non-zeroed.
  */
+#if defined LISP_FEATURE_RISCV && defined LISP_FEATURE_LINUX // KLUDGE
+int mmap_does_not_zero;
+#endif
 void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
     page_index_t i, j;
 
@@ -1000,8 +1003,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         else
             set_page_need_to_zero(page, 1);
 #else
-        if (page_type == PAGE_TYPE_CONS && !page_words_used(page)
-            && page_table[page].need_zerofill) {
+        if (page_type == PAGE_TYPE_CONS && page_need_to_zero(page) && !page_words_used(page)) {
             // Zero the trailing data (the cons cell mark bits)
             char *trailer = page_address(page) + CONS_PAGE_USABLE_BYTES;
             memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_USABLE_BYTES);
@@ -5465,6 +5467,21 @@ void gc_load_corefile_ptes(int card_table_nbits,
        Which is weird, because it's done many times in arch_write_linkage_table_entry later.
        Adding the executable bit here avoids calling pthread_jit_write_protect_np */
     os_protect((os_vm_address_t)STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, OS_VM_PROT_ALL);
+#endif
+#if defined LISP_FEATURE_RISCV && defined LISP_FEATURE_LINUX // KLUDGE
+    /* Accomodate buggy mmap() emulation, but detect up front whether it may be.
+     * Full system emulation running a RISCV kernel is generally fine. User mode is not.
+     * There's no way to know what it _will_ do, so we have to guess based on
+     * whether the emulation looks bad. */
+    char buf[100];
+    FILE *f = fopen("/proc/cpuinfo", "r");
+    fgets(buf, sizeof buf, f);
+    fgets(buf, sizeof buf, f);
+    fclose(f);
+    if (!strstr(buf, "hart")) {
+        fprintf(stderr, "WARNING: enabling mmap() workaround. GC time may be affected\n");
+        mmap_does_not_zero = 1;
+    }
 #endif
 }
 

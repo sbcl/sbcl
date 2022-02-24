@@ -9,6 +9,8 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
+#+riscv (setf (extern-alien "gencgc_verbose" char) 3)
+
 (in-package "COMMON-LISP-USER")
 
 ;;;; general warm init compilation policy
@@ -201,7 +203,9 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                               ((sb-kernel:redefinition-with-defgeneric
                                 #'muffle-warning))
                             (let ((sb-c::*source-namestring* fullname))
-                              (load output-truename)))
+                              ;; RISCV is slow, I'd like to see it doing something
+                              ;; rather than appearing to go out to lunch
+                              (load output-truename :verbose (or #+riscv t))))
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 

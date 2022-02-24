@@ -17,7 +17,11 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type);
 typedef unsigned int page_bytes_t;
 #define page_words_used(index) page_table[index].words_used_
 #define page_bytes_used(index) ((page_bytes_t)page_table[index].words_used_<<WORD_SHIFT)
+#if defined LISP_FEATURE_RISCV && defined LISP_FEATURE_LINUX // KLUDGE
+#define page_need_to_zero(index) (mmap_does_not_zero || page_table[index].need_zerofill)
+#else
 #define page_need_to_zero(index) page_table[index].need_zerofill
+#endif
 #define set_page_bytes_used(index,val) page_table[index].words_used_ = ((val)>>WORD_SHIFT)
 #define set_page_need_to_zero(index,val) page_table[index].need_zerofill = val
 
