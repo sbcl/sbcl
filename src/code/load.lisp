@@ -122,7 +122,7 @@
 
 ;;; a holder for the FASL file we're reading from
 (defstruct (fasl-input (:conc-name %fasl-input-)
-                       (:constructor make-fasl-input (stream))
+                       (:constructor make-fasl-input (stream print))
                        (:predicate nil)
                        (:copier nil))
   (stream nil :type ansi-stream :read-only t)
@@ -135,7 +135,8 @@
   ;; function calls) while executing other FOPs. SKIP-UNTIL will
   ;; either contain the position where the skipping will stop, or
   ;; NIL if we're executing normally.
-  (skip-until nil :type (or null fixnum)))
+  (skip-until nil :type (or null fixnum))
+  (print nil :type boolean))
 (declaim (freeze-type fasl-input))
 
 ;;; Output the current number of semicolons after a fresh-line.
@@ -681,17 +682,7 @@
 ;;; Return true if we successfully load a group from the stream, or
 ;;; NIL if EOF was encountered while trying to read from the stream.
 ;;; Dispatch to the right function for each fop.
-;;;
-;;; When true, PRINT causes most tlf-equivalent forms to print their primary value.
-;;; This differs from loading of Lisp source, which prints all values of
-;;; only truly-toplevel forms.  This is permissible per CLHS -
-;;;  "If print is true, load incrementally prints information to standard
-;;;   output showing the progress of the loading process. [...]
-;;;   For a compiled file, what is printed might not reflect precisely the
-;;;   contents of the source file, but some information is generally printed."
-;;;
-(defun load-fasl-group (fasl-input print)
-  (declare (ignorable print))
+(defun load-fasl-group (fasl-input)
   (let ((stream (%fasl-input-stream fasl-input))
         (trace *show-fops-p*))
     (unless (check-fasl-header stream)
@@ -733,10 +724,7 @@
                (setf (%fasl-input-deprecated-stuff fasl-input) nil)
                (loader-deprecation-warn
                 it
-                (and (eq (svref stack 1) 'sb-impl::%defun) (svref stack 2))))
-             (when print
-               (load-fresh-line)
-               (prin1 result)))))))))
+                (and (eq (svref stack 1) 'sb-impl::%defun) (svref stack 2)))))))))))
 
 ;; This is the moral equivalent of a warning from /usr/bin/ld that
 ;; "gets() is dangerous." You're informed by both the compiler and linker.
@@ -757,9 +745,9 @@
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
-  (let ((fasl-input (make-fasl-input stream)))
+  (let ((fasl-input (make-fasl-input stream print)))
     (unwind-protect
-         (loop while (load-fasl-group fasl-input print))
+         (loop while (load-fasl-group fasl-input))
       ;; Nuke the table and stack to avoid keeping garbage on
       ;; conservatively collected platforms.
       (nuke-fop-vector (%fasl-input-table fasl-input))
@@ -1237,7 +1225,11 @@
     (values)))
 
 (define-fop 20 (fop-fun-entry ((:operands fun-index) code-object))
-  (%code-entry-point code-object fun-index))
+  (let ((fun (%code-entry-point code-object fun-index)))
+    (when (%fasl-input-print (fasl-input))
+      (load-fresh-line)
+      (format t "~S loaded" fun))
+    fun))
 
 ;;;; assemblerish fops
 
