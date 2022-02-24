@@ -184,10 +184,26 @@
                              :expected header))))
           (file-position stream p))))))
 
-(defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
-                           (if-does-not-exist t) (external-format :default))
-  "Load the file given by FILESPEC into the Lisp environment, returning
-   T on success."
+(defun load (filespec &key (verbose *load-verbose*) (print *load-print*)
+                           (if-does-not-exist :error) (external-format :default))
+  "Load the file given by FILESPEC into the Lisp environment, returning T on
+   success. The file type (a.k.a extension) is defaulted if missing. These
+   options are defined:
+
+   :IF-DOES-NOT-EXIST
+       If :ERROR (the default), signal an error if the file can't be located.
+       If NIL, simply return NIL (LOAD normally returns T.)
+
+   :VERBOSE
+       If true, print a line describing each file loaded.
+
+   :PRINT
+       If true, print information about loaded values.  When loading the
+       source, the result of evaluating each top-level form is printed.
+
+   :EXTERNAL-FORMAT
+       The external-format to use when opening the FILENAME. The default is
+       :DEFAULT which uses the SB-EXT:*DEFAULT-EXTERNAL-FORMAT*."
   (labels ((load-stream (stream faslp)
              (if (and (fd-stream-p stream)
                       (eq (sb-impl::fd-stream-fd-type stream) :directory))
@@ -199,11 +215,11 @@
                   #'load-stream-1 stream
                   faslp
                   ;; If you prefer *LOAD-PATHNAME* to reflect what the user specified prior
-                  ;; to merging, then CALL-WITH-LOAD-BINDINGS is passed PATHSPEC,
+                  ;; to merging, then CALL-WITH-LOAD-BINDINGS is passed FILESPEC,
                   ;; otherwise it is passed STREAM.
                   (cond ((and (not sb-c::*merge-pathnames*)
-                              (typep pathspec '(or string pathname)))
-                         pathspec)
+                              (typep filespec '(or string pathname)))
+                         filespec)
                         (t stream)))))
            (load-stream-1 (stream faslp)
              (let (;; Bindings required by ANSI.
@@ -230,17 +246,17 @@
     (declare (truly-dynamic-extent #'load-stream-1))
 
     ;; Case 1: stream.
-    (when (streamp pathspec)
-      (return-from load (load-stream pathspec (fasl-header-p pathspec))))
+    (when (streamp filespec)
+      (return-from load (load-stream filespec (fasl-header-p filespec))))
 
-    (let ((pathname (pathname pathspec)))
+    (let ((pathname (pathname filespec)))
       ;; Case 2: Open as binary, try to process as a fasl.
       (with-open-stream
-          (stream (or (open pathspec :element-type '(unsigned-byte 8)
+          (stream (or (open filespec :element-type '(unsigned-byte 8)
                                      :if-does-not-exist nil)
-                      (when (null (pathname-type pathspec))
+                      (when (null (pathname-type filespec))
                         (let ((defaulted-pathname
-                                (probe-load-defaults pathspec)))
+                                (probe-load-defaults filespec)))
                           (if defaulted-pathname
                               (progn (setq pathname defaulted-pathname)
                                      (open pathname
@@ -249,10 +265,10 @@
                                            :element-type '(unsigned-byte 8))))))
                       (if if-does-not-exist
                           (error 'simple-file-error
-                                 :pathname pathspec
+                                 :pathname filespec
                                  :format-control
                                  "~@<Couldn't load ~S: file does not exist.~@:>"
-                                 :format-arguments (list pathspec))
+                                 :format-arguments (list filespec))
                           (return-from load nil))))
         (let* ((real (probe-file stream))
                (should-be-fasl-p
