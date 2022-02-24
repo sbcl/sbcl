@@ -3044,7 +3044,8 @@ register."
   (let* ((d-source (code-location-debug-source location))
          (di (compiled-debug-fun-debug-info
               (code-location-debug-fun location)))
-         (namestring (debug-source-namestring d-source)))
+         (namestring (debug-source-namestring d-source))
+         (sbcl-source-p (eql (search "SYS:" namestring) 0)))
     (multiple-value-bind (tlf-offset char-offset)
         (debug-fun-tlf-and-offset di
                                   (compiled-debug-fun-compiler-debug-fun
@@ -3060,7 +3061,12 @@ register."
                            "~%; File has been modified since compilation:~%;   ~A~@
                           ; Using form offset instead of character position.~%"
                            namestring)
-                   (let ((*read-suppress* t))
+                   (let ((*read-suppress* t)
+                         (*features* (if sbcl-source-p
+                                         (append *features*
+                                                 '(:sb-xc)
+                                                 (symbol-value 'sb-impl::+internal-features+))
+                                         *features*)))
                      (loop repeat tlf-offset
                            do (read f)))))
             (read f)))))))
