@@ -43,9 +43,10 @@
 # include <dlfcn.h>
 #endif
 
-static int decode_locs(lispobj packed_integer, int *offset, int *elsewhere)
+int df_decode_locs(lispobj encoded, int *offset, int *elsewhere)
 {
     struct varint_unpacker unpacker;
+    lispobj packed_integer = listp(encoded) ? CONS(encoded)->cdr : encoded;
     varint_unpacker_init(&unpacker, packed_integer);
     return varint_unpack(&unpacker, offset) && varint_unpack(&unpacker, elsewhere);
 }
@@ -67,14 +68,14 @@ debug_function_from_pc (struct code* code, void *pc)
 
     struct compiled_debug_fun *df = (struct compiled_debug_fun*)native_pointer(di->fun_map);
     int begin, end, elsewhere_begin, elsewhere_end;
-    if (!decode_locs(df->encoded_locs, &begin, &elsewhere_begin))
+    if (!df_decode_locs(df->encoded_locs, &begin, &elsewhere_begin))
         return NULL;
     sword_t offset = (char*)pc - code_text_start(code);
     while (df) {
         struct compiled_debug_fun *next;
         if (df->next != NIL) {
             next = (struct compiled_debug_fun*) native_pointer(df->next);
-            if (!decode_locs(next->encoded_locs, &end, &elsewhere_end))
+            if (!df_decode_locs(next->encoded_locs, &end, &elsewhere_end))
                 return NULL;
         } else {
             next = 0;
@@ -393,6 +394,13 @@ lisp_backtrace(int nframes)
         if (info.lra != make_lispobj(absolute_pc, OTHER_POINTER_LOWTAG)
             && info.lra != NIL)
             printf("LRA=%p ", (void*)info.lra);
+
+        int fpvalid = (lispobj*)info.frame >= thread->control_stack_start
+          && (lispobj*)info.frame < thread->control_stack_end;
+
+        // If the FP is invalid, then quite likely we'd crash trying to find a
+        // compiled-debug-fun because info.code is a wild pointer
+        if (!fpvalid) { printf(" BAD FRAME\n"); break; }
 
         if (info.code) {
             struct compiled_debug_fun *df;
