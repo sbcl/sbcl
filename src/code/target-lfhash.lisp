@@ -112,7 +112,7 @@
   (comparator #'equal :type function)
   (hash-function #'globaldb-sxhashoid :type function)
   (mutex (sb-thread:make-mutex))
-  ;; the number of phantom entries for simulated deletion.
+  ;; The number of phantom entries for simulated deletion.
   ;; Our tombstones are not the usual ones. Ordinarily an open-addressing
   ;; table will use tombstone keys that can be written over if inserting a new
   ;; pair into a dead entry. That doesn't work for the lockfree algorithm
@@ -159,7 +159,7 @@
 
 ;; The common skeleton of {Get, Put, Rehash} operations. Probe key cells until
 ;; either a hit occurs, in which case the :HIT form is executed and looping
-;; stops; or an empty slot is seen in which case the :MISS code is executed.
+;; stops; or an empty slot is seen, in which case the :MISS code is executed.
 ;; :MISS should contain a GO or RETURN on success, otherwise probing continues.
 ;; No precaution exists against probing forever, such as could happen if the
 ;; probing strategy fails to visit all candidate free cells.
@@ -215,7 +215,7 @@
 
 ;; Wait for ENV's storage to change to something other than STORAGE, and
 ;; return the new one. As long as rehash finishes in finite time, every thread
-;; makes progess. We don't protect against untimely death of the thread
+;; makes progress. We don't protect against untimely death of the thread
 ;; that holds the lock.
 ;;
 (defun %wait-for-rehash (env storage)
@@ -247,7 +247,7 @@
     ;; has been forwarded, but in general an unsynchronized read might be
     ;; perceived as executing before a conditional that guards whether the
     ;; read should happen at all. 'storage-next' has the deceptive look of a
-    ;; data dependency but it's not - it's a control dependency which as per
+    ;; data dependency but it's not - it's a control dependency which, as per
     ;; the 'memory-barriers.txt' document at kernel.org, demands a barrier.
     ;; The subsequent ref to storage (if the loop iterates) has a
     ;; data-dependency, and will never be reordered except on an Alpha :-(
@@ -292,7 +292,7 @@
                        ;; Unlike above, this read of storage-next can not
                        ;; be perceived as having occurred prior to CAS.
                        ;; x86 synchronizes at every locked instruction, and our
-                       ;; PPC CAS vops sync as a nececessity of performing CAS.
+                       ;; PPC CAS vops sync as a necessity of performing CAS.
                        (cond ((eq oldval actual-old) newval) ; win
                              ((info-value-moved-p actual-old) ; forwarded
                               (put (info-storage-next array)
@@ -407,7 +407,7 @@
 ;; CAS is the primitive operation on an info hashtable,
 ;; and SETF is implemented in terms of CAS. For the most part it is
 ;; inadvisable to use this for anything other than tinkering at the REPL.
-;; Of if the table has external sychronization, it's ok to use.
+;; Of if the table has external synchronization, it's ok to use.
 (defun (setf info-gethash) (newval key env)
   (dx-flet ((update (old) (declare (ignore old)) newval))
     (info-puthash env key #'update)))
