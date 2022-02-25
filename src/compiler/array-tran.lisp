@@ -968,7 +968,7 @@
                   (declare (ignorable ,@lambda-list))
                   (let ((content-length (length initial-contents)))
                    (unless (= content-length ,(or c-length 'length))
-                     (initial-contents-error content-length  ,(or c-length 'length))))
+                     (sb-vm::initial-contents-error content-length  ,(or c-length 'length))))
                   ,(wrap `(replace ,data-alloc-form initial-contents)))))))))
 
 ;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least

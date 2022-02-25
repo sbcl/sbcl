@@ -1125,7 +1125,7 @@
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
     array (flushable))
-(defknown initial-contents-error (t t) nil (no-verify-arg-count))
+(defknown sb-vm::initial-contents-error (t t) nil (no-verify-arg-count))
 (defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)
   :result-arg 0)
 
