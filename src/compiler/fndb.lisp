@@ -24,8 +24,8 @@
   )
 ;; These each check their input sequence for type-correctness,
 ;; but not the output type specifier, because MAKE-SEQUENCE will do that.
-(defknown list-to-vector* (list type-specifier) vector ())
-(defknown vector-to-vector* (vector type-specifier) vector ())
+(defknown list-to-vector* (list type-specifier) vector (no-verify-arg-count))
+(defknown vector-to-vector* (vector type-specifier) vector (no-verify-arg-count))
 
 ;; FIXME: Is this really FOLDABLE? A counterexample seems to be:
 ;;  (LET ((S :S)) (VALUES (TYPE-OF S) (UNINTERN S 'KEYWORD) (TYPE-OF S) S))
@@ -177,7 +177,7 @@
 ;;;; from the "Symbols" chapter:
 
 (defknown get (symbol t &optional t) t (flushable))
-(defknown sb-impl::get3 (symbol t t) t (flushable))
+(defknown sb-impl::get3 (symbol t t) t (flushable no-verify-arg-count))
 (defknown remprop (symbol t) t)
 (defknown symbol-plist (symbol) list (flushable))
 (defknown getf (list t &optional t) t (foldable flushable))
@@ -477,14 +477,16 @@
   (character &rest character) boolean (movable foldable flushable))
 
 (defknown (two-arg-char-equal)
-    (character character) boolean (movable foldable flushable commutative))
+    (character character) boolean
+  (movable foldable flushable commutative no-verify-arg-count))
 
 (defknown (two-arg-char-not-equal
            two-arg-char-lessp
            two-arg-char-not-lessp
            two-arg-char-greaterp
            two-arg-char-not-greaterp)
-    (character character) boolean (movable foldable flushable))
+    (character character) boolean
+  (movable foldable flushable no-verify-arg-count))
 
 (defknown character (t) character (movable foldable unsafely-flushable))
 (defknown char-code (character) char-code (movable foldable flushable))
@@ -555,11 +557,14 @@
   consed-sequence (call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
   )
-(defknown %map (type-specifier function-designator &rest sequence) consed-sequence (call))
-(defknown %map-for-effect-arity-1 (function-designator sequence) null (call))
-(defknown %map-to-list-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) list (flushable call))
+(defknown %map (type-specifier function-designator &rest sequence) consed-sequence
+  (call))
+(defknown %map-for-effect-arity-1 (function-designator sequence) null
+  (call no-verify-arg-count))
+(defknown %map-to-list-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) list
+   (flushable call no-verify-arg-count))
 (defknown %map-to-simple-vector-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) simple-vector
-  (flushable call))
+  (flushable call no-verify-arg-count))
 
 (defknown map-into ((modifying sequence)
                     (function-designator ((rest-args :sequence t))
@@ -576,7 +581,7 @@
                           :sb-impl))
     (simple-array index index function list)
     index
-    (call))
+    (call no-verify-arg-count))
 
 ;;; returns the result from the predicate...
 (defknown some (function-designator proper-sequence &rest proper-sequence) t
@@ -776,17 +781,17 @@
 
 (defknown (%bit-position/0 %bit-position/1) (simple-bit-vector t index index)
   (or (mod #.(1- array-dimension-limit)) null)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 (defknown (%bit-pos-fwd/0 %bit-pos-fwd/1 %bit-pos-rev/0 %bit-pos-rev/1)
   (simple-bit-vector index index)
   (or (mod #.(1- array-dimension-limit)) null)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 (defknown %bit-position (t simple-bit-vector t index index)
   (or (mod #.(1- array-dimension-limit)) null)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 (defknown (%bit-pos-fwd %bit-pos-rev) (t simple-bit-vector index index)
   (or (mod #.(1- array-dimension-limit)) null)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 
 (defknown count
   (t proper-sequence &rest t &key
@@ -832,7 +837,7 @@
   (call)
   :derive-type #'result-type-first-arg)
 (defknown sb-impl::stable-sort-list (list function function) list
-  (call important-result))
+  (call important-result no-verify-arg-count))
 (defknown sb-impl::sort-vector (vector index index function (or function null))
   * ; SORT-VECTOR works through side-effect
   (call))
@@ -840,12 +845,12 @@
 (defknown sb-impl::stable-sort-vector
   (vector function (or function null))
   vector
-  (call))
+  (call no-verify-arg-count))
 
 (defknown sb-impl::stable-sort-simple-vector
   (simple-vector function (or function null))
   simple-vector
-  (call))
+  (call no-verify-arg-count))
 
 (defknown merge (type-specifier (modifying sequence) (modifying sequence)
                 (function-designator ((nth-arg 1 :sequence t :key :key)
@@ -902,10 +907,10 @@
 (defknown nthcdr (unsigned-byte list) t (foldable unsafely-flushable))
 
 (defknown last (list &optional unsigned-byte) t (foldable flushable))
-(defknown %last0 (list) t (foldable flushable))
-(defknown %last1 (list) t (foldable flushable))
-(defknown %lastn/fixnum (list (and unsigned-byte fixnum)) t (foldable flushable))
-(defknown %lastn/bignum (list (and unsigned-byte bignum)) t (foldable flushable))
+(defknown %last0 (list) t (foldable flushable no-verify-arg-count))
+(defknown %last1 (list) t (foldable flushable no-verify-arg-count))
+(defknown %lastn/fixnum (list (and unsigned-byte fixnum)) t (foldable flushable no-verify-arg-count))
+(defknown %lastn/bignum (list (and unsigned-byte bignum)) t (foldable flushable no-verify-arg-count))
 
 (defknown list (&rest t) list (movable flushable))
 (defknown list* (t &rest t) t (movable flushable))
@@ -919,7 +924,8 @@
     (ash most-positive-fixnum (- (+ sb-vm:word-shift 1)))))
 (defknown make-list ((integer 0 #.make-list-limit) &key (:initial-element t)) list
   (movable flushable))
-(defknown %make-list ((integer 0 #.make-list-limit) t) list (movable flushable))
+(defknown %make-list ((integer 0 #.make-list-limit) t) list
+  (movable flushable no-verify-arg-count))
 
 (defknown sb-impl::|List| (&rest t) list (movable flushable))
 (defknown sb-impl::|List*| (t &rest t) t (movable flushable))
@@ -1119,8 +1125,8 @@
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
     array (flushable))
-(defknown initial-contents-error (t t) nil)
-(defknown fill-data-vector (vector list sequence) vector ()
+(defknown initial-contents-error (t t) nil (no-verify-arg-count))
+(defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)
   :result-arg 0)
 
 ;; INITIAL-CONTENTS is the first argument to FILL-ARRAY because
@@ -1139,7 +1145,8 @@
 ;; second way shown above, we would have to bind INITIAL-CONTENTS,
 ;; to ensure its evaluation before the allocation,
 ;; causing difficulty if doing any futher macro-like processing.
-(defknown fill-array (sequence simple-array) (simple-array) (flushable)
+(defknown fill-array (sequence simple-array) (simple-array)
+  (flushable no-verify-arg-count)
   :result-arg 1)
 
 (defknown vector (&rest t) simple-vector (flushable))
@@ -1185,16 +1192,14 @@
   #|:derive-type #'result-type-last-arg|#)
 
 (defknown bit-vector-= (bit-vector bit-vector) boolean
-  (movable foldable flushable))
+  (movable foldable flushable no-verify-arg-count))
 
 (defknown array-has-fill-pointer-p (array) boolean
   (movable foldable flushable))
 (defknown fill-pointer (complex-vector) index
     (unsafely-flushable))
-;;; We could cut 1 instruction off the call sequence by not loading the arg count
-;;; register for error-handler helpers that take fixed args.
-;;; Perhaps they should all be trap instead though?
-(defknown sb-vm::fill-pointer-error (t) nil)
+
+(defknown sb-vm::fill-pointer-error (t) nil (no-verify-arg-count))
 
 (defknown vector-push (t (modifying complex-vector)) (or index null) ())
 (defknown vector-push-extend (t (modifying complex-vector) &optional (and index (integer 1))) index
@@ -1237,14 +1242,14 @@
 (defknown (two-arg-string= two-arg-string-equal)
   (string-designator string-designator)
   boolean
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 
 (defknown (two-arg-string< two-arg-string> two-arg-string<= two-arg-string>=
            two-arg-string/= two-arg-string-lessp two-arg-string-greaterp
            two-arg-string-not-lessp two-arg-string-not-greaterp two-arg-string-not-equal)
   (string-designator string-designator)
   (or index null)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 
 (defknown make-string (index &key (:element-type type-specifier)
                        (:initial-element character))
@@ -1273,28 +1278,28 @@
                        (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
                        (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
   (or index null)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 
 (defknown string=*
   (string-designator string-designator
                      (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
                      (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
   boolean
-    (foldable flushable))
+    (foldable flushable no-verify-arg-count))
 
 (defknown simple-base-string=
     (simple-base-string simple-base-string
                         (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
                         (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
     boolean
-    (foldable flushable))
+    (foldable flushable no-verify-arg-count))
 
 (defknown simple-character-string=
     (simple-character-string simple-character-string
                              (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
                              (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
     boolean
-    (foldable flushable))
+    (foldable flushable no-verify-arg-count))
 
 ;;;; from the "Eval" chapter:
 
@@ -1319,7 +1324,7 @@
   ;; Not flushable, for two reasons:
   ;; - possibly need to verify that the second arg is a type specifier
   ;; - if you don't initialize the stream, then GET-OUTPUT-STRING-STREAM will crash
-  ())
+  (no-verify-arg-count))
 (defknown make-string-output-stream (&key (:element-type type-specifier))
   sb-impl::string-output-stream
   (flushable))
@@ -1454,7 +1459,7 @@
   :derive-type #'result-type-first-arg)
 
 (defknown output-object (t stream) null (any))
-(defknown %write (t stream-designator) t (any))
+(defknown %write (t stream-designator) t (any no-verify-arg-count))
 
 (defknown (pprint) (t &optional stream-designator) (values)
   ())
@@ -1489,7 +1494,7 @@
            (unsafely-flushable)))
 
 (defknown (prin1-to-string princ-to-string) (t) simple-string (unsafely-flushable))
-(defknown sb-impl::stringify-object (t) simple-string)
+(defknown sb-impl::stringify-object (t) simple-string (no-verify-arg-count))
 
 (defknown write-char (character &optional stream-designator) character ()
   :derive-type #'result-type-first-arg)
@@ -1683,7 +1688,7 @@
   null)
 
 ;;; and analogous SBCL extension:
-(defknown sb-impl::%failed-aver (t) nil)
+(defknown sb-impl::%failed-aver (t) nil (no-verify-arg-count))
 (defknown sb-impl::unreachable () nil)
 (defknown bug (t &rest t) nil) ; never returns
 (defknown simple-reader-error (stream string &rest t) nil)
@@ -1819,12 +1824,15 @@
 (defknown %rest-null (t t t t) * (always-translatable))
 (defknown %rest-true (t t t) * (always-translatable))
 
-(defknown %unary-truncate/single-float (single-float) integer (movable foldable flushable))
-(defknown %unary-truncate/double-float (double-float) integer (movable foldable flushable))
+(defknown %unary-truncate/single-float (single-float) integer
+   (movable foldable flushable no-verify-arg-count))
+(defknown %unary-truncate/double-float (double-float) integer
+   (movable foldable flushable no-verify-arg-count))
 
 ;;; We can't fold this in general because of SATISFIES. There is a
 ;;; special optimizer anyway.
-(defknown %typep (t (or type-specifier ctype)) boolean (movable flushable))
+(defknown %typep (t (or type-specifier ctype)) boolean
+  (movable flushable no-verify-arg-count))
 (defknown %instance-typep (t (or type-specifier ctype wrapper)) boolean
   (movable flushable always-translatable))
 ;;; We should never emit a call to %typep-wrapper
@@ -2001,7 +2009,7 @@
                        (array-call-type-deriver call trusted t t)))
 (defknown (%rplaca %rplacd) ((modifying cons) t) t ()
   :derive-type #'result-type-last-arg)
-(defknown %put (symbol t t) t ())
+(defknown %put (symbol t t) t (no-verify-arg-count))
 (defknown %setelt ((modifying sequence) index t) t ()
   :derive-type #'result-type-last-arg)
 (defknown %svset ((modifying simple-vector) index t) t ())
@@ -2071,7 +2079,7 @@
 ;;; Alternatively we could use PROCLAIM, except that that
 ;;; doesn't exist soon enough, and would need conditionals guarding
 ;;; it, which is sort of the very thing this is trying to avoid.
-(defknown missing-arg () nil)
+(defknown missing-arg () nil (no-verify-arg-count))
 (defknown give-up-ir1-transform (&rest t) nil)
 
 (defknown coerce-to-condition ((or condition symbol string function)
@@ -2081,7 +2089,7 @@
 
 (defknown coerce-symbol-to-fun (symbol)
   function
-  ())
+  (no-verify-arg-count))
 
 (defknown sc-number-or-lose (symbol) sc-number
   (foldable))

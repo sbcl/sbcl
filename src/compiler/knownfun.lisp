@@ -171,6 +171,11 @@
     (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
+  (when (and (memq 'no-verify-arg-count attributes)
+             (or (memq '&optional arg-types)
+                 (memq '&rest arg-types)
+                 (memq '&key arg-types)))
+    (bug "no-verify-arg-count works with fixed arguments only."))
   #-(or x86-64 arm64) ;; Needs to be supported by the call VOPs
   (setf attributes (remove 'no-verify-arg-count attributes))
   (multiple-value-bind (type annotation)

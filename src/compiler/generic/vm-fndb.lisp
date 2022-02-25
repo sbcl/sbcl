@@ -97,11 +97,11 @@
 (defknown %sp-string-compare
   (simple-string index (or null index) simple-string index (or null index))
   (values index fixnum)
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 (defknown %sp-string=
   (simple-string index (or null index) simple-string index (or null index))
   boolean
-  (foldable flushable))
+  (foldable flushable no-verify-arg-count))
 
 (defknown sb-impl::number-sxhash (number) hash-code (foldable flushable))
 (defknown %sxhash-string (string) hash-code (foldable flushable))
@@ -143,7 +143,7 @@
   :result-arg 0)
 
 (defknown (vector-fill* vector-fill/t) (t t t t) vector
-  ()
+  (no-verify-arg-count)
   :result-arg 0)
 
 ;;; Return the length of VECTOR.
@@ -202,7 +202,7 @@
   (flushable))
 (defknown sb-kernel::check-array-shape (simple-array list)
   (simple-array)
-  (flushable)
+  (flushable no-verify-arg-count)
   :result-arg 0)
 
 (defknown %make-instance (index) instance
@@ -634,11 +634,15 @@
 
 ;;; formerly in 'float-tran'
 
-(defknown %single-float (real) single-float (movable foldable))
-(defknown %double-float (real) double-float (movable foldable))
+(defknown %single-float (real) single-float
+  (movable foldable no-verify-arg-count))
+(defknown %double-float (real) double-float
+  (movable foldable no-verify-arg-count))
 
-(defknown bignum-to-float (bignum symbol) float (movable foldable))
-(defknown sb-kernel::float-ratio (ratio symbol) float (movable foldable))
+(defknown bignum-to-float (bignum symbol) float
+  (movable foldable no-verify-arg-count))
+(defknown sb-kernel::float-ratio (ratio symbol) float
+  (movable foldable no-verify-arg-count))
 
 (defknown make-single-float ((signed-byte 32)) single-float
   (movable flushable))
