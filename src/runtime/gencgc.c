@@ -1855,6 +1855,48 @@ static inline int lowtag_ok_for_page_type(__attribute__((unused)) lispobj ptr,
     return 1;
 }
 
+/*
+ * We offer many variations on root scanning:
+ * 1. X86: all refs from them stack are ambiguous, and pin their referent
+ *    if there is one. All refs from registers (interrupt contexts)
+ *    are ambiguous, and similarly pin their referent if there is one.
+ *    Interior pointers are disallowed to anything except code.
+ *    (FIXME: the PC to the jump instruction into an immobile fdefn
+ *    or self-contained trampoline GF - what does it do wrt pinning???)
+ *
+ * 2. ARM64: interior code pointers from the stack are ambiguous
+ *    and pin their referent if there is one,
+ *    Non-code references are unambiguous, and do NOT pin their referent.
+ *    Only the call chain is scanned for code pointers.
+ *    Interrupt context registers are unambiguous, and can get
+ *    altered by GC.
+ *
+ * 3. PPC64: interior code pointers from the stack are ambiguous roots,
+ *    and pin their referent if there is one.
+ *    FDEFN pointers may be untagged, and are therefore ambiguous.
+ *    They pin their referent if there is one, but only if the reference
+ *    is from a register in an interrupt context, not the control stack.
+ *    (codegen will never spill an untagged fdefn to the stack)
+ *    All other non-code object pointers are unambiguous, and do NOT pin
+ *    their referent from the stack.
+ *    Interrupt context registers are unambiguous and DO pin their referent.
+ *    The entire control stack is scanned for code pointers, thus avoiding
+ *    reliance on a correct backtrace. (I doubt the veracity of all claims
+ *    to the backtrace chain being correct in the presence of interrupts)
+ *
+ * 4. All references from the stack are tagged, and precise, and none pin
+ *    their referent.
+ *    Interrupt contexts registers are unambiguous, and do not pin their referent.
+ *    (pertains to any architecture not specifically mentione above)
+ *
+ * A single boolean value for GENCGC_IS_PRECISE is inadequate to express
+ * the possibilities. Anything except case 1 is considered "precise".
+ * Because of the variations, there are many other #ifdefs surrounding
+ * the logic pertaining to stack and interrupt context scanning.
+ * Anyway, the above is the theory, but in practice, we have to treat
+ * some unambiguous pointers as ambiguous for lack of information
+ * in conservative_root_p what the intent is.
+ */
 #define AMBIGUOUS_POINTER 1
 #if !GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
@@ -1929,32 +1971,43 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
     return 0;
 }
 #elif defined LISP_FEATURE_PPC64
-static inline int untagged_fdefn_p(lispobj addr) {
-    return ((addr & LOWTAG_MASK) == 0) && widetag_of((lispobj*)addr) == FDEFN_WIDETAG;
-}
-/* "Less conservative" than above - only consider code pointers as ambiguous
- * roots, not all pointers.  Eventually every architecture could use this
- * because life is so much easier when on-stack code does not move */
+/* Consider interior pointers to code as roots, and untagged fdefn pointers.
+ * But most other pointers are *unambiguous* conservative roots.
+ * This is not "less conservative" per se, than the non-precise code,
+ * because it's actually up to the user of this predicate to decide whehther
+ * the control stack as a whole is scanned for objects to pin.
+ * The so-called "precise" code should generally NOT scan the stack,
+ * and not call this on stack words.
+ * Anyway, this code isn't as performance-critical as the x86 variant,
+ * so it's not worth trying to optimize out the search for the object */
 static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     struct page* page = &page_table[addr_page_index];
-    // We allow ambiguous pointers to code and untagged fdefn pointers.
-    if (!(is_code(page->type) || untagged_fdefn_p(addr))) return 0;
 
-    // quick check 1: within from_space and within page usage
+    // quick check: within from_space and within page usage
     if ((addr & (GENCGC_PAGE_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
         (compacting_p() && immune_set_memberp(addr_page_index)))
         return 0;
     gc_assert(!(page->type & OPEN_REGION_PAGE_FLAG));
 
-    // Find the containing object, if any
+    /* Find the containing object, if any
+     * This is slightly less quick than could be: if sticky_preserve_pointer() was
+     * called on the contents of a boxed register, then we know that the value is
+     * a properly tagged descriptor, and don't really need to "search" for an object.
+     * (And in fact we should rule out fixnums up front)
+     * Unfortunately sticky_preserve_pointer() does not inform conservative_root_p()
+     * whether the pointer is known good. So we need a slightly different interface
+     * to achieve that extra bit of efficiency */
     lispobj* object_start = search_dynamic_space((void*)addr);
     if (!object_start) return 0;
 
-    /* If 'addr' points to object_start exactly or anywhere in
-     * the boxed words, then it points to the object */
-    if ((lispobj*)addr == object_start || instruction_ptr_p((void*)addr, object_start))
-        return compute_lispobj(object_start);
+    // Untagged fdefn pointer or code pointer: ok
+    if ((widetag_of(object_start) == FDEFN_WIDETAG && addr == (uword_t)object_start)
+        || is_code(page->type))
+        return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
+
+    // Correctly tagged pointer: ok
+    if (addr == compute_lispobj(object_start)) return addr;
     return 0;
 }
 #endif
@@ -2409,33 +2462,33 @@ static void pin_object(lispobj object)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
-static boolean NO_SANITIZE_MEMORY preserve_pointer(void *addr)
+static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word)
 {
 #ifdef LISP_FEATURE_METASPACE
     extern lispobj valid_metaspace_ptr_p(void* addr);
 #endif
-    page_index_t page = find_page_index(addr);
+    page_index_t page = find_page_index((void*)word);
     if (page < 0) {
         // Though immobile_space_preserve_pointer accepts any pointer,
         // there's a benefit to testing immobile_space_p first
         // because it's inlined. Either is a no-op if no immobile space.
-        if (immobile_space_p((lispobj)addr))
-            return immobile_space_preserve_pointer(addr);
+        if (immobile_space_p(word))
+            return immobile_space_preserve_pointer((void*)word);
 #ifdef LISP_FEATURE_METASPACE
         // Treat layout pointers as transparent - it's possible that no pointer
         // to a wrapper exists, other than a layout which is in a CPU register.
-        if ((uword_t)addr >= METASPACE_START
-            && (uword_t)addr < READ_ONLY_SPACE_END
-            && lowtag_of((uword_t)addr) == INSTANCE_POINTER_LOWTAG
-            && valid_metaspace_ptr_p(addr)) {
-            lispobj wrapper = LAYOUT((lispobj)addr)->friend;
+        if (word >= METASPACE_START
+            && word < READ_ONLY_SPACE_END
+            && lowtag_of(word) == INSTANCE_POINTER_LOWTAG
+            && valid_metaspace_ptr_p((void*)word)) {
+            lispobj wrapper = LAYOUT(word)->friend;
             // fprintf(stderr, "stack -> metaspace ptr %p -> %p\n", addr, (void*)wrapper);
             preserve_pointer((void*)wrapper);
         }
 #endif
         return 0;
     }
-    lispobj object = conservative_root_p((lispobj)addr, page);
+    lispobj object = conservative_root_p(word, page);
     if (!object) return 0;
     if (object != AMBIGUOUS_POINTER) {
         pin_object(object);
@@ -2443,16 +2496,15 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(void *addr)
     }
     // It's a non-large non-code ambiguous pointer.
     if (compacting_p()) {
-        if (!hopscotch_containsp(&pinned_objects, (lispobj)addr)) {
-            hopscotch_insert(&pinned_objects, (lispobj)addr, 1);
+        if (!hopscotch_containsp(&pinned_objects, word)) {
+            hopscotch_insert(&pinned_objects, word, 1);
             page_table[page].pinned = 1;
         }
         return 1;
     }
     // Mark only: search for the object, because the mark bit is stored
     // in the object. Writing to random addresses would be bad.
-    lispobj* found = search_dynamic_space(addr);
-    // fprintf(stderr, "search %p -> %p\n", addr, found);
+    lispobj* found = search_dynamic_space((void*)word);
     if (found) gc_mark_obj(compute_lispobj(found));
     return found != 0;
 }
@@ -2510,7 +2562,7 @@ static void sticky_preserve_pointer(os_context_register_t word)
             }
         }
     }
-    preserve_pointer((void*)word);
+    preserve_pointer(word);
 }
 #endif
 #endif
@@ -3525,24 +3577,29 @@ static void semiconservative_pin_stack(struct thread* th,
     for (i = i - 1; i >= 0; --i) {
         os_context_t* context = nth_interrupt_context(i, th);
         int j;
-        // FIXME: if we pick a register to consistently use with m[ft]lr
-        // then we would only need to examine that, and LR and CTR here.
-        // We may already be consistent, I just don't what the consistency is.
         static int boxed_registers[] = BOXED_REGISTERS;
         for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j) {
             lispobj word = *os_context_register_addr(context, boxed_registers[j]);
             if (gen == 0) sticky_preserve_pointer(word);
-            else preserve_pointer((void*)word);
+            else preserve_pointer(word);
         }
-        preserve_pointer((void*)*os_context_lr_addr(context));
-        preserve_pointer((void*)*os_context_ctr_addr(context));
+        // What kinds of data do we put in the Count register?
+        // maybe it's count (raw word), maybe it's a PC. I just don't know.
+        preserve_pointer(*os_context_lr_addr(context));
+        preserve_pointer(*os_context_ctr_addr(context));
+        preserve_pointer(os_context_pc(context));
     }
 }
 #endif
 
 #if GENCGC_IS_PRECISE && !defined(reg_CODE)
 
-static void pin_stack(struct thread* th) {
+/* Pin all (condemned) code objects pointed to by the chain of in-flight calls
+ * based on scanning from the innermost frame pointer. This relies on an exact backtrace,
+ * which some of our architectures have trouble obtaining. But it's theoretically
+ * more efficient to do it this way versus looking at all stack words to see
+ * whether each points to a code object. */
+static void pin_call_chain(struct thread* th) {
     lispobj *cfp = access_control_frame_pointer(th);
 
     if (cfp) {
@@ -3653,7 +3710,7 @@ conservative_stack_scan(struct thread* th,
         // (most OSes don't let users map memory there, though they used to).
         if (word >= BACKEND_PAGE_BYTES &&
             !(exclude_from <= word && word < exclude_to)) {
-            preserve_pointer((void*)word);
+            preserve_pointer(word);
         }
     }
 }
@@ -3824,7 +3881,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
 #elif !defined(reg_CODE)
-            pin_stack(th);
+            pin_call_chain(th);
 #endif
         }
     }
@@ -3868,7 +3925,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
                 // is pseudo-static, but let's use the right pinning function.
                 // (This line of code is so rarely executed that it doesn't
                 // impact performance to search for the object)
-                preserve_pointer((void*)fun);
+                preserve_pointer(fun);
 #else
                 pin_exact_root(fun);
 #endif

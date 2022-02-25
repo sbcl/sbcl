@@ -388,16 +388,7 @@ extern char *copied_string (char *string);
 # define THREADS_USING_GCSIGNAL 1
 #endif
 
-/* Now that SPARC has precise GENCGC, several places that used to be
- * #ifdef PCC need adjustment.  Clearly, "PPC or SPARC" is as unhelpful
- * a test as its reverse, "x86 or x86-64".  However, the feature
- * commonly used to differentiate between those two worlds is
- * C_STACK_IS_CONTROL_STACK, and clearly (or at least in my humble
- * opinion), at some point we'd like to have precise GC on x86 while
- * still sharing the C stack, so stack usage ought not imply GC
- * conservativeness.  So let's have a helper feature that makes the code
- * a bit more future-proof, even if it is itself currently defined in
- * the naive way: */
+/* FIXME: this is the wrong header to make this choice */
 #if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 # define GENCGC_IS_PRECISE 1
 #else
