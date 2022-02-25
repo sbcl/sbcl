@@ -243,15 +243,16 @@
   (!do-probe-sequence (storage key env)
     :miss (return-from info-gethash nil)
     ;; With 99% certainty the :READ barrier is needed for non-x86, and if not,
-    ;; it can't hurt. 'info-storage-next' can be empty until at least one cell
+    ;; it can't hurt. INFO-STORAGE-NEXT can be empty until at least one cell
     ;; has been forwarded, but in general an unsynchronized read might be
     ;; perceived as executing before a conditional that guards whether the
-    ;; read should happen at all. 'storage-next' has the deceptive look of a
+    ;; read should happen at all. STORAGE-NEXT has the deceptive look of a
     ;; data dependency but it's not - it's a control dependency which, as per
-    ;; the 'memory-barriers.txt' document at kernel.org, demands a barrier.
+    ;; [1], demands a barrier.
     ;; The subsequent ref to storage (if the loop iterates) has a
     ;; data-dependency, and will never be reordered except on an Alpha :-(
-    ;; so we _don't_ need a barrier after resetting 'storage' and 'index'.
+    ;; so we _don't_ need a barrier after resetting STORAGE and INDEX.
+    ;; Ad 1: https://www.kernel.org/doc/Documentation/memory-barriers.txt
     :hit (let ((index (value-index)))
            (loop (let ((value
                         (sb-thread:barrier (:read) (svref storage index))))
