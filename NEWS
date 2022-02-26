@@ -7,6 +7,8 @@ changes relative to sbcl-2.2.1:
        implemented only on x86 architectures.
     ** fixed a performance regression on x86-64 from changes in AVX2 register
        handling.  (lp#1960081, reported by Michael Kappert)
+    ** fixed a garbage collection bug on ppc64 manifesting in occasional
+       corruption on threaded programs.  (lp#1959338, lp#1952973)
     ** micro-optimizations in type tests for (SIGNED-BYTE 64).
   * enhancement: improved handling of source locations for some classes
     of compile time and runtime errors.
