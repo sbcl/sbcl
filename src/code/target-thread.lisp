@@ -208,13 +208,17 @@ a simple-string (not necessarily unique) or NIL.")
               values))))
 
 (defmethod print-object ((mutex mutex) stream)
-  (let ((name (mutex-name mutex))
-        (owner (mutex-owner mutex))
-        (*print-circle* t))
+  (let ((name (mutex-name mutex)))
     (print-unreadable-object (mutex stream :type t :identity (not name))
-      (if owner
-          (format stream "~@[~S ~]~2I~_owner: ~S" name owner)
-          (format stream "~@[~S ~](free)" name)))))
+      #+sb-futex
+      (format stream "~@[~S ~]~[free~;taken~;contested~:;err~] owner=~X"
+              name (mutex-state mutex) (vmthread-name (mutex-%owner mutex)))
+      #-sb-futex
+      (let ((owner (mutex-owner mutex))
+            (*print-circle* t))
+        (if owner
+            (format stream "~@[~S ~]~2I~_owner: ~S" name owner)
+            (format stream "~@[~S ~](free)" name))))))
 
 ;; NB: ephemeral threads must terminate strictly before the test of NTHREADS>1
 ;; in DEINIT, i.e. this is not a promise that the thread will terminate
@@ -241,6 +245,40 @@ an error in that case."
          (let ((new (avl-insert old addr ,thread)))
            (when (eq old (setq old (sb-ext:cas *all-threads* old new))) (return)))))))
 
+(defun vmthread-name (vmthread)
+  (binding* ((node (avl-find (vmthread-id->addr vmthread) *all-threads*) :exit-if-null)
+             (thread (avlnode-data node) :exit-if-null)
+             (name (thread-name thread) :exit-if-null))
+    (return-from vmthread-name name))
+  vmthread) ; lacking a string, the identifier constitutes its name
+
+;;; Translate a 'struct thread*' to a SB-THREAD:THREAD.
+;;; I'd like to do this simply by reading the 'lisp_thread' field,
+;;; but that's dangerous.  Ultimately I think we will have to either store a
+;;; refcount in the structure (freeing it only when its last referer is gone)
+;;; or implement hazard pointers. Either one is going to be tricky because we can't
+;;; store the refcount in the structure if it can go away while we're trying
+;;; to increment the count. But having the ability to manipulate the structure
+;;; of any thread from any thread would simplify other things in this file
+;;; as well as making MUTEX-OWNER more efficient.
+(defun mutex-owner-lookup (vmthread)
+  ;; Convert the "fixnum-encoded" value to a normal integer for 32-bit.
+  ;; It's possible that a race could cause find to fail. If the mutex
+  ;; really has a dead thread as its owner, you've got bigger problems.
+  ;; Moreover, because 'struct thread' can be recycled (very quickly)
+  ;; it's possible for the following sequence to occur: thread T1 at address A1
+  ;; grabs the mutex, then thread T2 reads MUTEX-%OWNER slot, then T1 exits
+  ;; and T3 gets allocated at address A1, and grabs the mutex.
+  ;; Thread T2 then performs AVL-FIND and concludes that T3 is the apparent owner.
+  ;; Well, as the docstring at MUTEX-OWNER says, it is "racy by design".
+  (acond ((avl-find (vmthread-id->addr vmthread) *all-threads*) (avlnode-data it))
+         ((= vmthread 0) nil)
+         ;; This is the same keyword that SYMBOL-VALUE-IN-THREAD can return on error.
+         ;; If people don't like seeing it, we could return instead
+         ;;   (LOAD-TIME-VALUE (%make-thread "dead-thread" nil nil))
+         ;; indicating that you observed a value of %OWNER which no longer exists.
+         (t :thread-dead)))
+
 (defun list-all-threads ()
   "Return a list of the live threads. Note that the return value is
 potentially stale even before the function returns, as new threads may be
@@ -257,17 +295,6 @@ created and old ones may exit at any time."
                   *all-threads*))
 
 ;;; used by debug-int.lisp to access interrupt contexts
-
-(declaim (inline current-thread-sap))
-(defun current-thread-sap ()
-  #+sb-thread (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
-  #-sb-thread (extern-alien "all_threads" system-area-pointer))
-
-#-sb-thread
-(progn
-  (declaim (inline sb-vm::current-thread-offset-sap))
-  (defun sb-vm::current-thread-offset-sap (n)
-    (sap-ref-sap (current-thread-sap) (* n sb-vm:n-word-bytes))))
 
 (sb-ext:define-load-time-global *initial-thread* nil)
 
@@ -295,7 +322,7 @@ created and old ones may exit at any time."
 ;;; Copy some slots from the C 'struct thread' into the SB-THREAD:THREAD.
 (defmacro copy-primitive-thread-fields (this)
   `(progn
-     (setf (thread-primitive-thread ,this) (sap-int (current-thread-sap)))
+     (setf (thread-primitive-thread ,this) (current-thread-sap-int))
      #-win32
      (setf (thread-os-thread ,this)
            (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot)))))
@@ -468,11 +495,13 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   (let* ((self *current-thread*)
          (origin (progn
                    (barrier (:read))
+                   ;; Not sure why a barrier is needed on our own data.
+                   ;; Who else stores thread-waiting-for of me?
                    (thread-waiting-for self))))
     (labels ((detect-deadlock (lock)
-               (let ((other-thread (mutex-%owner lock)))
-                 (cond ((not other-thread))
-                       ((eq self other-thread)
+               (let ((other-vmthread-id (mutex-%owner lock)))
+                 (cond ((= 0 other-vmthread-id))
+                       ((= (current-vmthread-id) other-vmthread-id)
                         (let ((chain
                                 (with-cas-lock ((symbol-value '**deadlock-lock**))
                                   (prog1 (deadlock-chain self origin)
@@ -492,9 +521,10 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
                                  :thread *current-thread*
                                  :cycle chain)))
                        (t
-                        (let ((other-lock (progn
-                                            (barrier (:read))
-                                            (thread-waiting-for other-thread))))
+                        (let* ((other-thread (mutex-owner-lookup other-vmthread-id))
+                               (other-lock (when (thread-p other-thread)
+                                             (barrier (:read))
+                                             (thread-waiting-for other-thread))))
                           ;; If the thread is waiting with a timeout OTHER-LOCK
                           ;; is a cons, and we don't consider it a deadlock -- since
                           ;; it will time out on its own sooner or later.
@@ -502,10 +532,10 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
                             (detect-deadlock other-lock)))))))
              (deadlock-chain (thread lock)
                (let* ((other-thread (mutex-owner lock))
-                      (other-lock (when other-thread
+                      (other-lock (when (thread-p other-thread)
                                     (barrier (:read))
                                     (thread-waiting-for other-thread))))
-                 (cond ((not other-thread)
+                 (cond ((member other-thread '(nil :thread-dead))
                         ;; The deadlock is gone -- maybe someone unwound
                         ;; from the same deadlock already?
                         (return-from check-deadlock nil))
@@ -643,23 +673,23 @@ returns NIL each time."
         (t
          ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
          (cond ((= (sb-ext:cas (mutex-state mutex) 0 1) 0)
-                (setf (mutex-%owner mutex) *current-thread*)
+                (setf (mutex-%owner mutex) (current-vmthread-id))
                 t) ; GRAB-MUTEX wants %TRY-MUTEX to return boolean, not generalized boolean
-               ((eq (mutex-%owner mutex) *current-thread*)
+               ((= (mutex-%owner mutex) (current-vmthread-id))
                 (error "Recursive lock attempt ~S." mutex))))
         #-sb-futex
         (t
          (barrier (:read))
          (let ((old (mutex-%owner mutex)))
-           (when (eq *current-thread* old)
+           (when (= (current-vmthread-id) old)
              (error "Recursive lock attempt ~S." mutex))
            #-sb-thread
-           (when old
+           (when (/= old 0)
              (error "Strange deadlock on ~S in an unithreaded build?" mutex))
-           (and (not old)
+           (and (zerop old)
                 ;; Don't even bother to try to CAS if it looks bad.
-                (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil
-                                               *current-thread*)))))))
+                (zerop (sb-ext:compare-and-swap (mutex-%owner mutex) 0
+                                                (current-vmthread-id))))))))
 
 #+sb-thread
 (defun %%wait-for-mutex (mutex to-sec to-usec stop-sec stop-usec)
@@ -709,17 +739,16 @@ returns NIL each time."
            ;; Unwinding because futex-wait allows interrupts, wake up another futex
            (with-pinned-objects (mutex)
              (futex-wake (mutex-state-address mutex) 1)))))
-      (setf (mutex-%owner mutex) *current-thread*)
+      (setf (mutex-%owner mutex) (current-vmthread-id))
       t))
    #-sb-futex
    (t
     (flet ((cas ()
            (loop repeat 100
-                 when (and (progn
-                             (barrier (:read))
-                             (not (mutex-%owner mutex)))
-                           (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil
-                                                         *current-thread*)))
+                 when (and (progn (barrier (:read))
+                                  (zerop (mutex-%owner mutex)))
+                           (zerop (sb-ext:compare-and-swap (mutex-%owner mutex) 0
+                                                           (current-vmthread-id))))
                  do (return-from cas t)
                  else
                  do
@@ -776,7 +805,7 @@ returns NIL each time."
     (declare (inline %wait-for-mutex-algorithm-2))
     (let ((mutex (sb-ext:truly-the mutex mutex)))
       (%wait-for-mutex-algorithm-2 mutex)
-      (setf (mutex-%owner mutex) *current-thread*)))
+      (setf (mutex-%owner mutex) (current-vmthread-id))))
   ;; The improvement with algorithm 3 is fairly negligible.
   ;; Code size is a little less. More improvement comes from doing the
   ;; partial-inline algorithms which perform one CAS without a function call.
@@ -784,21 +813,21 @@ returns NIL each time."
     (declare (inline %wait-for-mutex-algorithm-3))
     (let ((mutex (sb-ext:truly-the mutex mutex)))
       (%wait-for-mutex-algorithm-3 mutex)
-      (setf (mutex-%owner mutex) *current-thread*)))
+      (setf (mutex-%owner mutex) (current-vmthread-id))))
   (defmacro wait-for-mutex-2-partial-inline (mutex)
     `(let ((m ,mutex))
        (or (= (sb-ext:cas (mutex-state m) 0 1) 0) (%wait-for-mutex-algorithm-2 m))
-       (setf (mutex-%owner m) *current-thread*)))
+       (setf (mutex-%owner m) (current-vmthread-id))))
   (defmacro wait-for-mutex-3-partial-inline (mutex)
     `(let ((m ,mutex))
        (or (= (sb-ext:cas (mutex-state m) 0 1) 0) (%wait-for-mutex-algorithm-3 m))
-       (setf (mutex-%owner m) *current-thread*)))
+       (setf (mutex-%owner m) (current-vmthread-id))))
   ;; This is like RELEASE-MUTEX but without keyword arg parsing
   ;; and all the different error modes.
   (export 'fast-release-mutex)
   (defun fast-release-mutex (mutex)
     (let ((mutex (sb-ext:truly-the mutex mutex)))
-      (setf (mutex-%owner mutex) nil)
+      (setf (mutex-%owner mutex) 0)
       (unless (eql (sb-ext:atomic-decf (mutex-state mutex) 1) 1)
         (setf (mutex-state mutex) 0)
         (with-pinned-objects (mutex)
@@ -887,22 +916,22 @@ WARNING (if IF-NOT-OWNER is :WARN), or releases the mutex anyway (if
 IF-NOT-OWNER is :FORCE)."
   (declare (type mutex mutex))
   ;; Order matters: set owner to NIL before releasing state.
-  (let* ((self *current-thread*)
-         (old-owner (sb-ext:compare-and-swap (mutex-%owner mutex) self nil)))
-    (unless (eq self old-owner)
+  (let* ((self (current-vmthread-id))
+         (old-owner (sb-ext:compare-and-swap (mutex-%owner mutex) self 0)))
+    (unless (= self old-owner)
       (ecase if-not-owner
         ((:punt) (return-from release-mutex nil))
         ((:warn)
-         (warn "Releasing ~S, owned by another thread: ~S" mutex old-owner))
+         (warn "Releasing ~S, owned by another thread: ~S" mutex (vmthread-name old-owner)))
         ((:error)
-         (error "Releasing ~S, owned by another thread: ~S" mutex old-owner))
+         (error "Releasing ~S, owned by another thread: ~S" mutex (vmthread-name old-owner)))
         ((:force)))
-      (setf (mutex-%owner mutex) nil)
+      (setf (mutex-%owner mutex) 0)
       ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
       ;; barrier instead?
       (barrier (:memory)))
     #+sb-futex
-    (when old-owner
+    (when (/= old-owner 0)
       (unless (eql (sb-ext:atomic-decf (mutex-state mutex) 1) 1)
         (setf (mutex-state mutex) 0)
         (sb-thread:barrier (:write)) ; paranoid ?
@@ -984,8 +1013,9 @@ IF-NOT-OWNER is :FORCE)."
   (sb-ext:wait-for nil :timeout timeout) ; Yeah...
   #+sb-thread
   (let ((me *current-thread*))
+    (declare (ignorable me)) ; not used if #+sb-futex
     (barrier (:read))
-    (unless (eq me (mutex-%owner mutex))
+    (unless (holding-mutex-p mutex)
       (error "The current thread is not holding ~s." mutex))
     (let ((status :interrupted))
       ;; Need to disable interrupts so that we don't miss grabbing

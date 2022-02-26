@@ -27,14 +27,36 @@ any time."
 (defun mutex-value (mutex)
   "Current owner of the mutex, NIL if the mutex is free. May return a
 stale value, use MUTEX-OWNER instead."
-  (mutex-%owner mutex))
+  (mutex-owner-lookup (mutex-%owner mutex)))
+
+(declaim (inline current-thread-sap))
+(defun current-thread-sap ()
+  #+sb-thread (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
+  #-sb-thread (extern-alien "all_threads" system-area-pointer))
+
+#-sb-thread
+(progn
+  (declaim (inline sb-vm::current-thread-offset-sap))
+  (defun sb-vm::current-thread-offset-sap (n)
+    (sap-ref-sap (current-thread-sap) (* n sb-vm:n-word-bytes))))
+
+(defmacro current-thread-sap-int () `(sap-int (current-thread-sap)))
+
+;;; This is the same as thread-primitive-thread but using the "funny fixnum"
+;;; representation on 32-bit so that we never cons when reading the slot.
+;;; I'm not sure where consing was happening, but it did, which caused
+;;; failure of the (:no-consing :mutex) test.
+(defmacro current-vmthread-id ()
+  #-64-bit '(%make-lisp-obj (current-thread-sap-int))
+  #+64-bit '(current-thread-sap-int))
+(defmacro vmthread-id->addr (x) #-64-bit `(get-lisp-obj-address ,x) #+64-bit x)
 
 (declaim (inline holding-mutex-p))
 (defun holding-mutex-p (mutex)
   "Test whether the current thread is holding MUTEX."
   ;; This is about the only use for which a stale value of owner is
   ;; sufficient.
-  (eq sb-thread:*current-thread* (mutex-%owner mutex)))
+  (= (mutex-%owner mutex) (current-vmthread-id)))
 
 (declaim (inline mutex-owner))
 (defun mutex-owner (mutex)
@@ -44,7 +66,10 @@ this function returns), it is intended for informative purposes. For
 testing whether the current thread is holding a mutex see
 HOLDING-MUTEX-P."
   ;; Make sure to get the current value.
-  (sb-ext:compare-and-swap (mutex-%owner mutex) nil nil))
+  (let ((vmthread (sb-ext:compare-and-swap (mutex-%owner mutex) 0 0)))
+    (cond ((= vmthread (current-vmthread-id)) *current-thread*)
+          ((= vmthread 0) nil)
+          (t (mutex-owner-lookup vmthread)))))
 
 (defsetf mutex-value set-mutex-value)
 

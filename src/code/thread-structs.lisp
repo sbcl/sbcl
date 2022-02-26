@@ -32,7 +32,13 @@
   ;; If adding slots between STATE and NAME, please see futex_name() in linux_os.c
   ;; which attempts to divine a string from a futex word address.
   (name   nil :type (or null simple-string))
-  (%owner nil :type (or null thread)))
+  ;; The owner is a non-pointer so that GC pages containing mutexes do not get dirtied
+  ;; with mutex ownership change. The natural representation of this is SB-VM:WORD
+  ;; but the "funny fixnum" representation - i.e. N_WORD_BITS bits of significance, but
+  ;; cast as fixnum when read - avoids consing on 32-bit builds, and also not all of them
+  ;; implement RAW-INSTANCE-CAS which would be otherwise needed.
+  (%owner 0 :type #+64-bit sb-vm:word
+                  #-64-bit fixnum))
 
 (sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
