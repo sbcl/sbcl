@@ -2464,10 +2464,12 @@
 ;;; of confusion I have about what is allowed to reach the instruction
 ;;; emitter as a raw fixup, a fixup wrapped in an EA, a label wrapped
 ;;; in a fixup wrapped in an EA etc.
+;;; (The x86-64 assembler is more understandable - we need to kill this one)
 (defun sb-assem::%mark-used-labels (operand)
   (named-let recurse ((operand operand))
     (etypecase operand
       ((or integer tn keyword null))
+      #+sb-xc-host ((cons (eql sb-assem::entry)))
       (ea
        (let ((disp (ea-disp operand)))
          (etypecase disp

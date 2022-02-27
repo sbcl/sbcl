@@ -167,7 +167,7 @@
   (inst and tmp-tn lexenv lowtag-mask)
   (inst cmp tmp-tn fun-pointer-lowtag)
   (inst b :eq call)
-  (inst b (make-fixup 'tail-call-symbol :assembly-routine))
+  (inst b (entry-point-label 'tail-call-symbol))
   call
   (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
   (lisp-jump lip))
@@ -195,7 +195,7 @@
   (inst add lr-tn lr-tn 4)
   (inst br lr-tn)
   UNDEFINED
-  (inst b (make-fixup 'undefined-tramp :assembly-routine))
+  (inst b (entry-point-label 'undefined-tramp))
   NOT-CALLABLE
   (inst cmp fun null-tn) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst b :eq undefined)
@@ -240,7 +240,7 @@
   (inst b LOOP)
   DONE
   (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
-  (inst b (make-fixup 'unwind :assembly-routine)))
+  (inst b (entry-point-label 'unwind)))
 
 (define-assembly-routine (unwind
                           (:translate %unwind)

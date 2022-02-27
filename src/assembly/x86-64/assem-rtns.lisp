@@ -223,7 +223,7 @@
 
   (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
   (inst test :byte rbx-tn lowtag-mask)
-  (inst jmp :nz (make-fixup 'call-symbol :assembly-routine))
+  (inst jmp :nz (entry-point-label 'call-symbol))
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
 #+sb-assembling
@@ -245,7 +245,7 @@
   (inst mov fun fdefn)
   (inst jmp (ea (- (* fdefn-raw-addr-slot n-word-bytes) other-pointer-lowtag) fdefn))
   UNDEFINED
-  (inst jmp (make-fixup 'undefined-tramp :assembly-routine))
+  (inst jmp (entry-point-label 'undefined-tramp))
   NOT-CALLABLE
   (inst cmp fun nil-value) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst jmp :e undefined)
@@ -294,7 +294,7 @@
   ;; Here RAX points to catch block containing symbol pointed to by RDX.
   ;; An extra RET gets stuffed after the JMP, but oh well. You can't just change
   ;; the :return-style to :none because that also affects the call sequence.
-  (inst jmp (make-fixup 'unwind :assembly-routine)))
+  (inst jmp (entry-point-label 'unwind)))
 
 ;;; Simply return and enter the loop in UNWIND instead of calling
 ;;; UNWIND directly
