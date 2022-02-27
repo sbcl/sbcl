@@ -247,6 +247,14 @@
   (subcode :field (byte 10 6) :reader break-subcode)
   (funct :field (byte 6 0) :value #b001101))
 
+(define-instruction-format (trap 32 :default-printer
+                                 '(:name :tab rs ", " rt ", " code))
+  (op :field (byte 6 26))
+  (rs :field (byte 5 21) :type 'reg)
+  (rt :field (byte 5 16) :type 'reg)
+  (code :field (byte 10 6))
+  (funct :field (byte 6 0)))
+
 (define-instruction-format (coproc-branch 32
                             :default-printer '(:name :tab offset))
   (op :field (byte 6 26))
@@ -761,8 +769,7 @@
 
 (define-instruction bgez (segment reg target)
   (:declare (type label target) (type tn reg))
-  (:printer
-   immediate ((op bcond-op) (rt 1) (immediate nil :type 'relative-label))
+  (:printer immediate ((op bcond-op) (rt 1) (immediate nil :type 'relative-label))
             cond-branch-printer)
   (:attributes branch)
   (:dependencies (reads reg))
@@ -772,8 +779,7 @@
 
 (define-instruction bltzal (segment reg target)
   (:declare (type label target) (type tn reg))
-  (:printer
-   immediate ((op bcond-op) (rt #b01000) (immediate nil :type 'relative-label))
+  (:printer immediate ((op bcond-op) (rt #b10000) (immediate nil :type 'relative-label))
             cond-branch-printer)
   (:attributes branch)
   (:dependencies (reads reg) (writes lip-tn))
@@ -783,8 +789,7 @@
 
 (define-instruction bgezal (segment reg target)
   (:declare (type label target) (type tn reg))
-  (:printer
-   immediate ((op bcond-op) (rt #b01001) (immediate nil :type 'relative-label))
+  (:printer immediate ((op bcond-op) (rt #b10001) (immediate nil :type 'relative-label))
             cond-branch-printer)
   (:attributes branch)
   (:delay 1)
@@ -1035,6 +1040,38 @@
   (:delay 0)
   (:emitter
    (emit-break-inst segment special-op code subcode #b001101)))
+
+(macrolet ((deftrap (name bits)
+             `(define-instruction ,name (segment rs rt &optional (code 0))
+                (:declare (type (unsigned-byte 10) code))
+                (:printer trap ((op special-op) (funct ,bits)))
+                :pinned
+                (:cost 0)
+                (:delay 0)
+                (:emitter
+                 (emit-break-inst segment special-op
+                                  (logior (ash (reg-tn-encoding rs) 5) (reg-tn-encoding rt))
+                                  code ,bits))))
+           (deftrapi (name bits)
+             `(define-instruction ,name (segment rs imm)
+                (:printer immediate ((op #b000001) (rt ,bits)))
+                :pinned
+                (:cost 0)
+                (:delay 0)
+                (:emitter (emit-immediate-inst segment #b000001 (reg-tn-encoding rs) ,bits imm)))))
+  (deftrap teq  #b110100)
+  (deftrap tge  #b110000)
+  (deftrap tgeu #b110001)
+  (deftrap tlt  #b110010)
+  (deftrap tltu #b110011)
+  (deftrap tne  #b110110)
+
+  (deftrapi teqi  #b01100)
+  (deftrapi tgei  #b01000)
+  (deftrapi tgeiu #b01001)
+  (deftrapi tlti  #b01010)
+  (deftrapi tltiu #b01011)
+  (deftrapi tnei  #b01110))
 
 (define-instruction syscall (segment)
   (:printer register ((op special-op) (rd 0) (rt 0) (rs 0) (funct #b001110))
