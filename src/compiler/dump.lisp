@@ -89,6 +89,8 @@
   ;; a hash table of structures that are allowed to be dumped. If we
   ;; try to dump a structure that isn't in this hash table, we lose.
   (valid-structures (make-hash-table :test 'eq) :type hash-table)
+  ;; a hash table of slots to be saved when dumping an instance.
+  (saved-slot-names (make-hash-table :test 'eq) :type hash-table)
   ;; DEBUG-SOURCE written at the very beginning
   (source-info nil :type (or null sb-c::debug-source)))
 (declaim (freeze-type fasl-output))
@@ -212,11 +214,13 @@
 ;;; This structure holds information about a circularity.
 (defstruct (circularity (:copier nil))
   ;; the kind of modification to make to create circularity
-  (type (missing-arg) :type (member :rplaca :rplacd :svset :struct-set))
+  (type (missing-arg) :type (member :rplaca :rplacd :svset :struct-set :slot-set))
   ;; the object containing circularity
   object
   ;; index in object for circularity
   (index (missing-arg) :type index)
+  ;; slot name in object for circularity
+  (slot-name nil :type symbol)
   ;; the object to be stored at INDEX in OBJECT. This is that the key
   ;; that we were using when we discovered the circularity.
   value
@@ -469,7 +473,11 @@
                               ((eq x sb-c::*debug-name-ellipsis*) 2)
                               (t (bug "Bogus debug name marker")))))
              (instance
-              (dump-structure x file)
+              (multiple-value-bind (slot-names slot-names-p)
+                  (gethash x (fasl-output-saved-slot-names file))
+                (if slot-names-p
+                    (dump-instance-saving-slots x slot-names file)
+                    (dump-structure x file)))
               (eq-save-object x file))
              (array
               ;; DUMP-ARRAY (and its callees) are responsible for
@@ -564,7 +572,10 @@
                    (:rplaca     #.(get 'fop-rplaca 'opcode))
                    (:rplacd     #.(get 'fop-rplacd 'opcode))
                    (:svset      #.(get 'fop-svset 'opcode))
-                   (:struct-set #.(get 'fop-structset 'opcode)))
+                   (:struct-set #.(get 'fop-structset 'opcode))
+                   (:slot-set
+                    (dump-object (circularity-slot-name info) file)
+                    #.(get 'fop-slotset 'opcode)))
                  file)
       (dump-varint (gethash (circularity-object info) table) file)
       (dump-varint (circularity-index info) file))))
@@ -640,8 +651,14 @@
 
 ;;; Note that the specified structure can just be dumped by
 ;;; enumerating the slots.
-(defun fasl-note-dumpable-instance (structure file)
+(defun fasl-validate-structure (structure file)
   (setf (gethash structure (fasl-output-valid-structures file)) t)
+  (values))
+
+;;; Note that the specified standard object can just be dumped by
+;;; saving its slot values.
+(defun fasl-note-instance-saves-slots (instance slot-names file)
+  (setf (gethash instance (fasl-output-saved-slot-names file)) slot-names)
   (values))
 
 ;;;; number dumping
@@ -1240,7 +1257,7 @@
   #+sb-dyncount
   (let ((info (sb-c::ir2-component-dyncount-info (component-info component))))
     (when info
-      (fasl-note-dumpable-instance info file)))
+      (fasl-validate-structure info file)))
 
   (let* ((2comp (component-info component))
          (entries (sb-c::ir2-component-entries 2comp))
@@ -1342,12 +1359,17 @@
 ;;;   (defvar *cpus* (... (sb-alien:alien-funcall ...)))
 ;;; and the expansion of alien-funcall involves an ALIEN-TYPE literal
 ;;; which gets multiply expanded exactly as described above.
-
 (defun load-form-is-default-mlfss-p (struct)
   ;; FIXME? this is called while writing a fasl and so might need
   ;; to invoke MAKE-LOAD-FORM, long after IR1 conversion has happened.
   ;; Surely this is not the best design.
-  (eq (nth-value 1 (sb-c::%make-load-form struct)) 'fop-struct))
+  (multiple-value-bind (creation-form init-form)
+      (handler-case (make-load-form struct (make-null-lexenv))
+        (error (condition) (sb-c:compiler-error condition)))
+    (multiple-value-bind (ss-creation-form ss-init-form)
+        (make-load-form-saving-slots struct)
+      (and (equal creation-form ss-creation-form)
+           (equal init-form ss-init-form)))))
 
 ;; Having done nothing more than load all files in obj/from-host, the
 ;; cross-compiler running under any host Lisp begins life able to access
@@ -1410,6 +1432,31 @@
             (1+ (wrapper-depthoid obj)) ; non-stack args can't be negative
             (logand flags sb-kernel::layout-flags-mask)
             (wrapper-length obj)))
+
+;;;; dumping instances which just save their slots
+
+(defun dump-instance-saving-slots (object slot-names file)
+  (note-potential-circularity object file)
+  (let ((circ (fasl-output-circularity-table file)))
+    (dolist (slot-name slot-names)
+      (if (slot-boundp object slot-name)
+          (let* ((value (slot-value object slot-name))
+                 (ref (gethash value circ)))
+            (cond (ref
+                   (push (make-circularity :type :slot-set
+                                           :object object
+                                           :index 0
+                                           :slot-name slot-name
+                                           :value value
+                                           :enclosing-object ref)
+                         *circularities-detected*)
+                   (sub-dump-object nil file))
+                  (t
+                   (sub-dump-object value file))))
+          (dump-fop 'fop-misc-trap file))
+      (sub-dump-object slot-name file)))
+  (sub-dump-object (class-name (class-of object)) file)
+  (dump-fop 'fop-instance file (length slot-names)))
 
 ;;;; code coverage
 

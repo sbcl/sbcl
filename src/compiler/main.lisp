@@ -1450,38 +1450,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Compile the FORMS and arrange for them to be called (for effect,
 ;;; not value) at load time.
-(defun compile-make-load-form-init-forms (forms fasl)
-  ;; If FORMS has exactly one PROGN containing a call of SB-PCL::SET-SLOTS,
-  ;; then fopcompile it, otherwise use the main compiler.
-  (when (singleton-p forms)
-    (let ((call (car forms)))
-      (when (typep call '(cons (eql sb-pcl::set-slots) (cons instance)))
-        (pop call)
-        (let ((instance (pop call))
-              (slot-names (pop call))
-              (value-forms call)
-              (values))
-          (when (and (every #'symbolp slot-names)
-                     (every (lambda (x)
-                              ;; +SLOT-UNBOUND+ is not a constant,
-                              ;; but is trivially dumpable.
-                              (or (eql x 'sb-pcl:+slot-unbound+)
-                                  (constantp x)))
-                            value-forms))
-            (dolist (form value-forms)
-              (unless (eq form 'sb-pcl:+slot-unbound+)
-                (let ((val (constant-form-value form)))
-                  (maybe-emit-make-load-forms val)
-                  (push val values))))
-            (setq values (nreverse values))
-            (dolist (form value-forms)
-              (if (eq form 'sb-pcl:+slot-unbound+)
-                  (dump-fop 'sb-fasl::fop-misc-trap fasl)
-                  (dump-object (pop values) fasl)))
-            (dump-object slot-names fasl)
-            (dump-object instance fasl)
-            (dump-fop 'sb-fasl::fop-set-slot-values fasl (length slot-names))
-            (return-from compile-make-load-form-init-forms))))))
+(defun compile-make-load-form-init-forms (forms)
   (let ((lambda (compile-load-time-stuff `(progn ,@forms) nil)))
     (fasl-dump-toplevel-lambda-call lambda *compile-object*)))
 
@@ -1538,10 +1507,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; circular object.
 ;;;
 ;;; If the constant doesn't show up in *CONSTANTS-BEING-CREATED*, then
-;;; we have to create it. We call %MAKE-LOAD-FORM and check
-;;; if the result is 'FOP-STRUCT, and if so we don't do anything.
-;;; The dumper will eventually get its hands on the object and use the
-;;; normal structure dumping noise on it.
+;;; we have to create it. We call MAKE-LOAD-FORM and check if the
+;;; result comes from MAKE-LOAD-FORM-SAVING-SLOTS, and if so we don't
+;;; do anything. The dumper will eventually get its hands on the
+;;; object and use the normal structure dumping noise on it.
 ;;;
 ;;; Otherwise, we bind *CONSTANTS-BEING-CREATED* and
 ;;; *CONSTANTS-CREATED-SINCE- LAST-INIT* and compile the creation form
@@ -1570,55 +1539,64 @@ necessary, since type inference may take arbitrarily long to converge.")
         (when (find constant constants-created-since-last-init :test #'eq)
           (throw constant t))
         (throw 'pending-init circular-ref)))
-    (multiple-value-bind (creation-form init-form) (%make-load-form constant)
-      (cond
-        ((eq init-form 'sb-fasl::fop-struct)
-         (fasl-note-dumpable-instance constant fasl)
-         t)
-        (t
-         ;; Allow dumping objects that can't be printed
-         ;; Non-invocation of PRINT-OBJECT is tested by 'mlf.impure-cload.lisp'.
-         (let* ((name #+sb-xc-host 'blobby ; the name means nothing
-                      #-sb-xc-host
-                      (format nil "the-~A-formerly-known-as-~X"
-                              (type-of constant)
-                              (get-lisp-obj-address constant)))
-                (info (if init-form
-                          (list constant name init-form)
-                          (list constant))))
-           (let ((*constants-being-created* (cons info constants-being-created))
-                 (*constants-created-since-last-init*
-                  (cons constant constants-created-since-last-init)))
-             (when
-                 (catch constant
-                   (fasl-note-handle-for-constant
-                    constant
-                    (cond ((typep creation-form
-                                  '(cons (eql sb-kernel::new-instance)
-                                         (cons symbol null)))
-                           (dump-object (cadr creation-form) fasl)
-                           (dump-fop 'sb-fasl::fop-allocate-instance fasl)
-                           (let ((index (sb-fasl::fasl-output-table-free fasl)))
-                             (setf (sb-fasl::fasl-output-table-free fasl) (1+ index))
-                             index))
-                          (t
-                           (compile-load-time-value creation-form t)))
-                    fasl)
-                   nil)
-               (compiler-error "circular references in creation form for ~S"
-                               constant)))
-           (when (cdr info)
-             (let* ((*constants-created-since-last-init* nil)
-                    (circular-ref
-                     (catch 'pending-init
-                       (loop for (nil form) on (cdr info) by #'cddr
-                         collect form into forms
-                         finally (compile-make-load-form-init-forms forms fasl))
-                       nil)))
-               (when circular-ref
-                 (setf (cdr circular-ref)
-                       (append (cdr circular-ref) (cdr info)))))))
-         nil)))))
+    (multiple-value-bind (creation-form init-form)
+        (handler-case (make-load-form constant (make-null-lexenv))
+          (error (condition) (sb-c:compiler-error condition)))
+      (multiple-value-bind (ss-creation-form ss-init-form)
+          (make-load-form-saving-slots constant)
+        (cond
+          ((and (typep constant 'structure-object)
+                (equal creation-form ss-creation-form)
+                (equal init-form ss-init-form))
+           (fasl-validate-structure constant fasl)
+           t)
+          ((and (not (typep constant 'structure-object))
+                (equal creation-form ss-creation-form)
+                (subsetp (rest init-form) (rest ss-init-form) :test #'equal))
+           (collect ((slot-names))
+             (dolist (init (rest init-form))
+               (when (eq (first init) 'setf)
+                 (destructuring-bind (slot-value object 'slot-name)
+                     (second init)
+                   (declare (ignore slot-value object quote))
+                   (slot-names slot-name))))
+             (fasl-note-instance-saves-slots constant (slot-names) fasl))
+           t)
+          (t
+           ;; Allow dumping objects that can't be printed
+           ;; Non-invocation of PRINT-OBJECT is tested by 'mlf.impure-cload.lisp'.
+           (let* ((name #+sb-xc-host 'blobby ; the name means nothing
+                        #-sb-xc-host
+                        (format nil "the-~A-formerly-known-as-~X"
+                                (type-of constant)
+                                (get-lisp-obj-address constant)))
+                  (info (if init-form
+                            (list constant name init-form)
+                            (list constant))))
+             (let ((*constants-being-created* (cons info constants-being-created))
+                   (*constants-created-since-last-init*
+                     (cons constant constants-created-since-last-init)))
+               (when
+                   (catch constant
+                     (fasl-note-handle-for-constant
+                      constant
+                      (compile-load-time-value creation-form t)
+                      fasl)
+                     nil)
+                 (compiler-error "circular references in creation form for ~S"
+                                 constant)))
+             (when (cdr info)
+               (let* ((*constants-created-since-last-init* nil)
+                      (circular-ref
+                        (catch 'pending-init
+                          (loop for (nil form) on (cdr info) by #'cddr
+                                collect form into forms
+                                finally (compile-make-load-form-init-forms forms))
+                          nil)))
+                 (when circular-ref
+                   (setf (cdr circular-ref)
+                         (append (cdr circular-ref) (cdr info)))))))
+           nil))))))
 
 ;;; Arrange for a load time reference to the constant named by NAME to
 ;;; get dumped via the load form (SYMBOL-GLOBAL-VALUE ',NAME) if its

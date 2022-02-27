@@ -412,7 +412,9 @@
   (dx-let ((things-processed (alloc-xset)))
     (named-let grovel ((value constant))
       (unless (or (dumpable-leaflike-p value)
-                  (xset-member-p value things-processed))
+                  (xset-member-p value things-processed)
+                  #-sb-xc-host
+                  (unbound-marker-p value))
         (add-to-xset value things-processed)
         ;; FIXME: shouldn't this be something like SB-XC:TYPECASE ?
         (typecase value

@@ -2189,105 +2189,46 @@ or they must be declared locally notinline at each call site.~@:>"
           (setf (aref map (dsd-index dsd)) (dsd-accessor-name dsd)))))
     (funcall (aref map index) instance)))
 
-;;; It's easier for the compiler to recognize the output of M-L-F-S-S
-;;; without extraneous QUOTE forms, so we define some trivial wrapper macros.
-(defmacro new-instance (type) `(allocate-instance (find-class ',type)))
-(defmacro new-struct (type) `(allocate-struct ',type))
-(defmacro sb-pcl::set-slots (instance name-list &rest values)
-  `(sb-pcl::%set-slots ,instance ',name-list ,@values))
+#+sb-xc-host
+(defun %raw-instance-ref/word (instance index) (%instance-ref instance index))
 
-;;; We require that MAKE-LOAD-FORM-SAVING-SLOTS produce deterministic output
-;;; and that its output take a particular recognizable form so that it can
-;;; be optimized into a sequence of fasl ops.
-;;; The cross-compiler depends critically on optimizing the resulting sexprs
-;;; so that the host can load cold objects, which it could not do
-;;; if constructed by machine code for the target.
-;;; This ends up being a performance win for the target system as well.
 ;;; It is possible to produce instances of structure-object which violate
 ;;; the assumption throughout the compiler that slot readers are safe
 ;;; unless dictated otherwise by the SAFE-P flag in the DSD.
 ;;;  * (defstruct S a (b (error "Must supply me") :type symbol))
 ;;;  * (defmethod make-load-form ((x S) &optional e) (m-l-f-s-s x :slot-names '(a)))
 ;;; After these definitions, a dumped S will have #<unbound> in slot B.
-;;;
 (defun make-load-form-saving-slots (object &key (slot-names nil slot-names-p)
-                                                environment
-                                           &aux (type (type-of object)))
+                                                environment)
   (declare (ignore environment))
-  (flet ((quote-p (thing) (not (self-evaluating-p thing))))
-    (declare (inline quote-p))
-    ;; If TYPE-OF isn't a symbol, the creation form probably can't be compiled
-    ;; unless there is a MAKE-LOAD-FORM on the class without a proper-name.
-    ;; This is better than returning a creation form that produces
-    ;; something completely different.
-    (if (typep object 'structure-object)
-        (values `(new-struct ,(the symbol type)) ; no anonymous defstructs
-                `(setf ,@(mapcan
-                          (lambda (dsd)
-                            (declare (type defstruct-slot-description dsd))
-                            (when (or (not slot-names-p)
-                                      (memq (dsd-name dsd) slot-names))
-                              (let* ((acc (dsd-primitive-accessor dsd))
-                                     (ind (dsd-index dsd))
-                                     (val (funcall acc object ind)))
-                                (list `(,acc ,object ,ind)
-                                      (if (quote-p val) `',val val)))))
-                          (dd-slots (wrapper-dd (%instance-wrapper object))))))
-        #-sb-xc-host
-        (values `(,(if (symbolp type) 'new-instance 'allocate-instance) ,type)
-                (loop for slot in (sb-mop:class-slots (class-of object))
-                      for name = (sb-mop:slot-definition-name slot)
-                      when (if slot-names-p
-                               (memq name slot-names)
-                               (eq (sb-mop:slot-definition-allocation slot) :instance))
-                      collect name into names
-                      and
-                      collect (if (slot-boundp object name)
-                                  (let ((val (slot-value object name)))
-                                    (if (quote-p val) `',val val))
-                                  'sb-pcl:+slot-unbound+) into vals
-                      finally (return `(sb-pcl::set-slots ,object ,names ,@vals)))))))
-
-;;; Call MAKE-LOAD-FORM inside a condition handler in case the method fails,
-;;; returning its two values on success.
-;;; If the resulting CREATION-FORM and INIT-FORM are equivalent to those
-;;; returned from MAKE-LOAD-FORM-SAVING-SLOTS, return NIL and 'SB-FASL::FOP-STRUCT.
-(defun sb-c::%make-load-form (constant)
-  (flet ((canonical-p (inits dsds object &aux reader)
-           ;; Return T if (but not only-if) INITS came from M-L-F-S-S.
-           (dolist (dsd dsds (null inits))
-             (declare (type defstruct-slot-description dsd))
-             (if (and (listp inits)
-                      (let ((place (pop inits)))
-                        (and (listp place)
-                             (eq (setq reader (dsd-primitive-accessor dsd))
-                                 (pop place))
-                             (listp place) (eq object (pop place))
-                             (singleton-p place)
-                             (eql (dsd-index dsd) (car place))))
-                      (let ((init (and (listp inits) (car inits)))
-                            (val (funcall reader object (dsd-index dsd))))
-                        (if (self-evaluating-p val)
-                            (and inits (eql val init))
-                            (and (typep init '(cons (eql quote)))
-                                 (singleton-p (cdr init))
-                                 (eq val (cadr init))))))
-                 (pop inits)
-                 (return nil)))))
-    (multiple-value-bind (creation-form init-form)
-        (handler-case (make-load-form constant (make-null-lexenv))
-          (error (condition) (sb-c:compiler-error condition)))
-      (cond ((and (listp creation-form)
-                  (typep constant 'structure-object)
-                  (typep creation-form '(cons (eql new-struct) (cons symbol null)))
-                  (eq (second creation-form) (type-of constant))
-                  (typep init-form '(cons (eql setf)))
-                  (canonical-p (cdr init-form)
-                               (dd-slots (wrapper-dd (%instance-wrapper constant)))
-                               constant))
-             (values nil 'sb-fasl::fop-struct))
-            (t
-             (values creation-form init-form))))))
+  (if (typep object 'structure-object)
+      (let ((type (type-of object)))
+        (collect ((inits))
+          (dolist (dsd (dd-slots (wrapper-dd (%instance-wrapper object))))
+            (declare (type defstruct-slot-description dsd))
+            (let ((slot-name (dsd-name dsd)))
+              (when (or (memq slot-name slot-names)
+                        (not slot-names-p))
+                (let* ((accessor (dsd-primitive-accessor dsd))
+                       (index (dsd-index dsd))
+                       (value (funcall accessor object index)))
+                  (inits `(setf (,accessor ,object ,index) ',value))))))
+          (values `(allocate-struct ',(the symbol type)) ;; no anonymous defstructs
+                  `(progn ,@(inits)))))
+      #-sb-xc-host
+      (let ((class (class-of object)))
+        (collect ((inits))
+          (dolist (slot (sb-mop:class-slots class))
+            (let ((slot-name (sb-mop:slot-definition-name slot)))
+              (when (or (memq slot-name slot-names)
+                        (and (not slot-names-p)
+                             (eq :instance (sb-mop:slot-definition-allocation slot))))
+                (if (slot-boundp object slot-name)
+                    (let ((value (slot-value object slot-name)))
+                      (inits `(setf (slot-value ,object ',slot-name) ',value)))
+                    (inits `(slot-makunbound ,object ',slot-name))))))
+          (values `(allocate-instance (find-class ',(class-name class)))
+                  `(progn ,@(inits)))))))
 
 ;;; Compute a SAP to the specified slot in INSTANCE.
 ;;; This looks mildly redundant with DEFINE-STRUCTURE-SLOT-ADDRESSOR,

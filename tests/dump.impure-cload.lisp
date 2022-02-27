@@ -245,8 +245,8 @@
       (assert-canonical '(x y)) ; specifying all slots explicitly is still canonical
       (assert-canonical '(y x)))
     ;; specifying only one slot is not canonical
-    (assert (equal (let ((*foo-save-slots* '(x))) (sb-c::%make-load-form foo))
-                   '(sb-kernel::new-struct foo)))))
+    (let ((*foo-save-slots* '(x)))
+      (assert (not (sb-fasl:load-form-is-default-mlfss-p foo))))))
 
 ;; A huge constant vector. This took 9 seconds to compile (on a MacBook Pro)
 ;; prior to the optimization for using fops to dump.
@@ -335,7 +335,7 @@
 
 ;; Track the make-load-form FOPs as they fly by at load-time.
 (defvar *call-tracker* nil)
-(dolist (fop-name 'sb-fasl::(fop-allocate-instance fop-set-slot-values))
+(dolist (fop-name '(sb-fasl::fop-instance))
   (let* ((index (position fop-name sb-fasl::**fop-funs**
                           :key
                           (lambda (x) (and (functionp x) (sb-kernel:%fun-name x)))))
@@ -354,8 +354,7 @@
         (b p q r s)
         (c d e g))))
 
-(assert (= 14 (count 'sb-fasl::fop-allocate-instance *call-tracker*)))
-(assert (= 14 (count 'sb-fasl::fop-set-slot-values *call-tracker*)))
+(assert (= 14 (count 'sb-fasl::fop-instance *call-tracker*)))
 
 (with-test (:name :tree-with-parent-m-l-f-s-s)
   (verify-tree *y*))

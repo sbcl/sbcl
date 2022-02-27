@@ -812,25 +812,22 @@
   (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
   (sb-kernel::load-layout name depthoid inherits length bitmap flags))
 
-;; Allocate a CLOS object. This is used when the compiler detects that
-;; MAKE-LOAD-FORM returned a simple use of MAKE-LOAD-FORM-SAVING-SLOTS,
-;; or possibly a hand-written equivalent (however unlikely).
-(define-fop 68 :not-host (fop-allocate-instance (name) nil)
-  (let ((instance (allocate-instance (find-class (the symbol name)))))
-    (push-fop-table instance (fasl-input))))
-
-;; Fill in object slots as dictated by the second return value from
-;; MAKE-LOAD-FORM-SAVING-SLOTS.
-(define-fop 69 :not-host (fop-set-slot-values ((:operands n-slots) slot-names obj) nil)
-  (let* ((stack (operand-stack))
-         (ptr (fop-stack-pop-n stack n-slots)))
-      (dotimes (i n-slots)
-        (let ((val (svref stack (+ ptr i)))
-              (slot-name (pop slot-names)))
-          (if (unbound-marker-p val)
-              ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
-              (slot-makunbound obj slot-name)
-              (setf (slot-value obj slot-name) val))))))
+;;; This is dumped when the compiler detects that MAKE-LOAD-FORM
+;;; returned a simple use of MAKE-LOAD-FORM-SAVING-SLOTS, or possibly
+;;; a hand-written equivalent (however unlikely).
+(define-fop 68 :not-host (fop-instance ((:operands n-slots) name))
+  (let* ((instance (allocate-instance (find-class (the symbol name))))
+         (stack (operand-stack))
+         (ptr (fop-stack-pop-n stack (* 2 n-slots))))
+    (dotimes (i n-slots)
+      (let* ((index (+ ptr (* 2 i)))
+             (value (svref stack index))
+             (slot-name (svref stack (1+ index))))
+        (if (unbound-marker-p value)
+            ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
+            (slot-makunbound instance slot-name)
+            (setf (slot-value instance slot-name) value))))
+    instance))
 
 (define-fop 64 (fop-end-group () nil)
   (throw 'fasl-group-end t))
@@ -1097,22 +1094,25 @@
 
 ;;;; fops for fixing up circularities
 
-(define-fop 11 (fop-rplaca ((:operands tbl-slot idx) val) nil)
+(define-fop 11 (fop-rplaca ((:operands tbl-slot index) value) nil)
   (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
-    (setf (car (nthcdr idx obj)) val)))
+    (setf (car (nthcdr index obj)) value)))
 
-(define-fop 12 (fop-rplacd ((:operands tbl-slot idx) val) nil)
+(define-fop 12 (fop-rplacd ((:operands tbl-slot index) value) nil)
   (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
-    (setf (cdr (nthcdr idx obj)) val)))
+    (setf (cdr (nthcdr index obj)) value)))
 
-(define-fop 13 (fop-svset ((:operands tbl-slot idx) val) nil)
-  (setf (svref (ref-fop-table (fasl-input) tbl-slot) idx) val))
+(define-fop 13 (fop-svset ((:operands tbl-slot index) value) nil)
+  (setf (svref (ref-fop-table (fasl-input) tbl-slot) index) value))
 
-(define-fop 14 :not-host (fop-structset ((:operands tbl-slot idx) val) nil)
-  (%instance-set (ref-fop-table (fasl-input) tbl-slot) idx val)
-  val) ; I can't remmeber whether this fop needs to return VAL. maybe?
+(define-fop 14 :not-host (fop-structset ((:operands tbl-slot index) value) nil)
+  (%instance-set (ref-fop-table (fasl-input) tbl-slot) index value))
 
-(define-fop 15 (fop-nthcdr ((:operands n) obj))
+(define-fop 15 :not-host (fop-slotset ((:operands tbl-slot index) value slot-name) nil)
+  index
+  (setf (slot-value (ref-fop-table (fasl-input) tbl-slot) slot-name) value))
+
+(define-fop 16 (fop-nthcdr ((:operands n) obj))
   (nthcdr n obj))
 
 ;;;; fops for loading functions
@@ -1125,7 +1125,7 @@
 ;;; fasl file header.)
 
 (define-load-time-global *show-new-code* nil)
-(define-fop 16 :not-host (fop-load-code ((:operands header n-code-bytes n-fixups)))
+(define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixups)))
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
@@ -1195,13 +1195,13 @@
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.
-(define-fop 17 :not-host (fop-fdefn (name))
+(define-fop 18 :not-host (fop-fdefn (name))
   (awhen (deprecated-thing-p 'function name) ; returns the stage of deprecation
     (pushnew (list* it name :function)
              (%fasl-input-deprecated-stuff (fasl-input)) :test 'equal))
   (find-or-create-fdefn name))
 
-(define-fop 18 :not-host (fop-known-fun (name))
+(define-fop 19 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
 ;;; This FOP is only encountered in cross-compiled FASLs for cold load,
@@ -1217,14 +1217,14 @@
   (declare (ignore name qualifiers specializer fn)))
 
 ;;; Modify a slot of the code boxed constants.
-(define-fop 19 (fop-alter-code ((:operands index) code value) nil)
+(define-fop 20 (fop-alter-code ((:operands index) code value) nil)
   (flet (#+sb-xc-host
          ((setf code-header-ref) (value code index)
             (write-wordindexed code index value)))
     (setf (code-header-ref code index) value)
     (values)))
 
-(define-fop 20 (fop-fun-entry ((:operands fun-index) code-object))
+(define-fop 21 (fop-fun-entry ((:operands fun-index) code-object))
   (let ((fun (%code-entry-point code-object fun-index)))
     (when (%fasl-input-print (fasl-input))
       (load-fresh-line)
@@ -1233,7 +1233,7 @@
 
 ;;;; assemblerish fops
 
-(define-fop 21 (fop-assembler-code)
+(define-fop 22 (fop-assembler-code)
   (error "cannot load assembler code except at cold load"))
 
 ;;; FOPs needed for implementing an IF operator in a FASL

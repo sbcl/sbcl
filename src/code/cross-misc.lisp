@@ -267,9 +267,6 @@
   ;; In the target, it is theoretically possible to have %INSTANCE-LENGTH
   ;; exceeed layout length, but in the cross-compiler they're the same.
   (wrapper-length (%instance-wrapper instance)))
-(defun %raw-instance-ref/word (instance index)
-  (declare (ignore instance index))
-  (error "No such thing as raw structure access on the host"))
 (defun layout-id (x)
   (declare (notinline sb-kernel::wrapper-id))
   (sb-kernel::wrapper-id x))

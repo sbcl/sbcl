@@ -500,17 +500,13 @@
 ;;; This translation is done when type specifiers are parsed. Type
 ;;; system operations (union, subtypep, etc.) should never encounter
 ;;; translated classes, only their translation.
-(sb-xc:defstruct (built-in-classoid (:include classoid) (:copier nil)
+(def!struct (built-in-classoid (:include classoid) (:copier nil)
                                     (:constructor !make-built-in-classoid))
   ;; the type we translate to on parsing. If NIL, then this class
-  ;; stands on its own
-  (translation nil :type (or null ctype) :read-only t)
+  ;; stands on its own. Only :INITIALIZING for a period during cold
+  ;; load.
+  (translation nil :type (or null ctype (member :initializing)))
   (predicate nil :type (sfunction (t) boolean) :read-only t))
-#+sb-xc-host
-(defstruct (built-in-classoid (:include classoid) (:copier nil)
-                              (:constructor !make-built-in-classoid))
-  ;; until bootstrap of all CTYPEs, store a dummy value distinct from NIL
-  (translation nil :type (or null ctype (member :initializing))))
 
 (def!struct (condition-classoid (:include classoid)
                                 (:copier nil)

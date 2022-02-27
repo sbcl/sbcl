@@ -205,7 +205,7 @@
 (defun constant-fopcompilable-p (constant)
   (declare (optimize (debug 1))) ;; TCO
   (let ((xset (alloc-xset))
-        (dumpable-instances))
+        (dumpable-structures))
     (named-let grovel ((value constant))
       ;; Unless VALUE is an object which which obviously
       ;; can't contain other objects
@@ -245,11 +245,11 @@
              (return-from constant-fopcompilable-p nil))
            (do-instance-tagged-slot (i value)
              (grovel (%instance-ref value i)))
-           (push value dumpable-instances))
+           (push value dumpable-structures))
           (t
            (return-from constant-fopcompilable-p nil)))))
-    (dolist (instance dumpable-instances)
-      (fasl-note-dumpable-instance instance *compile-object*))
+    (dolist (structure dumpable-structures)
+      (fasl-validate-structure structure *compile-object*))
     t))
 
 ;;; FOR-VALUE-P is true if the value will be used (i.e., pushed onto
