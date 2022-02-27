@@ -2683,7 +2683,8 @@
     ((a :type integer
         :accessor setf-slot-value-restart-a))))
 
-(with-test (:name :setf-slot-value-restart)
+(with-test (:name :setf-slot-value-restart
+                  :skipped-on :sparc) ; hangs
   (let ((instance (make-instance 'setf-slot-value-restart)))
     (handler-bind ((type-error
                      (lambda (c) (use-value 1 c))))

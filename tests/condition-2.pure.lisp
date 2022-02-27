@@ -553,7 +553,8 @@
     (test-use-value #'(setf thing))
     (test-use-value '(setf thing))))
 
-(with-test (:name :unknown-key-restart)
+(with-test (:name :unknown-key-restart
+                  :fails-on :sparc)
   (handler-bind ((sb-ext:unknown-keyword-argument
                    (lambda (c)
                      (assert (eq (sb-ext:unknown-keyword-argument-name c)
@@ -604,7 +605,8 @@
            (store-value :nope e))))
     (assert (eql (ggg+1) 2))))
 
-(with-test (:name :restart-type-error)
+(with-test (:name :restart-type-error
+                  :skipped-on :sparc) ; hangs
   (let ((fun (checked-compile '(lambda (x)
                                 (sb-kernel:the* (fixnum :restart t) x)))))
     (handler-bind
