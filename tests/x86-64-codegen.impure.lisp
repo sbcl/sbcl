@@ -952,7 +952,8 @@ sb-vm::(define-vop (cl-user::test)
                     (when (/= linecount expect-n)
                       (warn "~S was ~d is ~d" type expect-n linecount))))))))))
 
-(with-test (:name :many-interesting-array-types :skipped-on (:not :sb-unicode))
+(with-test (:name :many-interesting-array-types :skipped-on (or (:not :sb-unicode)
+                                                                (not :sb-devel)))
   (compare-to-golden-typep-data "typep-golden-data.txt"))
 
 (with-test (:name :integerp->bignump-strength-reduction)
