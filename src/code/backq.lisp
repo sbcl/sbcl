@@ -13,7 +13,6 @@
 
 ;; An unquoting COMMA struct.
 (defstruct (comma (:constructor unquote (expr &optional (kind 0)))
-                  #+sb-xc-host (:include structure!object)
                   ;; READing unpretty commas requires a default constructor.
                   ;; Not needed on the host.
                   #-sb-xc-host (:constructor %default-comma-constructor)

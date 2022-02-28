@@ -439,11 +439,6 @@
              (grovel (row-major-aref value i))))
           (opaque-box)
           (instance
-           ;; In the target SBCL, we can dump any instance, but
-           ;; in the cross-compilation host, %INSTANCE-FOO
-           ;; functions don't work on general instances, only on
-           ;; STRUCTURE!OBJECTs.
-           ;;
            ;; Behold the wonderfully clear sense of this-
            ;;  WHEN (EMIT-MAKE-LOAD-FORM VALUE)
            ;; meaning "when you're _NOT_ using a custom load-form"

@@ -1542,61 +1542,67 @@ necessary, since type inference may take arbitrarily long to converge.")
     (multiple-value-bind (creation-form init-form)
         (handler-case (make-load-form constant (make-null-lexenv))
           (error (condition) (sb-c:compiler-error condition)))
-      (multiple-value-bind (ss-creation-form ss-init-form)
-          (make-load-form-saving-slots constant)
-        (cond
-          ((and (typep constant 'structure-object)
-                (equal creation-form ss-creation-form)
-                (equal init-form ss-init-form))
-           (fasl-validate-structure constant fasl)
-           t)
-          ((and (not (typep constant 'structure-object))
-                (equal creation-form ss-creation-form)
-                (subsetp (rest init-form) (rest ss-init-form) :test #'equal))
-           (collect ((slot-names))
-             (dolist (init (rest init-form))
-               (when (eq (first init) 'setf)
-                 (destructuring-bind (slot-value object 'slot-name)
-                     (second init)
-                   (declare (ignore slot-value object quote))
-                   (slot-names slot-name))))
-             (fasl-note-instance-saves-slots constant (slot-names) fasl))
-           t)
-          (t
-           ;; Allow dumping objects that can't be printed
-           ;; Non-invocation of PRINT-OBJECT is tested by 'mlf.impure-cload.lisp'.
-           (let* ((name #+sb-xc-host 'blobby ; the name means nothing
-                        #-sb-xc-host
-                        (format nil "the-~A-formerly-known-as-~X"
-                                (type-of constant)
-                                (get-lisp-obj-address constant)))
-                  (info (if init-form
-                            (list constant name init-form)
-                            (list constant))))
-             (let ((*constants-being-created* (cons info constants-being-created))
-                   (*constants-created-since-last-init*
-                     (cons constant constants-created-since-last-init)))
-               (when
-                   (catch constant
-                     (fasl-note-handle-for-constant
-                      constant
-                      (compile-load-time-value creation-form t)
-                      fasl)
-                     nil)
-                 (compiler-error "circular references in creation form for ~S"
-                                 constant)))
-             (when (cdr info)
-               (let* ((*constants-created-since-last-init* nil)
-                      (circular-ref
-                        (catch 'pending-init
-                          (loop for (nil form) on (cdr info) by #'cddr
-                                collect form into forms
-                                finally (compile-make-load-form-init-forms forms))
-                          nil)))
-                 (when circular-ref
-                   (setf (cdr circular-ref)
-                         (append (cdr circular-ref) (cdr info)))))))
-           nil))))))
+      (cond
+        ((and
+          ;; MAKE-LOAD-FORM-SAVING-SLOTS on the cross-compiler needs
+          ;; the type to be defined for the target.
+          #+sb-xc-host
+          (find-classoid (type-of constant) nil)
+          (multiple-value-bind (ss-creation-form ss-init-form)
+              (make-load-form-saving-slots constant)
+            (cond
+              ((and (typep constant 'structure-object)
+                    (equal creation-form ss-creation-form)
+                    (equal init-form ss-init-form))
+               (fasl-validate-structure constant fasl)
+               t)
+              ((and (not (typep constant 'structure-object))
+                    (equal creation-form ss-creation-form)
+                    (subsetp (rest init-form) (rest ss-init-form) :test #'equal))
+               (collect ((slot-names))
+                 (dolist (init (rest init-form))
+                   (when (eq (first init) 'setf)
+                     (destructuring-bind (slot-value object 'slot-name)
+                         (second init)
+                       (declare (ignore slot-value object quote))
+                       (slot-names slot-name))))
+                 (fasl-note-instance-saves-slots constant (slot-names) fasl))
+               t)))))
+        (t
+         ;; Allow dumping objects that can't be printed
+         ;; Non-invocation of PRINT-OBJECT is tested by 'mlf.impure-cload.lisp'.
+         (let* ((name #+sb-xc-host 'blobby ; the name means nothing
+                      #-sb-xc-host
+                      (format nil "the-~A-formerly-known-as-~X"
+                              (type-of constant)
+                              (get-lisp-obj-address constant)))
+                (info (if init-form
+                          (list constant name init-form)
+                          (list constant))))
+           (let ((*constants-being-created* (cons info constants-being-created))
+                 (*constants-created-since-last-init*
+                   (cons constant constants-created-since-last-init)))
+             (when
+                 (catch constant
+                   (fasl-note-handle-for-constant
+                    constant
+                    (compile-load-time-value creation-form t)
+                    fasl)
+                   nil)
+               (compiler-error "circular references in creation form for ~S"
+                               constant)))
+           (when (cdr info)
+             (let* ((*constants-created-since-last-init* nil)
+                    (circular-ref
+                      (catch 'pending-init
+                        (loop for (nil form) on (cdr info) by #'cddr
+                              collect form into forms
+                              finally (compile-make-load-form-init-forms forms))
+                        nil)))
+               (when circular-ref
+                 (setf (cdr circular-ref)
+                       (append (cdr circular-ref) (cdr info)))))))
+         nil)))))
 
 ;;; Arrange for a load time reference to the constant named by NAME to
 ;;; get dumped via the load form (SYMBOL-GLOBAL-VALUE ',NAME) if its

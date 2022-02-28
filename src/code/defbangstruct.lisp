@@ -30,32 +30,24 @@
 (defvar *delayed-defstructs* nil)
 
 ;;; DEF!STRUCT defines a structure for both the host and target.
-;;; The host's structure inherits from STRUCTURE!OBJECT so that we can test
-;;; for containment in the target's type hierarchy with minimal fuss.
-;;; (A similar thing could be achieved by testing the package probably)
-;;; When executed by the cross-compiler, DEF!STRUCT is just DEFSTRUCT.
 (defmacro def!struct (&rest args)
-  (multiple-value-bind (name supertype options slots)
+  (multiple-value-bind (name options slots)
       (destructuring-bind (nameoid &rest slots) args
         (multiple-value-bind (name options)
             (if (consp nameoid)
                 (values (first nameoid) (rest nameoid))
                 (values nameoid nil))
           (declare (type list options))
-          (let ((include-clause (find :include options :key #'first)))
-            (when (find :type options :key #'first)
-              (error "can't use :TYPE option in DEF!STRUCT"))
-            (values name (second include-clause) options slots))))
+          (when (find :type options :key #'first)
+            (error "can't use :TYPE option in DEF!STRUCT"))
+          (values name options slots)))
     ;; Attempting to define a type named by a CL symbol is an error.
     ;; Therefore NAME is wrong if it uncrosses to something other than itself.
     (assert (eq (uncross name) name))
     (assert (equal (uncross options) options))
     `(progn
        (sb-xc:defstruct ,@args)
-       ,@(when supertype
-           `((aver (cl:subtypep ',supertype 'structure!object))))
        (defstruct (,name
-                   ,@(unless supertype '((:include structure!object)))
                    ,@(remove :pure options :key #'car))
          ,@slots))))
 

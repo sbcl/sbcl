@@ -1371,10 +1371,6 @@
       (and (equal creation-form ss-creation-form)
            (equal init-form ss-init-form)))))
 
-;; Having done nothing more than load all files in obj/from-host, the
-;; cross-compiler running under any host Lisp begins life able to access
-;; SBCL-format metadata for any structure that is a subtype of STRUCTURE!OBJECT.
-;; But if it learns a layout by cross-compiling a DEFSTRUCT, that's ok too.
 (defun dump-structure (struct file)
   (unless (or (gethash struct (fasl-output-valid-structures file))
               (typep struct

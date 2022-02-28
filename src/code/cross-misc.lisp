@@ -86,25 +86,12 @@
 ;;; In the target SBCL, the INSTANCE type refers to a base
 ;;; implementation for compound types with lowtag
 ;;; INSTANCE-POINTER-LOWTAG. There's no way to express exactly that
-;;; concept portably, but we know that anything derived from STRUCTURE!OBJECT
-;;; is equivalent to the target INSTANCE type. Also, because we use host packages
-;;; as proxies for target packages, those too must satisfy our INSTANCEP
-;;; - even if not a subtype of (OR STANDARD-OBJECT STRUCTURE-OBJECT).
-;;; Nothing else satisfies this definition of INSTANCEP.
-;;; As a guarantee that our set of host object types is exhaustive, we add one
-;;; more constraint when self-hosted: host instances of unknown type cause failure.
-;;; Some objects manipulated by the cross-compiler like the INTERVAL struct
-;;; - which is not a STRUCTURE!OBJECT - should never be seen as literals in code.
-;;; We assert that by way of the guard function.
-#+host-quirks-sbcl
-(defun unsatisfiable-instancep (x)
-  (when (and (host-sb-kernel:%instancep x)
-             (not (target-num-p x)))
-    (bug "%INSTANCEP test on ~S" x)))
+;;; concept portably, but we can at least declare here what kind of
+;;; host objects get dumped into something that when loaded would be a
+;;; target INSTANCE.
 (deftype instance ()
-  '(or structure!object package
-    #+host-quirks-sbcl (and host-sb-kernel:instance ; optimizes out a call when false
-                            (satisfies unsatisfiable-instancep))))
+  '(or (and structure-object (not target-num))
+       package))
 (defun %instancep (x)
   (typep x 'instance))
 

@@ -273,8 +273,7 @@
 ;;; FLAGS are computed on demand, and not stored.
 #+sb-xc-host
 (progn
-  (defstruct (wrapper (:include structure!object)
-                      (:constructor host-make-wrapper
+  (defstruct (wrapper (:constructor host-make-wrapper
                          (id clos-hash classoid
                           &key ((:info %info)) depthoid inherits length invalid
                           #+metaspace friend)))
@@ -294,8 +293,7 @@
     (depthoid -1 :type layout-depthoid)
     (length 0 :type layout-length)
     (%info nil :type (or null defstruct-description)))
-  #+metaspace (defstruct (sb-vm:layout (:include structure!object)
-                                       (:constructor %make-layout))
+  #+metaspace (defstruct (sb-vm:layout (:constructor %make-layout))
                 friend)
   (defun make-temporary-wrapper (clos-hash classoid inherits)
     (host-make-wrapper nil clos-hash classoid :inherits inherits :invalid nil))

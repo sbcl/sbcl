@@ -107,8 +107,8 @@
 ;;; FMT-CONTROL is a structure with a nonstandard metaclass.
 ;;; The compile-time representation of that object is an ordinary defstruct
 ;;; which of course works on any cross-compiler host.
-(def!struct (fmt-control-proxy (:constructor make-fmt-control-proxy
-                                   (string symbols)))
+(defstruct (fmt-control-proxy (:constructor make-fmt-control-proxy
+                                  (string symbols)))
   string symbols)
 (!set-load-form-method fmt-control-proxy (:xc :target)
   (lambda (self env)
