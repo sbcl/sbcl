@@ -506,7 +506,7 @@
   ;; stands on its own. Only :INITIALIZING for a period during cold
   ;; load.
   (translation nil :type (or null ctype (member :initializing)))
-  (predicate nil :type (sfunction (t) boolean) :read-only t))
+  (predicate (missing-arg) :type (sfunction (t) boolean) :read-only t))
 
 (def!struct (condition-classoid (:include classoid)
                                 (:copier nil)
