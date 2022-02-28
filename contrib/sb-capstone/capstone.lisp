@@ -285,7 +285,7 @@
 (define-alien-type cs-insn
     (struct nil
             (insn-id int)
-            (insn-addr unsigned)
+            (insn-addr (unsigned 64))
             (insn-size short)
             (insn-bytes (array char 16))
             (insn-mnemonic (array char 32))
@@ -310,9 +310,9 @@
 
 ;; The handle returned by cs-open will be represented as being of type unsigned
 
-(define-alien-routine cs-open int (arch int) (mode (integer 64)) (handle unsigned :out))
+(define-alien-routine cs-open int (arch int) (mode unsigned-int) (handle unsigned :out))
 
-(define-alien-routine cs-version unsigned (major int :out) (minor int :out))
+(define-alien-routine cs-version unsigned-int (major int :out) (minor int :out))
 
 (define-alien-routine cs-close int (handle unsigned :in-out))
 
