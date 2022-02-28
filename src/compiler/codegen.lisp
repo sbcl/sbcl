@@ -348,9 +348,7 @@
         ;; phase (codegen has not made use of component-header-length),
         ;; so extending can be done with impunity.
         #+arm64
-        (vector-push-extend (make-constant (make-array (length coverage-map)
-                                                       :element-type '(unsigned-byte 8)
-                                                       :initial-element #xFF))
+        (vector-push-extend (cons :coverage-marks (length coverage-map))
                             (ir2-component-constants ir2-component))
         (vector-push-extend
          (make-constant (cons 'coverage-map
