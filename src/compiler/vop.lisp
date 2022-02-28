@@ -740,6 +740,8 @@
   (optional-results nil :type list)
   move-vop-p
   (after-sc-selection nil :type (or null function) :read-only t))
+(!set-load-form-method vop-info (:xc :target) :ignore-it)
+
 (declaim (inline vop-name))
 (defun vop-name (vop)
   (declare (type vop vop))

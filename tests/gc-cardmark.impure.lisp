@@ -7,7 +7,7 @@
 (defun get-layouts-for-test ()
   ;; Return a young layout and an old layout
   (vector (sb-kernel:find-layout 'foo)
-          (sb-kernel:find-layout 'sb-c::opaque-box)))
+          (sb-kernel:find-layout 'class)))
 
 (with-test (:name :compact-instance-header-layout
             :skipped-on (:not (:and :compact-instance-header :soft-card-marks)))

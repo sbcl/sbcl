@@ -461,7 +461,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
       (bug "%PRIMITIVE was used with an unknown values template."))
 
     (ir1-convert start next result
-                 `(%%primitive ',name
+                 `(%%primitive ',template
                                ',(eval-info-args
                                   (subseq args required min))
                                ,@(subseq args 0 required)

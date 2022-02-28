@@ -456,7 +456,7 @@
   (let* ((temps (make-gensym-list (length types)))
          (context (cast-context cast))
          (restart (and (eq context :restart)
-                       (setf context (opaquely-quote (make-restart-location))))))
+                       (setf context (make-restart-location)))))
     (lambda (dummy)
       `(multiple-value-bind ,temps ,dummy
          ,@(mapcar

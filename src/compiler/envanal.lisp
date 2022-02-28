@@ -296,7 +296,7 @@
          (info (make-nlx-info cleanup (first (block-succ exit-block))))
          (new-block (insert-cleanup-code (list exit-block) next-block
                                          entry
-                                         `(%nlx-entry ,(opaquely-quote info))
+                                         `(%nlx-entry ',info)
                                          cleanup))
          (component (block-component new-block)))
     (unlink-blocks exit-block new-block)
@@ -354,7 +354,7 @@
       (mapc (lambda (x)
               (setf (node-derived-type x) *wild-type*))
             (leaf-refs exit-fun))
-      (substitute-leaf (find-constant (opaquely-quote info)) exit-fun))
+      (substitute-leaf (find-constant info) exit-fun))
     (when lvar
       (let ((node (block-last (nlx-info-target info))))
         (unless (node-lvar node)
@@ -454,18 +454,18 @@
                        (basic-combination-args node))))
           (ecase (cleanup-kind cleanup)
             (:special-bind
-             (code `(%special-unbind ',(lvar-value (car args)))))
+             (code `(%special-unbind ',(leaf-source-name (lvar-value (car args))))))
             (:catch
-             (code `(%catch-breakup ,(opaquely-quote (car (cleanup-nlx-info cleanup))))))
+             (code `(%catch-breakup ',(car (cleanup-nlx-info cleanup)))))
             (:unwind-protect
-             (code `(%unwind-protect-breakup ,(opaquely-quote (car (cleanup-nlx-info cleanup)))))
+             (code `(%unwind-protect-breakup ',(car (cleanup-nlx-info cleanup))))
              (let ((fun (ref-leaf (lvar-uses (second args)))))
                 (when (functional-p fun)
                   (reanalyze-funs fun)
                   (code `(%funcall ,fun)))))
             ((:block :tagbody)
              (dolist (nlx (cleanup-nlx-info cleanup))
-               (code `(%lexical-exit-breakup ,(opaquely-quote nlx)))))
+               (code `(%lexical-exit-breakup ',nlx))))
             (:dynamic-extent
              (when (cleanup-nlx-info cleanup)
                (code `(%cleanup-point))))

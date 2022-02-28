@@ -65,6 +65,8 @@
         ((nil) ; default
          (values '(cl:make-load-form-saving-slots obj :environment env)
                  '(make-load-form-saving-slots obj :environment env)))
+        ((:ignore-it)
+         (values '(values nil nil) '(values nil nil)))
         (t
          (assert (not (member :host usable-by)))
          (values nil `(funcall ,method obj env))))

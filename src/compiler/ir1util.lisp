@@ -2355,12 +2355,6 @@ is :ANY, the function name is not checked."
 (defun find-constant (object &optional name
                              &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*)))
   (cond
-    ;; Pick off some objects that aren't actually constants in user
-    ;; code.  These things appear as literals in forms such as
-    ;; `(%POP-VALUES ,x) acting as a magic mechanism for passing data
-    ;; along.
-    ((opaque-box-p object)      ; quote an object without examining it
-     (make-constant (opaque-box-value object) *universal-type*))
     ((not (producing-fasl-file))
      ;;  "The consequences are undefined if literal objects are destructively modified
      ;;   For this purpose, the following operations are considered destructive:

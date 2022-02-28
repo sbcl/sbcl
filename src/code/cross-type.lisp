@@ -347,14 +347,15 @@
            (t
             ;; Beyond this, there seems to be no portable correspondence.
             (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
-    (sb-c::opaque-box (find-classoid 'structure-object))
     (instance
      (let ((type (type-of x)))
        (if (eq type 'sb-format::fmt-control-proxy)
            ;; These are functions, but they're weird. We don't want any IR1 transform
            ;; on FORMAT to kick in and try to convert to FUNCALL on the thing.
            (specifier-type '(or string function))
-           (find-classoid type))))
+           ;; The structure may not be defined on the target yet.
+           (or (find-classoid type nil)
+               (find-classoid 'structure-object)))))
     (t
      ;; There might be more cases which we could handle with
      ;; sufficient effort; since all we *need* to handle are enough

@@ -26,6 +26,7 @@
             (:copier nil))
   (fun nil :read-only t)
   (var nil :read-only t))
+(!set-load-form-method local-call-context (:xc :target) :ignore-it)
 
 ;;; This function propagates information from the variables in the
 ;;; function FUN to the actual arguments in CALL. This is also called
@@ -46,7 +47,7 @@
         for name = (lambda-var-%source-name var)
         do (assert-lvar-type (car args) (leaf-type var) policy
                              (if (eq (functional-kind fun) :optional)
-                                 (opaquely-quote (make-local-call-context fun name))
+                                 (make-local-call-context fun name)
                                  name))
            (unless (leaf-refs var)
              (flush-dest (car args))

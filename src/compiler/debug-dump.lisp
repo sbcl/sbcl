@@ -43,6 +43,7 @@
             (:copier nil))
   (label nil :type (or null label))
   (tn nil :type (or null tn) :read-only t))
+(!set-load-form-method restart-location (:xc :target) :ignore-it)
 
 ;;; This is called during code generation in places where there is an
 ;;; "interesting" location: someplace where we are likely to end up
@@ -221,10 +222,7 @@
 
          (path (node-source-path node))
          (loc (if (fixnump label) label (label-position label)))
-         (form-number (source-path-form-number path))
-         (context (if (opaque-box-p context)
-                      (opaque-box-value context)
-                      context)))
+         (form-number (source-path-form-number path)))
     (vector-push-extend
      (logior
       (if context

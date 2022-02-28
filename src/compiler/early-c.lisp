@@ -15,16 +15,6 @@
 
 (in-package "SB-C")
 
-;;; An OPAQUE-BOX instance is used to pass data from IR1 to IR2 as
-;;; a quoted object in a "source form" (not user-written) such that the
-;;; contained object is in a for-evaluation position but ignored by
-;;; the compiler's constant-dumping logic.
-(defstruct (opaque-box (:constructor opaquely-quote (value))
-                       (:copier nil)
-                       (:predicate opaque-box-p))
-  value)
-(declaim (freeze-type opaque-box))
-
 ;;; ANSI limits on compilation
 (defconstant call-arguments-limit most-positive-fixnum
   "The exclusive upper bound on the number of arguments which may be passed

@@ -198,6 +198,7 @@
   (dependent-nodes nil)
   (annotations nil)
   (dependent-annotations nil))
+(!set-load-form-method lvar (:xc :target) :ignore-it)
 
 ;;; These are used for annotating a LVAR with information that can't
 ;;; be expressed using types or if the CAST semantics are undesirable
@@ -783,6 +784,8 @@
   block
   target
   info)
+(!set-load-form-method nlx-info (:xc :target) :ignore-it)
+
 
 ;;;; LEAF structures
 
@@ -845,6 +848,7 @@
   (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent))
   ;; some kind of info used by the back end
   (info nil))
+(!set-load-form-method leaf (:xc :target) :ignore-it)
 
 (defun leaf-dynamic-extent (leaf)
   (let ((extent (leaf-extent leaf)))

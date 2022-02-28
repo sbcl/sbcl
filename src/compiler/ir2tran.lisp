@@ -725,7 +725,7 @@
 ;;; arguments.
 (defoptimizer (%%primitive ir2-convert) ((template info &rest args) call block)
   (declare (ignore args))
-  (let* ((template (gethash (lvar-value template) *backend-template-names*))
+  (let* ((template (lvar-value template))
          (info (lvar-value info))
          (lvar (node-lvar call))
          (rtypes (template-result-types template))
@@ -746,7 +746,7 @@
 
 (defoptimizer (%%primitive derive-type) ((template info &rest args))
   (declare (ignore info args))
-  (let* ((template (gethash (lvar-value template) *backend-template-names*))
+  (let* ((template (lvar-value template))
          (type (template-type template)))
     (cond ((zerop (vop-info-num-results template))
            (values-specifier-type '(values &optional)))
@@ -1753,7 +1753,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
 ;;; This is trivial, given our assumption of a shallow-binding
 ;;; implementation.
 (defoptimizer (%special-bind ir2-convert) ((var value) node block)
-  (let ((name (lvar-value var)))
+  (let ((name (leaf-source-name (lvar-value var))))
     ;; Emit either BIND or DYNBIND, preferring BIND if both exist.
     ;; If only one exists, it's DYNBIND.
     ;; Even if the backend supports load-time TLS index assignment,
