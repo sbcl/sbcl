@@ -1035,7 +1035,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 
     thread_interrupt_data(th).pending_handler = 0;
     thread_interrupt_data(th).gc_blocked_deferrables = 0;
-#if GENCGC_IS_PRECISE
+#if HAVE_ALLOCATION_TRAP_CONTEXT
     thread_interrupt_data(th).allocation_trap_context = 0;
 #endif
 #if defined LISP_FEATURE_PPC64
