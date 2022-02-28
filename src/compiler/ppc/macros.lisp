@@ -306,31 +306,15 @@
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
 (defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
   (declare (ignorable sync))
-  #+sb-safepoint
-  `(progn ,flag-tn ,@forms (emit-safepoint))
-  #-sb-safepoint
   `(progn
      (without-scheduling ()
-       ;; Extra debugging stuff:
-       #+debug
-       (progn
-         (inst andi. ,flag-tn alloc-tn lowtag-mask)
-         (inst twi :ne ,flag-tn 0))
-       (inst ori alloc-tn alloc-tn pseudo-atomic-flag))
+       (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot)))
      ,@forms
      #+sb-thread
      (when ,sync
        (inst sync))
      (without-scheduling ()
-       (inst subi alloc-tn alloc-tn pseudo-atomic-flag)
+       (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
        ;; Now test to see if the pseudo-atomic interrupted bit is set.
-       (inst andi. ,flag-tn alloc-tn pseudo-atomic-interrupted-flag)
-       (inst twi :ne ,flag-tn 0))
-     #+debug
-     (progn
-       (inst andi. ,flag-tn alloc-tn lowtag-mask)
+       (inst lhz ,flag-tn thread-base-tn (+ 2 (* n-word-bytes thread-pseudo-atomic-bits-slot)))
        (inst twi :ne ,flag-tn 0))))
-
-#+sb-safepoint
-(defun emit-safepoint ()
-  (inst lwz zero-tn null-tn (- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))

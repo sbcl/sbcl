@@ -520,7 +520,9 @@ during backtrace.
   (current-catch-block :special *current-catch-block*)
   #+(and (or riscv x86-64 arm64) sb-thread)
   (current-unwind-protect-block :special *current-unwind-protect-block*)
-  #+sb-thread (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*)
+  #+(or sb-thread ppc)
+  (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*
+                      :c-type "pa_bits_t")
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
   (stepping)

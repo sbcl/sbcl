@@ -19,11 +19,8 @@
     ;; RLIDCL dest, source, (64-rightshift), (64-indexbits)
     (inst rldicl (car temps) (or cell-address object) (- 64 gencgc-card-shift)
           (make-fixup nil :gc-barrier))
-    ;; THREAD-TN's low byte is 0.  NL5 is the card table address.
-    (inst stbx thread-base-tn
-          (make-random-tn :kind :normal
-                          :sc (sc-or-lose 'non-descriptor-reg) :offset nl5-offset)
-          (car temps))))
+    ;; THREAD-TN's low byte is 0.
+    (inst stbx thread-base-tn card-table-base-tn (car temps))))
 
 
 ;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the offset to

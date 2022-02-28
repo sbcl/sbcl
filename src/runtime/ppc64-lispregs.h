@@ -34,7 +34,7 @@
 #define reg_BSP       REG(14)   /* Binding stack pointer */
 #define reg_CFP       REG(15)   /* Control/value stack frame pointer */
 #define reg_CSP       REG(16)   /* Control/value stack top */
-#define reg_ALLOC     REG(17)   /* (Global) dynamic free pointer */
+#define reg_CARDTABLE REG(17)   /* GC Card Table address */
 #define reg_NULL      REG(18)   /* NIL and globals nearby */
 #define reg_CODE      REG(19)   /* Current function object */
 #define reg_NFP       REG(20)   /* Lisp may save around FF-call */

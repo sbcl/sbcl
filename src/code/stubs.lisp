@@ -87,9 +87,9 @@
   (def pointer-hash)
   (def vector-sap)
   (def binding-stack-pointer-sap  ())
-  ;; x86 uses a plain old inline function for 'dynamic_space_free_pointer'
-  ;; so there's no stub function for DYNAMIC-SPACE-FREE-POINTER.
-  #-(or x86 x86-64) (def dynamic-space-free-pointer ())
+  ;; 'dynamic_space_free_pointer' should have no vop, except that
+  ;; some of the architectures still do.
+  #-(or ppc ppc64 x86 x86-64) (def dynamic-space-free-pointer ())
   (def control-stack-pointer-sap ())
   (def sb-c:safe-fdefn-fun)
   (def %fun-pointer-widetag)

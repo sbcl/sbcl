@@ -8,9 +8,7 @@
 #include "genesis/code.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/static-symbols.h"
-#ifdef LISP_FEATURE_SB_THREAD
 #include "genesis/thread.h"
-#endif
 
 #define FUNCDEF(x)	.text ; \
 			.align 3 ; \
@@ -20,16 +18,6 @@ x:
 #define GFUNCDEF(x)	.globl x ; \
 	FUNCDEF(x)
 #define SET_SIZE(x) .size x,.-x
-
-/* Load a register from a global, using the register as an intermediary */
-/* The register will be a fixnum for one instruction, so this is gc-safe */
-
-#define load(reg,csym) \
-	addis reg, 2, ptr_##csym@toc@ha ; ld reg, ptr_##csym@toc@l(reg) ; ld reg, 0(reg)
-#define store(reg,temp,csym) \
-	addis temp, 2, ptr_##csym@toc@ha ; ld temp, ptr_##csym@toc@l(temp) ; std reg, 0(temp)
-#define wordstore(reg,temp,csym) \
-	addis temp, 2, ptr_##csym@toc@ha ; ld temp, ptr_##csym@toc@l(temp) ; stw reg, 0(temp)
 
 /*
 
@@ -129,22 +117,13 @@ Low Address
 	ld 0, 16(sp) ; mtlr 0       /* Restore LR  */ ; \
 	lwz 0, 8(sp) ; mtcr 0       /* Restore CR */
 
-/* We create a pointer into the actual csymbol
-   This way the symbol ptr_ symbol lives within a 32 bits offset
-   of the TOC. See Store and Load macros in this file */
-#define indirect_ptr(csym) ptr_##csym: .quad csym
-#if !defined(LISP_FEATURE_SB_THREAD)
-indirect_ptr(current_binding_stack_pointer)
-indirect_ptr(current_control_stack_pointer)
-indirect_ptr(current_control_frame_pointer)
-#endif
-indirect_ptr(dynamic_space_free_pointer)
-#if !defined(LISP_FEATURE_SB_THREAD)
-indirect_ptr(foreign_function_call_active)
-#endif
-indirect_ptr(all_threads)
-
 	.text
+
+#define BEGIN_PSEUDO_ATOMIC stb reg_NULL,THREAD_PSEUDO_ATOMIC_BITS_OFFSET(reg_THREAD)
+#define END_PSEUDO_ATOMIC \
+	stb reg_THREAD, THREAD_PSEUDO_ATOMIC_BITS_OFFSET(reg_THREAD) ; \
+	lhz reg_NL3, (2+THREAD_PSEUDO_ATOMIC_BITS_OFFSET)(reg_THREAD) ; \
+	twnei reg_NL3, 0
 
 /*
  * Function to transfer control into lisp.  The lisp object to invoke is
@@ -154,12 +133,10 @@ indirect_ptr(all_threads)
 	GFUNCDEF(call_into_lisp)
 	C_FULL_PROLOG
 	/* NL0 - function, NL1 - frame pointer, NL2 - nargs. */
-#ifdef LISP_FEATURE_SB_THREAD
 	// Copy ABI TLS value of current_thread into lisp thread base
 	addis reg_THREAD,13,current_thread@tprel@ha
 	addi reg_THREAD,reg_THREAD,current_thread@tprel@l
 	ld reg_THREAD,0(reg_THREAD)
-#endif
 	/* Initialize tagged registers */
 	li reg_ZERO,0
 	li reg_CODE,0
@@ -178,29 +155,14 @@ indirect_ptr(all_threads)
 	ori reg_NULL,reg_NULL,NIL@l
 
 	/* Turn on pseudo-atomic */
-	li reg_ALLOC,flag_PseudoAtomic
-#ifdef LISP_FEATURE_SB_THREAD
+	BEGIN_PSEUDO_ATOMIC
 	std reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 	ld reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
 	ld reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
-#else
-	wordstore(reg_ZERO,reg_NL4,foreign_function_call_active)
-	load(reg_BSP,current_binding_stack_pointer)
-	load(reg_CSP,current_control_stack_pointer)
-	load(reg_OCFP,current_control_frame_pointer)
-#endif
-	/* This is important for CHENEYGC: It's the allocation
-	 * pointer.  It's also important for ROOM on GENCGC:
-	 * It's a pointer to the end of dynamic space, used to
-	 * determine where to stop in MAP-ALLOCATED-OBJECTS. */
-	load(reg_NL4,dynamic_space_free_pointer)
-	add reg_ALLOC,reg_ALLOC,reg_NL4
 
 	/* No longer atomic, and check for interrupt */
-	subi reg_ALLOC,reg_ALLOC,flag_PseudoAtomic
-	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
-	twnei reg_NL3, 0
+	END_PSEUDO_ATOMIC
 
 	/* Pass in the arguments */
 
@@ -212,7 +174,7 @@ indirect_ptr(all_threads)
 	ld reg_A3,24(reg_CFP)
 
         /* load card table base */
-        ld reg_NL5, THREAD_CARD_TABLE_OFFSET(reg_THREAD)
+        ld reg_CARDTABLE, THREAD_CARD_TABLE_OFFSET(reg_THREAD)
 
 	/* Calculate LRA */
 	lis reg_LRA,lra@h
@@ -239,7 +201,7 @@ lra:
 	mr REG(3),reg_A0
 
 	/* Turn on  pseudo-atomic */
-	la reg_ALLOC,flag_PseudoAtomic(reg_ALLOC)
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Lisp does not understand the TOC register, so we have to restore it
 	   now - prior to the epilogue - because there are memory accesses
@@ -247,31 +209,16 @@ lra:
 	   the load() and store() macros uses register 2 as the base */
 	ld 2, (24)(sp)
 
-#ifdef LISP_FEATURE_SB_THREAD
 	/* Store lisp state */
 	std reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 	std reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
 	std reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
 
 	/* No longer in Lisp. */
-	std reg_ALLOC,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
-#else
-	/* Store lisp state */
-	clrrwi reg_NL1,reg_ALLOC,3
-	store(reg_NL1,reg_NL2,dynamic_space_free_pointer)
-	/* load(reg_NL2,current_thread) */
-	store(reg_BSP,reg_NL2,current_binding_stack_pointer)
-	store(reg_CSP,reg_NL2,current_control_stack_pointer)
-	store(reg_CFP,reg_NL2,current_control_frame_pointer)
-
-	/* No longer in Lisp. */
-	store(reg_NL1,reg_NL2,foreign_function_call_active)
-#endif
+	std reg_THREAD,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 
 	/* Check for interrupt */
-	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
-	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
-	twnei reg_NL3,0
+	END_PSEUDO_ATOMIC
 
 	/* Back to C */
 	C_FULL_EPILOG
@@ -305,7 +252,7 @@ lra:
 	mr reg_NARGS,reg_NL3
 
 	/* Turn on pseudo-atomic */
-	la reg_ALLOC,flag_PseudoAtomic(reg_ALLOC)
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Convert the return address to an offset and save it on the stack. */
 	sub reg_NFP,reg_LIP,reg_CODE
@@ -314,7 +261,6 @@ lra:
 #endif
 	std reg_NFP,8(reg_CFP)
 
-#ifdef LISP_FEATURE_SB_THREAD
 	/* Store Lisp state */
 	std reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 	std reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
@@ -322,25 +268,8 @@ lra:
 
 	/* No longer in Lisp. */
 	std reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
-#else
-	/* Store Lisp state */
-	// I have no idea what bit of state we're trying to set.
-	// At most this would clear the pseudo-atomic-interrupt flag.
-	clrrdi reg_NFP,reg_ALLOC,3
-	store(reg_NFP,reg_CFUNC,dynamic_space_free_pointer)
-	/* load(reg_CFUNC,current_thread) */
-
-	store(reg_BSP,reg_CFUNC,current_binding_stack_pointer)
-	store(reg_CSP,reg_CFUNC,current_control_stack_pointer)
-	store(reg_CFP,reg_CFUNC,current_control_frame_pointer)
-
-	/* No longer in Lisp */
-	store(reg_CSP,reg_CFUNC,foreign_function_call_active)
-#endif
 	/* Disable pseudo-atomic; check pending interrupt */
-	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
-	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
-	twnei reg_NL3, 0
+	END_PSEUDO_ATOMIC
 
 	mr reg_NL3,reg_NARGS
 
@@ -393,37 +322,16 @@ lra:
 	li reg_A3,0
 	li reg_L0,0
 	li reg_L1,0
-#ifndef LISP_FEATURE_SB_THREAD
-	/* reg_THREAD is our TLS block pointer. */
-	li reg_THREAD,0
-#endif
 	li reg_LIP,0
 
 	/* Atomic ... */
-	li reg_ALLOC,flag_PseudoAtomic
+	BEGIN_PSEUDO_ATOMIC
 
-#ifdef LISP_FEATURE_SB_THREAD
 	/* No longer in foreign function call. */
 	std reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 
 	/* The binding stack pointer isn't preserved by C. */
 	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
-#else
-	/* No long in foreign function call. */
-	store(reg_ZERO,reg_NL2,foreign_function_call_active)
-
-	/* The free pointer may have moved */
-	/* (moved below) */
-
-	/* The BSP wasn't preserved by C, so load it */
-	load(reg_BSP,current_binding_stack_pointer)
-#endif
-	/* This is important for CHENEYGC: It's the allocation
-	 * pointer.  It's also important for ROOM on GENCGC:
-	 * It's a pointer to the end of dynamic space, used to
-	 * determine where to stop in MAP-ALLOCATED-OBJECTS. */
-	load(reg_NL4,dynamic_space_free_pointer)
-	add reg_ALLOC,reg_ALLOC,reg_NL4
 
 	/* Other lisp stack/frame pointers were preserved by C.
 	I can't imagine why they'd have moved */
@@ -440,16 +348,11 @@ lra:
 	mtlr reg_LIP
 
 	/* No longer atomic */
-	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
-	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
-	twnei reg_NL3, 0
+	END_PSEUDO_ATOMIC
 
 	/* Reset the lisp stack. */
 	mr reg_CSP,reg_CFP
 	mr reg_CFP,reg_OCFP
-
-        /* load card table base */
-        ld reg_NL5, THREAD_CARD_TABLE_OFFSET(reg_THREAD)
 
 	/* And back into Lisp. */
 	blr

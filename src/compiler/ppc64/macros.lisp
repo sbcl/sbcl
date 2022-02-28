@@ -298,28 +298,21 @@
 
 ;;;; PSEUDO-ATOMIC
 
-;;; handy macro for making sequences look atomic
+;;; handy macro for making sequences look atomic with respect to GC
 ;;;
-;;; FLAG-TN must be wired to NL3. If a deferred interrupt happens
-;;; while we have the low bits of ALLOC-TN set, we add a "large"
-;;; constant to FLAG-TN. On exit, we add FLAG-TN to ALLOC-TN which (a)
-;;; aligns ALLOC-TN again and (b) makes ALLOC-TN go negative. We then
-;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
-;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
+;;; FLAG-TN must be wired to NL3.
 (defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
   (declare (ignorable sync))
-  #+sb-safepoint
-  `(progn ,flag-tn ,@forms (emit-safepoint))
-  #-sb-safepoint
   `(progn
-     (inst ori alloc-tn alloc-tn pseudo-atomic-flag)
+     (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
      ,@forms
      (when ,sync
        (inst sync))
      (without-scheduling ()
-       (inst subi alloc-tn alloc-tn pseudo-atomic-flag)
-       ;; Now test to see if the pseudo-atomic interrupted bit is set.
-       (inst andi. ,flag-tn alloc-tn pseudo-atomic-interrupted-flag)
+       ;; Clear PA. The low byte of THREAD-BASE-TN contains 0 as the value to store
+       (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
+       ;; Now test to see if pseudo-atomic interrupted is set.
+       (inst lhz ,flag-tn thread-base-tn (+ 2 (* n-word-bytes thread-pseudo-atomic-bits-slot)))
        #+sigill-traps
        (let ((continue (gen-label)))
          (inst beq continue)
@@ -327,8 +320,3 @@
          (emit-label continue))
        #-sigill-traps
        (inst twi :ne ,flag-tn 0))))
-
-#+sb-safepoint
-(defun emit-safepoint ()
-  (inst lwz temp-reg-tn null-tn
-        (- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))

@@ -4788,9 +4788,7 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
                 thread_register_gc_trigger();
 #else
                 set_pseudo_atomic_interrupted(thread);
-#if GENCGC_IS_PRECISE
-                /* PPC calls alloc() from a trap
-                 * look up the most context if it's from a trap. */
+#if HAVE_ALLOCATION_TRAP_CONTEXT
                 {
                     os_context_t *context =
                         thread_interrupt_data(thread).allocation_trap_context;

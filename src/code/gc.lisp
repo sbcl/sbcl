@@ -20,7 +20,7 @@
   #+gencgc sb-vm:dynamic-space-start
   #-gencgc (extern-alien "current_dynamic_space" unsigned-long))
 
-#+(or x86 x86-64)
+#+(or ppc ppc64 x86 x86-64)
 (progn
   (declaim (inline dynamic-space-free-pointer))
   (defun dynamic-space-free-pointer ()

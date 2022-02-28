@@ -35,7 +35,7 @@
 #define reg_BSP       REG(14)   /* Binding stack pointer */
 #define reg_CFP       REG(15)   /* Control/value stack frame pointer */
 #define reg_CSP       REG(16)   /* Control/value stack top */
-#define reg_ALLOC     REG(17)   /* (Global) dynamic free pointer */
+#define reg_THREAD    REG(17)   /* TLS block pointer */
 #define reg_NULL      REG(18)   /* NIL and globals nearby */
 #define reg_CODE      REG(19)   /* Current function object */
 #define reg_CNAME     REG(20)   /* Current function name */
@@ -48,9 +48,5 @@
 #define reg_A3        REG(27)   /* Last of (only) 4 arg regs */
 #define reg_L0        REG(28)   /* Tagged temp regs */
 #define reg_L1        REG(29)
-#ifdef LISP_FEATURE_SB_THREAD
-#define reg_THREAD    REG(30)   /* TLS block pointer */
-#else
 #define reg_L2        REG(30)   /* Last lisp temp reg */
-#endif
 #define reg_LIP       REG(31)   /* Lisp Interior Pointer, e.g., locative */

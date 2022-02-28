@@ -56,7 +56,7 @@
   (defreg bsp 14)
   (defreg cfp 15)
   (defreg csp 16)
-  (defreg alloc 17)
+  (defreg gc-card-table 17)
   (defreg null 18)
   ;; Use of a tagged pointer in reg_CODE on PPC64 is expensive, adding an extra
   ;; instruction to each load of a boxed constant. We should allow this register
@@ -77,10 +77,8 @@
   (defreg thread 30)
   (defreg lip 31)
 
-  ;; nl5 is reserved for the GC card table base. It's restored after every
-  ;; foreign call, since it coincides with the sixth C arg-passing register.
   (defregset non-descriptor-regs
-      nl0 nl1 nl2 nl3 nl4 #|nl5|# nl6 cfunc nargs nfp)
+      nl0 nl1 nl2 nl3 nl4 nl5 nl6 cfunc nargs nfp)
 
   (defregset descriptor-regs
       fdefn a0 a1 a2 a3  ocfp lra lexenv l0 l1)
@@ -228,6 +226,13 @@
 
 ;;;; Make some random tns for important registers.
 
+(defparameter thread-base-tn
+  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
+                  :offset thread-offset))
+(defparameter card-table-base-tn
+  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
+                  :offset gc-card-table-offset))
+
 (macrolet ((defregtn (name sc)
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
@@ -239,7 +244,6 @@
   (defregtn lip interior-reg)
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
-  (defregtn alloc any-reg)
   (defregtn lra descriptor-reg)
   (defregtn lexenv descriptor-reg)
 
@@ -298,10 +302,6 @@
                               :sc (sc-or-lose 'descriptor-reg)
                               :offset n))
           *register-arg-offsets*))
-
-(defparameter thread-base-tn
-  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
-                  :offset thread-offset))
 
 (export 'single-value-return-byte-offset)
 

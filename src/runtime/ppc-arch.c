@@ -23,6 +23,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "alloc.h"
+#include "getallocptr.h"
 
 #if defined(LISP_FEATURE_GENCGC)
 #include "gencgc-alloc-region.h"
@@ -92,54 +93,19 @@ arch_internal_error_arguments(os_context_t *context)
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *thread = get_sb_vm_thread();
-
-    if (foreign_function_call_active_p(thread)) {
-        return get_pseudo_atomic_atomic(thread);
-    } else return
-#else
-    /* FIXME: this foreign_function_call_active test is dubious at
-     * best. If a foreign call is made in a pseudo atomic section
-     * (?) or more likely a pseudo atomic section is in a foreign
-     * call then an interrupt is executed immediately. Maybe it
-     * has to do with C code not maintaining pseudo atomic
-     * properly. MG - 2005-08-10
-     *
-     * The foreign_function_call_active used to live at each call-site
-     * to arch_pseudo_atomic_atomic, but this seems clearer.
-     * --NS 2007-05-15 */
-    return (!foreign_function_call_active_p(get_sb_vm_thread())) &&
-#endif
-        ((*os_context_register_addr(context,reg_ALLOC)) & flag_PseudoAtomic);
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *thread = get_sb_vm_thread();
-
-    if (foreign_function_call_active_p(thread)) {
-        set_pseudo_atomic_interrupted(thread);
-    } else
-#endif
-        *os_context_register_addr(context,reg_ALLOC)
-            |= flag_PseudoAtomicInterrupted;
+    set_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 void
 arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *thread = get_sb_vm_thread();
-
-    if (foreign_function_call_active_p(thread)) {
-        clear_pseudo_atomic_interrupted(thread);
-    } else
-#endif
-        *os_context_register_addr(context,reg_ALLOC)
-            &= ~flag_PseudoAtomicInterrupted;
+    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 unsigned int
@@ -410,14 +376,6 @@ handle_allocation_trap(os_context_t * context)
 #endif
 
     *os_context_register_addr(context, target) = (unsigned long) memory;
-#ifndef LISP_FEATURE_SB_THREAD
-    /* This is handled by the fake_foreign_function_call machinery on
-     * threaded targets. */
-    *os_context_register_addr(context, reg_ALLOC) =
-      (unsigned long) dynamic_space_free_pointer
-      | (*os_context_register_addr(context, reg_ALLOC)
-         & LOWTAG_MASK);
-#endif
 
     undo_fake_foreign_function_call(context);
 

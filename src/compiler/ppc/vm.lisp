@@ -63,7 +63,7 @@
   (defreg bsp 14)
   (defreg cfp 15)
   (defreg csp 16)
-  (defreg alloc 17)
+  (defreg thread 17)
   (defreg null 18)
   (defreg code 19)
   (defreg cname 20)
@@ -76,19 +76,19 @@
   (defreg a3 27)
   (defreg l0 28)
   (defreg l1 29)
-  (defreg #-sb-thread l2 #+sb-thread thread 30)
+  (defreg l2 30)
   (defreg lip 31)
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 cfunc nargs nfp)
 
   (defregset descriptor-regs
-      fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 #-sb-thread l2 )
+      fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 l2)
 
   (defregset boxed-regs
       fdefn code cname lexenv ocfp lra
       a0 a1 a2 a3
-      l0 l1 #-sb-thread l2 #+sb-thread thread)
+      l0 l1 l2)
 
 
  (defregset *register-arg-offsets*  a0 a1 a2 a3)
@@ -246,7 +246,6 @@
   (defregtn lip interior-reg)
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
-  (defregtn alloc any-reg)
   (defregtn lra descriptor-reg)
   (defregtn lexenv descriptor-reg)
 
@@ -309,7 +308,6 @@
                               :offset n))
           *register-arg-offsets*))
 
-#+sb-thread
 (defparameter thread-base-tn
   (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
                   :offset thread-offset))

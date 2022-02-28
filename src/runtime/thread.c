@@ -992,8 +992,8 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->alien_stack_pointer=(lispobj*)((char*)th->alien_stack_start);
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
-    th->pseudo_atomic_bits=0;
+#ifdef HAVE_THREAD_PSEUDO_ATOMIC_BITS_SLOT
+    memset(&th->pseudo_atomic_bits, 0, sizeof th->pseudo_atomic_bits);
 #elif defined LISP_FEATURE_GENCGC
     clear_pseudo_atomic_atomic(th);
     clear_pseudo_atomic_interrupted(th);

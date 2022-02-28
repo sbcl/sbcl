@@ -142,14 +142,6 @@
 
 ;;;; Allocation
 
-(define-vop (dynamic-space-free-pointer)
-  (:results (int :scs (sap-reg)))
-  (:result-types system-area-pointer)
-  (:translate dynamic-space-free-pointer)
-  (:policy :fast-safe)
-  (:generator 1
-    (move int alloc-tn)))
-
 (define-vop (binding-stack-pointer-sap)
   (:results (int :scs (sap-reg)))
   (:result-types system-area-pointer)

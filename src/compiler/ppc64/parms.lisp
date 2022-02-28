@@ -43,10 +43,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 64)
 
-;;; flags for the generational garbage collector
-(defconstant pseudo-atomic-interrupted-flag 1)
-(defconstant pseudo-atomic-flag 4)
-
 (defconstant float-inexact-trap-bit (ash 1 0))
 (defconstant float-divide-by-zero-trap-bit (ash 1 1))
 (defconstant float-underflow-trap-bit (ash 1 2))
