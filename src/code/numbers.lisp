@@ -1375,7 +1375,6 @@ and the number of 0 bits if INTEGER is negative."
                    (ash (logand integer #xffffffffffffffff) amount)))))
 
   (defun sb-vm::ash-modfx (integer amount)
-    (let ((fixnum-width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)))
-      (etypecase integer
-        (fixnum (sb-c::mask-signed-field fixnum-width (ash integer amount)))
-        (integer (sb-c::mask-signed-field fixnum-width (ash (sb-c::mask-signed-field fixnum-width integer) amount)))))))
+    (if (minusp integer)
+        (sb-c::mask-signed-field sb-vm:n-fixnum-bits (ash integer amount))
+        (logand most-positive-fixnum (ash integer amount)))))

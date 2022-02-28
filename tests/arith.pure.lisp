@@ -992,3 +992,15 @@
       (ash 3 (ash (ash a -50) (1- sb-vm:n-word-bits))))
    ((-1) 0)
    ((1) 3)))
+
+(with-test (:name :ash-modfx-constant-folding)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type (integer -10000 5) a))
+      (ldb (byte 16 28)
+           (ash 4611686018427387913
+                (progn
+                  (multiple-value-setq (a) -10000)
+                  a))))
+   ((0) 0)))
