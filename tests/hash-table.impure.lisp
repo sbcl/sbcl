@@ -206,7 +206,8 @@
   (let ((h (make-hash-table :weakness :key)))
     (with-locked-hash-table (h) (setf (gethash 'foo h) 1))))
 
-(with-test (:name :hash-table-iterator-no-notes)
+(with-test (:name :hash-table-iterator-no-notes
+                  :fails-on (:or :ppc :ppc64))
   (let ((f
          (checked-compile
           '(lambda (h)

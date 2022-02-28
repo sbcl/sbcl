@@ -2612,7 +2612,8 @@
   (let ((c (sb-kernel:fun-code-header #'sb-debug::parse-trace-options)))
     (assert (>= (sb-kernel:code-jump-table-words c) 17))))
 
-(with-test (:name :modular-arith-type-derivers)
+(with-test (:name :modular-arith-type-derivers
+                  :fails-on :ppc64)
   (let ((f (checked-compile
             `(lambda (x)
                (declare ((and fixnum
