@@ -1369,13 +1369,14 @@
   ;; FIXME? this is called while writing a fasl and so might need
   ;; to invoke MAKE-LOAD-FORM, long after IR1 conversion has happened.
   ;; Surely this is not the best design.
-  (multiple-value-bind (creation-form init-form)
-      (handler-case (make-load-form struct (make-null-lexenv))
-        (error (condition) (sb-c:compiler-error condition)))
-    (multiple-value-bind (ss-creation-form ss-init-form)
-        (make-load-form-saving-slots struct)
-      (and (equal creation-form ss-creation-form)
-           (equal init-form ss-init-form)))))
+  (and (typep struct 'structure-object)
+       (multiple-value-bind (creation-form init-form)
+           (handler-case (make-load-form struct (make-null-lexenv))
+             (error (condition) (sb-c:compiler-error condition)))
+         (multiple-value-bind (ss-creation-form ss-init-form)
+             (make-load-form-saving-slots struct)
+           (and (equal creation-form ss-creation-form)
+                (equal init-form ss-init-form))))))
 
 (defun dump-structure (struct file)
   (unless (or (gethash struct (fasl-output-valid-structures file))
