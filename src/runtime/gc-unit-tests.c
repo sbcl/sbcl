@@ -192,6 +192,18 @@ void run_gencgc_tests()
               == FUNCALLABLE_INSTANCE_WIDETAG);
     gc_assert(instanceoid_widetag_p(INSTANCE_WIDETAG));
     gc_assert(instanceoid_widetag_p(FUNCALLABLE_INSTANCE_WIDETAG));
+
+    // Assert correctness of is_header()
+    int i;
+    for(i=0; i<256; ++i) if (fixnump(i)) gc_assert(!is_header(i));
+    gc_assert(!is_header(CHARACTER_WIDETAG));
+    gc_assert(!is_header(UNBOUND_MARKER_WIDETAG));
+#ifdef NO_TLS_VALUE_MARKER_WIDETAG
+    gc_assert(!is_header(NO_TLS_VALUE_MARKER_WIDETAG));
+#endif
+#ifdef LISP_FEATURE_64_BIT
+    gc_assert(!is_header(SINGLE_FLOAT_WIDETAG));
+#endif
     test_find_freeish();
     test_adjust_obj_ptes();
 }

@@ -62,6 +62,13 @@
 (define-load-time-global *n-bytes-freed-or-purified* 0)
 (defun gc-reinit ()
   (setq *gc-inhibit* nil)
+  ;; This GC looks utterly unnecessary, but when I tried removing it,
+  ;; I got heap exhaustions sooner than when I left it in.
+  ;; So why is that? Well, it seems like there's some state that is getting
+  ;; saved into the core which needs resetting, such as these SETQs,
+  ;; but how is that affecting the C runtime's decision on when to
+  ;; perform the first auto-triggered GC? How is not doing an explicit
+  ;; GC delaying the decision? It seems wrong.
   (gc)
   (setf *n-bytes-freed-or-purified* 0
         *gc-run-time* 0))

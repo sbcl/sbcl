@@ -2064,6 +2064,27 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 int
 valid_lisp_pointer_p(lispobj pointer)
 {
+    /* We don't have a general way to ask a specific GC implementation
+     * whether 'pointer' is definitely the tagged pointer to an object -
+     * all we have is "search for a containing object" and then a decision
+     * whether pointer is the tagged pointer to that.
+     * But searching is actually too complex an operation for some easy
+     * cases when we could answer the question more simply.
+     * So unfortunately this generic interface has to know something about
+     * which GC is in use. */
+#ifdef LISP_FEATURE_GENCGC
+    page_index_t page = find_page_index((void*)pointer);
+    if (page >= 0 &&
+        (page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_BOXED) {
+        int wordindex = (pointer & (GENCGC_PAGE_BYTES-1)) >> WORD_SHIFT;
+        return (wordindex < page_table[page].words_used_)
+            /* strictly boxed pages can only contain headers and immediates */
+            && is_header(*native_pointer(pointer))
+            && make_lispobj(native_pointer(pointer),
+                            LOWTAG_FOR_WIDETAG(*native_pointer(pointer) & WIDETAG_MASK))
+               == pointer;
+    }
+#endif
     lispobj *start = search_all_gc_spaces((void*)pointer);
     if (start != NULL)
         return properly_tagged_descriptor_p((void*)pointer, start);

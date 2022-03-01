@@ -31,3 +31,37 @@
                           offset expect-offset
                           elsewhere-pc expect-elsewhere-pc))))))))
     (assert ok)))
+
+;;; Check that valid_lisp_pointer_p is correct for all pure boxed objects
+;;; using the super quick check of header validity.
+(defun randomly-probe-pure-boxed-objects ()
+  (let (list)
+    (sb-vm:map-allocated-objects
+     (lambda (obj widetag size)
+       (declare (ignore widetag))
+       (let* ((index
+               (sb-vm::find-page-index (sb-kernel:get-lisp-obj-address obj)))
+              (type (ldb (byte 6 (+ #+big-endian 2))
+                         (sb-alien:slot (sb-alien:deref sb-vm::page-table index)
+                                        'sb-vm::flags))))
+         ;; mask off the SINGLE_OBJECT and OPEN_REGION bits
+         (when (eq (logand type 7) 2) ; PAGE_TYPE_BOXED
+           (push (cons obj size) list))))
+     :dynamic)
+    (dolist (cell list)
+      (let ((obj (car cell)) (size (cdr cell)))
+        (sb-sys:with-pinned-objects (obj)
+          ;; Check a random selection of pointers in between the untagged
+          ;; base address up to the last byte in the object.
+          ;; Exactly 1 should be OK.
+          (let* ((taggedptr (sb-kernel:get-lisp-obj-address obj))
+                 (base (logandc2 taggedptr sb-vm:lowtag-mask)))
+            (dotimes (i 40)
+              (let* ((ptr (+ base (random size)))
+                     (valid (sb-di::valid-lisp-pointer-p (sb-sys:int-sap ptr))))
+                (if (= ptr taggedptr)
+                    (assert (= valid 1))
+                    (assert (= valid 0)))))))))))
+(compile 'randomly-probe-pure-boxed-objects)
+(with-test (:name :fast-valid-lisp-pointer-p)
+  (randomly-probe-pure-boxed-objects))
