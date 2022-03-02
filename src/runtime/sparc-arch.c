@@ -23,6 +23,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "monitor.h"
+#include "getallocptr.h"
 
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
@@ -96,28 +97,17 @@ unsigned char *arch_internal_error_arguments(os_context_t *context)
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    /* FIXME: this foreign_function_call_active test is dubious at
-     * best. If a foreign call is made in a pseudo atomic section
-     * (?) or more likely a pseudo atomic section is in a foreign
-     * call then an interrupt is executed immediately. Maybe it
-     * has to do with C code not maintaining pseudo atomic
-     * properly. MG - 2005-08-10
-     *
-     * The foreign_function_call_active used to live at each call-site
-     * to arch_pseudo_atomic_atomic, but this seems clearer.
-     * --NS 2007-05-15 */
-    return (!foreign_function_call_active)
-        && ((*os_context_register_addr(context,reg_ALLOC)) & 4);
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) |=  1;
+    set_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) &= ~1;
+    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 unsigned int arch_install_breakpoint(void *pc)
@@ -175,41 +165,34 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 
 }
 
+static int is_btst_reg_self(unsigned int inst)
+{
+    // Refer to EMIT-FORMAT-3-REG for the bit packing.
+    int src1 = (inst >> 14) && 0x1f;
+    int src2 = (inst >>  0) && 0x1f;
+    /* Fix both src fields to the known value of 0x1f by ORing in a constant
+     * and check whether it matches BTST %rN, %rn ("bit test")
+     * which is the same as the ANDCC instruction.
+     * The constant is #b1111100000000011111 = #x7C01F
+     *                   -----         -----
+     *                   src1          src2
+     */
+    return (inst | 0x7C01F) == 0x808FC01F && src1 == src2;
+}
+
 static int pseudo_atomic_trap_p(os_context_t *context)
 {
-    unsigned int* pc;
-    unsigned int badinst;
-    int result;
+    unsigned int* pc = (unsigned int*) OS_CONTEXT_PC(context);
 
-
-    pc = (unsigned int*) OS_CONTEXT_PC(context);
-    badinst = *pc;
-    result = 0;
-
-    /* Check to see if the current instruction is a pseudo-atomic-trap */
-    if (((badinst >> 30) == 2) && (((badinst >> 19) & 0x3f) == 0x3a)
-        && (((badinst >> 13) & 1) == 1) && ((badinst & 0x7f) == PSEUDO_ATOMIC_TRAP))
-        {
-            unsigned int previnst;
-            previnst = pc[-1];
-            /*
-             * Check to see if the previous instruction was an andcc alloc-tn,
-             * 3, zero-tn instruction.
-             */
-            if (((previnst >> 30) == 2) && (((previnst >> 19) & 0x3f) == 0x11)
-                && (((previnst >> 14) & 0x1f) == reg_ALLOC)
-                && (((previnst >> 25) & 0x1f) == reg_ZERO)
-                && (((previnst >> 13) & 1) == 1)
-                && ((previnst & 0x1fff) == 3))
-                {
-                    result = 1;
-                }
-            else
-                {
-                    fprintf(stderr, "Oops!  Got a PSEUDO-ATOMIC-TRAP without a preceeding andcc!\n");
-                }
-        }
-    return result;
+    // As to the choice of bit patterns, see KLUDGE at
+    // (defconstant pseudo-atomic-trap) in sparc/parms.lisp
+    return pc[0] ==
+#ifdef LISP_FEATURE_LINUX
+        0x93D02040 // TNE 64. pseudo-atomic-trap = #x40
+#else
+        0x93D02010 // TNE 16. pseudo-atomic-trap = #x10
+#endif
+        && is_btst_reg_self(pc[-1]);
 }
 
 void
@@ -245,7 +228,6 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     arch_skip_instruction(context);
 }
 
-#ifdef LISP_FEATURE_GENCGC
 static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
 {
     unsigned int or_inst;
@@ -291,25 +273,22 @@ static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
      * Allocate some memory, store the memory address in rs1.
      */
     lispobj* memory;
-    {
-        struct interrupt_data *data = &thread_interrupt_data(thread);
-        data->allocation_trap_context = context;
-        extern lispobj *alloc(sword_t), *alloc_list(sword_t);
-        memory = (rd & 1) ? alloc_list(size) : alloc(size);
-        data->allocation_trap_context = 0;
-    }
+    struct interrupt_data *data = &thread_interrupt_data(thread);
+    data->allocation_trap_context = context;
+    extern lispobj *alloc(sword_t), *alloc_list(sword_t);
+    memory = (rd & 1) ? alloc_list(size) : alloc(size);
+    data->allocation_trap_context = 0;
 
     *os_context_register_addr(context, rs1) = (lispobj)memory;
     arch_skip_instruction(context);
 
     undo_fake_foreign_function_call(context);
 }
-#endif
 
 static void sigill_handler(int signal, siginfo_t *siginfo,
                            os_context_t *context)
 {
-    if ((siginfo->si_code) == ILL_ILLOPC) {
+    if (siginfo->si_code == ILL_ILLOPC) {
         int trap;
         unsigned int inst;
         unsigned int* pc = (unsigned int*) siginfo->si_addr;
@@ -319,18 +298,12 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
 
         inst = *pc;
         trap = inst & 0xff;
-#ifdef LISP_FEATURE_GENCGC
         if (trap == trap_Allocation) handle_allocation_trap(context, pc);
-        else
-#endif
-            handle_trap(context,trap);
+        else handle_trap(context,trap);
     }
-    else if ((siginfo->si_code) == ILL_ILLTRP) {
+    else if (siginfo->si_code == ILL_ILLTRP) {
         if (pseudo_atomic_trap_p(context)) {
-            /* A trap instruction from a pseudo-atomic.  We just need
-               to fixup up alloc-tn to remove the interrupted flag,
-               skip over the trap instruction, and then handle the
-               pending interrupt(s). */
+            /* A trap instruction from a pseudo-atomic. */
             arch_clear_pseudo_atomic_interrupted(context);
             arch_skip_instruction(context);
             interrupt_handle_pending(context);
@@ -397,7 +370,10 @@ arch_write_linkage_table_entry(int index, void *target_addr, int datap)
    *        nop
    *
    */
-  int* inst_ptr;
+
+  // 'volatile' works around
+  //   "warning: writing 4 bytes into a region of size 0 [-Wstringop-overflow=]"
+  volatile int* inst_ptr;
   unsigned long hi;                   /* Top 22 bits of address */
   unsigned long lo;                   /* Low 10 bits of address */
   unsigned int inst;

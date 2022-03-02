@@ -141,7 +141,6 @@
 ;;;; must be a multiple of the lisp object size).
 (defun allocation (type size lowtag result-tn &key stack-p temp-tn)
   (declare (ignorable type))
-  #+gencgc
   ;; A temp register is needed to do inline allocation.  TEMP-TN, in
   ;; this case, can be any register, since it holds a double-word
   ;; aligned address (essentially a fixnum).
@@ -178,31 +177,7 @@
       ;; Need to rearrange this code.
       (inst add csp-tn size))
 
-     #-gencgc
-     ;; Normal allocation to the heap -- cheneygc version.
-     ;;
-     ;; On cheneygc, the alloc-tn currently has the pseudo-atomic bit.
-     ;; If the lowtag also has a 1 bit in the same position, we're all set.
-     ;;
-     ;; See comment in PSEUDO-ATOMIC-FLAG.
-     ((logbitp (1- n-lowtag-bits) lowtag)
-      (inst or result-tn alloc-tn lowtag)
-      (inst add alloc-tn size))
-     ;;
-     ;; Otherwise, we need to zap out the lowtag from alloc-tn, and then
-     ;; or in the lowtag.
-     #-gencgc
-     (t
-      (inst andn result-tn alloc-tn lowtag-mask)
-      (inst or result-tn lowtag)
-      (inst add alloc-tn size))
-
      ;; Normal allocation to the heap -- gencgc version.
-     ;;
-     ;; No need to worry about lowtag bits matching up here, since
-     ;; alloc-tn is just a "pseudo-atomic-bit-tn" now and we don't read
-     ;; it.
-     #+gencgc
      (t
       (loadw result-tn null-tn 0 (- nil-value mixed-region)) ; free_pointer
       (loadw temp-tn null-tn 1 (- nil-value mixed-region))   ; end_addr
@@ -220,6 +195,10 @@
           ;; past the actual end of the region?  If so, we need a
           ;; full alloc.
           (inst cmp result-tn temp-tn)
+          ;; Why not just use trap on greater-than ??? This seems kooky.
+          ;; But I think it's because we have to encode size/result/page-type
+          ;; into another word. The PPC instruction is able to encode
+          ;; some registers into the trap instruction itself.
           (if (member :sparc-v9 *backend-subfeatures*)
               (inst b :gtu full-alloc :pn)
               (inst b :gtu full-alloc))
@@ -260,7 +239,7 @@
     (bug "empty &body in WITH-FIXED-ALLOCATION"))
   (once-only ((result-tn result-tn) (temp-tn temp-tn)
               (type-code type-code) (size size))
-    `(pseudo-atomic ()
+    `(pseudo-atomic (,temp-tn)
        (allocation nil (pad-data-block ,size) other-pointer-lowtag ,result-tn
                    :temp-tn ,temp-tn)
        (inst li ,temp-tn (compute-object-header ,size ,type-code))
@@ -298,18 +277,21 @@
       start-lab)))
 
 ;;; a handy macro for making sequences look atomic
-(defmacro pseudo-atomic ((&optional) &rest forms)
-  (let ()
-    `(progn
+(defmacro pseudo-atomic ((temp &optional) &rest forms)
+  `(progn
+     (without-scheduling ()
        ;; Set the pseudo-atomic flag.
-       (without-scheduling ()
-         (inst or alloc-tn 4))
-       ,@forms
+       (inst stb null-tn thread-tn (ash thread-pseudo-atomic-bits-slot
+                                        word-shift)))
+     ,@forms
+     (without-scheduling ()
        ;; Reset the pseudo-atomic flag.
-       (without-scheduling ()
-        ;; Remove the pseudo-atomic flag.
-        (inst andn alloc-tn 4)
-        ;; Check to see if pseudo-atomic interrupted flag is set (bit 0 = 1).
-        (inst andcc zero-tn alloc-tn 3)
-        ;; The C code needs to process this correctly and fixup alloc-tn.
-        (inst t :ne pseudo-atomic-trap)))))
+       ;; I wonder if it's worth trying to reduce this to one 'ldstub'
+       ;; instruction by packing both the PA-Atomic and PA-Interrupted flag
+       ;; into one byte.
+       (inst stb zero-tn thread-tn (ash thread-pseudo-atomic-bits-slot
+                                        word-shift)))
+       (inst ldub ,temp thread-tn (+ 2 (ash thread-pseudo-atomic-bits-slot
+                                            word-shift)))
+       (inst andcc zero-tn ,temp ,temp)
+       (inst t :ne pseudo-atomic-trap)))

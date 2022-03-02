@@ -16,11 +16,19 @@
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/simple-fun.h"
+#include "genesis/thread.h"
 
 #define load(sym, reg) \
         sethi %hi(sym), reg; ld [reg+%lo(sym)], reg
 #define store(reg, sym) \
         sethi %hi(sym), reg_L0; st reg, [reg_L0+%lo(sym)]
+
+#define BEGIN_PSEUDO_ATOMIC stb reg_NULL, [reg_THREAD+THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
+#define END_PSEUDO_ATOMIC(temp) \
+ stb reg_ZERO, [reg_THREAD+THREAD_PSEUDO_ATOMIC_BITS_OFFSET] ; \
+ ldub [reg_THREAD+THREAD_PSEUDO_ATOMIC_BITS_OFFSET+2], temp ; \
+ andcc temp, temp, reg_ZERO ; \
+ tne PSEUDO_ATOMIC_TRAP
 
 /* FIXME */
 #define FRAMESIZE 0x48
@@ -50,26 +58,23 @@ call_into_lisp:
 
         /* Establish NIL */
         set     NIL, reg_NULL
+	load(all_threads, reg_THREAD)
 
 	/* Set the pseudo-atomic flag. */
-	set	4, reg_ALLOC
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Turn off foreign function call. */
         sethi   %hi(foreign_function_call_active), reg_NL0
         st      reg_ZERO, [reg_NL0+%lo(foreign_function_call_active)]
 
         /* Load the rest of lisp state. */
-        load(dynamic_space_free_pointer, reg_NL0)
-	add	reg_NL0, reg_ALLOC, reg_ALLOC
         load(current_binding_stack_pointer, reg_BSP)
         load(current_control_stack_pointer, reg_CSP)
         load(current_control_frame_pointer, reg_OCFP)
 
         /* No longer atomic, and check for interrupt. */
-	sub	reg_ALLOC, 4, reg_ALLOC
-	andcc	reg_ALLOC, 3, reg_ZERO
-	
-	tne	PSEUDO_ATOMIC_TRAP
+	END_PSEUDO_ATOMIC(reg_NL0)
+
         /* Pass in the args. */
         sll     %i2, 2, reg_NARGS
         mov     %i1, reg_CFP
@@ -102,11 +107,9 @@ lra:
         mov     reg_A0, %i0
 
         /* Turn on pseudo_atomic */
-	add	reg_ALLOC, 4, reg_ALLOC
+	BEGIN_PSEUDO_ATOMIC
 
         /* Store LISP state */
-	andn	reg_ALLOC, 7, reg_NL1
-        store(reg_NL1,dynamic_space_free_pointer)
         store(reg_BSP,current_binding_stack_pointer)
         store(reg_CSP,current_control_stack_pointer)
         store(reg_CFP,current_control_frame_pointer)
@@ -115,9 +118,7 @@ lra:
         store(reg_NL1,foreign_function_call_active)
 
         /* Were we interrupted? */
-	sub	reg_ALLOC, 4, reg_ALLOC
-	andcc	reg_ALLOC, 3, reg_ZERO
-	tne	PSEUDO_ATOMIC_TRAP
+	END_PSEUDO_ATOMIC(reg_NL1)
 
         /* Back to C we go. */
 	ld	[%sp+FRAMESIZE-4], %i7
@@ -135,7 +136,7 @@ call_into_c:
         st      reg_CODE, [reg_CFP+8]
 
         /* Turn on pseudo-atomic. */
-	add	reg_ALLOC, 4, reg_ALLOC
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Convert the return address to an offset and save it on the stack. */
 	sub	reg_LIP, reg_CODE, reg_L0
@@ -146,18 +147,12 @@ call_into_c:
         store(reg_BSP,current_binding_stack_pointer)
         store(reg_CSP,current_control_stack_pointer)
         store(reg_CFP,current_control_frame_pointer)
-	/* Use reg_CFP as a work register, and restore it */
-	andn	reg_ALLOC, 7, reg_CFP
-        store(reg_CFP,dynamic_space_free_pointer)
-		load(current_control_frame_pointer, reg_CFP)
 
         /* No longer in Lisp. */
         store(reg_CSP,foreign_function_call_active)
 
         /* Were we interrupted? */
-	sub	reg_ALLOC, 4, reg_ALLOC
-	andcc	reg_ALLOC, 3, reg_ZERO
-	tne	PSEUDO_ATOMIC_TRAP
+	END_PSEUDO_ATOMIC(reg_L0)
 
         /* Into C we go. */
         call    reg_CFUNC
@@ -171,17 +166,16 @@ call_into_c:
 
         /* Re-establish NIL */
         set     NIL, reg_NULL
+	load(all_threads, reg_THREAD)
 
 	/* Atomic. */
-	set	4, reg_ALLOC
+	BEGIN_PSEUDO_ATOMIC
 
         /* No longer in foreign function call. */
         sethi   %hi(foreign_function_call_active), reg_NL2
         st      reg_ZERO, [reg_NL2+%lo(foreign_function_call_active)]
 
         /* Load the rest of lisp state. */
-        load(dynamic_space_free_pointer, reg_NL2)
-	add	reg_NL2, reg_ALLOC, reg_ALLOC
         load(current_binding_stack_pointer, reg_BSP)
         load(current_control_stack_pointer, reg_CSP)
         load(current_control_frame_pointer, reg_CFP)
@@ -193,9 +187,7 @@ call_into_c:
 	sub	reg_LIP, OTHER_POINTER_LOWTAG, reg_LIP
 
         /* No longer atomic. */
-	sub	reg_ALLOC, 4, reg_ALLOC
-	andcc	reg_ALLOC, 3, reg_ZERO
-	tne	PSEUDO_ATOMIC_TRAP
+	END_PSEUDO_ATOMIC(reg_NL2)
 
         /* Reset the lisp stack. */
         /* Note: OCFP is in one of the locals, it gets preserved across C. */

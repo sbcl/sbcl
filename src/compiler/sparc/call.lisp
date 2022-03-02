@@ -1101,7 +1101,7 @@ default-value-8
       (move result null-tn)
 
       ;; We need to do this atomically.
-      (pseudo-atomic ()
+      (pseudo-atomic (temp)
         ;; Allocate a cons (2 words) for each item.
         (inst sll temp count 1)
         (allocation 'list temp list-pointer-lowtag result

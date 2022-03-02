@@ -23,7 +23,7 @@
   (:temporary (:scs (non-descriptor-reg)) gencgc-temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 0
-    (pseudo-atomic ()
+    (pseudo-atomic (gencgc-temp)
       (inst add ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                                lowtag-mask))
       (inst andn ndescr lowtag-mask)

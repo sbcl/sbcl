@@ -290,18 +290,13 @@
          (index :scs (any-reg))
          (value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num *)
-  (:temporary (:scs (non-descriptor-reg)) temp #+gencgc card)
+  (:temporary (:scs (non-descriptor-reg)) temp card)
   (:generator 10
-    #+cheneygc
-    (progn (inst add temp index (- other-pointer-lowtag))
-           (inst st value object temp))
-    #+gencgc
-    (progn
     ;; Load the card mask
     (inst li temp (make-fixup "gc_card_table_mask" :foreign-dataref)) ; linkage entry
     (inst ld temp temp) ; address of gc_card_table_mask
     (inst ld temp temp) ; value of gc_card_table_mask
-    (pseudo-atomic ()
+    (pseudo-atomic (temp)
       ;; Compute card mark index
       (inst srl card object gencgc-card-shift)
       (inst and card card temp)
@@ -318,7 +313,7 @@
         (inst or temp temp #x40)
         (inst stb temp object byte))
       (inst add temp index (- other-pointer-lowtag))
-      (inst st value object temp)))))
+      (inst st value object temp))))
 
 ;;;; raw instance slot accessors
 

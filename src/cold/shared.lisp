@@ -335,7 +335,7 @@
          ("(and gencgc cheneygc)"
           ":GENCGC and :CHENEYGC are incompatible")
          ;; I srlsy doubt that any of these are tested with cheneygc any more
-         ("(and cheneygc (not (or mips riscv sparc)))"
+         ("(and cheneygc (not (or mips riscv)))"
           ":CHENEYGC not supported on selected architecture")
          ("(and gencgc (not (or sparc ppc ppc64 x86 x86-64 arm arm64 riscv)))"
           ":GENCGC not supported on selected architecture")

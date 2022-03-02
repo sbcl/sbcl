@@ -887,7 +887,7 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
 }
 #endif
 
-/* Stores the context for gc to scavange and builds fake stack
+/* Stores the context for gc to scavenge and builds fake stack
  * frames. */
 void fake_foreign_function_call_noassert(os_context_t *context)
 {

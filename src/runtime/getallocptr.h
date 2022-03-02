@@ -21,7 +21,7 @@
 
 # include "allocptr-x86.inc"
 
-#elif defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
+#elif defined LISP_FEATURE_SPARC || defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
 
 // PPC always uses the canonical variant of of PA flag manipulation:
 // per-thread bits, no static symbols, and no messing with low bits of dynamic_space_free_pointer.
@@ -35,7 +35,9 @@
 # define clear_pseudo_atomic_atomic(th) (th)->pseudo_atomic_bits[0] = 0
 // A 2-byte field allows for 'lhz' followed by 'twi'
 # define get_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] != 0
-# define set_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] = 1
+// make it look like a fixnum in case we only have a descriptor register
+// at our disposal when loading the flag
+# define set_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] = 8
 # define clear_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] = 0
 # define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
 # define get_alloc_pointer() (dynamic_space_free_pointer)

@@ -46,7 +46,7 @@
 
   ;; Globals.  These are difficult to extract from a sigcontext.
   (defreg zero 0)                               ; %g0
-  (defreg alloc 1)                              ; %g1
+  (defreg thread 1)                             ; %g1
   (defreg null 2)                               ; %g2
   (defreg csp 3)                                ; %g3
   (defreg cfp 4)                                ; %g4
@@ -279,7 +279,7 @@
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
   (defregtn lip descriptor-reg)
-  (defregtn alloc any-reg)
+  (defregtn thread any-reg)
 
   (defregtn nargs any-reg)
   (defregtn bsp any-reg)

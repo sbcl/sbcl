@@ -28,7 +28,7 @@
 #endif
 
 #define reg_ZERO        GREG(0)
-#define reg_ALLOC       GREG(1)
+#define reg_THREAD      GREG(1)
 #define reg_NULL        GREG(2)
 #define reg_CSP         GREG(3)
 #define reg_CFP         GREG(4)

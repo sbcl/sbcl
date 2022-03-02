@@ -33,7 +33,7 @@
                         temp)))))
       (let ((dx-p (node-stack-allocate-p node))
             (alloc (* (pad-data-block cons-size) cons-cells)))
-        (pseudo-atomic ()
+        (pseudo-atomic (temp)
                  (allocation 'list alloc list-pointer-lowtag res
                              :stack-p dx-p
                              :temp-tn alloc-temp)
@@ -79,7 +79,7 @@
   (:generator 10
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
-      (pseudo-atomic ()
+      (pseudo-atomic (temp)
         (allocation nil alloc-size fun-pointer-lowtag result
                     :stack-p stack-allocate-p
                     :temp-tn temp)
@@ -120,7 +120,7 @@
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
-    (pseudo-atomic ()
+    (pseudo-atomic (temp)
       (allocation nil (pad-data-block words) lowtag result :temp-tn temp
                   :stack-p stack-allocate-p)
         (inst li temp (compute-object-header words type))
@@ -145,6 +145,6 @@
           (t
            (inst add header header (+ (ash -2 (length-field-shift type)) type))
            (inst and bytes (lognot lowtag-mask))))
-    (pseudo-atomic ()
+    (pseudo-atomic (temp)
       (allocation nil bytes lowtag result :temp-tn temp)
       (storew header result 0 lowtag))))
