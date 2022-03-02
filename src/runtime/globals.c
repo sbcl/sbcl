@@ -50,19 +50,7 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
-/* ARM + RISCV use ALLOCATION-POINTER, not dynamic_space_free_pointer */
-
-# if !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
-/* The Object Formerly Known As current_dynamic_space_free_pointer */
-/* The ARM ports (32- and 64-bit) use a static-space lisp symbol for this pointer.
- * They also do not have a reg_ALLOC, so there is no ambiguity as to where the
- * pointer is obtained from: it is always in the static-space lisp symbol.
- * We do not copy that value back and forth to the C variable.
- * Moreover, because they do not have a reg_ALLOC, the pseudo-atomic flag
- * is not overlayed on the reg_ALLOC but is instead in another static-space
- * lisp symbol */
 lispobj *dynamic_space_free_pointer;
-#endif
 lispobj *read_only_space_free_pointer;
 lispobj *static_space_free_pointer;
 

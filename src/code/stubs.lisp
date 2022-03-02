@@ -87,9 +87,7 @@
   (def pointer-hash)
   (def vector-sap)
   (def binding-stack-pointer-sap  ())
-  ;; 'dynamic_space_free_pointer' should have no vop, except that
-  ;; some of the architectures still do.
-  #-(or sparc ppc ppc64 x86 x86-64) (def dynamic-space-free-pointer ())
+  #+cheneygc (def dynamic-space-free-pointer ())
   (def control-stack-pointer-sap ())
   (def sb-c:safe-fdefn-fun)
   (def %fun-pointer-widetag)

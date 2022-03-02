@@ -118,7 +118,6 @@
     ,@'(*binding-stack-pointer*
         *pseudo-atomic-atomic*
         *pseudo-atomic-interrupted*)
-    *allocation-pointer*
      ;; interrupt handling
      ,@+common-static-symbols+)
   #'equalp)

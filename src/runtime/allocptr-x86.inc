@@ -1,8 +1,5 @@
 /* -*- Mode: C -*- */
 
-#define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
-#define get_alloc_pointer() (dynamic_space_free_pointer)
-
 #include "interr.h" // for lose()
 #if defined(LISP_FEATURE_X86)
 #define LISPOBJ_ASM_SUFFIX "l"
@@ -22,6 +19,8 @@ get_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
     // mask out the 'interrupted' bit before testing
     return (pa_bits & ~1) != 0;
 }
+
+// FIXME: all this seems unnecessary use of inline assembly
 
 static inline void
 set_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)

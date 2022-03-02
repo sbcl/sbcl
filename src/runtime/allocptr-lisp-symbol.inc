@@ -1,9 +1,5 @@
 /* -*- Mode: C -*- */
 
-// ARM, AARCH64, and RISCV use a static-space lisp symbol for ALLOCATION_POINTER
-#define set_alloc_pointer(value) SetSymbolValue(ALLOCATION_POINTER, value, 0)
-#define get_alloc_pointer() (lispobj*)SymbolValue(ALLOCATION_POINTER, 0)
-
 #ifdef LISP_FEATURE_SB_THREAD
 #include "pseudo-atomic.h"
 #else

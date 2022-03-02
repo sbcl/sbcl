@@ -128,8 +128,6 @@
 ;;;
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    *allocation-pointer*
-
      *control-stack-pointer*
      *binding-stack-pointer*
      *interrupted-control-stack-pointer*

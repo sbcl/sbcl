@@ -17,6 +17,9 @@
 #ifndef GETALLOCPTR_H
 #define GETALLOCPTR_H
 
+# define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
+# define get_alloc_pointer() (dynamic_space_free_pointer)
+
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
 
 # include "allocptr-x86.inc"
@@ -39,16 +42,10 @@
 // at our disposal when loading the flag
 # define set_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] = 8
 # define clear_pseudo_atomic_interrupted(th) (th)->pseudo_atomic_bits[2] = 0
-# define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
-# define get_alloc_pointer() (dynamic_space_free_pointer)
 
 #elif defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV
 
 # include "allocptr-lisp-symbol.inc"
-
-#else
-
-# include "allocptr-c-symbol.inc"
 
 #endif
 

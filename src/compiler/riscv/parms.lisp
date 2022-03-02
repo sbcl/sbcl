@@ -117,7 +117,6 @@
 ;;;
 (defconstant-eqx +static-symbols+
  #.`#(,@+common-static-symbols+
-      *allocation-pointer*
       #-sb-thread
       ,@'(*binding-stack-pointer*
           ;; interrupt handling
