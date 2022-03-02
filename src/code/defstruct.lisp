@@ -948,7 +948,7 @@ unless :NAMED is also specified.")))
                                          always-boundp gc-ignorable
                                          rsd-index)
                           default)))
-      #-sb-xc-host (push (cons dsd spec) *dsd-source-form*)
+      (push (cons dsd spec) *dsd-source-form*)
       (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list dsd)))
       (let ((comparator
              ;; this is enough specialization for now
