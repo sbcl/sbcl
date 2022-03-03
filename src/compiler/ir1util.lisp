@@ -716,30 +716,37 @@
                                   (principal-lvar-use (cast-value use))
                                   use)))
       (unless (or
-               ;; Don't complain about not being able to stack allocate constants.
-               (and (ref-p use) (constant-p (ref-leaf use)))
                ;; If we're flushing, don't complain if we can flush the combination.
                (and flush
                     (or
                      (node-to-be-deleted-p use)
                      (and (combination-p use)
                           (flushable-combination-p use))))
-               ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
-               ;; reports that way.
-               ;; Also don't report if the home is :EXTERNAL. This allows declaring
-               ;; funargs as dynamic-extent which can inform compilation of callers
-               ;; to this lambda that they can DXify the arg.
-               (and (ref-p use) (lambda-var-p (ref-leaf use))
-                    (member (lambda-kind (lambda-var-home (ref-leaf use)))
-                            '(:optional :external)))
-               ;; Don't complain if the referent is #'SOMEFUN, avoiding a note for
-               ;;  (DEFUN FOO (X &KEY (TEST #'IDENTITY)) ...)
-               ;; where TEST is declared DX, and one possible use of this LVAR is
-               ;; to the supplied arg, and other is essentially constant-like.
                (and (ref-p use)
-                    (let ((var (ref-leaf use)))
-                      (and (global-var-p var)
-                           (eq (global-var-kind var) :global-function))))
+                    (let ((leaf (ref-leaf use)) )
+                      (or
+                       ;; Don't complain about not being able to stack allocate constants.
+                       (constant-p leaf)
+                       ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
+                       ;; reports that way.
+                       ;; Also don't report if the home is :EXTERNAL. This allows declaring
+                       ;; funargs as dynamic-extent which can inform compilation of callers
+                       ;; to this lambda that they can DXify the arg.
+                       (and (lambda-var-p leaf)
+                            (member (lambda-kind (lambda-var-home (ref-leaf use)))
+                                    '(:optional :external)))
+                       (or
+                        ;; Don't complain if the referent is #'SOMEFUN, avoiding a note for
+                        ;;  (DEFUN FOO (X &KEY (TEST #'IDENTITY)) ...)
+                        ;; where TEST is declared DX, and one possible use of this LVAR is
+                        ;; to the supplied arg, and other is essentially constant-like.
+                        (and (global-var-p leaf)
+                             (eq (global-var-kind leaf) :global-function))
+                        ;; Ignore top level closures
+                        (and (functional-p leaf)
+                             (functional-enclose leaf)
+                             (eq (functional-kind (node-home-lambda (functional-enclose leaf)))
+                                 :toplevel))))))
                ;; It's supposed to be slow, so who cares it can't
                ;; stack allocate something.
                (policy use (= speed 0)))
