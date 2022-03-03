@@ -19,6 +19,8 @@
             sb-vm::immediate-constant
             sb-vm::registers sb-vm::float-registers
             sb-vm::zero
+            sb-vm::null-offset
+            sb-vm::zero-offset
             sb-vm::lip-tn sb-vm::zero-tn)))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
@@ -26,8 +28,8 @@
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
   (sc-case tn
-    (zero sb-vm::zero-offset)
-    (null sb-vm::null-offset)
+    (zero zero-offset)
+    (null null-offset)
     (t
      (if (eq (sb-name (sc-sb (tn-sc tn))) 'registers)
          (tn-offset tn)

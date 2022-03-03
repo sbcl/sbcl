@@ -210,7 +210,7 @@
                         (= (tn-value value) ,(1- (ash 1 bits))))
              (inst mov temp ,(1- (ash 1 bits)))
              (inst bic old old (lsl temp shift)))
-           ;; LOGIOR in the new value (shifted appropriatly).
+           ;; LOGIOR in the new value (shifted appropriately).
            (sc-case value
              (immediate
               (inst mov temp (logand (tn-value value) ,(1- (ash 1 bits)))))

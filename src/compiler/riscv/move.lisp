@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 (define-move-fun (load-immediate 1) (vop x y)
-  ((immediate)
+  ((zero immediate)
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
     (etypecase val
@@ -27,7 +27,7 @@
                           character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
-  ((immediate)
+  ((zero immediate)
    (signed-reg unsigned-reg))
   (inst li y (tn-value x)))
 
@@ -65,7 +65,7 @@
   (loadw y (current-nfp-tn vop) (tn-offset x)))
 
 (define-move-fun (store-stack 5) (vop x y)
-  ((any-reg descriptor-reg) (control-stack))
+  ((any-reg descriptor-reg zero) (control-stack))
   (store-stack-tn y x))
 
 (define-move-fun (store-number-stack 5) (vop x y)
@@ -74,31 +74,26 @@
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
   (storew x (current-nfp-tn vop) (tn-offset y)))
-
 
+
 ;;;; The Move VOP:
 ;;;
 (define-vop (move)
   (:args (x :target y
-            :scs (any-reg descriptor-reg)
-            :load-if (not (or (location= x y)
-                              (and (sc-is x immediate)
-                                   (eql (tn-value x) 0))))))
+            :scs (any-reg zero descriptor-reg)
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
   (:generator 0
-    (let ((x (if (and (sc-is x immediate)
-                      (eql (tn-value x) 0))
-                 zero-tn
-                 x)))
-      (cond ((location= x y))
-            ((sc-is y control-stack)
-             (store-stack-tn y x))
-            (t
-             (move y x))))))
+    (unless (location= x y)
+      (sc-case y
+        ((any-reg descriptor-reg)
+         (move y x))
+        (control-stack
+         (store-stack-tn y x))))))
 
 (define-move-vop move :move
-  (any-reg descriptor-reg)
+  (any-reg descriptor-reg zero)
   (any-reg descriptor-reg))
 
 
@@ -107,7 +102,7 @@
 ;;;
 (define-vop (move-arg)
   (:args (x :target y
-            :scs (any-reg descriptor-reg))
+            :scs (any-reg descriptor-reg zero))
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
@@ -119,7 +114,7 @@
        (storew x fp (tn-offset y))))))
 ;;;
 (define-move-vop move-arg :move-arg
-  (any-reg descriptor-reg)
+  (any-reg descriptor-reg zero)
   (any-reg descriptor-reg))
 
 ;;;; Moves and coercions:

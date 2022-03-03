@@ -14,13 +14,28 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from SB-VM into this package
-  (import '(sb-vm::u-and-i-inst-immediate
-            sb-vm::lip-tn
-            sb-vm::zero-tn
-            sb-vm::null-tn
+  (import '(;; SBs, SCs, and TNs
+            sb-vm::immediate-constant
+            sb-vm::registers sb-vm::float-registers
+            sb-vm::zero
+            sb-vm::zero-offset
+            sb-vm::lip-tn sb-vm::zero-tn
+            ;; Types
+            sb-vm::u-and-i-inst-immediate
             sb-vm::short-immediate
             sb-vm::short-immediate-fixnum
             sb-vm::u+i-immediate)))
+
+;;;; Constants, types, conversion functions, some disassembler stuff.
+
+(defun reg-tn-encoding (tn)
+  (declare (type tn tn))
+  (sc-case tn
+    (zero zero-offset)
+    (t
+     (case (sb-name (sc-sb (tn-sc tn)))
+       ((registers float-registers) (tn-offset tn))
+       (t (error "~S isn't a register." tn))))))
 
 
 ;;;; disassembler field definitions
@@ -83,7 +98,7 @@
 (define-bitfield-emitter %emit-r-inst 32
   (byte 7 25) (byte 5 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
 (defun emit-r-inst (segment funct7 rs2 rs1 funct3 rd opcode)
-  (%emit-r-inst segment funct7 (tn-offset rs2) (tn-offset rs1) funct3 (tn-offset rd) opcode))
+  (%emit-r-inst segment funct7 (reg-tn-encoding rs2) (reg-tn-encoding rs1) funct3 (reg-tn-encoding rd) opcode))
 
 (defconstant-eqx i-printer
     '(:name :tab rd ", " rs1 ", " imm)
@@ -104,10 +119,10 @@
 (defun emit-i-inst (segment imm rs1 funct3 rd opcode)
   (etypecase imm
     (short-immediate
-     (%emit-i-inst segment imm (tn-offset rs1) funct3 (tn-offset rd) opcode))
+     (%emit-i-inst segment imm (reg-tn-encoding rs1) funct3 (reg-tn-encoding rd) opcode))
     (fixup
      (note-fixup segment :i-type imm)
-     (%emit-i-inst segment 0 (tn-offset rs1) funct3 (tn-offset rd) opcode))))
+     (%emit-i-inst segment 0 (reg-tn-encoding rs1) funct3 (reg-tn-encoding rd) opcode))))
 
 (defconstant-eqx s-printer
     '(:name :tab rs2 ", " "(" imm ")" rs1)
@@ -126,10 +141,16 @@
 (defun emit-s-inst (segment imm rs2 rs1 funct3 opcode)
   (etypecase imm
     (short-immediate
-     (%emit-s-inst segment (ldb (byte 7 5) imm) (tn-offset rs2) (tn-offset rs1) funct3 (ldb (byte 5 0) imm) opcode))
+     (%emit-s-inst segment (ldb (byte 7 5) imm)
+                   (reg-tn-encoding rs2) (reg-tn-encoding rs1)
+                   funct3 (ldb (byte 5 0) imm)
+                   opcode))
     (fixup
      (note-fixup segment :s-type imm)
-     (%emit-s-inst segment 0 (tn-offset rs2) (tn-offset rs1) funct3 0 opcode))))
+     (%emit-s-inst segment 0
+                   (reg-tn-encoding rs2) (reg-tn-encoding rs1)
+                   funct3 0
+                   opcode))))
 
 (defconstant-eqx cond-branch-printer
   '(:name :tab rs1 ", " rs2 ", " imm)
@@ -147,7 +168,8 @@
 (defun emit-b-inst (segment imm rs2 rs1 funct3 opcode)
   (aver (not (logbitp 0 imm)))
   (%emit-b-inst segment (ldb (byte 1 12) imm) (ldb (byte 6 5) imm)
-                (tn-offset rs2) (tn-offset rs1) funct3 (ldb (byte 4 1) imm)
+                (reg-tn-encoding rs2) (reg-tn-encoding rs1)
+                funct3 (ldb (byte 4 1) imm)
                 (ldb (byte 1 11) imm) opcode))
 
 (defconstant-eqx u-printer
@@ -164,10 +186,10 @@
 (defun emit-u-inst (segment imm rd opcode)
   (etypecase imm
     (integer
-     (%emit-u-inst segment imm (tn-offset rd) opcode))
+     (%emit-u-inst segment imm (reg-tn-encoding rd) opcode))
     (fixup
      (note-fixup segment :u-type imm)
-     (%emit-u-inst segment 0 (tn-offset rd) opcode))))
+     (%emit-u-inst segment 0 (reg-tn-encoding rd) opcode))))
 
 (defconstant-eqx j-printer
   '(:name :tab rd ", " imm)
@@ -184,7 +206,7 @@
   (aver (not (logbitp 0 imm)))
   (%emit-j-inst segment (ldb (byte 1 20) imm) (ldb (byte 10 1) imm)
                 (ldb (byte 1 11) imm) (ldb (byte 8 12) imm)
-                (tn-offset rd) opcode))
+                (reg-tn-encoding rd) opcode))
 
 (define-instruction lui (segment rd ui)
   (:printer u ((opcode #b0110111)))
@@ -564,10 +586,16 @@
     (:fcsr #x003)))
 
 (defun emit-csr-inst (segment csr funct3 rs rd)
-  (%emit-i-inst segment (csr-encoding csr) (tn-offset rs) funct3 (tn-offset rd) #b1110011))
+  (%emit-i-inst segment
+                (csr-encoding csr) (reg-tn-encoding rs)
+                funct3 (reg-tn-encoding rd)
+                #b1110011))
 
 (defun emit-csr-i-inst (segment csr funct3 zimm rd)
-  (%emit-i-inst segment (csr-encoding csr) zimm funct3 (tn-offset rd) #b1110011))
+  (%emit-i-inst segment
+                (csr-encoding csr) zimm
+                funct3 (reg-tn-encoding rd)
+                #b1110011))
 
 (macrolet ((define-csr-instruction (name funct3)
              `(define-instruction ,name (segment rd csr rs)
@@ -698,23 +726,23 @@
   (rd :field (byte 5 7) :type 'fp-reg)
   (opcode :field (byte 7 0)))
 
-(defun ensure-tn-offset (imm/tn)
+(defun ensure-reg-tn-encoding (imm/tn)
   (etypecase imm/tn
     ((integer 0 31) imm/tn)
-    (tn (tn-offset imm/tn))))
+    (tn (reg-tn-encoding imm/tn))))
 
 (defun emit-r-float-inst (segment rs3/funct5 fmt rs2 rs1 rm rd opcode)
   (%emit-r-inst segment
-                (dpb (ensure-tn-offset rs3/funct5)
+                (dpb (ensure-reg-tn-encoding rs3/funct5)
                      (byte 5 2)
                      (ecase fmt
                        (:single #b00)
                        (:double #b01)
                        (:quad #b10)))
-                (ensure-tn-offset rs2)
-                (tn-offset rs1)
+                (ensure-reg-tn-encoding rs2)
+                (reg-tn-encoding rs1)
                 rm
-                (tn-offset rd)
+                (reg-tn-encoding rd)
                 opcode))
 
 (defun rm-encoding (rm)

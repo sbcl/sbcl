@@ -101,7 +101,12 @@
  )
 
 (!define-storage-classes
+
+ ;; Non-immediate constants in the constant pool
  (constant constant)
+
+ ;; Immediate constant.
+ (zero immediate-constant)
  (immediate immediate-constant)
 
  (control-stack control-stack)
@@ -110,7 +115,7 @@
           :reserve-locations #.(append reserve-non-descriptor-regs
                                        reserve-descriptor-regs)
           :alternate-scs (control-stack)
-          :constant-scs (immediate constant)
+          :constant-scs (immediate zero constant)
           :save-p t)
 
  ;; Pointer descriptor objects.  Must be seen by GC.
@@ -149,7 +154,7 @@
              :locations #.non-descriptor-regs
              :reserve-locations #.reserve-non-descriptor-regs
              :alternate-scs (signed-stack)
-             :constant-scs (immediate)
+             :constant-scs (zero immediate)
              :save-p t)
  (unsigned-stack non-descriptor-stack)
  (unsigned-reg registers
@@ -219,6 +224,8 @@
 ;;; appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
+    ((integer 0 0)
+     zero-sc-number)
     (null
      (values descriptor-reg-sc-number null-offset))
     ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
@@ -230,7 +237,8 @@
          nil))))
 
 (defun boxed-immediate-sc-p (sc)
-  (eql sc immediate-sc-number))
+  (or (eql sc zero-sc-number)
+      (eql sc immediate-sc-number)))
 
 ;;;; Function Call Parameters
 

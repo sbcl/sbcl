@@ -53,31 +53,31 @@
 ;;; Assume that any constant operand is the second arg...
 
 (define-vop (fast-fixnum-binop fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg))
-         (y :target r :scs (any-reg)))
+  (:args (x :target r :scs (any-reg zero))
+         (y :target r :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
 (define-vop (fast-unsigned-binop fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg))
-         (y :target r :scs (unsigned-reg)))
+  (:args (x :target r :scs (unsigned-reg zero))
+         (y :target r :scs (unsigned-reg zero)))
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note #.(format nil "inline (unsigned-byte ~a) arithmetic" n-machine-word-bits)))
 
 (define-vop (fast-signed-binop fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg))
-         (y :target r :scs (signed-reg)))
+  (:args (x :target r :scs (signed-reg zero))
+         (y :target r :scs (signed-reg zero)))
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note #.(format nil "inline (signed-byte ~a) arithmetic" n-machine-word-bits)))
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg)))
+  (:args (x :target r :scs (any-reg zero)))
   (:info y)
   (:arg-types tagged-num (:constant short-immediate-fixnum))
   (:results (r :scs (any-reg)))
@@ -85,7 +85,7 @@
   (:note "inline arithmetic"))
 
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg)))
+  (:args (x :target r :scs (unsigned-reg zero)))
   (:info y)
   (:arg-types unsigned-num (:constant short-immediate))
   (:results (r :scs (unsigned-reg)))
@@ -93,7 +93,7 @@
   (:note "inline unsigned unboxed arithmetic"))
 
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg)))
+  (:args (x :target r :scs (signed-reg zero)))
   (:info y)
   (:arg-types signed-num (:constant short-immediate))
   (:results (r :scs (signed-reg)))
@@ -463,24 +463,24 @@
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)
-  (:args (x :scs (any-reg))
-         (y :scs (any-reg)))
+  (:args (x :scs (any-reg zero))
+         (y :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:generator 1
     (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/signed fast-conditional)
-  (:args (x :scs (signed-reg))
-         (y :scs (signed-reg)))
+  (:args (x :scs (signed-reg zero))
+         (y :scs (signed-reg zero)))
   (:arg-types signed-num signed-num)
   (:note #.(format nil "inline (signed-byte ~a) comparison" n-word-bits))
   (:generator 1
     (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
-  (:args (x :scs (unsigned-reg))
-         (y :scs (unsigned-reg)))
+  (:args (x :scs (unsigned-reg zero))
+         (y :scs (unsigned-reg zero)))
   (:arg-types unsigned-num unsigned-num)
   (:note #.(format nil "inline (unsigned-byte ~a) comparison" n-word-bits))
   (:generator 1
@@ -513,8 +513,8 @@
 ;;; doing this is to prevent fixnum specific operations from being
 ;;; used on word integers, spuriously consing the argument.
 (define-vop (fast-eql/fixnum fast-conditional)
-  (:args (x :scs (any-reg))
-         (y :scs (any-reg)))
+  (:args (x :scs (any-reg zero))
+         (y :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql)

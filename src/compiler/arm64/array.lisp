@@ -374,7 +374,7 @@
                (inst bic old old temp))
              (unless (and (sc-is value immediate)
                           (= (tn-value value) 0))
-               ;; LOGIOR in the new value (shifted appropriatly).
+               ;; LOGIOR in the new value (shifted appropriately).
                (sc-case value
                  (immediate
                   (inst mov temp (logand (tn-value value) ,(1- (ash 1 bits))))

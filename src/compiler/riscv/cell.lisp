@@ -23,7 +23,7 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg zero)))
   (:info name offset lowtag)
   (:ignore name)
   (:results)
@@ -47,7 +47,7 @@
     (inst sc temp new lip :aq :rl)
     (inst bne temp zero-tn LOOP)
     EXIT))
-
+
 ;;;; Symbol hacking VOPs:
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
@@ -399,7 +399,7 @@
 
 (define-full-setter %closure-index-set *
   closure-info-offset fun-pointer-lowtag
-  (descriptor-reg any-reg) * %closure-index-set)
+  (descriptor-reg any-reg zero) * %closure-index-set)
 
 (define-full-reffer funcallable-instance-info *
   funcallable-instance-info-offset fun-pointer-lowtag
@@ -448,7 +448,7 @@
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)
 
 (define-full-setter instance-index-set * instance-slots-offset
-  instance-pointer-lowtag (descriptor-reg any-reg) * %instance-set)
+  instance-pointer-lowtag (descriptor-reg any-reg zero) * %instance-set)
 
 (define-full-casser instance-index-cas * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-cas)
@@ -464,7 +464,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (any-reg descriptor-reg)))
+         (value :scs (any-reg descriptor-reg zero)))
   (:arg-types * tagged-num *)
   (:temporary (:scs (non-descriptor-reg)) temp card)
   (:temporary (:sc non-descriptor-reg) pa-flag)

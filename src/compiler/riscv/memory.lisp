@@ -24,7 +24,7 @@
 
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg)))
+         (value :scs (descriptor-reg any-reg zero)))
   (:variant-vars offset lowtag)
   (:generator 4
     (storew value object offset lowtag)))

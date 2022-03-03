@@ -60,7 +60,7 @@
     (inst lbu res x (- (/ array-rank-position n-byte-bits) other-pointer-lowtag))
     (inst addi res res 1)
     (inst andi res res array-rank-mask)))
-
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -110,7 +110,9 @@
              (setname (symbolicate "DATA-VECTOR-SET/" type)))
          `(progn
             (define-full-reffer ,refname ,type
-              vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-ref)
+              vector-data-offset other-pointer-lowtag
+              ,(remove-if (lambda (x) (member x '(zero))) scs)
+              ,element-type data-vector-ref)
             (define-full-setter ,setname ,type
               vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-set))))
      (def-partial-data-vector-frobs (type element-type size signed &rest scs)
@@ -139,7 +141,7 @@
              ,setname ,type
              ,size ,format vector-data-offset other-pointer-lowtag ,scs
              ,element-type t "inline array store" data-vector-set)))))
-  (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
+  (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg zero)
 
   (def-partial-data-vector-frobs simple-base-string character 1 nil character-reg)
   #+(and sb-unicode (not 64-bit))
@@ -240,7 +242,7 @@
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (unsigned-reg) :target shift)
-                     (value :scs (unsigned-reg immediate)))
+                     (value :scs (unsigned-reg zero immediate)))
               (:arg-types ,type positive-fixnum positive-fixnum)
               (:temporary (:scs (interior-reg)) lip)
               (:temporary (:scs (non-descriptor-reg)) temp old)
@@ -263,21 +265,22 @@
                   (inst sll temp temp shift)
                   (inst xori temp temp -1)
                   (inst and old old temp))
-                ;; LOGIOR in the new value (shifted appropriatly).
-                (sc-case value
-                  (immediate
-                   (inst li temp (logand (tn-value value) ,(1- (ash 1 bits)))))
-                  (unsigned-reg
-                   (inst andi temp value ,(1- (ash 1 bits)))))
-                (inst sll temp temp shift)
-                (inst or old old temp)
+                ;; LOGIOR in the new value (shifted appropriately).
+                (unless (sc-is value zero)
+                  (sc-case value
+                    (immediate
+                     (inst li temp (logand (tn-value value) ,(1- (ash 1 bits)))))
+                    (unsigned-reg
+                     (inst andi temp value ,(1- (ash 1 bits)))))
+                  (inst sll temp temp shift)
+                  (inst or old old temp))
                 ;; Write the altered word back to the array.
                 (storew old lip vector-data-offset other-pointer-lowtag)))
             (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" type))
               (:translate data-vector-set)
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
-                     (value :scs (unsigned-reg immediate)))
+                     (value :scs (unsigned-reg zero immediate)))
               (:arg-types ,type
                           (:constant
                            (integer 0
@@ -302,6 +305,7 @@
                                  (lognot (ash ,(1- (ash 1 bits)) (* extra ,bits))))
                            (inst and old old temp))))
                   (sc-case value
+                    (zero)
                     (immediate
                      (let ((value (ash (logand (tn-value value) ,(1- (ash 1 bits)))
                                        (* extra ,bits))))
