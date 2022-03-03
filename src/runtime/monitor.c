@@ -86,7 +86,14 @@ struct crash_thread_preamble {
 const int CRASH_PREAMBLE_SIGNATURE =
     (sizeof (struct crash_preamble) << 16) | sizeof (struct crash_thread_preamble);
 
-#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
+#if defined LISP_FEATURE_X86_64 // un-tested elsewhere
+#include <errno.h>
+static void checked_write(int fd, void* buf, long nbytes)
+{
+    ssize_t wrote = write(fd, buf, nbytes);
+    if (wrote != nbytes) lose("short write, errno=%d", errno);
+}
+
 #include "immobile-space.h"
 void save_gc_crashdump(char *pathname,
                        uword_t approx_stackptr_at_gc_start)
@@ -100,7 +107,11 @@ void save_gc_crashdump(char *pathname,
     struct crash_preamble preamble;
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
     gc_assert(nbytes_heap == ((uword_t)dynamic_space_free_pointer - DYNAMIC_SPACE_START));
+#ifdef LISP_FEATURE_SB_THREAD
     int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
+#else
+    int nbytes_tls = sizeof (struct thread);
+#endif
     preamble.signature = CRASH_PREAMBLE_SIGNATURE;
     preamble.static_start = STATIC_SPACE_START;
     preamble.static_nbytes = (uword_t)static_space_free_pointer - STATIC_SPACE_START;
@@ -123,23 +134,25 @@ void save_gc_crashdump(char *pathname,
     preamble.varyobj_free_pointer = (uword_t)varyobj_free_pointer;
 #endif
     // write the preamble and static space
-    write(fd, &preamble, sizeof preamble);
-    write(fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
+    checked_write(fd, &preamble, sizeof preamble);
+    checked_write(fd, (char*)STATIC_SPACE_START, preamble.static_nbytes);
     // write the dynamic-space, PTEs, card table
-    write(fd, (char*)DYNAMIC_SPACE_START, nbytes_heap);
-    write(fd, page_table, sizeof (struct page) * next_free_page);
-    write(fd, gc_card_mark, 1+gc_card_table_mask);
+
+    fprintf(stderr, "Writing dynamic space\n");
+    checked_write(fd, (char*)DYNAMIC_SPACE_START, nbytes_heap);
+    checked_write(fd, page_table, sizeof (struct page) * next_free_page);
+    checked_write(fd, gc_card_mark, 1+gc_card_table_mask);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     int usage = (uword_t)fixedobj_free_pointer - FIXEDOBJ_SPACE_START;
-    write(fd, (char*)FIXEDOBJ_SPACE_START, usage);
+    checked_write(fd, (char*)FIXEDOBJ_SPACE_START, usage);
     int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
-    write(fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
+    checked_write(fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
     usage = (uword_t)varyobj_free_pointer - VARYOBJ_SPACE_START;
-    write(fd, (char*)VARYOBJ_SPACE_START, usage);
+    checked_write(fd, (char*)VARYOBJ_SPACE_START, usage);
     total_npages = VARYOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
-    write(fd, varyobj_page_touched_bits, n_bitmap_elts * sizeof (int));
-    write(fd, varyobj_pages, total_npages * sizeof (int));
+    checked_write(fd, varyobj_page_touched_bits, n_bitmap_elts * sizeof (int));
+    checked_write(fd, varyobj_pages, total_npages * sizeof (int));
 #endif
     struct crash_thread_preamble thread_preamble;
     for_each_thread(th) {
@@ -147,32 +160,50 @@ void save_gc_crashdump(char *pathname,
         os_context_t* threadcontext = nth_interrupt_context(0, th);
         uword_t sp;
         if (ici)
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             sp = *os_context_register_addr(threadcontext, reg_SP);
+#else
+            sp = *os_context_register_addr(threadcontext, reg_CSP);
+#endif
         else {
             if (th != get_sb_vm_thread()) {
               char msg[] = "No stackptr for crash dump\n";
               write(2, msg, sizeof msg-1);
               _exit(1);
             }
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             sp = approx_stackptr_at_gc_start;
+#else
+            sp = access_control_stack_pointer(th);
+#endif
         }
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         int nbytes_control_stack =
             (char*)th->control_stack_end - (char*)sp; // grows downward
         int nbytes_binding_stack =
             (char*)th->binding_stack_pointer - (char*)th->binding_stack_start; // grows upward
+#else
+        int nbytes_control_stack = (char*)sp - (char*)th->control_stack_start; // grows upward
+        int nbytes_binding_stack =
+          (char*)get_binding_stack_pointer(th) - (char*)th->binding_stack_start;
+#endif
         thread_preamble.address = (uword_t)th;
         thread_preamble.has_context = ici != 0; // boolean for have context or not
         thread_preamble.control_stack_nbytes = nbytes_control_stack;
         thread_preamble.binding_stack_nbytes = nbytes_binding_stack;
         // write the preamble
-        write(fd, &thread_preamble, sizeof thread_preamble);
+        checked_write(fd, &thread_preamble, sizeof thread_preamble);
         // write 0 or 1 contexts, control-stack, binding-stack, TLS
         if (ici) write(fd, threadcontext, preamble.sizeof_context);
-        write(fd, (char*)sp, nbytes_control_stack);
-        write(fd, th->binding_stack_start, nbytes_binding_stack);
-        write(fd, th, nbytes_tls);
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        checked_write(fd, (char*)sp, nbytes_control_stack);
+#else
+        checked_write(fd, th->control_stack_start, nbytes_control_stack);
+#endif
+        checked_write(fd, th->binding_stack_start, nbytes_binding_stack);
+        checked_write(fd, th, nbytes_tls);
     }
-    write(fd, "SB.Crash", 8); // trailing signature
+    checked_write(fd, "SB.Crash", 8); // trailing signature
     close(fd);
 }
 #endif
@@ -829,7 +860,7 @@ int load_gc_crashdump(char* pathname)
     struct crash_preamble preamble;
     struct crash_thread_preamble thread_preamble;
     checked_read(fd, &preamble, sizeof preamble);
-    printf("static==%lx size=%x\n", preamble.static_start, (int)preamble.static_nbytes);
+    printf("static=%lx nbytes=%x\n", preamble.static_start, (int)preamble.static_nbytes);
     printf("heap_start=%lx npages=%d\n", preamble.dynspace_start, (int)preamble.dynspace_npages);
     // pin_dynspace_code is for display only. It gets recomputed as the
     // logical OR of all threads' values of *GC-PIN-CODE-PAGES*.
@@ -907,7 +938,11 @@ int load_gc_crashdump(char* pathname)
         if (thread_preamble.has_context) {
             checked_read(fd, context, preamble.sizeof_context);
         }
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         *os_context_sp_addr(context) = (uword_t)stackptr;
+#else
+        *os_context_register_addr(context, reg_CSP) = (uword_t)stackptr;
+#endif
         checked_read(fd, stackptr, thread_preamble.control_stack_nbytes);
         checked_read(fd, th->binding_stack_start, thread_preamble.binding_stack_nbytes);
         // Skip over the initial words of the thread structure that was saved
