@@ -2930,7 +2930,7 @@ static page_index_t scan_boxed_root_cards_spanning(page_index_t page, generation
 #else
         if (!PAGE_WRITEPROTECTED_P(page)) {
             int dirty = descriptors_scavenge(start, limit, gen, 0);
-            if (!dirty) protect_page(start);
+            if (ENABLE_PAGE_PROTECTION && !dirty) protect_page(start);
         }
 #endif
         ++page;
