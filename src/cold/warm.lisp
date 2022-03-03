@@ -9,8 +9,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-#+riscv (setf (extern-alien "gencgc_verbose" char) 3)
-
 (in-package "COMMON-LISP-USER")
 
 ;;;; general warm init compilation policy
