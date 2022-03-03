@@ -1287,7 +1287,7 @@ We could try a few things to mitigate this:
          ;; will promote but keep their MIXED page type. So don't bother with this.
          #+use-cons-region
          (let* ((flags (slot (deref page-table (find-page-index obj-addr)) 'flags))
-                (type (ldb (byte 5 (+ #+big-endian 3)) flags))
+                (type (ldb (byte 6 (+ #+big-endian 2)) flags))
                 (ok (if (consp obj)
                         (or (= type #b101) ; PAGE_TYPE_CONS
                             (and (eq (car obj) 0) (eq (cdr obj) 0)))
