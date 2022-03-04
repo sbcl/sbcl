@@ -39,26 +39,21 @@
 (defmacro zeroize (reg)
   `(inst move ,reg zero-tn))
 
-(defmacro def-mem-op (op inst shift load)
-  `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
-     `(progn
-        (inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag))
-        ,,@(when load '('(inst nop))))))
-;;;
-(def-mem-op loadw lw word-shift t)
-(def-mem-op storew sw word-shift nil)
+(macrolet ((def-mem-op (op inst shift)
+             `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
+                `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
+  (def-mem-op loadw lw word-shift)
+  (def-mem-op storew sw word-shift))
 
 (defmacro load-symbol (reg symbol)
   (once-only ((reg reg) (symbol symbol))
     `(inst addu ,reg null-tn (static-symbol-offset ,symbol))))
 
 (defmacro load-symbol-value (reg symbol)
-  `(progn
-     (inst lw ,reg null-tn
-           (+ (static-symbol-offset ',symbol)
-              (ash symbol-value-slot word-shift)
-              (- other-pointer-lowtag)))
-     (inst nop)))
+  `(inst lw ,reg null-tn
+         (+ (static-symbol-offset ',symbol)
+            (ash symbol-value-slot word-shift)
+            (- other-pointer-lowtag))))
 
 (defmacro store-symbol-value (reg symbol)
   `(inst sw ,reg null-tn
@@ -159,19 +154,16 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
               (dynamic-extent-p dynamic-extent-p)
               (lowtag lowtag))
     `(if ,dynamic-extent-p
-         (pseudo-atomic (,flag-tn)
+         (pseudo-atomic (,flag-tn) ; why P-A ???
            (align-csp ,temp-tn)
            (inst or ,result-tn csp-tn ,lowtag)
            (inst li ,temp-tn (compute-object-header ,size ,type-code))
            (inst addu csp-tn (pad-data-block ,size))
            (storew ,temp-tn ,result-tn 0 ,lowtag)
            ,@body)
-         (pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
-           ;; The pseudo-atomic bit in alloc-tn is set.  If the lowtag also
-           ;; has a 1 bit in the same position, we're all set.  Otherwise,
-           ;; we need to subtract the pseudo-atomic bit.
-           (inst or ,result-tn alloc-tn ,lowtag)
-           (unless (logbitp 0 ,lowtag) (inst subu ,result-tn 1))
+         (pseudo-atomic (,flag-tn)
+           (allocation ,type-code (pad-data-block ,size) ,result-tn ,lowtag
+                       (list ,flag-tn ,temp-tn) :stackp ,dynamic-extent-p)
            (inst li ,temp-tn (compute-object-header ,size ,type-code))
            (storew ,temp-tn ,result-tn 0 ,lowtag)
            ,@body))))
@@ -238,21 +230,18 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
 
 ;;;; PSEUDO-ATOMIC
 
-;;; handy macro for making sequences look atomic
-(defmacro pseudo-atomic ((flag-tn &key (extra 0)) &rest forms)
+(defmacro pseudo-atomic ((flag-tn &key elide-if (extra nil)) &rest forms)
+  (aver (not extra))
   `(progn
-     (aver (= (tn-offset ,flag-tn) nl4-offset))
-     (aver (not (minusp ,extra)))
-     (without-scheduling ()
-       (inst li ,flag-tn ,extra)
-       (inst addu alloc-tn 1))
+     (unless ,elide-if
+       (without-scheduling ()
+         (store-symbol-value csp-tn *pseudo-atomic-atomic*)))
      ,@forms
-     (without-scheduling ()
-       (let ((label (gen-label)))
-         (inst bgez ,flag-tn label)
-         (inst addu alloc-tn (1- ,extra))
-         (inst break 0 pending-interrupt-trap)
-         (emit-label label)))))
+     (unless ,elide-if
+       (without-scheduling ()
+         (store-symbol-value null-tn *pseudo-atomic-atomic*)
+         (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
+         (inst tne zero-tn ,flag-tn)))))
 
 ;;;; memory accessor vop generators
 

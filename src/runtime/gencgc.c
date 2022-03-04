@@ -1970,7 +1970,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
 
     return 0;
 }
-#elif defined LISP_FEATURE_PPC64
+#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
 /* Consider interior pointers to code as roots, and untagged fdefn pointers.
  * But most other pointers are *unambiguous* conservative roots.
  * This is not "less conservative" per se, than the non-precise code,
@@ -2448,7 +2448,7 @@ static void pin_object(lispobj object)
     }
 }
 
-#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_PPC64
+#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -3561,7 +3561,7 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     }
 }
 
-#ifdef LISP_FEATURE_PPC64
+#if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
 static void semiconservative_pin_stack(struct thread* th,
                                        generation_index_t gen) {
     /* Stack can only pin code, since it contains return addresses.
@@ -3577,6 +3577,14 @@ static void semiconservative_pin_stack(struct thread* th,
     for (i = i - 1; i >= 0; --i) {
         os_context_t* context = nth_interrupt_context(i, th);
         int j;
+#if defined LISP_FEATURE_MIPS
+        mcontext_t *mctx = &context->uc_mcontext;
+        for(j=1; j<32; ++j) {
+            // context registers have more significant bits than lispobj.
+            uword_t word = mctx->gregs[j];
+            preserve_pointer(word);
+        }
+#elif defined LISP_FEATURE_PPC64
         static int boxed_registers[] = BOXED_REGISTERS;
         for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j) {
             lispobj word = *os_context_register_addr(context, boxed_registers[j]);
@@ -3587,6 +3595,7 @@ static void semiconservative_pin_stack(struct thread* th,
         // maybe it's count (raw word), maybe it's a PC. I just don't know.
         preserve_pointer(*os_context_lr_addr(context));
         preserve_pointer(*os_context_ctr_addr(context));
+#endif
         preserve_pointer(os_context_pc(context));
     }
 }
@@ -3877,7 +3886,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
              * sticky card mark on any page (in any generation)
              * referenced from the stack. */
             conservative_stack_scan(th, generation, approximate_stackptr);
-#elif defined LISP_FEATURE_PPC64
+#elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
 #elif !defined(reg_CODE)
@@ -3964,7 +3973,9 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (conservative_stack) {
         struct thread *th;
         for_each_thread(th) {
+#ifndef LISP_FEATURE_MIPS // interrupt contexts already pinned everything they see
             scavenge_interrupt_contexts(th);
+#endif
             scavenge_control_stack(th);
         }
 

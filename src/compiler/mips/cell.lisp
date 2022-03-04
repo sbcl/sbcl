@@ -298,10 +298,40 @@
 (define-full-reffer code-header-ref * 0 other-pointer-lowtag
   (descriptor-reg any-reg) * code-header-ref)
 
-(define-full-setter code-header-set * 0 other-pointer-lowtag
-  (descriptor-reg any-reg null zero) * code-header-set)
-
-
+(define-vop (code-header-set)
+  (:translate code-header-set)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg))
+         (value :scs (any-reg descriptor-reg)))
+  (:arg-types * tagged-num *)
+  (:temporary (:scs (non-descriptor-reg)) temp card)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:generator 10
+    (inst li temp (make-fixup "gc_card_table_mask" :foreign-dataref))
+    (loadw temp temp) ; address of gc_card_table_mask
+    (inst lw temp temp 0) ; value of gc_card_table_mask (4-byte int)
+    (pseudo-atomic (pa-flag)
+      ;; Compute card mark index
+      (inst srl card object gencgc-card-shift)
+      (inst and card card temp)
+      ;; Load mark table base
+      (inst li temp (make-fixup "gc_card_mark" :foreign-dataref)) ; address of linkage entry
+      (loadw temp temp) ; address of gc_card_mark
+      (loadw temp temp) ; value of gc_card_mark (pointer)
+      ;; Touch the card mark byte.
+      (inst add temp temp card)
+      (inst sb null-tn temp 0)
+      ;; set 'written' flag in the code header
+      ;; If two threads get here at the same time, they'll write the same byte.
+      (let ((byte (- #+little-endian 3 other-pointer-lowtag)))
+        (inst lbu temp object byte)
+        (inst or temp temp #x40)
+        (inst sb temp object byte))
+      ;; No need for LIP register because this is pseudo-atomic
+      (inst sll temp index (- word-shift n-fixnum-tag-bits))
+      (inst add temp object temp)
+      (inst sw value temp (- other-pointer-lowtag)))))
 
 ;;;; raw instance slot accessors
 

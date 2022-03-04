@@ -18,7 +18,7 @@
   (:args (type :scs (any-reg))
          (rank :scs (any-reg)))
   (:arg-types positive-fixnum positive-fixnum)
-  (:temporary (:scs (non-descriptor-reg)) bytes header)
+  (:temporary (:scs (non-descriptor-reg)) bytes header temp)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:generator 13
@@ -35,9 +35,8 @@
     ;; were fixnums
     (inst srl header n-fixnum-tag-bits)
     (pseudo-atomic (pa-flag)
-      (inst or result alloc-tn other-pointer-lowtag)
-      (storew header result 0 other-pointer-lowtag)
-      (inst addu alloc-tn bytes))))
+      (allocation type bytes result other-pointer-lowtag `(,pa-flag ,temp))
+      (storew header result 0 other-pointer-lowtag))))
 
 ;;;; Additional accessors and setters for the array header.
 (define-full-reffer %array-dimension *

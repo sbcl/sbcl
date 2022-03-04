@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(defconstant-eqx +fixup-kinds+ #(:absolute :jmp :lui :addi) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:absolute :jmp :lui :addi :sll-sa) #'equalp)
 
 
 ;;;; Registers
@@ -61,8 +61,8 @@
   (defreg csp 23) ; control stack pointer
   ;; More C unsaved temporaries.
   (defreg l1 24) ; tagged temporary 1
-  (defreg alloc 25) ; ALLOC pointer
-  ;; 26 and 27 are used by the system kernel.
+  (defreg cardbase 25)
+  ;; 26 and 27 are used by the syste kernel.
   (defreg k0 26)
   (defreg k1 27)
   ;; 28 is the global pointer of our C runtime
@@ -275,7 +275,7 @@
   (defregtn bsp any-reg)
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
-  (defregtn alloc any-reg)
+  (defregtn cardbase any-reg)
   (defregtn nsp any-reg)
 
   (defregtn code descriptor-reg)

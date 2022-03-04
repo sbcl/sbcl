@@ -3,7 +3,7 @@
 #ifdef LISP_FEATURE_SB_THREAD
 #include "pseudo-atomic.h"
 #else
-// unithread ARM, AARCH64, and RISCV use a static symbol for PSEUDO_ATOMIC_foo
+// MIPS, unithread ARM, AARCH64, and RISCV use a static symbol for PSEUDO_ATOMIC_foo
 static inline int
 get_pseudo_atomic_atomic(struct thread *thread)
 {

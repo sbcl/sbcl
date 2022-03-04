@@ -18,6 +18,9 @@
   ;; The o32 ABI specifies 4k-64k as page size. We have to pick the
   ;; maximum since mprotect() works only with page granularity.
 (defconstant +backend-page-bytes+ 65536)
+(defconstant gencgc-page-bytes +backend-page-bytes+)
+(defconstant gencgc-alloc-granularity 0)
+(defconstant gencgc-release-granularity +backend-page-bytes+)
 
 ;;;; Machine Architecture parameters:
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -52,21 +55,7 @@
 
 #+linux
 (progn
-  ;; Where to put the address spaces on Linux.
-  ;;
-  ;; C runtime executable segment starts at 0x00400000
-  (defconstant read-only-space-start #x01000000)
-  (defconstant read-only-space-end   #x07ff0000) ; 112 MiB
-
-  (defconstant linkage-table-space-start #x08000000)
-  ;; 64K of linkage space = 16K linkage entries
-  (defconstant linkage-table-space-end   (+ linkage-table-space-start 65536))
-  (defconstant static-space-start    linkage-table-space-end)
-  (defconstant static-space-end      #x0fff0000)
-  ;; C runtime read/write segment starts at 0x10000000, heap and DSOs
-  ;; start at 0x2a000000
-  (defparameter dynamic-0-space-start #x30000000)
-  (defparameter dynamic-0-space-end   #x4fff0000)
+  (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
   (defconstant linkage-table-entry-size 4)
   (defconstant linkage-table-growth-direction :down)
@@ -84,6 +73,8 @@
   halt-trap
   pending-interrupt-trap
   cerror-trap
+  invalid-arg-count-trap
+  allocation-trap
   breakpoint-trap
   fun-end-breakpoint-trap
   after-breakpoint-trap
@@ -101,7 +92,9 @@
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 (defconstant-eqx +static-symbols+
-  `#(,@+common-static-symbols+)
+  `#(,@+common-static-symbols+
+     *pseudo-atomic-atomic*
+     *pseudo-atomic-interrupted*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

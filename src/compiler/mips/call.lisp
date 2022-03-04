@@ -1152,7 +1152,7 @@ default-value-8
   (:temporary (:scs (any-reg) :from (:argument 0)) context)
   (:temporary (:scs (any-reg) :from (:argument 1)) count)
   (:temporary (:scs (descriptor-reg) :from :eval) temp dst)
-  (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
   (:policy :safe)
@@ -1161,8 +1161,8 @@ default-value-8
     (let* ((enter (gen-label))
            (loop (gen-label))
            (done (gen-label))
-           (dx-p (node-stack-allocate-p node))
-           (alloc-area-tn (if dx-p csp-tn alloc-tn)))
+           (leave-pa (gen-label))
+           (dx-p (node-stack-allocate-p node)))
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
@@ -1170,17 +1170,39 @@ default-value-8
       (inst move result null-tn)
 
       ;; We need to do this atomically.
-      (pseudo-atomic (pa-flag)
-        (when dx-p
-          (align-csp temp))
-        ;; Allocate a cons (2 words) for each item.
-        (inst srl result alloc-area-tn n-lowtag-bits)
-        (inst sll result n-lowtag-bits)
-        (inst or result list-pointer-lowtag)
+      (pseudo-atomic (pa-flag :elide-if dx-p)
+        (inst sll count 1)
+        (cond (dx-p
+               (allocation 'list count result list-pointer-lowtag `(,pa-flag ,temp)
+                           :stackp t))
+              (t
+               (let ((end-addr pa-flag)
+                     (new-freeptr temp)
+                     (continue (gen-label)))
+                 (without-scheduling ()
+                   (inst lw result null-tn (- cons-region nil-value))
+                   (inst lw end-addr null-tn (+ 4 (- cons-region nil-value)))
+                   (inst add new-freeptr result count)
+                   ;; Use a different 'code' field for listify. Technically there are enough
+                   ;; bits in the code field to indicate how many bytes to skip to branch out
+                   ;; of the entire loop, which the C handler could use to adjust the RA.
+                   ;; But the assembler doesn't provide a way to compute that distance.
+                   (inst tltu end-addr new-freeptr (logior #x300 (reg-tn-encoding result)))
+                   ;; Jump to the freeptr writeback
+                   (inst beq zero-tn continue)
+                   ;; Encode CONTEXT into a dummy instruction
+                   (inst addu zero-tn context context) ; ADDU never signals overflow
+                   ;; If we return here, then skip the loop
+                   (inst beq zero-tn leave-pa)
+                   (inst nop)
+                   (emit-label continue)
+                   (inst sw new-freeptr null-tn (- cons-region nil-value))
+                   (inst or result list-pointer-lowtag)))))
+
         (move dst result)
-        (inst sll temp count 1)
+
         (inst b enter)
-        (inst addu alloc-area-tn temp)
+        (inst srl count 1)
 
         ;; Store the current cons in the cdr of the previous cons.
         (emit-label loop)
@@ -1200,7 +1222,8 @@ default-value-8
         (storew temp dst 0 list-pointer-lowtag)
 
         ;; NIL out the last cons.
-        (storew null-tn dst 1 list-pointer-lowtag))
+        (storew null-tn dst 1 list-pointer-lowtag)
+        (emit-label leave-pa))
       (emit-label done))))
 
 ;;; Return the location and size of the more arg glob created by Copy-More-Arg.
@@ -1236,30 +1259,36 @@ default-value-8
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
-    (let ((err-lab
-            (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (cond ((not min)
-             (cond ((zerop max)
-                    (inst bne nargs err-lab))
-                   (t
-                    (inst li temp (fixnumize max))
-                    (inst bne nargs temp err-lab)))
-             (inst nop))
-            (max
-             (when (plusp min)
-               (inst li temp (fixnumize min))
-               (inst sltu temp nargs temp)
-               (inst bne temp err-lab)
-               (inst nop))
-             (inst li temp (fixnumize max))
-             (inst sltu temp temp nargs)
-             (inst bne temp err-lab)
-             (inst nop))
-            ((plusp min)
-             (inst li temp (fixnumize min))
-             (inst sltu temp nargs temp)
-             (inst bne temp err-lab)
-             (inst nop))))))
+   (cond
+     ((not min) ; fixed args
+      (unless (zerop max) (inst li temp (fixnumize max)))
+      (note-this-location vop :internal-error)
+      (inst tne nargs (if (zerop max) zero-tn temp) invalid-arg-count-trap))
+     (t
+      (let ((err-lab
+             (generate-error-code vop 'invalid-arg-count-error nargs)))
+       (cond ((not min)
+              (cond ((zerop max)
+                     (inst bne nargs err-lab))
+                    (t
+                     (inst li temp (fixnumize max))
+                     (inst bne nargs temp err-lab)))
+              (inst nop))
+             (max
+              (when (plusp min)
+                (inst li temp (fixnumize min))
+                (inst sltu temp nargs temp)
+                (inst bne temp err-lab)
+                (inst nop))
+              (inst li temp (fixnumize max))
+              (inst sltu temp temp nargs)
+              (inst bne temp err-lab)
+              (inst nop))
+             ((plusp min)
+              (inst li temp (fixnumize min))
+              (inst sltu temp nargs temp)
+              (inst bne temp err-lab)
+              (inst nop))))))))
 
 ;;; Single-stepping
 

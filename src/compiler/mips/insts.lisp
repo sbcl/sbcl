@@ -532,13 +532,18 @@
 
 (define-instruction sll (segment dst src1 &optional src2)
   (:declare (type tn dst)
-            (type (or tn (unsigned-byte 5) null) src1 src2))
+            (type (or tn (unsigned-byte 5) null) src1)
+            ;; use-case for fixup is GC card index calculation (WIP)
+            (type (or tn (unsigned-byte 5) null fixup) src2))
   (:printer register ((op special-op) (rs 0) (shamt nil) (funct #b000000))
             shift-printer)
   (:printer register ((op special-op) (funct #b000100)) shift-printer)
   (:dependencies (reads src1) (if src2 (reads src2) (reads dst)) (writes dst))
   (:delay 0)
   (:emitter
+   (when (and (fixup-p src2) (eq (fixup-flavor src2) :gc-barrier))
+     (note-fixup segment :sll-sa src2) ; shift amount
+     (setq src2 0))
    (emit-shift-inst segment #b00 dst src1 src2)))
 
 (define-instruction sra (segment dst src1 &optional src2)
@@ -1430,6 +1435,9 @@
     (ecase kind
       (:absolute
        (setf (sap-ref-32 sap offset) value))
+      (:sll-sa
+       (bug "Not done yet")
+       (return-from fixup-code-object :immediate))
       (:jump
        (aver (zerop (ash value -28)))
        (setf (ldb (byte 26 0) (sap-ref-32 sap offset))

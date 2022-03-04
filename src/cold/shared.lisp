@@ -334,10 +334,6 @@
           "The selected architecture requires :SB-THREAD")
          ("(and gencgc cheneygc)"
           ":GENCGC and :CHENEYGC are incompatible")
-         ("(and cheneygc (not mips))"
-          ":CHENEYGC not supported on selected architecture")
-         ("(and gencgc (not (or sparc ppc ppc64 x86 x86-64 arm arm64 riscv)))"
-          ":GENCGC not supported on selected architecture")
          ("(not (or gencgc cheneygc))"
           "One of :GENCGC or :CHENEYGC must be enabled")
          ("(and sb-safepoint (not (and (or arm64 x86 x86-64) (or darwin linux win32))))"

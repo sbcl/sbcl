@@ -1,2 +1,2 @@
-:cheneygc
+:gencgc :use-cons-region
 :alien-callbacks

@@ -58,4 +58,14 @@
          (offset (if (logbitp 31 cause) 4 0))
          (trap-number (ldb (byte 8 6) (sap-ref-32 pc offset))))
     (declare (type system-area-pointer pc))
-    (sb-kernel::decode-internal-error-args (sap+ pc (+ offset 4)) trap-number)))
+    ;; Pick off invalid-arg-count here. Otherwise call the generic routine
+    (let ((inst (sap-ref-32 pc offset)))
+      ;; FIXME: recognize the whole gamut of trap instructions
+      (cond ((and (= (ldb (byte 6 0) inst) #b110110) ; TNE
+                  (= (ldb (byte 10 6) inst) invalid-arg-count-trap))
+             (let ((rs (ldb (byte 5 21) inst))) ; expect this to be NARGS-TN
+               (values (error-number-or-lose 'invalid-arg-count-error)
+                       (list (make-sc+offset (sc-number-or-lose 'any-reg) rs))
+                       invalid-arg-count-trap)))
+            (t
+             (sb-kernel::decode-internal-error-args (sap+ pc (+ offset 4)) trap-number))))))

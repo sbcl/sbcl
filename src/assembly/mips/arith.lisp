@@ -175,15 +175,17 @@
   ;; Only need one word, fix the header.
   (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
 
-  (pseudo-atomic (pa-flag :extra (pad-data-block (+ 1 bignum-digits-offset)))
-    (inst or res alloc-tn other-pointer-lowtag)
+  (pseudo-atomic (pa-flag)
+    (allocation bignum-widetag (pad-data-block (+ 1 bignum-digits-offset))
+                res other-pointer-lowtag `(,nargs ,pa-flag))
     (storew temp res 0 other-pointer-lowtag))
   (storew lo res bignum-digits-offset other-pointer-lowtag)
   (lisp-return lra lip :offset 2)
 
   TWO-WORDS
-  (pseudo-atomic (pa-flag :extra (pad-data-block (+ 2 bignum-digits-offset)))
-    (inst or res alloc-tn other-pointer-lowtag)
+  (pseudo-atomic (pa-flag)
+    (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset))
+                res other-pointer-lowtag `(,nargs ,pa-flag))
     (storew temp res 0 other-pointer-lowtag))
 
   (storew lo res bignum-digits-offset other-pointer-lowtag)
