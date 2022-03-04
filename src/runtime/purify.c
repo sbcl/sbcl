@@ -38,7 +38,7 @@
 #include "genesis/defstruct-description.h"
 #include "genesis/hash-table.h"
 #include "code.h"
-#include "getallocptr.h"
+#include "pseudo-atomic.h"
 
 /* We don't ever do purification with GENCGC as of 1.0.5.*. There was
  * a lot of hairy and fragile ifdeffage in here to support purify on

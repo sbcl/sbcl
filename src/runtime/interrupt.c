@@ -63,7 +63,7 @@
 #include "gc.h"
 #include "alloc.h"
 #include "dynbind.h"
-#include "getallocptr.h"
+#include "pseudo-atomic.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"

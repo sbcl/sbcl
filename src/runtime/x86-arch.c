@@ -23,7 +23,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "thread.h"
-#include "getallocptr.h"
+#include "pseudo-atomic.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
 #include "code.h"

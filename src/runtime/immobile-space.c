@@ -53,7 +53,7 @@
 #include "genesis/vector.h"
 #include "genesis/layout.h"
 #include "forwarding-ptr.h"
-#include "getallocptr.h"
+#include "pseudo-atomic.h"
 #include "var-io.h"
 #include "immobile-space.h"
 #include "unaligned.h"

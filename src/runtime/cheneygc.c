@@ -35,7 +35,7 @@
 #include "arch.h"
 #include "code.h"
 #include "private-cons.inc"
-#include "getallocptr.h"
+#include "pseudo-atomic.h"
 #include "genesis/gc-tables.h" // for leaf_obj_widetag_p
 
 /* So you need to debug? */

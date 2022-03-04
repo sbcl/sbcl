@@ -15,7 +15,7 @@
 #include "os.h"
 #include "lispregs.h"
 #include "signal.h"
-#include "getallocptr.h"
+#include "pseudo-atomic.h"
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"

@@ -22,7 +22,7 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-#include "getallocptr.h"
+#include "pseudo-atomic.h"
 
 os_vm_address_t
 arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
