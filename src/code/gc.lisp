@@ -24,7 +24,8 @@
 (progn
   (declaim (inline dynamic-space-free-pointer))
   (defun dynamic-space-free-pointer ()
-    (extern-alien "dynamic_space_free_pointer" system-area-pointer)))
+    (sap+ (int-sap (current-dynamic-space-start))
+          (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
 
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()

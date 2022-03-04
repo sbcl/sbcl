@@ -235,7 +235,6 @@ extern page_index_t page_table_pages;
 
 /* forward declarations */
 
-void update_dynamic_space_free_pointer(void);
 void gc_close_region(struct alloc_region *alloc_region, int page_type);
 static inline void ensure_region_closed(struct alloc_region *alloc_region,
                                         int page_type)

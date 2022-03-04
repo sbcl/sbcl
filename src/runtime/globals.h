@@ -23,6 +23,9 @@
 
 #ifndef __ASSEMBLER__
 
+extern sword_t next_free_page;
+#define dynamic_space_highwatermark() (next_free_page*GENCGC_PAGE_BYTES+DYNAMIC_SPACE_START)
+
 #ifdef LISP_FEATURE_SB_THREAD
 
 #ifdef LISP_FEATURE_ARM64
@@ -81,7 +84,6 @@ extern lispobj *current_control_frame_pointer;
 extern lispobj *current_binding_stack_pointer;
 #endif
 
-extern lispobj *dynamic_space_free_pointer;
 extern lispobj *read_only_space_free_pointer;
 extern lispobj *static_space_free_pointer;
 
@@ -155,11 +157,6 @@ EXTERN(current_control_stack_pointer)
 EXTERN(current_control_frame_pointer)
 # if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
 EXTERN(current_binding_stack_pointer)
-# endif
-// don't want an undefined C symbol for this in 'nm' output, it's confusing
-# if defined LISP_FEATURE_CHENEYGC && \
-  !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
-EXTERN(dynamic_space_free_pointer)
 # endif
 
 #endif /* __ASSEMBLER__ */

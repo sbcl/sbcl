@@ -106,7 +106,6 @@ void save_gc_crashdump(char *pathname,
     fprintf(stderr, "save: %d threads\n", nthreads);
     struct crash_preamble preamble;
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
-    gc_assert(nbytes_heap == ((uword_t)dynamic_space_free_pointer - DYNAMIC_SPACE_START));
 #ifdef LISP_FEATURE_SB_THREAD
     int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
 #else
@@ -460,12 +459,6 @@ regs_cmd(char __attribute__((unused)) **ptr)
     printf("STATIC\t=\t%p   ", static_space_free_pointer);
     printf("RDONLY\t=\t%p   ", read_only_space_free_pointer);
     printf("DYNAMIC\t=\t%p\n", (void*)current_dynamic_space);
-#endif
-
-#ifndef ALLOCATION_POINTER
-    printf("ALLOC\t=\t%p\n", (void*)dynamic_space_free_pointer);
-#else
-    printf("ALLOC\t=\t%p\n", (void*)SymbolValue(ALLOCATION_POINTER, thread));
 #endif
 
 #ifndef LISP_FEATURE_GENCGC
@@ -880,7 +873,6 @@ int load_gc_crashdump(char* pathname)
     static_space_free_pointer = (lispobj*)(STATIC_SPACE_START + preamble.static_nbytes);
     DYNAMIC_SPACE_START = preamble.dynspace_start;
     long dynspace_nbytes = preamble.dynspace_npages * GENCGC_PAGE_BYTES;
-    dynamic_space_free_pointer = (void*)(DYNAMIC_SPACE_START + dynspace_nbytes);
     char* dynspace = os_validate(0, (char*)preamble.dynspace_start,
                                  DEFAULT_DYNAMIC_SPACE_SIZE, 0, 0);
     if (dynspace != (char*)preamble.dynspace_start)

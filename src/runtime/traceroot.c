@@ -14,7 +14,6 @@
 #include "genesis/layout.h"
 #include "genesis/package.h"
 #include "genesis/vector.h"
-#include "getallocptr.h" // for get_alloc_pointer()
 #include "search.h"
 #include "genesis/avlnode.h"
 #include "genesis/sap.h"

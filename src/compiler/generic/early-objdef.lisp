@@ -20,15 +20,8 @@
 ;;;   * LIST-POINTER-LOWTAG + N-WORD-BYTES = OTHER-POINTER-LOWTAG: NIL
 ;;;     is both a cons and a symbol (at the same address) and depends on this.
 ;;;     See the definition of SYMBOL in objdef.lisp
-;;;   * OTHER-POINTER-LOWTAG > 4: Some code in the SPARC backend,
-;;;     which uses bit 2 of the ALLOC register to indicate that
-;;;     PSEUDO-ATOMIC is on, doesn't strip the low bits of reg_ALLOC
-;;;     before ORing in OTHER-POINTER-LOWTAG within a PSEUDO-ATOMIC
-;;;     section.
 ;;;   * OTHER-IMMEDIATE-0-LOWTAG are spaced 4 apart: various code wants to
-;;;     iterate through these
-;;;   * Allocation code on Alpha wants lowtags for heap-allocated
-;;;     objects to be odd.
+;;;     iterate through these.  (This is not true on PPC64)
 ;;; (These are just the ones we know about as of sbcl-0.7.1.22. There
 ;;; might easily be more, since these values have stayed highly
 ;;; constrained for more than a decade, an inviting target for

@@ -2240,8 +2240,8 @@ static void defrag_immobile_space(boolean verbose)
 
     // Dynamic space
     // We can safely ignore allocation region boundaries.
-    fixup_space(current_dynamic_space,
-                (lispobj*)get_alloc_pointer() - current_dynamic_space);
+    fixup_space((lispobj*)DYNAMIC_SPACE_START,
+                (uword_t)dynamic_space_highwatermark() - DYNAMIC_SPACE_START);
 
     // Copy the spaces back where they belong.
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE

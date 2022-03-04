@@ -967,30 +967,6 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
                    thread);
     unbind(thread);
 #endif
-
-#if defined(reg_ALLOC) && !defined(LISP_FEATURE_SB_THREAD)
-    /* Put the dynamic space free pointer back into the context. */
-    *os_context_register_addr(context, reg_ALLOC) =
-        (uword_t) dynamic_space_free_pointer
-        | (*os_context_register_addr(context, reg_ALLOC)
-           & LOWTAG_MASK);
-    /*
-      ((uword_t)(*os_context_register_addr(context, reg_ALLOC))
-      & ~LOWTAG_MASK)
-      | ((uword_t) dynamic_space_free_pointer & LOWTAG_MASK);
-    */
-#endif
-#if defined(reg_ALLOC) && defined(LISP_FEATURE_SB_THREAD)
-    /* Put the pseudo-atomic bits and dynamic space free pointer back
-     * into the context (p-a-bits for p-a, and dynamic space free
-     * pointer for ROOM). */
-    *os_context_register_addr(context, reg_ALLOC) =
-        (uword_t) dynamic_space_free_pointer
-        | (thread->pseudo_atomic_bits & LOWTAG_MASK);
-    /* And clear them so we don't get bit later by call-in/call-out
-     * not updating them. */
-    thread->pseudo_atomic_bits = 0;
-#endif
 }
 
 /* a handler for the signal caused by execution of a trap opcode

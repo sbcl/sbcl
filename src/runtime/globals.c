@@ -50,7 +50,6 @@ lispobj *current_control_frame_pointer;
 lispobj *current_binding_stack_pointer;
 #endif
 
-lispobj *dynamic_space_free_pointer;
 lispobj *read_only_space_free_pointer;
 lispobj *static_space_free_pointer;
 

@@ -324,11 +324,6 @@ struct generation generations[NUM_GENERATIONS];
  * data can be avoided. */
 generation_index_t gencgc_oldest_gen_to_gc = HIGHEST_NORMAL_GENERATION;
 
-/* The maximum used page in the heap is maintained and used to update
- * ALLOCATION_POINTER which is used by the room function to limit its
- * search of the heap. XX Gencgc obviously needs to be better
- * integrated with the Lisp code. */
-
 page_index_t next_free_page; // upper (exclusive) bound on used page range
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -990,10 +985,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         page_index_t page;
         INSTRUMENTING(page = find_single_page(page_type, nbytes, gc_alloc_generation),
                       et_find_freeish_page);
-        if (page+1 > next_free_page) {
-            next_free_page = page+1;
-            set_alloc_pointer((lispobj)page_address(next_free_page));
-        }
+        if (page+1 > next_free_page) next_free_page = page+1;
         page_table[page].gen = gc_alloc_generation;
         page_table[page].type = OPEN_REGION_PAGE_FLAG | page_type;
 #ifdef LISP_FEATURE_DARWIN_JIT
@@ -1489,10 +1481,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
     gc_assert(most_bytes_found_to);
     // most_bytes_found_to is the upper exclusive bound on the found range.
     // next_free_page is the high water mark of most_bytes_found_to.
-    if (most_bytes_found_to > next_free_page) {
-        next_free_page = most_bytes_found_to;
-        set_alloc_pointer((lispobj)(page_address(next_free_page)));
-    }
+    if (most_bytes_found_to > next_free_page) next_free_page = most_bytes_found_to;
     *restart_page_ptr = most_bytes_found_from;
     return most_bytes_found_to-1;
 }
@@ -4244,7 +4233,7 @@ find_next_free_page(void)
         if (page_words_used(i) != 0)
             last_page = i;
 
-    /* The last free page is actually the first available page */
+    /* 1 page beyond the last used page is the next free page */
     return last_page + 1;
 }
 
@@ -4513,7 +4502,6 @@ collect_garbage(generation_index_t last_gen)
         high_water_mark = next_free_page;
 
     next_free_page = find_next_free_page();
-    set_alloc_pointer((lispobj)(page_address(next_free_page)));
 
     /* Update auto_gc_trigger. Make sure we trigger the next GC before
      * running out of heap! */
@@ -4679,7 +4667,7 @@ void gc_allocate_ptes()
         // core was compiled for, so we need to patch all code blobs.
         gcbarrier_patch_code_range(READ_ONLY_SPACE_START, read_only_space_free_pointer);
         gcbarrier_patch_code_range(STATIC_SPACE_START, static_space_free_pointer);
-        gcbarrier_patch_code_range(DYNAMIC_SPACE_START, dynamic_space_free_pointer);
+        gcbarrier_patch_code_range(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark());
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         gcbarrier_patch_code_range(VARYOBJ_SPACE_START, varyobj_free_pointer);
 #endif
@@ -5381,11 +5369,6 @@ gc_and_save(char *filename, boolean prepend_runtime,
 #endif
     os_unlink_runtime();
 
-    /* The number of dynamic space pages saved is based on the allocation
-     * pointer, while the number of PTEs is based on next_free_page.
-     * Make sure they agree */
-    gc_assert((char*)get_alloc_pointer() == page_address(next_free_page));
-
     if (prepend_runtime)
         save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
                                    application_type);
@@ -5479,10 +5462,9 @@ void gc_load_corefile_ptes(int card_table_nbits,
         }
     }
     generations[gen].bytes_allocated = bytes_allocated;
-    gc_assert((ssize_t)bytes_allocated <=
-              ((char*)get_alloc_pointer() - page_address(0)));
+    gc_assert((ssize_t)bytes_allocated <= (ssize_t)(n_ptes * GENCGC_PAGE_BYTES));
     // write-protecting needs the current value of next_free_page
-    next_free_page = n_ptes;
+    gc_assert(next_free_page == n_ptes);
     if (gen != 0 && ENABLE_PAGE_PROTECTION) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         page_index_t p;

@@ -17,9 +17,6 @@
 #ifndef GETALLOCPTR_H
 #define GETALLOCPTR_H
 
-# define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
-# define get_alloc_pointer() (dynamic_space_free_pointer)
-
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
 
 # include "allocptr-x86.inc"
@@ -27,7 +24,7 @@
 #elif defined LISP_FEATURE_SPARC || defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
 
 // PPC always uses the canonical variant of of PA flag manipulation:
-// per-thread bits, no static symbols, and no messing with low bits of dynamic_space_free_pointer.
+// per-thread bits, no static symbols.
 // The PA-Atomic field is at byte 0 of the thread slot regardless of endianness.
 // The PA-Interrupted field is at byte 2 regardless of endian-ness.
 // This holds for either word size.

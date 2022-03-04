@@ -21,7 +21,6 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
-#include "getallocptr.h" // for get_alloc_pointer()
 
 lispobj *
 search_read_only_space(void *pointer)
@@ -100,7 +99,7 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
     // It has become even less safe now that don't prezero most pages during GC,
     // because we will certainly encounter remnants of forwarding pointers etc.
     // So if the specified range is all of dynamic space, defer to the space walker.
-    if (start == DYNAMIC_SPACE_START && end == (uword_t)get_alloc_pointer()) {
+    if (start == DYNAMIC_SPACE_START && end == dynamic_space_highwatermark()) {
         struct symbol_search ss = {name, ignore_case};
         return (lispobj*)walk_generation(search_symbol_aux, -1, (uword_t)&ss);
     }
@@ -150,7 +149,7 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
         if (where >= (lispobj*)DYNAMIC_SPACE_START)
             break;
         where = (lispobj*)DYNAMIC_SPACE_START;
-        end = (lispobj*)get_alloc_pointer();
+        end = (lispobj*)dynamic_space_highwatermark();
     }
     return 0;
 }
