@@ -449,7 +449,6 @@ lra:
 	stw reg_THREAD,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 #else
 	/* Store lisp state */
-	store(reg_NL1,reg_NL2,CSYMBOL(dynamic_space_free_pointer))
 	store(reg_BSP,reg_NL2,CSYMBOL(current_binding_stack_pointer))
 	store(reg_CSP,reg_NL2,CSYMBOL(current_control_stack_pointer))
 	store(reg_CFP,reg_NL2,CSYMBOL(current_control_frame_pointer))

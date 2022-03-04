@@ -339,18 +339,6 @@ handle_allocation_trap(os_context_t * context)
     fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
 #endif
 
-    /*
-     * alloc-tn was incremented by size.  Need to decrement it by size
-     * to restore its original value. This is not true on GENCGC
-     * anymore. d_s_f_p and reg_alloc get out of sync, but the p_a
-     * bits stay intact and we set it to the proper value when it
-     * needs to be. Keep this comment here for the moment in case
-     * somebody tries to figure out what happened here.
-     */
-    /*    dynamic_space_free_pointer =
-        (lispobj *) ((long) dynamic_space_free_pointer - size);
-    */
-
     char *memory;
     {
         extern lispobj *alloc(sword_t), *alloc_list(sword_t);
@@ -359,11 +347,6 @@ handle_allocation_trap(os_context_t * context)
         memory = (char*)(alloc_trap_p < 0 ? alloc_list(size) : alloc(size));
         data->allocation_trap_context = 0;
     }
-
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "alloc returned %p\n", memory);
-    fprintf(stderr, "free_pointer = %p\n", dynamic_space_free_pointer);
-#endif
 
     /*
      * The allocation macro wants the result to point to the end of the
