@@ -27,6 +27,7 @@
 #include "genesis/funcallable-instance.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
+#include "genesis/symbol.h"
 
 #define zero $0
 #define AT $1
@@ -103,6 +104,17 @@ symbol:
 		.type	symbol,@function;		\
 symbol:
 
+/* zero (or anything non-nil) -> atomic=true and NIL -> atomic=false  */
+#define BEGIN_PSEUDO_ATOMIC \
+	.set	noreorder ; \
+	sw 	zero, (PSEUDO_ATOMIC_ATOMIC+SYMBOL_VALUE_OFFSET-NIL)(reg_NIL) ; \
+	.set	reorder
+#define END_PSEUDO_ATOMIC(temp) \
+	.set	noreorder ; \
+	sw	reg_NIL, (PSEUDO_ATOMIC_ATOMIC+SYMBOL_VALUE_OFFSET-NIL)(reg_NIL) ; \
+	lw	temp, (PSEUDO_ATOMIC_INTERRUPTED+SYMBOL_VALUE_OFFSET-NIL)(reg_NIL) ; \
+	tne	zero, temp, 0 ; \
+	.set	reorder
 
 	.text
 
@@ -137,27 +149,14 @@ symbol:
 	li	reg_FDEFN, 0		# t6
 	li	reg_L1, 0		# t8
 
-	/* Turn on pseudo-atomic. */
-	.set	noreorder
-	li	reg_NL4, 0
-	li	reg_ALLOC, 1
-        .set    reorder
-
-	/* Load the allocation pointer, preserving the low-bit of alloc */
-	lw	reg_BSP, dynamic_space_free_pointer
-	addu	reg_ALLOC, reg_BSP
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Load the rest of the LISP state. */
 	lw	reg_BSP, current_binding_stack_pointer
 	lw	reg_CSP, current_control_stack_pointer
 	lw	reg_OCFP, current_control_frame_pointer
 
-	/* Check for interrupt */
-        .set    noreorder
-	bgez	reg_NL4, 1f
-	 subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-1:	.set	reorder
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Pass in args */
 	move	reg_LEXENV, a0
@@ -200,24 +199,14 @@ lra:	.word	RETURN_PC_WIDETAG
 	/* Mark us as in C land. */
 	sw	reg_CSP, foreign_function_call_active
 
-	/* Set the pseudo-atomic flag. */
-	li	reg_NL4, 0
-	addu	reg_ALLOC, 1
-	.set	reorder
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Save LISP state. */
-	subu	reg_NL0, reg_ALLOC, 1
-	sw	reg_NL0, dynamic_space_free_pointer
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
 
-	/* Check for interrupt */
-	.set	noreorder
-	bgez	reg_NL4, 1f
-	 subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-1:	.set	reorder
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Pass one return value back to C land. For a 64bit value, we may
 	   need to clobber v1 aka reg_NL4. */
@@ -257,11 +246,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	/* Mark us as in C land. */
 	sw	reg_CSP, foreign_function_call_active
 
-	/* Set the pseudo-atomic flag. */
-	.set	noreorder
-	li	reg_NL4, 0
-	addu	reg_ALLOC, 1
-	.set	reorder
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Convert the return address to an offset and save it on the stack. */
 	subu	reg_NFP, reg_LIP, reg_CODE
@@ -272,8 +257,6 @@ lra:	.word	RETURN_PC_WIDETAG
 	sw	$gp, 12(reg_CFP) // should this be saved? on the control stack?
 
 	/* Save LISP state. */
-	subu	reg_A0, reg_ALLOC, 1
-	sw	reg_A0, dynamic_space_free_pointer
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
@@ -282,18 +265,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	   $25 must cotain the address of the called function." */
 	lw	$25, (reg_CFUNC) /* linkage-table indirection */
 
-	/* Check for interrupt */
-	.set	noreorder
-	bgez	reg_NL4, 1f
-	/* Don't put the following 'subu' in the delay slot of the 'bgez'
-	 * because reg_ALLOC is $25 which now contains the callee address */
-	nop
-	subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-	// load $25 again if 'bgez' was not taken (and reg_ALLOC was trashed)
-	lw	$25, (reg_CFUNC) /* linkage-table indirection */
-	nop
-1:	.set	reorder
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Into C land we go. */
 	jalr	$25
@@ -327,15 +299,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	li	reg_CODE, 0		# s8
 	li	reg_LIP, 0		# ra
 
-	/* Turn on pseudo-atomic. */
-	.set	noreorder
-	li	reg_NL4, 0
-	li	reg_ALLOC, 1
-	.set	reorder
-
-	/* Load the allocation pointer, preserving the low-bit of alloc */
-	lw	reg_BSP, dynamic_space_free_pointer
-	addu	reg_ALLOC, reg_BSP
+	BEGIN_PSEUDO_ATOMIC
 
 	lw	reg_BSP, current_binding_stack_pointer
 
@@ -345,12 +309,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	subu	reg_LIP, reg_NFP, OTHER_POINTER_LOWTAG
 	addu	reg_LIP, reg_CODE
 
-	/* Check for interrupt */
-	.set	noreorder
-	bgez	reg_NL4, 1f
-	 subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-1:	.set	reorder
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Reset the lisp stack. */
 	/* Note: OCFP and CFP are in saved regs. */
