@@ -5411,6 +5411,9 @@ void gc_load_corefile_ptes(int card_table_nbits,
 {
     gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
               == (size_t)total_bytes);
+    if (next_free_page != n_ptes)
+        lose("n_PTEs=%"PAGE_INDEX_FMT" but expected %"PAGE_INDEX_FMT,
+             n_ptes, next_free_page);
 
     // Allocation of PTEs is delayed 'til now so that calloc() doesn't
     // consume addresses that would have been taken by a mapped space.
@@ -5463,8 +5466,6 @@ void gc_load_corefile_ptes(int card_table_nbits,
     }
     generations[gen].bytes_allocated = bytes_allocated;
     gc_assert((ssize_t)bytes_allocated <= (ssize_t)(n_ptes * GENCGC_PAGE_BYTES));
-    // write-protecting needs the current value of next_free_page
-    gc_assert(next_free_page == n_ptes);
     if (gen != 0 && ENABLE_PAGE_PROTECTION) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
         page_index_t p;
