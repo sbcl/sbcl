@@ -981,7 +981,7 @@ process_directory(int count, struct ndir_entry *entry,
              * For gencgc this is #defined as DYNAMIC_SPACE_START */
             current_dynamic_space = (lispobj *)addr;
 #else
-            next_free_page = entry->page_count;
+            next_free_page = entry->page_count * BACKEND_PAGE_BYTES/GENCGC_PAGE_BYTES;
 #endif
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
         }
