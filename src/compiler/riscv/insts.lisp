@@ -980,7 +980,7 @@
    ;; because COMPONENT-HEADER-LENGTH is known at this point.
    (let ((offset (+ (component-header-length)
                     ;; skip over jump table word and entries
-                    (* (1+ (component-n-jump-table-entries *component-being-compiled*))
+                    (* (1+ (component-n-jump-table-entries))
                        n-word-bytes)
                     mark-index
                     (- other-pointer-lowtag))))

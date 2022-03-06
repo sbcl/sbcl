@@ -3378,7 +3378,7 @@
    (assemble (segment)
      (inst mov :byte (rip-relative-ea (segment-origin segment)
                                       ;; skip over jump table word and entries
-                                      (+ (* (1+ (component-n-jump-table-entries *component-being-compiled*))
+                                      (+ (* (1+ (component-n-jump-table-entries))
                                             n-word-bytes)
                                          mark-index))
            1))))
