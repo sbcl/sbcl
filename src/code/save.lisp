@@ -315,7 +315,7 @@ sufficiently motivated to do lengthy fixes."
   (call-hooks "save" *save-hooks*)
   #+win32 (itimer-emulation-deinit)
   #+sb-thread
-  (let (err)
+  (let (error)
     (with-system-mutex (sb-thread::*make-thread-lock*)
       (finalizer-thread-stop)
       #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
@@ -328,10 +328,10 @@ sufficiently motivated to do lengthy fixes."
           (let* ((interactive (sb-thread::interactive-threads))
                  (other (union (set-difference threads interactive)
                                (union starting joinable))))
-            (make-condition 'save-with-multiple-threads-error
-                            :interactive-threads interactive
-                            :other-threads other)))))
-    (when err (error err))
+            (setf error (make-condition 'save-with-multiple-threads-error
+                                        :interactive-threads interactive
+                                        :other-threads other))))))
+    (when error (error error))
     #+allocator-metrics (setq sb-thread::*allocator-metrics* nil)
     (setq sb-thread::*sprof-data* nil))
   (tune-image-for-dump)
