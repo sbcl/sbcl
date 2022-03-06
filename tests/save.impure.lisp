@@ -11,7 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(with-test (:name (sb-ext:save-lisp-and-die error :multiple-threads))
+(with-test (:name (sb-ext:save-lisp-and-die error :multiple-threads)
+            :skipped-on (:not :sb-thread))
   (let* ((mutex (sb-thread:make-mutex))
          (cvar (sb-thread:make-waitqueue))
          (donep nil)
