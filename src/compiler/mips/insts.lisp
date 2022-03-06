@@ -1463,7 +1463,9 @@
    ;; for MIPS, I very much suspect that something would go wrong
    ;; by emitting more than 1 CPU instruction from within an emitter.
    (let ((offset (+ (component-header-length)
-                    n-word-bytes ; skip over jump table word
+                    ;; skip over jump table word and entries
+                    (* (1+ (component-n-jump-table-entries *component-being-compiled*))
+                       n-word-bytes)
                     mark-index
                     (- other-pointer-lowtag))))
      (inst* segment 'sb sb-vm::null-tn sb-vm::code-tn

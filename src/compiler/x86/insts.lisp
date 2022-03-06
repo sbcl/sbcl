@@ -2454,7 +2454,9 @@
 (define-instruction store-coverage-mark (segment mark-index)
   (:emitter
    (let ((offset (+ (component-header-length)
-                    n-word-bytes ; skip over jump table word
+                    ;; skip over jump table word and entries
+                    (* (1+ (component-n-jump-table-entries *component-being-compiled*))
+                       n-word-bytes)
                     mark-index
                     (- other-pointer-lowtag))))
      (assemble (segment)

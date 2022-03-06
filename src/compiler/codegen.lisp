@@ -35,6 +35,9 @@
         (header-length-in-bytes *component-being-compiled*)
         (* sb-vm:n-word-bytes (align-up sb-vm:code-constants-offset 2)))))
 
+(defun component-n-jump-table-entries (&optional (component *component-being-compiled*))
+  (ir2-component-n-jump-table-entries (component-info component)))
+
 ;;; the size of the NAME'd SB in the currently compiled component.
 ;;; This is useful mainly for finding the size for allocating stack
 ;;; frames.
@@ -145,7 +148,7 @@
          (error "EMIT-INLINE-CONSTANT called with ~S" args)))
 ;;; Emit the subset of inline constants which represent jump tables
 ;;; and remove those constants so that they don't get emitted again.
-(defun emit-jump-tables ()
+(defun emit-jump-tables (ir2-component)
   ;; Other backends will probably need relative jump tables instead
   ;; of absolute tables because of the problem of needing to load
   ;; the LIP register prior to loading an arbitrary PC.
@@ -169,6 +172,7 @@
       ;; is a jump table. I don't think that's worth the trouble.
       (emit section `(.lispword ,(1+ nwords)))
       (when (plusp nwords)
+        (setf (ir2-component-n-jump-table-entries ir2-component) nwords)
         (dolist (constant (jump-tables))
           (sb-vm:emit-inline-constant section (car constant) (cdr constant)))
         (let ((nremaining (length (other))))
@@ -341,7 +345,7 @@
           (sb-assem::asmstream-data-origin-label asmstream))
     ;; Jump tables precede the coverage mark bytes to simplify locating
     ;; them in trans_code().
-    (emit-jump-tables)
+    (emit-jump-tables ir2-component)
     (let ((coverage-map (ir2-component-coverage-map ir2-component)))
       (unless (zerop (length coverage-map))
         ;; Nothing depends on the length of the constant vector at this

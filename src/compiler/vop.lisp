@@ -374,6 +374,8 @@
   ;; collect dynamic statistics.)
   #+sb-dyncount
   (dyncount-info nil :type (or null dyncount-info))
+  ;; the number of jump table entries in this component
+  (n-jump-table-entries 0 :type index)
   ;; an array of references to lists of original source paths covered
   ;; for coverage instrumentation.
   (coverage-map (make-array 0 :fill-pointer 0 :adjustable t)

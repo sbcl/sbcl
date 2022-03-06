@@ -1794,7 +1794,9 @@
    ;; No backpatch is needed to compute the offset into the code header
    ;; because COMPONENT-HEADER-LENGTH is known at this point.
    (let* ((offset (+ (component-header-length)
-                     n-word-bytes ; skip over jump table word
+                     ;; skip over jump table word and entries
+                     (* (1+ (component-n-jump-table-entries *component-being-compiled*))
+                        n-word-bytes)
                      mark-index
                      (- other-pointer-lowtag)))
           (addr
