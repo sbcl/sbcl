@@ -134,7 +134,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
                 "trashed object");
     }
     // Must not point to a forwarding pointer
-    FAIL_IF(*native_pointer(thing) == 0x01, "forwarding ptr");
+    FAIL_IF(*native_pointer(thing) == FORWARDING_HEADER, "forwarding ptr");
     // Forbid pointers from R/O space into a GCed space
     FAIL_IF((READ_ONLY_SPACE_START <= (uword_t)where && where < read_only_space_free_pointer),
             "dynamic space from RO space");

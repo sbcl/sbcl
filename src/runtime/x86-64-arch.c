@@ -611,18 +611,18 @@ lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
     // This logic is rather nasty, but I don't know what else to do.
     lispobj word;
     if (header_widetag(word = raw_addr[-2]) == SIMPLE_FUN_WIDETAG
-        || (word == 1 &&
+        || (word == FORWARDING_HEADER &&
             widetag_of(native_pointer(forwarding_pointer_value(raw_addr-2)))
             == SIMPLE_FUN_WIDETAG))
         return make_lispobj(raw_addr - 2, FUN_POINTER_LOWTAG);
     int widetag;
     if ((widetag = header_widetag(word = raw_addr[-4])) == CODE_HEADER_WIDETAG
-        || (word == 1 &&
+        || (word == FORWARDING_HEADER &&
             widetag_of(native_pointer(forwarding_pointer_value(raw_addr-4)))
             == CODE_HEADER_WIDETAG))
         return make_lispobj(raw_addr - 4, OTHER_POINTER_LOWTAG);
     if (widetag == FUNCALLABLE_INSTANCE_WIDETAG
-        || (word == 1 &&
+        || (word == FORWARDING_HEADER &&
             widetag_of(native_pointer(forwarding_pointer_value(raw_addr-4)))
             == FUNCALLABLE_INSTANCE_WIDETAG))
         return make_lispobj(raw_addr - 4, FUN_POINTER_LOWTAG);

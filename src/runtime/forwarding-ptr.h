@@ -8,11 +8,13 @@ in_gc_p(void) {
 }
 #endif
 
+#define FORWARDING_HEADER 1
+
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {
     lispobj first_word=*pointer;
 #ifdef LISP_FEATURE_GENCGC
-    return (first_word == 0x01);
+    return (first_word == FORWARDING_HEADER);
 #else
     // FIXME: change 5c0d71f92c371769f911e6a2ac60b2dd9fbde349 added
     // an extra test here, which theoretically slowed things down.
@@ -50,7 +52,7 @@ static inline void set_forwarding_pointer(lispobj *addr, lispobj newspace_copy) 
   // that we're operating on a not-yet-forwarded object here.
 #ifdef LISP_FEATURE_GENCGC
     gc_dcheck(compacting_p());
-    addr[0] = 0x01;
+    addr[0] = FORWARDING_HEADER;
     addr[1] = newspace_copy;
 #else
     addr[0] = newspace_copy;
