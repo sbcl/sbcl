@@ -95,7 +95,7 @@ find . \( \
         -name 'core' -o \
         -name '?*.core' -o \
         -name '*.map' -o \
-        -name '*.nm' -o \
+        -name '*.mk' -o \
         -name '*.host-obj' -o \
         -name '*.lisp-obj' -o \
         -name '*.target-obj' -o \
