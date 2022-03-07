@@ -107,7 +107,7 @@
 
 ;;; bug 379
 (with-test (:name (trace :encapsulate nil)
-            :fails-on (or (and :ppc (not :linux)) :sparc :arm64)
+            :fails-on (or (and :ppc (not :linux)) :arm64)
             :broken-on (or :freebsd))
   (let ((output (with-traced-function (trace-this :encapsulate nil)
                   (assert (eq 'ok (trace-this))))))
@@ -115,7 +115,7 @@
     (assert (search "returned OK" output))))
 
 (with-test (:name (trace :encapsulate nil :recursive)
-            :fails-on (or (and :ppc (not :linux)) :sparc :arm64)
+            :fails-on (or (and :ppc (not :linux)) :arm64)
             :broken-on (or :freebsd))
   (let ((output (with-traced-function (trace-fact :encapsulate nil)
                   (assert (= 120 (trace-fact 5))))))
