@@ -183,7 +183,7 @@
   (:info name words type lowtag stack-allocate-p)
   (:ignore name stack-allocate-p)
   (:temporary (:scs (any-reg)) bytes)
-  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:temporary (:sc non-descriptor-reg :from (:argument 0) :to (:eval 0)) pa-flag)
   (:temporary (:sc non-descriptor-reg) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 6

@@ -80,10 +80,6 @@
         (move code null-tn)
         (inst j done)))))
 
-(define-vop (code-from-lra code-from-mumble)
-  (:translate sb-di::lra-code-header)
-  (:variant other-pointer-lowtag))
-
 (define-vop (code-from-fun code-from-mumble)
   (:translate sb-di::fun-code-header)
   (:variant fun-pointer-lowtag))

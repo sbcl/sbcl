@@ -119,26 +119,6 @@
 byte-ordering issues."
   `(inst lbu ,target ,source ,offset))
 
-(defun lisp-jump (function)
-  "Jump to the lisp function FUNCTION."
-  (inst jalr zero-tn function (- (ash simple-fun-insts-offset word-shift)
-                                 fun-pointer-lowtag)))
-
-(defun lisp-return (return-pc return-style)
-  "Return to RETURN-PC."
-  (ecase return-style
-    (:single-value (inst li nargs-tn -1))
-    (:multiple-values)
-    (:known))
-  ;; Avoid the LRA header word.
-  (inst jalr zero-tn return-pc (- n-word-bytes other-pointer-lowtag)))
-
-(defun emit-return-pc (label)
-  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
-  (emit-alignment n-lowtag-bits)
-  (emit-label label)
-  (inst lra-header-word))
-
 
 ;;;; Three Way Comparison
 (defun three-way-comparison (x y condition flavor not-p target)
@@ -721,7 +701,7 @@ and
               (inst ori result-tn result-tn lowtag)))
            (assemble (:elsewhere)
              (emit-label alloc)
-             (invoke-asm-routine (alloc-tramp-stub-name (tn-offset result-tn) type))
+             (inst jal lip-tn (make-fixup (alloc-tramp-stub-name (tn-offset result-tn) type) :assembly-routine))
              (inst j back-from-alloc))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size

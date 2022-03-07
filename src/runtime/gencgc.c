@@ -3550,6 +3550,28 @@ static void __attribute__((unused)) maybe_pin_code(lispobj addr) {
     }
 }
 
+#if defined reg_RA
+static void conservative_pin_code_from_return_addresses(struct thread* th) {
+    lispobj *object_ptr;
+    // We need more information to reliably backtrace through a call
+    // chain, as these backends may generate leaf functions where the
+    // return address does not get spilled. Therefore, fall back to
+    // scanning the entire stack for potential interior code pointers.
+    for (object_ptr = th->control_stack_start;
+         object_ptr < access_control_stack_pointer(th);
+         object_ptr++)
+        maybe_pin_code(*object_ptr);
+    int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+    // Scan return registers in interrupted frames: They may contain
+    // interior code pointers that weren't spilled onto the stack, as
+    // is the case for leaf functions.
+    for (i = i - 1; i >= 0; --i) {
+        os_context_t* context = nth_interrupt_context(i, th);
+        maybe_pin_code((lispobj)*os_context_register_addr(context, reg_RA));
+    }
+}
+#endif
+
 #if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
 static void semiconservative_pin_stack(struct thread* th,
                                        generation_index_t gen) {
@@ -3605,7 +3627,7 @@ static void pin_call_chain(struct thread* th) {
         lispobj* ocfp = (lispobj *) cfp[0];
         lispobj lr = cfp[1];
         if (ocfp == 0)
-          break;
+            break;
         maybe_pin_code(lr);
         cfp = ocfp;
       }
@@ -3878,6 +3900,8 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
+#elif defined REG_RA
+            conservative_pin_code_from_return_addresses(th);
 #elif !defined(reg_CODE)
             pin_call_chain(th);
 #endif

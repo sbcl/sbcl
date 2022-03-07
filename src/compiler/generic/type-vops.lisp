@@ -320,7 +320,8 @@
 
 (define-type-vop code-component-p (code-header-widetag))
 
-#-(or x86 x86-64 arm64) (define-type-vop lra-p (return-pc-widetag))
+#-(or x86 x86-64 arm64 riscv)
+(define-type-vop lra-p (return-pc-widetag))
 
 (define-type-vop fdefn-p (fdefn-widetag))
 

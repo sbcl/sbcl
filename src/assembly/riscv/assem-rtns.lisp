@@ -20,7 +20,7 @@
     ((:temp nvals any-reg nargs-offset)
      (:temp vals any-reg nl0-offset)
      (:temp ocfp any-reg nl1-offset)
-     (:temp lra descriptor-reg lra-offset)
+     (:temp ra non-descriptor-reg ra-offset)
 
      ;; These are just needed to facilitate the transfer
      (:temp count any-reg nl2-offset)
@@ -79,7 +79,7 @@
   (with-fixnum-as-word-index (nvals temp)
     (inst add csp-tn ocfp-tn nvals))
   ;; Return.
-  (lisp-return lra :multiple-values))
+  (inst jalr zero-tn ra 0))
 
 #+sb-assembling ;; no vop for this one either.
 (define-assembly-routine
@@ -127,13 +127,15 @@
   DONE
   ;; We are done.  Do the jump.
   (with-word-index-as-fixnum (nargs nargs))
-  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump temp))
+  (loadw count lexenv closure-fun-slot fun-pointer-lowtag)
+  (inst jalr zero-tn count
+        (- (ash simple-fun-insts-offset word-shift)
+           fun-pointer-lowtag)))
 
 
 ;;;; Non-local exit noise.
 
-(define-assembly-routine (throw (:return-style :none))
+(define-assembly-routine throw
   ((:arg target (descriptor-reg any-reg) a0-offset)
    (:arg start (descriptor-reg any-reg) ocfp-offset)
    (:arg count (descriptor-reg any-reg) nargs-offset)
@@ -154,17 +156,16 @@
 
   EXIT
   (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
-  (invoke-asm-routine 'unwind))
+  (inst jal zero-tn (make-fixup 'unwind :assembly-routine)))
 
 (define-assembly-routine (unwind
-                          (:return-style :none)
                           (:translate %unwind)
                           (:policy :fast-safe))
   ((:arg block (descriptor-reg any-reg) a0-offset)
    (:arg start (descriptor-reg any-reg) ocfp-offset)
    (:arg count (descriptor-reg any-reg) nargs-offset)
-   (:temp lra descriptor-reg lra-offset)
    (:temp cur-uwp any-reg nl0-offset)
+   (:temp temp any-reg nl1-offset)
    (:temp target-uwp any-reg nl2-offset))
   (declare (ignore start count))
 
@@ -180,8 +181,8 @@
   DO-EXIT
   (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
   (loadw code-tn cur-uwp unwind-block-code-slot)
-  (loadw lra cur-uwp unwind-block-entry-pc-slot)
-  (lisp-return lra :known)
+  (loadw temp cur-uwp unwind-block-entry-pc-slot)
+  (inst jalr zero-tn temp 0)
 
   DO-UWP
   (loadw target-uwp cur-uwp unwind-block-uwp-slot)
@@ -254,10 +255,10 @@
      (:arg nargs (any-reg) ca2-offset)
      #+sb-thread
      (:arg tls-ptr (any-reg) ca3-offset)
+     (:arg ra (any-reg) ra-offset)
 
      (:temp a0 descriptor-reg a0-offset)
 
-     (:temp lra descriptor-reg lra-offset)
      (:temp value (descriptor-reg any-reg) ca0-offset)
 
      ;; Don't want these to overlap with C args.
@@ -281,15 +282,11 @@
         for index from 0
         do (loadw arg cfp-tn index))
 
-  (inst compute-lra lra lip-tn lra-label)
   ;; Indirect closure.
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   ;; Call into Lisp!
-  (inst jalr zero-tn code-tn (- (* simple-fun-insts-offset n-word-bytes)
-                                fun-pointer-lowtag))
-  (emit-alignment n-lowtag-bits)
-  LRA-LABEL
-  (inst machine-word return-pc-widetag)
+  (inst jalr ra code-tn (- (* simple-fun-insts-offset n-word-bytes)
+                           fun-pointer-lowtag))
 
   (inst blt nargs-tn zero-tn single-value-return)
   (move csp-tn ocfp-tn)
@@ -302,7 +299,7 @@
     (save-lisp-context csp-tn cfp-tn temp))
 
   (restore-c-registers)
-  (inst jalr zero-tn lip-tn 0))
+  (inst jalr zero-tn ra 0))
 
 (define-assembly-routine (call-into-c (:return-style :none))
     ((:arg cfunc (any-reg) cfunc-offset)
@@ -323,22 +320,16 @@
   (move cfp-tn csp-tn)
   (inst addi csp-tn cfp-tn 32)
 
-  (pseudo-atomic (pa-temp)
-    ;; Convert the return address to an offset and save it on the stack.
-    (inst sub nfp-tn lip-tn code-tn)
-    (inst addi nfp-tn nfp-tn other-pointer-lowtag)
-    ;; Ensure it has fixnum nature so GC doesn't croak.
-    (when (> n-fixnum-tag-bits 2)
-      (inst slli nfp-tn nfp-tn (- n-fixnum-tag-bits 2)))
-    (storew ocfp-tn cfp-tn)
-    (storew nfp-tn cfp-tn 1)
-    (storew code-tn cfp-tn 2)
+  (storew ocfp-tn cfp-tn)
+  (storew ra-tn cfp-tn 1)
+  (storew code-tn cfp-tn 2)
 
+  (pseudo-atomic (pa-temp)
     (save-lisp-context csp-tn cfp-tn temp))
 
   ;; Call into C.
   (loadw cfunc cfunc) ; dereference the linkage table entry
-  (inst jalr lip-tn cfunc 0)
+  (inst jalr ra-tn cfunc 0)
 
   ;; Pass the return values to Lisp.
   (move value0-pass ca0)
@@ -353,17 +344,14 @@
     ;; registers and not bother loading them out again..
     (set-up-lisp-context csp-tn cfp-tn temp)
     (loadw ocfp-tn cfp-tn 0)
-    (loadw nfp-tn cfp-tn 1)
-    (loadw code-tn cfp-tn 2)
-    (when (> n-fixnum-tag-bits 2)
-      (inst srli nfp-tn nfp-tn (- n-fixnum-tag-bits 2)))
-    (inst add lip-tn nfp-tn code-tn))
+    (loadw ra-tn cfp-tn 1)
+    (loadw code-tn cfp-tn 2))
 
   ;; Reset the Lisp stack.
   (move csp-tn cfp-tn)
   (move cfp-tn ocfp-tn)
 
-  (inst jalr zero-tn lip-tn (- other-pointer-lowtag)))
+  (inst jalr zero-tn ra-tn 0))
 
 (define-assembly-routine (do-pending-interrupt (:return-style :none))
     ()

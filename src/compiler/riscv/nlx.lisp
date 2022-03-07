@@ -86,7 +86,7 @@
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
-    (inst compute-lra temp lip entry-label code-tn)
+    (inst compute-ra temp lip entry-label code-tn)
     (storew temp block catch-block-entry-pc-slot)))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
@@ -105,7 +105,7 @@
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
     (storew code-tn result catch-block-code-slot)
-    (inst compute-lra temp lip entry-label code-tn)
+    (inst compute-ra temp lip entry-label code-tn)
     (storew temp result catch-block-entry-pc-slot)
 
     (storew tag result catch-block-tag-slot)
@@ -155,7 +155,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
@@ -194,7 +194,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (move res value)
     (load-stack-tn csp-tn sp)))
@@ -216,7 +216,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
 
     (let ((loop (gen-label))
@@ -250,5 +250,5 @@
   (:ignore block start count)
   (:vop-var vop)
   (:generator 0
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)))

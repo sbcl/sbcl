@@ -11,7 +11,7 @@
   ;; to the return address? Without it, backtraces get truncated and
   ;; are incorrect. Are the other backends wrong as well by not adding
   ;; 8?
-  (+ (context-register scp lip-offset) 8))
+  (+ (context-register scp ra-offset) 8))
 
 
 ;;; CONTEXT-FLOAT-REGISTER

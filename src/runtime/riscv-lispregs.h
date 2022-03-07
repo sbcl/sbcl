@@ -18,11 +18,11 @@
 #define NREGS (32)
 
 #define reg_ZERO     REG(0)
-#define reg_LIP      REG(1)
+#define reg_RA       REG(1)
 #define reg_NSP      REG(2)
 #define reg_GLOBAL   REG(3)
 #define reg_TP       REG(4)
-#define reg_LRA      REG(5)
+#define reg_LIP      REG(5)
 #define reg_CFP      REG(6)
 #define reg_OCFP     REG(7)
 #define reg_NFP      REG(8)

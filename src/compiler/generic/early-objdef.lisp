@@ -207,8 +207,8 @@
   #+64-bit closure-widetag                  ;       41       41
 
   ;; x86[-64] does not have objects with this widetag,
-  #-(or x86 x86-64 arm64) return-pc-widetag ;  3E   45  3E   45
-  #+(or x86 x86-64 arm64) lra-widetag-notused
+  #-(or x86 x86-64 arm64 riscv) return-pc-widetag ;  3E   45  3E   45
+  #+(or x86 x86-64 arm64 riscv) lra-widetag-notused
 
   value-cell-widetag                        ;  42   49  42   49
   character-widetag                         ;  46   4D  46   4D

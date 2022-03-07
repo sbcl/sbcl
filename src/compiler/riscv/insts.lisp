@@ -906,21 +906,21 @@
                          (component-header-length))))
                  src)))
 
-(define-instruction compute-lra (segment dest lip lra-label &optional src)
+
+(define-instruction compute-ra (segment dest lip label &optional src)
   (:vop-var vop)
   (:emitter
    (emit-compute segment vop dest lip
                  (lambda (position &optional magic-value)
-                   (- (+ (label-position lra-label
-                                         (when magic-value position)
-                                         magic-value)
-                         other-pointer-lowtag)
+                   (- (label-position label
+                                      (when magic-value position)
+                                      magic-value)
                       position))
-                 ;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
-                 ;;     = code + header + label-offset
+                 ;; ra = code + header + label-offset - other-pointer-tag
                  (lambda (position &optional (magic-value 0))
-                   (+ (label-position lra-label position magic-value)
-                      (component-header-length)))
+                   (+ (label-position label position magic-value)
+                      (component-header-length)
+                      (- other-pointer-lowtag)))
                  src)))
 
 (defun emit-header-data (segment type)
@@ -935,10 +935,6 @@
 (define-instruction simple-fun-header-word (segment)
   (:emitter
    (emit-header-data segment simple-fun-widetag)))
-
-(define-instruction lra-header-word (segment)
-  (:emitter
-   (emit-header-data segment return-pc-widetag)))
 
 (define-instruction-macro load-layout-id (reg layout)
   `(progn (inst .layout-id-fixup ,layout)

@@ -851,7 +851,11 @@ build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
             access_control_frame_pointer(th)[0] =
                 *os_context_register_addr(context, reg_OCFP);
             access_control_frame_pointer(th)[1] =
-                *os_context_register_addr(context, reg_LRA);
+#ifdef reg_LRA
+              *os_context_register_addr(context, reg_LRA);
+#else
+              *os_context_register_addr(context, reg_RA);
+#endif
             access_control_frame_pointer(th) += 2;
             /* Build our frame on top of it. */
             oldcont = (lispobj)(*os_context_register_addr(context, reg_CFP));

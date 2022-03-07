@@ -41,7 +41,7 @@
      (inst addi csp-tn csp-tn n-word-bytes)
      (storew free+size csp-tn -1)
      (move free+size lip-tn)
-     (invoke-asm-routine 'alloc-tramp)
+     (inst jal lip-tn (make-fixup 'alloc-tramp :assembly-routine))
      (move lip-tn object-end)
      (loadw object-end csp-tn -1)
      (inst subi csp-tn csp-tn n-word-bytes)
@@ -92,7 +92,7 @@
     ;; picks out entry 0, if 0 it picks out 1.
     (inst andi temp ca0 (ash 1 sb-vm:word-shift))
     (inst add temp null-tn temp)
-    (loadw lip-tn temp 0 (- nil-value (linkage-table-entry-address 1)))
+    (loadw ra-tn temp 0 (- nil-value (linkage-table-entry-address 1)))
     (inst andi ca0 ca0 (lognot (ash 1 sb-vm:word-shift))) ; clear the selector bit
     ;; Recover and save the size.
     (load-alloc-free-pointer temp)
@@ -100,7 +100,7 @@
     (storew ca0 csp-tn -1)
     (inst addi csp-tn csp-tn lisp-framesize)
     (save-to-stack float-registers nsp-tn float-start t)
-    (inst jalr lip-tn lip-tn 0)
+    (inst jalr ra-tn ra-tn 0)
     (pop-from-stack float-registers nsp-tn float-start t)
     (inst subi csp-tn csp-tn lisp-framesize)
     (loadw temp csp-tn -1)
@@ -135,7 +135,7 @@
                       (:align n-lowtag-bits)
                       (:export (undefined-tramp
                                 (+ xundefined-tramp fun-pointer-lowtag))))
-    ((:temp lra descriptor-reg lra-offset))
+    ((:temp ra non-descriptor-reg ra-offset))
   (inst machine-word simple-fun-widetag)
   (inst machine-word (make-fixup 'undefined-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
@@ -146,7 +146,7 @@
   ;; doesn't point to a code object as undefined function.
   (inst li code-tn (make-fixup 'undefined-tramp :assembly-routine))
   (storew ocfp-tn cfp-tn 0)
-  (storew lra cfp-tn 1)
+  (storew ra cfp-tn 1)
   (error-call nil 'undefined-fun-error lexenv-tn))
 
 (define-assembly-routine

@@ -303,7 +303,7 @@
      (load-tls-index tls-index symbol)
      (inst bne tls-index zero-tn TLS-VALID)
      (move alloc-tls-symbol symbol)
-     (invoke-asm-routine 'alloc-tls-index)
+     (inst jal lip (make-fixup 'alloc-tls-index :assembly-routine))
      TLS-VALID
      (inst add lip thread-base-tn tls-index)
      (loadw value-temp lip)

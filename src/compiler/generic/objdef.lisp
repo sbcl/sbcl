@@ -251,17 +251,17 @@ during backtrace.
 (defconstant simple-fun-source-slot  2) ; form and/or docstring
 (defconstant simple-fun-info-slot    3) ; type and possibly xref
 
-#-(or x86 x86-64 arm64)
+#-(or x86 x86-64 arm64 riscv)
 (define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))
 
 (define-primitive-object (closure :lowtag fun-pointer-lowtag
-                                   :widetag closure-widetag
-                                   ;; This allocator is used when renaming or cloning
-                                   ;; a closure. The compiler has its own way of making
-                                   ;; closures which requires that the length be
-                                   ;; a compile-time constant.
-                                   :alloc-trans %alloc-closure)
+                                  :widetag closure-widetag
+                                  ;; This allocator is used when renaming or cloning
+                                  ;; a closure. The compiler has its own way of making
+                                  ;; closures which requires that the length be
+                                  ;; a compile-time constant.
+                                  :alloc-trans %alloc-closure)
   (fun :init :arg :ref-trans #+(or x86 x86-64 arm64) %closure-callee
                              #-(or x86 x86-64 arm64) %closure-fun)
   ;; 'fun' is an interior pointer to code, but we also need the base pointer

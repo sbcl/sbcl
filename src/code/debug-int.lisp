@@ -770,7 +770,7 @@
     (bogus-debug-fun
      ;; No handy backend (or compiler) defined constant for this one,
      ;; so construct it here and now.
-     (sb-c:make-sc+offset control-stack-sc-number lra-save-offset))))
+     (sb-c:make-sc+offset control-stack-sc-number #-riscv lra-save-offset #+riscv sb-vm::ra-save-offset))))
 
 (defun old-fp-offset-for-location (debug-fun location)
   (declare (ignorable debug-fun location))
@@ -857,7 +857,7 @@
 ;;; Note: Sometimes LRA is actually a fixnum. This happens when lisp
 ;;; calls into C. In this case, the code object is stored on the stack
 ;;; after the LRA, and the LRA is the word offset.
-#-(or x86 x86-64 arm64)
+#-(or x86 x86-64 arm64 riscv)
 (defun compute-calling-frame (caller lra up-frame &optional savedp)
   (declare (type system-area-pointer caller)
            (ignore savedp))
@@ -909,18 +909,18 @@
                                                         escaped)
                                  (if up-frame (1+ (frame-number up-frame)) 0)
                                  escaped))))))
-#+arm64
-(defun compute-calling-frame (caller lra up-frame &optional savedp)
+#+(or arm64 riscv)
+(defun compute-calling-frame (caller ra up-frame &optional savedp)
   (declare (type system-area-pointer caller)
            (ignore savedp))
   (when (control-stack-pointer-valid-p caller)
     (multiple-value-bind (code pc-offset escaped)
-        (if lra
-            (let* ((lr (int-sap (ash lra n-fixnum-tag-bits)))
-                   (code (code-header-from-pc lr)))
+        (if ra
+            (let* ((ra-sap (int-sap (ash ra n-fixnum-tag-bits)))
+                   (code (code-header-from-pc ra-sap)))
               (values code
                       (if code
-                          (sap- lr (code-instructions code))
+                          (sap- ra-sap (code-instructions code))
                           0)))
             (find-escaped-frame caller))
       (if (and (code-component-p code)
@@ -934,7 +934,7 @@
                          (:foreign-function
                           (make-bogus-debug-fun
                            (foreign-function-backtrace-name
-                            (int-sap (get-lisp-obj-address lra)))))
+                            (int-sap (get-lisp-obj-address ra)))))
                          ((nil)
                           (make-bogus-debug-fun
                            "bogus stack frame"))
@@ -1113,8 +1113,10 @@
                      (sap-int (context-pc context))
                      code
                      (%code-entry-point code 0)
-                     #-(or arm arm64)
+                     #-(or riscv arm arm64)
                      (context-register context sb-vm::lra-offset)
+                     #+riscv
+                     (context-register context sb-vm::ra-offset)
                      #+(or arm arm64)
                      (stack-ref (int-sap (context-register context
                                                            sb-vm::cfp-offset))
@@ -1190,6 +1192,7 @@ register."
            (let ((widetag (widetag-of object)))
              (cond ((= widetag code-header-widetag)
                     object)
+                   #-riscv
                    ((= widetag return-pc-widetag)
                     (lra-code-header object))
                    ((= widetag simple-fun-widetag)
@@ -1298,7 +1301,7 @@ register."
         (fp (frame-pointer frame)))
     (labels ((catch-ref (slot)
                (sap-ref-lispobj catch (* slot n-word-bytes)))
-             #-(or x86 x86-64 arm64)
+             #-(or x86 x86-64 arm64 riscv)
              (catch-entry-offset ()
                (let* ((lra (catch-ref catch-block-entry-pc-slot))
                       (component (catch-ref catch-block-code-slot))
@@ -1308,12 +1311,15 @@ register."
                  (* (- (1+ (get-header-data lra))
                        (code-header-words component))
                     n-word-bytes)))
-             #+(or x86 x86-64 arm64)
+             #+(or x86 x86-64 arm64 riscv)
              (catch-entry-offset ()
                (let* ((ra (sap-ref-sap
                            catch (* catch-block-entry-pc-slot
                                     n-word-bytes)))
-                      (component (code-header-from-pc ra)))
+                      (component #+riscv
+                                 (catch-ref catch-block-code-slot)
+                                 #+(or x86 x86-64 arm64)
+                                 (code-header-from-pc ra)))
                  (- (sap-int ra)
                     (- (get-lisp-obj-address component)
                        other-pointer-lowtag)
@@ -3684,10 +3690,11 @@ register."
 ;;; state of the program, not merely a return PC location.
 ;;; (I tried changing this to DEFUN-CACHED, which failed a regression test)
 (defun make-bpt-lra (real-lra)
-  (declare (type #-(or x86 x86-64 arm64) lra #+(or x86 x86-64 arm64) system-area-pointer real-lra))
+  (declare (type #-(or x86 x86-64 arm64 riscv) lra #+(or x86 x86-64 arm64 riscv) system-area-pointer real-lra))
   real-lra
   #+arm64 (error "Breakpoints do not work on ARM64")
-  #-arm64
+  #+riscv (error "Breakpoints don't work on RISC-V")
+  #-(or arm64 riscv)
   (macrolet ((symbol-addr (name)
                `(find-dynamic-foreign-symbol-address ,name))
              (trap-offset ()

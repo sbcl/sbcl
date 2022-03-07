@@ -265,7 +265,11 @@ call_info_from_context(struct call_info *info, os_context_t *context)
         info->frame =
             (struct call_frame *)(uword_t)
                 (*os_context_register_addr(context, reg_OCFP));
+#ifdef reg_LRA
         info->lra = (lispobj)(*os_context_register_addr(context, reg_LRA));
+#else
+        info->lra = (lispobj)(*os_context_register_addr(context, reg_RA));
+#endif
         info->code = code_pointer(info->lra);
         pc = (uword_t)native_pointer(info->lra);
     } else
@@ -366,13 +370,13 @@ lisp_backtrace(int nframes)
         printf("%4d: ", i);
         // Print spaces to keep the alignment nice
         if (info.interrupted
-#ifdef reg_CODE
+#ifdef reg_LRA
             || info.lra == NIL
 #endif
             ) {
             putchar('[');
             if (info.interrupted) { footnotes |= 1; putchar('I'); }
-#ifdef reg_CODE
+#ifdef reg_LRA
             if (info.lra == NIL) { footnotes |= 2; putchar('*'); }
 #endif
             putchar(']');
@@ -418,7 +422,7 @@ lisp_backtrace(int nframes)
 
     } while (++i <= nframes);
     if (footnotes) printf("Note: [I] = interrupted"
-#ifdef reg_CODE
+#ifdef reg_LRA
                           ", [*] = no LRA"
 #endif
                           "\n");

@@ -13,14 +13,13 @@
 
 
 (defconstant-eqx c-saved-registers
-    '#.`(,lip-offset 8 9 ,@(loop for i from 18 to 27 collect i))
+    '#.`(1 8 9 ,@(loop for i from 18 to 27 collect i))
   #'equal)
 
 (defconstant-eqx c-unsaved-registers
-    '#.`(,lip-offset
-         ,@(loop for i from 5 to 7 collect i)
-         ,@(loop for i from 10 to 17 collect i)
-         ,@(loop for i from 28 to 31 collect i))
+    '#.`(1 ,@(loop for i from 5 to 7 collect i)
+           ,@(loop for i from 10 to 17 collect i)
+           ,@(loop for i from 28 to 31 collect i))
   #'equal)
 
 (defconstant-eqx c-saved-float-registers
@@ -192,7 +191,7 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (move cfunc function)
-      (invoke-asm-routine 'call-into-c)
+      (inst jal ra-tn (make-fixup 'call-into-c :assembly-routine))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
