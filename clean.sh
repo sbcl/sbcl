@@ -14,7 +14,7 @@ set -e
 # this script (including "gmake clean" in the src/runtime directory)
 # several times in a row without failure.. so we leave the output/
 # directory in place.)
-rm -rf obj/* output/* src/runtime/genesis/
+rm -rf obj/* output/* src/runtime/genesis/ src/runtime/sbcl.mk
 
 # Ensure that we know GNUMAKE.
 . ./find-gnumake.sh
@@ -95,7 +95,6 @@ find . \( \
         -name 'core' -o \
         -name '?*.core' -o \
         -name '*.map' -o \
-        -name '*.mk' -o \
         -name '*.host-obj' -o \
         -name '*.lisp-obj' -o \
         -name '*.target-obj' -o \
