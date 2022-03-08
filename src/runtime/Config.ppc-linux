@@ -18,11 +18,7 @@ ARCH_SRC = ppc-arch.c
 OS_SRC = linux-os.c linux-mman.c ppc-linux-os.c
 OS_LIBS = -ldl -Wl,-no-as-needed
 
-ifdef LISP_FEATURE_GENCGC
-  GC_SRC = fullcgc.c gencgc.c traceroot.c
-else
-  GC_SRC = cheneygc.c
-endif
+GC_SRC = fullcgc.c gencgc.c traceroot.c
 
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
