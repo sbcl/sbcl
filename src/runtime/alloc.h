@@ -20,7 +20,7 @@
 #ifdef LISP_FEATURE_RISCV
 # define SAP_ALIGN 32 /* this seems to do the trick */
 #else
-# define N_WORD_BYTES * 2
+# define SAP_ALIGN N_WORD_BYTES * 2
 #endif
 
 #define DX_ALLOC_SAP(var_name, ptr)                                        \
