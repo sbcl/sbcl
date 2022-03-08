@@ -27,57 +27,7 @@
 
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
-#if 1 /* New way. */
     return (os_vm_address_t)code->si_addr;
-#else /* Old way, almost certainly predates sigaction(2)-style handlers */
-    unsigned int badinst;
-    unsigned int *pc;
-    int rs1;
-
-    pc = (unsigned int *)OS_CONTEXT_PC(context);
-
-    /* On the sparc, we have to decode the instruction. */
-
-    /* Make sure it's not the pc thats bogus, and that it was lisp code */
-    /* that caused the fault. */
-    if ((unsigned long) pc & 3) {
-      /* Unaligned */
-      return NULL;
-    }
-    if ((pc < READ_ONLY_SPACE_START ||
-         pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) &&
-        (pc < current_dynamic_space ||
-         pc >= current_dynamic_space + dynamic_space_size)) {
-      return NULL;
-    }
-
-    badinst = *pc;
-
-    if ((badinst >> 30) != 3)
-        /* All load/store instructions have op = 11 (binary) */
-        return 0;
-
-    rs1 = (badinst>>14)&0x1f;
-
-    if (badinst & (1<<13)) {
-        /* r[rs1] + simm(13) */
-        int simm13 = badinst & 0x1fff;
-
-        if (simm13 & (1<<12))
-            simm13 |= -1<<13;
-
-        return (os_vm_address_t)
-            (*os_context_register_addr(context, rs1)+simm13);
-    }
-    else {
-        /* r[rs1] + r[rs2] */
-        int rs2 = badinst & 0x1f;
-
-        return (os_vm_address_t)
-            (*os_context_register_addr(context, rs1) +
-             *os_context_register_addr(context, rs2));
-    }
-#endif
 }
 
 void arch_skip_instruction(os_context_t *context)

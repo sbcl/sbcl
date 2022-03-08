@@ -5,8 +5,6 @@
 
 #define _ASM
 
-#include "sparc-funcdef.h"
-
 #include "lispregs.h"
 #include "globals.h"
 #include "sbcl.h"
@@ -35,7 +33,6 @@
 #define ST_FLUSH_WINDOWS 0x03
 	.seg    "text"
         .global call_into_lisp
-	FUNCDEF(call_into_lisp)
 call_into_lisp:
         save    %sp, -FRAMESIZE, %sp
 
@@ -126,7 +123,6 @@ lra:
         restore	%sp, FRAMESIZE, %sp
 
         .global call_into_c
-	FUNCDEF(call_into_c)
 call_into_c:
         /* Build a lisp stack frame */
         mov     reg_CFP, reg_OCFP
@@ -233,7 +229,6 @@ fun_end_breakpoint_trap:
 fun_end_breakpoint_end:
 
 	.global sparc_flush_icache
-	FUNCDEF(sparc_flush_icache)
 sparc_flush_icache:
         add %o0,%o1,%o2
 1:      iflush %o0			! flush instruction cache
@@ -245,14 +240,12 @@ sparc_flush_icache:
         nop
 
 	.global do_pending_interrupt
-	FUNCDEF(do_pending_interrupt)
 do_pending_interrupt:
         unimp	trap_PendingInterrupt
         retl
         nop
 
 	.global save_context
-	FUNCDEF(save_context)
 save_context:
 	ta	ST_FLUSH_WINDOWS	! flush register windows
 	retl				! return from leaf routine

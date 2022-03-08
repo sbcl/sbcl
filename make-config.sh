@@ -680,22 +680,7 @@ case "$sbcl_arch" in
     fi
     ;;
   sparc)
-    # Test the compiler in order to see if we are building on Sun
-    # toolchain as opposed to GNU binutils, and write the appropriate
-    # FUNCDEF macro for assembler. No harm in running this on sparc-linux
-    # as well.
-    sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
-    if [ "$sbcl_os" = "netbsd" ] || [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
-        printf ' :gencgc' >> $ltf
-    else
-        echo '***'
-        echo '*** You are running SPARC on other than SunOS, NetBSD, or Linux.  Since'
-        echo '*** GENCGC is untested on this combination, make-config.sh'
-        echo '*** is falling back to CHENEYGC.  Please consider adjusting'
-        echo '*** parms.lisp to build with GENCGC instead.'
-        echo '***'
-        printf ' :cheneygc' >> $ltf
-    fi
+    printf ' :gencgc' >> $ltf
     ;;
 esac
 
