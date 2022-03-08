@@ -14,16 +14,11 @@
 
 ;;;; type format database
 
-(defstruct (room-info (:constructor make-room-info (mask name kind))
+;;; FIXME: this structure seems to no longer serve a purpose.
+;;; We'd do as well with a simple-vector of (or symbol cons saetp).
+(defstruct (room-info (:constructor make-room-info (name))
                       (:copier nil))
-    ;; the mask applied to HeaderValue to compute object size
-    (mask 0 :type (and fixnum unsigned-byte) :read-only t)
-    ;; the name of this type
-    (name nil :type symbol :read-only t)
-    ;; kind of type (how to reconstitute an object)
-    (kind nil
-          :type (member :other :closure :instance :list :code :fdefn)
-          :read-only t))
+    (name nil :type symbol :read-only t)) ; the name of this type
 (declaim (freeze-type room-info))
 
 (defun room-info-type-name (info)
@@ -33,58 +28,30 @@
 
 (defconstant tiny-boxed-size-mask #xFF)
 (defun compute-room-infos ()
-  (let ((infos (make-array 256 :initial-element nil))
-        (default-size-mask (mask-field (byte 23 0) -1)))
+  (let ((infos (make-array 256 :initial-element nil)))
     (dolist (obj *primitive-objects*)
       (let ((widetag (primitive-object-widetag obj))
             (lowtag (primitive-object-lowtag obj))
             (name (primitive-object-name obj)))
-        (when (and (eq lowtag 'other-pointer-lowtag)
-                   (not (member widetag '(t nil))))
-          (setf (svref infos (symbol-value widetag))
-                (case name
-                 (fdefn  (make-room-info 0 name :fdefn))
-                 (symbol (make-room-info tiny-boxed-size-mask name :other))
-                 (t      (make-room-info default-size-mask name :other)))))))
+        (when (and (member lowtag '(other-pointer-lowtag fun-pointer-lowtag
+                                    instance-pointer-lowtag))
+                   (not (member widetag '(t nil simple-fun-widetag))))
+          (setf (svref infos (symbol-value widetag)) (make-room-info name)))))
 
-    (let ((info (make-room-info tiny-boxed-size-mask 'array-header :other)))
+    (let ((info (make-room-info 'array-header)))
       (dolist (code (list #+sb-unicode complex-character-string-widetag
                           complex-base-string-widetag simple-array-widetag
                           complex-bit-vector-widetag complex-vector-widetag
                           complex-array-widetag))
         (setf (svref infos code) info)))
 
-    (setf (svref infos bignum-widetag)
-          ;; Lose 1 more bit than n-widetag-bits because fullcgc robs 1 bit,
-          ;; not that this is expected to work concurrently with gc.
-          (make-room-info (ash most-positive-word (- (1+ n-widetag-bits)))
-                          'bignum :other))
-    (setf (svref infos filler-widetag)
-          (make-room-info (ash most-positive-word (- (1+ n-widetag-bits)))
-                          'filler :other))
-
-    (setf (svref infos closure-widetag)
-          (make-room-info short-header-max-words 'closure :closure))
+    (setf (svref infos filler-widetag) (make-room-info 'filler))
 
     (dotimes (i (length *specialized-array-element-type-properties*))
       (let ((saetp (aref *specialized-array-element-type-properties* i)))
-        (when (saetp-specifier saetp) ;; SIMPLE-ARRAY-NIL is a special case.
-          (setf (svref infos (saetp-typecode saetp)) saetp))))
+        (setf (svref infos (saetp-typecode saetp)) saetp)))
 
-    ;; This one is here for completeness only- LENGTH does not imply size.
-    (setf (svref infos simple-array-nil-widetag)
-          (make-room-info 0 'simple-array-nil :other))
-
-    (setf (svref infos code-header-widetag)
-          (make-room-info 0 'code :code))
-
-    (setf (svref infos instance-widetag)
-          (make-room-info 0 'instance :instance))
-
-    (setf (svref infos funcallable-instance-widetag)
-          (make-room-info short-header-max-words 'funcallable-instance :closure))
-
-    (let ((cons-info (make-room-info 0 'cons :list)))
+    (let ((cons-info (make-room-info 'cons)))
       ;; A cons consists of two words, both of which may be either a
       ;; pointer or immediate data.  According to the runtime this means
       ;; either a fixnum, a character, an unbound-marker, a single-float
