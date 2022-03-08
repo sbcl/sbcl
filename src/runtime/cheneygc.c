@@ -52,6 +52,8 @@ lispobj *from_space_free_pointer;
 lispobj *new_space;
 lispobj *new_space_free_pointer;
 
+lispobj *current_dynamic_space;
+
 /* This does nothing. It's only to satisfy a reference from gc-common. */
 char gc_coalesce_string_literals = 0;
 
