@@ -598,24 +598,11 @@
         (prefix-len 0) ; sum of lengths of any prefix instruction(s)
         (prefix-print-names nil)) ; reverse list of prefixes seen
 
-   ;; To minimize the extent of disabled GC, the obligatory disabling for
-   ;; cheneygc occurs inside the per-instruction loop rather than around it.
-   ;; Otherwise, operating on huge memory regions could exhaust the heap.
-   ;; gencgc can do better though: pin SEG-OBJECT once only outside the loop.
-   (macrolet ((with-pinned-segment (&body body)
-                #-gencgc `(without-gcing
-                            (setf (dstate-segment-sap dstate)
-                                  (funcall (seg-sap-maker segment)))
-                            ,@body)
-                #+gencgc `(progn ,@body)))
-
     (rewind-current-segment dstate segment)
 
-    ;; Do not pin anything yet if using cheneygc, as that would inhibit GC
-    ;; with a larger scope than strictly necessary.
-    (with-pinned-objects (#+gencgc (seg-object (dstate-segment dstate))
-                          #+gencgc dstate) ; for SAP access to SCRATCH-BUF
-     #+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
+    (with-pinned-objects ((seg-object (dstate-segment dstate))
+                          dstate) ; for SAP access to SCRATCH-BUF
+     (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
      ;; Now commence disssembly of instructions
      (loop
@@ -636,7 +623,6 @@
       (call-offs-hooks nil stream dstate)
 
       (unless (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
-        (with-pinned-segment
          (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
                                     (dstate-cur-offs dstate)))
                 (raw-chunk (get-dchunk dstate))
@@ -693,7 +679,7 @@
                           (funcall function chunk inst)
 
                           (awhen (inst-control inst)
-                            (funcall it chunk inst stream dstate))))))))))
+                            (funcall it chunk inst stream dstate)))))))))
 
       (setf (dstate-cur-offs dstate) (dstate-next-offs dstate))
 
@@ -708,7 +694,7 @@
               (nconc (dstate-filtered-arg-pool-free dstate)
                      (dstate-filtered-arg-pool-in-use dstate)))
         (setf (dstate-filtered-arg-pool-in-use dstate) nil)
-        (setf (dstate-inst-properties dstate) 0)))))))
+        (setf (dstate-inst-properties dstate) 0))))))
 
 
 (defun collect-labelish-operands (args cache)
@@ -742,15 +728,6 @@
   ;; add labels at the beginning with a label-number of nil; we'll notice
   ;; later and fill them in (and sort them)
   (declare (type disassem-state dstate))
-  ;; Holy cow, is this flaky. The problem is that labels are computed as absolute
-  ;; addresses, yet GC is (in theory) able to relocate the code while disassembling.
-  ;; The labels wouldn't make sense if that happens.
-  ;; I'm disinclined to revise all of the backends to compute labels relative to
-  ;; code-instructions. Probably we shouldn't try to support code movement while
-  ;; disassembling, it's just not worth the headache.
-  ;; However, a potential fix might be to pin the code while scanning it for
-  ;; labels, then relativize all labels to the segment base.
-  ;; When disassembling arbitrary memory, relativization would be skipped.
   (let ((labels (dstate-labels dstate)))
     (map-segment-instructions
      (lambda (chunk inst)
@@ -792,17 +769,14 @@
      dstate)
     ;; erase any notes that got there by accident
     (setf (dstate-notes dstate) nil)
-    ;; add labels from code header jump tables. As noted above,
-    ;; this is buggy if code moves, but no worse than anything else.
+    ;; add labels from code header jump tables.
     ;; CODE-JUMP-TABLE-WORDS = 0 if the architecture doesn't have jump tables.
     (binding* ((code (seg-code segment) :exit-if-null))
       (with-pinned-objects (code)
         (loop with insts = (code-instructions code)
               for i from 1 below (code-jump-table-words code)
               do (pushnew (cons (sap-ref-word insts (ash i sb-vm:word-shift)) nil)
-                          labels :key #'car
-                          ;; FIXME: compiler uses EQ instead of EQL unless forced
-                          :test #'=))))
+                          labels :key #'car :test #'=))))
     ;; Return the new list
     (setf (dstate-labels dstate) labels)))
 
@@ -1505,6 +1479,13 @@
 ;;; objects).
 ;;; INITIAL-OFFSET is the displacement into the instruction bytes
 ;;; of CODE (if supplied) that the segment begins at.
+;;;
+;;; Technically we need to pin OBJECT around all of calls of MAKE-SEGMENT
+;;; with that same object. Otherwise, the VIRTUAL-LOCATION slots could come
+;;; out inconsistently across them. It's unlikely to happen, but if it did,
+;;; that would tend to lead to buggy disassemblies due to subtlety of
+;;; absolute addressing in MAP-SEGMENT-INSTRUCTIONS that supposedly hides
+;;; the movability of the underlying object.
 (defun make-segment (object sap-maker length
                      &key
                      code (initial-offset 0) virtual-location
