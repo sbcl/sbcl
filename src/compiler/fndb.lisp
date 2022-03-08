@@ -539,26 +539,24 @@
   :derive-type (creation-result-type-specifier-nth-arg 1))
 
 (defknown %concatenate-to-string (&rest sequence) simple-string
-  (flushable))
+  (flushable no-verify-arg-count))
 (defknown %concatenate-to-base-string (&rest sequence) simple-base-string
-  (flushable))
+  (flushable no-verify-arg-count))
 (defknown %concatenate-to-list (&rest sequence) list
-    (flushable))
+    (flushable no-verify-arg-count))
 (defknown %concatenate-to-simple-vector (&rest sequence) simple-vector
-  (flushable))
+  (flushable no-verify-arg-count))
 (defknown %concatenate-to-vector ((unsigned-byte #.sb-vm:n-widetag-bits) &rest sequence)
     vector
-  (flushable))
+  (flushable no-verify-arg-count))
 
 (defknown map (type-specifier (function-designator ((nth-arg 2 :sequence t)
                                                     (rest-args :sequence t))
                                                    (nth-arg 0 :sequence-type t))
                               proper-sequence &rest proper-sequence)
-  consed-sequence (call)
-; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
-  )
+  consed-sequence (call))
 (defknown %map (type-specifier function-designator &rest sequence) consed-sequence
-  (call))
+  (call no-verify-arg-count))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null
   (call no-verify-arg-count))
 (defknown %map-to-list-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) list
@@ -840,7 +838,7 @@
   (call important-result no-verify-arg-count))
 (defknown sb-impl::sort-vector (vector index index function (or function null))
   * ; SORT-VECTOR works through side-effect
-  (call))
+  (call no-verify-arg-count))
 
 (defknown sb-impl::stable-sort-vector
   (vector function (or function null))
@@ -1124,7 +1122,7 @@
                        (:fill-pointer (or index boolean))
                        (:displaced-to (or array null))
                        (:displaced-index-offset index))
-    array (flushable))
+    array (flushable no-verify-arg-count))
 (defknown sb-vm::initial-contents-error (t t) nil (no-verify-arg-count))
 (defknown fill-data-vector (vector list sequence) vector (no-verify-arg-count)
   :result-arg 0)

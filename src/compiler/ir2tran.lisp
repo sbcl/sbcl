@@ -1037,6 +1037,15 @@
         (t
          :symbol)))
 
+(defun pass-nargs-p (combination)
+  (let ((fun-info (combination-fun-info combination)))
+    (not (and fun-info
+              (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)
+              (let ((type (info :function :type (combination-fun-source-name combination))))
+                (and (not (fun-type-keyp type))
+                     (not (fun-type-rest type))
+                     (not (fun-type-optional type))))))))
+
 ;;; Move the arguments into the passing locations and do a (possibly
 ;;; named) tail call.
 (defun ir2-convert-tail-full-call (node block)
@@ -1048,11 +1057,9 @@
          (old-fp (ir2-environment-old-fp env))
          (return-pc (ir2-environment-return-pc env))
          (fun-lvar (basic-combination-fun node))
-         (fun-info (combination-fun-info node))
-         (nargs (if (and fun-info
-                         (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
-                    (list nargs)
-                    nargs)))
+         (nargs (if (pass-nargs-p node)
+                    nargs
+                    (list nargs))))
     (multiple-value-bind (fun-tn named)
         (fun-lvar-tn node block fun-lvar)
       (cond ((not named)
@@ -1117,11 +1124,9 @@
            (loc-refs (reference-tn-list locs t))
            (nvals (length locs))
            (fun-lvar (basic-combination-fun node))
-           (fun-info (combination-fun-info node))
-           (nargs (if (and fun-info
-                           (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count))
-                      (list nargs)
-                      nargs)))
+           (nargs (if (pass-nargs-p node)
+                      nargs
+                      (list nargs))))
       (multiple-value-bind (fun-tn named)
           (fun-lvar-tn node block fun-lvar)
         (cond ((not named)
@@ -1139,7 +1144,7 @@
               (t
                (vop* call-named node block
                      (fp #-immobile-code fun-tn args) ; args
-                     (loc-refs)                        ; results
+                     (loc-refs)                       ; results
                      arg-locs nargs #+immobile-code named nvals ; info
                      (emit-step-p node))))
         (move-lvar-result node block locs lvar))))
