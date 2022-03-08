@@ -275,6 +275,28 @@ void os_init()
 
 int os_preinit(char *argv[], char *envp[])
 {
+#ifdef LISP_FEATURE_RISCV
+    extern int riscv_user_emulation, mmap_does_not_zero, sigaction_does_not_mask;
+    /* Accomodate buggy mmap() emulation, but detect up front whether it may be.
+     * Full system emulation running a RISCV kernel is generally fine. User mode is not.
+     * There's no way to know what it _will_ do, so we have to guess based on
+     * whether the emulation looks bad. */
+    char buf[100];
+    FILE *f = fopen("/proc/cpuinfo", "r");
+    fgets(buf, sizeof buf, f);
+    fgets(buf, sizeof buf, f);
+    if (!strstr(buf, "hart")) { // look for "hardware thread" string
+        fprintf(stderr, "WARNING: enabling mmap() workaround. GC time may be affected\n");
+        rewind(f);
+        fprintf(stderr, "Contents of /proc/cpuinfo:\n");
+        while (fgets(buf, sizeof buf, f) && strlen(buf)>1) fprintf(stderr, " | %s", buf);
+        fprintf(stderr, "----\n");
+        riscv_user_emulation = 1;
+        mmap_does_not_zero = 1;
+        sigaction_does_not_mask = 1;
+    }
+    fclose(f);
+#endif
 
 #if ALLOW_PERSONALITY_CHANGE
     if (getenv("SBCL_IS_RESTARTING")) {

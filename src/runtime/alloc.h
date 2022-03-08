@@ -17,9 +17,15 @@
 #include "gc-internal.h"
 #include "genesis/sap.h"
 
+#ifdef LISP_FEATURE_RISCV
+# define SAP_ALIGN 32 /* this seems to do the trick */
+#else
+# define N_WORD_BYTES * 2
+#endif
+
 #define DX_ALLOC_SAP(var_name, ptr)                                        \
 lispobj var_name;                                                          \
-struct sap _dx_##var_name __attribute__ ((aligned (N_WORD_BYTES * 2)));                  \
+struct sap _dx_##var_name __attribute__ ((aligned (SAP_ALIGN)));           \
 do {                                                                       \
     _dx_##var_name.header = (1 << 8) | SAP_WIDETAG;                        \
     _dx_##var_name.pointer = (char *)(ptr);                                \

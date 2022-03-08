@@ -5517,21 +5517,6 @@ void gc_load_corefile_ptes(int card_table_nbits,
        Adding the executable bit here avoids calling pthread_jit_write_protect_np */
     os_protect((os_vm_address_t)STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, OS_VM_PROT_ALL);
 #endif
-#if defined LISP_FEATURE_RISCV && defined LISP_FEATURE_LINUX // KLUDGE
-    /* Accomodate buggy mmap() emulation, but detect up front whether it may be.
-     * Full system emulation running a RISCV kernel is generally fine. User mode is not.
-     * There's no way to know what it _will_ do, so we have to guess based on
-     * whether the emulation looks bad. */
-    char buf[100];
-    FILE *f = fopen("/proc/cpuinfo", "r");
-    fgets(buf, sizeof buf, f);
-    fgets(buf, sizeof buf, f);
-    fclose(f);
-    if (!strstr(buf, "hart")) {
-        fprintf(stderr, "WARNING: enabling mmap() workaround. GC time may be affected\n");
-        mmap_does_not_zero = 1;
-    }
-#endif
 }
 
 /* Prepare the array of corefile_ptes for save */

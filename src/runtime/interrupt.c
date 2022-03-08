@@ -524,8 +524,12 @@ check_deferrables_blocked_or_lose(sigset_t *sigset)
         lose("deferrables unblocked");
 }
 
+int sigaction_does_not_mask;
 static void assert_blockables_blocked()
 {
+#ifdef LISP_FEATURE_RISCV
+    if (sigaction_does_not_mask) return; // assert nothing
+#endif
 #if !defined(LISP_FEATURE_WIN32)
     /* On Windows, there are no actual signals, but since the win32 port
      * tracks the sigmask and checks it explicitly, some functions are

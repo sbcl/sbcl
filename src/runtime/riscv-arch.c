@@ -113,10 +113,26 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     arch_skip_instruction(context);
 }
 
-void
+int riscv_user_emulation;
+
+static void
 sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
+
+    static int sigaction_workaround;
+    if (riscv_user_emulation && !sigaction_workaround) {
+        sigset_t curmask;
+        thread_sigmask(SIG_BLOCK, 0, &curmask);
+        if (*(unsigned long int*)&curmask == 0) {
+            char msg[] = "WARNING: broken sigaction() workaround enabled\n";
+            write(2, msg, sizeof msg-1);
+            sigaction_workaround = 1;
+        } else {
+            sigaction_workaround = -1;
+        }
+    }
+    if (sigaction_workaround == 1) thread_sigmask(SIG_BLOCK, &blockable_sigset, 0);
 
     if (trap_instruction != 0x100073) {
         lose("Unrecognized trap instruction %08x in sigtrap_handler()",
@@ -132,10 +148,21 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
     handle_trap(context, code);
 }
 
+static void
+sigill_handler(int signal, siginfo_t *info, os_context_t *context)
+{
+    unsigned int* pc = (void*)OS_CONTEXT_PC(context);
+    fprintf(stderr, "SIGILL @ %p: %x\n", pc, *pc);
+    abort();
+}
+
 void
 arch_install_interrupt_handlers(void)
 {
     ll_install_handler(SIGTRAP, sigtrap_handler);
+    // lp#1962598 says it's seeing a SIGILL. Print some info if we hit that.
+    // (as to why the thread is non-lisp, that seems utterly ridiculous)
+    if (riscv_user_emulation) ll_install_handler(SIGILL, sigill_handler);
 }
 
 /* Linkage table */
