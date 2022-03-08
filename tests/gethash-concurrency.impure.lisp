@@ -71,6 +71,13 @@
          (sleep 10)
       (mapc #'terminate-thread threads))))
 
+
+;;; The new logic for concurrent GETHASH allows multiple threads each to decide to
+;;; invoke a GC-provoked rehash, but since we do not want concurrent writers,
+;;; only one thread actually rehashes and the other(s) perform linear search.
+;;; This is strictly less work than multiple rehashes and should give improved throughput
+;;; since no thread waits on rehash. The count of number of linear searches performed
+;;; is no longer collected unless explicitly compiled in.
 (defmacro with-test-setup ((array (table constructor)) &body body)
   ;; Using fixnums as hash-table keys does not engender a thorough enough test
   ;; as they will not cause the table to need rehash due to GC.
@@ -84,6 +91,7 @@
        (let ((v (sb-impl::hash-table-index-vector ,table)))
          (setf (sb-impl::hash-table-index-vector ,table) (subseq v 0 (/ (length v) 2)))))
      ,@body
+     #+hash-table-metrics
      (format t "~&::: INFO: Rehash count = ~D~%"
              (sb-impl::hash-table-n-rehash+find ,table))))
 
@@ -163,6 +171,7 @@
                      :name "collector"))))
             (unwind-protect (sleep 2.5)
               (mapc #'terminate-thread threads))
+            #+hash-table-metrics
             (format t "~&::: INFO: GETHASH count = ~D = ~D, lsearch=~d~%"
                     actions
                     (reduce #'+ actions)

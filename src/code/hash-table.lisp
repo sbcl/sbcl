@@ -125,7 +125,7 @@
   (%lock nil #-c-headers-only :type #-c-headers-only (or null sb-thread:mutex))
 
   ;; The 4 standard tests functions don't need these next 2 slots:
-
+  ;; (TODO: possibly don't have them in all hash-tables)
   ;; The function used to compare two keys. Returns T if they are the
   ;; same and NIL if not.
   (test-fun nil :type function :read-only t)
@@ -160,19 +160,31 @@
 
   ;; Statistics gathering for new gethash algorithm that doesn't
   ;; disable GC during rehash as a consequence of key movement.
-  (n-rehash+find 0 :type word)
-  (n-lsearch     0 :type word)
+  #+hash-table-metrics (n-rehash+find 0 :type word)
+  #+hash-table-metrics (n-lsearch     0 :type word)
+
   ;; only for debugging system bootstrap when hash-tables are completely
   ;; broken (which seems to be quite often as I optimize them)
-  #+hash-table-simulate (%alist)
+  #+hash-table-simulate (%alist))
 
-  ;;; Supporting slots for weak hash-tables.
-  ;; List of (pair-index . bucket-number) which GC smashed and are almost
-  ;; equivalent to free cells, except that they are not yet unlinked from
-  ;; their chain. Skipping the removal in GC eliminates a race with REMHASH.
-  ;; Pushing onto the free list wouldn't actually be difficult,
-  ;; but removing from the bucket is impossible without implementing
-  ;; lock-free linked lists compatibly between C and Lisp.
+(sb-xc:defstruct (general-hash-table (:copier nil)
+                             (:conc-name hash-table-)
+                             (:include hash-table)
+                             (:constructor %alloc-general-hash-table
+                               (flags
+                                gethash-impl
+                                puthash-impl
+                                remhash-impl
+                                clrhash-impl
+                                test
+                                test-fun
+                                hash-fun
+                                rehash-size
+                                rehash-threshold
+                                pairs
+                                index-vector
+                                next-vector
+                                hash-vector)))
   (smashed-cells nil)
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.

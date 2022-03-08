@@ -542,7 +542,8 @@ Examples:
                 (pick-table-methods (logtest flags hash-table-synchronized-flag)
                                     (if userfunp -1 table-kind))))
            (table
-            (%alloc-hash-table flags getter setter remover #'clrhash-impl
+            (funcall (if weakp #'%alloc-general-hash-table #'%alloc-hash-table)
+                               flags getter setter remover #'clrhash-impl
                                test test-fun hash-fun
                                rehash-size rehash-threshold
                                kv-vector index-vector next-vector hash-vector)))
@@ -814,7 +815,7 @@ multiple threads accessing the same hash-table without locking."
                               (hash-vector (hash-table-hash-vector table))
                               (rehashing-state (1+ epoch)))
   (declare (hash-table table) (fixnum epoch))
-  (atomic-incf (hash-table-n-rehash+find table))
+  #+hash-table-metrics (atomic-incf (hash-table-n-rehash+find table))
   ;; Verify some invariants prior to disabling array bounds checking
   (aver (>= (length kv-vector) #.(+ (* 2 +min-hash-table-size+)
                                     kv-pairs-overhead-slots)))
@@ -822,7 +823,8 @@ multiple threads accessing the same hash-table without locking."
   (when hash-vector
     (aver (= (length hash-vector) (length next-vector))))
   ;; Empty cells must be in the free chain already, and no smashed cells exist.
-  (aver (null (hash-table-smashed-cells table)))
+  (when (typep table 'general-hash-table)
+    (aver (null (hash-table-smashed-cells table))))
   ;; Must not permit the rehashing state to stick due to a nonlocal exit.
   ;; All further normal use of the table would be prevented.
   (without-interrupts
@@ -1452,7 +1454,7 @@ nnnn 1_    any       linear scan
 (defun hash-table-lsearch (hash-table eq-test key hash default)
   (declare (optimize (sb-c:insert-array-bounds-checks 0)))
   (declare (type (and fixnum unsigned-byte) hash))
-  (atomic-incf (hash-table-n-lsearch hash-table))
+  #+hash-table-metrics (atomic-incf (hash-table-n-lsearch hash-table))
   (let* ((kv-vector (hash-table-pairs hash-table))
          (key-index
           (let ((hash-vector (hash-table-hash-vector hash-table))
@@ -1922,8 +1924,9 @@ table itself."
                     ;; Clear the index-vector.
                     ;; Don't need to clear the hash-vector or the next-vector.
                     (fill (hash-table-index-vector hash-table) 0))
-                  (setf (hash-table-smashed-cells hash-table) nil
-                        (hash-table-next-free-kv hash-table) 1
+                  (when (typep hash-table 'general-hash-table)
+                    (setf (hash-table-smashed-cells hash-table) nil))
+                  (setf (hash-table-next-free-kv hash-table) 1
                         (kv-vector-high-water-mark kv-vector) 0))))
       (if (hash-table-synchronized-p hash-table)
           (sb-thread::call-with-recursive-system-lock #'clear (hash-table-%lock hash-table))

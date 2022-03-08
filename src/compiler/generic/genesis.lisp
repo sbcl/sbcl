@@ -4059,9 +4059,14 @@ III. initially undefined function references (alphabetically):
             (write-structure-object (wrapper-info (find-layout 'wrapper)) stream)
             (write-cast-operator 'wrapper "wrapper" sb-vm:instance-pointer-lowtag stream))
           (write-cast-operator 'layout "layout" sb-vm:instance-pointer-lowtag stream))
+        ;; For purposes of the C code, cast all hash tables as general_hash_table
+        ;; even if they lack the slots for weak tables.
+        (out-to "hash-table"
+          (write-structure-object (wrapper-info (find-layout 'sb-impl::general-hash-table))
+                                  stream "hash_table"))
         (dolist (class '(defstruct-description defstruct-slot-description
                          classoid
-                         hash-table package
+                         package
                          sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
