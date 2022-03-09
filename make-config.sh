@@ -444,7 +444,7 @@ else
             esac
     esac
     case $sbcl_arch in
-        arm64)
+        arm64|riscv)
             WITH_FEATURES="$WITH_FEATURES :sb-thread"
     esac
 fi

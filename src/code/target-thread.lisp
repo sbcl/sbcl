@@ -1792,7 +1792,11 @@ session."
                  (extern-alien "pthread_create"
                                (function int system-area-pointer system-area-pointer
                                          system-area-pointer system-area-pointer))
-                 (struct-slot-sap thread thread os-thread) attr c-tramp thread-sap))))))
+                 (struct-slot-sap thread thread os-thread) attr
+                 ;; FIXME these architectures have uniform linkage tables
+                 #+(or mips riscv) (sap-ref-sap c-tramp)
+                 #-riscv c-tramp
+                 thread-sap))))))
 
 (defmacro free-thread-struct (memory)
   `(alien-funcall (extern-alien "free_thread_struct" (function void system-area-pointer))

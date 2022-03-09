@@ -148,21 +148,10 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
     handle_trap(context, code);
 }
 
-static void
-sigill_handler(int signal, siginfo_t *info, os_context_t *context)
-{
-    unsigned int* pc = (void*)OS_CONTEXT_PC(context);
-    fprintf(stderr, "SIGILL @ %p: %x\n", pc, *pc);
-    abort();
-}
-
 void
 arch_install_interrupt_handlers(void)
 {
     ll_install_handler(SIGTRAP, sigtrap_handler);
-    // lp#1962598 says it's seeing a SIGILL. Print some info if we hit that.
-    // (as to why the thread is non-lisp, that seems utterly ridiculous)
-    if (riscv_user_emulation) ll_install_handler(SIGILL, sigill_handler);
 }
 
 /* Linkage table */
