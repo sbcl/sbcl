@@ -1759,10 +1759,10 @@ session."
 ;;; Return T if the thread was created
 (defun pthread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
-  #+mips
-  (aver "This and many other things will crash on MIPS either until it
-  does linkage tables like everyone else, or until all those things
-  can deal with either way of doing linkage.")
+  #+(or arm mips)
+  (aver "This and many other things will crash on MIPS/ARM either
+  until they do linkage tables like everyone else, or until all those
+  things can deal with either way of doing linkage.")
   (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t))
         (c-tramp
          (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
