@@ -290,7 +290,7 @@
 ;;; symbol.
 #+sb-thread
 (define-vop (dynbind)
-  (:args (value :scs (any-reg descriptor-reg))
+  (:args (value :scs (any-reg descriptor-reg zero))
          (symbol :scs (descriptor-reg) :target alloc-tls-symbol))
   ;; These have a dual personality in the assembly routine. We are
   ;; trying to pack as tightly as possible.
@@ -316,7 +316,7 @@
 
 #-sb-thread
 (define-vop (dynbind)
-  (:args (value :scs (any-reg descriptor-reg))
+  (:args (value :scs (any-reg descriptor-reg zero))
          (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (any-reg)) bsp-temp)
