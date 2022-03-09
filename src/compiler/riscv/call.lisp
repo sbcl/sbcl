@@ -174,7 +174,7 @@
     (note-this-location vop (if (<= nvals 1)
                                 :single-value-return
                                 :unknown-return))
-    (inst compute-code code-tn lip lra-label)
+    (inst compute-code code-tn lip lra-label ra-tn)
     ;; Pick off the single-value case first.
     (sb-assem:without-scheduling ()
 
@@ -269,7 +269,7 @@
 (defun receive-unknown-values (args nargs start count label lip)
   (declare (type tn args nargs start count))
   (assemble ()
-    (inst compute-code code-tn lip label)
+    (inst compute-code code-tn lip label ra-tn)
     (inst bge nargs-tn zero-tn MULTIPLE)
     (move start csp-tn)
     (inst addi csp-tn csp-tn n-word-bytes)

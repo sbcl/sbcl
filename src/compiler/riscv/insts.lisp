@@ -899,10 +899,11 @@
                    (- other-pointer-lowtag
                       position
                       (component-header-length)))
-                 ;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tagged
-                 ;;      = lra - (header + label-offset)
+                 ;; code = ra - header - label-offset + other-pointer-tagged
+                 ;;      = ra + other-pointer-tag - (header + label-offset)
                  (lambda (position &optional (magic-value 0))
-                   (- (+ (label-position label position magic-value)
+                   (- other-pointer-lowtag
+                      (+ (label-position label position magic-value)
                          (component-header-length))))
                  src)))
 
