@@ -328,7 +328,6 @@
     (save-lisp-context csp-tn cfp-tn temp))
 
   ;; Call into C.
-  (loadw cfunc cfunc) ; dereference the linkage table entry
   (inst jalr ra-tn cfunc 0)
 
   ;; Pass the return values to Lisp.
