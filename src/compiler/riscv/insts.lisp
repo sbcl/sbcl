@@ -871,11 +871,11 @@
                  (inst addi dest lip i))))
            (src-relative-emitter (segment position)
              (assemble (segment vop)
-               (inst addi dest src (funcall src-relative-delta position))))
-           (maybe-shrink (segment chooser position magic-value)
+               (inst addi dest src (funcall src-relative-delta position 0))))
+           (maybe-shrink (segment chooser position delta-if-after)
              (declare (ignore chooser))
              (when (and src
-                        (typep (funcall src-relative-delta position magic-value)
+                        (typep (funcall src-relative-delta position delta-if-after)
                                'short-immediate))
                (emit-back-patch segment 4 #'src-relative-emitter)
                t)))
@@ -894,34 +894,31 @@
   (:vop-var vop)
   (:emitter
    (emit-compute segment vop code lip
-                 (lambda (position &optional magic-value)
-                   (declare (ignore magic-value))
+                 (lambda (position)
                    (- other-pointer-lowtag
                       position
                       (component-header-length)))
                  ;; code = ra - header - label-offset + other-pointer-tagged
                  ;;      = ra + other-pointer-tag - (header + label-offset)
-                 (lambda (position &optional (magic-value 0))
+                 (lambda (position delta-if-after)
                    (- other-pointer-lowtag
-                      (+ (label-position label position magic-value)
+                      (+ (label-position label position delta-if-after)
                          (component-header-length))))
                  src)))
 
 
-(define-instruction compute-ra (segment dest lip label &optional src)
+(define-instruction compute-ra-from-code (segment dest src lip label)
   (:vop-var vop)
   (:emitter
    (emit-compute segment vop dest lip
-                 (lambda (position &optional magic-value)
-                   (- (label-position label
-                                      (when magic-value position)
-                                      magic-value)
-                      position))
-                 ;; ra = code + header + label-offset - other-pointer-tag
-                 (lambda (position &optional (magic-value 0))
-                   (+ (label-position label position magic-value)
-                      (component-header-length)
-                      (- other-pointer-lowtag)))
+                 (lambda (position)
+                   (- (label-position label) position))
+                 ;; ra = code - other-pointer-tag + header + label-offset
+                 ;;    = code + header + label-offset - other-pointer-tag
+                 (lambda (position delta-if-after)
+                   (- (+ (label-position label position delta-if-after)
+                         (component-header-length))
+                      other-pointer-lowtag))
                  src)))
 
 (defun emit-header-data (segment type)
