@@ -2710,6 +2710,39 @@
         `(- (ash x ,len))
         `(ash x ,len))))
 
+
+(when-vop-existsp (:translate fixnum*)
+  (defun fixnum* (x y)
+    (declare (fixnum x y))
+    (the fixnum (* x y)))
+
+  (deftransform * ((x y) (fixnum fixnum) * :node node)
+    (let ((dest (node-dest node))
+          (fixnum (specifier-type 'fixnum)))
+      (if (and (cast-p dest)
+               (cast-type-check dest)
+               (csubtypep fixnum (single-value-type (node-derived-type node)))
+               (type= (cast-type-to-check dest) fixnum))
+          `(fixnum* x y)
+          (give-up-ir1-transform))))
+
+  (deftransform fixnum* ((x y) (fixnum fixnum) * :node node)
+    (let (type
+          fixnum)
+      (cond ((and (constant-lvar-p x)
+                  (eql (lvar-value x) 2))
+             `(the fixnum (+ y y)))
+            ((and (constant-lvar-p y)
+                  (eql (lvar-value y) 2))
+             `(the fixnum (+ x x)))
+            ((csubtypep (setf type (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
+                        (setf fixnum (specifier-type 'fixnum)))
+             `(the fixnum (* x y)))
+            ((not (csubtypep fixnum type))
+             `(the fixnum (* x y)))
+            (t
+             (give-up-ir1-transform))))))
+
 ;;; These must come before the ones below, so that they are tried
 ;;; first.
 (deftransform floor ((number divisor))

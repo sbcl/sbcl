@@ -430,6 +430,9 @@
   (bug "~@<failed AVER: ~2I~_~S~:>" form))
 (deferr unreachable-error ()
   (bug "Unreachable code reached"))
+
+(deferr fixnum*-overflow-error (x y)
+  (object-not-type-error (* x y) 'fixnum))
 
 ;;;; INTERNAL-ERROR signal handler
 

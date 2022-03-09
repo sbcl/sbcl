@@ -117,7 +117,8 @@
    ("Object layout is invalid. (indicates obsolete instance)" layout-invalid 2)
    ("Thread local storage exhausted." tls-exhausted 0)
    ("Unreachable code reached" unreachable 0)
-   ("Failed aver" failed-aver 1))
+   ("Failed aver" failed-aver 1)
+   ("Fixnum multiplication overflow" fixnum*-overflow 2))
 
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.

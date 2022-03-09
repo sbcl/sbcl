@@ -2191,3 +2191,6 @@
 
   (defknown round-single (single-float #1#) single-float
       (foldable flushable movable always-translatable)))
+
+(defknown fixnum* (fixnum fixnum) fixnum
+  (movable foldable unsafely-flushable commutative))
