@@ -19,8 +19,8 @@
        (values
         `((inst jal ,ra (make-fixup ',name :assembly-routine)))
         `((:temporary (:sc descriptor-reg :from (:eval 0) :to (:eval 1)
-		       :offset ra-offset)
-		      ,ra)))))
+                       :offset ra-offset)
+                      ,ra)))))
     (:none
      (values
       `((inst jal zero-tn (make-fixup ',name :assembly-routine)))

@@ -833,7 +833,7 @@
 ;;; assembly-routine.
 (define-vop (return-multiple)
   (:args (old-fp-arg :scs (any-reg) :target old-fp)
-	 (return-pc :scs (any-reg) :target ra)
+         (return-pc :scs (any-reg) :target ra)
          (vals-arg :scs (any-reg) :target vals)
          (nvals-arg :scs (any-reg) :target nvals))
   (:temporary (:sc any-reg :offset nl1-offset :from (:argument 0)) old-fp)
