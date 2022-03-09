@@ -1794,8 +1794,8 @@ session."
                                          system-area-pointer system-area-pointer))
                  (struct-slot-sap thread thread os-thread) attr
                  ;; FIXME these architectures have uniform linkage tables
-                 #+(or mips riscv) (sap-ref-sap c-tramp)
-                 #-riscv c-tramp
+                 #+(or mips riscv) (sap-ref-sap c-tramp 0)
+                 #-(or mips riscv) c-tramp
                  thread-sap))))))
 
 (defmacro free-thread-struct (memory)
