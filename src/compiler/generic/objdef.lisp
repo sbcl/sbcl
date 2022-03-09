@@ -488,7 +488,7 @@ during backtrace.
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery
 ;;; can take care of maintaining Lisp and C versions.
-#.`(define-primitive-object (thread :size primitive-thread-object-length)
+(define-primitive-object (thread :size primitive-thread-object-length)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
   ;; pass the address of the start routine into new_thread_trampoline.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
