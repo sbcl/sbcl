@@ -1140,15 +1140,24 @@ DEF_SPECIALIZED_VECTOR(vector_long_float, length * LONG_FLOAT_SIZE)
 DEF_SPECIALIZED_VECTOR(vector_complex_long_float, length * (2 * LONG_FLOAT_SIZE))
 #endif
 
-sword_t
-scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
+// read 4 bits from byte index 1 of the header
+# define WEAKPTR_SIZE(wp) ALIGN_UP((1+(((char*)(wp))[1] & 0xf)), 2)
+#else
+# define WEAKPTR_SIZE(wp) ALIGN_UP((1+(*(lispobj*)(wp) >> 8) & 0xf), 2)
+#endif
+/* We might wish to support two sizes of weak-pointer. The hypothetical variation
+ * on weak-pointer would implement an ephemeron (https://en.wikipedia.org/wiki/Ephemeron)
+ * that otherwise can only be simulated very inefficiently in SBCL as a weak hash-table
+ * containing a single key */
+static sword_t scav_weakptr(lispobj *where, lispobj __attribute__((unused)) object)
 {
     struct weak_pointer * wp = (struct weak_pointer*)where;
     /* If wp->next is non-NULL then it's already in the weak pointer chain.
      * If it is, then even if wp->value is now known to be live,
      * we can't fix (or don't need to fix) the slot, because removing
      * from a singly-linked-list is an O(n) operation */
-    if (!wp->next) {
+    if (!in_weak_pointer_list(wp)) {
         lispobj pointee = wp->value;
         // A broken weak-pointer's value slot has unbound-marker
         // which does not satisfy is_lisp_pointer().
@@ -1160,23 +1169,28 @@ scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
             );
         if (breakable) { // Pointee could potentially be garbage.
             // But it might already have been deemed live and forwarded.
-            if (forwarding_pointer_p(native_pointer(pointee))) {
+            if (forwarding_pointer_p(native_pointer(pointee)))
                 wp->value = forwarding_pointer_value(native_pointer(pointee));
-                return WEAK_POINTER_NWORDS;
-            }
-            add_to_weak_pointer_chain(wp);
+            else
+                add_to_weak_pointer_chain(wp);
         }
     }
-    return WEAK_POINTER_NWORDS;
+    return WEAKPTR_SIZE(wp);
 }
+static lispobj trans_weakptr(lispobj object) {
+    return gc_copy_object(object,
+                          WEAKPTR_SIZE((object-OTHER_POINTER_LOWTAG)),
+                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
+}
+static sword_t size_weakptr(lispobj *where) { return WEAKPTR_SIZE(where); }
 
 void smash_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
         gc_assert(widetag_of(&wp->header) == WEAK_POINTER_WIDETAG);
-        next_wp = wp->next;
-        wp->next = NULL;
+        next_wp = get_weak_pointer_next(wp);
+        reset_weak_pointer_next(wp);
 
         lispobj val = wp->value;
         /* A weak pointer is placed onto the list only if it points to an object

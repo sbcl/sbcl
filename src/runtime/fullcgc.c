@@ -52,6 +52,15 @@
 #define BIGNUM_MARK_BIT MARK_BIT
 #endif
 
+static inline uword_t boxedobj_widetag_to_markbit(int widetag) {
+    return (widetag == FDEFN_WIDETAG || widetag == WEAK_POINTER_WIDETAG)
+         ? FDEFN_MARK_BIT : MARK_BIT;
+}
+static inline uword_t general_widetag_to_markbit(int widetag) {
+    return (widetag == FDEFN_WIDETAG || widetag == WEAK_POINTER_WIDETAG)
+        ? FDEFN_MARK_BIT : ((widetag == BIGNUM_WIDETAG) ? BIGNUM_MARK_BIT : MARK_BIT);
+}
+
 #define interesting_pointer_p(x) \
   (find_page_index((void*)x) >= 0 || immobile_space_p(x))
 
@@ -185,7 +194,8 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     int widetag = header_widetag(header);
     switch (widetag) {
     case BIGNUM_WIDETAG: return (header & BIGNUM_MARK_BIT) != 0;
-    case FDEFN_WIDETAG : return (header & FDEFN_MARK_BIT) != 0;
+    case WEAK_POINTER_WIDETAG:
+    case FDEFN_WIDETAG: return (header & FDEFN_MARK_BIT) != 0;
     }
     if (embedded_obj_p(widetag))
         header = *fun_code_header(native_pointer(pointer));
@@ -210,7 +220,7 @@ void __mark_obj(lispobj pointer)
                 pointer = make_lispobj(base, OTHER_POINTER_LOWTAG);
                 header = *base;
             }
-            uword_t markbit = (widetag == FDEFN_WIDETAG) ? FDEFN_MARK_BIT : MARK_BIT;
+            uword_t markbit = boxedobj_widetag_to_markbit(widetag);
             if (header & markbit) return; // already marked
             *base |= markbit;
         }
@@ -469,8 +479,8 @@ static void local_smash_weak_pointers()
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
         gc_assert(widetag_of(&wp->header) == WEAK_POINTER_WIDETAG);
-        next_wp = wp->next;
-        wp->next = NULL;
+        next_wp = get_weak_pointer_next(wp);
+        reset_weak_pointer_next(wp);
         lispobj pointee = wp->value;
         gc_assert(is_lisp_pointer(pointee));
         if (!pointer_survived_gc_yet(pointee))
@@ -535,7 +545,7 @@ static void sweep_fixedobj_pages(long *zeroed)
         lispobj *limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES - obj_spacing);
         for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
             lispobj header = *obj;
-            uword_t markbit = (header_widetag(header) == FDEFN_WIDETAG) ? FDEFN_MARK_BIT : MARK_BIT;
+            uword_t markbit = boxedobj_widetag_to_markbit(header_widetag(header));
             if (fixnump(header)) { // is a hole
             } else if (header & markbit) { // live object
                 *obj = header ^ markbit;
@@ -550,7 +560,7 @@ static void sweep_fixedobj_pages(long *zeroed)
     lispobj* limit = fixedobj_page_address(FIXEDOBJ_RESERVED_PAGES);
     while (obj < limit) {
         lispobj header = *obj;
-        uword_t markbit = (header_widetag(header) == FDEFN_WIDETAG) ? FDEFN_MARK_BIT : MARK_BIT;
+        uword_t markbit = boxedobj_widetag_to_markbit(header_widetag(header));
         if (header & markbit) *obj = header ^ markbit;
         obj += sizetab[widetag_of(obj)](obj);
     }
@@ -567,11 +577,7 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
         lispobj word = *where;
         if (is_header(word)) {
             nwords = sizetab[header_widetag(word)](where);
-            lispobj markbit = MARK_BIT;
-            switch (header_widetag(word)) {
-            case BIGNUM_WIDETAG: markbit = BIGNUM_MARK_BIT; break;
-            case FDEFN_WIDETAG : markbit = FDEFN_MARK_BIT; break;
-            }
+            lispobj markbit = general_widetag_to_markbit(header_widetag(word));
             if (word & markbit)
                 *where = word ^ markbit;
             else {

@@ -185,6 +185,12 @@
                                 index-vector
                                 next-vector
                                 hash-vector)))
+  ;; List of (pair-index . bucket-number) which GC smashed and are almost
+  ;; equivalent to free cells, except that they are not yet unlinked from
+  ;; their chain. Skipping the removal in GC eliminates a race with REMHASH.
+  ;; Pushing onto the free list wouldn't actually be difficult,
+  ;; but removing from the bucket is impossible without implementing
+  ;; lock-free linked lists compatibly between C and Lisp.
   (smashed-cells nil)
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.

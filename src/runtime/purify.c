@@ -559,7 +559,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 /* Weak pointers get preserved during purify, 'cause I
                  * don't feel like figuring out how to break them. */
                 pscav(addr+1, 2, constant);
-                count = WEAK_POINTER_NWORDS;
+                count = ALIGN_UP(WEAK_POINTER_SIZE,2);
                 break;
 
               case FDEFN_WIDETAG:

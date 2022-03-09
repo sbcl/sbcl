@@ -309,7 +309,8 @@ during backtrace.
                                        :alloc-trans make-weak-pointer)
   (value :ref-trans %weak-pointer-value :ref-known (flushable)
          :init :arg)
-  (next :c-type "struct weak_pointer *"))
+  ;; 64-bit uses spare header bytes to store the 'next' link
+  #-64-bit (next :c-type "struct weak_pointer *"))
 
 ;;;; other non-heap data blocks
 
