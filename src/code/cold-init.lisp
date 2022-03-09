@@ -230,6 +230,11 @@
            (aver (typep object 'code-component))
            (aver (unbound-marker-p (code-header-ref object index)))
            (setf (code-header-ref object index) (svref *!load-time-values* value))))
+        ((cons (eql :named-constant))
+         (destructuring-bind (object index name) (cdr toplevel-thing)
+           (aver (typep object 'code-component))
+           (aver (unbound-marker-p (code-header-ref object index)))
+           (sb-fasl::named-constant-set object index name)))
         ((cons (eql :begin-file))
          (unless (!c-runtime-noinform-p) (print (cdr toplevel-thing))))
         (t

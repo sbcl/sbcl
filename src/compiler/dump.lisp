@@ -43,7 +43,6 @@
   ;; of SYMBOL-GLOBAL-VALUE.
   (similar-table (make-similarity-table) :type hash-table :read-only t)
   (eq-table (make-hash-table :test 'eq) :type hash-table :read-only t)
-  (named-constant-table (make-hash-table :test #'eq) :type hash-table :read-only t)
   ;; the INSTANCE table maps dumpable instances to unique IDs for calculating
   ;; a similarity hash of composite objects that contain instances.
   ;; A user-defined hash function can not use address-based hashing, and it is
@@ -634,21 +633,6 @@
     (setf (gethash constant table) handle))
   (values))
 
-;;; Return T iff the constant named by NAME has already been
-;;; dumped. It's been dumped if it's in the NAMED-CONSTANTS table.
-(defun fasl-named-constant-already-dumped-p (name file)
-  (and (gethash name (fasl-output-named-constant-table file)) t))
-
-;;; Use HANDLE whenever we try to dump a constant named NAME. HANDLE
-;;; should have been returned earlier by
-;;; FASL-DUMP-LOAD-TIME-VALUE-LAMBDA.
-(defun fasl-note-handle-for-named-constant (name handle file)
-  (let ((table (fasl-output-named-constant-table file)))
-    (when (gethash name table)
-      (error "named constant ~S already dumped?" name))
-    (setf (gethash name table) handle))
-  (values))
-
 ;;; Note that the specified structure can just be dumped by
 ;;; enumerating the slots.
 (defun fasl-validate-structure (structure file)
@@ -1117,11 +1101,6 @@
       (dump-integer info fasl-output))
     (incf n)))
 
-;;; Dump a reference to the constant named by NAME.
-(defun dump-named-constant-reference (name fasl-output)
-  (dump-push (gethash name (fasl-output-named-constant-table fasl-output))
-             fasl-output))
-
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.
 ;;;
@@ -1144,22 +1123,19 @@
          (header-length (length constants))
          (n-named-calls 0))
     (dump-object alloc-points fasl-output)
-    (collect ((patches))
+    (collect ((patches)
+              (named-constants))
       ;; Dump the constants, noting any :ENTRY constants that have to
       ;; be patched.
       (loop for i from sb-vm:code-constants-offset below header-length do
         (let ((entry (aref constants i)))
           (etypecase entry
             (constant
-             (if (and (sb-c::leaf-has-source-name-p entry)
-                      ;; We can't really reference constants defined
-                      ;; by name at load time in the same block
-                      ;; compilation unit, so dump it anonymously when
-                      ;; such a situation arises.
-                      (not (member (sb-c::leaf-source-name entry)
-                                   sb-c::*hairy-defconstants*)))
-                 (dump-named-constant-reference (sb-c::leaf-source-name entry) fasl-output)
-                 (dump-object (sb-c::constant-value entry) fasl-output)))
+             (cond ((sb-c::leaf-has-source-name-p entry)
+                    (named-constants (cons (sb-c::leaf-source-name entry) i))
+                    (dump-fop 'fop-misc-trap fasl-output))
+                   (t
+                    (dump-object (sb-c::constant-value entry) fasl-output))))
             (cons
              (ecase (car entry)
                (:constant ; anything that has not been wrapped in a #<CONSTANT>
@@ -1219,6 +1195,10 @@
           (push (cons handle (cdr patch))
                 (gethash (car patch)
                          (fasl-output-patch-table fasl-output))))
+        (dolist (named-constant (named-constants))
+          (dump-object (car named-constant) fasl-output)
+          (dump-push handle fasl-output)
+          (dump-fop 'fop-named-constant-set fasl-output (cdr named-constant)))
         handle))))
 
 ;;; This is only called from assemfile, which doesn't exist in the target.

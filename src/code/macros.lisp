@@ -250,6 +250,9 @@ tree structure resulting from the evaluation of EXPRESSION."
         ;; don't warn or error or anything, just fall through.)
         )
        (t (warn "redefining ~(~A~) ~S to be a constant" kind name)))))
+  (dolist (backpatch (info :variable :forward-references name))
+    (funcall backpatch value))
+  (clear-info :variable :forward-references name)
   ;; We ought to be consistent in treating any change of :VARIABLE :KIND
   ;; as a continuable error. The above CASE expression pre-dates the
   ;; existence of symbol-macros (I believe), but at a bare minimum,
@@ -262,11 +265,6 @@ tree structure resulting from the evaluation of EXPRESSION."
     (when docp
       (setf (documentation name 'variable) doc))
     (%set-symbol-value name value))
-  ;; Record the names of hairy defconstants when block compiling.
-  (when (and sb-c::*compile-time-eval*
-             (eq (sb-c::block-compile sb-c::*compilation*) t))
-    (unless (sb-xc:typep value '(or fixnum character symbol))
-      (push name sb-c::*hairy-defconstants*)))
   ;; Define the constant in the cross-compilation host, since the
   ;; value is used when cross-compiling for :COMPILE-TOPLEVEL contexts
   ;; which reference the constant.

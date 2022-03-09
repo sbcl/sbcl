@@ -6,6 +6,7 @@ changes relative to sbcl-2.2.2:
     mutex (and is not now the owner), or died and never released it.
   * optimization: fasls containing standard object literals are now smaller
     and load more efficiently.
+  * bug fix: EQness of constants is now always preserved when block compiling.
 
 changes in sbcl-2.2.2 relative to sbcl-2.2.1:
   * platform support:

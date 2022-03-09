@@ -1604,25 +1604,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                        (append (cdr circular-ref) (cdr info)))))))
          nil)))))
 
-;;; Arrange for a load time reference to the constant named by NAME to
-;;; get dumped via the load form (SYMBOL-GLOBAL-VALUE ',NAME) if its
-;;; value is a pointer value and no reference to the named constant
-;;; has been dumped yet.
-(defun emit-load-time-constant-reference (name)
-  (let ((fasl-output *compile-object*))
-    (unless (or (sb-xc:typep (symbol-value name) '(or fixnum character symbol))
-                (member name *hairy-defconstants*)
-                (sb-fasl::fasl-named-constant-already-dumped-p name fasl-output))
-      (sb-fasl::fasl-note-handle-for-named-constant
-       name
-       (compile-load-time-value
-        ;; KLUDGE: Inhibit transforms trying to turn
-        ;; (SYMBOL-GLOBAL-VALUE 'X) back into X.
-        `(locally (declare (notinline symbol-global-value))
-           (symbol-global-value ',name))
-        t)
-       fasl-output))))
-
 
 ;;;; COMPILE-FILE
 
@@ -1716,8 +1697,7 @@ necessary, since type inference may take arbitrarily long to converge.")
             (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil))
         (setf (toplevel-lambdas compilation) nil))
       (setf (block-compile compilation) :specified)
-      (setf (entry-points compilation) nil)
-      (setf *hairy-defconstants* nil))))
+      (setf (entry-points compilation) nil))))
 
 (defun delimit-block-compilation ()
   (let ((compilation *compilation*))

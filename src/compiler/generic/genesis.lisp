@@ -2597,6 +2597,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (setf (svref **fop-funs** (get 'fop-funcall-no-skip 'opcode))
       (svref **fop-funs** (get 'fop-funcall 'opcode)))
 
+(define-cold-fop (fop-named-constant-set (index))
+  (push (cold-list (cold-intern :named-constant)
+                   (pop-stack)
+                   (number-to-core index)
+                   (pop-stack))
+        *!cold-toplevels*))
+
 
 ;;;; cold fops for fixing up circularities
 

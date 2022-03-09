@@ -418,6 +418,10 @@
 (define-info-type (:variable :where-from)
   :type-spec (member :declared :assumed :defined) :default :assumed)
 
+;;; a list of forward references to this constant.
+(define-info-type (:variable :forward-references)
+  :type-spec list)
+
 ;;; the macro-expansion for symbol-macros
 (define-info-type (:variable :macro-expansion) :type-spec t)
 

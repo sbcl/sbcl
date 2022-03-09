@@ -1224,6 +1224,24 @@
     (setf (code-header-ref code index) value)
     (values)))
 
+;;; Set the named constant value in the boxed constants, setting up
+;;; backpatching information if the symbol is not yet bound. Forward
+;;; references can occur at load time when non-top-level components
+;;; containing named constant references get loaded before the top
+;;; level form defining the constant gets loaded. This can happen when
+;;; top level lambdas get merged.
+#-sb-xc-host
+(defun named-constant-set (code index name)
+  (cond ((boundp name)
+         (setf (code-header-ref code index) (symbol-global-value name)))
+        (t
+         (push (lambda (value)
+                 (setf (code-header-ref code index) value))
+               (info :variable :forward-references name)))))
+
+(define-fop 121 :not-host (fop-named-constant-set ((:operands index) name code) nil)
+  (named-constant-set code index name))
+
 (define-fop 21 (fop-fun-entry ((:operands fun-index) code-object))
   (let ((fun (%code-entry-point code-object fun-index)))
     (when (%fasl-input-print (fasl-input))

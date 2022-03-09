@@ -11,10 +11,6 @@
 
 (!begin-collecting-cold-init-forms)
 
-;; %DEFCONSTANT needs this to be bound.
-(!cold-init-forms
- (setq sb-c::*compile-time-eval* nil))
-
 (define-type-class named :enumerable nil :might-contain-other-types nil)
 
 (macrolet ((frob (type global-sym)

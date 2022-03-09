@@ -79,15 +79,13 @@
   (assert (eq (sb-kernel::fun-code-header #'foo-before-defconstant)
               (sb-kernel::fun-code-header #'bar-after-defconstant))))
 
-(with-test (:name :block-defconstant-hairy-eqness-test
-            :fails-on :sbcl)
+(with-test (:name :block-defconstant-hairy-eqness-test)
   (ctu:file-compile
    `((sb-int:defconstant-eqx testconstant4
-         (let (list)
-           (dotimes (i 5 list) (push i list)))
+       (let (list)
+         (dotimes (i 5 list) (push i list)))
        #'equal)
      (defun bar () testconstant4))
    :block-compile t
-   :before-load (lambda () (unintern (find-symbol "TESTCONSTANT4")))
    :load t)
-  (assert (eq (bar) testconstant4)))
+  (assert (eq (bar) (symbol-value 'testconstant4))))
