@@ -1142,9 +1142,9 @@ DEF_SPECIALIZED_VECTOR(vector_complex_long_float, length * (2 * LONG_FLOAT_SIZE)
 
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 // read 4 bits from byte index 1 of the header
-# define WEAKPTR_SIZE(wp) ALIGN_UP((1+(((char*)(wp))[1] & 0xf)), 2)
+# define WEAKPTR_SIZE(wp) ALIGN_UP(1+(((char*)(wp))[1] & 0xf), 2)
 #else
-# define WEAKPTR_SIZE(wp) ALIGN_UP((1+(*(lispobj*)(wp) >> 8) & 0xf), 2)
+# define WEAKPTR_SIZE(wp) ALIGN_UP(1+(((char*)(wp))[N_WORD_BYTES-2] & 0xf), 2)
 #endif
 /* We might wish to support two sizes of weak-pointer. The hypothetical variation
  * on weak-pointer would implement an ephemeron (https://en.wikipedia.org/wiki/Ephemeron)

@@ -904,7 +904,8 @@ void fake_foreign_function_call_noassert(os_context_t *context)
 
 #ifdef reg_BSP
     set_binding_stack_pointer(thread,
-        *os_context_register_addr(context, reg_BSP));
+       // registers can be wider than uword_t (on some 64-bit machines compiling to 32-bit code)
+       (uword_t)*os_context_register_addr(context, reg_BSP));
 #endif
 
 #if defined(LISP_FEATURE_ARM)

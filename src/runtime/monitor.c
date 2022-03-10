@@ -685,7 +685,7 @@ catchers_cmd(char __attribute__((unused)) **ptr)
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM64)
                    component_ptr_from_pc((void*)catch->entry_pc),
 #else
-                   catch->code,
+                   (void*)catch->code,
 #endif
                    (void*)(catch->entry_pc));
             brief_print((lispobj)catch->tag);
