@@ -5200,7 +5200,10 @@ used for a COMPLEX component.~:@>"
       (cond
         ((= (count 0 eltypes) 0) 'simd-pack)
         ((= (count 1 eltypes) 1)
-         `(simd-pack ,(elt *simd-pack-element-types* (position 1 eltypes))))
+         (let ((pos (position 1 eltypes)))
+           (if pos
+               `(simd-pack ,(elt *simd-pack-element-types* pos))
+               (bug "bad simd-pack"))))
         (t
          `(or
            ,@(loop for x from 0
@@ -5262,7 +5265,10 @@ used for a COMPLEX component.~:@>"
       (cond
         ((= (count 0 eltypes) 0) 'simd-pack-256)
         ((= (count 1 eltypes) 1)
-         `(simd-pack-256 ,(elt *simd-pack-element-types* (position 1 eltypes))))
+         (let ((pos (position 1 eltypes)))
+           (if pos
+               `(simd-pack-256 ,(elt *simd-pack-element-types* pos))
+               (bug "bad simd-pack-256"))))
         (t
          `(or
            ,@(loop for x from 0
