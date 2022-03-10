@@ -1013,7 +1013,12 @@
   (input-stream (missing-arg) :type stream :read-only t)
   (output-stream (missing-arg) :type stream :read-only t))
 
-(defprinter (two-way-stream) input-stream output-stream)
+(defmethod print-object ((x two-way-stream) stream)
+  (print-unreadable-object (x stream :type t :identity t)
+    (format stream
+            ":INPUT-STREAM ~S :OUTPUT-STREAM ~S"
+            (two-way-stream-input-stream x)
+            (two-way-stream-output-stream x))))
 
 (defun make-two-way-stream (input-stream output-stream)
   "Return a bidirectional stream which gets its input from INPUT-STREAM and
