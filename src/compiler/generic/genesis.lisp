@@ -3575,7 +3575,15 @@ III. initially undefined function references (alphabetically):
               (descriptor-fixnum (read-slot pkg :id)))))
 
   (format t "~%~|~%VII. symbols (numerically):~2%")
-  (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
+  (mapc (lambda (cell)
+          (let* ((addr (car cell))
+                 (host-sym (cdr cell))
+                 (val
+                  (unless (or (keywordp host-sym) (null host-sym))
+                    (read-bits-wordindexed (cold-intern host-sym)
+                                           sb-vm:symbol-value-slot))))
+            (format t "~X: ~S~@[ = ~X~]~%" addr host-sym
+                    (unless (eql val sb-vm:unbound-marker-widetag) val))))
         (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
   (format t "~%~|~%VIII. parsed type specifiers:~2%")

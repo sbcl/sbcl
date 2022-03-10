@@ -229,11 +229,40 @@ gc_managed_heap_space_p(lispobj addr)
 
 #ifndef LISP_FEATURE_WIN32
 
+#if defined LISP_FEATURE_MIPS
+#include <sys/utsname.h>
+#endif
 /* Remap a part of an already existing memory mapping from a file,
  * and/or create a new mapping as need be */
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
                       int __attribute__((unused)) execute)
 {
+#if defined LISP_FEATURE_MIPS
+    /* Of the few MIPS machines I have access to, one definitely exhibits a
+     * horrible bug that mmap() persists MAP_PRIVATE pages back to disk,
+     * even though we alwayas open a core file as O_RDONLY. This is a kooky criterion
+     * to restrict the test by, but I didn't want it to be more general */
+    static int buggy_map_private;
+    if (!buggy_map_private) {
+        struct utsname name;
+        uname(&name);
+        if (!strcmp(name.version, "#1 SMP PREEMPT Mon Aug 3 14:22:54 PDT 2015") &&
+            !strcmp(name.release, "4.1.4")) {
+            buggy_map_private = 1;
+            fprintf(stderr, "WARNING: assuming that MAP_PRIVATE does not work on this kernel\n");
+        } else {
+            // fprintf(stderr, "INFO: kernel looks OK: [%s] [%s]\n", name.release, name.version);
+            buggy_map_private = -1;
+        }
+    }
+    if (buggy_map_private == 1) {
+        off_t old = lseek(fd, 0, SEEK_CUR);
+        lseek(fd, offset, SEEK_SET);
+        read(fd, addr, len);
+        lseek(fd, old, SEEK_SET);
+        return addr;
+    }
+#endif
     int fail = 0;
     os_vm_address_t actual;
 #ifdef LISP_FEATURE_64_BIT
