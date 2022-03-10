@@ -433,7 +433,7 @@
 (deferr unreachable-error ()
   (bug "Unreachable code reached"))
 
-(deferr fixnum*-overflow-error (low high)
+(deferr mul-overflow-error (low high)
   (let ((type (or (sb-di:error-context)
                   'fixnum)))
    (object-not-type-error (ash (logior

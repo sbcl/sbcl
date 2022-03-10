@@ -1319,7 +1319,7 @@
   (:generator 2
     (let* ((*location-context* (unless (eq type 'fixnum)
                                  type))
-           (error (generate-error-code vop 'sb-kernel::fixnum*-overflow-error r high)))
+           (error (generate-error-code vop 'sb-kernel::mul-overflow-error r high)))
       (assemble ()
         (inst smulh high x y)
         (inst mul r x y)
