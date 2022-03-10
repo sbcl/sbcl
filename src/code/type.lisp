@@ -5200,15 +5200,11 @@ used for a COMPLEX component.~:@>"
       (cond
         ((= (count 0 eltypes) 0) 'simd-pack)
         ((= (count 1 eltypes) 1)
-         (let ((pos (position 1 eltypes)))
-           (if pos
-               `(simd-pack ,(elt *simd-pack-element-types* pos))
-               ;; unreachable
-               nil)))
+         `(simd-pack ,(elt *simd-pack-element-types* (position 1 eltypes))))
         (t
          `(or
            ,@(loop for x from 0
-                   for bit on eltypes
+                   for bit across eltypes
                    if (= bit 1)
                      collect `(simd-pack ,(elt *simd-pack-element-types* x))))))))
 
@@ -5266,17 +5262,13 @@ used for a COMPLEX component.~:@>"
       (cond
         ((= (count 0 eltypes) 0) 'simd-pack-256)
         ((= (count 1 eltypes) 1)
-         (let ((pos (position 1 eltypes)))
-           (if pos
-               `(simd-pack-256 ,(elt *simd-pack-element-types* pos))
-               ;; unreachable
-               nil)))
+         `(simd-pack-256 ,(elt *simd-pack-element-types* (position 1 eltypes))))
         (t
          `(or
            ,@(loop for x from 0
-                   for bit on eltypes
+                   for bit across eltypes
                    if (= bit 1)
-                     collect `(simd-pack-256 ,(elt *simd-pack-element-types* x))))))))
+                   collect `(simd-pack-256 ,(elt *simd-pack-element-types* x))))))))
 
   (define-type-method (simd-pack-256 :simple-=) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
