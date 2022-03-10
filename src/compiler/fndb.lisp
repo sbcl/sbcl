@@ -2193,4 +2193,5 @@
       (foldable flushable movable always-translatable)))
 
 (defknown fixnum* (fixnum fixnum) fixnum
-  (movable foldable unsafely-flushable commutative))
+  (movable foldable unsafely-flushable commutative
+           always-translatable))

@@ -431,8 +431,12 @@
 (deferr unreachable-error ()
   (bug "Unreachable code reached"))
 
-(deferr fixnum*-overflow-error (x y)
-  (object-not-type-error (* x y) 'fixnum))
+(deferr fixnum*-overflow-error (low high)
+  (object-not-type-error (ash (logior
+                               (ash high sb-vm:n-word-bits)
+                               (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
+                              (- sb-vm:n-fixnum-tag-bits))
+                         'fixnum))
 
 ;;;; INTERNAL-ERROR signal handler
 
