@@ -2712,34 +2712,43 @@
 
 
 (when-vop-existsp (:translate fixnum*)
-  (defun fixnum* (x y)
+  (defun fixnum* (x y type)
     (declare (fixnum x y))
-    (the fixnum (* x y)))
+    (let ((r (* x y)))
+      (unless (typep r type)
+        (error 'type-error :expected-type type :datum r))
+      r))
 
   (deftransform * ((x y) (fixnum fixnum) * :node node)
     (let ((dest (node-dest node))
-          (fixnum (specifier-type 'fixnum)))
+          (fixnum (specifier-type 'fixnum))
+          type
+          type-to-check)
       (if (and (cast-p dest)
                (cast-type-check dest)
-               (csubtypep fixnum (single-value-type (node-derived-type node)))
-               (type= (cast-type-to-check dest) fixnum))
-          `(fixnum* x y)
+               (types-equal-or-intersect fixnum (setf type (single-value-type (node-derived-type node))))
+               (not (csubtypep type fixnum))
+               (csubtypep (setf type-to-check (single-value-type (cast-type-to-check dest))) fixnum))
+          `(fixnum* x y ',(if (type= type-to-check (specifier-type 'sb-int:index))
+                              ;; That's how the error is reported
+                              'sb-int:index
+                              (type-specifier type-to-check)))
           (give-up-ir1-transform))))
 
-  (deftransform fixnum* ((x y) (fixnum fixnum) * :node node)
+  (deftransform fixnum* ((x y type-to-check) (fixnum fixnum t) * :node node)
     (let (type
+          (type-to-check (lvar-value type-to-check))
           fixnum)
       (cond ((and (constant-lvar-p x)
                   (eql (lvar-value x) 2))
-             `(the fixnum (+ y y)))
+             `(the ,type-to-check (+ y y)))
             ((and (constant-lvar-p y)
                   (eql (lvar-value y) 2))
-             `(the fixnum (+ x x)))
-            ((csubtypep (setf type (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
-                        (setf fixnum (specifier-type 'fixnum)))
-             `(the fixnum (* x y)))
-            ((not (csubtypep fixnum type))
-             `(the fixnum (* x y)))
+             `(the ,type-to-check (+ x x)))
+            ((or (csubtypep (setf type (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
+                            (setf fixnum (specifier-type 'fixnum)))
+                 (not (types-equal-or-intersect fixnum type)))
+             `(the ,type-to-check (* x y)))
             (t
              (give-up-ir1-transform))))))
 

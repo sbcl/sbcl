@@ -336,10 +336,12 @@
                    (set-value value)))))
       (try condition))))
 
-(defun object-not-type-error (object type)
+(defun object-not-type-error (object type &optional (context nil context-p))
   (if (invalid-array-p object)
       (invalid-array-error object)
-      (let* ((context (sb-di:error-context))
+      (let* ((context (if context-p
+                          context
+                          (sb-di:error-context)))
              (condition
                (make-condition (if (and (%instancep object)
                                         (wrapper-invalid (%instance-wrapper object)))
@@ -432,11 +434,14 @@
   (bug "Unreachable code reached"))
 
 (deferr fixnum*-overflow-error (low high)
-  (object-not-type-error (ash (logior
-                               (ash high sb-vm:n-word-bits)
-                               (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
-                              (- sb-vm:n-fixnum-tag-bits))
-                         'fixnum))
+  (let ((type (or (sb-di:error-context)
+                  'fixnum)))
+   (object-not-type-error (ash (logior
+                                (ash high sb-vm:n-word-bits)
+                                (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
+                               (- sb-vm:n-fixnum-tag-bits))
+                          type
+                          nil)))
 
 ;;;; INTERNAL-ERROR signal handler
 
