@@ -818,8 +818,8 @@
   #+ubsan (ash (read-bits-wordindexed vector 0) (- -32 sb-vm:n-fixnum-tag-bits))
   #-ubsan (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
 
-(macrolet ((string-data (string-descriptor)
-             `(+ (descriptor-byte-offset ,string-descriptor)
+(macrolet ((vector-data (vector-descriptor)
+             `(+ (descriptor-byte-offset ,vector-descriptor)
                  (* sb-vm:vector-data-offset sb-vm:n-word-bytes))))
 (defun base-string-to-core (string &optional (gspace *dynamic*))
   "Copy STRING (which must only contain STANDARD-CHARs) into the cold
@@ -832,26 +832,24 @@ core and return a descriptor to it."
                                length (ceiling (1+ length) sb-vm:n-word-bytes)
                                gspace))
          (mem (descriptor-mem des))
-         (byte-base (string-data des)))
+         (byte-base (vector-data des)))
     (dotimes (i length des) ; was prezeroed, so automatically null-terminated
       (setf (bvref mem (+ byte-base i)) (char-code (aref string i))))))
 
 (defun base-string-from-core (descriptor)
   (let* ((mem (descriptor-mem descriptor))
-         (byte-base (string-data descriptor))
+         (byte-base (vector-data descriptor))
          (len (cold-vector-len descriptor))
          (str (make-string len)))
     (dotimes (i len str)
-      (setf (aref str i) (code-char (bvref mem (+ byte-base i))))))))
+      (setf (aref str i) (code-char (bvref mem (+ byte-base i)))))))
 
 (defun bit-vector-to-core (bit-vector &optional (gspace *dynamic*))
   (let* ((length (length bit-vector))
          (nwords (ceiling length sb-vm:n-word-bits))
          (des (allocate-vector sb-vm:simple-bit-vector-widetag length nwords gspace))
          (mem (descriptor-mem des))
-         ;; FIXME: reuse STRING-DATA above
-         (base (+ (descriptor-byte-offset des)
-                  (* sb-vm:vector-data-offset sb-vm:n-word-bytes))))
+         (base (vector-data des)))
     (let ((byte 0))
       (dotimes (i length)
         (let ((byte-bit (rem i 8)))
@@ -860,7 +858,7 @@ core and return a descriptor to it."
             (setf (bvref mem (+ base (floor i 8))) byte))))
       (when (/= 0 (rem length 8))
         (setf (bvref mem (+ base (floor length 8))) byte))
-      des)))
+      des))))
 
 ;;; Write the bits of INT to core as if a bignum, i.e. words are ordered from
 ;;; least to most significant regardless of machine endianness.
