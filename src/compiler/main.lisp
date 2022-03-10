@@ -1911,19 +1911,22 @@ necessary, since type inference may take arbitrarily long to converge.")
   "Compile INPUT-FILE, producing a corresponding fasl file and
 returning its filename.
 
+  :OUTPUT-FILE
+     The name of the FASL to output, NIL for none, T for the default.
+     (Note the difference between the treatment of NIL :OUTPUT-FILE
+     here and in COMPILE-FILE-PATHNAME.)  The returned pathname of the
+     output file may differ from the pathname of the :OUTPUT-FILE
+     parameter, e.g. when the latter is a designator for a directory.
+
+  :VERBOSE
+     If true, information indicating what file is being compiled is printed
+     to *STANDARD-OUTPUT*.
+
   :PRINT
-     If true, a message per non-macroexpanded top level form is printed
-     to *STANDARD-OUTPUT*. Top level forms that whose subforms are
-     processed as top level forms (eg. EVAL-WHEN, MACROLET, PROGN) receive
-     no such message, but their subforms do.
+     If true, each top level form in the file is printed to *STANDARD-OUTPUT*.
 
-     As an extension to ANSI, if :PRINT is :top-level-forms, a message
-     per top level form after macroexpansion is printed to *STANDARD-OUTPUT*.
-     For example, compiling an IN-PACKAGE form will result in a message about
-     a top level SETQ in addition to the message about the IN-PACKAGE form'
-     itself.
-
-     Both forms of reporting obey the SB-EXT:*COMPILER-PRINT-VARIABLE-ALIST*.
+  :EXTERNAL-FORMAT
+     The external format to use when opening the source file.
 
   :BLOCK-COMPILE {NIL | :SPECIFIED | T}
      Determines whether multiple functions are compiled together as a unit,
