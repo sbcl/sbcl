@@ -178,9 +178,8 @@
  ;;; convenient to stick them here)
 
  ("src/compiler/parse-lambda-list" :c-headers)
- ("src/compiler/fun-info" :c-headers)
- ("src/compiler/constantp" :c-headers)
  ("src/compiler/macros" :c-headers)
+ ("src/compiler/fun-info" :c-headers)
  ("src/compiler/generic/vm-macs" :c-headers)
  ("src/compiler/policies")
 
@@ -260,6 +259,8 @@
  ("src/code/source-location")
 
  ("src/compiler/proclaim" :c-headers)
+
+ ("src/compiler/constantp" :c-headers)
  ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
  ("src/code/type" :c-headers)
  ("src/compiler/generic/vm-type" :c-headers)
