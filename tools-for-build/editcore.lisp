@@ -333,6 +333,8 @@
   ;; but no more so than everything else in this file)
   (let ((locs (sb-c::compiled-debug-fun-encoded-locs
                (truly-the sb-c::compiled-debug-fun compiled-debug-fun))))
+    (when (consp locs)
+      (setq locs (cdr (translate locs spaces))))
     (sb-c::compiled-debug-fun-offset
      (sb-c::make-compiled-debug-fun
       :name nil
