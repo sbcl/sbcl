@@ -58,7 +58,7 @@
                           (remove-if (lambda (x) (member x '(nil t)))
                                      sb-vm:*specialized-array-element-type-properties*
                                      :key 'sb-vm:saetp-specifier))))
-                `(((integer 0 ,array-dimension-limit)
+                `(((mod ,(1+ array-dimension-limit))
                    object-not-array-dimension)
                   ;; Union of all unboxed array specializations,
                   ;; for type-checking the argument to VECTOR-SAP
