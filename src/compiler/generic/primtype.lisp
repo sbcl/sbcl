@@ -390,24 +390,34 @@
              (part-of character)))
         #+sb-simd-pack
         (simd-pack-type
-         (let ((eltypes (simd-pack-type-element-type type)))
-           (cond ((equal '(integer) eltypes)
+         (let* ((eltypes (simd-pack-type-element-type type))
+                (count (count 1 eltypes))
+                (position (position 1 eltypes)))
+           (if (= count 1)
+               (cond
+                 ((eql position (position 'integer *simd-pack-element-types*))
                   (exactly simd-pack-int))
-                 ((equal '(single-float) eltypes)
+                 ((eql position (position 'single-float *simd-pack-element-types*))
                   (exactly simd-pack-single))
-                 ((equal '(double-float) eltypes)
+                 ((eql position (position 'double-float *simd-pack-element-types*))
                   (exactly simd-pack-double))
-                 (t (any)))))
+                 (t (any)))
+               (any))))
         #+sb-simd-pack-256
         (simd-pack-256-type
-         (let ((eltypes (simd-pack-256-type-element-type type)))
-           (cond ((equal '(integer) eltypes)
+         (let* ((eltypes (simd-pack-256-type-element-type type))
+                (count (count 1 eltypes))
+                (position (position 1 eltypes)))
+           (if (= count 1)
+               (cond
+                 ((eql position (position 'integer *simd-pack-element-types*))
                   (exactly simd-pack-256-int))
-                 ((equal '(single-float) eltypes)
+                 ((eql position (position 'single-float *simd-pack-element-types*))
                   (exactly simd-pack-256-single))
-                 ((equal '(double-float) eltypes)
+                 ((eql position (position 'double-float *simd-pack-element-types*))
                   (exactly simd-pack-256-double))
-                 (t (any)))))
+                 (t (any)))
+               (any))))
         (cons-type
          (part-of list))
         (built-in-classoid

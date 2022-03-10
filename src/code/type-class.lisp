@@ -870,7 +870,7 @@
             (:constructor %make-simd-pack-type (element-type))
             (:copier nil))
   (element-type (missing-arg)
-   :type (cons #||(member #.*simd-pack-element-types*) ||#)
+   :type (simple-bit-vector #.(length *simd-pack-element-types*))
    :read-only t))
 
 #+sb-simd-pack-256
@@ -879,7 +879,7 @@
             (:constructor %make-simd-pack-256-type (element-type))
             (:copier nil))
   (element-type (missing-arg)
-   :type (cons #||(member #.*simd-pack-element-types*) ||#)
+   :type (simple-bit-vector #.(length *simd-pack-element-types*))
    :read-only t))
 
 (declaim (ftype (sfunction (ctype ctype) (values t t)) csubtypep))

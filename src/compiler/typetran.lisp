@@ -637,9 +637,10 @@
           (simd-pack-p ,object)
           (let ((,n-tag (%simd-pack-tag ,object)))
             (or ,@(loop
-                    for type in (simd-pack-type-element-type type)
-                    for index = (position type *simd-pack-element-types*)
-                    collect `(eql ,n-tag ,index))))))))
+                    for bit across (simd-pack-type-element-type type)
+                    for i from 0
+                    if (= bit 1)
+                      collect `(eql ,n-tag ,i))))))))
 
 #+sb-simd-pack-256
 (defun source-transform-simd-pack-256-typep (object type)
@@ -650,9 +651,10 @@
           (simd-pack-256-p ,object)
           (let ((,n-tag (%simd-pack-256-tag ,object)))
             (or ,@(loop
-                    for type in (simd-pack-256-type-element-type type)
-                    for index = (position type *simd-pack-element-types*)
-                    collect `(eql ,n-tag ,index))))))))
+                    for bit across (simd-pack-256-type-element-type type)
+                    for i from 0
+                    if (= bit 1)
+                      collect `(eql ,n-tag ,i))))))))
 
 ;;; Return the predicate and type from the most specific entry in
 ;;; *TYPE-PREDICATES* that is a supertype of TYPE.

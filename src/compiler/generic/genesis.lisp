@@ -844,6 +844,24 @@ core and return a descriptor to it."
     (dotimes (i len str)
       (setf (aref str i) (code-char (bvref mem (+ byte-base i))))))))
 
+(defun bit-vector-to-core (bit-vector &optional (gspace *dynamic*))
+  (let* ((length (length bit-vector))
+         (nwords (ceiling length sb-vm:n-word-bits))
+         (des (allocate-vector sb-vm:simple-bit-vector-widetag length nwords gspace))
+         (mem (descriptor-mem des))
+         ;; FIXME: reuse STRING-DATA above
+         (base (+ (descriptor-byte-offset des)
+                  (* sb-vm:vector-data-offset sb-vm:n-word-bytes))))
+    (let ((byte 0))
+      (dotimes (i length)
+        (let ((byte-bit (rem i 8)))
+          (setf (ldb (byte 1 byte-bit) byte) (bit bit-vector i))
+          (when (= byte-bit 7)
+            (setf (bvref mem (+ base (floor i 8))) byte))))
+      (when (/= 0 (rem length 8))
+        (setf (bvref mem (+ base (floor length 8))) byte))
+      des)))
+
 ;;; Write the bits of INT to core as if a bignum, i.e. words are ordered from
 ;;; least to most significant regardless of machine endianness.
 (defun integer-bits-to-core (int descriptor start nwords)
@@ -1618,6 +1636,7 @@ core and return a descriptor to it."
                           (get-uninterned-symbol (string value))))
               (number (number-to-core value))
               (string (base-string-to-core value))
+              (simple-bit-vector (bit-vector-to-core value))
               (cons (cold-cons (target-representation (car value))
                                (target-representation (cdr value))))
               (simple-vector

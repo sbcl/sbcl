@@ -100,15 +100,13 @@
     #+sb-simd-pack
     (simd-pack-type
      (and (simd-pack-p object)
-          (let* ((tag (%simd-pack-tag object))
-                 (name (nth tag *simd-pack-element-types*)))
-            (not (not (member name (simd-pack-type-element-type type)))))))
+          (let* ((tag (%simd-pack-tag object)))
+            (= (sbit (simd-pack-type-element-type type) tag) 1))))
     #+sb-simd-pack-256
     (simd-pack-256-type
      (and (simd-pack-256-p object)
-          (let* ((tag (%simd-pack-256-tag object))
-                 (name (nth tag *simd-pack-element-types*)))
-            (not (not (member name (simd-pack-256-type-element-type type)))))))
+          (let* ((tag (%simd-pack-256-tag object)))
+            (= (sbit (simd-pack-256-type-element-type type) tag) 1))))
     (character-set-type
      (test-character-type type))
     (negation-type
