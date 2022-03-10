@@ -5221,8 +5221,10 @@ used for a COMPLEX component.~:@>"
 
   (define-type-method (simd-pack :simple-subtypep) (type1 type2)
     (declare (type simd-pack-type type1 type2))
-    (= 0 (count 1 (bit-andc2 (simd-pack-type-element-type type1)
-                             (simd-pack-type-element-type type2)))))
+    (values
+     (= 0 (count 1 (bit-andc2 (simd-pack-type-element-type type1)
+                              (simd-pack-type-element-type type2))))
+     t))
 
   (define-type-method (simd-pack :simple-union2) (type1 type2)
     (declare (type simd-pack-type type1 type2))
@@ -5285,8 +5287,10 @@ used for a COMPLEX component.~:@>"
 
   (define-type-method (simd-pack-256 :simple-subtypep) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
-    (= 0 (count 1 (bit-andc2 (simd-pack-256-type-element-type type1)
-                             (simd-pack-256-type-element-type type2)))))
+    (values
+     (= 0 (count 1 (bit-andc2 (simd-pack-256-type-element-type type1)
+                              (simd-pack-256-type-element-type type2))))
+     t))
 
   (define-type-method (simd-pack-256 :simple-union2) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
