@@ -172,3 +172,18 @@
                                  '(simd-pack integer)))
   (assert-tri-eq nil t (subtypep '(or (simd-pack single-float) (simd-pack double-float))
                                  '(simd-pack integer))))
+
+(with-test (:name (simd-pack :ctype-unparse :smoke))
+  (flet ((unparsed (s) (sb-kernel:type-specifier (sb-kernel:specifier-type s))))
+    (assert (equal (unparsed 'simd-pack) 'simd-pack))
+    (assert (equal (unparsed '(simd-pack integer)) '(simd-pack integer)))
+    (assert (equal (unparsed '(simd-pack single-float)) '(simd-pack single-float)))
+    (assert (equal (unparsed '(simd-pack double-float)) '(simd-pack double-float)))
+    (assert (equal (unparsed '(or (simd-pack integer) (simd-pack double-float)))
+                   ;; depends on *SIMD-PACK-ELEMENT-TYPES* order
+                   '(or (simd-pack integer) (simd-pack double-float))))
+    (assert (equal (unparsed '(or
+                               (simd-pack integer)
+                               (simd-pack single-float)
+                               (simd-pack double-float)))
+                   'simd-pack))))

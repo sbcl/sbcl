@@ -207,3 +207,18 @@
                                  '(simd-pack-256 integer)))
   (assert-tri-eq nil t (subtypep '(or (simd-pack-256 single-float) (simd-pack-256 double-float))
                                  '(simd-pack-256 integer))))
+
+(with-test (:name (simd-pack-256 :ctype-unparse :smoke))
+  (flet ((unparsed (s) (sb-kernel:type-specifier (sb-kernel:specifier-type s))))
+    (assert (equal (unparsed 'simd-pack-256) 'simd-pack-256))
+    (assert (equal (unparsed '(simd-pack-256 integer)) '(simd-pack-256 integer)))
+    (assert (equal (unparsed '(simd-pack-256 single-float)) '(simd-pack-256 single-float)))
+    (assert (equal (unparsed '(simd-pack-256 double-float)) '(simd-pack-256 double-float)))
+    (assert (equal (unparsed '(or (simd-pack-256 integer) (simd-pack-256 double-float)))
+                   ;; depends on *SIMD-PACK-ELEMENT-TYPES* order
+                   '(or (simd-pack-256 integer) (simd-pack-256 double-float))))
+    (assert (equal (unparsed '(or
+                               (simd-pack-256 integer)
+                               (simd-pack-256 single-float)
+                               (simd-pack-256 double-float)))
+                   'simd-pack-256))))
