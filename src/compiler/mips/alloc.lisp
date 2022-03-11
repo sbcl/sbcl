@@ -13,13 +13,8 @@
 
 (defun allocation (type size result lowtag temps &key stackp)
   (cond (stackp
-         ;; Store a 0 word at CSP in case aligning up skips over that word
-         ;; (can't leave random words below the stack pointer)
-         (storew zero-tn csp-tn 0 0)
-         (inst addu csp-tn 7)
-         (inst li (car temps) (lognot 7))
-         (inst and csp-tn (car temps))
-         (inst add result csp-tn lowtag)
+         (align-csp (car temps) (cadr temps))
+         (inst or result csp-tn lowtag)
          (inst add csp-tn size))
         (t
          (let ((end-addr (car temps))
@@ -123,7 +118,7 @@
     (inst sll bytes n-lowtag-bits)
     ;; FIXME: It would be good to check for stack overflow here.
     (pseudo-atomic (pa-flag) ; FIXME: why pseudo-atomic on stack?
-      (align-csp temp)
+      (align-csp temp pa-flag)
       (inst or result csp-tn other-pointer-lowtag)
       (inst addu temp csp-tn (* vector-data-offset n-word-bytes))
       (inst addu csp-tn bytes)
@@ -134,7 +129,7 @@
         (storew zero-tn temp 0)
         (inst bne temp csp-tn loop)
         (inst addu temp n-word-bytes))
-      (align-csp temp))))
+      (align-csp temp pa-flag)))) ; why do it again???
 
 (define-vop (make-fdefn)
   (:policy :fast-safe)
@@ -204,7 +199,7 @@
   (:generator 4
     (pseudo-atomic (pa-flag)
       (cond (stack-allocate-p
-             (align-csp result)
+             (align-csp result pa-flag)
              (inst or result csp-tn lowtag)
              (inst addu csp-tn (pad-data-block words)))
             (t

@@ -268,14 +268,9 @@
 
 (defun align-csp (temp)
   ;; is used for stack allocation of dynamic-extent objects
-  (let ((aligned (gen-label)))
-    (inst andi. temp csp-tn lowtag-mask)
-    (inst beq aligned)
-    (inst addi csp-tn csp-tn n-word-bytes)
-    (inst li temp 0)
-    (storew temp csp-tn -1)
-    (emit-label aligned)))
-
+  (storew null-tn csp-tn 0 0) ; store a known-good value (don't want wild pointers below CSP)
+  (inst addi temp csp-tn lowtag-mask)
+  (inst clrrdi csp-tn temp n-lowtag-bits))
 
 ;;;; Error Code
 (defun emit-error-break (vop kind code values)

@@ -38,8 +38,7 @@
                  (if dx-p
                      (progn
                        (align-csp res)
-                       (inst clrrwi res csp-tn n-lowtag-bits)
-                       (inst ori res res list-pointer-lowtag)
+                       (inst ori res csp-tn list-pointer-lowtag)
                        (inst addi csp-tn csp-tn alloc))
                      (allocation 'list alloc list-pointer-lowtag res
                                  :temp-tn alloc-temp
@@ -91,9 +90,8 @@
         (if stack-allocate-p
             (progn
               (align-csp result)
-              (inst clrrwi. result csp-tn n-lowtag-bits)
+              (inst ori result csp-tn fun-pointer-lowtag)
               (inst addi csp-tn csp-tn alloc-size)
-              (inst ori result result fun-pointer-lowtag)
               (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-widetag)))
             (progn
               (allocation nil (pad-data-block size) fun-pointer-lowtag result

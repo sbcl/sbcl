@@ -155,7 +155,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
               (lowtag lowtag))
     `(if ,dynamic-extent-p
          (pseudo-atomic (,flag-tn) ; why P-A ???
-           (align-csp ,temp-tn)
+           (align-csp ,temp-tn ,flag-tn)
            (inst or ,result-tn csp-tn ,lowtag)
            (inst li ,temp-tn (compute-object-header ,size ,type-code))
            (inst addu csp-tn (pad-data-block ,size))
@@ -168,16 +168,10 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
            (storew ,temp-tn ,result-tn 0 ,lowtag)
            ,@body))))
 
-(defun align-csp (temp)
-  ;; is used for stack allocation of dynamic-extent objects
-  (let ((aligned (gen-label)))
-    (inst and temp csp-tn lowtag-mask)
-    (inst beq temp aligned)
-    (inst nop)
-    (inst addu csp-tn n-word-bytes)
-    (storew zero-tn csp-tn -1)
-    (emit-label aligned)))
-
+(defun align-csp (temp1 temp2)
+  (inst li temp1 (lognot lowtag-mask))
+  (inst addu temp2 csp-tn lowtag-mask)
+  (inst and csp-tn temp2 temp1))
 
 ;;;; Three Way Comparison
 (defun three-way-comparison (x y condition flavor not-p target temp)

@@ -162,11 +162,6 @@
 
       ;; temp-tn is csp-tn rounded up to a multiple of 8 (lispobj size)
       (align-csp temp-tn)
-      ;; For the benefit of future historians, this is how CMUCL does the
-      ;; align-csp (I think their version is branch free only because
-      ;; they simply don't worry about zeroing the pad word):
-      #+nil (inst add ,temp-tn csp-tn sb-vm:lowtag-mask)
-      #+nil (inst andn ,temp-tn sb-vm:lowtag-mask)
 
       ;; Set the result to csp-tn, with appropriate lowtag
       (inst or result-tn csp-tn lowtag)
@@ -247,15 +242,9 @@
        ,@body)))
 
 (defun align-csp (temp)
-  (let ((aligned (gen-label)))
-    ;; FIXME: why use a TEMP?  Why not just ZERO-TN?
-    (inst andcc temp csp-tn lowtag-mask)
-    (if (member :sparc-v9 *backend-subfeatures*)
-        (inst b :eq aligned :pt)
-        (inst b :eq aligned))
-    (storew zero-tn csp-tn 0) ; sneaky use of delay slot
-    (inst add csp-tn csp-tn n-word-bytes)
-    (emit-label aligned)))
+  (storew null-tn csp-tn 0 0) ; store a known-good value (don't want wild pointers below CSP)
+  (inst add temp csp-tn lowtag-mask)
+  (inst and csp-tn temp (lognot lowtag-mask)))
 
 ;;;; Error Code
 (defun emit-error-break (vop kind code values)

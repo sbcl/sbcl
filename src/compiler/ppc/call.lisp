@@ -1164,8 +1164,7 @@ default-value-8
       (if dx-p
           (progn
             (align-csp temp)
-            (inst clrrwi result csp-tn n-lowtag-bits)
-            (inst ori result result list-pointer-lowtag)
+            (inst ori result csp-tn list-pointer-lowtag)
             (move dst result)
             (inst slwi temp count 1)
             (inst add csp-tn csp-tn temp))
