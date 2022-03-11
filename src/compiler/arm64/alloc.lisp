@@ -102,7 +102,7 @@
   (:generator 10
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
-      (pseudo-atomic (pa-flag)
+      (pseudo-atomic (pa-flag :elide-if stack-allocate-p)
         (allocation nil alloc-size fun-pointer-lowtag result
                     :flag-tn pa-flag
                     :stack-allocate-p stack-allocate-p
