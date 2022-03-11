@@ -7,9 +7,9 @@
 
 (defconstant +alloc-region-size+
   #-gencgc
-  (get-page-size)
+  sb-c:+backend-page-bytes+
   #+gencgc
-  (max sb-vm:gencgc-alloc-granularity sb-vm:gencgc-card-bytes))
+  (max sb-vm:gencgc-alloc-granularity sb-vm:gencgc-page-bytes))
 
 (deftype report-type ()
   '(member nil :flat :graph))
@@ -38,27 +38,28 @@
                     count (scc-p v))))
     (if (eq (call-graph-sampling-mode call-graph) :alloc)
         (format t "~2&Number of samples:     ~d~%~
+                      Unique traces:         ~d~%~
                       Alloc interval:        ~a regions (approximately ~a kB)~%~
-                      Total sampling amount: ~a regions (approximately ~a kB)~%~
-                      Number of cycles:      ~d~%~
-                      Sampled threads:~{~%   ~S~}~2%"
+                      Total sampling amount: ~a regions (approximately ~a kB)"
                 nsamples
+                (call-graph-unique-trace-count call-graph)
                 interval
                 (truncate (* interval +alloc-region-size+) 1024)
                 (* nsamples interval)
-                (truncate (* nsamples interval +alloc-region-size+) 1024)
-                ncycles
-                (call-graph-sampled-threads call-graph))
+                (truncate (* nsamples interval +alloc-region-size+) 1024))
         (format t "~2&Number of samples:   ~d~%~
                       Sample interval:     ~f seconds~%~
-                      Total sampling time: ~f seconds~%~
-                      Number of cycles:    ~d~%~
-                      Sampled threads:~{~% ~S~}~2%"
+                      Total sampling time: ~f seconds"
                 nsamples
                 interval
-                (* nsamples interval)
-                ncycles
-                (call-graph-sampled-threads call-graph)))))
+                (* nsamples interval)))
+    (format t "~%Graph cycles:        ~d~%~
+               Sampled threads:~%" ncycles)
+    (loop for (thread bytes-used bytes-reserved buckets-used)
+          in (call-graph-sampled-threads call-graph)
+          do (format t "   ~a (~d/~d bytes, ~d hash buckets)~%"
+                     thread bytes-used bytes-reserved buckets-used))
+    (terpri)))
 
 (declaim (type report-sort-key *report-sort-by*))
 (defvar *report-sort-by* :samples
@@ -121,7 +122,7 @@
                (accrued-percent (samples-percent call-graph accrued-count)))
           (incf total-count count)
           (incf total-percent percent)
-          (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~8@a  ~s~%"
+          (format t "~&~4d ~6d ~5,1f ~6d ~5,1f ~6d ~5,1f ~8@a  "
                   (incf i)
                   count
                   percent
@@ -129,8 +130,10 @@
                   accrued-percent
                   total-count
                   total-percent
-                  (or (node-call-count node) "-")
-                  (node-name node))
+                  (or (node-call-count node) "-"))
+          (if (stringp (node-name node))
+              (format t "~a~%" (node-name node))
+              (format t "~s~%" (node-name node)))
           (finish-output)))
       (print-separator)
       (format t "~&     ~6d ~5,1f~36a elsewhere~%"
@@ -145,8 +148,12 @@
     (do-vertices (node call-graph)
       (when (cycle-p node)
         (flet ((print-info (indent index count percent name)
-                 (format t "~&~6d ~5,1f ~11@t ~V@t  ~s [~d]~%"
-                         count percent indent name index)))
+                 (format t "~&~6d ~5,1f ~11@t ~V@t  "
+                         count percent indent)
+                 (if (stringp name)
+                     (format t "~a" name)
+                     (format t "~s" name))
+                 (format t " [~d]~%" index)))
           (print-separator)
           (format t "~&~6d ~5,1f                ~a...~%"
                   (node-count node)
@@ -168,8 +175,12 @@
     (flet ((find-call (from to)
              (find to (node-edges from) :key #'call-vertex))
            (print-info (indent index count percent name)
-             (format t "~&~6d ~5,1f ~11@t ~V@t  ~s [~d]~%"
-                     count percent indent name index)))
+             (format t "~&~6d ~5,1f ~11@t ~V@t  "
+                     count percent indent)
+             (if (stringp name)
+                 (format t "~a" name)
+                 (format t "~s" name))
+             (format t " [~d]~%" index)))
       (format t "~&                               Callers~%")
       (format t "~&                 Total.     Function~%")
       (format t "~& Count     %  Count     %      Callees~%")
@@ -185,13 +196,15 @@
                         (samples-percent call-graph (call-count call))
                         (node-name caller))))
         ;; Print the node itself.
-        (format t "~&~6d ~5,1f ~6d ~5,1f   ~s [~d]~%"
+        (format t "~&~6d ~5,1f ~6d ~5,1f   "
                 (node-count node)
                 (samples-percent call-graph (node-count node))
                 (node-accrued-count node)
-                (samples-percent call-graph (node-accrued-count node))
-                (node-name node)
-                (node-index node))
+                (samples-percent call-graph (node-accrued-count node)))
+        (if (stringp (node-name node))
+            (format t "~a" (node-name node))
+            (format t "~s" (node-name node)))
+        (format t " [~d]~%" (node-index node))
         ;; Print callees.
         (do-edges (call called node)
           (print-info 4 (node-index called)
@@ -248,8 +261,8 @@ resulting call-graph, or NIL if there are no samples (eg. right after
 calling RESET.)
 
 Profiling is stopped before the call graph is generated."
-  (cond (*samples*
-         (let ((graph (or call-graph (make-call-graph most-positive-fixnum))))
+  (acond (*samples*
+          (let ((graph (or call-graph (make-call-graph it most-positive-fixnum))))
            (ecase type
              (:flat
               (print-flat graph :stream stream :max max :min-percent min-percent))
@@ -257,6 +270,6 @@ Profiling is stopped before the call graph is generated."
               (print-graph graph :stream stream :max max :min-percent min-percent))
              ((nil)))
            graph))
-        (t
-         (format stream "~&; No samples to report.~%")
-         nil)))
+         (t
+          (format stream "~&; No samples to report.~%")
+          nil)))

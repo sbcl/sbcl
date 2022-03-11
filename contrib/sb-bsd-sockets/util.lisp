@@ -53,5 +53,5 @@
   `(syscall-error-case (,form ,result-var ,test-form nil)
        ,no-error-form
      ,@(unless (find :error clauses :key #'first)
-         `((:error (addrinfo-error ,context ,result-var))))
+         `((:error (name-service-error ,context ,result-var))))
      ,@clauses))

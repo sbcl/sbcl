@@ -44,10 +44,10 @@
              (coerce (mapcar
                       #'code-char
                       (parse-codepoints
-                        (remove +mul+ (remove +div+ relevant-portion))))
+                       (remove +mul+ (remove +div+ relevant-portion))))
                      'string)))
-      (assert (equalp (funcall fn string)
-                      (line-to-clusters relevant-portion)))))))
+        (assert (equalp (funcall fn string)
+                        (line-to-clusters relevant-portion)))))))
 
 (defun test-graphemes ()
   (declare (optimize (debug 2)))
@@ -100,21 +100,23 @@
      (split-string (remove +mul+ (remove +div+ string)) #\Space)
      :test #'string=)) 'string))
 
-(defun test-line-breaking ()
-  (declare (optimize (debug 2)))
-  (with-test (:name (:line-breaking)
-                    :skipped-on (not :sb-unicode))
+(with-test (:name (:line-breaking)
+            :skipped-on (not :sb-unicode))
+  (let* ((line-break-exceptions (make-hash-table :test 'equal))
+         (strings
+           (with-open-file (s "data/line-break-exceptions.lisp-expr" :external-format :utf-8)
+             (read s))))
+    (dolist (s strings)
+      (setf (gethash s line-break-exceptions) t))
     (with-open-file (s "data/LineBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
-         while line
-         for string = (subseq line 0 (max 0 (1- (or (position #\# line) 1))))
-         unless (string= string "")
-         do
-           (assert (equal
-                    (process-line-break-line string)
-                    (substitute
-                     :can :must
-                     (sb-unicode::line-break-annotate
-                      (string-from-line-break-line string)))))))))
-
-(test-line-breaking)
+            while line
+            do (let ((string (subseq line 0 (max 0 (1- (or (position #\# line) 1))))))
+                 (unless (string= string "")
+                   (let* ((expected (process-line-break-line string))
+                          (annotated (sb-unicode::line-break-annotate
+                                      (string-from-line-break-line string)))
+                          (actual (substitute :can :must annotated)))
+                     (if (gethash string line-break-exceptions)
+                         (assert (not (equal expected actual)))
+                         (assert (equal expected actual))))))))))

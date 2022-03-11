@@ -86,7 +86,7 @@
 ;;; Conversion to UCS-2{LE,BE}
 (declaim (inline char->ucs-2le))
 (defun char->ucs-2le (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest))
   (let ((code (char-code char)))
     (if (< code #x10000)
@@ -103,7 +103,7 @@
 
 (declaim (inline char->ucs-2be))
 (defun char->ucs-2be (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest))
   (let ((code (char-code char)))
     (if (< code #x10000)
@@ -119,7 +119,7 @@
             (vector-push-extend (aref replacement i) dest))))))
 
 (defun string->ucs-2le (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 2 (+ additional-space (- send sstart)))
@@ -132,7 +132,7 @@
     (coerce array '(simple-array (unsigned-byte 8) (*)))))
 
 (defun string->ucs-2be (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 2 (+ additional-space (- send sstart)))
@@ -163,7 +163,7 @@
         (name-be (make-od-name 'simple-get-ucs-2be-char accessor)))
     `(progn
       (defun ,name-le (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes)
@@ -178,7 +178,7 @@
                (declare (inline cref))
                (code-char (dpb (cref 1) (byte 8 8) (cref 0))))))
       (defun ,name-be (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes)
@@ -199,7 +199,7 @@
         (name-be (make-od-name 'ucs-2be->string accessor)))
     `(progn
       (defun ,name-le (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -216,7 +216,7 @@
                      (incf pos bytes)))
           string))
       (defun ,name-be (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -259,7 +259,7 @@
 
 (declaim (inline char->ucs-4le))
 (defun char->ucs-4le (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest)
            (ignore string pos))
   (let ((code (char-code char)))
@@ -274,7 +274,7 @@
 
 (declaim (inline char->ucs-4be))
 (defun char->ucs-4be (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest)
            (ignore string pos))
   (let ((code (char-code char)))
@@ -288,7 +288,7 @@
       (add-byte (ldb (byte 8 0) code)))))
 
 (defun string->ucs-4le (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 4 (+ additional-space (- send sstart)))
@@ -301,7 +301,7 @@
     (coerce array '(simple-array (unsigned-byte 8) (*)))))
 
 (defun string->ucs-4be (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 4 (+ additional-space (- send sstart)))
@@ -332,7 +332,7 @@
         (name-be (make-od-name 'simple-get-ucs-4be-char accessor)))
     `(progn
       (defun ,name-le (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes))
@@ -347,12 +347,12 @@
                             (dpb (cref 3) (byte 8 24)
                                  (dpb (cref 2) (byte 8 16)
                                       (dpb (cref 1) (byte 8 8) (cref 0))))))))
-          (if (< code sb-xc:char-code-limit)
+          (if (< code char-code-limit)
               (code-char code)
               (decoding-error array pos (+ pos bytes) :ucs-4le
                               'octet-decoding-error pos))))
       (defun ,name-be (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes))
@@ -366,13 +366,13 @@
                             (dpb (cref 0) (byte 8 24)
                                  (dpb (cref 1) (byte 8 16)
                                       (dpb (cref 2) (byte 8 8) (cref 3))))))))
-          (if (< code sb-xc:char-code-limit)
+          (if (< code char-code-limit)
               (code-char code)
               (decoding-error array pos (+ pos bytes) :ucs-4be
                               'octet-decoding-error pos)))))))
 
 (eval-when (:compile-toplevel)
-  (sb-xc:proclaim '(muffle-conditions compiler-note)))
+  (proclaim '(muffle-conditions compiler-note)))
 (instantiate-octets-definition define-simple-get-ucs4-character)
 
 (defmacro define-ucs-4->string (accessor type)
@@ -380,7 +380,7 @@
         (name-be (make-od-name 'ucs-4be->string accessor)))
     `(progn
       (defun ,name-le (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -398,7 +398,7 @@
                      (incf pos bytes)))
           string))
       (defun ,name-be (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -424,7 +424,7 @@
   (setf (sap-ref-32le sap tail) bits)
   4
   (let ((code (sap-ref-32le sap head)))
-    (if (< code sb-xc:char-code-limit)
+    (if (< code char-code-limit)
         (code-char code)
         (return-from decode-break-reason 4)))
   ucs-4le->string-aref
@@ -436,7 +436,7 @@
   (setf (sap-ref-32be sap tail) bits)
   4
   (let ((code (sap-ref-32be sap head)))
-    (if (< code sb-xc:char-code-limit)
+    (if (< code char-code-limit)
         (code-char code)
         (return-from decode-break-reason 4)))
   ucs-4be->string-aref

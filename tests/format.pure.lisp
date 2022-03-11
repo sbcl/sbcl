@@ -115,3 +115,38 @@
     ;; 0 newlines, an ignored newline, and 0 tildes
     (try "~{~0%~
 ~0|~0~~}")))
+
+(with-test (:name :no-compiler-notes)
+  ;; you should't see optimization notes from compiling format strings.
+  ;; (the FORMATTER macro is a heavy user of PRINC)
+  (checked-compile
+   '(lambda (x) (declare (optimize speed)) (princ x))
+   :allow-notes nil)
+  (checked-compile
+   '(lambda ()  (declare (optimize speed)) (formatter "~:*"))))
+
+(defun format-to-string-stream (thing string-stream)
+  (declare (notinline format))
+  ;; Tokenizing this string will cons about 224 bytes
+  (format string-stream "Test ~D" thing)
+  ;; CLEAR-OUTPUT should work, but doesn't
+  (file-position string-stream 0))
+
+(with-test (:name :cached-tokenized-string
+            :skipped-on :interpreter)
+  (let ((stream (make-string-output-stream)))
+    (format-to-string-stream 45678 stream)
+    (ctu:assert-no-consing (format-to-string-stream 45678 stream))))
+
+(with-test (:name :uncached-tokenized-string)
+  (let ((control-string
+         ;; super-smart compiler might see that the result of
+         ;; this call is constantly "hello ~a"
+         (locally (declare (notinline format)) (format nil "hello ~~a"))))
+    (let ((s1 (format nil control-string '(1 2)))
+          (s2
+           (progn
+             (setf (aref control-string 0) #\Y)
+             (format nil control-string '(1 2)))))
+      (assert (string= s1 "hello (1 2)"))
+      (assert (string= s2 "Yello (1 2)")))))

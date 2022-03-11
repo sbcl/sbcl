@@ -1,3 +1,6 @@
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-capstone"
   :name "SB-CAPSTONE"
   :version "0.1"

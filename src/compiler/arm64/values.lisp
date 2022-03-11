@@ -59,29 +59,51 @@
 ;;; operand, but this seems unworthwhile.
 ;;;
 (define-vop (push-values)
-  (:args (vals :more t))
+  (:args (vals :more t :scs (descriptor-reg any-reg immediate control-stack constant)))
   (:results (start :scs (any-reg) :from :load)
             (count :scs (any-reg)))
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
+  (:vop-var vop)
   (:generator 20
-    (move start csp-tn)
-    (inst add csp-tn csp-tn (* nvals n-word-bytes))
-    (do ((val vals (tn-ref-across val))
-         (i 0 (1+ i)))
-        ((null val))
-      (let ((tn (tn-ref-tn val)))
-        (sc-case tn
-          (descriptor-reg
-           (storew tn start i))
-          (control-stack
-           (load-stack-tn temp tn)
-           (storew temp start i)))))
-    (inst mov count (fixnumize nvals))))
+    (unless (eq (tn-kind start) :unused)
+      (move start csp-tn))
+    (let (prev-constant)
+      (flet ((load-tn (tn-ref)
+               (let ((tn (tn-ref-tn tn-ref)))
+                 (sc-case tn
+                   ((descriptor-reg any-reg)
+                    tn)
+                   ((immediate constant)
+                    (cond ((eql (tn-value tn) 0)
+                           zr-tn)
+                          ((or (eql prev-constant (tn-value tn))
+                               (progn
+                                 (setf prev-constant (tn-value tn))
+                                 nil))
+                           temp)
+                          ((sc-is tn constant)
+                           (load-constant vop tn temp)
+                           temp)
+                          (t
+                           (load-immediate vop tn temp)
+                           temp)))
+                   (control-stack
+                    (setf prev-constant nil)
+                    (load-stack-tn temp tn)
+                    temp)))))
+        (cond ((= nvals 1)
+               (inst str (load-tn vals) (@ csp-tn n-word-bytes :post-index)))
+              (t
+               (do ((val vals (tn-ref-across val))
+                    (i 0 (1+ i)))
+                   ((null val))
+                 (inst str (load-tn val) (@ csp-tn n-word-bytes :post-index)))))))
+    (unless (eq (tn-kind count) :unused)
+      (inst mov count (fixnumize nvals)))))
 
 ;;; Push a list of values on the stack, returning Start and Count as used in
 ;;; unknown values continuations.
-;;;
 (define-vop (values-list)
   (:args (arg :scs (descriptor-reg) :target list))
   (:arg-types list)
@@ -95,7 +117,9 @@
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (move start csp-tn)
+
+    (unless (eq (tn-kind start) :unused)
+      (move start csp-tn))
 
     LOOP
     (inst cmp list null-tn)
@@ -108,39 +132,36 @@
     (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
-    (inst sub count csp-tn start)
-    (inst asr count count (- word-shift n-fixnum-tag-bits))))
+    (unless (eq (tn-kind count) :unused)
+      (inst sub count csp-tn start)
+      (inst asr count count (- word-shift n-fixnum-tag-bits)))))
 
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
-;;;
 (define-vop (%more-arg-values)
-  (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg immediate))
-         (num :scs (any-reg) :target count))
-  (:arg-types * positive-fixnum positive-fixnum)
-  (:temporary (:sc any-reg :from (:argument 0)) src)
-  (:temporary (:sc any-reg :from (:argument 2)) dst)
-  (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
+  (:args (context :scs (descriptor-reg any-reg) :to :save)
+         (num :scs (any-reg) :target count :to (:result 1)))
+  (:arg-types * positive-fixnum)
+  (:temporary (:sc descriptor-reg) temp)
   (:temporary (:sc any-reg) i)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (immediate
-       (inst add src context (* (tn-value skip) n-word-bytes)))
-      (any-reg
-       (inst add src context (lsl skip (- word-shift n-fixnum-tag-bits)))))
-    (inst adds count num 0)
+    (cond ((eq (tn-kind count) :unused)
+           (setf count num))
+          (t
+           (move count num)))
+    (when (eq (tn-kind start) :unused)
+      (setf start tmp-tn))
     (move start csp-tn)
+    ;; Shift and check for zero in one go
+    (inst adds i zr-tn (lsl count (- word-shift n-fixnum-tag-bits)))
     (inst b :eq DONE)
-    (inst mov dst start)
-    (inst lsl i count (- word-shift n-fixnum-tag-bits))
-    (inst add csp-tn start i)
+    (inst add csp-tn csp-tn i)
     LOOP
     (inst subs i i n-word-bytes)
-    (inst ldr temp (@ src i))
-    (inst str temp (@ dst i))
+    (inst ldr temp (@ context i))
+    (inst str temp (@ start i))
     (inst b :ne LOOP)
     DONE))

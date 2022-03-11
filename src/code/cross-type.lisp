@@ -13,9 +13,7 @@
 
 (define-condition cross-type-warning (warning)
   ((call :initarg :call :reader cross-type-warning-call)
-   (message :reader cross-type-warning-message
-            #+host-quirks-cmu :initarg #+host-quirks-cmu :message ; (to stop bogus non-STYLE WARNING)
-            ))
+   (message :reader cross-type-warning-message))
   (:report (lambda (c s)
              (format
               s
@@ -26,9 +24,7 @@
 ;;; This warning is signaled when giving up on a type calculation
 ;;; during cross-compilation.
 (define-condition cross-type-giving-up (cross-type-warning)
-  ((message :initform "giving up conservatively"
-            #+host-quirks-cmu :reader #+host-quirks-cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
-            )))
+  ((message :initform "giving up conservatively")))
 
 ;; Return T if SYMBOL is a predicate acceptable for use in a SATISFIES type
 ;; specifier. We assume that anything in CL: is allowed.
@@ -43,33 +39,60 @@
          (push symbol *seen-xtypep-preds*)))
   ;; For USAGE = TYPEP, always call the predicate.
   ;; For USAGE = CTYPEP, call it only if it is a foldable function.
-  ;; The major case in which we don't call something for CTYPEP is KEYWORDP
-  ;; which we consider not to be foldable.
-  (and (eq (sb-xc:symbol-package symbol) *cl-package*)
-       (or (eq usage 'sb-xc:typep)
-           (awhen (info :function :info symbol)
-             (sb-c::ir1-attributep (sb-c::fun-info-attributes it) sb-c:foldable)))))
+  ;;
+  ;; Exceptions:
+  ;; 1. CLOSUREP and SIMPLE-FUN-P. These can get called from WEAKEN-TYPE with
+  ;;    a symbol as the argument. It's ok to call either one in that case.
+  ;;
+  ;; 2. UNBOUND-MARKER-P is needed when compiling CLOSURE-EXTRA-VALUES
+  ;;    and maybe some other things too.
+  ;;
+  ;; 3. VECTOR-WITH-FILL-POINTER-P - as long as the argument is not a vector
+  ;;    we can safely say that the answer is NIL.
+  ;;
+  ;; 4. LEGAL-FUN-NAME-P and EXTENDED-FUNCTION-DESIGNATOR-P.
+  ;;    These are harmless enough to call, so why not.
+  ;;
+  ;; 5. Anything else needed by a particular backend.
+  (or (member symbol
+              '(closurep simple-fun-p unbound-marker-p
+                sb-impl::vector-with-fill-pointer-p
+                legal-fun-name-p extended-function-designator-p))
+      (member symbol sb-vm::*backend-cross-foldable-predicates*)
+      (and (eq (sb-xc:symbol-package symbol) *cl-package*)
+           (or (eq usage 'sb-xc:typep)
+               (awhen (info :function :info symbol)
+                 (sb-c::ir1-attributep (sb-c::fun-info-attributes it)
+                                       sb-c:foldable))))))
 
-;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
-;;; be of type TYPE when instantiated on the target SBCL. Since this
+;;; Return true of any SBCL-internal package.
+;;; Defined here so that CROSS-TYPEP can use it.
+;;; The target variant of this is in src/code/package.
+(defmacro system-package-p (package)
+  `(eql (mismatch "SB-" (package-name ,package)) 3))
+
+;;; This is like TYPEP, except that it asks whether OBJ (a host object acting
+;;; as a proxy for some logically equivalent object in the target sytem)
+;;; would be of type TYPE when instantiated on the target SBCL. Since this
 ;;; is hard to determine in some cases, and since in other cases we
 ;;; just haven't bothered to try, it needs to return two values, just
 ;;; like SUBTYPEP: the first value for its conservative opinion (never
 ;;; T unless it's certain) and the second value to tell whether it's
 ;;; certain.
-;;; The logic is a mixture of the code for CTYPEP as defined in src/code/late-type
-;;; and %%TYPEP as defined in src/code/typep.
+;;; The logic is a mixture of the code for CTYPEP and %%TYPEP
+;;; because it handles both.
 ;;; The order of clauses is fairly symmetrical with that of %%TYPEP.
-(defun cross-typep (caller host-object type)
-  (declare (type (member sb-xc:typep ctypep) caller))
-  (when (or (cl:floatp host-object) (cl:complexp host-object))
-    (error "Can't happen"))
-  (named-let recurse ((obj host-object) (type type))
-    (flet ((unimplemented ()
-             (bug "Incomplete implementation of ~S ~S ~S" caller obj type))
+(defvar *xtypep-uncertainty-action* #-sb-devel 'warn #+sb-devel nil) ; {BREAK WARN STYLE-WARN ERROR NIL}
+(macrolet ((unimplemented ()
+             '(bug "Incomplete implementation of ~S ~S ~S" caller obj type))
            (uncertain ()
-             (values nil nil)))
-      (etypecase type
+             '(values nil nil)))
+(defun cross-typep (caller obj type)
+  (declare (type (member sb-xc:typep ctypep) caller))
+  (when (or (cl:floatp obj) (cl:complexp obj))
+    (error "Can't happen"))
+  (multiple-value-bind (answer certain)
+     (typep-impl-macro (obj)
        (named-type
         (ecase (named-type-name type)
           ((t) (values t t)) ; universal supertype
@@ -104,64 +127,50 @@
                 t))
        (member-type
         (values (if (member-type-member-p obj type) t) t))
-       (compound-type
-        (funcall (etypecase type
-                  (intersection-type #'every/type)
-                  (union-type #'any/type))
-                 #'recurse
-                 obj
-                 (compound-type-types type)))
-       (cons-type
-        (if (not (consp obj))
-            (values nil t)
-            (multiple-value-bind (result certain)
-                (recurse (car obj) (cons-type-car-type type))
-              (if result
-                  (recurse (cdr obj) (cons-type-cdr-type type))
-                  (values nil certain)))))
+       ;; An empty (OR) produces a warning under CCL, and the warning as worded
+       ;; is a tad wrong: "Clause ((OR) ...) shadowed by (CONS-TYPE ...)".
+       ;; "Shadowed by" would imply that if you match the shadowing clause, then
+       ;; you will match (and not execute) the shadowed clause.
+       ;; But the empty (OR) should match nothing, so, what's up with that?
+       ;; Maybe we can define host-side types named simd-pack-blah deftyped to NIL?
        ((or #+sb-simd-pack simd-pack-type
             #+sb-simd-pack-256 simd-pack-256-type)
         (values nil t))
        (character-set-type
-        ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
-        (values (and (characterp obj) (character-in-charset-p obj type)) t))
-       (negation-type
-        (multiple-value-bind (res win) (recurse obj (negation-type-type type))
-          (if win
-              (values (not res) t)
-              (uncertain))))
-       ;; Test BUILT-IN before falling into the CLASSOID case
-       (built-in-classoid
-        (ecase (classoid-name type)
-          (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
-          (function
-           (if (functionp obj)
-               (uncertain)
-               ;; probably not a function. What about FMT-CONTROL instances?
-               (values nil t)))
-          ((system-area-pointer stream fdefn weak-pointer file-stream
-            code-component lra)
-           (values nil t)))) ; nothing could be this type
-       (classoid ; = {structure,condition,standard,static}-classoid
-        (if (not (%instancep obj))
-            (values nil t) ; false certainly
-            (let ((name (classoid-name type)))
-              (if (and (cl:find-class name nil) ; see if the host knows the type
-                       ;; and it's in our object hierarchy
-                       (cl:subtypep name 'structure!object))
-                  (values (cl:typep obj name) t)
-                  (unimplemented)))))
-       ;; Test FUN-DESIGNATOR before falling into the FUN-TYPE case
-       (fun-designator-type (values (typep obj '(or symbol function)) t))
+        ;; provided that CHAR-CODE doesn't fail, the answer is certain
+        (values (test-character-type type) t))
+       (classoid ; = {built-in,structure,condition,standard,static}-classoid
+        (let ((name (classoid-name type)))
+          (if (built-in-classoid-p type)
+              (ecase name
+                (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
+                (function
+                 (if (functionp obj)
+                     (uncertain)
+                     ;; probably not a function. What about FMT-CONTROL instances?
+                     (values nil t)))
+                ((system-area-pointer stream fdefn weak-pointer file-stream
+                  code-component lra pathname logical-pathname)
+                 (values nil t)))
+              (cond ((eq name 'pathname)
+                     (values (pathnamep obj) t))
+                    ((not (%instancep obj))
+                     (values nil t)) ; false certainly
+                    (t
+                     (if (cl:find-class name nil) ; see if the host knows the type
+                         (values (cl:typep obj name) t)
+                         (unimplemented)))))))
        (fun-type
-        ;; FUNCTION is not a specifier suitable for discrimination,
-        ;; thus TYPEP is not allowed to determine whether an object
-        ;; is in a particular subtype of function.
-        ;; But be lenient when the object is not a function.
-        (if (and (functionp obj) (eq caller 'sb-xc:typep))
-            (error "TYPEP called with function type")
-            (values (functionp obj) t)))
-       (alien-type-type (if (null obj) (values nil t) (unimplemented)))
+        (if (fun-designator-type-p type)
+             (values (typep obj '(or symbol function)) t)
+             ;; FUNCTION is not a specifier suitable for discrimination,
+             ;; thus TYPEP is not allowed to determine whether an object
+             ;; is in a particular subtype of function.
+             ;; But be lenient when the object is not a function.
+             (if (and (functionp obj) (eq caller 'sb-xc:typep))
+                 (error "TYPEP called with function type")
+                 (values (functionp obj) t))))
+       (alien-type-type (if (symbolp obj) (values nil t) (unimplemented)))
        ;; Test UNKNOWN before falling into the HAIRY case
        (unknown-type
         (let ((spec (unknown-type-specifier type)))
@@ -175,9 +184,17 @@
           ;; true for various X that are not known yet.
           (cond ((and (symbolp spec)
                       (cl:find-class spec nil)
-                      ;; See if the host knows our DEF!STRUCT yet
-                      (cl:subtypep spec 'structure!object))
+                      ;; See if the host knows our DEFSTRUCT yet
+                      (cl:subtypep spec 'instance))
                  (values (cl:typep obj spec) t))
+                ;; Sometimes we try to test a forward-referenced type
+                ;; that was unknown at the point of creation but has
+                ;; been resolved at the point of testing via block
+                ;; compilation. Retry with the now resolved type if
+                ;; this is the case.
+                ((and (symbolp spec)
+                      (not (unknown-type-p (specifier-type spec))))
+                 (cross-typep caller obj (specifier-type spec)))
                 ;; Special-case a few forward-referenced instance types.
                 ;; Some are picked off by the quick exit case in (DEFUN SB-XC:TYPEP)
                 ;; but a bunch of other cases arise within the type methods per se
@@ -195,14 +212,23 @@
                 ;; So unfortunately we still munst handle a few cases without parsing,
                 ;; but fewer than before, and then some after parsing.
                 ((and (symbolp obj)
-                      (member spec '(;; these occur during make-host-1
-                                     hash-table lexenv sb-c::abstract-lexenv
-                                     condition restart
-                                     sb-assem::label
-                                     ;; in addition to the above, these occur in make-host-2
-                                     interpreted-function
-                                     synonym-stream
-                                     )))
+                      (member
+                       spec
+                       (if (member :sb-xc sb-xc:*features*)
+                           ;; If :sb-xc is present, then we're cross-compiling.
+                           ;; CROSS-TYPEP should not see any unknowns.
+                           '()
+                           ;; If :sb-xc is absent, then we're either running CL:COMPILE
+                           ;; or CL:LOAD in make-host-1.
+                           ;; It is permissible to make forward references to the following
+                           ;; subtypes of structure-object in make-host-1.
+                           '(hash-table lexenv sb-c::abstract-lexenv
+                             condition restart
+                             pathname sb-impl::host sb-impl::pattern
+                             synonym-stream
+                             ;; why on earth is LABEL needed here?
+                             sb-assem:label))))
+                 #+nil (format t "~&(XTYPEP '~S '~S) -> (NIL T)~%" obj spec)
                  (values nil t))
                 (t
                  (uncertain)))))
@@ -210,10 +236,29 @@
         (let ((spec (hairy-type-specifier type)))
           (if (cl:typep spec '(cons (eql satisfies) (cons symbol null)))
               (let ((predicate (cadr spec)))
-                (if (acceptable-cross-typep-pred predicate caller)
-                    (values (funcall predicate obj) t)
-                    (uncertain)))
-              (unimplemented))))))))
+                ;; Keep in sync with KEYWORDP test in src/code/target-type
+                (cond ((eq predicate 'keywordp)
+                       (test-keywordp))
+                      ;; These are needed in order to compile the predicates
+                      ;; for the initial pprint dispatch table.
+                      ((and (eq obj nil) (member predicate '(fboundp macro-function)))
+                       (values nil t))
+                      ((acceptable-cross-typep-pred predicate caller)
+                       (values (funcall predicate obj) t))
+                      (t
+                       (uncertain))))
+              (unimplemented)))))
+    (when (and (not certain) *xtypep-uncertainty-action*
+               ;; KLUDGE: Allow some slack while block compiling, as we are
+               ;; hoping that forward referenced types get resolved.
+               (not (and (boundp 'sb-c::*compilation*)
+                         (eq (sb-c::block-compile sb-c::*compilation*) t))))
+      ;; can't even backtrace if the printing of a something involving
+      ;; uncertainty involves uncertainty.
+      (let* ((action *xtypep-uncertainty-action*)
+             (*xtypep-uncertainty-action* nil))
+        (funcall action "CROSS-TYPEP uncertain: ~S ~S ~S" caller obj type)))
+    (values answer certain))))
 
 ;;; This is an incomplete TYPEP which runs at cross-compile time to
 ;;; tell whether OBJECT is the host Lisp representation of a target
@@ -252,6 +297,7 @@
 (defun ctypep (obj ctype)
   (declare (type ctype ctype))
   (multiple-value-bind (answer certain) (cross-typep 'ctypep obj ctype)
+    ;; FIXME: I think we can (AVER CERTAIN) at this point.
     (if (or certain
             ;; Allow uncertainty only if the type contains a SATISFIES
             (block contains-satisfies
@@ -260,8 +306,12 @@
                                      (typep (hairy-type-specifier type)
                                             '(cons (eql satisfies))))
                             (return-from contains-satisfies t)))
-                        ctype)))
+                        ctype))
+            ;; KLUDGE: Allow uncertainty while block compiling.
+            (and (boundp 'sb-c::*compilation*)
+                 (eq (sb-c::block-compile sb-c::*compilation*) t)))
         (values answer certain)
+        #-sb-devel
         (warn 'cross-type-giving-up :call `(ctypep ,obj ,ctype)))))
 
 (defun ctype-of (x)
@@ -297,8 +347,15 @@
            (t
             ;; Beyond this, there seems to be no portable correspondence.
             (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
-    (sb-c::opaque-box (find-classoid 'structure-object))
-    (instance (find-classoid (type-of x)))
+    (instance
+     (let ((type (type-of x)))
+       (if (eq type 'sb-format::fmt-control-proxy)
+           ;; These are functions, but they're weird. We don't want any IR1 transform
+           ;; on FORMAT to kick in and try to convert to FUNCALL on the thing.
+           (specifier-type '(or string function))
+           ;; The structure may not be defined on the target yet.
+           (or (find-classoid type nil)
+               (find-classoid 'structure-object)))))
     (t
      ;; There might be more cases which we could handle with
      ;; sufficient effort; since all we *need* to handle are enough

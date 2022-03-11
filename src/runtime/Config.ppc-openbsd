@@ -11,7 +11,9 @@
 
 include Config.generic-openbsd
 
-ASSEM_SRC = ppc-assem.S ldso-stubs.S
+LINKFLAGS += -Wl,--export-dynamic
+
+ASSEM_SRC = ppc-assem.S
 ARCH_SRC = ppc-arch.c
 
 OS_SRC = bsd-os.c ppc-bsd-os.c

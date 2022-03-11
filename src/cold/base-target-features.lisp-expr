@@ -1,0 +1,397 @@
+;;;; -*- Lisp -*-
+
+;;;; tags which are set during the build process and which end up in
+;;;; CL:*FEATURES* in the target SBCL, plus some comments about other
+;;;; CL:*FEATURES* tags which have special meaning to SBCL or which
+;;;; have a special conventional meaning
+;;;;
+;;;; Note that the recommended way to customize the features of a
+;;;; local build of SBCL is not to edit this file, but instead to
+;;;; tweak customize-target-features.lisp. (You must create this file
+;;;; first; it is not in the SBCL distribution, and is in fact
+;;;; explicitly excluded from the distribution in places like
+;;;; .cvsignore.) If you define a function in
+;;;; customize-target-features.lisp, it will be used to transform the
+;;;; target features list after it's read and before it's used. E.g.,
+;;;; you can use code like this:
+;;;;    (lambda (list)
+;;;;      (flet ((enable (x) (pushnew x list))
+;;;;             (disable (x) (setf list (remove x list))))
+;;;;        #+nil (enable :sb-show)
+;;;;        (enable :sb-after-xc-core)
+;;;;        #+nil (disable :sb-doc)
+;;;;        list))
+;;;; By thus editing a local file (one which is not in the source
+;;;; distribution, and which is in .cvsignore) your customizations
+;;;; will remain local even if you do things like "cvs update",
+;;;; will not show up if you try to submit a patch with "cvs diff",
+;;;; and might even stay out of the way if you use other non-CVS-based
+;;;; methods to upgrade the files or store your configuration.
+
+;;;; This software is part of the SBCL system. See the README file for
+;;;; more information.
+;;;;
+;;;; This software is derived from the CMU CL system, which was
+;;;; written at Carnegie Mellon University and released into the
+;;;; public domain. The software is in the public domain and is
+;;;; provided with absolutely no warranty. See the COPYING and CREDITS
+;;;; files for more information.
+
+(
+ ;;
+ ;; features present in all builds
+ ;;
+
+ ;; our standard
+ :ansi-cl :common-lisp
+ ;; FIXME: Isn't there a :x3jsomething feature which we should set too?
+ ;; No. CLHS says ":x3j13 [...] A conforming implementation might or
+ ;; might not contain such a feature." -- CSR, 2002-02-21
+
+ ;; our dialect
+ :sbcl
+
+ ;;
+ ;; features present in this particular build
+ ;;
+
+ ;; Setting this enables the compilation of documentation strings
+ ;; from the system sources into the target Lisp executable.
+ ;; Traditional Common Lisp folk will want this option set.
+ ;; I (WHN) made it optional because I came to Common Lisp from
+ ;; C++ through Scheme, so I'm accustomed to asking
+ ;; Emacs about things that I'm curious about instead of asking
+ ;; the executable I'm running.
+ :sb-doc
+
+ ;; Make more debugging information available (for debugging SBCL
+ ;; itself). If you aren't hacking or troubleshooting SBCL itself,
+ ;; you probably don't want this set.
+ ;;
+ ;; At least two varieties of debugging information are enabled by this
+ ;; option:
+ ;;   * SBCL is compiled with a higher level of OPTIMIZE DEBUG, so that
+ ;;     the debugger can tell more about the state of the system.
+ ;;   * Various code to print debugging messages, and similar debugging code,
+ ;;     is compiled only when this feature is present.
+ ;;
+ ;; Note that the extra information recorded by the compiler at
+ ;; this higher level of OPTIMIZE DEBUG includes the source location
+ ;; forms. In order for the debugger to use this information, it has to
+ ;; re-READ the source file. In an ordinary installation of SBCL, this
+ ;; re-READing may not work very well, for either of two reasons:
+ ;;   * The sources aren't present on the system in the same location that
+ ;;     they were on the system where SBCL was compiled.
+ ;;   * SBCL is using the standard readtable, without the added hackage
+ ;;     which allows it to handle things like target features.
+ ;; If you want to be able to use the extra debugging information,
+ ;; therefore, be sure to keep the sources around, and run with the
+ ;; readtable configured so that the system sources can be read.
+ ; :sb-show
+
+ ;; Enable the low level debugger, "ldb", by default. In the ideal
+ ;; world you would not need this unless you are messing with SBCL at
+ ;; a very low level (e.g., trying to diagnose GC problems, or trying
+ ;; to debug assembly code for a port to a new CPU). However,
+ ;; experience shows that sooner or later everyone lose()'s, in which
+ ;; case SB-LDB can at least provide an informative backtrace.
+ :sb-ldb
+
+ ;; This isn't really a target Lisp feature at all, but controls
+ ;; whether the build process produces an after-xc.core file. This
+ ;; can be useful for shortening the edit/compile/debug cycle when
+ ;; you modify SBCL's own source code, as in slam.sh. Otherwise
+ ;; you don't need it.
+ ; :sb-after-xc-core
+
+ ;; Enable extra debugging output in the assem.lisp assembler/scheduler
+ ;; code. (This is the feature which was called :DEBUG in the
+ ;; original CMU CL code.)
+ ; :sb-show-assem
+
+ ;; Compile the C runtime with support for low-level debugging output
+ ;; through FSHOW and FSHOW_SIGNAL.  If enabled, this feature allows
+ ;; users to turn on such debugging output using environment variables at
+ ;; run-time.
+ ; :sb-qshow
+
+ ;; Setting this makes SBCL more "fluid", i.e. more amenable to
+ ;; modification at runtime, by suppressing various INLINE declarations,
+ ;; compiler macro definitions, FREEZE-TYPE declarations; and by
+ ;; suppressing various burning-our-ships-behind-us actions after
+ ;; initialization is complete; and so forth. This tends to clobber the
+ ;; performance of the system, so unless you have some special need for
+ ;; this when hacking SBCL itself, you don't want this set.
+ ; :sb-fluid
+
+ ;; Enable code for collecting statistics on usage of various operations,
+ ;; useful for performance tuning of the SBCL system itself. This code
+ ;; is probably pretty stale (having not been tested since the fork from
+ ;; base CMU CL) but might nonetheless be a useful starting point for
+ ;; anyone who wants to collect such statistics in the future.
+ ; :sb-dyncount
+
+ ;; Enable code for detecting concurrent accesses to the same hash-table
+ ;; in multiple threads. Note that this implementation is currently
+ ;; (2007-09-11) somewhat too eager: even though in the current implementation
+ ;; multiple readers are thread safe as long as there are no writers, this
+ ;; code will also trap multiple readers.
+ ; :sb-hash-table-debug
+
+ ;; Enabled automatically by make-config.sh for platforms which implement
+ ;; short vector SIMD intrinsics.
+ ;;
+ ; :sb-simd-pack
+
+ ;; Enabled automatically by make-config.sh for platforms which implement
+ ;; the %READ-CYCLE-COUNTER VOP. Can be disabled manually: affects TIME.
+ ;;
+ ;; FIXME: Should this be :SB-CYCLE-COUNTER instead? If so, then the same goes
+ ;; for :COMPARE-AND-SWAP-VOPS as well, and a bunch of others. Perhaps
+ ;; built-time convenience features like this should all live in eg. SB-INT
+ ;; instead?
+ ;;
+ ; :cycle-counter
+
+ ;; Build with support for an additional dynamic heap
+ ;; differing from the main dynamic heap in two ways:
+ ;;  1. it is guaranteed to reside below 4GB so that all pointers
+ ;;      into it fit in 32 bits. (Only an issue for >32 bit address space)
+ ;;  2. all objects therein are immovable, and space is reclaimed
+ ;;     by a mark-and-sweep collector.
+ ;; That combination of aspects potentially allows various efficiencies
+ ;; in code generation, especially for the x86-64 backend.
+ ;; The extra space has a fixed size which can only be changed by a rebuild,
+ ;; and out-of-space conditions are not easily preventable, so the space
+ ;; is sized rather generously to sidestep the issue.
+ ;; Additionally, it is assumed that for all objects in the immobile heap,
+ ;; speed of allocation of those objects is relatively unimportant.
+ ;; If unexpected performance regressions are observed,
+ ;; consider disabling this feature and reporting a bug.
+ ; :immobile-space
+
+ ;; Allocate most functions in the immobile space.
+ ;; Enabled by default if supported.
+ ;; The down-side of this feature is that the allocator is significantly
+ ;; slower than the allocator for movable code. If a particular application
+ ;; is performance-constrained by speed of creation of compiled functions
+ ;; (not including closures), the feature can be disabled.
+ ; :immobile-code
+
+ ;; Combine the layout pointer, instance-length, and widetag of INSTANCE
+ ;; into a single machine word. This represents a space savings of anywhere
+ ;; from 4% to 8% in typical applications. (Your mileage may vary).
+ ; :compact-instance-header
+
+ ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
+ ;;
+ ;; Some of the code which was #+high-security before the fork has now
+ ;; been either made unconditional, deleted, or rewritten into
+ ;; unrecognizability, but some remains. What remains is not maintained
+ ;; or tested in current SBCL, but I haven't gone out of my way to
+ ;; break it, either.
+ ;;
+ ; :high-security
+ ; :high-security-support
+
+ ;; low-level thread primitives support
+ ;;
+ ;; As of SBCL 1.0.33.26, threads are part of the default build on
+ ;; x86oid Linux. Other platforms that support them include
+ ;; x86oid Darwin, FreeBSD, and Solaris.
+ ; :sb-thread
+
+ ;; futex support
+ ;;
+ ;; While on linux we are able to use futexes for our locking
+ ;; primitive, on other platforms we don't have this luxury.
+ ;;
+ ; :sb-futex
+
+ ;; Support for detection of unportable code (when applied to the
+ ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
+ ;; code (when applied to user-level packages), relating to material
+ ;; alteration to packages or to bindings in symbols in packages.
+ :sb-package-locks
+
+ ;; Support for the entirety of the 21-bit character space defined by
+ ;; the Unicode consortium, rather than the classical 8-bit ISO-8859-1
+ ;; character set.
+ :sb-unicode
+
+ ;; Support for a full evaluator that can execute all the CL special
+ ;; forms, as opposed to the traditional SBCL evaluator which called
+ ;; COMPILE for everything complicated.
+ :sb-eval
+ ;; Support for a different evaluator (interpreter) with improved performance.
+ ;; You can't have both.
+ ; :sb-fasteval
+
+ ;; Record source location information for variables, classes, conditions,
+ ;; packages, etc. Gives much better information on M-. in Slime, but
+ ;; increases core size by about 100kB.
+ :sb-source-locations
+
+ ;; Record xref data for SBCL internals. This can be rather useful for
+ ;; people who want to develop on SBCL itself because it'll make M-?
+ ;; (slime-edit-uses) work which lists call/expansion/etc. sites.
+ ;; It'll increase the core size by major 5-6mB, though.
+ ; :sb-xref-for-internals
+
+ ;; We support package local nicknames. No :sb-prefix here as we vainly
+ ;; believe our API is worth copying to other implementations as well.
+ ;; This doesn't affect the build at all, merely declares how things are.
+ :package-local-nicknames
+
+ ;; This is set in classic CMU CL, and presumably there it means
+ ;; that the floating point arithmetic implementation
+ ;; conforms to IEEE's standard. Here it definitely means that the
+ ;; floating point arithmetic implementation conforms to IEEE's standard.
+ ;; I (WHN 19990702) haven't tried to verify
+ ;; that it does conform, but it should at least mostly conform (because
+ ;; the underlying x86 hardware tries).
+ :ieee-floating-point
+
+ ;; CMU CL had, and we inherited, code to support 80-bit LONG-FLOAT on the x86
+ ;; architecture. Nothing has been done to actively destroy the long float
+ ;; support, but it hasn't been thoroughly maintained, and needs at least
+ ;; some maintenance before it will work. (E.g. the LONG-FLOAT-only parts of
+ ;; genesis are still implemented in terms of unportable CMU CL functions
+ ;; which are not longer available at genesis time in SBCL.) A deeper
+ ;; problem is SBCL's bootstrap process implicitly assumes that the
+ ;; cross-compilation host will be able to make the same distinctions
+ ;; between floating point types that it does. This assumption is
+ ;; fundamentally sleazy, even though in practice it's unlikely to break down
+ ;; w.r.t. distinguishing SINGLE-FLOAT from DOUBLE-FLOAT; it's much more
+ ;; likely to break down w.r.t. distinguishing DOUBLE-FLOAT from LONG-FLOAT.
+ ;; Still it's likely to be quite doable to get LONG-FLOAT support working
+ ;; again, if anyone's sufficiently motivated.
+ ; :long-float
+
+ ;; Some platforms don't use a 32-bit off_t by default, and thus can't
+ ;; handle files larger than 2GB. This feature will control whether
+ ;; we'll try to use platform-specific compilation options to enable a
+ ;; 64-bit off_t. The intent is for this feature to be automatically
+ ;; enabled by make-config.sh on platforms where it's needed and known
+ ;; to work, you shouldn't be enabling it manually. You might however
+ ;; want to disable it, if you need to pass file descriptors to
+ ;; foreign code that uses a 32-bit off_t.
+ ; :largefile
+
+ ;; SBCL has optional support for zlib-based compressed core files.  Enable
+ ;; this feature to compile it in.  Obviously, doing so adds a dependency
+ ;; on zlib.
+ ; :sb-core-compression
+
+ ;; On certain thread-enabled platforms, synchronization between threads
+ ;; for the purpose of stopping and starting the world around GC can be
+ ;; performed using safepoints instead of signals.  Enable this feature
+ ;; to compile with safepoints and to use them for GC.
+ ;; (Replaces use of SIG_STOP_FOR_GC.)
+ ; :sb-safepoint
+
+ ;;
+ ;; miscellaneous notes on other things which could have special significance
+ ;; in the *FEATURES* list
+ ;;
+
+ ;; Any target feature which affects binary compatibility of fasl files
+ ;; needs to be recorded in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
+ ;; (elsewhere).
+
+ ;; notes on the :NIL and :IGNORE features:
+ ;;
+ ;; #+NIL is used to comment out forms. Occasionally #+IGNORE is used
+ ;; for this too. So don't use :NIL or :IGNORE as the names of features..
+
+ ;; notes on :SB-XC and :SB-XC-HOST features (which aren't controlled by this
+ ;; file, but are instead temporarily pushed onto *FEATURES* or
+ ;; *TARGET-FEATURES* during some phases of cross-compilation):
+ ;;
+ ;; :SB-XC-HOST stands for "cross-compilation host" and is in *FEATURES*
+ ;; during the first phase of cross-compilation bootstrapping, when the
+ ;; host Lisp is being used to compile the cross-compiler.
+ ;;
+ ;; :SB-XC stands for "cross compiler", and is in *FEATURES* during the second
+ ;; phase of cross-compilation bootstrapping, when the cross-compiler is
+ ;; being used to create the first target Lisp.
+
+ ;; notes on the :SB-ASSEMBLING feature (which isn't controlled by
+ ;; this file):
+ ;;
+ ;; This is a flag for whether we're in the assembler. It's
+ ;; temporarily pushed onto the *FEATURES* list in the setup for
+ ;; the ASSEMBLE-FILE function. It would be a bad idea
+ ;; to use it as a name for a permanent feature.
+
+ ;; notes on local features (which are set automatically by the
+ ;; configuration script, and should not be set here unless you
+ ;; really, really know what you're doing):
+ ;;
+ ;; machine architecture features:
+ ;;   :x86
+ ;;      any Intel 386 or better, or compatibles like the AMD K6 or K7
+ ;;   :x86-64
+ ;;      any x86-64 CPU running in 64-bit mode
+ ;;   :sparc
+ ;;      any Sun UltraSPARC (possibly also non-Ultras -- currently untested)
+ ;;   :ppc
+ ;;      any PowerPC CPU
+ ;;   :ppc64
+ ;;      64-bit PowerPC CPU, ISA 2.06 (POWER7) or later
+ ;;   :mips
+ ;;      any MIPS CPU (in little-endian mode with :little-endian)
+ ;;   :arm
+ ;;      an ARM CPU (details yet to be determined)
+ ;;   :arm64
+ ;;     an ARMv8 AArch64 CPU
+ ;;   :riscv
+ ;;      A RISC-V CPU.
+ ;; (CMU CL also had a :pentium feature, which affected the definition
+ ;; of some floating point vops. It was present but not enabled or
+ ;; documented in the CMU CL code that SBCL is derived from, and has
+ ;; now been moved to the backend-subfeatures mechanism.)
+ ;;
+ ;; properties derived from the machine architecture
+ ;;
+ ;;   :64-bit
+ ;;     means (= sb-vm:n-word-bits 64) currently true for x86-64, arm64, riscv64, ppc64
+ ;;
+ ;;   :64-bit-registers
+ ;;     means (= sb-vm:n-machine-word-bits 64), yet (= sb-vm:n-word-bits 32) currently true for alpha
+ ;;
+ ;;   :control-stack-grows-downward-not-upward
+ ;;     On the X86, the Lisp control stack grows downward. On the
+ ;;     other supported CPU architectures as of sbcl-0.7.1.40, the
+ ;;     system stack grows upward.
+ ;;   Note that there are other stack-related differences between the
+ ;;   X86 port and the other ports. E.g. on the X86, the Lisp control
+ ;;   stack coincides with the C stack, meaning that on the X86 there's
+ ;;   stuff on the control stack that the Lisp-level debugger doesn't
+ ;;   understand very well. As of sbcl-0.7.1.40 things like that are
+ ;;   just parameterized by #+X86, but it'd probably be better to
+ ;;   use new flags like :CONTROL-STACK-CONTAINS-C-STACK.
+ ;;
+ ;;   :alien-callbacks
+ ;;     Alien callbacks have been implemented for this platform.
+ ;;
+ ;;   :compare-and-swap-vops
+ ;;     The backend implements compare-and-swap VOPs.
+ ;;
+ ;; operating system features:
+ ;;   :unix       = We're intended to run under some Unix-like OS. (This is not
+ ;;                 exclusive with the features which indicate which particular
+ ;;                 Unix-like OS we're intended to run under.)
+ ;;   :linux      = We're intended to run under some version of Linux.
+ ;;   :bsd        = We're intended to run under some version of BSD Unix. (This
+ ;;                 is not exclusive with the features which indicate which
+ ;;                 particular version of BSD we're intended to run under.)
+ ;;   :freebsd    = We're intended to run under FreeBSD.
+ ;;   :openbsd    = We're intended to run under OpenBSD.
+ ;;   :netbsd     = We're intended to run under NetBSD.
+ ;;   :dragonfly  = We're intended to run under DragonFly BSD.
+ ;;   :darwin     = We're intended to run under Darwin (including MacOS X).
+ ;;   :sunos      = We're intended to run under Solaris user environment
+ ;;                 with the SunOS kernel.
+ ;;   :win32      = We're intended to under some version of Microsoft Windows.
+ )

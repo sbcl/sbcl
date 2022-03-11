@@ -151,3 +151,40 @@
                          (assert (< max number)))))))
           (test foo)
           (test bar))))))
+
+;;; RANDOM with a float argument used to produce that argument as a
+;;; return value with a probability depending on the magnitude of the
+;;; argument. That behavior was wrong since the argument is an
+;;; /exclusive/ upper bound for the range of produced values. The
+;;; cases below increase the failure possibility as much as possible:
+;;; an exclusive upper bound of LEAST-POSITIVE-*-FLOAT means that the
+;;; respective 0 is the only valid return value and that the old code
+;;; produced a wrong answer with probably 0.5 (assuming proper
+;;; distribution of the produced values).
+(with-test (:name (random float :upper-bound-exclusive))
+  ;; SINGLE-FLOAT, possibly inlined
+  (let ((values (loop :repeat 10000
+                      :collect (random least-positive-single-float))))
+    (assert (not (find 0.0f0 values :test-not #'=))))
+  ;; DOUBLE-FLOAT, possibly inlined
+  (let ((values (loop :repeat 10000
+                      :collect (random least-positive-double-float))))
+    (assert (not (find 0.0d0 values :test-not #'=))))
+  (locally (declare (notinline random))
+    ;; SINGLE-FLOAT, not inlined
+    (let ((values (loop :repeat 10000
+                        :collect (random least-positive-single-float))))
+      (assert (not (find 0.0f0 values :test-not #'=))))
+    ;; DOUBLE-FLOAT, not inlined
+    (let ((values (loop :repeat 10000
+                        :collect (random least-positive-double-float))))
+      (assert (not (find 0.0d0 values :test-not #'=))))))
+
+(with-test (:name :float-no-consing
+            :fails-on :ppc
+            :skipped-on :interpreter)
+  (let ((fun (checked-compile `(lambda ()
+                                 (declare (optimize speed))
+                                 (> (random 40d0) 1d0))
+                              :allow-notes nil)))
+    (ctu:assert-no-consing (funcall fun))))

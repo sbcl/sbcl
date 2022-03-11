@@ -80,17 +80,10 @@
           for results = (test-class-slots class)
           when results do (cerror "continue" "~A" results))))
 
-;;; AMOP says these are the defaults
-(with-test (:name :standard-direct-superclasses)
-  (assert (equal (list (find-class 'standard-object))
-                 (sb-mop:class-direct-superclasses (make-instance 'standard-class))))
-  (assert (equal (list (find-class 'sb-mop:funcallable-standard-object))
-                 (sb-mop:class-direct-superclasses (make-instance 'sb-mop:funcallable-standard-class)))))
-
 (with-test (:name :bug-936513)
   ;; This used to fail as ENSURE-GENERIC-FUNCTION wanted a list specifying
   ;; the method combination, and didn't accept the actual object
-  (let ((mc (sb-pcl:find-method-combination #'make-instance 'standard nil)))
+  (let ((mc (sb-mop:find-method-combination #'make-instance 'standard nil)))
     (ensure-generic-function 'make-instance :method-combination mc))
   ;; Let's make sure the list works too...
   (ensure-generic-function 'make-instance :method-combination '(standard)))
@@ -171,13 +164,13 @@
              (find slot-name (sb-mop:class-direct-slots kid)
                    :key 'sb-mop:slot-definition-name)
              (find slot-name (sb-mop:class-direct-slots par)
-                   :key 'sb-pcl:slot-definition-name)
+                   :key 'sb-mop:slot-definition-name)
              ;; there is only one effective slot of that name
              (assert (= 1 (count slot-name (sb-mop:class-slots kid)
-                                 :key 'sb-pcl:slot-definition-name))))))
+                                 :key 'sb-mop:slot-definition-name))))))
     ;; metaclass = structure-class
     ;; FUN-TYPE inherits CTYPE
-    (check 'sb-kernel:fun-type 'sb-kernel:ctype 'sb-kernel::class-info)
+    (check 'sb-kernel:fun-type 'sb-kernel:ctype 'sb-kernel::%bits)
     ;; metaclass = condition-class
     ;; REDEFINITION-WITH-DEFMETHOD inherits REDEFINITION-WARNING
     (check 'sb-kernel:redefinition-with-defmethod
@@ -193,3 +186,11 @@
           (dolist (slot-name (mapcar #'sb-mop:slot-definition-name
                                      (sb-mop:class-slots class)))
             (assert (sb-pcl::find-slot-cell layout slot-name))))))))
+
+(with-test (:name (typep sb-mop:class-precedence-list))
+  (let* ((objs (list (make-hash-table) (make-pathname) (make-condition 'warning)
+                     (find-class 't) #'make-instance)))
+    (dolist (obj objs)
+      (let ((cpl (sb-mop:class-precedence-list (class-of obj))))
+        (dolist (sc cpl)
+          (assert (typep obj sc)))))))

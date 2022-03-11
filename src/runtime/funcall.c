@@ -18,22 +18,17 @@
 #include "sbcl.h"
 #include "runtime.h"
 #include "globals.h"
-#include "os.h"
 #include "interrupt.h"
 
-/* This is implemented in either assembly language or assembly/runtime-rtns.lisp and called from C: */
-#ifdef CALL_INTO_LISP
-#define call_into_lisp ((lispobj(*)(lispobj fun, lispobj *args, int nargs))SYMBOL(CALL_INTO_LISP)->value)
-#else
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs)
-#endif
 
 #ifdef LISP_FEATURE_X86_64
     __attribute__((sysv_abi))
 #endif
     ;
 
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK) || defined(LISP_FEATURE_ARM64) \
+    || defined(LISP_FEATURE_ARM)
 /* These functions are an interface to the Lisp call-in facility.
  * Since this is C we can know nothing about the calling environment.
  * The control stack might be the C stack if called from the monitor
@@ -84,7 +79,7 @@ lispobj
 funcall0(lispobj function)
 {
     lispobj **stack_pointer
-        = &access_control_stack_pointer(arch_os_get_current_thread());
+        = &access_control_stack_pointer(get_sb_vm_thread());
     lispobj *args = *stack_pointer;
 
     return call_into_lisp(function, args, 0);
@@ -94,7 +89,7 @@ lispobj
 funcall1(lispobj function, lispobj arg0)
 {
     lispobj **stack_pointer
-        = &access_control_stack_pointer(arch_os_get_current_thread());
+        = &access_control_stack_pointer(get_sb_vm_thread());
     lispobj *args = *stack_pointer;
 
     *stack_pointer += 1;
@@ -107,7 +102,7 @@ lispobj
 funcall2(lispobj function, lispobj arg0, lispobj arg1)
 {
     lispobj **stack_pointer
-        = &access_control_stack_pointer(arch_os_get_current_thread());
+        = &access_control_stack_pointer(get_sb_vm_thread());
     lispobj *args = *stack_pointer;
 
     *stack_pointer += 2;
@@ -121,7 +116,7 @@ lispobj
 funcall3(lispobj function, lispobj arg0, lispobj arg1, lispobj arg2)
 {
     lispobj **stack_pointer
-        = &access_control_stack_pointer(arch_os_get_current_thread());
+        = &access_control_stack_pointer(get_sb_vm_thread());
     lispobj *args = *stack_pointer;
 
     *stack_pointer += 3;

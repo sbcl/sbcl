@@ -31,7 +31,8 @@
      (:temp edi unsigned-reg edi-offset))
 
   ;; Pick off the cases where everything fits in register args.
-  (inst jecxz ZERO-VALUES)
+  (inst test ecx ecx)
+  (inst jmp :z ZERO-VALUES)
   (inst cmp ecx (fixnumize 1))
   (inst jmp :e ONE-VALUE)
   (inst cmp ecx (fixnumize 2))
@@ -46,7 +47,7 @@
 
   ;; Save the count, the return address and restore the frame pointer,
   ;; because the loop is going to destroy them.
-  (inst mov edx ecx)
+  (inst push ecx)
   (inst mov eax (make-ea :dword :base ebp-tn
                          :disp (frame-byte-offset return-pc-save-offset)))
   (inst mov ebp-tn (make-ea :dword :base ebp-tn
@@ -55,18 +56,19 @@
   ;; we have to be careful not to clobber values before we've read
   ;; them. Because the stack builds down, we are copying to a larger
   ;; address. Therefore, we need to iterate from larger addresses to
-  ;; smaller addresses. pfw-this says copy ecx words from esi to edi
-  ;; counting down.
-  (inst shr ecx (1- n-lowtag-bits))
-  (inst std)                            ; count down
+  ;; smaller addresses.
   (inst sub esi n-word-bytes)
   (inst lea edi (make-ea :dword :base ebx :disp (- n-word-bytes)))
-  (inst rep)
-  (inst movs :dword)
-  (inst cld)
+  COPY-LOOP
+  (inst mov edx (make-ea :dword :base esi))
+  (inst sub esi n-word-bytes)
+  (inst mov (make-ea :dword :base edi) edx)
+  (inst sub edi n-word-bytes)
+  (inst sub ecx (fixnumize 1))
+  (inst jmp :nz copy-loop)
 
   ;; Restore the count.
-  (inst mov ecx edx)
+  (inst pop ecx)
 
   ;; Set the stack top to the last result.
   (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
@@ -157,27 +159,31 @@
   (inst jmp :le REGISTER-ARGS)
 
   ;; Save the OLD-FP and RETURN-PC because the blit is going to trash
-  ;; those stack locations. Save the ECX, because the loop is going to
-  ;; trash it.
+  ;; those stack locations. Save ECX and EAX, because the loop is
+  ;; going to trash them.
   (pushw ebp-tn (frame-word-offset ocfp-save-offset))
   (loadw ebx ebp-tn (frame-word-offset return-pc-save-offset))
   (inst push ecx)
+  (inst push eax)
 
   ;; Do the blit. Because we are coping from smaller addresses to
   ;; larger addresses, we have to start at the largest pair and work
   ;; our way down.
-  (inst shr ecx (1- n-lowtag-bits))
-  (inst std)                            ; count down
   (inst lea edi (make-ea :dword :base ebp-tn :disp (frame-byte-offset 0)))
   (inst sub esi (fixnumize 1))
-  (inst rep)
-  (inst movs :dword)
-  (inst cld)
+  COPY-LOOP
+  (inst mov eax (make-ea :dword :base esi))
+  (inst sub esi n-word-bytes)
+  (inst mov (make-ea :dword :base edi) eax)
+  (inst sub edi n-word-bytes)
+  (inst sub ecx (fixnumize 1))
+  (inst jmp :nz copy-loop)
 
   ;; Load the register arguments carefully.
   (loadw edx ebp-tn (frame-word-offset ocfp-save-offset))
 
-  ;; Restore OLD-FP and ECX.
+  ;; Restore OLD-FP, ECX and EAX.
+  (inst pop eax)
   (inst pop ecx)
   ;; Overwrites a1
   (popw ebp-tn (frame-word-offset ocfp-save-offset))
@@ -194,7 +200,7 @@
   (inst push ebx)
 
   ;; And jump into the function.
-  (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag))
+  (inst jmp (object-slot-ea eax closure-fun-slot fun-pointer-lowtag))
 
   ;; All the arguments fit in registers, so load them.
   REGISTER-ARGS
@@ -210,7 +216,7 @@
   (pushw ebp-tn (frame-word-offset return-pc-save-offset))
 
   ;; And away we go.
-  (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag)))
+  (inst jmp (object-slot-ea eax closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine (throw
                           (:return-style :raw))
@@ -239,7 +245,7 @@
     (inst test catch catch)             ; check for NULL pointer
     (inst jmp :z error))
 
-  (inst cmp target (make-ea-for-object-slot catch catch-block-tag-slot 0))
+  (inst cmp target (object-slot-ea catch catch-block-tag-slot 0))
   (inst jmp :e EXIT)
 
   (loadw catch catch catch-block-previous-catch-slot)
@@ -250,14 +256,14 @@
   ;; Here EAX points to catch block containing symbol pointed to by EDX.
   ;; An extra RET gets stuffed after the JMP, but oh well. You can't just change
   ;; the :return-style to :none because that also affects the call sequence.
-  (inst jmp (make-fixup 'unwind :assembly-routine)))
+  (inst jmp (entry-point-label 'unwind)))
 
 ;;;; non-local exit noise
 
 #-win32
 (define-assembly-routine (unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) eax-offset)
                           (:arg start (any-reg descriptor-reg) ebx-offset)
@@ -274,7 +280,7 @@
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
-        (make-ea-for-object-slot block unwind-block-uwp-slot 0))
+        (object-slot-ea block unwind-block-uwp-slot 0))
   ;; If a match, return to context in arg block.
   (inst jmp :e DO-EXIT)
 
@@ -296,7 +302,7 @@
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
   ;; count in ecx-tn.
 
-  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
+  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
 
 
 ;;;; Win32 non-local exit noise
@@ -354,7 +360,7 @@
 
   ;; Nlx-entry expects the arg start in ebx-tn and the arg count
   ;; in ecx-tn.  Fortunately, that's where they are already.
-  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
+  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
 
 ;;;; Win32 UWP block SEH interface.
 
@@ -393,7 +399,7 @@
   ;; we need to do the same stack frame hackery for the debugger
   ;; as we do for the main exception handler?
 
-  ;; When the UWP block calls %continue-unwind, we come back to
+  ;; When the UWP block calls %unwind, we come back to
   ;; the next assembly routine, below, which reinitializes for C
   ;; and returns to the Win32 unwind machinery.
 
@@ -437,12 +443,12 @@
   (inst xor ecx-tn ecx-tn)
   (inst mov ebx-tn ebp-tn)
   (loadw ebp-tn block unwind-block-cfp-slot)
-  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
+  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
 
 #+win32
 (define-assembly-routine (continue-unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) eax-offset)
                           (:arg start (any-reg descriptor-reg) ebx-offset)
@@ -476,77 +482,60 @@
   (inst mov eax-tn 1) ;; exception-continue-search
   (inst ret))
 
-#+sb-assembling
-(define-assembly-routine (code-header-set (:return-style :none)) ()
-  (inst push eax-tn)
-  (inst push edx-tn)
-  (inst push edi-tn)
-  ;; stack: spill[3], ret-pc, object, index, value-to-store
+#|
+    Turns out that setting the direction flag not only requires trapping
+    into microcode, but also prevents the processor from using its fast REP
+    MOVS mode, falling back to word-by-word copy instead.
 
-  (symbol-macrolet ((object (make-ea :dword :base esp-tn :disp 16))
-                    (word-index (make-ea :dword :base esp-tn :disp 20))
-                    (newval (make-ea :dword :base esp-tn :disp 24))
-                    (prefix #+(and sb-thread (not win32)) :fs
-                            #-(and sb-thread (not win32)) nil))
-    (flet ((thread-slot-ea (slot-index)
-             (make-ea :dword
-                      #+(or (not sb-thread) win32) :base #+(or (not sb-thread) win32) edi-tn
-                      :disp (ash slot-index word-shift))))
-      #-sb-thread
-      (progn
-        ;; Load 'all_threads' into EDI (which was already spilled)
-        ;; as the register with which to access thread slots.
-        #+sb-dynamic-core
-        (progn
-          (inst mov edi-tn
-                (make-ea :dword :disp (make-fixup "all_threads" :foreign-dataref)))
-          (inst mov edi-tn (make-ea :dword :base edi-tn)))
-        #-sb-dynamic-core
-        (inst mov edi-tn (make-ea :dword :disp (make-fixup "all_threads" :foreign))))
-      #+(and win32 sb-thread)
-      (inst mov edi-tn (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
+    This patch replaces almost every use of STD + REP MOVS + CLD with a a
+    simple word-wise loop. The one use in default-unknown-values remains for
+    now, because the logic in there is complex enough to require some
+    thinking to untangle.
 
-      (inst mov eax-tn object) ; object
-      (inst sub eax-tn (thread-slot-ea thread-dynspace-addr-slot) prefix)
-      (inst shr eax-tn (1- (integer-length gencgc-card-bytes)))
-      (pseudo-atomic ()
-        (assemble ()
-          (inst cmp eax-tn (thread-slot-ea thread-dynspace-card-count-slot)
-                prefix)
-          (inst jmp :ae STORE) ; not dynamic space
-          ;; sizeof (struct page) depends on GENCGC-CARD-BYTES
-          ;; It's 4+2+1+1 = 8 bytes if GENCGC-CARD-BYTES is (unsigned-byte 16),
-          ;; or   4+4+1+1 = 10 bytes (rounded to 12) if wider than (unsigned-byte 16).
-          ;; See the corresponding alien structure definition in 'room.lisp'
-          (cond ((typep gencgc-card-bytes '(unsigned-byte 16))
-                 (inst shl eax-tn 3) ; multiply by 8
-                 (inst add eax-tn (thread-slot-ea thread-dynspace-pte-base-slot)
-                       prefix)
-                 ;; clear WP - bit index 5 of flags byte
-                 (inst and (make-ea :byte :base eax-tn :disp 6) (lognot (ash 1 5))
-                       :lock))
-                (t
-                 (inst lea eax-tn ; multiply by 3
-                       (make-ea :dword :base eax-tn :index eax-tn :scale 2))
-                 (inst shl eax-tn 2) ; then by 4, = 12
-                 (inst add eax-tn (thread-slot-ea thread-dynspace-pte-base-slot)
-                       prefix)
-                 ;; clear WP
-                 (inst and (make-ea :byte :base eax-tn :disp 8) (lognot (ash 1 5))
-                       :lock)))
-          STORE
-          (inst mov edi-tn object)
-          (inst mov edx-tn word-index)
-          (inst mov eax-tn newval)
-          ;; set 'written' flag in the code header
-          (inst or (make-ea :byte :base edi-tn :disp (- 3 other-pointer-lowtag))
-                #x40 :lock)
-          ;; store newval into object
-          (inst mov (make-ea :dword :base edi-tn
-                             :index edx-tn :scale (ash 1 word-shift)
-                             :disp (- other-pointer-lowtag))
-                eax-tn)))))
-  (inst pop edi-tn) ; restore
-  (inst pop edx-tn)
-  (inst pop eax-tn)
-  (inst ret 12)) ; remove 3 stack args
+    An inline loop is faster than STD + REP MOVS + CLD, no matter the number
+    of words to copy, on all microarchitectures I've tested: P6, Pentium M,
+    Core, Ivy Bridge, Haswell and Zen.
+
+    A possible optimization is to use MOVAPS/MOVUPS if available to copy 16
+    bytes at a time, but that requires runtime CPUID checking, as x86
+    doesn't include SSE in its baseline features.
+
+    Testcase for benchmarking (here the tail-call-variable path, the results
+    for the other paths will be similar):
+        (defun sink (&rest x)
+          (declare (ignore x))
+          nil)
+        (defun foo (f x)
+          (declare (optimize speed) (type function f))
+          (apply f x))
+        (let ((list (make-list *SOME-SIZE* :initial-element 5)))
+          (time
+           (dotimes (_ 100000000)
+             (foo #'sink list))))
+
+    Performance counters on Haswell for (defvar *SOME-SIZE* 4), before:
+              4 889,34 msec task-clock:u
+        17 667 385 758      cycles:u
+        11 739 853 382      instructions:u
+         2 363 529 234      branches:u
+             6 884 040      branch-misses:u
+    After:
+              1 420,13 msec task-clock:u
+         5 062 214 204      cycles:u
+        13 953 180 368      instructions:u
+         2 766 006 753      branches:u
+             7 413 325      branch-misses:u
+
+    For (defvar *SOME-SIZE* 15), same hardware, before:
+              6 015,25 msec task-clock:u
+        21 262 810 113      cycles:u
+        20 540 217 689      instructions:u
+         4 563 619 868      branches:u
+             6 911 595      branch-misses:u
+    After:
+              2 632,55 msec task-clock:u
+         9 443 084 906      cycles:u
+        29 353 187 880      instructions:u
+         6 065 994 889      branches:u
+             6 974 505      branch-misses:u
+|#

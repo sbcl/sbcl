@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 /* GC private-use list allocator.
  *
  * A private-use list is a list of private-uses conses,
@@ -67,24 +69,24 @@ static struct cons* private_cons_impl()
     page_bytes_t bytes_used;
     struct cons* cons;
 
-    if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_CARD_BYTES) {
+    if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_PAGE_BYTES) {
         cons = (struct cons*)(page_address(page) + bytes_used);
     } else {
-        page = alloc_start_page(UNBOXED_PAGE_FLAG, 0);
+        page = alloc_start_page(PAGE_TYPE_UNBOXED, 0);
         page_index_t last_page __attribute__((unused)) =
-            gc_find_freeish_pages(&page, GENCGC_CARD_BYTES,
-                                  SINGLE_OBJECT_FLAG | UNBOXED_PAGE_FLAG, 0);
+            gc_find_freeish_pages(&page, GENCGC_PAGE_BYTES,
+                                  SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED, 0);
         // See question about last_page in gc_alloc_large
-        set_alloc_start_page(UNBOXED_PAGE_FLAG, 0, page);
+        set_alloc_start_page(PAGE_TYPE_UNBOXED, 0, page);
 
         struct cons* page_header = (struct cons*)page_address(page);
         if (PRIVATE_CONS_DEBUG)
             fprintf(stderr, "GC-private page @ %p\n", page_header);
         gc_assert(last_page == page);
-        gc_assert(!page_table[page].write_protected);
+        gc_dcheck(page_cards_all_marked_nonsticky(page));
         page_table[page].gen = 0;
-        page_table[page].type = UNBOXED_PAGE_FLAG;
-        zero_dirty_pages(page, page);
+        page_table[page].type = PAGE_TYPE_UNBOXED;
+        zero_dirty_pages(page, page, 0);
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused
         page_header->cdr = (lispobj)(tail >= 0 ? page_address(tail) : 0);

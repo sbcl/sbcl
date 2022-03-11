@@ -11,9 +11,6 @@
 
 (in-package "SB-IMPL")
 
-(defun time-reinit ()
-  (reinit-internal-real-time))
-
 ;;; Implemented in unix.lisp and win32.lisp.
 (setf (documentation 'get-internal-real-time 'function)
       "Return the real time (\"wallclock time\") since startup in the internal
@@ -193,14 +190,15 @@ format."
           (truncate years 100))
        (truncate (+ years 300) 400))))
 
-(defconstant +days-before-month+
+(defconstant-eqx +days-before-month+
   #.(let ((reversed-result nil)
           (sum 0))
       (push nil reversed-result)
       (dolist (days-in-month '(31 28 31 30 31 30 31 31 30 31 30 31))
         (push sum reversed-result)
         (incf sum days-in-month))
-      (coerce (nreverse reversed-result) 'simple-vector)))
+      (coerce (nreverse reversed-result) 'simple-vector))
+  #'equalp)
 
 (defun encode-universal-time (second minute hour date month year
                                      &optional time-zone)
@@ -431,12 +429,8 @@ EXPERIMENTAL: Interface subject to change."
         old-page-faults
         new-page-faults
         real-time-overhead
-        run-utime-overhead
-        run-stime-overhead
-        page-faults-overhead
         old-bytes-consed
         new-bytes-consed
-        cons-overhead
         (fun (if (functionp function) function (fdefinition function))))
     (declare (function fun))
     ;; Calculate the overhead...
@@ -450,14 +444,10 @@ EXPERIMENTAL: Interface subject to change."
     (multiple-value-setq
         (new-run-utime new-run-stime new-page-faults new-bytes-consed)
       (time-get-sys-info))
-    (setq run-utime-overhead (- new-run-utime old-run-utime))
-    (setq run-stime-overhead (- new-run-stime old-run-stime))
-    (setq page-faults-overhead (- new-page-faults old-page-faults))
     (setq old-real-time (get-internal-real-time))
     (setq old-real-time (get-internal-real-time))
     (setq new-real-time (get-internal-real-time))
     (setq real-time-overhead (- new-real-time old-real-time))
-    (setq cons-overhead (- new-bytes-consed old-bytes-consed))
     ;; Now get the initial times.
     (multiple-value-setq
         (old-run-utime old-run-stime old-page-faults old-bytes-consed)
@@ -467,7 +457,6 @@ EXPERIMENTAL: Interface subject to change."
           (*eval-calls* 0)
           (sb-c::*lambda-conversions* 0)
           (aborted t))
-      (declare (special *eval-calls* sb-c::*lambda-conversions*))
       (multiple-value-bind (h0 l0) (read-cycle-counter)
         (unwind-protect
              (multiple-value-prog1 (apply fun arguments)
@@ -496,8 +485,10 @@ EXPERIMENTAL: Interface subject to change."
                       (note :processor-cycles cycles #'zerop))
                     (note :lambdas-converted sb-c::*lambda-conversions* #'zerop)
                     (note :eval-calls *eval-calls* #'zerop)
-                    (note :gc-run-time-ms gc-internal-run-time)
+                    (note :gc-run-time-ms (floor gc-internal-run-time
+                                                 (/ internal-time-units-per-second 1000)))
                     (note :system-run-time-us system-run-time)
                     (note :user-run-time-us user-run-time)
-                    (note :real-time-ms real-time))
+                    (note :real-time-ms (floor real-time
+                                               (/ internal-time-units-per-second 1000))))
                   (apply timer plist))))))))))

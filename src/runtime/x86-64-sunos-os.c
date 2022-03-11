@@ -9,25 +9,32 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 
+#include <errno.h>
 #include <sys/types.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#ifdef LISP_FEATURE_SB_THREAD
-#error "Threading is not supported for Solaris running on x86-64."
-#endif
 
 #include "validate.h"
 
 
 int arch_os_thread_init(struct thread *thread) {
-  stack_t sigstack;
-     return 1;
+#if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+    /* Signal handlers are run on the control stack, so if it is exhausted
+     * we had better use an alternate stack for whatever signal tells us
+     * we've exhausted it */
+    stack_t sigstack;
+    sigstack.ss_sp    = calc_altstack_base(thread);
+    sigstack.ss_flags = 0;
+    sigstack.ss_size  = calc_altstack_size(thread);
+    if (sigaltstack(&sigstack,0) < 0) {
+        lose("Cannot sigaltstack: %s",strerror(errno));
+    }
+#endif
+    return 1;                  /* success */
 }
 
 int arch_os_thread_cleanup(struct thread *thread) {
@@ -65,12 +72,6 @@ os_context_register_addr(os_context_t *context, int offset)
 }
 
 os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return &context->uc_mcontext.gregs[REG_RIP];
-}
-
-os_context_register_t *
 os_context_sp_addr(os_context_t *context)
 {
     return &context->uc_mcontext.gregs[REG_RSP];
@@ -90,4 +91,12 @@ unsigned long
 os_context_fp_control(os_context_t *context)
 {
   return context->uc_mcontext.fpregs.fp_reg_set.fpchip_state.cw;
+}
+
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    fpregset_t *fp = &context->uc_mcontext.fpregs;
+
+    return (os_context_register_t *)&fp->fp_reg_set.fpchip_state.xmm[offset];
 }

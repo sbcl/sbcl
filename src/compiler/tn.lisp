@@ -32,11 +32,11 @@
        ,inner (progn ,@body)
               (if (setq ,tn (tn-next ,tn)) (go ,inner) (go ,outer)))))
 
-(defun set-ir2-physenv-live-tns (value instance)
-  (setf (ir2-physenv-live-tns instance) value))
+(defun set-ir2-environment-live-tns (value instance)
+  (setf (ir2-environment-live-tns instance) value))
 
-(defun set-ir2-physenv-debug-live-tns (value instance)
-  (setf (ir2-physenv-debug-live-tns instance) value))
+(defun set-ir2-environment-debug-live-tns (value instance)
+  (setf (ir2-environment-debug-live-tns instance) value))
 
 (defun set-ir2-component-alias-tns (value instance)
   (setf (ir2-component-alias-tns instance) value))
@@ -81,14 +81,14 @@
                (case (tn-kind tn)
                  (:environment
                   (clear-live tn
-                              #'ir2-physenv-live-tns
-                              #'set-ir2-physenv-live-tns))
+                              #'ir2-environment-live-tns
+                              #'set-ir2-environment-live-tns))
                  (:debug-environment
                   (clear-live tn
-                              #'ir2-physenv-debug-live-tns
-                              #'set-ir2-physenv-debug-live-tns))))
+                              #'ir2-environment-debug-live-tns
+                              #'set-ir2-environment-debug-live-tns))))
              (clear-live (tn getter setter)
-               (let ((env (physenv-info (tn-physenv tn))))
+               (let ((env (environment-info (tn-environment tn))))
                  (funcall setter (delete tn (funcall getter env)) env))))
       (declare (inline used-p delete-some delete-1 clear-live))
       (delete-some #'ir2-component-alias-tns
@@ -170,24 +170,24 @@
   (make-tn (incf (ir2-component-global-tn-counter (component-info *component-being-compiled*)))
            :unused nil nil))
 
-;;; Make TN be live throughout PHYSENV. Return TN. In the DEBUG case,
-;;; the TN is treated normally in blocks in the environment which
+;;; Make TN be live throughout ENV. Return TN. In the DEBUG case, the
+;;; TN is treated normally in blocks in the environment which
 ;;; reference the TN, allowing targeting to/from the TN. This results
 ;;; in move efficient code, but may result in the TN sometimes not
 ;;; being live when you want it.
-(defun physenv-live-tn (tn physenv)
-  (declare (type tn tn) (type physenv physenv))
+(defun environment-live-tn (tn env)
+  (declare (type tn tn) (type environment env))
   (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :environment)
-  (setf (tn-physenv tn) physenv)
-  (push tn (ir2-physenv-live-tns (physenv-info physenv)))
+  (setf (tn-environment tn) env)
+  (push tn (ir2-environment-live-tns (environment-info env)))
   tn)
-(defun physenv-debug-live-tn (tn physenv)
-  (declare (type tn tn) (type physenv physenv))
+(defun environment-debug-live-tn (tn env)
+  (declare (type tn tn) (type environment env))
   (aver (eq (tn-kind tn) :normal))
   (setf (tn-kind tn) :debug-environment)
-  (setf (tn-physenv tn) physenv)
-  (push tn (ir2-physenv-debug-live-tns (physenv-info physenv)))
+  (setf (tn-environment tn) env)
+  (push tn (ir2-environment-debug-live-tns (environment-info env)))
   tn)
 
 ;;; Make TN be live throughout the current component. Return TN.
@@ -216,10 +216,15 @@
 ;;; Create a constant TN. The backend dependent
 ;;; IMMEDIATE-CONSTANT-SC function is used to determine whether the
 ;;; constant has an immediate representation.
-(defun make-constant-tn (constant)
+;;; FIXME: this can create multiple boxed TNs (consuming more than one
+;;; slot in the boxed constant vector) for a given leaf when called by
+;;; EMIT-MOVES-AND-COERCIONS. That's wasteful.
+(defun make-constant-tn (constant &optional force-boxed)
   (declare (type constant constant))
   (or (leaf-info constant)
-      (multiple-value-bind (immed null-offset) (immediate-constant-sc (constant-value constant))
+      (multiple-value-bind (immed null-offset)
+          (immediate-constant-sc (constant-value constant))
+        ;; currently NULL-OFFSET is used only on ARM64
         (if null-offset
             (setf (leaf-info constant)
                   (component-live-tn
@@ -229,13 +234,16 @@
             (let* ((boxed (or (not immed)
                               (boxed-immediate-sc-p immed)))
                    (component (component-info *component-being-compiled*))
-                   ;; If a constant have either an immediate or boxed
+                   ;; If a constant has either an immediate or boxed
                    ;; representation (e.g. double-float) postpone the SC
                    ;; choice until SELECT-REPRESENTATIONS.
-                   (sc (and boxed
-                            (if immed
-                                (svref *backend-sc-numbers* immed)
-                                (sc-or-lose 'constant))))
+                   (sc (cond (boxed
+                              (if immed
+                                  (svref *backend-sc-numbers* immed)
+                                  (sc-or-lose 'constant)))
+                             (force-boxed
+                              (setf immed nil)
+                              (sc-or-lose 'constant))))
                    (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
               ;; Objects of type SYMBOL can be immediate but they still go in the constants
               ;; because liveness depends on pointer tracing without looking at code-fixups.
@@ -244,7 +252,7 @@
                              #+immobile-space
                              (let ((val (constant-value constant)))
                                (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
-                                   (typep val 'layout)))))
+                                   (typep val 'wrapper)))))
                 (let ((constants (ir2-component-constants component)))
                   (setf (tn-offset res)
                         (vector-push-extend constant constants))))
@@ -255,6 +263,23 @@
               (setf (tn-leaf res) constant)
               res)))))
 
+;;; Extracted from above
+(defun constant-sc (constant)
+  (if (leaf-info constant)
+      (tn-sc (leaf-info constant))
+      (multiple-value-bind (immed null-offset)
+          (immediate-constant-sc (constant-value constant))
+        (if null-offset
+            immed
+            (let ((boxed (or (not immed)
+                             (boxed-immediate-sc-p immed))))
+              (cond (boxed
+                     (if immed
+                         (svref *backend-sc-numbers* immed)
+                         (sc-or-lose 'constant)))
+                    (t
+                     (sc-or-lose 'constant))))))))
+
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))
          (sc (svref *backend-sc-numbers*
@@ -263,7 +288,7 @@
          (constants (ir2-component-constants component)))
     (setf (tn-offset res) (fill-pointer constants)
           (tn-type res) type)
-    (vector-push-extend (cons :load-time-value handle) constants)
+    (vector-push-extend (list :load-time-value handle res) constants)
     (push-in tn-next res (ir2-component-constant-tns component))
     res))
 
@@ -282,6 +307,11 @@
 ;;; Return a load-time constant TN with the specified KIND and INFO.
 ;;; If the desired CONSTANTS entry already exists, then reuse it,
 ;;; otherwise allocate a new load-time constant slot.
+;;; FIXME: this function deserves a comment about why it creates a new TN even
+;;; when KIND + INFO are already found. It's as if we need to maintain a 1:1
+;;; relation between TN and TN-REF for a subset of constants, but it's unclear
+;;; why that should be necessary. The shape of this algorithm suggests more than
+;;; mere oversight, and that it was a deliberate choice.
 (defun make-load-time-constant-tn (kind info)
   (declare (type keyword kind))
   (let* ((component (component-info *component-being-compiled*))
@@ -291,16 +321,16 @@
                        (svref *backend-sc-numbers* sb-vm:constant-sc-number)))
          (constants (ir2-component-constants component)))
     (setf (tn-type res) *universal-type*)
-    (do ((i 0 (1+ i)))
+    (do ((i 1 (1+ i)))
         ((= i (length constants))
          (setf (tn-offset res) i)
-         (vector-push-extend (cons kind info) constants))
+         (vector-push-extend (list kind info res) constants))
       (let ((entry (aref constants i)))
         (when (and (consp entry)
                    (eq (car entry) kind)
-                   (or (eq (cdr entry) info)
+                   (or (eq (cadr entry) info)
                        (and (consp info)
-                            (equal (cdr entry) info))))
+                            (equal (cadr entry) info))))
           (setf (tn-offset res) i)
           (return))))
 
@@ -323,6 +353,18 @@
           (push-in tn-ref-next res (tn-writes tn))
           (push-in tn-ref-next res (tn-reads tn))))
     res))
+
+(defun reference-tn-refs (refs write-p)
+  (when refs
+    (let* ((first (reference-tn (tn-ref-tn refs) write-p) )
+           (prev first))
+      (loop for tn-ref = (tn-ref-across refs) then (tn-ref-across tn-ref)
+            while tn-ref
+            do
+            (let ((ref (reference-tn  (tn-ref-tn tn-ref) write-p)))
+              (setf (tn-ref-across prev) ref)
+              (setq prev ref)))
+      first)))
 
 ;;; Make TN-REFS to reference each TN in TNs, linked together by
 ;;; TN-REF-ACROSS. WRITE-P is the WRITE-P value for the refs. MORE is
@@ -404,12 +446,12 @@
   (declare (type cblock block))
   (let ((2block (block-info block)))
     (or (ir2-block-%label 2block)
-        (setf (ir2-block-%label 2block) (gen-label)))))
+        (setf (ir2-block-%label 2block) (gen-label "basic block")))))
 (defun block-trampoline (block)
   (declare (type cblock block))
   (let ((2block (block-info block)))
     (or (ir2-block-%trampoline-label 2block)
-        (setf (ir2-block-%trampoline-label 2block) (gen-label)))))
+        (setf (ir2-block-%trampoline-label 2block) (gen-label "trampoline")))))
 
 ;;; Return true if Block is emitted immediately after the block ended by Node.
 (defun drop-thru-p (node block)
@@ -455,8 +497,8 @@
   (declare (type vop vop))
   (do ((ref (vop-refs vop) (tn-ref-next-ref ref)))
       ((null ref))
-    (delete-tn-ref ref))
-
+    (unless (eql (tn-kind (tn-ref-tn ref)) :unused)
+      (delete-tn-ref ref)))
   (let ((prev (vop-prev vop))
         (next (vop-next vop))
         (block (vop-block vop)))
@@ -467,7 +509,7 @@
         (setf (vop-prev next) prev)
         (setf (ir2-block-last-vop block) prev)))
 
-  (values))
+  nil)
 
 ;;; Return a list of N normal TNs of the specified primitive type.
 (defun make-n-tns (n ptype)

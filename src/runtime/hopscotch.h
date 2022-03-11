@@ -24,7 +24,7 @@ struct hopscotch_table {
     int  count;
     int  threshold;  // max count before sizing up
     int  prev_size;  // in cells, as specified to hopscotch_create()
-    int  mem_size;   // in bytes, for zero-filling when done using
+    uword_t mem_size;   // in bytes, for zero-filling when done using
     // Statistics
     struct { int n_seeks, n_probes; } hit, miss;
     char value_size; // number of bytes in a value: 0,1,2,4,8
@@ -39,6 +39,7 @@ void hopscotch_destroy(struct hopscotch_table*);
 int hopscotch_insert(struct hopscotch_table*,uword_t,sword_t);
 int hopscotch_put(struct hopscotch_table*,uword_t,sword_t);
 sword_t hopscotch_get(struct hopscotch_table*,uword_t,sword_t);
+void* hopscotch_get_ref(struct hopscotch_table*,uword_t);
 int hopscotch_containsp(struct hopscotch_table*,uword_t);
 boolean hopscotch_delete(struct hopscotch_table*,uword_t);
 void hopscotch_reset(struct hopscotch_table*);

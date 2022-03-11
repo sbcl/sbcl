@@ -33,10 +33,8 @@
            (let ((segment (sb-assem:make-segment)))
              (sb-assem:assemble (segment)
                (dolist (instruction (subst n :ARGC c-prog)
-                                    (sb-assem::segment-buffer segment))
-                 (apply #'sb-assem::%inst
-                        (sb-assem::op-encoder-name (car instruction))
-                        (cdr instruction)))))))
+                                    (sb-assem:segment-buffer segment))
+                 (apply #'sb-assem:inst* (car instruction) (cdr instruction)))))))
     (dotimes (n-args 4)
       (let ((the-code (assemble-it n-args)))
         ;; in case we change the way the assembler output works ...
@@ -63,9 +61,9 @@
      ;; Making room for 3 args aligns the stack to a 16-byte boundary
      ;; presuming it was at CALL to me. Darwin requires the alignment, others don't care.
      `((sub ,rsp-tn 24)
-       (mov ,(make-ea :qword :base rsp-tn :disp 16) ,(get-lisp-obj-address T))
-       (mov ,(make-ea :qword :base rsp-tn :disp 8) ,(fixnumize 311))
-       (mov ,(make-ea :qword :base rsp-tn :disp 0) ,(get-lisp-obj-address #\A))
+       (mov :qword ,(ea 16 rsp-tn) ,(get-lisp-obj-address T))
+       (mov :qword ,(ea  8 rsp-tn) ,(fixnumize 311))
+       (mov :qword ,(ea  0 rsp-tn) ,(get-lisp-obj-address #\A))
        (mov ,rdi-tn ,(get-lisp-obj-address #'monkeybiz)) ; C arg 0 = Lisp function
        (mov ,rsi-tn ,rsp-tn)                             ; C arg 1 = argv
        (mov ,rdx-tn :ARGC)                               ; C arg 2 = argc

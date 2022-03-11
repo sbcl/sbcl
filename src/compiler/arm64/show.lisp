@@ -18,7 +18,7 @@
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) nl0)
-  (:temporary (:sc any-reg :offset r8-offset) cfunc)
+  (:temporary (:sc any-reg :offset r9-offset) cfunc)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)

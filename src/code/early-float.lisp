@@ -17,7 +17,8 @@
 
 ;;;; utilities
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+;;; Don't need to define it in the host in both passes
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 ;;; These functions let us create floats from bits with the
 ;;; significand uniformly represented as an integer. This is less
@@ -49,58 +50,58 @@
 ) ; EVAL-WHEN
 
 ;;;; float parameters
-(defconstant sb-xc:most-positive-single-float #.sb-xc:most-positive-single-float)
-(defconstant sb-xc:most-negative-single-float #.sb-xc:most-negative-single-float)
-(defconstant sb-xc:most-positive-double-float #.sb-xc:most-positive-double-float)
-(defconstant sb-xc:most-negative-double-float #.sb-xc:most-negative-double-float)
-(defconstant sb-xc:pi #.sb-xc:pi)
+(defconstant most-positive-single-float #.most-positive-single-float)
+(defconstant most-negative-single-float #.most-negative-single-float)
+(defconstant most-positive-double-float #.most-positive-double-float)
+(defconstant most-negative-double-float #.most-negative-double-float)
+(defconstant pi #.pi)
 
-(defconstant sb-xc:least-positive-single-float (single-from-bits 0 0 1))
-(defconstant sb-xc:least-positive-short-float (single-from-bits 0 0 1))
-(defconstant sb-xc:least-negative-single-float (single-from-bits 1 0 1))
-(defconstant sb-xc:least-negative-short-float (single-from-bits 1 0 1))
-(defconstant sb-xc:least-positive-double-float (double-from-bits 0 0 1))
+(defconstant least-positive-single-float (single-from-bits 0 0 1))
+(defconstant least-positive-short-float (single-from-bits 0 0 1))
+(defconstant least-negative-single-float (single-from-bits 1 0 1))
+(defconstant least-negative-short-float (single-from-bits 1 0 1))
+(defconstant least-positive-double-float (double-from-bits 0 0 1))
 #-long-float
-(defconstant sb-xc:least-positive-long-float (double-from-bits 0 0 1))
+(defconstant least-positive-long-float (double-from-bits 0 0 1))
 #+(and long-float x86)
-(defconstant sb-xc:least-positive-long-float (long-from-bits 0 0 1))
-(defconstant sb-xc:least-negative-double-float (double-from-bits 1 0 1))
+(defconstant least-positive-long-float (long-from-bits 0 0 1))
+(defconstant least-negative-double-float (double-from-bits 1 0 1))
 #-long-float
-(defconstant sb-xc:least-negative-long-float (double-from-bits 1 0 1))
+(defconstant least-negative-long-float (double-from-bits 1 0 1))
 #+(and long-float x86)
-(defconstant sb-xc:least-negative-long-float (long-from-bits 1 0 1))
+(defconstant least-negative-long-float (long-from-bits 1 0 1))
 
-(defconstant sb-xc:least-positive-normalized-single-float
+(defconstant least-positive-normalized-single-float
   (single-from-bits 0 sb-vm:single-float-normal-exponent-min 0))
-(defconstant sb-xc:least-positive-normalized-short-float
-  sb-xc:least-positive-normalized-single-float)
-(defconstant sb-xc:least-negative-normalized-single-float
+(defconstant least-positive-normalized-short-float
+  least-positive-normalized-single-float)
+(defconstant least-negative-normalized-single-float
   (single-from-bits 1 sb-vm:single-float-normal-exponent-min 0))
-(defconstant sb-xc:least-negative-normalized-short-float
-  sb-xc:least-negative-normalized-single-float)
-(defconstant sb-xc:least-positive-normalized-double-float
+(defconstant least-negative-normalized-short-float
+  least-negative-normalized-single-float)
+(defconstant least-positive-normalized-double-float
   (double-from-bits 0 sb-vm:double-float-normal-exponent-min 0))
 #-long-float
-(defconstant sb-xc:least-positive-normalized-long-float
-  sb-xc:least-positive-normalized-double-float)
+(defconstant least-positive-normalized-long-float
+  least-positive-normalized-double-float)
 #+(and long-float x86)
-(defconstant sb-xc:least-positive-normalized-long-float
+(defconstant least-positive-normalized-long-float
   (long-from-bits 0 sb-vm:long-float-normal-exponent-min
                   (ash sb-vm:long-float-hidden-bit 32)))
-(defconstant sb-xc:least-negative-normalized-double-float
+(defconstant least-negative-normalized-double-float
   (double-from-bits 1 sb-vm:double-float-normal-exponent-min 0))
 #-long-float
-(defconstant sb-xc:least-negative-normalized-long-float
-  sb-xc:least-negative-normalized-double-float)
+(defconstant least-negative-normalized-long-float
+  least-negative-normalized-double-float)
 #+(and long-float x86)
-(defconstant sb-xc:least-negative-normalized-long-float
+(defconstant least-negative-normalized-long-float
   (long-from-bits 1 sb-vm:long-float-normal-exponent-min
                   (ash sb-vm:long-float-hidden-bit 32)))
 
-(defconstant sb-xc:most-positive-short-float sb-xc:most-positive-single-float)
-(defconstant sb-xc:most-negative-short-float sb-xc:most-negative-single-float)
-(defconstant sb-xc:most-positive-long-float  sb-xc:most-positive-double-float)
-(defconstant sb-xc:most-negative-long-float  sb-xc:most-negative-double-float)
+(defconstant most-positive-short-float most-positive-single-float)
+(defconstant most-negative-short-float most-negative-single-float)
+(defconstant most-positive-long-float  most-positive-double-float)
+(defconstant most-negative-long-float  most-negative-double-float)
 
 (defconstant single-float-positive-infinity #.(sb-impl::make-flonum :+infinity 'single-float))
 (defconstant single-float-negative-infinity #.(sb-impl::make-flonum :-infinity 'single-float))
@@ -124,28 +125,28 @@
   (long-from-bits 1 (1+ sb-vm:long-float-normal-exponent-max)
                   (ash sb-vm:long-float-hidden-bit 32)))
 
-(defconstant sb-xc:single-float-epsilon
+(defconstant single-float-epsilon
   (single-from-bits 0 (- sb-vm:single-float-bias
                          (1- sb-vm:single-float-digits)) 1))
-(defconstant sb-xc:short-float-epsilon sb-xc:single-float-epsilon)
-(defconstant sb-xc:single-float-negative-epsilon
+(defconstant short-float-epsilon single-float-epsilon)
+(defconstant single-float-negative-epsilon
   (single-from-bits 0 (- sb-vm:single-float-bias sb-vm:single-float-digits) 1))
-(defconstant sb-xc:short-float-negative-epsilon sb-xc:single-float-negative-epsilon)
-(defconstant sb-xc:double-float-epsilon
+(defconstant short-float-negative-epsilon single-float-negative-epsilon)
+(defconstant double-float-epsilon
   (double-from-bits 0 (- sb-vm:double-float-bias
                          (1- sb-vm:double-float-digits)) 1))
 #-long-float
-(defconstant sb-xc:long-float-epsilon sb-xc:double-float-epsilon)
+(defconstant long-float-epsilon double-float-epsilon)
 #+(and long-float x86)
-(defconstant sb-xc:long-float-epsilon
+(defconstant long-float-epsilon
   (long-from-bits 0 (- sb-vm:long-float-bias (1- sb-vm:long-float-digits))
                   (+ 1 (ash sb-vm:long-float-hidden-bit 32))))
-(defconstant sb-xc:double-float-negative-epsilon
+(defconstant double-float-negative-epsilon
   (double-from-bits 0 (- sb-vm:double-float-bias sb-vm:double-float-digits) 1))
 #-long-float
-(defconstant sb-xc:long-float-negative-epsilon sb-xc:double-float-negative-epsilon)
+(defconstant long-float-negative-epsilon double-float-negative-epsilon)
 #+(and long-float x86)
-(defconstant sb-xc:long-float-negative-epsilon
+(defconstant long-float-negative-epsilon
   (long-from-bits 0 (- sb-vm:long-float-bias sb-vm:long-float-digits)
                   (+ 1 (ash sb-vm:long-float-hidden-bit 32))))
 

@@ -84,7 +84,7 @@
           (or *source-namestring*
               (when source-info
                 (make-file-info-namestring
-                 *compile-file-pathname*
+                 cl:*compile-file-pathname*
                  (get-toplevelish-file-info source-info)))))
          tlf-number
          form-number)
@@ -96,10 +96,29 @@
     (%make-definition-source-location namestring tlf-number form-number)))
 
 (defun make-file-info-namestring (name file-info)
-  (let* ((untruename (file-info-untruename file-info))
-         (dir (and untruename (pathname-directory untruename))))
+  (let* ((pathname (file-info-pathname file-info))
+         (dir (and pathname (pathname-directory pathname))))
     (if (and dir (eq (first dir) :absolute))
-        (namestring untruename)
+        (namestring pathname)
         (if name
             (namestring name)
             nil))))
+
+#+sb-source-locations
+(progn
+  (define-source-transform source-location ()
+    (make-definition-source-location))
+  ;; We need a regular definition of SOURCE-LOCATION for calls processed
+  ;; during LOAD on a source file while *EVALUATOR-MODE* is :INTERPRET.
+  #-sb-xc-host
+  (defun source-location ()
+    (make-definition-source-location)))
+
+#-sb-source-locations
+(defun source-location () nil)
+
+(in-package "SB-IMPL")
+
+(defvar *eval-source-context* nil)
+(defvar *eval-tlf-index* nil)
+(defvar *eval-source-info* nil)

@@ -11,6 +11,24 @@
 
 (in-package "SB-C")
 
+;;;; DEFTYPEs
+
+;;; An INLINEP value describes how a function is called. The values
+;;; have these meanings:
+;;;     NIL     No declaration seen: do whatever you feel like, but don't
+;;;             dump an inline expansion.
+;;; NOTINLINE  NOTINLINE declaration seen: always do full function call.
+;;;    INLINE  INLINE declaration seen: save expansion, expanding to it
+;;;             if policy favors.
+;;; MAYBE-INLINE
+;;;             Retain expansion, but only use it opportunistically.
+;;;             MAYBE-INLINE is quite different from INLINE. As explained
+;;;             by APD on #lisp 2005-11-26: "MAYBE-INLINE lambda is
+;;;             instantiated once per component, INLINE - for all
+;;;             references (even under #'without FUNCALL)."
+(deftype inlinep () '(member inline maybe-inline notinline nil))
+
+
 ;;;; source-hacking defining forms
 
 ;;; Parse a DEFMACRO-style lambda-list, setting things up so that a
@@ -262,14 +280,12 @@
 ;;;   :POLICY - A form which is supplied to the POLICY macro to determine
 ;;;             whether this transformation is appropriate. If the result
 ;;;             is false, then the transform automatically gives up.
-;;;   :EVAL-NAME
-;;;           - The name and argument/result types are actually forms to be
-;;;             evaluated. Useful for getting closures that transform similar
-;;;             functions.
 ;;;   :DEFUN-ONLY
 ;;;           - Don't actually instantiate a transform, instead just DEFUN
 ;;;             Name with the specified transform definition function. This
 ;;;             may be later instantiated with %DEFTRANSFORM.
+;;;   :INFO   - an extra piece of information the transform receives,
+;;;             typically for use with :DEFUN-ONLY
 ;;;   :IMPORTANT
 ;;;           - If the transform fails and :IMPORTANT is
 ;;;               NIL,       then never print an efficiency note.
@@ -279,28 +295,30 @@
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                           (result-type '*)
                                           &key result policy node defun-only
-                                          eval-name (important :slightly))
+                                          (info nil info-p)
+                                          (important :slightly))
                              &body body-decls-doc)
   (declare (type (member nil :slightly t) important))
-  (when (and eval-name defun-only)
-    (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
+  (cond (defun-only
+         (aver (eq important :slightly)) ; can't be specified
+         (aver (not policy))) ; has no effect on the defun
+        (t
+         (aver (not info))))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
-    (let ((n-node (or node (make-symbol "NODE")))
-          (n-decls (sb-xc:gensym))
-          (n-lambda (sb-xc:gensym)))
+    (let ((n-node (or node '#:node))
+          (n-decls '#:decls)
+          (n-lambda '#:lambda))
       (multiple-value-bind (bindings vars)
           (parse-deftransform lambda-list n-node
                               '(give-up-ir1-transform))
         (let ((stuff
-                `((,n-node &aux ,@bindings
+                `((,n-node ,@(if info-p (list info)) &aux ,@bindings
                            ,@(when result
                                `((,result (node-lvar ,n-node)))))
                   (declare (ignorable ,@(mapcar #'car bindings)))
                   (declare (lambda-list (node)))
                   ,@decls
-                  ,@(and defun-only
-                         doc
-                         `(,doc))
+                  ,@(if doc `(,doc))
                   ;; What purpose does it serve to allow the transform's body
                   ;; to return decls as a second value? They would go in the
                   ;; right place if simply returned as part of the expression.
@@ -315,18 +333,11 @@
                            ,,n-lambda)))))))
           (if defun-only
               `(defun ,name ,@stuff)
-              `(%deftransform
-                ,(if eval-name name `',name)
-                ,(if eval-name
-                     ``(function ,,arg-types ,,result-type)
-                     `'(function ,arg-types ,result-type))
-                (named-lambda ,(if eval-name "xform" `(deftransform ,name))
-                  ,@stuff)
-                ,doc
-                ,important
-                ,(and policy
-                      `(lambda (,n-node)
-                         (policy ,n-node ,policy))))))))))
+              `(%deftransform ',name
+                              ,(and policy `(lambda (,n-node) (policy ,n-node ,policy)))
+                              '(function ,arg-types ,result-type)
+                              (named-lambda (deftransform ,name) ,@stuff)
+                              ,important)))))))
 
 (defmacro deftransforms (names (lambda-list &optional (arg-types '*)
                                                       (result-type '*)
@@ -334,24 +345,18 @@
                          &body body-decls-doc)
 
   (let ((transform-name (symbolicate (car names) '-transform))
-        (type (list 'function arg-types result-type))
-        (doc (nth-value 2 (parse-body body-decls-doc t))))
+        (type (list 'function arg-types result-type)))
     `(progn
        (deftransform ,transform-name
            (,lambda-list ,arg-types ,result-type
             :defun-only t
             :result ,result :policy ,policy :node ,node)
          ,@body-decls-doc)
-       ,@(loop for name in names
-               collect
-               `(let ((policy ,(and policy
-                                    (let ((node-sym (gensym "NODE")))
-                                      `(lambda (,node-sym)
-                                         (policy ,node-sym ,policy))))))
-                  (%deftransform ',name ',type #',transform-name
-                                 ,doc
-                                 ,important
-                                 policy))))))
+       (flet ,(if policy `((policy-test (node) (policy node ,policy))))
+         ,@(mapcar (lambda (name)
+                     `(%deftransform ',name ,(if policy '#'policy-test) ',type
+                                     #',transform-name ,important))
+                   names)))))
 
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list
@@ -378,8 +383,7 @@
                               &optional (node (sb-xc:gensym) node-p)
                               &rest vars)
                         &body body)
-  (binding* ((name
-              (flet ((function-name (name)
+  (let ((name (flet ((function-name (name)
                        (etypecase name
                          (symbol name)
                          ((cons (eql setf) (cons symbol null))
@@ -387,32 +391,48 @@
                 (if (symbolp what)
                     what
                     (symbolicate (function-name (first what))
-                                 "-" (second what) "-OPTIMIZER"))))
-             ((forms decls) (parse-body body nil))
-             ((var-decls more-decls) (extract-var-decls decls vars))
-             ;; In case the BODY declares IGNORE of the formal NODE var,
-             ;; we rebind it from N-NODE and never reference it from BINDS.
-             (n-node (make-symbol "NODE"))
-             ((binds lambda-vars gensyms)
-              (parse-deftransform lambda-list n-node
-                                  `(return-from ,name nil))))
-    (declare (ignore lambda-vars))
-    `(progn
-       ;; We can't stuff the BINDS as &AUX vars into the lambda list
-       ;; because there can be a RETURN-FROM in there.
-       (defun ,name (,n-node ,@vars)
-         ,@(if var-decls (list var-decls))
-         (let* (,@binds ,@(if node-p `((,node ,n-node))))
-           ;; Syntax requires naming NODE even if undesired if VARS
-           ;; are present, so in that case make NODE ignorable.
-           (declare (ignorable ,@(if (and vars node-p) `(,node))
-                               ,@gensyms))
-           ,@more-decls ,@forms))
-       ,@(when (consp what)
-           `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
-                          (symbolicate "FUN-INFO-" (second what)))
-                       (fun-info-or-lose ',(first what)))
-                      #',name))))))
+                                 "-"
+                                 (if (consp (second what))
+                                     (caadr what)
+                                     (second what))
+                                 "-OPTIMIZER")))))
+    (if (typep what '(cons (eql vop-optimize)))
+        `(progn
+           (defun ,name (,lambda-list)
+             ,@body)
+           ,@(loop for vop-name in (ensure-list (second what))
+                   collect
+                   `(set-vop-optimizer (template-or-lose ',vop-name) #',name)))
+        (binding* (((forms decls) (parse-body body nil))
+                   ((var-decls more-decls) (extract-var-decls decls vars))
+                   ;; In case the BODY declares IGNORE of the formal NODE var,
+                   ;; we rebind it from N-NODE and never reference it from BINDS.
+                   (n-node (make-symbol "NODE"))
+                   ((binds lambda-vars gensyms)
+                    (parse-deftransform lambda-list n-node
+                                        `(return-from ,name
+                                           ,(if (and (consp what)
+                                                     (eq (second what)
+                                                         'equality-constraint))
+                                                :give-up
+                                                nil)))))
+          (declare (ignore lambda-vars))
+          `(progn
+             ;; We can't stuff the BINDS as &AUX vars into the lambda list
+             ;; because there can be a RETURN-FROM in there.
+             (defun ,name (,n-node ,@vars)
+               ,@(if var-decls (list var-decls))
+               (let* (,@binds ,@(if node-p `((,node ,n-node))))
+                 ;; Syntax requires naming NODE even if undesired if VARS
+                 ;; are present, so in that case make NODE ignorable.
+                 (declare (ignorable ,@(if (and vars node-p) `(,node))
+                                     ,@gensyms))
+                 ,@more-decls ,@forms))
+             ,@(when (consp what)
+                 `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
+                             (symbolicate "FUN-INFO-" (second what)))
+                          (fun-info-or-lose ',(first what)))
+                         #',name))))))))
 
 ;;;; IR groveling macros
 
@@ -428,7 +448,7 @@
 (defmacro do-blocks ((block-var component &optional ends result) &body body)
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
-  (let ((n-component (gensym))
+  (let ((n-component (sb-xc:gensym))
         (n-tail (gensym)))
     `(let* ((,n-component ,component)
             (,n-tail ,(if (member ends '(:both :tail))
@@ -444,7 +464,7 @@
 (defmacro do-blocks-backwards ((block-var component &optional ends result) &body body)
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
-  (let ((n-component (gensym))
+  (let ((n-component (sb-xc:gensym))
         (n-head (gensym)))
     `(let* ((,n-component ,component)
             (,n-head ,(if (member ends '(:both :head))
@@ -579,7 +599,7 @@
 ;;; this table, as 42 is EQ to 42 no matter where in the source it
 ;;; appears. GET-SOURCE-PATH and NOTE-SOURCE-PATH functions should be
 ;;; always used to access this table.
-(declaim (hash-table *source-paths*))
+(declaim (type hash-table *source-paths*))
 (defvar *source-paths*)
 
 (defmacro with-source-paths (&body forms)
@@ -591,26 +611,19 @@
         (clrhash ,source-paths)))))
 
 ;;; Bind the hashtables used for keeping track of global variables,
-;;; functions, etc. Also establish condition handlers.
+;;; functions, etc.
 (defmacro with-ir1-namespace (&body forms)
-  `(let ((*free-vars* (make-hash-table :test 'eq))
-         (*free-funs* (make-hash-table :test 'equal))
-         (*constants* (make-hash-table :test 'equal)))
-     (unwind-protect
-          (progn ,@forms)
-       (clrhash *free-funs*)
-       (clrhash *free-vars*)
-       (clrhash *constants*))))
+  `(let ((*ir1-namespace* (make-ir1-namespace))) ,@forms))
 
 ;;; Look up NAME in the lexical environment namespace designated by
 ;;; SLOT, returning the <value, T>, or <NIL, NIL> if no entry. The
 ;;; :TEST keyword may be used to determine the name equality
 ;;; predicate.
-(defmacro lexenv-find (name slot &key test)
-  (once-only ((n-res `(assoc ,name (,(let ((*package* (sb-xc:symbol-package 'lexenv-funs)))
-                                          (symbolicate "LEXENV-" slot))
-                                     *lexenv*)
-                             :test ,(or test '#'eq))))
+(defmacro lexenv-find (name slot &key (lexenv '*lexenv*) test
+                                 &aux (accessor (package-symbolicate
+                                                 (cl:symbol-package 'lexenv-funs)
+                                                 "LEXENV-" slot)))
+  (once-only ((n-res `(assoc ,name (,accessor ,lexenv) :test ,(or test '#'eq))))
     `(if ,n-res
          (values (cdr ,n-res) t)
          (values nil nil))))
@@ -626,6 +639,208 @@
                      ,@body)
            (setf (component-last-block ,component)
                  ,old-last-block))))))
+
+
+;;;; DEFPRINTER
+
+;;; These functions are called by the expansion of the DEFPRINTER
+;;; macro to do the actual printing.
+(declaim (ftype (function (symbol t stream) (values))
+                defprinter-prin1 defprinter-princ))
+(defun defprinter-prin1 (name value stream)
+  (defprinter-prinx #'prin1 name value stream))
+(defun defprinter-princ (name value stream)
+  (defprinter-prinx #'princ name value stream))
+(defun defprinter-prinx (prinx name value stream)
+  (declare (type function prinx))
+  (when *print-pretty*
+    (pprint-newline :linear stream))
+  (format stream ":~A " name)
+  (funcall prinx value stream)
+  (values))
+(defun defprinter-print-space (stream)
+  (write-char #\space stream))
+
+(defvar *print-ir-nodes-pretty* nil)
+
+;;; Define some kind of reasonable PRINT-OBJECT method for a
+;;; STRUCTURE-OBJECT class.
+;;;
+;;; NAME is the name of the structure class, and CONC-NAME is the same
+;;; as in DEFSTRUCT.
+;;;
+;;; The SLOT-DESCS describe how each slot should be printed. Each
+;;; SLOT-DESC can be a slot name, indicating that the slot should
+;;; simply be printed. A SLOT-DESC may also be a list of a slot name
+;;; and other stuff. The other stuff is composed of keywords followed
+;;; by expressions. The expressions are evaluated with the variable
+;;; which is the slot name bound to the value of the slot. These
+;;; keywords are defined:
+;;;
+;;; :PRIN1    Print the value of the expression instead of the slot value.
+;;; :PRINC    Like :PRIN1, only PRINC the value
+;;; :TEST     Only print something if the test is true.
+;;;
+;;; If no printing thing is specified then the slot value is printed
+;;; as if by PRIN1.
+;;;
+;;; The structure being printed is bound to STRUCTURE and the stream
+;;; is bound to STREAM.
+;;;
+;;; If PRETTY-IR-PRINTER is supplied, the form is invoked when
+;;; *PRINT-IR-NODES-PRETTY* is true.
+(defmacro defprinter ((name
+                       &key
+                       (conc-name (concatenate 'simple-string
+                                               (symbol-name name)
+                                               "-"))
+                       identity
+                       pretty-ir-printer)
+                      &rest slot-descs)
+  (let ((first? t)
+        maybe-print-space
+        (reversed-prints nil))
+    (flet ((sref (slot-name)
+             `(,(symbolicate conc-name slot-name) structure)))
+      (dolist (slot-desc slot-descs)
+        (if first?
+            (setf maybe-print-space nil
+                  first? nil)
+            (setf maybe-print-space `(defprinter-print-space stream)))
+        (cond ((atom slot-desc)
+               (push maybe-print-space reversed-prints)
+               (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) stream)
+                     reversed-prints))
+              (t
+               (let ((sname (first slot-desc))
+                     (test t))
+                 (collect ((stuff))
+                   (do ((option (rest slot-desc) (cddr option)))
+                       ((null option)
+                        (push `(let ((,sname ,(sref sname)))
+                                 (when ,test
+                                   ,maybe-print-space
+                                   ,@(or (stuff)
+                                         `((defprinter-prin1
+                                             ',sname ,sname stream)))))
+                              reversed-prints))
+                     (case (first option)
+                       (:prin1
+                        (stuff `(defprinter-prin1
+                                  ',sname ,(second option) stream)))
+                       (:princ
+                        (stuff `(defprinter-princ
+                                  ',sname ,(second option) stream)))
+                       (:test (setq test (second option)))
+                       (t
+                        (error "bad option: ~S" (first option)))))))))))
+    (let ((normal-printer `(pprint-logical-block (stream nil)
+                             (print-unreadable-object (structure
+                                                       stream
+                                                       :type t
+                                                       :identity ,identity)
+                               ,@(nreverse reversed-prints))) ))
+      `(defmethod print-object ((structure ,name) stream)
+         ,(cond (pretty-ir-printer
+                 `(if *print-ir-nodes-pretty*
+                      ,pretty-ir-printer
+                      ,normal-printer))
+                (t
+                 normal-printer))))))
+
+
+;;;; boolean attribute utilities
+;;;;
+;;;; We need to maintain various sets of boolean attributes for known
+;;;; functions and VOPs. To save space and allow for quick set
+;;;; operations, we represent the attributes as bits in a fixnum.
+
+(deftype attributes () 'fixnum)
+
+;;; Given a list of attribute names and an alist that translates them
+;;; to masks, return the OR of the masks.
+(defun encode-attribute-mask (names universe)
+  (loop for name in names
+        for pos = (position name universe)
+        sum (if pos (ash 1 pos) (error "unknown attribute name: ~S" name))))
+
+(defun decode-attribute-mask (bits universe)
+  (loop for name across universe
+        for mask = 1 then (ash mask 1)
+        when (logtest mask bits) collect name))
+
+;;; Define a new class of boolean attributes, with the attributes
+;;; having the specified ATTRIBUTE-NAMES. NAME is the name of the
+;;; class, which is used to generate some macros to manipulate sets of
+;;; the attributes:
+;;;
+;;;    NAME-attributep attributes attribute-name*
+;;;      Return true if one of the named attributes is present, false
+;;;      otherwise. When set with SETF, updates the place Attributes
+;;;      setting or clearing the specified attributes.
+;;;
+;;;    NAME-attributes attribute-name*
+;;;      Return a set of the named attributes.
+(defmacro !def-boolean-attribute (name &body attribute-names)
+  (let ((vector (coerce attribute-names 'vector))
+        (constructor (symbolicate name "-ATTRIBUTES"))
+        (test-name (symbolicate name "-ATTRIBUTEP")))
+    `(progn
+       (defmacro ,constructor (&rest attribute-names)
+         "Automagically generated boolean attribute creation function.
+  See !DEF-BOOLEAN-ATTRIBUTE."
+         (encode-attribute-mask attribute-names ,vector))
+       (defun ,(symbolicate "DECODE-" name "-ATTRIBUTES") (attributes)
+         (decode-attribute-mask attributes ,vector))
+       (defmacro ,test-name (attributes &rest attribute-names)
+         "Automagically generated boolean attribute test function.
+  See !DEF-BOOLEAN-ATTRIBUTE."
+         `(logtest (the attributes ,attributes)
+                   (,',constructor ,@attribute-names)))
+       (define-setf-expander ,test-name (place &rest attributes
+                                               &environment env)
+         "Automagically generated boolean attribute setter. See
+ !DEF-BOOLEAN-ATTRIBUTE."
+         (multiple-value-bind (temps values stores setter getter)
+             (#+sb-xc-host cl:get-setf-expansion
+              #-sb-xc-host get-setf-expansion place env)
+           (when (cdr stores)
+             (error "multiple store variables for ~S" place))
+           (let ((newval (sb-xc:gensym))
+                 (n-place (sb-xc:gensym))
+                 (mask (encode-attribute-mask attributes ,vector)))
+             (values `(,@temps ,n-place)
+                     `(,@values ,getter)
+                     `(,newval)
+                     `(let ((,(first stores)
+                             (if ,newval
+                                 (logior ,n-place ,mask)
+                                 (logandc2 ,n-place ,mask))))
+                        ,setter
+                        ,newval)
+                     `(,',test-name ,n-place ,@attributes))))))))
+
+;;; And now for some gratuitous pseudo-abstraction...
+;;;
+;;; ATTRIBUTES-UNION
+;;;   Return the union of all the sets of boolean attributes which are its
+;;;   arguments.
+;;; ATTRIBUTES-INTERSECTION
+;;;   Return the intersection of all the sets of boolean attributes which
+;;;   are its arguments.
+;;; ATTRIBUTES=
+;;;   True if the attributes present in ATTR1 are identical to
+;;;   those in ATTR2.
+(defmacro attributes-union (&rest attributes)
+  `(the attributes
+        (logior ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
+(defmacro attributes-intersection (&rest attributes)
+  `(the attributes
+        (logand ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
+(declaim (ftype (function (attributes attributes) boolean) attributes=))
+(declaim (inline attributes=))
+(defun attributes= (attr1 attr2)
+  (eql attr1 attr2))
 
 
 ;;;; the EVENT statistics/trace utility
@@ -648,6 +863,7 @@
   ;; If true, a function that gets called with the node that the event
   ;; happened to.
   (action nil :type (or function null)))
+(declaim (freeze-type event-info))
 
 ;;; A hashtable from event names to event-info structures.
 (define-load-time-global *event-info* (make-hash-table :test 'eq))
@@ -748,7 +964,7 @@
 ;;;; functions on directly-linked lists (linked through specialized
 ;;;; NEXT operations)
 
-#-sb-fluid (declaim (inline find-in position-in))
+(declaim (inline find-in position-in))
 
 ;;; Find ELEMENT in a null-terminated LIST linked by the accessor
 ;;; function NEXT. KEY and TEST are the same as for generic sequence functions.
@@ -784,7 +1000,7 @@
 
 (defmacro deletef-in (next place item &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (#+sb-xc sb-xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
+      (#-sb-xc-host get-setf-expansion #+sb-xc-host cl:get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     (let ((n-item (gensym))
@@ -810,7 +1026,7 @@
 ;;;
 (defmacro push-in (next item place &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (#+sb-xc sb-xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
+      (#-sb-xc-host get-setf-expansion #+sb-xc-host cl:get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     `(let (,@(mapcar #'list temps vals)
@@ -847,3 +1063,64 @@ specify bindings for printer control variables.")
         (nreverse (mapcar #'car *compiler-print-variable-alist*))
         (nreverse (mapcar #'cdr *compiler-print-variable-alist*))
       ,@forms)))
+
+#|
+In trying to figure out whether we can rectify the totally unobvious behavior
+that FUN-INFO-TRANSFORMS are tried in the reverse order of their definitions,
+it is helpful to understand when multiple transforms exist where more than
+one could be selected.
+In the absence of type overlap, it wouldn't matter what order they were attempted.
+Unfortunately there are plenty of cases where the _least_ _specific_ fun-type
+should be attempted first, which at least superfically makes no sense at all.
+
+(in-package sb-c)
+;; As a special case, delete any functions where there are 2 transforms
+;; and they can't possibly both apply. Just check the first arg.
+(defun domains-possibly-overlap (xforms)
+  (when (/= (length xforms) 2) ; lazy, just say yes
+    (return-from domains-possibly-overlap t))
+  (let ((t1 (transform-type (car xforms)))
+        (t2 (transform-type (cadr xforms))))
+    (unless (and (fun-type-p t1) (fun-type-p t2))
+      (return-from domains-possibly-overlap t))
+    (let ((req1 (car (fun-type-required t1)))
+          (req2 (car (fun-type-required t2))))
+      (unless (and req1 req2)
+        (return-from domains-possibly-overlap t))
+      (when (or (and (type= req1 (specifier-type 'single-float))
+                     (type= req2 (specifier-type 'double-float)))
+                (and (type= req1 (specifier-type 'double-float))
+                     (type= req2 (specifier-type 'single-float))))
+        (return-from domains-possibly-overlap nil))))
+  ;; The conservative answer is always T.
+  t)
+(let (list)
+  (do-all-symbols (s)
+    (dolist (name (list s `(setf ,s) `(cas ,s)))
+      (let* ((info (sb-int:info :function :info name))
+             (xforms (and info (sb-c::fun-info-transforms info))))
+        (when (and info
+                   (> (length xforms) 1)
+                   (not (assoc name list)))
+          (if (domains-possibly-overlap xforms)
+              (push (cons name xforms) list)
+              (format t "~&Nonoverlapping xforms on ~s~%" name))))))
+  (let ((*print-pretty* nil))
+    (dolist (x (sort (copy-list list) #'> :key (lambda (x) (length (cdr x))))
+               (format t "~s functions~%" (length list)))
+      (format t "~a~%" (car x))
+      (let ((i 0))
+        (dolist (xform (cdr x))
+          (incf i)
+          (format t " ~2d. ~s~%" i (sb-kernel:type-specifier
+                                  (sb-c::transform-type xform)))
+          (let* ((fun (sb-c::transform-function xform))
+                 (code (sb-kernel:fun-code-header fun))
+                 (info (sb-kernel:%code-debug-info code))
+                 (source (sb-c::compiled-debug-info-source info))
+                 (tlf (sb-c::compiled-debug-info-tlf-number info))
+                 (offs (sb-c::compiled-debug-info-char-offset info))
+                 (ns (sb-c::debug-source-namestring source))
+                 (doc (documentation (sb-c::transform-function xform) 'function)))
+            (format t "     ; ~a ~a ~d ~d~%" doc ns tlf offs)))))))
+|#

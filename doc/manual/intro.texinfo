@@ -27,6 +27,29 @@ Essentially every type of non-conformance is considered a bug. (The
 exceptions involve internal inconsistencies in the standard.)
 @xref{Reporting Bugs}.
 
+@node Exceptions to ANSI Conformance
+@comment  node-name,  next,  previous,  up
+@subsection Exceptions
+
+@itemize
+
+@item
+@findex @cl{prog2}
+@code{prog2} returns the primary value of its second form, as
+specified in the @strong{Arguments and Values} section of the
+specification for that operator, not that of its first form, as
+specified in the @strong{Description}.
+
+@item
+@tindex @cl{string}
+@tindex @cl{character}
+@tindex @cl{nil}
+The @code{string} type is considered to be the union of all types
+@code{(array @emph{c} (@emph{size}))} for all non-@code{nil} subtypes @code{@emph{c}} of
+@code{character}, excluding arrays specialized to the empty type.
+
+@end itemize
+
 @node Extensions
 @comment  node-name,  next,  previous,  up
 @section Extensions
@@ -495,7 +518,7 @@ shock.
 @item Art Of Metaobject Programming, by Gregor Kiczales et al.
 Currently the prime source of information on the Common Lisp Metaobject
 Protocol, which is supported by SBCL. Section 2 (Chapters 5 and 6) are
-freely available at @uref{http://www.lisp.org/mop/}.
+freely available at @uref{http://mop.lisp.se/www.alu.org/mop/}.
 
 @end table
 

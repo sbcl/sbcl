@@ -15,11 +15,15 @@
            #:store-coverage-data))
 
 (in-package #:sb-cover)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defmacro code-coverage-hashtable () `(car sb-c:*code-coverage-info*))
 
-;;;; New coverage representation (only for x86-64 as of now).
+;;;; New coverage representation.
 ;;;; One byte per coverage mark is stored in the unboxed constants of the code.
+;;;; x86[-64] use a slightly different but not significantly different
+;;; representation of the marks from other architectures.
 (defun %find-coverage-map (code)
   (declare (type (or sb-kernel:simple-fun
                      sb-kernel:code-component
@@ -34,18 +38,29 @@
     (let ((n (sb-kernel:code-header-words code)))
       (let ((map (sb-kernel:code-header-ref code (1- n))))
         (when (typep map '(cons (eql sb-c::coverage-map)))
+          (return-from %find-coverage-map (values (cdr map) code))))
+      ;; if code-boxed-words can't be an odd number, try one more slot
+      #-(or x86 x86-64)
+      (let ((map (sb-kernel:code-header-ref code (- n 2))))
+        (when (typep map '(cons (eql sb-c::coverage-map)))
           (return-from %find-coverage-map (values (cdr map) code))))))))
 
-;;; Retun just the list of soure paths in CODE that are marked covered.
-(defun get-coverage (code)
-  (multiple-value-bind (map code) (%find-coverage-map code)
-    (when map
-      (sb-int:collect ((paths))
-        (sb-sys:with-pinned-objects (code)
-          (let ((sap (sb-kernel:code-instructions code)))
-            (dotimes (i (length map) (paths))
-              (unless (zerop (sb-sys:sap-ref-8 sap i))
-                (paths (svref map i))))))))))
+#+arm64
+(declaim (ftype (sb-int:sfunction (t) (simple-array (unsigned-byte 8) (*))) code-coverage-marks))
+;;; Coverage marks are in the raw bytes following the jump tables
+;;; preceding any other unboxed constants. This way we don't have to store
+;;; a pointer to the coverage marks since their location is implicit.
+(defun code-coverage-marks (code)
+  #-arm64
+  (let ((insts (sb-kernel:code-instructions code)))
+    (sb-sys:sap+ insts (ash (sb-kernel:code-jump-table-words code)
+                            sb-vm:word-shift)))
+  #+arm64
+  (let* ((words (sb-kernel:code-header-words code))
+         (last (sb-kernel:code-header-ref code (- words 2))))
+    (if (vectorp last)
+        last
+        (sb-kernel:code-header-ref code (- words 3)))))
 
 ;;;;
 
@@ -75,18 +90,55 @@ image."
              (let ((,var (sb-ext:weak-pointer-value (car cell))))
                (if ,var
                    (progn ,@body (setq predecessor cell))
-                   (rplacd predecessor (cdr cell)))))))))
+                   (rplacd predecessor (cdr cell))))))))
+     ;; Using different values here isn't great, but a 1 bit seemed
+     ;; the natural choice for "marked" which is fine for x86 which can
+     ;; store any immediate byte. But the architectures which can't
+     ;; have either a ZERO-TN or NULL-TN, and can store a byte from
+     ;; that register into the coverage mark. So they expect a 0
+     ;; in the low bit and therefore a 1 in the unmarked state.
+     (empty-mark-word ()
+       #+(or x86-64 x86) 0
+       #-(or x86-64 x86) sb-ext:most-positive-word)
+     (byte-marked-p (byte)
+       #+(or x86-64 x86) `(/= ,byte 0)
+       #-(or x86-64 x86) `(/= ,byte #xFF)))
+
+;;; Retun just the list of soure paths in CODE that are marked covered.
+(defun get-coverage (code)
+  (multiple-value-bind (map code) (%find-coverage-map code)
+    (when map
+      (sb-int:collect ((paths))
+        #-arm64
+        (sb-sys:with-pinned-objects (code)
+          (let ((sap (code-coverage-marks code)))
+            (dotimes (i (length map) (paths))
+              (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
+                (paths (svref map i))))))
+        #+arm64
+        (let ((marks (code-coverage-marks code)))
+          (dotimes (i (length map) (paths))
+            (when (byte-marked-p (aref marks i))
+              (paths (svref map i)))))))))
 
 (defun reset-coverage (&optional object)
   "Reset all coverage data back to the `Not executed` state."
   (cond (object ; reset only this object
-         (multiple-value-bind (map code) (%find-coverage-map object)
+         (multiple-value-bind (map code)
+             (%find-coverage-map (the sb-kernel:code-component object))
            (when map
-             (let ((header-length (sb-kernel:code-header-words code)))
-               (dotimes (i (ceiling (length map) sb-vm:n-word-bytes))
-                 (setf (sb-kernel:code-header-ref code (+ header-length i))
-                       0))))))
-        (t ; reset everything
+             #-arm64
+             (sb-sys:with-pinned-objects (code)
+               (sb-alien:alien-funcall
+                (sb-alien:extern-alien "memset"
+                                       (function sb-alien:void sb-sys:system-area-pointer
+                                                 sb-alien:int sb-alien:unsigned))
+                (code-coverage-marks code)
+                (logand (empty-mark-word) #xFF)
+                (length map)))
+             #+arm64
+             (fill (code-coverage-marks code) #xFF))))
+        (t                              ; reset everything
          (do-instrumented-code (code)
            (reset-coverage code))
          (sb-c:reset-code-coverage))))
@@ -96,10 +148,10 @@ image."
 ;;; Ideally we could report directly from the new data where applicable,
 ;;; however this is, for the time being, perfectly backward-compatibile.
 (defun refresh-coverage-info (&optional filename)
+  (declare (ignorable filename))
   ;; NAMESTRING->PATH-TABLES maps a namestring to a hashtable which maps
   ;; source paths to the legacy coverage record for that path in that file,
   ;;   e.g. (1 4 1) -> ((1 4 1) . SB-C::%CODE-COVERAGE-UNMARKED%)
-  #+(or x86-64 x86)
   (let ((namestring->path-tables (make-hash-table :test 'equal))
         (coverage-records (code-coverage-hashtable))
         (n-marks 0))
@@ -122,10 +174,11 @@ image."
                 (gethash namestring namestring->path-tables) path-lookup-table)
           (dolist (item legacy-coverage-marks)
             (setf (gethash (car item) path-lookup-table) item)))
+        #-arm64
         (sb-sys:with-pinned-objects (code)
-          (let ((sap (sb-kernel:code-instructions code)))
-            (dotimes (i (length map)) ; for each recorded mark
-              (unless (zerop (sb-sys:sap-ref-8 sap i))
+          (let ((sap (code-coverage-marks code)))
+            (dotimes (i (length map))   ; for each recorded mark
+              (when (byte-marked-p (sb-sys:sap-ref-8 sap i))
                 (incf n-marks)
                 ;; Set the legacy coverage mark for each path it touches
                 (dolist (path (svref map i))
@@ -134,7 +187,16 @@ image."
                         (rplacd found t)
                         #+nil
                         (warn "Missing coverage entry for ~S in ~S"
-                              path namestring))))))))))
+                              path namestring))))))))
+        #+arm64
+        (let ((marks (code-coverage-marks code)))
+          (dotimes (i (length map))     ; for each recorded mark
+            (when (byte-marked-p (aref marks i))
+              (incf n-marks)
+              (dolist (path (svref map i))
+                (let ((found (gethash path path-lookup-table)))
+                  (if found
+                      (rplacd found t)))))))))
     (values coverage-records n-marks)))
 
 ) ; end MACROLET

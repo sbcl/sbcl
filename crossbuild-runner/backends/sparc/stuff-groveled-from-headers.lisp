@@ -83,19 +83,17 @@
 (defconstant epipe 32) ; #x20
 (defconstant ewouldblock 11) ; #xb
 
-;;; for wait3(2) in run-program.lisp
+;;; for waitpid() in run-program.lisp
 (defconstant wnohang 1) ; #x1
 (defconstant wuntraced 2) ; #x2
 
 ;;; various ioctl(2) flags
 (defconstant tiocgpgrp 1074033795) ; #x40047483
-(defconstant tiocspgrp 2147775618) ; #x80047482
-(defconstant tiocgwinsz 1074295912) ; #x40087468
-(defconstant tiocswinsz 2148037735) ; #x80087467
 
 ;;; signals
-(defconstant sig-dfl 0) ; #x0
-(defconstant sig-ign 1) ; #x1
+(defconstant sizeof-sigset_t 128) ; #x80
+(defconstant sig_setmask 2) ; #x2
+(defconstant sig_unblock 2) ; #x2
 (defconstant sigalrm 14) ; #xe
 (defconstant sigbus 10) ; #xa
 (defconstant sigchld 20) ; #x14
@@ -106,7 +104,6 @@
 (defconstant sigill 4) ; #x4
 (defconstant sigint 2) ; #x2
 (defconstant sigio 23) ; #x17
-(defconstant sigiot 6) ; #x6
 (defconstant sigkill 9) ; #x9
 (defconstant sigpipe 13) ; #xd
 (defconstant sigprof 27) ; #x1b
@@ -135,6 +132,9 @@
 (defconstant fpe-fltinv 7) ; #x7
 (defconstant fpe-fltsub 8) ; #x8
 
+(defconstant clock-process-cputime-id 2) ; #x2
+(defconstant clock-monotonic-coarse 6) ; #x6
+
 ;;; structures
 (define-alien-type nil
   (struct timeval
@@ -153,3 +153,4 @@
 
 ;;; Our runtime types
 (define-alien-type os-vm-size-t (unsigned 32))
+

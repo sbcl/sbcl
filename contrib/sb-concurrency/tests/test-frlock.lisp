@@ -19,9 +19,10 @@
 
 ;; XXX something like clock_getres(CLOCK_REALTIME, ...) would be better
 (defvar *minimum-sleep*
-  #+openbsd 0.01
-  #-openbsd 0.0001)
+  #+(or openbsd netbsd sunos) 0.01
+  #-(or openbsd netbsd sunos) 0.0001)
 
+#+sb-thread
 (defun test-frlocks (&key (reader-count (min (* 12 *cpus*) 200))
                           (read-count 1000000)
                           (outer-read-pause 0) (inner-read-pause 0)
@@ -88,7 +89,7 @@
 #+sb-thread
 (deftest* (frlock.1)
     (handler-case
-        (sb-ext:with-timeout 20
+        (sb-ext:with-timeout 40
           (test-frlocks #+win32 :outer-write-pause #+win32 t ))
       (sb-ext:timeout (c)
         (error "~A" c)))

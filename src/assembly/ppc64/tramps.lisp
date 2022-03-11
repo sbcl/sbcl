@@ -14,14 +14,13 @@
                                    fun-pointer-lowtag))))
     ((:temp fdefn-tn descriptor-reg fdefn-offset))
   (inst dword simple-fun-widetag) ;; header
-  (inst dword (make-fixup 'undefined-tramp-tagged
-                          :assembly-routine)) ;; self
-  (dotimes (i (- simple-fun-code-offset 2))
+  (inst dword (make-fixup 'undefined-tramp-tagged :assembly-routine)) ;; self
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst dword nil-value))
 
   UNDEFINED-TRAMP
   (inst addi code-tn lip-tn (- fun-pointer-lowtag
-                               (ash simple-fun-code-offset word-shift)))
+                               (ash simple-fun-insts-offset word-shift)))
 
   (inst cmpwi nargs-tn (fixnumize register-arg-count))
   (inst bgt NO-STACK-ARGS)
@@ -38,9 +37,18 @@
     (closure-tramp (:return-style :none)
                    (:align n-lowtag-bits))
     ((:temp fdefn-tn descriptor-reg fdefn-offset))
-  (loadw lexenv-tn fdefn-tn fdefn-fun-slot other-pointer-lowtag)
+  ;; More complicated code allows an fdefn to be either tagged or untagged
+  ;; when referenced from a code header.
+  ;;  (inst andi. temp-reg-tn fdefn-tn 15)
+  ;;  (inst beq untagged)
+  ;;  (loadw lexenv-tn fdefn-tn fdefn-fun-slot other-pointer-lowtag)
+  ;;  (inst b continue)
+  ;;  untagged
+  ;;  (loadw lexenv-tn fdefn-tn fdefn-fun-slot 0)
+  ;;  continue
+  (loadw lexenv-tn fdefn-tn fdefn-fun-slot (+ #-untagged-fdefns other-pointer-lowtag))
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst addi lip-tn code-tn (- (ash simple-fun-code-offset word-shift)
+  (inst addi lip-tn code-tn (- (ash simple-fun-insts-offset word-shift)
                                fun-pointer-lowtag))
   (inst mtctr lip-tn)
   (inst bctr))
@@ -54,22 +62,22 @@
     ((:temp fdefn-tn descriptor-reg fdefn-offset))
   (inst dword simple-fun-widetag)
   (inst dword (make-fixup 'funcallable-instance-tramp :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst dword nil-value))
 
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (loadw fdefn-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst addi lip-tn fdefn-tn (- (ash simple-fun-code-offset word-shift)
+  (inst addi lip-tn fdefn-tn (- (ash simple-fun-insts-offset word-shift)
                                 fun-pointer-lowtag))
   (inst mtctr lip-tn)
   (inst bctr))
 
-;;; This is like call_into_c, but it does not affect the pseudo-atomic state,
-;;; and it preserves every FPR and GPR, because the trampoline must resemble
-;;; an allocation trap as much as possible - affecting no machine state except for
-;;; the register into which allocation occurs, and the allocation region.
+;;; This is the super-slow out-of-line allocator in which all allocations
+;;; go through C. It acts like call_into_c without affecting the pseudo-atomic
+;;; state or any CPU register except the one into which allocation occurs.
 ;;; We use a static area in which to perform the spill/restore just prior to
 ;;; this code, making it accessible relative to the instruction pointer on entry.
+#+nil
 (define-assembly-routine
     (xalloc-tramp (:return-style :raw)
                   (:align n-lowtag-bits)
@@ -79,8 +87,7 @@
      (:temp r2 unsigned-reg 2)
      (:temp r3 unsigned-reg 3)
      (:temp r12 unsigned-reg 12)
-     (:temp r13 unsigned-reg 13)
-     (:temp lip unsigned-reg 31)) ; lisp LIP reg needn't be saved
+     (:temp lip unsigned-reg 31))      ; lisp LIP reg needn't be saved
   ;; Reserve space for spilling 32 GPRs, 32 FPRs, the argument/result,
   ;; the link register, and the caller's link register (already spilled).
   ;; And double-lispword align the start of the routine.
@@ -100,27 +107,21 @@
       (dotimes (i 31)
         (inst std (reg i 'unsigned-reg) lip (decf disp 8))))
     ;; Everything else has been spilled now, except CTR which is volatile across calls.
-    ;; Normally you store _our_ LR into the _caller's_ frame, but I'm not sure we can
-    ;; do that here. The lisp number stack is the C stack and I think we don't create
-    ;; a correct minimal C frame each time we consume number stack space.
-    ;; Instead save LR into the spill area preceding this chunk of code.
+    ;; Store the LR that we received in the normal save location of 16(sp).
+    ;; This works because whenever Lisp adjusts the C stack pointer, it reserves
+    ;; the mandatory 4 words.
     (inst mflr r0)
-    (inst std r0 lip -24)
-    ;; Allocate minimal C frame and update back-chain. As noted, I doubt that the
-    ;; back-chain is correct if we are in a function that allocated any number
-    ;; stack space. (It would be better if we could play nice with the C stack.)
+    (inst std r0 machine-sp 16)
+    ;; Allocate a new minimal C frame.
     (inst stdu machine-sp machine-sp -32)
-    ;; restore r13 from the value cell of the R13-VALUE static lisp symbol.
-    ;; I very much suspect that you're not allowed to save and restore R13,
-    ;; but in fact must NEVER touch it at all.
-    ;; Anyway this seems to work for now.
-    (inst addi r13 null-tn (+ (static-symbol-offset 'r13-value)
-                              (- other-pointer-lowtag)
-                              (ash symbol-value-slot word-shift)))
-    (inst ld r13 r13 0)
-    (inst lr r12 (make-fixup "alloc_tramp" :foreign))
-    (inst ld r2 r12 8) ; TODO: SEE WHAT HAPPENS IF THIS IS REMOVED
-    (inst ld r12 r12 0)
+    (inst lr r12 (make-fixup "alloc" :foreign))
+    ;; We assume that little-endian machines use V2 of the ABI.
+    ;; In V2 you can call a function via its global entry point
+    ;; without loading r2. Just r12 is enough, because the callee
+    ;; can compute r2 from r12 if it needs to.
+    ;; big-endian would more accurately be: if this is the v1 ABI
+    #+big-endian (progn (inst ld r2 r12 8) ; TODO: SEE WHAT HAPPENS IF WE DON'T DO THIS AT ALL
+                        (inst ld r12 r12 0))
     ;; load the size argument into the first C argument register
     (inst ld r3 lip -8)
     (inst mtctr r12)
@@ -128,10 +129,15 @@
     ;; We're back.
     (inst mtctr r3) ; stash the result in a reg that won't be clobbered
     ;; Reload a pointer to this asm routine
-    (inst lr lip (make-fixup 'alloc-tramp :assembly-routine))
-    (inst ld r0 lip -24) ; restore the return address
+    (inst addi lip null-tn (make-fixup 'alloc-tramp :asm-routine-nil-offset))
+    ;; Restore the return address from the caller's frame.
+    ;; 'sp' hasn't been restored yet, so add our frame size.
+    (inst ld r0 machine-sp (+ 32 16))
     (inst mtlr r0)
-    ;; Restore all registers except LIP
+    ;; Restore all registers except LIP (register 31).
+    ;; LIP is a lisp-volatile register for lisp.
+    ;; Also note that we implicitly restore r1 (the C stack pointer)
+    ;; so there is no "add 1, 1, 32" to undo the 'stdu'.
     (let ((disp -24))
       (dotimes (i 32)
         (inst lfd (reg i 'double-reg) lip (decf disp 8)))

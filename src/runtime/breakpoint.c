@@ -66,6 +66,11 @@ lispobj find_code(os_context_t *context)
     lispobj code = *os_context_register_addr(context, reg_CODE);
     lispobj header;
 
+#ifdef LISP_FEATURE_PPC64
+    if (lowtag_of(code) == 0)
+        code |= OTHER_POINTER_LOWTAG;
+#endif
+
     if (lowtag_of(code) != OTHER_POINTER_LOWTAG)
         return NIL;
 
@@ -77,7 +82,7 @@ lispobj find_code(os_context_t *context)
         return code - HeaderValue(header)*sizeof(lispobj);
 #else
     lispobj codeptr =
-        (lispobj)component_ptr_from_pc((char *)(*os_context_pc_addr(context)));
+        (lispobj)component_ptr_from_pc((char *)os_context_pc(context));
 
     if (codeptr == 0)
         return NIL;
@@ -89,11 +94,7 @@ lispobj find_code(os_context_t *context)
 static long compute_offset(os_context_t *context, lispobj code)
 {
   if (code != NIL) {
-#ifdef LISP_FEATURE_HPPA
-        uword_t pc = *os_context_pc_addr(context) & ~3;
-#else
-        uword_t pc = *os_context_pc_addr(context);
-#endif
+        uword_t pc = os_context_pc(context);
         struct code *codeptr = (struct code *)native_pointer(code);
         uword_t code_start = (uword_t)code_text_start(codeptr);
         int offset;
@@ -112,7 +113,7 @@ void handle_breakpoint(os_context_t *context)
     fake_foreign_function_call(context);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
+    unblock_gc_signals();
 #endif
     code = find_code(context);
 
@@ -139,7 +140,7 @@ void *handle_fun_end_breakpoint(os_context_t *context)
     fake_foreign_function_call(context);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
+    unblock_gc_signals();
 #endif
 
     code = find_code(context);
@@ -158,7 +159,7 @@ void *handle_fun_end_breakpoint(os_context_t *context)
 
     lra = codeptr->constants[REAL_LRA_SLOT];
 
-#ifdef LISP_FEATURE_PPC
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
     /* PPC now passes LRA objects in reg_LRA during return.  Other
      * platforms should as well, but haven't been fixed yet. */
     *os_context_register_addr(context, reg_LRA) = lra;

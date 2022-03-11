@@ -14,6 +14,8 @@
    "MAKE-REPL-FUN"))
 
 (cl:in-package :sb-aclrepl)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defvar *noprint* nil
   "boolean: T if don't print prompt and output")

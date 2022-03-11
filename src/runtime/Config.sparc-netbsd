@@ -11,11 +11,11 @@
 
 CC = gcc
 CFLAGS += -g -Wall -O2
-LINKFLAGS += -v
+LINKFLAGS += -export-dynamic
 NM = nm -t x -p
 
-ASSEM_SRC = sparc-assem.S ldso-stubs.S
-ARCH_SRC = sparc-arch.c undefineds.c
+ASSEM_SRC = sparc-assem.S
+ARCH_SRC = sparc-arch.c
 
 OS_SRC = bsd-os.c sparc-bsd-os.c
 OS_LIBS = # -ldl
@@ -23,11 +23,7 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
 
-ifdef LISP_FEATURE_GENCGC
-  GC_SRC = fullcgc.c gencgc.c traceroot.c
-else
-  GC_SRC = cheneygc.c
-endif
+GC_SRC = fullcgc.c gencgc.c traceroot.c
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

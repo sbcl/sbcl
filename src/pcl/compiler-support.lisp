@@ -35,28 +35,16 @@
 ;;;; STANDARD-CLASS
 
 (deftransform sb-pcl::pcl-instance-p ((object))
+  ;; We declare SPECIFIER-TYPE notinline here because otherwise the
+  ;; literal classoid reflection/dumping machinery will instantiate
+  ;; the type at Genesis time, confusing PCL bootstrapping.
+  (declare (notinline specifier-type))
   (let* ((otype (lvar-type object))
          (standard-object (specifier-type 'standard-object)))
-    (cond
-      ;; Flush tests whose result is known at compile time.
-      ((csubtypep otype standard-object) t)
-      ((not (types-equal-or-intersect otype standard-object)) nil)
-      (t
-       `(sb-pcl::%pcl-instance-p object)))))
-
-(defun sb-pcl::safe-code-p (&optional env)
-  (policy (or env (make-null-lexenv)) (eql safety 3)))
-
-(declaim (ftype function sb-pcl::parse-specialized-lambda-list))
-(define-source-context defmethod (name &rest stuff)
-  (let ((arg-pos (position-if #'listp stuff)))
-    (if arg-pos
-        `(defmethod ,name ,@(subseq stuff 0 arg-pos)
-           ,(handler-case
-                (nth-value 2 (sb-pcl::parse-specialized-lambda-list
-                              (elt stuff arg-pos)))
-              (error () "<illegal syntax>")))
-        `(defmethod ,name "<illegal syntax>"))))
+    ;; Flush tests whose result is known at compile time.
+    (cond ((csubtypep otype standard-object) t)
+          ((not (types-equal-or-intersect otype standard-object)) nil)
+          (t `(%pcl-instance-p object)))))
 
 (define-load-time-global sb-pcl::*internal-pcl-generalized-fun-name-symbols* nil)
 
@@ -78,8 +66,6 @@
 
 (define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
-
-(defun interned-symbol-p (x) (and (symbolp x) (symbol-package x)))
 
 (flet ((struct-accessor-p (object slot-name)
          (let ((c-slot-name (lvar-value slot-name)))

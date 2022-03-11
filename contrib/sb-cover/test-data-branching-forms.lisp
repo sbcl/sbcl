@@ -1,6 +1,6 @@
+;; Total of 14 forms have coverage data (the in-package, defun plus 12 subforms)
 (in-package sb-cover-test)
 
-;; Total of 13 forms have coverage data (the defun plus 12 subforms)
 (defun test-branching-forms ()
   ;; The tests forms here need to be a cons to have coverage data
   ;; instrumentation, but the progn-like clauses should allow for coverage

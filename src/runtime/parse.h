@@ -9,9 +9,8 @@
  * files for more information.
  */
 
-/* All parse routines take a char ** as their only argument */
 extern boolean more_p(char **ptr);
 extern char *parse_token(char **ptr);
-extern lispobj parse_lispobj(char **ptr);
-extern char *parse_addr(char **ptr,boolean safely);
-extern uword_t parse_number(char **ptr);
+extern int parse_lispobj(char **ptr, lispobj *output);
+extern int parse_addr(char **ptr, boolean safely, char **output);
+extern int parse_number(char **ptr, int *output);

@@ -12,6 +12,17 @@
 
 (in-package "SB-ALIEN")
 
+;;; ALIEN-CALLBACK is supposed to be external in SB-ALIEN-INTERNALS,
+;;; but the export gets lost (as this is now a warm-loaded file), and
+;;; then 'chill' gets a conflict with SB-ALIEN over it.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (export (intern "ALIEN-CALLBACK" "SB-ALIEN-INTERNALS")
+          "SB-ALIEN-INTERNALS")
+  (export (intern "DEFINE-ALIEN-CALLABLE" "SB-ALIEN")
+          "SB-ALIEN")
+  (export (intern "ALIEN-CALLABLE-FUNCTION" "SB-ALIEN")
+          "SB-ALIEN"))
+
 ;;;; ALIEN CALLBACKS
 ;;;;
 ;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
@@ -104,16 +115,13 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
        ;; bother anyone about that sad fact
        (declare (muffle-conditions compiler-note)
                 (optimize speed))
-       ;; FIXME: the saps are not gc safe
-       (let ((args-sap (int-sap
-                        (sb-kernel:get-lisp-obj-address args-pointer)))
-             (res-sap (int-sap
-                       (sb-kernel:get-lisp-obj-address result-pointer))))
+       (let ((args-sap (descriptor-sap args-pointer))
+             (res-sap (descriptor-sap result-pointer)))
          (declare (ignorable args-sap res-sap))
-         (with-alien
+         (let
              ,(loop
                  with offset = 0
-                 for spec in argument-specs
+                for spec in argument-specs
                  ;; KLUDGE: At least one platform requires additional
                  ;; alignment beyond a single machine word for certain
                  ;; arguments.  Accept an additional delta (for the
@@ -124,8 +132,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
                  for (accessor-form alignment)
                    = (multiple-value-list
                       (alien-callback-accessor-form spec 'args-sap offset))
-                 collect `(,(pop argument-names) ,spec
-                            :local ,accessor-form)
+                 collect `(,(pop argument-names) ,accessor-form)
                  do (incf offset (+ (alien-callback-argument-bytes spec env)
                                     (or alignment 0))))
            ,(flet ((store (spec real-type)
@@ -198,7 +205,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 ;;;; interface (not public, yet) for alien callbacks
 
 (defmacro alien-callback (specifier function &environment env)
-  "Returns an alien-value with of alien ftype SPECIFIER, that can be passed to
+  "Returns an alien-value of alien ftype SPECIFIER, that can be passed to
 an alien function as a pointer to the FUNCTION. If a callback for the given
 SPECIFIER and FUNCTION already exists, it is returned instead of consing a new
 one."
@@ -248,7 +255,7 @@ and a secondary return value of true if the callback is still valid."
 (defun invalidate-alien-callback (alien)
   "Invalidates the callback designated by the alien, if any, allowing the
 associated lisp function to be GC'd, and causing further calls to the same
-callback signal an error."
+callback to signal an error."
   (let ((info (alien-callback-info alien)))
     (when (and info (callback-info-function info))
       ;; sap cache
@@ -272,27 +279,63 @@ callback signal an error."
       (parse-callback-specification result-type typed-lambda-list)
     `(alien-callback ,specifier (lambda ,lambda-list ,@forms))))
 
-;;; FIXME: Should subsequent (SETF FDEFINITION) affect the callback or not?
-;;; What about subsequent DEFINE-ALIEN-CALLBACKs? My guess is that changing
-;;; the FDEFINITION should invalidate the callback, and redefining the
-;;; callback should change existing callbacks to point to the new defintion.
-(defmacro define-alien-callback (name result-type typed-lambda-list &body forms)
-  "Defines #'NAME as a function with the given body and lambda-list, and NAME as
-the alien callback for that function with the given alien type."
-  (declare (symbol name))
-  (multiple-value-bind (specifier lambda-list)
-      (parse-callback-specification result-type typed-lambda-list)
+;;;; Alien callables
+
+(define-load-time-global *alien-callables* (make-hash-table :test #'eq)
+    "Map from Lisp symbols to the alien callable functions they name.")
+
+(defmacro define-alien-callable (name result-type typed-lambda-list &body body)
+  "Define an alien callable function in the alien callable namespace with result
+type RESULT-TYPE and with lambda list specifying the alien types of the
+arguments."
+  (multiple-value-bind (lisp-name alien-name)
+      (pick-lisp-and-alien-names name)
+    (declare (ignore alien-name))
     `(progn
-       (defun ,name ,lambda-list ,@forms)
-       (defparameter ,name (alien-callback ,specifier #',name)))))
+       (invalidate-alien-callable ',lisp-name)
+       (setf (gethash ',lisp-name *alien-callables*)
+             (alien-lambda ,result-type ,typed-lambda-list ,@body)))))
+
+(defun alien-callable-function (name)
+  "Return the alien callable function associated with NAME."
+  (gethash name *alien-callables*))
+
+(defun invalidate-alien-callable (name)
+  "Invalidates the callable designated by the alien, if any, allowing the
+associated lisp function to be GC'd, and causing further calls to the same
+callable to signal an error."
+  (multiple-value-bind (lisp-name alien-name)
+      (pick-lisp-and-alien-names name)
+    (declare (ignore alien-name))
+    (let ((alien (alien-callable-function lisp-name)))
+      (when alien
+        (invalidate-alien-callback alien)))
+    (remhash lisp-name *alien-callables*)))
+
+(defun initialize-alien-callable-symbol (name)
+  "Initialize the alien symbol named by NAME with its alien callable
+function value."
+  (multiple-value-bind (lisp-name alien-name)
+      (pick-lisp-and-alien-names name)
+    (setf (%alien-value (foreign-symbol-sap alien-name t)
+                        0
+                        (make-alien-pointer-type))
+          (cast (alien-callable-function lisp-name) (* t)))))
 
 (in-package "SB-THREAD")
 #+sb-thread
 (defun enter-foreign-callback (index return arguments)
-  (let ((thread (without-gcing
-                  ;; Hold off GCing until *current-thread* is set up
-                  (setf *current-thread*
-                        (make-foreign-thread :name "foreign callback")))))
-    (dx-flet ((enter ()
-                (sb-alien::enter-alien-callback index return arguments)))
-      (initial-thread-function-trampoline thread nil #'enter nil))))
+  (let ((thread (init-thread-local-storage (make-foreign-thread))))
+    #+pauseless-threadstart
+    (dx-let ((startup-info (vector nil ; trampoline is n/a
+                                   nil ; cell in *STARTING-THREADS* is n/a
+                                   #'sb-alien::enter-alien-callback
+                                   (list index return arguments)
+                                   nil nil))) ; sigmask + fpu state bits
+      (copy-primitive-thread-fields thread)
+      (setf (thread-startup-info thread) startup-info)
+      (update-all-threads (thread-primitive-thread thread) thread)
+      (run))
+    #-pauseless-threadstart
+    (dx-let ((args (list index return arguments)))
+      (run thread nil #'sb-alien::enter-alien-callback args))))

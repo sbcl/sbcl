@@ -11,45 +11,46 @@
 
 (in-package "SB-VM")
 
-(define-vop (debug-cur-sp)
-  (:translate sb-di::current-sp)
+(define-vop ()
+  (:translate current-sp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move res csp-tn)))
 
-(define-vop (debug-cur-fp)
-  (:translate sb-di::current-fp)
+(define-vop (current-fp-sap)
+  (:translate current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move res cfp-tn)))
 
-(define-vop (read-control-stack)
+(define-vop ()
   (:translate stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg)))
   (:arg-types system-area-pointer positive-fixnum)
   (:results (result :scs (descriptor-reg)))
+  (:temporary (:scs (unsigned-reg)) temp)
   (:result-types *)
   (:generator 5
-    (inst lwzx result sap offset)))
+    (inst sldi temp offset (- word-shift n-fixnum-tag-bits))
+    (inst ldx result sap temp)))
 
-(define-vop (write-control-stack)
+(define-vop ()
   (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg))
-         (value :scs (descriptor-reg) :target result))
+         (value :scs (descriptor-reg)))
   (:arg-types system-area-pointer positive-fixnum *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
+  (:temporary (:scs (unsigned-reg)) temp)
   (:generator 5
-    (inst stwx value sap offset)
-    (move result value)))
+    (inst sldi temp offset (- word-shift n-fixnum-tag-bits))
+    (inst stdx value sap temp)))
 
 (define-vop (code-from-mumble)
   (:policy :fast-safe)

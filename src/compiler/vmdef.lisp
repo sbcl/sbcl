@@ -111,8 +111,8 @@
          (last-result (1- num-operands))
          (temps (vop-info-temps template))
          ;; Can't have more temps than registers in the CPU.
-         ;; 32 is totally reasonable
-         (refs (make-array (+ (* 2 (the (mod 32) (length temps)))
+         ;; 64 is totally reasonable
+         (refs (make-array (+ (* 2 (the (mod 64) (length temps)))
                               num-operands)))
          (ref-ordering (vop-info-ref-ordering template)))
     (declare (dynamic-extent refs))
@@ -196,7 +196,7 @@
 
 ;;; Return a function type specifier describing TEMPLATE's type computed
 ;;; from the operand type restrictions.
-#-sb-fluid (declaim (inline template-conditional-p))
+(declaim (inline template-conditional-p))
 (defun template-conditional-p (template)
   (declare (type template template))
   (let ((rtypes (template-result-types template)))

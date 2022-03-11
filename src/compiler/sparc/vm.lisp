@@ -11,6 +11,8 @@
 
 (in-package "SB-VM")
 
+(defconstant-eqx +fixup-kinds+ #(:call :sethi :add :absolute :sethi+add) #'equalp)
+
 ;;;; Additional constants
 
 ;;; NUMBER-STACK-DISPLACEMENT
@@ -44,12 +46,14 @@
 
   ;; Globals.  These are difficult to extract from a sigcontext.
   (defreg zero 0)                               ; %g0
-  (defreg alloc 1)                              ; %g1
+  (defreg thread 1)                             ; %g1
   (defreg null 2)                               ; %g2
   (defreg csp 3)                                ; %g3
   (defreg cfp 4)                                ; %g4
   (defreg bsp 5)                                ; %g5
   ;; %g6 and %g7 are supposed to be reserved for the system.
+  (defreg %g6 6)
+  (defreg %g7 7)
 
   ;; Outs.  These get clobbered when we call into C.
   (defreg nl0 8)                                ; %o0
@@ -79,6 +83,7 @@
   (defreg cfunc 28)                             ; %i4
   (defreg code 29)                              ; %i5
   ;; we can't touch reg 30 if we ever want to return
+  (defreg %i6 30)
   (defreg lip 31)                               ; %i7
 
   (defregset non-descriptor-regs
@@ -87,7 +92,6 @@
   (defregset descriptor-regs
       a0 a1 a2 a3 a4 a5 ocfp lra cname lexenv l0)
 
-  ;; OAOOM: Same as runtime/sparc-lispregs.h
   (defregset boxed-regs
       a0 a1 a2 a3 a4 a5 cname lexenv
       ocfp lra l0 code)
@@ -275,7 +279,7 @@
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
   (defregtn lip descriptor-reg)
-  (defregtn alloc any-reg)
+  (defregtn thread any-reg)
 
   (defregtn nargs any-reg)
   (defregtn bsp any-reg)
@@ -292,7 +296,7 @@
      zero-sc-number)
     (null
      null-sc-number)
-    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
+    ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
          character)
      immediate-sc-number)
     (symbol

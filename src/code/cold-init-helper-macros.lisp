@@ -41,23 +41,16 @@
 
 (defmacro !defun-from-collected-cold-init-forms (name)
   #+sb-xc `(progn
+             ,(unless *!cold-init-forms*
+                ;; This error means: you don't understand the cold-init code
+                ;; as well as you should, so please fix something.
+                (error "(DEFUN ~s) has no forms" name))
              (defun ,name ()
                ,@(reverse *!cold-init-forms*)
                (values))
              (eval-when (:compile-toplevel :execute)
                (makunbound '*!cold-init-forms*)))
   #-sb-xc (declare (ignore name)))
-
-;;; !DEFINE-LOAD-TIME-GLOBAL avoids this anti-pattern:
-;;;    (!begin-collecting-cold-init-forms)
-;;;    (define-load-time-global *foo* nil)
-;;;    (!cold-init-forms (setq *foo* nil))
-;;;    (!defun-from-cold-init-forms !some-cold-init-fun)
-(defmacro !define-load-time-global (sym value &optional (doc nil doc-p))
-  `(progn (define-load-time-global ,sym ,value ,@(if doc-p (list doc)))
-          ;; The expansion of the DEFINE-L-T-G is too hairy to fopcompile,
-          ;; but SETQ is ok provided that the value form is ok.
-          #-sb-xc-host (setq ,sym ,value)))
 
 (defmacro !set-load-form-method (class-name usable-by &optional method)
   ;; If USABLE-BY is:
@@ -71,17 +64,19 @@
       (case method
         ((nil) ; default
          (values '(cl:make-load-form-saving-slots obj :environment env)
-                 '(sb-xc:make-load-form-saving-slots obj :environment env)))
+                 '(make-load-form-saving-slots obj :environment env)))
+        ((:ignore-it)
+         (values '(values nil nil) '(values nil nil)))
         (t
          (assert (not (member :host usable-by)))
          (values nil `(funcall ,method obj env))))
     `(progn
        ,@(when (or #+sb-xc-host (member :host usable-by))
-           `((defmethod make-load-form ((obj ,class-name) &optional env)
+           `((defmethod cl:make-load-form ((obj ,class-name) &optional env)
                ,host-expr)))
        ,@(when (or #+sb-xc-host (member :xc usable-by))
            ;; Use the host's CLOS implementation to select the target's method.
-           `((defmethod sb-xc:make-load-form ((obj ,class-name) &optional env)
+           `((defmethod make-load-form ((obj ,class-name) &optional env)
                (declare (ignorable obj env))
                ,target-expr)))
        ,@(when (or #-sb-xc-host (member :target usable-by))
@@ -89,38 +84,3 @@
            `((defmethod make-load-form ((obj ,class-name) &optional env)
                (declare (ignorable obj env))
                ,target-expr))))))
-
-;;; Define a variable that is initialized in create_thread_struct() before any
-;;; Lisp code can execute. In particular, *RESTART-CLUSTERS* and *HANDLER-CLUSTERS*
-;;; should have a value before anything else happens.
-;;; While thread-local vars are generally useful, this is not the implementation
-;;; that would exist in the target system, if exposed more generally.
-;;; (Among the issues is the very restricted initialization form)
-(defmacro !define-thread-local (name initform &optional docstring)
-  (check-type initform (or fixnum symbol))
-  #-sb-thread `(progn
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
-                    (setf (info :variable :always-bound ',name) :always-bound))
-                  ;; DEFPARAMETER, not DEFVAR, because genesis can do it
-                  (defparameter ,name ,initform ,docstring))
-  #+sb-thread `(progn
-                  ;; Genesis can handle !%DEFINE-THREAD-LOCAL
-                  #-sb-xc-host (!%define-thread-local ',name ',initform)
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
-                    (setf (info :variable :wired-tls ',name) :always-thread-local)
-                    (setf (info :variable :always-bound ',name) :always-bound))
-                  (defvar ,name ,initform ,docstring)))
-
-;;; Note that this mechanism for creation of thread-locals complements the
-;;; mechanism for initializing variables that affect GC and interrupts.
-;;; Those other thread-locals are defined with an ordinary DEFVAR, but the
-;;; full list of such symbols is enumerated by !PER-THREAD-C-INTERFACE-SYMBOLS
-;;; which specifies both the list and the initial value of each symbol.
-(defvar *!thread-initial-bindings* nil)
-#+sb-xc-host
-(setf (get '!%define-thread-local :sb-cold-funcall-handler/for-effect)
-      (lambda (name initsym)
-        (push `(,name . ,initsym) *!thread-initial-bindings*)))
-#-sb-xc-host
-(defun !%define-thread-local (dummy1 dummy2) ; to avoid warning
-  (declare (ignore dummy1 dummy2)))

@@ -19,7 +19,7 @@
     #+(or x86 x86-64)
     `(progn ,@body)
     #-(or x86 x86-64)
-    `(with-pinned-objects ((without-gcing
+    `(with-pinned-objects ((with-code-pages-pinned (:dynamic)
                              (sb-di::code-object-from-context ,context)))
        ,@body))
 
@@ -55,40 +55,29 @@
 ;; the pointer in order to read the lower half.  This has been broken
 ;; at least twice in the past.  MIPS also appears to be the ONLY
 ;; system for which the signal context field size may differ from
-;; n-word-bits (well, and ALPHA, but that's a separate matter), but
-;; this entire thing will likely need to be revisited when we add x32
-;; or n32 ABI support.
+;; n-word-bits.
 (defconstant kludge-big-endian-short-pointer-offset
   (+ 0
      #+(and mips big-endian (not 64-bit)) 1))
 
-(declaim (inline context-pc-addr))
-(define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned)
-  (context (* os-context-t)))
-
 (declaim (inline context-pc))
 (defun context-pc (context)
   (declare (type (alien (* os-context-t)) context))
-  (let ((addr (context-pc-addr context)))
-    (declare (type (alien (* unsigned)) addr))
-    (int-sap (deref addr kludge-big-endian-short-pointer-offset))))
-
-(declaim (inline incf-context-pc))
-(defun incf-context-pc (context offset)
-  (declare (type (alien (* os-context-t)) context))
-  (with-pinned-context-code-object (context)
-    (let ((addr (context-pc-addr context)))
-      (declare (type (alien (* unsigned)) addr))
-      (setf (deref addr kludge-big-endian-short-pointer-offset)
-            (+ (deref addr kludge-big-endian-short-pointer-offset) offset)))))
+  (alien-funcall (extern-alien "os_context_pc" (function system-area-pointer (* os-context-t)))
+                 context))
 
 (declaim (inline set-context-pc))
 (defun set-context-pc (context new)
   (declare (type (alien (* os-context-t)) context))
   (with-pinned-context-code-object (context)
-    (let ((addr (context-pc-addr context)))
-      (declare (type (alien (* unsigned)) addr))
-      (setf (deref addr kludge-big-endian-short-pointer-offset) new))))
+    (alien-funcall (extern-alien "set_os_context_pc" (function void (* os-context-t) unsigned))
+                   context new)))
+
+(declaim (inline incf-context-pc))
+(defun incf-context-pc (context offset)
+  (declare (type (alien (* os-context-t)) context))
+  (with-pinned-context-code-object (context)
+    (set-context-pc context (sap-int (sap+ (context-pc context) offset)))))
 
 (declaim (inline context-register-addr))
 (define-alien-routine ("os_context_register_addr" context-register-addr)
@@ -130,3 +119,8 @@
                            (* kludge-big-endian-short-pointer-offset
                               n-word-bytes))
           new)))
+
+;;; Convert the descriptor into a SAP. The bits all stay the same, we just
+;;; change our notion of what we think they are.
+(declaim (inline descriptor-sap))
+(defun descriptor-sap (x) (int-sap (get-lisp-obj-address x)))

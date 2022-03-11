@@ -1,5 +1,8 @@
 ;;; -*-  Lisp -*-
 
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-aclrepl"
     :author "Kevin Rosenberg <kevin@rosenberg.net>"
     :description "An AllegroCL compatible REPL"

@@ -13,4 +13,6 @@ static inline os_context_t *arch_os_get_context(void **void_context)
 unsigned long os_context_fp_control(os_context_t *context);
 void os_restore_fp_control(os_context_t *context);
 
+#define OS_CONTEXT_PC(context) context->si_regs.pc
+
 #endif /* _SPARC_LINUX_OS_H */

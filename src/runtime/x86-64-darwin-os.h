@@ -18,8 +18,10 @@ typedef register_t os_context_register_t;
 
 #if __DARWIN_UNIX03
 #define CONTEXT_ADDR_FROM_STEM(stem) (os_context_register_t*)&context->uc_mcontext->__ss.__##stem
+#define OS_CONTEXT_PC(context) context->uc_mcontext->__ss.__rip
 #else
 #define CONTEXT_ADDR_FROM_STEM(stem) &context->uc_mcontext->ss.stem
+#define OS_CONTEXT_PC(context) context->uc_mcontext->__ss.rip
 #endif /* __DARWIN_UNIX03 */
 
 #define RESTORE_FP_CONTROL_FROM_CONTEXT

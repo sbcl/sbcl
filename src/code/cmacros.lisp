@@ -26,6 +26,7 @@
   form)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+(declaim (inline maybe-note-read-from-string-signature-issue))
 (defun maybe-note-read-from-string-signature-issue (eof-error-p)
   ;; The interface is so unintuitive that we explicitly check for the common
   ;; error.
@@ -36,7 +37,8 @@
                 eof-error-p 'read-from-string)
     t)))
 
-(define-compiler-macro read-from-string (&whole form string &rest args)
+(define-compiler-macro read-from-string (&whole form string &rest args
+                                         &environment env)
   ;; Check this at compile-time, and rewrite it so we're silent at runtime.
   (destructuring-bind (&optional (eof-error-p t) eof-value &rest keys) args
     (if (maybe-note-read-from-string-signature-issue eof-error-p)
@@ -51,12 +53,15 @@
                  form ; Odd number of keys, punt.
                  (let ((positionals (list (copy-symbol 'string)
                                           (copy-symbol 'eof-error-p)
-                                          (copy-symbol 'eof-value))))
+                                          (copy-symbol 'eof-value)))
+                       (fun-name (if (sb-c:policy env (= safety 3))
+                                     '%read-from-string/safe
+                                     '%read-from-string)))
                    `(let (,@(mapcar #'list positionals
                                     (list string eof-error-p eof-value))
                           ,@(nreverse bind))
                       ,@(when ignore `((declare (ignore ,@ignore))))
-                      (%read-from-string ,@positionals ,@list)))))
+                      (,fun-name ,@positionals ,@list)))))
           (let* ((key (pop keys))
                  (index (case key
                           (:start 0)
@@ -70,3 +75,5 @@
                           (setf seen (logior (ash 1 index) seen)
                                 (nth index list) (copy-symbol key)))))
             (push (list var (pop keys)) bind))))))
+
+(defmacro def!struct (&rest args) `(defstruct ,@args))

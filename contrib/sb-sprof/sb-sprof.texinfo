@@ -118,12 +118,6 @@ runs.
 
 @subsection Platform support
 
-This module is known not to work consistently on the Alpha platform,
-for technical reasons related to the implementation of a machine
-language idiom for marking sections of code to be treated as atomic by
-the garbage collector;  However, it should work on other platforms,
-and the deficiency on the Alpha will eventually be rectified.
-
 Allocation profiling is only supported on SBCL builds that use
 the generational garbage collector. Tracking of call stacks at a
 depth of more than two levels is only supported on x86 and x86-64.
@@ -136,10 +130,6 @@ depth of more than two levels is only supported on x86 and x86-64.
 @subsection Functions
 
 @include fun-sb-sprof-map-traces.texinfo
-
-@include fun-sb-sprof-map-trace-samples.texinfo
-
-@include fun-sb-sprof-map-all-samples.texinfo
 
 @include fun-sb-sprof-sample-pc.texinfo
 

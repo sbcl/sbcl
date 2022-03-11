@@ -250,7 +250,7 @@ bootstrapping.
 
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
-  (check-designator fun-name defgeneric)
+  (check-designator fun-name 'defgeneric #'legal-fun-name-p "function name")
   (with-current-source-form (lambda-list)
     (check-gf-lambda-list lambda-list))
   (let ((initargs ())
@@ -289,7 +289,7 @@ bootstrapping.
                                     not allowed inside DEFGENERIC."
                                   spec))
                  (if (or (eq 'optimize (first spec))
-                         (info :declaration :recognized (first spec)))
+                         (info :declaration :known (first spec)))
                      (push spec (initarg :declarations))
                      (warn "Ignoring unrecognized declaration in DEFGENERIC: ~S"
                            spec))))
@@ -355,7 +355,9 @@ bootstrapping.
     ;; except that it doesn't clear an :ASSUMED-TYPE. Should it?
     (setf (info :function :where-from fun-name) :defined)
     (setf (info :function :type fun-name)
-          (specifier-type 'function))))
+          (if (eq **boot-state** 'complete)
+              :generic-function
+              (specifier-type 'function)))))
 
 (defun load-defgeneric (fun-name lambda-list source-location &rest initargs)
   (when (fboundp fun-name)
@@ -401,7 +403,9 @@ bootstrapping.
     ;; incorrect use of defaults.
     (labels ((lose (kind arg)
                (generic-function-lambda-list-error
-                "~@<Invalid ~A argument specifier ~S ~_in ~A ~:S~:>"
+                (sb-format:tokens
+                 "~@<Invalid ~A argument specifier ~S ~_in ~A ~
+                  ~/sb-impl:print-lambda-list/~:>")
                 kind arg context lambda-list))
              (verify-optional (spec)
                (when (nth-value 3 (parse-optional-arg-spec spec))
@@ -429,7 +433,7 @@ bootstrapping.
 ;;; which means that checking of callers' arglists can only occur after called
 ;;; methods are actually loaded.
 (defmacro defmethod (name &rest args)
-  (check-designator name defmethod)
+  (check-designator name 'defmethod #'legal-fun-name-p "function name")
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     `(progn
@@ -527,7 +531,13 @@ bootstrapping.
               (with-current-source-form (lambda-list)
                 (parse-specialized-lambda-list lambda-list)))
              (*method-name* `(,name ,@qualifiers ,specializers))
-             (method-lambda `(lambda ,unspecialized-lambda-list ,@body))
+             (method-lambda `(lambda ,unspecialized-lambda-list
+                               (declare (sb-c::source-form
+                                         (lambda ,unspecialized-lambda-list
+                                           ,@body))
+                                        (sb-c::current-defmethod ,name ,qualifiers ,specializers
+                                                                 ,unspecialized-lambda-list))
+                               ,@body))
              ((method-function-lambda initargs new-lambda-list)
               (make-method-lambda-using-specializers
                proto-gf proto-method qualifiers specializers method-lambda env))
@@ -567,9 +577,6 @@ bootstrapping.
                              (class-name (class-of proto-method))
                              'standard-method)
                          initargs-form)))
-
-(defun interned-symbol-p (x)
-  (and (symbolp x) (symbol-package x)))
 
 (defun make-defmethod-form
     (name qualifiers specializers unspecialized-lambda-list
@@ -755,7 +762,7 @@ bootstrapping.
       ;; perhaps because of the way that STRUCTURE-OBJECT inherits
       ;; both from SLOT-OBJECT and from SB-KERNEL:INSTANCE. In an
       ;; effort to sweep such problems under the rug, we exclude these
-      ;; problem cases by blacklisting them here. -- WHN 2001-01-19
+      ;; problem cases here. -- WHN 2001-01-19
       ((eq specializer 'slot-object)
        (declare-type nil))
 
@@ -1334,7 +1341,7 @@ bootstrapping.
 (defstruct (constant-method-call (:copier nil) (:include method-call))
   value)
 
-#-sb-fluid (declaim (sb-ext:freeze-type method-call))
+(declaim (sb-ext:freeze-type method-call))
 
 (defmacro invoke-method-call1 (function args cm-args)
   `(let ((.function. ,function)
@@ -1360,7 +1367,7 @@ bootstrapping.
              (:copier nil) (:include fast-method-call))
   value)
 
-#-sb-fluid (declaim (sb-ext:freeze-type fast-method-call))
+(declaim (sb-ext:freeze-type fast-method-call))
 
 ;; The two variants of INVOKE-FAST-METHOD-CALL differ in how REST-ARGs
 ;; are handled. The first one will get REST-ARG as a single list (as
@@ -1390,19 +1397,23 @@ bootstrapping.
     ;; a factor of 2 with very little effect on the other
     ;; cases. Though it'd be nice to have the generic case be equally
     ;; fast.
+    ;; This is enough hardwired cases to handle the 0, 1, or 2 optional
+    ;; arguments to STREAM-WRITE-STRING. If you change anything about this,
+    ;; make sure to benchmark it.
     `(case ,more-count
        (0 ,(generate-call 0))
        (1 ,(generate-call 1))
+       (2 ,(generate-call 2))
        (t (multiple-value-call (fast-method-call-function ,method-call)
             (values (fast-method-call-pv ,method-call))
             (values (fast-method-call-next-method-call ,method-call))
             ,@required-args
-            (sb-c::%more-arg-values ,more-context 0 ,more-count))))))
+            (sb-c:%more-arg-values ,more-context 0 ,more-count))))))
 
 (defstruct (fast-instance-boundp (:copier nil))
   (index 0 :type fixnum))
 
-#-sb-fluid (declaim (sb-ext:freeze-type fast-instance-boundp))
+(declaim (sb-ext:freeze-type fast-instance-boundp))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *allow-emf-call-tracing-p* nil)
@@ -1569,14 +1580,14 @@ bootstrapping.
     (fixnum
      (cond ((null args)
             (%program-error "invalid number of arguments: 0"))
-           ((null (cdr args))
+           ((and (not (minusp emf)) (null (cdr args)))
             (let* ((slots (get-slots (car args)))
                    (value (clos-slots-ref slots emf)))
               (if (unbound-marker-p value)
                   (slot-unbound-internal (car args) emf)
                   value)))
-           ((null (cddr args))
-            (setf (clos-slots-ref (get-slots (cadr args)) emf)
+           ((and (minusp emf) (not (null (cdr args))) (null (cddr args)))
+            (setf (clos-slots-ref (get-slots (cadr args)) (lognot emf))
                   (car args)))
            (t (%program-error "invalid number of arguments"))))
     (fast-instance-boundp
@@ -1647,48 +1658,6 @@ bootstrapping.
            (declare (ignorable #'next-method-p))
            (let ,rebindings
              ,@body)))))
-
-;;; CMUCL comment (Gerd Moellmann):
-;;;
-;;; The standard says it's an error if CALL-NEXT-METHOD is called with
-;;; arguments, and the set of methods applicable to those arguments is
-;;; different from the set of methods applicable to the original
-;;; method arguments.  (According to Barry Margolin, this rule was
-;;; probably added to ensure that before and around methods are always
-;;; run before primary methods.)
-;;;
-;;; This could be optimized for the case that the generic function
-;;; doesn't have hairy methods, does have standard method combination,
-;;; is a standard generic function, there are no methods defined on it
-;;; for COMPUTE-APPLICABLE-METHODS and probably a lot more of such
-;;; preconditions.  That looks hairy and is probably not worth it,
-;;; because this check will never be fast.
-(defun %check-cnm-args (cnm-args orig-args method-cell)
-  ;; 1. Check for no arguments.
-  (when cnm-args
-    (let* ((gf (method-generic-function (car method-cell)))
-           (nreq (generic-function-nreq gf)))
-      (declare (fixnum nreq))
-      ;; 2. Requirement arguments pairwise: if all are EQL, the applicable
-      ;; methods must be the same. This takes care of the relatively common
-      ;; case of twiddling with &KEY arguments without being horribly
-      ;; expensive.
-      (unless (do ((orig orig-args (cdr orig))
-                   (args cnm-args (cdr args))
-                   (n nreq (1- nreq)))
-                  ((zerop n) t)
-                (unless (and orig args (eql (car orig) (car args)))
-                  (return nil)))
-        ;; 3. Only then do the full check.
-        (let ((omethods (compute-applicable-methods gf orig-args))
-              (nmethods (compute-applicable-methods gf cnm-args)))
-          (unless (equal omethods nmethods)
-            (error "~@<The set of methods ~S applicable to argument~P ~
-                    ~{~S~^, ~} to call-next-method is different from ~
-                    the set of methods ~S applicable to the original ~
-                    method argument~P ~{~S~^, ~}.~@:>"
-                   nmethods (length cnm-args) cnm-args omethods
-                   (length orig-args) orig-args)))))))
 
 ;; FIXME: replacing this entire mess with DESTRUCTURING-BIND would correct
 ;; problems similar to those already solved by a correct implementation
@@ -1787,6 +1756,21 @@ bootstrapping.
         ;; modified in the method body.
         (parameters-setqd nil))
     (flet ((walk-function (form context env)
+             (when (eq context :set)
+               (let ((var form))
+                 ;; PCL uses "poor man's constraint propagation" - it starts by assuming
+                 ;; that each specialized parameter has a known type. If any SETQ on it
+                 ;; occurs in a method body, the assumption is dropped for the entire body.
+                 ;; Needless to say, it's horrible and could do much better by initially
+                 ;; binding all specialized parameters thusly:
+                 ;; (let ((arg1 (truly-the specialization1 arg1))
+                 ;;       (arg2 (truly-the specialization2 arg2)) ...
+                 ;; and then having ordinary transforms kick in.
+                 (when (var-declaration '%parameter var env)
+                   ;; If a parameter is shadowed by another binding it won't have a
+                   ;; %PARAMETER declaration.
+                   (pushnew var parameters-setqd :test #'eq)))
+               (return-from walk-function form))
              (unless (and (eq context :eval) (consp form))
                (return-from walk-function form))
              (case (car form)
@@ -1794,27 +1778,6 @@ bootstrapping.
                     ;; hierarchy: nil -> :simple -> T.
                     (unless (eq call-next-method-p t)
                       (setq call-next-method-p (if (cdr form) t :simple)))
-                    form)
-               ((setq multiple-value-setq)
-                    ;; The walker will split (SETQ A 1 B 2) to
-                    ;; separate (SETQ A 1) and (SETQ B 2) forms, so we
-                    ;; only need to handle the simple case of SETQ
-                    ;; here.
-                    (let ((vars (if (eq (car form) 'setq)
-                                    (list (second form))
-                                    (second form))))
-                      (dolist (var vars)
-                        ;; Note that we don't need to check for
-                        ;; %VARIABLE-REBINDING declarations like is
-                        ;; done in CAN-OPTIMIZE-ACCESS1, since the
-                        ;; bindings that will have that declation will
-                        ;; never be SETQd.
-                        (when (var-declaration '%parameter var env)
-                          ;; If a parameter binding is shadowed by
-                          ;; another binding it won't have a
-                          ;; %PARAMETER declaration anymore, and this
-                          ;; won't get executed.
-                          (pushnew var parameters-setqd :test #'eq))))
                     form)
                (function
                 (when (equal (cdr form) '(call-next-method))
@@ -1829,8 +1792,8 @@ bootstrapping.
                       (funcall fun form slots required-parameters env))
                     form))
                (t form))))
-
-      (let ((walked-lambda (walk-form method-lambda env #'walk-function)))
+      (let* ((sb-walker::*walk-form-preserve-source* t)
+             (walked-lambda (walk-form method-lambda env #'walk-function)))
         ;;; FIXME: the walker's rewriting of the source code causes
         ;;; trouble when doing code coverage. The rewrites should be
         ;;; removed, and the same operations done using
@@ -1875,18 +1838,29 @@ bootstrapping.
 (defun load-defmethod-internal
     (method-class gf-spec qualifiers specializers lambda-list
                   initargs source-location)
-  (when (and (eq **boot-state** 'complete)
-             (fboundp gf-spec))
-    (let* ((gf (fdefinition gf-spec))
-           (method (and (generic-function-p gf)
-                        (generic-function-methods gf)
-                        (find-method gf qualifiers specializers nil))))
-      (when method
-        (warn 'sb-kernel:redefinition-with-defmethod
-              :name gf-spec
-              :new-location source-location
-              :old-method method
-              :qualifiers qualifiers :specializers specializers))))
+  (block nil
+    (when (and (eq **boot-state** 'complete)
+               (fboundp gf-spec))
+      (restart-bind
+          ((continue (lambda ()
+                       (fmakunbound gf-spec)
+                       (return))
+                     :report-function
+                     (lambda (stream)
+                       (format stream "Unbind the generic function"))
+                     :test-function
+                     (lambda (c)
+                       (typep c 'find-method-length-mismatch))))
+        (let* ((gf (fdefinition gf-spec))
+               (method (and (generic-function-p gf)
+                            (generic-function-methods gf)
+                            (find-method gf qualifiers specializers nil))))
+          (when method
+            (warn 'sb-kernel:redefinition-with-defmethod
+                  :name gf-spec
+                  :new-location source-location
+                  :old-method method
+                  :qualifiers qualifiers :specializers specializers))))))
   (let ((method (apply #'add-named-method
                        gf-spec qualifiers specializers lambda-list
                        'source source-location
@@ -2010,10 +1984,6 @@ bootstrapping.
                            macro.~@:>")
           :format-arguments (list fun-name)))
 
-(define-load-time-global *sgf-wrapper*
-  (!boot-make-wrapper (!early-class-size 'standard-generic-function)
-                      'standard-generic-function))
-
 (define-load-time-global *sgf-slots-init*
   (mapcar (lambda (canonical-slot)
             (if (memq (getf canonical-slot :name) '(arg-info source))
@@ -2069,9 +2039,11 @@ bootstrapping.
 
   gf-info-static-c-a-m-emf
   (gf-info-c-a-m-emf-std-p t)
-  gf-info-fast-mf-p)
+  gf-info-fast-mf-p
 
-#-sb-fluid (declaim (sb-ext:freeze-type arg-info))
+  gf-info-cnm-checker)
+
+(declaim (sb-ext:freeze-type arg-info))
 
 (defun arg-info-valid-p (arg-info)
   (not (null (arg-info-number-optional arg-info))))
@@ -2124,9 +2096,10 @@ bootstrapping.
                          (= nopt gf-nopt)
                          (eq (ll-keyp-or-restp llks) gf-key/rest-p))
               (restart-case
-                  (error "New lambda-list ~S is incompatible with ~
-                          existing methods of ~S.~%~
-                          Old lambda-list ~s"
+                  (error (sb-format:tokens
+                          "New lambda-list ~/sb-impl:print-lambda-list/ is ~
+                           incompatible with existing methods of ~S.~%~
+                           Old lambda-list ~/sb-impl:print-lambda-list/")
                          lambda-list gf (arg-info-lambda-list arg-info))
                 (continue ()
                   :report "Remove all methods."
@@ -2207,16 +2180,6 @@ bootstrapping.
            (!bootstrap-slot-index 'global-writer-method s)
            (!bootstrap-slot-index 'global-boundp-method s))))
 
-(defconstant-eqx +standard-method-class-names+
-  '(standard-method standard-reader-method
-    standard-writer-method standard-boundp-method
-    global-reader-method global-writer-method
-    global-boundp-method)
-  #'equal)
-
-(declaim (list **standard-method-classes**))
-(defglobal **standard-method-classes** nil)
-
 (defun safe-method-specializers (method)
   (if (member (class-of method) **standard-method-classes** :test #'eq)
       (clos-slots-ref (std-instance-slots method) +sm-specializers-index+)
@@ -2290,7 +2253,7 @@ bootstrapping.
               ((and (consp name)
                     (member (car name)
                             *internal-pcl-generalized-fun-name-symbols*))
-                nil)
+               nil)
               (t (let* ((symbol (fun-name-block-name name))
                         (package (symbol-package symbol)))
                    (and (or (eq package *pcl-package*)
@@ -2357,11 +2320,10 @@ bootstrapping.
 (defun make-early-gf (name &optional lambda-list lambda-list-p
                       function argument-precedence-order source-location
                       documentation)
-  (let ((fin (allocate-standard-funcallable-instance-immobile
-              *sgf-wrapper* name)))
+  (let ((fin (allocate-standard-funcallable-instance *sgf-wrapper* name)))
     (replace (fsc-instance-slots fin) *sgf-slots-init*)
     (when function
-      (set-funcallable-instance-function fin function))
+      (setf (%funcallable-instance-fun fin) function))
     (setf (gdefinition name) fin)
     (!bootstrap-set-slot 'standard-generic-function fin 'name name)
     (!bootstrap-set-slot 'standard-generic-function fin
@@ -2400,8 +2362,7 @@ bootstrapping.
     (cond
       ((eq **boot-state** 'complete)
        ;; Check that we are under the lock.
-       #+sb-thread
-       (aver (eq sb-thread:*current-thread* (sb-thread:mutex-owner (gf-lock gf))))
+       #+sb-thread (aver (sb-thread:holding-mutex-p (gf-lock gf)))
        (setf (safe-gf-dfun-state gf) new-state))
       (t
        (setf (clos-slots-ref (get-slots gf) +sgf-dfun-state-index+)
@@ -2622,18 +2583,22 @@ bootstrapping.
        (result
         (list :early-method
 
+              ;; SECOND
               (getf initargs :function)
+              ;; THIRD
               (let ((mf (getf initargs :function)))
                 (aver mf)
                 (and (typep mf '%method-function)
                      (%method-function-fast-function mf)))
 
+              ;; FOURTH
               ;; the parsed specializers. This is used by
               ;; EARLY-METHOD-SPECIALIZERS to cache the parse.
               ;; Note that this only comes into play when there is
               ;; more than one early method on an early gf.
               parsed
 
+              ;; FIFTH
               ;; A list to which REAL-MAKE-A-METHOD can be applied
               ;; to make a real method corresponding to this early
               ;; one.
@@ -2643,7 +2608,10 @@ bootstrapping.
                (when slot-name
                  (list :slot-name slot-name :object-class object-class
                        :method-class-function method-class-function))
-               (list 'source source)))))
+               (list 'source source))
+
+              ;; SIXTH
+              (cons nil nil))))
     (initialize-method-function initargs result)
     result))
 
@@ -2896,19 +2864,6 @@ bootstrapping.
 
   (/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
 
-;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument
-;;; into the 'real' arguments. This is where the syntax of DEFMETHOD
-;;; is really implemented.
-(defun parse-defmethod (cdr-of-form)
-  (declare (list cdr-of-form))
-  (let ((qualifiers ())
-        (spec-ll ()))
-    (loop (if (and (car cdr-of-form) (atom (car cdr-of-form)))
-              (push (pop cdr-of-form) qualifiers)
-              (return (setq qualifiers (nreverse qualifiers)))))
-    (setq spec-ll (pop cdr-of-form))
-    (values qualifiers spec-ll cdr-of-form)))
-
 (defun parse-specializers (generic-function specializers)
   (declare (list specializers))
   (flet ((parse (spec)
@@ -2929,46 +2884,6 @@ bootstrapping.
   (def 1 extract-lambda-list)
   (def 2 extract-specializer-names))
 
-(define-condition specialized-lambda-list-error
-    (reference-condition simple-program-error)
-  ()
-  (:default-initargs :references '((:ansi-cl :section (3 4 3)))))
-
-(defun specialized-lambda-list-error (format-control &rest format-arguments)
-  (error 'specialized-lambda-list-error
-         :format-control format-control
-         :format-arguments format-arguments))
-
-;; Return 3 values:
-;; - the bound variables, without defaults, supplied-p vars, or &AUX vars.
-;; - the lambda list without specializers.
-;; - just the specializers
-(defun parse-specialized-lambda-list (arglist)
-  (binding* (((llks specialized optional rest key aux)
-              (parse-lambda-list
-               arglist
-               :context 'defmethod
-               :accept (lambda-list-keyword-mask
-                        '(&optional &rest &key &allow-other-keys &aux))
-               :silent t         ; never signal &OPTIONAL + &KEY style-warning
-               :condition-class 'specialized-lambda-list-error))
-             (required (mapcar (lambda (x) (if (listp x) (car x) x)) specialized))
-             (specializers (mapcar (lambda (x) (if (listp x) (cadr x) t)) specialized)))
-    (check-lambda-list-names
-     llks required optional rest key aux nil nil
-     :context "a method lambda list" :signal-via #'specialized-lambda-list-error)
-    (values (append required
-                    (mapcar #'parse-optional-arg-spec optional)
-                    rest
-                    ;; Preserve keyword-names when given as (:KEYWORD var)
-                    (mapcar (lambda (x)
-                              (if (typep x '(cons cons))
-                                  (car x)
-                                  (parse-key-arg-spec x)))
-                            key))
-            (make-lambda-list llks nil required optional rest key aux)
-            specializers)))
-
 (setq **boot-state** 'early)
 
 ;;; FIXME: In here there was a #-CMU definition of SYMBOL-MACROLET

@@ -449,6 +449,14 @@
     `(lambda (e) (search '(a) '(b) :end1 e))
     ((0) 0)))
 
+(with-test (:name (search :type-derivation))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (eql (search a (the (simple-vector 2) b) :from-end t) 2))
+   ((#() #(1 2)) t)
+   ((#(1) #(1 2)) nil)))
+
 (with-test (:name (count :no-consing)
             :skipped-on :interpreter)
   (let ((f (checked-compile
@@ -456,3 +464,150 @@
               (count 1 x)))))
     (ctu:assert-no-consing (funcall f #(1 2 3 4)))
     (ctu:assert-no-consing (funcall f '(1 2 3 4)))))
+
+(with-test (:name :hash-based-position)
+  (let* ((items '(a b c d d d h e f b g b))
+         (f (checked-compile
+             `(lambda (x) (position x ',items))))
+         (g (checked-compile
+             `(lambda (x) (position x ',items :from-end t)))))
+    (dolist (x items)
+      ;; opaque-identify prevents optimizing the POSITION call
+      (assert (= (funcall f x) (position x (opaque-identity items))))
+      (assert (= (funcall g x) (position x (opaque-identity items) :from-end t))))
+    (assert (not (funcall f 'blah)))
+    (assert (not (funcall g 'blah)))))
+
+(with-test (:name :hash-based-position-type-derivation)
+  ;; should neither crash nor warn about NIL being fed into ASH
+  (checked-compile '(lambda (x)
+                     (declare (type (member a b) x))
+                     (ash 1 (position x #(a b c d d e f))))))
+
+(with-test (:name :position-empty-seq)
+  (assert (not (funcall (checked-compile '(lambda (x) (position x #()))) 1))))
+
+(with-test (:name :hash-based-memq)
+  (let* ((f (checked-compile
+             '(lambda (x)
+               (if (member x '(:and :or :not and or not)) t nil))))
+         (consts (ctu:find-code-constants f :type 'vector)))
+    ;; Since there's no canonical order within a bin - we don't know
+    ;; whether bin 0 is {:AND,AND} or {AND,:AND} - this gets tricky to check.
+    ;; This is unfortunately a change-detector (if we alter SXHASH, or anything).
+    (assert (equalp (car consts) #(:and and :not not :or or 0 0)))))
+
+(with-test (:name :memq-empty-seq)
+  (assert (not (funcall (checked-compile '(lambda (x) (member x '()))) 1)))
+  (assert (not (funcall (checked-compile '(lambda (x) (sb-int:memq x '()))) 1))))
+
+(with-test (:name :adjoin-key-eq-comparable)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (adjoin (list x) y :key 'car))
+      ((3d0 '((3d0))) '((3d0)) :test #'equal)))
+
+(with-test (:name :fill-transform-bounds-checks)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (item start end)
+         (fill (make-array 3 :element-type '(unsigned-byte 8)) item :start start :end end))
+    ((2 0 nil) #(2 2 2) :test #'equalp)
+    ((2 10 10)  (condition 'sb-kernel:bounding-indices-bad-error))
+    ((2 2 1)  (condition 'sb-kernel:bounding-indices-bad-error))
+    ((2 10 nil)  (condition 'sb-kernel:bounding-indices-bad-error))))
+
+(with-test (:name :fill-transform-derive-type)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (x)
+              (fill (the (simple-array (unsigned-byte 32) (*)) x) 0))))
+          '(FUNCTION (T) (VALUES (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*)) &OPTIONAL)))))
+
+
+(with-test (:name :fill-transform-print-case)
+  (let ((*print-case* :downcase))
+    (checked-compile-and-assert
+        ()
+        `(lambda (x)
+           (make-array 3 :element-type 'fixnum :initial-element x))
+      ((1) #(1 1 1) :test #'equalp))))
+
+
+(with-test (:name (search :type-derivation))
+  (checked-compile-and-assert
+      ()
+      `(lambda (s)
+         (search '(a) s :end1 nil))
+    (('(b a)) 1)
+    ((#(1)) nil)))
+
+(with-test (:name :array-equalp-non-consing
+                  :skipped-on :interpreter)
+  (let ((a (make-array 1000 :element-type 'double-float :initial-element 0d0))
+        (b (make-array 1000 :element-type 'double-float :initial-element 0d0)))
+    (ctu:assert-no-consing (equalp a b))))
+
+(with-test (:name (search :array-equalp-numerics))
+  ;; This tests something that wasn't broken, but given that the new algorithm
+  ;; is potentially more complicated, it makes sense to test that various
+  ;; combinations of numeric arrays compare as equalp when they should.
+  (let (arrays (testdata '(7 3 1 5)))
+    (sb-int:dovector
+        (saetp (remove-if (lambda (x)
+                            (not (typep (sb-vm:saetp-ctype x) 'sb-kernel:numeric-type)))
+                          sb-vm:*specialized-array-element-type-properties*))
+      (let ((et (sb-vm::saetp-specifier saetp)))
+        (unless (or (eq et 'bit) (equal et '(unsigned-byte 2)))
+          (let ((fancy-array
+                 (make-array 4 :element-type et
+                               :displaced-to (make-array 5 :element-type et)
+                               :displaced-index-offset 1)))
+            (replace fancy-array
+                     (mapcar (lambda (x) (coerce x et)) testdata))
+            (push fancy-array arrays)))))
+    ;; All pairs should be EQUALP and it should be commutative
+    ;; and they should be EQUALP to a simple-vector.
+    (let* ((sv1 (coerce testdata 'simple-vector))
+           (sv2 (map 'simple-vector (lambda (x) (coerce x 'single-float)) sv1))
+           (sv3 (map 'simple-vector (lambda (x) (coerce x 'double-float)) sv1))
+           (sv4 (map 'simple-vector (lambda (x) (coerce x '(complex single-float))) sv1))
+           (sv5 (map 'simple-vector (lambda (x) (coerce x '(complex double-float))) sv1))
+           (svs (list sv1 sv2 sv3 sv4 sv5)))
+      (dolist (x arrays)
+        ;; Try simple vectors containing types that are not EQL to the testdata
+        (dolist (sv svs)
+          (assert (equalp x sv))
+          (assert (equalp sv x)))
+        ;; Try all other numeric array types
+        (dolist (y arrays)
+          (assert (equalp x y)))))))
+
+;; lp#1938598
+(with-test (:name :vector-replace-self)
+  ;; example 1
+  (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
+    (declare (notinline replace))
+    (vector-push-extend #\_ string)
+    ;; also test it indirectly
+    (replace string string :start1 1 :start2 0))
+  ;; example 2
+  (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
+    (declare (notinline replace))
+    (loop for char across "tset" do (vector-push-extend char string))
+    (replace string string :start2 1 :start1 2)
+    (assert (string= string "tsse"))))
+
+(with-test (:name :sort-vector-length-1
+                  :skipped-on :interpreter)
+  (let ((v (vector 5)))
+    (ctu:assert-no-consing (stable-sort v #'<))))
+
+(with-test (:name (replace :empty-constant))
+  (checked-compile-and-assert
+      ()
+      `(lambda (v s)
+         (replace (the simple-vector v) #() :start1 s))
+    ((#(1) 0) #(1) :test #'equalp)))

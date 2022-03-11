@@ -89,6 +89,7 @@
              (:copier nil))
   (contents nil :type vector   :read-only t)
   (keyfun   nil :type function :read-only t))
+(declaim (freeze-type priority-queue))
 
 (defmethod print-object ((object priority-queue) stream)
   (print-unreadable-object (object stream :type t :identity t)
@@ -144,6 +145,7 @@ future versions."
   (thread             nil :type (or sb-thread:thread boolean))
   (interrupt-function nil :type (or null function))
   (cancel-function    nil :type (or null function)))
+(declaim (freeze-type timer))
 
 (defmethod print-object ((timer timer) stream)
   (let ((name (%timer-name timer)))
@@ -186,7 +188,7 @@ from now. For timers with a repeat interval it returns true."
 
 (defmacro with-scheduler-lock ((&optional) &body body)
   ;; Don't let the SIGALRM handler mess things up.
-  `(sb-thread::with-system-mutex (*scheduler-lock*)
+  `(with-system-mutex (*scheduler-lock*)
      ,@body))
 
 (defun under-scheduler-lock-p ()
@@ -203,7 +205,7 @@ from now. For timers with a repeat interval it returns true."
 ;;; real time conversion
 
 (defun delta->real (delta)
-  (floor (* delta sb-xc:internal-time-units-per-second)))
+  (floor (* delta internal-time-units-per-second)))
 
 ;;; Public interface
 
@@ -342,13 +344,10 @@ triggers."
 ;;; win32 waitable timers using a timerfd-like portability layer in
 ;;; the runtime.
 
-#+sb-wtimer
-(define-alien-type wtimer
-    #+win32 system-area-pointer ;HANDLE, but that's not defined yet
-    #+sunos system-area-pointer ;struct os_wtimer *
-    #+(or android linux bsd) int)
+#+win32
+(define-alien-type wtimer system-area-pointer) ;HANDLE, but that's not defined yet
 
-#+sb-wtimer
+#+win32
 (progn
   (define-alien-routine "os_create_wtimer" wtimer)
   (define-alien-routine "os_wait_for_wtimer" int (wt wtimer))
@@ -368,15 +367,15 @@ triggers."
         (prog1
             (setf *waitable-timer-handle* (os-create-wtimer))
           (setf *timer-thread*
-                (sb-thread:make-thread
+                (sb-thread::make-system-thread
+                 "System timer watchdog thread"
                  (lambda ()
                    (loop while
-                        (or (zerop
-                             (os-wait-for-wtimer *waitable-timer-handle*))
-                            *waitable-timer-handle*)
-                        doing (run-expired-timers)))
-                 :ephemeral t
-                 :name "System timer watchdog thread")))))
+                         (or (zerop
+                              (os-wait-for-wtimer *waitable-timer-handle*))
+                             *waitable-timer-handle*)
+                         doing (run-expired-timers)))
+                 nil nil)))))
 
   (defun itimer-emulation-deinit ()
     (with-scheduler-lock ()
@@ -401,15 +400,15 @@ triggers."
   (let ((min-nsec 100000))
     (if (minusp time)
         (values 0 min-nsec)
-        (multiple-value-bind (s u) (floor time sb-xc:internal-time-units-per-second)
-          (setf u (floor (* (/ u sb-xc:internal-time-units-per-second)
+        (multiple-value-bind (s u) (floor time internal-time-units-per-second)
+          (setf u (floor (* (/ u internal-time-units-per-second)
                             #.(expt 10 9))))
           (if (and (= 0 s) (< u min-nsec))
               ;; 0 0 means "shut down the timer" for setitimer
               (values 0 min-nsec)
               (values s u))))))
 
-#-(or sb-wtimer win32)
+#+unix
 (progn
   (defun %set-system-timer (sec nsec)
     (sb-unix:unix-setitimer :real 0 0 sec (ceiling nsec 1000)))
@@ -467,8 +466,8 @@ triggers."
                    (push timer timers)))
         (run-timers)))))
 
-(defun timeout-cerror ()
-  (cerror "Continue" 'timeout))
+(defun timeout-cerror (&optional seconds)
+  (cerror "Continue" 'timeout :seconds seconds))
 
 (defmacro with-timeout (expires &body body)
   "Execute the body, asynchronously interrupting it and signalling a TIMEOUT
@@ -496,7 +495,7 @@ the system uninterruptible."
        ;; FIXME: a temporary compatibility workaround for CLX, if unsafe
        ;; unwinds are handled revisit it.
        (if (> expires 0)
-           (let ((timer (make-timer #'timeout-cerror)))
+           (let ((timer (make-timer (lambda () (timeout-cerror expires)))))
              (schedule-timer timer expires)
              (unwind-protect (timeout-body)
                (unschedule-timer timer)))

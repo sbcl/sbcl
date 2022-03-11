@@ -87,7 +87,7 @@
 
 (def!struct (compiled-debug-fun (:include debug-fun)
                                 (:copier nil)
-                                #-sb-xc-host (:pure t))
+                                (:pure t))
   ;; KLUDGE: Courtesy of more than a decade of, ah, organic growth in
   ;; CMU CL, there are two distinct -- but coupled -- mechanisms to
   ;; finding the name of a function. The slot here is one mechanism
@@ -131,7 +131,9 @@
   ;; (because it doesn't transform correctly under package renaming).
   ;; Check whether this slot's data might have the same problem that
   ;; that slot's data did.
-  (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
+  (blocks nil :type (or (simple-array (unsigned-byte 8) (*))
+                        (simple-array (signed-byte 8) (*))
+                        null))
   ;; a vector describing the variables that the argument values are
   ;; stored in within this function. The locations are represented by
   ;; the ordinal number of the entry in the VARIABLES slot value. The
@@ -189,6 +191,9 @@
   (return-pc-pass (missing-arg) :type sc+offset)
   #-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc+offset)
+  ;; When block compiling a single code object can have multiple top level forms,
+  ;; in that case it's a (cons (pack-tlf-num+offset tlf offset) integer)
+  ;; otherwise just an integer:
   ;; An integer which contains between 4 and 6 varint-encoded fields:
   ;; START-PC -
   ;; The earliest PC in this function at which the environment is properly
@@ -198,7 +203,7 @@
   ;; OFFSET
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
-  (encoded-locs (missing-arg) :type unsigned-byte :read-only t)
+  (encoded-locs (missing-arg) :type (or cons unsigned-byte) :read-only t)
   (next))
 
 (defun cdf-encode-locs (start-pc elsewhere-pc
@@ -209,10 +214,10 @@
                         #-fp-and-pc-standard-save cfp-saved-pc)
   (dx-let ((bytes (make-array (* 8 4) :fill-pointer 0
                                       :element-type '(unsigned-byte 8))))
-    ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
-    ;; which does not need access to any of the subsequent fields.
-    (write-var-integer elsewhere-pc bytes)
+    ;; OFFSET and ELSEWHERE are encoded first so that the C backtrace logic
+    ;; need not skip over all the other packed fields.
     (write-var-integer offset bytes)
+    (write-var-integer elsewhere-pc bytes)
     (write-var-integer form-number bytes)
     (write-var-integer (- start-pc offset) bytes)
     #+unwind-to-frame-and-call-vop
@@ -229,8 +234,11 @@
     (integer-from-octets bytes)))
 
 (defun cdf-decode-locs (cdf)
-  (let ((encoding (compiled-debug-fun-encoded-locs cdf))
-        (input-pointer 0))
+  (let* ((encoding (compiled-debug-fun-encoded-locs cdf))
+         (encoding (if (consp encoding)
+                       (cdr encoding)
+                       encoding))
+         (input-pointer 0))
     (flet ((decode-varint (&aux (accumulator 0) (shift 0))
              (loop
               (let ((byte (ldb (byte 8 input-pointer) encoding)))
@@ -238,8 +246,8 @@
                 (setf accumulator (logior accumulator (ash (logand byte #x7f) shift)))
                 (incf shift 7)
                 (unless (logtest byte #x80) (return accumulator))))))
-      (let* ((elsewhere-pc (decode-varint))
-             (offset (decode-varint))
+      (let* ((offset (decode-varint))
+             (elsewhere-pc (decode-varint))
              (form-number (decode-varint))
              (start-pc (+ offset (decode-varint)))
              #+unwind-to-frame-and-call-vop
@@ -280,24 +288,26 @@
     #-fp-and-pc-standard-save compiled-debug-fun-cfp-saved-pc
     #+unwind-to-frame-and-call-vop compiled-debug-fun-bsp-save))
 
+;;; If you add more subtypes here, be sure to amend the set of
+;;; predefined layout FOP codes in src/code/fop
 (def!struct (compiled-debug-fun-optional (:include compiled-debug-fun)
-                                         #-sb-xc-host (:pure t)
+                                         (:pure t)
                                          (:copier nil)
                                          (:predicate nil)))
 (def!struct (compiled-debug-fun-more (:include compiled-debug-fun)
-                                     #-sb-xc-host (:pure t)
+                                     (:pure t)
                                      (:copier nil)
                                      (:predicate nil)))
 (def!struct (compiled-debug-fun-external (:include compiled-debug-fun)
-                                         #-sb-xc-host (:pure t)
+                                         (:pure t)
                                          (:copier nil)
                                          (:predicate nil)))
 (def!struct (compiled-debug-fun-toplevel (:include compiled-debug-fun)
-                                         #-sb-xc-host (:pure t)
+                                         (:pure t)
                                          (:copier nil)
                                          (:predicate nil)))
 (def!struct (compiled-debug-fun-cleanup (:include compiled-debug-fun)
-                                        #-sb-xc-host (:pure t)
+                                        (:pure t)
                                         (:copier nil)
                                         (:predicate nil)))
 
@@ -376,7 +386,7 @@
 
 ;;; There is one per compiled file and one per function compiled at
 ;;; toplevel or loaded from source.
-(def!struct (debug-source #-sb-xc-host (:pure t)
+(def!struct (debug-source (:pure t)
                           (:copier nil))
   ;; When the DEBUG-SOURCE describes a file, the file's namestring.
   ;; Otherwise, NIL.
@@ -384,18 +394,8 @@
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
-  ;; the universal time that the source was compiled
-  (compiled (missing-arg) :type unsigned-byte)
   ;; Additional information from (WITH-COMPILATION-UNIT (:SOURCE-PLIST ...))
   (plist *source-plist* :read-only t))
-(def!struct (core-debug-source #-sb-xc-host (:pure t)
-                               (:copier nil)
-                               (:include debug-source))
-  ;; Compilation to memory stores each toplevel form given to %COMPILE.
-  ;; That form can generate multiple functions, and those functions can
-  ;; be in one or more code components. They all point at the same form.
-  form
-  (function nil :read-only t))
 
 ;;;; DEBUG-INFO structures
 
@@ -410,13 +410,15 @@
 (def!struct (compiled-debug-info
              (:include debug-info)
              (:copier nil)
-             #-sb-xc-host (:pure t))
+             (:pure t))
   ;; COMPILED-DEBUG-FUNs linked through COMPILED-DEBUG-FUN-NEXT
   (fun-map (missing-arg) :type compiled-debug-fun)
   ;; Location contexts
   ;; A (simple-array * (*)) or a context if there's only one context.
   (contexts nil :type t :read-only t)
-  (tlf-num+offset nil :type integer))
+  ;; Packed integers. Also can be a cons of that plus an alist which
+  ;; maps SB-C::COMPILED-DEBUG-FUN to SB-DI::COMPILED-DEBUG-FUN instances.
+  (tlf-num+offset (missing-arg) :type (or integer cons (eql :multiple))))
 
 ;;; The TLF-NUMBER and CHAR-OFFSET of a compiled-debug-info can each be NIL,
 ;;; but aren't often. However, to allow that, convert NIL to 0 and non-nil
@@ -441,20 +443,20 @@
 ;;; given file.
 (defstruct (file-info
              (:copier nil)
-             #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
-                                (princ (file-info-name s) stream)))))
+                                (princ (file-info-truename s) stream)))))
   ;; If a file, the truename of the corresponding source file. If from
-  ;; a Lisp form, :LISP. If from a stream, :STREAM.
-  (name (missing-arg) :type (or pathname (eql :lisp)) :read-only t)
+  ;; a Lisp form, :LISP. In COMPILE-FILE, this gets filled lazily
+  ;; after the file gets opened.
+  (truename nil :type (or pathname null (eql :lisp)))
   ;; the external format that we'll call OPEN with, if NAME is a file.
   (external-format nil  :read-only t)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
   ;; to TRUENAME call.) Null if not a file. This is used to set
   ;; *COMPILE-FILE-PATHNAME*, and if absolute (a harmful constraint to be sure),
   ;; is dumped in the debug-info.
-  (untruename nil :type (or pathname null) :read-only t)
+  (pathname nil :type (or pathname null) :read-only t)
   ;; the file's write date (if relevant)
   (write-date nil :type (or unsigned-byte null)  :read-only t)
   ;; parallel vectors containing the forms read out of the file and
@@ -466,7 +468,7 @@
                                                            :read-only t)
   ;; A vector of character ranges than span each subform in the TLF,
   ;; reset to empty for each one, updated by form-tracking-stream-observer.
-  (subforms nil :type (or null (vector t)) :read-only t :read-only t)
+  (subforms nil :type (or null (vector t)) :read-only t)
   ;; A list of objects about which the compile may/would/should have signaled
   ;; a style-warning in the :compile-toplevel situation, so we don't do it
   ;; again in the :load-toplevel situation.
@@ -474,21 +476,15 @@
   ;; the "&OPTIONAL and &KEY" warning is quite annoying to see repeated.
   ;; And I doubt it changes anyone's mind about coding style anyway.
   ;; Typically this matters for DEFTYPE and DEFMACRO.
-  (style-warning-tracker nil :type list)
-  ;; A list of forms that are pending compilation. Delaying compilation helps
-  ;; with defstruct constructors that involve type dependency cycles.
-  (queued-tlfs nil))
+  (style-warning-tracker nil :type list))
 
 ;;; The SOURCE-INFO structure provides a handle on all the source
 ;;; information for an entire compilation.
 (defstruct (source-info
-             #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object
                                   (s stream :type t :identity t))))
              (:copier nil))
-  ;; the UT that compilation started at
-  (start-time (get-universal-time) :type unsigned-byte :read-only t)
   ;; the IRT that compilation started at
   (start-real-time (get-internal-real-time) :type unsigned-byte :read-only t)
   ;; the FILE-INFO structure for this compilation

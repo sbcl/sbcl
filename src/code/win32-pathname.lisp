@@ -195,7 +195,9 @@
                 (cond (absolute
                        (cons :absolute directory))
                       (directory
-                       (cons :relative directory)))
+                       (cons :relative directory))
+                      (as-directory
+                       '(:absolute)))
                 (first name-and-type)
                 (second name-and-type)
                 nil)))))
@@ -257,7 +259,7 @@
               (make-pathname :defaults pathname
                              :directory (substitute :back :up directory))))))
     (coerce
-     (with-simple-output-to-string (s)
+     (%with-output-to-string (s)
        (when absolutep
          (write-string (case device
                          (:unc +unc-file-name-prefix+)

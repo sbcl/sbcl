@@ -28,7 +28,7 @@
 #endif
 
 #define reg_ZERO        GREG(0)
-#define reg_ALLOC       GREG(1)
+#define reg_THREAD      GREG(1)
 #define reg_NULL        GREG(2)
 #define reg_CSP         GREG(3)
 #define reg_CFP         GREG(4)
@@ -60,19 +60,3 @@
 #define reg_CFUNC       IREG(4)
 #define reg_CODE        IREG(5)
 #define reg_LIP         IREG(7)
-
-#define REGNAMES \
-        "ZERO",         "ALLOC",        "NULL",         "CSP", \
-        "CFP",          "BSP",          "%g6",          "%g7", \
-        "NL0",          "NL1",          "NL2",          "NL3", \
-        "NL4",          "NL5",          "NSP",          "NARGS", \
-        "A0",           "A1",           "A2",           "A3", \
-        "A4",           "A5",           "OCFP",         "LRA", \
-        "CNAME",        "LEXENV",       "L0",           "NFP", \
-        "CFUNC",        "CODE",         "???",          "LIP"
-
-/* OAOOM: Same as compiler/sparc/vm.lisp */
-#define BOXED_REGISTERS { \
-    reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, reg_CNAME, reg_LEXENV, \
-    reg_OCFP, reg_LRA, reg_L0, reg_CODE \
-}

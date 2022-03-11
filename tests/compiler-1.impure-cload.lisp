@@ -24,11 +24,11 @@
 ;;; inference behavior it's intended to test.)
 (defun emptyvalues (&rest rest) (declare (ignore rest)) (values))
 (defstruct foo x y)
-(defun bar ()
+(defun bar0 ()
   (let ((res (emptyvalues)))
     (unless (typep res 'foo)
       'expected-value)))
-(assert (eq (bar) 'expected-value))
+(assert (eq (bar0) 'expected-value))
 
 (declaim (ftype (function (real) (values integer single-float)) valuesify))
 (defun valuesify (x)
@@ -66,25 +66,25 @@
 ;;; and then use them to optimize code later [and it was almost
 ;;; right!]. This is of course bad when functions are redefined. The
 ;;; problem was fixed in sbcl-0.6.12.57.
-(defun foo (x)
+(defun foo1 (x)
           (if (plusp x)
               1.0
               0))
 (eval '(locally
-        (defun bar (x)
-          (typecase (foo x)
+        (defun bar1 (x) ; don't conflict with BAR from the test way up top
+          (typecase (foo1 x)
             (fixnum :fixnum)
             (real :real)
             (string :string)
             (t :t)))
-        (compile 'bar)))
-(assert (eql (bar 11) :real))
-(assert (eql (bar -11) :fixnum))
-(setf (symbol-function 'foo) #'identity)
-(assert (eql (bar 11) :fixnum))
-(assert (eql (bar -11.0) :real))
-(assert (eql (bar "this is a test") :string))
-(assert (eql (bar (make-hash-table)) :t))
+        (compile 'bar1)))
+(assert (eql (bar1 11) :real))
+(assert (eql (bar1 -11) :fixnum))
+(setf (symbol-function 'foo1) #'identity)
+(assert (eql (bar1 11) :fixnum))
+(assert (eql (bar1 -11.0) :real))
+(assert (eql (bar1 "this is a test") :string))
+(assert (eql (bar1 (make-hash-table)) :t))
 
 ;;; bug reported by Brian Spilsbury sbcl-devel 2001-09-30, fixed by
 ;;; Alexey Dejneka patch sbcl-devel 2001-10-02
@@ -154,27 +154,12 @@
 (defun bug115-2 ()
   (declare (optimize (speed 2) (debug 3)))
   (flet ((m1 ()
-           (bar (if (foo) 1 2))
-           (let ((x (foo)))
-             (bar x (list x)))))
+           (bar2 (if (foo0) 1 2))
+           (let ((x (foo0)))
+             (bar2 x (list x)))))
     (if (catch nil)
         (m1)
         (m1))))
-
-(defun bug226 ()
-  (declare (optimize (speed 0) (safety 3) (debug 3)))
-  (flet ((safe-format (stream string &rest r)
-           (unless (ignore-errors (progn
-                                    (apply #'format stream string r)
-                                    t))
-             (format stream "~&foo ~S" string))))
-    (cond
-      ((eq my-result :ERROR)
-       (cond
-         ((ignore-errors (typep condition result))
-          (safe-format t "~&bar ~S" result))
-         (t
-          (safe-format t "~&baz ~S (~A) ~S" condition condition result)))))))
 
 ;;; bug 231: SETQ did not check the type of the variable being set
 (defun bug231a-1 (x)

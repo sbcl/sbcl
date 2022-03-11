@@ -1,0 +1,120 @@
+@node ICR Graphing
+@comment  node-name,  next,  previous,  up
+@chapter ICR Graphing
+@cindex Graph, ICR, IR1
+
+The @code{sb-graph} module provides a graphing tool for SBCL ir1. It
+outputs graphviz DOT format.
+
+Its main features are that it can hook compilation so that SBCL can
+output .dot files when compiler tracing is enabled, and, given a graph
+in memory, provide the facility to interactively graph and interact with
+it.
+
+@menu
+* Overview::
+* User Manual::
+* API Description::
+@end menu
+
+@node Overview
+@section Overview
+
+@node User Manual
+@section User Manual
+
+If all you want to do is output .dot files during compiler tracing, you
+shouldn’t actually have to do anything after loading it except turning
+on SBCL’s trace output. This can be done by calling (compile-file "file"
+:trace-file t). After compilation is done, alongside the normal trace
+file, SBCL is transparently hooked into writing a series of .dot files,
+which contain the graphviz DOT representation of all the components
+compiled. If you set sb-c::*compile-progress* to T, it will print out
+progress information, and will tell you when and where it writes out the
+graphviz files.
+
+To use it interactively, call interactively-graph with a graph object
+and output filename. After this is done, output, expand, and get-node
+can be used to interact with said graph. As you call expand, the graph
+will be output to the filename you specified. In the root of the
+repository is a shell script render-on-change.sh which can be run with
+two arguments: the input DOT file (the one passed to
+interactively-graph), as well as an output SVG file that graphviz will
+render to every time the file is changed on disk. This uses
+inotify-wait, and so inotify-utils must be installed. As far as I know
+this only works on Linux. A similar thing could be written for other
+operating systems, though. All-in-all, this allows for a very short
+expand-render-display loop.
+
+@node API Description
+@section API Description
+
+@itemize
+
+@item
+
+* (make-and-dfs object distance)
+
+This function takes an ir1 object object, and integer distance, and
+returns a graph object with every node up to distance hops away from
+object in its dfs-table. Each object is tagged with a “codename”,
+visible as a hex digit in braces at the start of each graph node.
+
+@item
+
+* (interactively-graph graph &optional filename)
+
+This function takes a graph and a filename, and sets the current working
+graph to it, and the current output file to the filename. When calling
+output and expand, the graph will be written to filename.
+
+@item
+
+* (output)
+
+This function outputs the current working graph to a string, and if
+interactively-graph was called with a filename, writes it to that file.
+
+@item
+
+* (expand codename)
+
+After you’ve rendered the graph, if you want to add
+a node to the dfs-table (thus expanding the amount of the in-memory
+objects rendered), call this function with the codename of the new
+object you’d like to add. Example: (expand "A").
+
+If you passed a filename to interactively-graph, this function will then
+write the render to file automatically.
+
+@item
+
+* (get-node codename)
+
+Returns the object tied to codename from the current interactive graph.
+
+@item
+
+* (render-graph graph)
+
+Given a graph with objects in its dfs-table, returns a string of the
+rendering of the graph in DOT.
+
+Does the same thing as output, but without using interactively-graph.
+
+@item
+
+* (expand-graph-codename graph codename)
+
+Given a graph and codename, put the node tied to codename into the
+dfs-table of the graph.
+
+Does the same thing as expand, but without using interactively-graph.
+
+@item
+
+* (get-node-from-codename graph codename)
+
+Return the node tied to codename in graph.
+
+Does the same thing as node, but without using interactively-graph.

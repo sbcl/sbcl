@@ -26,7 +26,7 @@
 ;;; Conversion to UTF-16{LE,BE}
 (declaim (inline char->utf-16le))
 (defun char->utf-16le (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest))
   (let ((code (char-code char)))
     (if (utf-noncharacter-code-p code)
@@ -53,7 +53,7 @@
 
 (declaim (inline char->utf-16be))
 (defun char->utf-16be (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest))
     (let ((code (char-code char)))
     (if (utf-noncharacter-code-p code)
@@ -79,7 +79,7 @@
                (add-byte (ldb (byte 8 0) low)))))))))
 
 (defun string->utf-16le (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 2 (+ additional-space (- send sstart)))
@@ -92,7 +92,7 @@
     (coerce array '(simple-array (unsigned-byte 8) (*)))))
 
 (defun string->utf-16be (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 2 (+ additional-space (- send sstart)))
@@ -157,7 +157,7 @@
         (name-be (make-od-name 'simple-get-utf-16be-char accessor)))
     `(progn
       (defun ,name-le (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes)
@@ -182,7 +182,7 @@
                 (code-char (+ #x10000 (dpb (ldb (byte 10 0) code) (byte 10 10) (ldb (byte 10 0) next)))))
               (code-char code))))
       (defun ,name-be (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes)
@@ -213,7 +213,7 @@
         (name-be (make-od-name 'utf-16be->string accessor)))
     `(progn
       (defun ,name-le (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -233,7 +233,7 @@
                      (incf pos bytes)))
           string))
       (defun ,name-be (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -327,7 +327,7 @@
 
 (declaim (inline char->utf-32le))
 (defun char->utf-32le (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest))
   (let ((code (char-code char)))
     (if (utf-noncharacter-code-p code)
@@ -346,7 +346,7 @@
 
 (declaim (inline char->utf-32be))
 (defun char->utf-32be (char dest string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array (unsigned-byte 8) (*)) dest))
   (let ((code (char-code char)))
     (if (utf-noncharacter-code-p code)
@@ -364,7 +364,7 @@
           (add-byte (ldb (byte 8 0) code))))))
 
 (defun string->utf-32le (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 4 (+ additional-space (- send sstart)))
@@ -377,7 +377,7 @@
     (coerce array '(simple-array (unsigned-byte 8) (*)))))
 
 (defun string->utf-32be (string sstart send additional-space)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send additional-space))
   (let ((array (make-array (* 4 (+ additional-space (- send sstart)))
@@ -408,7 +408,7 @@
         (name-be (make-od-name 'simple-get-utf-32be-char accessor)))
     `(progn
       (defun ,name-le (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes))
@@ -429,7 +429,7 @@
               (decoding-error array pos (+ pos bytes) :utf-32le
                               'octet-decoding-error pos))))
       (defun ,name-be (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes))
@@ -457,7 +457,7 @@
         (name-be (make-od-name 'utf-32be->string accessor)))
     `(progn
       (defun ,name-le (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -475,7 +475,7 @@
                      (incf pos bytes)))
           string))
       (defun ,name-be (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))

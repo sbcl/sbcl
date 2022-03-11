@@ -131,21 +131,23 @@
     (store-tl-symbol-value uwp *current-unwind-protect-block* temp)))
 
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   #+sb-thread (:temporary (:scs (any-reg)) temp)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
     (store-tl-symbol-value block *current-catch-block* temp)))
 
-(define-vop (unlink-unwind-protect)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   #+sb-thread (:temporary (:scs (any-reg)) temp)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-uwp-slot)
@@ -212,6 +214,18 @@
                  (inst b defaulting-done))))))
     (load-stack-tn csp-tn sp)))
 
+(define-vop (nlx-entry-single)
+  (:args (sp)
+         (value))
+  (:results (res :from :load))
+  (:info label)
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)
+    (move res value)
+    (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
   (:args (top :target result) (src) (count))

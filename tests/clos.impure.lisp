@@ -443,7 +443,7 @@
 ;; FORWARD-REFERENCED-CLASS CHANGE-CLASS.FORWARD-REFERENCED.3.
 (defclass change-class.forward-referenced.2 (change-class.forward-referenced.3) ())
 
-(with-test (:name (change-class sb-pcl:forward-referenced-class))
+(with-test (:name (change-class sb-mop:forward-referenced-class))
   (mapc
    #'change-class-test-case
    '(;; Changing instances of "ordinary classes" to classes which are
@@ -846,16 +846,16 @@
 (assert-error (defmethod incompatible-ll-test-1 (x &rest y) y))
 ;;; Sneakily using a bit of MOPness to check some consistency
 (assert (= (length
-            (sb-pcl:generic-function-methods #'incompatible-ll-test-1)) 1))
+            (sb-mop:generic-function-methods #'incompatible-ll-test-1)) 1))
 
 (defmethod incompatible-ll-test-2 (x &key bar) bar)
 (assert-error (defmethod incompatible-ll-test-2 (x) x))
 (defmethod incompatible-ll-test-2 (x &rest y) y)
 (assert (= (length
-            (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 1))
+            (sb-mop:generic-function-methods #'incompatible-ll-test-2)) 1))
 (defmethod incompatible-ll-test-2 ((x integer) &key bar) bar)
 (assert (= (length
-            (sb-pcl:generic-function-methods #'incompatible-ll-test-2)) 2))
+            (sb-mop:generic-function-methods #'incompatible-ll-test-2)) 2))
 
 ;;; Per Christophe, this is an illegal method call because of 7.6.5
 (handler-bind ((style-warning #'muffle-warning))
@@ -1135,6 +1135,7 @@
     (call-next-method))
   (:method (x (y (eql nil)))
     (setf y t)
+    (opaque-identity y) ; or else "assigned but never read" style-warning
     (call-next-method)))
 (with-test (:name (:cnm-assignment :bug-1734771 1))
   (assert (equal (bug-1734771 2 3) '(2 3))))
@@ -2018,12 +2019,12 @@
   (assert (eql 13 (slot-value 'foobar *magic-symbol*))))
 
 ;;;; Built-in structure and condition layouts should have NIL in
-;;;; LAYOUT-FOR-STD-CLASS-P, and classes should have T.
+;;;; LAYOUT-FOR-PCL-OBJ-P, and classes should have T.
 
-(with-test (:name (sb-pcl::layout-for-std-class-p :builtin))
-  (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'warning))))
-  (assert (not (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'hash-table))))
-  (assert (eq t (sb-pcl::layout-for-std-class-p (sb-pcl::find-layout 'standard-object)))))
+(with-test (:name (sb-pcl::layout-for-pcl-obj-p :builtin))
+  (assert (not (sb-pcl::layout-for-pcl-obj-p (sb-pcl::find-layout 'warning))))
+  (assert (not (sb-pcl::layout-for-pcl-obj-p (sb-pcl::find-layout 'hash-table))))
+  (assert (eq t (sb-pcl::layout-for-pcl-obj-p (sb-pcl::find-layout 'standard-object)))))
 
 ;;;; bug 402: PCL used to warn about non-standard declarations
 (declaim (declaration bug-402-d))
@@ -2635,7 +2636,7 @@
     (eval `(defclass ,class2 (,class1) ()))
     (let ((instance (make-instance class2)))
       (sb-mop:finalize-inheritance (find-class class1))
-      (assert (not (sb-kernel:layout-invalid (sb-kernel:layout-of instance)))))))
+      (assert (not (sb-kernel:wrapper-invalid (sb-kernel:wrapper-of instance)))))))
 
 (with-test (:name (allocate-instance :on symbol))
   (let ((class (gensym "CLASS-")))
@@ -2654,7 +2655,7 @@
                 unbound-slot))
 
 (with-test (:name :layouf-of-nil)
-  (assert (eq (sb-kernel:layout-of nil) (sb-kernel:find-layout 'null))))
+  (assert (eq (sb-kernel:wrapper-of nil) (sb-kernel:find-layout 'null))))
 
 (with-test (:name (defmethod :on-classless-type))
   (handler-bind ((timeout (lambda (condition)
@@ -2676,3 +2677,20 @@
 (with-test (:name :removing-a-class)
   (sb-ext:gc :full t)
   (assert (not (sb-ext:weak-pointer-value *removing-a-class*))))
+
+(locally (declare (optimize safety))
+  (defclass setf-slot-value-restart ()
+    ((a :type integer
+        :accessor setf-slot-value-restart-a))))
+
+(with-test (:name :setf-slot-value-restart
+                  :skipped-on :sparc) ; hangs
+  (let ((instance (make-instance 'setf-slot-value-restart)))
+    (handler-bind ((type-error
+                     (lambda (c) (use-value 1 c))))
+      (setf (slot-value instance 'a) 'x))
+    (assert (eql (slot-value instance 'a) 1))
+    (handler-bind ((type-error
+                     (lambda (c) (use-value 2 c))))
+      (setf (setf-slot-value-restart-a instance) 'y))
+    (assert (eql (setf-slot-value-restart-a instance) 2))))

@@ -25,43 +25,32 @@
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
-#ifdef MEMORY_SANITIZER
-#include "genesis/symbol.h"
-#endif
-	
+
 /* Minimize conditionalization for different OS naming schemes. */
-#if defined __linux__  || defined LISP_FEATURE_FREEBSD || defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64 || defined __DragonFly__
+#if defined __linux__  || defined LISP_FEATURE_HAIKU || defined LISP_FEATURE_FREEBSD || \
+   defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64 || defined __DragonFly__
 #define GNAME(var) var
 #else
 #define GNAME(var) _##var
 #endif
 
-#ifdef POSITION_INDEPENDENT_ASM
-#define PIC_CALL(x) x@PLT
-#define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
-#else
+// Produce position-independent code.
+// macOS does not like the general way we do this, so do something different.
+#if defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_WIN32)
 #define PIC_CALL(x) x
-#ifdef LISP_FEATURE_DARWIN
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
 #else
-#define LOAD_PIC_VAR(x,dest) mov GNAME(x), dest
-#endif
+#define PIC_CALL(x) x@PLT
+#define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
  * want alignment in bytes. */
 #if defined(__linux__) || defined(LISP_FEATURE_FREEBSD) || defined(__OpenBSD__) || defined __NetBSD__ || defined(__sun) || defined _WIN64 || defined(__DragonFly__)
-#define align_4byte	4
-#define align_8byte	8
 #define align_16byte	16
-#define align_32byte	32
-#define align_page	32768
 #else
-#define	align_4byte	2
-#define	align_8byte	3
-#define	align_16byte	4	
-#define	align_page	15
-#endif			
+#define	align_16byte	4
+#endif
 
 /*
  * The assembler used for win32 doesn't like .type or .size directives,
@@ -77,25 +66,27 @@
 #define SIZE(name)
 #endif
 
-/*
- * x86/darwin (as of MacOS X 10.4.5) doesn't reliably fire signal
- * handlers (SIGTRAP or Mach exception handlers) for 0xCC, wo we have
- * to use ud2 instead. ud2 is an undefined opcode, #x0b0f, or
- * 0F 0B in low-endian notation, that causes SIGILL to fire. We check
- * for this instruction in the SIGILL handler and if we see it, we
- * advance the EIP by two bytes to skip over ud2 instruction and
- * call sigtrap_handler. */
-#if defined(LISP_FEATURE_UD2_BREAKPOINTS)
-#define TRAP ud2
-#elif defined(LISP_FEATURE_INT4_BREAKPOINTS)
-#define TRAP .byte 0xCE /* due to illegality, assembler won't emit "into" */
+#ifdef LISP_FEATURE_INT4_BREAKPOINTS
+// assembler won't emit the invalid instruction INTO, so use .byte to encode
+#define TRAP .byte 0xCE
 #else
 #define TRAP int3
 #endif
 
+#define CARD_TABLE_REG %r12
 #define THREAD_BASE_REG %r13
 
-#ifdef OS_THREAD_STACK
+#ifdef LISP_FEATURE_WIN32
+#define CARG1 %rcx
+#define CARG2 %rdx
+#define CARG3 %r8
+#else
+#define CARG1 %rdi
+#define CARG2 %rsi
+#define CARG3 %rdx
+#endif
+	
+#ifdef LISP_FEATURE_OS_THREAD_STACK
         .text
 	.globl  GNAME(funcall1_switching_stack)
 	TYPE(GNAME(funcall1_switching_stack))
@@ -107,8 +98,16 @@ GNAME(funcall1_switching_stack):
         push    %rbp
         mov     %rsp,%rbp
 
-        mov     THREAD_CONTROL_STACK_END_OFFSET(%rdi),%rsp
-        call    *%rsi
+        mov     THREAD_CONTROL_STACK_END_OFFSET(CARG1),%rsp
+
+#ifdef LISP_FEATURE_WIN32	
+	/* _chkstk() is called at some unknown points and is
+           expecting that
+	*/
+	mov 	THREAD_CONTROL_STACK_START_OFFSET(CARG1), %rax
+	movq    %rax, %gs:16
+#endif
+        call    *CARG2
 
         mov     %rbp, %rsp
         pop     %rbp
@@ -116,34 +115,28 @@ GNAME(funcall1_switching_stack):
         SIZE(GNAME(funcall1_switching_stack))
 #endif
 
-	.text	
+	.text
 	.globl  GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
-		
-/* We don't worry too much about saving registers 
- * here, because we never expect to return from the initial call to lisp 
+
+/* We don't worry too much about saving registers
+ * here, because we never expect to return from the initial call to lisp
  * anyway */
-	
+
 	.align	align_16byte,0x90
 	.cfi_startproc
 GNAME(call_into_lisp_first_time):
+GNAME(lspmain): # so much easier to type 'b lspmain' in gdb
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
-#ifdef MEMORY_SANITIZER // Presumes GCC_TLS and SB_THREAD
-	movq	GNAME(current_thread)@GOTTPOFF(%rip), %r8 // Clobberable
-	movq	%fs:(%r8), %r8
-	movq	%fs:0, %rax
-	leaq	__msan_param_tls@TPOFF(%rax), %rax
-	movq	%rax, THREAD_MSAN_PARAM_TLS_OFFSET(%r8)
-#endif
 	LOAD_PIC_VAR(all_threads, %rax)
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
 
-	.text	
+	.text
 	.globl  GNAME(call_into_lisp)
 	TYPE(GNAME(call_into_lisp))
-		
+
 /*
  * amd64 calling convention: C expects that
  * arguments go in rdi rsi rdx rcx r8 r9
@@ -171,26 +164,25 @@ Lstack:
 	.cfi_offset  rbp, -16
 	/* FIXME x86 saves FPU state here */
 	push	%rbx  	# these regs are callee-saved according to C
-	push	%r12	# so must be preserved and restored when 
+	push	%r12	# so must be preserved and restored when
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
 	push	%rdi	# args from C
 	push	%rsi	#
 	push	%rdx	#
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GS_SEGMENT_THREAD
 #ifdef LISP_FEATURE_GCC_TLS
 	movq	GNAME(current_thread)@GOTTPOFF(%rip), THREAD_BASE_REG
 	movq	%fs:(THREAD_BASE_REG), THREAD_BASE_REG
+#elif defined LISP_FEATURE_WIN32
+	call    PIC_CALL(GNAME(read_current_thread))
+	mov	%rax, THREAD_BASE_REG
 #else
 	LOAD_PIC_VAR(specials, %rdi)
 	call    PIC_CALL(GNAME(pthread_getspecific))
 	mov	%rax, THREAD_BASE_REG
 #endif
-#elif defined(LISP_FEATURE_SB_SAFEPOINT)
-        /* We need this to find the CSP trap page.  This does no harm,
-	 * as the compiler doesn't use THREAD_BASE_REG on non-threaded builds. */
-        LOAD_PIC_VAR(all_threads, THREAD_BASE_REG)
 #endif
 	pop	%rcx	# num args
 	pop	%rbx	# arg vector
@@ -198,8 +190,8 @@ Lstack:
 
 	# Why do we care what goes in unused argument-passing regs?
 	# These just seem like wasted instructions.
-	xor	%rdx,%rdx	# clear any descriptor registers 
-	xor	%rdi,%rdi	# that we can't be sure we'll 
+	xor	%rdx,%rdx	# clear any descriptor registers
+	xor	%rdi,%rdi	# that we can't be sure we'll
 	xor	%rsi,%rsi	# initialise properly.  XX do r8-r15 too?
 	cmp	$2,%rcx
 	je	Ltwo
@@ -224,13 +216,14 @@ Lzero:
 	# DW_OP_breg6 (rbp): 0 / DW_OP_deref / DW_OP_lit16 / DW_OP_plus
 	.cfi_escape 0x0f, 5, 0x76, 0, 6, 0x40, 0x22
 Lcall:
+	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
 	call	*CLOSURE_FUN_OFFSET(%rax)
-	
+
 	/* If the function returned multiple values, the carry flag will be set.
            Lose them */
-	jnc	LsingleValue	
+	jnc	LsingleValue
 	mov	%rbx, %rsp
-LsingleValue:	
+LsingleValue:
 
 /* Restore C regs */
 	pop	%r15
@@ -253,7 +246,7 @@ LsingleValue:
 	.cfi_endproc
 	SIZE(GNAME(call_into_lisp))
 
-	.text	
+	.text
 	.globl  GNAME(funcall_alien_callback)
 	TYPE(GNAME(funcall_alien_callback))
 	.align	align_16byte,0x90
@@ -264,12 +257,12 @@ GNAME(funcall_alien_callback):
    rdx arg0
    rcx thread #+sb-thread
 */
-        
+
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 
 	push	%rbx  	# these regs are callee-saved according to C
-	push	%r12	# so must be preserved and restored when 
+	push	%r12	# so must be preserved and restored when
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
@@ -290,6 +283,7 @@ GNAME(funcall_alien_callback):
 #else
         mov     (ENTER_ALIEN_CALLBACK_FDEFN+FDEFN_FUN_OFFSET),%rax
 #endif
+	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
 	call	*CLOSURE_FUN_OFFSET(%rax)
 
 /* Restore C regs */
@@ -328,7 +322,7 @@ GNAME(fun_end_breakpoint_guts):
 	mov	$(NIL),%rdi	# default second value
 	mov	$(NIL),%rsi	# default third value
 multiple_value_return:
-	
+
 	.globl  GNAME(fun_end_breakpoint_trap)
 	.align	align_16byte,0x90
 GNAME(fun_end_breakpoint_trap):
@@ -382,7 +376,7 @@ GNAME(memory_fault_emulation_trap):
 	.align	align_16byte,0x90
 GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
- 	 * doesn't exist.  This is where call_into_lisp returns when called 
+ 	 * doesn't exist.  This is where call_into_lisp returns when called
 	 * using return_to_lisp_function */
 	popq %r15
 	popq %r14
@@ -446,7 +440,8 @@ ascs_check_guard_page:
 	jae	ascs_clear_loop
 	cmp	%rax, %rsi
 	ja	ascs_clear_loop
-	cmpq	$(NIL), THREAD_CONTROL_STACK_GUARD_PAGE_PROTECTED_OFFSET(%rdi)
+	/* test state_word.control_stack_guard_page_protected */
+	cmpb	$0, THREAD_STATE_WORD_OFFSET(%rdi)
 	jne	ascs_finished
 
 	/* Clear memory backwards to the start of the (4KiB) page */

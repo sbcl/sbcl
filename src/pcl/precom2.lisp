@@ -23,6 +23,24 @@
 
 (in-package "SB-PCL")
 
-(precompile-random-code-segments pcl)
+(macrolet ((precompile-random-code-segments (&optional system)
+             `(progn
+                (eval-when (:compile-toplevel)
+                  (update-dispatch-dfuns))
+                (precompile-function-generators ,system)
+                (precompile-dfun-constructors ,system)
+                (precompile-ctors))))
+  (precompile-random-code-segments pcl))
 
 (push '("SB-PCL" *pcl-package* *built-in-classes*) *!removable-symbols*)
+
+(let ((class (find-class 'sequence)))
+  ;; Give the prototype a concrete prototype. It's an extra step because
+  ;; SEQUENCE was removed from *built-in-classes*
+  (setf (slot-value class 'prototype) #()))
+(dolist (c (sb-vm:list-allocated-objects
+            :all
+            :test (compile nil '(lambda (x) (typep x 'sb-pcl::system-class)))))
+  (when (slot-boundp c 'sb-pcl::prototype)
+    (let ((val (slot-value c 'sb-pcl::prototype)))
+      (assert (typep val c)))))

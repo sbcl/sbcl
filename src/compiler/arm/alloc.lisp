@@ -11,26 +11,18 @@
 
 (in-package "SB-VM")
 
-(define-vop (list-or-list*)
-  (:args (things :more t :scs (control-stack)))
+(define-vop (list)
+  (:args (things :more t :scs (any-reg descriptor-reg null control-stack)))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (any-reg)) temp)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
-  (:info num)
+  (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
-  (:variant-vars star)
-  (:policy :fast-safe)
   (:node-var node)
   (:generator 0
-    (cond ((zerop num)
-           (move result null-tn))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t
-           (macrolet
-               ((maybe-load (tn)
+    (macrolet ((maybe-load (tn)
                   (once-only ((tn tn))
                     `(sc-case ,tn
                        ((any-reg descriptor-reg null)
@@ -38,10 +30,9 @@
                        (control-stack
                         (load-stack-tn temp ,tn)
                         temp)))))
-             (let* ((cons-cells (if star (1- num) num))
-                    (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag)
-                 (allocation res alloc list-pointer-lowtag
+      (let ((alloc (* (pad-data-block cons-size) cons-cells)))
+        (pseudo-atomic (pa-flag)
+                 (allocation 'list alloc list-pointer-lowtag res
                              :flag-tn pa-flag
                              :stack-allocate-p (node-stack-allocate-p node))
                  (move ptr res)
@@ -59,13 +50,7 @@
                              (maybe-load (tn-ref-tn (tn-ref-across things)))
                              null-tn)
                      ptr cons-cdr-slot list-pointer-lowtag))
-               (move result res)))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-
-(define-vop (list* list-or-list*)
-  (:variant t))
+        (move result res)))))
 
 ;;;; Special purpose inline allocators.
 
@@ -98,8 +83,7 @@
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
       (pseudo-atomic (pa-flag)
-        (allocation result alloc-size
-                    fun-pointer-lowtag
+        (allocation nil alloc-size fun-pointer-lowtag result
                     :flag-tn pa-flag
                     :stack-allocate-p stack-allocate-p)
         (load-immediate-word pa-flag
@@ -154,8 +138,8 @@
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
-  (:info name words type lowtag)
-  (:ignore name)
+  (:info name words type lowtag stack-allocate-p)
+  (:ignore name stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (any-reg)) bytes)
   (:temporary (:scs (non-descriptor-reg)) header)
@@ -166,7 +150,7 @@
     (if (= type code-header-widetag)
         (inst add bytes extra 0)
         (inst add bytes extra (* (1- words) n-word-bytes)))
-    (inst mov header (lsl bytes (- n-widetag-bits n-fixnum-tag-bits)))
+    (inst mov header (lsl bytes (- (length-field-shift type) n-fixnum-tag-bits)))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity
@@ -177,5 +161,5 @@
     (inst bic bytes bytes lowtag-mask)
     ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag :flag-tn pa-flag)
+      (allocation nil bytes lowtag result :flag-tn pa-flag)
       (storew header result 0 lowtag))))

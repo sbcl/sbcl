@@ -14,7 +14,7 @@ TARGET=sbcl.exe
 ASSEM_SRC = x86-assem.S
 ARCH_SRC = x86-arch.c
 
-OS_SRC = win32-os.c x86-win32-os.c pthreads_win32.c
+OS_SRC = win32-os.c x86-win32-os.c
 
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   LIBSBCL = libsbcl.a
@@ -42,17 +42,24 @@ OS_LIBS = -l ws2_32 -ladvapi32
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
+ifdef LISP_FEATURE_SB_FUTEX
+  OS_LIBS += -lSynchronization
+endif
 
 GC_SRC = fullcgc.c gencgc.c traceroot.c
 
 CFLAGS = -g -Wall -O3 \
-        -fno-omit-frame-pointer -march=i686 -DWINVER=0x0501 \
+        -fno-omit-frame-pointer -march=i686 -DWINVER=0x600 -D_WIN32_WINNT=0x600 \
         -D__W32API_USE_DLLIMPORT__ \
 	-mpreferred-stack-boundary=2
 # We assume Windows ABI 4-byte alignment, but GCC decided to change to
 # 16-byte alignment
 
 CC = gcc
+
+ifeq ($(shell $(LD) --disable-dynamicbase 2>&1 | grep disable-dynamicbase),)
+LINKFLAGS += -Wl,--disable-dynamicbase,--disable-nxcompat
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

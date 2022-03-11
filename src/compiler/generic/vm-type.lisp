@@ -56,7 +56,7 @@
 (sb-xc:deftype internal-time () `(unsigned-byte ,internal-time-bits))
 
 (defconstant internal-seconds-limit
-    (floor (ash 1 internal-time-bits) sb-xc:internal-time-units-per-second))
+    (floor (ash 1 internal-time-bits) internal-time-units-per-second))
 (sb-xc:deftype internal-seconds () `(integer 0 ,internal-seconds-limit))
 
 (sb-xc:deftype bignum-element-type () 'sb-vm:word)
@@ -71,14 +71,20 @@
 
 ;;;; hooks into the type system
 
+;;; Typically the use for UNBOXED-ARRAY is with foreign APIs where we want to
+;;; require that the array being passed has byte nature, and is not SIMPLE-VECTOR.
+;;; But (VECTOR NIL) contains no data, so surely there is no reason for
+;;; passing it to foreign code.
 (sb-xc:deftype unboxed-array (&optional dims)
   (cons 'or (mapcar (lambda (type) `(array ,type ,dims))
-                    '#.(delete t (map 'list 'sb-vm:saetp-specifier
-                                      sb-vm:*specialized-array-element-type-properties*)))))
+                    '#.(delete-if (lambda (x) (member x '(nil t)))
+                                  (map 'list 'sb-vm:saetp-specifier
+                                       sb-vm:*specialized-array-element-type-properties*)))))
 (sb-xc:deftype simple-unboxed-array (&optional dims)
   (cons 'or (mapcar (lambda (type) `(simple-array ,type ,dims))
-                    '#.(delete t (map 'list 'sb-vm:saetp-specifier
-                                      sb-vm:*specialized-array-element-type-properties*)))))
+                    '#.(delete-if (lambda (x) (member x '(nil t)))
+                                  (map 'list 'sb-vm:saetp-specifier
+                                       sb-vm:*specialized-array-element-type-properties*)))))
 
 (sb-xc:deftype complex-vector (&optional element-type length)
   `(and (vector ,element-type ,length) (not simple-array)))
@@ -106,7 +112,7 @@
        (when (csubtypep eltype stype)
          (return stype)))))
 
-(defun sb-xc:upgraded-array-element-type (spec &optional environment)
+(defun upgraded-array-element-type (spec &optional environment)
   "Return the element type that will actually be used to implement an array
    with the specifier :ELEMENT-TYPE Spec."
   (declare (type lexenv-designator environment) (ignore environment))
@@ -119,7 +125,7 @@
           (t
            (type-specifier (%upgraded-array-element-type type))))))
 
-(defun sb-xc:upgraded-complex-part-type (spec &optional environment)
+(defun upgraded-complex-part-type (spec &optional environment)
   "Return the element type of the most specialized COMPLEX number type that
    can hold parts of type SPEC."
   (declare (type lexenv-designator environment) (ignore environment))
@@ -265,26 +271,48 @@
                (push disjunct output)))))
         (t input))))) ; no change
 
+;;; If TYPE is such that its entirety is represented by 1 widetag
+;;; - and that widetag can represent nothing else - then return the widetag.
+;;; This is almost but not exactly in correspondence with (SB-C:PRIMITIVE-TYPE X).
+;;; But a primitive type can be more specific than the type expressed by a widetag.
+;;;   e.g. (SB-C:PRIMITIVE-TYPE (SPECIFIER-TYPE '(SIMD-PACK-256 DOUBLE-FLOAT))))
+;;;         => #<SB-C:PRIMITIVE-TYPE :NAME SIMD-PACK-256-DOUBLE> and T
+;;; So I guess we don't have a predicate that returns T if and only if a CTYPE
+;;; is exactly one and only one of the "most primitive" representations,
+;;; hence this.  The computation is just a best effort - it's generally OK to
+;;; say NIL for anything nontrivial, even if there should be an exact answer.
+(defun widetag-for-exactly-type (type)
+  (cond ((built-in-classoid-p type)
+         (case (classoid-name type)
+           (system-area-pointer sb-vm:sap-widetag)
+           (fdefn sb-vm:fdefn-widetag)))
+        ((numeric-type-p type)
+         (cond ((type= type (specifier-type '(complex single-float)))
+                sb-vm:complex-single-float-widetag)
+               ((type= type (specifier-type '(complex double-float)))
+                sb-vm:complex-double-float-widetag)
+               ((type= type (specifier-type '(complex rational)))
+                sb-vm:complex-widetag)))
+        #+sb-simd-pack
+        ((simd-pack-type-p type)
+         (cond ((type= type (specifier-type 'simd-pack))
+                sb-vm:simd-pack-widetag)))
+        #+sb-simd-pack-256
+        ((simd-pack-256-type-p type)
+         (cond ((type= type (specifier-type 'simd-pack-256))
+                sb-vm:simd-pack-256-widetag)))))
+
 ;; Given TYPES which is a list of types from a union type, decompose into
 ;; two unions, one being an OR over types representable as widetags
 ;; with other-pointer-lowtag, and the other being the difference
 ;; between the input TYPES and the widetags.
-;; This is architecture-independent, but unfortunately the needed VOP can't
-;; be defined using DEFINE-TYPE-VOPS, so return (VALUES NIL TYPES) for
-;; unsupported backends which can't generate an arbitrary call to %TEST-HEADERS.
 (defun widetags-from-union-type (types)
   (setq types (simplify-array-unions types t))
-  ;; This seems preferable to a reader-conditional in generic code.
-  ;; There is a unit test that the supported architectures don't generate
-  ;; excessively large code, so hopefully it'll not get broken.
-  (let ((info (info :function :info '%other-pointer-subtype-p)))
-    (unless (and info (sb-c::fun-info-templates info))
-      (return-from widetags-from-union-type (values nil types))))
   (let (widetags remainder)
     ;; A little optimization for (OR BIGNUM other). Without this, there would
     ;; be a two-sided GENERIC-{<,>} test plus whatever test(s) "other" entails.
-    (let ((neg-bignum (specifier-type `(integer * (,sb-xc:most-negative-fixnum))))
-          (pos-bignum (specifier-type `(integer (,sb-xc:most-positive-fixnum) *))))
+    (let ((neg-bignum (specifier-type `(integer * (,most-negative-fixnum))))
+          (pos-bignum (specifier-type `(integer (,most-positive-fixnum) *))))
       (when (and (member neg-bignum types :test #'type=)
                  (member pos-bignum types :test #'type=))
         (push sb-vm:bignum-widetag widetags)
@@ -293,6 +321,7 @@
     (dolist (x types)
       (let ((adjunct
              (cond
+               ((widetag-for-exactly-type x)) ; easiest case
                ((and (array-type-p x)
                      (equal (array-type-dimensions x) '(*))
                      (type= (array-type-specialized-element-type x)
@@ -314,10 +343,9 @@
                              (list* (sb-vm:saetp-complex-typecode saetp)
                                     (when (eq (array-type-complexp x) :maybe)
                                       (list (sb-vm:saetp-typecode saetp)))))))))
-               ((classoid-p x)
+               ((built-in-classoid-p x)
                 (case (classoid-name x)
-                  (symbol sb-vm:symbol-widetag) ; plus a hack for nil
-                  (system-area-pointer sb-vm:sap-widetag))))))
+                  (symbol sb-vm:symbol-widetag)))))) ; plus a hack for nil
         (cond ((not adjunct) (push x remainder))
               ((listp adjunct) (setq widetags (nconc adjunct widetags)))
               (t (push adjunct widetags)))))
@@ -342,14 +370,14 @@
 (defun sb-vm::symbol-always-has-tls-index-p (symbol)
   (not (null (info :variable :wired-tls symbol))))
 
-;; Return T if SYMBOL will always have a thread-local value.
-;; True of variables defined by !DEFINE-THREAD-LOCAL and thread slots.
-;; As an optimization, set and ref are permitted (but not required)
-;; to avoid checking for no-tls-value.
+;;; Return T if SYMBOL will always have a value in its TLS cell that is
+;;; not EQ to NO-TLS-VALUE-MARKER-WIDETAG. As an optimization, set and ref
+;;; are permitted (but not required) to avoid checking for it.
+;;; This will be true of all C interface symbols, 'struct thread' slots,
+;;; and any variable defined by DEFINE-THREAD-LOCAL.
 (defun sb-vm::symbol-always-has-tls-value-p (symbol)
-  (let ((where (info :variable :wired-tls symbol)))
-    (or (fixnump where) ; thread slots
-        (eq where :always-thread-local)))) ; everything else
+  (typep (info :variable :wired-tls symbol)
+         '(or (eql :always-thread-local) fixnum)))
 
 #+(or x86 x86-64)
 (defun sb-vm::displacement-bounds (lowtag element-size data-offset)

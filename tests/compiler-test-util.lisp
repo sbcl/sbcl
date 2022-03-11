@@ -52,21 +52,25 @@
           when (typep fun type)
           collect fun)))
 
+;;; Return a subset of the code constants for FUN's code but excluding
+;;; constants that are present on behalf of %SIMPLE-FUN-foo accessors.
 (defun find-code-constants (fun &key (type t))
   (let ((code (fun-code-header (%fun-fun fun))))
-    (loop for i from sb-vm:code-constants-offset below (code-header-words code)
+    (loop for i from (+ sb-vm:code-constants-offset
+                        (* (code-n-entries code) sb-vm:code-slots-per-simple-fun))
+          below (code-header-words code)
           for c = (code-header-ref code i)
           for value = (if (= (widetag-of c) sb-vm:value-cell-widetag)
                           (value-cell-ref c)
                           c)
-          when (typep value type)
+          when (and (not (eql value 0)) ;; alignment zeros
+                    (typep value type))
           collect value)))
 
 (defun collect-consing-stats (thunk times)
   (declare (type function thunk))
   (declare (type fixnum times))
-  #+(and sb-thread gencgc)
-  (sb-vm::close-current-gc-region)
+  #+(and sb-thread gencgc) (sb-vm::close-thread-alloc-region)
   (setf sb-int:*n-bytes-freed-or-purified* 0)
   (let ((before (sb-ext:get-bytes-consed)))
     (dotimes (i times)
@@ -102,7 +106,8 @@
   `(check-consing t ',form (lambda () ,form) ,times))
 
 (defun file-compile (toplevel-forms &key load
-                                         before-load)
+                                         before-load
+                                         block-compile)
   (let* ((lisp (test-util:scratch-file-name "lisp"))
          (fasl (compile-file-pathname lisp))
          (error-stream (make-string-output-stream)))
@@ -115,7 +120,8 @@
                    (prin1 form f))))
            (multiple-value-bind (fasl warn fail)
                (let ((*error-output* error-stream))
-                 (compile-file lisp :print nil :verbose nil))
+                 (compile-file lisp :print nil :verbose nil
+                                    :block-compile block-compile))
              (when load
                (when before-load
                  (funcall before-load))
@@ -129,7 +135,7 @@
 (defun count-full-calls (name function)
   (let ((code (with-output-to-string (s)
                 (let ((*print-right-margin* 120))
-                  (disassemble function :stream s))))
+                  (sb-disassem:disassemble-code-component function :stream s))))
         (n 0))
     (flet ((asm-line-calls-name-p (line name)
              (dolist (herald '("#<FDEFN" "#<SB-KERNEL:FDEFN" "#<FUNCTION"))

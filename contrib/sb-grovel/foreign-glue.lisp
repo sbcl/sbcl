@@ -356,7 +356,7 @@ deeply nested structures."
 (defmacro define-c-struct (name size &rest elements)
   (multiple-value-bind (struct-elements accessors)
       (let* ((root (make-instance 'struct :name name :children nil :offset 0)))
-        (loop for e in (sort elements #'< :key #'fourth)
+        (loop for e in (sort (copy-list elements) #'< :key #'fourth)
               do (insert-element root (apply 'mk-val e))
               finally (return root))
         (setf (children root)
@@ -370,7 +370,6 @@ deeply nested structures."
                                    object c-object index)
       (let ((with (intern (format nil "WITH-~A" name)))
             (allocate (intern (format nil "ALLOCATE-~A" name)))
-            (free (intern (format nil "FREE-~A" name)))
             (size-of (intern (format nil "SIZE-OF-~A" name))))
         `(progn
            (sb-alien:define-alien-type ,@(first struct-elements))
@@ -390,7 +389,7 @@ deeply nested structures."
                                      ,(second ,pair)))
                                  ,field-values))
                         ,@,body)
-                    (,',free ,,var)))))
+                    (sb-alien:free-alien ,,var)))))
            (defconstant ,size-of ,size)
            (defun ,allocate ()
              (let* ((,object (sb-alien:make-alien ,name))
@@ -403,9 +402,7 @@ deeply nested structures."
                ;; optimizations might be possible.
                (dotimes (,index ,size)
                  (setf (deref ,c-object ,index) 0))
-               ,object))
-           (defun ,free (,object)
-             (sb-alien:free-alien ,object)))))))
+               ,object)))))))
 
 ;; FIXME: Nothing in SBCL uses this, but kept it around in case there
 ;; are third-party sb-grovel clients.  It should go away eventually,

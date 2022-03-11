@@ -51,6 +51,7 @@ Objects of type @code{(simple-array nil (*))} are represented in memory
 as two words: the first is the object header, with the appropriate
 widetag, and the second is the length field.  No memory is needed for
 elements of these objects, as they can have none.
+Such object are not strings though.
 
 Objects of type @code{simple-base-string} have the header word
 with widetag, then a word for the length, and after that a sequence of

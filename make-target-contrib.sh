@@ -21,7 +21,7 @@ LC_ALL=C
 
 # Just doing CC=${CC:-cc} may be enough, but it needs to be checked
 # that cc is available on all platforms.
-if [ -z $CC ]; then
+if [ -z "$CC" ]; then
     if [ -x "`command -v cc`" ]; then
         CC=cc
     else
@@ -35,16 +35,17 @@ export CC LANG LC_ALL
 # Load our build configuration
 . output/build-config
 
-. ./sbcl-pwd.sh
-sbcl_pwd
+## All programs spawned by make-target-contrib.sh that use this
+## variable or anything derived from it are started with CWD
+## contrib/<contrib_name>/. Keeping this a relative pathname to the
+## toplevel source directory makes the shell and make portions of the
+## build system robust against funny stuff in PWD.
+SBCL_TOP="../../"
 
-SBCL_HOME="$SBCL_PWD/obj/sbcl-home"
-export SBCL_HOME SBCL_PWD
-if [ "$OSTYPE" = "cygwin" ] ; then
-    SBCL_PWD=`echo $SBCL_PWD | sed s/\ /\\\\\\\\\ /g`
-fi
+SBCL_HOME="$SBCL_TOP/obj/sbcl-home"
+export SBCL_HOME SBCL_TOP
 
-SBCL="$SBCL_PWD/src/runtime/sbcl --noinform --core $SBCL_PWD/output/sbcl.core \
+SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
 --lose-on-corruption --disable-debugger --no-sysinit --no-userinit"
 SBCL_BUILDING_CONTRIB=1
 export SBCL SBCL_BUILDING_CONTRIB
@@ -55,45 +56,24 @@ export SBCL SBCL_BUILDING_CONTRIB
 # as SB-RT and SB-GROVEL, but FIXME: there's probably a better
 # solution.  -- CSR, 2003-05-30
 if [ -z "$DONT_CLEAN_SBCL_CONTRIB" ] ; then
-  find contrib/ obj/asdf-cache/ obj/sbcl-home/contrib/ \
-    \( -name '*.fasl' -o \
-       -name '*.FASL' -o \
-       -name 'foo.c' -o \
-       -name 'FOO.C' -o \
-       -name 'a.out' -o \
-       -name 'A.OUT' -o \
-       -name 'alien.so' -o \
-       -name 'ALIEN.SO' -o \
-       -name '*.o' -o \
-       -name '*.O' \) \
-    -print | xargs rm -f
+  rm -fr obj/sbcl-home/contrib/
+  rm -fr obj/asdf-cache/
 fi
 
 find output -name 'building-contrib.*' -print | xargs rm -f
 
 # Ignore all source registries.
 if [ -z "$*" ]; then
-    contribs_to_build="`cd contrib ; echo *`"
+    $GNUMAKE $SBCL_MAKE_JOBS -C contrib
 else
-    contribs_to_build="$*"
+    for x in "$@"; do
+        $GNUMAKE -C contrib $x.fasl
+    done
 fi
-
-for i in $contribs_to_build; do
-    test -d contrib/$i && test -f contrib/$i/Makefile || continue;
-    test -f contrib/$i/test-passed && rm contrib/$i/test-passed # remove old convention
-    test -f obj/asdf-cache/$i/test-passed.test-report && rm obj/asdf-cache/$i/test-passed.test-report
-    mkdir -p obj/asdf-cache/$i/
-    # hack to get exit codes right.
-    if $GNUMAKE -C contrib/$i test < /dev/null 2>&1 && touch obj/asdf-cache/$i/test-passed.test-report ; then
-	:
-    else
-	exit $?
-    fi | tee output/building-contrib.`basename $i` 
-done
 
 # Otherwise report expected failures:
 HEADER_HAS_BEEN_PRINTED=false
-for dir in `cd obj/asdf-cache/ ; echo *`; do
+for dir in `cd ./obj/asdf-cache/ ; echo *`; do
   f="obj/asdf-cache/$dir/test-passed.test-report"
   if test -f "$f" && grep -i fail "$f" >/dev/null; then
       if ! $HEADER_HAS_BEEN_PRINTED; then
@@ -108,6 +88,12 @@ EOF
       (unset IFS; while read line; do echo "    $line"; done <"$f")
   fi
 done
+
+if [ -z "$*" ]; then
+    contribs_to_build="`cd ./contrib ; echo *`"
+else
+    contribs_to_build="$*"
+fi
 
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...

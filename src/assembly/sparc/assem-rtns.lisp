@@ -163,7 +163,7 @@
 
 (define-assembly-routine (unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) a0-offset)
                           (:arg start (any-reg descriptor-reg) ocfp-offset)
@@ -206,8 +206,7 @@
                           (:arg start any-reg ocfp-offset)
                           (:arg count any-reg nargs-offset)
                           (:temp catch any-reg a1-offset)
-                          (:temp tag descriptor-reg a2-offset)
-                          (:temp temp non-descriptor-reg nl0-offset))
+                          (:temp tag descriptor-reg a2-offset))
 
   (declare (ignore start count))
 
@@ -224,15 +223,10 @@
   (inst cmp tag target)
   (inst b :eq exit)
   (inst nop)
-  (loadw catch catch catch-block-previous-catch-slot)
   (inst b loop)
-  (inst nop)
+  (loadw catch catch catch-block-previous-catch-slot) ; in branch delay slot
 
   exit
 
-  (move target catch)
-  (inst li temp (make-fixup 'unwind :assembly-routine))
-  (inst j temp)
-  (inst nop))
-
-
+  (inst b (entry-point-label 'unwind))
+  (move target catch))

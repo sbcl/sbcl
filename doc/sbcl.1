@@ -298,7 +298,7 @@ For more information about the compiler, see the user manual.
 .SH SYSTEM REQUIREMENTS
 
 SBCL currently runs on X86 (Linux, FreeBSD, OpenBSD, and NetBSD),
-X86-64 (Linux), Alpha (Linux, Tru64), PPC (Linux, Darwin/MacOS X),
+X86-64 (Linux), PPC (Linux),
 SPARC (Linux and Solaris 2.x), and MIPS (Linux). For information on
 other ongoing and possible ports, see the sbcl\-devel mailing list,
 and/or the web site.
@@ -420,10 +420,11 @@ years. See the CREDITS file in the distribution for more information.
 .TP 10n
 .BR SBCL_HOME
 This variable controls where files like "sbclrc", "sbcl.core", and the
-add-on "contrib" systems are searched for.  If it is not set, then
-sbcl sets it from a compile-time default location which is usually
-\fB/usr/local/lib/sbcl/\fR but may have been changed \fIe.g.\fR by a third-party
-packager.
+add-on "contrib" systems are searched for. If it is not set, then sbcl
+looks in \fB../lib/sbcl/\fR relative to the location of the executable,
+or in the current directory. If your executable is in the default
+location \fB/usr/local/bin/\fR then it will look in
+\fB/usr/local/lib/sbcl/\fR.
 
 .SH FILES
 

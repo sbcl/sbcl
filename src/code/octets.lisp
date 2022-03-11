@@ -22,6 +22,9 @@
 
 ;;; encoding condition
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *safety-0* '(safety 0)))
+
 (define-condition octets-encoding-error (character-encoding-error)
   ((string :initarg :string :reader octets-encoding-error-string)
    (position :initarg :position :reader octets-encoding-error-position)
@@ -181,7 +184,7 @@
          ;; this, you generally want a load-time ref to a global constant.
        ;(declaim (inline ,byte-char-name))
          (defun ,byte-char-name (byte)
-           (declare (optimize speed (safety 0))
+           (declare (optimize speed #.*safety-0*)
                     (type (unsigned-byte 8) byte))
            ,(let ((byte-to-code
                    (loop for byte below 256
@@ -203,7 +206,7 @@
                   `(aref ,(sb-c::coerce-to-smallest-eltype byte-to-code)
                          byte))))
          (defun ,code-byte-name (code)
-           (declare (optimize speed (safety 0))
+           (declare (optimize speed #.*safety-0*)
                     (type char-code code))
            (if (< code ,lowest-non-equivalent-code)
                code
@@ -253,7 +256,7 @@
           do (let ((byte (funcall get-bytes string pos)))
                (typecase byte
                  ((unsigned-byte 8)
-                  (locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                     (setf (aref octets index) byte)))
                  ((simple-array (unsigned-byte 8) (*))
                   ;; KLUDGE: We ran into encoding errors.  Bail and do
@@ -295,7 +298,7 @@
     `(progn
       (declaim (inline ,name))
       (defun ,name (string sstart send array astart aend mapper)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type simple-string string)
                  (type ,type array)
                  (type array-range sstart send astart aend)
@@ -312,7 +315,7 @@
     `(progn
       (declaim (inline ,name))
       (defun ,name (array astart aend mapper)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend)
                  (type function mapper))
@@ -324,47 +327,11 @@
 
 ;;;; external formats
 
-(defvar *default-external-format* nil)
+(defvar *default-external-format* :utf-8)
 
 (defun default-external-format ()
-  (or *default-external-format*
-      ;; On non-unicode, use iso-8859-1 instead of detecting it from
-      ;; the locale settings. Defaulting to an external-format which
-      ;; can represent characters that the CHARACTER type can't
-      ;; doesn't seem very sensible.
-      #-sb-unicode
-      (setf *default-external-format* :latin-1)
-      (let ((external-format #-win32 (intern (or #-android
-                                                  (alien-funcall
-                                                   (extern-alien
-                                                    "nl_langinfo"
-                                                    (function (c-string :external-format :latin-1)
-                                                              int))
-                                                   sb-unix:codeset)
-                                                  "LATIN-1")
-                                              "KEYWORD")
-                             #+win32 (sb-win32::ansi-codepage)))
-        (let ((entry (get-external-format external-format)))
-          (cond
-            (entry
-             (/show0 "matched"))
-            (t
-             ;; FIXME! This WARN would try to do printing
-             ;; before the streams have been initialized,
-             ;; causing an infinite erroring loop. We should
-             ;; either print it by calling to C, or delay the
-             ;; warning until later. Since we're in freeze
-             ;; right now, and the warning isn't really
-             ;; essential, I'm doing what's least likely to
-             ;; cause damage, and commenting it out. This
-             ;; should be revisited after 0.9.17. -- JES,
-             ;; 2006-09-21
-             #+nil
-             (warn "Invalid external-format ~A; using LATIN-1"
-                   external-format)
-             (setf external-format :latin-1))))
-        (/show0 "/default external format ok")
-        (setf *default-external-format* external-format))))
+  *default-external-format*)
+
 
 ;;;; public interface
 
@@ -438,36 +405,30 @@ STRING (or the subsequence bounded by START and END)."
       (funcall (ef-string-to-octets-fun ef) string start end
                (if null-terminate 1 0)))))
 
-#+sb-unicode
-(defvar +unicode-replacement-character+ (string (code-char #xfffd)))
-#+sb-unicode
-(defun use-unicode-replacement-char (condition)
-  (use-value +unicode-replacement-character+ condition))
+;;; Vector of all available EXTERNAL-FORMAT instances. Each format is named
+;;; by one or more keyword symbols. The mapping from symbol to index into this
+;;; vector is memoized into the symbol's :EXTERNAL-FORMAT property.
+(define-load-time-global *external-formats* (make-array 60 :initial-element nil))
 
-;;; Utilities that maybe should be exported
-
-#+sb-unicode
-(defmacro with-standard-replacement-character (&body body)
-  `(handler-bind ((octet-encoding-error #'use-unicode-replacement-char))
-    ,@body))
-
-(defmacro with-default-decoding-replacement ((c) &body body)
-  (let ((cname (gensym)))
-  `(let ((,cname ,c))
-    (handler-bind
-        ((octet-decoding-error (lambda (c)
-                                 (use-value ,cname c))))
-      ,@body))))
+(defun register-external-format (names &rest args)
+  ;; TODO: compare-and-swap the entry if NAME already has an index
+  ;; specifying to demand-load this format from a fasl.
+  ;; All synonyms of that name will also references the loaded format.
+  (let* ((entry (apply #'%make-external-format :names names args))
+         (table *external-formats*)
+         (free-index (position nil table)))
+    (dolist (name names)
+      (setf (get name :external-format) free-index))
+    (setf (aref table free-index) entry)))
 
 ;;; This function was moved from 'fd-stream' because it depends on
 ;;; the various error classes, two of which are defined just above.
+;;; XXX: Why does this get called with :DEFAULT and NIL when neither is
+;;; the name  of any format? Shouldn't those be handled higher up,
+;;; or else this should return the actual default?
 (defun get-external-format (external-format)
-  (flet ((keyword-external-format (keyword)
-           (declare (type keyword keyword))
-           (gethash keyword *external-formats*))
-         (replacement-handlerify (entry replacement)
-           (when entry
-             (wrap-external-format-functions
+  (flet ((replacement-handlerify (entry replacement)
+           (wrap-external-format-functions
               entry
               (lambda (fun)
                 (and fun
@@ -486,15 +447,58 @@ STRING (or the subsequence bounded by START and END)."
                              (lambda (c) (use-value replacement c)))
                             (octet-decoding-error
                              (lambda (c) (use-value replacement c))))
-                         (apply fun rest)))))))))
-    (typecase external-format
-      (keyword (keyword-external-format external-format))
-      ((cons keyword)
-       (let ((entry (keyword-external-format (car external-format)))
-             (replacement (getf (cdr external-format) :replacement)))
-         (if replacement
-             (replacement-handlerify entry replacement)
-             entry))))))
+                         (apply fun rest))))))))
+
+    (binding*
+        (((format-name replacement)
+          (etypecase external-format
+            ;; This seem like such an unnecessarily general way to
+            ;; pass an optional parameter. What's up with that???
+            ((cons keyword)
+             (values (car external-format)
+                     (getf (cdr external-format) :replacement)))
+            (symbol
+             (values external-format nil))))
+         (table-index (get format-name :external-format) :exit-if-null)
+         (formats *external-formats*)
+         (table-entry
+          ;; The table entry can be one of:
+          ;;   1. #<external-format>
+          ;;   2. (#<external-format> (#\char . #<modified-ef>) ...)
+          ;;      for a list of modified formats that alter the
+          ;;      choice of replacement character.
+          ;;   3. "namestring" - to autoload from a fasl containing
+          ;;      the named format.
+          (let ((ef (svref formats table-index)))
+            (etypecase ef
+              ((or instance list) ef)
+              #+nil
+              (string
+               ;; Theoretically allow demand-loading the external-format
+               ;; from a fasl of this name. (Not done yet)
+               ;; (module-provide-contrib ef)
+               (let ((ef (svref formats table-index)))
+                 (aver (external-format-p ef))
+                 ef)))))
+         ((base-format variations)
+          (if (listp table-entry)
+              (values (car table-entry) (cdr table-entry))
+              (values table-entry nil))))
+      (when (or (not base-format) (not replacement))
+        (return-from get-external-format base-format))
+      (loop
+        (awhen (assoc replacement variations)
+          (return (cdr it)))
+        (let* ((new-ef (replacement-handlerify base-format replacement))
+               (new-table-entry
+                (cons base-format (acons replacement new-ef variations)))
+               (old (cas (svref formats table-index) table-entry new-table-entry)))
+          (when (eq old table-entry)
+            (return new-ef))
+          ;; CAS failure -> some other thread added an entry. It's probably
+          ;; for the same replacement char which is usually #\ufffd.
+          ;; So try again. At worst this conses some more garbage.
+          (setq table-entry old))))))
 
 (push
   `("SB-IMPL"

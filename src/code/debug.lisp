@@ -62,7 +62,7 @@ provide bindings for printer control variables.")
 ;;; If this is bound before the debugger is invoked, it is used as the stack
 ;;; top by the debugger. It can either be the first interesting frame, or the
 ;;; name of the last uninteresting frame.
-(defparameter *stack-top-hint* nil) ; initialized by genesis
+(defvar *stack-top-hint* nil)
 (defvar *current-frame* nil)
 (declaim (always-bound *stack-top-hint* *current-frame*))
 
@@ -442,6 +442,7 @@ information."
                                (write-string (unprintable-object-string x) s))))
             (:copier nil))
   (string nil :read-only t))
+(declaim (freeze-type unprintable-object))
 
 (defun replace-dynamic-extent-object (obj)
   (if (stack-allocated-p obj)
@@ -464,11 +465,19 @@ information."
                      (< a (get-lisp-obj-address sb-vm:*control-stack-end*)))
                 sb-thread:*current-thread*)
                (all-threads
-                ;; find a stack whose base is nearest and below A.
-                (awhen (sb-thread::avl-find<= a sb-thread::*all-threads*)
-                  (let ((thread (sb-thread::avlnode-data it)))
-                    (when (< a (sb-thread::thread-stack-end thread))
-                      thread))))))))
+                (macrolet ((in-stack-range-p ()
+                             `(and (>= a (sb-thread::thread-control-stack-start thread))
+                                   (< a (sb-thread::thread-control-stack-end thread)))))
+                  #+win32 ; exhaustive search
+                  (dolist (thread (sb-thread:list-all-threads)) ; conses, but I don't care
+                    (when (in-stack-range-p)
+                      (return thread)))
+                  #-win32
+                  ;; find a stack whose primitive-thread is nearest and above A.
+                  (awhen (sb-thread::avl-find>= a sb-thread::*all-threads*)
+                    (let ((thread (sb-thread::avlnode-data it)))
+                      (when (in-stack-range-p)
+                        thread)))))))))
 
 ;;;; frame printing
 
@@ -577,7 +586,7 @@ information."
                         (setf reversed-result
                               (append (reverse
                                        (multiple-value-list
-                                        (sb-c::%more-arg-values context 0 count)))
+                                        (sb-c:%more-arg-values context 0 count)))
                                       reversed-result))
                         (return-from enumerating))
                       (push (make-unprintable-object "unavailable &MORE argument")
@@ -672,7 +681,7 @@ the current thread are replaced with dummy objects which can safely escape."
 
 (defun ensure-printable-object (object)
   (handler-case
-      (with-open-stream (out (make-broadcast-stream))
+      (with-open-stream (out sb-impl::*null-broadcast-stream*)
         (prin1 object out)
         object)
     (error (cond)
@@ -909,11 +918,19 @@ the current thread are replaced with dummy objects which can safely escape."
   ;; until bug 403 is fixed, PPRINT-LOGICAL-BLOCK (STREAM NIL) is
   ;; definitely preferred, because the FORMAT alternative was acting odd.
   (pprint-logical-block (stream nil)
+    #-sb-thread
+    (format stream "debugger invoked on a ~S: ~2I~_~A" (type-of condition) condition)
+    #+sb-thread
     (format stream
-            "debugger invoked on a ~S~@[ in thread ~_~A~]: ~2I~_~A"
+            "debugger invoked on a ~S~@[ @~x~] in thread ~_~A: ~2I~_~A"
             (type-of condition)
-            #+sb-thread sb-thread:*current-thread*
-            #-sb-thread nil
+            (when (boundp '*current-internal-error-context*)
+              (if (system-area-pointer-p *current-internal-error-context*)
+                  (sb-alien:with-alien ((context (* os-context-t)
+                                                 sb-kernel:*current-internal-error-context*))
+                    (sap-int (sb-vm:context-pc context)))
+                  (sap-int (sb-vm:context-pc *current-internal-error-context*))))
+            sb-thread:*current-thread*
             condition))
   (terpri stream))
 
@@ -1635,7 +1652,7 @@ forms that explicitly control this kind of evaluation.")
   (show-restarts *debug-restarts* *debug-io*))
 
 (!def-debug-command "BACKTRACE" ()
- (print-backtrace :count (read-if-available sb-xc:most-positive-fixnum)))
+ (print-backtrace :count (read-if-available most-positive-fixnum)))
 
 (!def-debug-command "PRINT" ()
   (print-frame-call *current-frame* *debug-io*))
@@ -1776,7 +1793,7 @@ forms that explicitly control this kind of evaluation.")
            ;; *CURRENT-CATCH-BLOCK* are negative, so we need to jump through
            ;; some hoops to make these calculated values negative too.
            (ash (truly-the sb-vm:signed-word (sap-int sap))
-                (- sb-vm::n-fixnum-tag-bits))))
+                (- sb-vm:n-fixnum-tag-bits))))
     ;; To properly unwind the stack, we need three pieces of information:
     ;;   * The unwind block that should be active after the unwind
     ;;   * The catch block that should be active after the unwind
@@ -1784,12 +1801,12 @@ forms that explicitly control this kind of evaluation.")
     ;;     unwind.
     (let ((catch-block (sap-int/fixnum (find-enclosing-catch-block frame)))
           (unbind-to (find-binding-stack-pointer frame)))
-      ;; This VOP will run the neccessary cleanup forms, reset the fp, and
+      ;; This VOP will run the necessary cleanup forms, reset the fp, and
       ;; then call the supplied function.
       (sb-vm::%primitive sb-vm::unwind-to-frame-and-call
                          (sb-di::frame-pointer frame)
                          (find-enclosing-uwp frame)
-                         #-x86-64
+                         #-unbind-in-unwind
                          (lambda ()
                            ;; Before calling the user-specified
                            ;; function, we need to restore the binding
@@ -1797,11 +1814,13 @@ forms that explicitly control this kind of evaluation.")
                            ;; is taken care of by the VOP.
                            (sb-vm::%primitive sb-vm::unbind-to-here
                                               unbind-to)
-                           (setf sb-vm::*current-catch-block* catch-block)
+                           (setf sb-vm:*current-catch-block* catch-block)
                            (funcall thunk))
-                         #+x86-64 thunk
-                         #+x86-64 unbind-to
-                         #+x86-64 catch-block)))
+                         #+unbind-in-unwind thunk
+                         #+unbind-in-unwind unbind-to
+                         #+(and unbind-in-unwind (not c-stack-is-control-stack))
+                         (%primitive sb-c:current-nsp)
+                         #+unbind-in-unwind catch-block)))
   #-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (replace-frame-catch-tag frame
@@ -1831,12 +1850,12 @@ forms that explicitly control this kind of evaluation.")
   ;; higher than the pointer for FRAME or a null pointer.
   (let* ((frame-pointer (sb-di::frame-pointer frame))
          (current-block (int-sap (ldb (byte #.sb-vm:n-word-bits 0)
-                                      (ash sb-vm::*current-catch-block*
+                                      (ash sb-vm:*current-catch-block*
                                            sb-vm:n-fixnum-tag-bits))))
          (enclosing-block (loop for block = current-block
                                 then (sap-ref-sap block
                                                   (* sb-vm:catch-block-previous-catch-slot
-                                                     sb-vm::n-word-bytes))
+                                                     sb-vm:n-word-bytes))
                                 when (or (zerop (sap-int block))
                                          #+stack-grows-downward-not-upward
                                          (sap> block frame-pointer)
@@ -1913,7 +1932,7 @@ forms that explicitly control this kind of evaluation.")
   ;; XEPs do not bind anything, nothing to restore
   (find-binding-stack-pointer frame)
   #-unwind-to-frame-and-call-vop
-  (find 'sb-c:debug-catch-tag (sb-di::frame-catches frame) :key #'car))
+  (find 'sb-c:debug-catch-tag (sb-di:frame-catches frame) :key #'car))
 
 (defun frame-has-debug-vars-p (frame)
   (debug-var-info-available
@@ -1932,3 +1951,39 @@ forms that explicitly control this kind of evaluation.")
   (if (listen-skip-whitespace *debug-io*)
       (read *debug-io*)
       default))
+
+#+(and sb-devel x86-64)
+(defun show-catch-tags ()
+  (declare (notinline format))
+  (let ((sap (descriptor-sap sb-vm:*current-catch-block*)))
+    (loop
+     (let ((tag (sap-ref-lispobj sap (ash sb-vm:catch-block-tag-slot 3)))
+           (link (sap-ref-sap sap (ash sb-vm:catch-block-previous-catch-slot 3))))
+       (format t "~S ~A~%" tag link)
+       (setq sap link)
+       (if (= (sap-int sap) 0) (return))))))
+
+;;; Sometimes in cold-init it is not possible to call LIST-BACKTRACE
+;;; because that depends on a zillion things being set up correctly.
+;;; This simple version seems to always work.
+#+(or x86 x86-64)
+(defun ultralite-backtrace (&optional (decode-pcs t))
+  ;; this misses the current frame but that's perfectly fine for its intended use
+  (let ((fp (current-fp)) (list))
+    (loop
+     (let ((prev-fp (sap-ref-sap fp 0)))
+       (cond ((and (sap> prev-fp fp)
+                   (sap< prev-fp (descriptor-sap sb-vm:*control-stack-end*)))
+              (push (sap-ref-sap fp sb-vm:n-word-bytes) list) ; pc
+              (setq fp prev-fp))
+             (t
+              (return)))))
+    (setq list (nreverse list))
+    (if decode-pcs
+        (mapcar (lambda (pc)
+                  (let ((code (sb-di::code-header-from-pc pc)))
+                    (if code
+                        (cons code (sap- pc (code-instructions code)))
+                        pc)))
+                list)
+        list)))

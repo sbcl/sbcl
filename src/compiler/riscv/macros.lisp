@@ -26,8 +26,37 @@
   (def-mem-op loadw #-64-bit lw #+64-bit ld word-shift)
   (def-mem-op storew #-64-bit sw #+64-bit sd word-shift))
 
-(defmacro load-symbol (reg symbol)
-  `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
+(macrolet ((def-coerce-op (name inst)
+             `(defmacro ,name ((reg temp-reg) &body body)
+                `(progn
+                   ,@(if (= word-shift n-fixnum-tag-bits)
+                         body
+                         `((inst ,',inst ,temp-reg ,reg ,(- word-shift n-fixnum-tag-bits))
+                           ,(when body
+                              `(let ((,reg ,temp-reg))
+                                 ,@body))))))))
+  (def-coerce-op with-word-index-as-fixnum srai)
+  (def-coerce-op with-fixnum-as-word-index slli))
+
+(defconstant fixnum-as-word-index-needs-temp
+  (cl:/= sb-vm:word-shift sb-vm:n-fixnum-tag-bits))
+
+(defun load-symbol (reg symbol)
+  (inst addi reg null-tn (static-symbol-offset symbol)))
+
+#+sb-thread
+(progn
+  (defun load-tls-index (reg symbol)
+    #-64-bit
+    (loadw reg symbol symbol-tls-index-slot other-pointer-lowtag)
+    #+64-bit
+    (inst lwu reg symbol (- 4 other-pointer-lowtag)))
+
+  (defun store-tls-index (reg symbol)
+    #-64-bit
+    (storew reg symbol symbol-tls-index-slot other-pointer-lowtag)
+    #+64-bit
+    (inst sw reg symbol (- 4 other-pointer-lowtag))))
 
 (defmacro load-symbol-value (reg symbol)
   `(inst #-64-bit lw #+64-bit ld ,reg null-tn
@@ -41,40 +70,54 @@
             (ash symbol-value-slot word-shift)
             (- other-pointer-lowtag))))
 
+(macrolet ((define-tls-accessors (reader setter slot-offset variable)
+             (declare (ignore #-sb-thread slot-offset
+                              #+sb-thread variable))
+             `(progn
+                (defun ,reader (reg)
+                  #+sb-thread
+                  (loadw reg thread-base-tn ,slot-offset)
+                  #-sb-thread
+                  (load-symbol-value reg ,variable))
+                (defun ,setter (reg)
+                  #+sb-thread
+                  (storew reg thread-base-tn ,slot-offset)
+                  #-sb-thread
+                  (store-symbol-value reg ,variable)))))
+  (define-tls-accessors load-binding-stack-pointer store-binding-stack-pointer
+    thread-binding-stack-pointer-slot *binding-stack-pointer*)
+  (define-tls-accessors load-current-catch-block store-current-catch-block
+    thread-current-catch-block-slot *current-catch-block*)
+  (define-tls-accessors load-current-unwind-protect-block store-current-unwind-protect-block
+    thread-current-unwind-protect-block-slot *current-unwind-protect-block*)
+  (define-tls-accessors load-stepping store-stepping
+    thread-stepping-slot sb-impl::*stepping*))
+
+;;; TODO: these two macros would benefit from linkage-table space being
+;;; located below static space with linkage entries allocated downward
+;;; from the end. Then the sequence would reduce to 2 instructions:
+;;;    lw temp (k)$NULL
+;;;    lw dest, (0)$TEMP
 (defun load-foreign-symbol-value (dest symbol temp)
-  (let ((fixup (make-fixup symbol :foreign)))
+  (aver (string/= symbol "foreign_function_call_active"))
+  (let ((fixup (make-fixup symbol :foreign-dataref)))
     (inst lui temp fixup)
-    (inst #-64-bit lw #+64-bit ld dest temp fixup)))
+    (inst #-64-bit lw #+64-bit ld temp temp fixup)
+    (inst #-64-bit lw #+64-bit ld dest temp 0)))
 
 (defun store-foreign-symbol-value (src symbol temp)
-  (let ((fixup (make-fixup symbol :foreign)))
+  (let ((fixup (make-fixup symbol :foreign-dataref))
+        ;; see comment in globals.c
+        (op (cond #+64-bit ((string/= symbol "foreign_function_call_active") 'sd)
+                  (t 'sw))))
     (inst lui temp fixup)
-    (inst #-64-bit sw #+64-bit sd src temp fixup)))
+    (inst #-64-bit lw #+64-bit ld temp temp fixup)
+    (inst* op src temp 0)))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
 byte-ordering issues."
   `(inst lbu ,target ,source ,offset))
-
-(defun lisp-jump (function)
-  "Jump to the lisp function FUNCTION."
-  (inst jalr zero-tn function (- (ash simple-fun-code-offset word-shift)
-                                 fun-pointer-lowtag)))
-
-(defun lisp-return (return-pc return-style)
-  "Return to RETURN-PC."
-  (ecase return-style
-    (:single-value (inst li nargs-tn -1))
-    (:multiple-values)
-    (:known))
-  ;; Avoid the LRA header word.
-  (inst jalr zero-tn return-pc (- n-word-bytes other-pointer-lowtag)))
-
-(defun emit-return-pc (label)
-  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
-  (emit-alignment n-lowtag-bits)
-  (emit-label label)
-  (inst lra-header-word))
 
 
 ;;;; Three Way Comparison
@@ -119,16 +162,38 @@ byte-ordering issues."
 
 ;;;; PSEUDO-ATOMIC
 
+(defun set-pseudo-atomic-bit ()
+  #-sb-thread
+  (store-symbol-value csp-tn *pseudo-atomic-atomic*)
+  #+sb-thread
+  (inst sh null-tn thread-base-tn
+        (* thread-pseudo-atomic-bits-slot n-word-bytes)))
+
+(defun clear-pseudo-atomic-bit ()
+  #-sb-thread
+  (store-symbol-value null-tn *pseudo-atomic-atomic*)
+  #+sb-thread
+  (inst sh zero-tn thread-base-tn (* thread-pseudo-atomic-bits-slot n-word-bytes)))
+
+(defun load-pseudo-atomic-interrupted (reg)
+  #-sb-thread
+  (load-symbol-value reg *pseudo-atomic-interrupted*)
+  #+sb-thread
+  (inst lh reg thread-base-tn
+        (+ (* thread-pseudo-atomic-bits-slot n-word-bytes) 2)))
+
 ;;; handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((flag-tn) &body forms)
   `(progn
      (without-scheduling ()
-       (store-symbol-value csp-tn *pseudo-atomic-atomic*))
+       (set-pseudo-atomic-bit))
      (assemble ()
        ,@forms)
+     #+sb-thread
+     (inst fence :rw :w)
      (without-scheduling ()
-       (store-symbol-value null-tn *pseudo-atomic-atomic*)
-       (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
+       (clear-pseudo-atomic-bit)
+       (load-pseudo-atomic-interrupted ,flag-tn)
        (let ((not-interrupted (gen-label)))
          (inst beq ,flag-tn zero-tn not-interrupted)
          (inst ebreak pending-interrupt-trap)
@@ -139,9 +204,9 @@ byte-ordering issues."
 If we are doing [reg+offset*n-word-bytes-lowtag+index*scale]
 and
 
--2^11 ≤ offset*n-word-bytes - lowtag + index*scale < 2^11
--2^11 ≤ offset*n-word-bytes - lowtag + index*scale ≤ 2^11-1
--2^11 + lowtag -offset*n-word-bytes ≤ index*scale ≤ 2^11-1 + lowtag - offset*n-word-bytes
+-2^11 <= offset*n-word-bytes - lowtag + index*scale < 2^11
+-2^11 <= offset*n-word-bytes - lowtag + index*scale <= 2^11-1
+-2^11 + lowtag -offset*n-word-bytes <= index*scale <= 2^11-1 + lowtag - offset*n-word-bytes
 |#
 (sb-xc:deftype load/store-index (scale lowtag offset)
   (let* ((encodable (list (- (ash 1 11)) (1- (ash 1 11))))
@@ -159,16 +224,13 @@ and
               (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
        (:temporary (:scs (interior-reg)) lip)
-       ,@(unless (= word-shift n-fixnum-tag-bits)
+       ,@(when fixnum-as-word-index-needs-temp
            `((:temporary (:sc non-descriptor-reg) temp)))
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 5
-         ,@(cond ((= word-shift n-fixnum-tag-bits)
-                  `((inst add lip object index)))
-                 (t
-                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                    (inst add lip object temp))))
+         (with-fixnum-as-word-index (index temp)
+           (inst add lip object index))
          (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate `((:translate ,translate)))
@@ -189,36 +251,27 @@ and
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs))
        (:arg-types ,type tagged-num ,eltype)
        (:temporary (:scs (interior-reg)) lip)
-       ,@(unless (= word-shift n-fixnum-tag-bits)
+       ,@(when fixnum-as-word-index-needs-temp
            `((:temporary (:sc non-descriptor-reg) temp)))
-       (:results (result :scs ,scs))
-       (:result-types ,eltype)
        (:generator 3
-         ,@(cond ((= word-shift n-fixnum-tag-bits)
-                  `((inst add lip object index)))
-                 (t
-                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                    (inst add lip object temp))))
-         (storew value lip ,offset ,lowtag)
-         (move result value)))
+         (with-fixnum-as-word-index (index temp)
+           (inst add lip object index))
+         (storew value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs))
        (:info index)
        (:arg-types ,type
          (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset)))
          ,eltype)
-       (:results (result :scs ,scs))
-       (:result-types ,eltype)
        (:generator 1
-         (storew value object (+ ,offset index) ,lowtag)
-         (move result value)))))
+         (storew value object (+ ,offset index) ,lowtag)))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs eltype &optional translate)
   (let ((shift (- (integer-length size) n-fixnum-tag-bits 1)))
@@ -274,11 +327,9 @@ and
                 (index :scs (any-reg))
                 (value :scs ,scs))
          (:arg-types ,type positive-fixnum ,eltype)
-         (:results (result :scs ,scs))
          (:temporary (:scs (interior-reg)) lip)
          ,@(unless (zerop shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
-         (:result-types ,eltype)
          (:generator 5
            ,@(cond ((zerop shift)
                     '((inst add lip object index)))
@@ -288,25 +339,21 @@ and
                            `(inst slli temp index ,shift))
                       (inst add lip object temp))))
            (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))
-                 value lip (- (* ,offset n-word-bytes) ,lowtag))
-           (move result value)))
+                 value lip (- (* ,offset n-word-bytes) ,lowtag))))
        (define-vop (,(symbolicate name "-C"))
          ,@(when translate
              `((:translate ,translate)))
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs))
          (:info index)
          (:arg-types ,type
            (:constant (load/store-index ,(eval size) ,(eval lowtag) ,(eval offset)))
            ,eltype)
-         (:results (result :scs ,scs))
-         (:result-types ,eltype)
          (:generator 4
            (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))
                  value object
-                 (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag))
-           (move result value))))))
+                 (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag)))))))
 
 (defmacro define-float-reffer (name type size format offset lowtag scs eltype &optional arrayp note translate)
   (let ((shift (if arrayp
@@ -348,7 +395,8 @@ and
 (defmacro define-float-setter (name type size format offset lowtag scs eltype &optional arrayp note translate)
   (let ((shift (if arrayp
                    (- (integer-length size) n-fixnum-tag-bits 1)
-                   (- word-shift n-fixnum-tag-bits))))
+                   (- word-shift n-fixnum-tag-bits)))
+        (resultp nil))
     `(progn
        (define-vop (,name)
          (:note ,note)
@@ -356,13 +404,12 @@ and
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (any-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs ,@(when resultp '(:target result))))
          (:arg-types ,type tagged-num ,eltype)
          (:temporary (:scs (interior-reg)) lip)
          ,@(unless (zerop shift)
              `((:temporary (:sc non-descriptor-reg) temp)))
-         (:results (result :scs ,scs))
-         (:result-types ,eltype)
+         ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
          (:generator 5
            ,@(cond ((zerop shift)
                     `((inst add lip object index)))
@@ -370,24 +417,23 @@ and
                     `((inst slli temp index ,shift)
                       (inst add lip object temp))))
            (inst fstore ,format value lip (- (* ,offset n-word-bytes) ,lowtag))
-           (unless (location= result value)
-             (inst fmove ,format result value))))
+           ,@(when resultp
+               `((unless (location= result value) (inst fmove ,format result value))))))
        (define-vop (,(symbolicate name "-C"))
          (:note ,note)
          ,@(when translate `((:translate ,translate)))
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs ,@(when resultp '(:target result))))
          (:info index)
          (:arg-types ,type
            (:constant (load/store-index ,(if arrayp size n-word-bytes) ,(eval lowtag) ,(eval offset)))
            ,eltype)
-         (:results (result :scs ,scs))
-         (:result-types ,eltype)
+         ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
          (:generator 4
            (inst fstore ,format value object (- (+ (* ,offset n-word-bytes) (* index ,(if arrayp size n-word-bytes))) ,lowtag))
-           (unless (location= result value)
-             (inst fmove ,format result value)))))))
+           ,@(when resultp
+               `((unless (location= result value) (inst fmove ,format result value)))))))))
 
 ;; FIXME: constant arg VOPs missing.
 (defmacro define-complex-float-reffer (name type size format offset lowtag scs eltype &optional arrayp note translate)
@@ -426,20 +472,20 @@ and
 (defmacro define-complex-float-setter (name type size format offset lowtag scs eltype &optional arrayp note translate)
   (let ((shift (if arrayp
                    (- (integer-length size) n-fixnum-tag-bits)
-                   (- word-shift n-fixnum-tag-bits))))
+                   (- word-shift n-fixnum-tag-bits)))
+        (resultp nil))
     `(define-vop (,name)
        (:note ,note)
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs ,@(when resultp '(:target result))))
        (:arg-types ,type tagged-num ,eltype)
        (:temporary (:scs (interior-reg)) lip)
        ,@(unless (zerop shift)
            `((:temporary (:sc non-descriptor-reg) temp)))
-       (:results (result :scs ,scs))
-       (:result-types ,eltype)
+       ,@(when resultp `((:results (result :scs ,scs)) (:result-types ,eltype)))
        (:generator 6
          ,@(cond ((zerop shift)
                   `((inst add lip object index)))
@@ -456,7 +502,52 @@ and
                   (inst fstore ,format real-tn lip (- (* ,offset n-word-bytes) ,lowtag)))
                 (let ((imag-tn (complex-reg-imag-tn ,format value)))
                   (inst fstore ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag))))))
-         (move-complex ,format result value)))))
+         ,@(when resultp `((move-complex ,format result value)))))))
+
+(defmacro define-full-casser (name type offset lowtag scs eltype &optional translate)
+  `(define-vop (,name)
+     ,@(when translate `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg) :target temp)
+            (old-value :scs ,scs)
+            (new-value :scs ,scs))
+     (:arg-types ,type positive-fixnum ,eltype ,eltype)
+     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:sc non-descriptor-reg) temp)
+     (:results (result :scs ,scs :from :load))
+     (:result-types ,eltype)
+     (:generator 5
+       (with-fixnum-as-word-index (index temp)
+         (inst add lip object index))
+       (inst addi lip lip (- (* ,offset n-word-bytes) ,lowtag))
+       LOOP
+       (inst lr result lip :aq)
+       (inst bne result old-value EXIT)
+       (inst sc temp new-value lip :aq :rl)
+       (inst bne temp zero-tn LOOP)
+       EXIT)))
+
+(defmacro define-atomic-frobber (name op type offset lowtag scs eltype &optional translate)
+  `(define-vop (,name)
+     ,@(when translate `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg)
+                   ,@(when fixnum-as-word-index-needs-temp
+                       '(:target temp)))
+            (operand :scs ,scs :target result))
+     (:arg-types ,type positive-fixnum ,eltype)
+     (:results (result :scs ,scs))
+     (:result-types unsigned-num)
+     (:temporary (:sc interior-reg) lip)
+     ,@(when fixnum-as-word-index-needs-temp
+         '((:temporary (:sc any-reg) temp)))
+     (:generator 3
+       (with-fixnum-as-word-index (index temp)
+         (inst add lip object index))
+       (inst addi lip lip (- (* ,offset n-word-bytes) ,lowtag))
+       (inst ,op result operand lip :aq :rl))))
 
 
 ;;;; Stack TN's
@@ -501,6 +592,36 @@ and
 
 ;;;; Storage allocation:
 
+#+gencgc
+(defun alloc-tramp-stub-name (tn-offset type)
+  (declare (type (unsigned-byte 5) tn-offset))
+  (aref (load-time-value
+         (let ((a (make-array 64)))
+           (dotimes (i 32 a)
+             (let ((r (write-to-string i)))
+               (setf (aref a i)  (package-symbolicate "SB-VM" "ALLOC-LIST-TO-R" r)
+                     (aref a (+ i 32)) (package-symbolicate "SB-VM" "ALLOC-TO-R" r)))))
+         t)
+        (if (eq type 'list) tn-offset (+ tn-offset 32))))
+
+(defun load-alloc-free-pointer (reg)
+  #-sb-thread
+  (loadw reg null-tn 0 (- nil-value mixed-region))
+  #+sb-thread
+  (loadw reg thread-base-tn thread-mixed-tlab-slot))
+
+(defun load-alloc-end-addr (reg)
+  #-sb-thread
+  (loadw reg null-tn 1 (- nil-value mixed-region))
+  #+sb-thread
+  (loadw reg thread-base-tn (+ thread-mixed-tlab-slot 1)))
+
+(defun store-alloc-free-pointer (reg)
+  #-sb-thread
+  (storew reg null-tn 0 (- nil-value mixed-region))
+  #+sb-thread
+  (storew reg thread-base-tn thread-mixed-tlab-slot))
+
 ;;; This is the main mechanism for allocating memory in the lisp heap.
 ;;;
 ;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
@@ -514,24 +635,10 @@ and
 ;;; FLAG-TN to emphasize the parallelism with PSEUDO-ATOMIC (which
 ;;; must surround a call to ALLOCATION anyway), and to indicate that
 ;;; the P-A FLAG-TN is also acceptable here.
-
-#+gencgc
-(defun allocation-tramp (alloc-tn size back-label)
-  (let ((size-tn (cond ((integerp size)
-                        (inst li alloc-tn size)
-                        alloc-tn)
-                       (t size))))
-    ;; Pass alloc-tn on the number stack.
-    ;; Instead of allocating space here, we save some code size by
-    ;; delegating the stack pointer frobbing to the assembly routine.
-    (storew size-tn nsp-tn -1))
-  (invoke-asm-routine 'alloc-tramp)
-  (loadw alloc-tn nsp-tn -1)
-  (inst j back-label))
-
-(defun allocation (result-tn size lowtag &key flag-tn
-                                              stack-allocate-p
-                                              temp-tn)
+(defun allocation (type size lowtag result-tn &key flag-tn
+                                                   stack-allocate-p
+                                                   temp-tn)
+  (declare (ignorable type))
   #-gencgc (declare (ignore temp-tn))
   (cond (stack-allocate-p
          ;; Stack allocation
@@ -569,35 +676,33 @@ and
         (t
          (let ((alloc (gen-label))
                (back-from-alloc (gen-label)))
-           ;; FIXME: Can optimize this to direct lui hi + load lo?
-           ;; Hit problems if the second struct member is past the
-           ;; most positive lo offset. Need relaxation.
-           (inst li flag-tn (make-fixup "gc_alloc_region" :foreign))
-           (loadw result-tn flag-tn)
-           (loadw flag-tn flag-tn 1)
+           (load-alloc-free-pointer result-tn)
            (etypecase size
              (short-immediate
               (inst addi result-tn result-tn size))
-             (U+i-immediate
+             (u+i-immediate
               (inst li temp-tn size)
               (inst add result-tn result-tn temp-tn))
              (tn
               (inst add result-tn result-tn size)))
+           (load-alloc-end-addr flag-tn)
            (inst blt flag-tn result-tn alloc)
-           (store-foreign-symbol-value result-tn "gc_alloc_region" flag-tn)
+           (store-alloc-free-pointer result-tn)
+           (emit-label back-from-alloc)
+           ;; Compute the base pointer and add the lowtag.
            (etypecase size
              (short-immediate
-              (inst subi result-tn result-tn size))
+              (inst subi result-tn result-tn (- size lowtag)))
              (u+i-immediate
-              (inst sub result-tn result-tn temp-tn))
+              (inst sub result-tn result-tn temp-tn)
+              (inst ori result-tn result-tn lowtag))
              (tn
-              (inst sub result-tn result-tn size)))
-           (emit-label back-from-alloc)
-           (when lowtag
-             (inst ori result-tn result-tn lowtag))
+              (inst sub result-tn result-tn size)
+              (inst ori result-tn result-tn lowtag)))
            (assemble (:elsewhere)
              (emit-label alloc)
-             (allocation-tramp result-tn size back-from-alloc))))))
+             (inst jal lip-tn (make-fixup (alloc-tramp-stub-name (tn-offset result-tn) type) :assembly-routine))
+             (inst j back-from-alloc))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                   &key (lowtag other-pointer-lowtag)
@@ -614,17 +719,10 @@ and
               (stack-allocate-p stack-allocate-p)
               (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
-       (allocation ,result-tn (pad-data-block ,size) ,lowtag
+       (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
                    ,@(when temp-tn `(:temp-tn ,temp-tn)))
-       (when ,type-code
-         (inst li ,flag-tn (+ (ash (1- ,size) n-widetag-bits) ,type-code))
-         (storew ,flag-tn ,result-tn 0 ,lowtag))
+       (inst li ,flag-tn (compute-object-header ,size ,type-code))
+       (storew ,flag-tn ,result-tn 0 ,lowtag)
        ,@body)))
-
-(defun load-binding-stack-pointer (reg)
-  (load-symbol-value reg *binding-stack-pointer*))
-
-(defun store-binding-stack-pointer (reg)
-  (store-symbol-value reg *binding-stack-pointer*))

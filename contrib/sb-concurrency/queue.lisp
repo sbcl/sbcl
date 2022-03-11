@@ -41,6 +41,7 @@ Use ENQUEUE to add objects to the queue, and DEQUEUE to remove them."
   (head (error "No HEAD.") :type cons)
   (tail (error "No TAIL.") :type cons)
   (name nil))
+(declaim (sb-ext:freeze-type queue))
 
 (setf (documentation 'queuep 'function)
       "Returns true if argument is a QUEUE, NIL otherwise."
@@ -48,6 +49,9 @@ Use ENQUEUE to add objects to the queue, and DEQUEUE to remove them."
       "Name of a QUEUE. Can be assigned to using SETF. Queue names
 can be arbitrary printable objects, and need not be unique.")
 
+(declaim (ftype (sfunction (&key (:name t)
+                                 (:initial-contents sequence)) queue)
+                make-queue))
 (defun make-queue (&key name initial-contents)
   "Returns a new QUEUE with NAME and contents of the INITIAL-CONTENTS
 sequence enqueued."
@@ -59,6 +63,8 @@ sequence enqueued."
       (map nil #'enc-1 initial-contents))
     queue))
 
+
+(declaim (ftype (sfunction (t queue) t) enqueue))
 (defun enqueue (value queue)
   "Adds VALUE to the end of QUEUE. Returns VALUE."
   ;; Attempt CAS, repeat upon failure. Upon success update QUEUE-TAIL.
@@ -69,6 +75,7 @@ sequence enqueued."
             (setf (queue-tail queue) new)
             (return value)))))
 
+(declaim (ftype (sfunction (queue) (values t boolean)) dequeue))
 (defun dequeue (queue)
   "Retrieves the oldest value in QUEUE and returns it as the primary value,
 and T as secondary value. If the queue is empty, returns NIL as both primary
@@ -105,6 +112,7 @@ and secondary value."
              ((null node)
               (return t))))))
 
+(declaim (ftype (sfunction (queue) list) list-queue-contents))
 (defun list-queue-contents (queue)
   "Returns the contents of QUEUE as a list without removing them from the
 QUEUE. Mainly useful for manual examination of queue state, as the list may be
@@ -117,6 +125,7 @@ in the worse case force the queue-traversal to be restarted several times."
          (go :retry))
        (return-from list-queue-contents (result)))))
 
+(declaim (ftype (sfunction (queue) unsigned-byte) queue-count))
 (defun queue-count (queue)
   "Returns the number of objects in QUEUE. Mainly useful for manual
 examination of queue state, and in PRINT-OBJECT methods: inefficient as it
@@ -131,6 +140,7 @@ must walk the entire queue."
          (go :retry))
        (return-from queue-count count))))
 
+(declaim (ftype (sfunction (queue) boolean) queue-empty-p))
 (defun queue-empty-p (queue)
   "Returns T if QUEUE is empty, NIL otherwise."
   (null (cdr (queue-head queue))))

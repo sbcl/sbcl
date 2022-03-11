@@ -124,16 +124,53 @@
 
 (defun integer-from-octets (octets)
   (declare (type (array (unsigned-byte 8) (*)) octets))
+  #-sb-xc-host (aver (array-header-p octets))
+
+  ;; Bignums are little-endian by word, but native-endian within each word,
+  ;; making use of the less consy algorithm too tricky for big-endian CPUs.
+  ;; And this does not work for little-endian, but I don't know why.
+  ;; It should not be too hard to use random testing to find an input
+  ;; at which the output obviously differs from the shift+add loop.
+  #+nil
+  (let ((input (%array-data octets)))
+    (if (typep (%vector-raw-bits input 0) 'fixnum)
+        (%vector-raw-bits input 0)
+        (let* ((nbytes (length octets))
+               (last-byte (if (plusp nbytes) (aref octets (1- nbytes)) 0))
+               ;; If the high bit of the highest byte is 1, we might need one more
+               ;; byte to avoid the bignum coming out negative.
+               (nbits (* (+ nbytes (ash last-byte -7)) sb-vm:n-byte-bits))
+               (ndigits (ceiling nbits sb-vm:n-word-bits))
+               (bignum (sb-bignum:%allocate-bignum ndigits)))
+          (dotimes (i ndigits (sb-bignum::%normalize-bignum bignum ndigits))
+            (setf (%bignum-ref bignum i) (%vector-raw-bits input i))))))
+
   (let ((result 0) (shift 0))
     (dovector (byte octets result)
       (setf result (logior result (ash byte shift))
             shift (+ shift 8)))))
 
-(defun pack-code-fixup-locs (abs-fixups rel-fixups)
-  (let ((bytes (make-array (* 2 (+ (length abs-fixups) ; guess at final length
-                                   (length rel-fixups)))
-                           :fill-pointer 0 :adjustable t
-                           :element-type '(unsigned-byte 8))))
+;;; Pack two lists of fixup locations into a single varint.
+;;; * 32-bit x86 code tends to have more absolute fixups than relative fixups.
+;;;   An absolute fixup is necessary for each reference to a boxed constant
+;;;   due to lack of PC-relative addressing. A relative fixup is necessary for each
+;;;   call to an assembly routine.
+;;; * x86-64 can use 64-bit absolute fixups to encode jump tables within a movable
+;;;   or immobile object.  It uses 32-bit fixups only in immobile code.
+;;;   Therefore the GC is concerned only with 64-bit fixups, whereas core relocation
+;;;   and defragmentation makes use of all of them.
+;;;   However, there are no 64-bit fixups recorded in the packed fixup locs.
+;;;   This would need to change if we had any 64-bit fixups at locations within
+;;;   the code that could not be deduced by examining the object.
+;;; It makes sense to store these externally to the object, as it would otherwise
+;;; intrude on text pages. Also, some of the bignums are shareable this way.
+(defun pack-code-fixup-locs (abs-fixups rel-fixups more)
+  (dx-let ((bytes (make-array (min (* 2 (+ (length abs-fixups) ; guess at final length
+                                           (length rel-fixups)
+                                           (length more)))
+                                   1024) ; limit the stack usage
+                              :fill-pointer 0 :adjustable t
+                              :element-type '(unsigned-byte 8))))
     (flet ((pack (list &aux (prev 0))
              (dolist (x list)
                ;; two fixups at the same location have to be wrong,
@@ -141,10 +178,13 @@
                (aver (> x prev))
                (write-var-integer (- x prev) bytes)
                (setq prev x))))
-      (pack (setq abs-fixups (sort abs-fixups #'<)))
-      (when rel-fixups
+      (pack (sort abs-fixups #'<))
+      (when (or rel-fixups more)
         (write-var-integer 0 bytes)
-        (pack (setq rel-fixups (sort rel-fixups #'<)))))
+        (pack (sort rel-fixups #'<)))
+      (when more
+        (write-var-integer 0 bytes)
+        (pack (sort more #'<))))
     ;; Stuff octets into an integer
     ;; It would be quite possible in the target to do something clever here
     ;; by creating a bignum directly from the ub8 vector.
@@ -175,117 +215,143 @@
                  (let ((,loc (+ ,prev ,acc))) ,@body (setq ,prev ,loc))
                  (setq ,acc 0 ,shift 0))))))))
 
+;;; Unpack the (potentially) three stream of data in PACKED-INTEGER.
 (defun unpack-code-fixup-locs (packed-integer)
-  (collect ((abs-locs) (rel-locs))
+  (collect ((stream1) (stream2) (stream3))
     (let ((pos 0))
-      (do-packed-varints (loc packed-integer pos) (abs-locs loc))
-      (do-packed-varints (loc packed-integer pos) (rel-locs loc)))
-    (values (abs-locs) (rel-locs))))
+      (do-packed-varints (loc packed-integer pos) (stream1 loc))
+      (do-packed-varints (loc packed-integer pos) (stream2 loc))
+      (do-packed-varints (loc packed-integer pos) (stream3 loc)))
+    (values (stream1) (stream2) (stream3))))
 
 (define-symbol-macro lz-symbol-1 210) ; arbitrary value that isn't frequent in the input
 (define-symbol-macro lz-symbol-2 218) ; ditto
 
+(defconstant +max-lz-size+ (* 1024 64))
+
 ;;; A somewhat bad (slow and not-very-squishy) compressor
 ;;; that gets between 15% and 20% space savings in debug blocks.
 ;;; Lengthy input may be compressible by as much as 3:1.
-(declaim (ftype (sfunction ((array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+(declaim (ftype (sfunction ((array (unsigned-byte 8) 1))
+                           (or (simple-array (unsigned-byte 8) 1)
+                               (simple-array (signed-byte 8) 1)))
                 lz-compress))
 (defun lz-compress (input)
-  (let ((output (make-array (length input)
-                            :element-type '(unsigned-byte 8)
-                            :fill-pointer 0 :adjustable t))
-        (tempbuf (make-array 8 :element-type '(unsigned-byte 8)
-                               :fill-pointer 0)))
-    (flet ((compare (index1 index2 end &aux (start1 index1))
-             (loop
-              (when (or (eql index2 end)
-                        (not (eql (aref input index1) (aref input index2))))
-                (return-from compare (- index1 start1)))
-              (incf index1)
-              (incf index2))))
-      (loop with pos of-type index = 0
-            while (< pos (length input))
-            do
-        (let ((match-start 0)
-              (match-len 2))
-          ;; limit the lookback amount to make the running time n^2 in input
-          ;; length instead of n^3.
-          (loop for start from (max 0 (- pos 4000)) below pos
+  (if (> (length input) +max-lz-size+)
+      (coerce input '(simple-array (unsigned-byte 8) (*)))
+      (let* ((length (length input))
+             (output (make-array length
+                                 :element-type '(unsigned-byte 8)
+                                 :fill-pointer 0 :adjustable t))
+             (tempbuf (make-array 8 :element-type '(unsigned-byte 8)
+                                    :fill-pointer 0))
+             #-sb-xc-host
+             (input (truly-the simple-array (%array-data input))))
+        (flet ((compare (index1 index2 end &aux (start1 index1))
+                 (loop
+                  (when (or (eql index2 end)
+                            (not (eql (aref input index1) (aref input index2))))
+                    (return-from compare (- index1 start1)))
+                  (incf index1)
+                  (incf index2))))
+          (loop with pos of-type index = 0
+                while (< pos length)
                 do
-            (let ((this-len (compare start pos (length input))))
-              (when (> this-len match-len)
-                (setq match-start start match-len this-len))))
-          (let ((offset (- pos match-start)))
-            ;; Length = 3 is emitted as symbol-2 followed by a single byte
-            ;; for the offset. Longer lengths are written as symbol-1 and
-            ;; then two varint-encoded values. We first determine whether
-            ;; writing the back-reference is shorter than the source bytes.
-            (cond ((and (> match-len 3)
-                        (progn (setf (fill-pointer tempbuf) 0)
-                               (write-var-integer offset tempbuf)
-                               (write-var-integer match-len tempbuf)
-                               (< (1+ (fill-pointer tempbuf)) match-len)))
-                   ;; marker symbol if followed by 0 would represent a literal
-                   (aver (/= (aref tempbuf 0) 0))
-                   (vector-push-extend lz-symbol-1 output)
-                   (dovector (elt tempbuf) (vector-push-extend elt output))
-                   (incf pos match-len))
-                  ((and (= match-len 3) (< offset 256))
-                   (vector-push-extend lz-symbol-2 output)
-                   (vector-push-extend offset output)
-                   (incf pos 3))
-                  (t
-                   (let ((byte (aref input pos)))
-                     (incf pos)
-                     (vector-push-extend byte output)
-                     (when (or (= byte lz-symbol-1) (= byte lz-symbol-2))
-                       (vector-push-extend 0 output)))))))))
-    (let ((result
-           #+sb-xc-host
-           (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
-           #-sb-xc-host
-           (%shrink-vector (%array-data output) (fill-pointer output))))
-      #+(or)
-      (aver (equalp input (lz-decompress result)))
-      result)))
+                (let ((match-start 0)
+                      (match-len 2))
+                  ;; limit the lookback amount to make the running time n^2 in input
+                  ;; length instead of n^3.
+                  (loop for start from (max 0 (- pos 4000)) below pos
+                        do
+                        (let ((this-len (compare start pos length)))
+                          (when (> this-len match-len)
+                            (setq match-start start match-len this-len))))
+                  (let ((offset (- pos match-start)))
+                    ;; Length = 3 is emitted as symbol-2 followed by a single byte
+                    ;; for the offset. Longer lengths are written as symbol-1 and
+                    ;; then two varint-encoded values. We first determine whether
+                    ;; writing the back-reference is shorter than the source bytes.
+                    (cond ((and (> match-len 3)
+                                (progn (setf (fill-pointer tempbuf) 0)
+                                       (write-var-integer offset tempbuf)
+                                       (write-var-integer match-len tempbuf)
+                                       (< (1+ (fill-pointer tempbuf)) match-len)))
+                           ;; marker symbol if followed by 0 would represent a literal
+                           (aver (/= (aref tempbuf 0) 0))
+                           (vector-push-extend lz-symbol-1 output)
+                           (dovector (elt tempbuf) (vector-push-extend elt output))
+                           (incf pos match-len))
+                          ((and (= match-len 3) (< offset 256))
+                           (vector-push-extend lz-symbol-2 output)
+                           (vector-push-extend offset output)
+                           (incf pos 3))
+                          (t
+                           (let ((byte (aref input pos)))
+                             (incf pos)
+                             (vector-push-extend byte output)
+                             (when (or (= byte lz-symbol-1) (= byte lz-symbol-2))
+                               (vector-push-extend 0 output)))))))))
+        (let ((result
+                (if (>= (length output) length)
+                    (map-into (sb-xc:make-array length :element-type '(signed-byte 8))
+                              (lambda (x)
+                                (mask-signed-field 8 (the (unsigned-byte 8) x)))
+                              input)
+                    #+sb-xc-host
+                    (coerce output '(simple-array (unsigned-byte 8) (*)))
+                    #-sb-xc-host
+                    (%shrink-vector (%array-data output) (fill-pointer output)))))
+          #+(or)
+          (aver (equalp input (lz-decompress result)))
+          result))))
 
 #-sb-xc-host
 (progn
-(declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+(declaim (ftype (sfunction ((or (simple-array (unsigned-byte 8) 1)
+                                (simple-array (signed-byte 8) 1)))
+                           (simple-array (unsigned-byte 8) 1))
                 lz-decompress))
 (defun lz-decompress (input)
-  (let* ((length (length input))
-         (output (make-array (* length 2)
-                             :element-type '(unsigned-byte 8)
-                             :fill-pointer 0 :adjustable t))
-         (inpos 0))
-    (flet ((copy (offset length)
-             (let ((index (- (fill-pointer output) offset)))
-               (dotimes (i length)
-                 (vector-push-extend (aref output index) output)
-                 (incf index)))))
-      (loop while (< inpos length)
-            do
-            (let ((byte (aref input inpos)))
-              (incf inpos)
-              (cond ((= byte lz-symbol-1) ; general case
-                     (let ((byte (aref input inpos)))
-                       (cond ((= byte 0) ; literal symbol
+  (cond ((typep input '(simple-array (signed-byte 8) 1))
+         ;; Uncompressed
+         (let ((result (make-array (length input) :element-type '(unsigned-byte 8))))
+           (ub8-bash-copy input 0 result 0 (length input))
+           result))
+        ((> (length input) +max-lz-size+)
+         input)
+        (t
+         (let* ((length (length input))
+                (output (make-array (* length 2)
+                                    :element-type '(unsigned-byte 8)
+                                    :fill-pointer 0 :adjustable t))
+                (inpos 0))
+           (flet ((copy (offset length)
+                    (let ((index (- (fill-pointer output) offset)))
+                      (dotimes (i length)
+                        (vector-push-extend (aref output index) output)
+                        (incf index)))))
+             (loop while (< inpos length)
+                   do
+                   (let ((byte (aref input inpos)))
+                     (incf inpos)
+                     (cond ((= byte lz-symbol-1) ; general case
+                            (let ((byte (aref input inpos)))
+                              (cond ((= byte 0) ; literal symbol
+                                     (incf inpos)
+                                     (vector-push-extend lz-symbol-1 output))
+                                    (t
+                                     (binding* (((offset new-inpos)
+                                                 (read-var-integer input inpos))
+                                                ((len new-new-inpos)
+                                                 (read-var-integer input new-inpos)))
+                                       (setf inpos new-new-inpos)
+                                       (copy offset len))))))
+                           ((= byte lz-symbol-2) ; special case
+                            (let ((offset (aref input inpos)))
                               (incf inpos)
-                              (vector-push-extend lz-symbol-1 output))
-                             (t
-                              (binding* (((offset new-inpos)
-                                          (read-var-integer input inpos))
-                                         ((len new-new-inpos)
-                                          (read-var-integer input new-inpos)))
-                                (setf inpos new-new-inpos)
-                                (copy offset len))))))
-                    ((= byte lz-symbol-2) ; special case
-                     (let ((offset (aref input inpos)))
-                       (incf inpos)
-                       (if (= offset 0) ; literal symbol
-                           (vector-push-extend lz-symbol-2 output)
-                           (copy offset 3))))
-                    (t
-                     (vector-push-extend byte output))))))
-    (%shrink-vector (%array-data output) (fill-pointer output)))))
+                              (if (= offset 0) ; literal symbol
+                                  (vector-push-extend lz-symbol-2 output)
+                                  (copy offset 3))))
+                           (t
+                            (vector-push-extend byte output))))))
+           (%shrink-vector (%array-data output) (fill-pointer output)))))))

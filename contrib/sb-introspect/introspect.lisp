@@ -34,6 +34,7 @@
            "FUNCTION-ARGLIST"
            "FUNCTION-LAMBDA-LIST"
            "FUNCTION-TYPE"
+           "METHOD-COMBINATION-LAMBDA-LIST"
            "DEFTYPE-LAMBDA-LIST"
            "VALID-FUNCTION-NAME-P"
            "FIND-DEFINITION-SOURCE"
@@ -57,6 +58,8 @@
            "WHO-SPECIALIZES-GENERALLY"))
 
 (in-package :sb-introspect)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (system-package-p *package*) t))
 
 ;;;; Internal interface for SBCL debug info
 
@@ -298,11 +301,11 @@ If an unsupported TYPE is requested, the function will return NIL.
                    (eq (car name) 'setf))
           (setf name (cadr name)))
         (let ((expander (info :setf :expander name)))
-          (when expander
-            (find-definition-source
-             (cond ((symbolp expander) (symbol-function expander))
-                   ((listp expander) (cdr expander))
-                   (t expander))))))
+          (cond ((typep expander '(cons symbol))
+                 (translate-source-location (cddr expander)))
+                (expander
+                 (find-definition-source
+                  (if (listp expander) (cdr expander) expander))))))
        ((:structure)
         (let ((class (get-class name)))
           (if class
@@ -351,6 +354,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (sb-c:fun-info-ltn-annotate . sb-c:ltn-annotate)
                             (sb-c:fun-info-optimizer . sb-c:optimizer)
                             (sb-c:fun-info-ir2-convert . sb-c:ir2-convert)
+                            (sb-c::fun-info-ir2-hook . sb-c::ir2-hook)
                             (sb-c::fun-info-stack-allocate-result
                              . sb-c::stack-allocate-result)
                             (sb-c::fun-info-constraint-propagate
@@ -456,18 +460,18 @@ If an unsupported TYPE is requested, the function will return NIL.
 (defun find-function-definition-source (function)
   (let* ((debug-info (function-debug-info function))
          (debug-source (debug-info-source debug-info))
-         (debug-fun (debug-info-debug-function function debug-info))
-         (tlf (sb-c::compiled-debug-info-tlf-number debug-info)))
-    (make-definition-source
-     :pathname
-     (when (stringp (debug-source-namestring debug-source))
-       (parse-namestring (debug-source-namestring debug-source)))
-     :character-offset
-     (sb-c::compiled-debug-info-char-offset debug-info)
-     :form-path (if tlf (list tlf))
-     :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
-     :file-write-date (debug-source-created debug-source)
-     :plist (sb-c::debug-source-plist debug-source))))
+         (debug-fun (debug-info-debug-function function debug-info)))
+    (multiple-value-bind (tlf character-offset)
+        (sb-di::debug-fun-tlf-and-offset debug-info debug-fun)
+      (make-definition-source
+       :pathname
+       (when (stringp (debug-source-namestring debug-source))
+         (parse-namestring (debug-source-namestring debug-source)))
+       :character-offset character-offset
+       :form-path (if tlf (list tlf))
+       :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
+       :file-write-date (debug-source-created debug-source)
+       :plist (sb-c::debug-source-plist debug-source)))))
 
 (defun translate-source-location (location)
   (if location
@@ -490,11 +494,13 @@ If an unsupported TYPE is requested, the function will return NIL.
   (function-lambda-list function))
 
 (defun function-lambda-list (function)
-  "Describe the lambda list for the extended function designator FUNCTION.
+  "Return the lambda list for the extended function designator FUNCTION.
 Works for special-operators, macros, simple functions, interpreted functions,
 and generic functions. Signals an error if FUNCTION is not a valid extended
-function designator."
-  ;; FIXME: sink this logic into SB-KERNEL:%FUN-LAMBDA-LIST and just call that?
+function designator.
+
+If the function does not have a lambda list (compiled with debug 0),
+then two values are returned: (values nil t)"
   (cond ((and (symbolp function) (special-operator-p function))
          (function-lambda-list (info :function :ir1-convert function)))
         ((valid-function-name-p function)
@@ -504,7 +510,10 @@ function designator."
         ((typep function 'generic-function)
          (sb-pcl::generic-function-pretty-arglist function))
         (t
-         (%fun-lambda-list function))))
+         (let ((raw-result (%fun-lambda-list function)))
+           (if (eq raw-result :unknown)
+               (values nil t)
+               (values raw-result nil))))))
 
 (defun deftype-lambda-list (typespec-operator)
   "Returns the lambda list of TYPESPEC-OPERATOR as first return
@@ -519,31 +528,39 @@ value."
         (values (%fun-lambda-list f) t)
         (values nil nil))))
 
+(defun method-combination-lambda-list (method-combination)
+  "Return the lambda-list of METHOD-COMBINATION designator.
+METHOD-COMBINATION can be a method combination object,
+or a method combination name."
+  (let* ((name (etypecase method-combination
+                 (symbol method-combination)
+                 (method-combination
+                  (sb-pcl::method-combination-type-name method-combination))))
+         (info (or (gethash name sb-pcl::**method-combinations**)
+                   (error "~S: no such method combination." name))))
+    (sb-pcl::method-combination-info-lambda-list info)))
+
 (defun function-type (function-designator)
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
-  (flet ((ftype-of (function-designator)
-           (type-specifier
-            (global-ftype function-designator))))
-    (etypecase function-designator
-      (symbol
-       (when (and (fboundp function-designator)
-                  (not (macro-function function-designator))
-                  (not (special-operator-p function-designator)))
-         (ftype-of function-designator)))
-      (cons
-       (when (and (legal-fun-name-p function-designator)
-                  (fboundp function-designator))
-         (ftype-of function-designator)))
-      (generic-function
-       (function-type (sb-pcl:generic-function-name function-designator)))
-      (function
-       ;; Give declared type in globaldb priority over derived type
-       ;; because it contains more accurate information e.g. for
-       ;; struct-accessors.
-       (let ((type (function-type (%fun-name (%fun-fun function-designator)))))
-         (if type
-             type
-             (sb-impl::%fun-type function-designator)))))))
+  (etypecase function-designator
+    ((or symbol cons)
+     ;; XXX: why require FBOUNDP? Would it be wrong to always report the proclaimed type?
+     (when (and (legal-fun-name-p function-designator) ; guarding FBOUNDP against error
+                (fboundp function-designator)
+                (eq (info :function :kind function-designator) :function))
+       (type-specifier (global-ftype function-designator))))
+    (function
+     (let ((name (%fun-name function-designator)))
+       (if (and (legal-fun-name-p name)
+                (fboundp name)
+                ;; It seems inappropriate to report the global ftype if this
+                ;; function is not the current binding of the global name,
+                (eq (fdefinition name) function-designator))
+           ;; Give declared type in globaldb priority over derived type
+           ;; because it contains more accurate information e.g. for
+           ;; struct-accessors.
+           (function-type name)
+           (sb-impl::%fun-ftype function-designator))))))
 
 ;;;; find callers/callees, liberated from Helmut Eller's code in SLIME
 
@@ -599,7 +616,21 @@ value."
                 ;; entry.
                 (setf (definition-source-form-number source-location)
                       xref-form-number)
-                (push (cons name source-location) result))))
+                (let ((name (cond ((sb-c::transform-p name)
+                                   (let ((fun-name (%fun-name fun)))
+                                     (append (if (consp fun-name)
+                                                 fun-name
+                                                 (list fun-name))
+                                             (let* ((type (sb-c::transform-type name))
+                                                    (type-spec (type-specifier type)))
+                                               (and (sb-kernel:fun-type-p type)
+                                                    (list (second type-spec)))))))
+                                  ((sb-c::vop-info-p name)
+                                   (list 'sb-c:define-vop
+                                         (sb-c::vop-info-name name)))
+                                  (t
+                                   name))))
+                  (push (cons name source-location) result)))))
           xrefs))))
     result))
 
@@ -721,7 +752,6 @@ Experimental.
 ;;;; ALLOCATION INTROSPECTION
 
 (defun allocation-information (object)
-  #+sb-doc
   "Returns information about the allocation of OBJECT. Primary return value
 indicates the general type of allocation: :IMMEDIATE, :HEAP, :STACK,
 or :FOREIGN.
@@ -787,26 +817,21 @@ Experimental: interface subject to change."
                          ;; bits are packed in the opposite order. And thankfully,
                          ;; this fix seems not to depend on whether the numbering
                          ;; scheme is MSB 0 or LSB 0, afaict.
-                         (let* ((index (sb-vm:find-page-index
+                         (let* ((wp (page-protected-p object))
+                                (index (sb-vm:find-page-index
                                         (get-lisp-obj-address object)))
                                 (flags (sb-alien:slot page 'sb-vm::flags))
                                 .
-                                ;; The unused WP-CLR is for ease of counting
                                 #+big-endian
-                                ((type      (ldb (byte 5 3) flags))
-                                 (wp        (logbitp 2 flags))
-                                 (wp-clr    (logbitp 1 flags))
+                                ((type      (ldb (byte 6 2) flags))
                                  (dontmove  (logbitp 0 flags)))
                                 #+little-endian
-                                ((type      (ldb (byte 5 0) flags))
-                                 (wp        (logbitp 5 flags))
-                                 (wp-clr    (logbitp 6 flags))
+                                ((type      (ldb (byte 6 0) flags))
                                  (dontmove  (logbitp 7 flags))))
-                           (declare (ignore wp-clr))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
-                                 :boxed (logbitp 0 type)
+                                 :boxed (> (logand type #xf) 1)
                                  :pinned dontmove
                                  :large (logbitp 4 type)
                                  :page index)))
@@ -857,10 +882,11 @@ Experimental: interface subject to change."
                  (add-to-xset part seen)
                  (funcall fun part))))
       (when ext
-        (let ((table sb-pcl::*eql-specializer-table*))
-          (multiple-value-bind (value foundp)
-              (with-locked-system-table (table) (gethash object table))
-            (when foundp (call value)))))
+        (multiple-value-bind (value foundp)
+            (let ((table sb-pcl::*eql-specializer-table*))
+              (with-system-mutex ((hash-table-lock table))
+                (gethash object table)))
+          (when foundp (call value))))
       (sb-vm:do-referenced-object (object call)
         (cons
          :extend
@@ -913,7 +939,7 @@ Experimental: interface subject to change."
            (call (fun-code-header object)))
          (call (%simple-fun-name object))
          (call (%simple-fun-arglist object))
-         (call (%simple-fun-type object))
+         (call (%simple-fun-source object))
          (call (%simple-fun-info object)))
         (symbol
          ;; We use :override here because (apparently) the intent is
@@ -1007,7 +1033,7 @@ Experimental: interface subject to change."
                                    (= this-bin-size (+ prev-bin-size 2)))
                                this-bin-size))))))))
 
-(defun largest-objects (&key (threshold #+gencgc sb-vm:gencgc-card-bytes
+(defun largest-objects (&key (threshold #+gencgc sb-vm:gencgc-page-bytes
                                         #-gencgc sb-c:+backend-page-bytes+)
                              (sort :size))
   (declare (type (member :address :size) sort))

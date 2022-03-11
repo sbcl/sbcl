@@ -12,8 +12,8 @@ SB-THREAD package.
 Threads are part of the default build on x86[-64]/ARM64 Linux and Windows.
 
 They are also supported on: x86[-64] Darwin (Mac OS X), x86[-64]
-FreeBSD, x86 SunOS (Solaris), PPC Linux, ARM64 Linux. On these
-platforms threads must be explicitly enabled at build-time, see
+FreeBSD, x86 SunOS (Solaris), PPC Linux, ARM64 Linux, RISC-V Linux. On
+these platforms threads must be explicitly enabled at build-time, see
 @file{INSTALL} for directions.
 
 @menu
@@ -116,19 +116,11 @@ lockless algorithms.
 
 @unnumberedsubsec CAS Protocol
 
-Our @code{compare-and-swap} is user-extensible using a protocol
-similar to @code{setf}, allowing users to add CAS support to new
-places via e.g. @code{defcas}.
-
-At the same time, new atomic operations can be built on top of CAS
-using @code{get-cas-expansion}. See @code{atomic-update},
-@code{atomic-push}, and @code{atomic-pop} for examples of how to do
-this.
+Our @code{compare-and-swap} is user-extensible by defining functions
+named (CAS place), allowing users to add CAS support to new
+places.
 
 @include macro-sb-ext-cas.texinfo
-@include macro-sb-ext-define-cas-expander.texinfo
-@include macro-sb-ext-defcas.texinfo
-@include fun-sb-ext-get-cas-expansion.texinfo
 
 @node Mutex Support
 @comment  node-name,  next,  previous,  up
@@ -279,8 +271,8 @@ it.
 @section Barriers
 
 These are based on the Linux kernel barrier design, which is in turn
-based on the Alpha CPU memory model. They are presently implemented
-for x86, x86-64, PPC, and ARM64 systems, and behave as compiler
+based on the Alpha CPU memory model. They are presently implemented for
+x86, x86-64, PPC, ARM64, and RISC-V systems, and behave as compiler
 barriers on all other CPUs.
 
 In addition to explicit use of the @code{sb-thread:barrier} macro, the

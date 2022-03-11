@@ -1,0 +1,143 @@
+(defglobal *counter* 0)
+(declaim (fixnum *counter*))
+
+;; how many threads to make, not all at once, of course
+(defparameter howmany-threads 20000)
+
+(defun thread-lambda ()
+  (atomic-incf *counter*))
+
+(defun test1 (&optional (n howmany-threads))
+  (setq *counter* 0)
+  (dotimes (i n)
+    (sb-thread:join-thread (sb-thread:make-thread #'thread-lambda)))
+  (assert (= *counter* n)))
+
+(defun test2 (&optional (n howmany-threads))
+  (setq *counter* 0)
+  (let (prev-thread)
+    (dotimes (i n)
+      ;; while starting the new thread, join the previously made.
+      (let ((new-thread (sb-thread:make-thread #'thread-lambda)))
+        (when prev-thread
+          (sb-thread:join-thread prev-thread))
+        (setq prev-thread new-thread)))
+    (sb-thread:join-thread prev-thread))
+  (assert (= *counter* n)))
+
+(defun test3 (&optional (n howmany-threads))
+  (setq *counter* 0)
+  ;; try making 10 at a time and waiting for those 10 before making more
+  (dotimes (i (/ n 10))
+    (let ((threads))
+      (dotimes (i 10)
+        (push (sb-thread:make-thread #'thread-lambda) threads))
+      (dolist (thread threads)
+        (sb-thread:join-thread thread))))
+  (assert (= *counter* n)))
+
+Without :pauseless-threadstart
+-------------------------------
+
+$ perf stat ... --eval '(test1)' --quit
+          6,435.72 msec task-clock:u              #    1.103 CPUs utilized
+                 0      context-switches:u        #    0.000 K/sec
+                 0      cpu-migrations:u          #    0.000 K/sec
+           219,735      page-faults:u             #    0.034 M/sec
+     1,484,016,696      cycles:u                  #    0.231 GHz
+    17,008,247,359      stalled-cycles-frontend:u # 1146.10% frontend cycles idle
+       525,232,002      instructions:u            #    0.35  insn per cycle
+                                                  #   32.38  stalled cycles per insn
+       145,098,224      branches:u                #   22.546 M/sec
+         4,045,481      branch-misses:u           #    2.79% of all branches
+
+       5.834005191 seconds time elapsed
+       0.684522000 seconds user
+       6.391622000 seconds sys
+
+$ perf stat ... --eval '(test2)' --quit
+          6,383.26 msec task-clock:u              #    1.182 CPUs utilized
+                 0      context-switches:u        #    0.000 K/sec
+                 0      cpu-migrations:u          #    0.000 K/sec
+           220,625      page-faults:u             #    0.035 M/sec
+     1,435,852,231      cycles:u                  #    0.225 GHz
+    16,839,228,290      stalled-cycles-frontend:u # 1172.77% frontend cycles idle
+       524,776,029      instructions:u            #    0.37  insn per cycle
+                                                  #   32.09  stalled cycles per insn
+       144,951,979      branches:u                #   22.708 M/sec
+         4,018,908      branch-misses:u           #    2.77% of all branches
+
+       5.401308431 seconds time elapsed
+       0.773771000 seconds user
+       6.235207000 seconds sys
+
+$ perf stat ... --eval '(test3)' --quit
+          7,813.04 msec task-clock:u              #    1.133 CPUs utilized
+                 0      context-switches:u        #    0.000 K/sec
+                 0      cpu-migrations:u          #    0.000 K/sec
+           131,699      page-faults:u             #    0.017 M/sec
+     1,477,424,012      cycles:u                  #    0.189 GHz
+    20,769,787,623      stalled-cycles-frontend:u # 1405.81% frontend cycles idle
+       525,748,318      instructions:u            #    0.36  insn per cycle
+                                                  #   39.51  stalled cycles per insn
+       145,134,345      branches:u                #   18.576 M/sec
+         4,412,369      branch-misses:u           #    3.04% of all branches
+
+       6.894458409 seconds time elapsed
+       0.641120000 seconds user
+       7.864134000 seconds sys
+
+Conclusion: approximately 300 microseconds to start a thread
+
+With :pauseless-threadstart
+----------------------------
+
+$ perf stat ... --eval '(test1)' --quit
+          1,541.91 msec task-clock:u              #    1.068 CPUs utilized
+                 0      context-switches:u        #    0.000 K/sec
+                 0      cpu-migrations:u          #    0.000 K/sec
+               633      page-faults:u             #    0.411 K/sec
+       801,317,853      cycles:u                  #    0.520 GHz
+     3,751,130,586      stalled-cycles-frontend:u #  468.12% frontend cycles idle
+       352,170,311      instructions:u            #    0.44  insn per cycle
+                                                  #   10.65  stalled cycles per insn
+        81,884,155      branches:u                #   53.106 M/sec
+         1,334,916      branch-misses:u           #    1.63% of all branches
+
+       1.443664147 seconds time elapsed
+       0.425407000 seconds user
+       1.471034000 seconds sys
+
+$ perf stat ... --eval '(test2)' --quit
+          1,249.01 msec task-clock:u              #    1.550 CPUs utilized
+                 0      context-switches:u        #    0.000 K/sec
+                 0      cpu-migrations:u          #    0.000 K/sec
+               573      page-faults:u             #    0.459 K/sec
+       668,480,325      cycles:u                  #    0.535 GHz
+     3,086,418,550      stalled-cycles-frontend:u #  461.71% frontend cycles idle
+       376,966,208      instructions:u            #    0.56  insn per cycle
+                                                  #    8.19  stalled cycles per insn
+        95,790,671      branches:u                #   76.694 M/sec
+           918,120      branch-misses:u           #    0.96% of all branches
+
+       0.805563424 seconds time elapsed
+       0.325539000 seconds user
+       1.162641000 seconds sys
+
+$ perf stat ... --eval '(test3)' --quit
+          1,308.09 msec task-clock:u              #    1.455 CPUs utilized
+                 0      context-switches:u        #    0.000 K/sec
+                 0      cpu-migrations:u          #    0.000 K/sec
+             4,838      page-faults:u             #    0.004 M/sec
+       660,514,151      cycles:u                  #    0.505 GHz
+     3,230,465,234      stalled-cycles-frontend:u #  489.08% frontend cycles idle
+       364,307,811      instructions:u            #    0.55  insn per cycle
+                                                  #    8.87  stalled cycles per insn
+        92,966,084      branches:u                #   71.070 M/sec
+           730,714      branch-misses:u           #    0.79% of all branches
+
+       0.899161220 seconds time elapsed
+       0.339090000 seconds user
+       1.227741000 seconds sys
+
+Conclusion: 40 to 100 microseconds to start a thread

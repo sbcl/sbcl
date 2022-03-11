@@ -109,7 +109,7 @@
     (assert (member 'happiness *recognized-declarations*))
     (proclaim '(declaration happiness))
     (assert (equal *recognized-declarations* saved)) ; not pushed again
-    (setf (info :declaration :recognized 'happiness) nil)
+    (setf (info :declaration :known 'happiness) nil)
     (assert (not (member 'happiness *recognized-declarations*)))))
 
 (test-util:with-test (:name :recognized-decl-not-also-type)
@@ -135,11 +135,11 @@
       (info :variable :macro-expansion 'fruitbaskets)
     (assert (and (not foundp) (not data)))))
 
-;; packed info vector tests
+;; packed-info tests
 
 (test-util:with-test (:name :globaldb-info-iterate)
   (let ((s (with-output-to-string (*standard-output*) (show-info '*))))
-    (dolist (x '((:function :definition) (:function :type)
+    (dolist (x '((:function :type)
                  (:function :where-from) (:function :kind)
                  (:function :info) (:function :source-transform)
                  (:type :kind) (:type :builtin)
@@ -157,7 +157,6 @@
   (flet ((try (x)
            (assert (eq (find-fdefn x) (info :function :definition x)))))
     (do-all-symbols (s)
-      (try s)
       (try `(setf ,s))
       (try `(cas ,s)))))
 
@@ -178,7 +177,7 @@
         (let ((val (format nil "value for ~D" num)))
           (setq iv1 (quick-packed-info-insert iv1 num val)
                 iv2 (%packed-info-insert ; not PACKED-INFO-INSERT
-                     iv2 +no-auxilliary-key+ num val))
+                     iv2 +no-auxiliary-key+ num val))
           (assert (equalp iv1 iv2))))
       ;; the first and only info descriptor should be full
       (assert (not (info-quickly-insertable-p iv1))))))
@@ -189,10 +188,10 @@
 
 ;; The real GET-INFO-VALUE AVERs that INFO-NUMBER is legal. This one doesn't.
 (defun cheating-get-info-value (sym aux-key info-number)
-  (let* ((vector (symbol-info-vector sym))
+  (let* ((vector (symbol-dbinfo sym))
          (index (packed-info-value-index vector aux-key info-number)))
     (if index
-        (values (svref vector index) t)
+        (values (sb-kernel:%info-ref vector index) t)
         (values nil nil))))
 
 ;; Info vectors may be concurrently updated. If more than one thread writes
@@ -203,7 +202,7 @@
 #+sb-thread
 (test-util:with-test (:name :info-vector-concurrency)
   (let ((s (gensym))
-        (a (make-array 1 :element-type 'sb-ext:word)))
+        (a (make-array 1 :element-type 'sb-ext:word :initial-element 0)))
     (let* ((aux-keys '(0 a b c d e f g h nil i j k l m n o p setf q r s))
            (info-types (loop for i from 1 below 64 collect i))
            (work (test-util:shuffle (coerce (crossprod aux-keys info-types) 'vector)))
@@ -336,7 +335,8 @@
     (let ((tally (make-array n-threads :initial-element 0)))
       (info-maphash
        (lambda (key id-list)
-         (let ((scoreboard (make-array (/ n-threads 2) :element-type 'bit)))
+         (let ((scoreboard (make-array (/ n-threads 2) :element-type 'bit
+                                       :initial-element 0)))
            (dolist (thread-id id-list)
              (let ((group-id (floor thread-id 2)))
                ;; assert no duplicate for a peer group
@@ -501,7 +501,7 @@
   ;; Precompute random generalized function names for testing, some of which
   ;; are "simple" (per the taxonomy of globaldb) and some hairy.
   (let ((work (coerce (loop repeat 10000
-                            nconc (list `(sb-pcl::slow-method ,(gensym)) ; simple name
+                            nconc (list `(setf ,(gensym)) ; simple name
                                          (gensym))) ; very simple name
                       'vector))
         (n-threads 10) readers writers fdefn-results random-results)
@@ -568,7 +568,7 @@
   (flet ((run (names)
            (declare (simple-vector names))
            (let* ((n (length names))
-                  (counts (make-array n :element-type 'sb-ext:word))
+                  (counts (make-array n :element-type 'sb-ext:word :initial-element 0))
                   (threads))
              (dotimes (i 15)
                (push (sb-thread:make-thread

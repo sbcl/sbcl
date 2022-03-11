@@ -24,7 +24,7 @@
 ;;; Can be parsed but fails to define a method on
 ;;; SPECIALIZER-TYPE-SPECIFIER.
 
-(defclass custom-2-impl (sb-pcl:specializer)
+(defclass custom-2-impl (sb-mop:specializer)
   ())
 
 (defmethod sb-pcl:parse-specializer-using-class ((generic-function standard-generic-function)
@@ -36,7 +36,7 @@
 ;;; Can be parsed and has a suitable method on
 ;;; SPECIALIZER-TYPE-SPECIFIER.
 
-(defclass custom-3-impl (sb-pcl:specializer)
+(defclass custom-3-impl (sb-mop:specializer)
   ())
 
 (defmethod sb-pcl:parse-specializer-using-class ((generic-function standard-generic-function)
@@ -51,7 +51,7 @@
 ;;; Test
 
 (with-test (:name (sb-pcl:parse-specializer-using-class :smoke))
-  (let ((proto-gf (sb-pcl:class-prototype
+  (let ((proto-gf (sb-mop:class-prototype
                    (find-class 'standard-generic-function))))
     (flet ((test (specializer-name expected)
              (flet ((do-it ()
@@ -106,9 +106,9 @@
       (test `(eql t)                             (sb-mop:intern-eql-specializer t)))))
 
 (with-test (:name (sb-pcl:specializer-type-specifier :smoke))
-  (let* ((proto-gf (sb-pcl:class-prototype
+  (let* ((proto-gf (sb-mop:class-prototype
                     (find-class 'standard-generic-function)))
-         (proto-method (sb-pcl:class-prototype
+         (proto-method (sb-mop:class-prototype
                         (find-class 'standard-method))))
     (flet ((parse (specializer-specifier)
              (sb-pcl:parse-specializer-using-class

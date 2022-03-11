@@ -24,7 +24,7 @@
           (loop (gen-label))
           (not-list (generate-error-code vop 'object-not-list-error ptr)))
       (move ptr object)
-      (move count zero-tn)
+      (inst li count 0)
 
       (inst cmpd ptr null-tn)
       (inst beq done)

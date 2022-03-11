@@ -12,29 +12,132 @@
 
 (in-package "SB-C")
 
-;;; The front-end data structure (IR1) is composed of nodes,
-;;; representing actual evaluations. Linear sequences of nodes in
-;;; control-flow order are combined into blocks (but see
-;;; JOIN-SUCCESSOR-IF-POSSIBLE for precise conditions); control
-;;; transfers inside a block are represented with CTRANs and between
-;;; blocks -- with BLOCK-SUCC/BLOCK-PRED lists; data transfers are
-;;; represented with LVARs.
+(declaim (special *lexenv*))
 
-;;; FIXME: this file contains a ton of DEF!STRUCT definitions most of which
-;;; could be DEFSTRUCT, except for the fact that we use def!struct as
-;;; a workaround for the compiler's inability to cope with mutally referential
-;;; structures, even ones within the same file. The IR1 structures are tightly
-;;; knitted together - for example, starting from a CRETURN, you can reach
-;;; at least 15 other structure objects, not counting some like HASH-TABLE
-;;; which are fundamental. e.g. we have:
-;;;  CRETURN -> {NODE,CTRAN,CLAMBDA,LVAR}
-;;;  CTRAN -> {BLOCK},
-;;;  CLAMBDA -> {FUNCTIONAL,COMBINATION,BIND,PHYSENV,OPTIONAL-DISPATCH}
-;;; and so on.  DEF!STRUCT solves this problem by way of a terrible hack
-;;; that works only for compiling the compiler.
+;;; The LEXENV represents the lexical environment used for IR1 conversion.
+;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
+(declaim (inline internal-make-lexenv))
+(defstruct (lexenv
+            (:include abstract-lexenv)
+             (:print-function
+              (lambda (lexenv stream depth)
+                (if (null-lexenv-p lexenv)
+                    (print-unreadable-object (lexenv stream)
+                      (write-string "NULL-LEXENV" stream))
+                    (default-structure-print lexenv stream depth))))
+             (:copier nil)
+             (:constructor make-null-lexenv ())
+             (:constructor make-almost-null-lexenv (%policy handled-conditions
+                                                    flushable lambda parent))
+             (:constructor make-package-lock-lexenv
+                           (disabled-package-locks %policy
+                            &aux (handled-conditions nil)))
+             (:constructor internal-make-lexenv
+                           (funs vars blocks tags
+                            type-restrictions
+                            flushable
+                            lambda cleanup handled-conditions
+                            disabled-package-locks %policy user-data
+                            parent)))
+  ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
+  ;; local function), a DEFINED-FUN, representing an
+  ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
+  ;; local macro, with the specifier expander). Note that NAME may be
+  ;; a (SETF <name>) list, not necessarily a single symbol.
+  (funs nil :type list)
+  ;; an alist translating variable names to LEAF structures. A special
+  ;; binding is indicated by a :SPECIAL GLOBAL-VAR leaf. Each special
+  ;; binding within the code gets a distinct leaf structure, as does
+  ;; the current "global" value on entry to the code compiled.
+  ;; (locally (special ...)) is handled by adding the most recent
+  ;; special binding to the front of the list.
+  ;;
+  ;; If the CDR is (MACRO . <exp>), then <exp> is the expansion of a
+  ;; symbol macro.
+  (vars nil :type list)
+  ;; BLOCKS and TAGS are alists from block and go-tag names to 2-lists
+  ;; of the form (<entry> <continuation>), where <continuation> is the
+  ;; continuation to exit to, and <entry> is the corresponding ENTRY
+  ;; node.
+  (blocks nil :type list)
+  (tags nil :type list)
+  ;; an alist (THING . CTYPE) which is used to keep track of
+  ;; "pervasive" type declarations. When THING is a leaf, this is for
+  ;; type declarations that pertain to the type in a syntactic extent
+  ;; which does not correspond to a binding of the affected name.
+  (type-restrictions nil :type list)
+  ;; the lexically enclosing lambda, if any
+  (lambda nil :type (or clambda null))
+  ;; the lexically enclosing cleanup, or NIL if none enclosing within LAMBDA
+  (cleanup nil :type (or cleanup null))
+  ;; condition types we handle with a handler around the compiler
+  (handled-conditions *handled-conditions*)
+  ;; lexically disabled package locks (list of symbols)
+  (disabled-package-locks *disabled-package-locks*)
+  ;; the current OPTIMIZE policy. this is null in the null environment,
+  ;; and the global policy is stored in *POLICY*. (Because we want to
+  ;; be able to affect it from :WITH-COMPILATION-UNIT.) NIL here also
+  ;; works as a convenient null-lexenv identifier.
+  (%policy nil :type (or null policy))
+  ;; A list associating extra user info to symbols.  The entries
+  ;; are of the form (:declare name . value),
+  ;; (:variable name key . value), or (:function name key . value)
+  (user-data nil :type list)
+  (parent nil)
+  ;; Cache of all visible variables, including the ones coming from
+  ;; (call-lexenv lambda)
+  ;; Used for LEAF-VISIBLE-TO-DEBUGGER-P
+  (var-cache nil :type (or null hash-table))
+  ;; A list of functions that can be removed when unused.
+  ;; Similar to the FLUSHABLE attribute in DEFKNOWN, but can applied
+  ;; locally to things that are generally not flushable but can be
+  ;; flushed in some circumstances.
+  (flushable nil :type list))
+
+(defun lexenv-policy (lexenv)
+  (or (lexenv-%policy lexenv) *policy*))
+
+(defun null-lexenv-p (lexenv)
+  (not (lexenv-%policy lexenv)))
+
+;;; an object suitable for input to standard functions that accept
+;;; "environment objects" (of the ANSI glossary)
+(def!type lexenv-designator () '(or abstract-lexenv null))
+
+;;; support for the idiom (in MACROEXPAND and elsewhere) that NIL is
+;;; to be taken as a null lexical environment.
+;;; Of course this is a mostly pointless "idiom" because NIL *is*
+;;; an environment, as far as most environment inquiry functions care.
+(defun coerce-to-lexenv (x)
+  (etypecase x
+    (null (make-null-lexenv))
+    (lexenv x)
+    #+(and sb-fasteval (not sb-xc-host))
+    (sb-interpreter:basic-env (sb-interpreter:lexenv-from-env x))))
+
+;;; The front-end data structure (IR1) is composed of nodes and
+;;; continuations. The general idea is that continuations contain
+;;; top-down information and nodes contain bottom-up, derived
+;;; information. A continuation represents a place in the code, while
+;;; a node represents code that does something.
+;;;
+;;; This representation is more of a flow-graph than an augmented
+;;; syntax tree. The evaluation order is explicitly represented in the
+;;; linkage by continuations, rather than being implicit in the nodes
+;;; which receive the the results of evaluation. This allows us to
+;;; decouple the flow of results from the flow of control. A
+;;; continuation represents both, but the continuation can represent
+;;; the case of a discarded result by having no DEST.
+
+;;; Note: Continuations have been split into CTRANs and LVARs. Control
+;;; transfers inside a block are represented with CTRANs; data
+;;; transfers are represented with LVARs. However, many of the
+;;; comments and names have not been updated to reflect this, and it
+;;; is easy to find references to the old way of doing things with
+;;; continuations throughout the compiler.
 
 ;;; "Lead-in" Control TRANsfer [to some node]
-(def!struct (ctran (:constructor make-ctran) (:copier nil))
+(defstruct (ctran (:constructor make-ctran) (:copier nil))
   ;; an indication of the way that this continuation is currently used
   ;;
   ;; :UNUSED
@@ -61,8 +164,9 @@
   ;; the basic block this continuation is in. This is null only in
   ;; :UNUSED continuations.
   (block nil :type (or cblock null))
-  ;; Entries created by the BLOCK special operator
-  (entries nil :type list))
+  ;; Use for reporting notes for the following node,
+  ;; which can be transformed and lose its original source code.
+  (source-path nil :type list))
 
 (defmethod print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)
@@ -71,8 +175,8 @@
 
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
 ;;; temporal storage.
-(def!struct (lvar (:constructor make-lvar (&optional dest))
-                  (:copier nil))
+(defstruct (lvar (:constructor make-lvar (&optional dest))
+                 (:copier nil))
   ;; The node which receives this value. NIL only temporarily.
   (dest nil :type (or node null))
   ;; cached type of this lvar's value. If NIL, then this must be
@@ -90,12 +194,15 @@
   (dynamic-extent nil :type (or null cleanup))
   ;; something or other that the back end annotates this lvar with
   (info nil)
-  (dependent-casts nil)
+  ;; Nodes to reoptimize together with the lvar
+  (dependent-nodes nil)
   (annotations nil)
   (dependent-annotations nil))
+(!set-load-form-method lvar (:xc :target) :ignore-it)
 
-;;; These are used for annottating a LVAR with information that can't
-;;; be expressed using types.
+;;; These are used for annotating a LVAR with information that can't
+;;; be expressed using types or if the CAST semantics are undesirable
+;;; (type derivation, runtime errors).
 ;;; Right now it's basically used for tracking constants and checking
 ;;; them for things like proper sequence, or valid type specifier.
 (defstruct lvar-annotation
@@ -127,52 +234,59 @@
                                        proper-or-circular-list proper-or-dotted-list)))
 
 (defstruct (lvar-dependent-annotation
-             (:include lvar-annotation)
-             (:copier nil))
+            (:include lvar-annotation)
+            (:copier nil))
     (deps nil :type list))
 
 (defstruct (lvar-function-designator-annotation
-             (:include lvar-dependent-annotation)
-             (:copier nil))
+            (:include lvar-dependent-annotation)
+            (:copier nil))
   (caller nil :type symbol)
   (arg-specs nil :type list)
   (result-specs nil :type list)
   type)
 
-(defstruct (lvar-function-annotation
-             (:include lvar-annotation)
-             (:copier nil))
+(defstruct (lvar-type-annotation
+            (:include lvar-annotation)
+            (:copier nil))
   type
   context)
+
+(defstruct (lvar-function-annotation
+            (:include lvar-type-annotation)
+            (:copier nil)))
+
+(defstruct (lvar-lambda-var-annotation
+            (:include lvar-annotation)
+            (:copier nil))
+  lambda-var)
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
     (when (boundp '*compilation*)
       (format stream "~D" (cont-num x)))))
 
-#-sb-fluid (declaim (inline lvar-has-single-use-p))
+(declaim (inline lvar-has-single-use-p))
 (defun lvar-has-single-use-p (lvar)
   (typep (lvar-uses lvar) '(not list)))
 
 ;;; Return the unique node, delivering a value to LVAR.
-#-sb-fluid (declaim (inline lvar-use))
+(declaim (inline lvar-use))
 (defun lvar-use (lvar)
   (the (not list) (lvar-uses lvar)))
 
-#-sb-fluid (declaim (inline lvar-derived-type))
+(declaim (inline lvar-derived-type))
 (defun lvar-derived-type (lvar)
   (declare (type lvar lvar))
   (or (lvar-%derived-type lvar)
       (setf (lvar-%derived-type lvar)
             (%lvar-derived-type lvar))))
 
-(def!struct (node (:constructor nil)
-                  (:include sset-element
-                            (number (when (boundp '*compilation*)
-                                      (incf (sset-counter *compilation*)))))
-                  (:copier nil))
-  ;; unique ID for debugging
-  #+sb-show (id (new-object-id) :read-only t)
+(defstruct (node (:constructor nil)
+                 (:include sset-element
+                           (number (when (boundp '*compilation*)
+                                     (incf (sset-counter *compilation*)))))
+                 (:copier nil))
   ;; True if this node needs to be optimized. This is set to true
   ;; whenever something changes about the value of an lvar whose DEST
   ;; is this node.
@@ -211,16 +325,16 @@
   ;; top level form containing the original source.
   (source-path *current-path* :type list)
   ;; If this node is in a tail-recursive position, then this is set to
-  ;; T. At the end of IR1 (in physical environment analysis) this is
-  ;; computed for all nodes (after cleanup code has been emitted).
-  ;; Before then, a non-null value indicates that IR1 optimization has
+  ;; T. At the end of IR1 (in environment analysis) this is computed
+  ;; for all nodes (after cleanup code has been emitted).  Before
+  ;; then, a non-null value indicates that IR1 optimization has
   ;; converted a tail local call to a direct transfer.
   ;;
   ;; If the back-end breaks tail-recursion for some reason, then it
   ;; can null out this slot.
   (tail-p nil :type boolean))
 
-#-sb-fluid (declaim (inline node-block))
+(declaim (inline node-block))
 (defun node-block (node)
   (ctran-block (node-prev node)))
 
@@ -233,17 +347,17 @@
     (aver-live-component *current-component*)
     (funcall fun)))
 
-(def!struct (valued-node (:conc-name node-)
-                         (:include node)
-                         (:constructor nil)
-                         (:copier nil))
+(defstruct (valued-node (:conc-name node-)
+                        (:include node)
+                        (:constructor nil)
+                        (:copier nil))
   ;; the bottom-up derived type for this node.
   (derived-type *wild-type* :type ctype)
   ;; Lvar, receiving the values, produced by this node. May be NIL if
   ;; the value is unused.
   (lvar nil :type (or lvar null)))
 
-#-sb-fluid (declaim (inline node-dest))
+(declaim (inline node-dest))
 (defun node-dest (node)
   (awhen (node-lvar node) (lvar-dest it)))
 
@@ -277,10 +391,10 @@
   (defattr block-type-check)
   (defattr block-delete-p))
 
-(def!struct (cloop (:conc-name loop-)
-                   (:predicate loop-p)
-                   (:constructor make-loop)
-                   (:copier nil))
+(defstruct (cloop (:conc-name loop-)
+                  (:predicate loop-p)
+                  (:constructor make-loop)
+                  (:copier nil))
   ;; The kind of loop that this is.  These values are legal:
   ;;
   ;;    :OUTER
@@ -326,19 +440,19 @@
 ;;; order. This latter numbering also forms the basis of the block
 ;;; numbering in the debug-info (though that is relative to the start
 ;;; of the function.)
-(def!struct (cblock (:include sset-element)
-                    (:constructor make-block (start))
-                    (:constructor make-block-key)
-                    (:copier nil)
-                    (:conc-name block-)
-                    (:predicate block-p))
-    ;; a list of all the blocks that are predecessors/successors of this
-    ;; block. In well-formed IR1, most blocks will have one successor.
-    ;; The only exceptions are:
-    ;;  1. component head blocks (any number)
-    ;;  2. blocks ending in an IF (1 or 2)
-    ;;  3. blocks with DELETE-P set (zero)
-    (pred nil :type list)
+(defstruct (cblock (:include sset-element)
+                   (:constructor make-block (start))
+                   (:constructor make-block-key)
+                   (:copier nil)
+                   (:conc-name block-)
+                   (:predicate block-p))
+  ;; a list of all the blocks that are predecessors/successors of this
+  ;; block. In well-formed IR1, most blocks will have one successor.
+  ;; The only exceptions are:
+  ;;  1. component head blocks (any number)
+  ;;  2. blocks ending in an IF (1 or 2)
+  ;;  3. blocks with DELETE-P set (zero)
+  (pred nil :type list)
   (succ nil :type list)
   ;; the ctran which heads this block (a :BLOCK-START), or NIL when we
   ;; haven't made the start ctran yet (and in the dummy component head
@@ -384,9 +498,9 @@
   ;; what macroexpansions and source transforms happened "in" this block, used
   ;; for xref
   (xrefs nil :type list)
-  ;; Cache the physenv of a block during lifetime analysis. :NONE if
-  ;; no cached value has been stored yet.
-  (physenv-cache :none :type (or null physenv (member :none))))
+  ;; Cache the environment of a block during lifetime analysis. :NONE
+  ;; if no cached value has been stored yet.
+  (environment-cache :none :type (or null environment (member :none))))
 (defmethod print-object ((cblock cblock) stream)
   (if (boundp '*compilation*)
       (print-unreadable-object (cblock stream :type t :identity t)
@@ -398,8 +512,8 @@
 ;;; The BLOCK-ANNOTATION class is inherited (via :INCLUDE) by
 ;;; different BLOCK-INFO annotation structures so that code
 ;;; (specifically control analysis) can be shared.
-(def!struct (block-annotation (:constructor nil)
-                              (:copier nil))
+(defstruct (block-annotation (:constructor nil)
+                             (:copier nil))
   ;; The IR1 block that this block is in the INFO for.
   (block (missing-arg) :type cblock)
   ;; the next and previous block in emission order (not DFO). This
@@ -420,22 +534,14 @@
 ;;;   size of flow analysis problems, this allows back-end data
 ;;;   structures to be reclaimed after the compilation of each
 ;;;   component.
-(locally
-  ;; This is really taking the low road. I couldn't think of a way to
-  ;; avoid a style warning regarding IR2-COMPONENT other than to declare
-  ;; the INFO slot as :type (or (satisfies ir2-component-p) ...)
-  ;; During make-host-2, the solution to this is the same hack
-  ;; as for everything else: use DEF!STRUCT for IR2-COMPONENT.
-  #+host-quirks-sbcl (declare (host-sb-ext:muffle-conditions style-warning))
-(def!struct (component (:copier nil)
-                       (:constructor
-                        make-component
-                        (head
-                         tail &aux
-                         (last-block tail)
-                         (outer-loop (make-loop :kind :outer :head head)))))
-  ;; unique ID for debugging
-  #+sb-show (id (new-object-id) :read-only t)
+(defstruct (component (:copier nil)
+                      (:constructor make-component
+                       (head
+                        tail &aux
+                        (last-block tail)
+                        (outer-loop (make-loop :kind :outer
+                                               :head head
+                                               :tail (list tail))))))
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.
@@ -473,9 +579,9 @@
   ;; Entry/exit points have these blocks as their
   ;; predecessors/successors. The start and return from each
   ;; non-deleted function is linked to the component head and
-  ;; tail. Until physical environment analysis links NLX entry stubs
-  ;; to the component head, every successor of the head is a function
-  ;; start (i.e. begins with a BIND node.)
+  ;; tail. Until environment analysis links NLX entry stubs to the
+  ;; component head, every successor of the head is a function start
+  ;; (i.e. begins with a BIND node.)
   (head (missing-arg) :type cblock)
   (tail (missing-arg) :type cblock)
   ;; New blocks are inserted before this.
@@ -511,17 +617,8 @@
   (reanalyze nil :type boolean)
   ;; some sort of name for the code in this component
   (name "<unknown>" :type t)
-  ;; When I am a child, this is :NO-IR2-YET.
-  ;; In my adulthood, IR2 stores notes to itself here.
-  ;; After I have left the great wheel and am staring into the GC, this
-  ;;   is set to :DEAD to indicate that it's a gruesome error to operate
-  ;;   on me (e.g. by using me as *CURRENT-COMPONENT*, or by pushing
-  ;;   LAMBDAs onto my NEW-FUNCTIONALS, as in sbcl-0.pre7.115).
-  (info :no-ir2-yet :type (or ir2-component (member :no-ir2-yet :dead)))
-  ;; count of the number of inline expansions we have done while
-  ;; compiling this component, to detect infinite or exponential
-  ;; blowups
-  (inline-expansions 0 :type index)
+  ;; some kind of info used by the back end.
+  (info nil)
   ;; a map from combination nodes to things describing how an
   ;; optimization of the node failed. The description is an alist
   ;; (TRANSFORM . ARGS), where TRANSFORM is the structure describing
@@ -535,23 +632,20 @@
   ;; from COMPONENT-LAMBDAS.
   (reanalyze-functionals nil :type list)
   (delete-blocks nil :type list)
-  (nlx-info-generated-p nil :type boolean)
-  ;; this is filled by physical environment analysis
+  ;; this is filled by environment analysis
   (dx-lvars nil :type list)
   ;; The default LOOP in the component.
   (outer-loop (missing-arg) :type cloop)
   ;; The current sset index
-  (sset-number 0 :type fixnum)))
+  (sset-number 0 :type fixnum))
 (defprinter (component :identity t)
   name
-  #+sb-show id
   (reanalyze :test reanalyze))
 
 (declaim (inline reoptimize-component))
 (defun reoptimize-component (component kind)
   (declare (type component component)
-           (type (member nil :maybe t) kind))
-  (aver kind)
+           (type (member :maybe t) kind))
   (unless (eq (component-reoptimize component) t)
     (setf (component-reoptimize component) kind)))
 
@@ -578,7 +672,7 @@
 ;;; boundaries by requiring that the exit ctrans initially head their
 ;;; blocks, and then by not merging blocks when there is a cleanup
 ;;; change.
-(def!struct (cleanup (:copier nil))
+(defstruct (cleanup (:copier nil))
   ;; the kind of thing that has to be cleaned up
   (kind (missing-arg)
         :type (member :special-bind :catch :unwind-protect
@@ -590,59 +684,37 @@
   (mess-up nil :type (or node null))
   ;; For all kinds, except :DYNAMIC-EXTENT: a list of all the NLX-INFO
   ;; structures whose NLX-INFO-CLEANUP is this cleanup. This is filled
-  ;; in by physical environment analysis.
+  ;; in by environment analysis.
   ;;
   ;; For :DYNAMIC-EXTENT: a list of all DX LVARs, preserved by this
   ;; cleanup. This is filled when the cleanup is created (now by
-  ;; locall call analysis) and is rechecked by physical environment
-  ;; analysis. (For closures this is a list of the allocating node -
-  ;; during IR1, and a list of the argument LVAR of the allocator -
-  ;; after physical environment analysis.)
-  (info nil :type list))
+  ;; locall call analysis) and is rechecked by environment
+  ;; analysis. (For closures this is a list of the LVAR of the enclose
+  ;; after environment analysis.)
+  (nlx-info nil :type list))
 (defprinter (cleanup :identity t)
   kind
   mess-up
-  (info :test info))
+  (nlx-info :test nlx-info))
 
-;;; A PHYSENV represents the result of physical environment analysis.
-;;;
-;;; As far as I can tell from reverse engineering, this IR1 structure
-;;; represents the physical environment (which is probably not the
-;;; standard Lispy term for this concept, but I dunno what is the
-;;; standard term): those things in the lexical environment which a
-;;; LAMBDA actually interacts with. Thus in
-;;;   (DEFUN FROB-THINGS (THINGS)
-;;;     (DOLIST (THING THINGS)
-;;;       (BLOCK FROBBING-ONE-THING
-;;;         (MAPCAR (LAMBDA (PATTERN)
-;;;                   (WHEN (FITS-P THING PATTERN)
-;;;                     (RETURN-FROM FROB-THINGS (LIST :FIT THING PATTERN))))
-;;;                 *PATTERNS*))))
-;;; the variables THINGS, THING, and PATTERN and the block names
-;;; FROB-THINGS and FROBBING-ONE-THING are all in the inner LAMBDA's
-;;; lexical environment, but of those only THING, PATTERN, and
-;;; FROB-THINGS are in its physical environment. In IR1, we largely
-;;; just collect the names of these things; in IR2 an IR2-PHYSENV
-;;; structure is attached to INFO and used to keep track of
-;;; associations between these names and less-abstract things (like
-;;; TNs, or eventually stack slots and registers). -- WHN 2001-09-29
-(def!struct (physenv (:copier nil))
-  ;; the function that allocates this physical environment
+;;; The ENVIRONMENT structure represents the result of environment analysis.
+(defstruct (environment (:copier nil))
+  ;; the function that allocates this environment
   (lambda (missing-arg) :type clambda :read-only t)
   ;; This ultimately converges to a list of all the LAMBDA-VARs and
   ;; NLX-INFOs needed from enclosing environments by code in this
-  ;; physical environment. In the meantime, it may be
+  ;; environment. In the meantime, it may be
   ;;   * NIL at object creation time
   ;;   * a superset of the correct result, generated somewhat later
   ;;   * smaller and smaller sets converging to the correct result as
   ;;     we notice and delete unused elements in the superset
   (closure nil :type list)
   ;; a list of NLX-INFO structures describing all the non-local exits
-  ;; into this physical environment
+  ;; into this environment
   (nlx-info nil :type list)
   ;; some kind of info used by the back end
   (info nil))
-(defprinter (physenv :identity t)
+(defprinter (environment :identity t)
   lambda
   (closure :test closure)
   (nlx-info :test nlx-info))
@@ -660,7 +732,7 @@
 ;;; The tail set is somewhat approximate, because it is too early to
 ;;; be sure which calls will be tail-recursive. Any call that *might*
 ;;; end up tail-recursive causes TAIL-SET merging.
-(def!struct (tail-set)
+(defstruct (tail-set)
   ;; a list of all the LAMBDAs in this tail set
   (funs nil :type list)
   ;; our current best guess of the type returned by these functions.
@@ -677,15 +749,10 @@
 ;;; An NLX-INFO structure is used to collect various information about
 ;;; non-local exits. This is effectively an annotation on the
 ;;; continuation, although it is accessed by searching in the
-;;; PHYSENV-NLX-INFO.
-(def!struct (nlx-info
-             (:copier nil)
-             (:constructor make-nlx-info (cleanup
-                                          exit
-                                          &aux
-                                          (block
-                                           (first (block-succ
-                                                   (node-block exit)))))))
+;;; ENVIRONMENT-NLX-INFO.
+(defstruct (nlx-info
+            (:copier nil)
+            (:constructor make-nlx-info (cleanup block)))
   ;; the cleanup associated with this exit. In a catch or
   ;; unwind-protect, this is the :CATCH or :UNWIND-PROTECT cleanup,
   ;; and not the cleanup for the escape block. The CLEANUP-KIND of
@@ -694,7 +761,7 @@
   (cleanup (missing-arg) :type cleanup)
   ;; the ``continuation'' exited to (the block, succeeding the EXIT
   ;; nodes). If this exit is from an escape function (CATCH or
-  ;; UNWIND-PROTECT), then physical environment analysis deletes the
+  ;; UNWIND-PROTECT), then environment analysis deletes the
   ;; escape function and instead has the %NLX-ENTRY use this
   ;; continuation.
   ;;
@@ -703,20 +770,22 @@
   ;; ENTRY must also be used to disambiguate, since exits to different
   ;; places may deliver their result to the same continuation.
   (block (missing-arg) :type cblock)
-  ;; the entry stub inserted by physical environment analysis. This is
-  ;; a block containing a call to the %NLX-ENTRY funny function that
-  ;; has the original exit destination as its successor. Null only
+  ;; the entry stub inserted by environment analysis. This is a block
+  ;; containing a call to the %NLX-ENTRY funny function that has the
+  ;; original exit destination as its successor. Null only
   ;; temporarily.
   (target nil :type (or cblock null))
   ;; for a lexical exit it determines whether tag existence check is
   ;; needed
   (safe-p nil :type boolean)
   ;; some kind of info used by the back end
-  info)
+  (info nil))
 (defprinter (nlx-info :identity t)
   block
   target
   info)
+(!set-load-form-method nlx-info (:xc :target) :ignore-it)
+
 
 ;;;; LEAF structures
 
@@ -724,13 +793,11 @@
 ;;; structures. A reference to a LEAF is indicated by a REF node. This
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
-(def!struct (leaf (:include sset-element
-                            (number (when (boundp '*compilation*)
-                                      (incf (sset-counter *compilation*)))))
-                  (:copier nil)
-                  (:constructor nil))
-  ;; unique ID for debugging
-  #+sb-show (id (new-object-id) :read-only t)
+(defstruct (leaf (:include sset-element
+                           (number (when (boundp '*compilation*)
+                                     (incf (sset-counter *compilation*)))))
+                 (:copier nil)
+                 (:constructor nil))
   ;; (For public access to this slot, use LEAF-SOURCE-NAME.)
   ;;
   ;; the name of LEAF as it appears in the source, e.g. 'FOO or '(SETF
@@ -771,17 +838,21 @@
   (where-from :assumed :type (member :declared :assumed :defined-here :defined :defined-method))
   ;; list of the REF nodes for this leaf
   (refs () :type list)
-  ;; true if there was ever a REF or SET node for this leaf. This may
-  ;; be true when REFS and SETS are null, since code can be deleted.
-  (ever-used nil :type boolean)
+  ;; For tracking whether to warn about unused variables:
+  ;; NIL if there was never a REF or SET.
+  ;; SET if there was a set but no REF.
+  ;; T if there was a REF.
+  ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
+  (ever-used nil :type (member nil set t))
   ;; is it declared dynamic-extent, or truly-dynamic-extent?
-  (extent nil :type (member nil :maybe-dynamic :always-dynamic :indefinite))
+  (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent))
   ;; some kind of info used by the back end
   (info nil))
+(!set-load-form-method leaf (:xc :target) :ignore-it)
 
 (defun leaf-dynamic-extent (leaf)
   (let ((extent (leaf-extent leaf)))
-    (unless (member extent '(nil :indefinite))
+    (unless (member extent '(nil indefinite-extent))
       extent)))
 
 ;;; LEAF name operations
@@ -792,17 +863,34 @@
   (aver (leaf-has-source-name-p leaf))
   (leaf-%source-name leaf))
 
+;;; The CONSTANT structure is used to represent known constant values.
+;;; If NAME is not null, then it is the name of the named constant
+;;; which this leaf corresponds to, otherwise this is an anonymous
+;;; constant.
+(defstruct (constant (:constructor make-constant (value
+                                                  &optional
+                                                  (type (ctype-of value))
+                                                  (%source-name '.anonymous.)
+                                                  &aux
+                                                  (where-from :defined)))
+                     (:copier nil)
+                     (:include leaf))
+  ;; the value of the constant
+  (value (missing-arg) :type t))
+(defprinter (constant :identity t)
+  value (%source-name :test (neq %source-name '.anonymous.)))
+
 ;;; The BASIC-VAR structure represents information common to all
 ;;; variables which don't correspond to known local functions.
-(def!struct (basic-var (:include leaf)
-                       (:copier nil)
-                       (:constructor nil))
+(defstruct (basic-var (:include leaf)
+                      (:copier nil)
+                      (:constructor nil))
   ;; Lists of the set nodes for this variable.
   (sets () :type list))
 
 ;;; The GLOBAL-VAR structure represents a value hung off of the symbol
 ;;; NAME.
-(def!struct (global-var (:include basic-var) (:copier nil))
+(defstruct (global-var (:include basic-var) (:copier nil))
   ;; kind of variable described
   (kind (missing-arg)
         :type (member :special :global-function :global :unknown)))
@@ -818,7 +906,6 @@
              :pretty-ir-printer
              (pretty-print-global-var structure stream))
   %source-name
-  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (defined-type :test (not (eq defined-type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -839,10 +926,10 @@
 ;;; non-NIL INLINEP value. Whenever we change the INLINEP state (i.e.
 ;;; an inline proclamation) we copy the structure so that former
 ;;; INLINEP values are preserved.
-(def!struct (defined-fun (:include global-var
-                                   (where-from :defined)
-                                   (kind :global-function))
-                         (:copier nil))
+(defstruct (defined-fun (:include global-var
+                                  (where-from :defined)
+                                  (kind :global-function))
+                        (:copier nil))
   ;; The values of INLINEP and INLINE-EXPANSION initialized from the
   ;; global environment.
   (inlinep nil :type inlinep)
@@ -851,11 +938,11 @@
   ;; conversion of a NAMED-LAMBDA, or from inline-expansion (see
   ;; RECOGNIZE-KNOWN-CALL) - we need separate functionals for each policy in
   ;; which the function is used.
-  (functionals nil :type list))
+  (functionals nil :type list)
+  (named-lambda-p nil))
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
-  #+sb-show id
   inlinep
   (functionals :test functionals))
 
@@ -864,11 +951,11 @@
 ;;; We default the WHERE-FROM and TYPE slots to :DEFINED and FUNCTION.
 ;;; We don't normally manipulate function types for defined functions,
 ;;; but if someone wants to know, an approximation is there.
-(def!struct (functional (:include leaf
-                                  (%source-name '.anonymous.)
-                                  (where-from :defined)
-                                  (type (specifier-type 'function)))
-                        (:copier nil))
+(defstruct (functional (:include leaf
+                                 (%source-name '.anonymous.)
+                                 (where-from :defined)
+                                 (type (specifier-type 'function)))
+                       (:copier nil))
   ;; (For public access to this slot, use LEAF-DEBUG-NAME.)
   ;;
   ;; the name of FUNCTIONAL for debugging purposes, or NIL if we
@@ -922,15 +1009,15 @@
   ;;
   ;;    :ASSIGNMENT
   ;;    similar to a LET (as per FUNCTIONAL-SOMEWHAT-LETLIKE-P), but
-  ;;    can have other than one call as long as there is at most
-  ;;    one non-tail call.
+  ;;    can have more than one call as long as the calls all return to
+  ;;    the same place.
   ;;
   ;;    :OPTIONAL
   ;;    a lambda that is an entry point for an OPTIONAL-DISPATCH.
   ;;    Similar to NIL, but requires greater caution, since local call
   ;;    analysis may create new references to this function. Also, the
   ;;    function cannot be deleted even if it has *no* references. The
-  ;;    OPTIONAL-DISPATCH is in the LAMDBA-OPTIONAL-DISPATCH.
+  ;;    OPTIONAL-DISPATCH is in the LAMBDA-OPTIONAL-DISPATCH.
   ;;
   ;;    :EXTERNAL
   ;;    an external entry point lambda. The function it is an entry
@@ -1003,9 +1090,9 @@
   (arg-documentation nil :type (or list (member :unspecified)))
   ;; the documentation string for the lambda
   (documentation nil :type (or null string))
-  ;; Node, allocating closure for this lambda. May be NIL when we are
-  ;; sure that no closure is needed.
-  (allocator nil :type (or null combination))
+  ;; the enclose node allocating the closure for this lambda. May be
+  ;; NIL when we are sure that no closure is needed.
+  (enclose nil :type (or null enclose))
   ;; various rare miscellaneous info that drives code generation & stuff
   (plist () :type list)
   ;; xref information for this functional (only used for functions with an
@@ -1015,7 +1102,8 @@
   ;; is either T, or the GLOBAL-VAR for which it is an expansion.
   (inline-expanded nil)
   ;; Is it coming from a top-level NAMED-LAMBDA?
-  (top-level-defun-p nil))
+  (top-level-defun-p nil)
+  (ignore nil))
 
 (defun pretty-print-functional (functional stream)
   (let ((name (functional-debug-name functional)))
@@ -1028,8 +1116,7 @@
 (defprinter (functional :identity t
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
-  %debug-name
-  #+sb-show id)
+  %debug-name)
 
 (defun leaf-debug-name (leaf)
   (if (functional-p leaf)
@@ -1080,11 +1167,11 @@
 ;;; The CLAMBDA only deals with required lexical arguments. Special,
 ;;; optional, keyword and rest arguments are handled by transforming
 ;;; into simpler stuff.
-(def!struct (clambda (:include functional)
-                     (:conc-name lambda-)
-                     (:predicate lambda-p)
-                     (:constructor make-lambda)
-                     (:copier nil))
+(defstruct (clambda (:include functional)
+                    (:conc-name lambda-)
+                    (:predicate lambda-p)
+                    (:constructor make-lambda)
+                    (:copier nil))
   ;; list of LAMBDA-VAR descriptors for arguments
   (vars nil :type list)
   ;; If this function was ever a :OPTIONAL function (an entry-point
@@ -1130,17 +1217,14 @@
   (tail-set nil :type (or tail-set null))
   ;; the structure which represents the phsical environment that this
   ;; function's variables are allocated in. This is filled in by
-  ;; physical environment analysis. In a LET, this is EQ to our home's
-  ;; physical environment.
-  (physenv nil :type (or physenv null))
+  ;; environment analysis. In a LET, this is EQ to our home's
+  ;; environment.
+  (environment nil :type (or environment null))
   ;; In a LET, this is the NODE-LEXENV of the combination node. We
   ;; retain it so that if the LET is deleted (due to a lack of vars),
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
   (call-lexenv nil :type (or lexenv null))
-  ;; list of embedded lambdas
-  (children nil :type list)
-  (parent nil :type (or clambda null))
   (allow-instrumenting *allow-instrumenting* :type boolean)
   ;; True if this is a system introduced lambda: it may contain user code, but
   ;; the lambda itself is not, and the bindings introduced by it are considered
@@ -1150,7 +1234,6 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  #+sb-show id
   kind
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -1198,7 +1281,7 @@
 ;;; arguments into a direct call to the appropriate entry-point
 ;;; function, so functions that are compiled together can avoid doing
 ;;; the dispatch.
-(def!struct (optional-dispatch (:include functional) (:copier nil))
+(defstruct (optional-dispatch (:include functional) (:copier nil))
   ;; the original parsed argument list, for anyone who cares
   (arglist nil :type list)
   ;; true if &ALLOW-OTHER-KEYS was supplied
@@ -1206,6 +1289,7 @@
   ;; true if &KEY was specified (which doesn't necessarily mean that
   ;; there are any &KEY arguments..)
   (keyp nil :type boolean)
+  (source-path)
   ;; the number of required arguments. This is the smallest legal
   ;; number of arguments.
   (min-args 0 :type unsigned-byte)
@@ -1232,7 +1316,6 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   arglist
@@ -1248,7 +1331,7 @@
 ;;; LAMBDA-VARs during IR1 conversion. If we use one of these things,
 ;;; then the var will have to be massaged a bit before it is simple
 ;;; and lexical.
-(def!struct (arg-info (:copier nil))
+(defstruct (arg-info (:copier nil))
   ;; true if this arg is to be specially bound
   (specialp nil :type boolean)
   ;; the kind of argument being described. Required args only have arg
@@ -1269,6 +1352,7 @@
   ;; For &REST arguments this may contain information about more context
   ;; the rest list comes from.
   (default nil :type t)
+  (default-p nil :type boolean)
   ;; the actual key for a &KEY argument. Note that in ANSI CL this is
   ;; not necessarily a keyword: (DEFUN FOO (&KEY ((BAR BAR))) ...).
   (key nil :type symbol))
@@ -1284,30 +1368,33 @@
 ;;; lambda arguments which may ultimately turn out not to be simple
 ;;; and lexical.
 ;;;
-;;; LAMBDA-VARs with no REFs are considered to be deleted; physical
-;;; environment analysis isn't done on these variables, so the back
-;;; end must check for and ignore unreferenced variables. Note that a
-;;; deleted LAMBDA-VAR may have sets; in this case the back end is
-;;; still responsible for propagating the SET-VALUE to the set's CONT.
+;;; LAMBDA-VARs with no REFs are considered to be deleted; environment
+;;; analysis isn't done on these variables, so the back end must check
+;;; for and ignore unreferenced variables. Note that a deleted
+;;; LAMBDA-VAR may have sets; in this case the back end is still
+;;; responsible for propagating the SET-VALUE to the set's CONT.
 (!def-boolean-attribute lambda-var
   ;; true if this variable has been declared IGNORE
   ignore
-  ;; This is set by physical environment analysis if it chooses an
-  ;; indirect (value cell) representation for this variable because it
-  ;; is both set and closed over.
+  ;; This is set by environment analysis if it chooses an indirect
+  ;; (value cell) representation for this variable because it is both
+  ;; set and closed over.
   indirect
   ;; true if the last reference has been deleted (and new references
   ;; should not be made)
   deleted
-  ;; This is set by physical environment analysis if, should it be an
-  ;; indirect lambda-var, an actual value cell object must be
-  ;; allocated for this variable because one or more of the closures
-  ;; that refer to it are not dynamic-extent.  Note that both
-  ;; attributes must be set for the value-cell object to be created.
+  ;; This is set by environment analysis if, should it be an indirect
+  ;; lambda-var, an actual value cell object must be allocated for
+  ;; this variable because one or more of the closures that refer to
+  ;; it are not dynamic-extent.  Note that both attributes must be set
+  ;; for the value-cell object to be created.
   explicit-value-cell
-  )
+  ;; Do not propagate constraints for this var
+  no-constraints
+  ;; Does it hold a constant that should't be destructively modified
+  constant)
 
-(def!struct (lambda-var (:include basic-var) (:copier nil))
+(defstruct (lambda-var (:include basic-var) (:copier nil))
   (flags (lambda-var-attributes)
          :type attributes)
   ;; the CLAMBDA that this var belongs to. This may be null when we are
@@ -1335,12 +1422,11 @@
   (eql-var-constraints     nil :type (or null (array t 1)))
   (inheritable-constraints nil :type (or null (array t 1)))
   (private-constraints     nil :type (or null (array t 1)))
-  ;; The FOP handle of the lexical variable represented by LAMBDA-VAR
-  ;; in the fopcompiler.
-  (fop-value nil))
+  (equality-constraints    nil :type (or null (array t 1)))
+
+  source-form)
 (defprinter (lambda-var :identity t)
   %source-name
-  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (flags :test (not (zerop flags))
@@ -1356,20 +1442,25 @@
   `(lambda-var-attributep (lambda-var-flags ,var) deleted))
 (defmacro lambda-var-explicit-value-cell (var)
   `(lambda-var-attributep (lambda-var-flags ,var) explicit-value-cell))
+(defmacro lambda-var-no-constraints (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) no-constraints))
+(defmacro lambda-var-constant (var)
+  `(lambda-var-attributep (lambda-var-flags ,var) constant))
+
 
 ;;;; basic node types
 
 ;;; A REF represents a reference to a LEAF. REF-REOPTIMIZE is
 ;;; initially (and forever) NIL, since REFs don't receive any values
 ;;; and don't have any IR1 optimizer.
-(def!struct (ref (:include valued-node (reoptimize nil))
-                 (:constructor make-ref
-                               (leaf
-                                &optional (%source-name '.anonymous.)
-                                &aux (leaf-type (leaf-type leaf))
-                                (derived-type
-                                 (make-single-value-type leaf-type))))
-                 (:copier nil))
+(defstruct (ref (:include valued-node (reoptimize nil))
+                (:constructor make-ref
+                              (leaf
+                               &optional (%source-name '.anonymous.)
+                               &aux (leaf-type (leaf-type leaf))
+                                    (derived-type
+                                     (make-single-value-type leaf-type))))
+                (:copier nil))
   ;; The leaf referenced.
   (leaf nil :type leaf)
   ;; CONSTANT nodes are always anonymous, since we wish to coalesce named and
@@ -1377,18 +1468,17 @@
   ;; reference name for XREF.
   (%source-name (missing-arg) :type symbol :read-only t)
   ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
-  constraints)
+  (constraints nil))
 (defprinter (ref :identity t)
-  #+sb-show id
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)
 
 ;;; Naturally, the IF node always appears at the end of a block.
-(def!struct (cif (:include node)
-                 (:conc-name if-)
-                 (:predicate if-p)
-                 (:constructor make-if)
-                 (:copier nil))
+(defstruct (cif (:include node)
+                (:conc-name if-)
+                (:predicate if-p)
+                (:constructor make-if)
+                (:copier nil))
   ;; LVAR for the predicate
   (test (missing-arg) :type lvar)
   ;; the blocks that we execute next in true and false case,
@@ -1402,13 +1492,13 @@
   consequent
   alternative)
 
-(def!struct (cset (:include valued-node
+(defstruct (cset (:include valued-node
                            (derived-type (make-single-value-type
                                           *universal-type*)))
-                  (:conc-name set-)
-                  (:predicate set-p)
-                  (:constructor make-set)
-                  (:copier nil))
+                 (:conc-name set-)
+                 (:predicate set-p)
+                 (:constructor make-set)
+                 (:copier nil))
   ;; descriptor for the variable set
   (var (missing-arg) :type basic-var)
   ;; LVAR for the value form
@@ -1417,13 +1507,21 @@
   var
   (value :prin1 (lvar-uses value)))
 
+(defvar *inline-expansion-limit* 50
+  "an upper limit on the number of inline function calls that will be expanded
+   in any given code object (single function or block compilation)")
+
+(defvar *inline-expansions* nil)
+(declaim (list *inline-expansions*)
+         (always-bound *inline-expansions*))
+
 ;;; The BASIC-COMBINATION structure is used to represent both normal
 ;;; and multiple value combinations. In a let-like function call, this
 ;;; node appears at the end of its block and the body of the called
 ;;; function appears as the successor; the NODE-LVAR is null.
-(def!struct (basic-combination (:include valued-node)
-                               (:constructor nil)
-                               (:copier nil))
+(defstruct (basic-combination (:include valued-node)
+                              (:constructor nil)
+                              (:copier nil))
   ;; LVAR for the function
   (fun (missing-arg) :type lvar)
   ;; list of LVARs for the args. In a local call, an argument lvar may
@@ -1446,18 +1544,19 @@
   ;; Untrusted type we have asserted for this combination.
   (type-validated-for-leaf nil)
   ;; some kind of information attached to this node by the back end
-  ;; or by CHECK-IMPORTANT-RESULT
+  ;; or by CHECK-IMPORTANT-RESULT, or by anything else that may need to.
   (info nil)
-  (step-info))
+  (step-info nil)
+  ;; A plist of inline expansions
+  (inline-expansions *inline-expansions* :type list :read-only t))
 
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that
 ;;; an MV-COMBINATION isn't COMBINATION-P.
-(def!struct (combination (:include basic-combination)
-                         (:constructor make-combination (fun))
-                         (:copier nil)))
+(defstruct (combination (:include basic-combination)
+                        (:constructor make-combination (fun))
+                        (:copier nil)))
 (defprinter (combination :identity t)
-  #+sb-show id
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar (lambda (x)
                          (if x
@@ -1468,17 +1567,17 @@
 ;;; An MV-COMBINATION is to MULTIPLE-VALUE-CALL as a COMBINATION is to
 ;;; FUNCALL. This is used to implement all the multiple-value
 ;;; receiving forms.
-(def!struct (mv-combination (:include basic-combination)
-                            (:constructor make-mv-combination (fun))
-                            (:copier nil)))
+(defstruct (mv-combination (:include basic-combination)
+                           (:constructor make-mv-combination (fun))
+                           (:copier nil)))
 (defprinter (mv-combination)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar #'lvar-uses args)))
 
 ;;; The BIND node marks the beginning of a lambda body and represents
 ;;; the creation and initialization of the variables.
-(def!struct (bind (:include node)
-                  (:copier nil))
+(defstruct (bind (:include node)
+                 (:copier nil))
   ;; the lambda we are binding variables for. Null when we are
   ;; creating the LAMBDA during IR1 translation.
   (lambda nil :type (or clambda null)))
@@ -1489,11 +1588,11 @@
 ;;; return values and represents the control transfer on return. This
 ;;; is also where we stick information used for TAIL-SET type
 ;;; inference.
-(def!struct (creturn (:include node)
-                     (:conc-name return-)
-                     (:predicate return-p)
-                     (:constructor make-return)
-                     (:copier nil))
+(defstruct (creturn (:include node)
+                    (:conc-name return-)
+                    (:predicate return-p)
+                    (:constructor make-return)
+                    (:copier nil))
   ;; the lambda we are returning from. Null temporarily during
   ;; ir1tran.
   (lambda nil :type (or clambda null))
@@ -1502,7 +1601,7 @@
   ;; the union of the node-derived-type of all uses of the result
   ;; other than by a local call, intersected with the result's
   ;; asserted-type. If there are no non-call uses, this is
-  ;; *EMPTY-TYPE*
+  ;; *EMPTY-TYPE*.
   (result-type *wild-type* :type ctype))
 (defprinter (creturn :conc-name return- :identity t)
   lambda
@@ -1511,9 +1610,9 @@
 ;;; The CAST node represents type assertions. The check for
 ;;; TYPE-TO-CHECK is performed and then the VALUE is declared to be of
 ;;; type ASSERTED-TYPE.
-(def!struct (cast (:include valued-node)
-                  (:copier nil)
-                  (:constructor %make-cast))
+(defstruct (cast (:include valued-node)
+                 (:copier nil)
+                 (:constructor %make-cast))
   (asserted-type (missing-arg) :type ctype)
   (type-to-check (missing-arg) :type ctype)
   ;; an indication of what we have proven about how this type
@@ -1540,12 +1639,16 @@
   asserted-type
   type-to-check)
 
-;;; A filter to help order the value semantics of MULTIPLE-VALUE-PROG1
-(def!struct (vestigial-exit-cast (:include cast
-                                           (%type-check nil)
-                                           (asserted-type *wild-type*)
-                                           (type-to-check *wild-type*))
-                                 (:copier nil)))
+;;; The DELAY node is interposed between a VALUE's USE and its DEST in
+;;; order to allow the value to be immediately used. This is necessary
+;;; for implementing multiple-use unknown values LVARs, as otherwise,
+;;; a non-moveable dynamic extent object may be allocated between the
+;;; DEST and one of the LVAR's uses but not the others.
+(defstruct (delay (:include cast
+                   (%type-check nil)
+                   (asserted-type *wild-type*)
+                   (type-to-check *wild-type*))
+                  (:copier nil)))
 
 ;;; A cast that always follows %check-bound and they are deleted together.
 ;;; Created via BOUND-CAST ir1-translator by chaining it together with %check-bound.
@@ -1553,8 +1656,8 @@
 ;;; DELETE-CAST deletes BOUND-CAST-CHECK
 ;;; GENERATE-TYPE-CHECKS ignores it, it never translates to a type check,
 ;;; %CHECK-BOUND does all the checking.
-(def!struct (bound-cast (:include cast (%type-check nil))
-                        (:copier nil))
+(defstruct (bound-cast (:include cast (%type-check nil))
+                       (:copier nil))
   ;; %check-bound combination before the cast
   (check (missing-arg) :type (or null combination))
   ;; Tells whether the type information is in a state where it can be
@@ -1564,7 +1667,7 @@
   (bound (missing-arg) :type lvar))
 
 ;;; Inserted by ARRAY-CALL-TYPE-DERIVER so that it can be later deleted
-(def!struct (array-index-cast (:include cast) (:copier nil)))
+(defstruct (array-index-cast (:include cast) (:copier nil)))
 
 ;;;; non-local exit support
 ;;;;
@@ -1574,24 +1677,23 @@
 ;;; The ENTRY node serves to mark the start of the dynamic extent of a
 ;;; lexical exit. It is the mess-up node for the corresponding :ENTRY
 ;;; cleanup.
-(def!struct (entry (:include node)
-                   (:copier nil))
+(defstruct (entry (:include node)
+                  (:copier nil))
   ;; All of the EXIT nodes for potential non-local exits to this point.
   (exits nil :type list)
   ;; The cleanup for this entry. NULL only temporarily.
   (cleanup nil :type (or cleanup null)))
-(defprinter (entry :identity t)
-  #+sb-show id)
+(defprinter (entry :identity t))
 
 ;;; The EXIT node marks the place at which exit code would be emitted,
 ;;; if necessary. This is interposed between the uses of the exit
 ;;; continuation and the exit continuation's DEST. Instead of using
 ;;; the returned value being delivered directly to the exit
 ;;; continuation, it is delivered to our VALUE lvar. The original exit
-;;; lvar is the exit node's LVAR; physenv analysis also makes it the
-;;; lvar of %NLX-ENTRY call.
-(def!struct (exit (:include valued-node)
-                  (:copier nil))
+;;; lvar is the exit node's LVAR; environment analysis also makes it
+;;; the lvar of %NLX-ENTRY call.
+(defstruct (exit (:include valued-node)
+                 (:copier nil))
   ;; the ENTRY node that this is an exit for. If null, this is a
   ;; degenerate exit. A degenerate exit is used to "fill" an empty
   ;; block (which isn't allowed in IR1.) In a degenerate exit, Value
@@ -1602,9 +1704,48 @@
   (value nil :type (or lvar null))
   (nlx-info nil :type (or nlx-info null)))
 (defprinter (exit :identity t)
-  #+sb-show id
   (entry :test entry)
   (value :test value))
+
+;;; The ENCLOSE node marks the place at which closure allocation code
+;;; would be emitted, if necessary.
+(defstruct (enclose (:include valued-node) ; this node uses a dummy lvar for dx analysis
+                    (:copier nil))
+  ;; the list of functionals that this ENCLOSE node allocates.
+  (funs nil :type list))
+(defprinter (enclose :identity t)
+  funs)
+
+
+;;;; miscellaneous IR1 structures
+
+(defstruct (undefined-warning
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s :type t)
+                               (prin1 (undefined-warning-name x) s))))
+            (:copier nil))
+  ;; the name of the unknown thing
+  (name nil :type (or symbol list))
+  ;; the kind of reference to NAME
+  (kind (missing-arg) :type (member :function :type :variable))
+  ;; the number of times this thing was used
+  (count 0 :type unsigned-byte)
+  ;; a list of COMPILER-ERROR-CONTEXT structures describing places
+  ;; where this thing was used. Note that we only record the first
+  ;; *UNDEFINED-WARNING-LIMIT* calls.
+  (warnings () :type list))
+
+(declaim (freeze-type undefined-warning))
+
+(defstruct (argument-mismatch-warning
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s :type t)
+                               (prin1 (argument-mismatch-warning-name x) s))))
+            (:copier nil))
+  (name nil :type (or symbol list))
+  ;; a list of (KEYS . COMPILER-ERROR-CONTEXT)
+  (warnings () :type list))
+
 
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined
@@ -1624,6 +1765,7 @@
     (policy thing)
     #+(and sb-fasteval (not sb-xc-host))
     (sb-interpreter:basic-env (sb-interpreter:env-policy thing))
+    ;; Why not *policy*?
     (null **baseline-policy**)
     (t (lexenv-policy (etypecase thing
                         (lexenv thing)
@@ -1632,10 +1774,5 @@
 
 ;;;; Freeze some structure types to speed type testing.
 
-;; FIXME: the frozen-ness can't actually help optimize anything
-;; until this file is compiled by the cross-compiler.
-;; Anything compiled prior to then uses the non-frozen classoid as existed
-;; at load-time of the cross-compiler. SB-XC:PROCLAIM would likely work here.
-#-sb-fluid
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
-                      physenv tail-set nlx-info))
+                      environment tail-set nlx-info leaf))

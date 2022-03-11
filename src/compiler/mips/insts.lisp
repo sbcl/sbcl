@@ -19,6 +19,8 @@
             sb-vm::immediate-constant
             sb-vm::registers sb-vm::float-registers
             sb-vm::zero
+            sb-vm::null-offset
+            sb-vm::zero-offset
             sb-vm::lip-tn sb-vm::zero-tn)))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
@@ -26,8 +28,8 @@
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
   (sc-case tn
-    (zero sb-vm::zero-offset)
-    (null sb-vm::null-offset)
+    (zero zero-offset)
+    (null null-offset)
     (t
      (if (eq (sb-name (sc-sb (tn-sc tn))) 'registers)
          (tn-offset tn)
@@ -74,31 +76,41 @@
 
 (define-arg-type reg
   :printer #'(lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
+               (declare (fixnum value))
                (let ((regname (aref *reg-symbols* value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value 'registers regname dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'registers regname dstate))
+                       (t
+                        (operand regname dstate))))))
 
 (define-arg-type load-store-annotation
   :printer (lambda (value stream dstate)
-             (declare (ignore stream))
-             (destructuring-bind (reg offset) value
-               (when (= reg sb-vm::code-offset)
-                 (note-code-constant offset dstate)))))
+             ;; We don't need to print anything if not disassembling
+             ;; to text, because rs + immediate were already shown.
+             ;; The load-store-annotation is overlayed on those fields
+             ;; (which I didn't think was allowed at all)
+             (when stream
+               (destructuring-bind (reg offset) value
+                 (when (= reg sb-vm::code-offset)
+                   (note-code-constant offset dstate))))))
 
 (defparameter *float-reg-symbols*
-  (coerce
-   (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
-   'vector))
+  #.(coerce
+     (loop for n from 0 to 31 collect (make-symbol (format nil "$F~d" n)))
+     'vector))
 
 (define-arg-type fp-reg
   :printer #'(lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
+               (declare (fixnum value))
                (let ((regname (aref *float-reg-symbols* value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value 'float-registers regname dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'float-registers regname dstate))
+                       (t
+                        (operand regname dstate))))))
 
 (define-arg-type control-reg :printer "(CR:#x~X)")
 
@@ -120,15 +132,15 @@
 
 (define-arg-type float-format
   :printer #'(lambda (value stream dstate)
-               (declare (ignore dstate)
-                        (stream stream)
-                        (fixnum value))
-               (princ (case value
-                        (0 's)
-                        (1 'd)
-                        (4 'w)
-                        (t '?))
-                      stream)))
+               (declare (fixnum value))
+               (let ((char (case value
+                             (0 's)
+                             (1 'd)
+                             (4 'w)
+                             (t '?))))
+                 (if stream
+                     (princ char stream)
+                     (operand char dstate)))))
 
 (defconstant-eqx compare-kinds
   '(:f :un :eq :ueq :olt :ult :ole :ule :sf :ngle :seq :ngl :lt :nge :le :ngt)
@@ -213,16 +225,9 @@
     (load-store-annotation :fields (list (byte 5 21) (byte 16 0))
                            :type 'load-store-annotation))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter jump-printer
-    #'(lambda (value stream dstate)
-        (let ((addr (ash value 2)))
-          (maybe-note-assembler-routine addr t dstate)
-          (write addr :base 16 :radix t :stream stream)))))
-
 (define-instruction-format (jump 32 :default-printer '(:name :tab target))
   (op :field (byte 6 26))
-  (target :field (byte 26 0) :printer jump-printer))
+  (target :field (byte 26 0) :printer #'jump-printer))
 
 (defconstant-eqx reg-printer
   '(:name :tab rd (:unless (:same-as rd) ", " rs) ", " rt)
@@ -243,6 +248,14 @@
   (code :field (byte 10 16) :reader break-code)
   (subcode :field (byte 10 6) :reader break-subcode)
   (funct :field (byte 6 0) :value #b001101))
+
+(define-instruction-format (trap 32 :default-printer
+                                 '(:name :tab rs ", " rt ", " code))
+  (op :field (byte 6 26))
+  (rs :field (byte 5 21) :type 'reg)
+  (rt :field (byte 5 16) :type 'reg)
+  (code :field (byte 10 6))
+  (funct :field (byte 6 0)))
 
 (define-instruction-format (coproc-branch 32
                             :default-printer '(:name :tab offset))
@@ -352,6 +365,12 @@
   (:emitter
    (emit-math-inst segment dst src1 src2 #b100000 #b001000)))
 
+;;; Note: ADDU doesn't really mean "unsigned" when used with an immediate operand.
+;;; From the processor manual: "ALL arithmetic immediate values are sign-extended.
+;;; After that, they are handled as signed or unsigned 32 bit numbers,
+;;; depending upon the instruction. The only difference between signed and unsigned
+;;; instructions is that signed instructions can generate an overflow exception
+;;; and unsigned instructions can not."
 (define-instruction addu (segment dst src1 &optional src2)
   (:declare (type tn dst)
             (type (or tn (signed-byte 16) fixup null) src1 src2))
@@ -513,13 +532,18 @@
 
 (define-instruction sll (segment dst src1 &optional src2)
   (:declare (type tn dst)
-            (type (or tn (unsigned-byte 5) null) src1 src2))
+            (type (or tn (unsigned-byte 5) null) src1)
+            ;; use-case for fixup is GC card index calculation (WIP)
+            (type (or tn (unsigned-byte 5) null fixup) src2))
   (:printer register ((op special-op) (rs 0) (shamt nil) (funct #b000000))
             shift-printer)
   (:printer register ((op special-op) (funct #b000100)) shift-printer)
   (:dependencies (reads src1) (if src2 (reads src2) (reads dst)) (writes dst))
   (:delay 0)
   (:emitter
+   (when (and (fixup-p src2) (eq (fixup-flavor src2) :gc-barrier))
+     (note-fixup segment :sll-sa src2) ; shift amount
+     (setq src2 0))
    (emit-shift-inst segment #b00 dst src1 src2)))
 
 (define-instruction sra (segment dst src1 &optional src2)
@@ -752,8 +776,7 @@
 
 (define-instruction bgez (segment reg target)
   (:declare (type label target) (type tn reg))
-  (:printer
-   immediate ((op bcond-op) (rt 1) (immediate nil :type 'relative-label))
+  (:printer immediate ((op bcond-op) (rt 1) (immediate nil :type 'relative-label))
             cond-branch-printer)
   (:attributes branch)
   (:dependencies (reads reg))
@@ -763,8 +786,7 @@
 
 (define-instruction bltzal (segment reg target)
   (:declare (type label target) (type tn reg))
-  (:printer
-   immediate ((op bcond-op) (rt #b01000) (immediate nil :type 'relative-label))
+  (:printer immediate ((op bcond-op) (rt #b10000) (immediate nil :type 'relative-label))
             cond-branch-printer)
   (:attributes branch)
   (:dependencies (reads reg) (writes lip-tn))
@@ -774,8 +796,7 @@
 
 (define-instruction bgezal (segment reg target)
   (:declare (type label target) (type tn reg))
-  (:printer
-   immediate ((op bcond-op) (rt #b01001) (immediate nil :type 'relative-label))
+  (:printer immediate ((op bcond-op) (rt #b10001) (immediate nil :type 'relative-label))
             cond-branch-printer)
   (:attributes branch)
   (:delay 1)
@@ -788,7 +809,7 @@
   #'equalp)
 
 (define-instruction j (segment target)
-  (:declare (type (or tn fixup) target))
+  (:declare (type tn target))
   (:printer register ((op special-op) (rt 0) (rd 0) (funct #b001000))
             j-printer)
   (:printer jump ((op #b000010)) j-printer)
@@ -796,19 +817,11 @@
   (:dependencies (reads target))
   (:delay 1)
   (:emitter
-   (etypecase target
-     (tn
       (emit-register-inst segment special-op (reg-tn-encoding target)
-                          0 0 0 #b001000))
-     (fixup
-      (note-fixup segment :lui target)
-      (emit-immediate-inst segment #b001111 0 28 0)
-      (note-fixup segment :addi target)
-      (emit-immediate-inst segment #b001001 28 28 0)
-      (emit-register-inst segment special-op 28 0 0 0 #b001000)))))
+                          0 0 0 #b001000)))
 
 (define-instruction jal (segment reg-or-target &optional target)
-  (:declare (type (or null tn fixup) target)
+  (:declare (type (or null tn) target)
             (type (or tn fixup) reg-or-target))
   (:printer register ((op special-op) (rt 0) (funct #b001001)) j-printer)
   (:printer jump ((op #b000011)) j-printer)
@@ -825,17 +838,8 @@
    (unless target
      (setf target reg-or-target
            reg-or-target lip-tn))
-   (etypecase target
-     (tn
-      (emit-register-inst segment special-op (reg-tn-encoding target) 0
-                          (reg-tn-encoding reg-or-target) 0 #b001001))
-     (fixup
-      (note-fixup segment :lui target)
-      (emit-immediate-inst segment #b001111 0 28 0)
-      (note-fixup segment :addi target)
-      (emit-immediate-inst segment #b001001 28 28 0)
-      (emit-register-inst segment special-op 28 0
-                          (reg-tn-encoding reg-or-target) 0 #b001001)))))
+   (emit-register-inst segment special-op (reg-tn-encoding target) 0
+                       (reg-tn-encoding reg-or-target) 0 #b001001)))
 
 (define-instruction bc1f (segment target)
   (:declare (type label target))
@@ -947,7 +951,8 @@
      (inst addu reg zero-tn value))
     ((or (signed-byte 32) (unsigned-byte 32))
      (inst lui reg (ldb (byte 16 16) value))
-     (inst or reg (ldb (byte 16 0) value)))
+     (when (logtest value #xFFFF)
+       (inst or reg (ldb (byte 16 0) value))))
     (fixup
      (inst lui reg value)
      (inst addu reg value))))
@@ -1032,42 +1037,6 @@
 
 ;;;; Random system hackery and other noise
 
-(define-instruction-macro entry-point ()
-  nil)
-
-(defmacro break-cases (breaknum &body cases)
-  (let ((bn-temp (gensym)))
-    (collect ((clauses))
-      (dolist (case cases)
-        (clauses `((= ,bn-temp ,(car case)) ,@(cdr case))))
-      `(let ((,bn-temp ,breaknum))
-         (cond ,@(clauses))))))
-
-(defun break-control (chunk inst stream dstate)
-  (declare (ignore inst))
-  (flet ((nt (x) (if stream (note x dstate))))
-    (let ((trap (break-subcode chunk dstate)))
-      (case trap
-        (#.halt-trap
-         (nt "Halt trap"))
-        (#.pending-interrupt-trap
-         (nt "Pending interrupt trap"))
-        (#.breakpoint-trap
-         (nt "Breakpoint trap"))
-        (#.fun-end-breakpoint-trap
-         (nt "Function end breakpoint trap"))
-        (#.after-breakpoint-trap
-         (nt "After breakpoint trap"))
-        (#.single-step-around-trap
-         (nt "Single step around trap"))
-        (#.single-step-before-trap
-         (nt "Single step before trap"))
-        (#.cerror-trap
-         (nt "Cerror trap")
-         (handle-break-args #'snarf-error-junk trap stream dstate))
-        (t
-         (handle-break-args #'snarf-error-junk trap stream dstate))))))
-
 (define-instruction break (segment code &optional (subcode 0))
   (:declare (type (unsigned-byte 10) code subcode))
   (:printer break ((op special-op) (funct #b001101))
@@ -1078,6 +1047,38 @@
   (:delay 0)
   (:emitter
    (emit-break-inst segment special-op code subcode #b001101)))
+
+(macrolet ((deftrap (name bits)
+             `(define-instruction ,name (segment rs rt &optional (code 0))
+                (:declare (type (unsigned-byte 10) code))
+                (:printer trap ((op special-op) (funct ,bits)))
+                :pinned
+                (:cost 0)
+                (:delay 0)
+                (:emitter
+                 (emit-break-inst segment special-op
+                                  (logior (ash (reg-tn-encoding rs) 5) (reg-tn-encoding rt))
+                                  code ,bits))))
+           (deftrapi (name bits)
+             `(define-instruction ,name (segment rs imm)
+                (:printer immediate ((op #b000001) (rt ,bits)))
+                :pinned
+                (:cost 0)
+                (:delay 0)
+                (:emitter (emit-immediate-inst segment #b000001 (reg-tn-encoding rs) ,bits imm)))))
+  (deftrap teq  #b110100)
+  (deftrap tge  #b110000)
+  (deftrap tgeu #b110001)
+  (deftrap tlt  #b110010)
+  (deftrap tltu #b110011)
+  (deftrap tne  #b110110)
+
+  (deftrapi teqi  #b01100)
+  (deftrapi tgei  #b01000)
+  (deftrapi tgeiu #b01001)
+  (deftrapi tlti  #b01010)
+  (deftrapi tltiu #b01011)
+  (deftrapi tnei  #b01110))
 
 (define-instruction syscall (segment)
   (:printer register ((op special-op) (rd 0) (rt 0) (rs 0) (funct #b001110))
@@ -1245,12 +1246,21 @@
 
 (define-instruction lw (segment reg base &optional (index 0))
   (:declare (type tn reg base)
-            (type (or (signed-byte 16) fixup) index))
+            (type (or (signed-byte 16) fixup label) index))
   (:printer load-store ((op #b100011)))
   (:dependencies (reads base) (reads :memory) (writes reg))
   (:delay 1)
   (:emitter
-   (emit-load/store-inst segment #b100011 base reg index)))
+   (if (and (label-p index) (eq base sb-vm::code-tn))
+       (emit-back-patch segment 4
+        (lambda (segment posn)
+          (declare (ignore posn))
+          (emit-load/store-inst segment #b100011
+                                base reg
+                                (+ (component-header-length)
+                                   (label-position index)
+                                   (- sb-vm:other-pointer-lowtag)))))
+       (emit-load/store-inst segment #b100011 base reg index))))
 
 ;; next is just for ease of coding double-in-int c-call convention
 (define-instruction lw-odd (segment reg base &optional (index 0))
@@ -1375,3 +1385,88 @@
   (:emitter
    (emit-fp-load/store-inst segment #b111001 reg 1 base index)))
 
+;;; This mechanism is more complicated than minimally necessary for it to do its job.
+;;; Consequently each backend has its own completely screwy way of canonicalizing
+;;; because each one is better than the other.
+;;; CONSTANT is just the &REST list passed to REGISTER-INLINE-CONSTANT which acts as
+;;; a key in an EQUAL table for collapsing multiple references to the same data
+;;; so that we only emit it once (or possibly not even once, if we fuse bytes from
+;;; adjacent constants as suggested by comments in codegen. e.g. an 8-byte constant
+;;; may contain a naturally-aligned 4-byte constant whose bytes match).
+;;; The question is - why doesn't the vop just pass the proper key in the first place?
+(defun canonicalize-inline-constant (constant)
+  constant)
+
+;;; Again this is too complex in the simplest case- you return an assembler label,
+;;; and a cookie to hand to the consumer of the constant, which is {often,always}
+;;; redundant, because the consumer knows what shape the value is - float, octaword, etc.
+;;; The label alone conveys enough data to access the bits stored, however
+;;; in some cases the sorting logic might need a way to determine the storage size.
+(defun inline-constant-value (constant)
+  (declare (ignore constant))
+  (let ((label (gen-label)))
+    (values label label)))
+
+;;; Trivial "sort"
+(defun sort-inline-constants (constants) constants)
+
+;;; This is called once per unboxed constant, to emit its bytes.
+;;; In general the bytes may be literal octets, or a fixup (as here)
+;;; which is in turn emitted with a pseudo-instruction.
+(defun emit-inline-constant (section constant label)
+  (aver (typep constant '(cons (eql :layout-id) (cons t null))))
+  (emit section
+        `(.align 2) ; 2 bits of alignment (just to be pedantic I suppose)
+        label
+        `(.layout-id ,(cadr constant))))
+
+(sb-assem::%def-inst-encoder
+ '.layout-id
+ (lambda (segment layout)
+   (sb-c:note-fixup segment :absolute (sb-c:make-fixup layout :layout-id))
+   (sb-assem::%emit-skip segment 4)))
+
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset))
+  (declare (ignore flavor))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (let ((sap (code-instructions code)))
+    (ecase kind
+      (:absolute
+       (setf (sap-ref-32 sap offset) value))
+      (:sll-sa
+       (bug "Not done yet")
+       (return-from fixup-code-object :immediate))
+      (:jump
+       (aver (zerop (ash value -28)))
+       (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
+             (ash value -2)))
+      (:lui
+       (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+             (ash (1+ (ash value -15)) -1)))
+      (:addi
+       (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
+             (ldb (byte 16 0) value)))))
+  nil)
+
+(define-instruction store-coverage-mark (segment mark-index)
+  ;; Don't need to annotate the dependence on code-tn, I think?
+  (:dependencies (writes :memory))
+  (:delay 0)
+  (:emitter
+   ;; No backpatch is needed to compute the offset into the code header
+   ;; because COMPONENT-HEADER-LENGTH is known at this point.
+   ;;
+   ;; If someone wants to be clever and allow larger offsets from code-tn,
+   ;; feel free to try to improve this, but given that ASSEM-SCHEDULER-P is T
+   ;; for MIPS, I very much suspect that something would go wrong
+   ;; by emitting more than 1 CPU instruction from within an emitter.
+   (let ((offset (+ (component-header-length)
+                    ;; skip over jump table word and entries
+                    (* (1+ (component-n-jump-table-entries))
+                       n-word-bytes)
+                    mark-index
+                    (- other-pointer-lowtag))))
+     (inst* segment 'sb sb-vm::null-tn sb-vm::code-tn
+            (the (unsigned-byte 15) offset)))))

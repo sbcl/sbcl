@@ -22,11 +22,7 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
-
-void arch_init(void)
-{
-    return;
-}
+#include "pseudo-atomic.h"
 
 os_vm_address_t
 arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
@@ -38,17 +34,12 @@ void arch_skip_instruction(os_context_t *context)
 {
     /* KLUDGE: Other platforms check for trap codes and skip inlined
      * trap/error parameters.  We should too. */
-
-    /* Note that we're doing integer arithmetic here, not pointer. So
-     * the value that the return value of os_context_pc_addr() points
-     * to will be incremented by 4, not 16.
-     */
-    *os_context_pc_addr(context) += 4;
+    OS_CONTEXT_PC(context) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char*)(*os_context_pc_addr(context) + 5);
+    return (unsigned char*)(OS_CONTEXT_PC(context) + 5);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
@@ -64,7 +55,7 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
 #ifdef LISP_FEATURE_GENCGC
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC, 0) != NIL;
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 #else
     return (!foreign_function_call_active)
         && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
@@ -73,12 +64,12 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, 0);
+    set_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
+    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 unsigned int arch_install_breakpoint(void *pc)
@@ -106,14 +97,14 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) = (long) handle_fun_end_breakpoint(context);
 }
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
     unsigned char register_offset =
-      *((unsigned char *)(*os_context_pc_addr(context)) + 5);
+      *((unsigned char *)(OS_CONTEXT_PC(context)) + 5);
     handle_single_step_trap(context, trap, register_offset);
     /* KLUDGE: arch_skip_instruction() only skips one instruction, and
      * there is a following word to deal with as well, so skip
@@ -122,17 +113,33 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     arch_skip_instruction(context);
 }
 
-void
+int riscv_user_emulation;
+
+static void
 sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 {
-    u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
+
+    static int sigaction_workaround;
+    if (riscv_user_emulation && !sigaction_workaround) {
+        sigset_t curmask;
+        thread_sigmask(SIG_BLOCK, 0, &curmask);
+        if (*(unsigned long int*)&curmask == 0) {
+            char msg[] = "WARNING: broken sigaction() workaround enabled\n";
+            write(2, msg, sizeof msg-1);
+            sigaction_workaround = 1;
+        } else {
+            sigaction_workaround = -1;
+        }
+    }
+    if (sigaction_workaround == 1) thread_sigmask(SIG_BLOCK, &blockable_sigset, 0);
 
     if (trap_instruction != 0x100073) {
-        lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
+        lose("Unrecognized trap instruction %08x in sigtrap_handler()",
              trap_instruction);
     }
 
-    u32 code = *((u32 *)(4 + *os_context_pc_addr(context)));
+    uint32_t code = *((uint32_t *)(4 + OS_CONTEXT_PC(context)));
 
     if (code == trap_PendingInterrupt) {
       arch_skip_instruction(context);
@@ -144,20 +151,21 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 void
 arch_install_interrupt_handlers(void)
 {
-    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+    ll_install_handler(SIGTRAP, sigtrap_handler);
 }
-
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 
 /* Linkage tables
  *
  * Linkage entry size is 8 or 20, because we need 2 instructions for the 32-bit case and we need 3 instructions and an 8 byte address in the 64-bit case.
  */
 
-#define LINKAGE_TEMP_REG reg_NL7
+#define LINKAGE_TEMP_REG reg_NL3
 
-void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+    // allocate successive entries downward
+    char *reloc_addr =
+        (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
     if (datap) {
       *(unsigned long *)reloc_addr = (unsigned long)target_addr;
       return;
@@ -203,4 +211,8 @@ void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int dat
 
     os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
-#endif
+
+lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs) {
+    return ((lispobj(*)(lispobj, lispobj *, int, struct thread*))SYMBOL(CALL_INTO_LISP)->value)
+      (fun, args, nargs, get_sb_vm_thread());
+}

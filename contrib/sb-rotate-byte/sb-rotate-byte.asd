@@ -1,5 +1,8 @@
 ;;; -*-  Lisp -*-
 
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-rotate-byte"
   :version "0.1"
   #+sb-building-contrib :pathname
@@ -16,7 +19,8 @@
      (:file "x86-vm" :if-feature :x86)
      (:file "x86-64-vm" :if-feature :x86-64)
      (:file "riscv-vm" :if-feature :riscv)
-     (:file "ppc-vm" :if-feature :ppc)))
+     (:file "ppc-vm" :if-feature :ppc)
+     (:file "ppc64-vm" :if-feature :ppc64)))
    (:file "rotate-byte" :depends-on ("vm")))
   :perform (load-op :after (o c) (provide 'sb-rotate-byte))
   :in-order-to ((test-op (test-op "sb-rotate-byte/tests"))))

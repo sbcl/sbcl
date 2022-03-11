@@ -143,7 +143,7 @@
 
 (define-assembly-routine (unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) a0-offset)
                           (:arg start (any-reg descriptor-reg) ocfp-offset)
@@ -207,6 +207,6 @@
 
   (move target catch)
   ;; reuse catch
-  (inst lr catch (make-fixup 'unwind :assembly-routine))
+  (inst addi catch null-tn (make-fixup 'unwind :asm-routine-nil-offset))
   (inst mtlr catch)
   (inst blr))

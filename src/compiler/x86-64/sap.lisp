@@ -27,10 +27,11 @@
 (define-vop (move-from-sap)
   (:args (sap :scs (sap-reg) :to :result))
   (:results (res :scs (descriptor-reg) :from :argument))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:note "SAP to pointer coercion")
   (:node-var node)
   (:generator 20
-    (alloc-other res sap-widetag sap-size node)
+    (alloc-other sap-widetag sap-size res node nil thread-tn)
     (storew sap res sap-pointer-slot other-pointer-lowtag)))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
@@ -61,7 +62,7 @@
       (sap-reg
        (move y x))
       (sap-stack
-       (if (= (tn-offset fp) esp-offset)
+       (if (= (tn-offset fp) rsp-offset)
            (storew x fp (tn-offset y))  ; c-call
            (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-sap-arg :move-arg
@@ -99,9 +100,9 @@
   (:generator 1
     (move sap int)))
 
-;;;; POINTER+ and POINTER-
+;;;; SAP+ and SAP-
 
-(define-vop (pointer+)
+(define-vop ()
   (:translate sap+)
   (:args (ptr :scs (sap-reg) :target res
               :load-if (not (location= ptr res)))
@@ -138,7 +139,7 @@
                        (inst mov temp value)
                        (inst add res temp))))))))))
 
-(define-vop (pointer-)
+(define-vop ()
   (:translate sap-)
   (:args (ptr1 :scs (sap-reg) :target res)
          (ptr2 :scs (sap-reg)))
@@ -157,30 +158,122 @@
 #+linux ; shadow space differs by OS
 (defconstant msan-mem-to-shadow-xor-const #x500000000000)
 
-(defun emit-sap-set (size sap ea-index ea-disp value result)
+#|
+https://llvm.org/doxygen/MemorySanitizer_8cpp.html
+/// "We load the shadow _after_ the application load,
+/// and we store the shadow _before_ the app store."
+|#
+
+(defun emit-sap-ref (size insn modifier result ea node vop temp)
+  (declare (ignorable node size vop temp))
+  (cond
+   #+linux
+   ((and (sb-c:msan-unpoison sb-c:*compilation*) (policy node (> safety 0)))
+    ;; Must not clobber TEMP with the load.
+    (aver (not (location= temp result)))
+    (inst lea temp ea)
+    (sb-assem:inst* insn modifier result (ea temp))
+    (inst xor temp (thread-slot-ea thread-msan-xor-constant-slot))
+    ;; Per the documentation, shadow is tested _after_
+    (let ((mask (sb-c::masked-memory-load-p vop))
+          (good (gen-label))
+          (nbytes (size-nbyte size))
+          bad)
+      ;; If the load is going to be masked, then we must only check the
+      ;; shadow bits under the mask.
+      (cond ((not mask)
+             (inst cmp size (ea temp) 0))
+            ((or (neq size :qword) (plausible-signed-imm32-operand-p mask))
+             (inst test size (ea temp)
+                   (ldb (byte (* 8 nbytes) 0) mask)))
+            (t
+             ;; Test two 32-bit chunks of the shadow memory since we don't
+             ;; have an available register to load a 64-bit constant.
+             (inst test :dword (ea temp) (ldb (byte 32 0) mask))
+             (setq bad (gen-label))
+             (inst jmp :ne bad)
+             (inst test :dword (ea 4 temp) (ldb (byte 32 32) mask))))
+      (inst jmp :e good)
+      (when bad (emit-label bad))
+      (inst break sb-vm:uninitialized-load-trap)
+      ;; Encode the target size and register. If XMM register loads were sanitized,
+      ;; then this would need some more bits to indicate the register file.
+      (let ((scale (1- (integer-length nbytes))))
+        (inst byte (logior (ash (tn-offset result) 2) scale)))
+      (emit-label good)))
+   (t
+    (sb-assem:inst* insn modifier result ea))))
+
+(defun emit-sap-set (size ea value temp)
   #+linux
   (when (sb-c:msan-unpoison sb-c:*compilation*)
-    (let ((offset (or ea-index ea-disp)))
-      (unless (eql offset 0)
-        (inst add sap offset))
-      (inst mov temp-reg-tn msan-mem-to-shadow-xor-const)
-      (inst xor temp-reg-tn sap)
-      (inst mov size (ea 0 temp-reg-tn) 0)
-      (unless (eql offset 0) ; restore SAP as if nothing happened
-        (inst sub sap offset))))
-  (inst mov size (ea ea-disp sap ea-index) value)
-  (move result value))
+    (inst lea temp ea)
+    (inst xor temp (thread-slot-ea thread-msan-xor-constant-slot))
+    (inst mov size (ea temp) 0))
+  (when (sc-is value constant immediate)
+    (cond ((plausible-signed-imm32-operand-p (tn-value value))
+           (setq value (tn-value value)))
+          (t
+           (inst mov temp (tn-value value))
+           (setq value temp))))
+  (inst mov size ea value))
 
+(defun emit-cas-sap-ref (size sap offset oldval newval result rax temp)
+  (multiple-value-bind (disp index)
+      (cond ((sc-is offset signed-reg)
+             (values 0 offset))
+            ((typep (tn-value offset) '(signed-byte 32))
+             (values (tn-value offset) nil))
+            (t
+             (inst mov temp (tn-value offset))
+             (values 0 temp)))
+    (cond ((sc-is oldval immediate constant)
+           (inst mov rax (tn-value oldval)))
+          ((not (location= oldval rax))
+           (inst mov (if (eq size :qword) :qword :dword) rax oldval)))
+    (inst cmpxchg size :lock (ea disp sap index) newval)
+    (unless (location= result rax)
+      (inst mov (if (eq size :qword) :qword :dword) result rax))))
+
+;;; TODO: these should be refactored so that there is only one vop for any given
+;;; result storage class. In particular, sap-ref-{8,16,32} can all produce tagged-num.
+;;; The vop can examine the node to see which function it translates
+;;; and select the appropriate modifier to movzx or movsx.
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
                                     ref-insn
                                     sc
                                     type
                                     size)
-             (let ((ref-name-c (symbolicate ref-name "-C"))
-                   (set-name-c (symbolicate set-name "-C"))
-                   (modifier (if (eq ref-insn 'mov) size `(,size :qword))))
+             (let ((value-scs (cond ((member ref-name '(sap-ref-64 signed-sap-ref-64))
+                                     `(,sc constant immediate))
+                                    ((not (member ref-name '(sap-ref-single sap-ref-sap
+                                                             sap-ref-lispobj)))
+                                     `(,sc immediate))
+                                    (t
+                                     `(,sc))))
+                   (modifier (if (eq ref-insn 'mov)
+                                 size
+                                 `(,size ,(if (eq ref-insn 'movzx) :dword :qword)))))
                `(progn
+                  ,@(when (member ref-name '(sap-ref-8 sap-ref-16 sap-ref-32 sap-ref-64
+                                             signed-sap-ref-64
+                                             sap-ref-lispobj sap-ref-sap))
+                      `((define-vop (,(symbolicate "CAS-" ref-name))
+                          (:translate (cas ,ref-name))
+                          (:policy :fast-safe)
+                          (:args (oldval :scs ,value-scs :target rax)
+                                 (newval :scs ,(remove 'immediate value-scs))
+                                 (sap :scs (sap-reg))
+                                 (offset :scs (signed-reg immediate)))
+                          (:arg-types ,type ,type system-area-pointer signed-num)
+                          (:results (result :scs (,sc)))
+                          (:result-types ,type)
+                          (:temporary (:sc unsigned-reg :offset rax-offset
+                                       :from (:argument 0) :to :result) rax)
+                          (:temporary (:sc unsigned-reg) temp)
+                          (:generator 3
+                            (emit-cas-sap-ref ',size sap offset oldval newval result rax temp)))))
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -189,40 +282,48 @@
                     (:arg-types system-area-pointer signed-num)
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
-                    (:generator 5
-                      (inst ,ref-insn ',modifier result (ea sap offset))))
-                  (define-vop (,ref-name-c)
+                    (:node-var node)
+                    (:vop-var vop)
+                    ;; this temp has to be wired because the uninitialized-load-trap handler
+                    ;; looks in RAX to get the poisoned address.
+                    ;; We should have a different variant of this reffer for msan or no msan
+                    ;; to avoid wasting a register that is not needed.
+                    (:temporary (:sc unsigned-reg :offset rax-offset) temp)
+                    (:generator 3 (emit-sap-ref ,size ',ref-insn
+                                                ',modifier result (ea sap offset) node vop temp)))
+                  (define-vop (,(symbolicate ref-name "-C"))
                     (:translate ,ref-name)
                     (:policy :fast-safe)
                     (:args (sap :scs (sap-reg)))
-                    (:arg-types system-area-pointer
-                                (:constant (signed-byte 32)))
+                    (:arg-types system-area-pointer (:constant (signed-byte 32)))
                     (:info offset)
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
-                    (:generator 4
-                      (inst ,ref-insn ',modifier result (ea offset sap))))
+                    (:node-var node)
+                    (:vop-var vop)
+                    (:temporary (:sc unsigned-reg :offset rax-offset) temp)
+                    (:generator 2 (emit-sap-ref ,size ',ref-insn
+                                                ',modifier result (ea offset sap) node vop temp)))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
-                    (:args (sap :scs (sap-reg) :to (:eval 0))
-                           (offset :scs (signed-reg) :to (:eval 0))
-                           (value :scs (,sc) :target result))
-                    (:arg-types system-area-pointer signed-num ,type)
-                    (:results (result :scs (,sc)))
-                    (:result-types ,type)
-                    (:generator 5 (emit-sap-set ,size sap offset 0 value result)))
-                  (define-vop (,set-name-c)
+                    (:args (value :scs ,value-scs)
+                           (sap :scs (sap-reg))
+                           (offset :scs (signed-reg)))
+                    (:arg-types ,type system-area-pointer signed-num)
+                    (:temporary (:sc unsigned-reg) temp)
+                    (:generator 5
+                      (emit-sap-set ,size (ea sap offset) value temp)))
+                  (define-vop (,(symbolicate set-name "-C"))
                     (:translate ,set-name)
                     (:policy :fast-safe)
-                    (:args (sap :scs (sap-reg) :to (:eval 0))
-                           (value :scs (,sc) :target result))
-                    (:arg-types system-area-pointer
-                                (:constant (signed-byte 32)) ,type)
+                    (:args (value :scs ,value-scs)
+                           (sap :scs (sap-reg)))
+                    (:arg-types ,type system-area-pointer (:constant (signed-byte 32)))
                     (:info offset)
-                    (:results (result :scs (,sc)))
-                    (:result-types ,type)
-                    (:generator 4 (emit-sap-set ,size sap nil offset value result)))))))
+                    (:temporary (:sc unsigned-reg) temp)
+                    (:generator 4
+                      (emit-sap-set ,size (ea offset sap) value temp)))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8 movzx
     unsigned-reg positive-fixnum :byte)
@@ -232,7 +333,7 @@
     unsigned-reg positive-fixnum :word)
   (def-system-ref-and-set signed-sap-ref-16 %set-signed-sap-ref-16 movsx
     signed-reg tagged-num :word)
-  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 movzx
+  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 mov
     unsigned-reg unsigned-num :dword)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32 movsx
     signed-reg signed-num :dword)
@@ -245,106 +346,47 @@
   (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj mov
     descriptor-reg * :qword))
 
-;;;; SAP-REF-DOUBLE
+;;;; SAP-REF-SINGLE and SAP-REF-DOUBLE
 
-(define-vop (sap-ref-double)
-  (:translate sap-ref-double)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg))
-         (offset :scs (signed-reg)))
-  (:arg-types system-area-pointer signed-num)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
-  (:generator 5
-     (inst movsd result (ea sap offset))))
-
-(define-vop (sap-ref-double-c)
-  (:translate sap-ref-double)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg)))
-  (:arg-types system-area-pointer (:constant (signed-byte 32)))
-  (:info offset)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
-  (:generator 4
-     (inst movsd result (ea offset sap))))
-
-(define-vop (%set-sap-ref-double)
-  (:translate %set-sap-ref-double)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg) :to (:eval 0))
-         (offset :scs (signed-reg) :to (:eval 0))
-         (value :scs (double-reg)))
-  (:arg-types system-area-pointer signed-num double-float)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
-  (:generator 5
-    (inst movsd (ea sap offset) value)
-    (move result value)))
-
-(define-vop (%set-sap-ref-double-c)
-  (:translate %set-sap-ref-double)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg) :to (:eval 0))
-         (value :scs (double-reg)))
-  (:arg-types system-area-pointer (:constant (signed-byte 32)) double-float)
-  (:info offset)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
-  (:generator 4
-    (inst movsd (ea offset sap) value)
-    (move result value)))
-
-;;;; SAP-REF-SINGLE
-
-(define-vop (sap-ref-single)
-  (:translate sap-ref-single)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg))
-         (offset :scs (signed-reg)))
-  (:arg-types system-area-pointer signed-num)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
-  (:generator 5
-     (inst movss result (ea sap offset))))
-
-(define-vop (sap-ref-single-c)
-  (:translate sap-ref-single)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg)))
-  (:arg-types system-area-pointer (:constant (signed-byte 32)))
-  (:info offset)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
-  (:generator 4
-     (inst movss result (ea offset sap))))
-
-(define-vop (%set-sap-ref-single)
-  (:translate %set-sap-ref-single)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg) :to (:eval 0))
-         (offset :scs (signed-reg) :to (:eval 0))
-         (value :scs (single-reg)))
-  (:arg-types system-area-pointer signed-num single-float)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
-  (:generator 5
-    (inst movss (ea sap offset) value)
-    (move result value)))
-
-(define-vop (%set-sap-ref-single-c)
-  (:translate %set-sap-ref-single)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg) :to (:eval 0))
-         (value :scs (single-reg)))
-  (:arg-types system-area-pointer (:constant (signed-byte 32)) single-float)
-  (:info offset)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
-  (:generator 4
-    (inst movss (ea offset sap) value)
-    (move result value)))
-
+(macrolet ((def-system-ref-and-set (ref-fun res-sc res-type insn
+                                            &aux (set-fun (symbolicate "%SET-" ref-fun)))
+             `(progn
+                (define-vop (,ref-fun)
+                  (:translate ,ref-fun)
+                  (:policy :fast-safe)
+                  (:args (sap :scs (sap-reg))
+                         (offset :scs (signed-reg)))
+                  (:arg-types system-area-pointer signed-num)
+                  (:results (result :scs (,res-sc)))
+                  (:result-types ,res-type)
+                  (:generator 5 (inst ,insn result (ea sap offset))))
+                (define-vop (,(symbolicate ref-fun "-C"))
+                  (:translate ,ref-fun)
+                  (:policy :fast-safe)
+                  (:args (sap :scs (sap-reg)))
+                  (:arg-types system-area-pointer (:constant (signed-byte 32)))
+                  (:info offset)
+                  (:results (result :scs (,res-sc)))
+                  (:result-types ,res-type)
+                  (:generator 4 (inst ,insn result (ea offset sap))))
+                (define-vop (,set-fun)
+                  (:translate ,set-fun)
+                  (:policy :fast-safe)
+                  (:args (value :scs (,res-sc immediate))
+                         (sap :scs (sap-reg))
+                         (offset :scs (signed-reg)))
+                  (:arg-types ,res-type system-area-pointer signed-num)
+                  (:generator 5 (inst ,insn (ea sap offset) value)))
+                (define-vop (,(symbolicate set-fun "-C"))
+                  (:translate ,set-fun)
+                  (:policy :fast-safe)
+                  (:args (value :scs (,res-sc))
+                         (sap :scs (sap-reg)))
+                  (:arg-types ,res-type system-area-pointer (:constant (signed-byte 32)))
+                  (:info offset)
+                  (:generator 4 (inst ,insn (ea offset sap) value))))))
+  (def-system-ref-and-set sap-ref-single single-reg single-float movss)
+  (def-system-ref-and-set sap-ref-double double-reg double-float movsd))
 
 ;;; noise to convert normal lisp data objects into SAPs
 
@@ -359,21 +401,3 @@
       (if (location= sap vector)
           (inst add sap disp)
           (inst lea sap (ea disp vector))))))
-
-;;; Compare and swap
-(define-vop (signed-sap-cas-32)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg) :to (:eval 0))
-         (offset :scs (signed-reg) :to (:eval 0))
-         (oldval :scs (signed-reg) :target eax)
-         (newval :scs (signed-reg) :to (:eval 0)))
-  (:temporary (:sc unsigned-reg :offset eax-offset
-                   :from (:argument 2) :to (:result 0)) eax)
-  (:arg-types system-area-pointer signed-num signed-num signed-num)
-  (:results (result :scs (signed-reg)))
-  (:result-types signed-num)
-  (:generator 5
-    (inst mov :dword eax oldval)
-    (inst cmpxchg :dword (ea sap offset) newval :lock)
-    (inst movsx '(:dword :qword) result eax)))
-

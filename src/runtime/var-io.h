@@ -25,5 +25,6 @@ struct varint_unpacker {
 
 void varint_unpacker_init(struct varint_unpacker*, lispobj);
 int varint_unpack(struct varint_unpacker*, int*);
+void skip_data_stream(struct varint_unpacker* unpacker);
 
 #endif /* _VAR_IO_H_ */

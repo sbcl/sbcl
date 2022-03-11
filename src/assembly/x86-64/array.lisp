@@ -16,7 +16,7 @@
 ;;; to deal with pre- and post-loop pieces for proper alignment.
 ;;; Alternatively, if the CPU has the enhanced MOVSB feature, use REP STOS
 ;;; depending on the number of elements to be written.
-(define-assembly-routine (vector-fill/t
+(define-assembly-routine (vector-fill/t ; <-- this could work on raw bits too
                           (:translate vector-fill/t)
                           (:policy :fast-safe))
                          ((:arg  vector (descriptor-reg) rdx-offset)
@@ -25,16 +25,46 @@
                           (:arg  end    (any-reg descriptor-reg) rsi-offset)
                           (:res  res    (descriptor-reg) rdx-offset)
                           (:temp count unsigned-reg rcx-offset)
+                          (:temp end-card-index unsigned-reg rbx-offset)
                           ;; storage class doesn't matter since all float regs
                           ;; and sse regs map to the same storage base.
                           (:temp wordpair double-reg float0-offset))
   (move res vector) ; to "use" res
+
+  ;; Mark each GC card of the vector unless ITEM is not a pointer
+  ;; (NIL is non-pointer) or the COUNT is 0.
+  (inst cmp start end)
+  (inst jmp :ge DONE)
+  (inst lea :dword count (ea -3 item)) ; same as POINTERP (see type-vops)
+  (inst test :byte count #b11)
+  (inst jmp :nz DONE-CARD-MARKING)
+  (inst cmp item nil-value)
+  (inst jmp :e DONE-CARD-MARKING)
+
+  (let ((disp (- (ash vector-data-offset word-shift) other-pointer-lowtag))
+        (card-index count)
+        (loop (gen-label)))
+    ;; Compute EA of starting and ending (inclusive) indices
+    (inst lea card-index (ea disp vector start (ash 1 (- word-shift n-fixnum-tag-bits))))
+    (inst lea end-card-index (ea (- disp n-word-bytes)
+                                 vector end (ash 1 (- word-shift n-fixnum-tag-bits))))
+    (inst shr card-index gencgc-card-shift)
+    (inst shr end-card-index gencgc-card-shift)
+    (inst and :dword card-index card-index-mask)
+    (inst and :dword end-card-index card-index-mask)
+    (emit-label LOOP)
+    (inst mov :byte (ea gc-card-table-reg-tn card-index) 0) ; mark one card
+    (inst cmp card-index end-card-index)
+    (inst jmp :e DONE-CARD-MARKING)
+    (inst inc :dword card-index)
+    (inst and :dword card-index card-index-mask)
+    (inst jmp LOOP))
+
+  DONE-CARD-MARKING
   (move count end)
   (inst sub count start)
-  ;; 'start' and 'limit' will be interior pointers into 'vector',
+  ;; 'start' is an interior pointer to 'vector',
   ;; but 'vector' is pinned because it's in a register, so this is ok.
-  ;; If we had a precise GC we'd want to keep start and limit as offsets
-  ;; because we couldn't tie them both to the vector.
   (inst lea start (ea (- (ash vector-data-offset word-shift) other-pointer-lowtag)
                       vector start (ash 1 (- word-shift n-fixnum-tag-bits))))
   ;; REP STOS has a fixed cost that makes it suboptimal below
@@ -50,7 +80,7 @@
 
   (inst shr count n-fixnum-tag-bits)
   (inst rep)
-  (inst stos item)
+  (inst stos :qword)
   DONE
   (inst ret)
   UNROLL

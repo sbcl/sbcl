@@ -5,270 +5,193 @@
 
 (in-package #:sb-sprof)
 
-
-;;; Append-only sample vector
-
 (deftype sampling-mode ()
   '(member :cpu :alloc :time))
 
 ;;; 0 code-component-ish
 ;;; 1 an offset relative to the start of the code-component or an
 ;;;   absolute address
-(defconstant +elements-per-sample+ 2)
+(defconstant +elements-per-pc-loc+ 2)
 
 ;;; 0 the trace start marker (trace-start . END-INDEX)
 ;;; 1 the current thread, an SB-THREAD:THREAD instance
-;;; 2 the current internal real time
-(defconstant +elements-per-trace-start+ 3)
-
-(declaim (inline make-sample-vector))
-(defun make-sample-vector (max-samples)
-  (make-array (* max-samples
-                 ;; Arbitrary guess at how many samples we'll be
-                 ;; taking for each trace. The exact amount doesn't
-                 ;; matter, this is just to decrease the amount of
-                 ;; re-allocation that will need to be done.
-                 10
-                 ;; Each sample takes two cells in the vector
-                 +elements-per-sample+)))
+(defconstant +elements-per-trace-start+ 2)
 
 ;;; Encapsulate all the information about a sampling run
-(defstruct (samples
-             (:constructor
-              make-samples (&key start-time
-                                 mode sample-interval alloc-interval
-                                 max-depth max-samples
-                            &aux (vector (make-sample-vector max-samples)))))
-  ;; When this vector fills up, we allocate a new one and copy over
-  ;; the old contents.
-  (vector          nil                  :type simple-vector)
-  (index           0                    :type sb-int:index)
-  ;; Only used while recording a trace. Stores a cell that is
-  ;;
-  ;;   (start-trace . nil)   (start-trace is the marker symbol
-  ;;                          SB-SPROF:START-TRACE)
-  ;;
-  ;; when starting to record a trace and
-  ;;
-  ;;   (start-trace . END-INDEX-OF-THE-TRACE)
-  ;;
-  ;; after finishing recording the trace. This allows MAP-TRACES to
-  ;; jump from one trace to the next in O(1) instead of O(N) time.
-  (trace-start     '(nil . nil)         :type cons)
+(defstruct (samples (:constructor make-samples (mode sample-interval)))
+  (vector          #()                  :type simple-vector)
+  ;; The trace count is updated only when profiling is stopped.
   (trace-count     0                    :type sb-int:index)
-
+  (unique-trace-count nil)
   (sampled-threads nil                  :type list)
-
   ;; Metadata
-  (start-time      (sb-int:missing-arg) :type sb-kernel:internal-time    :read-only t)
-  (end-time        nil                  :type (or null sb-kernel:internal-time))
-
   (mode            nil                  :type sampling-mode              :read-only t)
-  (sample-interval (sb-int:missing-arg) :type (real (0))                 :read-only t)
-  (alloc-interval  (sb-int:missing-arg) :type (integer (0))              :read-only t)
-  (max-depth       most-positive-fixnum :type (and fixnum (integer (0))) :read-only t)
-  (max-samples     (sb-int:missing-arg) :type sb-int:index               :read-only t))
+  (sample-interval (sb-int:missing-arg) :type (real (0))                 :read-only t))
+
+(defun samples-index (x) (length (samples-vector x)))
+
+(define-alien-variable ("gencgc_alloc_profiler" enable-alloc-profiler) (signed 32))
+(define-alien-variable ("sb_sprof_trace_ct" trace-count) (signed 32))
+(define-alien-variable ("sb_sprof_trace_ct_max" trace-limit) (signed 32))
 
 (defmethod print-object ((samples samples) stream)
   (let ((*print-array* nil))
     (call-next-method)))
-
-(defun note-sample-vector-full (samples)
-  (format *trace-output* "Profiler sample vector full (~:D trace~:P / ~
-                          approximately ~:D sample~:P), doubling the ~
-                          size~%"
-          (samples-trace-count samples)
-          (truncate (samples-index samples) +elements-per-sample+)))
-
-(declaim (inline ensure-samples-vector))
-(defun ensure-samples-vector (samples)
-  (declare (optimize (speed 3)))
-  (let ((vector (samples-vector samples))
-        (index (samples-index samples)))
-    ;; Allocate a new sample vector if the current one is too small to
-    ;; accommodate the largest chunk of elements that we could
-    ;; potentially store in one go (currently 3 elements, stored by
-    ;; RECORD-TRACE-START).
-    (values (if (< (length vector) (+ index (max +elements-per-sample+
-                                                 +elements-per-trace-start+)))
-                (let ((new-vector (make-array (* 2 index))))
-                  (note-sample-vector-full samples)
-                  (replace new-vector vector)
-                  (setf (samples-vector samples) new-vector))
-                vector)
-            index)))
-
-(defun record-trace-start (samples)
-  ;; Mark the start of the trace.
-  (multiple-value-bind (vector index) (ensure-samples-vector samples)
-    (let ((trace-start (cons 'trace-start nil)))
-      (setf (aref vector index)       trace-start
-            (aref vector (+ index 1)) sb-thread:*current-thread*
-            (aref vector (+ index 2)) (get-internal-real-time))
-      (setf (samples-index samples)       (+ index +elements-per-trace-start+)
-            (samples-trace-start samples) trace-start))))
-
-(defun record-trace-end (samples)
-  (setf (cdr (samples-trace-start samples)) (samples-index samples)))
-
-(declaim (inline record-sample))
-(defun record-sample (samples info pc-or-offset)
-  (multiple-value-bind (vector index) (ensure-samples-vector samples)
-    ;; For each sample, store the debug-info and the PC/offset into
-    ;; adjacent cells.
-    (setf (aref vector index) info
-          (aref vector (1+ index)) pc-or-offset)
-    (setf (samples-index samples) (+ index +elements-per-sample+))))
 
 ;;; Trace and sample and access functions
 
 (defun map-traces (function samples)
   "Call FUNCTION on each trace in SAMPLES
 
-The lambda list of FUNCTION has to be compatible to
+The signature of FUNCTION must be compatible with (thread trace).
 
-  (thread time trace)
-
-. FUNCTION is called once for each trace such that THREAD is the
-SB-THREAD:TREAD instance that was sampled to produce TRACE, TIME is
-the internal real time at which TRACE was produced and TRACE is an
-opaque object whose only purpose is being used as the second argument
-to MAP-TRACE-SAMPLES.
+FUNCTION is called once for each trace where THREAD is the SB-THREAD:TREAD
+instance which was sampled to produce TRACE, and TRACE is an opaque object
+to be passed to MAP-TRACE-PC-LOCS.
 
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function))
         (vector (samples-vector samples))
-        (index (samples-index samples))
-        (start-time (samples-start-time samples)))
+        (index (samples-index samples)))
     (when (plusp index)
       (sb-int:aver (typep (aref vector 0) '(cons (eql trace-start) index)))
       (loop for start = 0 then end
             while (< start index)
             for end = (cdr (aref vector start))
             for thread = (aref vector (+ start 1))
-            for time = (/ (- (aref vector (+ start 2)) start-time)
-                          internal-time-units-per-second)
             do (let ((trace (list vector start end)))
-                 (funcall function thread time trace))))))
+                 (funcall function thread trace))))))
 
-(defun map-trace-samples (function trace)
-  "Call FUNCTION on each sample in TRACE.
-
-The lambda list of FUNCTION has to be compatible to
-
-  (info pc-or-offset)
-
-.
-
-TRACE is an object as received by a function passed to MAP-TRACES.
-
-EXPERIMENTAL: Interface subject to change."
+;;; Call FUNCTION on each PC location in TRACE.
+;;; The signature of FUNCTION must be compatible with (info pc-or-offset).
+;;; TRACE is an object as received by the function passed to MAP-TRACES.
+(defun map-trace-pc-locs (function trace)
   (let ((function (sb-kernel:%coerce-callable-to-fun function)))
     (destructuring-bind (samples start end) trace
-      (loop for i from (- end +elements-per-sample+)
+      (loop for i from (- end +elements-per-pc-loc+)
             downto (+ start +elements-per-trace-start+ -1)
-            by +elements-per-sample+
+            by +elements-per-pc-loc+
             for info = (aref samples i)
             for pc-or-offset = (aref samples (1+ i))
             do (funcall function info pc-or-offset)))))
 
-(declaim (special *samples*))
-(defun map-all-samples (function &optional (samples *samples*))
-  "Call FUNCTION on each sample in SAMPLES.
+;;; One "sample" is a trace, usually. But also it means an instance of SAMPLES,
+;;; but also it means a PC location expressed as code + offset.
+;;; So when is a sample not a sample? When it's a PC location.
+(declaim (type (or null samples) *samples*))
+(defglobal *samples* nil)
 
-The lambda list of FUNCTION has to be compatible to
-
-  (info pc-or-offset)
-
-.
-
-SAMPLES is usually the value of *SAMPLES* after a profiling run.
-
-EXPERIMENTAL: Interface subject to change."
-  (sb-int:dx-flet ((do-trace (thread time trace)
-                     (declare (ignore thread time))
-                     (map-trace-samples function trace)))
+;;; Call FUNCTION on each PC location in SAMPLES which is usually
+;;; the value of *SAMPLES* after a profiling run.
+;;; The signature of FUNCTION must be compatible with (info pc-or-offset).
+(defun map-all-pc-locs (function &optional (samples *samples*))
+  (sb-int:dx-flet ((do-trace (thread trace)
+                     (declare (ignore thread))
+                     (map-trace-pc-locs function trace)))
     (map-traces #'do-trace samples)))
 
 (defun sample-pc (info pc-or-offset)
   "Extract and return program counter from INFO and PC-OR-OFFSET.
 
-Can be applied to the arguments passed by MAP-TRACE-SAMPLES and
-MAP-ALL-SAMPLES.
+Can be applied to the arguments passed by MAP-TRACE-PC-LOCS and
+MAP-ALL-PC-LOCS.
 
 EXPERIMENTAL: Interface subject to change."
   (etypecase info
     ;; Assembly routines or foreign functions don't move around, so
     ;; we've stored a raw PC
-    ((or null sb-kernel:code-component string)
+    ((or null sb-kernel:code-component string symbol)
      pc-or-offset)
     ;; Lisp functions might move, so we've stored a offset from the
     ;; start of the code component.
     (sb-di::compiled-debug-fun
-     (let* ((component (sb-di::compiled-debug-fun-component info))
-            (start-pc (code-start component)))
-       (+ start-pc pc-or-offset)))))
+     (let ((component (sb-di::compiled-debug-fun-component info)))
+       (sap-int (sap+ (sb-kernel:code-instructions component) pc-or-offset))))))
 
 ;;; Sampling
 
-(defvar *samples* nil)
-(declaim (type (or null samples) *samples*))
-
+;;; *PROFILING* is both the global enabling flag, and the operational mode.
 (defvar *profiling* nil)
 (declaim (type (or (eql nil) sampling-mode) *profiling*))
-(defvar *sampling* nil)
-(declaim (type boolean *sampling*))
 
 (defvar *show-progress* nil)
 
-(defvar *old-sampling* nil)
-
 ;; Call count encapsulation information
 (defvar *encapsulations* (make-hash-table :test 'equal))
-
-(defun turn-off-sampling ()
-  (setq *old-sampling* *sampling*)
-  (setq *sampling* nil))
-
-(defun turn-on-sampling ()
-  (setq *sampling* *old-sampling*))
 
 (defun show-progress (format-string &rest args)
   (when *show-progress*
     (apply #'format t format-string args)
     (finish-output)))
 
-(defun start-sampling ()
-  "Switch on statistical sampling."
-  (setq *sampling* t))
+(define-alien-routine "sb_toggle_sigprof" int (context system-area-pointer) (state int))
+(eval-when (:compile-toplevel)
+  ;; current-thread-offset-sap has no slot setter, let alone for other threads,
+  ;; nor for sub-fields of a word, so ...
+  (defmacro sprof-enable-byte () ; see 'thread.h'
+    (+ (ash sb-vm:thread-state-word-slot sb-vm:word-shift) 1)))
 
-(defun stop-sampling ()
-  "Switch off statistical sampling."
-  (setq *sampling* nil))
+;;; If a thread wants sampling but had previously blocked SIGPROF,
+;;; it will have to unblock the signal. We can use %INTERRUPT-THREAD
+;;; to tell it to do that.
+(defun start-sampling (&optional (thread sb-thread:*current-thread*))
+  "Unblock SIGPROF in the specified thread"
+  (if (eq thread sb-thread:*current-thread*)
+      (when (zerop (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)))
+        (setf (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte)) 1)
+        (sb-toggle-sigprof (if (boundp 'sb-kernel:*current-internal-error-context*)
+                               sb-kernel:*current-internal-error-context*
+                               (sb-sys:int-sap 0))
+                           0))
+      ;; %INTERRUPT-THREAD requires that the interruptions lock be held by the caller.
+      (sb-thread:with-deathlok (thread c-thread)
+        (when (and (/= c-thread 0)
+                   (zerop (sap-ref-8 (int-sap c-thread) (sprof-enable-byte))))
+          (sb-thread::%interrupt-thread thread #'start-sampling))))
+  nil)
+
+(defun stop-sampling (&optional (thread sb-thread:*current-thread*))
+  "Block SIGPROF in the specified thread"
+  (sb-thread:with-deathlok (thread c-thread)
+    (when (and (/= c-thread 0)
+               (not (zerop (sap-ref-8 (int-sap c-thread) (sprof-enable-byte)))))
+      (setf (sap-ref-8 (int-sap c-thread) (sprof-enable-byte)) 0)
+      ;; Blocking the signal is done lazily in threads other than the current one.
+      (when (eq thread sb-thread:*current-thread*)
+        (sb-toggle-sigprof (sb-sys:int-sap 0) 1)))) ; 1 = mask it
+  nil)
+
+(defun call-with-sampling (enable thunk)
+  (declare (dynamic-extent thunk))
+  (if (= (sap-ref-8 (sb-thread:current-thread-sap) (sprof-enable-byte))
+         (if enable 1 0))
+      ;; Already in the correct state
+      (funcall thunk)
+      ;; Invert state, call thunk, invert again
+      (progn (if enable (start-sampling) (stop-sampling))
+             (unwind-protect (funcall thunk)
+               (if enable (stop-sampling) (start-sampling))))))
 
 (defmacro with-sampling ((&optional (on t)) &body body)
-  "Evaluate body with statistical sampling turned on or off."
-  `(let ((*sampling* ,on)
-         (sb-vm:*alloc-signal* sb-vm:*alloc-signal*))
-     ,@body))
+  "Evaluate body with statistical sampling turned on or off in the current thread."
+  `(call-with-sampling (if ,on t nil) (lambda () ,@body)))
 
 ;;; Return something serving as debug info for address PC.
-(declaim (inline debug-info))
-(defun debug-info (pc)
+(defun debug-info (pc code)
   (declare (type system-area-pointer pc)
            (muffle-conditions compiler-note))
-  (let ((code (sb-di::code-header-from-pc pc)))
+  (let ((pc-int (sap-int pc)))
     (cond ((not code)
            (let ((name (sap-foreign-symbol pc)))
              (if name
                  (values (format nil "foreign function ~a" name)
-                         (sap-int pc)
-                         :foreign)
-                 (values nil (sap-int pc) :foreign))))
+                         pc-int :foreign)
+                 (values nil pc-int :foreign))))
+          ((eq code sb-fasl:*assembler-routines*)
+           (values (sb-disassem::find-assembler-routine pc-int)
+                   pc-int :asm-routine))
           (t
-           (let* ((code-header-len (* (sb-kernel:code-header-words code)
-                                      sb-vm:n-word-bytes))
-                  ;; Give up if we land in the 2 or 3 instructions of a
+           (let* (;; Give up if we land in the 2 or 3 instructions of a
                   ;; code component sans simple-fun that is not an asm routine.
                   ;; While it's conceivable that this could be improved,
                   ;; the problem will be different or nonexistent after
@@ -277,190 +200,232 @@ EXPERIMENTAL: Interface subject to change."
                   (di (unless (typep (sb-kernel:%code-debug-info code)
                                      'sb-c::compiled-debug-info)
                         (return-from debug-info
-                          (values code (sap-int pc)))))
-                  (pc-offset (- (sap-int pc)
-                                (- (sb-kernel:get-lisp-obj-address code)
-                                   sb-vm:other-pointer-lowtag)
-                                code-header-len))
+                          (values code pc-int nil))))
+                  (pc-offset (sap- (int-sap pc-int) (sb-kernel:code-instructions code)))
                   (df (sb-di::debug-fun-from-pc code pc-offset)))
              #+immobile-code (declare (ignorable di))
              (cond ((typep df 'sb-di::bogus-debug-fun)
-                    (values code (sap-int pc) nil))
+                    (values code pc-int nil))
                    (df
                     ;; The code component might be moved by the GC. Store
-                    ;; a PC offset, and reconstruct the data in
-                    ;; SAMPLE-PC-FROM-PC-OR-OFFSET.
+                    ;; a PC offset, and reconstruct the data in SAMPLE-PC
                     (values df pc-offset nil))
                    (t
                     (values nil 0 nil))))))))
 
-(declaim (inline record))
-(defun record (samples pc)
-  (declare (type system-area-pointer pc))
-  (multiple-value-bind (info pc-or-offset foreign) (debug-info pc)
-    (record-sample samples info pc-or-offset)
-    foreign))
+(defun sprof-data-header (sap)
+  (values (sap-ref-sap sap 0)   ; bucket pointer
+          (sap-ref-32 sap 8)    ; free pointer
+          (sap-ref-32 sap 12))) ; capacity
+(defconstant n-buckets #x10000)
+(defconstant element-size 8)
+(defun sprof-data-trace (data trace-index) (sap+ data (* trace-index element-size)))
+(defun trace-multiplicity (trace) (sap-ref-32 trace 4))
+(defun trace-len (trace)
+  #+64-bit (logand (sap-ref-64 trace 8) #xffffffff)
+  #-64-bit (sap-ref-32 trace 8))
 
-;;; List of thread currently profiled, or :ALL for all threads.
-(defvar *profiled-threads* nil)
-(declaim (type (or list (member :all)) *profiled-threads*))
+;;; Pseudo-functions for marking questionable parts of the stack trace
+(defun unavailable-frames ())
+(defun unknown-function ())
 
-;;; Thread which runs the wallclock timers, if any.
-(defvar *timer-thread* nil)
+(defun build-serialno-to-code-map ()
+  ;; Allocate a hash-table for serial# -> code object
+  ;; Identifying code-containing pages is quick (except on cheneygc), so
+  ;; two passes over the heap is cheaper than sizing up the table repeatedly.
+  (let ((ht (make-hash-table
+             :size (let ((n 0))
+                     (sb-vm:map-code-objects (lambda (x) (declare (ignore x)) (incf n)))
+                     n))))
+    ;; Collect the objects
+    (sb-vm:map-code-objects
+     (lambda (x)
+       (let ((serial (sb-kernel:%code-serialno x)))
+         (unless (eql serial 0)
+           (setf (gethash serial ht) x)))))
+    ht))
 
-(defun profiled-threads ()
-  (let ((profiled-threads *profiled-threads*))
-    (remove *timer-thread*
-            (if (eq :all profiled-threads)
-                (sb-thread:list-all-threads)
-                profiled-threads))))
+(defun extract-traces (sap serialno-to-code)
+  (macrolet ((absolute-pc (pc)
+               ;; Foreign function or immovable code
+               `(let ((sap (int-sap ,pc)))
+                  (debug-info sap (sb-di::code-header-from-pc sap))))
+             (relative-pc (serialno offset)
+               ;; Convert serial# + base-address-relative pc-offset
+               ;; to tagged code object + CODE-INSTRUCTIONS-relative pc-offset.
+               ;; This can fail only if the code was GCed in the meantime.
+               `(let* ((id ,serialno)
+                       (code (gethash id serialno-to-code))
+                       (rel-pc ,offset))
+                  (when (and (not code) (/= id 0))
+                    ;; If the serial# could not be found, something has gone wrong in GC.
+                    ;; This really should not happen. If it does, simulate a random code blob
+                    ;; named with that serial#.
+                    (setf code (sb-kernel:fun-code-header
+                                (compile nil `(named-lambda ,(format nil "Unknown fn ~d" id) ())))
+                          (gethash id serialno-to-code) code
+                          rel-pc 0))
+                  (if code
+                      (with-pinned-objects (code)
+                        (debug-info (sap+ (int-sap (logandc2 (sb-kernel:get-lisp-obj-address code)
+                                                             sb-vm:lowtag-mask))
+                                          rel-pc)
+                                    code))
+                      (let ((code (sb-kernel:fun-code-header #'unknown-function)))
+                        (debug-info (sb-kernel:code-instructions code) code)))))
+             (elision-marker ()
+               `(let ((code (sb-kernel:fun-code-header #'unavailable-frames)))
+                  (debug-info (sb-kernel:code-instructions code) code))))
+    (do ((free-ptr (nth-value 1 (sprof-data-header sap)))
+         (trace-ptr 2)
+         (result))
+        ((>= trace-ptr free-ptr)
+         (aver (= trace-ptr free-ptr))
+         result)
+      (let* ((trace (sprof-data-trace sap trace-ptr))
+             (len (trace-len trace))
+             ;; byte offset into the trace at which the locs[] array begins
+             (element-offset 16)
+             (locs))
+        (dotimes (i len (push (cons (nreverse (coerce locs 'vector))
+                                    (trace-multiplicity trace))
+                              result))
+          (multiple-value-bind (info pc-or-offset)
+              #-64-bit
+              (let ((word0 (sap-ref-word trace element-offset))
+                    (word1 (sap-ref-word trace (+ element-offset 4))))
+                (cond ((not (zerop word1)) (relative-pc word0 word1)) ; serial# + offset
+                      ((eql word0 sb-ext:most-positive-word) (elision-marker))
+                      (t (absolute-pc word0))))
+              #+64-bit
+              (let ((bits (sap-ref-word trace element-offset)))
+                (cond ((eql bits sb-ext:most-positive-word) (elision-marker))
+                      ((logbitp 63 bits)
+                       (relative-pc (ldb (byte 32 0) bits) (ldb (byte 31 32) bits)))
+                      (t (absolute-pc bits))))
+          (setf locs (list* pc-or-offset info locs))
+          (incf element-offset element-size)))
+        (incf trace-ptr (+ 2 len))))))
 
-(defun profiled-thread-p (thread)
-  (let ((profiled-threads *profiled-threads*))
-    (or (and (eq :all profiled-threads)
-             (not (eq *timer-thread* thread)))
-        (member thread profiled-threads :test #'eq))))
+;;; Call FUNCTION with each thread's sampled data, and deallocate the data.
+(defun call-with-each-profile-buffer (function)
+  (with-alien ((acquire-data (function system-area-pointer unsigned) :extern "acquire_sprof_data"))
+    (flet ((process (sap thread)
+             (multiple-value-bind (buckets free-ptr capacity) (sprof-data-header sap)
+               (let ((buckets-used 0))
+                 (dotimes (bucket-index n-buckets)
+                   ;; bucket values are uint32_t
+                   (when (plusp (sap-ref-32 buckets (ash bucket-index 2))) (incf buckets-used)))
+                 (funcall function sap thread
+                          (list (* free-ptr element-size)
+                                (* capacity element-size)
+                                buckets-used)))
+               (sb-sys:deallocate-system-memory buckets (* n-buckets 4))
+               (sb-sys:deallocate-system-memory sap (* capacity element-size)))))
+      (let ((all-threads sb-thread::*all-threads*)
+            (processed-threads))
+        ;; Scan exited threads. Careful not to lose elements if a thread receives a
+        ;; profiling signal after the timer gets stopped, exits, and pushes data into
+        ;; the list. i.e. concurrent access to sb-thread::*sprof-data* is possible.
+        #+sb-thread
+        (loop
+          (let ((data (atomic-pop sb-thread::*sprof-data*)))
+            (unless data (return))
+            (destructuring-bind (sap . thread) data
+              ;; Avoid double-free of the foreign memory, in case two threads try to
+              ;; reset the profiler at the same time (which constitutes user error)
+              (when (and sap (eq (cas (car data) sap nil) sap))
+                (process sap thread)
+                (push thread processed-threads)))))
+        ;; Scan running threads
+        (sb-thread::avltree-filter
+         (lambda (node &aux (thread (sb-thread::avlnode-data node)))
+           (unless (memq thread processed-threads)
+             ;; Ensure that the thread can't exit (which ensures that it can't free the sprof_sem
+             ;; that might be needed by the C routine, depending on things), and also ensure
+             ;; mutual exclusivity with other callers of this.
+             (sb-thread:with-deathlok (thread c-thread)
+               (unless (zerop c-thread)
+                 (let ((sap (alien-funcall acquire-data c-thread)))
+                   (unless (= (sap-int sap) 0)
+                     (process sap thread))))))
+           nil)
+         all-threads)))))
 
-#+(and (or x86 x86-64) (not win32))
-(progn
-  ;; Ensure that only one thread at a time will be doing profiling stuff.
-  (defvar *profiler-lock* (sb-thread:make-mutex :name "Statistical Profiler"))
-  (defvar *distribution-lock* (sb-thread:make-mutex :name "Wallclock profiling lock"))
+(defun convert-raw-data ()
+  (let ((ht (build-serialno-to-code-map))
+        (threads)
+        ;; traces are not de-deduplicated across threads,
+        ;; so this number is only approximate.
+        (n-unique-traces 0)
+        (aggregate-data))
+    ;; Mask SIGPROF in this thread in case of pending signal
+    ;; and funky scheduling by the OS.
+    (let ((saved-sigprof-mask (sb-toggle-sigprof (int-sap 0) 1)))
+      (call-with-each-profile-buffer
+       (lambda (sap thread memusage)
+         (push (cons thread memusage) threads)
+         (push (cons (extract-traces sap ht) thread) aggregate-data)))
+      (setf (extern-alien "sb_sprof_enabled" int) 0)
+      (sb-toggle-sigprof (int-sap 0) saved-sigprof-mask))
+    ;; Precompute the length of the new SAMPLES-VECTOR
+    (let ((vector
+           (make-array
+            (let ((total-length 0))
+              (dolist (subsample aggregate-data total-length)
+                (loop for (trace . multiplicity) in (car subsample)
+                      do (incf total-length (* (+ (length trace) +elements-per-trace-start+)
+                                               multiplicity)))))))
+          (index 0))
+      ;; Now fill in the vector to match the old data format.
+      ;; This is of needlessly inefficient for :ALLOC mode, since the entire point
+      ;; of the new format is to speed up callgraph construction.
+      (dolist (subsample aggregate-data)
+        (loop with thread = (cdr subsample)
+              for (trace . multiplicity) in (car subsample)
+              do (incf n-unique-traces)
+                 (dotimes (i multiplicity)
+                   (let* ((len (+ (length trace) +elements-per-trace-start+))
+                          (end (+ index len)))
+                     (setf (aref vector index) `(trace-start . ,end)
+                           (aref vector (1+ index)) thread)
+                     (replace vector trace :start1 (+ index 2))
+                     (setq index end)))))
+      (aver (= index (length vector)))
+      (values vector n-unique-traces threads))))
 
-  #+sb-thread
-  (declaim (inline pthread-kill))
-  #+sb-thread
-  (define-alien-routine pthread-kill int (os-thread unsigned-long) (signal int))
+#+nil
+(defun dump-hash-buckets (sap-or-thread)
+  (binding* ((sap (if (typep sap-or-thread 'sb-thread::thread)
+                      (sap-ref-sap (int-sap (sb-thread::thread-primitive-thread sap-or-thread))
+                                   (ash sb-vm:thread-sprof-data-slot sb-vm:word-shift))
+                      sap-or-thread))
+             ((buckets free-ptr) (sprof-data-header sap))
+             (buckets-used 0)
+             (trace-ptr 2)
+             (n-traces 0)
+             (n-unique 0))
+    (dotimes (bucket-index n-buckets)
+      (let ((n (do ((entry (sap-ref-32 buckets (ash bucket-index 2))
+                           (sap-ref-32 (sprof-data-trace sap entry) 0))
+                    (chainlen 0 (1+ chainlen)))
+                   ((= entry 0) chainlen))))
+        (when (plusp n)
+          (incf buckets-used)
+          (format t "~5d ~d~%" bucket-index n))))
+    (loop while (< trace-ptr free-ptr)
+          do (let ((trace (sprof-data-trace sap trace-ptr)))
+               (incf n-unique)
+               (incf n-traces (trace-multiplicity trace))
+               (incf trace-ptr (+ 2 (trace-len trace)))))
+    (aver (= trace-ptr free-ptr))
+    (format t "~d buckets in use, ~D unique traces, ~D total~%" buckets-used n-unique n-traces)))
 
-  ;;; A random thread will call this in response to either a timer firing,
-  ;;; This in turn will distribute the notice to those threads we are
-  ;;; interested using SIGPROF.
-  (defun thread-distribution-handler ()
-    (declare (optimize speed (space 0)))
-    #+sb-thread
-    (let ((lock *distribution-lock*))
-      ;; Don't flood the system with more interrupts if the last
-      ;; set is still being delivered.
-      (unless (sb-thread:mutex-value lock)
-        (sb-thread::with-system-mutex (lock)
-          (dolist (thread (profiled-threads))
-            ;; This may occasionally fail to deliver the signal, but that
-            ;; seems better then using kill_thread_safely with it's 1
-            ;; second backoff.
-            (let ((os-thread (sb-thread::thread-os-thread thread)))
-              (when os-thread
-                (pthread-kill os-thread sb-unix:sigprof)))))))
-    #-sb-thread
-    (unix-kill 0 sb-unix:sigprof))
-
-  (defun sigprof-handler (signal code scp)
-    (declare (ignore signal code) (optimize speed (space 0))
-             (disable-package-locks sb-di::x86-call-context)
-             (muffle-conditions compiler-note)
-             (type system-area-pointer scp))
-    (let ((self sb-thread:*current-thread*)
-          (profiling *profiling*))
-      ;; Turn off allocation counter when it is not needed. Doing this in the
-      ;; signal handler means we don't have to worry about racing with the runtime
-      (unless (eq :alloc profiling)
-        (setf sb-vm::*alloc-signal* nil))
-      (when (and *sampling*
-                 ;; Normal SIGPROF gets practically speaking delivered to threads
-                 ;; depending on the run time they use, so we need to filter
-                 ;; out those we don't care about. For :ALLOC and :TIME profiling
-                 ;; only the interesting threads get SIGPROF in the first place.
-                 ;;
-                 ;; ...except that Darwin at least doesn't seem to work like we
-                 ;; would want it to, which makes multithreaded :CPU profiling pretty
-                 ;; pointless there -- though it may be that our mach magic is
-                 ;; partially to blame?
-                 (or (not (eq :cpu profiling)) (profiled-thread-p self)))
-        (sb-thread::with-system-mutex (*profiler-lock* :without-gcing t)
-          (let ((samples *samples*))
-            (when (and samples
-                       (< (samples-trace-count samples)
-                          (samples-max-samples samples)))
-              (with-alien ((scp (* os-context-t) :local scp))
-                (let* ((pc-ptr (sb-vm:context-pc scp))
-                       (fp (sb-vm::context-register scp #.sb-vm::ebp-offset)))
-                  ;; foreign code might not have a useful frame
-                  ;; pointer in ebp/rbp, so make sure it looks
-                  ;; reasonable before walking the stack
-                  (unless (sb-di::control-stack-pointer-valid-p (sb-sys:int-sap fp))
-                    (return-from sigprof-handler nil))
-                  (incf (samples-trace-count samples))
-                  (pushnew self (samples-sampled-threads samples))
-                  (let ((fp (int-sap fp))
-                        (ok t))
-                    (declare (type system-area-pointer fp pc-ptr))
-                    ;; FIXME: How annoying. The XC doesn't store enough
-                    ;; type information about SB-DI::X86-CALL-CONTEXT,
-                    ;; even if we declaim the ftype explicitly in
-                    ;; src/code/debug-int. And for some reason that type
-                    ;; information is needed for the inlined version to
-                    ;; be compiled without boxing the returned saps. So
-                    ;; we declare the correct ftype here manually, even
-                    ;; if the compiler should be able to deduce this
-                    ;; exact same information.
-                    (declare (ftype (function (system-area-pointer)
-                                              (values (member nil t)
-                                                      system-area-pointer
-                                                      system-area-pointer))
-                                    sb-di::x86-call-context))
-                    (record-trace-start samples)
-                    (dotimes (i (samples-max-depth samples))
-                      (record samples pc-ptr)
-                      (setf (values ok pc-ptr fp)
-                            (sb-di::x86-call-context fp))
-                      (unless ok
-                        ;; If we fail to walk the stack beyond the
-                        ;; initial frame, there is likely something
-                        ;; wrong. Undo the trace start marker and the
-                        ;; one sample we already recorded.
-                        (when (zerop i)
-                          (decf (samples-index samples)
-                                (+ +elements-per-trace-start+
-                                   (* +elements-per-sample+ (1+ i)))))
-                        (return)))
-                    (record-trace-end samples))))
-              ;; Reset thread-local allocation counter before interrupts
-              ;; are enabled.
-              (when (eq t sb-vm::*alloc-signal*)
-                (setf sb-vm:*alloc-signal* (1- (samples-alloc-interval samples)))))))))
-    nil))
-
-;; FIXME: On non-x86 platforms we don't yet walk the call stack deeper
-;; than one level.
-#-(or x86 x86-64)
-(defun sigprof-handler (signal code scp)
-  (declare (ignore signal code))
-  (sb-sys:without-interrupts
-    (let ((samples *samples*))
-      (when (and *sampling*
-                 samples
-                 (< (samples-trace-count samples)
-                    (samples-max-samples samples)))
-        (sb-sys:without-gcing
-          (with-alien ((scp (* os-context-t) :local scp))
-            (locally (declare (optimize (inhibit-warnings 2)))
-              (incf (samples-trace-count samples))
-              (record-trace-start samples)
-              (let ((pc-ptr (sb-vm:context-pc scp))
-                    (fp (sb-vm::context-register scp #.sb-vm::cfp-offset)))
-                (unless (eq (record samples pc-ptr) :foreign)
-                  (record samples (sap-ref-sap
-                                   (int-sap fp)
-                                   (* sb-vm::lra-save-offset sb-vm::n-word-bytes)))))
-              (record-trace-end samples))))))))
-
-;;; Return the start address of CODE.
-(defun code-start (code)
-  (declare (type sb-kernel:code-component code))
-  (sap-int (sb-kernel:code-instructions code)))
-
-;;; Return start and end address of CODE as multiple values.
-(defun code-bounds (code)
-  (declare (type sb-kernel:code-component code))
-  (let* ((start (code-start code))
-         (end (+ start (sb-kernel:%code-text-size code))))
-    (values start end)))
+#+nil
+(defun code-summary-by-gc-generation ()
+  (let ((gens (make-array 7 :initial-element 0)))
+    (dolist (code (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
+      (let ((gen (sb-kernel:generation-of code)))
+        (when (<= 0 gen 6)
+          (incf (aref gens gen)))))
+    gens))

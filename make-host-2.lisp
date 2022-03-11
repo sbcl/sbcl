@@ -14,36 +14,49 @@
 ;; Supress function/macro redefinition warnings under clisp.
 #+clisp (setf custom:*suppress-check-redefinition* t)
 
+;; Avoid natively compiling new code under ecl
+#+ecl (ext:install-bytecodes-compiler)
+
 ;;; Run the cross-compiler to produce cold fasl files.
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 (setq sb-c::*static-vop-usage-counts* (make-hash-table))
 (let (fail
       variables
       functions
-      types)
-  (sb-xc:with-compilation-unit ()
-    (let ((*feature-evaluation-results* nil))
+      types
+      warnp
+      style-warnp)
+  ;; Even the host may get STYLE-WARNINGS from e.g. cross-compiling
+  ;; macro definitions. FIXME: This is duplicate code from make-host-1
+  (handler-bind ((style-warning
+                   (lambda (c)
+                     (signal c)
+                     (setq style-warnp 'style-warning)))
+                 (simple-warning
+                   (lambda (c)
+                     (declare (ignore c))
+                     (setq warnp 'warning))))
+    (sb-xc:with-compilation-unit ()
       (load "src/cold/compile-cold-sbcl.lisp")
-      (sanity-check-feature-evaluation))
-    ;; Enforce absence of unexpected forward-references to warm loaded code.
-    ;; Looking into a hidden detail of this compiler seems fair game.
-    (when (and sb-c::*undefined-warnings*
-               (feature-in-list-p
-                '(:or :x86 :x86-64 :arm64) ; until all the rest are clean
-                :target))
-      (setf fail t)
-      (dolist (warning sb-c::*undefined-warnings*)
-        (case (sb-c::undefined-warning-kind warning)
-          (:variable (setf variables t))
-          (:type (setf types t))
-          (:function (setf functions t))))))
+      ;; Enforce absence of unexpected forward-references to warm loaded code.
+      ;; Looking into a hidden detail of this compiler seems fair game.
+      (when sb-c::*undefined-warnings*
+        (setf fail t)
+        (dolist (warning sb-c::*undefined-warnings*)
+          (case (sb-c::undefined-warning-kind warning)
+            (:variable (setf variables t))
+            (:type (setf types t))
+            (:function (setf functions t)))))))
   ;; Exit the compilation unit so that the summary is printed. Then complain.
   ;; win32 is not clean
-  (when (and fail (not (feature-in-list-p :win32 :target)))
+  (when (and fail (not (target-featurep :win32)))
     (cerror "Proceed anyway"
             "Undefined ~:[~;variables~] ~:[~;types~]~
-             ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-WHITELIST*?)~]"
-            variables types functions)))
+             ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-ALLOWLIST*?)~]"
+            variables types functions))
+  (when (and (or warnp style-warnp) *fail-on-warnings* (not (target-featurep :win32)))
+    (cerror "Proceed anyway"
+            "make-host-2 stopped due to unexpected ~A raised from the host." (or warnp style-warnp))))
 
 #-clisp ; DO-ALL-SYMBOLS seems to kill CLISP at random
 (do-all-symbols (s)
@@ -51,20 +64,23 @@
              (eq (sb-int:info :function :where-from s) :assumed))
       (error "INLINE declaration for an undefined function: ~S?" s)))
 
-;; enable this too see which vops were or weren't used
-#+nil
-(when (hash-table-p sb-c::*static-vop-usage-counts*)
-  (format t "Vops used:~%")
-  (dolist (cell (sort (sb-int:%hash-table-alist sb-c::*static-vop-usage-counts*)
-                      #'> :key #'cdr))
-    (format t "~6d ~s~%" (cdr cell) (car cell))))
+(with-open-file (output "output/cold-vop-usage.txt"
+                        :direction :output :if-exists :supersede)
+  (sb-int:dohash ((name vop) sb-c::*backend-parsed-vops*)
+    (declare (ignore vop))
+    (format output "~7d ~s~%"
+            (gethash name sb-c::*static-vop-usage-counts* 0)
+            ;; change SB-XC symbols back to their normal counterpart
+            (if (string= (cl:package-name (cl:symbol-package name)) "SB-XC")
+                (find-symbol (string name) "COMMON-LISP")
+                name))))
 
 (when sb-c::*track-full-called-fnames*
   (let (possibly-suspicious likely-suspicious)
     (sb-int:call-with-each-globaldb-name
      (lambda (name)
        (let* ((cell (sb-int:info :function :emitted-full-calls name))
-              (inlinep (eq (sb-int:info :function :inlinep name) :inline))
+              (inlinep (eq (sb-int:info :function :inlinep name) 'inline))
               (source-xform (sb-int:info :function :source-transform name))
               (info (sb-int:info :function :info name)))
          (if (and cell
@@ -97,8 +113,7 @@
     ;; As each platform's build becomes warning-free,
     ;; it should be added to the list here to prevent regresssions.
     (when (and likely-suspicious
-               (feature-in-list-p '(:and (:or :x86 :x86-64) (:or :linux :darwin))
-                                  :target))
+               (target-featurep '(:and (:or :x86 :x86-64) (:or :linux :darwin))))
       (warn "Expected zero inlinining failures"))))
 
 ;; After cross-compiling, show me a list of types that checkgen
@@ -152,9 +167,9 @@ Sample output
 ;;; time to run it. The resulting core isn't used in the normal build,
 ;;; but can be handy for experimenting with the system. (See slam.sh
 ;;; for an example.)
-#+sb-after-xc-core
-(progn
-  #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
-  #+sbcl (host-sb-ext:save-lisp-and-die "output/after-xc.core")
-  #+openmcl (ccl::save-application "output/after-xc.core")
-  #+clisp (ext:saveinitmem "output/after-xc.core"))
+;;; FIXME: can we just always do this for supported hosts, and remove the choice?
+(cond #+sbcl (t (host-sb-ext:save-lisp-and-die "output/after-xc.core"))
+      ((member :sb-after-xc-core sb-xc:*features*)
+       #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
+       #+openmcl (ccl::save-application "output/after-xc.core")
+       #+clisp (ext:saveinitmem "output/after-xc.core")))

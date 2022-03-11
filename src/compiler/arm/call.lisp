@@ -14,26 +14,8 @@
 (defconstant arg-count-sc (make-sc+offset immediate-arg-scn nargs-offset))
 (defconstant closure-sc (make-sc+offset descriptor-reg-sc-number lexenv-offset))
 
-;;; Always wire the return PC location to the stack in its standard
-;;; location.
-(defun make-return-pc-passing-location (standard)
-  (declare (ignore standard))
-  (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
-                 lra-save-offset))
-
 (defconstant return-pc-passing-offset
   (make-sc+offset control-stack-sc-number lra-save-offset))
-
-;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
-;;; location to pass OLD-FP in.
-;;;
-;;; This is wired in both the standard and the local-call conventions,
-;;; because we want to be able to assume it's always there. Besides,
-;;; the ARM doesn't have enough registers to really make it profitable
-;;; to pass it in a register.
-(defun make-old-fp-passing-location ()
-  (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
-                 ocfp-save-offset))
 
 (defconstant old-fp-passing-offset
   (make-sc+offset control-stack-sc-number ocfp-save-offset))
@@ -41,21 +23,22 @@
 ;;; Make the TNs used to hold OLD-FP and RETURN-PC within the current
 ;;; function. We treat these specially so that the debugger can find
 ;;; them at a known location.
-(defun make-old-fp-save-location (env)
+(defun make-old-fp-save-location ()
   ;; Unlike the other backends, ARM function calling is designed to
   ;; pass OLD-FP within the stack frame rather than in a register.  As
   ;; such, in order for lifetime analysis not to screw up, we need it
   ;; to be a stack TN wired to the save offset, not a normal TN with a
   ;; wired SAVE-TN.
-  (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
-                                        control-stack-arg-scn
-                                        ocfp-save-offset)
-                         env))
-(defun make-return-pc-save-location (physenv)
-  (physenv-debug-live-tn
-   (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
-                  lra-save-offset)
-   physenv))
+  (let ((tn (make-wired-tn *fixnum-primitive-type*
+                           control-stack-arg-scn
+                           ocfp-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
+(defun make-return-pc-save-location ()
+  (let ((tn (make-wired-tn *backend-t-primitive-type* control-stack-sc-number
+                           lra-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
 
 ;;; Make a TN for the standard argument count passing location.  We
 ;;; only need to make the standard location, since a count is never
@@ -123,7 +106,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     (inst compute-code code-tn lip start-lab temp)))
 
 (define-vop (xep-setup-sp)
@@ -151,7 +134,7 @@
      (* (max 1 (sb-allocated-size 'control-stack))
         n-word-bytes))
     (store-csp nfp)
-    (when (ir2-physenv-number-stack-p callee)
+    (when (ir2-environment-number-stack-p callee)
       (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
         (inst sub nfp nsp-tn nbytes)
         (inst mov nsp-tn nfp)))))
@@ -309,8 +292,7 @@
               values-start)
   (:temporary (:sc any-reg :offset nargs-offset
                :from :eval :to (:result 1))
-              nvals)
-  (:temporary (:scs (non-descriptor-reg)) temp))
+              nvals))
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
@@ -462,8 +444,32 @@
     (inst add temp context index)
     (loadw value temp)))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg) :to (:result 1)))
+  (:arg-types * tagged-num)
+  (:info index)
+  (:temporary (:sc unsigned-reg) temp)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (flet ((maybe-load-immediate (x)
+             (cond ((encodable-immediate x)
+                    x)
+                   (t
+                    (load-immediate-word temp x)
+                    temp))))
+      (inst mov value null-tn)
+      (inst cmp count (maybe-load-immediate (fixnumize index)))
+      (inst b :le done)
+      (inst ldr value
+            (@ object
+               (maybe-load-immediate (ash index word-shift)))))
+    done))
+
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -493,7 +499,7 @@
                          (t
                           (inst mov temp (lsl count 1))
                           temp))))
-        (allocation dst size list-pointer-lowtag
+        (allocation 'list size list-pointer-lowtag dst
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p))
       (move result dst)
@@ -531,7 +537,7 @@
 ;;; preventing this info from being returned as values.  What we do is
 ;;; compute supplied - fixed, and return a pointer that many words
 ;;; below the current stack top.
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg)))

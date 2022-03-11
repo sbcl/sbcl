@@ -32,9 +32,30 @@ a list of protocol aliases"
         (getprotobyname (string-downcase name))
         #+android (error 'unknown-protocol :name name))))
 
-#+(and sb-thread (not os-provides-getprotoby-r) (not android) (not netbsd))
+#+(and sb-thread (not os-provides-getprotoby-r) (not android))
 ;; Since getprotobyname is not thread-safe, we need a lock.
 (sb-ext:defglobal **getprotoby-lock** (sb-thread:make-mutex :name "getprotoby lock"))
+
+;;; msan sanitizer does not intercept getprotobyname_r() and reports that the output
+;;; parameter does not get written by the library function. Minimal test program:
+;;;   #include <netdb.h>
+;;;   #include <stdio.h>
+;;;   #include <sanitizer/msan_interface.h>
+;;;
+;;;   long __attribute__((no_sanitize_memory)) get(void* p){ return *(long*)p; }
+;;;   void main() {
+;;;     struct protoent ent, *answer;
+;;;     char strings[1024];
+;;;     answer = (void*)0xaabbccddee;
+;;;     __msan_allocated_memory(&answer, 8); // mark it as poisoned
+;;;     int rc = getprotobyname_r("nosuchproto", &ent, strings, 1024, &answer);
+;;;     printf("rc=%d answer=%lx\n", rc, get(&answer));
+;;;     __msan_check_mem_is_initialized(&answer, 8);
+;;;   }
+;;; Result:
+;;;   rc=0 res=0
+;;;   Uninitialized bytes in __msan_check_mem_is_initialized at offset 0 inside [0x7ffca9a14580, 8)
+;;;   ==110705==WARNING: MemorySanitizer: use-of-uninitialized-value
 
 ;;; getprotobyname only works in the internet domain, which is why this
 ;;; is here
@@ -56,7 +77,7 @@ a list of protocol aliases"
                            (sb-alien:alien-sap alias)
                            (sb-impl::default-external-format)
                            'character))))))
-    #+(and sb-thread os-provides-getprotoby-r (not netbsd))
+    #+(and sb-thread os-provides-getprotoby-r)
     (let ((buffer-length 1024)
           (max-buffer 10000)
           (result-buf nil)
@@ -80,7 +101,10 @@ a list of protocol aliases"
                            name result-buf buffer buffer-length #-solaris result)))
                  (cond ((eql res 0)
                         #-solaris
-                        (when (sb-alien:null-alien (sb-alien:deref result 0))
+                        (when (sb-alien:null-alien
+                               ;; See comment above about spurious failure under MSAN.
+                               (locally (declare (optimize (safety 0)))
+                                 (sb-alien:deref result 0)))
                           (error 'unknown-protocol :name name))
                         (return-from getprotobyname
                           (protoent-to-values result-buf)))
@@ -102,17 +126,17 @@ a list of protocol aliases"
           #-solaris
           (when result
             (sb-alien:free-alien result)))))
-    #+(or (not sb-thread) (not os-provides-getprotoby-r) netbsd)
+    #+(or (not sb-thread) (not os-provides-getprotoby-r))
     (tagbody
        (flet ((get-it ()
                 (let ((ent (sockint::getprotobyname name)))
                   (if (sb-alien::null-alien ent)
                       (go :error)
                       (return-from getprotobyname (protoent-to-values ent))))))
-         #+(and sb-thread (not netbsd))
-         (sb-thread::with-system-mutex (**getprotoby-lock**)
+         #+sb-thread
+         (sb-int:with-system-mutex (**getprotoby-lock**)
            (get-it))
-         #+(or (not sb-thread) netbsd)
+         #-sb-thread
          (get-it))
      :error
        (error 'unknown-protocol :name name))))

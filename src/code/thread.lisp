@@ -11,34 +11,65 @@
 
 (in-package "SB-THREAD")
 
-(!define-thread-local *current-thread* nil
+(declaim (inline thread-alive-p))
+(defun thread-alive-p (thread)
+  "Return T if THREAD is still alive. Note that the return value is
+potentially stale even before the function returns, as the thread may exit at
+any time."
+  (declare (ignorable thread))
+  (barrier (:read))
+  #+sb-thread (/= (thread-primitive-thread thread) 0)
+  #-sb-thread t)
+
+(setf (documentation '*current-thread* 'variable)
       "Bound in each thread to the thread itself.")
-
-(defstruct (foreign-thread
-             (:copier nil)
-             (:include thread)
-             (:conc-name "THREAD-"))
-  "Type of native threads which are attached to the runtime as Lisp threads
-temporarily.")
-
-#+(and sb-safepoint-strictly (not win32))
-(defstruct (signal-handling-thread
-             (:copier nil)
-             (:include foreign-thread)
-             (:conc-name "THREAD-"))
-  "Asynchronous signal handling thread."
-  (signal-number nil :type integer))
 
 (defun mutex-value (mutex)
   "Current owner of the mutex, NIL if the mutex is free. May return a
 stale value, use MUTEX-OWNER instead."
-  (mutex-%owner mutex))
+  (mutex-owner-lookup (mutex-%owner mutex)))
 
+(declaim (inline current-thread-sap))
+(defun current-thread-sap ()
+  #+sb-thread (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
+  #-sb-thread (extern-alien "all_threads" system-area-pointer))
+
+#-sb-thread
+(progn
+  (declaim (inline sb-vm::current-thread-offset-sap))
+  (defun sb-vm::current-thread-offset-sap (n)
+    (sap-ref-sap (current-thread-sap) (* n sb-vm:n-word-bytes))))
+
+(defmacro current-thread-sap-int () `(sap-int (current-thread-sap)))
+
+;;; This is the same as thread-primitive-thread but using the "funny fixnum"
+;;; representation on 32-bit so that we never cons when reading the slot.
+;;; I'm not sure where consing was happening, but it did, which caused
+;;; failure of the (:no-consing :mutex) test.
+(defmacro current-vmthread-id ()
+  #-64-bit '(%make-lisp-obj (current-thread-sap-int))
+  #+64-bit '(current-thread-sap-int))
+(defmacro vmthread-id->addr (x) #-64-bit `(get-lisp-obj-address ,x) #+64-bit x)
+
+(declaim (inline holding-mutex-p))
 (defun holding-mutex-p (mutex)
   "Test whether the current thread is holding MUTEX."
   ;; This is about the only use for which a stale value of owner is
   ;; sufficient.
-  (eq sb-thread:*current-thread* (mutex-%owner mutex)))
+  (= (mutex-%owner mutex) (current-vmthread-id)))
+
+(declaim (inline mutex-owner))
+(defun mutex-owner (mutex)
+  "Current owner of the mutex, NIL if the mutex is free. Naturally,
+this is racy by design (another thread may acquire the mutex after
+this function returns), it is intended for informative purposes. For
+testing whether the current thread is holding a mutex see
+HOLDING-MUTEX-P."
+  ;; Make sure to get the current value.
+  (let ((vmthread (sb-ext:compare-and-swap (mutex-%owner mutex) 0 0)))
+    (cond ((= vmthread (current-vmthread-id)) *current-thread*)
+          ((= vmthread 0) nil)
+          (t (mutex-owner-lookup vmthread)))))
 
 (defsetf mutex-value set-mutex-value)
 
@@ -84,6 +115,10 @@ stale value, use MUTEX-OWNER instead."
           (function with-recursive-spinlock :replacement with-recursive-lock)
           (function with-spinlock :replacement with-mutex)))
 
+;;; Needed to pacify deadlock detection if inerrupting wait-for-mutex,
+;;; otherwise it would appear that if there is a lock grabbed inside
+;;; of BODY it would appear backwards--waiting on a lock while holding
+;;; the new one, which looks like a deadlock.
 (defmacro without-thread-waiting-for ((&key already-without-interrupts) &body body)
   (with-unique-names (thread prev)
     (let ((without (if already-without-interrupts
@@ -111,7 +146,7 @@ stale value, use MUTEX-OWNER instead."
                     (barrier (:write)))))
                (exec)))))))
 
-(defmacro with-mutex ((mutex &key (wait-p t) timeout value)
+(defmacro with-mutex ((mutex &key (wait-p t) timeout (value nil valuep))
                             &body body)
   "Acquire MUTEX for the dynamic scope of BODY. If WAIT-P is true (the default),
 and the MUTEX is not immediately available, sleep until it is available.
@@ -133,9 +168,20 @@ current thread."
      (call-with-mutex
       #'with-mutex-thunk
       ,mutex
-      ,value
       ,wait-p
-      ,timeout)))
+      ;; Users should not pass VALUE. If they do, the overhead of validity checking
+      ;; is at the call site so that normal invocations of CALL-WITH-MUTEX receive
+      ;; only the useful arguments.
+      ;; And as is true of so many macros, strict left-to-right evaluation of args
+      ;; is not promised, but let's try to be consistent with the order in the lambda list.
+      ;; (i.e. You don't know if the source form was ":value me :wait-p nil")
+      ,(if valuep
+           `(prog1 ,timeout
+              (let ((value ,value))
+                (unless (or (null value) (eq *current-thread* value))
+                  (error "~S called with non-nil :VALUE that isn't the current thread."
+                         'with-mutex))))
+           timeout))))
 
 (defmacro with-recursive-lock ((mutex &key (wait-p t) timeout) &body body)
   "Acquire MUTEX for the dynamic scope of BODY.
@@ -167,7 +213,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
                 (declare (function function))
                 (declare (dynamic-extent function))
                 (flet ((%call-with-system-mutex ()
-                         (dx-let (got-it)
+                         (let (got-it)
                            (unwind-protect
                                 (when (setf got-it (grab-mutex mutex))
                                   (funcall function))
@@ -188,12 +234,9 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 
 #-sb-thread
 (progn
-  (defun call-with-mutex (function mutex value waitp timeout)
+  (defun call-with-mutex (function mutex waitp timeout)
     (declare (ignore mutex waitp timeout)
              (function function))
-    (unless (or (null value) (eq *current-thread* value))
-      (error "~S called with non-nil :VALUE that isn't the current thread."
-             'with-mutex))
     (funcall function))
 
   (defun call-with-recursive-lock (function mutex waitp timeout)
@@ -204,25 +247,14 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
   (defun call-with-recursive-system-lock (function lock)
     (declare (function function) (ignore lock))
     (without-interrupts
-      (funcall function)))
-
-  (defun call-with-recursive-system-lock/without-gcing (function mutex)
-    (declare (function function) (ignore mutex))
-    (without-gcing
       (funcall function))))
 
 #+sb-thread
-;;; KLUDGE: These need to use DX-LET, because the cleanup form that
-;;; closes over GOT-IT causes a value-cell to be allocated for it --
-;;; and we prefer that to go on the stack since it can.
 (progn
-  (defun call-with-mutex (function mutex value waitp timeout)
+  (defun call-with-mutex (function mutex waitp timeout)
     (declare (function function))
     (declare (dynamic-extent function))
-    (unless (or (null value) (eq *current-thread* value))
-      (error "~S called with non-nil :VALUE that isn't the current thread."
-             'with-mutex))
-    (dx-let ((got-it nil))
+    (let ((got-it nil))
       (without-interrupts
         (unwind-protect
              (when (setq got-it (allow-with-interrupts
@@ -235,37 +267,27 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
   (defun call-with-recursive-lock (function mutex waitp timeout)
     (declare (function function))
     (declare (dynamic-extent function))
-    (dx-let ((inner-lock-p (eq (mutex-%owner mutex) *current-thread*))
-             (got-it nil))
+    (let ((had-it (holding-mutex-p mutex))
+          (got-it nil))
       (without-interrupts
         (unwind-protect
-             (when (or inner-lock-p (setf got-it (allow-with-interrupts
-                                                   (grab-mutex mutex :waitp waitp
-                                                                     :timeout timeout))))
+             (when (or had-it
+                       (setf got-it (allow-with-interrupts
+                                     (grab-mutex mutex :waitp waitp :timeout timeout))))
                (with-local-interrupts (funcall function)))
           (when got-it
             (release-mutex mutex))))))
 
-  (macrolet ((def (name &optional variant)
-               `(defun ,(if variant (symbolicate name "/" variant) name)
-                    (function lock)
-                  (declare (function function))
-                  (declare (dynamic-extent function))
-                  (flet ((%call-with-recursive-system-lock ()
-                           (dx-let ((inner-lock-p
-                                     (eq *current-thread* (mutex-owner lock)))
-                                    (got-it nil))
-                             (unwind-protect
-                                  (when (or inner-lock-p
-                                            (setf got-it (grab-mutex lock)))
-                                    (funcall function))
-                               (when got-it
-                                 (release-mutex lock))))))
-                    (declare (inline %call-with-recursive-system-lock))
-                    ,(ecase variant
-                      (:without-gcing
-                        `(without-gcing (%call-with-recursive-system-lock)))
-                      ((nil)
-                        `(without-interrupts (%call-with-recursive-system-lock))))))))
-    (def call-with-recursive-system-lock)
-    (def call-with-recursive-system-lock :without-gcing)))
+  (defun call-with-recursive-system-lock (function lock)
+    (declare (function function))
+    (declare (dynamic-extent function))
+    (without-interrupts
+      (let ((had-it (holding-mutex-p lock))
+            (got-it nil))
+        (unwind-protect
+             (when (or had-it (setf got-it (grab-mutex lock)))
+               (funcall function))
+          (when got-it
+            (release-mutex lock)))))))
+
+(sb-ext:define-load-time-global *make-thread-lock* nil)

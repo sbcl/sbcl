@@ -13,7 +13,6 @@
 
 include Config.x86-64-bsd
 
-ASSEM_SRC += ldso-stubs.S
 LINKFLAGS += -dynamic -export-dynamic
 
 # Link against pthread even if we do not want threaded SBCL

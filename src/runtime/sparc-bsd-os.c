@@ -25,8 +25,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -64,12 +62,6 @@ os_context_register_addr(os_context_t *context, int offset)
    } else {
        return 0;
    }
-}
-
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-   return &(context->uc_mcontext.__gregs[_REG_PC]);
 }
 
 os_context_register_t *

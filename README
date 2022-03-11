@@ -32,10 +32,6 @@ contributing to SBCL.
 
 SYSTEM-SPECIFIC HINTS
 
-for NetBSD:
-  NetBSD 2.0 and above are required because of the lack of needed
-  signal APIs in NetBSD 1.6 and earlier.
-
 for OpenBSD 6.0 and newer:
   SBCL must be built and run from a filesystem with the "wxallowed"
   mount option, such as /usr/local in the default install.

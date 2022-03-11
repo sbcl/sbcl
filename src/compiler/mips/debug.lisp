@@ -12,23 +12,23 @@
 (in-package "SB-VM")
 
 
-(define-vop (debug-cur-sp)
-  (:translate sb-di::current-sp)
+(define-vop ()
+  (:translate current-sp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move res csp-tn)))
 
-(define-vop (debug-cur-fp)
-  (:translate sb-di::current-fp)
+(define-vop (current-fp-sap)
+  (:translate current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move res cfp-tn)))
 
-(define-vop (read-control-stack)
+(define-vop ()
   (:translate stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
@@ -42,46 +42,17 @@
     (inst lw result sap 0)
     (inst nop)))
 
-(define-vop (read-control-stack-c)
-  (:translate stack-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (sap-reg)))
-  (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte 14)))
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 4
-    (inst lw result object (* offset n-word-bytes))
-    (inst nop)))
-
-(define-vop (write-control-stack)
+(define-vop ()
   (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
          (offset :scs (any-reg))
-         (value :scs (descriptor-reg) :target result))
+         (value :scs (descriptor-reg)))
   (:arg-types system-area-pointer positive-fixnum *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
   (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
   (:generator 2
     (inst addu sap object offset)
-    (inst sw value sap 0)
-    (move result value)))
-
-(define-vop (write-control-stack-c)
-  (:translate %set-stack-ref)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg))
-         (value :scs (descriptor-reg) :target result))
-  (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte 14)) *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 1
-    (inst sw value sap (* offset n-word-bytes))
-    (move result value)))
-
+    (inst sw value sap 0)))
 
 (define-vop (code-from-mumble)
   (:policy :fast-safe)
@@ -103,7 +74,7 @@
       (assemble (:elsewhere)
         (emit-label bogus)
         (inst b done)
-        (move code null-tn t)))))
+        (inst move code null-tn)))))
 
 (define-vop (code-from-lra code-from-mumble)
   (:translate sb-di::lra-code-header)

@@ -21,12 +21,7 @@
 ;;; if necessary, until the cross-compiler's DEFTYPE machinery has been
 ;;; set up.
 
-;;; FIXME: This code was created by cut-and-paste from the
-;;; corresponding code for DEF!MACRO. DEF!TYPE and DEF!MACRO are
-;;; currently very parallel, and if we ever manage to rationalize the
-;;; use of UNCROSS in the cross-compiler, they should become
-;;; completely parallel, at which time they should be merged to
-;;; eliminate the duplicate code.
+(defvar *delayed-def!types* nil)
 
 (defmacro def!type (name &rest rest)
   ;; Attempting to define a type named by a CL symbol is an error.
@@ -39,21 +34,3 @@
         (if (boundp '*delayed-def!types*)
             `(push ',form *delayed-def!types*)
             form))))
-
-;;; machinery to implement DEF!TYPE delays
-#+sb-xc-host
-(progn
-  (/show "binding *DELAYED-DEF!TYPES*")
-  (defvar *delayed-def!types* nil)
-  (/show "done binding *DELAYED-DEF!TYPES*")
-  (defun force-delayed-def!types ()
-    (if (boundp '*delayed-def!types*)
-        (progn
-          (mapc #'eval *delayed-def!types*)
-          (makunbound '*delayed-def!types*))
-        ;; This condition is probably harmless if it comes up when
-        ;; interactively experimenting with the system by loading a
-        ;; source file into it more than once. But it's worth warning
-        ;; about it because it definitely shouldn't come up in an
-        ;; ordinary build process.
-        (warn "*DELAYED-DEF!TYPES* is already unbound."))))

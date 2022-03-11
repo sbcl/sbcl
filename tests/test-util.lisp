@@ -31,8 +31,10 @@
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
            #:assemble
+           #:get-simple-fun-instruction-model
 
            #:scratch-file-name
+           #:*scratch-file-prefix*
            #:with-scratch-file
            #:opaque-identity
            #:runtime #:split-string #:integer-sequence #:shuffle))
@@ -121,7 +123,19 @@
   (sb-ext:wait-for (null (sb-thread::thread-interruptions thread))))
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
-  (let ((child  (make-kill-thread function-to-interrupt)))
+  ;; Tests of interrupting a newly created thread can fail if the creator runs
+  ;; so quickly that it bypasses execution of the created thread. So the creator
+  ;; needs to wait, to have a facsimile of the situation prior to implementation
+  ;; of the so-called pauseless thread start feature.
+  ;; Wouldn't you know, it's just reintroducing a startup semaphore.
+  ;; And interruption tests are even more likely to fail with :sb-safepoint.
+  ;; Noneless, this tries to be robust enough to pass.
+  (let* ((sem (sb-thread:make-semaphore))
+         (child  (make-kill-thread
+                  (lambda ()
+                    (sb-thread:signal-semaphore sem)
+                    (funcall function-to-interrupt)))))
+    (sb-thread:wait-on-semaphore sem)
     (format t "interrupting child ~A~%" child)
     (sb-thread:interrupt-thread child
      (lambda ()
@@ -171,7 +185,12 @@
                             (if (expected-failure-p fails-on)
                                 (fail-test :expected-failure name error)
                                 (fail-test :unexpected-failure name error))
-                            (return-from run-test))))
+                            (return-from run-test)))
+                   (timeout (lambda (error)
+                              (if (expected-failure-p fails-on)
+                                  (fail-test :expected-failure name error t)
+                                  (fail-test :unexpected-failure name error t))
+                              (return-from run-test))))
       ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
       (log-msg/non-pretty *trace-output* "Running ~S" name)
       (funcall test-function)
@@ -184,10 +203,6 @@
         (setf threads (union (union *threads-to-kill*
                                     *threads-to-join*)
                              threads))
-        #+(and sb-safepoint-strictly (not win32))
-        (dolist (thread (sb-thread:list-all-threads))
-          (when (typep thread 'sb-thread:signal-handling-thread)
-            (ignore-errors (sb-thread:join-thread thread))))
         (dolist (thread (sb-thread:list-all-threads))
           (unless (or (not (sb-thread:thread-alive-p thread))
                       (eql (the sb-thread:thread thread)
@@ -214,7 +229,7 @@
 ;;; Like RUN-TEST but do not perform any of the automated thread management.
 ;;; Since multiple threads are executing tests, there is no reason to kill
 ;;; unrecognized threads.
-(sb-ext:define-load-time-global *output-mutex* (sb-thread:make-mutex))
+(sb-ext:define-load-time-global *output-mutex* (sb-thread:make-mutex :name "run-tests output"))
 (defun run-test-concurrently (test-spec)
   (destructuring-bind (test-body . name) test-spec
     (sb-thread:with-mutex (*output-mutex*)
@@ -298,7 +313,7 @@
       (enable-debugger)
       (invoke-debugger condition))))
 
-(defun fail-test (type test-name condition)
+(defun fail-test (type test-name condition &optional backtrace)
   (if (stringp condition)
       (log-msg *trace-output* "~@<~A ~S ~:_~A~:>"
                type test-name condition)
@@ -310,6 +325,8 @@
                      :condition (princ-to-string condition))
         *results*)
   (unless (stringp condition)
+    (when backtrace
+      (sb-debug:print-backtrace :from :interrupted-frame))
     (when (or (and *break-on-failure*
                    (not (eq type :expected-failure)))
               *break-on-expected-failure*)
@@ -839,7 +856,8 @@
         finally (return (/ min-internal-time-units-per-call
                            (float internal-time-units-per-second)))))
 
-(defmacro runtime (form &key (repetitions 5) (precision 30))
+(defmacro runtime (form &key (repetitions 5) (precision (* 30
+                                                           (/ internal-time-units-per-second 1000))))
   `(runtime* (lambda () ,form) ,repetitions ,precision))
 
 (declaim (notinline opaque-identity))
@@ -870,21 +888,20 @@
 ;;; Return a random file name to avoid writing into the source tree.
 ;;; We can't use any of the interfaces provided in libc because those are inadequate
 ;;; for purposes of COMPILE-FILE. This is not trying to be robust against attacks.
+(defvar *scratch-file-prefix* "sbcl-scratch")
 (defun scratch-file-name (&optional extension)
   (let ((a (make-array 10 :element-type 'character)))
     (dotimes (i 10)
       (setf (aref a i) (code-char (+ (char-code #\a) (random 26)))))
-    ;; not sure where to write files on win32. this is no worse than what it was
-    #+win32 (format nil "~a~@[.~a~]" a extension)
-    #-win32 (let ((dir (posix-getenv "TMPDIR"))
-                  (file (format nil "sbcl~d~a~@[.~a~]"
-                                (sb-unix:unix-getpid) a extension)))
-              (if dir
-                  (namestring
-                   (merge-pathnames
-                    file (parse-native-namestring dir nil *default-pathname-defaults*
-                                                  :as-directory t)))
-                  (concatenate 'string "/tmp/" file)))))
+    (let ((dir (posix-getenv #+win32 "TMP" #+unix "TMPDIR"))
+          (file (format nil "~a~d~a~@[.~a~]" *scratch-file-prefix*
+                        (sb-unix:unix-getpid) a extension)))
+      (if dir
+          (namestring
+           (merge-pathnames
+            file (truename (parse-native-namestring dir nil *default-pathname-defaults*
+                                                    :as-directory t))))
+          (concatenate 'string "/tmp/" file)))))
 
 (defmacro with-scratch-file ((var &optional extension) &body forms)
   (sb-int:with-unique-names (tempname)
@@ -896,7 +913,7 @@
 ;;; Take a list of lists and assemble them as though they are
 ;;; instructions inside the body of a vop. There is no need
 ;;; to use the INST macro in front of each list.
-;;; As a special case, an atom is the symbol LABEL, it will be
+;;; As a special case, if an atom is the symbol LABEL, it will be
 ;;; changed to a generated label. At most one such atom may appear.
 (defun assemble (instructions)
   (let ((segment (sb-assem:make-segment))
@@ -909,10 +926,45 @@
                    (setq label (sb-assem:gen-label))
                    (rplaca cell label)))
                inst)
-         (apply #'sb-assem::%inst
-                (sb-assem::op-encoder-name (car inst))
-                (cdr inst)))
+         (apply #'sb-assem:inst* (car inst) (cdr inst)))
        (when label
          (sb-assem::%emit-label segment nil label)))
     (sb-assem:segment-buffer
      (sb-assem:finalize-segment segment))))
+
+(defun get-simple-fun-instruction-model (fun)
+  (declare (type sb-kernel:simple-fun fun))
+  (sb-disassem:get-inst-space) ; for effect
+  (let* ((code (sb-kernel:fun-code-header fun))
+         (segment (sb-disassem:make-code-segment code
+                                                 (sb-sys:sap- (sb-vm:simple-fun-entry-sap fun)
+                                                              (sb-kernel:code-instructions code))
+                                                 (sb-kernel:%simple-fun-text-len fun)))
+         (dstate (sb-disassem:make-dstate nil)))
+    (setf (sb-disassem::dstate-absolutize-jumps dstate) nil
+          (sb-disassem:dstate-segment dstate) segment
+          (sb-disassem:dstate-segment-sap dstate) (funcall (sb-disassem:seg-sap-maker segment)))
+    (sb-int:collect ((result))
+      (loop (let ((pc (sb-disassem:dstate-cur-offs dstate)))
+              (result (cons pc (sb-disassem:disassemble-instruction dstate))))
+            (when (>= (sb-disassem:dstate-cur-offs dstate) (sb-disassem:seg-length segment))
+              (return)))
+      (result))))
+
+;;; If a test file is not very tolerant of the statistical profiler, then
+;;; it should call this. There seem to be at least 2 common categories of failure:
+;;;  * the stack exhaustion test can get a profiling signal when you're already
+;;;    near exhaustion, and then the profiler exhausts the stack, which isn't
+;;;    handled very well. Example:
+;;;    Control stack exhausted, fault: 0xd76b9ff8, PC: 0x806cad2
+;;;       0: fp=0xd76ba008 pc=0x806cad2 Foreign function search_dynamic_space
+;;;       1: fp=0xd76ba028 pc=0x80633d1 Foreign function search_all_gc_spaces
+;;;       2: fp=0xd76ba048 pc=0x805647e Foreign function component_ptr_from_pc
+;;;       3: fp=0xd76baa18 pc=0x8065dfd Foreign function (null)
+;;;       4: fp=0xd76baa98 pc=0x806615a Foreign function record_backtrace_from_context
+;;;       5: fp=0xd76baab8 pc=0x806625e Foreign function sigprof_handler
+;;;  * debugger-related tests. I'm not sure why.
+(defun disable-profiling ()
+  (when (find-package "SB-SPROF")
+    (format t "INFO: disabling SB-SPROF~%")
+    (funcall (intern "STOP-PROFILING" "SB-SPROF"))))

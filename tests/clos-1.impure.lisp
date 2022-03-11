@@ -231,10 +231,15 @@
                         (:arguments &whole)))
                 program-error))
 
-(define-method-combination bug-309084-b/mc nil
-  ((all *))
-  (:arguments x &optional (y 'a yp) &key (z 'b zp) &aux (w (list y z)))
-  `(list ,x ,y ,yp ,z ,zp ,w))
+(let (warnings)
+  (handler-bind ((warning (lambda (c) (push c warnings))))
+    (eval '(define-method-combination bug-309084-b/mc nil
+             ((all *))
+             (:arguments x &optional (y 'a yp) &key (z 'b zp) &aux (w (list y z)))
+             `(list ,x ,y ,yp ,z ,zp ,w)))
+    ;; Should not get any "assigned but never read" warnings.
+    (assert (= (length warnings) 1))
+    (assert (search "&OPTIONAL and &KEY" (princ-to-string (car warnings))))))
 
 (defgeneric bug-309084-b/gf (a &optional b &key &allow-other-keys)
   (:method-combination bug-309084-b/mc)
@@ -255,3 +260,59 @@
   (assert (equal (bug-309084-b/gf2 1 2 3 4) '(1 3 t b nil (3 b))))
   (assert (equal (bug-309084-b/gf2 1 2 :z t) '(1 :z t b nil (:z b))))
   (assert (equal (bug-309084-b/gf2 1 2 3 4 :z 5) '(1 3 t 5 t (3 5)))))
+
+(defmethod bug-1840595-a (x y))
+(defmethod bug-1840595-z (x))
+
+(with-test (:name :bug-1840595/reader)
+  (eval '(defclass bug-1840595r () ()))
+  (assert-error (eval '(defclass bug-1840595r () ((a :reader bug-1840595-a)))))
+  (eval '(defclass bug-1840595r () ())))
+
+(with-test (:name :bug-1840595/writer)
+  (eval '(defclass bug-1840595w () ()))
+  (assert-error (eval '(defclass bug-1840595w () ((z :writer bug-1840595-z)))))
+  (eval '(defclass bug-1840595w () ())))
+
+(with-test (:name :bug-1909659/reader)
+  (eval '(defclass bug-1909659r () ((name :initarg :name :reader bug-1909659r-name))))
+  (let ((one (make-instance 'bug-1909659r :name 1))
+        (two (make-instance 'bug-1909659r :name 2)))
+    (assert-error (bug-1909659r-name one two) program-error)
+    (assert (eql (bug-1909659r-name one) 1))
+    (assert (eql (bug-1909659r-name two) 2))))
+
+(with-test (:name :bug-1909659/writer)
+  (eval '(defclass bug-1909659w () ((name :initarg :name :writer bug-1909659w-set-name))))
+  (let ((one (make-instance 'bug-1909659w :name 1))
+        (two (make-instance 'bug-1909659w :name 2)))
+    (assert-error (bug-1909659w-set-name one) program-error)
+    (assert-error (bug-1909659w-set-name two) program-error)
+    (bug-1909659w-set-name one two)
+    (assert (eql (slot-value one 'name) 1))
+    (assert (eql (slot-value two 'name) one))))
+
+(with-test (:name :defmethod-self-call-arg-mismatch
+            :skipped-on :interpreter)
+  (assert-signal (eval '(defmethod method-self-call (a b &key)
+                         b
+                         (method-self-call a)))
+      (and warning
+           (not sb-kernel:redefinition-warning)))
+  (assert-no-signal (eval '(defmethod method-self-call (a b &key z)
+                            (method-self-call a b :z z)))
+      (and warning
+           (not sb-kernel:redefinition-warning)))
+  (assert-signal (eval '(defmethod method-self-call (a b &key j)
+                         j
+                         (method-self-call a b :z j)))
+      (and warning
+           (not sb-kernel:redefinition-warning)))
+  (eval '(defmethod method-self-call (a (b list) &key z)
+          (list a b z)))
+
+  (assert-no-signal (eval '(defmethod method-self-call (a b &key j)
+                            j
+                            (method-self-call a b :z j :j 10)))
+      (and warning
+           (not sb-kernel:redefinition-warning))))

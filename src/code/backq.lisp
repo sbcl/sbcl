@@ -13,14 +13,13 @@
 
 ;; An unquoting COMMA struct.
 (defstruct (comma (:constructor unquote (expr &optional (kind 0)))
-                  #+sb-xc-host (:include structure!object)
                   ;; READing unpretty commas requires a default constructor.
                   ;; Not needed on the host.
                   #-sb-xc-host (:constructor %default-comma-constructor)
                   (:copier nil))
  (expr nil :read-only t)
  (kind nil :read-only t :type (member 0 1 2)))
-#+sb-xc (declaim (freeze-type comma))
+(declaim (freeze-type comma))
 
 (defconstant !+comma-dot+ 1)
 (defconstant !+comma-at+  2)
@@ -51,8 +50,9 @@
         result)))
 
 (defun comma-charmacro (stream char)
-  (declare (ignore char))
-  (declare (notinline read-char unread-char))
+  (declare (type stream stream)
+           (ignore char)
+           (notinline read-char unread-char))
   (unless (> *backquote-depth* 0)
     (when *read-suppress*
       (return-from comma-charmacro nil))
@@ -69,10 +69,6 @@
                            (svref #("comma" "comma-dot" "comma-at") flag)))
     (unquote (let ((*backquote-depth* (1- *backquote-depth*)))
                (read stream t nil t)) flag)))
-
-;; KLUDGE: 'sfunction' is not a defined type yet.
-(declaim (ftype (function (t fixnum boolean) (values t t &optional))
-                qq-template-to-sexpr qq-template-1))
 
 ;; A QQ-SUBFORM is a cons whose car is an arbitrary S-expression, and
 ;; cdr one of {EVAL,QUOTE,NCONC,|Append|} signifying how to treat the car.
@@ -109,6 +105,7 @@
 ;; the template, substituting into the outermost commas. Return two values:
 ;; the S-expression, and an indicator of how to incorporate it into its parent.
 (defun qq-template-to-sexpr (expr depth compiler-p)
+  (declare (type fixnum depth))
   (cond ((not expr) (values nil 'quote))
         ((listp expr)
          (qq-template-1 expr (+ (if (eq (car expr) 'quasiquote) 1 0) depth)
@@ -171,6 +168,7 @@
 ;; non-nil atom. Return a secondary value indicating whether it was or not.
 ;; The output list never "dots" its last cons, regardless of the input.
 (defun qq-map-template-to-list (input depth compiler-p)
+  (declare (type fixnum depth))
   (let ((original input) list dotted-p)
     (flet ((to-sexpr (x)
              (multiple-value-call #'cons
@@ -221,6 +219,7 @@
 ;; and then compile it, they miss out on the opportunity for the minor
 ;; advantage provided by the foldable functions, but why would they do that?
 (defun qq-template-1 (input depth compiler-p)
+  (declare (type fixnum depth))
   (multiple-value-bind (subforms dot-p)
       (qq-map-template-to-list input depth compiler-p)
     (labels ((const-p (subform) ; is SUBFORM constant?
@@ -318,7 +317,7 @@
   (set-macro-character #\, 'comma-charmacro nil rt))
 ;;; This is a load-time effect, not compile-time, and *READTABLE* will have been
 ;;; reverted to the standard one, so be sure to assign into ours, not that.
-#-sb-xc (!backq-cold-init sb-cold:*xc-readtable*)
+#+sb-xc-host (!backq-cold-init sb-cold:*xc-readtable*)
 
 ;;; Since our backquote is installed on the host lisp, and since
 ;;; developers make mistakes with backquotes and commas too, let's

@@ -175,6 +175,7 @@
   blocks
   declarations
   native-lexenv)
+(declaim (freeze-type env))
 
 (defun make-env (&key parent vars funs expanders
                  symbol-expansions tags blocks declarations)
@@ -322,14 +323,20 @@
            (let*-like-bindings nil))
       (cond
         ((< arguments-present required-length)
-         (ip-error "~@<Too few arguments in ~S to satisfy lambda list ~S.~:@>"
+         (ip-error (sb-format:tokens
+                    "~@<Too few arguments in ~S to satisfy lambda list ~
+                     ~/sb-impl:print-lambda-list/.~:@>")
                    arguments lambda-list))
         ((and (not (or rest-p keyword-p)) keywords-present-p)
-         (ip-error "~@<Too many arguments in ~S to satisfy lambda list ~S.~:@>"
+         (ip-error (sb-format:tokens
+                    "~@<Too many arguments in ~S to satisfy lambda list ~
+                     ~/sb-impl:print-lambda-list/.~:@>")
                    arguments lambda-list))
         ((and keyword-p keywords-present-p
               (oddp (- arguments-present non-keyword-arguments)))
-         (ip-error "~@<Odd number of &KEY arguments in ~S for ~S.~:@>"
+         (ip-error (sb-format:tokens
+                    "~@<Odd number of &KEY arguments in ~S for ~
+                     /sb-impl:print-lambda-list/.~:@>")
                    arguments lambda-list)))
       (dotimes (i required-length)
         (push (cons (pop required) (pop arguments)) let-like-bindings))
@@ -355,7 +362,9 @@
             (loop for (key value) on keyword-plist by #'cddr doing
                   (when (and (not (eq key :allow-other-keys))
                              (not (member key keyword :key #'keyword-key)))
-                    (ip-error "~@<Unknown &KEY argument ~S in ~S for ~S.~:@>"
+                    (ip-error (sb-format:tokens
+                               "~@<Unknown &KEY argument ~S in ~S for ~
+                                ~/sb-impl:print-lambda-list/.~:@>")
                               key original-arguments lambda-list))))
           (dolist (keyword-spec keyword)
             (let ((supplied (getf keyword-plist (keyword-key keyword-spec)
@@ -599,6 +608,23 @@
            (setf declarations (append declarations (cdar form))))
           (t (return (values form documentation declarations lambda-list))))
         finally (return (values nil documentation declarations lambda-list))))
+
+(defun make-interpreted-function
+      (&key name lambda-list env declarations documentation body source-location
+            (debug-lambda-list lambda-list))
+    (let ((function (%make-interpreted-function
+                     name name lambda-list debug-lambda-list env
+                     declarations documentation body source-location)))
+      (setf (%funcallable-instance-fun function)
+            #'(lambda (&rest args)
+                (interpreted-apply function args)))
+      function))
+
+(defmethod print-object ((obj interpreted-function) stream)
+  (print-unreadable-object (obj stream
+                            :identity (not (interpreted-function-name obj)))
+    (format stream "~A ~A" '#:interpreted-function
+            (interpreted-function-name obj))))
 
 ;;; Create an interpreted function from the lambda-form EXP evaluated
 ;;; in the environment ENV.
@@ -1003,6 +1029,8 @@
         (sb-sys:with-pinned-objects ((%eval (car values) env))
           (eval-with-pinned-objects (cons (cdr values) body) env)))))
 
+(defparameter *eval-level* -1)
+(defparameter *eval-verbose* nil)
 (defvar *eval-dispatch-functions* nil)
 
 ;;; Dispatch to the appropriate EVAL-FOO function based on the contents of EXP.

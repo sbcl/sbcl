@@ -37,15 +37,50 @@
 (define-vop (branch-if)
   (:info dest not-p flags)
   (:generator 0
-     (flet ((negate-condition (name)
-              (let ((code (logxor 1 (conditional-opcode name))))
-                (aref +condition-name-vec+ code))))
        (aver (null (rest flags)))
        (inst jmp
              (if not-p
                  (negate-condition (first flags))
                  (first flags))
-             dest))))
+             dest)))
+
+(define-vop (multiway-branch-if-eq)
+  ;; TODO: also accept signed-reg, unsigned-reg, character-reg
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:info labels otherwise key-type keys test-vop-name)
+  (:temporary (:sc unsigned-reg) index)
+  (:ignore test-vop-name)
+  (:generator 10
+    (let* ((min (car keys)) ; keys are sorted
+           (max (car (last keys)))
+           (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+      (mapc (lambda (key label) (setf (aref vector (- key min)) label))
+            keys labels)
+      (ecase key-type
+       (fixnum
+         (inst test x fixnum-tag-mask)
+         (inst jmp :ne otherwise)
+         (if (= min 0)
+             (inst mov index x)
+             (inst lea index (make-ea :dword :base x :disp (fixnumize (- min)))))
+         (inst cmp index (fixnumize (- max min)))
+         (inst jmp :a otherwise)
+         (let ((table (register-inline-constant :jump-table vector)))
+           (inst jmp (make-ea :dword :disp (ea-disp table)
+                              :index index :scale 1))))
+       (character
+         (inst mov index x)
+         (inst and index widetag-mask)
+         (inst cmp index character-widetag)
+         (inst jmp :ne otherwise)
+         (inst mov index x)
+         (inst shr index n-widetag-bits)
+         (inst sub index min)
+         (inst cmp index (- max min))
+         (inst jmp :a otherwise)
+         (let ((table (register-inline-constant :jump-table vector)))
+           (inst jmp (make-ea :dword :disp (ea-disp table)
+                              :index index :scale 4))))))))
 
 (define-load-time-global *cmov-ptype-representation-vop*
   (mapcan (lambda (entry)
@@ -83,7 +118,7 @@
 (defun convert-conditional-move-p (node dst-tn x-tn y-tn)
   (declare (ignore node))
   (let* ((ptype (sb-c::tn-primitive-type dst-tn))
-         (name  (sb-c::primitive-type-name ptype))
+         (name  (sb-c:primitive-type-name ptype))
          (param (and (memq :cmov *backend-subfeatures*)
                      (cdr (or (assoc name *cmov-ptype-representation-vop*)
                               '(t descriptor-reg move-if/t))))))

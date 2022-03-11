@@ -25,12 +25,12 @@
   "~S is unsupported as of SBCL 0.8.13. Please use LOAD-SHARED-OBJECT."
   (load-1-foreign))
 
-(define-alien-variable undefined-alien-address unsigned)
 (defvar *runtime-dlhandle*)
 
 (defvar *shared-objects*)
 
 (defstruct (shared-object (:copier nil)) pathname namestring handle dont-save)
+(declaim (freeze-type shared-object))
 
 (defun load-shared-object (pathname &key dont-save)
   "Load a shared library / dynamic shared object file / similar foreign
@@ -47,7 +47,7 @@ EQUAL to the designated pathname of a previous call will replace the old
 definitions; if a symbol was previously referenced through the object and
 is not present in the reloaded version an error will be signalled. Reloading
 may not work as expected if user or library-code has called dlopen(3) on the
-same shared object.
+same shared object or running on a system where dlclose(3) is a noop.
 
 LOAD-SHARED-OBJECT interacts with SB-EXT:SAVE-LISP-AND-DIE:
 
@@ -88,18 +88,11 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
           (dlopen-or-lose obj))
         (setf *shared-objects* (append (remove obj *shared-objects*)
                                        (list obj)))
-        ;; FIXME: Why doesn't the linkage table work on Windows? (Or maybe it
-        ;; does and this can be just #+linkage-table?) Note: remember to change
-        ;; FOREIGN-DEINIT as well then!
-        ;;
-        ;; Kovalenko 2010-11-24: I think so. Alien _data_ references
-        ;; are the only thing on win32 that is even slightly
-        ;; problematic. Handle function references in the same way as
-        ;; other linkage-table platforms is easy.
-        ;;
-        #+linkage-table
-        (when (or old (undefined-foreign-symbols-p))
-          (update-linkage-table))))
+        (when (or old (cdr *linkage-info*))
+          ;; If OLD is non-NIL, then we're passing "true" which causes all foreign
+          ;; symbols to get looked up again. Otherwise we're passing "false"
+          ;; which only tries to find symbols that aren't already found.
+          (update-linkage-table old))))
     pathname))
 
 (defun unload-shared-object (pathname)
@@ -113,10 +106,11 @@ Experimental."
                        :key #'shared-object-pathname
                        :test #'equal)))
         (when old
-          #-hpux (dlclose-or-lose old)
+          (dlclose-or-lose old)
           (setf *shared-objects* (remove old *shared-objects*))
-          #+linkage-table
-          (update-linkage-table))))))
+          (update-linkage-table t)
+          ;; Return T for unloaded, vs whatever update-linkage-info returns
+          t)))))
 
 (defun try-reopen-shared-object (obj)
   (declare (type shared-object obj))
@@ -163,52 +157,8 @@ Experimental."
 (defun close-shared-objects ()
   (let (saved)
     (dolist (obj (reverse *shared-objects*))
-      #-hpux (dlclose-or-lose obj)
+      (dlclose-or-lose obj)
       (unless (shared-object-dont-save obj)
         (push obj saved)))
     (setf *shared-objects* saved))
-  #-hpux
   (dlclose-or-lose))
-
-;;; These tables are synchronized by the lock on *LINKAGE-INFO*
-(let ((symbols (make-hash-table :test #'equal))
-      (undefineds (make-hash-table :test #'equal)))
-  (defun ensure-dynamic-foreign-symbol-address (symbol &optional datap)
-    "Returns the address of the foreign symbol as an integer. On linkage-table
-ports if the symbols isn't found a special guard address is returned instead,
-accesses to which will result in an UNDEFINED-ALIEN-ERROR. On other ports an
-error is immediately signalled if the symbol isn't found. The returned address
-is never in the linkage-table."
-    (declare (ignorable datap))
-    (let ((addr (find-dynamic-foreign-symbol-address symbol)))
-      (cond  #-linkage-table
-             ((not addr)
-              (error 'undefined-alien-error :name symbol))
-             #+linkage-table
-             ((not addr)
-              ;; If we can report the actual name when an undefined
-              ;; alien is called don't warn.
-              #-(or arm arm64 x86-64)
-              (style-warn 'sb-kernel:undefined-alien-style-warning
-                          :symbol symbol)
-              (setf (gethash symbol undefineds) t)
-              (remhash symbol symbols)
-              (if datap
-                  undefined-alien-address
-                  (or
-                   (sb-fasl::get-asm-routine 'sb-vm::undefined-alien-tramp)
-                   (find-foreign-symbol-address "undefined_alien_function"))))
-             (addr
-              (setf (gethash symbol symbols) t)
-              (remhash symbol undefineds)
-              addr))))
-  (defun undefined-foreign-symbols-p ()
-    (plusp (hash-table-count undefineds)))
-  (defun dynamic-foreign-symbols-p ()
-    (plusp (hash-table-count symbols)))
-  (defun list-dynamic-foreign-symbols ()
-    (loop for symbol being each hash-key in symbols
-          collect symbol))
-  (defun list-undefined-foreign-symbols ()
-    (loop for symbol being each hash-key in undefineds
-          collect symbol)))

@@ -40,7 +40,7 @@
 
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
       (inst add count count (fixnumize 1))
-      (test-type ptr temp loop nil (list-pointer-lowtag))
+      (inst b loop)
 
       (emit-label not-list)
 

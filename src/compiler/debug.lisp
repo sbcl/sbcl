@@ -38,7 +38,7 @@
 ;;; Check everything that we can think of for consistency. When a
 ;;; definite inconsistency is detected, we BARF.
 ;;; Our argument is a list of components, but
-;;; we also look at the *FREE-VARS*, *FREE-FUNS* and *CONSTANTS*.
+;;; we also look at the *IR1-NAMESPACE*.
 ;;;
 ;;; First we do a pre-pass which finds all the CBLOCKs and CLAMBDAs,
 ;;; testing that they are linked together properly and entering them
@@ -46,7 +46,7 @@
 ;;; the actual code and control flow. Finally, we scan the global leaf
 ;;; hashtables, looking for lossage.
 (declaim (ftype (function (list) (values)) check-ir1-consistency))
-(defun check-ir1-consistency (components)
+(defun check-ir1-consistency (components &aux (ns *ir1-namespace*))
   (let ((*seen-blocks* (make-hash-table :test 'eq))
         (*seen-funs* (make-hash-table :test 'eq)))
     (unwind-protect
@@ -69,16 +69,16 @@
                  (unless (or (eq block tail)
                              (eq (block-component block) c))
                    (barf "~S is not in ~S." block c)))
-               #|
-               (when (or (loop-blocks c) (loop-inferiors c))
-               (do-blocks (block c :both)
-               (setf (block-flag block) nil))
-               (check-loop-consistency c nil)
-               (do-blocks (block c :both)
-               (unless (block-flag block)
-               (barf "~S was not in any loop." block))))
-               |#
-               ))
+               #+(or)
+               (let ((component-outer-loop (component-outer-loop c)))
+                 (when (or (loop-blocks component-outer-loop)
+                           (loop-inferiors component-outer-loop))
+                   (do-blocks (block c :both)
+                     (setf (block-flag block) nil))
+                   (check-loop-consistency component-outer-loop nil)
+                   (do-blocks (block c :both)
+                     (unless (block-flag block)
+                       (barf "~S was not in any loop." block)))))))
            (check-fun-consistency components)
 
            (dolist (c components)
@@ -93,32 +93,32 @@
                                   (and (global-var-p v)
                                        (member (global-var-kind v)
                                                '(:global :special :unknown))))
-                        (barf "strange *FREE-VARS* entry: ~S" v))
+                        (barf "strange FREE-VARS entry: ~S" v))
                       (when (leaf-p v)
                         (dolist (n (leaf-refs v))
                           (check-node-reached n)))
                       (when (basic-var-p v)
                         (dolist (n (basic-var-sets v))
                           (check-node-reached n))))
-                    *free-vars*)
+                    (free-vars ns))
 
            (maphash (lambda (k v)
                       (declare (ignore k))
                       (unless (constant-p v)
-                        (barf "strange *CONSTANTS* entry: ~S" v))
+                        (barf "strange CONSTANTS entry: ~S" v))
                       (dolist (n (leaf-refs v))
                         (check-node-reached n)))
-                    *constants*)
+                    (eql-constants ns))
 
            (maphash (lambda (k v)
                       (declare (ignore k))
                       (unless (or (functional-p v)
                                   (and (global-var-p v)
                                        (eq (global-var-kind v) :global-function)))
-                        (barf "strange *FREE-FUNS* entry: ~S" v))
+                        (barf "strange FREE-FUNS entry: ~S" v))
                       (dolist (n (leaf-refs v))
                         (check-node-reached n)))
-                    *free-funs*))
+                    (free-funs ns)))
       (clrhash *seen-blocks*)
       (clrhash *seen-funs*))
     (values)))
@@ -244,12 +244,11 @@
 
 ;;;; loop consistency checking
 
-#|
 ;;; Descend through the loop nesting and check that the tree is well-formed
 ;;; and that all blocks in the loops are known blocks. We also mark each block
 ;;; that we see so that we can do a check later to detect blocks that weren't
 ;;; in any loop.
-(declaim (ftype (function (loop (or loop null)) (values)) check-loop-consistency))
+(declaim (ftype (function (cloop (or cloop null)) (values)) check-loop-consistency))
 (defun check-loop-consistency (loop superior)
   (unless (eq (loop-superior loop) superior)
     (barf "wrong superior in ~S, should be ~S" loop superior))
@@ -278,7 +277,7 @@
   (values))
 
 ;;; Check that Block is either in Loop or an inferior.
-(declaim (ftype (function (block loop) (values)) check-loop-block))
+(declaim (ftype (function (cblock cloop) (values)) check-loop-block))
 (defun check-loop-block (block loop)
   (unless (gethash block *seen-blocks*)
     (barf "unseen block ~S in loop info for ~S" block loop))
@@ -290,8 +289,6 @@
     (unless (walk loop)
       (barf "~S is in loop info for ~S but not in the loop." block loop)))
   (values))
-
-|#
 
 ;;; Check a block for consistency at the general flow-graph level, and
 ;;; call CHECK-NODE-CONSISTENCY on each node to locally check for
@@ -502,6 +499,11 @@
      (dolist (exit (entry-exits node))
        (unless (node-deleted exit)
          (check-node-reached node))))
+    (enclose
+     (dolist (fun (enclose-funs node))
+       (let ((enclose (functional-enclose fun)))
+         (unless (eq node enclose)
+           (barf "~S is not the ENCLOSE for its FUN ~S." node enclose)))))
     (exit
      (let ((entry (exit-entry node))
            (value (exit-value node)))
@@ -760,14 +762,8 @@
 (defun check-block-conflicts (component)
   (do-ir2-blocks (block component)
     (do ((conf (ir2-block-global-tns block)
-               (global-conflicts-next-blockwise conf))
-         (prev nil conf))
+               (global-conflicts-next-blockwise conf)))
         ((null conf))
-      (when prev
-        (unless (> (tn-number (global-conflicts-tn conf))
-                   (tn-number (global-conflicts-tn prev)))
-          (barf "~S and ~S out of order in ~S" prev conf block)))
-
       (unless (find-in #'global-conflicts-next-tnwise
                        conf
                        (tn-global-conflicts
@@ -789,13 +785,13 @@
 ;;; TNs to access the full call passing locations.
 (defun check-environment-lifetimes (component)
   (dolist (fun (component-lambdas component))
-    (let* ((env (lambda-physenv fun))
-           (2env (physenv-info env))
+    (let* ((env (lambda-environment fun))
+           (2env (environment-info env))
            (vars (lambda-vars fun))
-           (closure (ir2-physenv-closure 2env))
-           (pc (ir2-physenv-return-pc-pass 2env))
-           (fp (ir2-physenv-old-fp 2env))
-           (2block (block-info (lambda-block (physenv-lambda env)))))
+           (closure (ir2-environment-closure 2env))
+           (pc (ir2-environment-return-pc-pass 2env))
+           (fp (ir2-environment-old-fp 2env))
+           (2block (block-info (lambda-block (environment-lambda env)))))
       (do ((conf (ir2-block-global-tns 2block)
                  (global-conflicts-next-blockwise conf)))
           ((null conf))
@@ -844,30 +840,77 @@
 
 ;;;; data structure dumping routines
 
+;;; IR2 blocks don't get a convenient number until LIFETIME-ANALYZE which is
+;;; too late when trying to talk about an ir2 block during IR2-OPTIMIZE.
+;;; So instead of accessing them by the block-number, use an opaque ID.
+;;; And avoid confusion with all the other opaque IDs flying around
+;;; by using alphabetics instead.
+;;; Generate this numbering sequence for up to 5 alphabetic "digits":
+;;; A..Z, AA,AB ... AZ, BA ... BZ, ZA .. ZZ, AAA, AAB ...
+(defun id->string (id)
+  (declare (type (integer 1 *) id))
+  (flet ((n-digit-string (n-digits val)
+           (let ((str (make-string n-digits :element-type 'base-char)))
+             (loop for i downfrom (1- n-digits) to 0
+                   do (multiple-value-bind (quo rem) (floor val 26)
+                        (setf (aref str i) (code-char (+ (char-code #\A) rem))
+                              val quo)))
+             str)))
+    (do ((min 0) (n-digits 1 (1+ n-digits)))
+        (nil)
+      (let ((span (expt 26 n-digits)))
+        (when (<= id (+ min span))
+          (return (n-digit-string n-digits (- id (1+ min)))))
+        (incf min span)))))
+;;; Invert the above mapping
+(defun string->id (string)
+  (let ((val 0))
+    (dotimes (i (length string))
+      (setq val (+ (* val 26) (- (char-code (char string i)) (char-code #\A)))))
+    (dotimes (i (1- (length string)))
+      (incf val (expt 26 (1+ i))))
+    (1+ val)))
+
+(eval-when (#+sb-xc :compile-toplevel)
+  (loop for i from 1 to 1000 ; sanity check the stringifying algorithm
+        do (assert (= (string->id (id->string i)) i))))
+
 ;;; When we print CONTINUATIONs and TNs, we assign them small numeric
 ;;; IDs so that we can get a handle on anonymous objects given a
 ;;; printout.
-(macrolet ((def (array-getter fto ffrom) ; "to" = to number/id, resp. "from"
-             `(progn
-                (defun ,fto (x)
-                  (let* ((map *compilation*)
-                         (ht (objmap-obj-to-id map)))
-                    (or (values (gethash x ht))
-                        (let ((array (,array-getter map))
-                              (num (incf (,(symbolicate "OBJMAP-" fto) map))))
-                          (when (>= num (length array))
-                            (let ((new (adjust-array array (* (length array) 2))))
-                              (fill array nil)
-                              (setf array new (,array-getter map) array)))
-                          (setf (svref array num) x)
-                          (setf (gethash x ht) num)))))
-
-                (defun ,ffrom (num)
-                  (let ((array (,array-getter *compilation*)))
-                    (and (< num (length array)) (svref array num)))))))
-  (def objmap-id-to-cont cont-num num-cont)
-  (def objmap-id-to-tn tn-id id-tn)
-  (def objmap-id-to-label label-id id-label))
+(macrolet ((def (array-getter fto ffrom type) ; "to" = to number/id, resp. "from"
+             (let ((xform (if (eq array-getter 'objmap-id-to-ir2block)
+                              'id->string
+                              'identity)))
+               `(progn
+                  (export '(,fto ,ffrom))
+                  (defun ,fto (x)
+                    (declare (type ,type x))
+                    (let* ((map *compilation*)
+                           (ht (objmap-obj-to-id map)))
+                      (or (gethash x ht)
+                          (let ((array (,array-getter map)))
+                            (when (null array)
+                              (setf array (make-array 20 :fill-pointer 0
+                                                      :adjustable t)
+                                    (,array-getter map) array))
+                            (setf (gethash x ht)
+                                  (,xform (1+ (vector-push-extend x array))))))))
+                  (defun ,ffrom (num)
+                    (let ((array (,array-getter *compilation*)))
+                      ,@(when (eq array-getter 'objmap-id-to-ir2block)
+                          '((setq num (string->id num))))
+                      ;; numbers start from 1, not 0
+                      (and (< (1- num) (length array)) (aref array (1- num)))))))))
+  (def objmap-id-to-node node-id id-node node)
+  (def objmap-id-to-comp component-id id-component component)
+  (def objmap-id-to-leaf leaf-id id-leaf leaf)
+  (def objmap-id-to-cont %cont-num num-cont (or ctran lvar))
+  (def objmap-id-to-ir2block ir2-block-id id-ir2-block ir2-block)
+  (def objmap-id-to-tn tn-id id-tn tn)
+  (def objmap-id-to-label label-id id-label label))
+;; Do not give NIL a continuation number
+(defun cont-num (x) (if x (%cont-num x)))
 
 ;;; Print a terse one-line description of LEAF.
 (defun print-leaf (leaf &optional (stream *standard-output*))
@@ -877,14 +920,19 @@
     (constant (format stream "'~S" (constant-value leaf)))
     (global-var
      (format stream "~S {~A}" (leaf-debug-name leaf) (global-var-kind leaf)))
+    (clambda
+     (format stream "lambda ~@[~S ~]~:S"
+             (and (leaf-has-source-name-p leaf)
+                  (functional-debug-name leaf))
+             (mapcar #'leaf-debug-name (lambda-vars leaf))))
+    (optional-dispatch
+     (format stream "optional-dispatch ~S" (mapcar #'leaf-debug-name (optional-dispatch-arglist leaf))))
     (functional
-     (format stream "~S ~S ~S" (type-of leaf) (functional-debug-name leaf)
-             (mapcar #'leaf-debug-name
-                     (typecase leaf
-                       (clambda
-                        (lambda-vars leaf))
-                       (optional-dispatch
-                        (optional-dispatch-arglist leaf))))))))
+     (case (functional-kind leaf)
+       (:toplevel-xep
+        (format stream "TL-XEP ~S" (entry-info-name (leaf-info leaf))))
+       (t
+        (format stream "~S ~S" (type-of leaf) (functional-debug-name leaf)))))))
 
 ;;; Attempt to find a block given some thing that has to do with it.
 (declaim (ftype (sfunction (t) cblock) block-or-lose))
@@ -897,11 +945,11 @@
     (ctran (ctran-block thing))
     (node (node-block thing))
     (component (component-head thing))
-#|    (cloop (loop-head thing))|#
+    (cloop (loop-head thing))
     (integer (ctran-block (num-cont thing)))
     (functional (lambda-block (main-entry thing)))
     (null (error "Bad thing: ~S." thing))
-    (symbol (block-or-lose (gethash thing *free-funs*)))))
+    (symbol (block-or-lose (gethash thing (free-funs *ir1-namespace*))))))
 
 ;;; Print cN.
 (defun print-ctran (cont)
@@ -910,7 +958,11 @@
   (values))
 (defun print-lvar (cont)
   (declare (type lvar cont))
-  (format t "v~D " (cont-num cont))
+  (if (and (lvar-info cont)
+           (eq (ir2-lvar-kind (lvar-info cont))
+               :unknown))
+      (format t "uv~D " (cont-num cont))
+      (format t "v~D " (cont-num cont)))
   (values))
 
 (defun print-lvar-stack (stack &optional (stream *standard-output*))
@@ -918,12 +970,14 @@
         do (format stream "~:[u~;d~]v~D~@[ ~]"
                    (lvar-dynamic-extent lvar) (cont-num lvar) rest)))
 
+(defvar *debug-print-types* nil)
+
 ;;; Print out the nodes in BLOCK in a format oriented toward
 ;;; representing what the code does.
 (defun print-nodes (block)
   (setq block (block-or-lose block))
   (pprint-logical-block (nil nil)
-    (format t "~:@_IR1 block ~D start c~D"
+    (format t "~:@_IR1 block ~D~@[ start c~D~]"
             (block-number block) (cont-num (block-start block)))
     (when (block-delete-p block)
       (format t " <deleted>"))
@@ -981,11 +1035,15 @@
                ((:dynamic-extent)
                 (format t "entry DX~{ v~D~}"
                         (mapcar (lambda (lvar-or-cell)
-                                  (if (consp lvar-or-cell)
-                                      (cons (car lvar-or-cell)
-                                            (cont-num (cdr lvar-or-cell)))
-                                      (cont-num lvar-or-cell)))
-                                (cleanup-info cleanup))))
+                                  (typecase lvar-or-cell
+                                    (cons
+                                     (cons (car lvar-or-cell)
+                                           (cont-num (cdr lvar-or-cell))))
+                                    (enclose
+                                     lvar-or-cell)
+                                    (t
+                                     (cont-num lvar-or-cell))))
+                                (cleanup-nlx-info cleanup))))
                (t
                 (format t "entry ~S" (entry-exits node))))))
           (exit
@@ -997,12 +1055,24 @@
                     (format t "exit <no value>"))
                    (t
                     (format t "exit <degenerate>")))))
+          (delay
+           (write-string "delay ")
+           (print-lvar (delay-value node)))
           (cast
            (let ((value (cast-value node)))
              (format t "cast v~D ~A[~S -> ~S]" (cont-num value)
                      (if (cast-%type-check node) #\+ #\-)
                      (cast-type-to-check node)
-                     (cast-asserted-type node)))))
+                     (cast-asserted-type node))))
+          (enclose
+           (write-string "enclose ")
+           (dolist (leaf (enclose-funs node))
+             (print-leaf leaf)
+             (write-char #\space))))
+        (when (and *debug-print-types*
+                   (valued-node-p node))
+          (write-char #\space)
+          (princ (type-specifier (node-derived-type node))))
         (pprint-newline :mandatory)))
 
     (awhen (block-info block)
@@ -1028,7 +1098,13 @@
            (format stream "t~D" (tn-id tn))))
     (when (and (tn-sc tn) (tn-offset tn))
       (format stream "[~A]" (location-print-name tn)))
-    (format stream " ~s" (tn-kind tn))))
+    (format stream " ~s~@[ ~a~]~@[ ~a~]" (tn-kind tn)
+            (and *debug-print-types*
+                 (and (tn-sc tn)
+                      (sc-name (tn-sc tn))))
+            (and *debug-print-types*
+                 (and (tn-primitive-type tn)
+                      (primitive-type-name (tn-primitive-type tn)))))))
 
 ;;; Print the TN-REFs representing some operands to a VOP, linked by
 ;;; TN-REF-ACROSS.
@@ -1039,6 +1115,7 @@
         ((null ref))
       (let ((tn (tn-ref-tn ref))
             (ltn (tn-ref-load-tn ref)))
+        (awhen (tn-ref-memory-access ref) (format t "@~A" it))
         (cond ((not ltn)
                (print-tn-guts tn))
               (t
@@ -1052,16 +1129,29 @@
 ;;; necessary.
 (defun print-vop (vop)
   (pprint-logical-block (*standard-output* nil)
-    (princ (vop-info-name (vop-info vop)))
+    (princ (vop-name vop))
     (princ #\space)
     (pprint-indent :current 0)
     (print-operands (vop-args vop))
     (pprint-newline :linear)
     (when (vop-codegen-info vop)
-      (princ (with-simple-output-to-string (stream)
-               (let ((*print-level* 1)
-                     (*print-length* 3))
-                 (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))
+      (case (vop-name vop)
+       (multiway-branch-if-eq
+        (princ (vop-codegen-info vop)))
+       (t
+        (princ (%with-output-to-string (stream)
+                 ;; Current print depth varies based on whether PRINT-VOP
+                 ;; is called by DESCRIBE-IR2-COMPONENT or TRACE-INSTRUCTION,
+                 ;; so any fixed value of *PRINT-LEVEL* changes its effect
+                 ;; depending on the call context. Resetting depth to 0 seems
+                 ;; like the best way to get consistent output.
+                 ;; We shouldn't bind the printer limits to NIL, because
+                 ;; hairy internal objects such as ENVIRONMENT can be printed.
+                 ;; See also the comment above FUNCALL-WITH-DEBUG-IO-SYNTAX.
+                 (let (#-sb-xc-host (*current-level-in-print* 0)
+                       (*print-level* 2)
+                       (*print-length* 15))
+                   (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))))
       (pprint-newline :linear))
     (when (vop-results vop)
       (princ "=> ")
@@ -1074,9 +1164,15 @@
   (pprint-logical-block (*standard-output* nil)
     (cond
       ((eq (block-info (ir2-block-block block)) block)
-       (format t "~:@_IR2 block ~D start c~D~:@_"
+       (format t "~:@_IR2 block ~A~@[(#~d)~]~@[ start c~D~]~:@_"
+               (ir2-block-id block)
                (ir2-block-number block)
                (cont-num (block-start (ir2-block-block block))))
+       (when (boundp '*2block-info*)
+         (let ((info (gethash block *2block-info*)))
+           (format t "pred=~:A succ=~:A~:@_"
+                   (mapcar #'ir2-block-id (car info))
+                   (mapcar #'ir2-block-id (cdr info)))))
        (let ((label (ir2-block-%label block)))
          (when label
            (format t "L~D:~:@_" (label-id label)))))
@@ -1111,7 +1207,7 @@
          do (pprint-logical-block (*standard-output* nil)
               (if full
                   (print-nodes block)
-                  (format t "IR1 block ~D start c~D"
+                  (format t "IR1 block ~D~@[ start c~D~]"
                           (block-number block)
                           (cont-num (block-start block))))
               (pprint-indent :block 4)
@@ -1231,31 +1327,101 @@
          (vop (ir2-block-start-vop block) (vop-next vop)))
         ((= i n) vop))))
 
+(defun show-transform-p (showp fun-name)
+  (or (and (listp showp) (member fun-name showp :test 'equal))
+      (eq showp t)))
+
+(defun show-transform (kind name new-form &optional combination)
+  (let ((*print-length* 100)
+        (*print-level* 50)
+        (*print-right-margin* 128))
+    (format *trace-output* "~&xform (~a) ~S ~% -> ~S~%"
+            kind
+            (if combination
+                (cons name
+                      (loop for arg in (combination-args combination)
+                            collect (if (constant-lvar-p arg)
+                                        (lvar-value arg)
+                                        (type-specifier (lvar-type arg)))))
+                name)
+            new-form)))
+
+(defun show-type-derivation (combination type)
+  (let ((*print-length* 100)
+        (*print-level* 50)
+        (*print-right-margin* 128))
+    (unless (type= (node-derived-type combination)
+                   (coerce-to-values type))
+      (format *trace-output* "~&~a derived to ~a"
+              (cons (combination-fun-source-name combination)
+                    (loop for arg in (combination-args combination)
+                          collect (if (constant-lvar-p arg)
+                                      (lvar-value arg)
+                                      (type-specifier (lvar-type arg)))))
+              (type-specifier type)))))
+
+;;;; producing a graphviz file
+
+(defun replace-all (string part replacement &key (test #'char=))
+  "Returns a new string in which all the occurences of the part
+is replaced with replacement."
+  (with-output-to-string (out)
+    (loop with part-length = (length part)
+          for old-pos = 0 then (+ pos part-length)
+          for pos = (search part string
+                            :start2 old-pos
+                            :test test)
+          do (write-string string out
+                           :start old-pos
+                           :end (or pos (length string)))
+          when pos do (write-string replacement out)
+            while pos)))
+
 (defun ir1-to-dot (component output-file)
   (with-open-file (stream output-file :if-exists :supersede
                                       :if-does-not-exist :create
                                       :direction :output)
     (write-line "digraph G {" stream)
-    (do-blocks (block component)
-      (when (typep (block-out block) '(cons (eql :graph) cons))
-        (format stream "~a[style=filled color=~a];~%"
-                (block-number block)
-                (case (cadr (block-out block))
-                  (:marked "green")
-                  (:remarked "aquamarine")
-                  (:start "lightblue")
-                  (:end "red"))))
-      (let ((succ (block-pred block)))
-        (when succ
-          (loop for succ in succ
-                for attr = "[style=bold]" then ""
-                do
-                (format stream "~a -> ~a~a;~%"
-                        (block-number block)
-                        (block-number succ)
-                        attr)))
-        (when (nle-block-p block)
-          (format stream "~a -> ~a [style=dotted];~%"
-                  (block-number block)
-                  (block-number (nle-block-entry-block block))))))
+    (write-line "node [fontname = \"monospace\"];" stream)
+    (write-line "node [shape=box];" stream)
+    ;; Give a unique label to every block, since BLOCK-NUMBERs may be
+    ;; uninitialized during optimization.
+    (let ((label 0)
+          (block-labels (make-hash-table :test #'eq)))
+      (do-blocks (block component :both)
+        (setf (gethash block block-labels) label)
+        (incf label))
+      (flet ((block-label (block)
+               (gethash block block-labels)))
+        (do-blocks (block component :both)
+          (cond ((eq block (component-head component))
+                 (format stream "~a [label=\"head of component ~a\"];"
+                         (block-label block)
+                         (component-name component)))
+                ((eq block (component-tail component))
+                 (format stream "~a [label=tail];"
+                         (block-label block)))
+                (t
+                 (format stream "~a [label=\"~a\"];~%"
+                         (block-label block)
+                         (replace-all
+                          (replace-all (with-output-to-string (*standard-output*)
+                                         (print-nodes block))
+                                       (string #\Newline)
+                                       "\\l")
+                          "\""
+                          "\\"))))
+          (let ((succ (block-succ block)))
+            (when succ
+              (loop for succ in succ
+                    for attr = "[style=bold]" then ""
+                    do
+                       (format stream "~a -> ~a~a;~%"
+                               (block-label block)
+                               (block-label succ)
+                               attr)))
+            (when (nle-block-p block)
+              (format stream "~a -> ~a [style=dotted];~%"
+                      (block-label block)
+                      (block-label (nle-block-entry-block block))))))))
     (write-line "}" stream)))

@@ -12,58 +12,44 @@
 (in-package "SB-VM")
 
 
-(define-vop (list-or-list*)
-  (:args (things :more t))
+(define-vop (list)
+  (:args (things :more t :scs (any-reg descriptor-reg zero control-stack)))
   (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
   (:temporary (:scs (any-reg)) temp)
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:info num)
+  (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
-  (:policy :fast-safe)
-  (:variant-vars star)
   (:node-var node)
   (:generator 0
-    (cond ((zerop num)
-           (move result null-tn))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t (flet ((maybe-load (tn)
-                      (sc-case tn
-                        ((any-reg descriptor-reg)
-                         tn)
-                        (control-stack
-                         (load-stack-tn temp tn)
-                         temp))))
-               (let* ((cons-cells (if star (1- num) num))
-                      (alloc (* (pad-data-block cons-size) cons-cells)))
-                 (pseudo-atomic (pa-flag)
-                   (allocation res alloc list-pointer-lowtag
-                               :flag-tn pa-flag
-                               :stack-allocate-p (node-stack-allocate-p node)
-                               :temp-tn temp)
-                   (move ptr res)
-                   (dotimes (i (1- cons-cells))
-                     (storew (maybe-load (tn-ref-tn things)) ptr
-                             cons-car-slot list-pointer-lowtag)
-                     (setf things (tn-ref-across things))
-                     (inst addi ptr ptr (pad-data-block cons-size))
-                     (storew ptr ptr (- cons-cdr-slot cons-size)
-                             list-pointer-lowtag))
-                   (storew (maybe-load (tn-ref-tn things)) ptr
-                     cons-car-slot list-pointer-lowtag)
-                   (storew (if star
-                               (maybe-load (tn-ref-tn (tn-ref-across things)))
-                               null-tn)
-                       ptr cons-cdr-slot list-pointer-lowtag))
-                 (move result res)))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-(define-vop (list* list-or-list*)
-  (:variant t))
-
+    (flet ((maybe-load (tn)
+             (sc-case tn
+              ((any-reg descriptor-reg zero) tn)
+              (control-stack
+               (load-stack-tn temp tn)
+               temp))))
+      (let ((alloc (* (pad-data-block cons-size) cons-cells)))
+        (pseudo-atomic (pa-flag)
+          (allocation 'list alloc list-pointer-lowtag res
+                      :flag-tn pa-flag
+                      :stack-allocate-p (node-stack-allocate-p node)
+                      :temp-tn temp)
+          (move ptr res)
+          (dotimes (i (1- cons-cells))
+            (storew (maybe-load (tn-ref-tn things)) ptr
+                    cons-car-slot list-pointer-lowtag)
+            (setf things (tn-ref-across things))
+            (inst addi ptr ptr (pad-data-block cons-size))
+            (storew ptr ptr (- cons-cdr-slot cons-size)
+                    list-pointer-lowtag))
+          (storew (maybe-load (tn-ref-tn things)) ptr
+                  cons-car-slot list-pointer-lowtag)
+          (storew (if star
+                      (maybe-load (tn-ref-tn (tn-ref-across things)))
+                      null-tn)
+                  ptr cons-cdr-slot list-pointer-lowtag))
+        (move result res)))))
 
 ;;;; Special purpose inline allocators.
 
@@ -93,13 +79,10 @@
   (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
-      (cond ((zerop (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
-            (t
-             (inst slli bytes words (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
+      (with-fixnum-as-word-index (words bytes)
+        (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
       (inst andi bytes bytes (lognot lowtag-mask))
-      (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
+      (allocation nil bytes other-pointer-lowtag result :flag-tn pa-flag)
       (storew type result 0 other-pointer-lowtag)
       (storew length result vector-length-slot other-pointer-lowtag))))
 
@@ -116,15 +99,13 @@
   (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
-      (cond ((zerop (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
-            (t
-             (inst slli bytes words (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
+      (with-fixnum-as-word-index (words bytes)
+        (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
       (inst andi bytes bytes (lognot lowtag-mask))
 
       ;; FIXME: It would be good to check for stack overflow here.
-      (allocation result bytes other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
+      (allocation nil bytes other-pointer-lowtag result
+                  :flag-tn pa-flag :stack-allocate-p t)
 
       (storew type result 0 other-pointer-lowtag)
 
@@ -153,7 +134,7 @@
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
       (pseudo-atomic (pa-flag)
-        (allocation result alloc-size fun-pointer-lowtag
+        (allocation nil alloc-size fun-pointer-lowtag result
                     :flag-tn pa-flag
                     :stack-allocate-p stack-allocate-p)
         (inst li pa-flag (logior (ash (1- size) n-widetag-bits)
@@ -163,7 +144,7 @@
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
-  (:args (value :to :save :scs (descriptor-reg any-reg)))
+  (:args (value :to :save :scs (descriptor-reg any-reg zero)))
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:info stack-allocate-p)
@@ -199,19 +180,16 @@
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
-  (:info name words type lowtag)
-  (:ignore name)
+  (:info name words type lowtag stack-allocate-p)
+  (:ignore name stack-allocate-p)
   (:temporary (:scs (any-reg)) bytes)
-  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:temporary (:sc non-descriptor-reg :from (:argument 0) :to (:eval 0)) pa-flag)
   (:temporary (:sc non-descriptor-reg) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 6
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst addi bytes extra (* (1- words) n-word-bytes)))
-          (t
-           (inst slli bytes extra (- word-shift n-fixnum-tag-bits))
-           (inst addi bytes bytes (* (1- words) n-word-bytes))))
-    (inst slli header bytes (- n-widetag-bits word-shift))
+    (with-fixnum-as-word-index (extra bytes)
+      (inst addi bytes extra (* (1- words) n-word-bytes)))
+    (inst slli header bytes (- (length-field-shift type) word-shift))
     (inst addi header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity.
@@ -221,5 +199,5 @@
       (inst addi bytes bytes (* 2 n-word-bytes)))
     (inst andi bytes bytes (lognot lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag :flag-tn pa-flag)
+      (allocation nil bytes lowtag result :flag-tn pa-flag)
       (storew header result 0 lowtag))))

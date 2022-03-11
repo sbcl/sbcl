@@ -1,0 +1,15 @@
+(cd ../../src/runtime ; make -s libsbcl.a)
+
+lisp="../../run-sbcl.sh $SBCL_ARGS"
+m_arg=`$lisp --eval '(progn #+x86 (princ " -m32"))' --quit`
+libs=`$lisp --eval '(progn #+sb-core-compression (princ " -lz"))' --quit`
+
+# Insert CFLAGS in case they contain -fsanitize=memory, for example.
+# Specify that some symbols are undefined so that the complete
+# contents of 'wrap.o' and 'largefile.o' get pulled in.
+cc=${CC:-cc}
+CFLAGS=${CFLAGS:-}
+${cc} -o test-sbcl $CFLAGS ${m_arg} -g \
+  -Wl,-ufstat_wrapper -Wl,-uget_timezone -Wl,-ulseek_largefile -Wl,-uspawn \
+  -Wl,--export-dynamic -no-pie fake-mman.c ../../src/runtime/libsbcl.a \
+  -ldl -lpthread -lm ${libs}

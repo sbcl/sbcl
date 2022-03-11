@@ -56,7 +56,7 @@
              (n-actual (if (proper-list-p actual) (length actual) nil)))
        (format stream
                "~A elements in ~2I~_~:S ~
-                ~I~_to satisfy lambda list ~2I~_~:S: ~I~_"
+                ~I~_to satisfy lambda list ~2I~_~/sb-impl:print-lambda-list/: ~I~_"
                (cond ((and n-actual (< n-actual min)) "too few")
                      ((and n-actual max (> n-actual max)) "too many")
                      (t "invalid number of"))

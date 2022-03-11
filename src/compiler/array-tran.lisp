@@ -31,6 +31,10 @@
 ;;; known supertype of the upgraded-array-element-type, if if the exact
 ;;; U-A-E-T is not known. (If it is NIL, the primary return value is as good
 ;;; as it gets.)
+;;; FIXME: poorly named, it sounds like an accessor on an instance of ARRAY-TYPE,
+;;; but unfortunately UPGRADED-ARRAY-ELEMENT-TYPE is a CL: symbol
+;;; and %UPGRADED-ARRAY-ELEMENT-TYPE is already a thing as well.
+;;; Perhaps ARRAY-IMPLIED-ELEMENT-TYPE would be less misleading?
 (defun array-type-upgraded-element-type (type)
   (typecase type
     ;; Note that this IF mightn't be satisfied even if the runtime
@@ -109,7 +113,7 @@
      ;; 2002-08-21
      (values *wild-type* nil))))
 
-(defun array-type-declared-element-type (type)
+(defun declared-array-element-type (type)
   (if (array-type-p type)
       (array-type-element-type type)
       *wild-type*))
@@ -126,14 +130,6 @@
        (lexenv-policy (node-lexenv (lvar-dest new-value)))
        :aref)))
   (lvar-type new-value))
-
-;;; Return true if ARG is NIL, or is a constant-lvar whose
-;;; value is NIL, false otherwise.
-(defun unsupplied-or-nil (arg)
-  (declare (type (or lvar null) arg))
-  (or (not arg)
-      (and (constant-lvar-p arg)
-           (not (lvar-value arg)))))
 
 (defun supplied-and-true (arg)
   (and arg
@@ -252,12 +248,8 @@
                 (assert-new-value-type new-value array))))
   (define hairy-data-vector-set)
   (define hairy-data-vector-set/check-bounds)
-  (define data-vector-set))
-
-#+(or x86 x86-64)
-(defoptimizer (data-vector-set-with-offset derive-type) ((array index offset new-value))
-  (declare (ignore index offset))
-  (assert-new-value-type new-value array))
+  ;; DATA-VECTOR-SET is never used for value, so it doesn't need a type deriver.
+  )
 
 ;;; Figure out the type of the data vector if we know the argument
 ;;; element type.
@@ -312,7 +304,7 @@
                                        (lvar-value element-type))))
                            (cond
                              ((or (null ctype) (contains-unknown-type-p ctype)) '*)
-                             (t (sb-xc:upgraded-array-element-type
+                             (t (upgraded-array-element-type
                                  (lvar-value element-type))))))
                         (t
                          '*))
@@ -345,6 +337,17 @@
                           fill-pointer displaced-to
                           node))
 
+(defoptimizer (make-array-header* derive-type) ((&rest inits))
+  (let* ((data-position
+          #.(sb-vm:slot-offset
+             (sb-vm::primitive-object-slot (sb-vm::primitive-object 'array)
+                                           'sb-vm::data)))
+         (data (nth data-position inits))
+         (type (lvar-type data)))
+    (when (array-type-p type)
+      (make-array-type '* :element-type (array-type-element-type type)
+                          :specialized-element-type (array-type-specialized-element-type type)))))
+
 (defoptimizer (%make-array derive-type)
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
            &allow-other-keys)
@@ -367,14 +370,27 @@
 (define-source-transform vector (&rest elements)
   `(make-array ,(length elements) :initial-contents (list ,@elements)))
 
-;;; Just convert it into a MAKE-ARRAY.
-(deftransform make-string ((length &key
-                                   (element-type 'character)
-                                   (initial-element (code-char 0))))
-  `(the simple-string (make-array (the index length)
-                       :element-type element-type
-                       ,@(when initial-element
-                           '(:initial-element initial-element)))))
+;;; Convert it into a MAKE-ARRAY if the element-type is known at compile-time.
+;;; Otherwise, don't. This prevents allocating memory for a million element
+;;; array of things that are not characters, and then signaling an error.
+(deftransform make-string ((length &key element-type initial-element))
+  (let ((elt-ctype
+         (cond ((not element-type) (specifier-type 'character))
+               ((constant-lvar-p element-type)
+                (ir1-transform-specifier-type (lvar-value element-type))))))
+    (when (or (not elt-ctype)
+              (eq elt-ctype *empty-type*) ; silly, don't do it
+              (contains-unknown-type-p elt-ctype))
+      (give-up-ir1-transform))
+    (multiple-value-bind (subtypep certainp)
+        (csubtypep elt-ctype (specifier-type 'character))
+      (if (not certainp) (give-up-ir1-transform)) ; could be valid, don't know
+      (if (not subtypep)
+          (abort-ir1-transform "~S is not a valid :ELEMENT-TYPE for MAKE-STRING"
+                               (lvar-value element-type))))
+    `(the simple-string (make-array (the index length)
+                         ,@(when initial-element '(:initial-element initial-element))
+                         :element-type ',(type-specifier elt-ctype)))))
 
 ;; Traverse the :INTIAL-CONTENTS argument to an array constructor call,
 ;; changing the skeleton of the data to be constructed by calls to LIST
@@ -393,7 +409,7 @@
   ;; optimizing `#(#(foo bar) #(,x ,y)) we convert the whole expression
   ;; into (VECTOR 'FOO 'BAR X Y), whereas in the unidimensional case
   ;; it never makes sense to turn #(FOO BAR) into (VECTOR 'FOO 'BAR).
-  (when (or (and (= rank 1) (sb-xc:constantp initial-contents env))
+  (when (or (and (= rank 1) (constantp initial-contents env))
             ;; If you inhibit inlining these - game over.
             (fun-lexically-notinline-p 'vector env)
             (fun-lexically-notinline-p 'list env)
@@ -401,12 +417,12 @@
     (return-from rewrite-initial-contents (values nil nil)))
   (let ((dimensions (make-array rank :initial-element nil))
         (output))
-    (named-let recurse ((form (handler-case (sb-xc:macroexpand initial-contents env)
+    (named-let recurse ((form (handler-case (macroexpand initial-contents env)
                                 (error ()
                                   (return-from rewrite-initial-contents))))
                         (axis 0))
       (flet ((make-list-ctor (tail &optional (prefix nil prefixp) &aux val)
-               (when (and (sb-xc:constantp tail)
+               (when (and (constantp tail)
                           (or (proper-list-p (setq val (constant-form-value tail env)))
                               (and (vectorp val) (not prefixp))))
                  (setq form
@@ -446,16 +462,16 @@
      ;; If the unaltered INITIAL-CONTENTS were constant, then the flattened
      ;; form must be too. Turning it back to a self-evaluating object
      ;; is essential to avoid compile-time blow-up on huge vectors.
-     (if (sb-xc:constantp initial-contents env)
+     (if (constantp initial-contents env)
          (map 'vector (lambda (x) (constant-form-value x env)) output)
          (let ((f (if (singleton-p output) 'list 'vector)))
            `(locally (declare (notinline ,f))
              (,f ,@(mapcar (lambda (x)
                              (cond ((and (symbolp x)
                                          (not (nth-value
-                                               1 (sb-xc:macroexpand-1 x env))))
+                                               1 (macroexpand-1 x env))))
                                     x)
-                                   ((sb-xc:constantp x env)
+                                   ((constantp x env)
                                     `',(constant-form-value x env))
                                    (t
                                     `(locally (declare (inline ,f)) ,x))))
@@ -472,13 +488,13 @@
 ;;; in this path, mainly due to complications in picking the right widetag.
 (define-source-transform make-array (dims-form &rest rest &environment env
                                                &aux dims dims-constp)
-  (cond ((and (sb-xc:constantp dims-form env)
+  (cond ((and (constantp dims-form env)
               (proper-list-p (setq dims (constant-form-value dims-form env)))
               (not (singleton-p dims))
               (every (lambda (x) (typep x 'index)) dims))
          (setq dims-constp t))
         ((and (cond ((typep (setq dims (handler-case
-                                           (sb-xc:macroexpand dims-form env)
+                                           (macroexpand dims-form env)
                                          (error ()
                                            (return-from make-array (values nil t)))))
                             '(cons (eql list)))
@@ -487,7 +503,7 @@
                     ;; `(,X 2 1) -> (LIST* X '(2 1)) for example
                     ((typep dims '(cons (eql list*) cons))
                      (let ((last (car (last dims))))
-                       (when (sb-xc:constantp last env)
+                       (when (constantp last env)
                          (let ((lastval (constant-form-value last env)))
                            (when (listp lastval)
                              (setq dims (append (butlast (cdr dims)) lastval))
@@ -495,7 +511,7 @@
               (proper-list-p dims)
               (not (singleton-p dims)))
          ;; If you spell '(2 2) as (LIST 2 2), it is constant for purposes of MAKE-ARRAY.
-         (when (every (lambda (x) (sb-xc:constantp x env)) dims)
+         (when (every (lambda (x) (constantp x env)) dims)
            (let ((values (mapcar (lambda (x) (constant-form-value x env)) dims)))
              (when (every (lambda (x) (typep x 'index)) values)
                (setq dims values dims-constp t)))))
@@ -527,7 +543,7 @@
                     (case k
                       (:element-type
                        (unless (eq et unsupplied) (return nil))
-                       (setq et (car v) et-constp (sb-xc:constantp et env)))
+                       (setq et (car v) et-constp (constantp et env)))
                       (:initial-element
                        (when (or contents element) (return nil))
                        (setq element v))
@@ -577,6 +593,7 @@
                                 (t '*))
                          ,(if dims-constp dims (length dims)))
               (make-array-header*
+               sb-vm:simple-array-widetag
                ,@(sb-vm::make-array-header-inits
                   `(make-array ,size ,@keys) size dims)))))
       `(let* (,@axis-bindings ,@et-binding (,size (the index (* ,@dims))))
@@ -596,13 +613,13 @@
                  `(fill-array ,(car contents) ,alloc-form)))))))
 
 (define-source-transform coerce (x type &environment env)
-  (if (and (sb-xc:constantp type env)
+  (if (and (constantp type env)
            (proper-list-p x)
            (memq (car x) '(sb-impl::|List| list
                            sb-impl::|Vector| vector)))
       (let* ((type (constant-form-value type env))
              (length (1- (length x)))
-             (ctype (careful-values-specifier-type type)))
+             (ctype (careful-specifier-type type)))
         (if (and ctype
                  (neq ctype *empty-type*)
                  (csubtypep ctype (specifier-type '(array * (*)))))
@@ -624,34 +641,126 @@
       (proper-list-p sequence)
       (typep sequence 'sequence)))
 
+;;; Numeric sizes which are smaller than a word, or an even multiple of a byte,
+;;; do not need zero-fill because you can't produce a bogus object by reading
+;;; an element. But odd sizes such as (UNSIGNED-BYTE 7) should be zero-filled.
+;;; CHARACTER too because it's it's 21 bits taking up the space of 32 bits.
+;;; Technically the floating-point types should probably be zero-filled because
+;;; there may otherwise be trapping NaNs.
+(defun should-zerofill-p (saetp &aux (spec (sb-vm:saetp-specifier saetp))
+                                     (ctype (sb-vm:saetp-ctype saetp)))
+  (or (eq spec 't)
+      (and (numeric-type-p ctype)
+           (> (sb-vm:saetp-n-bits saetp) 1)
+           (consp spec)
+           (not (eql (second spec) (sb-vm:saetp-n-bits saetp))))
+      ;; Actually, nothing bad seems to happen by seeing char codes over CHAR-CODE-LIMIT
+      ;; (and (eq spec 'character) (= bits 32))
+      ))
+
+(declaim (inline calc-nwords-form))
+(defun calc-nwords-form (saetp const-length
+                         &aux (n-bits (sb-vm:saetp-n-bits saetp))
+                              (n-pad-elements (sb-vm:saetp-n-pad-elements saetp)))
+  (when const-length
+    (return-from calc-nwords-form
+      (if (typep const-length 'index)
+          (ceiling (* (+ const-length n-pad-elements) n-bits) sb-vm:n-word-bits))))
+  (let ((padded-length-form (if (zerop n-pad-elements)
+                                '%length
+                                `(+ %length ,n-pad-elements))))
+    (cond ((= n-bits 0) 0)
+          ((= n-bits sb-vm:n-word-bits) padded-length-form)
+          ((> n-bits sb-vm:n-word-bits) ; e.g. double-float on 32-bit
+           (let ((n-words-per-element
+                  (the fixnum (/ n-bits sb-vm:n-word-bits)))) ; i.e., not RATIO
+             #+64-bit `(* ,padded-length-form ,n-words-per-element)
+             #-64-bit `(the fixnum (* ,padded-length-form ,n-words-per-element))))
+          (t
+           ;; This would have to change if we ever implement Unicode strings
+           ;; using 3 bytes per char (as has been suggested by xof) which makes
+           ;; the number of elements per word a fraction.
+           (let ((n-elements-per-word
+                  (the fixnum (/ sb-vm:n-word-bits n-bits))))  ; i.e., not RATIO
+             ;; Use the standard algorithm for integer division rounding up,
+             ;; but with right-shift as the divide operator, i.e.
+             ;; (NTH-VALUE 0 (CEILING length n-elements-per-word)) without going
+             ;; through the ceiling transform, because that needs a few extra
+             ;; machinations to eliminate the un-needed second return value.
+             `(ash (+ (truly-the index ,padded-length-form) ,(1- n-elements-per-word))
+                   ,(- (1- (integer-length n-elements-per-word)))))))))
+
+;;; TODO: "initial-element #\space" for strings would be nice to handle.
+(declaim (inline splat-value-p))
+(defun splat-value-p (elt-ctype initial-element default-initial-element)
+  (declare (ignorable elt-ctype))
+  ;; If the initial-element is specified and equivalent to 0-fill
+  ;; then use SPLAT.
+  (if (constant-lvar-p initial-element)
+      (cond ((eql (lvar-value initial-element) default-initial-element)
+             0)
+            ;; If SPLAT is not always a no-op - which it is for everything
+            ;; but x86-64 - then also use it to store NIL or unbound-marker,
+            ;; which is better than QUICKFILL on small arrays. Arguably it is
+            ;; a defect of the FILL transforms that they can't do as well.
+            #+x86-64
+            ((eq (lvar-value initial-element) nil)
+             sb-vm:nil-value))
+      ;; This case should not be architecture-dependent, and it isn't,
+      ;; except that the other architectures lack the ability
+      ;; to convert SPLAT via a vop.
+      ;; I feel that it would be a lot easier if unbound-marker manifested
+      ;; itself as a compile-time literal, but there's no lisp type for it
+      ;; and I guess we don't like that.
+      ;; So why not just return T from ctype-of for that object?
+      #+x86-64
+      (when (eq elt-ctype *universal-type*)
+        (let ((node (lvar-uses initial-element)))
+          (when (and (combination-p node)
+                     (lvar-fun-is (combination-fun node) '(%%primitive))
+                     (let* ((args (combination-args node))
+                            (arg (car args))
+                            (leaf (when (ref-p (lvar-uses arg))
+                                    (ref-leaf (lvar-uses arg)))))
+                       (and (constant-p leaf) ; (I think it has to be)
+                            (eq (constant-value leaf) 'make-unbound-marker))))
+            ;; don't need to look at the other codegen arg which is
+            ;; surely NIL.
+            :unbound)))))
+
 ;;; This baby is a bit of a monster, but it takes care of any MAKE-ARRAY
 ;;; call which creates a vector with a known element type -- and tries
 ;;; to do a good job with all the different ways it can happen.
 (defun transform-make-array-vector (length element-type initial-element
                                     initial-contents call
-                                    &key adjustable fill-pointer)
-  (let* ((c-length (if (lvar-p length)
-                       (if (constant-lvar-p length) (lvar-value length))
-                       length))
-         (complex (cond ((and (or
-                               (not fill-pointer)
-                               (and (constant-lvar-p fill-pointer)
-                                    (null (lvar-value fill-pointer))))
-                              (or
-                               (not adjustable)
-                               (and
-                                (constant-lvar-p adjustable)
-                                (null (lvar-value adjustable)))))
-                         nil)
-                        ((and (constant-lvar-p adjustable)
-                              (lvar-value adjustable)))
-                        ((and fill-pointer
-                              (constant-lvar-p fill-pointer)
-                              (lvar-value fill-pointer)))
-                        (t
-                         ;; Deciding between complex and simple at
-                         ;; run-time would be too much hassle
-                         (give-up-ir1-transform))))
+                                    &key adjustable fill-pointer
+                                    &aux c-length)
+  (when (and initial-contents initial-element)
+    (abort-ir1-transform "Both ~S and ~S specified."
+                         :initial-contents :initial-element))
+  (setq c-length (if (lvar-p length) ; some callers pass an integer per se
+                     (if (constant-lvar-p length) (lvar-value length))
+                     length))
+  (when (and (integerp c-length) ; 'bad-code.pure' tries to pass ((("foo"))) e.g.
+             fill-pointer
+             (csubtypep (lvar-type fill-pointer) (specifier-type 'index))
+             (not (types-equal-or-intersect (lvar-type fill-pointer)
+                                            (specifier-type `(integer 0 ,c-length)))))
+    (abort-ir1-transform "Invalid fill-pointer ~s for a vector of length ~s."
+                         (type-specifier (lvar-type fill-pointer))
+                         c-length))
+  (let* ((expressly-adjustable (cond ((not adjustable) nil)
+                                     ((not (constant-lvar-p adjustable)) :maybe)
+                                     (t (and (lvar-value adjustable) t))))
+         (has-fill-pointer (cond ((not fill-pointer) nil)
+                                 ((numeric-type-p (lvar-type fill-pointer)) t)
+                                 ((constant-lvar-p fill-pointer)
+                                  (not (null (lvar-value fill-pointer))))
+                                 (t :maybe)))
+         (array-header-p (cond ((or (eq expressly-adjustable t) (eq has-fill-pointer t)) t)
+                               ((or (eq expressly-adjustable :maybe) (eq has-fill-pointer :maybe))
+                                ;; Picking between simple and nonsimple at runtime is hard
+                                (give-up-ir1-transform))))
          (elt-spec (if element-type
                        (lvar-value element-type) ; enforces const-ness.
                        t))
@@ -663,47 +772,14 @@
                        (give-up-ir1-transform))
                       (t
                        (find-saetp-by-ctype elt-ctype))))
+         (n-words-form (or (calc-nwords-form saetp c-length) (give-up-ir1-transform)))
          (default-initial-element (sb-vm:saetp-initial-element-default saetp))
-         (n-bits (sb-vm:saetp-n-bits saetp))
-         (typecode (sb-vm:saetp-typecode saetp))
-         (n-pad-elements (sb-vm:saetp-n-pad-elements saetp))
-         (n-words-form
-           (cond ((not c-length)
-                  (let ((padded-length-form (if (zerop n-pad-elements)
-                                                'length
-                                                `(+ length ,n-pad-elements))))
-                    (cond
-                      ((= n-bits 0) 0)
-                      ((>= n-bits sb-vm:n-word-bits)
-                       `(* ,padded-length-form
-                           ;; i.e., not RATIO
-                           ,(the fixnum (/ n-bits sb-vm:n-word-bits))))
-                      (t
-                       (let ((n-elements-per-word (/ sb-vm:n-word-bits n-bits)))
-                         (declare (type index n-elements-per-word)) ; i.e., not RATIO
-                         `(ceiling (truly-the index ,padded-length-form)
-                                   ,n-elements-per-word))))))
-                 ((and (fixnump c-length)
-                       (>= c-length 0))
-                  (ceiling (* (+ c-length n-pad-elements) n-bits)
-                           sb-vm:n-word-bits))
-                 (t
-                  (give-up-ir1-transform))))
-         (data-result-spec
-           `(simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*))))
-         (result-spec
-           (if complex
-               `(and (array ,(sb-vm:saetp-specifier saetp) (*))
-                     (not simple-array))
-               `(simple-array
-                 ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))))
          (data-alloc-form
-           `(truly-the ,data-result-spec
-                       (allocate-vector ,typecode
-                                        ;; If LENGTH is a singleton list,
-                                        ;; we want to avoid reading it.
-                                        (the index ,(or c-length 'length))
-                                        ,n-words-form))))
+          `(truly-the
+            (simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))
+            (allocate-vector #+ubsan ,(not (or initial-contents initial-element))
+                             ,(sb-vm:saetp-typecode saetp) %length nwords))))
+
     (flet ((eliminate-keywords ()
              (eliminate-keyword-args
               call 1
@@ -712,90 +788,131 @@
                 (:initial-element initial-element)
                 (:adjustable adjustable)
                 (:fill-pointer fill-pointer))))
-           (with-alloc-form (&optional data-wrapper)
-             (when (and c-length
-                        fill-pointer
-                        (csubtypep (lvar-type fill-pointer) (specifier-type 'index))
-                        (not (types-equal-or-intersect (lvar-type fill-pointer)
-                                                       (specifier-type `(integer 0 ,c-length)))))
-               (compiler-warn "Invalid fill-pointer ~s for a vector of length ~s."
-                              (type-specifier (lvar-type fill-pointer))
-                              c-length)
-               (give-up-ir1-transform))
-             (cond (complex
-                    (let* ((constant-fill-pointer-p (constant-lvar-p fill-pointer))
-                           (fill-pointer-value (and constant-fill-pointer-p
-                                                    (lvar-value fill-pointer))))
-                      `(let ((%length (the index ,(or c-length 'length))))
-                         (truly-the
-                          ,result-spec
-                          (make-array-header* ,(or (sb-vm:saetp-complex-typecode saetp)
-                                                   sb-vm:complex-vector-widetag)
-                                              ;; fill-pointer
-                                              ,(cond ((eq fill-pointer-value t)
-                                                      '%length)
-                                                     (fill-pointer-value)
-                                                     ((and fill-pointer
-                                                           (not constant-fill-pointer-p))
-                                                      `(cond ((or (eq fill-pointer t)
-                                                                  (null fill-pointer))
-                                                              %length)
-                                                             ((> fill-pointer %length)
-                                                              (error "Invalid fill-pointer ~a" fill-pointer))
-                                                             (t
-                                                              fill-pointer)))
-                                                     (t
-                                                      '%length))
-                                              ;; fill-pointer-p
-                                              ,(and fill-pointer
-                                                    `(and fill-pointer t))
-                                              ;; elements
-                                              %length
-                                              ;; data
-                                              (let ((data ,data-alloc-form))
-                                                ,(or data-wrapper 'data))
-                                              ;; displacement
-                                              0
-                                              ;; displaced-p
-                                              nil
-                                              ;; displaced-from
-                                              nil
-                                              ;; dimensions
-                                              %length)))))
-                   (data-wrapper
-                    (subst data-alloc-form 'data data-wrapper))
-                   (t
-                    data-alloc-form))))
-      (cond ((and initial-element initial-contents)
-             (abort-ir1-transform "Both ~S and ~S specified."
-                                  :initial-contents :initial-element))
-            ;; Case (1)
-            ;; :INITIAL-CONTENTS (LIST ...), (VECTOR ...) and `(1 1 ,x) with a
-            ;; constant LENGTH.
-            ((and initial-contents c-length
-                  (lvar-matches initial-contents
-                                ;; FIXME: probably don't need all 4 of these now?
-                                :fun-names '(list vector
-                                             sb-impl::|List| sb-impl::|Vector|)
-                                :arg-count c-length))
-             (let ((parameters (eliminate-keywords))
-                   (elt-vars (make-gensym-list c-length))
-                   (lambda-list '(length)))
-               (splice-fun-args initial-contents :any c-length)
-               (dolist (p parameters)
-                 (setf lambda-list
-                       (append lambda-list
-                               (if (eq p 'initial-contents)
-                                   elt-vars
-                                   (list p)))))
+           (wrap (underlying)
+             `(let* ((%length ,(or c-length '(the index length)))
+                     (nwords ,n-words-form))
+                (declare (flushable sb-vm::splat))
+                ,(if (not array-header-p)
+                     underlying     ; was already cast using TRULY-THE
+                     (let* ((constant-fill-pointer-p (and fill-pointer
+                                                          (constant-lvar-p fill-pointer)))
+                            (fill-pointer-value (and constant-fill-pointer-p
+                                                     (lvar-value fill-pointer)))
+                            (length-expr
+                              (cond ((eq fill-pointer-value t) '%length)
+                                    (fill-pointer-value)
+                                    ((and fill-pointer (not constant-fill-pointer-p))
+                                     `(cond ((or (eq fill-pointer t) (null fill-pointer))
+                                             %length)
+                                            ((> fill-pointer %length)
+                                             (error "Invalid fill-pointer ~a" fill-pointer))
+                                            (t fill-pointer)))
+                                    (t '%length)))
+                            ;; MAKE-ARRAY-HEADER* demands a constant, not an expression
+                            ;; for the the header word.
+                            (header-bits
+                              (logior (if (eq has-fill-pointer t) ; (i.e. can't handle :maybe)
+                                          (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-position)
+                                          0)
+                                      (or (sb-vm:saetp-complex-typecode saetp)
+                                          sb-vm:complex-vector-widetag)))
+                            (array-header
+                              `(truly-the
+                                ;; A constant length must not be part of the result type.
+                                (and (array ,(sb-vm:saetp-specifier saetp) (*))
+                                     (not simple-array))
+                                (make-array-header* ,header-bits
+                                                    ,length-expr ; fill-pointer
+                                                    %length ; total number of elements
+                                                    ,underlying
+                                                    0 ; displacement
+                                                    nil ; displaced-p
+                                                    nil ; displaced-from
+                                                    %length)))) ; dimensions
+                       (if (eq has-fill-pointer :maybe)
+                           `(let ((%array ,array-header))
+                              (when fill-pointer
+                                (logior-array-flags %array sb-vm:+array-fill-pointer-p+))
+                              %array)
+                           array-header))))))
+      (cond ;; Case (1) - :INITIAL-ELEMENT
+            (initial-element
+             ;; If the specified initial element is equivalent to zero-filling,
+             ;; then use SPLAT, which is elidable for heap allocations.
+             ;; Also pick off (at least 2) other common cases for SPLAT: NIL and
+             ;; unbound-marker. The latter helps PCL ctors not to call FILL.
+             (let ((splat (splat-value-p elt-ctype initial-element
+                                         default-initial-element))
+                   (init (if (constant-lvar-p initial-element)
+                             (list 'quote (lvar-value initial-element))
+                             'initial-element))
+                   (lambda-list `(length ,@(eliminate-keywords))))
                `(lambda ,lambda-list
-                  (declare (type ,elt-spec ,@elt-vars)
-                           (ignorable ,@lambda-list))
-                  ,(with-alloc-form
-                       `(initialize-vector data ,@elt-vars)))))
-            ;; Case (2)
-            ;; constant :INITIAL-CONTENTS and LENGTH
-            ((and initial-contents c-length
+                  (declare (ignorable ,@lambda-list))
+                  ,(wrap (cond ((not splat)
+                                `(quickfill ,data-alloc-form
+                                            ,(if (eq elt-spec t) init
+                                                 `(the ,elt-spec ,init))))
+                               ((or (eq splat :unbound)
+                                    (and (constant-lvar-p initial-element)
+                                         (testable-type-p elt-ctype)
+                                         (ctypep (lvar-value initial-element) elt-ctype)))
+                                ;; all good
+                                `(sb-vm::splat ,data-alloc-form nwords ,splat))
+                               (t
+                                ;; uncertain if initial-element is type-correct
+                                `(progn (the ,elt-spec ,init) ; check en passant
+                                        (sb-vm::splat ,data-alloc-form nwords
+                                                      ,splat))))))))
+
+            ;; Case (2) - neither element nor contents specified.
+            ((not initial-contents)
+             ;; The implicit default is to zero-fill, but DX arrays could be initialized
+             ;; with the unbound-marker. Either way it's worth a style-warning
+             ;; if it looks wrong for the specified element type.
+             ;; This situation arises e.g. in (MAKE-ARRAY 4 :ELEMENT-TYPE '(INTEGER 1 5))
+             ;; ANSI's definition of MAKE-ARRAY says "If INITIAL-ELEMENT is not supplied,
+             ;; the consequences of later reading an uninitialized element of new-array
+             ;; are undefined," so this could be legal code as long as the user plans to
+             ;; write before he reads, and if he doesn't we're free to do anything we like.
+             ;; But in case the user doesn't know to write elements before he reads elements
+             ;; (or to read manuals before he writes code:-), we'll signal a STYLE-WARNING
+             ;; in case he didn't realize this.
+             #-sb-xc-host
+             (when (and ;; Warn only if any array elements are initialized using the default.
+                        (not (eql c-length 0))
+                        ;; If it's coming from the source transform,
+                        ;; then fill-array means it was supplied initial-contents
+                        (not (lvar-matches-calls (combination-lvar call)
+                                                 '(make-array-header* fill-array)))
+                        (testable-type-p elt-ctype)
+                        ;; I really don't want to style-warn about
+                        ;; (MAKE-ARRAY 1 :ELEMENT-TYPE 'STANDARD-CHAR) even though technically
+                        ;; the default fill of #\nul is wrong because it must match the specified
+                        ;; element type, not the upgraded array type, and #\nul isn't standard.
+                        (not (ctypep default-initial-element
+                                     (if (and (eq elt-spec 'standard-char) (not initial-element))
+                                         (sb-vm:saetp-ctype saetp)
+                                         elt-ctype))))
+               (compiler-style-warn 'initial-element-mismatch-style-warning
+                                    :format-control "The default initial element ~S is not a ~S."
+                                    :format-arguments (list default-initial-element elt-spec)))
+             (let ((lambda-list `(length ,@(eliminate-keywords))))
+               `(lambda ,lambda-list
+                  (declare (ignorable ,@lambda-list))
+                  ,(wrap (cond ((eql (sb-vm:saetp-typecode saetp) sb-vm:simple-vector-widetag)
+                                `(sb-vm::splat ,data-alloc-form nwords
+                                               ;; uninitialized reads are trapped regardless of safety
+                                               ;; if #+ubsan
+                                               #+ubsan :trap
+                                               #-ubsan 0))
+                               (t
+                                ;; otherwise, reading an element can't cause an invalid bit pattern
+                                ;; to be observed, but the bits could be random.
+                                data-alloc-form))))))
+
+            ;; Case (3) - constant :INITIAL-CONTENTS and LENGTH
+            ((and c-length
                   (constant-lvar-p initial-contents)
                   ;; As a practical matter, the initial-contents should not be
                   ;; too long, otherwise the compiler seems to spend forever
@@ -813,93 +930,77 @@
                (let ((lambda-list `(length ,@(eliminate-keywords))))
                  `(lambda ,lambda-list
                     (declare (ignorable ,@lambda-list))
-                    ,(with-alloc-form
-                         `(initialize-vector data
-                                             ,@(map 'list (lambda (elt)
-                                                            `(the ,elt-spec ',elt))
-                                                    contents)))))))
-            ;; Case (3)
-            ;; any other :INITIAL-CONTENTS
-            (initial-contents
-             (let ((lambda-list `(length ,@(eliminate-keywords))))
-               `(lambda ,lambda-list
-                  (declare (ignorable ,@lambda-list))
-                  (unless (= (length initial-contents) ,(or c-length 'length))
-                    (error "~S has ~D elements, vector length is ~D."
-                           :initial-contents (length initial-contents)
-                           ,(or c-length 'length)))
-                  ,(with-alloc-form
-                       `(replace data initial-contents)))))
+                    ,(wrap `(initialize-vector
+                             ,data-alloc-form
+                             ,@(map 'list
+                                     (if (eq elt-spec t) ; THE would be pure noise
+                                         (lambda (elt) `',elt)
+                                         (lambda (elt) `(the ,elt-spec ',elt)))
+                                     contents)))))))
+
             ;; Case (4)
-            ;; :INITIAL-ELEMENT, not EQL to the default
-            ((and initial-element
-                  (or (not (constant-lvar-p initial-element))
-                      (not (eql default-initial-element (lvar-value initial-element)))))
-             (let ((lambda-list `(length ,@(eliminate-keywords)))
-                   (init (if (constant-lvar-p initial-element)
-                             (list 'quote (lvar-value initial-element))
-                             'initial-element)))
+            ;; :INITIAL-CONTENTS (LIST ...), (VECTOR ...) and `(1 1 ,x) with constant LENGTH.
+            ((and c-length
+                  (lvar-matches initial-contents
+                                ;; FIXME: probably don't need all 4 of these now?
+                                :fun-names '(list vector
+                                             sb-impl::|List| sb-impl::|Vector|)
+                                :arg-count c-length))
+             (let ((parameters (eliminate-keywords))
+                   (elt-vars (make-gensym-list c-length))
+                   (lambda-list '(length)))
+               (splice-fun-args initial-contents :any c-length)
+               (dolist (p parameters)
+                 (setf lambda-list
+                       (append lambda-list
+                               (if (eq p 'initial-contents)
+                                   elt-vars
+                                   (list p)))))
                `(lambda ,lambda-list
-                  (declare (ignorable ,@lambda-list))
-                  ,(with-alloc-form
-                       `(fill data (the ,elt-spec ,init))))))
-            ;; Case (5)
-            ;; just :ELEMENT-TYPE, or maybe with :INITIAL-ELEMENT EQL to the
-            ;; default
+                  (declare ,@(unless (eq elt-spec t) `((type ,elt-spec ,@elt-vars)))
+                           (ignorable ,@lambda-list))
+                  ,(wrap `(initialize-vector ,data-alloc-form ,@elt-vars)))))
+
+            ;; Case (5) - :INITIAL-CONTENTS and indeterminate length
             (t
-             #-sb-xc-host
-             (and (and (testable-type-p elt-ctype)
-                       (neq elt-ctype *empty-type*)
-                       (not (ctypep default-initial-element elt-ctype)))
-                  ;; This situation arises e.g. in (MAKE-ARRAY 4 :ELEMENT-TYPE
-                  ;; '(INTEGER 1 5)) ANSI's definition of MAKE-ARRAY says "If
-                  ;; INITIAL-ELEMENT is not supplied, the consequences of later
-                  ;; reading an uninitialized element of new-array are undefined,"
-                  ;; so this could be legal code as long as the user plans to
-                  ;; write before he reads, and if he doesn't we're free to do
-                  ;; anything we like. But in case the user doesn't know to write
-                  ;; elements before he reads elements (or to read manuals before
-                  ;; he writes code:-), we'll signal a STYLE-WARNING in case he
-                  ;; didn't realize this.
-                  (cond
-                    (initial-element
-                     (compiler-warn "~S ~S is not a ~S"
-                                    :initial-element default-initial-element
-                                    elt-spec))
-                    ;; For the default initial element, only warn if
-                    ;; any array elements are initialized using it.
-                    ((and (not (eql c-length 0))
-                          ;; If it's coming from the source transform,
-                          ;; then fill-array means it was supplied initial-contents
-                          (not (lvar-matches-calls (combination-lvar call)
-                                                   '(make-array-header* fill-array))))
-                     (compiler-style-warn "The default initial element ~S is not a ~S."
-                                          default-initial-element
-                                          elt-spec))))
              (let ((lambda-list `(length ,@(eliminate-keywords))))
                `(lambda ,lambda-list
                   (declare (ignorable ,@lambda-list))
-                  ,(with-alloc-form))))))))
+                  (let ((content-length (length initial-contents)))
+                   (unless (= content-length ,(or c-length 'length))
+                     (sb-vm::initial-contents-error content-length  ,(or c-length 'length))))
+                  ,(wrap `(replace ,data-alloc-form initial-contents)))))))))
 
 ;;; IMPORTANT: The order of these three MAKE-ARRAY forms matters: the least
 ;;; specific must come first, otherwise suboptimal transforms will result for
 ;;; some forms.
 
+;;; 3rd choice
 (deftransform make-array ((dims &key initial-element initial-contents
                                      element-type
                                      adjustable fill-pointer
                                      displaced-to
                                      displaced-index-offset)
-                          (t &rest *) *
+                          (t &rest t) *
                           :node node)
   (delay-ir1-transform node :constraint)
   (when (and initial-contents initial-element)
-    (compiler-warn "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS")
-    (give-up-ir1-transform))
+    (abort-ir1-transform "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
   (when (and displaced-index-offset
              (not displaced-to))
-    (compiler-warn "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO")
-    (give-up-ir1-transform))
+    (abort-ir1-transform "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
+  (when (and displaced-to
+             (or initial-element initial-contents))
+    (if (types-equal-or-intersect (lvar-type displaced-to)
+                                  (specifier-type 'null))
+        (give-up-ir1-transform ":DISPLACED-TO potentially used with ~S"
+                               (if initial-element
+                                   :initial-element
+                                   :initial-contents))
+        (abort-ir1-transform "Can't specify :DISPLACED-TO and ~S"
+                             (if initial-element
+                                 :initial-element
+                                 :initial-contents))))
   (let ((fp-type (and fill-pointer
                       (lvar-type fill-pointer)) ))
     (when (and fp-type
@@ -947,10 +1048,14 @@
                             ,@(maybe-arg fill-pointer)
                             ,@(maybe-arg displaced-to)
                             ,@(maybe-arg displaced-index-offset))))
-      (cond ((or (not initial-element)
-                 (and (constant-lvar-p initial-element)
-                      (eql (lvar-value initial-element)
-                           (sb-vm:saetp-initial-element-default saetp))))
+      (cond ((not initial-element) creation-form)
+            ;; with ubsan the call to %MAKE-ARRAY needs to see the :INITIAL-ELEMENT
+            ;; even if it looks like the default, otherwise %MAKE-ARRAY reserves the right
+            ;; to scribble on the array. Same for allocators that don't prezero
+            #-ubsan
+            ((and (constant-lvar-p initial-element)
+                  (eql (lvar-value initial-element)
+                       (sb-vm:saetp-initial-element-default saetp)))
              creation-form)
             (t
              ;; error checking for target, disabled on the host because
@@ -971,11 +1076,14 @@
                            (type-specifier (sb-vm:saetp-ctype saetp))
                            'upgraded-array-element-type
                            eltype)))
-                   ((not (ctypep value eltype-type))
-                    ;; this case will not cause an error at runtime, but
+                   ((multiple-value-bind (typep surep)
+                        (ctypep value eltype-type)
+                      (and (not typep) surep))
+                    ;; This case will not cause an error at runtime, but
                     ;; it's still worth STYLE-WARNing about.
-                    (compiler-style-warn "~S is not a ~S."
-                                         value eltype)))))
+                    (compiler-style-warn 'initial-element-mismatch-style-warning
+                                         :format-control "~S is not a ~S."
+                                         :format-arguments (list value eltype))))))
              `(let ((array ,creation-form))
                 (multiple-value-bind (vector)
                     (%data-vector-and-index array 0)
@@ -985,6 +1093,7 @@
 ;;; The list type restriction does not ensure that the result will be a
 ;;; multi-dimensional array. But the lack of adjustable, fill-pointer,
 ;;; and displaced-to keywords ensures that it will be simple.
+;;; 2nd choice
 (deftransform make-array ((dims &key
                                 element-type initial-element initial-contents
                                 adjustable fill-pointer)
@@ -997,50 +1106,48 @@
                           *
                           :node call)
   (block make-array
-    ;; If lvar-use of DIMS is a call to LIST, then it must mean that LIST
-    ;; was declared notinline - because if it weren't, then it would have been
-    ;; source-transformed into CONS - which gives us reason NOT to optimize
-    ;; this call to MAKE-ARRAY. So look for CONS instead of LIST,
-    ;; which means that LIST was *not* declared notinline.
-    (when (and (lvar-matches dims :fun-names '(cons) :arg-count 2)
-               (let ((cdr (second (combination-args (lvar-uses dims)))))
-                 (and (constant-lvar-p cdr) (null (lvar-value cdr)))))
-      (let* ((args (splice-fun-args dims :any 2)) ; the args to CONS
-             (dummy (cadr args)))
-        (flush-dest dummy)
+    ;; Recognize vector construction where the length is spelled as (LIST n)
+    ;; or (LIST* n nil). Don't care if FUN-LEXICALLY-NOTINLINE-P on those because
+    ;; you can't portably observe whether they're called (tracing them isn't allowed).
+    ;; XXX: minor OAOO problem, see similar logic in (VALUES-LIST OPTIMIZER).
+    (awhen (cond ((and (lvar-matches dims :fun-names '(list) :arg-count 1))
+                  (car (splice-fun-args dims :any 1)))
+                 ((and (lvar-matches dims :fun-names '(list*) :arg-count 2)
+                       (lvar-value-is-nil (second (combination-args (lvar-uses dims)))))
+                  (let* ((args (splice-fun-args dims :any 2)) ; the args to LIST*
+                         (dummy (cadr args)))
+                    (flush-dest dummy)
+                    (setf (combination-args call) (delete dummy (combination-args call)))
+                    (car args))))
         ;; Don't want (list (list x)) to become a valid dimension specifier.
-        (assert-lvar-type (car args) (specifier-type 'index)
-                          (%coerce-to-policy call))
-        (setf (combination-args call) (delete dummy (combination-args call)))
+        (assert-lvar-type it (specifier-type 'index) (%coerce-to-policy call))
         (return-from make-array
-          (transform-make-array-vector (car args)
+          (transform-make-array-vector it
                                        element-type
                                        initial-element
                                        initial-contents
                                        call
                                        :adjustable adjustable
-                                       :fill-pointer fill-pointer))))
+                                       :fill-pointer fill-pointer)))
     (unless (constant-lvar-p dims)
       (give-up-ir1-transform
        "The dimension list is not constant; cannot open code array creation."))
     (let ((dims (lvar-value dims))
-          (element-type-ctype (and (constant-lvar-p element-type)
+          (element-type-ctype (and element-type
+                                   (constant-lvar-p element-type)
                                    (ir1-transform-specifier-type
                                     (lvar-value element-type)))))
       (when (or (contains-unknown-type-p element-type-ctype)
                 (not (proper-list-p dims)))
         (give-up-ir1-transform))
       (unless (check-array-dimensions dims call)
-          (give-up-ir1-transform))
+        (give-up-ir1-transform))
       (cond ((singleton-p dims)
              (transform-make-array-vector (car dims) element-type
                                           initial-element initial-contents call
                                           :adjustable adjustable
                                           :fill-pointer fill-pointer))
-            ((and fill-pointer
-                  (not (and
-                        (constant-lvar-p fill-pointer)
-                        (null (lvar-value fill-pointer)))))
+            ((and fill-pointer (not (lvar-value-is-nil fill-pointer)))
              (give-up-ir1-transform))
             (t
              (let* ((total-size (reduce #'* dims))
@@ -1054,7 +1161,7 @@
                                  'simple-array)
                             ,(cond ((null element-type) t)
                                    (element-type-ctype
-                                    (sb-xc:upgraded-array-element-type
+                                    (upgraded-array-element-type
                                      (lvar-value element-type)))
                                    (t '*))
                             ,(make-list rank :initial-element '*))))
@@ -1064,8 +1171,6 @@
                                                     sb-vm:simple-array-widetag)
                                                ;; fill-pointer
                                                ,total-size
-                                               ;; fill-pointer-p
-                                               nil
                                                ;; elements
                                                ,total-size
                                                ;; data
@@ -1087,6 +1192,7 @@
                                                ;; dimensions
                                                ,@dims))))))))
 
+;;; 1st choice
 (deftransform make-array ((dims &key element-type initial-element initial-contents
                                      adjustable fill-pointer)
                           (integer &key
@@ -1134,10 +1240,53 @@
                             :displaced-to displaced-to
                             ,@(and displaced-index-offset
                                    '(:displaced-index-offset displacement)))))))
+
+(defoptimizer (adjust-array derive-type) ((array dims &key
+                                                 fill-pointer
+                                                 displaced-to
+                                                 displaced-index-offset
+                                                 &allow-other-keys)
+                                          node)
+  (let* ((array-type (lvar-type array))
+         (complex (conservative-array-type-complexp array-type))
+         (simple (null complex))
+         (complex (eq complex t))
+         (dims (if (constant-lvar-p dims)
+                   (let ((value (lvar-value dims)))
+                     (if (check-array-dimensions value node)
+                         value
+                         (return-from adjust-array-derive-type-optimizer)))
+                   '*)))
+    (unless complex
+      (let ((null (specifier-type 'null)))
+        (flet ((simple (lvar)
+                 (when lvar
+                   (cond ((not (type= (lvar-type lvar) null))
+                          (setf simple nil))
+                         ((not (types-equal-or-intersect (lvar-type lvar) null))
+                          (setf simple nil
+                                complex t))))))
+          (simple fill-pointer)
+          (simple displaced-to)
+          (simple displaced-index-offset))))
+    (let ((int (type-intersection (strip-array-dimensions-and-complexity array-type)
+                                  (make-array-type (if (integerp dims)
+                                                       (list dims)
+                                                       dims)
+                                                   :complexp (cond ((eq complex t))
+                                                                   ((not simple) :maybe))
+                                                   :element-type *wild-type*))))
+      (if (eq int *empty-type*)
+          (let ((*compiler-error-context* node))
+            (setf (combination-kind node) :error)
+            (compiler-warn "New dimensions ~s do not match the rank of ~a"
+                           dims
+                           (type-specifier array-type)))
+          int))))
 
 ;;;; miscellaneous properties of arrays
 
-;;; Transforms for various array properties. If the property is know
+;;; Transforms for various array properties. If the property is known
 ;;; at compile time because of a type spec, use that constant value.
 
 ;;; Most of this logic may end up belonging in code/late-type.lisp;
@@ -1212,14 +1361,22 @@
 ;; reduction.
 (deftransform array-rank ((array) (array) * :node node)
   (let ((array-type (lvar-type array)))
-    (cond ((eq t (and (array-type-p array-type)
-                      (array-type-complexp array-type)))
+    (cond ((and (array-type-p array-type)
+                (listp (array-type-dimensions array-type)))
+           (length (array-type-dimensions array-type)))
+          ;; We need an extra case in here to best handle a known vector, because
+          ;; if we try to add a transform on ARRAY-HEADER-P (returning false for
+          ;; known simple-array of rank 1), that would fail to optimize where we know
+          ;; the thing is a vector but possibly non-simple. So then the IF below
+          ;; would still have both if its consequents considered plausible.
+          ((csubtypep array-type (specifier-type 'vector))
+           1)
+          ((and (array-type-p array-type)
+                (eq (array-type-complexp array-type) t))
            '(%array-rank array))
           (t
-           (delay-ir1-transform node :constraint)
-           `(if (array-header-p array)
-                (%array-rank array)
-                1)))))
+           (delay-ir1-transform node :constraint) ; Why?
+           `(%array-rank array)))))
 
 (defun derive-array-rank (ctype)
   (let ((array (specifier-type 'array)))
@@ -1236,15 +1393,30 @@
              ;; Might as well catch some easy negation cases.
              (typecase x
                (array-type
-                (let ((dims (array-type-dimensions x)))
+                (let ((dims (array-type-dimensions x))
+                      (et (array-type-element-type x)))
+                  ;; Need to check if the whole type has the same specialization and simplicity,
+                  ;; otherwise it's not clear which part of the type is negated.
                   (cond ((eql dims '*)
                          '*)
-                        ((every (lambda (dim)
-                                  (eql dim '*))
-                                dims)
-                         (list (length dims)))
+                        ((not (every (lambda (dim)
+                                       (eql dim '*))
+                                     dims))
+                         nil)
+                        ((not
+                          (case (array-type-complexp x)
+                            ((t)
+                             (csubtypep ctype (specifier-type '(not simple-array))))
+                            ((nil)
+                             (csubtypep ctype (specifier-type 'simple-array)))
+                            (t t)))
+                         nil)
+                        ((not (or (eq et *wild-type*)
+                                  (csubtypep ctype
+                                             (specifier-type `(array ,(type-specifier et))))))
+                         nil)
                         (t
-                         '()))))
+                         (list (length dims))))))
                (t '()))))
       (declare (dynamic-extent #'over #'under))
       (multiple-value-bind (not-p ranks)
@@ -1321,12 +1493,11 @@
 ;;; compile-time constant.
 (deftransform vector-length ((vector))
   (let* ((vtype (lvar-type vector))
-         (dim (first (array-type-dimensions-or-give-up vtype))))
-    (when (eq dim '*)
+         (dim (array-type-dimensions-or-give-up vtype)))
+    (when (or (not (typep dim '(cons integer)))
+              (conservative-array-type-complexp vtype))
       (give-up-ir1-transform))
-    (when (conservative-array-type-complexp vtype)
-      (give-up-ir1-transform))
-    dim))
+    (first dim)))
 
 (defoptimizer (vector-length derive-type) ((vector))
   (let ((array-type (lvar-conservative-type vector))
@@ -1367,40 +1538,57 @@
           (t
            `(%array-available-elements array)))))
 
-;;; Only complex vectors have fill pointers.
-(deftransform array-has-fill-pointer-p ((array))
+;;; Any array can be tested for a fill-pointer now, using the header bit.
+;;; Only a non-simple vector could possibly return true.
+;;; If the input is known simple, we have to avoid doing the logtest because there's
+;;; no constraint that says that the logtest will return false, and style-warnings
+;;; will result from MAP-INTO and other things which have
+;;    (if (array-has-fill-pointer-p a) (setf (fill-pointer a) ...))
+;; where the compiler knows that the input is simple.
+(deftransform array-has-fill-pointer-p ((array) * * :node node)
   (let* ((array-type (lvar-type array))
-         (dims (array-type-dimensions-or-give-up array-type)))
-    (if (and (listp dims) (not (= (length dims) 1)))
-        nil
-        (ecase (conservative-array-type-complexp array-type)
-          ((t)
-           t)
-          ((nil)
-           nil)
-          ((:maybe)
-           (give-up-ir1-transform
-            "The array type is ambiguous; must call ~
-               ARRAY-HAS-FILL-POINTER-P at runtime."))))))
+         (dims (array-type-dimensions-or-give-up array-type))
+         complexp)
+    ;; If a vector and possibly non-simple, then perform the bit test,
+    ;; otherwise the answer is definitely NIL.
+    (cond ((and (listp dims) (/= (length dims) 1)) nil) ; dims = * is possibly a vector
+          ((eq (setf complexp (conservative-array-type-complexp array-type)) nil) nil)
+          (t
+           (when (eq complexp :maybe)
+             ;; Delay as much as possible so that this transform and
+             ;; the CONSTRAINT-PROPAGATE-IF optimizer have the most
+             ;; chances to run.
+             (delay-ir1-transform node :ir1-phases))
+           (if (vop-existsp :named test-header-data-bit)
+               `(test-header-data-bit array
+                                 (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position))
+               `(logtest (get-header-data array)
+                         (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position)))))))
 
-(deftransform %check-bound ((array dimension index) ((simple-array * (*)) * *))
+(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
   (let ((array-ref (lvar-uses array))
         (index-ref (lvar-uses index)))
     (unless (and
              (ref-p array-ref)
              (ref-p index-ref)
              (or
-              (let ((index-leaf (ref-leaf index-ref)))
+              (let* ((index-leaf (ref-leaf index-ref))
+                     (index-value (and (constant-p index-leaf)
+                                       (constant-value index-leaf)))
+                     (index-value (and (integerp index-value)
+                                       index-value)))
                 (loop for constraint in (ref-constraints array-ref)
                       for y = (constraint-y constraint)
-                      thereis (if (constant-p index-leaf)
-                                  (and (constant-p y)
-                                       (<= (constant-value index-leaf)
-                                           (constant-value y)))
-                                  (eq index-leaf y))))
+                      thereis (and
+                               (eq (constraint-kind constraint) 'array-in-bounds-p)
+                               (if index-value
+                                   (and (constant-p y)
+                                        (<= index-value (constant-value y)))
+                                   (eq index-leaf y)))))
               (loop for constraint in (ref-constraints index-ref)
-                    thereis (eq (constraint-y constraint)
-                                (ref-leaf array-ref)))))
+                    thereis (and (eq (constraint-kind constraint) 'array-in-bounds-p)
+                                 (eq (constraint-y constraint)
+                                     (ref-leaf array-ref))))))
       (give-up-ir1-transform)))
   ;; It's in bounds but it may be of the wrong type
   `(the (and fixnum unsigned-byte) index))
@@ -1593,46 +1781,13 @@
                 (define-source-transform ,setter (a i v)
                   `(setf (aref (the ,',type ,a) ,i) ,v)))))
   (define-frob schar %scharset simple-string)
-  (define-frob char %charset string))
+  (define-frob char %charset string)
+  (define-frob svref %svset simple-vector))
 
-;;; We transform SVREF and %SVSET directly into DATA-VECTOR-REF/SET: this is
-;;; around 100 times faster than going through the general-purpose AREF
-;;; transform which ends up doing a lot of work -- and introducing many
-;;; intermediate lambdas, each meaning a new trip through the compiler -- to
-;;; get the same result.
-;;;
-;;; FIXME: [S]CHAR, and [S]BIT above would almost certainly benefit from a similar
-;;; treatment.
-(define-source-transform svref (vector index)
-  (let ((elt-type (or (when (symbolp vector)
-                        (let ((var (lexenv-find vector vars)))
-                          (when (lambda-var-p var)
-                            (type-specifier
-                             (array-type-declared-element-type (lambda-var-type var))))))
-                      t)))
-    (with-unique-names (n-vector)
-      `(let ((,n-vector ,vector))
-         (the ,elt-type (data-vector-ref
-                         (the simple-vector ,n-vector)
-                         (check-bound ,n-vector (length ,n-vector) ,index)))))))
-
-(define-source-transform %svset (vector index value)
-  (let ((elt-type (or (when (symbolp vector)
-                        (let ((var (lexenv-find vector vars)))
-                          (when (lambda-var-p var)
-                            (type-specifier
-                             (array-type-declared-element-type (lambda-var-type var))))))
-                      t)))
-    (with-unique-names (n-vector)
-      `(let ((,n-vector ,vector))
-         (truly-the ,elt-type (data-vector-set
-                               (the simple-vector
-                                    (with-annotations
-                                        (,(make-lvar-modified-annotation :caller
-                                                                         '(setf svref)))
-                                      ,n-vector))
-                               (check-bound ,n-vector (length ,n-vector) ,index)
-                               (the ,elt-type ,value)))))))
+(defun the-unwild (type expr)
+  (if (or (null type) (eq type *wild-type*)) expr `(the ,type ,expr)))
+(defun truly-the-unwild (type expr)
+  (if (or (null type) (eq type *wild-type*)) expr `(truly-the ,type ,expr)))
 
 (macrolet (;; This is a handy macro for computing the row-major index
            ;; given a set of indices. We wrap each index with a call
@@ -1708,13 +1863,13 @@
             (null (array-type-complexp type))
             (neq element-ctype *wild-type*)
             (eql (length (array-type-dimensions type)) 1))
-       (let* ((declared-element-ctype (array-type-declared-element-type type))
+       (let* ((declared-element-ctype (array-type-element-type type))
               (bare-form
                 `(data-vector-ref array
                                   (check-bound array (array-dimension array 0) index))))
          (if (type= declared-element-ctype element-ctype)
              bare-form
-             `(the ,(type-specifier declared-element-ctype) ,bare-form))))
+             `(the ,declared-element-ctype ,bare-form))))
       ((policy node (zerop insert-array-bounds-checks))
        `(hairy-data-vector-ref array index))
       (t `(hairy-data-vector-ref/check-bounds array index)))))
@@ -1727,13 +1882,11 @@
 ;;; But if we find out later that there's some useful type information
 ;;; available, switch back to the normal one to give other transforms
 ;;; a stab at it.
-(macrolet ((define (name transform-to extra extra-type)
-             (declare (ignore extra-type))
-             `(deftransform ,name ((array index ,@extra))
+(macrolet ((define (name args expr)
+             `(deftransform ,name ,args
                 (let* ((type (lvar-type array))
                        (element-type (array-type-upgraded-element-type type))
-                       (declared-type (type-specifier
-                                       (array-type-declared-element-type type))))
+                       (declared-type (declared-array-element-type type)))
                   ;; If an element type has been declared, we want to
                   ;; use that information it for type checking (even
                   ;; if the access can't be optimized due to the array
@@ -1749,22 +1902,17 @@
                               (not (null (array-type-complexp type))))
                       (give-up-ir1-transform
                        "Upgraded element type of array is not known at compile time.")))
-                  ,(if extra
-                       ``(truly-the ,declared-type
-                                    (,',transform-to array
-                                                     (check-bound array
-                                                                  (array-dimension array 0)
-                                                                  index)
-                                                     (the ,declared-type ,@',extra)))
-                       ``(the ,declared-type
-                           (,',transform-to array
-                                            (check-bound array
-                                                         (array-dimension array 0)
-                                                         index))))))))
-  (define hairy-data-vector-ref/check-bounds
-      hairy-data-vector-ref nil nil)
-  (define hairy-data-vector-set/check-bounds
-      hairy-data-vector-set (new-value) (*)))
+                  ,expr))))
+  (define hairy-data-vector-ref/check-bounds ((array index))
+    (the-unwild declared-type
+          `(hairy-data-vector-ref
+           array (check-bound array (array-dimension array 0) index))))
+  (define hairy-data-vector-set/check-bounds ((array index new-value))
+    (truly-the-unwild declared-type
+                `(hairy-data-vector-set
+                 array
+                 (check-bound array (array-dimension array 0) index)
+                 ,(the-unwild declared-type 'new-value)))))
 
 ;;; Just convert into a HAIRY-DATA-VECTOR-REF (or
 ;;; HAIRY-DATA-VECTOR-SET) after checking that the index is inside the
@@ -1819,18 +1967,20 @@
 
 ;;; Pick off some constant cases.
 (defoptimizer (array-header-p derive-type) ((array))
-  (let ((type (lvar-type array)))
-    (cond ((not (types-equal-or-intersect type (specifier-type 'simple-array)))
+  (let ((type (lvar-type array))
+        (array-type (specifier-type 'array)))
+    (cond ((or (not (types-equal-or-intersect type array-type))
+               (csubtypep type (specifier-type '(simple-array * (*)))))
+           (specifier-type 'null))
+          ((and (csubtypep type array-type)
+                (not (types-equal-or-intersect type (specifier-type 'simple-array))))
            (specifier-type '(eql t)))
           ((not (array-type-p type))
            ;; FIXME: use analogue of ARRAY-TYPE-DIMENSIONS-OR-GIVE-UP
            nil)
           (t
            (let ((dims (array-type-dimensions type)))
-             (cond ((csubtypep type (specifier-type '(simple-array * (*))))
-                    ;; no array header
-                    (specifier-type 'null))
-                   ((and (listp dims) (/= (length dims) 1))
+             (cond ((and (listp dims) (/= (length dims) 1))
                     ;; multi-dimensional array, will have a header
                     (specifier-type '(eql t)))
                    ((eql (array-type-complexp type) t)
@@ -1842,3 +1992,10 @@
     ((array) node gen)
   (declare (ignore gen))
   (values array (specifier-type '(and array (not (simple-array * (*)))))))
+
+;;; If ARRAY-HAS-FILL-POINTER-P returns true, then ARRAY
+;;; is of the specified type.
+(defoptimizer (array-has-fill-pointer-p constraint-propagate-if)
+    ((array) node gen)
+  (declare (ignore gen))
+  (values array (specifier-type '(and vector (not simple-array)))))

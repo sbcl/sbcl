@@ -52,11 +52,9 @@
                `(defmethod ,name ,args
                  (declare (ignore initargs))
                  (error 'metaobject-initialization-violation
-                  ;; FIXME: I'm pretty sure this wants to be "~~@<~A~~@:>"
-                  :format-control ,(coerce (format nil "~@<~A~@:>" control)
-                                           'base-string)
-                  :format-arguments (list ',name)
-                  :references '((:amop :initialization method))))))
+                        :format-control ,(format nil "~~@<~A~~@:>" control)
+                        :format-arguments (list ',name)
+                        :references '((:amop :initialization method))))))
   (def reinitialize-instance ((method method) &rest initargs)
     "Method objects cannot be redefined by ~S.")
   (def change-class ((method method) new &rest initargs)
@@ -96,6 +94,16 @@
   (unless (functionp fun)
     (invalid-method-initarg method "~@<~S of ~S is not a ~S.~@:>"
                             :function fun 'function)))
+
+(macrolet ((dolist-carefully ((var list improper-list-handler) &body body)
+             `(let ((,var nil)
+                    (.dolist-carefully. ,list))
+                (loop (when (null .dolist-carefully.) (return nil))
+                   (if (consp .dolist-carefully.)
+                       (progn
+                         (setq ,var (pop .dolist-carefully.))
+                         ,@body)
+                       (,improper-list-handler))))))
 
 (defun check-qualifiers (method qualifiers)
   (flet ((improper-list ()
@@ -137,6 +145,7 @@
                      ~V[~;~1{~S~}~;~1{~S and ~S~}~:;~{~#[~;and ~]~S~^, ~}~] ~
                      as ~2:*~V[~;a specializer~:;specializers~].~@:>"
                     (length frcs) frcs)))))
+) ; end MACROLET
 
 (defmethod shared-initialize :before
     ((method standard-method) slot-names &key
@@ -494,27 +503,36 @@
           (setf (info :function :type name) :generic-function))))))
 
 (defun compute-gf-ftype (name)
-  (let ((gf (and (fboundp name) (fdefinition name))))
-    (if (generic-function-p gf)
-        (let* ((ll (generic-function-lambda-list gf))
-               ;; If the GF has &REST without &KEY then we don't augment
-               ;; the FTYPE with keywords, so as not to complain about keywords
-               ;; which seem not to be accepted.
-               (type (sb-c::ftype-from-lambda-list
-                      (if (and (member '&rest ll) (not (member '&key ll)))
-                          ll
-                          (generic-function-pretty-arglist gf)))))
-          ;; It would be nice if globaldb were transactional,
-          ;; so that either both updates or neither occur.
-          (setf (info :function :type name) type
-                (info :function :where-from name) :defined-method)
-          type)
-        ;; The defaulting expression for (:FUNCTION :TYPE) does not store
-        ;; the default. For :GENERIC-FUNCTION that is not FBOUNDP we also
-        ;; don't, however this branch should never be reached because the
-        ;; info only stores :GENERIC-FUNCTION when methods are loaded.
-        ;; Maybe AVER that it does not happen?
-        (sb-c::ftype-from-fdefn name))))
+  (let ((gf (and (fboundp name) (fdefinition name)))
+        (methods-in-compilation-unit (and (boundp 'sb-c::*methods-in-compilation-unit*)
+                                          sb-c::*methods-in-compilation-unit*
+                                          (gethash name sb-c::*methods-in-compilation-unit*))))
+    (cond ((generic-function-p gf)
+           (let* ((ll (generic-function-lambda-list gf))
+                  ;; If the GF has &REST without &KEY then we don't augment
+                  ;; the FTYPE with keywords, so as not to complain about keywords
+                  ;; which seem not to be accepted.
+                  (type (sb-c::ftype-from-lambda-list
+                         (if (and (member '&rest ll) (not (member '&key ll)))
+                             ll
+                             (generic-function-pretty-arglist gf methods-in-compilation-unit)))))
+
+             ;; It would be nice if globaldb were transactional,
+             ;; so that either both updates or neither occur.
+             (setf (info :function :where-from name) :defined-method
+                   (info :function :type name) type)))
+          (methods-in-compilation-unit
+           (setf (info :function :where-from name) :defined-method
+                 (info :function :type name)
+                 (sb-c::ftype-from-lambda-list
+                  (gf-merge-arglists methods-in-compilation-unit))))
+          (t
+           ;; The defaulting expression for (:FUNCTION :TYPE) does not store
+           ;; the default. For :GENERIC-FUNCTION that is not FBOUNDP we also
+           ;; don't, however this branch should never be reached because the
+           ;; info only stores :GENERIC-FUNCTION when methods are loaded.
+           ;; Maybe AVER that it does not happen?
+           (sb-impl::ftype-from-fdefn name)))))
 
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
   (flet ((similar-lambda-lists-p (old-method new-lambda-list)
@@ -913,9 +931,9 @@
                                    'get-accessor-method-function)))
                     ,optimized-std-fun)))
                 (wrappers
-                 (let ((wrappers (list (layout-of class)
+                 (let ((wrappers (list (wrapper-of class)
                                        (class-wrapper class)
-                                       (layout-of slotd))))
+                                       (wrapper-of slotd))))
                    (if (eq type 'writer)
                        (cons (class-wrapper *the-class-t*) wrappers)
                        wrappers)))
@@ -1085,12 +1103,16 @@
 (defmacro class-test (arg class)
   (cond
     ((eq class *the-class-t*) t)
-    ((eq class *the-class-slot-object*)
-     `(not (typep (classoid-of ,arg) 'system-classoid)))
     ((eq class *the-class-standard-object*)
      `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
     ((eq class *the-class-funcallable-standard-object*)
      `(fsc-instance-p ,arg))
+    ;; This is going to be cached (in *fgens*),
+    ;; and structure type tests do not check for invalid layout.
+    ;; Cache the wrapper itself, which is going to be different after
+    ;; redifinition.
+    ((structure-class-p class)
+     `(sb-c::%instance-typep ,arg ,(class-wrapper class)))
     (t
      `(typep ,arg ',(class-name class)))))
 
@@ -1269,8 +1291,8 @@
 
 (defun compute-secondary-dispatch-function (generic-function net &optional
                                             method-alist wrappers)
-  (function-funcall (compute-secondary-dispatch-function1 generic-function net)
-                    method-alist wrappers))
+  (funcall (the function (compute-secondary-dispatch-function1 generic-function net))
+           method-alist wrappers))
 
 (defvar *eq-case-table-limit* 15)
 (defvar *case-table-limit* 10)
@@ -1420,17 +1442,17 @@
       (multiple-value-bind (cfunction constants)
           ;; We don't want NAMED-LAMBDA for any expressions handed to FNGEN,
           ;; because name mismatches will render the hashing ineffective.
-          (get-fun1 `(lambda ,arglist
+          (get-fun `(lambda ,arglist
                       (declare (optimize (sb-c::store-closure-debug-pointer 3)))
                       ,@(unless function-p
                           `((declare (ignore .pv. .next-method-call.))))
                       (locally (declare #.*optimize-speed*)
-                               (let ((emf ,net))
-                                 ,(make-emf-call nargs applyp 'emf))))
-                    #'net-test-converter
-                    #'net-code-converter
-                    (lambda (form)
-                      (net-constant-converter form generic-function)))
+                        (let ((emf ,net))
+                          ,(make-emf-call nargs applyp 'emf))))
+                   #'net-test-converter
+                   #'net-code-converter
+                   (lambda (form)
+                     (net-constant-converter form generic-function)))
         (lambda (method-alist wrappers)
           (let* ((alist (list nil))
                  (alist-tail alist))
@@ -1661,7 +1683,7 @@
    gf (generic-function-encapsulations gf) (call-next-method)))
 
 (defmethod (setf class-name) (new-value class)
-  (let ((classoid (layout-classoid (class-wrapper class))))
+  (let ((classoid (wrapper-classoid (class-wrapper class))))
     (if (and new-value (symbolp new-value))
         (setf (classoid-name classoid) new-value)
         (setf (classoid-name classoid) nil)))
@@ -1689,10 +1711,16 @@
 ;;; The compiler uses this for type-checking that callers pass acceptable
 ;;; keywords, so don't make this do anything fancy like looking at effective
 ;;; methods without also fixing the compiler.
-(defmethod generic-function-pretty-arglist ((gf standard-generic-function))
+(defmethod generic-function-pretty-arglist ((gf standard-generic-function) &optional methods-in-compilation-unit)
   (let ((gf-lambda-list (generic-function-lambda-list gf))
         (methods (generic-function-methods gf)))
-    (flet ((canonize (k)
+    (flet ((lambda-list (m)
+             (or (and methods-in-compilation-unit
+                      (gethash (cons (method-qualifiers m)
+                                     (unparse-specializers gf (method-specializers m)))
+                               methods-in-compilation-unit))
+                 (method-lambda-list m)))
+           (canonize (k)
              (multiple-value-bind (kw var)
                  (parse-key-arg-spec k)
                (if (and (eql (symbol-package kw) *keyword-package*)
@@ -1701,15 +1729,54 @@
                    (list (list kw var))))))
       (multiple-value-bind (llks required optional rest keys)
           (parse-lambda-list gf-lambda-list :silent t)
-        (collect ((keys (mapcar #'canonize keys)))
-        ;; Possibly extend the keyword parameters of the gf by
-        ;; additional key parameters of its methods:
-          (dolist (m methods
-                     (make-lambda-list llks nil required optional rest (keys)))
-            (binding* (((m.llks nil nil nil m.keys)
-                        (parse-lambda-list (method-lambda-list m) :silent t)))
-              (setq llks (logior llks m.llks))
-              (dolist (k m.keys)
-                (unless (member (parse-key-arg-spec k) (keys)
-                                :key #'parse-key-arg-spec :test #'eq)
-                  (keys (canonize k)))))))))))
+        (if (or (ll-kwds-keyp llks)
+                (ll-kwds-restp llks))
+            (collect ((keys (mapcar #'canonize keys)))
+              ;; Possibly extend the keyword parameters of the gf by
+              ;; additional key parameters of its methods:
+              (flet ((process (lambda-list)
+                       (binding* (((m.llks nil nil nil m.keys)
+                                   (parse-lambda-list lambda-list :silent t)))
+                         (setq llks (logior llks m.llks))
+                         (dolist (k m.keys)
+                           (unless (member (parse-key-arg-spec k) (keys)
+                                           :key #'parse-key-arg-spec :test #'eq)
+                             (keys (canonize k)))))))
+                (dolist (m methods)
+                  (process (lambda-list m))))
+              (make-lambda-list llks nil required optional rest (keys)))
+            (make-lambda-list llks nil required optional))))))
+
+(defun gf-merge-arglists (methods-in-compilation-unit)
+  (flet ((canonize (k)
+           (multiple-value-bind (kw var)
+               (parse-key-arg-spec k)
+             (if (and (eql (symbol-package kw) *keyword-package*)
+                      (string= kw var))
+                 var
+                 (list (list kw var))))))
+    (with-hash-table-iterator (iterator methods-in-compilation-unit)
+      (multiple-value-bind (llks required optional rest keys)
+          (parse-lambda-list (nth-value 2 (iterator)) :silent t)
+        (if (or (ll-kwds-keyp llks)
+                (ll-kwds-restp llks))
+            (collect ((keys (mapcar #'canonize keys)))
+              ;; Possibly extend the keyword parameters of the gf by
+              ;; additional key parameters of its methods:
+              (flet ((process (lambda-list)
+                       (binding* (((m.llks nil nil nil m.keys)
+                                   (parse-lambda-list lambda-list :silent t)))
+                         (setq llks (logior llks m.llks))
+                         (dolist (k m.keys)
+                           (unless (member (parse-key-arg-spec k) (keys)
+                                           :key #'parse-key-arg-spec :test #'eq)
+                             (keys (canonize k)))))))
+
+                (loop
+                 (multiple-value-bind (more key value) (iterator)
+                   (declare (ignore key))
+                   (unless more
+                     (return))
+                   (process value)))
+                (make-lambda-list llks nil required optional rest (keys))))
+            (make-lambda-list llks nil required optional))))))

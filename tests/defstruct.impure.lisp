@@ -11,6 +11,54 @@
 
 (load "compiler-test-util.lisp")
 
+;;;; Better ensure nothing in messed up in the ID space
+;;;; or else everything is suspect.
+(defun layout-id-vector-sap (layout)
+  (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address layout))
+               (- (ash (+ sb-vm:instance-slots-offset
+                          (sb-kernel:get-dsd-index sb-vm:layout sb-kernel::id-word0))
+                       sb-vm:word-shift)
+                  sb-vm:instance-pointer-lowtag)))
+
+(let ((hash (make-hash-table)))
+  ;; assert that all layout IDs are unique
+  (let ((all-wrappers
+         (delete-if
+          ;; temporary layouts (created for parsing DEFSTRUCT)
+          ;; must be be culled out.
+          (lambda (x)
+            (and (typep (sb-kernel:wrapper-classoid x)
+                        'sb-kernel:structure-classoid)
+                 (eq (sb-kernel:wrapper-equalp-impl x)
+                     #'sb-kernel::equalp-err)))
+          (sb-vm::list-allocated-objects :all
+                                         :type sb-vm:instance-widetag
+                                         :test #'sb-kernel::wrapper-p))))
+    (dolist (wrapper all-wrappers)
+      (let ((id (sb-kernel:layout-id wrapper)))
+        (sb-int:awhen (gethash id hash)
+          (error "ID ~D is ~A and ~A" id sb-int:it wrapper))
+        (setf (gethash id hash) wrapper)))
+    ;; assert that all inherited ID vectors match the layout-inherits vector
+    (let ((structure-object
+           (sb-kernel:find-layout 'structure-object)))
+      (dolist (wrapper all-wrappers)
+        (when (find structure-object (sb-kernel:wrapper-inherits wrapper))
+          (let* ((layout (sb-kernel:wrapper-friend wrapper))
+                 (ids
+                  (sb-sys:with-pinned-objects (layout)
+                   (let ((sap (layout-id-vector-sap layout)))
+                     (loop for depthoid from 2 to (sb-kernel:wrapper-depthoid wrapper)
+                           collect (sb-sys:signed-sap-ref-32 sap (ash (- depthoid 2) 2))))))
+                (expected
+                 (map 'list 'sb-kernel:layout-id (sb-kernel:wrapper-inherits wrapper))))
+            (unless (equal (list* (sb-kernel:layout-id (sb-kernel:find-layout 't))
+                                  (sb-kernel:layout-id (sb-kernel:find-layout 'structure-object))
+                                  ids)
+                           (append expected (list (sb-kernel:layout-id wrapper))))
+              (error "Wrong IDs for ~A: expect ~D actual ~D~%"
+                     wrapper expected ids))))))))
+
 ;;;; examples from, or close to, the Common Lisp DEFSTRUCT spec
 
 ;;; Type mismatch of slot default init value isn't an error until the
@@ -34,19 +82,15 @@
 (defstruct (boa-kid (:include boa-saux)))
 (defstruct (boa-grandkid (:include boa-kid)))
 (with-test (:name :defstruct-boa-typecheck)
-  (flet ((dsd-always-boundp (dsd)
-           ;; A copy of sb-kernel::dsd-always-boundp, which may not
-           ;; survive make-target-2's shake-packages.
-           (logbitp 3 (sb-kernel::dsd-bits dsd))))
     (dolist (dsd (sb-kernel:dd-slots
                   (sb-kernel:find-defstruct-description 'boa-saux)))
       (let ((name (sb-kernel:dsd-name dsd))
-            (always-boundp (dsd-always-boundp dsd)))
+            (always-boundp (sb-kernel:dsd-always-boundp dsd)))
         (ecase name
           ((a c) (assert (not always-boundp)))
           (b (assert always-boundp)))))
     (let ((dd (sb-kernel:find-defstruct-description 'boa-grandkid)))
-      (assert (not (dsd-always-boundp (car (sb-kernel:dd-slots dd))))))
+      (assert (not (sb-kernel:dsd-always-boundp (car (sb-kernel:dd-slots dd))))))
     (let ((s (make-boa-saux)))
       (locally (declare (optimize (safety 3))
                         (inline boa-saux-a))
@@ -55,7 +99,7 @@
       (setf (boa-saux-c s) 5)
       (assert (eql (boa-saux-a s) 1))
       (assert (eql (boa-saux-b s) 3))
-      (assert (eql (boa-saux-c s) 5)))))
+      (assert (eql (boa-saux-c s) 5))))
 
 (with-test (:name :defstruct-boa-nice-error :skipped-on :interpreter)
   (let ((err (nth-value 1 (ignore-errors (boa-saux-a (make-boa-saux))))))
@@ -252,9 +296,10 @@
 
 (declaim (optimize (debug 2)))
 
+(declaim (muffle-conditions style-warning)) ; &OPTIONAL and &KEY
+
 (defmacro test-variant (defstructname &key colontype boa-constructor-p)
   `(locally
-     (declare (muffle-conditions style-warning)) ; &OPTIONAL and &KEY
      #+nil(format t "~&/beginning PROGN for COLONTYPE=~S~%" ',colontype)
      (defstruct (,defstructname
                   ,@(when colontype `((:type ,colontype)))
@@ -541,7 +586,7 @@
                (eql (huge-manyraw-w1 s) #xffee)
                (eql (huge-manyraw-w2 s) #xeeee)))
   (dolist (slot (sb-kernel:dd-slots
-                 (sb-kernel:layout-info (sb-kernel:layout-of s))))
+                 (sb-kernel:wrapper-info (sb-kernel:wrapper-of s))))
     (let ((name (string (sb-kernel:dsd-name slot))))
       (cond ((eql (mismatch name "SLOT-") 5)
              (let ((n (parse-integer name :start 5)))
@@ -764,33 +809,19 @@
                              (aref (vector x) (incf i)))
                     (bug-348-x x)))))
 
-;;; obsolete instance trapping
-;;;
-;;; FIXME: Both error conditions below should possibly be instances
-;;; of the same class. (Putting this FIXME here, since this is the only
-;;; place where they appear together.)
-
 (with-test (:name :obsolete-defstruct/print-object)
   (eval '(defstruct born-to-change))
   (let ((x (make-born-to-change)))
     (handler-bind ((error 'continue))
       (eval '(defstruct born-to-change slot)))
-    (assert (eq :error
-                (handler-case
-                    (princ-to-string x)
-                  (sb-pcl::obsolete-structure ()
-                    :error))))))
+    (assert (search "UNPRINTABLE instance" (princ-to-string x)))))
 
 (with-test (:name :obsolete-defstruct/typep)
   (eval '(defstruct born-to-change-2))
   (let ((x (make-born-to-change-2)))
     (handler-bind ((error 'continue))
       (eval '(defstruct born-to-change-2 slot)))
-      (assert (eq :error2
-                  (handler-case
-                      (typep x (find-class 'standard-class))
-                    (sb-kernel:layout-invalid ()
-                      :error2))))))
+      (assert (not (typep x (find-class 'standard-class))))))
 
 ;; EQUALP didn't work for structures with float slots (reported by
 ;; Vjacheslav Fyodorov).
@@ -911,13 +942,8 @@ redefinition."
 (defun assert-is (predicate instance)
   (assert (funcall predicate instance)))
 
-;;; It used to call the predicate function, but out-of-line predicate
-;;; functions now don't signal layout-invalid, just like inlined
-;;; predicates didn't signal it.
 (defun assert-invalid (instance)
-  (declare (notinline typep))
-  (assert (typep (nth-value 1 (ignore-errors (typep instance 'structure-object)))
-                 'sb-kernel::layout-invalid)))
+  (assert (sb-kernel:wrapper-invalid (sb-kernel:%instance-wrapper instance))))
 
 ;; Don't try to understand this macro; just look at its expansion.
 (defmacro with-defstruct-redefinition-test (name
@@ -1435,3 +1461,23 @@ redefinition."
   ;; object (specifically NIL) meets the test for the slot.
   (assert (macroexpand-1
            '(defstruct strangestruct (a nil :type (satisfies plusp))))))
+
+
+(defstruct foo4130 bar)
+(test-util:with-test (:name :duplicated-slot-names)
+      (flet ((assert-that (expect form)
+               (multiple-value-bind (ret error) (ignore-errors (eval form))
+                 (assert (not ret))
+                 (assert (string= (princ-to-string error)
+                                  expect)))))
+    (assert-that "duplicate slot name BAR"
+                 `(defstruct foo4131 bar bar))
+    (assert-that "slot name BAR duplicated via included FOO4130"
+                 `(defstruct (foo4132 (:include foo4130)) bar))))
+
+(test-util:with-test (:name :specialized-equalp)
+  ;; make sure we didn't mess up PATHNAME and HASH-TABLE
+  (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'pathname))))
+    (assert (eq f #'sb-int:pathname=)))
+  (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'hash-table))))
+    (assert (eq f #'sb-int:hash-table-equalp))))

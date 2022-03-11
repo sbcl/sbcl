@@ -38,6 +38,7 @@
 #include "genesis/defstruct-description.h"
 #include "genesis/hash-table.h"
 #include "code.h"
+#include "pseudo-atomic.h"
 
 /* We don't ever do purification with GENCGC as of 1.0.5.*. There was
  * a lot of hairy and fragile ifdeffage in here to support purify on
@@ -63,21 +64,18 @@ static lispobj *read_only_free, *static_free;
 static lispobj *pscav(lispobj *addr, long nwords, boolean constant);
 
 #define LATERBLOCKSIZE 1020
-#define LATERMAXCOUNT 10
 
 static struct
 later {
     struct later *next;
-    union {
-        lispobj *ptr;
-        long count;
-    } u[LATERBLOCKSIZE];
+    // slightly denser packing vs a struct of a lispobj* and an int
+    lispobj *ptr[LATERBLOCKSIZE];
+    int count[LATERBLOCKSIZE];
 } *later_blocks = NULL;
 static long later_count = 0;
 
 
-static boolean
-forwarding_pointer_p(lispobj obj)
+static boolean forwarded_p(lispobj obj)
 {
     lispobj *ptr = native_pointer(obj);
 
@@ -100,13 +98,13 @@ newspace_alloc(long nwords, int constantp)
     gc_assert((nwords & 1) == 0);
     if(constantp) {
         if(read_only_free + nwords >= (lispobj *)READ_ONLY_SPACE_END) {
-            lose("Ran out of read-only space while purifying!\n");
+            lose("Ran out of read-only space while purifying!");
         }
         ret=read_only_free;
         read_only_free+=nwords;
     } else {
         if(static_free + nwords >= (lispobj *)STATIC_SPACE_END) {
-            lose("Ran out of static space while purifying!\n");
+            lose("Ran out of static space while purifying!");
         }
         ret=static_free;
         static_free+=nwords;
@@ -115,34 +113,27 @@ newspace_alloc(long nwords, int constantp)
 }
 
 
+/* Enqueue <where,count> into later_blocks */
 static void
 pscav_later(lispobj *where, long count)
 {
     struct later *new;
 
-    if (count > LATERMAXCOUNT) {
-        while (count > LATERMAXCOUNT) {
-            pscav_later(where, LATERMAXCOUNT);
-            count -= LATERMAXCOUNT;
-            where += LATERMAXCOUNT;
-        }
+    if (later_blocks == NULL || later_count == LATERBLOCKSIZE) {
+        new  = (struct later *)malloc(sizeof(struct later));
+        new->next = later_blocks;
+        later_blocks = new;
+        later_count = 0;
     }
-    else {
-        if (later_blocks == NULL || later_count == LATERBLOCKSIZE ||
-            (later_count == LATERBLOCKSIZE-1 && count > 1)) {
-            new  = (struct later *)malloc(sizeof(struct later));
-            new->next = later_blocks;
-            if (later_blocks && later_count < LATERBLOCKSIZE)
-                later_blocks->u[later_count].ptr = NULL;
-            later_blocks = new;
-            later_count = 0;
-        }
 
-        if (count != 1)
-            later_blocks->u[later_count++].count = count;
-        later_blocks->u[later_count++].ptr = where;
-    }
+    later_blocks->count[later_count] = count;
+    later_blocks->ptr[later_count] = where;
+    ++later_count;
 }
+
+//FILE *xlog;
+//#define XLOG(old,new) fprintf(xlog, "%x > %x\n", old, (uword_t)new)
+#define XLOG(dumm1,dummy2)
 
 static lispobj
 ptrans_boxed(lispobj thing, lispobj header, boolean constant)
@@ -151,9 +142,10 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     lispobj *old = native_pointer(thing);
     long nwords = sizetab[header_widetag(header)](old);
     lispobj *new = newspace_alloc(nwords,constant);
+    XLOG(thing, new);
 
     /* Copy it. */
-    bcopy(old, new, nwords * sizeof(lispobj));
+    memcpy(new, old, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
     lispobj result = make_lispobj(new, lowtag_of(thing));
@@ -172,8 +164,8 @@ static lispobj
 ptrans_instance(lispobj thing, lispobj header, boolean /* ignored */ constant)
 {
     constant = 0;
-    lispobj info = LAYOUT(instance_layout(native_pointer(thing)))->info;
-    if (info != NIL) {
+    lispobj info = LAYOUT(instance_layout(native_pointer(thing)))->_info;
+    if (instancep(info)) {
         lispobj pure = ((struct defstruct_description*)native_pointer(info))->pure;
         if (pure != NIL && pure != T) {
             gc_abort();
@@ -191,9 +183,10 @@ ptrans_fdefn(lispobj thing, lispobj header)
     lispobj *old = native_pointer(thing);
     long nwords = sizetab[header_widetag(header)](old);
     lispobj *new = newspace_alloc(nwords, 0);    /* inconstant */
+    XLOG(thing, new);
 
     /* Copy it. */
-    bcopy(old, new, nwords * sizeof(lispobj));
+    memcpy(new, old, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
     lispobj result = make_lispobj(new, lowtag_of(thing));
@@ -216,9 +209,10 @@ ptrans_unboxed(lispobj thing, lispobj header)
     lispobj *old = native_pointer(thing);
     long nwords = sizetab[header_widetag(header)](old);
     lispobj *new = newspace_alloc(nwords, 1);     /* always constant */
+    XLOG(thing, new);
 
     /* copy it. */
-    bcopy(old, new, nwords * sizeof(lispobj));
+    memcpy(new, old, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
     lispobj result = make_lispobj(new, lowtag_of(thing));
@@ -234,7 +228,8 @@ ptrans_vector(lispobj thing, boolean boxed, boolean constant)
     long nwords = sizetab[header_widetag(vector->header)]((lispobj*)vector);
 
     lispobj *new = newspace_alloc(nwords, (constant || !boxed));
-    bcopy(vector, new, nwords * sizeof(lispobj));
+    XLOG(thing, new);
+    memcpy(new, vector, nwords * sizeof(lispobj));
 
     lispobj result = make_lispobj(new, lowtag_of(thing));
     vector->header = result;
@@ -252,37 +247,43 @@ ptrans_code(lispobj thing)
     long nwords = code_total_nwords(code);
 
     struct code *new = (struct code *)newspace_alloc(nwords,1); /* constant */
+    XLOG(thing, new);
 
-    bcopy(code, new, nwords * sizeof(lispobj));
+    memcpy(new, code, nwords * sizeof(lispobj));
 
     lispobj result = make_lispobj(new, OTHER_POINTER_LOWTAG);
-
-    /* Put in forwarding pointers for all the functions. */
     uword_t displacement = result - thing;
+
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
+    // Fixup absolute jump tables. These aren't recorded in code->fixups
+    // because we don't need to denote an arbitrary set of places in the code.
+    // The count alone suffices. A GC immediately after creating the code
+    // could cause us to observe some 0 words here. Those should be ignored.
+    lispobj* jump_table = code_jumptable_start(new);
+    int count = jumptable_count(jump_table);
+    int i;
+    for (i = 1; i < count; ++i)
+        if (jump_table[i]) jump_table[i] += displacement;
+#endif
+    /* Put in forwarding pointers for all the functions. */
     for_each_simple_fun(i, newfunc, new, 1, {
-        lispobj* old = (lispobj*)LOW_WORD((char*)newfunc - displacement);
+        lispobj* old = (lispobj*)((char*)newfunc - displacement);
         *old = make_lispobj(newfunc, FUN_POINTER_LOWTAG);
+        pscav(&newfunc->self, 1, 1); // and fix the self-pointer now
     });
 
+    int n_funs = code_n_funs(code);
     /* Stick in a forwarding pointer for the code object. */
     /* This smashes the header, so do it only after reading n_funs */
     *(lispobj *)code = result;
 
-    /* Arrange to scavenge the debug info later. */
-    pscav_later(&new->debug_info, 1);
-
-    /* Scavenge the constants. */
-    pscav(new->constants,
-          code_header_words(new) - (offsetof(struct code, constants) >> WORD_SHIFT),
-          1);
-
-    /* Scavenge all the functions. */
-    for_each_simple_fun(i, func, new, 1, {
-        gc_assert(!dynamic_pointer_p((lispobj)func));
-        pscav(&func->self, 1, 1);
-        pscav_later(&func->name, 4);
-    })
-
+    int n_later_words = 1 + n_funs * CODE_SLOTS_PER_SIMPLE_FUN;
+    /* Scavenge the constants excluding the ones that will be done later. */
+    lispobj* from = &new->debug_info + n_later_words;
+    lispobj* end = (lispobj*)new + code_header_words(new);
+    pscav(from, end - from, 1);
+    /* Arrange to scavenge the debug info and simple-fun metadata later. */
+    pscav_later(&new->debug_info, n_later_words);
     return result;
 }
 
@@ -302,8 +303,7 @@ ptrans_func(lispobj thing, lispobj header)
          * would have been left behind for all the entry points. */
 
         struct simple_fun *function = (struct simple_fun *)native_pointer(thing);
-        lispobj code = make_lispobj(native_pointer(thing) - HeaderValue(function->header),
-                                    OTHER_POINTER_LOWTAG);
+        lispobj code = fun_code_tagged((lispobj*)function);
 
         /* This will cause the function's header to be replaced with a
          * forwarding pointer. */
@@ -322,9 +322,10 @@ ptrans_func(lispobj thing, lispobj header)
 
         lispobj *new = newspace_alloc
             (nwords,(header_widetag(header)!=FUNCALLABLE_INSTANCE_WIDETAG));
+        XLOG(thing, new);
 
         /* Copy it. */
-        bcopy(old, new, nwords * sizeof(lispobj));
+        memcpy(new, old, nwords * sizeof(lispobj));
 
         /* Deposit forwarding pointer. */
         lispobj result = make_lispobj(new, lowtag_of(thing));
@@ -345,7 +346,7 @@ ptrans_returnpc(lispobj thing, lispobj header)
 
     /* Make sure it's been transported. */
     lispobj new = *native_pointer(code);
-    if (!forwarding_pointer_p(new))
+    if (!forwarded_p(new))
         new = ptrans_code(code);
 
     /* Maintain the offset: */
@@ -361,6 +362,7 @@ ptrans_list(lispobj thing, boolean constant)
     long length;
 
     orig = (struct cons *) newspace_alloc(0,constant);
+    //fprintf(xlog, "%x > %x", thing, (uword_t)orig);
     length = 0;
 
     do {
@@ -379,9 +381,10 @@ ptrans_list(lispobj thing, boolean constant)
         length++;
     } while (listp(thing) &&
              dynamic_pointer_p(thing) &&
-             !(forwarding_pointer_p(*native_pointer(thing))));
+             !(forwarded_p(*native_pointer(thing))));
 
     /* Scavenge the list we just copied. */
+    //fprintf(xlog, "*%d\n", (int)length);
     pscav((lispobj *)orig, length * WORDS_PER_CONS, constant);
 
     return make_lispobj(orig, LIST_POINTER_LOWTAG);
@@ -418,7 +421,6 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
     case COMPLEX_CHARACTER_STRING_WIDETAG:
 #endif
       case COMPLEX_BIT_VECTOR_WIDETAG:
-      case COMPLEX_VECTOR_NIL_WIDETAG:
       case COMPLEX_VECTOR_WIDETAG:
       case COMPLEX_ARRAY_WIDETAG:
         return ptrans_boxed(thing, header, constant);
@@ -481,7 +483,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 /* Maybe. Have we already moved it? */
                 thingp = native_pointer(thing);
                 header = *thingp;
-                if (is_lisp_pointer(header) && forwarding_pointer_p(header))
+                if (is_lisp_pointer(header) && forwarded_p(header))
                     /* Yep, so just copy the forwarding pointer. */
                     thing = header;
                 else {
@@ -535,10 +537,10 @@ pscav(lispobj *addr, long nwords, boolean constant)
               case SIMPLE_VECTOR_WIDETAG:
                 // addr[0] : header
                 //     [1] : vector length
-                //     [2] : element[0] = hashtable
+                //     [2] : element[0] = high-water mark
                 //     [3] : element[1] = rehash bit
-                if (is_vector_subtype(thing, VectorValidHashing))
-                    addr[3] = make_fixnum(1);
+                if (vector_flagp(thing, VectorAddrHashing))
+                    addr[3] = make_fixnum(1); // just flag it for rehash
                 count = 2;
                 break;
 
@@ -557,7 +559,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 /* Weak pointers get preserved during purify, 'cause I
                  * don't feel like figuring out how to break them. */
                 pscav(addr+1, 2, constant);
-                count = WEAK_POINTER_NWORDS;
+                count = ALIGN_UP(WEAK_POINTER_SIZE,2);
                 break;
 
               case FDEFN_WIDETAG:
@@ -568,23 +570,22 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
               case INSTANCE_WIDETAG:
                 {
-                    lispobj lbitmap = LAYOUT(instance_layout(addr))->bitmap;
-                    lispobj* slots = addr + 1;
-                    long nslots = instance_length(*addr) | 1;
-                    int index;
-                    if (fixnump(lbitmap)) {
-                      sword_t bitmap = fixnum_value(lbitmap);
-                      for (index = 0; index < nslots ; index++, bitmap >>= 1)
-                        if (bitmap & 1)
-                          pscav(slots + index, 1, constant);
-                    } else {
-                      struct bignum * bitmap;
-                      bitmap = (struct bignum*)native_pointer(lbitmap);
-                      for (index = 0; index < nslots ; index++)
-                        if (positive_bignum_logbitp(index, bitmap))
-                          pscav(slots + index, 1, constant);
-                    }
-                    count = 1 + nslots;
+                lispobj layout = instance_layout(addr);
+                lispobj layout_header = *native_pointer(layout);
+                if (is_lisp_pointer(layout_header)) {
+                    gc_assert(forwarded_p(layout_header));
+                    layout = layout_header;
+                }
+                if (!layoutp(layout)) lose("Bad layout in instance: %p %x", addr, layout);
+                struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
+                gc_assert(bitmap.nwords >= 1);
+                long nslots = instance_length(*addr);
+                int index;
+                for (index = 0; index < nslots ; index++)
+                    // logically treat index 0 (layout) as a tagged slot
+                    if (index == 0 || bitmap_logbitp(index, bitmap))
+                        pscav((addr+1) + index, 1, constant);
+                count = 1 + (nslots | 1);
                 }
                 break;
 
@@ -609,12 +610,12 @@ pscav(lispobj *addr, long nwords, boolean constant)
     return addr;
 }
 
+extern void dump_space_to_file(lispobj* where, lispobj* limit, char* pathname);
 int
 purify(lispobj static_roots, lispobj read_only_roots)
 {
     lispobj *clean;
     long count, i;
-    struct later *laters, *next;
     struct thread *thread;
 
     if(all_threads->next) {
@@ -624,6 +625,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
         fflush(stderr);
         return 0;
     }
+    // verify_heap(0); fprintf(stderr, "pre-verify passed\n");
 
 #ifdef PRINTNOISE
     printf("[doing purification:");
@@ -640,7 +642,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
         return 0;
     }
 
-    dynamic_space_purify_pointer = dynamic_space_free_pointer;
+    dynamic_space_purify_pointer = get_alloc_pointer();
 
     read_only_end = read_only_free = read_only_space_free_pointer;
     static_end = static_free = static_space_free_pointer;
@@ -657,9 +659,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
     printf(" handlers");
     fflush(stdout);
 #endif
-    pscav((lispobj *) interrupt_handlers,
-          sizeof(interrupt_handlers) / sizeof(lispobj),
-          0);
+    pscav(lisp_sig_handlers, NSIG, 0);
+    pscav(&lisp_package_vector, 1, 0);
 
 #ifdef PRINTNOISE
     printf(" stack");
@@ -680,25 +681,6 @@ purify(lispobj static_roots, lispobj read_only_roots)
            all_threads->binding_stack_start,
           0);
 
-    /* The original CMU CL code had scavenge-read-only-space code
-     * controlled by the Lisp-level variable
-     * *SCAVENGE-READ-ONLY-SPACE*. It was disabled by default, and it
-     * wasn't documented under what circumstances it was useful or
-     * safe to turn it on, so it's been turned off in SBCL. If you
-     * want/need this functionality, and can test and document it,
-     * please submit a patch. */
-#if 0
-    if (SymbolValue(SCAVENGE_READ_ONLY_SPACE) != UNBOUND_MARKER_WIDETAG
-        && SymbolValue(SCAVENGE_READ_ONLY_SPACE) != NIL) {
-      unsigned  read_only_space_size =
-          read_only_space_free_pointer - (lispobj *)READ_ONLY_SPACE_START;
-      fprintf(stderr,
-              "scavenging read only space: %d bytes\n",
-              read_only_space_size * sizeof(lispobj));
-      pscav( (lispobj *)READ_ONLY_SPACE_START, read_only_space_size, 0);
-    }
-#endif
-
 #ifdef PRINTNOISE
     printf(" static");
     fflush(stdout);
@@ -707,22 +689,14 @@ purify(lispobj static_roots, lispobj read_only_roots)
     do {
         while (clean != static_free)
             clean = pscav(clean, static_free - clean, 0);
-        laters = later_blocks;
+        struct later* laters = later_blocks;
         count = later_count;
         later_blocks = NULL;
         later_count = 0;
         while (laters != NULL) {
-            for (i = 0; i < count; i++) {
-                if (laters->u[i].count == 0) {
-                    ;
-                } else if (laters->u[i].count <= LATERMAXCOUNT) {
-                    pscav(laters->u[i+1].ptr, laters->u[i].count, 1);
-                    i++;
-                } else {
-                    pscav(laters->u[i].ptr, 1, 1);
-                }
-            }
-            next = laters->next;
+            for (i = 0; i < count; i++)
+                pscav(laters->ptr[i], laters->count[i], 1);
+            struct later* next = laters->next;
             free(laters);
             laters = next;
             count = LATERBLOCKSIZE;
@@ -732,9 +706,6 @@ purify(lispobj static_roots, lispobj read_only_roots)
 #ifdef PRINTNOISE
     printf(" cleanup");
     fflush(stdout);
-#endif
-#ifdef LISP_FEATURE_HPUX
-    clear_auto_gc_trigger(); /* restore mmap as it was given by os */
 #endif
 
     os_zero((os_vm_address_t) current_dynamic_space, dynamic_space_size);
@@ -750,7 +721,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     read_only_space_free_pointer = read_only_free;
     static_space_free_pointer = static_free;
 
-    dynamic_space_free_pointer = current_dynamic_space;
+    set_alloc_pointer((lispobj)current_dynamic_space);
     set_auto_gc_trigger(bytes_consed_between_gcs);
 
     /* Blast away instruction cache */
@@ -758,9 +729,11 @@ purify(lispobj static_roots, lispobj read_only_roots)
     os_flush_icache((os_vm_address_t)STATIC_SPACE_START, STATIC_SPACE_SIZE);
 
 #ifdef PRINTNOISE
+    // verify_heap(1);
     printf(" done]\n");
     fflush(stdout);
 #endif
+    //fclose(xlog);
     return 0;
 }
 #else /* LISP_FEATURE_GENCGC */

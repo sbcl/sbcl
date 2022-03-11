@@ -16,9 +16,13 @@
 ;;; ANSI: "the floating-point format that is to be used when reading a
 ;;; floating-point number that has no exponent marker or that has e or
 ;;; E for an exponent marker"
-(defparameter *read-default-float-format* 'single-float)
+(defvar *read-default-float-format* 'single-float)
 
 (defvar *readtable*)
+
+(defun !readtable-cold-init ()
+  (setq *empty-extended-char-table* (make-hash-table :rehash-size 1 :test #'eq)
+        *readtable* (make-readtable)))
 
 (setf (documentation '*readtable* 'variable)
       "Variable bound to current readtable.")
@@ -37,15 +41,15 @@
 ;;;; reader errors
 
 (defun reader-eof-error (stream context)
-  (declare (optimize allow-non-returning-tail-call))
+  ;; Don't worry if STREAM isn't a valid stream; it's not a reason to fail now.
+  (declare (explicit-check) (optimize allow-non-returning-tail-call))
   (error 'reader-eof-error
          :stream stream
          :context context))
 
-;;; If The Gods didn't intend for us to use multiple namespaces, why
-;;; did They specify them?
 (defun simple-reader-error (stream control &rest args)
-  (declare (optimize allow-non-returning-tail-call))
+  ;; Don't worry if STREAM isn't a valid stream; it's not a reason to fail now.
+  (declare (explicit-check) (optimize allow-non-returning-tail-call))
   (error 'simple-reader-error
          :stream stream
          :format-control control
@@ -53,35 +57,43 @@
 
 ;;;; macros and functions for character tables
 
-(declaim (ftype (sfunction (character readtable) (unsigned-byte 8))
-                get-cat-entry))
-(defun get-cat-entry (char rt)
-  (if (typep char 'base-char)
-      (elt (character-attribute-array rt) (char-code char))
-      (values (gethash char (character-attribute-hash-table rt)
-                       +char-attr-constituent+))))
+;;; As efficiently as possible look up the character attributes of CHAR.
+;;; If CAST is true then insert an assertion that CHARACTER is actually
+;;; a character. This seems to be necessary to ensure that gray stream
+;;; methods that should return characters don't return random objects.
+(defmacro char-syntax (char syntax-array extension-table &optional cast)
+  #-sb-unicode (declare (ignore cast))
+  `(progn
+     #-sb-unicode ,extension-table
+     (truly-the (unsigned-byte 8)
+                #-sb-unicode
+                (elt ,syntax-array (char-code ,char))
+                #+sb-unicode
+                (if (typep ,char 'base-char)
+                    (elt ,syntax-array (char-code ,char))
+                    (car (truly-the list
+                                    (gethash ,(if cast `(the character ,char) char)
+                                             ,extension-table
+                                             ',`(,+char-attr-constituent+))))))))
 
-(defun set-cat-entry (char newvalue &optional (rt *readtable*))
-  (declare (character char) (type (unsigned-byte 8) newvalue) (readtable rt))
+;;; Formerly known as SET-CAT-ENTRY and SET-CMT-ENTRY
+(defun assign-char-syntax (readtable char attributes function)
+  (declare (readtable readtable)
+           (character char)
+           (type (unsigned-byte 8) attributes)
+           (type (or null function fdefn) function))
   (if (typep char 'base-char)
-      (setf (elt (character-attribute-array rt) (char-code char)) newvalue)
-      (if (= newvalue +char-attr-constituent+)
-          ;; Default value for the C-A-HASH-TABLE is +CHAR-ATTR-CONSTITUENT+.
-          (%remhash char (character-attribute-hash-table rt))
-          (setf (gethash char (character-attribute-hash-table rt)) newvalue)))
-  (values))
-
-;; Set the character-macro-table entry without coercing NEW-VALUE.
-;; As used by set-syntax-from-char it must always process "raw" values.
-(defun set-cmt-entry (char new-value &optional (rt *readtable*))
-  (declare (character char)
-           (type (or null function fdefn) new-value)
-           (type readtable rt))
-  (if (typep char 'base-char)
-      (setf (svref (character-macro-array rt) (char-code char)) new-value)
-      (if new-value ; never store NILs
-          (setf (gethash char (character-macro-hash-table rt)) new-value)
-          (remhash char (character-macro-hash-table rt)))))
+      (setf (aref (base-char-syntax-array readtable) (char-code char)) attributes
+            (aref (base-char-macro-array readtable) (char-code char)) function)
+      (let ((table (extended-char-table readtable)))
+        (cond ((or function (/= attributes +char-attr-constituent+))
+               (when (eq table *empty-extended-char-table*) ; copy-on-write
+                 (setf table (make-hash-table :test 'eq)
+                       (extended-char-table readtable) table))
+               (setf (gethash char table) (cons attributes function)))
+              ((neq table *empty-extended-char-table*)
+               (remhash char table)))))
+  nil)
 
 ;;; the value actually stored in the character macro table. As per
 ;;; ANSI #'GET-MACRO-CHARACTER and #'SET-MACRO-CHARACTER, this can
@@ -90,26 +102,30 @@
 (defun get-raw-cmt-entry (char readtable)
   (declare (character char) (readtable readtable))
   (if (typep char 'base-char)
-      (svref (character-macro-array readtable) (char-code char))
-      (values (gethash char (character-macro-hash-table readtable) nil))))
+      (svref (base-char-macro-array readtable) (char-code char))
+      ;; extended-char entry if present is a cons of the attributes and function
+      (cdr (truly-the list (gethash char (extended-char-table readtable))))))
 
 ;; As above but get the entry for SUB-CHAR in a dispatching macro table.
+
+(defmacro charmacro-dtable-base-chars (dtable)
+  `(truly-the (simple-vector ,base-char-code-limit) (car ,dtable)))
+(defmacro charmacro-dtable-extended-chars (dtable)
+  `(cdr ,dtable))
 (defun get-raw-cmt-dispatch-entry (sub-char sub-table)
   (declare (character sub-char))
   (if (typep sub-char 'base-char)
-      (svref (truly-the (simple-vector #.base-char-code-limit)
-                        (cdr (truly-the cons sub-table)))
-             (char-code sub-char))
-      (awhen (car sub-table)
+      (svref (charmacro-dtable-base-chars (truly-the cons sub-table)) (char-code sub-char))
+      (awhen (charmacro-dtable-extended-chars sub-table)
         (gethash sub-char it))))
 
 ;; Coerce THING to a character-macro-table entry
-(defmacro !coerce-to-cmt-entry (thing)
+(defmacro coerce-to-cmt-entry (thing)
   `(let ((x ,thing))
      (if (typep x '(or null function)) x (find-or-create-fdefn x))))
 
 ;; Return a callable function given a character-macro-table entry.
-(defmacro !cmt-entry-to-function (val fallback)
+(defmacro cmt-entry-to-function (val fallback)
   `(let ((x ,val))
      (truly-the
       function
@@ -118,24 +134,28 @@
             (t (sb-c:safe-fdefn-fun x))))))
 
 ;; Return a function-designator given a character-macro-table entry.
-(defmacro !cmt-entry-to-fun-designator (val)
+(defmacro cmt-entry-to-fun-designator (val)
   `(let ((x ,val))
      (if (fdefn-p x) (fdefn-name x) x)))
 
 ;;; The character attribute table is a BASE-CHAR-CODE-LIMIT vector
 ;;; of (unsigned-byte 8) plus a hashtable to handle higher character codes.
 
-(defmacro test-attribute (char whichclass rt)
-  `(= (get-cat-entry ,char ,rt) ,whichclass))
+(defmacro test-attribute (char whichclass readtable &optional cast)
+  (let ((temp '#:readtable))
+    `(let ((,temp ,readtable))
+       (= (char-syntax ,char
+                       (base-char-syntax-array ,temp)
+                       (extended-char-table ,temp)
+                       ,cast)
+          ,whichclass))))
 
 ;;; predicates for testing character attributes
 
-#-sb-fluid
-(progn
-  (declaim (inline whitespace[1]p whitespace[2]p))
-  (declaim (inline constituentp terminating-macrop))
-  (declaim (inline single-escape-p multiple-escape-p))
-  (declaim (inline token-delimiterp)))
+(declaim (inline whitespace[1]p whitespace[2]p))
+(declaim (inline constituentp terminating-macrop))
+(declaim (inline single-escape-p multiple-escape-p))
+(declaim (inline token-delimiterp))
 
 ;;; the [1] and [2] here refer to ANSI glossary entries for
 ;;; "whitespace".
@@ -146,7 +166,7 @@
 (defun whitespace[1]p (char)
   (test-attribute char +char-attr-whitespace+ *standard-readtable*))
 (defun whitespace[2]p (char &optional (rt *readtable*))
-  (test-attribute char +char-attr-whitespace+ rt))
+  (test-attribute char +char-attr-whitespace+ rt t))
 
 (defun constituentp (char rt)
   (test-attribute char +char-attr-constituent+ rt))
@@ -162,21 +182,22 @@
 
 (defun token-delimiterp (char &optional (rt *readtable*))
   ;; depends on actual attribute numbering in readtable.lisp.
-  (<= (get-cat-entry char rt) +char-attr-terminating-macro+))
+  (<= (char-syntax char (base-char-syntax-array rt) (extended-char-table rt))
+      +char-attr-terminating-macro+))
 
 ;;;; constituent traits (see ANSI 2.1.4.2)
 
 ;;; There are a number of "secondary" attributes which are constant
 ;;; properties of characters (as long as they are constituents).
-;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
-;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
-(defconstant +constituent-trait-table+
+(defconstant-eqx +constituent-trait-table+
   #.(let ((a (sb-xc:make-array base-char-code-limit
+                               :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 8))))
       (fill a +char-attr-constituent+)
-      (flet ((!set-constituent-trait (char trait)
-               (aver (typep char 'base-char))
-               (setf (elt a (char-code char)) trait)))
+      (labels ((!set-code-constituent-trait (code trait)
+                 (setf (elt a code) trait))
+               (!set-constituent-trait (char trait)
+                 (!set-code-constituent-trait (char-code char) trait)))
         (!set-constituent-trait #\: +char-attr-package-delimiter+)
         (!set-constituent-trait #\. +char-attr-constituent-dot+)
         (!set-constituent-trait #\+ +char-attr-constituent-sign+)
@@ -184,7 +205,7 @@
         (!set-constituent-trait #\/ +char-attr-constituent-slash+)
         (do ((i (char-code #\0) (1+ i)))
             ((> i (char-code #\9)))
-          (!set-constituent-trait (code-char i) +char-attr-constituent-digit+))
+          (!set-code-constituent-trait i +char-attr-constituent-digit+))
         (!set-constituent-trait #\E +char-attr-constituent-expt+)
         (!set-constituent-trait #\F +char-attr-constituent-expt+)
         (!set-constituent-trait #\D +char-attr-constituent-expt+)
@@ -201,8 +222,9 @@
         (!set-constituent-trait #\Newline +char-attr-invalid+)
         (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
                          return-char-code rubout-char-code))
-          (!set-constituent-trait (code-char c) +char-attr-invalid+)))
-      a))
+          (!set-code-constituent-trait c +char-attr-invalid+)))
+      a)
+  #'equalp)
 
 (declaim (inline get-constituent-trait))
 (defun get-constituent-trait (char)
@@ -217,18 +239,18 @@
     (cerror "Frob it anyway!" 'standard-readtable-modified-error
             :operation operation)))
 
+(declaim (inline readtable-case))
 (defun readtable-case (readtable)
-  (aref #(:upcase :downcase :preserve :invert) (%readtable-case readtable)))
+  (%readtable-case readtable))
 
 (defun (setf readtable-case) (case readtable)
   ;; This function does not accept a readtable designator, only a readtable.
   (assert-not-standard-readtable readtable '(setf readtable-case))
-  (setf (%readtable-case readtable)
-        (ecase case (:upcase 0) (:downcase 1) (:preserve 2) (:invert 3)))
-  case)
+  (setf (%readtable-case readtable) case))
 
+(declaim (inline readtable-normalization))
 (defun readtable-normalization (readtable)
-  "Returns T if READTABLE normalizes strings to NFKC, and NIL otherwise.
+  "Returns T if READTABLE normalizes symbols to NFKC, and NIL otherwise.
 The READTABLE-NORMALIZATION of the standard readtable is T."
   (%readtable-normalization readtable))
 
@@ -263,7 +285,7 @@ be interned (returned, respectively) as required. The default is :SYMBOLS."
         (if (member new-value '(:strings :both)) 'base-char 'character))
   new-value)
 
-(defun replace/eql-hash-table (to from &optional (transform #'identity))
+(defun hash-table-replace (to from &optional (transform #'identity))
   (maphash (lambda (k v) (setf (gethash k to) (funcall transform v))) from)
   to)
 
@@ -279,15 +301,16 @@ be interned (returned, respectively) as required. The default is :SYMBOLS."
                             t))
        (find-if-in-closure #'consp fun)))
 
-;; If ENTRY is a dispatching macro, copy its dispatch table.
-;; Otherwise return it without alteration.
+;;; Copy a char-macro-table entry.
+;;; If ENTRY is a dispatching macro, copy its dispatch table.
+;;; Otherwise return it unchanged, be it NIL or a function or fdefn.
 (defun copy-cmt-entry (entry)
   (let ((dtable (%dispatch-macro-char-table entry)))
     (if dtable
         (%make-dispatch-macro-char
-         (cons (awhen (car dtable)
-                 (replace/eql-hash-table (make-hash-table) it))
-               (copy-seq (cdr dtable))))
+         (cons (copy-seq (charmacro-dtable-base-chars dtable))
+               (awhen (charmacro-dtable-extended-chars dtable)
+                 (hash-table-replace (make-hash-table :test 'eq) it))))
         entry)))
 
 (defun copy-readtable (&optional (from-readtable *readtable*) to-readtable)
@@ -298,18 +321,24 @@ readtable when not provided."
   (assert-not-standard-readtable to-readtable 'copy-readtable)
   (let ((really-from-readtable (or from-readtable *standard-readtable*))
         (really-to-readtable (or to-readtable (make-readtable))))
-    (replace (character-attribute-array really-to-readtable)
-             (character-attribute-array really-from-readtable))
-    (replace/eql-hash-table
-     (clrhash (character-attribute-hash-table really-to-readtable))
-     (character-attribute-hash-table really-from-readtable))
-    (map-into (character-macro-array really-to-readtable)
+    (replace (base-char-syntax-array really-to-readtable)
+             (base-char-syntax-array really-from-readtable))
+    (map-into (base-char-macro-array really-to-readtable)
               #'copy-cmt-entry
-              (character-macro-array really-from-readtable))
-    (replace/eql-hash-table
-     (clrhash (character-macro-hash-table really-to-readtable))
-     (character-macro-hash-table really-from-readtable)
-     #'copy-cmt-entry)
+              (base-char-macro-array really-from-readtable))
+    (setf (extended-char-table really-to-readtable)
+          (let ((source-ht (extended-char-table really-from-readtable)))
+            (if (eq source-ht *empty-extended-char-table*)
+                source-ht
+                (let ((copy (make-hash-table :test 'eq)))
+                  (hash-table-replace
+                   copy source-ht
+                   (lambda (x)
+                     (when x
+                       ;; (syntax . macro) in which macro could be
+                       ;; a function with a nested dispatch table.
+                       (cons (car x) (copy-cmt-entry (cdr x))))))
+                  copy))))
     (setf (readtable-case really-to-readtable)
           (readtable-case really-from-readtable))
     (setf (%readtable-string-preference really-to-readtable)
@@ -328,10 +357,11 @@ standard Lisp readtable when NIL."
   ;; TO-READTABLE is a readtable, not a readtable-designator
   (assert-not-standard-readtable to-readtable 'set-syntax-from-char)
   (let* ((really-from-readtable (or from-readtable *standard-readtable*))
-         (att (get-cat-entry from-char really-from-readtable))
+         (att (char-syntax from-char
+                           (base-char-syntax-array really-from-readtable)
+                           (extended-char-table really-from-readtable)))
          (mac (get-raw-cmt-entry from-char really-from-readtable)))
-    (set-cat-entry to-char att to-readtable)
-    (set-cmt-entry to-char (copy-cmt-entry mac) to-readtable))
+    (assign-char-syntax to-readtable to-char att (copy-cmt-entry mac)))
   t)
 
 (defun set-macro-character (char function &optional
@@ -342,11 +372,11 @@ standard Lisp readtable when NIL."
    character non-terminating, i.e. embeddable in a symbol name."
   (let ((designated-readtable (or rt-designator *standard-readtable*)))
     (assert-not-standard-readtable designated-readtable 'set-macro-character)
-    (set-cat-entry char (if non-terminatingp
-                            +char-attr-constituent+
-                            +char-attr-terminating-macro+)
-                   designated-readtable)
-    (set-cmt-entry char (!coerce-to-cmt-entry function) designated-readtable)
+    (assign-char-syntax
+     designated-readtable
+     char
+     (if non-terminatingp +char-attr-constituent+ +char-attr-terminating-macro+)
+     (coerce-to-cmt-entry function))
     t)) ; (ANSI-specified return value)
 
 (defun get-macro-character (char &optional (rt-designator *readtable*))
@@ -357,7 +387,7 @@ standard Lisp readtable when NIL."
   (let* ((designated-readtable (or rt-designator *standard-readtable*))
          ;; the first return value: (OR FUNCTION SYMBOL) if CHAR is a macro
          ;; character, or NIL otherwise
-         (fun-value (!cmt-entry-to-fun-designator
+         (fun-value (cmt-entry-to-fun-designator
                      (get-raw-cmt-entry char designated-readtable))))
     (values fun-value
             ;; NON-TERMINATING-P return value:
@@ -387,13 +417,12 @@ standard Lisp readtable when NIL."
   ;; by catching the error, so I removed it.
   ;; RT is a readtable, not a readtable-designator, as per CLHS.
   (unless (get-dispatch-macro-char-table char rt nil)
-    ;; The dtable is a cons whose whose CAR is initially NIL but upgraded
-    ;; to a hashtable if required, and whose CDR is a vector indexed by
-    ;; char-code up to the maximum base-char.
-    (let ((dtable (cons nil (make-array base-char-code-limit
-                                        :initial-element nil))))
-      (set-macro-character char (%make-dispatch-macro-char dtable)
-                           non-terminating-p rt)))
+    ;; Dispatch table is a cons whose whose CAR is a vector indexed by base char code
+    ;; and CDR is initially NIL, changed to a hashtable if there are extended chars.
+    (set-macro-character char
+                         (%make-dispatch-macro-char
+                          (list (make-array base-char-code-limit :initial-element nil)))
+                         non-terminating-p rt))
   t)
 
 (defun set-dispatch-macro-character (disp-char sub-char function
@@ -408,16 +437,16 @@ standard Lisp readtable when NIL."
     (when (digit-char-p sub-char)
       (error "SUB-CHAR must not be a decimal digit: ~S" sub-char))
     (let ((dtable (get-dispatch-macro-char-table disp-char readtable))
-          (function (!coerce-to-cmt-entry function)))
+          (function (coerce-to-cmt-entry function)))
       ;; (SET-MACRO-CHARACTER #\$ (GET-MACRO-CHARACTER #\#)) will share
       ;; the dispatch table. Perhaps it should be copy-on-write?
       (if (typep sub-char 'base-char)
-          (setf (svref (cdr dtable) (char-code sub-char)) function)
-          (let ((hashtable (car dtable)))
+          (setf (svref (charmacro-dtable-base-chars dtable) (char-code sub-char)) function)
+          (let ((hashtable (charmacro-dtable-extended-chars dtable)))
             (cond (function ; allocate the hashtable if it wasn't made yet
                    (setf (gethash sub-char
-                                  (or hashtable (setf (car dtable)
-                                                      (make-hash-table))))
+                                  (or hashtable (setf (charmacro-dtable-extended-chars dtable)
+                                                      (make-hash-table :test 'eq))))
                          function))
                   (hashtable ; remove an existing entry
                    (remhash sub-char hashtable)))))))
@@ -429,7 +458,7 @@ standard Lisp readtable when NIL."
    or NIL if there is no associated function."
   (let ((dtable (get-dispatch-macro-char-table
                  disp-char (or rt-designator *standard-readtable*))))
-    (!cmt-entry-to-fun-designator
+    (cmt-entry-to-fun-designator
      (get-raw-cmt-dispatch-entry (char-upcase sub-char) dtable))))
 
 
@@ -440,16 +469,11 @@ standard Lisp readtable when NIL."
 (defun flush-whitespace (stream)
   ;; This flushes whitespace chars, returning the last char it read (a
   ;; non-white one). It always gets an error on end-of-file.
-  (let* ((stream (in-stream-from-designator stream))
-         (rt *readtable*)
-         (attribute-array (character-attribute-array rt))
-         (attribute-hash-table (character-attribute-hash-table rt)))
+  (let* ((rt *readtable*)
+         (base (base-char-syntax-array rt))
+         (extended (extended-char-table rt)))
     (macrolet ((done-p ()
-                '(not (eql (if (typep char 'base-char)
-                               (aref attribute-array (char-code char))
-                               (gethash char attribute-hash-table
-                                        +char-attr-constituent+))
-                           +char-attr-whitespace+))))
+                '(neq (char-syntax char base extended) +char-attr-whitespace+)))
       (if (ansi-stream-p stream)
           (prepare-for-fast-read-char stream
             (loop (let ((char (fast-read-char t)))
@@ -468,25 +492,21 @@ standard Lisp readtable when NIL."
 ;;;; temporary initialization hack
 
 ;; Install the (easy) standard macro-chars into *READTABLE*.
-(defun !cold-init-standard-readtable ()
-  (/show0 "entering !cold-init-standard-readtable")
+(defun !reader-cold-init ()
   ;; All characters get boring defaults in MAKE-READTABLE. Now we
   ;; override the boring defaults on characters which need more
   ;; interesting behavior.
   (flet ((whitespaceify (char)
-           (set-cmt-entry char nil)
-           (set-cat-entry char +char-attr-whitespace+)))
+           (assign-char-syntax *readtable* char +char-attr-whitespace+ nil)))
     (whitespaceify (code-char tab-char-code))
     (whitespaceify #\Newline)
     (whitespaceify #\Space)
     (whitespaceify (code-char form-feed-char-code))
     (whitespaceify (code-char return-char-code)))
 
-  (set-cat-entry #\\ +char-attr-single-escape+)
-  (set-cmt-entry #\\ nil)
+  (assign-char-syntax *readtable* #\\ +char-attr-single-escape+ nil)
 
-  (set-cat-entry #\| +char-attr-multiple-escape+)
-  (set-cmt-entry #\| nil)
+  (assign-char-syntax *readtable* #\| +char-attr-multiple-escape+ nil)
 
   ;; Easy macro-character definitions are in this source file.
   (set-macro-character #\" #'read-string)
@@ -498,16 +518,7 @@ standard Lisp readtable when NIL."
   (set-macro-character #\; #'read-comment)
   ;; (The hairier macro-character definitions, for #\# and #\`, are
   ;; defined elsewhere, in their own source files.)
-
-  ;; all constituents
-  (do ((ichar 0 (1+ ichar))
-       (char))
-      ((= ichar base-char-code-limit))
-    (setq char (code-char ichar))
-    (when (constituentp char *readtable*)
-      (set-cmt-entry char nil)))
-
-  (/show0 "leaving !cold-init-standard-readtable"))
+  )
 
 ;;;; implementation of the read buffer
 
@@ -528,7 +539,7 @@ standard Lisp readtable when NIL."
   ;; Counter advanced as characters are placed into 'string'
   (fill-ptr 0 :type index)
   ;; Counter advanced as characters are consumed from 'string' on re-scan
-  ;; by auxilliary functions MAKE-{INTEGER,FLOAT,RATIONAL} etc.
+  ;; by auxiliary functions MAKE-{INTEGER,FLOAT,RATIONAL} etc.
   (cursor 0 :type index)
   ;; A string used only for FIND-PACKAGE calls in package-qualified
   ;; symbols so that we don't need to call SUBSEQ on the 'string'.
@@ -553,7 +564,7 @@ standard Lisp readtable when NIL."
 
 ;; A list of available TOKEN-BUFs
 (declaim (type (or null token-buf) *token-buf-pool*))
-(!define-thread-local *token-buf-pool* nil)
+(define-thread-local *token-buf-pool* nil)
 
 (defun reset-read-buffer (buffer)
   ;; Turn BUFFER into an empty read buffer.
@@ -568,7 +579,7 @@ standard Lisp readtable when NIL."
 (defun ouch-read-buffer (char buffer)
   ;; When buffer overflow
   (let ((op (token-buf-fill-ptr buffer)))
-    (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+    (declare (optimize (sb-c:insert-array-bounds-checks 0)))
     (when (>= op (length (token-buf-string buffer)))
     ;; an out-of-line call for the uncommon case avoids bloat.
     ;; Size should be doubled.
@@ -591,7 +602,7 @@ standard Lisp readtable when NIL."
 ;; Retun the next character from the buffered token, or NIL.
 (declaim (maybe-inline token-buf-getchar))
 (defun token-buf-getchar (b)
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
   (let ((i (token-buf-cursor (truly-the token-buf b))))
     (and (< i (token-buf-fill-ptr b))
          (prog1 (elt (token-buf-string b) i)
@@ -733,8 +744,9 @@ standard Lisp readtable when NIL."
   "Read from STREAM and return the value read, preserving any whitespace
    that followed the object."
   (declare (explicit-check))
-  (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
-  (%read-preserving-whitespace stream eof-error-p eof-value recursive-p))
+  (let ((stream (in-stream-from-designator stream)))
+    (check-for-recursive-read stream recursive-p 'read-preserving-whitespace)
+    (%read-preserving-whitespace stream eof-error-p eof-value recursive-p)))
 
 ;;; Read from STREAM given starting CHAR, returning 1 and the resulting
 ;;; object, unless CHAR is a macro yielding no value, then 0 and NIL,
@@ -754,14 +766,15 @@ standard Lisp readtable when NIL."
     (and (form-tracking-stream-p stream)
          ;; Subtract 1 because the position points _after_ CHAR.
          (1- (form-tracking-stream-input-char-pos stream)))
-    (funcall (!cmt-entry-to-function
+    (funcall (cmt-entry-to-function
               (get-raw-cmt-entry char *readtable*) #'read-token)
              stream char)))
 
 (defun read (&optional (stream *standard-input*)
                        (eof-error-p t)
                        (eof-value nil)
-                       (recursive-p nil))
+                       (recursive-p nil)
+             &aux (stream (in-stream-from-designator stream)))
   "Read the next Lisp value from STREAM, and return it."
   (declare (explicit-check))
   (check-for-recursive-read stream recursive-p 'read)
@@ -798,16 +811,15 @@ standard Lisp readtable when NIL."
              'sb-kernel::character-decoding-error-in-macro-char-comment
              :position (file-position stream) :stream stream)
             (invoke-restart 'attempt-resync))))
-    (let ((stream (in-stream-from-designator stream)))
-      (if (ansi-stream-p stream)
-          (prepare-for-fast-read-char stream
+    (if (ansi-stream-p stream)
+        (prepare-for-fast-read-char stream
            (loop (let ((char (fast-read-char nil +EOF+)))
                    (when (or (eq char +EOF+) (char= char #\newline))
                      (return (done-with-fast-read-char))))))
           ;; CLOS stream
-          (loop (let ((char (read-char stream nil +EOF+)))
+        (loop (let ((char (read-char stream nil +EOF+)))
                   (when (or (eq char +EOF+) (char= char #\newline))
-                    (return)))))))
+                    (return))))))
   ;; Don't return anything.
   (values))
 
@@ -867,7 +879,9 @@ standard Lisp readtable when NIL."
   ;;; (This is a COMMON-LISP exported symbol.)
   (defun read-delimited-list (endchar &optional
                                       (input-stream *standard-input*)
-                                      recursive-p)
+                                      recursive-p
+                                      &aux (input-stream
+                                            (in-stream-from-designator input-stream)))
   "Read Lisp values from INPUT-STREAM until the next character after a
    value's representation is ENDCHAR, and return the objects as a list."
     (declare (explicit-check))
@@ -877,7 +891,8 @@ standard Lisp readtable when NIL."
                (read-list-item input-stream))))
       (if recursive-p
           (%read-delimited-list)
-          (with-read-buffer () (%read-delimited-list)))))) ; end MACROLET
+          (let ((*sharp-equal* nil))
+            (with-read-buffer () (%read-delimited-list))))))) ; end MACROLET
 
 (defun read-after-dot (stream firstchar collectp)
   ;; FIRSTCHAR is non-whitespace!
@@ -913,7 +928,7 @@ standard Lisp readtable when NIL."
   (declare (character closech))
   (macrolet ((scan (read-a-char eofp &optional finish)
                `(loop (let ((char ,read-a-char))
-                        (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                        (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                         (cond (,eofp (error 'end-of-file :stream stream))
                               ((eql char closech)
                                (return ,finish))
@@ -934,7 +949,6 @@ standard Lisp readtable when NIL."
     (let* ((token-buf *read-buffer*)
            (buf (token-buf-string token-buf))
            (rt *readtable*)
-           (stream (in-stream-from-designator stream))
            (suppress *read-suppress*)
            (lim (length buf))
            (ptr 0)
@@ -1027,12 +1041,8 @@ standard Lisp readtable when NIL."
 
 ;;; Return the character class for CHAR.
 ;;;
-;;; FIXME: why aren't these ATT-getting forms using GET-CAT-ENTRY?
-;;; Because we've cached the readtable tables?
 (defmacro char-class (char attarray atthash)
-  `(let ((att (if (typep (truly-the character ,char) 'base-char)
-                  (aref ,attarray (char-code ,char))
-                  (gethash ,char ,atthash +char-attr-constituent+))))
+  `(let ((att (char-syntax ,char ,attarray ,atthash)))
      (declare (fixnum att))
      (cond
        ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
@@ -1045,9 +1055,7 @@ standard Lisp readtable when NIL."
 ;;; Return the character class for CHAR, which might be part of a
 ;;; rational number.
 (defmacro char-class2 (char attarray atthash read-base)
-  `(let ((att (if (typep (truly-the character ,char) 'base-char)
-                  (aref ,attarray (char-code ,char))
-                  (gethash ,char ,atthash +char-attr-constituent+))))
+  `(let ((att (char-syntax ,char ,attarray ,atthash)))
      (declare (fixnum att))
      (cond
        ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
@@ -1064,9 +1072,7 @@ standard Lisp readtable when NIL."
 ;;; rational or floating number. (Assume that it is a digit if it
 ;;; could be.)
 (defmacro char-class3 (char attarray atthash read-base)
-  `(let ((att (if (typep (truly-the character ,char) 'base-char)
-                  (aref ,attarray (char-code ,char))
-                  (gethash ,char ,atthash +char-attr-constituent+))))
+  `(let ((att (char-syntax ,char ,attarray ,atthash)))
      (declare (fixnum att))
      (cond
        ((<= att +char-attr-terminating-macro+) +char-attr-delimiter+)
@@ -1144,7 +1150,7 @@ standard Lisp readtable when NIL."
      ((and (zerop (length escapes)) (eq case :upcase))
       (let ((buffer (token-buf-string token-buf)))
         (dotimes (i (token-buf-fill-ptr token-buf))
-          (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+          (declare (optimize (sb-c:insert-array-bounds-checks 0)))
           (setf (schar buffer i) (char-upcase (schar buffer i))))))
      ((eq case :preserve))
      (t
@@ -1155,7 +1161,7 @@ standard Lisp readtable when NIL."
                                   -1 (vector-pop escapes))))
                         ((minusp i))
                       (declare (fixnum i)
-                               (optimize (sb-c::insert-array-bounds-checks 0)))
+                               (optimize (sb-c:insert-array-bounds-checks 0)))
                       (if (< esc i)
                           (let ((ch (schar buffer i)))
                             ,@body)
@@ -1225,8 +1231,8 @@ extended <package-name>::<form-in-package> syntax."
     (return-from read-token nil))
   (let* ((rt *readtable*)
          (base *read-base*)
-         (attribute-array (character-attribute-array rt))
-         (attribute-hash-table (character-attribute-hash-table rt))
+         (attribute-array (base-char-syntax-array rt))
+         (attribute-hash-table (extended-char-table rt))
          (buf *read-buffer*)
          (package-designator nil)
          (colons 0)
@@ -1453,8 +1459,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (t (go SYMBOL)))
      SYMBOL ; not a dot, dots, or number
-      (let ((stream (in-stream-from-designator stream)))
-        (macrolet
+      (macrolet
            ((scan (read-a-char &optional finish)
              `(prog ()
                SYMBOL-LOOP
@@ -1473,7 +1478,7 @@ extended <package-name>::<form-in-package> syntax."
             (prepare-for-fast-read-char stream
               (scan (fast-read-char nil +EOF+) (done-with-fast-read-char)))
             ;; CLOS stream
-            (scan (read-char stream nil +EOF+)))))
+            (scan (read-char stream nil +EOF+))))
      SINGLE-ESCAPE ; saw a single-escape
       ;; Don't put the escape character in the read buffer.
       ;; READ-NEXT CHAR, put in buffer (no case conversion).
@@ -1565,6 +1570,9 @@ extended <package-name>::<form-in-package> syntax."
                   (multiple-value-bind (symbol accessibility)
                       (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf) pkg)
                     (when (eq accessibility :external) (return symbol))
+                    (when (and accessibility
+                               (check-deprecated-export pkg symbol))
+                      (return symbol))
                     (with-simple-restart (continue "Use symbol anyway.")
                       (error 'simple-reader-package-error
                              :package pkg
@@ -1633,7 +1641,7 @@ extended <package-name>::<form-in-package> syntax."
 (defmacro !setq-optional-leading-sign (sign-flag token-buf rewind)
   ;; guaranteed to have at least one character in buffer at the start
   ;; or immediately following [ESFDL] marker depending on 'rewind' flag.
-  `(locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  `(locally (declare (optimize (sb-c:insert-array-bounds-checks 0)))
      (,(if rewind 'setf 'incf)
        (token-buf-cursor ,token-buf)
        (case (elt (token-buf-string ,token-buf)
@@ -1649,8 +1657,8 @@ extended <package-name>::<form-in-package> syntax."
            (inline token-buf-getchar)) ; makes for smaller code
   (let* ((fixnum-max-digits
           (macrolet ((maxdigits ()
-                       (sb-xc:coerce (integer-reader-safe-digits)
-                                     '(vector (unsigned-byte 8)))))
+                       (coerce (integer-reader-safe-digits)
+                               '(vector (unsigned-byte 8)))))
             (aref (maxdigits) (- base 2))))
          (base-power
           (macrolet ((base-powers ()
@@ -1825,23 +1833,31 @@ extended <package-name>::<form-in-package> syntax."
                  (return (setq sub-char (char-upcase ch))))))))
     ;; Look up the function and call it.
     (let ((fn (get-raw-cmt-dispatch-entry sub-char dispatch-table)))
-      (funcall (!cmt-entry-to-function fn #'dispatch-char-error)
+      (funcall (cmt-entry-to-function fn #'dispatch-char-error)
                stream sub-char (if numargp numarg nil)))))
 
 ;;;; READ-FROM-STRING
 
 (declaim (ftype (sfunction (string t t index (or null index) t) (values t index))
-                %read-from-string))
+                %read-from-string
+                %read-from-string/safe))
 (defun %read-from-string (string eof-error-p eof-value start end preserve-whitespace)
-  (with-array-data ((string string :offset-var offset)
-                    (start start)
-                    (end end)
-                    :check-fill-pointer t)
-    (let ((stream (make-string-input-stream string start end)))
-      (values (if preserve-whitespace
-                  (%read-preserving-whitespace stream eof-error-p eof-value nil)
-                  (read stream eof-error-p eof-value))
-              (- (string-input-stream-current stream) offset)))))
+  (let* ((index)
+         (thing
+          (with-input-from-string (stream string :start start :end end :index index)
+            (if preserve-whitespace
+                (%read-preserving-whitespace stream eof-error-p eof-value nil)
+                (read stream eof-error-p eof-value)))))
+    (values thing index)))
+(defun %read-from-string/safe (string eof-error-p eof-value start end preserve-whitespace)
+  (declare (optimize safety)) ; make a stream with indefinite extent
+  (let* ((index)
+         (thing
+          (with-input-from-string (stream string :start start :end end :index index)
+            (if preserve-whitespace
+                (%read-preserving-whitespace stream eof-error-p eof-value nil)
+                (read stream eof-error-p eof-value)))))
+    (values thing index)))
 
 (locally
 (declare (muffle-conditions style-warning))
@@ -1852,7 +1868,7 @@ extended <package-name>::<form-in-package> syntax."
    will take effect."
   (declare (string string))
   (maybe-note-read-from-string-signature-issue eof-error-p)
-  (%read-from-string string eof-error-p eof-value start end preserve-whitespace)))
+  (%read-from-string/safe string eof-error-p eof-value start end preserve-whitespace)))
 
 ;;;; PARSE-INTEGER
 
@@ -1915,9 +1931,6 @@ extended <package-name>::<form-in-package> syntax."
 
 ;;;; reader initialization code
 
-(defun !reader-cold-init ()
-  (!cold-init-standard-readtable))
-
 (defmethod print-object ((readtable readtable) stream)
   (print-unreadable-object (readtable stream :identity t :type t)))
 
@@ -1927,23 +1940,32 @@ extended <package-name>::<form-in-package> syntax."
 ;; values was a hashtable which got immediately coerced to an alist.
 ;; In anticipation of perhaps not doing an extra re-shaping, if HASH-TABLE-P
 ;; is NIL then return nested alists: ((#\# (#\R . #<FUNCTION SHARP-R>) ...))
+;; FIXME: provide a better interface for iterating over reader macros
 (defun dispatch-tables (readtable &optional (hash-table-p t))
   (let (alist)
     (flet ((process (char fn &aux (dtable (%dispatch-macro-char-table fn)))
              (when dtable
-               (let ((output (awhen (car dtable) (%hash-table-alist it))))
-                 (loop for fn across (the simple-vector (cdr dtable))
+               (let ((output (awhen (charmacro-dtable-extended-chars dtable)
+                               (%hash-table-alist it))))
+                 (loop for fn across (the simple-vector (charmacro-dtable-base-chars dtable))
                        and ch from 0
                        when fn do (push (cons (code-char ch) fn) output))
                  (dolist (cell output) ; coerce values to function-designator
-                   (rplacd cell (!cmt-entry-to-fun-designator (cdr cell))))
-                 (when hash-table-p ; caller wants hash-tables
+                   (rplacd cell (cmt-entry-to-fun-designator (cdr cell))))
+                 (when hash-table-p     ; caller wants hash-tables
                    (setq output (%stuff-hash-table (make-hash-table) output)))
                  (push (cons char output) alist)))))
-      (loop for fn across (character-macro-array readtable) and ch from 0
+      (loop for fn across (base-char-macro-array readtable) and ch from 0
             do (process (code-char ch) fn))
-      (maphash #'process (character-macro-hash-table readtable)))
+      (maphash (lambda (char val) (process char (cdr val)))
+               (extended-char-table readtable)))
     alist))
+
+(declaim (inline character-macro-array character-macro-hash-table))
+(define-deprecated-function :early "2.0.6" character-macro-array base-char-macro-array (readtable)
+  (base-char-macro-array readtable))
+(define-deprecated-function :early "2.0.6" character-macro-hash-table extended-char-table (readtable)
+  (extended-char-table readtable))
 
 ;; Stub - should never get called with anything but NIL
 ;; and only after all macros have been changed to constituents already.

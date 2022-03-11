@@ -56,11 +56,12 @@
 ;;; operand, but this seems unworthwhile.
 ;;;
 (define-vop (push-values)
-  (:args (vals :more t))
+  (:args (vals :more t :scs (descriptor-reg any-reg control-stack)))
   (:results (start :scs (any-reg) :from :load)
             (count :scs (any-reg)))
   (:info nvals)
   (:temporary (:scs (descriptor-reg)) temp)
+  (:vop-var vop)
   (:generator 20
     (inst mr start csp-tn)
     (inst addi csp-tn csp-tn (* nvals n-word-bytes))
@@ -69,10 +70,13 @@
         ((null val))
       (let ((tn (tn-ref-tn val)))
         (sc-case tn
-          (descriptor-reg
+          ((descriptor-reg any-reg)
            (storew tn start i))
           (control-stack
            (load-stack-tn temp tn)
+           (storew temp start i))
+          (constant
+           (load-constant vop tn temp)
            (storew temp start i)))))
     (inst lr count (fixnumize nvals))))
 
@@ -116,9 +120,8 @@
 ;;;
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg zero immediate))
          (num :scs (any-reg) :target count))
-  (:arg-types * positive-fixnum positive-fixnum)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 0)) src)
   (:temporary (:sc any-reg :from (:argument 2)) dst)
   (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
@@ -126,13 +129,7 @@
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (zero
-       (inst mr src context))
-      (immediate
-       (inst addi src context (* (tn-value skip) n-word-bytes)))
-      (any-reg
-       (inst add src context skip)))
+    (move src context)
     (inst mr. count num)
     (inst mr start csp-tn)
     (inst beq done)

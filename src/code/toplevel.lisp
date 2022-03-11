@@ -58,7 +58,7 @@ been specified on the command-line.")
          (%exit)))))
 
 (define-load-time-global *exit-lock* nil)
-(!define-thread-local *exit-in-process* nil)
+(define-thread-local *exit-in-progress* nil)
 (declaim (type (or null real) *exit-timeout*))
 (defvar *exit-timeout* 60
   "Default amount of seconds, if any, EXIT should wait for other
@@ -67,21 +67,86 @@ means to wait indefinitely.")
 
 (defun os-exit-handler (condition)
   (declare (ignore condition))
-  (os-exit *exit-in-process* :abort t))
+  (os-exit *exit-in-progress* :abort t))
 
 (defvar *exit-error-handler* #'os-exit-handler)
 
 (defun call-exit-hooks ()
-  (unless *exit-in-process*
-    (setf *exit-in-process* 0))
+  (unless *exit-in-progress*
+    (setf *exit-in-progress* 0))
   (handler-bind ((serious-condition *exit-error-handler*))
     (call-hooks "exit" *exit-hooks* :on-error :warn)))
+
+;;; TERMINATE-THREAD as it exists is basically unsuitable for anything other than
+;;; interactive use, because it uses INTERRUPT-THREAD to unwind through user code.
+;;; It is only slightly ok to call INTERRUPT-THREAD on a thread when you know
+;;; exactly what it is doing. But even if you know what it's doing, you don't know
+;;; when, so even if it's your code, it might be calling an alien destructor.
+;;; It says right in the docstring of INTERRUPT-THREAD not to call it,
+;;; and then what do we do? We go full steam ahead and call it.
+;;;   https://www.dictionary.com/e/slang/i-cant-even/
+;;;
+;;; The full story here is that some users seem to think that EXIT is responsible
+;;; for stopping any threads. There was a not-insignificant amount of discussion
+;;; in https://groups.google.com/g/sbcl-devel/c/6Xj_d1dM1k0/m/G9OPAbOueDsJ
+;;; But the mechanism employed for %EXIT-OTHER-THREADS is TERMINATE-THREAD,
+;;; and that's just horrible. No matter how well the SBCL code is constructed,
+;;; this approach can cause lockup.
+;;;
+;;; The *EXIT-HOOKS* are fine, but we can't assume that users call JOIN-THREAD in
+;;; the exit hooks - they might ask threads to stop by assigning a global polled
+;;; flag or by CONDITION-BROADCAST.  They may do nothing. It's arbitrary.
+;;; So maybe the threads are stopping "peacefully" and would finish on their own
+;;; and we {could,should} just call JOIN-THREAD on them. But there's no way to know.
+;;; Instead we just abort random threads with INTERRUPT-THREAD.
+;;; Some of those threads that we forcibly terminate might have already been
+;;; halfway through cleanly unwinding, which very possibly (or even likely)
+;;; involves calling free() to release resources. When we interrupt a thread
+;;; in the midst of its voluntary call to free(), no matter how clever free() is,
+;;; we can presume that it will acquire a global lock.
+;;;
+;;; And there you have it - some dead thread owned a global lock that can't become
+;;; available because we just punched that thread in the guts and killed it.
+;;; Hence *all* threads (including non-Lisp) are permanently stuck waiting on
+;;; a lock that is not owned by any running thread.
+;;;
+;;; I tried to remedy this by having the SIGURG signal handler silently discard
+;;; a signal if interrupted at a non-Lisp program counter, but that presumes the
+;;; call stack is never Lisp -> C -> Lisp, which first of all means that the handler
+;;; needs to be entirely in C (if called from TERMINATE-THREAD) and secondly requires
+;;; TERMINATE-THREAD to keep trying to send a signal if it thinks the signal was dropped.
+;;; And you can't figure out whether a signal got purposely discard because then you'd
+;;; need to wait an arbitrary amount of time to decide whether it might have been.
+;;; Or invent a synchronized technique to see whether the asynchronous mechanism worked.
+;;;
+;;; So then the solution occurred to me:
+;;;  --> just don't terminate threads by force. Problem solved. <--
+;;;
+;;; Therefore, if you want EXIT to be as near to the C exit() call as possible,
+;;; after doing the lisp exit hooks, just set this global flag to NIL.
+;;; Or leave it as T if you're fine with the old lockup-prone behavior.
+;;;
+;;; And if you think it's up to the Lisp environment to try to make threads stop
+;;; by hook or by crook as a precondition to calling OS-EXIT (with which I disagree),
+;;; the right solution is possibly modeled on pthread_cancel() which has specified
+;;; cancelation points (system and C library calls) which check for cancelation,
+;;; perform whatever cleanups were pushed by pthread_cleanup_push() and then stop.
+;;;
+;;; P.S. To see that #+sb-safepoint is no magic fix - suppose you have a stack
+;;; with Lisp -> C -> -> Lisp where C acquired a resource and the currently
+;;; top-of-stack Lisp function took a safepoint trap. It would be fine if all it
+;;; wanted to do was GC, but is not safe in general.
+;;; Hence #+sb-safepoint paints a dangerously attractive veneer over an unsafe
+;;; concept, making it more subtly bad instead of very obviously bad.
+;;;
+;;; So this is a bad default. Bad bad bad. But it's backward-compatible.
+(define-load-time-global *forcibly-terminate-threads-on-exit* t)
 
 (defun %exit ()
   ;; If anything goes wrong, we will exit immediately and forcibly.
   (handler-bind ((serious-condition *exit-error-handler*))
     (let ((ok nil)
-          (code *exit-in-process*))
+          (code *exit-in-progress*))
       (if (consp code)
           ;; Another thread called EXIT, and passed the buck to us -- only
           ;; final call left to do.
@@ -89,7 +154,11 @@ means to wait indefinitely.")
           (unwind-protect
                (progn
                  (flush-standard-output-streams)
-                 (sb-thread::%exit-other-threads)
+                 (if *forcibly-terminate-threads-on-exit*
+                     (sb-thread::%exit-other-threads)
+                     (with-deadline (:seconds nil :override t)
+                       #+sb-thread (finalizer-thread-stop)
+                       (sb-thread:grab-mutex sb-thread::*make-thread-lock*)))
                  (setf ok t))
             (os-exit code :abort (not ok)))))))
 
@@ -119,9 +188,9 @@ means to wait indefinitely.")
                                                     $1f9)))))))
     (declare (inline split-float))
     (typecase seconds
-      ((single-float $0f0 #.(float sb-xc:most-positive-fixnum $1f0))
+      ((single-float $0f0 #.(float most-positive-fixnum $1f0))
        (split-float))
-      ((double-float $0d0 #.(float sb-xc:most-positive-fixnum $1d0))
+      ((double-float $0d0 #.(float most-positive-fixnum $1d0))
        (split-float))
       (ratio
        (split-ratio-for-sleep seconds))
@@ -181,11 +250,11 @@ any non-negative real number."
             ;; use the largest representable value in that case.
             (timeout (or (seconds-to-maybe-internal-time seconds)
                          (* safe-internal-seconds-limit
-                            sb-xc:internal-time-units-per-second))))
+                            internal-time-units-per-second))))
         (labels ((sleep-for-a-bit (remaining)
                    (multiple-value-bind
                          (timeout-sec timeout-usec stop-sec stop-usec deadlinep)
-                       (decode-timeout (/ remaining sb-xc:internal-time-units-per-second))
+                       (decode-timeout (/ remaining internal-time-units-per-second))
                      (declare (ignore stop-sec stop-usec))
                      ;; Sleep until either the timeout or the deadline
                      ;; expires.
@@ -246,31 +315,28 @@ any non-negative real number."
 ;;; Flush anything waiting on one of the ANSI Common Lisp standard
 ;;; output streams before proceeding.
 (defun flush-standard-output-streams ()
-  (let ((null (make-broadcast-stream)))
-    (dolist (name '(*debug-io*
-                    *error-output*
-                    *query-io*
-                    *standard-output*
-                    *trace-output*
-                    *terminal-io*))
       ;; 0. Pull out the underlying stream, so we know what it is.
       ;; 1. Handle errors on it. We're doing this on entry to
       ;;    debugger, so we don't want recursive errors here.
       ;; 2. Rebind the stream symbol in case some poor sod sees
       ;;    a broken stream here while running with *BREAK-ON-ERRORS*.
-      (let ((stream (stream-output-stream (symbol-value name))))
-        ;; This is kind of crummy because it checks in globaldb for each
-        ;; stream symbol whether it can be bound to a stream. The translator
-        ;; for PROGV could skip ABOUT-TO-MODIFY-SYMBOL-VALUE based on
-        ;; an aspect of a policy, but if users figure that out they could
-        ;; do something horrible like rebind T and NIL.
-        (progv (list name) (list null)
-          (handler-bind ((stream-error
-                           (lambda (c)
-                             (when (eq stream (stream-error-stream c))
-                               (go :next)))))
-            (force-output stream))))
-      :next))
+  (flet ((flush (stream)
+           (let ((stream (stream-output-stream stream)))
+             (handler-bind ((stream-error
+                             (lambda (c)
+                               (when (eq (stream-error-stream c) stream)
+                                 (return-from flush)))))
+               (force-output stream)))))
+    (let ((null-stream (load-time-value *null-broadcast-stream* t)))
+      (macrolet ((flush-all (&rest streamvars)
+                   `(progn
+                      ,@(mapcar (lambda (streamvar)
+                                  `(let ((stream ,streamvar)
+                                         (,streamvar null-stream))
+                                     (flush stream)))
+                                streamvars))))
+        (flush-all *debug-io* *error-output* *query-io* *standard-output*
+                   *trace-output* *terminal-io*))))
   (values))
 
 (defun process-eval/load-options (options)
@@ -335,6 +401,13 @@ any non-negative real number."
           control-string
           args)
   (exit :code 1))
+
+
+(defvar *runtime-options*
+  #("--noinform" "--core" "--help" "--version" "--dynamic-space-size"
+    "--control-stack-size" "--tls"
+    "--debug-environment" "--disable-ldb" "--lose-on-corruption"
+    "--end-runtime-options" "--merge-core-pages" "--no-merge-core-pages"))
 
 ;;; the default system top level function
 (defun toplevel-init ()
@@ -431,6 +504,9 @@ any non-negative real number."
                    ((string= option "--end-toplevel-options")
                     (pop-option)
                     (return))
+                   ((find option *runtime-options* :test #'string=)
+                    (startup-error "C runtime option ~a in the middle of Lisp options."
+                                   option))
                    (t
                     ;; Anything we don't recognize as a toplevel
                     ;; option must be the start of user-level
@@ -483,9 +559,9 @@ any non-negative real number."
                                                  (pathname it))
                                              :if-does-not-exist nil)
                        (cond (stream
-                              (dx-flet ((thunk ()
-                                          (load-as-source stream :context kind)))
-                                (sb-fasl::call-with-load-bindings #'thunk stream)))
+                              (sb-fasl::call-with-load-bindings
+                               (lambda (stream kind) (load-as-source stream :context kind))
+                               stream kind stream))
                              (specified-pathname
                               (cerror "Ignore missing init file"
                                       "The specified ~A file ~A was not found."
@@ -583,22 +659,16 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
       ;; Each REPL in a multithreaded world should have bindings of
       ;; most CL specials (most critically *PACKAGE*).
       (with-rebound-io-syntax
-          (handler-bind ((step-condition 'invoke-stepper))
-            (loop
-               (/show0 "about to set up restarts in TOPLEVEL-REPL")
-               ;; CLHS recommends that there should always be an
-               ;; ABORT restart; we have this one here, and one per
-               ;; debugger level.
-               (with-simple-restart
-                   (abort "~@<Exit debugger, returning to top level.~@:>")
-                 (catch 'toplevel-catcher
-                   ;; In the event of a control-stack-exhausted-error, we
-                   ;; should have unwound enough stack by the time we get
-                   ;; here that this is now possible.
-                   #-win32
-                   (sb-kernel::reset-control-stack-guard-page)
-                   (funcall repl-fun noprint)
-                   (critically-unreachable "after REPL")))))))))
+        (loop
+         (/show0 "about to set up restarts in TOPLEVEL-REPL")
+         ;; CLHS recommends that there should always be an
+         ;; ABORT restart; we have this one here, and one per
+         ;; debugger level.
+         (with-simple-restart
+             (abort "~@<Exit debugger, returning to top level.~@:>")
+           (catch 'toplevel-catcher
+             (funcall repl-fun noprint)
+             (critically-unreachable "after REPL"))))))))
 
 ;;; Our default REPL prompt is the minimal traditional one.
 (defun repl-prompt-fun (stream)
@@ -658,3 +728,67 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()
   (%primitive sb-c:halt))
+
+
+;;;; Examples of why NEVER NEVER NEVER to call TERMINATE-THREAD in production.
+
+#|
+Example 1. Stuck somewhere in free() and in JOIN-THREAD.
+[stuck at https://github.com/google/tcmalloc/blob/master/tcmalloc/cpu_cache.cc#L204]
+  Thread "A":
+    0x98e697c [AbslInternalSpinLockDelay]
+    0x9898287 [tcmalloc::CPUCache::UpdateCapacity(int, unsigned long, unsigned long, bool, tcmalloc::CPUCache::ObjectClass*, unsigned long*)]
+    0x9898b38 [tcmalloc::CPUCache::Overflow(void*, unsigned long, int)]
+    0x9891f39 [(anonymous namespace)::do_free_no_hooks(void*)]
+    0x988cea1 [MallocBlock::ProcessFreeQueue(MallocBlock*, unsigned long, int)]
+    0x26f490a [CFFI::FOREIGN-ARRAY-FREE]
+  Thread "main thread":
+    0x9877f23 [futex_wait]
+    0x32f32c8 [(FLET SB-UNIX::BODY :IN SB-THREAD::FUTEX-WAIT)]
+    0x32f301f [SB-THREAD::%%WAIT-FOR-MUTEX]
+    0x2f97f5d [SB-THREAD::%WAIT-FOR-MUTEX]
+    0x2f287be [SB-THREAD::JOIN-THREAD]
+
+Example 2. Stuck somewhere else in free() and in JOIN-THREAD.
+  Thread "A":
+    0x7f657d1a7cb9 [syscall]
+    0x98e697c [AbslInternalSpinLockDelay]
+    0x995e9e7 [absl::base_internal::SpinLock::SlowLock()]
+    0x988d63b [MallocBlock::CheckAndClear(int)]
+    0x9a8511f [__libc_free]
+    0x26f490a [CFFI::FOREIGN-ARRAY-FREE]
+  Thread "main thread":
+    0x9877f23 [futex_wait]
+    0x32f32c8 [(FLET SB-UNIX::BODY :IN SB-THREAD::FUTEX-WAIT)]
+    0x32f301f [SB-THREAD::%%WAIT-FOR-MUTEX]
+    0x2f97f5d [SB-THREAD::%WAIT-FOR-MUTEX]
+    0x2f287be [SB-THREAD::JOIN-THREAD]
+
+Example 3. main thread stuck in a C library exit handler:
+   0x98e697c [AbslInternalSpinLockDelay]
+   0x995e9e7 [absl::base_internal::SpinLock::SlowLock()]
+   0x98a43cf [tcmalloc::HugePageAwareAllocator::LockAndAlloc(unsigned long, bool*)]
+   0x98a423f [tcmalloc::HugePageAwareAllocator::New(unsigned long)]
+   0x9896ee8 [tcmalloc::CentralFreeList::Populate()]
+   0x9896c69 [tcmalloc::CentralFreeList::RemoveRange(void**, int)]
+   0x9897e74 [tcmalloc::CPUCache::Refill(int, unsigned long)]
+   0x989221b [tcmalloc::dbg_do_malloc(unsigned long, unsigned long*)]
+   0x9a85045 [__libc_malloc]
+   0x7f25a8ad5772 [__run_exit_handlers]
+   0x7f25a8ad57c5 [exit]
+   0x2fa99a3 [SB-SYS::OS-EXIT]
+
+Example 4. main thread stuck in a different C library exit handler:
+   0x992ecfe [absl::synchronization_internal::Waiter::Wait(absl::synchronization_internal::KernelTimeout)]
+   0x98e6865 [AbslInternalPerThreadSemWait]
+   0x992fd4d [absl::Mutex::Block(absl::base_internal::PerThreadSynch*)]
+   0x99324a0 [absl::Mutex::LockSlowLoop(absl::SynchWaitParams*, int)]
+   0x9930b0e [absl::Mutex::LockSlow(absl::MuHowS const*, absl::Condition const*, int)]
+   0x9930346 [absl::Mutex::Lock()]
+   0x97ca6c0 [thread::local::internal::Var::~Var()]
+   0x7fcf3fde0772 [__run_exit_handlers]
+   0x7fcf3fde07c5 [exit]
+   0x2fa99a3 [SB-SYS::OS-EXIT]
+
+There are plenty more where those came from.
+|#

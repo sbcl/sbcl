@@ -108,6 +108,7 @@
                       / // ///
                       + ++ +++
                       -
+                      *break-on-signals*
                       *gensym-counter*
                       ;; These are bound when compiling and/or loading:
                       *package*

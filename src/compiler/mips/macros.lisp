@@ -23,36 +23,37 @@
 
 ;;; Instruction-like macros.
 
-(defmacro move (dst src &optional (always-emit-code-p nil))
-  "Move SRC into DST (unless they are location= and ALWAYS-EMIT-CODE-P
-is nil)."
+(defmacro move (dst src)
+  "Move SRC into DST unless they are location="
+  (once-only ((n-dst dst)
+              (n-src src))
+    `(unless (location= ,n-dst ,n-src)
+       (inst move ,n-dst ,n-src))))
+(defmacro emit-nop-or-move (dst src)
+  "Move SRC into DST, but if they are location= then emit a NOP"
   (once-only ((n-dst dst)
               (n-src src))
     `(if (location= ,n-dst ,n-src)
-         (when ,always-emit-code-p
-           (inst nop))
+         (inst nop)
          (inst move ,n-dst ,n-src))))
+(defmacro zeroize (reg)
+  `(inst move ,reg zero-tn))
 
-(defmacro def-mem-op (op inst shift load)
-  `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
-     `(progn
-        (inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag))
-        ,,@(when load '('(inst nop))))))
-;;;
-(def-mem-op loadw lw word-shift t)
-(def-mem-op storew sw word-shift nil)
+(macrolet ((def-mem-op (op inst shift)
+             `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
+                `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
+  (def-mem-op loadw lw word-shift)
+  (def-mem-op storew sw word-shift))
 
 (defmacro load-symbol (reg symbol)
   (once-only ((reg reg) (symbol symbol))
     `(inst addu ,reg null-tn (static-symbol-offset ,symbol))))
 
 (defmacro load-symbol-value (reg symbol)
-  `(progn
-     (inst lw ,reg null-tn
-           (+ (static-symbol-offset ',symbol)
-              (ash symbol-value-slot word-shift)
-              (- other-pointer-lowtag)))
-     (inst nop)))
+  `(inst lw ,reg null-tn
+         (+ (static-symbol-offset ',symbol)
+            (ash symbol-value-slot word-shift)
+            (- other-pointer-lowtag))))
 
 (defmacro store-symbol-value (reg symbol)
   `(inst sw ,reg null-tn
@@ -79,10 +80,10 @@ byte-ordering issues."
 (defmacro lisp-jump (function lip)
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
-     (inst addu ,lip ,function (- (ash simple-fun-code-offset word-shift)
+     (inst addu ,lip ,function (- (ash simple-fun-insts-offset word-shift)
                                    fun-pointer-lowtag))
      (inst j ,lip)
-     (move code-tn ,function t)))
+     (emit-nop-or-move code-tn ,function)))
 
 (defmacro lisp-return (return-pc lip &key (offset 0) (frob-code t))
   "Return to RETURN-PC.  LIP is an interior-reg temporary."
@@ -91,7 +92,7 @@ byte-ordering issues."
            (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
      (inst j ,lip)
      ,(if frob-code
-          `(move code-tn ,return-pc t)
+          `(emit-nop-or-move code-tn ,return-pc)
           '(inst nop))))
 
 
@@ -153,33 +154,24 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
               (dynamic-extent-p dynamic-extent-p)
               (lowtag lowtag))
     `(if ,dynamic-extent-p
-         (pseudo-atomic (,flag-tn)
-           (align-csp ,temp-tn)
+         (pseudo-atomic (,flag-tn) ; why P-A ???
+           (align-csp ,temp-tn ,flag-tn)
            (inst or ,result-tn csp-tn ,lowtag)
-           (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
+           (inst li ,temp-tn (compute-object-header ,size ,type-code))
            (inst addu csp-tn (pad-data-block ,size))
            (storew ,temp-tn ,result-tn 0 ,lowtag)
            ,@body)
-         (pseudo-atomic (,flag-tn :extra (pad-data-block ,size))
-           ;; The pseudo-atomic bit in alloc-tn is set.  If the lowtag also
-           ;; has a 1 bit in the same position, we're all set.  Otherwise,
-           ;; we need to subtract the pseudo-atomic bit.
-           (inst or ,result-tn alloc-tn ,lowtag)
-           (unless (logbitp 0 ,lowtag) (inst subu ,result-tn 1))
-           (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
+         (pseudo-atomic (,flag-tn)
+           (allocation ,type-code (pad-data-block ,size) ,result-tn ,lowtag
+                       (list ,flag-tn ,temp-tn) :stackp ,dynamic-extent-p)
+           (inst li ,temp-tn (compute-object-header ,size ,type-code))
            (storew ,temp-tn ,result-tn 0 ,lowtag)
            ,@body))))
 
-(defun align-csp (temp)
-  ;; is used for stack allocation of dynamic-extent objects
-  (let ((aligned (gen-label)))
-    (inst and temp csp-tn lowtag-mask)
-    (inst beq temp aligned)
-    (inst nop)
-    (inst addu csp-tn n-word-bytes)
-    (storew zero-tn csp-tn -1)
-    (emit-label aligned)))
-
+(defun align-csp (temp1 temp2)
+  (inst li temp1 (lognot lowtag-mask))
+  (inst addu temp2 csp-tn lowtag-mask)
+  (inst and csp-tn temp2 temp1))
 
 ;;;; Three Way Comparison
 (defun three-way-comparison (x y condition flavor not-p target temp)
@@ -232,21 +224,18 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
 
 ;;;; PSEUDO-ATOMIC
 
-;;; handy macro for making sequences look atomic
-(defmacro pseudo-atomic ((flag-tn &key (extra 0)) &rest forms)
+(defmacro pseudo-atomic ((flag-tn &key elide-if (extra nil)) &rest forms)
+  (aver (not extra))
   `(progn
-     (aver (= (tn-offset ,flag-tn) nl4-offset))
-     (aver (not (minusp ,extra)))
-     (without-scheduling ()
-       (inst li ,flag-tn ,extra)
-       (inst addu alloc-tn 1))
+     (unless ,elide-if
+       (without-scheduling ()
+         (store-symbol-value csp-tn *pseudo-atomic-atomic*)))
      ,@forms
-     (without-scheduling ()
-       (let ((label (gen-label)))
-         (inst bgez ,flag-tn label)
-         (inst addu alloc-tn (1- ,extra))
-         (inst break 0 pending-interrupt-trap)
-         (emit-label label)))))
+     (unless ,elide-if
+       (without-scheduling ()
+         (store-symbol-value null-tn *pseudo-atomic-atomic*)
+         (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
+         (inst tne zero-tn ,flag-tn)))))
 
 ;;;; memory accessor vop generators
 
@@ -299,15 +288,12 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
-              (value :scs ,scs :target result))
+              (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
        (:temporary (:scs (interior-reg)) lip)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
        (:generator 2
          (inst addu lip object index)
-         (storew value lip ,offset ,lowtag)
-         (move result value)))
+         (storew value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -319,11 +305,8 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
                    (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
                                                 ,(eval offset)))
                    ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
        (:generator 1
-         (storew value object (+ ,offset index) ,lowtag)
-         (move result value)))))
+         (storew value object (+ ,offset index) ,lowtag)))))
 
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs
@@ -379,34 +362,28 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs))
          (:arg-types ,type positive-fixnum ,el-type)
          (:temporary (:scs (interior-reg)) lip)
-         (:results (result :scs ,scs))
-         (:result-types ,el-type)
          (:generator 5
            (inst addu lip object index)
            ,@(when (eq size :short)
                '((inst addu lip index)))
            (inst ,(ecase size (:byte 'sb) (:short 'sh))
-                 value lip (- (* ,offset n-word-bytes) ,lowtag))
-           (move result value)))
+                 value lip (- (* ,offset n-word-bytes) ,lowtag))))
        (define-vop (,(symbolicate name "-C"))
          ,@(when translate
              `((:translate ,translate)))
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs ,scs :target result))
+                (value :scs ,scs))
          (:info index)
          (:arg-types ,type
                      (:constant (load/store-index ,scale
                                                   ,(eval lowtag)
                                                   ,(eval offset)))
                      ,el-type)
-         (:results (result :scs ,scs))
-         (:result-types ,el-type)
          (:generator 4
            (inst ,(ecase size (:byte 'sb) (:short 'sh))
                  value object
-                 (- (+ (* ,offset n-word-bytes) (* index ,scale)) ,lowtag))
-           (move result value))))))
+                 (- (+ (* ,offset n-word-bytes) (* index ,scale)) ,lowtag)))))))

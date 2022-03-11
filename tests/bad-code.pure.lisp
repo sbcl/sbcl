@@ -343,10 +343,9 @@
 
 
 (with-test (:name :sequence-lvar-dimensions-dotted-list)
-  (assert (nth-value 3
+  (assert (nth-value 1
                      (checked-compile
                       '(lambda () (position 0 '(1 2 0 5 . 5)))
-                      :allow-style-warnings t
                       :allow-warnings t))))
 
 (with-test (:name :source-form-context-dotted-list)
@@ -430,19 +429,27 @@
                         (search '(a . b) x))
                       :allow-warnings t))))
 
+(with-test (:name :improper-list.3)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                          (let ((x '(1 2 . 3)))
+                            (position c x)))
+                      :allow-warnings t))))
+
 (with-test (:name :call-nil)
   (checked-compile-and-assert
-   ()
-   `(lambda ()
-      (funcall nil))
-   (() (condition 'undefined-function)))
+      ()
+      `(lambda ()
+         (funcall nil))
+    (() (condition 'undefined-function)))
   (checked-compile-and-assert
-   ()
-   `(lambda (x)
-      (if x
-          10
-          (funcall x)))
-   ((nil) (condition 'undefined-function))))
+      ()
+      `(lambda (x)
+         (if x
+             10
+             (funcall x)))
+    ((nil) (condition 'undefined-function))))
 
 (with-test (:name (:valid-callable-argument :toplevel-xep))
   (assert (nth-value 2 (checked-compile `(lambda (l) (find-if (lambda ()) l))
@@ -484,3 +491,205 @@
                     args))
                :allow-style-warnings t
                :allow-warnings t))))
+
+(with-test (:name :keyword-type-checking)
+  (assert
+   (nth-value 2
+              (checked-compile
+               `(lambda (x)
+                  (make-array 10 (list x) x))
+               :allow-warnings t))))
+
+(with-test (:name :unused-local-functions)
+  (labels ((find-note (x)
+             (loop for note in (nth-value 4 (checked-compile x))
+                   thereis (and (typep note 'sb-ext:code-deletion-note)
+                                (eql (search "deleting unused function"
+                                             (princ-to-string note))
+                                     0))))
+           (check (f)
+             (assert (find-note `(lambda () (flet (,f)))))
+             (assert (not (find-note `(lambda (x)
+                                        (flet (,f)
+                                          (and x (not x) (f)))))))))
+    (check '(f ()))
+    (check '(f (&key)))
+    (check '(f (&key k) k))
+    (check '(f (&rest args) args))
+    (check '(f (&optional o) o))
+    (check '(f (&optional)))))
+
+(with-test (:name :calling-ignored-local)
+  (assert
+   (nth-value 3
+              (checked-compile
+               `(lambda ()
+                  (flet ((f ()))
+                    (declare (ignore #'f))
+                    (f)))
+               :allow-style-warnings t))))
+
+(with-test (:name :inappropriate-declare)
+  (assert
+   (nth-value 5
+              (checked-compile
+               `(lambda (x y) (print-unreadable-object (x y) (declare (optimize))))
+               :allow-failure t)))
+  (assert
+   (nth-value 5
+              (checked-compile
+               `(lambda () (restart-bind () (declare (optimize)) 42))
+               :allow-failure t)))
+  (assert
+   (nth-value 5
+              (checked-compile
+               `(lambda () (prog1 10 (declare (optimize))))
+               :allow-failure t))))
+
+(with-test (:name :reduce-initial-value)
+  (assert
+   (nth-value 2
+              (checked-compile
+               `(lambda ()
+                  (reduce (lambda (x y)
+                            (declare (fixnum x))
+                            (+ x (char-code y)))
+                          "abc"))
+               :allow-warnings t)))
+  (assert
+   (nth-value 2
+              (checked-compile
+               `(lambda ()
+                  (reduce (lambda (x y)
+                            (declare (fixnum x))
+                            (+ x (char-code y)))
+                          "abc"
+                          :initial-value #\a))
+               :allow-warnings t)))
+  (checked-compile-and-assert
+      ()
+      `(lambda (s)
+         (declare (string s))
+         (reduce (lambda (x y)
+                   (declare (fixnum x))
+                   (+ x (char-code y)))
+                 s
+                 :initial-value 0))
+    (("abc") 294)))
+
+(with-test (:name :get-defined-fun-lambda-list-error)
+  (assert (nth-value 1 (checked-compile '(lambda () (defun x 10)) :allow-failure t))))
+
+(with-test (:name :dolist-mismatch)
+  (assert (nth-value 2
+                     (checked-compile '(lambda (x)
+                                        (dolist (x (the integer x))))
+                                      :allow-warnings 'sb-int:type-warning))))
+
+(with-test (:name :loop-list-mismatch)
+  (assert (nth-value 2
+                     (checked-compile '(lambda (x)
+                                        (loop for y in (the integer x)))
+                                      :allow-warnings 'sb-int:type-warning)))
+  (assert (nth-value 2
+                     (checked-compile '(lambda (x)
+                                        (loop for y on (the integer x)))
+                                      :allow-warnings 'sb-int:type-warning))))
+
+(with-test (:name :mapcar-list-mismatch)
+  (assert (nth-value 2
+                     (checked-compile '(lambda (z)
+                                        (mapl #'car  (the integer z)))
+                                      :allow-warnings 'sb-int:type-warning)))
+  (assert (nth-value 2
+                     (checked-compile '(lambda (f z x)
+                                        (mapcar f  (the integer z) (the integer x)))
+                                      :allow-warnings 'sb-int:type-warning))))
+
+(with-test (:name :aref-too-many-subscripts)
+  (assert (nth-value 2
+                     (checked-compile `(lambda (a) (aref a ,@(loop repeat array-rank-limit collect 0)))
+                                      :allow-warnings 'warning))))
+
+(with-test (:name :defclass-bad-type)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda () (defclass ,(gensym) () ((s :type (2)))))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :macro-as-a-function)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x) (find-if 'and x))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x) (funcall 'if x))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x) (mapcar 'and x))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :replace-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x y)
+                         (declare (bit-vector x)
+                                  (string y))
+                         (replace x y :start1 10))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :substitute-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (substitute 10 #\a x))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :make-array-initial-contents-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (n c)
+                         (make-array n :element-type 'bit :initial-contents (the string c)))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :make-array-initial-contents-constant-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (n)
+                         (make-array n :element-type 'bit :initial-contents '(a b c)))
+                      :allow-warnings 'warning))))
+
+
+(with-test (:name :replace-constant-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (replace x '(1 2 3)))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :fill-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (fill x 1))
+                      :allow-warnings 'warning))))
+
+(with-test (:name :vector-push-type-mismatch)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (vector-push 1 x))
+                      :allow-warnings 'warning)))
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (declare (string x))
+                         (vector-push-extend 1 x))
+                      :allow-warnings 'warning))))
+

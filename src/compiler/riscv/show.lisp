@@ -26,7 +26,7 @@
         (store-stack-tn nfp-save cur-nfp))
       (move ca0 object)
       (inst li cfunc (make-fixup "debug_print" :foreign))
-      (invoke-asm-routine 'call-into-c nil)
+      (inst jal ra-tn (make-fixup 'call-into-c :assembly-routine))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
       (move result ca0))))

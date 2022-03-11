@@ -185,7 +185,7 @@
            (exp-marker (if (and marker-pos
                                 (char-not-equal (char string marker-pos) #\E))
                            (char-upcase (char string marker-pos))
-                           (ecase *read-default-float-format*
+                           (ecase cl:*read-default-float-format*
                             ((cl:single-float cl:short-float) #\F)
                             ((cl:double-float cl:long-float)  #\D))))
            (significand (if marker-pos (subseq string 0 marker-pos) string))
@@ -239,18 +239,22 @@
                (double-float (host-sb-kernel:make-double-float
                               (ash bits -32) (ldb (byte 32 0) bits))))))
       (let ((authoritative-answer
-             (apply (intern (string fun) "CL")
-                    (mapcar (lambda (x)
-                              (etypecase x
-                                (float (native-flonum-value x))
-                                (rational x)
-                                (symbol (intern (string x) "CL"))))
-                            (ensure-list args)))))
-        (unless (eql authoritative-answer
-                     (if (floatp (first values))
-                         (native-flonum-value (first values))
-                         (first values)))
-          (#+sb-devel error
+              (multiple-value-list
+               (host-sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
+                 (apply (intern (string fun) "CL")
+                        (mapcar (lambda (x)
+                                  (etypecase x
+                                    (float (native-flonum-value x))
+                                    (rational x)
+                                    (symbol (intern (string x) "CL"))))
+                                (ensure-list args)))))))
+        (unless (equal authoritative-answer
+                       (mapcar (lambda (value)
+                                 (if (floatp value)
+                                     (native-flonum-value value)
+                                     value))
+                               values))
+          (#+sb-devel cerror #+sb-devel "Ignore"
            #-sb-devel format #-sb-devel t
            "~&//CROSS-FLOAT DISCREPANCY!
 // CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
@@ -258,7 +262,7 @@
                   (when (cl:floatp authoritative-answer)
                     (get-float-bits authoritative-answer))
                   authoritative-answer)))))
-  (setf (gethash key table) (if (singleton-p values) (car values) values)))
+  (setf (gethash key table) (if (singleton-p values) (car values) (cons '&values values))))
 
 (defun get-float-ops-cache (&aux (cache sb-cold::*math-ops-memoization*))
   (when (atom cache)
@@ -277,10 +281,15 @@
                 ;; from the SB-KERNEL package, but the cache key should
                 ;; always use the symbol in the CL package.
                 (float-ops-cache-insert (cons (intern (string fun) "CL") args)
-                                        values table))))
+                                        (if (and (symbolp (first values))
+                                                 (string= (symbol-name (first values))
+                                                          "&VALUES"))
+                                            (rest values)
+                                            values)
+                                        table))))
+          (setf (cdr cache) (hash-table-count table))
           (when cl:*compile-verbose*
-            (format t "~&; Float-ops cache prefill: ~D entries~%"
-                    (setf (cdr cache) (hash-table-count table)))))))
+            (format t "~&; Float-ops cache prefill: ~D entries~%" (cdr cache))))))
     table))
 
 (defun record-math-op (key &rest values)
@@ -293,13 +302,14 @@
     (float-ops-cache-insert key values table))
   (apply #'values values))
 
-(defmacro with-memoized-math-op ((name key-expr &optional (n-values 1)) calculation)
-  (unless (= n-values 1)
-    (error "multiple values not working with memoization yet"))
+(defmacro with-memoized-math-op ((name key-expr) calculation)
   `(dx-let ((cache-key (cons ',(intern (string name) "CL") ,key-expr)))
      (multiple-value-bind (answer foundp) (gethash cache-key (get-float-ops-cache))
        (if foundp
-           answer
+           (if (and (listp answer)
+                    (eq (first answer) '&values))
+               (values-list (rest answer))
+               answer)
            (multiple-value-call #'record-math-op cache-key ,calculation)))))
 
 ;;; REAL and IMAG are either host integers (therefore EQL-comparable)
@@ -340,7 +350,7 @@
                                      mantissa)))
                ;; Subtract the exponent bias and account for discrepancy in binary
                ;; point placement in the IEEE representation and the CL function
-               (decf exp (+ (floor max-exp 2) mantissa-nbits))
+               (decf exp (+ (cl:floor max-exp 2) mantissa-nbits))
                (let ((value (cl:scale-float (cl:coerce mantissa host-type) exp)))
                  (if (logbitp (1- format-nbits) bits) (cl:- value) value))))))
     (ecase (flonum-format x)
@@ -371,7 +381,7 @@
                  ((null value) ; must not be one of the exceptional symbols
                   (setf (flonum-%value x) (calculate-flonum-value x)))
                  (t ; infinity or minus-zero
-                  (error "~S has no portable value" x)))))
+                  (error "~S (~D) has no portable value" value x)))))
         (t (error "Got host float"))))
 
 (defun realnumify* (args) (mapcar #'realnumify args))
@@ -424,6 +434,15 @@
               ;; to runtime use. So don't do it.
               (error "Won't do (RATIONAL ~S) due to possible precision loss" x))))))
 
+(defun rationalize (x)
+  (if (rationalp x)
+      x
+      (with-memoized-math-op (rationalize x)
+        (multiple-value-bind (whole frac) (cl:ftruncate (realnumify x))
+          (if (cl:zerop frac)
+              (cl:rationalize whole)
+              (error "Won't do (RATIONALIZE ~S) due to possible precision loss" x))))))
+
 (defun coerce (object type)
   ;; OBJECT is validated prior to testing the quick bail out case, because supposing
   ;; that we accidentally got a host complex number or float, and we accidentally got
@@ -441,7 +460,7 @@
                 (vector (destructuring-bind (et) (cdr type) et)))))
       (return-from coerce
         (sb-xc:make-array (length object) :element-type et
-                          :initial-contents object))))
+                                          :initial-contents object))))
   (unless (numberp object)
     (return-from coerce (cl:coerce object type)))
   (when (member type '(integer rational real))
@@ -483,7 +502,13 @@
 
 ;;; Signum should return -0 of the correct type for -0 input.
 ;;; We don't need it currently.
-(defun xfloat-signum (x) (error "signum ~S: incomplete" x))
+(defun xfloat-signum (x)
+  (if (zerop x)
+      x
+      (coerce (if (= (float-sign-bit x) 1)
+                  -1
+                  1)
+              (flonum-format x))))
 
 ;;; This is simple enough that it's not necessary to memoize all calls.
 (defun xfloat-zerop (x)
@@ -519,9 +544,36 @@
 (defun float-sign (float1 &optional (float2 (float 1 float1) float2p))
   (validate-args float1 float2)
   (with-memoized-math-op (float-sign (cons float1 (if float2p (list float2))))
-    (if (= (float-sign-bit float2) (float-sign-bit float1))
-        float2
-        (sb-xc:- float2))))
+    (let ((res (if (= (float-sign-bit float2) (float-sign-bit float1))
+                   float2
+                   (sb-xc:- float2))))
+      (if (eq (flonum-format float1) 'double-float)
+          (coerce res 'double-float)
+          res))))
+
+(macrolet ((define (name float-fun)
+             `(progn
+                (declaim (inline ,name))
+                (defun ,name (number &optional (divisor 1))
+                  (if (and (rationalp number) (rationalp divisor))
+                      (,(intern (string name) "CL") number divisor)
+                      (,float-fun number divisor)))
+                (defun ,float-fun (number divisor)
+                  (with-memoized-math-op (,name (list number divisor))
+                    (multiple-value-bind (q r)
+                        (,(intern (string name) "CL")
+                         (realnumify number)
+                         (realnumify divisor))
+                      (values q
+                              (make-flonum r (if (or (eq (flonum-format number) 'double-float)
+                                                     (and (floatp divisor)
+                                                          (eq (flonum-format divisor) 'double-float)))
+                                                 'double-float
+                                                 'single-float)))))))))
+  (define floor xfloat-floor)
+  (define ceiling xfloat-ceiling)
+  (define truncate xfloat-truncate)
+  (define round xfloat-round))
 
 (defun exp (x)
   (validate-args x)
@@ -533,13 +585,62 @@
   (cond ((and (rationalp base) (integerp power))
          (cl:expt base power))
         (t
-         (with-memoized-math-op (expt (list base power))
-           (cond ((and (eql base $2f0) (eql power 63))
-                  #.(make-flonum #x5F000000 'single-float))
-                 ((and (eql base $2d0) (eql power 63))
-                  #.(make-flonum #x43E0000000000000 'double-float))
-                 (t
-                  (error "Unhandled case in EXPT")))))))
+         (if (zerop power)
+             (coerce 1 (flonum-format base))
+             (with-memoized-math-op (expt (list base power))
+               (cond ((and (eql base $2f0) (eql power 63))
+                      #.(make-flonum #x5F000000 'single-float))
+                     ((and (eql base $2d0) (eql power 63))
+                      #.(make-flonum #x43E0000000000000 'double-float))
+                     ((and (eql base $10d0) (>= power 322))
+                      #.(make-flonum :+infinity 'double-float))
+                     ((and (eql base $10d0) (eql power -309))
+                      #.(make-flonum #xB8157268FDAF 'double-float))
+                     (t
+                      (make-flonum (cl:expt (realnumify base) power)
+                                   (pick-result-format base power)))))))))
+
+(defun %unary-truncate (number)
+  (typecase number
+    (integer number)
+    (ratio (values (truncate (numerator number) (denominator number))))
+    ((or single-float double-float #+long-float long-float)
+     (error "Unimplemented."))))
+
+(defun %unary-ftruncate (number)
+  (typecase number
+    (integer number)
+    (ratio (values (ftruncate (numerator number) (denominator number))))
+    ((or single-float double-float #+long-float long-float)
+     (error "Unimplemented."))))
+
+(defun %unary-round (number)
+  (typecase number
+    (integer number)
+    (ratio (values (round (numerator number) (denominator number))))
+    ((or single-float double-float #+long-float long-float)
+     (error "Unimplemented."))))
+
+(defun cis (number)
+  (declare (ignore number))
+  (error "Unimplemented."))
+
+(defun scale-float (f ex)
+  (validate-args f)
+  (with-memoized-math-op (scale-float (list f ex))
+    (make-flonum (cl:scale-float (let ((val (realnumify f)))
+                                   (assert (cl:floatp val))
+                                   val)
+                                 ex)
+                 (flonum-format f))))
+
+(defun scale-single-float (f ex)
+  (validate-args f)
+  (scale-float f ex))
+
+(defun scale-double-float (f ex)
+  (validate-args f)
+  (scale-float f ex))
 
 (defun log (number &optional (base nil base-p))
   (validate-args number base)
@@ -551,18 +652,21 @@
     ;; * (log 2d0 2d0) => 1.0d0
     ;; * (log 2s0 2s0) => 1.0
     (let ((format (pick-result-format number (if base-p base 0))))
-      (make-flonum (if base-p
-                       (cl:log (realnumify number) (realnumify base))
-                       (cl:log (realnumify number)))
-                   (if (eq format 'rational) ; neither arg was floating-point
-                       'single-float
-                       format)))))
+      (if (zerop number)
+          (make-flonum :-infinity (if (eq format 'rational)
+                                      'single-float
+                                      format))
+          (make-flonum (if base-p
+                           (cl:log (realnumify number) (realnumify base))
+                           (cl:log (realnumify number)))
+                       (if (eq format 'rational) ; neither arg was floating-point
+                           'single-float
+                           format))))))
 
 ;;;;
 
-;;; There seems to be no portable way to mask float traps, but we
-;;; shouldn't encounter any float traps when cross-compiling SBCL
-;;; itself, anyway, so we just make this a no-op.
+;;; There seems to be no portable way to mask float traps, so right
+;;; now we ignore them and hardcode special cases.
 (defmacro sb-vm::with-float-traps-masked (traps &body body)
   (declare (ignore traps))
   #+nil
@@ -610,28 +714,35 @@
 ;;; These use "#." so that they are dumped as literals rather than having to
 ;;; call read-from-string at load-time (and failing) due to the reader intercept.
 ;;      #define __FLT_MAX__ 3.40282347e+38F
-(defconstant sb-xc:most-positive-single-float
+(defconstant most-positive-single-float
   #.(make-flonum (read-from-string "+3.40282347F38") 'single-float))
-(defconstant sb-xc:most-negative-single-float
+(defconstant most-negative-single-float
   #.(make-flonum (read-from-string "-3.40282347F38") 'single-float))
 
 ;;      #define __DBL_MAX__ 1.7976931348623157e+308
-(defconstant sb-xc:most-positive-double-float
+(defconstant most-positive-double-float
   #.(make-flonum (read-from-string "+1.7976931348623157D308") 'double-float))
-(defconstant sb-xc:most-negative-double-float
+(defconstant most-negative-double-float
   #.(make-flonum (read-from-string "-1.7976931348623157D308") 'double-float))
 
 ;;; PI is needed in order to build the cross-compiler mainly so that vm-fndb
 ;;; can define bounds on irrational functions.
-(defconstant sb-xc:pi
+(defconstant pi
   #.(make-flonum (read-from-string "3.14159265358979323846264338327950288419716939937511L0")
                  'double-float))
 
 (eval-when (:compile-toplevel :execute) (setq sb-cold::*choke-on-host-irrationals* t))
 
-;;; These two constants are used in 'late-type'
-(defconstant sb-xc:most-positive-long-float sb-xc:most-positive-double-float)
-(defconstant sb-xc:most-negative-long-float sb-xc:most-negative-double-float)
+;;; These two constants are used in 'type'
+(defconstant most-positive-long-float most-positive-double-float)
+(defconstant most-negative-long-float most-negative-double-float)
+
+(defun substitute-minus-zero (list)
+  (substitute $0.0d0
+              (make-flonum :minus-zero 'double-float)
+              (substitute $0.0f0
+                          (make-flonum :minus-zero 'single-float)
+                          list)))
 
 (macrolet ((intercept (symbols lambda-list body-form)
              `(progn ,@(mapcar (lambda (symbol)
@@ -647,20 +758,57 @@
              `(let ((x (car args)) (y (cadr args)))
                 (and (floatp x) (floatp y) (eql (flonum-%bits x) (flonum-%bits y)))))
            (two-zeros-p ()
-             `(and (eql nargs 2) (zerop (car args)) (zerop (cadr args)))))
+             `(and (eql nargs 2) (zerop (car args)) (zerop (cadr args))))
+           (same-sign-infinities-p ()
+             `(and (eql nargs 2)
+                   (floatp (car args))
+                   (floatp (cadr args))
+                   (member (flonum-%value (car args)) '(:-infinity :+infinity))
+                   (eq (flonum-%value (cadr args)) (flonum-%value (car args))))))
 
-  ;; Simple case of using the interceptor to return a boolean.
-  ;; If a signed zero or infinity leaks in, the host will choke
-  ;; since those are represented as symbols.
+  ;; Simple case of using the interceptor to return a boolean.  If
+  ;; infinity leaks in, the host will choke since those are
+  ;; represented as symbols.
   (intercept (= /=) (&rest args)
-    (dispatch :me (apply #':me (realnumify* args))))
+    (dispatch :me (apply #':me (realnumify* (substitute-minus-zero args)))))
 
   ;; Simple case of using the interceptor to return a float.
   ;; As above, no funky values allowed.
-  (intercept (max min + * / sqrt) (&rest args)
+  (intercept (max min + acos acosh asin asinh atan atanh conjugate cos cosh fceiling ffloor fround ftruncate phase sin sinh tan tanh) (&rest args)
     (dispatch :me
      (make-flonum (apply #':me (realnumify* args))
                   (apply #'pick-result-format args))))
+
+  (intercept (sqrt) (&rest args)
+    (destructuring-bind (x) args
+      (if (zerop x)
+          x
+          (dispatch :me
+                    (make-flonum (funcall #':me (realnumify x))
+                                 (pick-result-format x))))))
+
+  (intercept (*) (&rest args)
+    (dispatch :me
+              (let ((res (make-flonum (apply #':me (realnumify* (substitute-minus-zero args)))
+                                      (apply #'pick-result-format args))))
+                (if (evenp (+ (count $-0.0d0 args)
+                              (count $-0.0 args)))
+                    res
+                    (sb-xc:- res)))))
+
+  (intercept (/) (&rest args)
+    (if (and (= (length args) 2)
+             ;; ugly hack to avoid tripping up overflow trap
+             (eql (first args) $1.3407807929942596d154)
+             (eql (second args) $8.90029543402881d-308))
+        (make-flonum :+infinity (apply #'pick-result-format args))
+        (dispatch :me
+                  (let ((res (make-flonum (apply #':me (realnumify* (substitute-minus-zero args)))
+                                          (apply #'pick-result-format args))))
+                    (if (evenp (+ (count $-0.0d0 args)
+                                  (count $-0.0 args)))
+                        res
+                        (sb-xc:- res))))))
 
   (intercept (-) (&rest args)
     (dispatch :me
@@ -676,7 +824,7 @@
     (dispatch :me
       (if (and (eql nargs 2) (or (flonums-eql-p) (two-zeros-p)))
           nil ; if eql, or both = 0, then not '<'
-          (apply #':me (realnumify* args)))))
+          (apply #':me (realnumify* (substitute-minus-zero args))))))
 
   ;; '>' needs to permit some of the "inoperable" floats because making any constant
   ;; (as in 'early-float') calls CTYPE-OF -> CTYPE-OF-NUMBER -> MAKE-NUMERIC-TYPE
@@ -686,7 +834,7 @@
     (dispatch :me
       (if (and (eql nargs 2) (or (flonums-eql-p) (two-zeros-p)))
           nil ; if eql, or both = 0, then not '>'
-          (apply #':me (realnumify* args)))))
+          (apply #':me (realnumify* (substitute-minus-zero args))))))
 
   (intercept (>=) (&rest args  &aux (nargs (length args)))
     (dispatch :me
@@ -699,9 +847,12 @@
                          (eql b $2.0d0))))
              nil)
             ((two-zeros-p) t) ; signed zeros are equal
+            ((same-sign-infinities-p) t) ; infinities are =
             ((and (eql nargs 2) (zerop (cadr args)))
              ;; Need this case if the first arg is represented as bits
-             (= (float-sign-bit (car args)) 0)) ; anything positive is >= 0
+             (if (rationalp (car args))
+                 (plusp (car args))
+                 (= (float-sign-bit (car args)) 0))) ; anything positive is >= 0
             ((eql nargs 2)
              (multiple-value-bind (a b) (collapse-zeros (car args) (cadr args))
                (:me a b)))
@@ -712,21 +863,25 @@
     (dispatch :me
       (cond ((and (eql nargs 3) (every #'floatp args))
              (destructuring-bind (a b c) args
-               (if (and (eq (flonum-format a) (flonum-format b))
-                        (eq (flonum-format b) (flonum-format c)))
-                   (cond ((and (eql a sb-xc:most-negative-single-float)
-                               (eql c sb-xc:most-positive-single-float))
+               (if (and (eq (flonum-format a) (flonum-format c))
+                        (or (eq (flonum-format b) (flonum-format a))
+                            (eq (flonum-format b) 'single-float)))
+                   (cond ((and (eql a most-negative-single-float)
+                               (eql c most-positive-single-float))
                           (not (float-infinity-p b)))
-                         ((and (eql a sb-xc:most-negative-double-float)
-                               (eql c sb-xc:most-positive-double-float))
+                         ((and (eql a most-negative-double-float)
+                               (eql c most-positive-double-float))
                           (not (float-infinity-p b)))
                          (t
                           (error "Unhandled")))
                    (error "Unhandled"))))
             ((two-zeros-p) t) ; signed zeros are equal
+            ((same-sign-infinities-p) t) ; infinities are =
             ((and (eql nargs 2) (zerop (cadr args)))
              ;; Need this case if the first arg is represented as bits
-             (= (float-sign-bit (car args)) 1)) ; anything negative is <= 0
+             (if (floatp (car args))
+                 (= (float-sign-bit (car args)) 1) ; anything negative is <= 0
+                 (minusp (car args))))
             ((eql nargs 2)
              (multiple-value-bind (a b) (collapse-zeros (car args) (cadr args))
                (:me a b)))
@@ -742,7 +897,18 @@
 (defun sb-c::maybe-exact-reciprocal (x)
   (cond ((eql x $2.0d0) $.5d0)
         ((eql x $10.0d0) nil)
+        ((eql x #.(make-flonum #x3FE62E42FEFA39EF 'double-float))
+         nil)
+        ((eql x #.(make-flonum #x49742400 'single-float))
+         nil)
         (t (error "MAYBE-EXACT-RECIPROCAL: didn't expect ~S" x))))
+
+;;; This is a convenient utility to have - we use it within this file and
+;;; genesis quite a bit. The target definition resides in target-hash-table.
+(defun %hash-table-alist (hash-table &aux result)
+  (maphash (lambda (key value) (push (cons key value) result))
+           hash-table)
+  result)
 
 ;;; Canonicalize and write out the memoization table. Order it by function,
 ;;; then number of arguments, then each argument's value. Rational precedes
@@ -842,6 +1008,7 @@
   (assert (eq (make-flonum :+infinity format) (sb-xc:- (make-flonum :-infinity format))))
   (assert (eq (make-flonum :-infinity format) (sb-xc:- (make-flonum :+infinity format))))
   (assert (eq (sb-xc:- (coerce 0 format)) (make-flonum :minus-zero format)))
+  (let ((*break-on-signals* nil))
   (flet ((assert-not-number (x)
            (handler-case (realnumify x)
              (:no-error (x) (error "Expected an error, got ~S" x))
@@ -851,7 +1018,7 @@
       (assert-not-number nan)
       (assert (float-nan-p nan)))
     (dolist (symbol '(:+infinity :-infinity :minus-zero))
-      (assert-not-number (make-flonum symbol format)))))
+      (assert-not-number (make-flonum symbol format))))))
 
 #+host-quirks-sbcl ; Cross-check some more things if we can
 (loop for (our-symbol host-single host-double)

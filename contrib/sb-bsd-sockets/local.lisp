@@ -25,7 +25,7 @@ also known as unix-domain sockets."))
     (values sockaddr sockint::size-of-sockaddr-un)))
 
 (defmethod free-sockaddr-for ((socket local-socket) sockaddr)
-  (sockint::free-sockaddr-un sockaddr))
+  (sb-alien:free-alien sockaddr))
 
 (defmethod size-of-sockaddr ((socket local-socket))
   sockint::size-of-sockaddr-un)
@@ -80,7 +80,7 @@ in the abstract namespace."))
          (values sockaddr sockint::size-of-sockaddr-un-abstract))))))
 
 (defmethod free-sockaddr-for ((socket local-abstract-socket) sockaddr)
-  (sockint::free-sockaddr-un-abstract sockaddr))
+  (sb-alien:free-alien sockaddr))
 
 (defmethod size-of-sockaddr ((socket local-abstract-socket))
   sockint::size-of-sockaddr-un-abstract)

@@ -58,16 +58,11 @@
                              '(0 1 2 3 4 5 6 7 8 9
                                10 11 12 13 14 15 16 17 18 19)))
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *circle-list1* '(a))
-  (setf (car *circle-list1*) *circle-list1*)
-  (defparameter *circle-list2* '(b))
-  (setf (cdr *circle-list2*) *circle-list2*)
-  (defparameter *circle-list3* '(a b c))
-  (setf (car *circle-list3*) *circle-list3*)
-  (defparameter *circle-list4* '(a b c))
-  (setf (second *circle-list4*) *circle-list4*)
-  (defparameter *circle-list5* '(a b c))
-  (setf (cddr *circle-list5*) *circle-list5*))
+  (defparameter *circle-list1* '#1=(#1#))
+  (defparameter *circle-list2* '#2=(b . #2#))
+  (defparameter *circle-list3* '#3=(#3# b c))
+  (defparameter *circle-list4* '#4=(a #4# c))
+  (defparameter *circle-list5* '#5=(a b . #5#)))
 
 (defun find-position (object id)
     (nth-value 0 (sb-aclrepl::find-part-id object id)))
@@ -182,7 +177,7 @@
 (def-elements-tests *complex* 2 #(1 2) #((0 . "real") (1 . "imag")))
 (def-elements-tests *ratio* 2 #(22 7)
                 #((0 . "numerator") (1 . "denominator")))
-(case sb-vm::n-word-bits
+(case sb-vm:n-word-bits
   (32
    (def-elements-tests *bignum* 2
      #(4154852436 1149780945)
@@ -317,7 +312,7 @@
    2 REALLY-LONG-STRUCT-SLOT-NAME -> a simple-string (4) \"defg\""
   nil 2)
 
-(case sb-vm::n-word-bits
+(case sb-vm:n-word-bits
   (32
    (def-display-test *bignum*
        "bignum 4938271560493827156 with 2 32-bit words

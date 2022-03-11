@@ -9,22 +9,28 @@
 (defun 32-bit-register-p (dstate)
   (not (logbitp 31 (current-instruction dstate))))
 
-(defun print-lsl-alias-name (value stream dstate)
+(defun print-ubfm-alias-name (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (immr imms) value
-    (princ (if (and (/= imms 63)
-                    (= (1+ imms) immr))
-               'lsl
-               'ubfm)
+    (princ (cond ((and (/= imms 63)
+                       (= (1+ imms) immr))
+                  'lsl)
+                 ((< imms immr)
+                  'ubfiz)
+                 (t
+                  'ubfm))
            stream)))
 
-(defun print-lsl-alias (value stream dstate)
+(defun print-ubfm-alias (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (immr imms) value
-    (if (and (/= imms 63)
-             (= (1+ imms) immr))
-        (format stream "#~d" (- 63 imms))
-        (format stream "#~d, #~d" immr imms))))
+    (cond ((and (/= imms 63)
+                (= (1+ imms) immr))
+           (format stream "#~d" (- 63 imms)))
+          ((< imms immr)
+           (format stream "#~d, #~d" (- 64 immr) (1+ imms)))
+          (t
+           (format stream "#~d, #~d" immr imms)))))
 
 (defun print-mem-bar-kind (value stream dstate)
   (declare (ignore dstate))
@@ -101,7 +107,7 @@
 (defun print-test-branch-immediate (value stream dstate)
   (declare (ignore dstate))
   (format stream "#~D"
-          (dpb (car value) (byte 1 5) (car value))))
+          (dpb (car value) (byte 1 5) (cadr value))))
 
 (defun decode-scaled-immediate (value)
   (destructuring-bind (size opc value simd) value
@@ -178,6 +184,13 @@
       (princ "NSP" stream)
       (princ (aref *register-names* value) stream)))
 
+(defun print-sized-reg (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size reg) value
+    (when (zerop size)
+      (princ "W" stream))
+    (princ (svref *register-names* reg) stream)))
+
 (defun print-reg-float-reg (value stream dstate)
   (let* ((inst (current-instruction dstate))
          (v (ldb (byte 1 26) inst)))
@@ -232,6 +245,47 @@
                 "8B"
                 "16B"))))
 
+(defun print-vbhs (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size offset) value
+    (format stream "~a~d"
+            (case size
+              (#b00 "B")
+              (#b01 "H")
+              (#b10 "S"))
+            offset)))
+
+(defun print-vhsd (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (size offset) value
+    (format stream "~a~d"
+            (case size
+              (#b00 "H")
+              (#b01 "S")
+              (#b10 "D"))
+            offset)))
+
+(defun print-vx.t (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (q size offset) value
+    (format stream "V~d.~a"
+            offset
+            (cond ((and (= size 0)
+                        (= q 0))
+                   "8B")
+                  ((and (= size 0)
+                        (= q 1))
+                   "16B")
+                  ((and (= size 1)
+                        (= q 0))
+                   "4H")
+                  ((and (= size 1)
+                        (= q 1))
+                   "8H")
+                  ((and (= size 2)
+                        (= q 1))
+                   "4S")))))
+
 (defun lowest-set-bit-index (integer-value)
   (max 0 (1- (integer-length (logand integer-value (- integer-value))))))
 
@@ -251,7 +305,7 @@
 
 (defun print-cond (value stream dstate)
   (declare (ignore dstate))
-  (princ (svref sb-vm::+condition-name-vec+ value) stream))
+  (princ (svref +condition-name-vec+ value) stream))
 
 (defun use-label (value dstate)
   (let* ((value (if (consp value)
@@ -267,26 +321,37 @@
 
 (defun annotate-ldr-str (register offset dstate)
   (case register
-    (#.sb-vm::code-offset
-     (note-code-constant offset dstate))
     (#.sb-vm::null-offset
-     (let ((offset (+ sb-vm::nil-value offset)))
-       (maybe-note-assembler-routine offset nil dstate)
-       (maybe-note-static-symbol (logior offset other-pointer-lowtag)
-                                              dstate)))
+     (let ((offset (+ sb-vm:nil-value offset)))
+       (or (maybe-note-static-symbol (logior offset other-pointer-lowtag)
+                                     dstate)
+           (maybe-note-assembler-routine offset nil dstate))))
     #+sb-thread
     (#.sb-vm::thread-offset
      (let* ((thread-slots
-             (load-time-value
-              (primitive-object-slots
-               (find 'sb-vm::thread *primitive-objects*
-                     :key #'primitive-object-name)) t))
-            (slot (find (ash offset (- word-shift)) thread-slots
-                        :key #'slot-offset)))
-       (when slot
-         (note (lambda (stream)
-                 (format stream "thread.~(~A~)" (slot-name slot)))
-               dstate))))))
+              (load-time-value
+               (primitive-object-slots (primitive-object 'sb-vm::thread))
+               t))
+            (slot (find (ash offset (- word-shift)) thread-slots :key #'slot-offset)))
+       (if slot
+           (note (lambda (stream)
+                   (format stream "~(~A~)" (slot-name slot)))
+                 dstate)
+           (flet ((guess-symbol (predicate)
+                    (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
+                               (header-n-words (code-header-words code-header)))
+                      (loop for word-num from code-constants-offset below header-n-words
+                            for obj = (code-header-ref code-header word-num)
+                            when (and (symbolp obj) (funcall predicate obj))
+                            do (return obj)))))
+             (let ((symbol (or (guess-symbol
+                                (lambda (s) (= (symbol-tls-index s) offset)))
+                               ;; static symbols aren't in the code header
+                               (find offset +static-symbols+
+                                     :key #'symbol-tls-index))))
+               (when symbol
+                 (note (lambda (stream) (format stream "tls: ~S" symbol))
+                       dstate)))))))))
 
 (defun find-value-from-previos-inst (register dstate)
   ;; Needs to be MOVZ REGISTER, imm, LSL #0
@@ -317,25 +382,75 @@
                             value)
                         dstate))))
 
+(defun annotate-ldr-str-pair (value stream dstate)
+  (declare (ignore stream) (ignorable dstate))
+  (destructuring-bind (reg offset) value
+    (declare (ignorable offset))
+    (case reg
+      #+sb-thread
+      (#.sb-vm::thread-offset
+       (let* ((thread-slots
+                (load-time-value
+                 (primitive-object-slots (primitive-object 'sb-vm::thread))
+                 t))
+              (slot1 (find offset thread-slots :key #'slot-offset))
+              (slot2 (find (1+ offset) thread-slots :key #'slot-offset)))
+         (when slot1
+           (note (lambda (stream)
+                   (if (memq (slot-name slot1) '(sb-vm::mixed-tlab
+                                                 sb-vm::cons-tlab
+                                                 sb-vm::unboxed-tlab))
+                       (format stream "~(~a~).{free-pointer, end-addr}" (slot-name slot1))
+                       (format stream "~(~A, ~A~)" (slot-name slot1) (slot-name slot2))))
+                 dstate)))))))
+
+(defun annotate-ldr-literal (value stream dstate)
+  (declare (ignore stream))
+  (let* ((value (* 4 value))
+         (seg (dstate-segment dstate))
+         (code (seg-code seg)))
+    (when code
+      (or (note-code-constant (sb-disassem::segment-offs-to-code-offs
+                               (+ (dstate-cur-offs dstate) value) seg)
+                              dstate)
+          (let ((addr (+ (dstate-cur-addr dstate) value)))
+            (and (sb-disassem::points-to-code-constant-p addr code)
+                 (maybe-note-assembler-routine (sap-ref-word (int-sap addr) 0)
+                                               nil dstate)))))))
+
 ;;;; special magic to support decoding internal-error and related traps
+;;; See EMIT-ERROR-BREAK for the scheme
 (defun snarf-error-junk (sap offset trap-number &optional length-only)
-  (declare (ignore trap-number))
   (let* ((inst (sap-ref-32 sap (- offset 4)))
-         (error-number (ldb (byte 8 13) inst))
+         (error-number (cond
+                         ((>= trap-number sb-vm:error-trap)
+                          (prog1
+                              (- trap-number sb-vm:error-trap)
+                            (setf trap-number sb-vm:error-trap)))
+                         (t
+                          (prog1 (sap-ref-8 sap offset)
+                            (incf offset)))))
+         (first-arg (ldb (byte 8 13) inst))
          (length (sb-kernel::error-length error-number))
          (index offset))
     (declare (type sb-sys:system-area-pointer sap)
              (type (unsigned-byte 8) length))
+    (unless (or (= first-arg sb-vm::zr-offset)
+                (zerop length))
+      (decf length))
     (cond (length-only
-           (loop repeat length do (sb-c::sap-read-var-integerf sap index))
+           (loop repeat length do (sb-c:sap-read-var-integerf sap index))
            (values 0 (- index offset) nil nil))
           (t
            (collect ((sc+offsets)
                      (lengths))
+             (unless (= first-arg sb-vm::zr-offset)
+               (sc+offsets (make-sc+offset sb-vm:descriptor-reg-sc-number first-arg))
+               (lengths 0))
              (loop repeat length do
-                  (let ((old-index index))
-                    (sc+offsets (sb-c::sap-read-var-integerf sap index))
-                    (lengths (- index old-index))))
+                   (let ((old-index index))
+                     (sc+offsets (sb-c:sap-read-var-integerf sap index))
+                     (lengths (- index old-index))))
              (values error-number
                      (- index offset)
                      (sc+offsets)
@@ -345,7 +460,9 @@
   (declare (ignore inst chunk))
   (let ((code (ldb (byte 8 5) (current-instruction dstate))))
     (flet ((nt (x) (if stream (note x dstate))))
-      (case code
+      (case (if (> code error-trap)
+                error-trap
+                code)
         (#.halt-trap
          (nt "Halt trap"))
         (#.pending-interrupt-trap

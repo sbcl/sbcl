@@ -116,23 +116,6 @@ os_context_sp_addr(os_context_t *context)
 
 #endif  /* __NetBSD__ */
 
-int *os_context_pc_addr(os_context_t *context)
-{
-#if defined(LISP_FEATURE_FREEBSD) || defined(__DragonFly__)
-    return CONTEXT_ADDR_FROM_STEM(eip);
-#elif defined __OpenBSD__
-    return CONTEXT_ADDR_FROM_STEM(pc);
-#elif defined __NetBSD__
-    return CONTEXT_ADDR_FROM_STEM(EIP);
-#elif defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86)
-    return (int *)CONTEXT_ADDR_FROM_STEM(eip);
-#elif defined LISP_FEATURE_DARWIN
-    return &context->uc_mcontext->ss.srr0;
-#else
-#error unsupported BSD variant
-#endif
-}
-
 /* FIXME: If this can be a no-op on BSD/x86, then it
  * deserves a more precise name.
  *
@@ -191,19 +174,12 @@ int arch_os_thread_init(struct thread *thread) {
     n = i386_set_ldt(LDT_AUTO_ALLOC, (union descriptor*) &ldt_entry, 1);
     if (n < 0) {
         perror("i386_set_ldt");
-        lose("unexpected i386_set_ldt(..) failure\n");
+        lose("unexpected i386_set_ldt(..) failure");
     }
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     thread->tls_cookie=n;
     arch_os_load_ldt(thread);
-
-#ifdef LISP_FEATURE_GCC_TLS
-    current_thread = thread;
-#else
-    pthread_setspecific(specials,thread);
 #endif
-#endif
-
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     stack_t sigstack;

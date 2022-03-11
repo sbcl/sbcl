@@ -155,7 +155,7 @@
 (define-assembly-routine
     (unwind
      (:return-style :none)
-     (:translate %continue-unwind)
+     (:translate %unwind)
      (:policy :fast-safe))
     ((:arg block (any-reg descriptor-reg) a0-offset)
      (:arg start (any-reg descriptor-reg) ocfp-offset)
@@ -211,8 +211,16 @@
   (inst beq tag target EXIT)
   (inst nop)
   (inst b LOOP)
+  ;; Is this legal MIPS I code? The LW instruction is in the delay slot of the preceding B,
+  ;; going to an instruction that uses the value right away. LOADW thinks it's so clever
+  ;; by inserting a NOP, but the control flow is altered to not hit that NOP. I wonder if
+  ;; this is one of the weird cases that either does or doesn't work, depending on what the
+  ;; microarchitecture is doing at that exact moment. i.e. I've never understood if a
+  ;; loaded value is guaranteed NOT to be in the register for 1 cycle, or *might* not be.
+  ;; Are we relying on "might or might not be and probably is"?
+  ;; It looks ok for MIPS II though (which eliminated load delays).
   (loadw catch catch catch-block-previous-catch-slot)
 
   EXIT
-  (inst j (make-fixup 'unwind :assembly-routine))
-  (move target catch t))
+  (inst beq zero-tn (entry-point-label 'unwind))
+  (inst move target catch))

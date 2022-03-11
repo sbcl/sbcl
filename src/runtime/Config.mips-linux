@@ -9,14 +9,13 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-LINKFLAGS += -v -O2 -Wl,--export-dynamic
-NM = ./linux-nm
+LINKFLAGS += -O2 -Wl,--export-dynamic
 
-ASSEM_SRC = mips-assem.S ldso-stubs.S
+ASSEM_SRC = mips-assem.S
 ARCH_SRC = mips-arch.c
 
 OS_SRC = linux-os.c linux-mman.c mips-linux-os.c
-OS_LIBS = -ldl
+OS_LIBS = -ldl -Wl,-no-as-needed
 
 ifdef LISP_FEATURE_LARGEFILE
   CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -29,7 +28,7 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
 
-GC_SRC = cheneygc.c
+GC_SRC = gencgc.c fullcgc.c traceroot.c
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

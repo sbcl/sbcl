@@ -39,6 +39,18 @@
       (declare (ignore value))
       (assert (not format-err)))))
 
+(with-test (:name (defclass :initform type-error))
+  (mapc (lambda (form)
+          (assert (nth-value 1 (checked-compile
+                                `(lambda () ,form) :allow-warnings t))))
+        '(;; Special-cased initforms
+          (defclass foo () ((%bar :type integer :initform t)))
+          (defclass foo () ((%bar :type integer :initform nil)))
+          (defclass foo () ((%bar :type boolean :initform 0)))
+          ;; Ordinary initforms
+          (defclass foo () ((%bar :type integer :initform (lisp-implementation-version))))
+          (defclass foo () ((%bar :type boolean :initform (random 2)))))))
+
 ;;; another not (user-)observable behaviour: make sure that
 ;;; sb-pcl::map-all-classes calls its function on each class once and
 ;;; exactly once.
@@ -82,16 +94,26 @@
                      (setf (slot-value x z) (slot-value y z)))
                    :allow-notes nil))
 
-(with-test (:name :slot-table-of-symbol-works)
-  (assert (eq :win
-              ;; the error that I want is about a missing slot,
-              ;; not a missing method, so don't let the compiler turn
-              ;; this into (funcall #'(SLOT-ACCESSOR :GLOBAL A READER)...)
-              (handler-case (eval '(slot-value 'a 'a))
-                (simple-condition (c)
-                  (and (search "slot ~S is missing"
-                               (simple-condition-format-control c))
-                       :win))))))
+(defun assert-no-such-slot (obj slot-name)
+  (dolist (method '(slot-value slot-boundp))
+    (assert (eq :win
+                ;; the error that I want is about a missing slot,
+                ;; not a missing method, so don't let the compiler turn
+                ;; this into (funcall #'(SLOT-ACCESSOR :GLOBAL A READER)...)
+                (handler-case (eval `(,method ',obj ',slot-name))
+                  (simple-condition (c)
+                    (and (search "slot ~S is missing"
+                                 (simple-condition-format-control c))
+                         :win))))))
+  ;; and of course SLOT-EXISTS-P should just return NIL
+  (assert (not (slot-exists-p obj slot-name))))
+
+(with-test (:name :slot-table-of-builtin-classoids)
+  (assert-no-such-slot 'some-symbol 'some-slot)
+  (assert-no-such-slot #P"foo" 'some-slot)
+  (let ((lpn #p"sys:contrib;"))
+    (assert (typep lpn 'logical-pathname))
+    (assert-no-such-slot lpn 'some-slot)))
 
 (with-test (:name :funcallable-instance-sxhash)
   (assert
@@ -104,3 +126,29 @@
       `(lambda (x)
          (typep x #.(find-class 'symbol)))
     (('x) t)))
+
+(with-test (:name :slot-value-on-not-slot-object)
+  (checked-compile-and-assert ()
+                              `(lambda (x)
+                                 (slot-value x 'm))
+    ((nil) (condition 'sb-pcl::missing-slot)))
+  (checked-compile-and-assert ()
+                              `(lambda (x)
+                                 (slot-boundp x 's))
+    ((1) (condition 'sb-pcl::missing-slot)))
+  (checked-compile-and-assert ()
+                              `(lambda (x)
+                                 (setf (slot-value x 'j) 30))
+    ((1.0) (condition 'sb-pcl::missing-slot)))
+  (checked-compile-and-assert ()
+                              `(lambda (x)
+                                 (slot-makunbound x 'l))
+    ((#\a) (condition 'sb-pcl::missing-slot))))
+
+
+(with-test (:name :illegal-class-name)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (find-class x))
+   (('(t)) (condition 'sb-kernel::illegal-class-name-error))))

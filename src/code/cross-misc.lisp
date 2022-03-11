@@ -14,18 +14,31 @@
 
 ;;; Forward declarations
 
+(defun make-system-hash-table (&rest args)
+  (let ((args (copy-list args)))
+    (remf args :weakness)
+    (remf args :synchronized)
+    (remf args :finalizer)
+    (let ((hash-fun (getf args :hash-function)))
+      (when hash-fun
+        (assert (eq (getf args :test) 'eq))
+        (remf args :hash-function)))
+    (apply 'make-hash-table args)))
+
 ;;; In correct code, TRULY-THE has only a performance impact and can
 ;;; be safely degraded to ordinary THE.
 (defmacro truly-the (type expr)
+  `(the ,type ,expr))
+
+(defmacro the* ((type &rest args) expr)
+  (declare (ignore args))
   `(the ,type ,expr))
 
 (defmacro named-lambda (name args &body body)
   (declare (ignore name))
   `#'(lambda ,args ,@body))
 
-(defmacro with-locked-system-table ((table) &body body)
-  (declare (ignore table))
-  `(progn ,@body))
+(defmacro define-thread-local (&rest rest) `(defvar ,@rest))
 
 (defmacro defglobal (name value &rest doc)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -39,7 +52,30 @@
 
 ;;; Necessary only to placate the host compiler in %COMPILER-DEFGLOBAL.
 (defun set-symbol-global-value (sym val)
-  (error "Can't set symbol-global-value: ~S ~S" sym val))
+  (setf (symbol-value sym) val))
+
+(defun %defun (name lambda &optional inline-expansion)
+  (declare (ignore inline-expansion))
+  (cl:proclaim `(ftype function ,name))
+  (setf (fdefinition name) lambda))
+
+(defun %defglobal (name value source-location &optional (doc nil docp))
+  (declare (ignore source-location doc docp))
+  (cl:proclaim `(special ,name))
+  (setf (symbol-value name) value))
+
+(defun %defparameter (var val source-location &optional (doc nil docp))
+  (declare (ignore source-location doc docp))
+  (cl:proclaim `(special ,var))
+  (setf (symbol-value var) val))
+
+(defun %defvar (var source-location &optional (val nil valp) (doc nil docp))
+  (declare (ignore source-location doc docp))
+  (cl:proclaim `(special ,var))
+  (when (and valp (not (boundp var)))
+    (setf (symbol-value var) val)))
+
+(defun %boundp (symbol) (boundp symbol))
 
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
@@ -50,25 +86,12 @@
 ;;; In the target SBCL, the INSTANCE type refers to a base
 ;;; implementation for compound types with lowtag
 ;;; INSTANCE-POINTER-LOWTAG. There's no way to express exactly that
-;;; concept portably, but we know that anything derived from STRUCTURE!OBJECT
-;;; is equivalent to the target INSTANCE type. Also, because we use host packages
-;;; as proxies for target packages, those too must satisfy our INSTANCEP
-;;; - even if not a subtype of (OR STANDARD-OBJECT STRUCTURE-OBJECT).
-;;; Nothing else satisfies this definition of INSTANCEP.
-;;; As a guarantee that our set of host object types is exhaustive, we add one
-;;; more constraint when self-hosted: host instances of unknown type cause failure.
-;;; Some objects manipulated by the cross-compiler like the INTERVAL struct
-;;; - which is not a STRUCTURE!OBJECT - should never be seen as literals in code.
-;;; We assert that by way of the guard function.
-#+host-quirks-sbcl
-(defun unsatisfiable-instancep (x)
-  (when (and (host-sb-kernel:%instancep x)
-             (not (target-num-p x)))
-    (bug "%INSTANCEP test on ~S" x)))
+;;; concept portably, but we can at least declare here what kind of
+;;; host objects get dumped into something that when loaded would be a
+;;; target INSTANCE.
 (deftype instance ()
-  '(or structure!object package
-    #+host-quirks-sbcl (and host-sb-kernel:instance ; optimizes out a call when false
-                            (satisfies unsatisfiable-instancep))))
+  '(or (and structure-object (not target-num))
+       package))
 (defun %instancep (x)
   (typep x 'instance))
 
@@ -76,6 +99,17 @@
   (error "not clear how to represent FUNCALLABLE-INSTANCE type"))
 (defun funcallable-instance-p (x)
   (error "Called FUNCALLABLE-INSTANCE-P ~s" x))
+
+(defun simple-fun-p (x)
+  (if (symbolp x) nil (error "Called SIMPLE-FUN-P on ~S" x)))
+(defun closurep (x)
+  (if (symbolp x) nil (error "Called CLOSUREP on ~S" x)))
+(defun unbound-marker-p (x)
+  (if (symbolp x) nil (error "Called UNBOUND-MARKER-P on ~S" x)))
+(defun vector-with-fill-pointer-p (x)
+  (if (symbolp x) nil (error "Called VECTOR-WITH-FILL-POINTER-P on ~S" x)))
+
+(defparameter sb-vm::*backend-cross-foldable-predicates* nil)
 
 ;; The definition of TYPE-SPECIFIER for the target appears in the file
 ;; 'deftypes-for-target' - it allows CLASSes and CLASOIDs as specifiers.
@@ -105,6 +139,12 @@
   (when (typep object 'array)
     (assert (not (eq (array-element-type object) nil))))
   nil)
+
+(defun data-vector-ref-with-offset (array index offset)
+  (svref array (+ index offset)))
+
+(defun data-vector-ref (array index)
+  (svref array index))
 
 (defun %negate (number)
   (sb-xc:- number))
@@ -172,10 +212,16 @@
 ;;; host CL package. This works around situations where the host has *more*
 ;;; symbols exported from CL than should be.
 (defun sb-xc:symbol-package (symbol)
-  (let ((p (cl:symbol-package symbol)))
+  (let ((p (cl:symbol-package symbol))
+        (name (string symbol)))
     (if (and p
-             (or (eq (find-symbol (string symbol) "XC-STRICT-CL") symbol)
-                 (eq (find-symbol (string symbol) "SB-XC") symbol)))
+             (or (eq (find-symbol name "XC-STRICT-CL") symbol)
+                 (eq (find-symbol name "SB-XC") symbol)
+                 ;; OK if the name of a symbol in the host CL package
+                 ;; is found in XC-STRICT-CL, even if the symbols
+                 ;; differ.
+                 (and (find-symbol name "XC-STRICT-CL")
+                      (eq (find-symbol name "CL") symbol))))
         *cl-package*
         p)))
 
@@ -186,6 +232,32 @@
   (write structure :stream stream :circle t))
 
 (in-package "SB-KERNEL")
+
+;;; These functions are required to emulate SBCL kernel functions
+;;; in a vanilla ANSI Common Lisp cross-compilation host.
+;;; The emulation doesn't need to be efficient, since it's needed
+;;; only for object dumping.
+
+;; The set of structure types that we access by slot position at cross-compile
+;; time is fairly small:
+;;   - DEFINITION-SOURCE-LOCATION
+;;   - DEFSTRUCT-DESCRIPTION, DEFSTRUCT-SLOT-DESCRIPTION
+;;   - DEBUG-SOURCE, COMPILED-DEBUG-INFO, COMPILED-DEBUG-FUN-{something}
+;;   - HEAP-ALIEN-INFO and ALIEN-{something}-TYPE
+;;   - COMMA
+#-metaspace (defmacro wrapper-friend (x) x)
+(defun %instance-wrapper (instance)
+  (declare (notinline classoid-wrapper))
+  (classoid-wrapper (find-classoid (type-of instance))))
+(defun %instance-length (instance)
+  (declare (notinline wrapper-length))
+  ;; In the target, it is theoretically possible to have %INSTANCE-LENGTH
+  ;; exceeed layout length, but in the cross-compiler they're the same.
+  (wrapper-length (%instance-wrapper instance)))
+(defun layout-id (x)
+  (declare (notinline sb-kernel::wrapper-id))
+  (sb-kernel::wrapper-id x))
+
 (defun %find-position (item seq from-end start end key test)
   (let ((position (position item seq :from-end from-end
                             :start start :end end :key key :test test)))
@@ -197,15 +269,18 @@
 
 ;;; Needed for constant-folding
 (defun system-area-pointer-p (x) x nil) ; nothing is a SAP
-;;; Needed for DEFINE-MOVE-FUN LOAD-SYSTEM-AREA-POINTER
-(defun sap-int (x) (error "can't take SAP-INT ~S" x))
-;;; Needed for FIXUP-CODE-OBJECT
-(defmacro without-gcing (&body body) `(progn ,@body))
+(defmacro sap-ref-word (sap offset)
+  `(#+64-bit sap-ref-64 #-64-bit sap-ref-32 ,sap ,offset))
 
 (defun logically-readonlyize (x) x)
 
 ;;; Mainly for the fasl loader
 (defun %fun-name (f) (nth-value 2 (function-lambda-expression f)))
+
+(defun %svset (vector index val) ; stemming from toplevel (SETF SVREF)
+  (setf (aref vector index) val))
+(defun %puthash (key table val) ; stemming from toplevel (SETF GETHASH)
+  (setf (gethash key table) val))
 
 ;;;; Variables which have meaning only to the cross-compiler, defined here
 ;;;; in lieu of #+sb-xc-host elsewere which messes up toplevel form numbers.
@@ -214,8 +289,9 @@
 ;;; For macro lambdas that are processed by the host
 (declaim (declaration top-level-form))
 
-;;; The opposite of the whitelist - if certain full calls are seen, it is probably
-;;; the result of a missed transform and/or misconfiguration.
+;;; The opposite of *undefined-fun-allowlist* - if certain full calls
+;;; are seen, it is probably the result of a missed transform and/or
+;;; misconfiguration.
 (defparameter *full-calls-to-warn-about*
   '(;mask-signed-field ;; Too many to fix
     ))
@@ -226,9 +302,9 @@
   (let* ((n (length string))
          (a (make-array n :element-type '(unsigned-byte 8))))
     (dotimes (i n a)
-      (let ((code (sb-xc:char-code (char string i))))
+      (let ((code (char-code (char string i))))
         (unless (<= 0 code 127)
-          (setf code (sb-xc:char-code #\?)))
+          (setf code (char-code #\?)))
         (setf (aref a i) code)))))
 
 ;;;; Stubs for host
@@ -238,89 +314,16 @@
                    `(lambda ,@(cddr lambda))
                    lambda)))
 
-(defun sb-impl::%defun (name lambda &optional inline-expansion)
-  (declare (ignore inline-expansion))
-  (proclaim `(ftype function ,name))
-  (setf (fdefinition name) (eval lambda)))
-
-(defun %svset (vector index val) ; stemming from toplevel (SETF SVREF)
-  (setf (aref vector index) val))
-(defun %puthash (key table val) ; stemming from toplevel (SETF GETHASH)
-  (setf (gethash key table) val))
-
 ;;; The compiler calls this with forms in EVAL-WHEN (:COMPILE-TOPLEVEL) situations.
-;;; Since we've already performed macroexpansion using our macros, we can either
-;;; implement target-compatible functions for all things into which we might expand,
-;;; or we can un-macro-expand the form.  This does a little of both,
-;;; mainly for the sake of showing that it's quite easily done.
-;;; Truth be told I'd have preferred to use the anti-expansion technique consistently,
-;;; however occasionally we see things like (LET ((V FROB)) (%SVSET *THING* X V))
-;;; which means that the host is going to do the LET and then call %SVSET.
 (defun eval-tlf (form index &optional lexenv)
   (declare (ignore index lexenv))
-  (flet ((matchp (template form &aux results)
-           (if (named-let recurse ((form form) (template template))
-                 (typecase template
-                   (null (null form))
-                   ((eql ?) (push form results) t) ; match and store anything
-                   ((eql :ignore) t) ; match anything and disregard
-                   ((cons (eql :or))
-                    (some (lambda (template)
-                            (recurse form template))
-                          (cdr template)))
-                   (cons (and (consp form)
-                              (and (recurse (car form) (car template))
-                                   (recurse (cdr form) (cdr template)))))
-                   (t (eql template form)))) ; match template exactly
-               (nreverse results)
-               (error "Pattern match failure: ~S~% ~S~%" template form))))
-    ;; Note that in all cases below, the package lock on CL prevents
-    ;; accidental appearance of a CL symbol as a thing being defined.
-    (named-let recurse ((form form))
-      (case (car form)
-       (progn (mapc #'recurse (cdr form))) ; compiler doesn't care about return value
-       (t
-        (eval
-         (case (car form)
-           (sb-impl::%defglobal
-            (destructuring-bind (symbol value)
-                (matchp '((quote ?) (if (%boundp :ignore) :ignore ?)) (cdr form))
-              `(defvar ,symbol ,value)))
-           (sb-impl::%defparameter
-            (destructuring-bind (symbol value)
-                (matchp '((quote ?) ? :ignore) (cdr form))
-              `(defparameter ,symbol ,value)))
-           (sb-impl::%defvar
-            (destructuring-bind (symbol value) ; always occurs with a value
-                (matchp '((quote ?) (source-location) (:or (unless (%boundp :ignore) ?) ?))
-                        (cdr form))
-              `(defvar ,symbol ,value)))
-           (sb-c::%defconstant
-            ;; There is genuinely ambiguity here - does :COMPILE-TOPLEVEL situation for
-            ;; DEFCONSTANT mean that we want the host compiler to know the constant?
-            ;; It must, because the standard specifies that defconstant need not be within
-            ;; EVAL-WHEN for the compiler to know it. But because of how our defconstant
-            ;; expands - calling %defconstant inside of an eval-when listing all 3
-            ;; situations - we can't discern whether this is our defconstant doing its
-            ;; normal thing, versus inside an explicity written eval-when with intent
-            ;; to convey the constant to the host - perhaps because of a DEFUN also inside
-            ;; an eval-when where we need the host to reference the constant.
-            ;; Therefore every constant has to be made known to the host under the
-            ;; assumption that it needs it, AND the cross-compiler under the assumption
-            ;; that this is our normal :compile-toplevel handling.
-            (destructuring-bind (symbol value) (matchp '((quote ?) ? . :ignore) (cdr form))
-              `(progn (defconstant ,symbol ,value)
-                      (sb-c::%defconstant ',symbol ,symbol nil))))
-           (sb-xc:defconstant ; we see this maro as well. The host expansion will not do,
-            ;; because it calls our %defconstant which does not assign the symbol a value.
-            ;; It might be possible to change that now that we don't use CL: symbols.
-            (destructuring-bind (symbol value) (cdr form)
-              `(progn (defconstant ,symbol ,value)
-                      (sb-c::%defconstant ',symbol ,symbol nil))))
-           (t
-            form))))))))
+  (eval form))
 
 (defmacro sb-format:tokens (string) string)
+
+(defmacro with-system-mutex ((lock) &body body)
+  (declare (ignore lock))
+  `(progn ,@body))
 
 ;;; Used by our lockfree memoization functions (define-hash-cache)
 (defmacro sb-thread:barrier ((kind) &body body)
@@ -331,3 +334,10 @@
 (defmacro %primitive (name arg)
   (ecase name
     (print `(format t "~A~%" ,arg))))
+
+(defmacro %with-output-to-string ((var) &body body)
+  ;; Let's suppose that the host lisp knows what it's doing to efficiently
+  ;; compile the standard macro. Don't try to outdo it.
+  `(with-output-to-string (,var) ,@body))
+
+(defun source-location ())

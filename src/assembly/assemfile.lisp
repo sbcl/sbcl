@@ -12,9 +12,6 @@
 
 (in-package "SB-C")
 
-;;; If non-NIL, emit assembly code. If NIL, emit VOP templates.
-(defvar *emit-assembly-code-not-vops-p* nil)
-
 ;;; a list of (NAME LABEL OFFSET) for every entry point
 (defvar *entry-points* nil)
 
@@ -27,8 +24,7 @@
   (declare (ignore print))
   (when sb-cold::*compile-for-effect-only*
     (return-from assemble-file t))
-  (let* ((*emit-assembly-code-not-vops-p* t)
-         (name (pathname name))
+  (let* ((name (pathname name))
          ;; the fasl file currently being output to
          (lap-fasl-output (open-fasl-output (pathname output-file) name))
          (*entry-points* nil)
@@ -40,29 +36,41 @@
         (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
               (*readtable* sb-cold:*xc-readtable*))
           (load (merge-pathnames name (make-pathname :type "lisp")))
-          ;; Leave room for the indirect call table. relocate_heap() in
-          ;; 'coreparse' finds the end with a 0 word so add 1 extra word.
-          #+(or x86 x86-64)
-          (emit (asmstream-data-section asmstream)
-                `(.skip ,(* (align-up (1+ (length *entry-points*)) 2)
-                            sb-vm:n-word-bytes)))
-          (when (emit-inline-constants)
-            ;; Ensure alignment to double-Lispword in case a raw constant
-            ;; causes misalignment, as actually happens on ARM64.
-            ;; You might think one Lispword is aligned enough, but it isn't,
-            ;; because to created a tagged pointer to an asm routine,
-            ;; the base address must have all 0s in the tag bits.
-            ;; Note that for code components that contain simple-funs,
-            ;; alignment is ensured by SIMPLE-FUN-HEADER-WORD.
+          (resolve-ep-labels (asmstream-code-section asmstream))
+          ;; Reserve space for the jump table. The first word of the table
+          ;; indicates the total length in words, counting the length word itself
+          ;; as a word, and the words comprising jump tables that were registered
+          ;; as unboxed constants. The logic in compiler/codegen splits unboxed
+          ;; constants into two groups: jump-tables and everything else, but that's
+          ;; because a code coverage map, if present, goes in between them.
+          ;; Assembly routines have no coverage map, so there is no need to split.
+          (let ((n-extra-words ; Space for the indirect call table if needed
+                 (+ #+(or x86 x86-64) (length *entry-points*)))
+                (n-data-words  ; Space for internal jump tables if needed
+                 (loop for ((category . data) . label)
+                       across (asmstream-constant-vector asmstream)
+                       do (progn #+host-quirks-ccl label) ; shut up the host
+                       when (eq category :jump-table) sum (length data))))
             (emit (asmstream-data-section asmstream)
-                  `(.align ,sb-vm:n-lowtag-bits)))
+                  `(.lispword ,(+ n-extra-words n-data-words 1))
+                  `(.skip ,(* n-extra-words sb-vm:n-word-bytes))))
+          (emit-inline-constants)
+          ;; Ensure alignment to double-Lispword in case a raw constant
+          ;; causes misalignment, as actually happens on ARM64.
+          ;; You might think one Lispword is aligned enough, but it isn't,
+          ;; because to created a tagged pointer to an asm routine,
+          ;; the base address must have all 0s in the tag bits.
+          ;; Note that for code components that contain simple-funs,
+          ;; alignment is ensured by SIMPLE-FUN-HEADER-WORD.
+          (emit (asmstream-data-section asmstream)
+                `(.align ,sb-vm:n-lowtag-bits))
           (let ((segment (assemble-sections
                           asmstream nil
-                          (make-segment :inst-hook (default-segment-inst-hook)
-                                        :run-scheduler nil))))
+                          (make-segment :run-scheduler nil))))
             (dump-assembler-routines segment
                                      (segment-buffer segment)
                                      (sb-assem::segment-fixup-notes segment)
+                                     (sb-assem::get-allocation-points asmstream)
                                      *entry-points*
                                      lap-fasl-output))
           (setq won t))
@@ -115,6 +123,21 @@
     for export in exports
     collect `(push ,(expand-one-export-spec export) *entry-points*)))
 
+;;; Create a placeholder that will later resolve to the label of an entry point.
+;;; This is because we don't know all the names of routines until seeing them.
+;;; This is an alternative to using a fixup. It may generate shorter code.
+(defun sb-vm::entry-point-label (name) `(sb-assem::entry ,name))
+
+(defun resolve-ep-labels (section)
+  (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
+      ((null statement))
+    (binding* ((patch (member-if (lambda (x) (typep x '(cons (eql sb-assem::entry))))
+                                 (stmt-operands statement))
+                      :exit-if-null)
+               (ep (assoc (cadar patch) *entry-points*)))
+      (aver (and ep (= (third ep) 0)))
+      (rplaca patch (second ep)))))
+
 (defun expand-align-option (align)
   (when align
     `((emit-alignment ,align))))
@@ -147,12 +170,12 @@
          ;; by GENERATE-ERROR-CODE were interposed between those.
          #-arm
          (let ((asmstream *asmstream*))
-           (join-sections (asmstream-code-section asmstream)
-                          (asmstream-elsewhere-section asmstream)))
+           (append-sections (asmstream-code-section asmstream)
+                            (asmstream-elsewhere-section asmstream)))
          (emit-alignment sb-vm:n-lowtag-bits
                          ;; EMIT-LONG-NOP does not exist for (not x86-64)
                          #+x86-64 :long-nop))
-       (when *compile-print*
+       (when cl:*compile-print*
          (format *error-output* "~S assembled~%" ',name)))))
 
 (defun arg-or-res-spec (reg)
@@ -221,15 +244,9 @@
                       :key #'car)
          (:generator ,cost
            ,@(mapcar (lambda (arg)
-                       #+(or hppa alpha) `(move ,(reg-spec-name arg)
-                                                 ,(reg-spec-temp arg))
-                       #-(or hppa alpha) `(move ,(reg-spec-temp arg)
-                                                 ,(reg-spec-name arg)))
+                       `(move ,(reg-spec-temp arg) ,(reg-spec-name arg)))
                      args)
            ,@call-sequence
            ,@(mapcar (lambda (res)
-                       #+(or hppa alpha) `(move ,(reg-spec-temp res)
-                                                 ,(reg-spec-name res))
-                       #-(or hppa alpha) `(move ,(reg-spec-name res)
-                                                 ,(reg-spec-temp res)))
+                       `(move ,(reg-spec-name res) ,(reg-spec-temp res)))
                      results))))))

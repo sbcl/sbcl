@@ -39,7 +39,7 @@
 ;;; them at a known location.
 (defun make-old-fp-save-location (env)
   (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (environment-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type*
                   control-stack-arg-scn
                   ocfp-save-offset)))
@@ -47,7 +47,7 @@
 (defun make-return-pc-save-location (env)
   (let ((ptype *backend-t-primitive-type*))
     (specify-save-tn
-     (physenv-debug-live-tn (make-normal-tn ptype) env)
+     (environment-debug-live-tn (make-normal-tn ptype) env)
      (make-wired-tn ptype control-stack-arg-scn lra-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location.  We only
@@ -119,7 +119,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Compute CODE from the address of this entry point.
     (let ((entry-point (gen-label)))
@@ -148,7 +148,7 @@
     (move res csp-tn)
     (inst addu csp-tn csp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
-    (when (ir2-physenv-number-stack-p callee)
+    (when (ir2-environment-number-stack-p callee)
       (inst addu nsp-tn nsp-tn
             (- (bytes-needed-for-non-descriptor-stack-frame)))
       (move nfp nsp-tn))))
@@ -244,7 +244,7 @@ default-value-8
         ;; gets confused.
         (without-scheduling ()
           (note-this-location vop :single-value-return)
-          (move csp-tn ocfp-tn t)
+          (emit-nop-or-move csp-tn ocfp-tn)
           (inst nop))
         (when lra-label
           (inst compute-code-from-lra code-tn code-tn lra-label temp)))
@@ -259,7 +259,7 @@ default-value-8
           ;; If there are no stack results, clear the stack now.
           (if (> nvals register-arg-count)
               (inst addu temp nargs-tn (fixnumize (- register-arg-count)))
-              (move csp-tn ocfp-tn t)))
+              (emit-nop-or-move csp-tn ocfp-tn)))
 
         ;; Do the single value case.
         (do ((i 1 (1+ i))
@@ -268,7 +268,7 @@ default-value-8
           (move (tn-ref-tn val) null-tn))
         (when (> nvals register-arg-count)
           (inst b default-stack-vals)
-          (move ocfp-tn csp-tn t))
+          (emit-nop-or-move ocfp-tn csp-tn))
 
         (emit-label regs-defaulted)
 
@@ -358,7 +358,7 @@ default-value-8
         (storew (first arg) args i))
       (move start args)
       (inst b done)
-      (move count nargs t)))
+      (emit-nop-or-move count nargs)))
   (values))
 
 
@@ -374,8 +374,7 @@ default-value-8
               values-start)
   (:temporary (:sc any-reg :offset nargs-offset
                :from :eval :to (:result 1))
-              nvals)
-  (:temporary (:scs (non-descriptor-reg)) temp))
+              nvals))
 
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
@@ -552,7 +551,7 @@ default-value-8
               (bytes-needed-for-non-descriptor-stack-frame))))
     (inst addu lip return-pc-temp (- n-word-bytes other-pointer-lowtag))
     (inst j lip)
-    (move cfp-tn ocfp-temp t)))
+    (emit-nop-or-move cfp-tn ocfp-temp)))
 
 
 ;;;; Full call:
@@ -726,7 +725,7 @@ default-value-8
                             '((:load-ocfp
                                (sc-case ocfp
                                  (any-reg
-                                  (move ocfp-pass ocfp t))
+                                  (emit-nop-or-move ocfp-pass ocfp))
                                  (control-stack
                                   (inst lw ocfp-pass cfp-tn
                                         (ash (tn-offset ocfp)
@@ -734,7 +733,7 @@ default-value-8
                               (:load-return-pc
                                (sc-case return-pc
                                  (descriptor-reg
-                                  (move return-pc-pass return-pc t))
+                                  (emit-nop-or-move return-pc-pass return-pc))
                                  (control-stack
                                   (inst lw return-pc-pass cfp-tn
                                         (ash (tn-offset return-pc)
@@ -748,7 +747,7 @@ default-value-8
                               (:frob-nfp
                                (store-stack-tn nfp-save cur-nfp))
                               (:save-fp
-                               (move ocfp-pass cfp-tn t))
+                               (emit-nop-or-move ocfp-pass cfp-tn))
                               (:load-fp
                                ,(if variable
                                     '(move cfp-tn new-fp)
@@ -813,7 +812,7 @@ default-value-8
                   ;; is calculated.
                   (insert-step-instrumenting function)
                   (inst addu entry-point function
-                        (- (ash simple-fun-code-offset word-shift)
+                        (- (ash simple-fun-insts-offset word-shift)
                            fun-pointer-lowtag))))
                (:direct
                 `((inst lw entry-point null-tn (static-fun-offset fun)))))
@@ -872,6 +871,7 @@ default-value-8
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 2)) ocfp)
   (:temporary (:sc any-reg :offset lra-offset :from (:argument 3)) lra)
+  (:temporary (:sc any-reg :offset nl3-offset) temp)
 
   (:vop-var vop)
 
@@ -885,7 +885,8 @@ default-value-8
 
     ;; Clear the number stack if anything is there and jump to the
     ;; assembly-routine that does the bliting.
-    (inst j (make-fixup 'tail-call-variable :assembly-routine))
+    (inst li temp (make-fixup 'tail-call-variable :assembly-routine))
+    (inst j temp)
     (let ((cur-nfp (current-nfp-tn vop)))
       (if cur-nfp
         (inst addu nsp-tn cur-nfp
@@ -989,12 +990,12 @@ default-value-8
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset a0-offset) a0)
+  (:temporary (:sc any-reg :offset nl3-offset) temp)
   (:temporary (:scs (interior-reg)) lip)
 
   (:vop-var vop)
 
   (:generator 13
-    (let ((not-single (gen-label)))
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))
         (when cur-nfp
@@ -1012,13 +1013,14 @@ default-value-8
       (lisp-return lra-arg lip :offset 2)
 
       ;; Nope, not the single case.
-      (emit-label not-single)
+    NOT-SINGLE
       (move ocfp ocfp-arg)
       (move lra lra-arg)
       (move vals vals-arg)
 
-      (inst j (make-fixup 'return-multiple :assembly-routine))
-      (move nvals nvals-arg t))))
+      (inst li temp (make-fixup 'return-multiple :assembly-routine))
+      (inst j temp)
+      (emit-nop-or-move nvals nvals-arg)))
 
 ;;;; XEP hackery:
 
@@ -1069,7 +1071,7 @@ default-value-8
       ;; Everything of interest in registers.
       (inst blez count do-regs)
       ;; Initialize dst to be end of stack.
-      (move dst csp-tn t)
+      (emit-nop-or-move dst csp-tn)
       ;; Initialize src to be end of args.
       (inst addu src cfp-tn nargs-tn)
 
@@ -1124,16 +1126,33 @@ default-value-8
   (:generator 4
     (loadw value context index)))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg) :to (:result 1)))
+  (:temporary (:scs (any-reg)) temp)
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (cond ((zerop index)
+           (inst beq count done))
+          (t
+           (inst subu temp (fixnumize index) count)
+           (inst bgez temp done)))
+    (move value null-tn)
+    (loadw value object index)
+    done))
 
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
   (:temporary (:scs (any-reg) :from (:argument 0)) context)
   (:temporary (:scs (any-reg) :from (:argument 1)) count)
   (:temporary (:scs (descriptor-reg) :from :eval) temp dst)
-  (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:translate %listify-rest-args)
   (:policy :safe)
@@ -1142,26 +1161,48 @@ default-value-8
     (let* ((enter (gen-label))
            (loop (gen-label))
            (done (gen-label))
-           (dx-p (node-stack-allocate-p node))
-           (alloc-area-tn (if dx-p csp-tn alloc-tn)))
+           (leave-pa (gen-label))
+           (dx-p (node-stack-allocate-p node)))
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
       (inst beq count done)
-      (move result null-tn t)
+      (inst move result null-tn)
 
       ;; We need to do this atomically.
-      (pseudo-atomic (pa-flag)
-        (when dx-p
-          (align-csp temp))
-        ;; Allocate a cons (2 words) for each item.
-        (inst srl result alloc-area-tn n-lowtag-bits)
-        (inst sll result n-lowtag-bits)
-        (inst or result list-pointer-lowtag)
+      (pseudo-atomic (pa-flag :elide-if dx-p)
+        (inst sll count 1)
+        (cond (dx-p
+               (allocation 'list count result list-pointer-lowtag `(,pa-flag ,temp)
+                           :stackp t))
+              (t
+               (let ((end-addr pa-flag)
+                     (new-freeptr temp)
+                     (continue (gen-label)))
+                 (without-scheduling ()
+                   (inst lw result null-tn (- cons-region nil-value))
+                   (inst lw end-addr null-tn (+ 4 (- cons-region nil-value)))
+                   (inst add new-freeptr result count)
+                   ;; Use a different 'code' field for listify. Technically there are enough
+                   ;; bits in the code field to indicate how many bytes to skip to branch out
+                   ;; of the entire loop, which the C handler could use to adjust the RA.
+                   ;; But the assembler doesn't provide a way to compute that distance.
+                   (inst tltu end-addr new-freeptr (logior #x300 (reg-tn-encoding result)))
+                   ;; Jump to the freeptr writeback
+                   (inst beq zero-tn continue)
+                   ;; Encode CONTEXT into a dummy instruction
+                   (inst addu zero-tn context context) ; ADDU never signals overflow
+                   ;; If we return here, then skip the loop
+                   (inst beq zero-tn leave-pa)
+                   (inst nop)
+                   (emit-label continue)
+                   (inst sw new-freeptr null-tn (- cons-region nil-value))
+                   (inst or result list-pointer-lowtag)))))
+
         (move dst result)
-        (inst sll temp count 1)
+
         (inst b enter)
-        (inst addu alloc-area-tn temp)
+        (inst srl count 1)
 
         ;; Store the current cons in the cdr of the previous cons.
         (emit-label loop)
@@ -1181,7 +1222,8 @@ default-value-8
         (storew temp dst 0 list-pointer-lowtag)
 
         ;; NIL out the last cons.
-        (storew null-tn dst 1 list-pointer-lowtag))
+        (storew null-tn dst 1 list-pointer-lowtag)
+        (emit-label leave-pa))
       (emit-label done))))
 
 ;;; Return the location and size of the more arg glob created by Copy-More-Arg.
@@ -1194,7 +1236,7 @@ default-value-8
 ;;; supplied - fixed, and return a pointer that many words below the current
 ;;; stack top.
 ;;;
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg)))
@@ -1217,30 +1259,36 @@ default-value-8
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
-    (let ((err-lab
-            (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (cond ((not min)
-             (cond ((zerop max)
-                    (inst bne nargs err-lab))
-                   (t
-                    (inst li temp (fixnumize max))
-                    (inst bne nargs temp err-lab)))
-             (inst nop))
-            (max
-             (when (plusp min)
-               (inst li temp (fixnumize min))
-               (inst sltu temp nargs temp)
-               (inst bne temp err-lab)
-               (inst nop))
-             (inst li temp (fixnumize max))
-             (inst sltu temp temp nargs)
-             (inst bne temp err-lab)
-             (inst nop))
-            ((plusp min)
-             (inst li temp (fixnumize min))
-             (inst sltu temp nargs temp)
-             (inst bne temp err-lab)
-             (inst nop))))))
+   (cond
+     ((not min) ; fixed args
+      (unless (zerop max) (inst li temp (fixnumize max)))
+      (note-this-location vop :internal-error)
+      (inst tne nargs (if (zerop max) zero-tn temp) invalid-arg-count-trap))
+     (t
+      (let ((err-lab
+             (generate-error-code vop 'invalid-arg-count-error nargs)))
+       (cond ((not min)
+              (cond ((zerop max)
+                     (inst bne nargs err-lab))
+                    (t
+                     (inst li temp (fixnumize max))
+                     (inst bne nargs temp err-lab)))
+              (inst nop))
+             (max
+              (when (plusp min)
+                (inst li temp (fixnumize min))
+                (inst sltu temp nargs temp)
+                (inst bne temp err-lab)
+                (inst nop))
+              (inst li temp (fixnumize max))
+              (inst sltu temp temp nargs)
+              (inst bne temp err-lab)
+              (inst nop))
+             ((plusp min)
+              (inst li temp (fixnumize min))
+              (inst sltu temp nargs temp)
+              (inst bne temp err-lab)
+              (inst nop))))))))
 
 ;;; Single-stepping
 

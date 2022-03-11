@@ -16,17 +16,11 @@
  *
  */
 
+#include "genesis/config.h"
 #include "murmur_hash.h"
 #include <string.h>
 
 #define ROTL32(x, r) ((x) << (r)) | ((x) >> (32 - (r)))
-
-#define FMIX32(h)    \
-  (h) ^= (h) >> 16;  \
-  (h) *= 0x85ebca6b; \
-  (h) ^= (h) >> 13;  \
-  (h) *= 0xc2b2ae35; \
-  (h) ^= (h) >> 16;
 
 uint32_t gpr_murmur_hash3(const void* key, size_t len, uint32_t seed) {
   uint32_t h1 = seed;
@@ -76,3 +70,14 @@ uint32_t gpr_murmur_hash3(const void* key, size_t len, uint32_t seed) {
   FMIX32(h1);
   return h1;
 }
+
+uint32_t murmur3_fmix32(uint32_t k) {
+    FMIX32(k);
+    return k;
+}
+#ifdef LISP_FEATURE_64_BIT
+uint64_t murmur3_fmix64(uint64_t k) {
+    FMIX64(k);
+    return k;
+}
+#endif

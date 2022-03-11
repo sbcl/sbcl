@@ -67,7 +67,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (define-assembly-routine (generic--
@@ -116,7 +116,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 
@@ -175,15 +175,17 @@
   ;; Only need one word, fix the header.
   (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
 
-  (pseudo-atomic (pa-flag :extra (pad-data-block (+ 1 bignum-digits-offset)))
-    (inst or res alloc-tn other-pointer-lowtag)
+  (pseudo-atomic (pa-flag)
+    (allocation bignum-widetag (pad-data-block (+ 1 bignum-digits-offset))
+                res other-pointer-lowtag `(,nargs ,pa-flag))
     (storew temp res 0 other-pointer-lowtag))
   (storew lo res bignum-digits-offset other-pointer-lowtag)
   (lisp-return lra lip :offset 2)
 
   TWO-WORDS
-  (pseudo-atomic (pa-flag :extra (pad-data-block (+ 2 bignum-digits-offset)))
-    (inst or res alloc-tn other-pointer-lowtag)
+  (pseudo-atomic (pa-flag)
+    (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset))
+                res other-pointer-lowtag `(,nargs ,pa-flag))
     (storew temp res 0 other-pointer-lowtag))
 
   (storew lo res bignum-digits-offset other-pointer-lowtag)
@@ -195,7 +197,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (macrolet
@@ -319,7 +321,7 @@
           ,cmp
 
           (inst ,(if not-p 'beq 'bne) temp DONE)
-          (move res null-tn t)
+          (inst move res null-tn)
           (load-symbol res t)
 
           DONE
@@ -330,7 +332,7 @@
           (inst li nargs (fixnumize 2))
           (move ocfp cfp-tn)
           (inst j lip)
-          (move cfp-tn csp-tn t))))
+          (inst move cfp-tn csp-tn))))
 
   (define-cond-assem-rtn generic-< < two-arg-< (inst slt temp x y) t)
   (define-cond-assem-rtn generic-<= <= two-arg-<= (inst slt temp x y) nil)
@@ -361,7 +363,7 @@
   (inst nop)
 
   (inst bne x y DONE)
-  (move res null-tn t)
+  (inst move res null-tn)
 
   RETURN-T
   (load-symbol res t)
@@ -374,7 +376,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (define-assembly-routine (generic-=
@@ -399,7 +401,7 @@
   (inst nop)
 
   (inst bne x y DONE)
-  (move res null-tn t)
+  (inst move res null-tn)
   (load-symbol res t)
 
   DONE
@@ -410,7 +412,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (define-assembly-routine (generic-/=
@@ -435,7 +437,7 @@
   (inst nop)
 
   (inst beq x y DONE)
-  (move res null-tn t)
+  (inst move res null-tn)
   (load-symbol res t)
 
   DONE
@@ -446,4 +448,4 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))

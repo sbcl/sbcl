@@ -22,7 +22,7 @@
       (if (fboundp s)
           (when (documentation s 'function)
             (incf n))))
-    (assert (= n 594))))
+    (assert (= n 595))))
 
 ;;;; tests of interface machinery
 
@@ -52,6 +52,13 @@
   (assert (< 0
              (length (apropos-list "" "SB-VM" t))
              (length (apropos-list "" "SB-VM")))))
+
+(with-test (:name :apropos-symbol-values)
+  (let ((string
+         (with-output-to-string (*standard-output*)
+           (apropos "*print-"))))
+    (assert (search "=" string))
+    (assert (search "PPRINT-DISPATCH" string))))
 
 ;;; TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE and
 ;;; UPGRADED-COMPLEX-PART-TYPE should be able to deal with NIL as an
@@ -108,7 +115,8 @@
                   :timeout)))))
 
 ;;; SLEEP should work with large integers as well
-(with-test (:name (sleep :pretty-much-forever))
+(with-test (:name (sleep :pretty-much-forever)
+            :skipped-on (:and :darwin :sb-safepoint)) ; hangs
   (assert (eq :timeout
               (handler-case
                   (sb-ext:with-timeout 1
@@ -280,13 +288,14 @@
 (with-test (:name :split-seconds-for-sleep)
   (assert (< (nth-value 1 (sb-impl::split-seconds-for-sleep 7.2993028420866d7))
              1000000000)))
-#+x86-64
+
+#+(or x86-64 arm64)
 (with-test (:name :restart-invalid-arg-counts.1)
   (handler-bind ((error (lambda (c)
                           (invoke-restart (find-restart 'sb-kernel::replace-function c) 'list))))
     (assert (equal (eval '(cons 324)) '(324)))))
 
-#+x86-64
+#+(or x86-64 arm64)
 (with-test (:name :restart-invalid-arg-counts.2)
   (handler-bind ((error (lambda (c)
                           (invoke-restart (find-restart 'sb-kernel::call-form c) 123))))
@@ -300,3 +309,8 @@
                      (multiple-value-list
                       (funcall fun '(1 2 3 4 5 6 7 8 . 10))))
                    '(1 2 3 4 5 6 7 8)))))
+
+(with-test (:name :no-v0p-ex1stsp-in-build ; spelled L33t Hax0r style on purpose
+            :skipped-on (or :sb-devel
+                            :sb-xref-for-internals))
+  (assert (null (apropos-list "VOP-EXISTSP"))))

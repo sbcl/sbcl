@@ -13,10 +13,42 @@
 
 (in-package "SB-IMPL")
 
+;;; FIXME: a lot of places in the code that should use ARRAY-RANGE
+;;; instead use INDEX and vice-versa, but the thing is, we have
+;;; a ton of fenceposts errors all over the place regardless.
+;;; CLHS glosary reference:
+;;; "array total size n. the total number of elements in an array,
+;;;  computed by taking the product of the dimensions of the array."
+;;; and ARRAY-TOTAL-SIZE-LIMIT:
+;;; "The upper exclusive bound on the array total size of an array."
+
+;;; Consider a reduced example for the sake of argument in which
+;;; ARRAY-TOTAL-SIZE-LIMIT were 21.
+;;; - the largest vector would have LENGTH 20.
+;;; - the largest legal index for AREF on it would be 19.
+;;; - the largest legal :END on sequence functions would be 20.
+;;; Nothing should allow 21. So DEFTYPE ARRAY-RANGE is wrong
+;;; and must never be used for anything.
+;;; Unfortunately, it's all over mb-util and enc-utf etc.
+;;;
+;;; *Also* INDEX is wrong, as the comment there says.
+;;; To fix these and also SEQUENCE-END:
+;;; - INDEX should be `(integer 0 (,1- array-dimension-limit))
+;;; - ARRAY-RANGE should be `(integer 0 (,array-dimension-limit))
+;;; - SEQUENCE-END (in deftypes-for-target) should be
+;;;   `(OR NULL ARRAY-RANGE)
+;;;
+;;; A further consideration for INDEX on 64-bit machines is that
+;;; if INDEX were equivalent to (UNSIGNED-BYTE n) for some 'n'
+;;; then (TYPEP X 'INDEX) can combines FIXNUMP and the range test into
+;;; one bit-masking test, depending on the architecture.
+;;; Probably it should be (UNSIGNED-BYTE 61) except on ppc64
+;;; where it would have to be (UNSIGNED-BYTE 59).
+
 ;;; A number that can represent an index into a vector, including
 ;;; one-past-the-end
 (deftype array-range ()
-  `(integer 0 ,sb-xc:array-dimension-limit))
+  `(integer 0 ,array-dimension-limit))
 
 ;;; a type used for indexing into sequences, and for related
 ;;; quantities like lengths of lists and other sequences.
@@ -35,13 +67,13 @@
 ;;; MOST-POSITIVE-FIXNUM lets the system know it can increment a value
 ;;; of type INDEX without having to worry about using a bignum to
 ;;; represent the result.
-(def!type index () `(integer 0 (,sb-xc:array-dimension-limit)))
+(def!type index () `(integer 0 (,array-dimension-limit)))
 
 ;;; like INDEX, but augmented with -1 (useful when using the index
 ;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
 ;;; an implementation which terminates the loop by testing for the
 ;;; index leaving the loop range)
-(def!type index-or-minus-1 () `(integer -1 (,sb-xc:array-dimension-limit)))
+(def!type index-or-minus-1 () `(integer -1 (,array-dimension-limit)))
 
 ;;; The smallest power of two that is equal to or greater than X.
 (declaim (inline power-of-two-ceiling))
@@ -203,49 +235,17 @@
          ,@(if ignores `((declare (ignorable ,@ignores))))
          ,@body))))
 
-;;;; some old-fashioned functions. (They're not just for old-fashioned
-;;;; code, they're also used as optimized forms of the corresponding
-;;;; general functions when the compiler can prove that they're
-;;;; equivalent.)
+;;; Functions for compatibility sake:
 
-;;; like (MEMBER ITEM LIST :TEST #'EQ)
 (defun memq (item list)
   "Return tail of LIST beginning with first element EQ to ITEM."
-  (declare (explicit-check))
-  ;; KLUDGE: These could be and probably should be defined as
-  ;;   (MEMBER ITEM LIST :TEST #'EQ)),
-  ;; but when I try to cross-compile that, I get an error from
-  ;; LTN-ANALYZE-KNOWN-CALL, "Recursive known function definition". The
-  ;; comments for that error say it "is probably a botched interpreter stub".
-  ;; Rather than try to figure that out, I just rewrote this function from
-  ;; scratch. -- WHN 19990512
-  (do ((i list (cdr i)))
-      ((null i))
-    (when (eq (car i) item)
-      (return i))))
+  (declare (inline member))
+  (member item list :test #'eq))
 
-;;; like (ASSOC ITEM ALIST :TEST #'EQ):
-;;;   Return the first pair of ALIST where ITEM is EQ to the key of
-;;;   the pair.
 (defun assq (item alist)
-  (declare (explicit-check))
-  ;; KLUDGE: CMU CL defined this with
-  ;;   (DECLARE (INLINE ASSOC))
-  ;;   (ASSOC ITEM ALIST :TEST #'EQ))
-  ;; which is pretty, but which would have required adding awkward
-  ;; build order constraints on SBCL (or figuring out some way to make
-  ;; inline definitions installable at build-the-cross-compiler time,
-  ;; which was too ambitious for now). Rather than mess with that, we
-  ;; just define ASSQ explicitly in terms of more primitive
-  ;; operations:
-  (dolist (pair alist)
-    ;; though it may look more natural to write this as
-    ;;   (AND PAIR (EQ (CAR PAIR) ITEM))
-    ;; the temptation to do so should be resisted, as pointed out by PFD
-    ;; sbcl-devel 2003-08-16, as NIL elements are rare in association
-    ;; lists.  -- CSR, 2003-08-16
-    (when (and (eq (car pair) item) (not (null pair)))
-      (return pair))))
+  "Return the first pair of alist where item is EQ to the key of pair."
+  (declare (inline assoc))
+  (assoc item alist :test #'eq))
 
 ;;; Delete just one item
 (defun delq1 (item list)
@@ -309,7 +309,7 @@
                        ,result)))
     `(let ((,n-table ,table))
        ,(if locked
-            `(with-locked-system-table (,n-table) ,iter-form)
+            `(with-system-mutex ((hash-table-lock ,n-table)) ,iter-form)
             iter-form))))
 
 ;;; Executes BODY for all entries of PLIST with KEY and VALUE bound to
@@ -317,6 +317,7 @@
 (defmacro doplist ((key val) plist &body body)
   (with-unique-names (tail)
     `(let ((,tail ,plist) ,key ,val)
+       (declare (ignorable ,key ,val))
        (loop (when (null ,tail) (return nil))
              (setq ,key (pop ,tail))
              (when (null ,tail)
@@ -467,6 +468,7 @@ NOTE: This interface is experimental and subject to change."
 
 ;; Make a new hash-cache and optionally create the statistics vector.
 (defun alloc-hash-cache (size symbol)
+  (declare (type index size))
   (let (cache)
     ;; It took me a while to figure out why infinite recursion could occur
     ;; in VALUES-SPECIFIER-TYPE. It's because SET calls VALUES-SPECIFIER-TYPE.
@@ -565,7 +567,7 @@ NOTE: This interface is experimental and subject to change."
          (line-type (let ((n (+ nargs nvalues)))
                       (if (<= n 3) 'cons `(simple-vector ,n))))
          (bind-hashval
-          `((,hashval (the (signed-byte #.sb-vm:n-fixnum-bits)
+          `((,hashval (the sb-xc:fixnum
                            (funcall ,hash-function ,@arg-vars)))
             (,cache ,var-name)))
          (probe-it
@@ -574,7 +576,7 @@ NOTE: This interface is experimental and subject to change."
                (let ((,hashval ,hashval) ; gets clobbered in probe loop
                      (,cache (truly-the ,cache-type ,cache)))
                  ;; FIXME: redundant?
-                 (declare (type (signed-byte #.sb-vm:n-fixnum-bits) ,hashval))
+                 (declare (type sb-xc:fixnum ,hashval))
                  (loop repeat 2
                     do (let ((,entry
                               (svref ,cache
@@ -738,6 +740,27 @@ NOTE: This interface is experimental and subject to change."
 (defun legal-fun-name-p (name)
   (values (valid-function-name-p name)))
 
+(declaim (inline legal-class-name-p))
+(defun legal-class-name-p (thing)
+  (symbolp thing))
+
+;;; * extended-function-designator: an object that denotes a function and that is one of:
+;;;   a function name (denoting the function it names in the global environment),
+;;;   or a function (denoting itself). The consequences are undefined if a function name
+;;;   is used as an extended function designator but it does not have a global definition
+;;;   as a function, or if it is a symbol that has a global definition as a macro
+;;;   or a special form.
+;;; Release 1.4.6 advertised that (disassemble 'a-macro) works, which entails a choice:
+;;; - if (EXTENDED-FUNCTION-DESIGNATOR-P) is to return NIL, then we have to
+;;;   add (OR (SATISFIES MACRO-FUNCTION) ...) to the signature of DISASSEMBLE.
+;;; - if (EXTENDED-FUNCTION-DESIGNATOR-P) is to return T, then we must avoid
+;;;   using this predicate in contexts that demand a function.
+(defun extended-function-designator-p (x)
+  (or (and (legal-fun-name-p x)
+           (fboundp x)
+           (not (and (symbolp x) (special-operator-p x))))
+      (functionp x)))
+
 (deftype function-name () '(satisfies legal-fun-name-p))
 
 ;;; Signal an error unless NAME is a legal function name.
@@ -862,19 +885,6 @@ NOTE: This interface is experimental and subject to change."
   (if (consp x)
       (destructuring-bind (result) x result)
       x))
-
-;;; Coerce a numeric type bound to the given type while handling
-;;; exclusive bounds.
-(defun coerce-numeric-bound (bound type)
-  (flet ((c (thing)
-           (case type
-             (rational (rational thing))
-             (t (coerce thing type)))))
-    (when bound
-      (if (consp bound)
-          (list (c (car bound)))
-          (c bound)))))
-
 
 ;;;; utilities for two-VALUES predicates
 
@@ -919,121 +929,7 @@ NOTE: This interface is experimental and subject to change."
             (unless sub-value (return (values nil t)))
             (setf certain? nil))))))
 
-;;;; DEFPRINTER
 
-;;; These functions are called by the expansion of the DEFPRINTER
-;;; macro to do the actual printing.
-(declaim (ftype (function (symbol t stream) (values))
-                defprinter-prin1 defprinter-princ))
-(defun defprinter-prin1 (name value stream)
-  (defprinter-prinx #'prin1 name value stream))
-(defun defprinter-princ (name value stream)
-  (defprinter-prinx #'princ name value stream))
-(defun defprinter-prinx (prinx name value stream)
-  (declare (type function prinx))
-  (when *print-pretty*
-    (pprint-newline :linear stream))
-  (format stream ":~A " name)
-  (funcall prinx value stream)
-  (values))
-(defun defprinter-print-space (stream)
-  (write-char #\space stream))
-
-(defvar *print-ir-nodes-pretty* nil)
-
-;;; Define some kind of reasonable PRINT-OBJECT method for a
-;;; STRUCTURE-OBJECT class.
-;;;
-;;; NAME is the name of the structure class, and CONC-NAME is the same
-;;; as in DEFSTRUCT.
-;;;
-;;; The SLOT-DESCS describe how each slot should be printed. Each
-;;; SLOT-DESC can be a slot name, indicating that the slot should
-;;; simply be printed. A SLOT-DESC may also be a list of a slot name
-;;; and other stuff. The other stuff is composed of keywords followed
-;;; by expressions. The expressions are evaluated with the variable
-;;; which is the slot name bound to the value of the slot. These
-;;; keywords are defined:
-;;;
-;;; :PRIN1    Print the value of the expression instead of the slot value.
-;;; :PRINC    Like :PRIN1, only PRINC the value
-;;; :TEST     Only print something if the test is true.
-;;;
-;;; If no printing thing is specified then the slot value is printed
-;;; as if by PRIN1.
-;;;
-;;; The structure being printed is bound to STRUCTURE and the stream
-;;; is bound to STREAM.
-;;;
-;;; If PRETTY-IR-PRINTER is supplied, the form is invoked when
-;;; *PRINT-IR-NODES-PRETTY* is true.
-(defmacro defprinter ((name
-                       &key
-                       (conc-name (concatenate 'simple-string
-                                               (symbol-name name)
-                                               "-"))
-                       identity
-                       pretty-ir-printer)
-                      &rest slot-descs)
-  (let ((first? t)
-        maybe-print-space
-        (reversed-prints nil))
-    (flet ((sref (slot-name)
-             `(,(symbolicate conc-name slot-name) structure)))
-      (dolist (slot-desc slot-descs)
-        (if first?
-            (setf maybe-print-space nil
-                  first? nil)
-            (setf maybe-print-space `(defprinter-print-space stream)))
-        (cond ((atom slot-desc)
-               (push maybe-print-space reversed-prints)
-               (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) stream)
-                     reversed-prints))
-              (t
-               (let ((sname (first slot-desc))
-                     (test t))
-                 (collect ((stuff))
-                   (do ((option (rest slot-desc) (cddr option)))
-                       ((null option)
-                        (push `(let ((,sname ,(sref sname)))
-                                 (when ,test
-                                   ,maybe-print-space
-                                   ,@(or (stuff)
-                                         `((defprinter-prin1
-                                             ',sname ,sname stream)))))
-                              reversed-prints))
-                     (case (first option)
-                       (:prin1
-                        (stuff `(defprinter-prin1
-                                  ',sname ,(second option) stream)))
-                       (:princ
-                        (stuff `(defprinter-princ
-                                  ',sname ,(second option) stream)))
-                       (:test (setq test (second option)))
-                       (t
-                        (error "bad option: ~S" (first option)))))))))))
-    (let ((normal-printer `(pprint-logical-block (stream nil)
-                             (print-unreadable-object (structure
-                                                       stream
-                                                       :type t
-                                                       :identity ,identity)
-                               ,@(nreverse reversed-prints))) ))
-      `(defmethod print-object ((structure ,name) stream)
-         ,(cond (pretty-ir-printer
-                 `(if *print-ir-nodes-pretty*
-                      ,pretty-ir-printer
-                      ,normal-printer))
-                (t
-                 normal-printer))))))
-
-;;; When cross-compiling, there is nothing out of the ordinary
-;;; about compilling a DEFUN wrapped in PRESERVING-HOST-FUNCTION,
-;;; so just remove the decoration.
-#-sb-xc-host
-(eval-when (:compile-toplevel)
-  (sb-xc:defmacro sb-cold:preserving-host-function (form) form))
-
-(sb-cold:preserving-host-function
 (defun print-symbol-with-prefix (stream symbol &optional colon at)
   "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
   the current package."
@@ -1042,10 +938,9 @@ NOTE: This interface is experimental and subject to change."
   ;; keywords are always printed with colons, so this guarantees that the
   ;; symbol will not be printed without a prefix.
   (let ((*package* *keyword-package*))
-    (write symbol :stream stream :escape t))))
+    (write symbol :stream stream :escape t)))
 
 (declaim (special sb-pretty:*pprint-quote-with-syntactic-sugar*))
-(sb-cold:preserving-host-function
 (defun print-type-specifier (stream type-specifier &optional colon at)
   (declare (ignore colon at))
   ;; Binding *PPRINT-QUOTE-WITH-SYNTACTIC-SUGAR* prevents certain
@@ -1061,11 +956,16 @@ NOTE: This interface is experimental and subject to change."
   ;; specifiers.
   (let ((sb-pretty:*pprint-quote-with-syntactic-sugar* nil)
         (*package* *cl-package*))
-    (prin1 type-specifier stream))))
+    (prin1 type-specifier stream)))
 
-(sb-cold:preserving-host-function
 (defun print-type (stream type &optional colon at)
-  (print-type-specifier stream (type-specifier type) colon at)))
+  (print-type-specifier stream (type-specifier type) colon at))
+
+(defun print-lambda-list (stream lambda-list &optional colon at)
+  (declare (ignore colon at))
+  (let ((sb-pretty:*pprint-quote-with-syntactic-sugar* nil)
+        (*package* *cl-package*))
+    (format stream "~:A" lambda-list)))
 
 
 ;;;; Deprecating stuff
@@ -1154,7 +1054,7 @@ NOTE: This interface is experimental and subject to change."
     ((or symbol cons)
      (%check-deprecated-type type-specifier))
     (class
-     (let ((name (class-name type-specifier)))
+     (let ((name (cl:class-name type-specifier)))
        (when (and name (symbolp name)
                   (eq type-specifier (find-class name nil)))
          (%check-deprecated-type name))))))
@@ -1189,13 +1089,6 @@ NOTE: This interface is experimental and subject to change."
 ;;; - SOCKINT::WIN32-IOCTL                         since 1.2.10 (03/2015)    -> Late: 08/2015
 ;;; - SOCKINT::WIN32-SETSOCKOPT                    since 1.2.10 (03/2015)    -> Late: 08/2015
 ;;; - SOCKINT::WIN32-GETSOCKOPT                    since 1.2.10 (03/2015)    -> Late: 08/2015
-;;;
-;;; - SB-C::MERGE-TAIL-CALLS (policy)              since 1.0.53.74 (11/2011) -> Late: 11/2012
-;;;
-;;; LATE:
-;;; - SB-C::STACK-ALLOCATE-DYNAMIC-EXTENT (policy) since 1.0.19.7            -> Final: anytime
-;;; - SB-C::STACK-ALLOCATE-VECTOR (policy)         since 1.0.19.7            -> Final: anytime
-;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy)    since 1.0.19.7            -> Final: anytime
 
 (defun setup-function-in-final-deprecation
     (software version name replacement-spec)
@@ -1224,7 +1117,7 @@ NOTE: This interface is experimental and subject to change."
 (defun setup-type-in-final-deprecation
     (software version name replacement-spec)
   (declare (ignore software version replacement-spec))
-  (%compiler-deftype name (constant-type-expander name t) nil))
+  (%deftype name (constant-type-expander name t) nil))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:
@@ -1244,7 +1137,9 @@ NOTE: This interface is experimental and subject to change."
                                 ((or (listp id) ; must be a type-specifier
                                      (memq id '(special ignorable ignore
                                                 dynamic-extent
-                                                truly-dynamic-extent))
+                                                truly-dynamic-extent
+                                                sb-c::constant-value
+                                                sb-c::no-constraints))
                                      (info :type :kind id))
                                  (cdr decl))))))
            (partition (spec)
@@ -1398,25 +1293,6 @@ NOTE: This interface is experimental and subject to change."
                            vector))
              (sorted (stable-sort wrapped comparator :key #'cdr)))
         (map-into sorted #'car sorted))))
-
-;;; Just like WITH-OUTPUT-TO-STRING but doesn't close the stream,
-;;; producing more compact code.
-(defmacro with-simple-output-to-string
-    ((var &optional string)
-     &body body)
-  (multiple-value-bind (forms decls) (parse-body body nil)
-    (if string
-        `(let ((,var (sb-impl::make-fill-pointer-output-stream ,string)))
-           ,@decls
-           ,@forms)
-        `(let ((,var #+sb-xc-host (make-string-output-stream)
-                     #-sb-xc-host (sb-impl::%make-string-output-stream
-                                   (or #-sb-unicode 'character :default)
-                                   #'sb-impl::string-ouch)))
-
-           ,@decls
-           ,@forms
-           (get-output-stream-string ,var)))))
 
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)

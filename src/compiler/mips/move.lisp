@@ -185,6 +185,7 @@
 
     (with-fixed-allocation
         (y pa-flag temp bignum-widetag (1+ bignum-digits-offset) nil)
+      ;; FIXME: could this store be moved forward into the branch delay slot?
       (storew x y bignum-digits-offset other-pointer-lowtag))
     (inst b done)
     (inst nop)
@@ -208,7 +209,7 @@
     (inst beq temp done)
     (inst sll y x n-fixnum-tag-bits)
 
-    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
+    (load-constant vop (emit-constant (1+ most-positive-fixnum))
                    y)
     (inst b done)
     (inst nop)
@@ -225,7 +226,7 @@
     (inst beq temp done)
     (inst sll y x n-fixnum-tag-bits)
 
-    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
+    (load-constant vop (emit-constant (1- most-negative-fixnum))
                    y)
     (inst b done)
     (inst nop)
@@ -249,9 +250,9 @@
     (inst beq temp done)
     (inst sll y x n-fixnum-tag-bits)
 
-    (pseudo-atomic
-      (pa-flag :extra (pad-data-block (+ bignum-digits-offset 2)))
-      (inst or y alloc-tn other-pointer-lowtag)
+    (pseudo-atomic (pa-flag)
+      (allocation bignum-widetag (pad-data-block (+ bignum-digits-offset 2)) y
+        other-pointer-lowtag `(,pa-flag ,temp))
       (inst slt temp x zero-tn)
       (inst sll temp n-widetag-bits)
       (inst addu temp (logior (ash 1 n-widetag-bits) bignum-widetag))

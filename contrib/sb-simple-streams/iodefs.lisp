@@ -57,13 +57,10 @@
 
 (defmacro with-stream-class ((class-name &optional stream) &body body)
   (if stream
-    (let ((stm (gensym "STREAM"))
-          (slt (gensym "SV")))
-      `(let* ((,stm ,stream)
-              (,slt (sb-kernel:%instance-ref ,stm 1)))
-         (declare (type ,class-name ,stm)
-                  (type simple-vector ,slt)
-                  (ignorable ,slt))
+    (let ((stm (gensym "STREAM")))
+      `(let* ((,stm ,stream))
+         (declare (type ,class-name ,stm))
+         (declare (ignorable ,stm))
          (macrolet ((sm (slot-name stream)
                       (declare (ignore stream))
                       #-count-sm
@@ -166,4 +163,3 @@
 
 #+nil
 (provide :iodefs)
-

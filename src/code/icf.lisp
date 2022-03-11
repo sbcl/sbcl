@@ -25,6 +25,7 @@
 
 ;;; Return T if any pointers were replaced in a code object.
 (defun apply-forwarding-map (map print &aux any-change)
+  (declare (optimize (sb-c::aref-trapping 0)))
   (when print
     (let ((*print-pretty* nil))
       (dohash ((k v) map)
@@ -47,22 +48,19 @@
      (lambda (object widetag size &aux touchedp)
        (declare (ignore size))
        (macrolet ((rewrite (place &aux (accessor (if (listp place) (car place))))
-                    ;; These two slots have no setters, but nor are
-                    ;; they possibly affected by code folding.
-                    (unless (member accessor '(symbol-name symbol-package))
+                    ;; SYMBOL-NAME, SYMBOL-PACKAGE, SYMBOL-%INFO have no setters,
+                    ;; but nor are they possibly affected by code folding.
+                    ;; {%INSTANCE,%FUN}-LAYOUT have setters but they are not spelled
+                    ;; SETF, nor are they affected by code folding.
+                    (unless (member accessor '(symbol-name symbol-package symbol-%info
+                                               %fun-layout %instance-layout))
                       `(let* ((oldval ,place) (newval (forward oldval)))
                          (unless (eq newval oldval)
                            ,(case accessor
                               (data-vector-ref
                                `(setf (svref ,@(cdr place)) newval touchedp t))
                               (value-cell-ref
-                               ;; pinned already because we're iterating over the heap
-                               ;; which disables GC, but maybe some day it won't.
-                               `(with-pinned-objects (object)
-                                  (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address object))
-                                                         (- (ash value-cell-value-slot word-shift)
-                                                            other-pointer-lowtag))
-                                        newval)))
+                               `(%primitive value-cell-set object newval))
                               (weak-pointer-value
                                ;; Preserve gencgc invariant that a weak pointer
                                ;; can't point to an object younger than itself.
@@ -73,12 +71,10 @@
                                        #+nil
                                        (warn "Can't update weak pointer ~s" object))
                                       (t
-                                       (with-pinned-objects (object)
-                                         (setf (sap-ref-lispobj
-                                                (int-sap (get-lisp-obj-address object))
-                                                (- (ash weak-pointer-value-slot word-shift)
-                                                   other-pointer-lowtag))
-                                               newval)))))
+                                       (%primitive set-slot object newval
+                                                   '(setf weak-pointer-value)
+                                                   weak-pointer-value-slot
+                                                   other-pointer-lowtag))))
                               (%primitive
                                (ecase (cadr place)
                                  (fast-symbol-global-value
@@ -89,7 +85,7 @@
          (do-referenced-object (object rewrite)
            (simple-vector
             :extend
-            (when (and (= (get-header-data object) vector-valid-hashing-subtype)
+            (when (and (logtest (get-header-data object) vector-addr-hashing-flag)
                        touchedp)
               (setf (svref object 1) 1)))
            (code-component
@@ -114,6 +110,7 @@
             (let* ((oldval (%closure-fun object))
                    (newval (forward oldval)))
               (unless (eq newval oldval)
+                #+nil ; FIXME: gotta figure out GC marking situation here
                 (with-pinned-objects (object newval)
                   (setf (sap-ref-sap (int-sap (- (get-lisp-obj-address object)
                                                  fun-pointer-lowtag))
@@ -123,11 +120,7 @@
               (let* ((oldval (%closure-index-ref object i))
                      (newval (forward oldval)))
                 (unless (eq newval oldval)
-                  (with-pinned-objects (object)
-                    (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address object))
-                                           (- (ash (+ i closure-info-offset) word-shift)
-                                              fun-pointer-lowtag))
-                          newval))))))
+                  (%closure-index-set object i newval)))))
            (ratio :override)
            ((complex rational) :override)
            (t
@@ -185,14 +178,19 @@
          (= (%code-code-size code1) (%code-code-size code2))
          (= (code-n-unboxed-data-bytes code1)
             (code-n-unboxed-data-bytes code2))
-         ;; Compare boxed constants. (Ignore debug-info and fixups)
-         (loop for i from code-constants-offset
+         ;; Compare boxed constants. Ignore debug-info, fixups, and all
+         ;; the simple-fun metadata (name, args, type, info) which will be compared
+         ;; later based on how similar we require them to be.
+         (loop for i from (+ code-constants-offset
+                             (* code-slots-per-simple-fun (code-n-entries code1)))
                below (code-header-words code1)
                always (eq (code-header-ref code1 i) (code-header-ref code2 i)))
-         ;; Compare unboxed constants
-         (let ((nwords (ceiling (code-n-unboxed-data-bytes code1) n-word-bytes))
-               (sap1 (code-instructions code1))
-               (sap2 (code-instructions code2)))
+         ;; jump table word contains serial# which is arbitrary; don't compare it
+         (= (code-jump-table-words code1) (code-jump-table-words code2))
+         ;; Compare unboxed constants less 1 word which was already compared
+         (let ((nwords (1- (ceiling (code-n-unboxed-data-bytes code1) n-word-bytes)))
+               (sap1 (sap+ (code-instructions code1) n-word-bytes))
+               (sap2 (sap+ (code-instructions code2) n-word-bytes)))
            (dotimes (i nwords t)
              (unless (= (sap-ref-word sap1 (ash i word-shift))
                         (sap-ref-word sap2 (ash i word-shift)))
@@ -224,18 +222,35 @@
              (return nil))))))
 
 ;;; Compute a key for binning purposes.
-(defun compute-code-hash-key (code)
-  (with-pinned-objects (code)
-    (list* (code-header-words code)
-           (collect ((offs))
-             (dotimes (i (code-n-entries code) (offs))
-               (offs (%code-fun-offset code i)
-                     (%simple-fun-text-len (%code-entry-point code i) i))))
-           (collect ((consts))
-             ;; Ignore the fixups and the debug info
-             (do ((i (1- (code-header-words code)) (1- i)))
-                 ((< i code-constants-offset) (consts))
-               (consts (code-header-ref code i)))))))
+(defun compute-code-hash-key (code constants)
+  (flet ((constant-to-moniker (object)
+           ;; Prevent EQUAL from descending into certain objects by assigning
+           ;; a sequential integer as its moniker.
+           ;; - CONS is obvious: just don't do it.
+           ;; - Do not collapse STRING, because doing so would break the concept
+           ;;   of similarity as applied to strings of differing element types
+           ;;   which are EQUAL but dissimilar.
+           ;; - Do not collapse PATHNAME because those contain strings.
+           ;; - Additionally, as I intend to implement lazy stable hash values on
+           ;;   all INSTANCE types stored in EQUAL tables, assign them a moniker
+           ;;   so that extra GC work is avoided. (This subsumes PATHNAME too)
+           ;; BIT-VECTOR is the only remaining nontrivial type for which EQUAL
+           ;; does anything other than EQL. That's fine.
+           (if (typep object '(or cons instance string pathname))
+               (ensure-gethash object constants (hash-table-count constants))
+               object)))
+    (with-pinned-objects (code)
+      (list* (code-header-words code)
+             (collect ((offs))
+               (dotimes (i (code-n-entries code) (offs))
+                 (offs (%code-fun-offset code i)
+                       (%simple-fun-text-len (%code-entry-point code i) i))))
+             ;; Ignore the debug-info, fixups, and simple-fun metadata.
+             ;; (Same things that are ignored by the CODE-EQUIVALENT-P predicate)
+             (loop for i from (+ code-constants-offset
+                                 (* code-slots-per-simple-fun (code-n-entries code)))
+                     below (code-header-words code)
+                     collect (constant-to-moniker (code-header-ref code i)))))))
 
 (declaim (inline default-allow-icf-p))
 (defun default-allow-icf-p (code)
@@ -258,7 +273,7 @@
                        sb-c::deftransform
                        :source-transform))))))
 
-(defun fold-identical-code (&key aggressive preserve-docstrings print)
+(defun fold-identical-code (&key aggressive preserve-docstrings (print nil))
   (loop
     #+gencgc (gc :gen 7)
     ;; Pass 1: count code objects.  I'd like to enhance MAP-ALLOCATED-OBJECTS
@@ -285,7 +300,12 @@
                       (plusp (code-n-entries obj)))
              (setf (aref code-objects i) obj)
              (incf i)))
-         :all))
+         :all)
+        ;; GC in between the first and second heap walk might somehow free
+        ;; a code object. It's possible apparently, because a user encountered
+        ;; an error at (COMPUTE-CODE-HASH-KEY 0) in save-lisp-and-die.
+        (unless (= i (length code-objects))
+          (%shrink-vector code-objects i)))
       (unless aggressive
         ;; Figure out which of those are referenced by any object
         ;; except for an fdefn.
@@ -315,12 +335,16 @@
            :all)))
       ;; Now place objects that possibly match into the same bin.
       (let ((bins (make-hash-table :test 'equal))
+            ;; Constants all need to be treated as though they are atoms.
+            ;; Map each one to a fixnum so that the EQUAL table doesn't
+            ;; recurse into constants during the binning step.
+            (constants (make-hash-table :test 'eq))
             (n 0))
         (dovector (x code-objects)
           (when (or (not (gethash x referenced-objects))
                     (default-allow-icf-p x))
             (incf n)
-            (push x (gethash (compute-code-hash-key x) bins))))
+            (push x (gethash (compute-code-hash-key x constants) bins))))
         (when print
           (format t "ICF: ~d objects, ~d candidates, ~d bins~%"
                   (length code-objects) n (hash-table-count bins)))
@@ -354,20 +378,12 @@
                                               (name (and entry
                                                          (sb-kernel:%fun-name entry))))
                                          (and (symbolp name)
+                                              (symbol-package name)
                                               (eq (nth-value 1 (find-symbol (symbol-name name)
                                                                             (symbol-package name)))
                                                   :external))))
                                      (keyfn (x)
-                                       #+64-bit
-                                       (%code-serialno x)
-                                       ;; Creation time is an estimate of order, but
-                                       ;; frankly we shouldn't be storing times anyway,
-                                       ;; as it causes irreproducible builds.
-                                       ;; But I don't know what else to do.
-                                       #-64-bit
-                                       (sb-c::debug-source-compiled
-                                        (sb-c::compiled-debug-info-source
-                                         (%code-debug-info x))))
+                                       (%code-serialno x))
                                      (compare (a b)
                                        (let ((exported-a (exported-p a))
                                              (exported-b (exported-p b) ))

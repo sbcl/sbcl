@@ -5,6 +5,16 @@
 (defpackage :bug254 (:use :cl))
 (in-package :bug254)
 (declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
+;;; Kill all stupid useless notes, which is to say that IMHO 99.999999% of all notes
+;;; are useless and stupid unless expressly requested. If a test wants notes,
+;;; then it needs to do something to request them.
+;;; Of course I don't know which tests wanted them, so ... maybe this causes
+;;; some test to stop testing a thing. That's its fault for being badly written.
+(declaim (sb-ext:muffle-conditions sb-ext:compiler-note))
+;;; Oh for f***'s sake why is INHIBIT-WARNINGS *STRONGER* *THAN* MUFFLE-CONDITIONS?
+;;; (which is to say, more effective than, i.e. effective at all)
+;;; Maybe one of these days we should fix MUFFLE-CONDITIONS to actually do its job ?????
+(declaim (optimize (sb-ext:inhibit-warnings 3)))
 (defstruct foo
   (uhw2 nil :type (or package null)))
 (macrolet ((defprojection (variant &key lexpr eexpr)
@@ -31,33 +41,6 @@
 (in-package :cl-user)
 (delete-package :bug254)
 
-;;; bug 255
-(defpackage :bug255 (:use :cl))
-(in-package :bug255)
-(declaim (optimize (safety 3) (debug 2) (speed 2) (space 1)))
-(defvar *1*)
-(defvar *2*)
-(defstruct v a b)
-(defstruct w)
-(defstruct yam (v nil :type (or v null)))
-(defstruct un u)
-(defstruct (bod (:include un)) bo)
-(defstruct (bad (:include bod)) ba)
-(declaim (ftype (function ((or w bad) (or w bad)) (values)) %ufm))
-(defun %ufm (base bound) (froj base bound *1*) (values))
-(declaim (ftype (function ((vector t)) (or w bad)) %pu))
-(defun %pu (pds) (declare (ignore pds)) *2*)
-(defun uu (yam)
-  (declare (ignore yam))
-  (let ((v (yam-v az)))
-    (%ufm v
-          (flet ((project (x) (frob x 0)))
-            (let ((avecname *1*))
-              (multiple-value-prog1
-                  (progn (%pu avecname))
-                (frob)))))))
-(in-package :cl-user)
-(delete-package :bug255)
 
 ;;; bug 148
 (defpackage :bug148 (:use :cl))
@@ -209,7 +192,7 @@
 ;;; bug 291 reported by Nikodemus Siivola (modified version)
 (defstruct line
   (%chars ""))
-(defun update-window-imag (line)
+(defun update-window-imag (line &aux string)
   (tagbody
    TOP
      (if (null line)
@@ -220,7 +203,7 @@
        (let* ((cc (car current))
               (old-line (dis-line-line cc)))
          (if (eq old-line line)
-             (do ((chars (line-%chars line) nil))
+             (do ((chars (and line (line-%chars line)) nil))
                  (())
                (let* ()
                  (multiple-value-call
@@ -599,3 +582,16 @@
 
 (with-test (:name :non-top-level-type-clobbering)
   (assert (non-top-level-type-clobbering2)))
+
+(macrolet ((x () '#(a b c d)))
+  (defun constant-test-1 ()
+    (list (x) (x) (x)))
+  (defun constant-test-2 ()
+    (list (x))))
+
+(with-test (:name :emit-only-unique-constants)
+  (let ((l1 (ctu:find-code-constants #'constant-test-1))
+        (l2 (ctu:find-code-constants #'constant-test-2)))
+    (assert (= (length l1) 1))
+    (assert (= (length l2) 1))
+    (assert (eq (car l1) (car l2)))))

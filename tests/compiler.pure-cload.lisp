@@ -168,22 +168,36 @@
             ,@(loop for saetp across
                     sb-vm:*specialized-array-element-type-properties*
                     for specifier = (sb-vm:saetp-specifier saetp)
-                    for array = (make-array (if specifier 10 0)
-                                            :element-type specifier)
+                    for init = (cond ((member specifier '(character base-char))
+                                      '(:initial-element #\X))
+                                     ((eq specifier 't) '(:initial-element :hello))
+                                     (specifier
+                                      `(:initial-element
+                                        ,(sb-vm:saetp-initial-element-default saetp))))
+                    for array = (apply 'make-array (if specifier 10 0)
+                                       :element-type specifier init)
                     for make-array = `(make-array ,(if specifier 10 0)
-                                                  :element-type ',specifier)
+                                                  :element-type ',specifier
+                                                  ,@init)
                     collect `(assert (and (equal (type-of ,array)
                                                  ',(type-of array))
                                           (equalp ,array
                                                   ,make-array)))))))
     (make-tests)))
 
-(lambda () (the string (+ 1 x)))
+(defparameter *my-type-test-ran* 0)
+(deftype some-weird-type () '(satisfies my-thing-p))
+(defun my-thing-p (x)
+  (incf *my-type-test-ran*)
+  (member x '(nil :foo)))
 
-(lambda ()
-  (macrolet ((x (&rest args)
-               (declare (ignore args))
-               'a))
-    (let (a)
-      (declare (type vector a))
-      (x #.#'list))))
+(defun make-array-fill-nil ()
+  (sb-int:dx-let ((a (make-array 5 :initial-element nil
+                                 :element-type '(or (and complex) some-weird-type))))
+    (values (stack-allocated-p a)
+            *my-type-test-ran*)))
+
+(with-test (:name :splat-nil)
+  (multiple-value-bind (ok tested) (make-array-fill-nil)
+    ;; should not inhibit stack allocation, should check that NIL is OK
+    (assert (and ok (eql tested 1)))))

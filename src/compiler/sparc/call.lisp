@@ -41,14 +41,14 @@
 ;;; them at a known location.
 (defun make-old-fp-save-location (env)
   (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (environment-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type*
                   control-stack-arg-scn
                   ocfp-save-offset)))
 
 (defun make-return-pc-save-location (env)
   (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
+   (environment-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
    (make-wired-tn *backend-t-primitive-type*
                   control-stack-arg-scn
                   lra-save-offset)))
@@ -118,7 +118,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Fix CODE, cause the function object was passed in.
     (inst compute-code-from-fn code-tn code-tn start-lab temp)))
@@ -141,7 +141,7 @@
     (move res csp-tn)
     (inst add csp-tn csp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
-    (when (ir2-physenv-number-stack-p callee)
+    (when (ir2-environment-number-stack-p callee)
       (inst sub nsp-tn (bytes-needed-for-non-descriptor-stack-frame))
       (inst add nfp nsp-tn number-stack-displacement))))
 
@@ -352,8 +352,7 @@ default-value-8
               values-start)
   (:temporary (:sc any-reg :offset nargs-offset
                :from :eval :to (:result 1))
-              nvals)
-  (:temporary (:scs (non-descriptor-reg)) temp))
+              nvals))
 
 
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
@@ -436,6 +435,7 @@ default-value-8
   (:ignore args save)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 20
     (let ((label (gen-label))
           (cur-nfp (current-nfp-tn vop)))
@@ -778,7 +778,7 @@ default-value-8
 
            (note-this-location vop :call-site)
            (inst j function
-                 (- (ash simple-fun-code-offset word-shift)
+                 (- (ash simple-fun-insts-offset word-shift)
                     fun-pointer-lowtag))
            (inst move code-tn function))
 
@@ -1061,8 +1061,22 @@ default-value-8
   (:variant 0 0)
   (:translate %more-arg))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg)))
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (inst cmp count (fixnumize index))
+    (inst b :le done)
+    (move value null-tn)
+    (loadw value object index)
+    done))
+
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -1087,10 +1101,10 @@ default-value-8
       (move result null-tn)
 
       ;; We need to do this atomically.
-      (pseudo-atomic ()
+      (pseudo-atomic (temp)
         ;; Allocate a cons (2 words) for each item.
         (inst sll temp count 1)
-        (allocation result temp list-pointer-lowtag
+        (allocation 'list temp list-pointer-lowtag result
                     :stack-p dx-p
                     :temp-tn dst)
         (inst b enter)
@@ -1128,7 +1142,7 @@ default-value-8
 ;;; info from being returned as values.  What we do is compute
 ;;; supplied - fixed, and return a pointer that many words below the current
 ;;; stack top.
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg)))

@@ -11,8 +11,6 @@
 
 include Config.x86-64-bsd
 
-ASSEM_SRC += ldso-stubs.S
-
 # Until sbcl-0.6.7.3, we used "LINKFLAGS+=-static" here, which
 # worked fine for most things, but LOAD-FOREIGN & friends require
 # dlopen() etc., which in turn depend on dynamic linking of the

@@ -14,28 +14,8 @@
 (defconstant arg-count-sc (make-sc+offset any-reg-sc-number ecx-offset))
 (defconstant closure-sc (make-sc+offset descriptor-reg-sc-number eax-offset))
 
-;;; Make a passing location TN for a local call return PC.
-;;;
-;;; Always wire the return PC location to the stack in its standard
-;;; location.
-(defun make-return-pc-passing-location (standard)
-  (declare (ignore standard))
-  (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
-                 sap-stack-sc-number return-pc-save-offset))
-
 (defconstant return-pc-passing-offset
   (make-sc+offset sap-stack-sc-number return-pc-save-offset))
-
-;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
-;;; location to pass OLD-FP in.
-;;;
-;;; This is wired in both the standard and the local-call conventions,
-;;; because we want to be able to assume it's always there. Besides,
-;;; the x86 doesn't have enough registers to really make it profitable
-;;; to pass it in a register.
-(defun make-old-fp-passing-location ()
-  (make-wired-tn *fixnum-primitive-type* control-stack-sc-number
-                 ocfp-save-offset))
 
 (defconstant old-fp-passing-offset
   (make-sc+offset control-stack-sc-number ocfp-save-offset))
@@ -46,16 +26,17 @@
 ;;;
 ;;; Without using a save-tn - which does not make much sense if it is
 ;;; wired to the stack?
-(defun make-old-fp-save-location (physenv)
-  (physenv-debug-live-tn (make-wired-tn *fixnum-primitive-type*
-                                        control-stack-sc-number
-                                        ocfp-save-offset)
-                         physenv))
-(defun make-return-pc-save-location (physenv)
-  (physenv-debug-live-tn
-   (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
-                  sap-stack-sc-number return-pc-save-offset)
-   physenv))
+(defun make-old-fp-save-location ()
+  (let ((tn (make-wired-tn *fixnum-primitive-type*
+                           control-stack-sc-number
+                           ocfp-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
+(defun make-return-pc-save-location ()
+  (let ((tn (make-wired-tn (primitive-type-or-lose 'system-area-pointer)
+                           sap-stack-sc-number return-pc-save-offset)))
+    (setf (tn-kind tn) :environment)
+    tn))
 
 ;;; Make a TN for the standard argument count passing location. We only
 ;;; need to make the standard location, since a count is never passed when we
@@ -239,7 +220,7 @@
     (emit-label start-lab)
     ;; Skip space for the function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Save the return-pc.
     (popw ebp-tn (frame-word-offset return-pc-save-offset))))
@@ -403,12 +384,12 @@
                    (inst mov (second default) eax-tn))
                  (inst jmp defaulting-done)))))))
       (t
-       ;; 91 bytes for this branch.
        (let ((regs-defaulted (gen-label))
              (restore-edi (gen-label))
              (no-stack-args (gen-label))
              (default-stack-vals (gen-label))
-             (count-okay (gen-label)))
+             (count-okay (gen-label))
+             (copy-loop (gen-label)))
          (note-this-location vop :unknown-return)
          ;; Branch off to the MV case.
          (inst jmp :c regs-defaulted)
@@ -427,8 +408,7 @@
          ;; Load EAX with NIL so we can quickly store it, and set up
          ;; stuff for the loop.
          (inst mov eax-tn nil-value)
-         (inst std)
-         (inst mov ecx-tn (- nvals register-arg-count))
+         (inst mov ecx-tn (fixnumize (- nvals register-arg-count)))
          ;; Jump into the default loop.
          (inst jmp default-stack-vals)
          ;; The regs are defaulted. We need to copy any stack arguments,
@@ -458,10 +438,15 @@
                         :disp (frame-byte-offset
                                (+ sp->fp-offset register-arg-count))))
          ;; Do the copy.
-         (inst shr ecx-tn word-shift)   ; make word count
-         (inst std)
-         (inst rep)
-         (inst movs :dword)
+         (inst push edx-tn)
+         (emit-label copy-loop)
+         (inst mov edx-tn (make-ea :dword :base esi-tn))
+         (inst sub esi-tn n-word-bytes)
+         (inst mov (make-ea :dword :base edi-tn) edx-tn)
+         (inst sub edi-tn n-word-bytes)
+         (inst sub ecx-tn (fixnumize 1))
+         (inst jmp :nz copy-loop)
+         (inst pop edx-tn)
          ;; Restore ESI.
          (loadw esi-tn ebx-tn (frame-word-offset (+ sp->fp-offset 2)))
          ;; Now we have to default the remaining args. Find out how many.
@@ -470,18 +455,18 @@
          ;; If none, then just blow out of here.
          (inst jmp :le restore-edi)
          (inst mov ecx-tn eax-tn)
-         (inst shr ecx-tn word-shift)   ; word count
          ;; Load EAX with NIL for fast storing.
          (inst mov eax-tn nil-value)
          ;; Do the store.
          (emit-label default-stack-vals)
-         (inst rep)
-         (inst stos eax-tn)
+         (inst mov (make-ea :dword :base edi-tn) eax-tn)
+         (inst sub edi-tn n-word-bytes)
+         (inst sub ecx-tn (fixnumize 1))
+         (inst jmp :nz default-stack-vals)
          ;; Restore EDI, and reset the stack.
          (emit-label restore-edi)
          (loadw edi-tn ebx-tn (frame-word-offset (+ sp->fp-offset 1)))
-         (inst mov esp-tn ebx-tn)
-         (inst cld)))))
+         (inst mov esp-tn ebx-tn)))))
   (values))
 
 ;;;; unknown values receiving
@@ -906,10 +891,10 @@
                          '(make-ea :dword :disp
                            (+ nil-value (static-fun-offset fun))))
                         ((t)
-                         '(make-ea-for-object-slot eax fdefn-raw-addr-slot
+                         '(object-slot-ea eax fdefn-raw-addr-slot
                            other-pointer-lowtag))
                         ((nil)
-                         '(make-ea-for-object-slot eax closure-fun-slot
+                         '(object-slot-ea eax closure-fun-slot
                            fun-pointer-lowtag))))
                ,@(ecase return
                    (:fixed
@@ -1126,7 +1111,8 @@
   (:generator 20
     ;; Avoid the copy if there are no more args.
     (cond ((zerop fixed)
-           (inst jecxz JUST-ALLOC-FRAME))
+           (inst test ecx-tn ecx-tn)
+           (inst jmp :z JUST-ALLOC-FRAME))
           (t
            (inst cmp ecx-tn (fixnumize fixed))
            (inst jmp :be JUST-ALLOC-FRAME)))
@@ -1267,7 +1253,7 @@
 
     DONE))
 
-(define-vop (more-kw-arg)
+(define-vop ()
   (:translate sb-c::%more-kw-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
@@ -1288,7 +1274,7 @@
                                   :disp n-word-bytes))))))
 
 (define-vop (more-arg/c)
-  (:translate sb-c::%more-arg)
+  (:translate sb-c:%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:info index)
@@ -1300,7 +1286,7 @@
                                     :disp (- (* index n-word-bytes))))))
 
 (define-vop (more-arg)
-    (:translate sb-c::%more-arg)
+  (:translate sb-c:%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target value))
@@ -1312,54 +1298,76 @@
     (inst neg value)
     (inst mov value (make-ea :dword :base object :index value))))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg) :to (:result 1)))
+  (:arg-types * tagged-num)
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (inst mov value nil-value)
+    (inst cmp count (fixnumize index))
+    (inst jmp :be done)
+    (inst mov value (make-ea :dword :base object
+                                    :disp (- (* index n-word-bytes))))
+    done))
+
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:translate %listify-rest-args)
   (:policy :safe)
-  (:args (context :scs (descriptor-reg) :target src)
+  ;; CONTEXT is used throughout the copying loop
+  (:args (context :scs (descriptor-reg) :to :save)
          (count :scs (any-reg) :target ecx))
   (:arg-types * tagged-num)
-  (:temporary (:sc unsigned-reg :offset esi-offset :from (:argument 0)) src)
+  ;; The only advantage to specifying ECX here is that JECXZ can be used
+  ;; in one place, and then only in the unlikely scenario that CONTEXT is not
+  ;; in ECX. If it was, SHL sets/clears the Z flag, but LEA doesn't.
+  ;; Not much of an advantage, but why not.
   (:temporary (:sc unsigned-reg :offset ecx-offset :from (:argument 1)) ecx)
-  (:temporary (:sc unsigned-reg :offset eax-offset) eax)
-  (:temporary (:sc unsigned-reg) dst)
+  ;; Note that DST conflicts with RESULT because we use both as temps
+  (:temporary (:sc unsigned-reg ) value dst)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
-    (let ((enter (gen-label))
-          (loop (gen-label))
+    (let ((loop (gen-label))
           (done (gen-label))
           (stack-allocate-p (node-stack-allocate-p node)))
-      (move src context)
-      (move ecx count)
-      ;; Check to see whether there are no args, and just return NIL if so.
+      ;; Compute the number of bytes to allocate
+      (let ((shift (- (1+ word-shift) n-fixnum-tag-bits)))
+        (if (location= count ecx)
+            (inst shl ecx shift)
+            (inst lea ecx (make-ea :dword :index count :scale (ash 1 shift)))))
+      ;; Setup for the CDR of the last cons (or the entire result) being NIL.
       (inst mov result nil-value)
-      (inst jecxz done)
-      (inst lea dst (make-ea :dword :base ecx :index ecx))
+      (inst jecxz DONE)
       (pseudo-atomic (:elide-if stack-allocate-p)
-       (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-       ;; Set decrement mode (successive args at lower addresses)
-       (inst std)
-       ;; Set up the result.
-       (move result dst)
-       ;; Jump into the middle of the loop, 'cause that's where we want
-       ;; to start.
-       (inst jmp enter)
-       (emit-label loop)
-       ;; Compute a pointer to the next cons.
-       (inst add dst (* cons-size n-word-bytes))
-       ;; Store a pointer to this cons in the CDR of the previous cons.
-       (storew dst dst -1 list-pointer-lowtag)
-       (emit-label enter)
-       ;; Grab one value and stash it in the car of this cons.
-       (inst lods eax)
-       (storew eax dst 0 list-pointer-lowtag)
-       ;; Go back for more.
-       (inst sub ecx n-word-bytes)
-       (inst jmp :nz loop)
-       ;; NIL out the last cons.
-       (storew nil-value dst 1 list-pointer-lowtag)
-       (inst cld))
+       ;; Produce an untagged pointer into DST
+       (allocation 'list ecx 0 node stack-allocate-p dst)
+       ;; Recalculate DST as a tagged pointer to the last cons
+       (inst lea dst (make-ea :dword :disp (- list-pointer-lowtag (* cons-size n-word-bytes))
+                              :base dst :index ecx))
+       (inst shr ecx (1+ word-shift)) ; convert bytes to number of cells
+       ;; The rightmost arguments are at lower addresses.
+       ;; Start by indexing the last argument
+       (inst neg ecx)
+       (emit-label LOOP)
+       ;; Grab one value and store into this cons. Use ECX as an index into the
+       ;; vector of values in CONTEXT, but add 4 because CONTEXT points exactly at
+       ;; the 0th value, which means that the index is 1 word too low.
+       ;; (It's -1 if there is exactly 1 value, instead of 0, and so on)
+       (inst mov value (make-ea :dword :disp 4 :base context :index ecx :scale 4))
+       ;; RESULT began as NIL which gives the correct value for the CDR in the final cons.
+       ;; Subsequently it points to each cons just populated, which is correct all the way
+       ;; up to and including the final result.
+       (storew result dst cons-cdr-slot list-pointer-lowtag)
+       (storew value dst cons-car-slot list-pointer-lowtag)
+       (inst mov result dst) ; preserve the value to put in the CDR of the preceding cons
+       (inst sub dst (* cons-size n-word-bytes)) ; get the preceding cons
+       (inst inc ecx)
+       (inst jmp :nz loop))
       (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
@@ -1372,7 +1380,7 @@
 ;;; preventing this info from being returned as values. What we do is
 ;;; compute supplied - fixed, and return a pointer that many words
 ;;; below the current stack top.
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg) :target count))

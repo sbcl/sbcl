@@ -33,13 +33,27 @@ run_sbcl <<EOF
          (ignore-me (format t "untranslated=~S~%" untranslated))
          (translation (namestring (translate-logical-pathname untranslated)))
          (expected-translation "$testdir/$testfilestem.lisp"))
+    (declare (ignore ignore-me))
     (format t "translation=~S~%" translation)
     (format t "expected-translation=~S~%" expected-translation)
     (assert (string= translation expected-translation)))
   (format t "about to LOAD ~S~%" "TEST:$StudlyCapsStem")
   (load "TEST:$StudlyCapsStem")
   (assert (eq *loaded* :yes))
-  (let ((compiled-file-name (namestring (compile-file "TEST:$StudlyCapsStem")))
+  ;; COMPILE-FILE returns truenames unless SB-C::*MERGE-PATHNAMES* is set it NIL
+  ;; so that you don't see pathnames returned that are immediately useless
+  ;; on another machine, in which case we should just explicitly call TRUENAME
+  ;; to get the expected result for this test, which is of course meaningless,
+  ;; because my 'pwd' is here:
+  ;;  /google/src/cloud/..somewhere...EA0643B31763702B4088D15FEA8C1700_1/google3/third_party/lisp/sbcl
+  ;; but it "wants" to see:
+  ;;  /build/work/bb4efcf5cc6f5221b1a246e4fe09dd16eed5/google3/tmp/side-effectful-pathnames-test-4187/load-test.fasl"
+  ;; even though a different execution's might as well be here (or anywhere):
+  ;;  /build/work/698d0e844a200a4c30cf75e6233b55b215ea/google3/runfiles/google3/third_party/lisp/sbcl/src/tests
+  ;; So is it better to have a kludged passing test, or a failing test?
+  ;; And is it better to change the test's expectation, or "force" a valid result?
+  ;; I don't know the answer to those questions, and I don't care.
+  (let ((compiled-file-name (namestring (truename (compile-file "TEST:$StudlyCapsStem"))))
         (expected-file-name "$testdir/$testfilestem.fasl"))
     (format t "compiled-file-name=~S~%" compiled-file-name)
     (format t "expected-file-name=~S~%" expected-file-name)

@@ -29,10 +29,10 @@
   ;; Make sure basics are sane on unithreaded ports as well
   (let ((mutex (make-mutex)))
     (grab-mutex mutex)
-    (assert (eq *current-thread* (mutex-value mutex)))
+    (assert (eq *current-thread* (mutex-owner mutex)))
     (handler-bind ((warning #'error))
       (release-mutex mutex))
-    (assert (not (mutex-value mutex)))))
+    (assert (not (mutex-owner mutex)))))
 
 ;;; Terminating a thread that's waiting for the terminal.
 
@@ -48,23 +48,34 @@
    (assert (not (thread-alive-p thread)))))
 
 ;;; Condition-wait should not be interruptible under WITHOUT-INTERRUPTS
+;;; BUT: Such a claim is without much merit. Even if a wait is not "interrupted",
+;;; the very definition of spurious wakeup is that return from the wait happens
+;;; for ANY reason - users of condition variables must ALWAYS anticipate needing
+;;; to loop over a condition-wait.
 
 (with-test (:name :without-interrupts+condition-wait
             :skipped-on (not :sb-thread)
             :broken-on :win32)
   (let* ((lock (make-mutex))
          (queue (make-waitqueue))
+         (actually-wakeup nil)
          (thread (make-thread (lambda ()
                                 (sb-sys:without-interrupts
                                   (with-mutex (lock)
-                                    (condition-wait queue lock)))))))
-    (sleep 1)
+                                    (loop
+                                     (condition-wait queue lock)
+                                     (if actually-wakeup (return)))))))))
+    (sleep .25)
     (assert (thread-alive-p thread))
+    ;; this is the supposed "interrupt that doesn't interrupt",
+    ;; but it _is_ permitted to wake the condition variable.
     (terminate-thread thread)
-    (sleep 1)
+    (sleep .5)
     (assert (thread-alive-p thread))
+    (setq actually-wakeup t)
+    (sb-thread:barrier (:write))
     (condition-notify queue)
-    (sleep 1)
+    (sleep .25)
     (assert (not (thread-alive-p thread)))))
 
 ;;; GRAB-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
@@ -109,9 +120,10 @@
                       collect
                       (make-thread
                        (lambda ()
-                         (let ((sem semaphore))
-                           (dotimes (s i)
-                             (wait-on-semaphore sem))))
+                         (sb-ext:with-timeout 10
+                           (let ((sem semaphore))
+                             (dotimes (s i)
+                               (wait-on-semaphore sem)))))
                        :name "reader"))
                 (* n i)))
              (make-writers (n readers i)
@@ -123,9 +135,10 @@
                                  collect
                                  (make-thread
                                   (lambda ()
-                                    (let ((sem semaphore))
-                                      (dotimes (s k)
-                                        (signal-semaphore sem))))
+                                    (sb-ext:with-timeout 10
+                                      (let ((sem semaphore))
+                                        (dotimes (s k)
+                                          (signal-semaphore sem)))))
                                   :name "writer"))))
                       (assert (zerop rem))
                       writers)
@@ -142,17 +155,14 @@
                    (values)))))
       (assert
        (eq :ok
-           (handler-case
-               (sb-ext:with-timeout 10
-                 (test 1 1 100)
-                 (test 2 2 10000)
-                 (test 4 2 10000)
-                 (test 4 2 10000)
-                 (test 10 10 10000)
-                 (test 10 1 10000)
-                 :ok)
-             (sb-ext:timeout ()
-               :timeout)))))))
+           (sb-ext:with-timeout 20
+             (test 1 1 100)
+             (test 2 2 10000)
+             (test 4 2 10000)
+             (test 4 2 10000)
+             (test 10 10 10000)
+             (test 10 1 10000)
+             :ok))))))
 
 ;;;; Printing waitqueues
 
@@ -288,99 +298,6 @@
                        (sb-thread::symbol-value-in-thread-error-info e)))))
     (assert error-occurred)))
 
-(with-test (:name :deadlock-detection.1 :skipped-on (not :sb-thread))
-  (loop
-    repeat 1000
-    do (flet ((test (ma mb sa sb)
-                (lambda ()
-                  (handler-case
-                      (with-mutex (ma)
-                        (signal-semaphore sa)
-                        (wait-on-semaphore sb)
-                        (with-mutex (mb)
-                          :ok))
-                    (thread-deadlock (e)
-                      ;; (assert (plusp (length ...))) prevents
-                      ;; flushing.
-                      (assert (plusp (length (princ-to-string e))))
-                      :deadlock)))))
-         (let* ((m1 (make-mutex :name "M1"))
-                (m2 (make-mutex :name "M2"))
-                (s1 (make-semaphore :name "S1"))
-                (s2 (make-semaphore :name "S2"))
-                (t1 (make-thread (test m1 m2 s1 s2) :name "T1"))
-                (t2 (make-thread (test m2 m1 s2 s1) :name "T2")))
-           ;; One will deadlock, and the other will then complete normally.
-           (let ((res (list (join-thread t1)
-                            (join-thread t2))))
-             (assert (or (equal '(:deadlock :ok) res)
-                         (equal '(:ok :deadlock) res))))))))
-
-(with-test (:name :deadlock-detection.2 :skipped-on (not :sb-thread))
-  (let* ((m1 (make-mutex :name "M1"))
-         (m2 (make-mutex :name "M2"))
-         (s1 (make-semaphore :name "S1"))
-         (s2 (make-semaphore :name "S2"))
-         (t1 (make-thread
-              (lambda ()
-                (with-mutex (m1)
-                  (signal-semaphore s1)
-                  (wait-on-semaphore s2)
-                  (with-mutex (m2)
-                    :ok)))
-              :name "T1")))
-    (prog (err)
-     :retry
-       (handler-bind ((thread-deadlock
-                       (lambda (e)
-                         (unless err
-                           ;; Make sure we can print the condition
-                           ;; while it's active
-                           (let ((*print-circle* nil))
-                             (setf err (princ-to-string e)))
-                           (go :retry)))))
-         (when err
-           (sleep 1))
-         (assert (eq :ok (with-mutex (m2)
-                           (unless err
-                             (signal-semaphore s2)
-                             (wait-on-semaphore s1)
-                             (sleep 1))
-                           (with-mutex (m1)
-                             :ok)))))
-       (assert (stringp err)))
-    (assert (eq :ok (join-thread t1)))))
-
-(with-test (:name :deadlock-detection.3  :skipped-on (not :sb-thread))
-  (let* ((m1 (make-mutex :name "M1"))
-         (m2 (make-mutex :name "M2"))
-         (s1 (make-semaphore :name "S1"))
-         (s2 (make-semaphore :name "S2"))
-         (t1 (make-thread
-              (lambda ()
-                (with-mutex (m1)
-                  (signal-semaphore s1)
-                  (wait-on-semaphore s2)
-                  (with-mutex (m2)
-                    :ok)))
-              :name "T1")))
-    ;; Currently we don't consider it a deadlock
-    ;; if there is a timeout in the chain.
-    (assert (eq :deadline
-                (handler-case
-                    (with-mutex (m2)
-                      (signal-semaphore s2)
-                      (wait-on-semaphore s1)
-                      (sleep 1)
-                      (sb-sys:with-deadline (:seconds 0.1)
-                        (with-mutex (m1)
-                          :ok)))
-                  (sb-sys:deadline-timeout ()
-                    :deadline)
-                  (thread-deadlock ()
-                    :deadlock))))
-    (assert (eq :ok (join-thread t1)))))
-
 #+sb-thread
 (with-test (:name :pass-arguments-to-thread)
   (assert (= 3 (join-thread (make-thread #'+ :arguments '(1 2))))))
@@ -490,9 +407,7 @@
 
 (with-test (:name (wait-on-semaphore semaphore-notification :lp-1038034)
             :skipped-on (not :sb-thread)
-            :fails-on (and :sb-thread
-                           (not (or :darwin :openbsd))) ;; Maybe because it doesn't use futexes?
-            :broken-on :win32)
+            :broken-on :sb-safepoint)
   ;; Test robustness of semaphore acquisition and notification with
   ;; asynchronous thread termination...  Which we know is currently
   ;; fragile.
@@ -530,8 +445,8 @@
                                           :timeout timeout
                                           :default :timeout))
                      (error "Hang in (join-thread ~A) ?" thread))))
-            (safe-join-thread t1 :timeout 10)
-            (safe-join-thread t3 :timeout 10)))))
+            (safe-join-thread t1 :timeout 60)
+            (safe-join-thread t3 :timeout 60)))))
     (when (zerop (mod run 60))
       (fresh-line)
       (write-string "; "))
@@ -576,3 +491,22 @@
 (with-test (:name (abort-thread :main-thread))
   (assert (main-thread-p))
   (assert-error (abort-thread) thread-error))
+
+;;; The OSes vary in how pthread_setname works.
+;;; According to https://stackoverflow.com/questions/2369738/how-to-set-the-name-of-a-thread-in-linux-pthreads
+;;;   // NetBSD: name + arg work like printf(name, arg)
+;;;   int pthread_setname_np(pthread_t thread, const char *name, void *arg);
+;;;   // FreeBSD & OpenBSD: function name is slightly different, and has no return value
+;;;   void pthread_set_name_np(pthread_t tid, const char *name);
+;;;   // Mac OS X: must be set from within the thread (can't specify thread ID)
+;;;   int pthread_setname_np(const char*);
+;;; Only Linux is implemented for now.
+(with-test (:name :os-thread-name :skipped-on (:not (and :linux :sb-thread)))
+  (let ((thr
+         (make-thread
+          (lambda ()
+            (with-open-file (stream (format nil "/proc/self/task/~d/comm"
+                                            (thread-os-tid *current-thread*)))
+              (read-line stream)))
+          :name "testme")))
+    (assert (string= (join-thread thr) "testme"))))

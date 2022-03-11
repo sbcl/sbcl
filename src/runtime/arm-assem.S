@@ -28,7 +28,7 @@ call_into_lisp:
 	@@ All registers other than R0-R3 and R12 are callee-saves.
         @@ Save R3 to get 8-byte alignemnt.
 	stmfd	sp!, {r3-r11, lr}
-        fstmfdd sp!, {d8-d15}
+        vstmdb	sp!, {d8-d15}
 
 	@@ Start by finding NIL.
 	ldr	reg_NULL, .known_nil
@@ -58,13 +58,6 @@ call_into_lisp:
 
 	@@ Enter PSEUDO-ATOMIC.
 	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
-
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer into the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_OCFP, [reg_OCFP]
-        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-#endif
 
 	@@ Clear FFCA, so the runtime knows that we're "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
@@ -105,7 +98,7 @@ call_into_lisp:
         ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 
 	@@ And, finally, call into Lisp!
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+	add	reg_PC, reg_CODE, #SIMPLE_FUN_INSTS_OFFSET
 
 	.align 3
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
@@ -128,13 +121,6 @@ call_into_lisp:
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     pc, [reg_OCFP]
 
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer out from the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-        str     reg_NFP, [reg_OCFP]
-#endif
-
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
@@ -142,7 +128,7 @@ call_into_lisp:
 	blxne   reg_OCFP
 
 	@@ Restore saved registers.
-        fldmfdd sp!, {d8-d15}
+        vldmia	sp!, {d8-d15}
 	ldmfd	sp!, {r3-r11, lr}
 	bx	lr
 	.size	call_into_lisp, .-call_into_lisp
@@ -212,13 +198,6 @@ call_into_c:
 	@@ arguments to its final resting place now.
         mov     r0, reg_OCFP
 
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer out from the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-        str     reg_NFP, [reg_OCFP]
-#endif
-
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
@@ -266,13 +245,6 @@ call_into_c:
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_R2, [reg_OCFP]
 
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer into the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_OCFP, [reg_OCFP]
-        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-#endif
-
         @@ Restore the Lisp stack and frame pointers, but store the
         @@ control frame pointer in reg_NFP (saving a register move
         @@ later).
@@ -314,47 +286,58 @@ fun_end_breakpoint_trap:
         .global fun_end_breakpoint_end
 fun_end_breakpoint_end:
 
-#ifdef LISP_FEATURE_GENCGC
-	.align
-	.global	alloc_tramp
-	.type	alloc_tramp, %function
-alloc_tramp:
-        stmfd	sp!, {r4, r6, r12, lr}
+@@ FIXME: writing this as a lisp assembly routine would eliminate all the
+@@ preprocessor noise. There's no reasom it can't be done, but we lack
+@@ instruction encoders for: stmfd, ldmfd, stmea, ldmea, fstmfdd, fldfdd.
 
-        ldr     r4, =foreign_function_call_active
-        str     pc, [r4]
-
-        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        add     r6, r4, #8*4
-        str     r6, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-
+#define DEFINE_TRAMPOLINE(name, entry) \
+	.align ;\
+	.global	name ;\
+	.type	name, %function ;\
+name: \
+        stmfd	sp!, {r4, r6, r12, lr} ;\
+\
+        ldr     r4, =foreign_function_call_active ;\
+        str     pc, [r4] ;\
+\
+        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+        add     r6, r4, #8*4 ;\
+        str     r6, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+	/*
+	@@ The following comment is misleading: GC won't need to see
+	@@ anything when we're pseudo-atomic.
         @@ Create a new frame and save descriptor regs on the stack
-	@@ for the GC to see.
-        str     reg_CFP, [r4, #0]
-        str     reg_NULL, [r4, #4]
-        str     reg_CODE, [r4, #8]
-        add     r4, r4, #3*4
-        stmea   r4, {r0-reg_LEXENV, r8}
-
-        ldr     r0,  [sp, #4*4]
-        fstmfdd sp!, {d0-d7}
-
-        mov     lr, pc
-        ldr     pc,=alloc
-
-        fldmfdd sp!, {d0-d7}
-        str     r0,  [sp, #4*4]
-        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        ldmea   r4, {r0-reg_LEXENV, r8}
-        sub     r4, r4, #8*4
-        str     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-
-        ldr     r4, =foreign_function_call_active
-        mov     r6, #0
-	str     r6, [r4]
-
-	ldmfd	sp!, {r4, r6, r12, lr}
+	@@ for the GC to see. */ \
+        str     reg_CFP, [r4, #0] ;\
+        str     reg_NULL, [r4, #4] ;\
+        str     reg_CODE, [r4, #8] ;\
+        add     r4, r4, #3*4 ;\
+        stmea   r4, {r0-reg_LEXENV, r8} ;\
+\
+        ldr     r0,  [sp, #4*4] ;\
+        vstmdb  sp!, {d0-d7} ;\
+\
+        mov     lr, pc ;\
+        ldr     pc,=entry ;\
+\
+        vldmia sp!, {d0-d7} ;\
+        str     r0,  [sp, #4*4] ;\
+        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+        ldmea   r4, {r0-reg_LEXENV, r8} ;\
+        sub     r4, r4, #8*4 ;\
+        str     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+\
+        ldr     r4, =foreign_function_call_active ;\
+        mov     r6, #0 ;\
+	str     r6, [r4] ;\
+\
+	ldmfd	sp!, {r4, r6, r12, lr} ;\
 	bx	lr
+
+#ifdef LISP_FEATURE_GENCGC
+DEFINE_TRAMPOLINE(alloc_tramp, alloc)
+DEFINE_TRAMPOLINE(list_alloc_tramp, alloc_list)
+#endif
 
         .align
 	.global	do_pending_interrupt
@@ -362,7 +345,7 @@ alloc_tramp:
 do_pending_interrupt:
 #if defined(LISP_FEATURE_LINUX)
 	.word 0xe7f001f0
-#elif defined(LISP_FEATURE_NETBSD)
+#elif defined(LISP_FEATURE_NETBSD) || defined(LISP_FEATURE_OPENBSD)
 	.word 0xe7ffdefe
 #endif
         .byte trap_PendingInterrupt
@@ -370,7 +353,6 @@ do_pending_interrupt:
         .byte 0
         .byte 0
 	bx	lr
-#endif
 
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.

@@ -49,28 +49,21 @@
   ;; 16 byte alignment.
   `(inst and ,tn -16))
 
-(defmacro make-ea-for-object-slot (ptr slot lowtag &optional (size :dword))
+(defmacro object-slot-ea (ptr slot lowtag &optional (size :dword))
   `(make-ea ,size :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
-  `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
+  `(inst mov ,value (object-slot-ea ,ptr ,slot ,lowtag)))
 
 (defmacro storew (value ptr &optional (slot 0) (lowtag 0))
   (once-only ((value value))
-    `(inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) ,value)))
-
-;;; A handy utility for storing widetags.
-(defun store-widetag (value ptr &optional (slot 0) (lowtag 0))
-  (inst mov (make-ea-for-object-slot
-             ptr slot lowtag
-             (if (typep value '(and integer (not (unsigned-byte 8)))) :word :byte))
-        value))
+    `(inst mov (object-slot-ea ,ptr ,slot ,lowtag) ,value)))
 
 (defmacro pushw (ptr &optional (slot 0) (lowtag 0))
-  `(inst push (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
+  `(inst push (object-slot-ea ,ptr ,slot ,lowtag)))
 
 (defmacro popw (ptr &optional (slot 0) (lowtag 0))
-  `(inst pop (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
+  `(inst pop (object-slot-ea ,ptr ,slot ,lowtag)))
 
 (defmacro make-ea-for-vector-data (object &key (size :dword) (offset 0)
                                    index (scale (ash (width-bits size) -3)))
@@ -101,8 +94,7 @@
 #+sb-thread
 (progn
 (defmacro tls-index-of (symbol)
-  `(make-ea-for-object-slot ,symbol ,sb-vm:symbol-tls-index-slot
-                            ,other-pointer-lowtag))
+  `(object-slot-ea ,symbol ,sb-vm:symbol-tls-index-slot ,other-pointer-lowtag))
 (defmacro make-ea-for-symbol-tls-index (symbol)
   (declare (type symbol symbol))
   `(make-ea :dword
@@ -202,13 +194,12 @@
 #+sb-safepoint
 (defun emit-safepoint ()
   (inst test eax-tn (make-ea :dword :disp
-                             (- nil-value n-word-bytes other-pointer-lowtag
-                                gc-safepoint-trap-offset))))
+                             (- static-space-start gc-safepoint-trap-offset))))
 
 (defmacro pseudo-atomic ((&key elide-if) &rest forms)
-  #+sb-safepoint-strictly
+  #+sb-safepoint
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))
-  #-sb-safepoint-strictly
+  #-sb-safepoint
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
@@ -225,13 +216,7 @@
          ;; if PAI was set, interrupts were disabled at the same time
          ;; using the process signal mask.
          (inst break pending-interrupt-trap)
-         (emit-label ,label)
-         #+sb-safepoint
-         ;; In this case, when allocation thinks a GC should be done, it
-         ;; does not mark PA as interrupted, but schedules a safepoint
-         ;; trap instead.  Let's take the opportunity to trigger that
-         ;; safepoint right now.
-         (emit-safepoint)))))
+         (emit-label ,label)))))
 
 ;;;; indexed references
 
@@ -296,7 +281,7 @@
                                      :disp (- (* ,offset n-word-bytes)
                                               ,lowtag)))))))))
 
-(defmacro define-full-reffer+offset (name type offset lowtag scs el-type &optional translate)
+(defmacro define-full-reffer+addend (name type offset lowtag scs el-type &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate
@@ -306,7 +291,7 @@
               (index :scs (any-reg immediate unsigned-reg)))
        (:arg-types ,type tagged-num
                    (:constant (constant-displacement ,lowtag n-word-bytes ,offset)))
-       (:info offset)
+       (:info addend)
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; pw was 5
@@ -315,32 +300,29 @@
             (inst mov value (make-ea :dword :base object
                                      :disp (- (* (+ ,offset
                                                     (tn-value index)
-                                                    offset)
+                                                    addend)
                                                  n-word-bytes)
                                               ,lowtag))))
            (unsigned-reg
             (inst mov value (make-ea :dword :base object :index index :scale 4
-                                     :disp (- (* (+ ,offset offset)
+                                     :disp (- (* (+ ,offset addend)
                                                  n-word-bytes)
                                               ,lowtag))))
            (t
             (inst mov value (make-ea :dword :base object :index index
-                                     :disp (- (* (+ ,offset offset)
+                                     :disp (- (* (+ ,offset addend)
                                                  n-word-bytes)
                                               ,lowtag)))))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
-  `(progn
-     (define-vop (,name)
+    `(define-vop (,name)
        ,@(when translate
            `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg immediate))
-              (value :scs ,scs :target result))
+              (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
        (:generator 4                    ; was 5
          (sc-case index
            (immediate
@@ -352,37 +334,7 @@
            (t
             (inst mov (make-ea :dword :base object :index index
                                :disp (- (* ,offset n-word-bytes) ,lowtag))
-                  value)))
-        (move result value)))))
-
-(defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
-  `(progn
-     (define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg immediate))
-              (value :scs ,scs :target result))
-       (:info offset)
-       (:arg-types ,type tagged-num
-                   (:constant (constant-displacement ,lowtag n-word-bytes ,offset)) ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
-       (:generator 4                    ; was 5
-         (sc-case index
-           (immediate
-            (inst mov (make-ea :dword :base object
-                               :disp (- (* (+ ,offset (tn-value index) offset)
-                                           n-word-bytes)
-                                        ,lowtag))
-                  value))
-           (t
-            (inst mov (make-ea :dword :base object :index index
-                               :disp (- (* (+ ,offset offset)
-                                           n-word-bytes) ,lowtag))
-                  value)))
-        (move result value)))))
+                  value))))))
 
 ;;; Helper to hide the fact that thread access on Windows needs one more
 ;;; instruction, needs the FS prefix in that instruction _instead_ of

@@ -48,10 +48,10 @@
                   names)))
 ) ; EVAL-WHEN
 
-;;; interpreter stubs for floating point modes get/setters for the
-;;; alpha have been removed to alpha-vm.lisp, as they are implemented
-;;; in C rather than as VOPs. Likewise for x86-64 and mips.
-#-(or alpha x86-64 mips)
+;;; interpreter stubs for floating point modes get/setters for
+;;; some architectures have been removed, as they are implemented
+;;; in C rather than as VOPs.
+#-(or x86-64 mips)
 (progn
   (defun floating-point-modes ()
     (floating-point-modes))
@@ -159,7 +159,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; LEAST-NEGATIVE-SINGLE-FLOAT, so the :UNDERFLOW exceptions are
 ;;; disabled by default. Joe User can explicitly enable them if
 ;;; desired.
-(defvar *saved-floating-point-modes*
+(define-load-time-global *saved-floating-point-modes*
   '(:traps (:overflow #-(or netbsd ppc) :invalid :divide-by-zero)
     :rounding-mode :nearest :current-exceptions nil
     :accrued-exceptions nil :fast-mode nil
@@ -201,8 +201,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
      (with-interrupts
        ;; Reset the accumulated exceptions, may be needed on other
        ;; platforms too, at least Linux doesn't seem to require it.
-       #+(or sunos (and hppa linux))
-       (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
+       #+sunos (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
        (error (or (cdr (assoc code +sigfpe-code-error-alist+))
                   'floating-point-exception)
               :operation op
@@ -226,17 +225,22 @@ sets the floating point modes to their current values (and thus is a no-op)."
         ;; which can be set from user code.  Compute the mask here,
         ;; and clear them below.
         #+mips (cause-mask (dpb (lognot (float-trap-mask traps))
-                                 float-exceptions-byte #xffffffff))
+                                float-exceptions-byte #xffffffff))
         (orig-modes (gensym)))
+    #+ppc64
+    (unless (logbitp float-invalid-trap-bit (ldb float-sticky-bits exception-mask))
+      ;; float-invalid-trap-bit is just a summary of this bits which
+      ;; all have to be cleared invidually.
+      (setf (ldb float-invalid-byte exception-mask) 0))
     `(let ((,orig-modes (floating-point-modes)))
-      (unwind-protect
-           (progn
-             (setf (floating-point-modes)
-                   (logand ,orig-modes ,(logand trap-mask exception-mask)))
-             ,@body)
-        ;; Restore the original traps and exceptions.
-        (setf (floating-point-modes)
-              (logior (logand ,orig-modes ,(logior traps exceptions))
-                      (logand (floating-point-modes)
-                              ,(logand trap-mask exception-mask
-                                       #+mips cause-mask))))))))
+       (unwind-protect
+            (progn
+              (setf (floating-point-modes)
+                    (logand ,orig-modes ,(logand trap-mask exception-mask)))
+              ,@body)
+         ;; Restore the original traps and exceptions.
+         (setf (floating-point-modes)
+               (logior (logand ,orig-modes ,(logior traps exceptions))
+                       (logand (floating-point-modes)
+                               ,(logand trap-mask exception-mask
+                                        #+mips cause-mask))))))))

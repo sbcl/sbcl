@@ -733,7 +733,8 @@
 
 (defun scratch-dir-truename ()
   (with-scratch-file (name)
-    (truename (make-pathname :directory (pathname-directory name)))))
+    (truename (make-pathname :directory (pathname-directory name)
+                             :device (pathname-device name)))))
 
 (with-test (:name (delete-file logical-pathname))
   (setf (logical-pathname-translations "SB-TEST")
@@ -879,3 +880,46 @@
                            :displaced-to string
                            :displaced-index-offset 1)))
     (assert (equal (parse-namestring disp) #p"SYS:ABC.LISP"))))
+
+;;; LOGICAL-PATHAME was missing the specialized pathname comparator
+;;; function in SB_KERNEL::LAYOUT-EQUALP-IMPL
+(with-test (:name :logical-pathname-equalp-method)
+  ;; PATHNAME is not a structure-object but uses the instance EQUALP case.
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (equalp x y))
+    (((make-pathname) (make-pathname :version :newest)) t))
+  (let ((s "#p\"sys:contrib/f[1-9].txt\""))
+    (let ((a (read-from-string s)))
+      ;; result shouldn't depend on the pathnames being EQ
+      (clrhash sb-impl::*pathnames*)
+      (let ((b (read-from-string s)))
+        (assert (not (eq a b)))
+        (equalp a b)))))
+
+;;; After the change which added address-based hashing to all INSTANCE types,
+;;; someone forgot to ensure that address-based hashes were not used on
+;;; PATTERN instances which can comprise the subcomponents of a pathname.
+;;; So make sure the hash is based on the string contents of the pattern.
+;;; Read pathnames from strings to guarantee that some magic effect of reading
+;;; pathnames doesn't coalesce them. To be especially certain, clear the
+;;; SB-IMPL::*PATHNAMES* table between the read-from-string calls.
+(with-test (:name :wild-pathnames-string-based-hash)
+  (let ((string "#p\"file[0-9].txt\""))
+    (let ((a (read-from-string string)))
+      (clrhash (clrhash sb-impl::*pathnames*))
+      (let ((b (read-from-string string)))
+        (assert (not (eq a b)))
+        (assert (eql (sxhash a) (sxhash b)))))))
+
+(with-test (:name :cfp-examples)
+  (let ((*default-pathname-defaults* #p""))
+    (assert (equal (compile-file-pathname "a/b/srcfile.lsp" :output-file "build/bin/")
+                   #P"build/bin/srcfile.fasl"))
+    (assert (equal (compile-file-pathname "a/b/srcfile.lsp" :output-file "build/bin/f")
+                   #P"build/bin/f.fasl"))
+    (assert (equal (compile-file-pathname "a/b/srcfile.lsp" :output-file "build/bin/foo.tmp")
+                   #P"build/bin/foo.tmp"))
+    (assert (equal (compile-file-pathname "a/b/srcfile.lsp")
+                   #P"a/b/srcfile.fasl"))))

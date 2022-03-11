@@ -33,30 +33,11 @@
 
 (in-package "SB-PCL")
 
-(defmethod wrapper-fetcher ((class funcallable-standard-class))
-  '%funcallable-instance-layout)
-
-(defmethod slots-fetcher ((class funcallable-standard-class))
-  'fsc-instance-slots)
-
-(defmethod raw-instance-allocator ((class funcallable-standard-class))
-  (cond #+(and compact-instance-header immobile-code)
-        ((subtypep class 'generic-function)
-         'allocate-standard-funcallable-instance-immobile)
-        (t
-         'allocate-standard-funcallable-instance)))
-
 (defmethod allocate-instance ((class funcallable-standard-class) &rest initargs)
   (declare (inline ensure-class-finalized))
-  (cond #+(and compact-instance-header immobile-code)
-        ((subtypep class 'generic-function)
-         (allocate-standard-funcallable-instance-immobile
-          (class-wrapper (ensure-class-finalized class))
-          (getf initargs :name)))
-        (t
-         (allocate-standard-funcallable-instance
-          (class-wrapper (ensure-class-finalized class))
-          (getf initargs :name)))))
+  (allocate-standard-funcallable-instance
+   (class-wrapper (ensure-class-finalized class))
+   (getf initargs :name)))
 
 (defmethod make-reader-method-function ((class funcallable-standard-class)
                                         slot-name)
@@ -65,25 +46,3 @@
 (defmethod make-writer-method-function ((class funcallable-standard-class)
                                         slot-name)
   (make-std-writer-method-function class slot-name))
-
-;;;; See the comment about reader-function--std and writer-function--sdt.
-;;;;
-;(define-function-template reader-function--fsc () '(slot-name)
-;  `(function
-;     (lambda (instance)
-;       (slot-value-using-class (wrapper-class (get-wrapper instance))
-;                              instance
-;                              slot-name))))
-;
-;(define-function-template writer-function--fsc () '(slot-name)
-;  `(function
-;     (lambda (nv instance)
-;       (setf
-;        (slot-value-using-class (wrapper-class (get-wrapper instance))
-;                                instance
-;                                slot-name)
-;        nv))))
-;
-;(eval-when (:load-toplevel)
-;  (pre-make-templated-function-constructor reader-function--fsc)
-;  (pre-make-templated-function-constructor writer-function--fsc))

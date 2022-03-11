@@ -83,10 +83,9 @@
             (when immediate
               (aver (symbol-extra-slot-p name))
               (setf (symbol-extra name) immediate))
-            (set-header-data
+            (logior-header-bits
              name (logior +special-op-symbol+
-                          (if simple +simple-special-op+ 0)
-                          (get-header-data name))))
+                          (if simple +simple-special-op+ 0))))
           ',name
           ',simple-p
           ,(when immediate-code
@@ -200,9 +199,7 @@
         (error (encapsulated-condition condition))))))
 
 ;;; Wrap SB-C:POLICY changing its accessor to convert to a policy.
-;;; The default of %COERCE-TO-POLICY is wrong for the interpreter -
-;;; it needs to be ENV-POLICY. The last macro arg is unevaluated
-;;; and names the function to call to get a policy from ENV-VAR.
+;;; Using ENV-POLICY directly saves a function call to %COERCE-TO-POLICY.
 (defmacro policy (env-obj expr) `(sb-c:policy ,env-obj ,expr env-policy))
 
 ;;; This is used for two different things, which happen to be identical

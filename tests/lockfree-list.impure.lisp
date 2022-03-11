@@ -1,6 +1,22 @@
 (in-package "SB-LOCKLESS")
 
-#-(and sb-thread (or arm64 ppc x86 x86-64)) (sb-ext:exit :code 104)
+#-gencgc (sb-ext:exit :code 104)
+
+(assert (not (logtest (sb-kernel:wrapper-flags (find-layout 'keyed-node))
+                      sb-kernel::+strictly-boxed-flag+)))
+
+;;; Make sure no promotions occur so that objects will be movable
+;;; throughout these tests.
+(setf (generation-number-of-gcs-before-promotion 0) 1000000)
+
+;;; Set up a list of 2 items for later use
+(defparameter *lll2* (make-ordered-list :key-type 'fixnum))
+(defparameter *5* (lfl-insert *lll2* 5 'five))
+(defparameter *10* (lfl-insert *lll2* 10 'ten))
+(defparameter *addr-of-10* (get-lisp-obj-address *10*))
+
+(defun check-next-is-10 (node)
+  (assert (eq (get-next node) *10*)))
 
 ;;;; These functions are for examining GC behavior.
 
@@ -18,6 +34,8 @@
       (with-pinned-objects (succ)
         (cas (%node-next node) succ (make-marked-ref succ)))))
   list)
+
+(logical-delete 0 *lll2*)
 
 (defvar *lfl*)
 (defvar *l*)
@@ -43,12 +61,13 @@
     (when show (show (list-head *lfl*) #'get-next "GCed"))
     (logical-delete 1 *lfl*)
     (logical-delete 4 *lfl*)
-    (gc :gen 2)
+    (gc)
     (when show (show (list-head *lfl*) #'get-next "del "))))
 
+;; Enable heap validity tester
+#+gencgc (setf (sb-alien:extern-alien "verify_gens" char) 0)
+
 (test-util:with-test (:name :lockfree-list-gc-correctness)
-  ;; Enable heap validity tester
-  (setf (sb-alien:extern-alien "verify_gens" char) 0)
   ;; Create a small list and perform logical deletion of 2 nodes
   (makelflist 10)
   (gc)) ; Verify no post-gc crash
@@ -162,3 +181,103 @@
                         sb-unix::sc-nprocessors-onln)
                #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int))))
     (assert (> (primitive-benchmark) (min 2 (log cpus 2))))))
+
+(test-util:with-test (:name :lfl-next-implicit-pin-one-more-time)
+  (let* ((anode *5*)
+         (next (%node-next anode)))
+    (assert (fixnump next))
+    ;; maybe this should be a keyword to WITH-PINNED-OBJECTS saying
+    ;; to explicitly cons onto the list of pins?
+    (let ((sb-vm::*pinned-objects* (cons anode sb-vm::*pinned-objects*)))
+      (gc)
+      ;; nowhere do we reference node *10* in this test,
+      ;; so there's no reason the GC should want not to move that node
+      ;; except for the implicit pin on account of node *5*.
+      ;; i.e. if we can reconstruct node 10 from its pointer
+      ;; as a fixnum, then the special GC strategy flag worked.
+      (check-next-is-10 anode)
+      (assert (eql (logandc2 (get-lisp-obj-address (get-next anode))
+                             sb-vm:lowtag-mask)
+                   (ldb (byte sb-vm:n-word-bits 0)
+                        (ash next sb-vm:n-fixnum-tag-bits)))))))
+
+;; Show that nodes which are referenced only via a "fixnum" pointer
+;; can and do actually move via GC, which adjusts the fixnum accordingly.
+(test-util:with-test (:name :lfl-not-pinned)
+  (gc)
+  (assert (= (sb-kernel:generation-of *5*) 0))
+  (assert (= (sb-kernel:generation-of *10*) 0))
+  (assert (not (eql (get-lisp-obj-address *10*)
+                    *addr-of-10*))))
+
+
+(defun scan-pointee-gens (page &optional print)
+  (unless (zerop (sb-alien:slot (sb-alien:deref sb-vm::page-table page) 'sb-vm::start))
+    (warn "Can't properly scan: page start is a lower address"))
+  (sb-sys:without-gcing
+    (let* ((where (sb-sys:sap+ (sb-sys:int-sap (current-dynamic-space-start))
+                               (* page sb-vm:gencgc-page-bytes)))
+           (limit (sb-sys:sap+ where sb-vm:gencgc-page-bytes))
+           (gens 0))
+      (do ((where where (sb-sys:sap+ where sb-vm:n-word-bytes)))
+          ((sap>= where limit) gens)
+        (let* ((word (sb-sys:sap-ref-word where 0))
+               (targ-page)
+               (gen (when (and (sb-vm:is-lisp-pointer word)
+                               (>= (setq targ-page (sb-vm:find-page-index word)) 0))
+                      (sb-alien:slot (sb-alien:deref sb-vm::page-table targ-page)
+                                     'sb-vm::gen))))
+          (when gen (setq gens (logior gens (ash 1 gen))))
+          (when print
+            (sb-alien:alien-funcall
+             (sb-alien:extern-alien "printf"
+                                    (function sb-alien:void system-area-pointer
+                                              system-area-pointer
+                                              sb-alien:unsigned
+                                              sb-alien:unsigned))
+               (sb-sys:vector-sap (if gen #.(format nil "%p: %p -> %d~%") #.(format nil "%p: %p~%")))
+               where word (or gen 0))))))))
+
+;;; Make sure promotions do occur.
+(setf (generation-number-of-gcs-before-promotion 0) 1)
+
+(defstruct foo a b c)
+(defparameter *l* nil)
+(defun construct (n)
+  (setq *l* (make-ordered-list :key-type 'fixnum))
+  (loop repeat n for key from 10 by 10 do (lfl-insert *l* key (make-foo :a key))))
+
+(defun scan-lfl-gens (deletep &aux page-indices)
+  (do ((node (get-next (list-head *l*)) ; can't delete the dummy node (list head)
+             (get-next node)))
+      ((eq node *tail-atom*))
+    (when (eql (generation-of node) 1)
+      (let ((page (sb-vm:find-page-index
+                   (sb-kernel:get-lisp-obj-address node))))
+        (pushnew page page-indices)))
+    (let ((succ (get-next node)))
+      (when (and (eql (generation-of node) 1)
+                 (eql (generation-of succ) 0)
+                 deletep)
+        ;; Logically delete NODE, turning its successor pointer untagged.
+        (format t "~A (deleting) -> ~A~%" node succ)
+        (with-pinned-objects (succ)
+          (cas (%node-next node) succ (make-marked-ref succ))))))
+  (dolist (page page-indices)
+    (format t "Page ~d -> ~b~%" page (scan-pointee-gens page))))
+
+(defun test-fixnum-as-pointer ()
+  (construct 250)
+  (gc :gen 1)
+  (loop for key from 15 by 400 repeat 10  do (lfl-insert *l* key (- key)))
+  ;; For informational purposes, print the page number on which any node
+  ;; of *L* is present, and the bitmask of generations to which that page points.
+  (scan-lfl-gens nil)
+  ;; Now logically delete any node on a generation 1 page that points
+  ;; to a generation 0 page.  The deletion algorithm first marks the NEXT
+  ;; pointer on the node being deleted, where "mark" equates to turning
+  ;; the successor pointer to an untagged pointer.
+  (scan-lfl-gens t)
+  (gc))
+
+(test-util:with-test (:name :lfl-hidden-pointers) (test-fixnum-as-pointer))

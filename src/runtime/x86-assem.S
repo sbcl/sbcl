@@ -19,18 +19,15 @@
 #endif
 
 #include "sbcl.h"
-#include "validate.h"
 #include "genesis/closure.h"
-#include "genesis/funcallable-instance.h"
-#include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "genesis/thread.h"
-	
-/* Minimize conditionalization for different OS naming schemes. 
+
+/* Minimize conditionalization for different OS naming schemes.
  *
- * (As of sbcl-0.8.10, this seems no longer to be much of an issue, 
- * since everyone has converged on ELF. If this generality really 
+ * (As of sbcl-0.8.10, this seems no longer to be much of an issue,
+ * since everyone has converged on ELF. If this generality really
  * turns out not to matter, perhaps it's just clutter we could get
  * rid of? -- WHN 2004-04-18)
  *
@@ -44,26 +41,20 @@
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and NetBSD (but not OpenBSD)
- * want alignment in bytes. 
+ * want alignment in bytes.
  *
- * (As in the GNAME() definitions above, as of sbcl-0.8.10, this seems 
+ * (As in the GNAME() definitions above, as of sbcl-0.8.10, this seems
  * no longer to be much of an issue, since everyone has converged on
- * the same value. If this generality really turns out not to 
+ * the same value. If this generality really turns out not to
  * matter any more, perhaps it's just clutter we could get
  * rid of? -- WHN 2004-04-18)
  */
 #if defined(__linux__) || defined(LISP_FEATURE_FREEBSD) || defined(__NetBSD__) || defined(__OpenBSD__) || \
         defined(__sun) || defined(LISP_FEATURE_WIN32) || defined(__DragonFly__)
-#define align_4byte	4
-#define align_8byte	8
 #define align_16byte	16
-#define align_page	4096
 #else
-#define	align_4byte	2
-#define	align_8byte	3
-#define	align_16byte	4	
-#define align_page	12
-#endif			
+#define	align_16byte	4
+#endif
 
 /*
  * The assembler used for win32 doesn't like .type or .size directives,
@@ -165,15 +156,7 @@
 /* the CSP page sits right before the thread */
 #define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 
-/*
- * x86/darwin (as of MacOS X 10.4.5) doesn't reliably file signal
- * handlers (SIGTRAP or Mach exception handlers) for 0xCC, wo we have
- * to use ud2 instead. ud2 is an undefined opcode, #x0b0f, or
- * 0F 0B in low-endian notation, that causes SIGILL to fire. We check
- * for this instruction in the SIGILL handler and if we see it, we
- * advance the EIP by two bytes to skip over ud2 instruction and
- * call sigtrap_handler. */
-#if defined(LISP_FEATURE_UD2_BREAKPOINTS)
+#ifdef LISP_FEATURE_UD2_BREAKPOINTS
 #define TRAP ud2
 #else
 #define TRAP int3
@@ -183,7 +166,7 @@
 	.globl	GNAME(all_threads)
 
 /*
- * A call to call_into_c preserves esi, edi, and ebp.	
+ * A call to call_into_c preserves esi, edi, and ebp.
  * (The C function will preserve ebx, esi, edi, and ebp across its
  * function call, but we trash ebx ourselves by using it to save the
  * return Lisp address.)
@@ -334,7 +317,7 @@ Lfp_rtn_value:
 	SIZE(GNAME(call_into_c))
 
 
-#ifdef OS_THREAD_STACK
+#ifdef LISP_FEATURE_OS_THREAD_STACK
         .text
 	.globl  GNAME(funcall1_switching_stack)
 	TYPE(GNAME(funcall1_switching_stack))
@@ -353,23 +336,24 @@ GNAME(funcall1_switching_stack):
         push    %edx
         push    %eax
         call    *%edx
-        
+
         mov     %ebp, %esp
         pop     %ebp
         ret
         SIZE(GNAME(funcall1_switching_stack))
 #endif
 
-	.text	
+	.text
 	.globl GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
-		
-/* We don't worry too much about saving registers 
- * here, because we never expect to return from the initial call to lisp 
+
+/* We don't worry too much about saving registers
+ * here, because we never expect to return from the initial call to lisp
  * anyway */
-	
+
 	.align	align_16byte,0x90
 GNAME(call_into_lisp_first_time):
+GNAME(lspmain):
 	pushl	%ebp		# Save old frame pointer.
 	movl	%esp,%ebp	# Establish new frame.
 #ifndef LISP_FEATURE_WIN32
@@ -382,13 +366,13 @@ GNAME(call_into_lisp_first_time):
 #endif
 	jmp     Lstack
 
-	.text	
+	.text
 	.globl GNAME(call_into_lisp)
 	TYPE(GNAME(call_into_lisp))
-		
+
 /* The C conventions require that ebx, esi, edi, and ebp be preserved
  * across function calls. */
-	
+
 	.align	align_16byte,0x90
 GNAME(call_into_lisp):
 	pushl	%ebp		# Save old frame pointer.
@@ -415,12 +399,12 @@ Lstack:
 	fldz
 	fldz
 	fldz
-	
+
 /* Save C regs: ebx esi edi. */
 	pushl	%ebx
 	pushl	%esi
 	pushl	%edi
-	
+
 /* Clear descriptor regs. */
 	xorl	%eax,%eax	# lexenv
 	xorl	%ebx,%ebx	# available
@@ -443,7 +427,7 @@ Lstack:
 	cmpl	$8,%ecx
 	je	Ldone
 	movl	8(%ebx),%esi	# arg2
-Ldone:	
+Ldone:
 	/* Registers eax, ecx, edx, edi, and esi are now live. */
 
 #ifdef LISP_FEATURE_WIN32
@@ -471,7 +455,7 @@ Ldone:
 	sub	$4,%esp		# Ensure 3 slots are allocated, two above.
 
 	call	*CLOSURE_FUN_OFFSET(%eax)
-	
+
 	/* If the function returned multiple values, it will return to
 	   this point.  Lose them */
 	jnc	LsingleValue
@@ -494,7 +478,7 @@ LsingleValue:
 /* Restore the NPX state. */
 	frstor  (%esp)
 	addl	$108, %esp
-	
+
 	popl	%ebp		# c-sp
 	movl	%edx,%eax	# c-val
 	ret
@@ -543,9 +527,9 @@ GNAME(fun_end_breakpoint_guts):
 	movl	$(1 << N_FIXNUM_TAG_BITS),%ecx		# Setup ecx for one return value.
 	movl	$(NIL),%edi	# default second value
 	movl	$(NIL),%esi	# default third value
-		
+
 multiple_value_return:
-	
+
 	.globl GNAME(fun_end_breakpoint_trap)
 GNAME(fun_end_breakpoint_trap):
 	TRAP
@@ -593,225 +577,6 @@ GNAME(memory_fault_emulation_trap):
 	.byte 	trap_MemoryFaultEmulation
 	SIZE(GNAME(memory_fault_emulation_trap))
 
-/* Allocate bytes and return the start of the allocated space
- * in the specified destination register.
- *
- * In the general case the size will be in the destination register.
- *
- * All registers must be preserved except the destination.
- * The C conventions will preserve ebx, esi, edi, and ebp.
- * So only eax, ecx, and edx need special care here.
- *
- * ALLOC factors out the logic of calling alloc(): stack alignment, etc.
- *
- * DEFINE_ALLOC_TO_FOO defines an alloction routine.
- */
-
-#define ALLOC(size)                                             \
-        pushl   %ebp;              /* Save EBP               */ \
-        movl    %esp,%ebp;         /* Save ESP to EBP        */ \
-        pushl   $0;                /* Reserve space for arg  */ \
-        andl    $0xfffffff0,%esp;  /* Align stack to 16bytes */ \
-        movl    size, (%esp);      /* Argument to alloc      */ \
-        call    GNAME(alloc);                                   \
-        movl    %ebp,%esp;         /* Restore ESP from EBP   */ \
-        popl    %ebp;              /* Restore EBP            */
-
-#define DEFINE_ALLOC_TO_EAX(name,size)                          \
-        .globl  GNAME(name);                                    \
-        TYPE(GNAME(name));                                      \
-        .align  align_16byte,0x90;                              \
-GNAME(name):                                                    \
-        pushl   %ecx;              /* Save ECX and EDX       */ \
-        pushl   %edx;                                           \
-        ALLOC(size)                                             \
-        popl    %edx;              /* Restore ECX and EDX    */ \
-        popl    %ecx;                                           \
-        ret;                                                    \
-        SIZE(GNAME(name))
-
-#define DEFINE_ALLOC_TO_ECX(name,size)                          \
-        .globl  GNAME(name);                                    \
-        TYPE(GNAME(name));                                      \
-        .align  align_16byte,0x90;                              \
-GNAME(name):                                                    \
-        pushl   %eax;              /* Save EAX and EDX       */ \
-        pushl   %edx;                                           \
-        ALLOC(size)                                             \
-        movl    %eax,%ecx;         /* Result to destination  */ \
-        popl    %edx;                                           \
-        popl    %eax;                                           \
-        ret;                                                    \
-        SIZE(GNAME(name))
-        
-#define DEFINE_ALLOC_TO_EDX(name,size)                          \
-        .globl  GNAME(name);                                    \
-        TYPE(GNAME(name));                                      \
-        .align  align_16byte,0x90;                              \
-GNAME(name):                                                    \
-        pushl   %eax;               /* Save EAX and ECX      */ \
-        pushl   %ecx;                                           \
-        ALLOC(size)                                             \
-        movl    %eax,%edx;          /* Restore EAX and ECX   */ \
-        popl    %ecx;                                           \
-        popl    %eax;                                           \
-        ret;                                                    \
-        SIZE(GNAME(name))
-
-#define DEFINE_ALLOC_TO_REG(name,reg,size)                      \
-        .globl  GNAME(name);                                    \
-        TYPE(GNAME(name));                                      \
-        .align  align_16byte,0x90;                              \
-GNAME(name):                                                    \
-        pushl   %eax;              /* Save EAX, ECX, and EDX */ \
-        pushl   %ecx;                                           \
-        pushl   %edx;                                           \
-        ALLOC(size)                                             \
-        movl    %eax,reg;          /* Restore them           */ \
-        popl    %edx;                                           \
-        popl    %ecx;                                           \
-        popl    %eax;                                           \
-        ret;                                                    \
-	SIZE(GNAME(name))
-
-DEFINE_ALLOC_TO_EAX(alloc_to_eax,%eax)
-DEFINE_ALLOC_TO_EAX(alloc_8_to_eax,$8)
-DEFINE_ALLOC_TO_EAX(alloc_16_to_eax,$16)
-
-DEFINE_ALLOC_TO_ECX(alloc_to_ecx,%ecx)
-DEFINE_ALLOC_TO_ECX(alloc_8_to_ecx,$8)
-DEFINE_ALLOC_TO_ECX(alloc_16_to_ecx,$16)
-
-DEFINE_ALLOC_TO_EDX(alloc_to_edx,%edx)
-DEFINE_ALLOC_TO_EDX(alloc_8_to_edx,$8)
-DEFINE_ALLOC_TO_EDX(alloc_16_to_edx,$16)
-
-DEFINE_ALLOC_TO_REG(alloc_to_ebx,%ebx,%ebx)
-DEFINE_ALLOC_TO_REG(alloc_8_to_ebx,%ebx,$8)
-DEFINE_ALLOC_TO_REG(alloc_16_to_ebx,%ebx,$16)
-
-DEFINE_ALLOC_TO_REG(alloc_to_esi,%esi,%esi)
-DEFINE_ALLOC_TO_REG(alloc_8_to_esi,%esi,$8)
-DEFINE_ALLOC_TO_REG(alloc_16_to_esi,%esi,$16)
-
-DEFINE_ALLOC_TO_REG(alloc_to_edi,%edi,%edi)
-DEFINE_ALLOC_TO_REG(alloc_8_to_edi,%edi,$8)
-DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16)
-
-/* Called from lisp when an inline allocation overflows.
- * Every register except the result needs to be preserved.
- * We depend on C to preserve ebx, esi, edi, and ebp.
- * But where necessary must save eax, ecx, edx. */
-
-#ifdef LISP_FEATURE_SB_THREAD
-#define START_REGION %fs:THREAD_ALLOC_REGION_OFFSET
-#else
-#define START_REGION GNAME(gc_alloc_region)
-#endif
-
-#if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_WIN32)
-#define ALLOC_OVERFLOW(size,scratch)				\
-	movl SBCL_THREAD_BASE_EA, scratch;			\
-	/* Calculate the size for the allocation. */		\
-	subl THREAD_ALLOC_REGION_OFFSET(scratch),size;		\
-	ALLOC(size)
-#else
-#define ALLOC_OVERFLOW(size,scratch)			\
-	  /* Calculate the size for the allocation. */	\
-	  subl    START_REGION,size;			\
-	  ALLOC(size)
-#endif
-
-/* This routine handles an overflow with eax=crfp+size. So the
-   size=eax-crfp. */
-        .align  align_16byte
-        .globl  GNAME(alloc_overflow_eax)
-	TYPE(GNAME(alloc_overflow_eax))
-GNAME(alloc_overflow_eax):
-        pushl   %ecx            # Save ecx
-        pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%eax,%edx)
-        popl    %edx    # Restore edx.
-        popl    %ecx    # Restore ecx.
-        ret
-        SIZE(GNAME(alloc_overflow_eax))
-
-        .align  align_16byte
-        .globl  GNAME(alloc_overflow_ecx)
-	TYPE(GNAME(alloc_overflow_ecx))
-GNAME(alloc_overflow_ecx):
-        pushl   %eax            # Save eax
-        pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%ecx,%edx)
-        movl    %eax,%ecx       # setup the destination.
-        popl    %edx    # Restore edx.
-        popl    %eax    # Restore eax.
-        ret
-        SIZE(GNAME(alloc_overflow_ecx))
-
-        .align  align_16byte
-        .globl  GNAME(alloc_overflow_edx)
-        TYPE(GNAME(alloc_overflow_edx))
-GNAME(alloc_overflow_edx):
-        pushl   %eax            # Save eax
-        pushl   %ecx            # Save ecx
-	ALLOC_OVERFLOW(%edx,%ecx)
-        movl    %eax,%edx       # setup the destination.
-        popl    %ecx    # Restore ecx.
-        popl    %eax    # Restore eax.
-        ret
-        SIZE(GNAME(alloc_overflow_edx))
-
-/* This routine handles an overflow with ebx=crfp+size. So the
-   size=ebx-crfp. */
-        .align  align_16byte
-        .globl  GNAME(alloc_overflow_ebx)
-        TYPE(GNAME(alloc_overflow_ebx))
-GNAME(alloc_overflow_ebx):
-        pushl   %eax            # Save eax
-        pushl   %ecx            # Save ecx
-        pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%ebx,%edx)
-        movl    %eax,%ebx       # setup the destination.
-        popl    %edx    # Restore edx.
-        popl    %ecx    # Restore ecx.
-        popl    %eax    # Restore eax.
-        ret
-        SIZE(GNAME(alloc_overflow_ebx))
-
-/* This routine handles an overflow with esi=crfp+size. So the
-   size=esi-crfp. */
-        .align  align_16byte
-        .globl  GNAME(alloc_overflow_esi)
-        TYPE(GNAME(alloc_overflow_esi))
-GNAME(alloc_overflow_esi):
-        pushl   %eax            # Save eax
-        pushl   %ecx            # Save ecx
-        pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%esi,%edx)
-        movl    %eax,%esi       # setup the destination.
-        popl    %edx    # Restore edx.
-        popl    %ecx    # Restore ecx.
-        popl    %eax    # Restore eax.
-        ret
-        SIZE(GNAME(alloc_overflow_esi))
-
-        .align  align_16byte
-        .globl  GNAME(alloc_overflow_edi)
-        TYPE(GNAME(alloc_overflow_edi))
-GNAME(alloc_overflow_edi):
-        pushl   %eax            # Save eax
-        pushl   %ecx            # Save ecx
-        pushl   %edx            # Save edx
-	ALLOC_OVERFLOW(%edi,%edx)
-        movl    %eax,%edi       # setup the destination.
-        popl    %edx    # Restore edx.
-        popl    %ecx    # Restore ecx.
-        popl    %eax    # Restore eax.
-        ret
-        SIZE(GNAME(alloc_overflow_edi))
-
-
 #ifdef LISP_FEATURE_WIN32
 	/* The guts of the exception-handling system doesn't use
 	 * frame pointers, which manages to throw off backtraces
@@ -895,16 +660,16 @@ GNAME(call_into_lisp_tramp):
         popfl
         leave
         ret
-        
+
         SIZE(call_into_lisp_tramp)
 #endif
-        
+
 	.align	align_16byte,0x90
 	.globl	GNAME(post_signal_tramp)
 	TYPE(GNAME(post_signal_tramp))
 GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
- 	 * doesn't exist.  This is where call_into_lisp returns when called 
+ 	 * doesn't exist.  This is where call_into_lisp returns when called
 	 * using return_to_lisp_function */
 	addl $12,%esp  	/* clear call_into_lisp args from stack */
 	popal           /* restore registers */
@@ -918,6 +683,7 @@ GNAME(post_signal_tramp):
 	SIZE(GNAME(post_signal_tramp))
 
 
+#ifndef LISP_FEATURE_LINUX
         /* fast_bzero implementations and code to detect which implementation
          * to use.
          */
@@ -935,12 +701,12 @@ GNAME(fast_bzero_pointer):
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero)
 	TYPE(GNAME(fast_bzero))
-GNAME(fast_bzero):        
+GNAME(fast_bzero):
         /* Indirect function call */
         jmp *GNAME(fast_bzero_pointer)
 	SIZE(GNAME(fast_bzero))
-        
-      
+
+
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_detect)
@@ -968,26 +734,26 @@ Lbase:
 Lsse2:
         movl $(GNAME(fast_bzero_sse)), GNAME(fast_bzero_pointer)
         jmp Lrestore
-        
+
 Lrestore:
         pop %edx
         pop %ecx
         pop %ebx
         pop %eax
         jmp *GNAME(fast_bzero_pointer)
-        
+
 	SIZE(GNAME(fast_bzero_detect))
-        
+
 
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_sse)
 	TYPE(GNAME(fast_bzero_sse))
-        
+
 GNAME(fast_bzero_sse):
         /* A fast routine for zero-filling blocks of memory that are
          * guaranteed to start and end at a 4096-byte aligned address.
-         */        
+         */
         push %esi                 /* Save temporary registers */
         push %edi
         mov 16(%esp), %esi        /* Parameter: amount of bytes to fill */
@@ -1009,7 +775,7 @@ Lloop_sse:
         movntdq %xmm7, 16(%edi)
         movntdq %xmm7, 32(%edi)
         movntdq %xmm7, 48(%edi)
- 
+
         add $64, %edi /* Advance pointer */
         dec %esi      /* Decrement 64-byte block count */
         jnz Lloop_sse
@@ -1023,17 +789,17 @@ Lend_sse:
         pop %esi
 	ret
 	SIZE(GNAME(fast_bzero_sse))
-                
+
 
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_base)
 	TYPE(GNAME(fast_bzero_base))
-        
+
 GNAME(fast_bzero_base):
         /* A fast routine for zero-filling blocks of memory that are
          * guaranteed to start and end at a 4096-byte aligned address.
-         */        
+         */
         push %eax                 /* Save temporary registers */
         push %ecx
         push %edi
@@ -1046,13 +812,14 @@ GNAME(fast_bzero_base):
         rep
         stosl                     /* Store EAX to *EDI, ECX times, incrementing
                                    * EDI by 4 after each store */
-        
-Lend_base:        
+
+Lend_base:
         pop %edi                  /* Restore temp registers */
         pop %ecx
         pop %eax
 	ret
 	SIZE(GNAME(fast_bzero_base))
+#endif /* LISP_FEATURE_LINUX */
 
 
 /* When LISP_FEATURE_C_STACK_IS_CONTROL_STACK, we cannot safely scrub
@@ -1077,7 +844,7 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in ECX, and our hard guard
 	 * page upper bound in EDX. */
 	lea	-4(%esp), %eax
-	mov	GNAME(os_vm_page_size),%edx
+	mov	$BACKEND_PAGE_BYTES,%edx
 	mov	%edx, %ecx
 	add	8(%esp), %ecx
 	add	12(%esp), %edx
@@ -1103,7 +870,8 @@ ascs_check_guard_page:
 	jae	ascs_clear_loop
 	cmp	8(%esp), %eax
 	jbe	ascs_clear_loop
-	cmpl	$(NIL), THREAD_CONTROL_STACK_GUARD_PAGE_PROTECTED_OFFSET(%ecx)
+	/* test state_word.control_stack_guard_page_protected */
+	cmpb	$0, THREAD_STATE_WORD_OFFSET(%ecx)
 	jne	ascs_finished
 
 	/* Clear memory backwards to the start of the (4KiB) page */

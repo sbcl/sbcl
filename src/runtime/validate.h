@@ -21,15 +21,20 @@
 #define ALIEN_STACK_SIZE (1024*1024)     /* chosen at random */
 
 /* eventually choosable per-thread: */
+#ifndef DEFAULT_CONTROL_STACK_SIZE // CFLAGS=-D... can set this
 #define DEFAULT_CONTROL_STACK_SIZE (2*1024*1024)
+#endif
 
 /* constants derived from the fundamental constants in passed by GENESIS */
 #define READ_ONLY_SPACE_SIZE (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START)
 #define STATIC_SPACE_SIZE (STATIC_SPACE_END - STATIC_SPACE_START)
-#ifdef LISP_FEATURE_LINKAGE_TABLE
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+#define STATIC_CODE_SPACE_SIZE (STATIC_CODE_SPACE_END - STATIC_CODE_SPACE_START)
+#endif
+
 #define LINKAGE_TABLE_SPACE_SIZE \
     (LINKAGE_TABLE_SPACE_END - LINKAGE_TABLE_SPACE_START)
-#endif
 
 #if !defined(__ASSEMBLER__)
 #include "thread.h"
@@ -84,7 +89,7 @@
 #define BINDING_STACK_RETURN_GUARD_PAGE(th) \
     (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
-extern void allocate_spaces(boolean);
+extern void allocate_lisp_dynamic_space(boolean);
 extern boolean allocate_hardwired_spaces(boolean);
 
 extern void
@@ -117,7 +122,7 @@ extern os_vm_address_t undefined_alien_address;
  *   #include "x86-validate.h"
  *   #endif
  * and so forth. In SBCL, the memory map data are defined at the Lisp
- * level (compiler/target/parms.lisp) and stuffed into the sbcl.h file
+ * level (compiler/{arch}/parms.lisp) and stuffed into the sbcl.h file
  * created by GENESIS, so there's no longer a need for an
  * architecture-dependent header file of memory map data.
  */

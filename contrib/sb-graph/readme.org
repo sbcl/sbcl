@@ -1,0 +1,124 @@
+* ir1-grapher
+  This library graphs SBCL [[https://cmucl.org/docs/internals/html/The-Implicit-Continuation-Representation.html#The-Implicit-Continuation-Representation][ir1]] and outputs graphviz.
+
+  As of now, it is stil unfinished. There are a few tweaks that are
+  needed to improve useablility, in particular, I think the rendering
+  could be done a lot better, with subgraphs, to make it a lot more
+  readable. Also to make it more readable, I'm planning on
+  implementing rainbow-parens-esque arrow + label color randomization.
+
+** How do I use it during compiler tracing?
+   To load the system, you can call ~(asdf:load-system
+   :ir1-grapher)~ once you have either loaded ~ir1-grapher.asd~
+   manually, or placed the folder inside your [[https://common-lisp.net/project/asdf/asdf/Configuring-ASDF-to-find-your-systems.html][ASDF load path]].
+
+   Because of the way it hooks in the compiler, you shouldn't actually
+   have to do anything after loading it except turning on trace output
+   of the compiler (SBCL), and adding ~:sb-graph~ to
+   ~sb-c::*compile-trace-targets*~. Turning on the tracing can be done
+   by calling ~(compile-file "file" :trace-file t)~, and adding
+   ~:sb-graph~ to ~sb-c::*compile-trace-targets*~ can be done however
+   you want. After compilation is done, alongside the normal trace
+   file, SBCL is hooked into writing a series of .dot files, which
+   contain the graphviz DOT representation of all the components
+   compiled. If you set ~*compile-progress*~ to ~T~, it will print out
+   progress information, and will tell you when and where it writes
+   out the graphviz files.
+
+** How do I use the system interactively?
+   If you ran into a compiler error, and want to graph the
+   still-in-memory code interactively, you can do so with the
+   following functions:
+
+*** ~(make-and-dfs object distance)~
+    This function takes an ir1 object ~object~, and integer
+    ~distance~, and returns a graph object with every node up to
+    ~distance~ hops away from ~object~ in its ~dfs-table~. Each object
+    is tagged with a "codename", visible as a hex digit in braces at
+    the start of each graph node.
+
+    Then, to operate on the graph interactively, you can use:
+
+*** ~(interactively-graph graph &optional filename)~
+    This function takes a ~graph~ and a ~filename~, and sets the
+    current working graph to it, and the current output file to the
+    filename. When calling ~output~ and ~expand~, the graph will be
+    written to ~filename~.
+
+*** ~(output)~
+    This function outputs the current working graph to a string, and
+    if ~interactively-graph~ was called with a filename, writes it to
+    that file.
+
+*** ~(expand codename)~
+    After you've rendered the graph, if you want to add a node to the
+    ~dfs-table~ (thus expanding the amount of the in-memory objects
+    rendered), call this function with the codename of the new object
+    you'd like to add. Example: ~(expand "A")~.
+
+    If you passed a filename to ~interactively-graph~, this function
+    will then write the render to file automatically.
+
+*** ~(unexpand codename)~
+    Removes the node tied to the codename from the table, meaning that
+    it won't get its neighbours traversed when graph rendering is done.
+
+*** ~(get-node codename)~
+    Returns the object tied to ~codename~ from the current interactive
+    graph.
+
+** And if you don't want to use ~interactively-graph~:
+*** ~(render-graph graph)~
+    Given a graph with objects in its ~dfs-table~, returns a string of
+    the rendering of the graph in DOT.
+
+    Does the same thing as ~output~, but without using
+    ~interactively-graph~.
+
+*** ~(expand-codename graph codename)~
+    Given a graph and codename, put the node tied to ~codename~ into
+    the ~dfs-table~ of the graph.
+
+    Does the same thing as ~expand~, but without using
+    ~interactively-graph~.
+
+*** ~(unexpand-codename graph codename)~
+    Does the same thing as ~unexpand~, but without using
+    ~interactively-graph~.
+
+*** ~(get-node-from-codename graph codename)~
+    Return the node tied to ~codename~ in ~graph~.
+
+    Does the same thing as ~node~, but without using
+    ~interactively-graph~.
+
+** What good is ~interactively-graph~ if I need to run ~dot~ every time the graph gets output?
+   That's where ~render-on-change.sh~ comes in. Run
+   ~render-on-change.sh~ with two arguments. First is the input DOT
+   file, and second is the output SVG file. If you want to export to a
+   different format, just modify the ~-Tsvg~ of the script.
+
+** Help! It's saying there's a package locking error.
+   Run ~(sb-ext:unlock-package :sb-c)~ in the REPL, or compile SBCL
+   with ~--with-sb-devel~ (if you're doing compiler work, you should
+   probably do this anyways). In ~src/package.lisp~, there's a
+   ~(sb-ext:unlock-package :sb-c)~ statement, but it seems to not work
+   as expected.
+
+** But what if the compiler breaks your library, or I want to muck around with it?
+   ~hooking.lisp~ contains all the code that is used to hook the
+   compiler directly, and ~graphing.lisp~ goes from the compiler data
+   structures to the graphviz DOT format.
+
+   Right now, I'm assuming that the only place that the compiler will
+   ever call ~sb-c::ir2-convert~ for each component is inside
+   ~%compile-component~, and only one time. If this becomes no longer
+   true, then the hooking location/manner will have to be modified.
+
+** After the ~.dot~ files get output, how do I render them?
+   ~dot -T<output-format> input.dot > output~.
+   For example, ~dot -Tsvg trace-1-DEFUNFOO.dot > out.svg~.
+
+** Can I see an example?
+   Yes, look at the ~example/~ folder. It contains the dot output
+   when running ~(compile-file "testfile" :trace-file t)~.

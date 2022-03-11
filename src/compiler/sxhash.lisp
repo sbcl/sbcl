@@ -12,6 +12,32 @@
 
 (in-package "SB-C")
 
+;;; CAUTION: transforms are selected in the *reverse* order of definition,
+;;; so define the most general first, followed by more specific.
+;;; I once tried to fix that glitch by using APPEND instead of PUSH into
+;;; FUN-INFO-TRANSFORMS, and of course it broke things because we depend on such
+;;; stupidity. It would be remedied by reversing all definitions whenever
+;;; it matters but I didn't feel like figuring out all places where it does.
+
+(deftransform sxhash ((x) (t))
+  (let ((type (lvar-type x)))
+    ;; It is common for structure slots to have a :TYPE resembling (OR STRING NULL),
+    ;; and also common to create custom hash calculations on structures with such slots.
+    ;; So it makes sense for the compiler to try to pick off cases where the slot type
+    ;; has a specialized hash computation via sxhash after picking off NIL.
+    (or (dolist (case '((simple-string . %sxhash-simple-string)
+                        (string . %sxhash-string)
+                        (simple-bit-vector . %sxhash-simple-bit-vector)
+                        (bit-vector . %sxhash-bit-vector)))
+          (cond ((csubtypep type (specifier-type (car case)))
+                 (return `(,(cdr case) x)))
+                ((csubtypep type (specifier-type `(or null ,(car case))))
+                 (return `(if x (,(cdr case) x) ,(sb-xc:sxhash nil))))))
+        (give-up-ir1-transform))))
+
+(deftransform sxhash ((x) (number)) `(sb-impl::number-sxhash x))
+(deftransform sxhash ((x) (integer)) `(sb-impl::integer-sxhash x))
+
 ;;; Note about signed zeros with respect to SXHASH (but not PSXHASH!) -
 
 ;;; Change b0a51fec91 added some logic to discard the sign of floating-point zeros
@@ -100,10 +126,9 @@
 (defglobal +sxhash-single-float-expr+
   `(let ((bits (logand (single-float-bits x) ,(1- (ash 1 32)))))
      (logxor 66194023
-             (sxhash (the fixnum
-                          (logand sb-xc:most-positive-fixnum
-                                  (logxor bits
-                                          (ash bits -7))))))))
+             (sxhash (the sb-xc:fixnum
+                          (logand most-positive-fixnum
+                                  (logxor bits (ash bits -7))))))))
 (deftransform sxhash ((x) (single-float)) '#.+sxhash-single-float-expr+)
 
 #-64-bit
@@ -113,16 +138,16 @@
           (hilo (logxor hi lo)))
      (logxor 475038542
              (sxhash (the fixnum
-                          (logand sb-xc:most-positive-fixnum
+                          (logand most-positive-fixnum
                                   (logxor hilo
                                           (ash hilo -7))))))))
 
 ;;; SXHASH of FIXNUM values is defined as a DEFTRANSFORM because it's so
 ;;; simple.
 (defglobal +sxhash-fixnum-expr+
-  (let ((c (logand 1193941380939624010 sb-xc:most-positive-fixnum)))
+  (let ((c (logand 1193941380939624010 most-positive-fixnum)))
     ;; shift by -1 to get sign bit into hash
-    `(logand (logxor (ash x 4) (ash x -1) ,c) sb-xc:most-positive-fixnum)))
+    `(logand (logxor (ash x 4) (ash x -1) ,c) most-positive-fixnum)))
 (deftransform sxhash ((x) (fixnum)) '#.+sxhash-fixnum-expr+)
 
 ;;; Treat double-float essentially the same as a fixnum if words are 64 bits.
@@ -130,55 +155,16 @@
 (defglobal +sxhash-double-float-expr+
   ;; logical negation of magic constant ensures that 0.0d0 hashes to something
   ;; other than what the fixnum 0 hashes to (as tested in hash.impure.lisp)
-  (let ((c (logandc1 1193941380939624010 sb-xc:most-positive-fixnum)))
+  (let ((c (logandc1 1193941380939624010 most-positive-fixnum)))
     `(let ((x (double-float-bits x)))
-       ;; shift by -2 to get sign bit into hash.
-       ;; shifting by -1 isn't enough, for lack of significant bits in a fixnum.
-       ;; This would need to shift more if N-FIXNUM-TAG-BITS > 1,
-       ;; but seriously, who changes that parameter?
-       (logand (logxor (ash x 4) (ash x -2) ,c) sb-xc:most-positive-fixnum))))
+       ;; ensure we mix the sign bit into the hash
+       (logand (logxor (ash x 4)
+                       (ash x (- (1+ sb-vm:n-fixnum-tag-bits)))
+                       ,c)
+               most-positive-fixnum))))
 
 (deftransform sxhash ((x) (double-float)) '#.+sxhash-double-float-expr+)
 
-;;; SXHASH of SIMPLE-BIT-VECTOR values is defined as a DEFTRANSFORM
-;;; because it is endian-dependent.
-;;; ("because it is endian-dependent" is not a reason to define
-;;; a transform. This is probably better off as an asm routine)
-(deftransform sxhash ((x) (simple-bit-vector))
-  `(let* ((length (length x))
-          (result (word-mix 410823708 length)))
-    (declare (type unsigned-byte result))
-     (multiple-value-bind (n-full-words n-bits-remaining)
-         (floor length sb-vm:n-word-bits)
-       (dotimes (i n-full-words)
-         (setq result (word-mix (%vector-raw-bits x i) result)))
-       (when (plusp n-bits-remaining)
-         ;; FIXME: Do we really have to mask off bits of the final word?
-         ;; I don't think so, given that remaining bits are invariantly zero.
-         (setq result
-               (word-mix (logand (ash (1- (ash 1 n-bits-remaining))
-                                      ,(ecase sb-c:*backend-byte-order*
-                                         (:little-endian 0)
-                                         (:big-endian
-                                          '(- sb-vm:n-word-bits n-bits-remaining))))
-                                 (%vector-raw-bits x n-full-words))
-                         result)))
-       (logand result sb-xc:most-positive-fixnum))))
-
-;;; Some other common SXHASH cases are defined as DEFTRANSFORMs in
-;;; order to avoid having to do TYPECASE at runtime.
-;;;
-;;; We also take the opportunity to handle the cases of constant
-;;; strings, and of symbols whose names are known at compile time;
-;;; except that since SXHASH on the cross-compilation host is not in
-;;; general compatible with SXHASH on the target SBCL, we can't so
-;;; easily do this optimization in the cross-compiler - the SB-XC:SXHASH
-;;; operation will catch any attempt to call it on strings.
-(deftransform sxhash ((x) (string))
-  (cond ((csubtypep (lvar-type x) (specifier-type 'simple-string))
-         '(%sxhash-simple-string x))
-        (t
-         '(%sxhash-string x))))
 (deftransform sxhash ((x) (symbol))
   (cond ((csubtypep (lvar-type x) (specifier-type 'keyword))
          ;; All interned symbols have a precomputed hash.
@@ -186,10 +172,13 @@
          ;; be interned, but we *can* test for the specific case of keywords.
          ;; Even if it gets uninterned, this shortcut remains valid.
          `(symbol-hash x)) ; Never need to lazily compute and memoize
+        ((gethash 'ensure-symbol-hash *backend-parsed-vops*)
+         ;; A vop might emit slightly better code than the expression below
+         `(ensure-symbol-hash x))
         (t
-          ;; Cache the value of the symbol's sxhash in the symbol-hash
-          ;; slot.
-          '(let ((result (symbol-hash x)))
+         ;; Cache the value of the symbol's sxhash in the symbol-hash
+         ;; slot.
+         '(let ((result (symbol-hash x)))
             ;; 0 marks uninitialized slot. We can't use negative
             ;; values for the uninitialized slots since NIL might be
             ;; located so high in memory on some platforms that its
@@ -199,25 +188,37 @@
                 (ensure-symbol-hash x)
                 result)))))
 
-;;; These transforms are somehow needed when compiling ARRAY-PSXHASH and
-;;; then never again.  Can't we define the guts of it to not need them?
-(deftransform psxhash ((x &optional depthoid) (character &optional t))
-  `(char-code (char-upcase x)))
+(deftransform symbol-hash* ((object predicate) (symbol null) * :important nil)
+  `(symbol-hash* object 'symbolp)) ; annotate that object satisfies SYMBOLP
+(deftransform symbol-hash* ((object predicate)
+                            ((and (not null) symbol)
+                             (constant-arg (member nil symbolp)))
+                            * :important nil)
+  `(symbol-hash* object 'non-null-symbol-p)) ; etc
 
-(deftransform psxhash ((x &optional depthoid) (integer &optional t))
-  `(sxhash x))
-
-;;; To define SB-XC:SXHASH compatibly without repeating the logic in the transforms
+;;; To define SXHASH compatibly without repeating the logic in the transforms
 ;;; that define the numeric cases, we do some monkey business involving #. to paste
 ;;; in the expressions that the transforms would return.
 #+sb-xc-host
 (progn
   (defvar *sxhash-crosscheck* nil)
+  (defun symbol-name-hash (x)
+    (cond ((string= x "NIL") ; :NIL must hash the same as NIL
+           (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
+          (t
+           ;; (STRING X) could be a non-simple string, it's OK.
+           (let ((hash (logxor (sb-impl::%sxhash-simple-string (string x))
+                               most-positive-fixnum)))
+             (aver (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) hash))
+             hash))))
   (defun sxhash (x)
-    (let ((answer (etypecase x ; croak on anything but these
-                    (null         (ash sb-vm::nil-value (- sb-vm:n-fixnum-tag-bits)))
-                    (fixnum       #.+sxhash-fixnum-expr+)
-                    (single-float #.+sxhash-single-float-expr+)
-                    (double-float #.+sxhash-double-float-expr+))))
-      (push (cons x answer) *sxhash-crosscheck*)
+    (let ((answer
+           (etypecase x ; croak on anything but these
+            (symbol (symbol-name-hash x))
+            (sb-xc:fixnum #.+sxhash-fixnum-expr+)
+            (single-float #.+sxhash-single-float-expr+)
+            (double-float #.+sxhash-double-float-expr+))))
+      ;; Symbol hashes are cross-checked during cold-init
+      (unless (symbolp x)
+        (push (cons x answer) *sxhash-crosscheck*))
       answer)))

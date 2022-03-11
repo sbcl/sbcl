@@ -58,7 +58,7 @@
            "Read the content of STREAM into a buffer in order to count
 lines and columns."
            (unless (and old-position position
-                        (< position sb-xc:array-dimension-limit))
+                        (< position array-dimension-limit))
              (return-from read-content))
            (let ((content
                    (make-string position :element-type (stream-element-type stream))))

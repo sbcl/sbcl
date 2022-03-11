@@ -36,14 +36,7 @@
 #include <libkern/OSAtomic.h>
 #endif
 
-#if defined(LISP_FEATURE_SB_WTIMER)
-# include <sys/types.h>
-# include <sys/event.h>
-# include <sys/time.h>
-#endif
-
-char *
-os_get_runtime_executable_path(int external)
+char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
     uint32_t size = sizeof(path);
@@ -151,7 +144,7 @@ mach_lisp_thread_init(struct thread * thread)
                                  thread_exception_port,
                                  MACH_MSG_TYPE_MAKE_SEND);
     if (ret) {
-        lose("mach_port_insert_right failed with return_code %d\n", ret);
+        lose("mach_port_insert_right failed with return_code %d", ret);
     }
 
     current_mach_thread = mach_thread_self();
@@ -161,19 +154,19 @@ mach_lisp_thread_init(struct thread * thread)
                                      EXCEPTION_DEFAULT,
                                      THREAD_STATE_NONE);
     if (ret) {
-        lose("thread_set_exception_ports failed with return_code %d\n", ret);
+        lose("thread_set_exception_ports failed with return_code %d", ret);
     }
 
     ret = mach_port_deallocate (mach_task_self(), current_mach_thread);
     if (ret) {
-        lose("mach_port_deallocate failed with return_code %d\n", ret);
+        lose("mach_port_deallocate failed with return_code %d", ret);
     }
 
     ret = mach_port_move_member(mach_task_self(),
                                 thread_exception_port,
                                 mach_exception_handler_port_set);
     if (ret) {
-        lose("mach_port_move_member failed with return_code %d\n", ret);
+        lose("mach_port_move_member failed with return_code %d", ret);
     }
 
     return ret;
@@ -203,6 +196,14 @@ darwin_reinit() {
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     setup_mach_exception_handling_thread();
     mach_lisp_thread_init(all_threads);
+#endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+    struct extra_thread_data *extra_data = thread_extra_data(get_sb_vm_thread());
+    os_sem_init(&extra_data->state_sem, 1);
+    os_sem_init(&extra_data->state_not_running_sem, 0);
+    os_sem_init(&extra_data->state_not_stopped_sem, 0);
+    os_sem_init(&extra_data->sprof_sem, 0);
 #endif
 }
 
@@ -242,74 +243,6 @@ os_sem_destroy(os_sem_t *sem)
     dispatch_release(*sem);
 }
 
-#endif
-
-#if defined(LISP_FEATURE_SB_WTIMER)
-
-# error Completely untested. Go ahead! Remove this line, try your luck!
-
-/*
- * Waitable timer implementation for the safepoint-based (SIGALRM-free)
- * timer facility using kqueue.
- *
- * Unlike FreeBSD with its ms (!) timer resolution, Darwin supports ns
- * timer resolution -- or at least it pretends to do so on the API
- * level (?).  To use it, we need the *64 versions of the functions and
- * structures.
- *
- * Unfortunately, I don't run Darwin, and can't test this code, so it's
- * just a hopeful translation from FreeBSD.
- */
-
-int
-os_create_wtimer()
-{
-    int kq = kqueue();
-    if (kq == -1)
-        lose("os_create_wtimer: kqueue");
-    return kq;
-}
-
-int
-os_wait_for_wtimer(int kq)
-{
-    struct kevent64_s ev;
-    int n;
-    if ( (n = kevent64(kq, 0, 0, &ev, 1, 0, 0)) == -1) {
-        if (errno != EINTR)
-            lose("os_wtimer_listen failed");
-        n = 0;
-    }
-    return n != 1;
-}
-
-void
-os_close_wtimer(int kq)
-{
-    if (close(kq) == -1)
-        lose("os_close_wtimer failed");
-}
-
-void
-os_set_wtimer(int kq, int sec, int nsec)
-{
-    int64_t nsec = ((int64_t) sec) * 1000000000 + (int64_t) nsec;
-
-    struct kevent64_s ev;
-    EV_SET64(&ev, 1, EVFILT_TIMER, EV_ADD|EV_ENABLE|EV_ONESHOT, NOTE_NSECONDS,
-             nsec, 0, 0, 0);
-    if (kevent64(kq, &ev, 1, 0, 0, 0, 0) == -1)
-        perror("os_set_wtimer: kevent");
-}
-
-void
-os_cancel_wtimer(int kq)
-{
-    struct kevent64_s ev;
-    EV_SET64(&ev, 1, EVFILT_TIMER, EV_DISABLE, 0, 0, 0, 0, 0);
-    if (kevent64(kq, &ev, 1, 0, 0, 0, 0) == -1 && errno != ENOENT)
-        perror("os_cancel_wtimer: kevent");
-}
 #endif
 
 /* nanosleep() is not re-entrant on some versions of Darwin,

@@ -95,133 +95,143 @@
   (declare (optimize (safety 1)))
   (setf (schar string index) new-el))
 
-(defun string=* (string1 string2 start1 end1 start2 end2)
-  (declare (optimize speed))
-  (with-two-strings string1 string2 start1 end1 nil start2 end2
-    (let ((len (- end1 start1)))
-      (unless (= len (- end2 start2)) ; trivial
-        (return-from string=* nil))
-      ;; Optimizing the non-unicode builds is not terribly important
-      ;; because no per-character test for base/UCS4 is needed.
-      #+sb-unicode
-      (let* ((widetag1 (%other-pointer-widetag string1))
-             (widetag2 (%other-pointer-widetag string2))
-             (char-shift
+(macrolet ((memcmp (shift)
+             ;; Efficiently compute byte indices. Derive-type on ASH isn't
+             ;; good enough. For 32-bit, it should be ok because
+             ;; (TYPEP (ASH ARRAY-TOTAL-SIZE-LIMIT 2) 'SB-VM:SIGNED-WORD) => T
+             ;; For 63-bit fixnums, that's false in theory, but true in practice.
+             ;; ARRAY-TOTAL-SIZE-LIMIT is too large for a 48-bit address space.
+             `(macrolet ((sap (string start)
+                           `(sap+ (vector-sap (truly-the string ,string))
+                                  (scale ,start)))
+                         (scale (index)
+                           `(truly-the sb-vm:signed-word
+                                       (ash (truly-the index ,index) ,',shift))))
+                (declare (optimize (sb-c:alien-funcall-saves-fp-and-pc 0)))
+                (with-pinned-objects (string1 string2)
+                  (zerop (alien-funcall
+                          (extern-alien "memcmp"
+                                        (function int (* char) (* char) long))
+                          (sap string1 start1) (sap string2 start2)
+                          (scale len))))))
+           (char-loop (type1 type2)
+             `(let ((string1 (truly-the (simple-array ,type1 1) string1))
+                    (string2 (truly-the (simple-array ,type2 1) string2)))
+                (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+                (do ((index1 start1 (1+ index1))
+                     (index2 start2 (1+ index2)))
+                    ((>= index1 end1) t)
+                  (declare (index index1 index2))
+                  (unless (char= (schar string1 index1)
+                                 (schar string2 index2))
+                    (return nil))))))
+
+  (defun string=* (string1 string2 start1 end1 start2 end2)
+    (with-two-strings string1 string2 start1 end1 nil start2 end2
+      (let ((len (- end1 start1)))
+        (unless (= len (- end2 start2)) ; trivial
+          (return-from string=* nil))
+        ;; Optimizing the non-unicode builds is not terribly important
+        ;; because no per-character test for base/UCS4 is needed.
+        #+sb-unicode
+        (let* ((widetag1 (%other-pointer-widetag string1))
+               (widetag2 (%other-pointer-widetag string2)))
+          (macrolet ((char-loop (type1 type2)
+                       `(return-from string=*
+                          (let ((string1 (truly-the (simple-array ,type1 1) string1))
+                                (string2 (truly-the (simple-array ,type2 1) string2)))
+                            (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+                            (do ((index1 start1 (1+ index1))
+                                 (index2 start2 (1+ index2)))
+                                ((>= index1 end1) t)
+                              (declare (index index1 index2))
+                              (unless (char= (schar string1 index1)
+                                             (schar string2 index2))
+                                (return nil)))))))
+            (cond #+(or x86 x86-64)
+                  ;; The cost of WITH-PINNED-OBJECTS is near nothing on x86,
+                  ;; and memcmp() is much faster except below a cutoff point.
+                  ;; The threshold is higher on x86-32 because the overhead
+                  ;; of a foreign call is higher due to FPU stack save/restore.
+                  ((and (= widetag1 widetag2)
+                        (>= len #+x86 16
+                                #+x86-64 8))
+                   (let ((shift (case widetag1
+                                  (#.sb-vm:simple-base-string-widetag 0)
+                                  (#.sb-vm:simple-character-string-widetag 2))))
+                     (memcmp shift)))
+                  ((= widetag1 widetag2)
+                   (case widetag1
+                     (#.sb-vm:simple-base-string-widetag
+                      (char-loop base-char base-char))
+                     (#.sb-vm:simple-character-string-widetag
+                      (char-loop character character))))
+                  ((or (and (= widetag1 sb-vm:simple-character-string-widetag)
+                            (= widetag2 sb-vm:simple-base-string-widetag))
+                       (and (= widetag2 sb-vm:simple-character-string-widetag)
+                            (= widetag1 sb-vm:simple-base-string-widetag)
+                            (progn (rotatef start1 start2)
+                                   (rotatef end1 end2)
+                                   (rotatef string1 string2)
+                                   t)))
+                   (char-loop character base-char))))))
+      #-sb-unicode
+      (%sp-string= string1 start1 end1 string2 start2 end2)))
+
+  (defun simple-base-string= (string1 string2 start1 end1 start2 end2)
+    (with-two-strings string1 string2 start1 end1 nil start2 end2
+      (let ((len (- end1 start1)))
+        (cond ((/= len (- end2 start2))
+               nil)
               #+(or x86 x86-64)
-              ;; The cost of WITH-PINNED-OBJECTS is near nothing on x86,
-              ;; and memcmp() is much faster except below a cutoff point.
-              ;; The threshold is higher on x86-32 because the overhead
-              ;; of a foreign call is higher due to FPU stack save/restore.
-              (if (and (= widetag1 widetag2)
-                       (>= len #+x86 16
-                               #+x86-64 8))
-                  (case widetag1
-                    (#.sb-vm:simple-base-string-widetag 0)
-                    (#.sb-vm:simple-character-string-widetag 2)))))
-        (when char-shift
-          (return-from string=*
-            ;; Efficiently compute byte indices. Derive-type on ASH isn't
-            ;; good enough. For 32-bit, it should be ok because
-            ;; (TYPEP (ASH ARRAY-TOTAL-SIZE-LIMIT 2) 'SB-VM:SIGNED-WORD) => T
-            ;; For 63-bit fixnums, that's false in theory, but true in practice.
-            ;; ARRAY-TOTAL-SIZE-LIMIT is too large for a 48-bit address space.
-            (macrolet ((sap (string start)
-                         `(sap+ (vector-sap (truly-the string ,string))
-                                (scale ,start)))
-                       (scale (index)
-                         `(truly-the sb-vm:signed-word
-                           (ash (truly-the index ,index) char-shift))))
-              (declare (optimize (sb-c:alien-funcall-saves-fp-and-pc 0)))
-              (with-pinned-objects (string1 string2)
-                (zerop (alien-funcall
-                        (extern-alien "memcmp"
-                                      (function int (* char) (* char) long))
-                        (sap string1 start1) (sap string2 start2)
-                        (scale len)))))))
-        (macrolet
-            ((char-loop (type1 type2)
-               `(return-from string=*
-                  (let ((string1 (truly-the (simple-array ,type1 1) string1))
-                        (string2 (truly-the (simple-array ,type2 1) string2)))
-                    (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-                    (do ((index1 start1 (1+ index1))
-                         (index2 start2 (1+ index2)))
-                        ((>= index1 end1) t)
-                      (declare (index index1 index2))
-                      (unless (char= (schar string1 index1)
-                                     (schar string2 index2))
-                        (return nil)))))))
-          ;; On x86-64, short strings with same widetag use the general case.
-          ;; Why not always have cases for equal widetags and short strings?
-          ;; Because the code below deals with comparison when memcpy _can't_
-          ;; be used and is essential to this logic. No major speed gain is had
-          ;; with extra cases where memcpy would do, but was avoided.
-          ;; On non-x86, Lisp code is used always because I did not profile
-          ;; memcmp(), and this code is at least as good as %SP-STRING-COMPARE.
-          ;; Also, (ARRAY NIL) always punts.
-          (cond #-x86-64
-                ((= widetag1 widetag2)
-                 (case widetag1
-                   (#.sb-vm:simple-base-string-widetag
-                    (char-loop base-char base-char))
-                   (#.sb-vm:simple-character-string-widetag
-                    (char-loop character character))))
-                ((or (and (= widetag1 sb-vm:simple-character-string-widetag)
-                          (= widetag2 sb-vm:simple-base-string-widetag))
-                     (and (= widetag2 sb-vm:simple-character-string-widetag)
-                          (= widetag1 sb-vm:simple-base-string-widetag)
-                          (progn (rotatef start1 start2)
-                                 (rotatef end1 end2)
-                                 (rotatef string1 string2)
-                                 t)))
-                 (char-loop character base-char))))))
-    (not (%sp-string-compare string1 start1 end1 string2 start2 end2))))
+              ((>= len #+x86 16
+                       #+x86-64 8)
+               (memcmp 0))
+              (t
+               (char-loop base-char base-char))))))
+
+  #+sb-unicode
+  (defun simple-character-string= (string1 string2 start1 end1 start2 end2)
+    (with-two-strings string1 string2 start1 end1 nil start2 end2
+      (let ((len (- end1 start1)))
+        (cond ((/= len (- end2 start2))
+               nil)
+              #+(or x86 x86-64)
+              ((>= len #+x86 16
+                       #+x86-64 8)
+               (memcmp 2))
+              (t
+               (char-loop character character)))))))
 
 (defun string/=* (string1 string2 start1 end1 start2 end2)
   (with-two-strings string1 string2 start1 end1 offset1 start2 end2
-    (let ((comparison (%sp-string-compare string1 start1 end1
-                                          string2 start2 end2)))
-      (if comparison (- (the fixnum comparison) offset1)))))
+    (multiple-value-bind (index diff)
+        (%sp-string-compare string1 start1 end1 string2 start2 end2)
+      (if (zerop diff)
+          nil
+          (- index offset1)))))
 
-;;; LESSP is true if the desired expansion is for STRING<* or STRING<=*.
-;;; EQUALP is true if the desired expansion is for STRING<=* or STRING>=*.
-(defmacro string<>=*-body (lessp equalp)
-  (let ((offset1 (gensym)))
-    `(with-two-strings string1 string2 start1 end1 ,offset1 start2 end2
-       (let ((index (%sp-string-compare string1 start1 end1
-                                        string2 start2 end2)))
-         (if index
-             (cond ((= (the fixnum index) (the fixnum end1))
-                    ,(if lessp
-                         `(- (the fixnum index) ,offset1)
-                       `nil))
-                   ((= (+ (the fixnum index) (- start2 start1))
-                       (the fixnum end2))
-                    ,(if lessp
-                         `nil
-                       `(- (the fixnum index) ,offset1)))
-                   ((,(if lessp 'char< 'char>)
-                     (schar string1 index)
-                     (schar string2 (+ (the fixnum index) (- start2 start1))))
-                    (- (the fixnum index) ,offset1))
-                   (t nil))
-             ,(if equalp `(- (the fixnum end1) ,offset1) nil))))))
+(defmacro string<>=*-body (test index)
+  `(with-two-strings string1 string2 start1 end1 offset1 start2 end2
+     (multiple-value-bind (index diff)
+         (%sp-string-compare string1 start1 end1
+                             string2 start2 end2)
+       (if (,test diff 0)
+           ,(if index '(- index offset1) nil)
+           ,(if index nil '(- index offset1))))))
 
 (defun string<* (string1 string2 start1 end1 start2 end2)
-  (declare (fixnum start1 start2))
-  (string<>=*-body t nil))
+  (string<>=*-body < t))
 
 (defun string>* (string1 string2 start1 end1 start2 end2)
-  (declare (fixnum start1 start2))
-  (string<>=*-body nil nil))
+  (string<>=*-body > t))
 
 (defun string<=* (string1 string2 start1 end1 start2 end2)
-  (declare (fixnum start1 start2))
-  (string<>=*-body t t))
+  (string<>=*-body > nil))
 
 (defun string>=* (string1 string2 start1 end1 start2 end2)
   (declare (fixnum start1 start2))
-  (string<>=*-body nil t))
+  (string<>=*-body < nil))
 
 (defun string< (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Given two strings, if the first string is lexicographically less than
@@ -451,55 +461,110 @@
 (defun two-arg-string-not-greaterp (string1 string2)
   (string-not-greaterp* string1 string2 0 nil 0 nil))
 
-(defun make-string (count &key
-                    (element-type 'character)
-                    ((:initial-element fill-char)))
+(defun make-string (count &key (element-type 'character)
+                               (initial-element nil iep))
   "Given a character count and an optional fill character, makes and returns a
 new string COUNT long filled with the fill character."
   (declare (index count))
   (declare (explicit-check))
-  ;; FIXME: while this is a correct implementation relying on an IR1 transform,
-  ;; it would be better if in the following example (assuming NOTINLINE):
-  ;;  (MAKE-STRING 1000 :ELEMENT-TYPE 'BIT :INITIAL-element #\a)
-  ;; we could report that "BIT is not a subtype of CHARACTER"
-  ;; instead of "#\a is not of type BIT". Additionally, in this case:
-  ;;  (MAKE-STRING 200000000 :ELEMENT-TYPE 'WORD :INITIAL-ELEMENT #\a)
-  ;; the error reported is heap exhaustion rather than type mismatch.
-  (if fill-char
-      (make-string count :element-type element-type
-                         :initial-element (the character fill-char))
-      (make-string count :element-type element-type)))
+  (cond ((eq element-type 'character)
+         (let ((c (if iep (the character initial-element)))
+               (s (make-string count :element-type 'character)))
+           (when c (sb-vm::unpoison s) (fill s c))
+           s))
+         ((or (eq element-type 'base-char)
+              (eq element-type 'standard-char)
+              ;; What's the "most specialized" thing possible that's still a string?
+              ;; Well clearly it's a string whose elements have the smallest domain.
+              ;; So that would be 8 bits per character, not 32 bits per character.
+              (eq element-type nil))
+          (let ((c (if iep (the base-char initial-element)))
+                (s (make-string count :element-type 'base-char)))
+            (when c (sb-vm::unpoison s) (fill s c))
+            s))
+         (t
+          (multiple-value-bind (widetag n-bits-shift)
+              (sb-vm::%vector-widetag-and-n-bits-shift element-type)
+            (unless (or #+sb-unicode (= widetag sb-vm:simple-character-string-widetag)
+                        (= widetag sb-vm:simple-base-string-widetag))
+              (error "~S is not a valid :ELEMENT-TYPE for MAKE-STRING" element-type))
+            ;; If you give a ridiculous type such as (member #\EN_SPACE) as your
+            ;; :ELEMENT-TYPE, then you get what you deserve - slow type checking.
+            (when (and iep (not (typep initial-element element-type)))
+              (error 'simple-type-error
+                     :datum initial-element
+                     :expected-type element-type
+                     :format-control "~S is not a ~S"
+                     :format-arguments (list initial-element element-type)))
+            (let ((string
+                   (sb-vm::allocate-vector-with-widetag
+                    #+ubsan nil widetag count n-bits-shift)))
+              (when initial-element (fill string initial-element))
+              string)))))
 
-(flet ((%upcase (string start end)
-         (declare (string string) (index start) (type sequence-end end))
-         (let ((saved-header string))
-           (with-one-string (string start end)
-             (do ((index start (1+ index)))
-                 ((= index (the fixnum end)))
-               (declare (fixnum index))
-               (setf (schar string index) (char-upcase (schar string index)))))
-           saved-header)))
-(defun string-upcase (string &key (start 0) end)
-  (%upcase (copy-seq (string string)) start end))
+(declaim (maybe-inline nstring-upcase))
 (defun nstring-upcase (string &key (start 0) end)
-  (%upcase string start end))
-) ; FLET
+  (declare (explicit-check))
+  (if (typep string '(array nil (*)))
+      (if (zerop (length string))
+          string
+          (data-nil-vector-ref string 0))
+      (locally
+          (declare ((or base-string
+                        (array character (*)))
+                    string))
+        (with-one-string (string start end)
+          (do ((index start (1+ index))
+               (cases +character-cases+))
+              ((>= index end))
+            (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+            (let ((char (schar string index)))
+              (with-case-info (char case-index cases
+                               :cases cases)
+                (let ((code (aref cases (1+ case-index))))
+                  (unless (zerop code)
+                    (setf (schar string index)
+                          (code-char (truly-the char-code code)))))))))
+        string)))
 
-(flet ((%downcase (string start end)
-         (declare (string string) (index start) (type sequence-end end))
-         (let ((saved-header string))
-           (with-one-string (string start end)
-             (do ((index start (1+ index)))
-                 ((= index (the fixnum end)))
-               (declare (fixnum index))
-               (setf (schar string index)
-                     (char-downcase (schar string index)))))
-           saved-header)))
-(defun string-downcase (string &key (start 0) end)
-  (%downcase (copy-seq (string string)) start end))
+(defun string-upcase (string &key (start 0) end)
+  (declare (explicit-check)
+           (inline nstring-upcase))
+  (nstring-upcase (copy-seq (%string string)) :start start :end end))
+
+(declaim (maybe-inline nstring-downcase))
 (defun nstring-downcase (string &key (start 0) end)
-  (%downcase string start end))
-) ; FLET
+  (declare (explicit-check))
+  (if (typep string '(array nil (*)))
+      (if (zerop (length string))
+          string
+          (data-nil-vector-ref string 0))
+      (locally
+          (declare ((or base-string
+                        (array character (*)))
+                    string))
+        (with-one-string (string start end)
+          (do ((index start (1+ index))
+               (cases #.+character-cases+))
+              ((>= index end))
+            (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+            (let ((char (schar (truly-the (or simple-base-string
+                                              simple-character-string)
+                                          string)
+                               index)))
+              (with-case-info (char case-index cases
+                               :cases cases)
+                (let ((code (aref cases case-index)))
+                  (unless (zerop code)
+                    (setf (schar string index)
+                          (code-char (truly-the char-code code)))))))))
+        string)))
+
+(defun string-downcase (string &key (start 0) end)
+  (declare (explicit-check)
+           (inline nstring-downcase))
+  (nstring-downcase (copy-seq (%string string)) :start start :end end))
+
 (flet ((%capitalize (string start end)
          (declare (string string) (index start) (type sequence-end end))
          (let ((saved-header string))
@@ -581,9 +646,14 @@ new string COUNT long filled with the fill character."
   ;; "Always" means that regardless of whether the user want
   ;; coalescing of strings used as literals in code compiled to memory,
   ;; the string is shareable.
-  ;;  #b01_ ; symbol name, literal compiled to fasl, some other stuff
-  ;;  #b10_ ; literal compiled to core
-  (set-header-data (the (simple-array * 1) vector)
-                   (if always-shareable
-                       sb-vm:+vector-shareable+
-                       sb-vm:+vector-shareable-nonstd+)))
+  (when (eq (heap-allocated-p vector) :dynamic)
+    (logior-array-flags (the (simple-array * 1) vector)
+                        (if always-shareable
+                            sb-vm:+vector-shareable+
+                            sb-vm:+vector-shareable-nonstd+)))
+  vector)
+
+(clear-info :function :inlining-data 'nstring-upcase)
+(clear-info :function :inlinep 'nstring-upcase)
+(clear-info :function :inlining-data 'nstring-downcase)
+(clear-info :function :inlinep 'nstring-downcase)

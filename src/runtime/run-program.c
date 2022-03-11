@@ -1,5 +1,5 @@
 /*
- * support for the Lisp function RUN-PROGRAM and friends
+ * Unix support for the Lisp function RUN-PROGRAM and friends
  */
 
 /*
@@ -14,9 +14,6 @@
  */
 
 #include "sbcl.h"
-
-#ifndef LISP_FEATURE_WIN32
-
 #include <stdlib.h>
 #include <sys/file.h>
 #include <sys/types.h>
@@ -29,6 +26,8 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <errno.h>
+#include <dirent.h>
+#include "interr.h" // for lose()
 
 #ifdef LISP_FEATURE_OPENBSD
 #include <util.h>
@@ -78,7 +77,7 @@ set_pty(char *pty_name)
 {
     int fd;
 
-#if !defined(LISP_FEATURE_HPUX) && !defined(SVR4)
+#if !defined(SVR4) && !defined(__HAIKU__)
     fd = open("/dev/tty", O_RDWR, 0);
     if (fd >= 0) {
         ioctl(fd, TIOCNOTTY, 0);
@@ -96,6 +95,86 @@ set_pty(char *pty_name)
 }
 
 #endif /* !LISP_FEATURE_OPENBSD */
+
+void closefrom_fallback(int lowfd)
+{
+    int fd, maxfd;
+
+#ifdef SVR4
+    maxfd = sysconf(_SC_OPEN_MAX)-1;
+#else
+    maxfd = getdtablesize()-1;
+#endif
+
+    for (fd = maxfd; fd >= lowfd; fd--)
+        close(fd);
+}
+
+int closefrom_fddir(char *dir, int lowfd)
+{
+    DIR *d;
+    struct dirent *ent;
+    int fd;
+
+    /* This may fail if e.g. the program is running in
+     * a chroot that does not include /proc, or potentially
+     * on old kernel versions. */
+    d = opendir(dir);
+    if (!d) return -1;
+
+    for (ent = readdir(d); ent; ent = readdir(d)) {
+        /* atoi will return bogus values for certain inputs, but lowfd will
+         * prevent us from closing anything we care about. */
+        fd = atoi(ent->d_name);
+        if (fd >= 0 && fd >= lowfd)
+            close(fd);
+    }
+    closedir(d);
+    return 0;
+}
+
+void closefds_from(int lowfd, int* dont_close)
+{
+    if (dont_close) {
+        /* dont_close is a sorted simple-array of tagged ints */
+        uword_t length = fixnum_value(((uword_t*)dont_close)[-1]);
+        uword_t i;
+        for (i = 0; i < length; i++)
+        {
+            int fd = dont_close[i];
+            int close_fd;
+
+            /* Close the gaps between the fds */
+            for (close_fd = lowfd; close_fd < fd; close_fd++)
+            {
+                close(close_fd);
+            }
+            lowfd = fd+1;
+        }
+    }
+
+#if defined(LISP_FEATURE_OPENBSD) || defined(LISP_FEATURE_NETBSD)       \
+    || defined(LISP_FEATURE_DRAGONFLY) || defined(LISP_FEATURE_FREEBSD) \
+    || defined(LISP_FEATURE_SUNOS)
+    closefrom(lowfd);
+#else
+    int fds_closed = 0;
+
+/* readdir() uses malloc, which is prone to deadlocking
+#ifdef LISP_FEATURE_LINUX
+    if (!fds_closed)
+        fds_closed = !closefrom_fddir("/proc/self/fd/", lowfd);
+#endif
+#ifdef LISP_FEATURE_DARWIN
+    if (!fds_closed)
+        fds_closed = !closefrom_fddir("/dev/fd/", lowfd);
+#endif
+*/
+
+    if (!fds_closed)
+        closefrom_fallback(lowfd);
+#endif
+}
 
 int wait_for_exec(int pid, int channel[2]) {
     if ((-1 != pid) && (-1 != channel[1])) {
@@ -138,21 +217,16 @@ extern char **environ;
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name,
           int channel[2],
-          char *pwd)
+          char *pwd, int* dont_close)
 {
     pid_t pid;
-    int fd;
     sigset_t sset;
     int failure_code = 2;
 
     channel[0] = -1;
     channel[1] = -1;
-    if (!pipe(channel)) {
-        if (-1==fcntl(channel[1], F_SETFD,  FD_CLOEXEC)) {
-            close(channel[1]);
-            channel[1] = -1;
-        }
-    }
+    // Surely we can do better than to lose()
+    if (pipe(channel)) lose("can't run-program");
 
     pid = fork();
     if (pid) {
@@ -164,11 +238,11 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
      * share stdin with our parent. In the latter case we claim
      * control of the terminal. */
     if (sin >= 0) {
-#if defined(LISP_FEATURE_HPUX) || defined(LISP_FEATURE_OPENBSD)
+#ifdef LISP_FEATURE_OPENBSD
       setsid();
 #elif defined(LISP_FEATURE_DARWIN)
       setpgid(0, getpid());
-#elif defined(SVR4) || defined(__linux__) || defined(__osf__) || defined(__GLIBC__)
+#elif defined SVR4 || defined __linux__ || defined __osf__ || defined __GLIBC__ || defined __HAIKU__
       setpgrp();
 #else
       setpgrp(0, getpid());
@@ -193,14 +267,17 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     if (serr >= 0)
         dup2(serr, 2);
     }
-    /* Close all other fds. */
-#ifdef SVR4
-    for (fd = sysconf(_SC_OPEN_MAX)-1; fd >= 3; fd--)
-        if (fd != channel[1]) close(fd);
-#else
-    for (fd = getdtablesize()-1; fd >= 3; fd--)
-        if (fd != channel[1]) close(fd);
-#endif
+    /* Close all other fds. First arrange for the pipe fd to be the
+     * lowest free fd, then close every open fd above that. */
+    channel[1] = dup2(channel[1], 3);
+    closefds_from(4, dont_close);
+
+    if (-1 != channel[1]) {
+        if (-1==fcntl(channel[1], F_SETFD,  FD_CLOEXEC)) {
+            close(channel[1]);
+            channel[1] = -1;
+        }
+    }
 
     if (pwd && chdir(pwd) < 0) {
        failure_code = 3;
@@ -238,105 +315,4 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     }
     _exit(failure_code);
 }
-#else  /* !LISP_FEATURE_WIN32 */
 
-#  include <windows.h>
-#  include <process.h>
-#  include <stdio.h>
-#  include <stdlib.h>
-#  include <fcntl.h>
-#  include <io.h>
-
-#define   READ_HANDLE  0
-#define   WRITE_HANDLE 1
-
-/* These functions do not attempt to deal with wchar_t variations. */
-
-/* Get the value of _environ maintained by MSVCRT */
-char **msvcrt_environ ( void ) {
-    return ( _environ );
-}
-
-/* Set up in, out, err pipes and spawn a program, waiting or otherwise. */
-HANDLE spawn (
-    const char *program,
-    const char *const *argv,
-    int in,
-    int out,
-    int err,
-    int search,
-    char *envp,
-    char *ptyname,
-    int wait,
-    char *pwd
-    )
-{
-    int stdout_backup, stdin_backup, stderr_backup, wait_mode;
-    HANDLE hProcess;
-    HANDLE hReturn;
-
-    /* Duplicate and save the original stdin/out/err handles. */
-    stdout_backup = _dup (  _fileno ( stdout ) );
-    stdin_backup  = _dup (  _fileno ( stdin  ) );
-    stderr_backup = _dup (  _fileno ( stderr ) );
-
-    /* If we are not using stdin/out/err
-     * then duplicate the new pipes to current stdin/out/err handles.
-     *
-     * Default std fds are used if in, out or err parameters
-     * are -1. */
-
-    hReturn = (HANDLE)-1;
-    hProcess = (HANDLE)-1;
-    if ( ( out >= 0 ) && ( out != _fileno ( stdout ) ) ) {
-        if ( _dup2 ( out, _fileno ( stdout ) ) != 0 ) goto error_exit;
-    }
-    if ( ( in >= 0 ) && ( in != _fileno ( stdin ) ) ) {
-        if ( _dup2 ( in,  _fileno ( stdin )  ) != 0 ) goto error_exit_out;
-    }
-    if ( ( err >= 0 ) && ( err != _fileno ( stderr ) ) ) {
-        if ( _dup2 ( err, _fileno ( stderr ) ) != 0 ) goto error_exit_in;
-    }
-
-    /* Set the wait mode. */
-    if ( 0 == wait ) {
-        wait_mode = P_NOWAIT;
-    } else {
-        wait_mode = P_WAIT;
-    }
-
-    /* Change working directory if supplied. */
-    if (pwd) {
-        if (chdir(pwd) < 0) {
-            goto error_exit;
-        }
-    }
-
-    /* Spawn process given on the command line*/
-    if (search)
-        hProcess = (HANDLE) spawnvp ( wait_mode, program, (char* const* )argv );
-    else
-        hProcess = (HANDLE) spawnv ( wait_mode, program, (char* const* )argv );
-
-    /* Now that the process is launched, replace the original
-     * in/out/err handles and close the backups. */
-
-    if ( _dup2 ( stderr_backup, _fileno ( stderr ) ) != 0 ) goto error_exit;
- error_exit_in:
-    if ( _dup2 ( stdin_backup,  _fileno ( stdin )  ) != 0 ) goto error_exit;
- error_exit_out:
-    if ( _dup2 ( stdout_backup, _fileno ( stdout ) ) != 0 ) goto error_exit;
-
-    hReturn = hProcess;
-
- error_exit:
-    close ( stdout_backup );
-    close ( stdin_backup  );
-    close ( stderr_backup );
-
-    return hReturn;
-
-}
-
-
-#endif /* !LISP_FEATURE_WIN32 */

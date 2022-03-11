@@ -25,8 +25,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -36,7 +34,6 @@
 #include <errno.h>
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 #ifdef LISP_FEATURE_SB_THREAD
 #error "Define threading support functions"
@@ -51,7 +48,7 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
     if(sigaltstack(&sigstack,0)<0)
-        lose("Cannot sigaltstack: %s\n",strerror(errno));
+        lose("Cannot sigaltstack: %s",strerror(errno));
 
     return 1;                   /* success */
 }
@@ -69,12 +66,6 @@ os_context_register_addr(os_context_t *context, int offset)
      * address of the first one (R0) and treat it as the start of an
      * array. */
     return (os_context_register_t*)&(&context->uc_mcontext.arm_r0)[offset];
-}
-
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return os_context_register_addr(context, reg_PC);
 }
 
 os_context_register_t *
@@ -106,8 +97,8 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
-    u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
+    unsigned int code = *((unsigned char *)(4+OS_CONTEXT_PC(context)));
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
 
     if (trap_instruction != 0xe7f001f0) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
@@ -123,5 +114,5 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
 void arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+    ll_install_handler(SIGTRAP, sigtrap_handler);
 }

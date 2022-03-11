@@ -108,22 +108,27 @@
                                  use-blocks
                                  :key (lambda (block)
                                         (let ((2block (block-info block)))
+                                          ;; same as logic in UPDATE-UVL-LIVE-SETS
                                           (merge-uvl-live-sets
-                                           (ir2-block-end-stack 2block)
-                                           (ir2-block-pushed 2block))))))
+                                           (set-difference
+                                            (ir2-block-start-stack 2block)
+                                            (ir2-block-popped 2block))
+                                           (member dx-lvar (reverse (ir2-block-pushed 2block))))))))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
+    (aver start-block)
     (labels ((revisit-cycles (block)
                (dolist (succ (block-succ block))
                  (when (eq (block-flag succ) cycle)
                    (mark succ)))
                (when (eq (block-out block) nlx)
-                 (map-block-nlxes
-                  (lambda (nlx)
-                    (let ((target (nlx-info-target nlx)))
-                      (when (eq (block-flag target) cycle)
-                        (mark target))))
-                  block)))
+                 (do-nested-cleanups (cleanup (block-end-lexenv block))
+                   (case (cleanup-kind cleanup)
+                     ((:block :tagbody :catch :unwind-protect)
+                      (dolist (nlx-info (cleanup-nlx-info cleanup))
+                        (let ((target (nlx-info-target nlx-info)))
+                          (when (eq (block-flag target) cycle)
+                            (mark target)))))))))
              (mark (block)
                (let ((2block (block-info block)))
                  (unless (eq (block-flag block) flag)
@@ -147,7 +152,8 @@
                   t)
                  ((eq (block-flag current-block) flag)
                   t)
-                 ((eq (block-flag current-block) cycle))
+                 ((eq (block-flag current-block) cycle)
+                  nil)
                  ;; Don't go back past START-BLOCK.
                  ((not (eq current-block start-block))
                   (setf (block-flag current-block) cycle)
@@ -195,57 +201,61 @@
                                          ;; they're handled specially.
                                          (remove-if #'lvar-dynamic-extent
                                                     (ir2-block-start-stack (block-info succ))))))
-    (map-block-nlxes (lambda (nlx-info)
-                       (let* ((nle (nlx-info-target nlx-info))
-                              (nle-start-stack (ir2-block-start-stack
-                                                (block-info nle)))
-                              (exit-lvar (nlx-info-lvar nlx-info))
-                              (next-stack (if exit-lvar
-                                              (remove exit-lvar nle-start-stack)
-                                              nle-start-stack)))
-                         (setq new-end (merge-uvl-live-sets
-                                        new-end next-stack))))
-                     block
-                     (lambda (dx-cleanup)
-                       (dolist (lvar (cleanup-info dx-cleanup))
-                         (do-uses (generator lvar)
-                           (let* ((block (node-block generator))
-                                  (2block (block-info block)))
-                             ;; DX objects, living in the LVAR, are alive in
-                             ;; the environment, protected by the CLEANUP. We
-                             ;; also cannot move them (because, in general, we
-                             ;; cannot track all references to them).
-                             ;; Therefore, everything, allocated deeper than a
-                             ;; DX object -- that is, before the DX object --
-                             ;; should be kept alive until the object is
-                             ;; deallocated.
-                             ;;
-                             ;; Since DX generators end their blocks, we can
-                             ;; find out UVLs allocated before them by looking
-                             ;; at the stack at the end of the block.
-                             (setq new-end (merge-uvl-live-sets
-                                            new-end (ir2-block-end-stack 2block)))
-                             (setq new-end (merge-uvl-live-sets
-                                            new-end (ir2-block-pushed 2block))))))))
+    (do-nested-cleanups (cleanup (block-end-lexenv block))
+      (case (cleanup-kind cleanup)
+        ((:block :tagbody :catch :unwind-protect)
+         (dolist (nlx-info (cleanup-nlx-info cleanup))
+           (let* ((nle (nlx-info-target nlx-info))
+                  (nle-start-stack (ir2-block-start-stack
+                                    (block-info nle)))
+                  (exit-lvar (nlx-info-lvar nlx-info))
+                  (next-stack (if exit-lvar
+                                  (remove exit-lvar nle-start-stack)
+                                  nle-start-stack)))
+             (setq new-end (merge-uvl-live-sets
+                            new-end next-stack)))))
+        (:dynamic-extent
+         (dolist (lvar (cleanup-nlx-info cleanup))
+           (do-uses (generator lvar)
+             (let* ((block (node-block generator))
+                    (2block (block-info block)))
+               ;; DX objects, living in the LVAR, are alive in
+               ;; the environment, protected by the CLEANUP. We
+               ;; also cannot move them (because, in general, we
+               ;; cannot track all references to them).
+               ;; Therefore, everything, allocated deeper than a
+               ;; DX object -- that is, before the DX object --
+               ;; should be kept alive until the object is
+               ;; deallocated.
+               (setq new-end (merge-uvl-live-sets
+                              new-end
+                              (set-difference
+                               (ir2-block-start-stack 2block)
+                               (ir2-block-popped 2block))))
+               (setq new-end (merge-uvl-live-sets
+                              ;; union in the lvars
+                              ;; pushed before LVAR in
+                              ;; this block.
+                              new-end (member lvar (reverse (ir2-block-pushed 2block)))))))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 
-    ;; If a block starts with an "entry DX" node (the start of a DX
+    ;; If a block has a "entry DX" node (the start of a DX
     ;; environment) then we need to back-propagate the DX LVARs to
     ;; their allocation sites.  We need to be clever about this
     ;; because some code paths may not allocate all of the DX LVARs.
-    (let ((first-node (ctran-next (block-start block))))
-      (when (typep first-node 'entry)
-        (let ((cleanup (entry-cleanup first-node)))
+    (do-nodes (node nil block)
+      (when (typep node 'entry)
+        (let ((cleanup (entry-cleanup node)))
           (when (eq (cleanup-kind cleanup) :dynamic-extent)
-            (back-propagate-dx-lvars block (cleanup-info cleanup))))))
+            (back-propagate-dx-lvars block (cleanup-nlx-info cleanup))))))
 
     (let ((start new-end))
       (setq start (set-difference start (ir2-block-pushed 2block)))
       (setq start (merge-uvl-live-sets start (ir2-block-popped 2block)))
 
       ;; We cannot delete unused UVLs during NLX, so all UVLs live at
-      ;; ENTRY will be actually live at NLE.
+      ;; ENTRY which are not popped will be actually live at NLE.
       ;;
       ;; BUT, UNWIND-PROTECTor is called in the environment, which has
       ;; nothing in common with the environment of its entry. So we
@@ -260,7 +270,9 @@
                (cleanup (nlx-info-cleanup nlx-info)))
           (unless (eq (cleanup-kind cleanup) :unwind-protect)
             (let* ((entry-block (node-block (cleanup-mess-up cleanup)))
-                   (entry-stack (ir2-block-start-stack (block-info entry-block))))
+                   (entry-stack (set-difference
+                                 (ir2-block-start-stack (block-info entry-block))
+                                 (ir2-block-popped (block-info entry-block)))))
               (setq start (merge-uvl-live-sets start entry-stack))))))
 
       (when *check-consistency*
@@ -424,7 +436,7 @@
                                            (nthcdr moved-count after-stack))))
                     (cleanup-code
                      `(%nip-values ',last-nipped ,q-last-moved
-                       ,@qmoved))
+                                   ,@qmoved))
                     (discard (nconc moved rest) after-stack)))
                  (t
                   (multiple-value-bind (popped last-popped rest)
@@ -509,6 +521,10 @@
         (when (and (block-start succ)
                    (not (eq (ir2-block-start-stack (block-info succ))
                             top)))
-          (insert-stack-cleanups block succ)))))
+          ;; Return resets the stack, so no need to clean anything.
+          (let ((start (block-last succ)))
+            (unless (and (return-p start)
+                         (eq (block-start succ) (node-prev start)))
+              (insert-stack-cleanups block succ)))))))
 
   (values))

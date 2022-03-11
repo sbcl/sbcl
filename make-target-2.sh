@@ -39,30 +39,50 @@ fi
 # system with the :SB-SHOW feature enabled, it does it rather silently,
 # without trying to tell you about what it's doing. So unless it hangs
 # for much longer than that, don't worry, it's likely to be normal.
-if [ "$1" != --load ]; then
-    if [ "x$1" != x ]; then
-        echo Unknown option \'"$1"\' to make-target-2
-        exit 1
-    fi
+warm_compile=yes
+devel=""
+if [ "$1" = --load ]; then
+    warm_compile=no
+elif [ "$1" = --load-with-sb-devel ]; then
+    warm_compile=no
+    devel="(pushnew :sb-devel *features*)"
+elif [ "x$1" != x ]; then
+    echo Unknown option \'"$1"\' to make-target-2
+    exit 1
+fi
+if [ "$warm_compile" = yes ]; then
     echo //doing warm init - compilation phase
     ./src/runtime/sbcl --core output/cold-sbcl.core \
      --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
      --eval '(sb-fasl::!warm-load "src/cold/warm.lisp")' --quit
 fi
 echo //doing warm init - load and dump phase
-./src/runtime/sbcl --core output/cold-sbcl.core \
- --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
- --eval '(sb-fasl::!warm-load "make-target-2-load.lisp")' \
- --eval '(progn #+gencgc(setf (extern-alien "gc_coalesce_string_literals" char) 2))' \
- --eval '(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
- (sb-ext:save-lisp-and-die "output/sbcl.core"))'
+./src/runtime/sbcl --noinform --core output/cold-sbcl.core \
+                   --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS \
+                   --no-sysinit --no-userinit --noprint <<EOF
+(progn ${devel})
+(sb-fasl::!warm-load "make-target-2-load.lisp")
+(setf (extern-alien "gc_coalesce_string_literals" char) 2)
+;;; Use the historical (bad) convention for *compile-file-pathname*
+(setf sb-c::*merge-pathnames* t)
+;;; and for storing pathname namestrings in fasls too.
+(setq sb-c::*name-context-file-path-selector* 'truename)
+(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
+ (sb-ext:save-lisp-and-die "output/sbcl.core"))
+EOF
+
+# Confirm that default evaluation strategy is :INTERPRET if sb-fasteval was built
+src/runtime/sbcl --core output/sbcl.core --lose-on-corruption --noinform \
+  --no-sysinit --no-userinit --disable-debugger \
+  --eval '(when (find-package "SB-INTERPRETER") (assert (eq *evaluator-mode* :interpret)))' \
+  --quit
 
 echo //checking for leftover cold-init symbols
 ./src/runtime/sbcl --core output/sbcl.core \
  --lose-on-corruption --noinform $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit --eval '
     (restart-case
       (let (l1 l2)
-        (sb-vm::map-allocated-objects
+        (sb-vm:map-allocated-objects
          (lambda (obj type size)
            (declare (ignore size))
            (when (and (= type sb-vm:symbol-widetag) (not (symbol-package obj))
@@ -74,7 +94,7 @@ echo //checking for leftover cold-init symbols
                              (sb-kernel:fdefn-name obj)))))
              (push obj l2)))
          :all)
-        (format t "Found ~D:~%~S~%" (length l1) l1)
+        (when l1 (format t "Found ~D:~%~S~%" (length l1) l1))
         (sb-int:awhen
           (mapcan (quote apropos-list)
            (quote ("DEFINE-INFO-TYPE" "LVAR-TYPE-USING"
@@ -85,7 +105,8 @@ echo //checking for leftover cold-init symbols
                    "SHIFT-RIGHT-UNALIGNED"
                    "STRING-LESS-GREATER-EQUAL-TESTS")))
          (format t "~&Leftover from [disabled?] tree-shaker:~%~S~%" sb-int:it))
-        (format t "Found ~D fdefns named by uninterned symbols:~%~S~%" (length l2) l2))
+        (when l2 
+           (format t "Found ~D fdefns named by uninterned symbols:~%~S~%" (length l2) l2)))
     (abort-build ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1)))' --quit

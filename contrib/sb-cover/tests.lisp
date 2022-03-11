@@ -49,10 +49,10 @@
 
 (assert (probe-file (subpathname *output-directory* "cover-index.html")))
 
-;;; None of the code was executed
+;;; Only the top level forms have been executed
 (assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
 (assert (zerop (sb-cover::all-of (getf sb-cover::*counts* :branch))))
-(assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
+(assert (= 2 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
 (assert (plusp (sb-cover::all-of (getf sb-cover::*counts* :expression))))
 
 ;;; Call the function again
@@ -116,7 +116,7 @@
 (report)
 
 ;; Complete expression coverage
-(assert (= 13
+(assert (= 14
            (sb-cover::ok-of (getf sb-cover::*counts* :expression))
            (sb-cover::all-of (getf sb-cover::*counts* :expression))))
 

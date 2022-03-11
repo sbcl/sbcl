@@ -124,15 +124,18 @@
 ;;;
 ;;; See CHECK-BACKTRACE for an explanation of the structure
 ;;; EXPECTED-FRAMES.
-(defun verify-backtrace (test-function expected-frames &key details)
+(defun verify-backtrace (test-function expected-frames &key details
+                                                            error)
   (labels ((find-frame (function-name frames)
              (member function-name frames
                      :key (if details #'caar #'car)
                      :test #'equal))
            (fail (datum &rest arguments)
              (return-from verify-backtrace
-               (values nil (apply #'sb-kernel:coerce-to-condition
-                                  datum 'simple-error 'error arguments)))))
+               (let ((c (apply #'sb-kernel:coerce-to-condition datum 'simple-error 'error arguments)))
+                 (if error
+                     (error c)
+                     (values nil c))))))
     (call-with-backtrace
      (lambda (backtrace condition)
        (declare (ignore condition))
@@ -157,11 +160,10 @@
      test-function :details details)))
 
 (defun assert-backtrace (test-function expected-frames &key details)
-  (multiple-value-bind (successp condition)
-      (verify-backtrace test-function expected-frames :details details)
-    (or successp (error condition))))
+  (verify-backtrace test-function expected-frames :details details
+                                                  :error t))
 
-(defvar *p* (namestring *load-truename*))
+(defvar *p* (namestring (if sb-c::*merge-pathnames* *load-truename* *load-pathname*)))
 
 (defvar *undefined-function-frame*
   '("undefined function"))
@@ -187,7 +189,7 @@
 
   (with-test (:name (:backtrace :undefined-function :bug-346)
               :skipped-on :interpreter
-              ;; Failures on SPARC, and probably HPPA are due to
+              ;; Failures on SPARC are due to
               ;; not having a full and valid stack frame for the
               ;; undefined function frame.  See PPC
               ;; undefined_tramp for details.
@@ -208,7 +210,8 @@
            (list `(flet test :in ,*p*) #'not-optimized)))))
 
 (with-test (:name (:backtrace :interrupted-condition-wait)
-                  :skipped-on (not :sb-thread))
+            :skipped-on (not :sb-thread)
+            :broken-on :sb-safepoint) ;; unreliable
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert-backtrace
@@ -327,7 +330,7 @@
   ;; WTF is this? This is a way to make these tests not depend so much on the
   ;; details of LOAD/EVAL. Around 1.0.57 we changed %SIMPLE-EVAL to be
   ;; slightly smarter, which meant that things which used to have xeps
-  ;; suddently had tl-xeps, etc. This takes care of that.
+  ;; suddenly had tl-xeps, etc. This takes care of that.
   `(funcall
     (checked-compile
      '(lambda ()
@@ -653,3 +656,22 @@
                    (sb-debug:print-backtrace :count 100 :stream stream))))
         (foo 100 (let ((list (list t)))
                    (nconc list list)))))))
+
+(with-test (:name :uninitialized-optionals)
+  (let ((fun (checked-compile
+              `(lambda (l &optional m n)
+                 (declare (fixnum l))
+                 (values l m n)))))
+    (checked-compile-and-assert
+        ()
+        `(lambda (fun &rest args)
+           (block nil
+             (handler-bind ((error
+                              (lambda (c)
+                                c
+                                (return (cdar (sb-debug:list-backtrace :count 1))))))
+               (apply fun args))))
+      ((fun t) (list t *unavailable-argument* *unavailable-argument*) :test #'equalp)
+      ((fun t 1) (list t 1 *unavailable-argument*) :test #'equalp)
+      ((fun t 1 2) (list t 1 2) :test #'equalp)
+      ((fun 1 2 3) (values 1 2 3)))))

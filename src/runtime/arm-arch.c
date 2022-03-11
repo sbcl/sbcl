@@ -24,11 +24,6 @@
 #include "breakpoint.h"
 #include "monitor.h"
 
-void arch_init(void)
-{
-    return;
-}
-
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
     return (os_vm_address_t)code->si_addr;
@@ -38,17 +33,12 @@ void arch_skip_instruction(os_context_t *context)
 {
     /* KLUDGE: Other platforms check for trap codes and skip inlined
      * trap/error parameters.  We should too. */
-
-    /* Note that we're doing integer arithmetic here, not pointer. So
-     * the value that the return value of os_context_pc_addr() points
-     * to will be incremented by 4, not 16.
-     */
-    *os_context_pc_addr(context) += 4;
+    OS_CONTEXT_PC(context) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)(*os_context_pc_addr(context) + 5);
+    return (unsigned char *)(OS_CONTEXT_PC(context) + 5);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
@@ -73,6 +63,7 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
+    extern void do_pending_interrupt();
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, 0);
 }
 
@@ -107,14 +98,13 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) = (int) handle_fun_end_breakpoint(context);
 }
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned char register_offset =
-        *((unsigned char *)(*os_context_pc_addr(context))+5);
+    unsigned char register_offset = *(unsigned char *)(OS_CONTEXT_PC(context)+5);
     handle_single_step_trap(context, trap, register_offset);
     /* KLUDGE: arch_skip_instruction() only skips one instruction, and
      * there is a following word to deal with as well, so skip
@@ -125,8 +115,6 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 
 
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
-
 /* Linkage tables
  *
  * Linkage entry size is 16, because we need 4 instructions.
@@ -134,8 +122,11 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 
 #define LINKAGE_TEMP_REG        reg_NFP
 
-void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+  // allocate successive entries downward
+  char *reloc_addr =
+      (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
   if (datap) {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
     return;
@@ -172,4 +163,3 @@ void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int dat
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
-#endif

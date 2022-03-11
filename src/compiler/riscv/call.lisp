@@ -17,10 +17,8 @@
 
 ;;; Make a passing location TN for a local call return PC.
 (defun make-return-pc-passing-location (standard)
-  ;; Should we have a non standard convention? RISCV gives a hardware bonus to using x1 and x5
-  (if standard
-      (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number lra-offset)
-      (make-restricted-tn *backend-t-primitive-type* descriptor-reg-sc-number)))
+  (declare (ignore standard))
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ra-offset))
 
 ;;; This is similar to MAKE-RETURN-PC-PASSING-LOCATION, but makes a
 ;;; location to pass OLD-FP in. This is (obviously) wired in the
@@ -38,13 +36,14 @@
 ;;; them at a known location.
 (defun make-old-fp-save-location (env)
   (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (environment-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
    (make-wired-tn *fixnum-primitive-type* control-stack-arg-scn ocfp-save-offset)))
 
 (defun make-return-pc-save-location (env)
-  (specify-save-tn
-   (physenv-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
-   (make-wired-tn *backend-t-primitive-type* control-stack-arg-scn lra-save-offset)))
+  (let ((ptype *fixnum-primitive-type*))
+    (specify-save-tn
+     (environment-debug-live-tn (make-normal-tn ptype) env)
+     (make-wired-tn ptype control-stack-arg-scn ra-save-offset))))
 
 ;;; Make a TN for the standard argument count passing location.  We
 ;;; only need to make the standard location, since a count is never
@@ -106,7 +105,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     (inst compute-code code-tn lip start-lab)))
 
 (define-vop (xep-setup-sp)
@@ -125,7 +124,7 @@
   (:generator 2
     (move res csp-tn)
     (inst addi csp-tn csp-tn (* n-word-bytes (sb-allocated-size 'control-stack)))
-    (when (ir2-physenv-number-stack-p callee)
+    (when (ir2-environment-number-stack-p callee)
       (inst addi nsp-tn nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)))
       (move nfp nsp-tn))))
 
@@ -175,7 +174,7 @@
     (note-this-location vop (if (<= nvals 1)
                                 :single-value-return
                                 :unknown-return))
-    (inst compute-code code-tn lip lra-label)
+    (inst compute-code code-tn lip lra-label ra-tn)
     ;; Pick off the single-value case first.
     (sb-assem:without-scheduling ()
 
@@ -267,10 +266,10 @@
 ;;;    Args and Nargs are TNs wired to the named locations.  We must
 ;;; explicitly allocate these TNs, since their lifetimes overlap with the
 ;;; results Start and Count (also, it's nice to be able to target them).
-(defun receive-unknown-values (args nargs start count lra-label lip)
+(defun receive-unknown-values (args nargs start count label lip)
   (declare (type tn args nargs start count))
   (assemble ()
-    (inst compute-code code-tn lip lra-label)
+    (inst compute-code code-tn lip label ra-tn)
     (inst bge nargs-tn zero-tn MULTIPLE)
     (move start csp-tn)
     (inst addi csp-tn csp-tn n-word-bytes)
@@ -350,10 +349,9 @@
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra (callee-return-pc-tn callee) lip label code-tn)
       (note-this-location vop :call-site)
-      (inst j target)
-      (emit-return-pc label)
+      (inst jal ra-tn target)
+      (emit-label label)
       (default-unknown-values vop values nvals move-temp lip label)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
@@ -386,10 +384,9 @@
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra (callee-return-pc-tn callee) lip label code-tn)
       (note-this-location vop :call-site)
-      (inst j target)
-      (emit-return-pc label)
+      (inst jal ra-tn target)
+      (emit-label label)
       (note-this-location vop :unknown-return)
       (receive-unknown-values values-start nvals start count label lip)
       (when cur-nfp
@@ -415,20 +412,16 @@
   (:move-args :local-call)
   (:vop-var vop)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:scs (interior-reg)) lip)
   (:generator 5
-    (let ((label (gen-label))
-          (cur-nfp (current-nfp-tn vop)))
+    (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (let ((callee-nfp (callee-nfp-tn callee)))
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra (callee-return-pc-tn callee) lip label code-tn)
       (note-this-location vop :call-site)
-      (inst j target)
-      (emit-return-pc label)
+      (inst jal ra-tn target)
       (note-this-location vop :known-return)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
@@ -441,11 +434,11 @@
 ;;; since all registers may be tied up by the more operand.  Instead,
 ;;; we use MAYBE-LOAD-STACK-TN.
 (define-vop (known-return)
-  (:args (old-fp :scs (any-reg))
-         (return-pc :scs (descriptor-reg))
+  (:args (old-fp :target old-fp-temp)
+         (return-pc :target return-pc-temp)
          (values :more t))
   (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
-  (:temporary (:sc descriptor-reg :from (:argument 1)) return-pc-temp)
+  (:temporary (:sc any-reg :from (:argument 1) :offset ra-offset) return-pc-temp)
   (:info val-locs)
   (:ignore val-locs values)
   (:move-args :known-return)
@@ -456,7 +449,7 @@
     (move csp-tn cfp-tn)
     (clear-number-stack vop)
     (move cfp-tn old-fp-temp)
-    (lisp-return return-pc-temp :known)))
+    (inst jalr zero-tn return-pc-temp 0)))
 
 
 ;;;; Full call:
@@ -529,7 +522,8 @@
         ,@(when (eq named :direct) '(fun))
         ,@(when (eq return :fixed) '(nvals))
         step-instrumenting)
-       (:ignore ,@(unless (or variable (eq return :tail)) '(arg-locs))
+       (:ignore ,@(unless (eq return :tail) '(return-pc-pass))
+                ,@(unless (or variable (eq return :tail)) '(arg-locs))
                 ,@(unless variable '(args)))
 
        (:temporary (:sc descriptor-reg
@@ -539,8 +533,8 @@
                         '(:to :eval)))
                    old-fp-pass)
 
-       (:temporary (:sc descriptor-reg
-                    :offset lra-offset
+       (:temporary (:sc any-reg
+                    :offset ra-offset
                     :from (:argument ,(if (eq return :tail) 2 1))
                     :to :eval)
                    return-pc-pass)
@@ -581,7 +575,7 @@
                        (if (eq return :unknown) 25 0))
          (let* ((cur-nfp (current-nfp-tn vop))
                 ,@(unless (eq return :tail)
-                    '((lra-label (gen-label))))
+                    '((label (gen-label))))
                 (step-done-label (gen-label))
                 (filler
                   (remove nil
@@ -594,8 +588,7 @@
                                           :load-return-pc)
                                         (when cur-nfp
                                           :frob-nfp))
-                                      '(:comp-lra
-                                        (when cur-nfp
+                                      '((when cur-nfp
                                           :frob-nfp)
                                         :save-fp
                                         :load-fp))))))
@@ -606,8 +599,7 @@
                         (:load-nargs
                          ,@(if variable
                                `((inst sub nargs-pass csp-tn new-fp)
-                                 (unless (zerop (- word-shift n-fixnum-tag-bits))
-                                   (inst srai nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits)))
+                                 (with-word-index-as-fixnum (nargs-pass nargs-pass))
                                  ,@(let ((index -1))
                                      (mapcar (lambda (name)
                                                `(loadw ,name new-fp ,(incf index)))
@@ -622,16 +614,14 @@
                                     (load-stack-tn old-fp-pass old-fp))))
                                 (:load-return-pc
                                  (sc-case return-pc
-                                   (descriptor-reg
+                                   (any-reg
                                     (move return-pc-pass return-pc))
                                    (control-stack
                                     (load-stack-tn return-pc-pass return-pc))))
                                 (:frob-nfp
                                  (inst addi nsp-tn cur-nfp
                                   (bytes-needed-for-non-descriptor-stack-frame))))
-                              `((:comp-lra
-                                 (inst compute-lra return-pc-pass lip lra-label code-tn))
-                                (:frob-nfp
+                              `((:frob-nfp
                                  (store-stack-tn nfp-save cur-nfp))
                                 (:save-fp
                                  (move old-fp-pass cfp-tn))
@@ -645,7 +635,7 @@
                   (insert-step-instrumenting (callable-tn)
                     ;; Conditionally insert a conditional trap:
                     (when step-instrumenting
-                      (load-symbol-value stepping sb-impl::*stepping*)
+                      (load-stepping stepping)
                       ;; If it's not 0, trap.
                       (inst beq stepping zero-tn STEP-DONE-LABEL)
                       ;; CONTEXT-PC will be pointing here when the
@@ -700,19 +690,24 @@
                    (return)))
 
              (note-this-location vop :call-site)
-             (lisp-jump function))
+             (inst jalr ,(if (eq return :tail)
+                             'zero-tn
+                             'ra-tn)
+                   function
+                   (- (ash simple-fun-insts-offset word-shift)
+                      fun-pointer-lowtag)))
 
            ,@(ecase return
                (:fixed
-                '((emit-return-pc lra-label)
-                  (default-unknown-values vop values nvals move-temp lip lra-label)
+                '((emit-label label)
+                  (default-unknown-values vop values nvals move-temp lip label)
                   (when cur-nfp
                     (load-stack-tn cur-nfp nfp-save))))
                (:unknown
-                '((emit-return-pc lra-label)
+                '((emit-label label)
                   (note-this-location vop :unknown-return)
                   (receive-unknown-values values-start nvals start count
-                                          lra-label lip)
+                                          label lip)
                   (when cur-nfp
                     (load-stack-tn cur-nfp nfp-save))))
                (:tail)))))))
@@ -736,22 +731,22 @@
    (args-arg :scs (any-reg) :target args)
    (function-arg :scs (descriptor-reg) :target lexenv)
    (old-fp-arg :scs (any-reg) :target old-fp)
-   (lra-arg :scs (descriptor-reg) :target lra))
+   (ra-arg :scs (any-reg) :target ra))
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) args)
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 2)) old-fp)
-  (:temporary (:sc any-reg :offset lra-offset :from (:argument 3)) lra)
+  (:temporary (:sc any-reg :offset ra-offset :from (:argument 3)) ra)
   (:vop-var vop)
   (:generator 75
     ;; Move these into the passing locations if they are not already there.
     (move args args-arg)
     (move lexenv function-arg)
     (move old-fp old-fp-arg)
-    (move lra lra-arg)
+    (move ra ra-arg)
     ;; Clear the number stack if anything is there.
     (clear-number-stack vop)
     ;; And jump to the assembly routine.
-    (invoke-asm-routine 'tail-call-variable t)))
+    (inst jal zero-tn (make-fixup 'tail-call-variable :assembly-routine))))
 
 
 ;;;; Unknown values return:
@@ -764,8 +759,9 @@
 ;;; Return a single value using the unknown-values convention.
 (define-vop (return-single)
   (:args (old-fp :scs (any-reg))
-         (return-pc :scs (descriptor-reg))
+         (return-pc :scs (any-reg) :target ra)
          (value))
+  (:temporary (:sc any-reg :offset ra-offset :from (:argument 1)) ra)
   (:ignore value)
   (:vop-var vop)
   (:generator 6
@@ -775,7 +771,9 @@
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
     ;; Out of here.
-    (lisp-return return-pc :single-value)))
+    (inst li nargs-tn -1) ; mark single value return
+    (move ra return-pc)
+    (inst jalr zero-tn ra 0)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values
 ;;; are required to be set up in the standard passing locations.
@@ -792,7 +790,7 @@
                             collect (gensym))))
                `(define-vop (return)
                   (:args (old-fp :scs (any-reg))
-                         (return-pc :scs (descriptor-reg) :to (:eval 1))
+                         (return-pc :scs (any-reg) :to (:eval 1) :target ra)
                          (values :more t))
                   (:ignore values)
                   ,@(loop for an-offset in *register-arg-offsets*
@@ -803,6 +801,7 @@
                                                ,an))
                   (:temporary (:sc any-reg :offset nargs-offset) nargs)
                   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
+                  (:temporary (:sc any-reg :offset ra-offset :from (:eval 1)) ra)
                   (:info nvals)
                   (:vop-var vop)
                   (:generator 6
@@ -823,7 +822,8 @@
                       (dolist (reg (subseq (list ,@a) nvals))
                         (move reg null-tn)))
                     ;; And away we go.
-                    (lisp-return return-pc :multiple-values))))))
+                    (move ra return-pc)
+                    (inst jalr zero-tn ra 0))))))
   (frob))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
@@ -833,11 +833,11 @@
 ;;; assembly-routine.
 (define-vop (return-multiple)
   (:args (old-fp-arg :scs (any-reg) :target old-fp)
-         (lra-arg :scs (descriptor-reg) :target lra)
+         (return-pc :scs (any-reg) :target ra)
          (vals-arg :scs (any-reg) :target vals)
          (nvals-arg :scs (any-reg) :target nvals))
   (:temporary (:sc any-reg :offset nl1-offset :from (:argument 0)) old-fp)
-  (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
+  (:temporary (:sc any-reg :offset ra-offset :from (:argument 1)) ra)
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:scs (descriptor-reg) :offset a0-offset) a0)
@@ -855,15 +855,17 @@
     ;; Return with one value.
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp-arg)
-    (lisp-return lra-arg :single-value)
+    (inst li nargs-tn -1) ; mark single value return
+    (move ra return-pc)
+    (inst jalr zero-tn ra 0)
 
     NOT-SINGLE
     (move old-fp old-fp-arg)
-    (move lra lra-arg)
+    (move ra return-pc)
     (move vals vals-arg)
     (move nvals nvals-arg)
 
-    (invoke-asm-routine 'return-multiple t)))
+    (inst jal zero-tn (make-fixup 'return-multiple :assembly-routine))))
 
 
 ;;;; XEP hackery:
@@ -907,11 +909,9 @@
       ;; Compute the end of the MORE arg area (and our overall frame
       ;; allocation) into the stack pointer.
       (cond ((zerop fixed)
-             (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result nargs-tn))
-                   (t
-                    (inst slli dest nargs-tn (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result dest)))
+             (let ((nargs nargs-tn))
+               (with-fixnum-as-word-index (nargs dest)
+                 (inst add dest result nargs)))
              (move csp-tn dest)
              (inst beq nargs-tn zero-tn done))
             (t
@@ -921,11 +921,8 @@
                (move csp-tn result)
                (inst j done)
                (emit-label skip))
-             (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result count))
-                   (t
-                    (inst slli dest count (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result dest)))
+             (with-fixnum-as-word-index (count dest)
+               (inst add dest result count))
              ;; Don't leave the arguments unprotected when moving below the stack pointer
              (when (>= delta 0)
                (move csp-tn dest))))
@@ -977,7 +974,8 @@
       (emit-label do-regs)
       (when (< fixed register-arg-count)
         ;; Now we have to deposit any more args that showed up in registers.
-        (inst subi count nargs-tn (fixnumize fixed))
+        (when (zerop fixed)
+          (move count nargs-tn))
         (do ((i fixed (1+ i)))
             ((>= i register-arg-count))
           ;; Don't deposit any more than there are.
@@ -996,8 +994,26 @@
           (inst subi nsp-tn nsp-tn (bytes-needed-for-non-descriptor-stack-frame))
           (move cur-nfp nsp-tn))))))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg) :to (:result 1)))
+  (:temporary (:scs (any-reg)) index-temp)
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (move value null-tn)
+    (cond ((zerop index)
+           (inst beq count zero-tn done))
+          (t
+           (inst li index-temp (fixnumize index))
+           (inst bge index-temp count done)))
+    (loadw value object index)
+    done))
+
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -1024,27 +1040,25 @@
       ;; We need to do this atomically.
       (pseudo-atomic (pa-flag)
         (inst slli temp count (1+ (- word-shift n-fixnum-tag-bits)))
-        (allocation dst temp list-pointer-lowtag
+        (allocation 'list temp list-pointer-lowtag dst
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p)
         (move result dst)
-
         (inst j enter)
 
         ;; Compute the next cons and store it in the current one.
         (emit-label loop)
-        (inst addi dst dst (* 2 n-word-bytes))
+        (inst addi dst dst (* cons-size n-word-bytes))
         (storew dst dst -1 list-pointer-lowtag)
 
         (emit-label enter)
         ;; Grab one value
         (loadw temp context)
         (inst addi context context n-word-bytes)
-
-        ;; Dec count, and if != zero, go back for more.
-        (inst subi count count (fixnumize 1))
         ;; Store the value into the car of the current cons.
         (storew temp dst 0 list-pointer-lowtag)
+        ;; Dec count, and if != zero, go back for more.
+        (inst subi count count (fixnumize 1))
         (inst bne count zero-tn loop)
 
         ;; NIL out the last cons.
@@ -1061,24 +1075,24 @@
 ;;; supplied - fixed, and return a pointer that many words below the current
 ;;; stack top.
 ;;;
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
-  (:args (supplied :scs (any-reg) :target temp))
+  (:args (supplied :scs (any-reg) .
+         #.(cl:when sb-vm::fixnum-as-word-index-needs-temp
+             '(:target temp))))
   (:arg-types tagged-num (:constant fixnum))
   (:info fixed)
   (:results (context :scs (descriptor-reg))
             (count :scs (any-reg)))
+  #+#.(cl:if sb-vm::fixnum-as-word-index-needs-temp '(and) '(or))
   (:temporary (:sc non-descriptor-reg) temp)
   (:result-types t tagged-num)
   (:note "more-arg-context")
   (:generator 5
     (inst subi count supplied (fixnumize fixed))
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst sub context csp-tn count))
-          (t
-           (inst slli temp count (- word-shift n-fixnum-tag-bits))
-           (inst sub context csp-tn temp)))))
+    (with-fixnum-as-word-index (count temp)
+      (inst sub context csp-tn count))))
 
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
@@ -1112,7 +1126,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (load-symbol-value stepping sb-impl::*stepping*)
+    (load-stepping stepping)
     ;; If it's not 0, trap.
     (inst beq stepping zero-tn DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,

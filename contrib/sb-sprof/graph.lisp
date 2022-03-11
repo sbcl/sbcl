@@ -14,10 +14,10 @@
   (root        nil :type (or null vertex))
   (dfn           0 :type fixnum)
   (edges        () :type list)
-  (scc-vertices () :type list))
+  (scc-vertices () :type list :read-only t))
 
 (defstruct edge
-  (vertex (sb-impl::missing-arg) :type vertex))
+  (vertex (sb-int:missing-arg) :type vertex))
 
 (defstruct graph
   (vertices () :type list))
@@ -147,15 +147,16 @@
                        (:constructor %make-call-graph))
   ;; the value of *SAMPLE-INTERVAL* or *ALLOC-INTERVAL* at the time
   ;; the graph was created (depending on the current allocation mode)
-  (sample-interval (sb-impl::missing-arg) :type (real (0)))
+  (sample-interval (sb-int:missing-arg) :type (real (0)) :read-only t)
   ;; the sampling-mode that was used for the profiling run
-  (sampling-mode   (sb-impl::missing-arg) :type sampling-mode)
+  (sampling-mode   (sb-int:missing-arg) :type sampling-mode :read-only t)
   ;; number of samples taken
-  (nsamples        (sb-impl::missing-arg) :type sb-int:index)
+  (nsamples        (sb-int:missing-arg) :type sb-int:index :read-only t)
+  (unique-trace-count (sb-int:missing-arg) :type sb-int:index :read-only t)
   ;; threads that have been sampled
-  (sampled-threads '()                    :type list)
+  (sampled-threads '()                    :type list :read-only t)
   ;; sample count for samples not in any function
-  (elsewhere-count (sb-impl::missing-arg) :type sb-int:index))
+  (elsewhere-count (sb-int:missing-arg) :type sb-int:index :read-only t))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
@@ -181,13 +182,13 @@
   (start-pc-or-offset 0 :type address)
   (end-pc-or-offset 0 :type address)
   ;; the name of the function
-  (name nil :type t)
+  (name nil :type t :read-only t)
   ;; sample count for this function
   (count 0 :type fixnum)
   ;; count including time spent in functions called from this one
   (accrued-count 0 :type fixnum)
   ;; the debug-info that this node was created from
-  (debug-info nil :type t)
+  (debug-info nil :type t :read-only t)
   ;; list of NODEs for functions calling this one
   (callers () :type list)
   ;; the call count for the function that corresponds to this node (or NIL
@@ -253,7 +254,11 @@
 
 ;;; Make a NODE for debug-info INFO.
 (defun make-node (info)
-  (flet ((clean-name (name)
+  (flet ((code-bounds (code)
+           (let* ((start (sb-kernel:code-instructions code))
+                  (end (sap+ start (sb-kernel:%code-text-size code))))
+             (values (sap-int start) (sap-int end))))
+         (clean-name (name)
            (if (and (consp name)
                     (member (first name)
                             '(sb-c::xep sb-c::tl-xep sb-c::&more-processor
@@ -262,12 +267,11 @@
                (second name)
                name)))
     (typecase info
-      (sb-kernel::code-component
+      (sb-kernel:code-component
        (multiple-value-bind (start end)
            (code-bounds info)
          (values
-          (%make-node :name (or (sb-disassem::find-assembler-routine start)
-                                (format nil "~a" info))
+          (%make-node :name (format nil "~a" info)
                       :debug-info info
                       :start-pc-or-offset start
                       :end-pc-or-offset end)
@@ -277,12 +281,11 @@
               (cdf (sb-di::compiled-debug-fun-compiler-debug-fun info))
               (start-offset (sb-c::compiled-debug-fun-start-pc cdf))
               (end-offset (sb-c::compiled-debug-fun-elsewhere-pc cdf))
-              (component (sb-di::compiled-debug-fun-component info))
-              (start-pc (code-start component)))
+              (component (sb-di::compiled-debug-fun-component info)))
          ;; Call graphs are mostly useless unless we somehow
          ;; distinguish a gazillion different (LAMBDA ())'s.
          (when (equal name '(lambda ()))
-           (setf name (format nil "Unknown component: #x~x" start-pc)))
+           (setf name (format nil "~a in ~a" name component)))
          (values (%make-node :name (clean-name name)
                              :debug-info info
                              :start-pc-or-offset start-offset
@@ -291,6 +294,9 @@
       (sb-di::debug-fun
        (%make-node :name (clean-name (sb-di::debug-fun-name info))
                    :debug-info info))
+      (symbol
+       (%make-node :name (string info)
+                   :debug-info sb-fasl:*assembler-routines*))
       (t
        (%make-node :name (coerce info 'string)
                    :debug-info info)))))
@@ -334,17 +340,17 @@
      collect node))
 
 ;;; Value is a CALL-GRAPH for the current contents of *SAMPLES*.
-(defun make-call-graph-1 (max-depth)
+(defun make-call-graph-1 (samples max-depth)
   (let ((elsewhere-count 0))
     (with-lookup-tables ()
       (map-traces
-       (lambda (thread time trace)
-         (declare (ignore thread time))
+       (lambda (thread trace)
+         (declare (ignore thread))
          (let ((visited-nodes '())
                (depth 0)
                (caller nil))
            (block calls
-             (map-trace-samples
+             (map-trace-pc-locs
               (lambda (debug-info pc-offset)
                 (declare (ignore pc-offset))
                 (when (> depth max-depth)
@@ -372,17 +378,17 @@
               (incf (node-accrued-count caller)))
              (t
               (incf elsewhere-count)))))
-       *samples*)
+       samples)
       (let ((sorted-nodes (sort (collect-nodes) #'> :key #'node-count)))
         (loop for node in sorted-nodes and i from 1 do
              (setf (node-index node) i))
-        (%make-call-graph :nsamples (samples-trace-count *samples*)
-                          :sample-interval (if (eq (samples-mode *samples*)
-                                                   :alloc)
-                                               (samples-alloc-interval *samples*)
-                                               (samples-sample-interval *samples*))
-                          :sampling-mode (samples-mode *samples*)
-                          :sampled-threads (samples-sampled-threads *samples*)
+        (%make-call-graph :nsamples (samples-trace-count samples)
+                          :unique-trace-count (samples-unique-trace-count samples)
+                          :sample-interval (if (eq (samples-mode samples) :alloc)
+                                               1
+                                               (samples-sample-interval samples))
+                          :sampling-mode (samples-mode samples)
+                          :sampled-threads (samples-sampled-threads samples)
                           :elsewhere-count elsewhere-count
                           :vertices sorted-nodes)))))
 
@@ -417,10 +423,19 @@
 ;;; *SAMPLES*.  The result contain a list of nodes sorted by self-time
 ;;; in the FLAT-NODES slot, and a dag in VERTICES, with call cycles
 ;;; reduced to CYCLE structures.
-(defun make-call-graph (max-depth)
+(defun make-call-graph (samples max-depth)
   (stop-profiling)
-  (show-progress "~&Computing call graph ")
-  (let ((call-graph (without-gcing (make-call-graph-1 max-depth))))
+  (when (zerop (length (samples-vector samples)))
+    (show-progress "~&Aggregating raw data")
+    (setf (values (samples-vector samples)
+                  (samples-unique-trace-count samples)
+                  (samples-sampled-threads samples))
+          (convert-raw-data)))
+  (show-progress "~&Computing call graph")
+  ;; I _think_ the reason for pinning all code is that the graph logic
+  ;; compares absolute PC locations. Wonderfully commented, it is.
+  (let ((call-graph (with-code-pages-pinned (:dynamic)
+                      (make-call-graph-1 samples max-depth))))
     (show-progress "~&Finding cycles")
     #+nil
     (reduce-call-graph call-graph)

@@ -175,7 +175,7 @@
   (endp object))
 
 (defun list-length (list)
-  "Return the length of the given List, or Nil if the List is circular."
+  "Return the length of LIST, or NIL if LIST is circular."
   (do ((n 0 (+ n 2))
        (y list (cddr y))
        (z list (cdr z)))
@@ -310,15 +310,15 @@
                 returned-list)))
 
   (defun %last0 (list)
-    (declare (optimize speed (sb-c::verify-arg-count 0)))
+    (declare (optimize speed (sb-c:verify-arg-count 0)))
     (last0-macro))
 
   (defun %last1 (list)
-    (declare (optimize speed (sb-c::verify-arg-count 0)))
+    (declare (optimize speed (sb-c:verify-arg-count 0)))
     (last1-macro))
 
   (defun %lastn/fixnum (list n)
-    (declare (optimize speed (sb-c::verify-arg-count 0))
+    (declare (optimize speed (sb-c:verify-arg-count 0))
              (type (and unsigned-byte fixnum) n))
     (case n
       (1 (last1-macro))
@@ -326,7 +326,7 @@
       (t (lastn-macro fixnum))))
 
   (defun %lastn/bignum (list n)
-    (declare (optimize speed (sb-c::verify-arg-count 0))
+    (declare (optimize speed (sb-c:verify-arg-count 0))
              (type (and unsigned-byte bignum) n))
     (lastn-macro unsigned-byte))
 
@@ -343,7 +343,7 @@
           (lastn-macro unsigned-byte)))))))
 
 (define-compiler-macro last (&whole form list &optional (n 1) &environment env)
-  (if (sb-xc:constantp n env)
+  (if (constantp n env)
       (case (constant-form-value n env)
         (0 `(%last0 ,list))
         (1 `(%last1 ,list))
@@ -351,7 +351,7 @@
       form))
 
 (defun list (&rest args)
-  "Return constructs and returns a list of its arguments."
+  "Construct and return a list containing the objects ARGS."
   args)
 
 ;;; LIST* is done the same as LIST, except that the last cons is made
@@ -380,7 +380,7 @@
              result)))))
 
 (defun make-list (size &key initial-element)
-  "Constructs a list with size elements each set to value"
+  "Construct and return a list with SIZE elements each set to INITIAL-ELEMENT."
   (declare (explicit-check))
   (%make-list size initial-element))
 ;;; This entry point is to be preferred, irrespective of
@@ -393,7 +393,7 @@
     (declare (type index count))))
 
 (defun append (&rest lists)
-  "Construct a new list by concatenating the list arguments"
+  "Construct and return a list by concatenating LISTS."
   (let* ((result (list nil))
          (tail result)
          (index 0)
@@ -419,7 +419,7 @@
        (cdr result)))))
 
 (defun append2 (x y)
-  (declare (optimize (sb-c::verify-arg-count 0)))
+  (declare (optimize (sb-c:verify-arg-count 0)))
   (if (null x)
       y
       (let ((result (list (car x))))
@@ -1107,7 +1107,11 @@
       (dolist (elt list1)
         (unless (funcall member-test elt list2 key test)
           (push elt result)))
-      (dx-flet ((test (x y) (funcall (truly-the function test) y x)))
+      (dx-flet ((test (x y)
+                      ;; This local function is never called if TEST is NIL,
+                      ;; but the compiler doesn't know that, suppress the warning.
+                      (funcall (the* (function :truly t :silent-conflict t) test)
+                               y x)))
         (dolist (elt list2)
           (unless (funcall member-test elt list1 key #'test)
             (push elt result)))))
@@ -1190,7 +1194,11 @@
 
 (defun acons (key datum alist)
   "Construct a new alist by adding the pair (KEY . DATUM) to ALIST."
-  (cons (cons key datum) alist))
+  ;; This function is maybe-inline, so can't use vop-existsp
+  ;; which does not remain in the image post-build.
+  #.(if (gethash 'acons sb-c::*backend-template-names*)
+        '(acons key datum alist) ; vop translated
+        '(cons (cons key datum) alist)))
 
 (defun pairlis (keys data &optional (alist '()))
   "Construct an association list from KEYS and DATA (adding to ALIST)."
@@ -1414,7 +1422,7 @@
                                  body-loop)))
                   `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
                        (x list ,@funs)
-                     (declare (optimize speed (sb-c::verify-arg-count 0)))
+                     (declare (optimize speed (sb-c:verify-arg-count 0)))
                      ,@(when funs `((declare (function ,@funs)
                                              (dynamic-extent ,@funs))))
                      ,@(unless (member name '(member assoc adjoin rassoc))

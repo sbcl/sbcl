@@ -21,7 +21,7 @@
                       ((or (atom result)
                            (not (eq (car result) 'values)))
                        `(values ,result &optional))
-                      ((intersection (cdr result) sb-xc:lambda-list-keywords)
+                      ((intersection (cdr result) lambda-list-keywords)
                        result)
                       (t `(values ,@(cdr result) &optional)))))
     `(function ,args ,result)))
@@ -35,20 +35,78 @@
 #-sb-xc-host
 (declaim (ftype (sfunction (t) ctype) global-ftype))
 
+;;; A bit about the physical representation of the packed info format:
+;;; With #+compact-instance-header it is possible to represent a vector of N things
+;;; in a structure using (ALIGN-UP (1+ N) 2) words of memory. This is a saving
+;;; of 1 word on average when compared to SIMPLE-VECTOR which needs
+;;; (ALIGN-UP (+ N 2) 2) words.  Granted that either might have a padding word,
+;;; but I've observed 5% to 10% space reduction by eliminating one slot.
+;;; Without compact-instance-header, we'e indifferent, in terms of space,
+;;; as to whether this is an INSTANCE or a SIMPLE-VECTOR. For consistency,
+;;; we use an INSTANCE regardless of presence of the compact-header feature.
+;;; This makes assembly routines (e.g. CALL-SYMBOL) slightly less sensitive
+;;; to the feature's absence.
+
+;;; Since variable-length instances aren't portably a thing,
+;;; we use a structure of one slot holding a vector.
+#+sb-xc-host (defstruct (packed-info
+                          (:constructor %make-packed-info (cells))
+                          (:copier nil))
+               ;; These objects are immutable.
+               (cells #() :type simple-vector :read-only t))
+;;; Some abstractions for host/target compatibility of all the defuns.
+#+sb-xc-host
+(progn
+  (defmacro make-packed-info (n) `(%make-packed-info (make-array ,n)))
+  (defmacro copy-packed-info (info)
+    `(%make-packed-info (copy-seq (packed-info-cells ,info))))
+  (defmacro packed-info-len (info)
+    `(length (packed-info-cells ,info)))
+  (defmacro  %info-ref (info index) `(svref (packed-info-cells ,info) ,index)))
+#-sb-xc-host
+(progn
+  #+nil
+  (defmethod print-object ((obj packed-info) stream)
+    (format stream "[~{~W~^ ~}]"
+            (loop for i below (%instance-length obj)
+               collect (%instance-ref obj i))))
+  (eval-when (:compile-toplevel)
+    (sb-xc:defmacro make-packed-info (n)
+      ;; this file is earlier than early-vm, so we have to take
+      ;; INSTANCE-DATA-START from the value set in make-host-1.
+      `(let ((new (%make-instance (+ ,n #.sb-vm:instance-data-start))))
+         (setf (%instance-wrapper new) #.(find-layout 'packed-info))
+         new))
+    ;; We can't merely call COPY-STRUCTURE due to two issues:
+    ;; 1. bootstrapping- the DEFSTRUCT-DESCRIPTION is not available
+    ;;    in cold-init by the first call to COPY-PACKED-INFO,
+    ;;    but COPY-STRUCTURE needs it, because of raw slots.
+    ;; 2. the transform for COPY-STRUCTURE would think that
+    ;;    it needs to copy exactly 1 slot. Well, it would think that,
+    ;;    if the FREEZE-TYPE wasn't commented out.
+    (sb-xc:defmacro copy-packed-info (info)
+      ;; not bothering with ONCE-ONLY here (doesn't matter)
+      `(%copy-instance (%make-instance (%instance-length ,info)) ,info)))
+  (defmacro packed-info-len (info)
+      `(- (%instance-length ,info) #.sb-vm:instance-data-start))
+  (defmacro %info-ref (v i)
+    `(%instance-ref ,v (+ ,i #.sb-vm:instance-data-start)))
+  (defmethod print-object ((self packed-info) stream)
+    (print-unreadable-object (self stream :type t :identity t)
+      (format stream "len=~d" (packed-info-len self)))))
+
 ;;; At run time, we represent the type of a piece of INFO in the globaldb
 ;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]
 ;;; CLISP, and maybe others, need EVAL-WHEN because without it, the constant
 ;;; is not seen by the "#." expression a few lines down.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant info-number-bits 6))
-(def!type info-number () `(unsigned-byte ,info-number-bits))
+(deftype info-number () `(unsigned-byte ,info-number-bits))
 
 ;;; A map from info-number to its META-INFO object.
 ;;; The reverse mapping is obtained by reading the META-INFO.
 (declaim (type (simple-vector #.(ash 1 info-number-bits)) *info-types*))
-(!define-load-time-global *info-types*
-            ;; Must be dumped as a literal for cold-load.
-            #.(make-array (ash 1 info-number-bits) :initial-element nil))
+(define-load-time-global *info-types* (make-array (ash 1 info-number-bits) :initial-element nil))
 
 (defstruct (meta-info
             (:constructor
@@ -81,37 +139,24 @@
 (defconstant +info-metainfo-type-num+ 0)
 
 ;; Refer to info-vector.lisp for the meaning of this constant.
-(defconstant +no-auxilliary-key+ 0)
+(defconstant +no-auxiliary-key+ 0)
 
 ;;; Return the globaldb info for SYMBOL. With respect to the state diagram
 ;;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
 ;;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
 ;;; Otherwise, it is in state 2 so return the value as-is.
-;;; In terms of this function being named "-vector", implying always a vector,
-;;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
+;;; NIL is an acceptable substitute for +NIL-PACKED-INFOS+,
+;;; but I might change that.
 ;;;
-;;; Declaim SYMBOL-INFO-VECTOR inline unless a vop translates it.
+;;; Define SYMBOL-INFO as an inline function unless a vop translates it.
 ;;; (Inlining occurs first, which would cause the vop not to be used.)
-;;; Also note that we have to guard the appearance of VOP-TRANSLATES here
-;;; so that it does not get tested when building the cross-compiler.
-;;; This was the best way I could see to work around a spurious warning
-;;; about a wrongly ordered VM definition in make-host-1.
-;;; The #+/- reader can't see that a VOP-TRANSLATES term is not for the
-;;; host compiler unless the whole thing is one expression.
-#-(or sb-xc-host (vop-translates sb-kernel:symbol-info-vector))
-(declaim (inline symbol-info-vector))
 #-sb-xc-host
-(defun symbol-info-vector (symbol)
-  (let ((info-holder (symbol-info symbol)))
-    (truly-the (or null simple-vector)
-               (if (listp info-holder) (cdr info-holder) info-holder))))
-
-;;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
-;;; But in the host Lisp, there is no such thing as a symbol-info slot.
-;;; Instead, symbol-info is kept in the host symbol's plist.
-;;; This must be a SETFable place.
-#+sb-xc-host
-(defmacro symbol-info-vector (symbol) `(get ,symbol :sb-xc-globaldb-info))
+(sb-c::unless-vop-existsp (:translate sb-kernel:symbol-dbinfo)
+  (declaim (inline symbol-dbinfo))
+  (defun symbol-dbinfo (symbol)
+    (let ((info-holder (symbol-%info symbol)))
+      (truly-the (or null instance)
+                 (if (listp info-holder) (cdr info-holder) info-holder)))))
 
 ;; Perform the equivalent of (GET-INFO-VALUE KIND +INFO-METAINFO-TYPE-NUM+)
 ;; but skipping the defaulting logic.
@@ -119,19 +164,21 @@
 ;; - though not always - a unique identifier for the (:TYPE :KIND) pair.
 ;; Note that bypassing of defaults is critical for bootstrapping,
 ;; since INFO is used to retrieve its own META-INFO at system-build time.
-(defmacro !get-meta-infos (kind)
-  `(let* ((info-vector (symbol-info-vector ,kind))
-          (index (if info-vector
-                     (packed-info-value-index info-vector +no-auxilliary-key+
+(defmacro get-meta-infos (kind)
+  `(let* ((packed-info (symbol-dbinfo ,kind))
+          (index (if packed-info
+                     (packed-info-value-index packed-info +no-auxiliary-key+
                                               +info-metainfo-type-num+))))
-     (if index (svref info-vector index))))
+     (if index (%info-ref packed-info index))))
 
-;; (UNSIGNED-BYTE 16) is an arbitrarily generous limit on the number of
-;; cells in an info-vector. Most vectors have a fewer than a handful of things,
+;; (UNSIGNED-BYTE 11) is an arbitrarily generous limit on the number of
+;; cells in a packed-info. Most packed-infos have fewer than a handful of things,
 ;; and performance would need to be re-thought if more than about a dozen
 ;; cells were in use. (It would want to become hash-based probably)
-(declaim (ftype (function (simple-vector (or (eql 0) symbol) info-number)
-                          (or null (unsigned-byte 16)))
+;; It has to be smaller than INSTANCE_LENGTH_MASK certainly,
+;; plus leaving room for a layout slot if #-compact-instance-header.
+(declaim (ftype (function (packed-info (or (eql 0) symbol) info-number)
+                          (or null (unsigned-byte 11)))
                 packed-info-value-index))
 
 ;; Return the META-INFO object for CATEGORY and KIND, signaling an error
@@ -144,7 +191,7 @@
 ;; through, whereas typically no more than 3 or 4 items have the same KIND.
 ;;
 (defun meta-info (category kind &optional (errorp t))
-  (or (let ((metadata (!get-meta-infos kind)))
+  (or (let ((metadata (get-meta-infos kind)))
         (cond ((listp metadata) ; conveniently handles NIL
                (dolist (info metadata nil) ; FIND is slower :-(
                  (when (eq (meta-info-category (truly-the meta-info info))
@@ -152,7 +199,7 @@
                    (return info))))
               ((eq (meta-info-category (truly-the meta-info metadata)) category)
                metadata)))
-      ;; !GET-META-INFOS enforces that KIND is a symbol, therefore
+      ;; GET-META-INFOS enforces that KIND is a symbol, therefore
       ;; if a metaobject was found, CATEGORY was necessarily a symbol too.
       ;; Otherwise, if the caller wants no error to be signaled on missing info,
       ;; we must nevertheless enforce that CATEGORY was actually a symbol.
@@ -258,97 +305,3 @@
              (meta-info-number (meta-info category kind))
              `(meta-info-number (meta-info ,category ,kind)))
         ,name #',proc))))
-
-;;;; boolean attribute utilities
-;;;;
-;;;; We need to maintain various sets of boolean attributes for known
-;;;; functions and VOPs. To save space and allow for quick set
-;;;; operations, we represent the attributes as bits in a fixnum.
-
-(in-package "SB-C")
-(def!type attributes () 'fixnum)
-
-;;; Given a list of attribute names and an alist that translates them
-;;; to masks, return the OR of the masks.
-(defun encode-attribute-mask (names universe)
-  (loop for name in names
-        for pos = (position name universe)
-        sum (if pos (ash 1 pos) (error "unknown attribute name: ~S" name))))
-
-(defun decode-attribute-mask (bits universe)
-  (loop for name across universe
-        for mask = 1 then (ash mask 1)
-        when (logtest mask bits) collect name))
-
-;;; Define a new class of boolean attributes, with the attributes
-;;; having the specified ATTRIBUTE-NAMES. NAME is the name of the
-;;; class, which is used to generate some macros to manipulate sets of
-;;; the attributes:
-;;;
-;;;    NAME-attributep attributes attribute-name*
-;;;      Return true if one of the named attributes is present, false
-;;;      otherwise. When set with SETF, updates the place Attributes
-;;;      setting or clearing the specified attributes.
-;;;
-;;;    NAME-attributes attribute-name*
-;;;      Return a set of the named attributes.
-(defmacro !def-boolean-attribute (name &rest attribute-names)
-  (let ((vector (coerce attribute-names 'vector))
-        (constructor (symbolicate name "-ATTRIBUTES"))
-        (test-name (symbolicate name "-ATTRIBUTEP")))
-    `(progn
-       (defmacro ,constructor (&rest attribute-names)
-         "Automagically generated boolean attribute creation function.
-  See !DEF-BOOLEAN-ATTRIBUTE."
-         (encode-attribute-mask attribute-names ,vector))
-       (defun ,(symbolicate "DECODE-" name "-ATTRIBUTES") (attributes)
-         (decode-attribute-mask attributes ,vector))
-       (defmacro ,test-name (attributes &rest attribute-names)
-         "Automagically generated boolean attribute test function.
-  See !DEF-BOOLEAN-ATTRIBUTE."
-         `(logtest (the attributes ,attributes)
-                   (,',constructor ,@attribute-names)))
-       (define-setf-expander ,test-name (place &rest attributes
-                                               &environment env)
-         "Automagically generated boolean attribute setter. See
- !DEF-BOOLEAN-ATTRIBUTE."
-         (multiple-value-bind (temps values stores setter getter)
-             (#+sb-xc-host get-setf-expansion
-              #-sb-xc-host sb-xc:get-setf-expansion place env)
-           (when (cdr stores)
-             (error "multiple store variables for ~S" place))
-           (let ((newval (sb-xc:gensym))
-                 (n-place (sb-xc:gensym))
-                 (mask (encode-attribute-mask attributes ,vector)))
-             (values `(,@temps ,n-place)
-                     `(,@values ,getter)
-                     `(,newval)
-                     `(let ((,(first stores)
-                             (if ,newval
-                                 (logior ,n-place ,mask)
-                                 (logandc2 ,n-place ,mask))))
-                        ,setter
-                        ,newval)
-                     `(,',test-name ,n-place ,@attributes))))))))
-
-;;; And now for some gratuitous pseudo-abstraction...
-;;;
-;;; ATTRIBUTES-UNION
-;;;   Return the union of all the sets of boolean attributes which are its
-;;;   arguments.
-;;; ATTRIBUTES-INTERSECTION
-;;;   Return the intersection of all the sets of boolean attributes which
-;;;   are its arguments.
-;;; ATTRIBUTES=
-;;;   True if the attributes present in ATTR1 are identical to
-;;;   those in ATTR2.
-(defmacro attributes-union (&rest attributes)
-  `(the attributes
-        (logior ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
-(defmacro attributes-intersection (&rest attributes)
-  `(the attributes
-        (logand ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
-(declaim (ftype (function (attributes attributes) boolean) attributes=))
-#-sb-fluid (declaim (inline attributes=))
-(defun attributes= (attr1 attr2)
-  (eql attr1 attr2))

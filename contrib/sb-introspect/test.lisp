@@ -93,3 +93,5 @@
   (flet ((x ()))
     (declare (notinline x))
     (x)))
+
+(defun 0-debug (a b c) (declare (optimize (debug 0))) (+ a b c))

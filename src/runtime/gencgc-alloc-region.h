@@ -27,12 +27,19 @@ struct alloc_region {
     void  *start_addr;
 };
 
-// One region for each of {BOXED,UNBOXED,CODE}_PAGE_FLAG
-extern struct alloc_region  gc_alloc_region[3];
-#define boxed_region   gc_alloc_region[BOXED_PAGE_FLAG-1]
-#define unboxed_region gc_alloc_region[UNBOXED_PAGE_FLAG-1]
-#define code_region    gc_alloc_region[CODE_PAGE_TYPE-1]
+// One region for each of page type.
+// These indices have no correlation to PAGE_TYPE constants.
+// MIXED has to always be at array index 0 because lisp accesses
+// it directly in #-sb-thread builds.
+extern struct alloc_region  gc_alloc_region[6];
+#define mixed_region   (&gc_alloc_region[0])
+#define small_mixed_region (&gc_alloc_region[1])
+#define unboxed_region (&gc_alloc_region[2])
+#define code_region    (&gc_alloc_region[3])
+#define boxed_region   (&gc_alloc_region[4])
+#define cons_region    (&gc_alloc_region[5])
 
 extern generation_index_t from_space, new_space;
+extern int gencgc_alloc_profiler;
 
 #endif /*  _GENCGC_ALLOC_REGION_H_ */

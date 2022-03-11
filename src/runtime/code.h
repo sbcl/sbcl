@@ -13,7 +13,7 @@
 #define _CODE_H_
 
 #include "genesis/code.h"
-#include "gc-internal.h" // for gc_assert()
+#include "gc-assert.h"
 
 static inline int code_total_nwords(struct code* c) {
 #ifdef LISP_FEATURE_64_BIT
@@ -75,6 +75,32 @@ static inline char* code_text_start(struct code* code) {
 static inline int code_text_size(struct code* c) {
     return N_WORD_BYTES * code_total_nwords(c) - code_boxed_len(c) - code_trailer_len(c);
 }
+/// Return the text start, unless the boxed size has not yet been assigned.
+/// In the latter case, the text start would seem to be the object address,
+/// and reading a word there as if it were the jump table size would be wrong.
+static inline lispobj* code_jumptable_start(struct code* code) {
+    return code->boxed_size ? (lispobj*)code_text_start(code) : 0;
+}
+static inline unsigned int jumptable_count(lispobj* table) {
+    // extract low 14 bits regardless of machine word size
+    return table ? *table & 0x3FFF : 0;
+}
+static inline unsigned int code_serialno(struct code* code) {
+    lispobj* table = code_jumptable_start(code);
+#ifdef LISP_FEATURE_64_BIT
+    return table ? *table >> 32 : 0; // high 4 bits are the serialno
+#else
+    return table ? *table >> 14 : 0; // else it only gets 18 (= 32 - 14) bits
+#endif
+}
+
+static inline unsigned int code_n_named_calls(struct code* code) {
+#ifdef LISP_FEATURE_64_BIT
+    return code->boxed_size >> 32;
+#else
+    return 0;
+#endif
+}
 
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions
@@ -107,5 +133,55 @@ static inline int instruction_ptr_p(char *pointer, lispobj *start_addr)
     return widetag_of(start_addr) == CODE_HEADER_WIDETAG &&
            pointer >= code_text_start((struct code*)start_addr);
 }
+
+/// Maximum number of word backwards from a simple-fun
+/// to its containing code component - corresponds to ~128MB.
+/// The limit exists so that we can store the layout pointer
+/// in the header of any callable object if N_WORD_BITS = 64.
+/// This is not technically a restriction on the code size.
+#define FUN_HEADER_NWORDS_MASK 0xFFFFFF
+
+static inline lispobj* FUNCTION(lispobj obj) {
+  return (lispobj*)(obj - FUN_POINTER_LOWTAG);
+}
+
+static inline lispobj* fun_code_header(lispobj* fun) {
+    return fun - (HeaderValue(*fun) & FUN_HEADER_NWORDS_MASK);
+}
+static inline lispobj fun_code_tagged(lispobj* fun) {
+    return make_lispobj(fun_code_header(fun), OTHER_POINTER_LOWTAG);
+}
+
+#ifdef RETURN_PC_WIDETAG
+#define embedded_obj_p(tag) (tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG)
+#else
+#define embedded_obj_p(tag) (tag==SIMPLE_FUN_WIDETAG)
+#endif
+/* Convert from a lispobj with lowtag bits to the starting address
+ * of the heap object. */
+static inline lispobj *
+base_pointer(lispobj ptr)
+{
+    lispobj *obj = native_pointer(ptr);
+    int widetag = widetag_of(obj);
+    return embedded_obj_p(widetag) ? fun_code_header(obj) : obj;
+}
+
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || defined LISP_FEATURE_ARM64
+# define fun_self_from_baseptr(simple_fun) (lispobj)simple_fun->insts
+# define fun_self_from_taggedptr(funptr) \
+    funptr - FUN_POINTER_LOWTAG + 2*N_WORD_BYTES
+# define fun_taggedptr_from_self(self) \
+    self - 2*N_WORD_BYTES + FUN_POINTER_LOWTAG
+#else
+# define fun_self_from_baseptr(simple_fun) \
+    make_lispobj(simple_fun,FUN_POINTER_LOWTAG)
+# define fun_self_from_taggedptr(funptr) funptr
+# define fun_taggedptr_from_self(self) self
+#endif
+
+#define simplefun_is_wrapped(fun) \
+  fun->self != fun_self_from_baseptr(fun) && fun->self != 0
+#define CODE_IS_TRACED 0x01
 
 #endif

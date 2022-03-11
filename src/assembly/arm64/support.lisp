@@ -19,7 +19,7 @@
       `((progn
           ,@(if (eq style :none)
                 `((load-inline-constant tmp-tn '(:fixup ,name :assembly-routine))
-                  (inst br tmp-tn))
+                  (inst blr tmp-tn))
                 `((load-inline-constant lr-tn '(:fixup ,name :assembly-routine))
                   (inst blr lr-tn)))))
       nil))
@@ -72,7 +72,3 @@
                                     :offset lip-offset)
                     :offset 2)))
     (:none)))
-
-#-sb-xc-host ; CONTEXT-REGISTER is not defined at xc-time
-(defun return-machine-address (scp)
-  (context-register scp lr-offset))

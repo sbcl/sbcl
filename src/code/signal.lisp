@@ -51,7 +51,7 @@
 ;;; These 4 symbols are initialized by create_thread_struct()
 (defvar *interrupts-enabled*)
 (defvar *interrupt-pending*)
-#+sb-thruption (defvar *thruption-pending*)
+#+sb-safepoint (defvar *thruption-pending*)
 (defvar *allow-with-interrupts*)
 
 ;;; This is to support signal handlers that want to return to the
@@ -65,13 +65,13 @@
 ;;; would not cut it, as upon leaving WITHOUT-INTERRUPTS the pending
 ;;; handlers is run with stuff from the function in which this is
 ;;; still on the stack.
-(defparameter *unblock-deferrables-on-enabling-interrupts-p* nil)
+(defvar *unblock-deferrables-on-enabling-interrupts-p* nil)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (dolist (symbol '(*unblock-deferrables-on-enabling-interrupts-p*
                     *interrupts-enabled*
                     *interrupt-pending*
-                    #+sb-thruption *thruption-pending*
+                    #+sb-safepoint *thruption-pending*
                     *allow-with-interrupts*))
     ;; Force these to be always bound despite absence of a compile-time binding.
     ;; (Avoid accidentally installing a value into symbol->value in cold-load)
@@ -154,7 +154,7 @@ WITHOUT-INTERRUPTS in:
              ;; handled immediately upon exit from said
              ;; WITHOUT-INTERRUPTS, so it is as if nothing has happened.
              (when (or *interrupt-pending*
-                       #+sb-thruption *thruption-pending*)
+                       #+sb-safepoint *thruption-pending*)
                (receive-pending-interrupt)))
            (,without-interrupts-body)))))
 
@@ -188,13 +188,3 @@ by ALLOW-WITH-INTERRUPTS."
   (declare (ignore body))
   (error "~S is valid only inside ~S."
          'with-local-interrupts 'without-interrupts))
-
-;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is
-;;; false, *ALLOW-WITH-INTERRUPTS* is true and deferrable signals are
-;;; unblocked.
-(defun %check-interrupts ()
-  ;; Here we check for pending interrupts first, because reading a
-  ;; special is faster then binding it!
-  (when (or *interrupt-pending* #+sb-thruption *thruption-pending*)
-    (let ((*interrupts-enabled* t))
-      (receive-pending-interrupt))))

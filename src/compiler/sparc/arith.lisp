@@ -650,7 +650,7 @@
              fast-ash-left/unsigned=>unsigned))
 (deftransform ash-left-mod32 ((integer count)
                               ((unsigned-byte 32) (unsigned-byte 5)))
-  (when (sb-c::constant-lvar-p count)
+  (when (sb-c:constant-lvar-p count)
     (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
@@ -769,25 +769,19 @@
 
 ;;;; 32-bit logical operations
 
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg))
-         (amount :scs (signed-reg)))
-  (:arg-types unsigned-num tagged-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "shift-towards-start")
-  (:generator 1
-    (inst sll r num amount)))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "shift-towards-end")
-  (:generator 1
-    (inst srl r num amount)))
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg))
+                       (amount :scs (signed-reg)))
+                (:arg-types unsigned-num tagged-num)
+                (:results (r :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 1 (inst ,operation r num amount)))))
+  (define shift-towards-start sll)
+  (define shift-towards-end   srl))
 
 ;;;; Bignum stuff.
 (define-vop (bignum-length get-header-data)
@@ -810,9 +804,7 @@
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate zero))
          (value :scs (unsigned-reg)))
-  (:arg-types t positive-fixnum unsigned-num)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num))
+  (:arg-types t positive-fixnum unsigned-num))
 
 (define-vop (digit-0-or-plus)
   (:translate sb-bignum:%digit-0-or-plusp)

@@ -40,6 +40,8 @@
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
   (code nil :type (or null code-component))
+  ;; list of function and fdefn constants extracted from code header
+  (code-callables :?)
   ;; the byte offset beyond CODE-INSTRUCTIONS of CODE which
   ;; corresponds to offset 0 in this segment
   (initial-offset 0 :type index)
@@ -53,6 +55,9 @@
                            (:constructor %make-dstate
                                (alignment argument-column fun-hooks))
                            (:copier nil))
+  ;; to avoid buffer overrun at segment end, we might need to copy bytes
+  ;; here first because we access memory in chunks larger than 1 byte.
+  (scratch-buf 0 :type sb-vm:word)
   ;; offset of current pos in segment
   (cur-offs 0 :type offset)
   ;; offset of next position
@@ -61,13 +66,20 @@
   (segment-sap (int-sap 0) :type system-area-pointer)
   ;; the current segment
   (segment nil :type (or null segment))
-  ;; to avoid buffer overrun at segment end, we might need to copy bytes
-  ;; here first because sap-ref-dchunk reads a fixed length.
-  (scratch-buf (make-array 8 :element-type '(unsigned-byte 8)))
+  ;; true if disassembling non-lisp code, which disables interpretation
+  ;; of bytes after a trap instruction as SC+OFFSETs.
+  (foreign-code-p nil)
+  ;; true (the default) if PC-relative jumps should be decoded as absolute.
+  ;; No effect if the target disassembler does not implement the choice.
+  (absolutize-jumps t)
   ;; what to align to in most cases
   (alignment sb-vm:n-word-bytes :type alignment)
   (byte-order sb-c:*backend-byte-order*
               :type (member :big-endian :little-endian))
+  ;; current instruction as found in instruction space
+  (inst)
+  (operands (make-array 10) :read-only t) ; enough for anybody
+  (n-operands 0)
   ;; for user code to track decoded bits, cleared each time after a
   ;; non-prefix instruction is processed
   (inst-properties 0 :type fixnum)

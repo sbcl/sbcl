@@ -1,0 +1,73 @@
+name: Linux
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy: 
+      matrix: 
+        options: [--with-sb-thread, --without-sb-thread, --without-sb-unicode]
+        arch: [x86, x86-64]
+        subfeatures: ['']
+        include:
+          - { arch: x86-64, subfeatures: sse4, options: --with-sb-thread }
+          - { arch: x86-64, subfeatures: fasteval, options: --with-sb-fasteval --without-sb-eval }
+
+      fail-fast: false
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: instal host sbcl
+      run: |
+        sudo apt-get -qq update | true
+        sudo apt-get -qq install sbcl libcapstone-dev
+    - name: instal host gcc-multilib
+      if: matrix.arch == 'x86'
+      run: sudo apt-get -qq --no-install-recommends install gcc-multilib
+
+    - name: backend-sub-features
+      if: matrix.subfeatures == 'sse4'
+      run: echo '(lambda (features) (list* :popcnt :sse4 features))' > customize-backend-subfeatures.lisp
+
+    - name: build
+      env:
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh ${{ matrix.options }} --xc-host='sbcl --dynamic-space-size 500MB --lose-on-corruption --disable-ldb --disable-debugger' --arch=${{ matrix.arch }}
+    - name: test
+      run: cd tests; ./run-tests.sh
+    - name: test
+      if: matrix.subfeatures == 'fasteval'
+      run: cd tests; ./run-tests.sh --evaluator-mode interpret
+    - name: ansi-test
+      run: cd tests; ./ansi-tests.sh
+
+    - name: crossbuild arm
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh arm
+    - name: crossbuild arm64
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh arm64
+    - name: crossbuild mips
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh mips
+    - name: crossbuild ppc
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh ppc
+    - name: crossbuild ppc64
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh ppc64
+    - name: crossbuild riscv
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh riscv
+    - name: crossbuild sparc
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh sparc
+    - name: crossbuild x86
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh x86
+    - name: crossbuild x86-64
+      if: matrix.subfeatures == 'sse4'
+      run: crossbuild-runner/build-all.sh x86-64

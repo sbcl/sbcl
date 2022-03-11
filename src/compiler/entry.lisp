@@ -14,11 +14,7 @@
 (in-package "SB-C")
 
 ;;; This phase runs before IR2 conversion, initializing each XEP's
-;;; ENTRY-INFO structure. We call the VM-supplied
-;;; SELECT-COMPONENT-FORMAT function to make VM-dependent
-;;; initializations in the IR2-COMPONENT. This includes setting the
-;;; IR2-COMPONENT-KIND and allocating fixed implementation overhead in
-;;; the constant pool. If there was a forward reference to a function,
+;;; ENTRY-INFO structure.  If there was a forward reference to a function,
 ;;; then the ENTRY-INFO will already exist, but will be uninitialized.
 (defun entry-analyze (component)
   (let ((2comp (component-info component)))
@@ -28,7 +24,6 @@
                         (setf (leaf-info fun) (make-entry-info)))))
           (compute-entry-info fun info)
           (push info (ir2-component-entries 2comp))))))
-  (select-component-format component)
   (values))
 
 ;;; An "effectively" null environment captures at most
@@ -57,17 +52,17 @@
   (let ((bind (lambda-bind fun))
         (internal-fun (functional-entry-fun fun)))
     (setf (entry-info-closure-tn info)
-          (if (physenv-closure (lambda-physenv fun))
+          (if (environment-closure (lambda-environment fun))
               (make-normal-tn *backend-t-primitive-type*)
               nil))
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
           (leaf-debug-name internal-fun))
-    (let ((form (functional-inline-expansion internal-fun))
-          (doc (functional-documentation internal-fun))
-          (xrefs (pack-xref-data (functional-xref internal-fun))))
-      (setf (entry-info-form/doc/xrefs info)
-            (list (if (fasl-output-p *compile-object*)
+    (setf (entry-info-xref info) (pack-xref-data (functional-xref internal-fun)))
+    (let* ((inline-expansion (functional-inline-expansion internal-fun))
+           (form  (if (producing-fasl-file)
+                      ;; If compiling to a file, we only store sources if the STORE-SOURCE
+                      ;; quality value is 3. If to memory, any nonzero value will do.
                       (and (policy bind (= store-source-form 3))
                            ;; Downgrade the error to a warning if this was signaled
                            ;; by SB-PCL::DONT-KNOW-HOW-TO-DUMP.
@@ -83,28 +78,35 @@
                                      ;; on MAKE-LOAD-FORM?  Why did we choose to further obfuscate
                                      ;; a condition that was reflectable and instead turn it
                                      ;; into a dumb text string?
-                                     (when (and (typep c 'simple-error)
-                                                (search "know how to dump"
-                                                        (simple-condition-format-control c)))
-                                       ;; This might be worth a full warning. Dunno.
-                                       ;; After all, the user asked to do what can't be done.
-                                       (compiler-style-warn
+                                     (if (and (typep c 'simple-error)
+                                              (stringp (simple-condition-format-control c))
+                                              (search "know how to dump"
+                                                      (simple-condition-format-control c)))
+                                         ;; This might be worth a full warning. Dunno.
+                                         ;; After all, the user asked to do what can't be done.
+                                         (compiler-style-warn
                                         "Can't preserve function source - ~
 missing MAKE-LOAD-FORM methods?")
-                                       (return nil)))))
-                               (constant-value (find-constant form)))))
+                                         (compiler-style-warn
+                                          "Can't preserve function source: ~A"
+                                          (princ-to-string c)))
+                                     (return nil))))
+                               (maybe-emit-make-load-forms inline-expansion)
+                               inline-expansion)))
                       (and (policy bind (> store-source-form 0))
-                           form))
-                  doc
-                  xrefs)))
+                           inline-expansion)))
+           (doc (functional-documentation internal-fun)))
+      (setf (entry-info-form/doc info)
+            (if (and form doc) (cons form doc) (or form doc))))
     (when (policy bind (>= debug 1))
       (let ((args (functional-arg-documentation internal-fun)))
         ;; When the component is dumped, the arglists of the entry
         ;; points will be dumped.  If they contain values that need
         ;; make-load-form processing then we need to do it now (bug
         ;; 310132).
-        (setf (entry-info-arguments info)
-              (constant-value (find-constant args))))
+        (when (producing-fasl-file)
+          (maybe-emit-make-load-forms args))
+        (setf (entry-info-arguments info) args))
       ;; Arguably we should not parse/unparse if the type was obtained from
       ;; a proclamation. On the other hand, this preserves exact semantics
       ;; if a later DEFTYPE changes something. Be that as it may, storing
@@ -112,12 +114,15 @@ missing MAKE-LOAD-FORM methods?")
       (let ((spec (type-specifier (leaf-type internal-fun)))
             (result))
         (setf (entry-info-type info)
-              (if (and (listp spec)
-                       (typep (setq result (third spec))
-                              '(cons (eql values)
-                                     (cons t (cons (eql &optional) null)))))
-                  `(sfunction ,(cadr spec) ,(cadr result))
-                  spec)))))
+              (let ((type (if (and (listp spec)
+                                   (typep (setq result (third spec))
+                                          '(cons (eql values)
+                                            (cons t (cons (eql &optional) null)))))
+                              `(sfunction ,(cadr spec) ,(cadr result))
+                              spec)))
+                (when (producing-fasl-file)
+                  (maybe-emit-make-load-forms type))
+                type)))))
   (values))
 
 ;;; Replace all references to COMPONENT's non-closure XEPs that appear
@@ -154,7 +159,7 @@ missing MAKE-LOAD-FORM methods?")
                             ;; It may have been deleted due to none of
                             ;; the optional entries reaching it.
                             (neq (functional-kind main-entry) :deleted)
-                            (physenv-closure (lambda-physenv main-entry)))))
+                            (environment-closure (lambda-environment main-entry)))))
              (dolist (ref (leaf-refs lambda))
                (let ((ref-component (node-component ref)))
                  (cond ((eq ref-component component))

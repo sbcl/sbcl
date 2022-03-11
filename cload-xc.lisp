@@ -11,7 +11,7 @@
 (load-or-cload-xcompiler #'host-cload-stem)
 
 (defun xc-compile-file (file)
-  (sb!c::init-xc-policy)
-  (sb!xc:with-compilation-unit ()
-    (sb!xc:compile-file file :trace-file *standard-output*)
-    (setf sb!c::*undefined-warnings* nil)))
+  (sb-c::init-xc-policy)
+  (sb-xc:with-compilation-unit ()
+    (sb-xc:compile-file file :trace-file *standard-output*)
+    (setf sb-c::*undefined-warnings* nil)))

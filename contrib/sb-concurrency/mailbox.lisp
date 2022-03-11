@@ -13,8 +13,6 @@
 
 (in-package :sb-concurrency)
 
-;; TODO: type and values decls
-
 (defstruct (mailbox (:constructor %make-mailbox (queue semaphore name))
                     (:copier nil)
                     (:predicate mailboxp))
@@ -28,12 +26,15 @@ Messages can be arbitrary objects"
   (queue (missing-arg) :type queue)
   (semaphore (missing-arg) :type semaphore)
   (name nil))
+(declaim (sb-ext:freeze-type mailbox))
 
 (setf (documentation 'mailboxp 'function)
       "Returns true if argument is a MAILBOX, NIL otherwise."
       (documentation 'mailbox-name 'function)
       "Name of a MAILBOX. SETFable.")
 
+(declaim (ftype (sfunction (&key (:name t) (:initial-contents sequence)) mailbox)
+                make-mailbox))
 (defun make-mailbox (&key name initial-contents)
   "Returns a new MAILBOX with messages in INITIAL-CONTENTS enqueued."
   (flet ((genname (thing name)
@@ -53,25 +54,30 @@ Messages can be arbitrary objects"
             (mailbox-count mailbox)))
   mailbox)
 
+(declaim (ftype (sfunction (mailbox) unsigned-byte) mailbox-count))
 (defun mailbox-count (mailbox)
   "Returns the number of messages currently in the mailbox."
   (semaphore-count (mailbox-semaphore mailbox)))
 
+(declaim (ftype (sfunction (mailbox) boolean) mailbox-empty-p))
 (defun mailbox-empty-p (mailbox)
   "Returns true if MAILBOX is currently empty, NIL otherwise."
   (zerop (mailbox-count mailbox)))
 
+(declaim (ftype (sfunction (mailbox) list) list-mailbox-messages))
 (defun list-mailbox-messages (mailbox)
   "Returns a fresh list containing all the messages in the
 mailbox. Does not remove messages from the mailbox."
   (list-queue-contents (mailbox-queue mailbox)))
 
+(declaim (ftype (sfunction (mailbox t) null) send-message))
 (defun send-message (mailbox message)
   "Adds a MESSAGE to MAILBOX. Message can be any object."
   (sb-sys:without-interrupts
     (enqueue message (mailbox-queue mailbox))
     (signal-semaphore (mailbox-semaphore mailbox))))
 
+(declaim (ftype (sfunction (mailbox &key (:timeout t)) (values t boolean)) receive-message))
 (defun receive-message (mailbox &key timeout)
   "Removes the oldest message from MAILBOX and returns it as the primary
 value, and a secondary value of T. If MAILBOX is empty waits until a message
@@ -94,6 +100,7 @@ returns primary and secondary value of NIL."
      (sb-int:bug "Mailbox ~S empty after WAIT-ON-SEMAPHORE."
                  mailbox)))
 
+(declaim (ftype (sfunction (mailbox) (values t boolean)) receive-message-no-hang))
 (defun receive-message-no-hang (mailbox)
   "The non-blocking variant of RECEIVE-MESSAGE. Returns two values,
 the message removed from MAILBOX, and a flag specifying whether a
@@ -113,6 +120,8 @@ message could be received."
      (sb-int:bug "Mailbox ~S empty after successfull TRY-SEMAPHORE."
                  mailbox)))
 
+(declaim (ftype (sfunction (mailbox &optional (or null unsigned-byte)) list)
+                receive-pending-messages))
 (defun receive-pending-messages (mailbox &optional n)
   "Removes and returns all (or at most N) currently pending messages
 from MAILBOX, or returns NIL if no messages are pending.

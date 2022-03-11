@@ -20,8 +20,8 @@
                `(progn
                   (defconstant n-internal-error-handlers ,n)
                   (declaim ((simple-vector ,n) **internal-error-handlers**))
-                  (!define-load-time-global **internal-error-handlers**
-                              ,(make-array n :initial-element 0))))))
+                  (define-load-time-global **internal-error-handlers**
+                      ,(make-array n :initial-element 0))))))
   (def-it))
 
 (defmacro deferr (name args &rest body)
@@ -33,7 +33,7 @@
         (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" max))))
   `(setf (svref **internal-error-handlers** ,(error-number-or-lose name))
          (named-lambda ,(string name) (,@args)
-           (declare (optimize (sb-c::verify-arg-count 0)))
+           (declare (optimize (sb-c:verify-arg-count 0)))
            ,@body)))
 
 ;;; Backtrace code may want to know the error that caused
@@ -131,10 +131,18 @@
 
 (deferr undefined-fun-error (fdefn-or-symbol)
   (let* ((name (etypecase fdefn-or-symbol
+                 #+untagged-fdefns
+                 ((unsigned-byte 61)
+                  (fdefn-name (make-lisp-obj (logior (get-lisp-obj-address fdefn-or-symbol)
+                                                     sb-vm:other-pointer-lowtag))))
                  (symbol fdefn-or-symbol)
                  (fdefn (fdefn-name fdefn-or-symbol))))
          (condition
-           (make-condition 'undefined-function
+           ;; Depending whether NAME is a special operator we signal a different
+           ;; condition class. Similar logic appears in SB-C::INSTALL-GUARD-FUNCTION.
+           (make-condition (if (and (symbolp name) (special-operator-p name))
+                               'special-form-function
+                               'undefined-function)
                            :name name
                            :not-yet-loaded
                            (cond ((and (boundp 'sb-c:*compilation*)
@@ -213,10 +221,12 @@
                    (info :variable :type symbol)
                  (if (and defined
                           (not (ctypep value type)))
-                     (still-bad (sb-format:tokens
-                                 "Type mismatch when restarting unbound symbol error:~@
-                                 ~s is not of type ~/sb-impl:print-type/")
-                                value type)
+                     (try (make-condition 'type-error
+                                          :datum value
+                                          :expected-type (type-specifier type)
+                                          :context
+                                          (format nil "while restarting unbound variable ~a."
+                                                  symbol)))
                      value)))
              (set-value (value &optional set-symbol)
                (sb-di::sub-set-debug-var-slot
@@ -230,12 +240,7 @@
              (retry-evaluation ()
                (if (boundp symbol)
                    (set-value (symbol-value symbol))
-                   (still-bad "~s is still unbound" symbol)))
-             (still-bad (format-control &rest format-arguments)
-               (try (make-condition 'retry-unbound-variable
-                                    :name symbol
-                                    :format-control format-control
-                                    :format-arguments format-arguments)))
+                   (try condition)))
              (try (condition)
                (restart-case (error condition)
                  (continue ()
@@ -306,27 +311,66 @@
          :operation '/
          :operands (list this that)))
 
-(deferr object-not-type-error (object type)
+(defun restart-type-error (type condition pc-offset)
+  (let ((tn-offset (car *current-internal-error-args*)))
+    (labels ((retry-value (value)
+               (if (typep value type)
+                   value
+                   (try (make-condition 'type-error
+                                        :expected-type type
+                                        :datum value
+                                        :context "while restarting a type error."))))
+             (set-value (value)
+               (sb-di::sub-set-debug-var-slot
+                nil tn-offset (retry-value value)
+                *current-internal-error-context*)
+               (sb-vm::incf-context-pc *current-internal-error-context*
+                                       pc-offset)
+               (return-from restart-type-error))
+             (try (condition)
+               (restart-case (error condition)
+                 (use-value (value)
+                   :report (lambda (stream)
+                             (format stream "Use specified value."))
+                   :interactive read-evaluated-form
+                   (set-value value)))))
+      (try condition))))
+
+(defun object-not-type-error (object type &optional (context nil context-p))
   (if (invalid-array-p object)
       (invalid-array-error object)
-      (error (if (and (%instancep object)
-                      (layout-invalid (%instance-layout object)))
-                 'layout-invalid
-                 'type-error)
-             :datum object
-             :expected-type (typecase type
-                              (classoid-cell
-                               (classoid-cell-name type))
-                              (layout
-                               (layout-proper-name type))
-                              (t
-                               type))
-             :context (sb-di:error-context))))
+      (let* ((context (if context-p
+                          context
+                          (sb-di:error-context)))
+             (condition
+               (make-condition (if (and (%instancep object)
+                                        (wrapper-invalid (%instance-wrapper object)))
+                                   ;; Signaling LAYOUT-INVALID is dubious, but I guess it provides slightly
+                                   ;; more information in that it says that the object may have at some point
+                                   ;; been TYPE. Anyway, it's not wrong - it's a subtype of TYPE-ERROR.
+                                   'layout-invalid
+                                   'type-error)
+                               :datum object
+                               :expected-type (typecase type
+                                                (classoid-cell
+                                                 (classoid-cell-name type))
+                                                (wrapper
+                                                 (wrapper-proper-name type))
+                                                (t
+                                                 type))
+                               :context (and (not (integerp context))
+                                             context))))
+        (if (integerp context)
+            (restart-type-error type condition context)
+            (error condition)))))
 
-(deferr layout-invalid-error (object layout)
-  (error 'layout-invalid
-         :datum object
-         :expected-type (layout-classoid layout)))
+(macrolet ((def (errname fun-name)
+             `(setf (svref **internal-error-handlers**
+                           ,(error-number-or-lose errname))
+                    (fdefinition ',fun-name))))
+  (def etypecase-failure-error etypecase-failure)
+  (def ecase-failure-error ecase-failure)
+  (def object-not-type-error object-not-type-error))
 
 (deferr odd-key-args-error ()
   (%program-error "odd number of &KEY arguments"))
@@ -343,10 +387,12 @@
                                     context)))
         (error 'unknown-keyword-argument :name key-name))))
 
-;; TODO: make the arguments (ARRAY INDEX &optional BOUND)
-;; and don't need the bound for vectors. Just read it.
 (deferr invalid-array-index-error (array bound index)
   (invalid-array-index-error array index bound))
+(deferr invalid-vector-index-error (vector index)
+  (invalid-array-index-error vector index (length vector)))
+(deferr uninitialized-element-error (vector index)
+  (error 'uninitialized-element-error :name (cons vector index)))
 
 (deferr tls-exhausted-error ()
   ;; There is nothing we can do about it. A number of entries in the
@@ -357,8 +403,45 @@
   (%primitive print "Thread local storage exhausted.")
   (sb-impl::%halt))
 
+(deferr uninitialized-memory-error (address nbytes value)
+  (declare (type sb-vm:word address))
+  ;; Ignore sanitizer errors from reading the C stack.
+  ;; These occur because foreign code typically marks shadow words as valid/invalid
+  ;; as it consumes parts of the stack for each new frame; but Lisp does not mark words
+  ;; as valid when storing to the stack, so reading via sap-ref-n needs to disregard
+  ;; the sanitizer error.  This was especially noticeable in our 'callback.impure' test.
+  ;; Obviously it would be more efficient to annotate all the pertinent code with
+  ;; a safety 0 declaration to avoid a detour through the trap handler, but that was
+  ;; more intrusive than I'd have liked. At minimum, these functions need some help:
+  ;;   SB-DI::SUB-ACCESS-DEBUG-VAR-SLOT
+  ;;   SB-DI::X86-CALL-CONTEXT
+  ;;   SB-VM::BOXED-CONTEXT-REGISTER
+  (let ((stackp (and (>= address (get-lisp-obj-address sb-vm:*control-stack-start*))
+                     (< address (get-lisp-obj-address sb-vm:*control-stack-end*)))))
+    (unless stackp
+      (let ((pc (sap-int (sb-vm:context-pc *current-internal-error-context*))))
+        (cerror "Treat the value #x~*~x as valid."
+                'sanitizer-error
+                :value value
+                :address address
+                :size nbytes
+                :format-control "Read of uninitialized memory: ~D byte~:P at #x~x = #x~x (PC=#x~x)."
+                :format-arguments (list nbytes address value pc))))))
+
 (deferr failed-aver-error (form)
   (bug "~@<failed AVER: ~2I~_~S~:>" form))
+(deferr unreachable-error ()
+  (bug "Unreachable code reached"))
+
+(deferr mul-overflow-error (low high)
+  (let ((type (or (sb-di:error-context)
+                  'fixnum)))
+   (object-not-type-error (ash (logior
+                                (ash high sb-vm:n-word-bits)
+                                (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
+                               (- sb-vm:n-fixnum-tag-bits))
+                          type
+                          nil)))
 
 ;;;; INTERNAL-ERROR signal handler
 
@@ -408,27 +491,27 @@
                                   :format-arguments (list slot-name struct-name)
                                   :datum (make-unbound-marker)
                                   :expected-type (if dsd (dsd-type dsd) 't))))
-                       (error 'type-error
-                              :datum (sb-di::sub-access-debug-var-slot
-                                      fp (first arguments) alien-context)
-                              :expected-type
-                              (car (svref sb-c:+backend-internal-errors+
-                                          error-number))
-                              :context context)))
+                       (object-not-type-error (sb-di::sub-access-debug-var-slot
+                                               fp (first arguments) alien-context)
+                                              (car (svref sb-c:+backend-internal-errors+
+                                                          error-number)))))
                  (let ((handler
                          (and (typep error-number `(mod ,n-internal-error-handlers))
                               (svref **internal-error-handlers** error-number))))
                    (cond
                      ((functionp handler)
-                      ;; INTERNAL-ERROR-ARGS supplies the right amount of arguments
-                      (macrolet ((arg (n)
-                                   `(sb-di::sub-access-debug-var-slot
-                                     fp (nth ,n arguments) alien-context)))
-                        (ecase (length arguments)
-                          (0 (funcall handler))
-                          (1 (funcall handler (arg 0)))
-                          (2 (funcall handler (arg 0) (arg 1)))
-                          (3 (funcall handler (arg 0) (arg 1) (arg 2))))))
+                      (if (eq (car arguments) :raw) ; pass args as they are
+                          (apply handler (cdr arguments))
+                          ;; Otherwise decode the SC+OFFSETs
+                          ;; INTERNAL-ERROR-ARGS supplies the right amount of arguments
+                          (macrolet ((arg (n)
+                                       `(sb-di::sub-access-debug-var-slot
+                                         fp (nth ,n arguments) alien-context)))
+                            (ecase (length arguments)
+                              (0 (funcall handler))
+                              (1 (funcall handler (arg 0)))
+                              (2 (funcall handler (arg 0) (arg 1)))
+                              (3 (funcall handler (arg 0) (arg 1) (arg 2)))))))
                      ((eql handler 0) ; if (DEFERR x) was inadvertently omitted
                       (error 'simple-error
                              :format-control

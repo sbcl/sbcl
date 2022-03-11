@@ -20,6 +20,74 @@
 
 (in-package :sb-concurrency)
 
+;;; This algorithm is very subtle and relies on meticulous placement of
+;;; memory barriers for CPUs that do not preserve LOAD-LOAD program order
+;;; or STORE-STORE program order.
+
+;;; Our code suffered from two problems:
+;;; 1. The BARRIER macro, under the best of circumstances, has such godawful
+;;;    syntax that you can't tell whether it's right. The inventor (Alastair?)
+;;;    has practically disavowed it, suggesting that you should never put code
+;;;    in the body of the macro, but instead should express your "before"
+;;;    and "after" pieces of code so that you can see where they happen.
+;;;
+;;; 2. It is my educated guess that Nikodemus copied a proposed patch
+;;;    from LKML almost bug-for-bug. The algorithm appeared in
+;;;    https://lwn.net/Articles/7388/ and, exactly like ours, had a read barrier
+;;;    in the wrong place.  Nikodemus had to one-up them though, so added
+;;;    an extra bug - our store barrier was wrong, where theirs wasn't.
+;;;    Possibly because our BARRIER macro is confusing, I don't know.
+;;;    At the time, barriers were not well understood or used, and x86
+;;;    always did the right thing [see * footnote though] with no barrier,
+;;;    and the Linux contributor said the patch was only tested with x86.
+;;;
+;;; A subsequent LWN article https://lwn.net/Articles/21379/ said that two
+;;; counters should not have been necessary in the algorithm.
+;;; And yet another (https://lwn.net/Articles/21812/) said
+;;;   "Despite all the discussion, there has been no good argument that original
+;;;    x86_64 code was incorrect in the way it used wmb and rmb."
+;;; which is easily refuted (below).
+;;; But then it went ahead and changed the code to be correct using a
+;;; new algorithm posted in https://lwn.net/Articles/21812/.
+;;; The latter has a read barrier _after_ reading the counter, but it also
+;;; does away with separate pre- and post- counters, which we should do.
+;;;
+;;; * As to the only way that x86-64 will display relaxed memory order, see
+;;;   https://bartoszmilewski.com/2008/11/05/who-ordered-memory-fences-on-an-x86/
+;;;   in which he presents one algorithm that can go wrong without
+;;;   an explicit fence instruction. (This is extremely rare for x86.)
+;;;   But it also seems that x86-64 emulators and/or VMs could encounter our bug,
+;;;   possibly they model symmetric multiprocessing in a way that is not 100%
+;;;   faithful to what physical Intel or AMD hardware would do.
+
+;;; Anyway, here is a perfectly good argument that the original code was wrong.
+;;;  - initial conditions: (X,Y) = (x0,y0); pre = post = 3
+;;;  - thread A wants to load a consistent view of X and Y
+;;;  - thread B wants to set them to (x1,y1)
+
+;;; Using all correct barriers except for one misplaced rmb(), the
+;;; "observe post" and "observe X" steps can occur out-of-order thusly:
+;;;
+;;;     Thread A                    Thread B
+;;;   ------------                ------------
+;;;   rmb() /* no effect */
+;;;   observe X, gets x0
+;;;                                 pre <- 4
+;;;                                 wmb()
+;;;                                 Y <- y1
+;;;                                 X <- x1
+;;;                                 wmb()
+;;;                                 post <- 4
+;;;   observe post, gets 4
+;;;   observe Y, gets y1
+;;;   rmb()
+;;;   observe pre, gets 4
+;;;
+;;; Thread A thinks it saw a consistent view of (x0,y1) because pre = post = 4.
+;;; The correct C code would have been
+;;;    "unsigned post = rw->post_sequence; rmb(); return post;"
+;;; [Note: rmb() = 'read' memory barrier; wmb() = 'write' memory barrier]
+
 (defstruct (frlock (:constructor %make-frlock (name))
                    (:predicate nil)
                    (:copier nil))
@@ -67,6 +135,7 @@ Example:
   ;; an epoch marker to keep track of that.
   (epoch (list t) :type cons)
   (name nil))
+(declaim (sb-ext:freeze-type frlock))
 
 (setf (documentation 'frlock-name 'function)
       "Name of an FRLOCK. SETFable.")
@@ -82,9 +151,12 @@ Example:
 validated later.
 
 Using FRLOCK-READ instead is recommended."
-  (barrier (:read))
-  (values (frlock-post-counter frlock)
-          (frlock-epoch frlock)))
+  (let ((a (frlock-post-counter frlock))
+        (b (frlock-epoch frlock)))
+    (barrier (:read))
+    ;; now any state that user observes can't be speculated backwards
+    ;; prior to the loads of A and B.
+    (values a b)))
 
 (declaim (inline frlock-read-end))
 (defun frlock-read-end (frlock)
@@ -162,10 +234,10 @@ due to eg. a timeout. Using FRLOCK-WRITE instead is recommended."
   "Releases FRLOCK after writing, allowing valid read-tokens to be acquired again.
 Signals an error if the current thread doesn't hold FRLOCK for writing. Using FRLOCK-WRITE
 instead is recommended."
+  (barrier (:write)) ; ensure all user state is published
   (setf (frlock-post-counter frlock)
         (logand most-positive-fixnum (1+ (frlock-post-counter frlock))))
-  (release-mutex (frlock-mutex frlock) :if-not-owner :error)
-  (barrier (:write)))
+  (release-mutex (frlock-mutex frlock) :if-not-owner :error))
 
 (defmacro frlock-write ((frlock &key (wait-p t) timeout) &body body)
   "Executes BODY while holding FRLOCK for writing."

@@ -53,6 +53,26 @@
     (load-type result lip)
     DONE))
 
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional)
+  ;; "extra" info in conditional vops follows the 2 super-magical info args
+  (:info target not-p test-layout)
+  (:temporary (:sc unsigned-reg) this-id temp)
+  (:generator 4
+    (let ((offset (+ (id-bits-offset)
+                     (ash (- (wrapper-depthoid test-layout) 2) 2)
+                     (- instance-pointer-lowtag))))
+      (inst lw this-id x offset)
+      (if (or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
+              (not (sb-c::producing-fasl-file)))
+          (inst li temp (layout-id test-layout))
+          (inst load-layout-id temp test-layout))
+      (inst* (if not-p 'bne 'beq) this-id temp target))))
+
 #+64-bit
 (define-vop (layout-depthoid)
   (:translate layout-depthoid)
@@ -63,7 +83,7 @@
   (:generator 1
     (inst lw values object
           (- (+ (ash (+ instance-slots-offset
-                        (get-dsd-index layout sb-kernel::%bits))
+                        (get-dsd-index layout sb-kernel::flags))
                      word-shift)
                 4)
              instance-pointer-lowtag))))
@@ -77,24 +97,14 @@
   (:generator 6
     (load-type result object (- other-pointer-lowtag))))
 
-(define-vop (fun-subtype)
-  (:translate fun-subtype)
+(define-vop ()
+  (:translate %fun-pointer-widetag)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
-
-(define-vop (fun-header-data)
-  (:translate fun-header-data)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    (inst srli res res n-widetag-bits)))
 
 (define-vop (get-header-data)
   (:translate get-header-data)
@@ -109,10 +119,9 @@
 (define-vop (set-header-data)
   (:translate set-header-data)
   (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg) :target res)
-         (data :scs (any-reg immediate)))
+  (:args (x :scs (descriptor-reg))
+         (data :scs (any-reg immediate zero)))
   (:arg-types * positive-fixnum)
-  (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
   (:generator 6
     (load-type t1 x (- other-pointer-lowtag))
@@ -126,9 +135,9 @@
                 (inst ori t1 t1 val))
                (t
                 (inst li t2 val)
-                (inst or t1 t1 t2))))))
-    (storew t1 x 0 other-pointer-lowtag)
-    (move res x)))
+                (inst or t1 t1 t2)))))
+      (zero))
+    (storew t1 x 0 other-pointer-lowtag)))
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)
@@ -136,19 +145,10 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst andi res ptr (lognot lowtag-mask))
-    (inst srli res res (- n-lowtag-bits n-fixnum-tag-bits))))
+    (inst andi res ptr (lognot fixnum-tag-mask))))
 
 
 ;;;; Allocation
-
-(define-vop (dynamic-space-free-pointer)
-  (:results (int :scs (sap-reg)))
-  (:result-types system-area-pointer)
-  (:translate dynamic-space-free-pointer)
-  (:policy :fast-safe)
-  (:generator 1
-    (load-symbol-value int *allocation-pointer*)))
 
 (define-vop (binding-stack-pointer-sap)
   (:results (int :scs (sap-reg)))
@@ -225,38 +225,6 @@
     (inst add ndescr ndescr offset)
     (inst subi ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
-;;;
-(define-vop (symbol-info-vector)
-  (:policy :fast-safe)
-  (:translate symbol-info-vector)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) temp)
-  (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
-    (inst andi temp res lowtag-mask)
-    (inst xori temp temp list-pointer-lowtag)
-    (inst bne temp zero-tn not-equal)
-    (loadw res res cons-cdr-slot list-pointer-lowtag)
-    NOT-EQUAL))
-
-(define-vop (symbol-plist)
-  (:policy :fast-safe)
-  (:translate symbol-plist)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg) temp)
-  (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
-    ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
-    (loadw res res cons-car-slot list-pointer-lowtag)
-    (inst andi temp res fixnum-tag-mask)
-    (inst bne temp zero-tn not-equal)
-    (move res null-tn)
-    NOT-EQUAL))
-
 
 ;;;; Other random VOPs.
 
@@ -268,13 +236,74 @@
     (inst ebreak pending-interrupt-trap)
     (emit-alignment 2)))
 
+#+sb-thread
+(define-vop (current-thread-offset-sap)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:args (n :scs (signed-reg) :target sap))
+  (:temporary (:scs (interior-reg)) lip)
+  (:arg-types signed-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst slli n n word-shift)
+    (inst add lip thread-base-tn n)
+    (loadw sap lip)))
+
+#+sb-thread
+(define-vop (current-thread-offset-sap/c)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:info n)
+  (:arg-types (:constant short-immediate))
+  (:policy :fast-safe)
+  (:generator 1
+    (loadw sap thread-base-tn n)))
+
 (define-vop (halt)
   (:generator 1
     (inst ebreak halt-trap)
     (emit-alignment 2)))
 
 ;;;; Dummy definition for a spin-loop hint VOP
-(define-vop (spin-loop-hint)
+(define-vop ()
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0))
+
+;;; Barriers
+(define-vop (%compiler-barrier)
+  (:policy :fast-safe)
+  (:translate %compiler-barrier)
+  (:generator 3))
+
+(define-vop (%memory-barrier)
+  (:policy :fast-safe)
+  (:translate %memory-barrier)
+  (:generator 3
+    (inst fence :rw :rw)))
+
+(define-vop (%read-barrier)
+  (:policy :fast-safe)
+  (:translate %read-barrier)
+  (:generator 3
+    (inst fence :r :r)))
+
+(define-vop (%write-barrier)
+  (:policy :fast-safe)
+  (:translate %write-barrier)
+  (:generator 3
+    (inst fence :w :w)))
+
+(define-vop (%data-dependency-barrier)
+  (:policy :fast-safe)
+  (:translate %data-dependency-barrier)
+  (:generator 3))
+
+(define-vop (sb-c::mark-covered)
+ (:info index)
+ (:generator 4
+   ;; Can't convert index to a code-relative index until the boxed header length
+   ;; has been determined.
+   (inst store-coverage-mark index)))

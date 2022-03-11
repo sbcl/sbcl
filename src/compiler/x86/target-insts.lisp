@@ -209,21 +209,22 @@
             (t ; memory absolute
              (setq offset (ldb (byte 32 0) offset)) ; never show as negative
              (princ16 offset stream)
-             (or (nth-value 1 (note-code-constant-absolute offset dstate))
+             (or (nth-value 1 (note-code-constant offset dstate :absolute))
                  (maybe-note-assembler-routine offset nil dstate))))))
   (write-char #\] stream))
 
 ;;;; interrupt instructions
 
 (defun break-control (chunk inst stream dstate)
-  (declare (ignore inst))
+  ;; Do not parse bytes following a trap instruction unless it belongs to lisp code.
+  ;; C++ compilers will emit ud2 for various reasons.
+  (when (sb-disassem::dstate-foreign-code-p dstate)
+    (return-from break-control))
   (flet ((nt (x) (if stream (note x dstate))))
-    (let ((trap #-ud2-breakpoints (byte-imm-code chunk dstate)
-                #+ud2-breakpoints (word-imm-code chunk dstate)))
+    (let ((trap (if (eq (sb-disassem::inst-print-name inst) 'ud2)
+                    (word-imm-code chunk dstate)
+                    (byte-imm-code chunk dstate))))
      (case trap
-       (#.cerror-trap
-        (nt "cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
        (#.breakpoint-trap
         (nt "breakpoint trap"))
        (#.pending-interrupt-trap
@@ -233,4 +234,6 @@
        (#.fun-end-breakpoint-trap
         (nt "function end breakpoint trap"))
        (t
-        (handle-break-args #'snarf-error-junk trap stream dstate))))))
+        (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
+                  (>= trap error-trap))
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))

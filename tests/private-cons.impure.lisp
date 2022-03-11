@@ -32,9 +32,13 @@
                  list))
 
 #+gencgc
+(progn
+(defun page-need-to-zero (index)
+  (logbitp #+little-endian 6 #+big-endian 1
+           (slot (deref sb-vm::page-table index) 'sb-vm::flags)))
 (defun test-private-consing ()
   (let ((conses-per-page ; subtract one for the page header cons
-         (1- (/ sb-vm:gencgc-card-bytes (* 2 sb-vm:n-word-bytes))))
+         (1- (/ sb-vm:gencgc-page-bytes (* 2 sb-vm:n-word-bytes))))
         (counter 0)
         (pages)
         (recycle-me))
@@ -42,17 +46,17 @@
       (let* ((cons (private-list (incf counter)))
              (index (sb-vm::find-page-index cons))
              (base-address
-              (+ sb-vm:dynamic-space-start (* index sb-vm:gencgc-card-bytes)))
+              (+ sb-vm:dynamic-space-start (* index sb-vm:gencgc-page-bytes)))
              (final))
         (push index pages)
         (assert (= cons (+ base-address (* 2 sb-vm:n-word-bytes))))
-        ;; bytes-used should correspond to 2 conses,
-        ;; and the dirty flag should be 1.
-        (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::bytes-used)
-                   (logior (* 4 sb-vm:n-word-bytes) 1)))
+        ;; words-used should be 4, for 2 conses,
+        ;; and the need_zerofill bit should be 1.
+        (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::words-used) 4))
+        (assert (page-need-to-zero index))
         (dotimes (i (1- conses-per-page))
           (setq final (private-list (incf counter))))
-        (assert (= final (+ base-address sb-vm:gencgc-card-bytes
+        (assert (= final (+ base-address sb-vm:gencgc-page-bytes
                             (* -2 sb-vm:n-word-bytes))))
         (push final recycle-me)))
     (dolist (list recycle-me)
@@ -65,9 +69,10 @@
         (assert (= (sb-vm::find-page-index (sb-sys:sap-int sap))
                    (pop pages)))))
     (alien-funcall (extern-alien "gc_dispose_private_pages" (function void)))
-    ;; Each of the pages should have zero bytes used and need-to-zero = 1
+    ;; Each of the pages should have zero words used and need-to-zero = 1
     (dolist (index pages)
-      (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::bytes-used) 1)))))
+      (assert (page-need-to-zero index))
+      (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::words-used) 0))))))
 
 #-gencgc
 (defun test-private-consing ()

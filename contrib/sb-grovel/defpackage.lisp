@@ -6,3 +6,5 @@
   ;; nasty things done with SB-ALIEN:STRUCT.
   (:implement "SB-ALIEN")
   (:use "COMMON-LISP" "SB-ALIEN" #+asdf "ASDF" #+asdf "UIOP"))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-GROVEL")) t))

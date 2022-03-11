@@ -2,51 +2,19 @@
 ;;;
 (in-package "SB-VM")
 
-#-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
-  "PowerPC")
+  #-64-bit "PowerPC"
+  #+64-bit "PowerPC64")
+
+(defun return-machine-address (scp)
+  (sap-int (context-lr scp)))
+
 
-;;;; FIXUP-CODE-OBJECT
-
-(defconstant-eqx +fixup-kinds+ #(:absolute :b :ba :ha :l) #'equalp)
-(!with-bigvec-or-sap
-(defun fixup-code-object (code offset fixup kind flavor)
-  (declare (type index offset))
-  (declare (ignore flavor))
-  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
-    (error "Unaligned instruction?  offset=#x~X." offset))
-  (let ((sap (code-instructions code)))
-    (ecase kind
-       (:absolute
-        (setf (sap-ref-32 sap offset) fixup))
-       (:b
-        (error "Can't deal with CALL fixups, yet."))
-       (:ba
-        (setf (ldb (byte 24 2) (sap-ref-32 sap offset))
-              (ash fixup -2)))
-       (:ha
-        (let* ((h (ldb (byte 16 16) fixup))
-               (l (ldb (byte 16 0) fixup)))
-          ; Compensate for possible sign-extension when the low half
-          ; is added to the high.  We could avoid this by ORI-ing
-          ; the low half in 32-bit absolute loads, but it'd be
-          ; nice to be able to do:
-          ;  lis rX,foo@ha
-          ;  lwz rY,foo@l(rX)
-          ; and lwz/stw and friends all use a signed 16-bit offset.
-          (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-                 (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
-       (:l
-        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) fixup)))))
-  nil))
-
 
 ;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
 
-#-sb-xc-host (progn
 (define-alien-routine ("os_context_lr_addr" context-lr-addr) (* unsigned-long)
   (context (* os-context-t)))
 
@@ -63,13 +31,15 @@
   (* long)
   (context (* os-context-t))
   (index int))
-#+nil
 (defun context-float-register (context index format)
   (declare (type (alien (* os-context-t)) context))
+  (error "context-float-register not working yet? ~S" (list context index format))
+  #+nil
   (coerce (deref (context-float-register-addr context index)) format))
-#+nil
 (defun %set-context-float-register (context index format new)
   (declare (type (alien (* os-context-t)) context))
+  (error "%set-context-float-register not working yet? ~S" (list context index format new))
+  #+nil
   (setf (deref (context-float-register-addr context index))
         (coerce new format)))
 
@@ -101,8 +71,11 @@
          (op (ldb (byte 16 16) bad-inst))
          (regnum (ldb (byte 5 0) op)))
     (declare (type system-area-pointer pc))
-    (cond ((= op (logior (ash 3 10) (ash 6 5)))
-           (let ((trap-number (sap-ref-8 pc 3)))
+    (cond ((= op #+64-bit
+                 (logior (ash 2 10) (ash 1 5) null-offset) ;; TDI LGT,$NULL
+                 #-64-bit
+                 (logior (ash 3 10) (ash 6 5))) ;; twllei r0
+           (let ((trap-number (ldb (byte 8 0) bad-inst)))
              (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number)))
           ((and (= (ldb (byte 6 10) op) 3) ;; twi
                 (or (= regnum #.(sc+offset-offset arg-count-sc))
@@ -123,4 +96,3 @@
                          '(#.arg-count-sc)))))
           (t
            (values #.(error-number-or-lose 'unknown-error) nil)))))
-) ; end PROGN

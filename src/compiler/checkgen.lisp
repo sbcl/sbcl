@@ -193,9 +193,9 @@
 (defun maybe-weaken-check (type policy)
   (declare (type ctype type))
   (typecase type
-    ;; Can't do much funcational type checking at run-time
+    ;; Can't do much functional type checking at run-time
     (fun-designator-type
-     (specifier-type '(or function symbol)))
+     (specifier-type 'function-designator))
     (fun-type
      (specifier-type 'function))
     (t
@@ -203,6 +203,12 @@
        (0 *wild-type*)
        (2 (weaken-values-type type))
        (3 type)))))
+
+(defun type-contains-fun-type-p (type)
+  (sb-kernel::map-type (lambda (type)
+                         (when (fun-type-p type)
+                           (return-from type-contains-fun-type-p t)))
+                       type))
 
 ;;; LVAR is an lvar we are doing a type check on and TYPES is a list
 ;;; of types that we are checking its values against. If we have
@@ -221,6 +227,9 @@
                        c)
           for diff = (type-difference p cc)
           collect (if (and diff
+                           ;; FUN-TYPE is weakend to FUNCTION, can't
+                           ;; use that for invereted type testes
+                           (not (type-contains-fun-type-p diff))
                            (< (type-test-cost diff)
                               (type-test-cost cc)))
                       (list t diff a)
@@ -444,28 +453,35 @@
 ;;; source level because our fixed-values conventions are optimized
 ;;; for the common MV-BIND case.
 (defun make-type-check-form (types cast)
-  (let ((temps (make-gensym-list (length types))))
-    `(multiple-value-bind ,temps 'dummy
-       ,@(mapcar
-          (lambda (temp %type)
-            (destructuring-bind (not type-to-check
-                                 type-to-report) %type
-              (let* ((spec
-                       (let ((*unparse-fun-type-simplify* t))
-                         (type-specifier type-to-check)))
-                     (test (if not `(not ,spec) spec)))
-                `(unless
-                     ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
-                        (%source-transform-typep temp test))
-                   ,(internal-type-error-call temp
-                                              (if (fun-designator-type-p type-to-report)
-                                                  ;; Simplify
-                                                  (specifier-type 'callable)
-                                                  type-to-report)
-                                              (cast-context cast))))))
-          temps
-          types)
-       (values ,@temps))))
+  (let* ((temps (make-gensym-list (length types)))
+         (context (cast-context cast))
+         (restart (and (eq context :restart)
+                       (setf context (make-restart-location)))))
+    (lambda (dummy)
+      `(multiple-value-bind ,temps ,dummy
+         ,@(mapcar
+            (lambda (temp %type)
+              (destructuring-bind (not type-to-check
+                                   type-to-report) %type
+                (let* ((spec
+                         (let ((*unparse-fun-type-simplify* t))
+                           (type-specifier type-to-check)))
+                       (test (if not `(not ,spec) spec)))
+                  `(progn
+                     (unless
+                         ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
+                            (%source-transform-typep temp test))
+                       ,(internal-type-error-call temp
+                                                  (if (fun-designator-type-p type-to-report)
+                                                      ;; Simplify
+                                                      (specifier-type 'function-designator)
+                                                      type-to-report)
+                                                  context))
+                     ,@(and restart
+                            `((restart-point ,restart)))))))
+            temps
+            types)
+         (values ,@temps)))))
 
 ;;; Splice in explicit type check code immediately before CAST. This
 ;;; code receives the value(s) that were being passed to CAST-VALUE,
@@ -490,9 +506,11 @@
          (not-ok-uses '()))
     (do-uses (use value)
       (let ((dtype (node-derived-type use)))
-        (if (values-types-equal-or-intersect dtype atype)
-            (setf condition 'type-style-warning)
-            (push use not-ok-uses))))
+        (cond ((values-types-equal-or-intersect dtype atype)
+               (setf condition 'type-style-warning))
+              ((cast-mismatch-from-inlined-p cast use))
+              (t
+               (push use not-ok-uses)))))
     (dolist (use (nreverse not-ok-uses))
       (let* ((*compiler-error-context* use)
              (dtype (node-derived-type use))
@@ -575,12 +593,27 @@
                (convert-type-check cast types)
                (setf generated t))
               (:too-hairy
-               (let ((*compiler-error-context* cast))
-                 (when (policy cast (>= safety inhibit-warnings))
+               (when (policy cast (>= safety inhibit-warnings))
+                 (let* ((*compiler-error-context* cast)
+                       (type (cast-asserted-type cast))
+                       (value-type (coerce-to-values type)))
                    (compiler-notify
-                    "type assertion too complex to check:~%~
-                    ~/sb-impl:print-type/."
-                    (coerce-to-values (cast-asserted-type cast)))))
+                    "Type assertion too complex to check:~@
+                    ~/sb-impl:print-type/.~a"
+                    type
+                    (cond ((values-type-rest value-type)
+                           (format nil
+                                   "~%It allows an unknown number of values, consider using~@
+                                    ~/sb-impl:print-type/."
+                                   (make-values-type :required (values-type-required value-type)
+                                                     :optional (values-type-optional value-type))))
+                          ((values-type-optional value-type)
+                           (format nil
+                                   "~%It allows a variable number of values, consider using~@
+                                    ~/sb-impl:print-type/."
+                                   (make-values-type :required (append (values-type-required value-type)
+                                                                       (values-type-optional value-type)))))
+                          ("")))))
                (setf (cast-type-to-check cast) *wild-type*)
                (setf (cast-%type-check cast) nil)))))))
     generated))

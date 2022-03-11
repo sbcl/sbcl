@@ -19,7 +19,7 @@
 ;;; In the target system's compiler, uncrossing is just identity.
 #-sb-xc-host
 (progn
-  #-sb-fluid (declaim (inline uncross))
+  (declaim (inline uncross))
   (defun uncross (x) x))
 ;;; In the cross-compiler, uncrossing is slightly less trivial.
 

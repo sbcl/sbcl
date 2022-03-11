@@ -35,7 +35,7 @@
 ;;; 2) Factorial by recursing in syntax rather than semantics works
 ;;;    because it's CAR circular, not CDR circular.
 ;;;      (#1=(LAMBDA (N) (IF (ZEROP N) 1 (* N (#1# (1- N))))) 6)
-;;;    Athough it forces an awful lot of consing on each recursion.
+;;;    Although it forces an awful lot of consing on each recursion.
 (defun vector-of-sexpr (forms)
   (let ((n (list-length forms)))
     (cond ((null n) (error "Circular form"))
@@ -285,10 +285,7 @@
        ;; Unlike ENFORCE-TYPE, this returns all VALUES though only one
        ;; was expected. This should not cons except on error.
        (enforce-single-type (type &rest values)
-         (cond ((null values)
-                (error "~S received no values"
-                       (list 'the (specifier-from-checkfun type))))
-               ((itypep (first values) type)
+         (cond ((itypep (first values) type)
                 (apply #'values values))
                (t
                 (error 'type-error
@@ -311,7 +308,7 @@
     (if (policy env (> speed safety))
         (%eval form env)
         (let ((type (parse-type type-specifier)))
-          (multiple-value-call (if (sb-kernel::%values-type-p type)
+          (multiple-value-call (if (sb-kernel::values-type-p type)
                                    #'enforce-values-types
                                    #'enforce-single-type)
             type (%eval form env))))
@@ -322,7 +319,7 @@
           (if (eq type *universal-type*) ; don't type-check if T
               (handler #'digest-form form)
               (let ((form (%sexpr form)))
-                (if (sb-kernel::%values-type-p type)
+                (if (sb-kernel::values-type-p type)
                     (hlambda THE/MULTI (type form) (env)
                        (multiple-value-call #'enforce-values-types
                          type (dispatch form env)))
@@ -399,7 +396,7 @@
 (defspecial load-time-value (form &optional read-only-p)
   (declare (ignore read-only-p))
   :immediate () (%eval form nil)
-  ;; full-eval used the enviroment here. CLHS says use the null environment.
+  ;; full-eval used the environment here. CLHS says use the null environment.
   ;; I wonder if the true intent was to use the macro and symbol-macro
   ;; environment but otherwise have no lexical bindings visible?
   ;; In other words, is this allowed?
@@ -647,7 +644,7 @@
         (throw (env-payload (env-ancestor env index))
           (frame-ptr-cell-index index))))))
 
-;;; FIXME: this special case makes it a bit difficult to turn the intepreter
+;;; FIXME: this special case makes it a bit difficult to turn the interpreter
 ;;; into exactly a minimal compiler, since SETQ always wants to do something
 ;;; that has an immediate effect.
 (defun eval-setq (assignments env sexpr) ; SEXPR is nil for immediate mode
@@ -1145,7 +1142,7 @@
           (enclose (make-proto-fn name (not (null env)))
                    (capture-toplevel-stuff env)
                    nil))
-        ;; immediate mode calls FDEFINITION as needed, so wil err as it should.
+        ;; immediate mode calls FDEFINITION as needed, so will err as it should.
         (multiple-value-bind (definition macro-p) (get-function name env)
           (if macro-p (not-a-function name) definition)))
     :deferred (env)
@@ -1209,7 +1206,7 @@
  ;; hand-generated lists of useful functions
  (setq *unary-functions*
   (sb-impl::%stuff-hash-table
-   (make-hash-table :test #'eq)
+   (make-hash-table) ; keys are symbols
    (macrolet
        ((def-wrapper (&rest input)
           (cons 'list
@@ -1289,7 +1286,7 @@
 
  (setq *binary-functions*
   (sb-impl::%stuff-hash-table
-   (make-hash-table :test #'eq)
+   (make-hash-table) ; keys are symbols
    (macrolet
        ((def-wrapper (&rest input)
           (cons 'list

@@ -136,6 +136,16 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
         (equalp (frob (+ x x))
                 '(+ y y))))
   t)
+;; MULTIPLE-VALUE-BIND and -SETQ and were failing to macroexpand-all
+;; because the walker treated them both as special operators.
+(deftest macroexpand-all.mvb
+  (let ((form '(multiple-value-bind (a b) (something) (use-them a b))))
+    (not (equalp form (macroexpand-all form nil))))
+  t)
+(deftest macroexpand-all.mvs
+  (let ((form '(multiple-value-setq (a b) (something))))
+    (not (equalp form (macroexpand-all form nil))))
+  t)
 ;;;; DECLARATION-INFORMATION
 
 (defmacro dinfo (thing &environment env)
@@ -440,6 +450,21 @@ sb-ext::(declaim (unmuffle-conditions compiler-note))
   (:function
    t
    ((ftype function (integer) (values integer &optional)))))
+
+(deftest function-information.ftype-struct-ctor
+  (fun-info sb-c::make-lvar)
+  (:function nil
+   ((ftype function (&optional (or sb-c::node null)) (values sb-c::lvar &optional)))))
+(deftest function-information.ftype-struct-accessor
+  (fun-info (setf sb-c::sset-vector))
+  (:function nil
+   ((ftype function (simple-vector sset) (values simple-vector &optional)))))
+(deftest function-information.ftype-struct-predicate
+  (fun-info sb-c::sset-p)
+  (:function nil ((ftype function (t) (values boolean &optional)))))
+(deftest function-information.ftype-struct-copier
+  (fun-info sb-c::copy-sset)
+  (:function nil ((ftype function (sset) (values sset &optional)))))
 
 ;;;;; AUGMENT-ENVIRONMENT
 

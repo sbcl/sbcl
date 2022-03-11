@@ -1,5 +1,10 @@
+(load "bbtree-test-util.lisp")
 (use-package "SB-INT")
+
+#-sb-thread (invoke-restart 'run-tests::skip-file) ;; some of the symbols below disappear
+
 (import 'sb-thread::(avlnode-key avlnode-data avlnode-left avlnode-right
+                     avl-find<= avl-find>=
                      avl-insert avl-delete avl-find
                      avl-balance-factor avl-count))
 
@@ -95,3 +100,9 @@ node [shape=record];~%")
 (test-util:with-test (:name :avltree-random-tester)
   (random-operations 10 10 nil)
   (random-operations 10 200 nil))
+
+(defun test-avlfind-inexact (n-nodes n-iterations)
+  (bbtree-test:test-find-inexact-macro avl-insert avl-find<= avl-find>= avlnode-key))
+
+(test-util:with-test (:name :avl-find-inexact)
+  (bbtree-test:exercise-find-inexact 'test-avlfind-inexact))

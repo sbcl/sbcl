@@ -32,7 +32,16 @@
       (stdout handle)
       (stderr handle)))
 
+(defconstant +startf-use-show-window+ #x001)
 (defconstant +startf-use-std-handles+ #x100)
+
+(defconstant +sw-hide+               0)
+(defconstant +sw-show-normal+        1)
+(defconstant +sw-show-minimized+     2)
+(defconstant +sw-show-maximized+     3)
+(defconstant +sw-show-no-activate+   4)
+(defconstant +sw-show-min-no-active+ 7)
+(defconstant +sw-show-na+            8)
 
 (define-alien-routine ("CreateProcessW" create-process) lispbool
   (application-name system-string)
@@ -45,8 +54,6 @@
   (current-directory system-string)
   (startup-info (* t))
   (process-information (* t)))
-
-
 
 (defun search-path (partial-name)
   "Searh executable using the system path"
@@ -76,17 +83,23 @@
   (process handle)
   (exit-code uint))
 
-(defun mswin-spawn (program argv stdin stdout stderr searchp envp directory)
+(defun zero-alien (alien type)
+  `(alien-funcall (extern-alien "memset" (function void system-area-pointer int unsigned))
+                  (alien-sap ,alien) 0 (alien-size ,type :bytes)))
+
+(defun mswin-spawn (program argv stdin stdout stderr searchp envp directory window preserve-handles)
   (let ((std-handles (multiple-value-list (get-std-handles)))
         (inheritp nil))
     (flet ((maybe-std-handle (arg)
              (let ((default (pop std-handles)))
                (case arg (-1 default) (otherwise (setf inheritp t) arg)))))
+      (when preserve-handles
+        (setf inheritp t)
+        (loop for handle in preserve-handles
+              do (setf (inheritable-handle-p handle) t)))
       (with-alien ((process-information process-information)
                    (startup-info startup-info))
-        (sb-kernel:system-area-ub8-fill
-         0 (alien-sap startup-info)
-         0 (alien-size startup-info :bytes))
+        (zero-alien startup-info startup-info)
         (setf (slot startup-info 'cb) (alien-size startup-info :bytes)
               (slot startup-info 'stdin) (maybe-std-handle stdin)
               (slot startup-info 'stdout) (maybe-std-handle stdout)
@@ -94,7 +107,18 @@
               (slot startup-info 'reserved1) nil
               (slot startup-info 'reserved2) 0
               (slot startup-info 'reserved3) nil
-              (slot startup-info 'flags) (if inheritp +startf-use-std-handles+ 0))
+              (slot startup-info 'show-window) (ecase window
+                                                 (:hide +sw-hide+)
+                                                 (:show-normal +sw-show-normal+)
+                                                 (:show-maximized +sw-show-maximized+)
+                                                 (:show-minimized +sw-show-minimized+)
+                                                 (:show-no-activate +sw-show-no-activate+)
+                                                 (:show-min-no-active +sw-show-min-no-active+)
+                                                 (:show-na +sw-show-na+)
+                                                 ((nil) 0))
+              (slot startup-info 'flags) (logior (if inheritp +startf-use-std-handles+ 0)
+                                                 (if window +startf-use-show-window+ 0)))
+
         (without-interrupts
           ;; KLUDGE: pass null image file name when searchp is true.
           ;; This way, file extension gets resolved by OS if omitted.
@@ -137,7 +161,7 @@
 (defvar *console-control-enabled* nil)
 (defvar *console-control-spec* nil)
 
-(sb-alien::define-alien-callback *alien-console-control-handler* (:stdcall int)
+(define-alien-callable alien-console-control-handler (:stdcall int)
     ((event-code int))
   (if (ignore-errors (funcall *console-control-handler* event-code)) 1 0))
 
@@ -159,7 +183,7 @@ true to stop searching)." *console-control-spec*)
      (setf *console-control-enabled* nil))
     ((or symbol function)
      (setf *console-control-handler* new-handler)
-     (aver (plusp (set-console-ctrl-handler *alien-console-control-handler* 1)))))
+     (aver (plusp (set-console-ctrl-handler (alien-callable-function 'alien-console-control-handler) 1)))))
   (setf *console-control-spec* new-handler))
 
 (defun initialize-console-control-handler (&optional reset-to-default-p)
@@ -247,11 +271,6 @@ true to stop searching)." *console-control-spec*)
   overlapped)
 
 (defconstant +copier-buffer+ 256)
-
-(defmacro zero-alien (alien type)
-  `(sb-kernel:system-area-ub8-fill
-    0 (alien-sap ,alien)
-    0 (alien-size ,type :bytes)))
 
 (defun setup-copiers (copiers)
   (let ((result (make-array (length copiers))))

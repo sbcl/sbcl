@@ -118,6 +118,8 @@
    (pending :initform nil :type list)
    (handler :initform nil :type (or null sb-impl::handler))))
 
+(setq sb-pcl::*simple-stream-root-classoid* (sb-kernel:find-classoid 'simple-stream))
+
 (def-stream-class single-channel-simple-stream (simple-stream)
   (;; the "dirty" flag -- if this is > 0, write out buffer contents
    ;; before changing position; see flush-buffer

@@ -10,6 +10,5 @@
 # files for more information.
 
 include Config.x86-64-bsd
+DISABLE_PIE=no
 include Config.generic-openbsd
-
-ASSEM_SRC += ldso-stubs.S

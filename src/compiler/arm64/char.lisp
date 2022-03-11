@@ -73,7 +73,7 @@
 (define-vop (char-code)
   (:translate char-code)
   (:policy :fast-safe)
-  (:args (ch :scs (character-reg) :target res))
+  (:args (ch :scs (character-reg)))
   (:arg-types character)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
@@ -83,7 +83,7 @@
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
-  (:args (code :scs (any-reg) :target res))
+  (:args (code :scs (any-reg)))
   (:arg-types positive-fixnum)
   (:results (res :scs (character-reg)))
   (:result-types character)
@@ -112,7 +112,8 @@
   (:conditional :lt))
 
 (defun char-immediate-p (char)
-  (add-sub-immediate-p (sb-xc:char-code char)))
+  (and (characterp char)
+       (add-sub-immediate-p (char-code char))))
 
 (define-vop (character-compare/c)
   (:args (x :scs (character-reg)))
@@ -121,7 +122,7 @@
   (:policy :fast-safe)
   (:note "inline constant comparison")
   (:generator 2
-    (inst cmp x (sb-xc:char-code y))))
+    (inst cmp x (char-code y))))
 
 (define-vop (fast-char=/character/c character-compare/c)
   (:translate char=)
@@ -166,3 +167,29 @@
   (:policy :fast-safe)
   (:generator 2
     (inst cmp value base-char-code-limit)))
+
+(defoptimizer (sb-c::vop-optimize move-to-character) (vop)
+  (when (sb-c:next-vop-is vop 'char-code)
+    (sb-c:replace-vops 2 vop 'tagged-char-code)))
+
+;;; Exploit the fact that the MSB of character-widetag is 0 and that n-fixnum-tag-bits is 1.
+(eval-when (:compile-toplevel)
+  (assert (not (logbitp 7 character-widetag))))
+(define-vop (tagged-char-code)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:note "character untagging")
+  (:generator 1
+    (inst lsr y x (- n-widetag-bits n-fixnum-tag-bits))))
+
+(defoptimizer (sb-c::vop-optimize code-char) (vop)
+  (when (sb-c:next-vop-is vop 'move-from-character)
+    (sb-c:replace-vops 2 vop 'tagged-code-char)))
+
+(define-vop (tagged-code-char)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:note "character tagging")
+  (:generator 1
+    (inst lsl y x (- n-widetag-bits n-fixnum-tag-bits))
+    (inst add y y character-widetag)))

@@ -19,42 +19,22 @@
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (sb-ext:exit :code 104))
 
+#+(or x86 x86-64)
+(with-test (:name :legal-bpt-lra-object)
+  (sb-int:binding* ((code (sb-kernel:fun-code-header #'read))
+                    (sap (sb-sys:sap+ (sb-kernel:code-instructions code) 13)) ; random
+                    ((bpt-sap bpt-code-obj) (sb-di::make-bpt-lra sap)))
+    (declare (ignore bpt-sap))
+    ;; This was causing heap corruption
+    (assert (zerop (sb-kernel:code-jump-table-words bpt-code-obj)))))
+
 
 ;;;; Check that we get debug arglists right.
 
-;;; FIXME: This should use some get-argslist like functionality that
-;;; we actually export.
-;;;
-;;; Return the debug arglist of the function object FUN as a list, or
-;;; punt with :UNKNOWN.
-(defun get-arglist (fun)
-  (declare (type function fun))
-  ;; The Lisp-level type FUNCTION can conceal a multitude of sins..
-  (case (sb-kernel:widetag-of fun)
-    (#.sb-vm:simple-fun-widetag
-      (sb-kernel:%simple-fun-arglist fun))
-    (#.sb-vm:closure-widetag
-     (get-arglist (sb-kernel:%closure-fun fun)))
-    ;; In code/describe.lisp, ll. 227 (%describe-fun), we use a scheme
-    ;; like above, and it seems to work. -- MNA 2001-06-12
-    ;;
-    ;; (There might be other cases with arglist info also.
-    ;; SIMPLE-FUN-WIDETAG and CLOSURE-WIDETAG just
-    ;; happen to be the two case that I had my nose rubbed in when
-    ;; debugging a GC problem caused by applying %SIMPLE-FUN-ARGLIST to
-    ;; a closure. -- WHN 2001-06-05)
-    (t
-     ;; FIXME: what about #+sb-fasteval ?
-     #+sb-eval
-     (if (typep fun 'sb-eval::interpreted-function)
-         (sb-eval::interpreted-function-lambda-list fun)
-         :unknown)
-     #-sb-eval
-     :unknown)))
-
 (defun zoop (zeep &key beep)
+  (declare (ignore zeep beep) (special blurp))
   blurp)
-(assert (equal (get-arglist #'zoop) '(zeep &key beep)))
+(assert (equal (sb-kernel:%fun-lambda-list #'zoop) '(zeep &key beep)))
 
 ;;; Check some predefined functions too.
 ;;;
@@ -63,17 +43,18 @@
 ;;; whatever. But we do know the general structure that a correct
 ;;; answer should have, so we can safely do a lot of checks.)
 (with-test (:name :predefined-functions-1)
-  (destructuring-bind (object-sym &optional-sym stream-sym) (get-arglist #'print)
+  (destructuring-bind (object-sym andoptional-sym stream-sym)
+      (sb-kernel:%fun-lambda-list #'print)
     (assert (symbolp object-sym))
-    (assert (eql &optional-sym '&optional))
+    (assert (eql andoptional-sym '&optional))
     (assert (symbolp stream-sym))))
 
 (with-test (:name :predefined-functions-2)
-  (destructuring-bind (dest-sym control-sym &rest-sym format-args-sym)
-      (get-arglist #'format)
+  (destructuring-bind (dest-sym control-sym andrest-sym format-args-sym)
+      (sb-kernel:%fun-lambda-list #'format)
     (assert (symbolp dest-sym))
     (assert (symbolp control-sym))
-    (assert (eql &rest-sym '&rest))
+    (assert (eql andrest-sym '&rest))
     (assert (symbolp format-args-sym))))
 
 ;;;; test TRACE
@@ -109,18 +90,33 @@
     (assert (search "foo" output))
     (assert (search "returned OK" output))))
 
+;;; The following should not work:
+;;;  (DEFUN G () (M))
+;;;  (DEFMACRO M (&REST r) (format t "M invoked: ~S~%" r))
+;;;  (ENCAPSULATE 'M 'foo (lambda (f &rest r) (format t "encapsulation: ~S ~S~%" f r)))
+;;;  (G)
+;;; If (ENCAPSULATE) were permitted, M's guard trampoline would be replaced by the
+;;; encapsulation which is not meaningful. Most uses of the macro M will NOT invoke
+;;; the encapsulation since we don't store macro functions in the symbol-function location.
+;;; Only a consumer of M being accidentally compiled first and resolving M to an
+;;; fdefinition would see the encapulation. That should just be an error.
+(with-test (:name :no-macro-encapsulation)
+  (assert-error (sb-int:encapsulate 'cond 'tryme
+                                    (lambda (f &rest stuff)
+                                      (declare (ignore f stuff))))))
+
 ;;; bug 379
 (with-test (:name (trace :encapsulate nil)
-            :fails-on (or (and :ppc (not :linux)) :sparc :arm64)
-            :broken-on (or :sunos :hppa))
+            :fails-on (or (and :ppc (not :linux)) :arm64)
+            :broken-on (or :freebsd))
   (let ((output (with-traced-function (trace-this :encapsulate nil)
                   (assert (eq 'ok (trace-this))))))
     (assert (search "TRACE-THIS" output))
     (assert (search "returned OK" output))))
 
-(with-test (:name (:trace :encapsulate nil :recursive)
-            :fails-on (or (and :ppc (not :linux)) :sparc :sunos :arm64)
-            :broken-on (or (and :x86 :sunos) :hppa))
+(with-test (:name (trace :encapsulate nil :recursive)
+            :fails-on (or (and :ppc (not :linux)) :arm64)
+            :broken-on (or :freebsd))
   (let ((output (with-traced-function (trace-fact :encapsulate nil)
                   (assert (= 120 (trace-fact 5))))))
     (assert (search "TRACE-FACT" output))
@@ -133,6 +129,9 @@
 (with-test (:name (trace fmakunbound :bug-667657))
   (trace trace-and-fmakunbound-this)
   (fmakunbound 'trace-and-fmakunbound-this)
+  ;; FIXME: this generates a pointless warning that we can't untrace a formerly
+  ;; traced function. Function redefinition knows to untrace/re-trace because of
+  ;; the setf-fdefn hook. fmakunbound can do something similar - drop the trace.
   (untrace)
   (assert (not (trace))))
 
@@ -152,8 +151,10 @@
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")
-      (load (compile-file "bug-414.lisp" :output-file output)))
-    (disassemble 'bug-414)))
+      (load (compile-file "bug-414.lisp" :output-file output
+                                         :verbose nil :print nil)))
+    (with-output-to-string (s)
+      (disassemble 'bug-414 :stream s))))
 
 ;; A known function can be stored as a code constant in lieu of the
 ;; usual mode of storing an #<fdefn> and looking up the function from it.
@@ -176,7 +177,7 @@
     (untrace)
     (assert (>= (count #\Newline (get-output-stream-string s)) 4))))
 
-(with-test (:name :bug-310175 :fails-on (not :stack-allocatable-lists))
+(with-test (:name :bug-310175)
   ;; KLUDGE: Not all DX-enabled platforms DX CONS, and the compiler
   ;; transforms two-arg-LIST* (and one-arg-LIST) to CONS.  Therefore,
   ;; use two-arg-LIST, which should get through to VOP LIST, and thus
@@ -449,7 +450,8 @@
 
 (with-test (:name (:print-frame-call :respect *debug-print-variable-alist*
                    *print-length* :bug-1261646))
-  (let* ((printed (print-backtrace-to-string/debug-print-variable-alist (make-array 200)))
+  (let* ((printed (print-backtrace-to-string/debug-print-variable-alist
+                   (make-array 200 :initial-element 0)))
          (call "(PRINT-BACKTRACE-TO-STRING/DEBUG-PRINT-VARIABLE-ALIST ")
          (position (+ (search call printed) (length call))))
     (assert (eql position (search "#(0 0 0 0 0 ...)" printed :start2 position)))))
@@ -660,3 +662,61 @@
                            l)))
          '(error))))
     (assert (= count 1))))
+
+(with-test (:name :properly-tagged-p-internal)
+  ;; Pick a code component that has a ton of restarts.
+  (let* ((code (sb-kernel:fun-code-header #'sb-impl::update-package-with-variance))
+         (n (sb-kernel:code-n-entries code)))
+    (sb-sys:with-pinned-objects (code)
+      (let* ((base (logandc2 (sb-kernel:get-lisp-obj-address code)
+                             sb-vm:lowtag-mask))
+             (limit (+ base (sb-ext:primitive-object-size code))))
+        (flet ((properly-tagged-p (ptr)
+                 (eql (alien-funcall (extern-alien "properly_tagged_p_internal"
+                                                   (function int unsigned unsigned))
+                                     ptr base)
+                      1)))
+          ;; For architectures that don't use LRAs, there are exactly 'n-entries'
+          ;; properly tagged interior pointers. For those which do use LRAs,
+          ;; there are at least that many, because we allow pointing to LRAs,
+          ;; but they aren't enumerable so we don't know the actual count.
+          (assert (#+(or x86 x86-64 arm64) =
+                   #-(or x86 x86-64 arm64) >
+                     (loop for ptr from (+ base (* 2 sb-vm:n-word-bytes))
+                           below limit count (properly-tagged-p ptr))
+                     n))
+          ;; Verify that the binary search algorithm for simple-fun-index works.
+          (let ((count 0))
+            (loop for ptr from base below limit
+                  do
+               (let ((index (alien-funcall
+                             (extern-alien "simple_fun_index"
+                                           (function int unsigned unsigned))
+                             base ptr)))
+                 (unless (eql index -1)
+                   (let ((tagged-fun (logior ptr sb-vm:fun-pointer-lowtag)))
+                     (assert (properly-tagged-p tagged-fun))
+                     (incf count)
+                     #+nil
+                     (format t "~x -> ~d (~a)~%"
+                             ptr index (sb-kernel:make-lisp-obj tagged-fun))))))
+            (assert (= count n))))))))
+
+(with-test (:name :repeatable-fasl)
+  (with-scratch-file (output1 "fasl")
+    (compile-file "bug-414.lisp" ; compile this file, why not
+                  ::output-file output1 :verbose nil :print nil)
+    (with-scratch-file (output2 "fasl")
+      (compile-file "bug-414.lisp" ; compile this file, why not
+                    ::output-file output2 :verbose nil :print nil)
+      (with-open-file (fasl1 output1 :element-type '(unsigned-byte 8))
+        (with-open-file (fasl2 output2 :element-type '(unsigned-byte 8))
+          (assert (= (file-length fasl1) (file-length fasl2)))
+          (loop repeat (file-length fasl1)
+                do (assert (= (read-byte fasl1) (read-byte fasl2)))))))))
+
+;; lp#1901781
+(defun ll-unknown (x y) (declare (optimize (debug 0))) (+ x y))
+(compile 'll-unknown)
+(with-test (:name :unknown-lambda-list)
+  (assert (eq (sb-kernel:%fun-lambda-list #'ll-unknown) :unknown)))

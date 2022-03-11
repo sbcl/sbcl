@@ -25,9 +25,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
-#include <machine/sysarch.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -37,7 +34,6 @@
 #include <errno.h>
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 #ifdef LISP_FEATURE_SB_THREAD
 #error "Define threading support functions"
@@ -52,7 +48,7 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
     if(sigaltstack(&sigstack,0)<0)
-        lose("Cannot sigaltstack: %s\n",strerror(errno));
+        lose("Cannot sigaltstack: %s",strerror(errno));
 
     return 1;                   /* success */
 }
@@ -60,6 +56,8 @@ int arch_os_thread_cleanup(struct thread *thread) {
     return 1;                   /* success */
 }
 #endif
+
+#if defined(LISP_FEATURE_NETBSD)
 
 os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
@@ -72,11 +70,33 @@ os_context_register_addr(os_context_t *context, int offset)
     return &context->uc_mcontext.__gregs[offset];
 }
 
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
+#elif defined(LISP_FEATURE_OPENBSD)
+
+os_context_register_t   *
+os_context_register_addr(os_context_t *context, int offset)
 {
-    return os_context_register_addr(context, reg_PC);
+    switch (offset) {
+        case 0:       return (os_context_register_t *)(&context->sc_r0);
+        case 1:       return (os_context_register_t *)(&context->sc_r1);
+        case 2:       return (os_context_register_t *)(&context->sc_r2);
+        case 3:       return (os_context_register_t *)(&context->sc_r3);
+        case 4:       return (os_context_register_t *)(&context->sc_r4);
+        case 5:       return (os_context_register_t *)(&context->sc_r5);
+        case 6:       return (os_context_register_t *)(&context->sc_r6);
+        case 7:       return (os_context_register_t *)(&context->sc_r7);
+        case 8:       return (os_context_register_t *)(&context->sc_r8);
+        case 9:       return (os_context_register_t *)(&context->sc_r9);
+        case 10:      return (os_context_register_t *)(&context->sc_r10);
+        case 11:      return (os_context_register_t *)(&context->sc_r11);
+        case 12:      return (os_context_register_t *)(&context->sc_r12);
+        case reg_NSP: return (os_context_register_t *)(&context->sc_usr_sp);
+        case reg_LR:  return (os_context_register_t *)(&context->sc_usr_lr);
+        case reg_PC:  return (os_context_register_t *)(&context->sc_pc);
+    }
+    lose("illegal register number: %d", offset);
 }
+
+#endif
 
 os_context_register_t *
 os_context_lr_addr(os_context_t *context)
@@ -84,11 +104,23 @@ os_context_lr_addr(os_context_t *context)
     return os_context_register_addr(context, reg_LR);
 }
 
+#if defined(LISP_FEATURE_OPENBSD)
+
+void
+os_restore_fp_control(os_context_t *context)
+{
+    asm ("fmxr fpscr,%0" : : "r" (context->sc_fpscr));
+}
+
+#else
+
 void
 os_restore_fp_control(os_context_t *context)
 {
     /* FIXME: Implement. */
 }
+
+#endif
 
 void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
@@ -99,8 +131,8 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    unsigned int code = *((unsigned char *)(4+*os_context_pc_addr(context)));
-    u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
+    unsigned int code = *((unsigned char *)(4+OS_CONTEXT_PC(context)));
+    uint32_t trap_instruction = *(uint32_t *)OS_CONTEXT_PC(context);
 
     if (trap_instruction != 0xe7ffdefe) {
         lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
@@ -116,5 +148,5 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
 void arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+    ll_install_handler(SIGTRAP, sigtrap_handler);
 }

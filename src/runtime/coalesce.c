@@ -31,7 +31,7 @@ static boolean gcable_pointer_p(lispobj pointer)
 {
 #ifdef LISP_FEATURE_CHENEYGC
    return pointer >= (lispobj)current_dynamic_space
-       && pointer < (lispobj)dynamic_space_free_pointer;
+       && pointer < (lispobj)get_alloc_pointer();
 #endif
 #ifdef LISP_FEATURE_GENCGC
    return find_page_index((void*)pointer) >= 0 || immobile_space_p(pointer);
@@ -72,7 +72,7 @@ static boolean eql_comparable_p(lispobj obj)
 static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
 {
     int i;
-    for (i = fixnum_value(v->length)-1; i >= 0; --i)
+    for (i = vector_len(v)-1; i >= 0; --i)
         if (!pred(v->data[i])) return 0;
     return 1;
 }
@@ -82,12 +82,12 @@ static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
  * updating the need-to-rehash indicator, we might create keys that compare
  * the same under the table's comparator.  It seems like doing that could
  * cause various kinds of weirdness in some applications. Nobody has reported
- * misbehavior in the 10 months or so that coalescing has been the default,
+ * misbehavior in the 3 years or so that coalescing has been the default,
  * so it doesn't seem horribly bad, but does seem a bit broken */
 static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 {
     lispobj ptr = *where;
-    if (lowtag_of(ptr) != OTHER_POINTER_LOWTAG)
+    if (lowtag_of(ptr) != OTHER_POINTER_LOWTAG || !gc_managed_heap_space_p(ptr))
         return;
 
     extern char gc_coalesce_string_literals;
@@ -95,8 +95,8 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
     // If 1, then we share vectors tagged as +VECTOR-SHAREABLE+,
     // but if >1, those and also +VECTOR-SHAREABLE-NONSTD+.
     int mask = gc_coalesce_string_literals > 1
-      ? (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<N_WIDETAG_BITS
-      : (VECTOR_SHAREABLE                        )<<N_WIDETAG_BITS;
+      ? (VECTOR_SHAREABLE|VECTOR_SHAREABLE_NONSTD)<<ARRAY_FLAGS_POSITION
+      : (VECTOR_SHAREABLE                        )<<ARRAY_FLAGS_POSITION;
 
     lispobj* obj = native_pointer(ptr);
     lispobj header = *obj;
@@ -108,9 +108,9 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
              || specialized_vector_widetag_p(widetag)))
         || coalescible_number_p(obj)) {
         if (widetag == SIMPLE_VECTOR_WIDETAG) {
-            sword_t n_elts = fixnum_value(obj[1]), i;
-            for (i = 2 ; i < n_elts+2 ; ++i)
-                coalesce_obj(obj + i, ht);
+            struct vector* v = (void*)obj;
+            sword_t n_elts = vector_len(v), i;
+            for (i = 0 ; i < n_elts ; ++i) coalesce_obj(v->data+i, ht);
         }
         int index = hopscotch_get(ht, (uword_t)obj, 0);
         if (!index) // Not found
@@ -130,7 +130,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 
 /* FIXME: there are 10+ variants of the skeleton of an object traverser.
  * Pick one and try to make it customizable. I tried a callback-based approach,
- * but it's too slow. Next best thing is a ".inc" file which defines the shape
+ * but it's way too slow. Next best thing is a ".inc" file which defines the shape
  * of the function, with pieces inserted by #define.
  *
  * (1) gc-common's table-based mechanism
@@ -140,47 +140,47 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
  * (4) fullcgc's trace_object()
  * (5) coreparse's relocate_space()
  * (6) traceroot's find_ref() and build_refs() which itself has two modes
- * (7) cheneygc's print_garbage()
+ * (7) sanity_check_loaded_core() which is quite possibly the prettiest yet
  * (8) purify()
  * (9) coalesce_range()
  * plus the Lisp variant:
  * (10) do-referenced-object which thank goodness is common to 2 uses
  * and if you want to count 'print.c' as another, there's that.
+ * There's also cheneygc's print_garbage() which uses the dispatch tables.
+ * And now there's update_writeprotection() which is also ad-hoc.
  */
 
 static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
 {
     struct hopscotch_table* ht = (struct hopscotch_table*)arg;
-    lispobj layout, bitmap, *next;
-    sword_t nwords, i, j;
+    lispobj *next;
+    sword_t nwords, i;
 
     for ( ; where < limit ; where = next ) {
-        lispobj header = *where;
-        if (is_cons_half(header)) {
-            coalesce_obj(where+0, ht);
-            coalesce_obj(where+1, ht);
-            next = where + 2;
-        } else {
-            int widetag = header_widetag(header);
+        lispobj word = *where;
+        if (is_header(word)) {
+            int widetag = header_widetag(word);
             nwords = sizetab[widetag](where);
             next = where + nwords;
-            switch (widetag) {
-            case INSTANCE_WIDETAG: // mixed boxed/unboxed objects
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-            case FUNCALLABLE_INSTANCE_WIDETAG:
-#endif
-                layout = instance_layout(where);
-                bitmap = LAYOUT(layout)->bitmap;
-                for(i=1; i<nwords; ++i)
-                    if (layout_bitmap_logbitp(i-1, bitmap))
-                        coalesce_obj(where+i, ht);
+            if (instanceoid_widetag_p(widetag)) {
+                lispobj layout = layout_of(where);
+                struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
+                for (i=0; i<(nwords-1); ++i)
+                    if (bitmap_logbitp(i, bitmap)) coalesce_obj(where+1+i, ht);
                 continue;
+            }
+            switch (widetag) {
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+            case SYMBOL_WIDETAG:
+            {
+                struct symbol* symbol = (void*)where;
+                lispobj name = decode_symbol_name(symbol->name);
+                coalesce_obj(&name, ht);
+                set_symbol_name(symbol, name);
+                continue;
+            }
+#endif
             case CODE_HEADER_WIDETAG:
-                for_each_simple_fun(i, fun, (struct code*)where, 0, {
-                    lispobj* fun_slots = SIMPLE_FUN_SCAV_START(fun);
-                    for (j=0; j<SIMPLE_FUN_SCAV_NWORDS(fun); ++j)
-                        coalesce_obj(fun_slots+j, ht);
-                })
                 nwords = code_header_words((struct code*)where);
                 break;
             default:
@@ -189,6 +189,10 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             }
             for(i=1; i<nwords; ++i)
                 coalesce_obj(where+i, ht);
+        } else {
+            coalesce_obj(where+0, ht);
+            coalesce_obj(where+1, ht);
+            next = where + 2;
         }
     }
     return 0;
@@ -203,16 +207,13 @@ void coalesce_similar_objects()
     uword_t arg = (uword_t)&ht;
 
     hopscotch_create(&ht, HOPSCOTCH_VECTOR_HASH, 0, 1<<17, 0);
-#ifndef LISP_FEATURE_WIN32
-    // Apparently this triggers the "Unable to recommit" lossage message
-    // in handle_access_violation() in src/runtime/win32-os.c
     coalesce_range((lispobj*)READ_ONLY_SPACE_START,
                    (lispobj*)READ_ONLY_SPACE_END,
                    arg);
-    coalesce_range((lispobj*)STATIC_SPACE_START,
-                   (lispobj*)STATIC_SPACE_END,
-                   arg);
-#endif
+    lispobj* the_symbol_nil = (lispobj*)(NIL - LIST_POINTER_LOWTAG - N_WORD_BYTES);
+    coalesce_range(the_symbol_nil, ALIGN_UP(SYMBOL_SIZE,2) + the_symbol_nil, arg);
+    coalesce_range((lispobj*)(T - OTHER_POINTER_LOWTAG), static_space_free_pointer, arg);
+
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, arg);
     coalesce_range((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, arg);
@@ -220,7 +221,7 @@ void coalesce_similar_objects()
 #ifdef LISP_FEATURE_GENCGC
     walk_generation(coalesce_range, -1, arg);
 #else
-    coalesce_range(current_dynamic_space, dynamic_space_free_pointer, arg);
+    coalesce_range(current_dynamic_space, get_alloc_pointer(), arg);
 #endif
     hopscotch_destroy(&ht);
 }

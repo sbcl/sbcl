@@ -22,7 +22,8 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
+#include <stdint.h> // for uintptr_t
+#include <stdlib.h> // for atoi
 
 /* <nikodemus> bwahahahaaa!
  * <Xophe> oh dear.  He's finally flipped
@@ -35,7 +36,7 @@
 extern int
 stack_alignment_offset (int alignment)
 {
-    return ((unsigned int)&alignment) % alignment;
+    return ((unsigned int)(uintptr_t)&alignment) % alignment;
 }
 
 extern int

@@ -41,16 +41,9 @@
 ;;; Do the actual insertion of the conflict NEW into BLOCK's global
 ;;; conflicts.
 (defun insert-block-global-conflict (new block)
-  (let ((global-num (tn-number (global-conflicts-tn new))))
-    (do ((prev nil conf)
-         (conf (ir2-block-global-tns block)
-               (global-conflicts-next-blockwise conf)))
-        ((or (null conf)
-             (> (tn-number (global-conflicts-tn conf)) global-num))
-         (if prev
-             (setf (global-conflicts-next-blockwise prev) new)
-             (setf (ir2-block-global-tns block) new))
-         (setf (global-conflicts-next-blockwise new) conf))))
+  ;; This used to keep the TNs sorted by TN-NUMBER, but appears to be
+  ;; unnecessary.
+  (shiftf (global-conflicts-next-blockwise new) (ir2-block-global-tns block) new)
   (values))
 
 ;;; Reset the CURRENT-CONFLICT slot in all packed TNs to point to the
@@ -59,19 +52,19 @@
   (do-packed-tns (tn component)
     (setf (tn-current-conflict tn) (tn-global-conflicts tn))))
 
-;;; Cache the results of BLOCK-PHYSENV during lifetime analysis.
+;;; Cache the results of BLOCK-ENVIRONMENT during lifetime analysis.
 ;;;
-;;; Fetching the home-lambda of a block (needed in block-physenv) can
+;;; Fetching the home-lambda of a block (needed in block-environment) can
 ;;; be an expensive operation under some circumstances, and it needs
 ;;; to be done a lot during lifetime analysis when compiling with high
 ;;; DEBUG (e.g. 30% of the total compilation time for CL-PPCRE with
 ;;; DEBUG 3 just for that).
-(defun cached-block-physenv (block)
-  (let ((physenv (block-physenv-cache block)))
-    (if (eq physenv :none)
-        (setf (block-physenv-cache block)
-              (block-physenv block))
-        physenv)))
+(defun cached-block-environment (block)
+  (let ((env (block-environment-cache block)))
+    (if (eq env :none)
+        (setf (block-environment-cache block)
+              (block-environment block))
+        env)))
 
 ;;;; pre-pass
 
@@ -441,14 +434,14 @@
 ;;; TN. We make the TN global if it isn't already. The TN must have at
 ;;; least one reference.
 (defun setup-environment-tn-conflicts (component tn env debug-p)
-  (declare (type component component) (type tn tn) (type physenv env))
+  (declare (type component component) (type tn tn) (type environment env))
   (when (and debug-p
              (not (tn-global-conflicts tn))
              (tn-local tn))
     (convert-to-global tn))
   (setf (tn-current-conflict tn) (tn-global-conflicts tn))
   (do-blocks-backwards (block component)
-    (when (eq (cached-block-physenv block) env)
+    (when (eq (cached-block-environment block) env)
       (let* ((2block (block-info block))
              (last (do ((b (ir2-block-next 2block) (ir2-block-next b))
                         (prev 2block b))
@@ -462,14 +455,14 @@
 ;;; Implicit value cells are allocated on the stack and local
 ;;; functions can access closed over values of the parent function
 ;;; that way, but when the parent function tail calls a local function
-;;; its physenv ceases to exist, yet the indirect TNs should still be
-;;; accessible within the tail-called function.
-;;; Find all the users of the TN, returning their physenvs, in wich
-;;; the TN should be marked as live.
+;;; its environment ceases to exist, yet the indirect TNs should still
+;;; be accessible within the tail-called function.  Find all the users
+;;; of the TN, returning their environments, in which the TN should be
+;;; marked as live.
 (defun find-implicit-value-cell-users (home-env tn)
   (let (result)
     (labels ((recur (lambda)
-               (let ((env (lambda-physenv lambda)))
+               (let ((env (lambda-environment lambda)))
                  (unless (or (eq env home-env)
                              (memq env result))
                    (push env result)
@@ -486,39 +479,39 @@
 (defun setup-environment-live-conflicts (component)
   (declare (type component component))
   (dolist (fun (component-lambdas component))
-    (let* ((env (lambda-physenv fun))
-           (2env (physenv-info env)))
-      (dolist (tn (ir2-physenv-live-tns 2env))
+    (let* ((env (lambda-environment fun))
+           (2env (environment-info env)))
+      (dolist (tn (ir2-environment-live-tns 2env))
         (setup-environment-tn-conflicts component tn env nil)
         (when (implicit-value-cell-tn-p tn)
           (loop for env in (find-implicit-value-cell-users env tn)
                 ;; See the comment above FIND-IMPLICIT-VALUE-CELL-USERS
-                when (memq (physenv-lambda env)
+                when (memq (environment-lambda env)
                            (tail-set-funs (lambda-tail-set fun)))
                 do
                 (setup-environment-tn-conflicts component tn env nil))))
-      (dolist (tn (ir2-physenv-debug-live-tns 2env))
+      (dolist (tn (ir2-environment-debug-live-tns 2env))
         (setup-environment-tn-conflicts component tn env t))))
   (values))
 
 ;;; Convert a :NORMAL or :DEBUG-ENVIRONMENT TN to an :ENVIRONMENT TN.
-;;; This requires adding :LIVE conflicts to all blocks in TN-PHYSENV.
-(defun convert-to-environment-tn (tn tn-physenv)
-  (declare (type tn tn) (type physenv tn-physenv))
+;;; This requires adding :LIVE conflicts to all blocks in TN-ENV.
+(defun convert-to-environment-tn (tn tn-env)
+  (declare (type tn tn) (type environment tn-env))
   (aver (member (tn-kind tn) '(:normal :debug-environment)))
   (ecase (tn-kind tn)
     (:debug-environment
-     (setq tn-physenv (tn-physenv tn))
-     (let* ((2env (physenv-info tn-physenv)))
-       (setf (ir2-physenv-debug-live-tns 2env)
-             (delete tn (ir2-physenv-debug-live-tns 2env)))))
+     (setq tn-env (tn-environment tn))
+     (let* ((2env (environment-info tn-env)))
+       (setf (ir2-environment-debug-live-tns 2env)
+             (delete tn (ir2-environment-debug-live-tns 2env)))))
     (:normal
      (setf (tn-local tn) nil)
      (setf (tn-local-number tn) nil)))
-  (setup-environment-tn-conflicts *component-being-compiled* tn tn-physenv nil)
+  (setup-environment-tn-conflicts *component-being-compiled* tn tn-env nil)
   (setf (tn-kind tn) :environment)
-  (setf (tn-physenv tn) tn-physenv)
-  (push tn (ir2-physenv-live-tns (physenv-info tn-physenv)))
+  (setf (tn-environment tn) tn-env)
+  (push tn (ir2-environment-live-tns (environment-info tn-env)))
   (values))
 
 ;;;; flow analysis
@@ -706,7 +699,7 @@
                (num (global-conflicts-number conf)))
           (when (and num (zerop (sbit live-bits num))
                      (eq (tn-kind tn) :debug-environment)
-                     (eq (tn-physenv tn) (cached-block-physenv 1block))
+                     (eq (tn-environment tn) (cached-block-environment 1block))
                      (saved-after-read tn block))
             (note-conflicts live-bits live-list tn num)
             (setf (sbit live-bits num) 1)
@@ -778,7 +771,7 @@
           (unless (eq (tn-kind tn) :environment)
             (convert-to-environment-tn
              tn
-             (cached-block-physenv (ir2-block-block block))))))))
+             (cached-block-environment (ir2-block-block block))))))))
   (values))
 
 ;;; This is used in SCAN-VOP-REFS to simultaneously do something to
@@ -1024,16 +1017,16 @@
   (values))
 
 ;;; On high debug levels, for all variables that a lambda closes over
-;;; convert the TNs to :ENVIRONMENT TNs (in the physical environment
-;;; of that lambda). This way the debugger can display the variables.
+;;; convert the TNs to :ENVIRONMENT TNs (in the environment of that
+;;; lambda). This way the debugger can display the variables.
 (defun maybe-environmentalize-closure-tns (component)
   (dolist (lambda (component-lambdas component))
     (when (policy lambda (>= debug 2))
-      (let ((physenv (lambda-physenv lambda)))
-        (dolist (closure-var (physenv-closure physenv))
-          (let ((tn (find-in-physenv closure-var physenv)))
+      (let ((env (lambda-environment lambda)))
+        (dolist (closure-var (environment-closure env))
+          (let ((tn (find-in-environment closure-var env)))
             (when (member (tn-kind tn) '(:normal :debug-environment))
-              (convert-to-environment-tn tn physenv))))))))
+              (convert-to-environment-tn tn env))))))))
 
 
 (defun lifetime-analyze (component)

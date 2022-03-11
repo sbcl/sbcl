@@ -1,0 +1,40 @@
+Closure without CODE slot (#-metaspace)
+---------------------------------------
+nvalues = len - 1
+
+1 value:                      1 value + name:
+word 0: header [len=2]        word 0: header [len=2]
+word 1: addr                  word 1: addr
+word 2: value                 word 2: value = closure-index-ref 0
+word 3: padding               word 3: name  = closure-index-ref 1
+
+2 values:                     2 values + name:
+word 0: header: [len=3]       word 0: header [len=4]
+word 1: addr                  word 1: addr
+word 2: value 0               word 2: value 0 = closure-index-ref 0
+word 3: value 1               word 3: value 1 = closure-index-ref 1
+                              word 4: pad     = closure-index-ref 2
+                              word 5: name    = closure-index-ref 3
+
+Closure with CODE slot (#+metaspace)
+------------------------------------
+
+nvalues = len - 2
+
+1 value:
+word 0: header [len=3]        word 0: header [len=4]
+word 1: addr                  word 1: addr
+word 2: code                  word 2: code
+word 3: value                 word 3: value = closure-index-ref 0
+                              word 4: pad   = closure-index-ref 1
+                              word 5: name  = closure-index-ref 2
+
+2 valuess:
+word 0: header [len=4]        word 0: header [len=4]
+word 1: addr                  word 1: tramp            
+word 2: code                  word 2: code
+word 3: value 0               word 3: value 0 = closure-index-ref 0
+word 4: value 1               word 4: value 1 = closure-index-ref 1
+word 5: pad                   word 5: name    = closure-index-ref 2
+
+In all cases, NAME is in (closure-index-ref c nvalues)

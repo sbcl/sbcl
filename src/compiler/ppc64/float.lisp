@@ -83,17 +83,17 @@
 (define-vop (move-from-single)
   (:args (x :scs (single-reg) :to :save))
   ;; There are no moves between float regs and gprs, so use the stack
-  (:temporary (:scs (double-stack)) stack-temp)
+  (:temporary (:scs (single-stack)) stack-temp)
   (:results (y :scs (descriptor-reg)))
   (:vop-var vop)
   (:note "float to pointer coercion")
   (:generator 4
-    (inst li y single-float-widetag)
     (let ((base (current-nfp-tn vop))
           (disp (tn-byte-offset stack-temp)))
-      #+little-endian (progn (inst stw y base disp) (inst stfs x base (+ disp 4)))
-      #+big-endian    (progn (inst stfs x base disp) (inst stw y base (+ disp 4)))
-      (inst ld y base disp))))
+      (inst stfs x base disp)
+      (inst lwz temp-reg-tn base disp)
+      (inst sldi temp-reg-tn temp-reg-tn 32)
+      (inst ori y temp-reg-tn single-float-widetag))))
 
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
@@ -192,7 +192,7 @@
     (let ((real-tn (complex-double-reg-real-tn y)))
       (inst lfd real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn y)))
-      (inst lfd imag-tn nfp (+ offset (* 2 n-word-bytes))))))
+      (inst lfd imag-tn nfp (+ offset n-word-bytes)))))
 
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
@@ -201,7 +201,7 @@
     (let ((real-tn (complex-double-reg-real-tn x)))
       (inst stfd real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn x)))
-      (inst stfd imag-tn nfp (+ offset (* 2 n-word-bytes))))))
+      (inst stfd imag-tn nfp (+ offset n-word-bytes)))))
 
 
 ;;;
@@ -369,7 +369,7 @@
          (let ((real-tn (complex-double-reg-real-tn x)))
            (inst stfd real-tn nfp offset))
          (let ((imag-tn (complex-double-reg-imag-tn x)))
-           (inst stfd imag-tn nfp (+ offset (* 2 n-word-bytes)))))))))
+           (inst stfd imag-tn nfp (+ offset n-word-bytes))))))))
 (define-move-vop move-complex-double-float-arg :move-arg
   (complex-double-reg descriptor-reg) (complex-double-reg))
 
@@ -475,7 +475,7 @@
 
 ;;;; Conversion:
 
-(macrolet ((frob (name translate inst to-sc to-type)
+(macrolet ((frob (name translate to-sc to-type)
              `(define-vop (,name)
                 (:args (x :scs (signed-reg)))
                 (:temporary (:scs (double-stack)) temp)
@@ -492,10 +492,13 @@
                     (inst std x (current-nfp-tn vop) disp)
                     (inst lfd y (current-nfp-tn vop) disp)
                     (note-this-location vop :internal-error)
-                    (inst ,inst y y))))))
-  (frob %single-float/signed %single-float fcfids single-reg single-float)
-  (frob %double-float/signed %double-float fcfid double-reg double-float))
+                    (inst fcfid y y)
+                    ,@(and (eq to-type 'single-float)
+                           `((inst frsp y y))))))))
+  (frob %single-float/signed %single-float single-reg single-float)
+  (frob %double-float/signed %double-float double-reg double-float))
 
+#+nil ;; no fcfidu instructions
 (macrolet ((frob (name translate inst to-sc to-type)
             `(define-vop (,name)
                (:args (x :scs (unsigned-reg)))
@@ -696,7 +699,7 @@
     (let ((nfp (current-nfp-tn vop)))
       (inst mffs fp-temp)
       (inst stfd fp-temp nfp (* n-word-bytes (tn-offset temp)))
-      (loadw res nfp (1+ (tn-offset temp))))))
+      (loadw res nfp (tn-offset temp)))))
 
 (define-vop (set-floating-point-modes)
   (:args (new :scs (unsigned-reg) :target res))
@@ -710,9 +713,9 @@
   (:vop-var vop)
   (:generator 3
     (let ((nfp (current-nfp-tn vop)))
-      (storew new nfp (1+ (tn-offset temp)))
+      (storew new nfp (tn-offset temp))
       (inst lfd fp-temp nfp (* n-word-bytes (tn-offset temp)))
-      ;; (inst mtfsf 255 fp-temp) ; FIXME: gets sigfpe
+      (inst mtfsf 255 fp-temp)
       (move res new))))
 
 
@@ -744,7 +747,7 @@
              (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst stfs real nfp offset))
-         (inst stfs imag nfp (+ offset 4)))))))
+         (inst stfs imag nfp (+ offset n-word-bytes)))))))
 
 (define-vop (make-complex-double-float)
   (:translate complex)
@@ -798,6 +801,6 @@
                      (inst ,inst r (current-nfp-tn vop)
                            (+ (tn-byte-offset x) ,byte-offset))))))))
   (def real single 0 lfs)
-  (def imag single 4 lfs)
+  (def imag single 8 lfs)
   (def real double 0 lfd)
   (def imag double 8 lfd))

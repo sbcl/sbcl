@@ -40,7 +40,7 @@
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst bic ndescr ndescr lowtag-mask)
-    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag)
+    (allocation nil ndescr other-pointer-lowtag vector :flag-tn pa-flag)
     (inst mov ndescr (lsr type word-shift))
     (storew ndescr vector 0 other-pointer-lowtag)
     ;; Touch the last element, to ensure that null-terminated strings
@@ -72,7 +72,7 @@
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst bic ndescr ndescr lowtag-mask)
-    (allocation vector ndescr other-pointer-lowtag
+    (allocation nil ndescr other-pointer-lowtag vector
                 :flag-tn pa-flag
                 :stack-allocate-p t)
     (inst mov pa-flag (lsr type word-shift))

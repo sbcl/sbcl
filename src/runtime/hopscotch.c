@@ -17,12 +17,23 @@
  */
 
 #include "os.h"
-#include "gc-internal.h" // for os_allocate()
+#include "gc-internal.h" // for sizetab[] and os_allocate()
 #include "hopscotch.h"
 #include <stdint.h>
 #include <stdio.h>
+#ifdef LISP_FEATURE_WIN32
+/* I don't know where ffs() is prototyped */
+extern int ffs(int);
+#else
+/* https://www.freebsd.org/cgi/man.cgi?query=fls&sektion=3&manpath=FreeBSD+7.1-RELEASE
+   says strings.h */
+#include <strings.h>
+#endif
 #include "genesis/vector.h"
 #include "murmur_hash.h"
+
+#define hopscotch_allocate(nbytes) os_allocate(nbytes)
+#define hopscotch_deallocate(addr,length) os_deallocate(addr, length)
 
 typedef struct hopscotch_table* tableptr;
 void hopscotch_integrity_check(tableptr,char*,int);
@@ -104,6 +115,20 @@ static sword_t get_val4(tableptr ht, int index) { return ((int32_t*)ht->values)[
 static sword_t get_val2(tableptr ht, int index) { return ((int16_t*)ht->values)[index]; }
 static sword_t get_val1(tableptr ht, int index) { return ((int8_t *)ht->values)[index]; }
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+
+// We can safely use malloc + free because there should be no
+// problem of holding a malloc lock from another thread.
+#include <stdlib.h>
+#define cached_allocate(n) calloc(1,n)
+#define cached_deallocate(ptr,size) free(ptr)
+void hopscotch_init() { }
+
+#else
+
+/// We can't safely use malloc because the stop-for-GC signal might be received
+/// in the midst of a malloc while holding a global malloc lock.
+
 /// Hopscotch storage allocation granularity.
 /// Our usual value of "page size" is the GC page size, which is
 /// coarser than necessary (cf {target}/backend-parms.lisp).
@@ -121,9 +146,9 @@ char* cached_alloc[N_CACHED_ALLOCS];
 void hopscotch_init() // Called once on runtime startup, from gc_init().
 {
     // Prefill the cache with 2 entries, each the size of a kernel page.
-    int n_bytes_per_slice = getpagesize();
+    int n_bytes_per_slice = os_reported_page_size;
     int n_bytes_total = N_CACHED_ALLOCS * n_bytes_per_slice;
-    char* mem = os_allocate(n_bytes_total);
+    char* mem = hopscotch_allocate(n_bytes_total);
     gc_assert(mem);
     cached_alloc[0] = mem + ALLOCATION_OVERHEAD;
     cached_alloc[1] = cached_alloc[0] + n_bytes_per_slice;
@@ -158,7 +183,7 @@ static char* cached_allocate(os_vm_size_t nbytes)
     // not a multiple of the mmap granularity, which we'll assume is 4K.
     // (It doesn't actually matter.)
     nbytes = ALIGN_UP(nbytes, hh_allocation_granularity);
-    char* result = os_allocate(nbytes);
+    char* result = hopscotch_allocate(nbytes);
     gc_assert(result);
     result += ALLOCATION_OVERHEAD;
     usable_size(result) = nbytes - ALLOCATION_OVERHEAD;
@@ -171,7 +196,7 @@ static char* cached_allocate(os_vm_size_t nbytes)
  * which is why the length is specified again.
  * If returning it to the OS and not the cache, then don't bother 0-filling.
  */
-static void cached_deallocate(char* mem, int zero_fill_length)
+static void cached_deallocate(char* mem, uword_t zero_fill_length)
 {
     int line = 0;
     if (!cached_alloc[0]) {
@@ -185,19 +210,20 @@ static void cached_deallocate(char* mem, int zero_fill_length)
         int cached_size1 = usable_size(cached_alloc[1]);
         if (!(this_size > cached_size0 || this_size > cached_size1)) {
             // mem is not strictly larger than either cached block. Release it.
-            os_deallocate(mem - ALLOCATION_OVERHEAD,
-                          usable_size(mem) + ALLOCATION_OVERHEAD);
+            hopscotch_deallocate(mem - ALLOCATION_OVERHEAD,
+                                 usable_size(mem) + ALLOCATION_OVERHEAD);
             return;
         }
         // Evict and replace the smaller of the two cache entries.
         if (cached_size1 < cached_size0)
             line = 1;
-        os_deallocate(cached_alloc[line] - ALLOCATION_OVERHEAD,
-                      usable_size(cached_alloc[line]) + ALLOCATION_OVERHEAD);
+        hopscotch_deallocate(cached_alloc[line] - ALLOCATION_OVERHEAD,
+                             usable_size(cached_alloc[line]) + ALLOCATION_OVERHEAD);
     }
-    bzero(mem, zero_fill_length);
+    memset(mem, 0, zero_fill_length);
     cached_alloc[line] = mem;
 }
+#endif
 
 /* Initialize 'ht' for 'size' logical bins with a max hop of 'hop_range'.
  * 'valuesp' makes a hash-map if true; a hash-set if false.
@@ -223,12 +249,16 @@ static void hopscotch_realloc(tableptr ht, int size, char hop_range)
     // The last few logical cells in the key array can use physical cells
     // at indices greater than 'size'; there's no wrapping back to index 0.
     int n_keys = size + (hop_range - 1);
-    unsigned storage_size = (sizeof (uword_t) + ht->value_size) * n_keys
+    uword_t storage_size = (sizeof (uword_t) + ht->value_size) * n_keys
         + sizeof (int) * size; // hop bitmasks
 
-    if (ht->keys)
+    if (ht->keys) {
+#ifndef LISP_FEATURE_SB_SAFEPOINT
+        // the usable size is a private-but-visible aspect of the memory block
+        // if not using malloc(). But with malloc we can't really ask the question.
         gc_assert(usable_size(ht->keys) >= storage_size);
-    else
+#endif
+    } else
         ht->keys = (uword_t*)cached_allocate(storage_size);
 
     ht->mem_size  = storage_size;
@@ -250,7 +280,7 @@ uword_t sxhash_simple_string(struct vector* string)
     unsigned int* char_string = (unsigned int*)(string->data);
 #endif
     unsigned char* base_string = (unsigned char*)(string->data);
-    sword_t len = fixnum_value(string->length);
+    sword_t len = vector_len(string);
     uword_t result = 0;
     sword_t i;
     switch (widetag_of(&string->header)) {
@@ -258,6 +288,7 @@ uword_t sxhash_simple_string(struct vector* string)
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     case SIMPLE_CHARACTER_STRING_WIDETAG:
         for(i=0;i<len;++i) MIX(char_string[i])
+        break;
 #endif
     case SIMPLE_BASE_STRING_WIDETAG:
         for(i=0;i<len;++i) MIX(base_string[i])
@@ -303,7 +334,10 @@ static boolean vector_eql(uword_t arg1, uword_t arg2)
 
     int widetag1 = header_widetag(header1);
     sword_t nwords = sizetab[widetag1](obj1);
-    if (widetag1 < SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG)
+    // OMGWTF! Widetags have been rearranged so many times, I am not sure
+    // how to keep this code from regressing.
+    // ASSUMPTION: the range of number widetags ends with (COMPLEX DOUBLE-FLOAT)
+    if (widetag1 <= COMPLEX_DOUBLE_FLOAT_WIDETAG)
         // All words must match exactly. Start by comparing the length
         // (as encoded in the header) since we don't yet know that obj2
         // occupies the correct number of words.
@@ -312,8 +346,14 @@ static boolean vector_eql(uword_t arg1, uword_t arg2)
 
     // Vector elements must have already been coalesced
     // when comparing simple-vectors for similarity.
-    return (obj1[1] == obj2[1]) // same length vectors
-        && !memcmp(obj1 + 2, obj2 + 2, (nwords-2) << WORD_SHIFT);
+    // Note that only vectors marked "shareable" will get here, so no
+    // hash-table storage vectors or anything of that nature.
+    struct vector *v1 = (void*)obj1;
+    struct vector *v2 = (void*)obj2;
+    return (vector_len(v1) == vector_len(v2)) // same length vectors
+        && !memcmp(v1->data, v2->data,
+                   // ASSUMPTION: exactly 2 non-data words
+                   (nwords-2) << WORD_SHIFT);
 }
 
 /* Initialize 'ht' for first use, which entails zeroing the counters
@@ -382,7 +422,7 @@ void hopscotch_destroy(tableptr ht)
 void hopscotch_reset(tableptr ht)
 {
     if (need_to_zero(ht)) {
-        bzero(ht->keys, ht->mem_size);
+        memset(ht->keys, 0, ht->mem_size);
         ht->count = 0;
     }
     // If the size exceeds twice the final size from the prior run,
@@ -676,6 +716,44 @@ found2: ++index;
 found1: ++index;
 found0:
     return get_val(ht, index);
+}
+
+/* Return the address of the value associated with 'key',
+   insert 'key' with value 0 if it was not found. */
+void* hopscotch_get_ref(tableptr ht, uword_t key)
+{
+    gc_dcheck(key);
+    int index = hash(ht, key) & ht->mask;
+    unsigned bits = get_hop_mask(ht, index);
+    int __attribute__((unused)) probes = 0;
+    if (ht->compare) // Custom comparator
+        for ( ; bits ; bits >>= 1, ++index ) {
+            if ((bits & 1) && ht->compare(ht->keys[index], key))
+                goto found0;
+        }
+    else for ( ; bits ; bits >>= 4, index += 4)
+        if (bits & 0xf) {
+            probe(1, index+0, goto found0);
+            probe(2, index+1, goto found1);
+            probe(4, index+2, goto found2);
+            probe(8, index+3, goto found3);
+        }
+    tally_miss(ht, probes);
+    hopscotch_insert(ht, key, 0);
+    return hopscotch_get_ref(ht, key);
+found3: ++index;
+found2: ++index;
+found1: ++index;
+found0:
+    switch(ht->value_size) {
+#ifdef LISP_FEATURE_64_BIT
+    case 8: return (int64_t*)ht->values + index;
+#endif
+    case 4: return (int32_t*)ht->values + index;
+    case 2: return (int16_t*)ht->values + index;
+    case 1: return (int8_t *)ht->values + index;
+    }
+    return 0;
 }
 
 /* Update or insert a key/value pair. Return nonzero if

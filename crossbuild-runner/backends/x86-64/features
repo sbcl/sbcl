@@ -1,0 +1,16 @@
+:64-bit
+:gencgc
+:use-cons-region
+:soft-card-marks
+:stack-grows-downward-not-upward
+:c-stack-is-control-stack
+:compare-and-swap-vops
+:unwind-to-frame-and-call-vop
+:fp-and-pc-standard-save
+:alien-callbacks
+:cycle-counter
+:integer-eql-vop
+:undefined-fun-restarts
+:call-symbol
+:unbind-in-unwind
+:no-continue-unwind

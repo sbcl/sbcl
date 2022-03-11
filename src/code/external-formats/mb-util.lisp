@@ -10,7 +10,7 @@
        #'equalp)))
 
 (defun get-multibyte-mapper (table code)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type (array * (* 2)) table)
            (type fixnum code))
   (labels ((recur (start end)
@@ -42,7 +42,7 @@
       `(progn
          ;;(declaim (inline ,name))
          (defun ,name (array pos end)
-           (declare (optimize speed (safety 0))
+           (declare (optimize speed #.*safety-0*)
                     (type ,type array)
                     (type array-range pos end))
            ;; returns the number of bytes consumed and nil if it's a
@@ -113,7 +113,7 @@
       `(progn
          (declaim (inline ,name))
          (defun ,name (array pos bytes)
-           (declare (optimize speed (safety 0))
+           (declare (optimize speed #.*safety-0*)
                     (type ,type array)
                     (type array-range pos)
                     (type (integer 1 3) bytes))
@@ -140,7 +140,7 @@
            (make-od-name-list 'simple-get format 'char accessor)))
       `(progn
          (defun ,name (array astart aend)
-           (declare (optimize speed (safety 0))
+           (declare (optimize speed #.*safety-0*)
                     (type ,type array)
                     (type array-range astart aend))
            (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))
@@ -165,7 +165,7 @@
 
   (declaim (inline mb-char-len))
   (defun mb-char-len (code)
-    (declare (optimize speed (safety 0))
+    (declare (optimize speed #.*safety-0*)
              (type fixnum code))
     (cond ((< code 0) (bug "can't happen"))
           ((< code #x100) 1)
@@ -196,7 +196,7 @@
 
        (declaim (inline ,char->mb))
        (defun ,char->mb (char dest string pos)
-         (declare (optimize speed (safety 0))
+         (declare (optimize speed #.*safety-0*)
                   (type (array (unsigned-byte 8) (*)) dest))
          (let ((code (,ucs-to-mb (char-code char))))
            (if code
@@ -218,7 +218,7 @@
                (encoding-error ,format string pos))))
 
        (defun ,string->mb (string sstart send additional-space)
-         (declare (optimize speed (safety 0))
+         (declare (optimize speed #.*safety-0*)
                   (type simple-string string)
                   (type array-range sstart send additional-space))
          (let ((array (make-array (+ additional-space (- send sstart))

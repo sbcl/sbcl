@@ -286,7 +286,7 @@ are present in the debugger, see @ref{Debugger Policy Control}.
 If a function is defined by @code{defun} it will appear in backtrace
 by that name. Functions defined by @code{labels} and @code{flet} will
 appear as @code{(FLET @var{name})} and @code{(LABELS @var{name})} respectively.
-Anonymous lambdas will appear as @code{(LAMDBA @var{lambda-list})}.
+Anonymous lambdas will appear as @code{(LAMBDA @var{lambda-list})}.
 
 @menu
 * Entry Point Details::
@@ -306,27 +306,13 @@ Sometimes the compiler introduces new functions that are used to
 implement a user function, but are not directly specified in the
 source. This is mostly done for argument type and count checking.
 
-@c FIXME: the following bits talked about block-compilation, but
-@c we don't currently support it...
-
-@c With recursive
-@c or block compiled
-@c functions, an additional @code{:EXTERNAL} frame
-@c may appear before the frame representing the first call to the
-@c recursive function
-@c or entry to the compiled block.
-@c This is a
-@c consequence of the way the compiler works: there is
-@c nothing odd with your program. You will also see @code{:CLEANUP}
-@c frames during the execution of @code{unwind-protect} cleanup
-@c code.
-
-With recursive functions, an additional @code{external} frame may
-appear before the frame representing the first call to the recursive
-function. This is a consequence of the way the compiler works: there
-is nothing odd with your program. You may also see @code{cleanup}
-frames during the execution of @code{unwind-protect} cleanup code, and
-@code{optional} for variable argument entry points.
+With recursive or block compiled functions, an additional
+@code{external} frame may appear before the frame representing the first
+call to the recursive function or entry to the compiled block. This is a
+consequence of the way the compiler works: there is nothing odd with
+your program. You may also see @code{cleanup} frames during the
+execution of @code{unwind-protect} cleanup code, and @code{optional} for
+variable argument entry points.
 
 @node  Debug Tail Recursion
 @comment  node-name,  next,  previous,  up
@@ -416,7 +402,7 @@ quality.
 
 In the last two cases, the values of argument variables are
 accessible, but may be incorrect.  For more details on when variable
-values are accessible, @ref{Variable Value Availability}.
+values are accessible, see @ref{Variable Value Availability}.
 
 It is possible for an interrupt to happen when a function call or
 return is in progress.  The debugger may then flame out with some
@@ -906,7 +892,7 @@ is of the same type as SBCL expects the stack frame to return.
 @deffn {Debugger Command} @nopkg{restart-frame}
 Restarts execution of the current stack frame. This command is
 available when the @code{debug} optimization quality is greater than
-both @code{speed} and @code{space} and when the frame is for is a global
+both @code{speed} and @code{space} and when the frame is for a global
 function. If the function is redefined in the debugger before the frame
 is restarted, the new function will be used.
 @end deffn

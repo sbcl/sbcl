@@ -23,46 +23,23 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 5
     ;; Compute the allocation size.
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
-                                     lowtag-mask)))
-          (t
-           (inst slli ndescr rank (- word-shift n-fixnum-tag-bits))
-           (inst addi ndescr ndescr (+ (* array-dimensions-offset n-word-bytes)
-                                       lowtag-mask))))
+    (with-fixnum-as-word-index (rank ndescr)
+      (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
+                                lowtag-mask)))
     (inst andi ndescr ndescr (lognot lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag)
+      (allocation nil ndescr other-pointer-lowtag header :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header
       ;; value.
-      (inst slli ndescr rank (- n-widetag-bits n-fixnum-tag-bits))
-      (inst addi ndescr ndescr (ash (1- array-dimensions-offset) n-widetag-bits))
-      (inst srli pa-flag type n-fixnum-tag-bits)
-      (inst or ndescr ndescr pa-flag)
+      ;; Compute the encoded rank. See ENCODE-ARRAY-RANK.
+      (inst subi ndescr rank (fixnumize 1))
+      (inst andi ndescr ndescr (fixnumize array-rank-mask))
+      (inst slli ndescr ndescr array-rank-position)
+      (inst or ndescr ndescr type)
+      (inst srli ndescr ndescr n-fixnum-tag-bits)
       ;; And store the header value.
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
-
-(define-vop (make-array-header/c)
-  (:translate make-array-header)
-  (:policy :fast-safe)
-  (:arg-types (:constant t) (:constant t))
-  (:info type rank)
-  (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
-  (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:results (result :scs (descriptor-reg)))
-  (:generator 4
-    (let* ((header-size (+ rank (1- array-dimensions-offset)))
-           (bytes (logandc2 (+ (* (1+ header-size) n-word-bytes)
-                               lowtag-mask)
-                            lowtag-mask))
-           (header-bits (logior (ash header-size n-widetag-bits) type)))
-      (pseudo-atomic (pa-flag)
-        (allocation header bytes other-pointer-lowtag :flag-tn pa-flag)
-        (inst li pa-flag header-bits)
-        (storew pa-flag header 0 other-pointer-lowtag)))
-    (move result header)))
-
 
 ;;;; Additional accessors and setters for the array header.
 (define-full-reffer %array-dimension *
@@ -73,18 +50,17 @@
   array-dimensions-offset other-pointer-lowtag
   (any-reg) positive-fixnum sb-kernel:%set-array-dimension)
 
-(define-vop (array-rank-vop)
-  (:translate sb-kernel:%array-rank)
+(define-vop ()
+  (:translate %array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:results (res :scs (any-reg descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
   (:generator 6
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst srai temp temp n-widetag-bits)
-    (inst subi temp temp (1- array-dimensions-offset))
-    (inst slli res temp n-fixnum-tag-bits)))
-
+    (inst lbu res x (- (/ array-rank-position n-byte-bits) other-pointer-lowtag))
+    (inst addi res res 1)
+    (inst andi res res array-rank-mask)))
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -134,7 +110,9 @@
              (setname (symbolicate "DATA-VECTOR-SET/" type)))
          `(progn
             (define-full-reffer ,refname ,type
-              vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-ref)
+              vector-data-offset other-pointer-lowtag
+              ,(remove-if (lambda (x) (member x '(zero))) scs)
+              ,element-type data-vector-ref)
             (define-full-setter ,setname ,type
               vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-set))))
      (def-partial-data-vector-frobs (type element-type size signed &rest scs)
@@ -163,12 +141,12 @@
              ,setname ,type
              ,size ,format vector-data-offset other-pointer-lowtag ,scs
              ,element-type t "inline array store" data-vector-set)))))
-  (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
+  (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg zero)
 
   (def-partial-data-vector-frobs simple-base-string character 1 nil character-reg)
-  #-64-bit
+  #+(and sb-unicode (not 64-bit))
   (def-full-data-vector-frobs simple-character-string character character-reg)
-  #+64-bit
+  #+(and sb-unicode 64-bit)
   (def-partial-data-vector-frobs simple-character-string character
     4 nil character-reg)
 
@@ -264,10 +242,8 @@
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (unsigned-reg) :target shift)
-                     (value :scs (unsigned-reg immediate) :target result))
+                     (value :scs (unsigned-reg zero immediate)))
               (:arg-types ,type positive-fixnum positive-fixnum)
-              (:results (result :scs (unsigned-reg)))
-              (:result-types positive-fixnum)
               (:temporary (:scs (interior-reg)) lip)
               (:temporary (:scs (non-descriptor-reg)) temp old)
               (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
@@ -289,26 +265,22 @@
                   (inst sll temp temp shift)
                   (inst xori temp temp -1)
                   (inst and old old temp))
-                ;; LOGIOR in the new value (shifted appropriatly).
-                (sc-case value
-                  (immediate
-                   (inst li temp (logand (tn-value value) ,(1- (ash 1 bits)))))
-                  (unsigned-reg
-                   (inst andi temp value ,(1- (ash 1 bits)))))
-                (inst sll temp temp shift)
-                (inst or old old temp)
+                ;; LOGIOR in the new value (shifted appropriately).
+                (unless (sc-is value zero)
+                  (sc-case value
+                    (immediate
+                     (inst li temp (logand (tn-value value) ,(1- (ash 1 bits)))))
+                    (unsigned-reg
+                     (inst andi temp value ,(1- (ash 1 bits)))))
+                  (inst sll temp temp shift)
+                  (inst or old old temp))
                 ;; Write the altered word back to the array.
-                (storew old lip vector-data-offset other-pointer-lowtag)
-                (sc-case value
-                  (immediate
-                   (inst li result (tn-value value)))
-                  (unsigned-reg
-                   (move result value)))))
+                (storew old lip vector-data-offset other-pointer-lowtag)))
             (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" type))
               (:translate data-vector-set)
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
-                     (value :scs (unsigned-reg immediate) :target result))
+                     (value :scs (unsigned-reg zero immediate)))
               (:arg-types ,type
                           (:constant
                            (integer 0
@@ -319,8 +291,6 @@
                                             elements-per-word))))
                           positive-fixnum)
               (:info index)
-              (:results (result :scs (unsigned-reg)))
-              (:result-types positive-fixnum)
               (:temporary (:scs (non-descriptor-reg)) temp old)
               (:generator 20
                 (multiple-value-bind (word extra) (floor index ,elements-per-word)
@@ -335,6 +305,7 @@
                                  (lognot (ash ,(1- (ash 1 bits)) (* extra ,bits))))
                            (inst and old old temp))))
                   (sc-case value
+                    (zero)
                     (immediate
                      (let ((value (ash (logand (tn-value value) ,(1- (ash 1 bits)))
                                        (* extra ,bits))))
@@ -347,12 +318,7 @@
                     (unsigned-reg
                      (inst slli temp value (* extra ,bits))
                      (inst or old old temp)))
-                  (storew old object (+ word vector-data-offset) other-pointer-lowtag)
-                  (sc-case value
-                    (immediate
-                     (inst li result (tn-value value)))
-                    (unsigned-reg
-                     (move result value))))))))))
+                  (storew old object (+ word vector-data-offset) other-pointer-lowtag))))))))
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
@@ -364,3 +330,8 @@
   (unsigned-reg) unsigned-num %vector-raw-bits)
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
+
+(define-full-casser data-vector-cas/simple-vector simple-vector vector-data-offset other-pointer-lowtag
+  (any-reg descriptor-reg) * %compare-and-swap-svref)
+(define-atomic-frobber array-atomic-incf/word amoadd * vector-data-offset
+  other-pointer-lowtag (unsigned-reg) unsigned-num %array-atomic-incf/word)

@@ -44,39 +44,10 @@
     (dolist (form (cdr d))
       (when (and (consp form) (eq (car form) name))
         (return-from get-declaration (cdr form))))))
-
-(defmacro dolist-carefully ((var list improper-list-handler) &body body)
-  `(let ((,var nil)
-         (.dolist-carefully. ,list))
-     (loop (when (null .dolist-carefully.) (return nil))
-           (if (consp .dolist-carefully.)
-               (progn
-                 (setq ,var (pop .dolist-carefully.))
-                 ,@body)
-               (,improper-list-handler)))))
 
 ;;;; FIND-CLASS
 ;;;;
 ;;;; This is documented in the CLOS specification.
-
-(define-condition illegal-class-name-error (error)
-  ((name :initarg :name :reader illegal-class-name-error-name))
-  (:default-initargs :name (missing-arg))
-  (:report (lambda (condition stream)
-             (format stream "~@<~S is not a legal class name.~@:>"
-                     (illegal-class-name-error-name condition)))))
-
-(declaim (inline legal-class-name-p check-class-name))
-(defun legal-class-name-p (thing)
-  (symbolp thing))
-
-(defun check-class-name (thing &optional (allow-nil t))
-  ;; Apparently, FIND-CLASS and (SETF FIND-CLASS) accept any symbol,
-  ;; but DEFCLASS only accepts non-NIL symbols.
-  (if (or (not (legal-class-name-p thing))
-          (and (null thing) (not allow-nil)))
-      (error 'illegal-class-name-error :name thing)
-      thing))
 
 (define-condition class-not-found-error (sb-kernel::cell-error)
   ((sb-kernel::name :type (satisfies legal-class-name-p)))
@@ -170,23 +141,7 @@
                                 (bind `((,object-var ,object))))
                            (setf object object-var)
                            bind)))
-          ;; What's going on by not assuming that #'(SETF x) returns NEW-VALUE?
-          ;; It seems wrong to return anything other than what the SETF fun
-          ;; yielded. By analogy, when the SETF macro changes (SETF (F x) v)
-          ;; into (funcall #'(setf F) ...), it does not insert any code to
-          ;; enforce V as the overall value. So we do we do that here???
-          (form `(let ((.new-value. ,new-value))
-                   ,(call-gf 'slot-writer-name object slot-name env '(.new-value.))
-                   .new-value.)))
+          (form (call-gf 'slot-writer-name object slot-name env (list new-value))))
       (if bind-object
           `(let ,bind-object ,form)
           form))))
-
-(defmacro function-funcall (form &rest args)
-  `(funcall (the function ,form) ,@args))
-
-(defmacro function-apply (form &rest args)
-  `(apply (the function ,form) ,@args))
-
-(defun get-setf-fun-name (name)
-  `(setf ,name))

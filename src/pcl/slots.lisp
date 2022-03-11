@@ -42,14 +42,8 @@
                          (cell-error-name condition)
                          (type-of (unbound-slot-instance condition))))))))
 
-(defmethod wrapper-fetcher ((class standard-class))
-  '%instance-layout)
-
-(defmethod slots-fetcher ((class standard-class))
-  'std-instance-slots)
-
-(defmethod raw-instance-allocator ((class standard-class))
-  'allocate-standard-instance)
+(define-condition missing-slot (cell-error simple-type-error)
+  ())
 
 ;;; These three functions work on std-instances and fsc-instances. These are
 ;;; instances for which it is possible to change the wrapper and the slots.
@@ -58,35 +52,6 @@
 ;;; structure protocol are promoted to the implementation-specific class
 ;;; std-class. Many of these methods call these four functions.
 
-(defun %swap-wrappers-and-slots (i1 i2) ; old -> new
-  (cond ((std-instance-p i1)
-         #+(and compact-instance-header x86-64)
-         (let ((oslots (std-instance-slots i1))
-               (nslots (std-instance-slots i2)))
-           ;; The hash val is in the header of the slots. Copying is race-free
-           ;; because it is immutable once memoized by STD-INSTANCE-HASH.
-           (sb-vm::cas-header-data-high
-            nslots 0 (sb-impl::%std-instance-hash oslots)))
-         ;; FIXME: If a backend supports two-word primitive instances
-         ;; and double-wide CAS, it's probably best to use that.
-         ;; Maybe we're inside a mutex here anyway though?
-         (let ((w1 (%instance-layout i1))
-               (s1 (std-instance-slots i1)))
-           (setf (%instance-layout i1) (%instance-layout i2))
-           (setf (std-instance-slots i1) (std-instance-slots i2))
-           (setf (%instance-layout i2) w1)
-           (setf (std-instance-slots i2) s1)))
-        ((fsc-instance-p i1)
-         (let ((w1 (%funcallable-instance-layout i1))
-               (w2 (%funcallable-instance-layout i2))
-               (s1 (fsc-instance-slots i1)))
-           (aver (= (layout-bitmap w1) (layout-bitmap w2)))
-           (setf (%funcallable-instance-layout i1) w2)
-           (setf (fsc-instance-slots i1) (fsc-instance-slots i2))
-           (setf (%funcallable-instance-layout i2) w1)
-           (setf (fsc-instance-slots i2) s1)))
-        (t
-         (error "unrecognized instance type"))))
 
 ;;;; STANDARD-INSTANCE-ACCESS
 
@@ -133,7 +98,7 @@
                  (return-from slot-value
                    (if cell
                        (funcall (slot-info-reader (cdr cell)) object)
-                       (values (slot-missing (wrapper-class* wrapper) object
+                       (values (slot-missing (wrapper-class wrapper) object
                                              slot-name 'slot-value)))))
                 ;; this next test means CONSP, but the transform that weakens
                 ;; CONSP to LISTP isn't working here for some reason.
@@ -142,21 +107,21 @@
                 (t
                  (bug "Bogus slot cell in SLOT-VALUE: ~S" cell)))))
     (if (unbound-marker-p value)
-        (slot-unbound (wrapper-class* wrapper) object slot-name)
+        (slot-unbound (wrapper-class wrapper) object slot-name)
         value)))
 
 (defun set-slot-value (object slot-name new-value)
   (let* ((wrapper (valid-wrapper-of object))
          (cell (or (find-slot-cell wrapper slot-name)
                    (return-from set-slot-value
-                     (progn (slot-missing (wrapper-class* wrapper)
+                     (progn (slot-missing (wrapper-class wrapper)
                                           object slot-name 'setf new-value)
                             new-value))))
          (location (car cell))
          (info (cdr cell))
          (typecheck (slot-info-typecheck info)))
     (when typecheck
-      (funcall typecheck new-value))
+      (setf new-value (funcall typecheck new-value)))
     (cond ((fixnump location)
            (if (std-instance-p object)
                (setf (standard-instance-access object location) new-value)
@@ -181,13 +146,13 @@
   (let* ((wrapper (valid-wrapper-of object))
          (cell (or (find-slot-cell wrapper slot-name)
                    (return-from slot-value
-                     (values (slot-missing (wrapper-class* wrapper) object slot-name
+                     (values (slot-missing (wrapper-class wrapper) object slot-name
                                            'cas (list old-value new-value))))))
          (location (car cell))
          (info (cdr cell))
          (typecheck (slot-info-typecheck info)))
     (when typecheck
-      (funcall typecheck new-value))
+      (setf new-value (funcall typecheck new-value)))
     (let ((old (cond ((fixnump location)
                       (if (std-instance-p object)
                           (cas (standard-instance-access object location) old-value new-value)
@@ -201,7 +166,7 @@
                      (t
                       (bug "Bogus slot-cell in (CAS SLOT-VALUE): ~S" cell)))))
       (if (and (unbound-marker-p old) (neq old old-value))
-          (slot-unbound (wrapper-class* wrapper) object slot-name)
+          (slot-unbound (wrapper-class wrapper) object slot-name)
           old))))
 
 (defun slot-boundp (object slot-name)
@@ -217,7 +182,7 @@
                  (return-from slot-boundp
                    (if cell
                        (funcall (slot-info-boundp (cdr cell)) object)
-                       (and (slot-missing (wrapper-class* wrapper) object
+                       (and (slot-missing (wrapper-class wrapper) object
                                           slot-name 'slot-boundp)
                             t))))
                 ((listp location) ; forcibly transform CONSP to LISTP
@@ -237,10 +202,10 @@
                      +slot-unbound+)))
           ((not location)
            (if cell
-               (let ((class (wrapper-class* wrapper)))
+               (let ((class (wrapper-class wrapper)))
                  (slot-makunbound-using-class class object
                                               (find-slot-definition class slot-name)))
-               (slot-missing (wrapper-class* wrapper) object slot-name
+               (slot-missing (wrapper-class wrapper) object slot-name
                              'slot-makunbound)))
           ((listp location) ; forcibly transform CONSP to LISTP
            (setf (cdr location) +slot-unbound+))
@@ -259,6 +224,11 @@
       (slot-value object slot-name)
       (load-time-value (make-unprintable-object "unbound slot") t)))
 
+(defmacro safely-get-slots (method-name x)
+  `(cond ((std-instance-p ,x) (std-instance-slots ,x))
+         ((fsc-instance-p ,x) (fsc-instance-slots ,x))
+         (t (bug "unrecognized instance type in ~S" ',method-name))))
+
 (defmethod slot-value-using-class ((class std-class)
                                    (object standard-object)
                                    (slotd standard-effective-slot-definition))
@@ -269,14 +239,8 @@
          (value
           (typecase location
             (fixnum
-             (cond ((std-instance-p object)
-                    (clos-slots-ref (std-instance-slots object)
-                                    location))
-                   ((fsc-instance-p object)
-                    (clos-slots-ref (fsc-instance-slots object)
-                                    location))
-                   (t (bug "unrecognized instance type in ~S"
-                           'slot-value-using-class))))
+             (clos-slots-ref (safely-get-slots slot-value-using-class object)
+                             location))
             (cons
              (cdr location))
             (t
@@ -301,14 +265,9 @@
                         new-value)))
     (typecase location
       (fixnum
-       (cond ((std-instance-p object)
-              (setf (clos-slots-ref (std-instance-slots object) location)
-                    new-value))
-             ((fsc-instance-p object)
-              (setf (clos-slots-ref (fsc-instance-slots object) location)
-                    new-value))
-             (t (bug "unrecognized instance type in ~S"
-                     '(setf slot-value-using-class)))))
+       (setf (clos-slots-ref (safely-get-slots (setf slot-value-using-class) object)
+                             location)
+             new-value))
       (cons
        (setf (cdr location) new-value))
       (t
@@ -322,24 +281,17 @@
   ;; FIXME: Do we need this? SLOT-BOUNDP checks for obsolete
   ;; instances. Are users allowed to call this directly?
   (check-obsolete-instance object)
-  (let* ((location (slot-definition-location slotd))
-         (value
+  (let ((location (slot-definition-location slotd)))
+    (not (unbound-marker-p
           (typecase location
             (fixnum
-             (cond ((std-instance-p object)
-                          (clos-slots-ref (std-instance-slots object)
-                                          location))
-                   ((fsc-instance-p object)
-                    (clos-slots-ref (fsc-instance-slots object)
-                                    location))
-                   (t (bug "unrecognized instance type in ~S"
-                           'slot-boundp-using-class))))
+             (clos-slots-ref (safely-get-slots slot-boundp-using-class object)
+                             location))
             (cons
              (cdr location))
             (t
              (instance-structure-protocol-error slotd
-                                                'slot-boundp-using-class)))))
-    (not (unbound-marker-p value))))
+                                                'slot-boundp-using-class)))))))
 
 (defmethod slot-makunbound-using-class
            ((class std-class)
@@ -349,14 +301,9 @@
   (let ((location (slot-definition-location slotd)))
     (typecase location
       (fixnum
-       (cond ((std-instance-p object)
-              (setf (clos-slots-ref (std-instance-slots object) location)
-                    +slot-unbound+))
-             ((fsc-instance-p object)
-              (setf (clos-slots-ref (fsc-instance-slots object) location)
-                    +slot-unbound+))
-             (t (bug "unrecognized instance type in ~S"
-                     'slot-makunbound-using-class))))
+       (setf (clos-slots-ref (safely-get-slots slot-makunbound-using-class object)
+                             location)
+             +slot-unbound+))
       (cons
        (setf (cdr location) +slot-unbound+))
       (t
@@ -425,17 +372,30 @@
 
 (defmethod slot-missing
            ((class t) instance slot-name operation &optional new-value)
-  (error "~@<When attempting to ~A, the slot ~S is missing from the ~
-          object ~S.~@:>"
-         (ecase operation
-           (slot-value "read the slot's value (slot-value)")
-           (setf (format nil
-                         "set the slot's value to ~S (SETF of SLOT-VALUE)"
-                         new-value))
-           (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
-           (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
-         slot-name
-         instance))
+  (error 'missing-slot
+         :name slot-name
+         :format-control
+         "~@<When attempting to ~A, the slot ~S is missing from the ~
+          object ~S.~@[~%~a~]~@:>"
+         :format-arguments
+         (list (ecase operation
+                 (slot-value "read the slot's value (slot-value)")
+                 (setf (format nil
+                               "set the slot's value to ~S (SETF of SLOT-VALUE)"
+                               new-value))
+                 (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
+                 (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
+               slot-name
+               instance
+               (let ((slot (and (typep class 'slot-class)
+                                (find slot-name (class-slots class)
+                                      :key #'slot-definition-name
+                                      :test #'string-equal))))
+                 (when slot
+                   (format nil "It has a slot ~/sb-ext:print-symbol-with-prefix/, while ~
+                         ~/sb-ext:print-symbol-with-prefix/ is requested."
+                           (slot-definition-name slot)
+                           slot-name))))))
 
 (defmethod slot-unbound ((class t) instance slot-name)
   (restart-case
@@ -460,7 +420,7 @@
        ;; in list. The only exceptions are when there are non-local slots
        ;; before the one we want.
        (slot-definition-name
-        (find position (layout-slot-list (layout-of instance))
+        (find position (wrapper-slot-list (wrapper-of instance))
               :key #'slot-definition-location)))
       (cons
        (car position))))))
@@ -496,11 +456,3 @@
            :format-control "~S called on ~S, which is not yet finalized."
            :format-arguments (list 'class-slots class)
            :references '((:amop :generic-function class-slots)))))
-
-(defun %set-slots (object names &rest values)
-  (mapc (lambda (name value)
-          (if (unbound-marker-p value)
-              ;; SLOT-MAKUNBOUND-USING-CLASS might do something nonstandard.
-              (slot-makunbound object name)
-              (setf (slot-value object name) value)))
-        names values))

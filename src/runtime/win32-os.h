@@ -15,6 +15,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
 #include <windows.h>
+#include <ntstatus.h>
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -30,9 +31,6 @@
 
 #ifdef LISP_FEATURE_SB_THREAD
 #include "pthreads_win32.h"
-/* prevent inclusion of a mingw semaphore.h */
-#define CANNOT_USE_POSIX_SEM_T
-typedef sem_t os_sem_t;
 #else
 typedef void *siginfo_t;
 typedef int sigset_t;
@@ -60,7 +58,17 @@ extern int os_number_of_processors;
 extern int win32_open_for_mmap(const char* file);
 extern FILE* win32_fopen_runtime();
 
+// 64-bit uses whatever TLS index the kernels gives us which we store in
+// 'sbcl_thread_tls_index' to hold our thread-local value of the pointer
+// to struct thread.
+// 32-bit uses a quasi-arbitrary fixed TLS index that we try to claim on startup.
+// of the process.
+#ifdef LISP_FEATURE_64_BIT
+extern DWORD sbcl_thread_tls_index;
+#define OUR_TLS_INDEX sbcl_thread_tls_index
+#else
 #define OUR_TLS_INDEX 63
+#endif
 #define SIG_MEMORY_FAULT SIGSEGV
 
 #define SIG_STOP_FOR_GC (SIGRTMIN+1)
@@ -76,14 +84,9 @@ struct lisp_exception_frame {
 void wos_install_interrupt_handlers(struct lisp_exception_frame *handler);
 char *dirname(char *path);
 
-void os_invalidate_free(os_vm_address_t addr, os_vm_size_t len);
-
 boolean win32_maybe_interrupt_io(void* thread);
+void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len);
 
-#define bcopy(src,dest,n) memmove(dest,src,n)
-
-struct thread;
-void** os_get_csp(struct thread* th);
-
+int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
 
 #endif  /* SBCL_INCLUDED_WIN32_OS_H */

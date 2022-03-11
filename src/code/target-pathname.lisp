@@ -37,6 +37,7 @@
                        (unparse-directory-separator ";")
                        (simplify-namestring #'identity)
                        (customary-case :upper)))
+  (name-hash 0 :type fixnum)
   (name "" :type simple-string :read-only t)
   (translations nil :type list)
   (canon-transls nil :type list))
@@ -57,31 +58,26 @@
 ;;;
 ;;; Physical pathnames include all these slots and a device slot.
 
-;;; Logical pathnames are a subclass of PATHNAME. Their class
-;;; relations are mimicked using structures for efficiency.
-(defstruct (logical-pathname (:conc-name %logical-pathname-)
-                                   (:include pathname)
-                                   (:copier nil)
-                                   (:constructor %make-logical-pathname
-                                    (host device directory name type version
-                                     &aux (dir-hash (pathname-dir-hash directory))
-                                          (stem-hash (mix (sxhash name) (sxhash type)))))))
-
-;;; FIXME: this, and many other FREEZE-TYPEs don't actually do anything.
-;;; Unobvious order of execution of TLFs in cold-init is one potential problem,
-;;; but there could be other issues as well, like maybe we're unsealing classes
-;;; because the FREEZE-TYPE was wrong to begin with. (So why no warnings then?)
-#-sb-fluid (declaim (freeze-type logical-pathname logical-host))
-
-(defmethod make-load-form ((logical-host logical-host) &optional env)
-  (declare (ignore env))
-  (values `(find-logical-host ',(logical-host-name logical-host))
-          nil))
+;;; We can't freeze HOST because later on we define either UNIX-HOST or WIN32-HOST.
+(declaim (freeze-type logical-host))
 
 ;;; Utility functions
 
 (deftype absent-pathname-component ()
   '(member nil :unspecific))
+
+(defun make-pattern (pieces)
+  ;; Ensure that the hash will meet the SXASH persistence requirement:
+  ;; "2. For any two objects, x and y, both of which are ... pathnames ... and which are similar,
+  ;;     (sxhash x) and (sxhash y) yield the same mathematical value even if x and y exist in
+  ;;     different Lisp images of the same implementation."
+  ;; Specifically, hashes that depend on object identity (address) are impermissible.
+  (dolist (piece pieces)
+    (aver (typep piece '(or string symbol (cons (eql :character-set) string)))))
+  (%make-pattern (sxhash pieces) pieces))
+
+(declaim (inline %pathname-directory))
+(defun %pathname-directory (pathname) (car (%pathname-dir+hash pathname)))
 
 (declaim (inline pathname-component-present-p))
 (defun pathname-component-present-p (component)
@@ -236,20 +232,13 @@
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
 ;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
 (defun make-trivial-default-pathname ()
-  (%%make-pathname *physical-host* nil nil nil nil :newest))
+  (intern-pathname *physical-host* nil nil nil nil :newest))
 
 ;;; pathname methods
 
-;;; SXHASH does a really poor job on pathname directory, especially if in your
-;;; environment, the directories of interest are all many levels down from the
-;;; filesystem root- every directory in your work space might hash to the same
-;;; value under SXHASH. Mixing in all pieces of the directory path solves that.
-(defun pathname-dir-hash (directory)
-  ;; FIXME: all instances of PATTERN hash to the same thing.
-  ;; We should probably hash the pattern pieces. (Same for stem-hash)
-  (let ((hash (sxhash (car directory))))
-    (dolist (piece (cdr directory) hash)
-      (mixf hash (sxhash piece)))))
+(defun pathname-sxhash (x)
+  (declare (pathname x))
+  (pathname-key-hash x))
 
 (defmethod print-object ((pathname pathname) stream)
   (let ((namestring (handler-case (namestring pathname)
@@ -270,40 +259,95 @@
                   (%pathname-name pathname)
                   (%pathname-type pathname)
                   (%pathname-version pathname))))))
-
-(defmethod make-load-form ((pathname pathname) &optional environment)
-  (make-load-form-saving-slots pathname :environment environment))
 
+;;; Use an unsynchronized weak hash table with explicit locking to "try"
+;;; to intern pathnames. "Try" because there are several factors that preclude
+;;; ensuring uniqueness:
+;;;  - pathname is a STRUCTURE-OBJECT, so users might call COPY-STRUCTURE.
+;;;    We can make that fail by inventing a subtype of instance that is not
+;;;    a STRUCTURE-OBJECT. Whatever that metatype is could be useful for
+;;;    PATTERN (parts of the pathname) as well as THREAD, MUTEX, HASH-TABLE
+;;;    and maybe some other things that yield strange semantics if copied.
+;;;  - the load form methods use MAKE-LOAD-FORM-SAVING-SLOTS thereby
+;;;    bypassing the interning operation. That seems totally fixable.
+;;;
+;;; Additionally, it would be nice if this table would act to reduce
+;;; EQUAL to EQ on pathnames by ensuring that we never intern two distinct
+;;; pathnames that are EQUAL.
+;;; That would require performing some canonicalization immediately which may
+;;; or may not pose a problem for fixing https://bugs.launchpad.net/sbcl/+bug/1834266
+;;; which is to say, if hosts can actually be :UNSPECIFIC, then the version
+;;; collapsing that is done here would not be done.  I don't know if it's that simple.
+;;; If it isn't that simple, then the answer is that hash function and comparator
+;;; function used for the *PATHNAMES* table needs to be more fine-grained than
+;;; the hash value that SXHASH returns for a pathname.
+;;;
+;;; The spec is actually extremely underspecified in regard to the meaning of
+;;;  "pathnames that are equal should be functionally equivalent."
+;;; The simple test:
+;;;  (equal (make-pathname :name "a" :version nil) (make-pathname :name "a" :version :newest))
+;;; shows that EQUAL is inconsistent in terms of what "functionally equivalent" means:
+;;;  SBCL, ABCL, and CCL => T
+;;;  CLISP and ECL => NIL
+;;; Also, on case-sensitive-case-preserving filesystems it's not possible
+;;; to know which pathnames are equivalent without asking the filesystem.
+;;;
+;;; This table uses %MAKE-HASH-TABLE, not MAKE-HASH-TABLE, because the latter
+;;; always creates a synchronized table if :WEAKNESS is specified.
+;;; But to correctly use the "put-if-absent" operation, the locking must occur
+;;; *around* the get and put operations. It makes no sense to lock the table around
+;;; individual operations, hence the unsynchronized table.
+
+(define-load-time-global *pathnames*
+    (let ((h (%make-hash-table (logior (pack-ht-flags-weakness +ht-weak-value+)
+                                       (pack-ht-flags-kind 3)
+                                       hash-table-userfun-flag)
+                               'pathname-key=
+                               #'pathname-key=
+                               #'pathname-key-hash
+                               10
+                               default-rehash-size
+                               $1.0)))
+      (install-hash-table-lock h)
+      h))
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
 ;;; from parsed arguments.
-(defun %make-maybe-logical-pathname (host device directory name type version)
+(defun intern-pathname (host device directory name type version)
   ;; We canonicalize logical pathname components to uppercase. ANSI
   ;; doesn't strictly require this, leaving it up to the implementor;
   ;; but the arguments given in the X3J13 cleanup issue
   ;; PATHNAME-LOGICAL:ADD seem compelling: we should canonicalize the
   ;; case, and uppercase is the ordinary way to do that.
   (flet ((upcase-maybe (x) (typecase x (string (logical-word-or-lose x)) (t x))))
-    (if (typep host 'logical-host)
-        (%make-logical-pathname host
-                                :unspecific
-                                (mapcar #'upcase-maybe directory)
-                                (upcase-maybe name)
-                                (upcase-maybe type)
-                                version)
-        (progn
-          (aver (eq host *physical-host*))
-          (%make-pathname host device directory name type version)))))
+    (when (typep host 'logical-host)
+        (setq device :unspecific
+              directory (mapcar #'upcase-maybe directory)
+              name (upcase-maybe name)
+              type (upcase-maybe type))))
+  (let ((table *pathnames*))
+    (declare (inline !allocate-pathname)) ; for DXability
+    (with-system-mutex ((hash-table-%lock table))
+      (let* ((dir+hash (when directory
+                         (ensure-gethash
+                          directory table
+                          (cons directory (pathname-key-hash directory)))))
+             (key (!allocate-pathname host device dir+hash name type version)))
+        (declare (truly-dynamic-extent key))
+        (or (gethash key table)
+            (let ((key (!allocate-pathname host device dir+hash name type version)))
+              (when (typep host 'logical-host)
+                (setf (%instance-wrapper key) #.(find-layout 'logical-pathname)))
+              (setf (gethash key table) key)))))))
 
-;;; Hash table searching maps a logical pathname's host to its
-;;; physical pathname translation.
-(define-load-time-global *logical-hosts*
-    (make-hash-table :test 'equal :synchronized t))
+;;; Vector of logical host objects, each of which contains its translations.
+;;; The vector is never mutated- always a new vector is created when adding
+;;; translations for a new host. So nothing needs locking.
+;;; And the fact that hosts are never deleted keeps things really simple.
+(define-load-time-global *logical-hosts* #())
+(declaim (simple-vector *logical-hosts*))
 
 ;;;; patterns
-
-(defmethod make-load-form ((pattern pattern) &optional environment)
-  (make-load-form-saving-slots pattern :environment environment))
 
 (defmethod print-object ((pattern pattern) stream)
   (print-unreadable-object (pattern stream :type t)
@@ -428,7 +472,7 @@
         (pattern
          ;; A pattern is only matched by an identical pattern.
          (and (pattern-p wild) (pattern= thing wild)))
-        (integer
+        (bignum
          ;; An integer (version number) is matched by :WILD or the
          ;; same integer. This branch will actually always be NIL as
          ;; long as the version is a fixnum.
@@ -436,120 +480,87 @@
 
 ;;; a predicate for comparing two pathname slot component sub-entries
 (defun compare-component (this that)
-  (or (eql this that)
+  (or (eq this that)
       (typecase this
         (simple-string
          (and (simple-string-p that)
               (string= this that)))
         (pattern
+         ;; PATTERN instances should probably become interned objects
+         ;; so that we can use EQ on them. But that currently has the same
+         ;; problem as PATHAME= has - the cache can be bypassed.
          (and (pattern-p that)
               (pattern= this that)))
         (cons
          (and (consp that)
               (compare-component (car this) (car that))
-              (compare-component (cdr this) (cdr that)))))))
+              (compare-component (cdr this) (cdr that))))
+        (bignum
+         (eql this that)))))
 
 ;;;; pathname functions
 
-(defun pathname= (pathname1 pathname2)
-  (declare (type pathname pathname1)
-           (type pathname pathname2))
-  (or (eq pathname1 pathname2)
-      (and (eq (%pathname-host pathname1)
-               (%pathname-host pathname2))
-           (= (%pathname-dir-hash pathname1) (%pathname-dir-hash pathname2))
-           (= (%pathname-stem-hash pathname1) (%pathname-stem-hash pathname2))
-           (compare-component (%pathname-device pathname1)
-                              (%pathname-device pathname2))
-           (compare-component (%pathname-directory pathname1)
-                              (%pathname-directory pathname2))
-           (compare-component (%pathname-name pathname1)
-                              (%pathname-name pathname2))
-           (compare-component (%pathname-type pathname1)
-                              (%pathname-type pathname2))
-           (or (eq (%pathname-host pathname1) *physical-host*)
-               (compare-component (%pathname-version pathname1)
-                                  (%pathname-version pathname2))))))
+(macrolet ((compare-most-components ()
+             `(and (eq (%pathname-host a) (%pathname-host b)) ; Interned
+                   ;; Unless the pathname cache can be made 100% reliable,
+                   ;; strength-reducing EQUAL to EQ is inadmissible here.
+                   ;; To fix that, MAKE-LOAD-FORM methods need not to bypass
+                   ;; INTERN-PATHNAME.
+                   (let ((dir-a (%pathname-dir+hash a))
+                         (dir-b (%pathname-dir+hash b)))
+                     (or (eq dir-a dir-b)
+                         (compare-component (car dir-a) (car dir-b))))
+                   (compare-component (%pathname-device a) (%pathname-device b))
+                   (compare-component (%pathname-name a) (%pathname-name b))
+                   (compare-component (%pathname-type a) (%pathname-type b)))))
 
-;;; This is conceptually like (DEFUN-CACHED (%MAKE-PATHNAME ...))
-;;; except that we try hard never to evict entries until SAVE-LISP-AND-DIE.
-;;; Entries can still be kicked out randomly though.
-;;; A two-level lookup is used- it works better than mixing all
-;;; pathname components into a hash key.
-(define-load-time-global *pathnames* (make-array 211 :initial-element nil))
-(define-load-time-global *pathnames-lock* (sb-thread:make-mutex :name "Pathnames"))
+;;; PATHNAME-KEY= can receive two different subsets of keys:
+;;; - non-nil LIST is the directory part of a pathname
+;;; - entire PATHNAME
+(defun pathname-key= (a b)
+  (etypecase a
+    (list (and (listp b) (compare-component a b)))
+    (pathname (and (pathnamep b)
+                   (compare-most-components)
+                   (eql (pathname-version a) (pathname-version b))))))
 
-(defun %make-pathname (host device directory name type version)
-  (if (or device (neq host *physical-host*))
-      (%%make-pathname host device directory name type version)
-      (let* ((table *pathnames*)
-             (index (rem (pathname-dir-hash directory) (length table)))
-             (dir-holder
-              ;; Candidates is a list of ((dir . contents) ...)
-              (loop named outer
-                    with candidates = (svref table index) and new = nil
-                    do
-                    (let ((n-candidates 0))
-                      (dolist (candidate candidates)
-                        (incf n-candidates)
-                        (when (compare-component (car candidate) directory)
-                          (return-from outer candidate)))
-                      (unless new
-                        (setq new (cons directory (make-array 3 :initial-element nil))))
-                      (cond ((< n-candidates 10)
-                             (let* ((cell (cons new candidates))
-                                    (actual-old (cas (svref table index) candidates cell)))
-                               (when (eq actual-old candidates)
-                                 (return-from outer new))
-                               (setq candidates actual-old)))
-                            (t
-                             ;; Clobber this cache entry, losing all directories in it.
-                             ;; Hopefully this doesn't happen often.
-                             #+nil (format t "~&*** Pathname cache overflow: ~D ~S~%"
-                                           index (mapcar 'car candidates))
-                             (setf (svref table index) (list new))
-                             (return-from outer new)))))))
-        (flet ((matchp (stem-hash candidates)
-                 (let ((n-candidates 0))
-                   (dolist (pathname candidates (values nil n-candidates))
-                     (when (and (= (%pathname-stem-hash pathname) stem-hash)
-                                (compare-component (%pathname-version pathname) version)
-                                (compare-component (%pathname-name pathname) name)
-                                (compare-component (%pathname-type pathname) type))
-                       (return (values pathname 0)))
-                     (incf n-candidates)))))
-          ;; We have tests asserting that the distinction between :NEWEST
-          ;; and NIL is preserved, though there is no effective difference.
-          (binding* ((stem-hash (mix (sxhash name) (sxhash type)))
-                     (vector (the simple-vector (cdr dir-holder)))
-                     (index (rem stem-hash (length vector)))
-                     (candidates (svref vector index))
-                     ((found n-candidates) (matchp stem-hash candidates)))
-            (when found
-              (return-from %make-pathname found))
-            ;; Optimistically assuming that the pathname won't be found
-            ;; on the double-check, allocate it now
-            (let ((pathname (%%make-pathname *physical-host* nil (car dir-holder)
-                                             name type version)))
-              (sb-thread::with-system-mutex (*pathnames-lock*)
-                (when (>= n-candidates 10)
-                  ;; Rehash into a larger vector
-                  (let* ((old-len (length vector))
-                         (new-len (+ old-len 4))
-                         (new-vector (make-array new-len :initial-element nil)))
-                    (dovector (list vector)
-                      (dolist (p list)
-                        (push p (svref new-vector (rem (%pathname-stem-hash p)
-                                                       new-len)))))
-                    (rplacd dir-holder new-vector)
-                    (setq vector new-vector
-                          index (rem stem-hash new-len)
-                          candidates (svref vector index))))
-                (let ((found (matchp stem-hash candidates)))
-                  (if found
-                      (setq pathname found)
-                      (push pathname (svref vector index)))))
-              pathname))))))
+(defun pathname= (a b)
+  (declare (type pathname a b))
+  (or (eq a b)
+      (and (compare-most-components)
+           (or (eq (%pathname-host a) *physical-host*)
+               (compare-component (pathname-version a)
+                                  (pathname-version b)))))))
+
+(sb-kernel::assign-equalp-impl 'pathname #'pathname=)
+(sb-kernel::assign-equalp-impl 'logical-pathname #'pathname=)
+
+;;; A pathname key is a key to an entry in *PATHNAMES*, either a pathname
+;;; or a pathname-directory.
+(defun pathname-key-hash (x)
+  (flet ((hash-piece (piece)
+           (etypecase piece
+             (string (sxhash piece)) ; transformed
+             (symbol (sxhash piece)) ; transformed
+             (pattern (pattern-hash piece))
+             ((cons (eql :home) (cons string null))
+              (sxhash (second piece))))))
+    (etypecase x
+      (pathname
+       (let* ((host (%pathname-host x))
+              ;; NAME-HASH is based on SXHASH of a string
+              (hash (if (typep host 'logical-host) (logical-host-name-hash host) 0)))
+         (mixf hash (hash-piece (%pathname-device x))) ; surely stringlike, right?
+         (awhen (%pathname-dir+hash x) (mixf hash (cdr it)))
+         (mixf hash (hash-piece (%pathname-name x)))
+         (mixf hash (hash-piece (%pathname-type x)))
+         ;; EQUAL might ignore the version, and it doesn't provide many bits
+         ;; of randomness, so don't bother with it.
+         hash))
+      (list ;; a directory
+       (let ((hash 0))
+         (dolist (piece x hash)
+           (mixf hash (hash-piece piece))))))))
 
 ;;; Convert PATHNAME-DESIGNATOR (a pathname, or string, or
 ;;; stream), into a pathname in PATHNAME.
@@ -749,7 +760,7 @@ the operating system native pathname conventions."
                           (if diddle-case
                               (diddle-case default)
                               default)))))
-        (%make-maybe-logical-pathname
+        (intern-pathname
          (or pathname-host default-host)
          ;; The device of ~/ shouldn't be merged, because the
          ;; expansion may have a different device
@@ -884,7 +895,7 @@ a host-structure or string."
                                             diddle-defaults))
                         (t
                          nil))))
-      (%make-maybe-logical-pathname
+      (intern-pathname
        host
        (pick device devp %pathname-device) ; forced to :UNSPECIFIC when logical
        dir
@@ -1025,21 +1036,8 @@ a host-structure or string."
                    does not match the explicit HOST argument, ~S."
                   :format-arguments (list new-host host)))
          (let ((pn-host (or new-host host (pathname-host defaults))))
-           (values (%make-maybe-logical-pathname
-                    pn-host device directory file type version)
+           (values (intern-pathname pn-host device directory file type version)
                    end)))))))
-
-;;; If NAMESTR begins with a colon-terminated, defined, logical host,
-;;; then return that host, otherwise return NIL.
-(defun extract-logical-host-prefix (namestr start end)
-  (declare (type simple-string namestr)
-           (type index start end)
-           (values (or logical-host null)))
-  (let ((colon-pos (position #\: namestr :start start :end end)))
-    (if colon-pos
-        (values (gethash (nstring-upcase (subseq namestr start colon-pos))
-                         *logical-hosts*))
-        nil)))
 
 (defun parse-namestring (thing
                          &optional
@@ -1116,8 +1114,7 @@ a host-structure or string."
                    does not match the explicit HOST argument, ~S."
                   :format-arguments (list new-host host)))
          (let ((pn-host (or new-host host (pathname-host defaults))))
-           (values (%make-pathname
-                    pn-host device directory file type version)
+           (values (intern-pathname pn-host device directory file type version)
                    end)))))))
 
 (defun parse-native-namestring (thing
@@ -1481,7 +1478,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                             (if (eq result :error)
                                 (error "~S doesn't match ~S." source from)
                                 result))))
-              (%make-maybe-logical-pathname
+              (intern-pathname
                (or to-host source-host)
                (frob %pathname-device)
                (frob %pathname-directory translate-directories)
@@ -1554,8 +1551,13 @@ unspecified elements into a completed to-pathname based on the to-wildname."
 (defun find-logical-host (thing &optional (errorp t))
   (etypecase thing
     (string
-     (let ((found (gethash (logical-word-or-lose thing)
-                           *logical-hosts*)))
+     (let* ((name (logical-word-or-lose thing))
+            (hash (sxhash name))
+            ;; Can do better here: binary search, since we maintain sorted order.
+            (found (dovector (x *logical-hosts*)
+                     (when (and (eq (logical-host-name-hash x) hash)
+                                (string= (logical-host-name x) name))
+                       (return x)))))
        (if (or found (not errorp))
            found
            ;; This is the error signalled from e.g.
@@ -1573,13 +1575,16 @@ unspecified elements into a completed to-pathname based on the to-wildname."
 
 ;;; Given a logical host name or host, return a logical host, creating
 ;;; a new one if necessary.
-(defun intern-logical-host (thing)
-  (with-locked-system-table (*logical-hosts*)
-    (or (find-logical-host thing nil)
-        (let* ((name (logical-word-or-lose thing))
-               (new (make-logical-host :name name)))
-          (setf (gethash name *logical-hosts*) new)
-          new))))
+(defun intern-logical-host (thing &aux name host)
+  (loop
+    (awhen (find-logical-host thing nil) (return it))
+    (unless name
+      (setq name (logical-word-or-lose thing)
+            host (make-logical-host :name name :name-hash (sxhash name))))
+    (let* ((old *logical-hosts*)
+           (new (merge 'vector old (list host) #'string< :key #'logical-host-name)))
+      (when (eq (cas *logical-hosts* old new) old)
+        (return host)))))
 
 ;;;; logical pathname parsing
 
@@ -1729,9 +1734,14 @@ unspecified elements into a completed to-pathname based on the to-wildname."
         (parse-host (logical-chunkify namestr start end)))
       (values host :unspecific (directory) name type version))))
 
-;;; We can't initialize this yet because not all host methods are
-;;; loaded yet.
-(defvar *logical-pathname-defaults*)
+;;; Return a value suitable, e.g., for preinitializing
+;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
+;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
+(defun make-trivial-default-logical-pathname ()
+  (intern-pathname (make-logical-host :name "") :unspecific nil nil nil nil))
+
+(define-load-time-global *logical-pathname-defaults*
+  (make-trivial-default-logical-pathname))
 
 (defun logical-namestring-p (x)
   (and (stringp x)
@@ -1925,11 +1935,6 @@ unspecified elements into a completed to-pathname based on the to-wildname."
       (translate-logical-pathname possibly-logical-pathname)
       possibly-logical-pathname))
 
-(defvar *logical-pathname-defaults*
-  (%make-logical-pathname
-   (make-logical-host :name (logical-word-or-lose "BOGUS"))
-   :unspecific nil nil nil nil))
-
 (defun load-logical-pathname-translations (host)
   "Reads logical pathname translations from SYS:SITE;HOST.TRANSLATIONS.NEWEST,
 with HOST replaced by the supplied parameter. Returns T on success.
@@ -2006,3 +2011,24 @@ existing translations for \"SYS:SRC;\", \"SYS:CONTRIB;\", and
               ("SYS:CONTRIB;**;*.*.*" ,(physical-target "contrib"))
               ("SYS:OUTPUT;**;*.*.*" ,(physical-target "output"))
               ,@current-translations)))))
+
+(defmethod make-load-form ((pn pathname) &optional env)
+  (declare (ignore env))
+  (labels ((reconstruct (component)
+             (cond ((pattern-p component) (patternify component))
+                   ((and (listp component) (some #'pattern-p component))
+                    (cons 'list (mapcar #'patternify component)))
+                   (t `',component)))
+           (patternify (subcomponent)
+             (if (pattern-p subcomponent)
+                 `(make-pattern ',(pattern-pieces subcomponent))
+                 `',subcomponent)))
+    (values `(intern-pathname
+              ,(if (typep pn 'logical-pathname)
+                   `(find-logical-host ',(logical-host-name (%pathname-host pn)))
+                   '*physical-host*)
+              ,(reconstruct (%pathname-device pn))
+              ,(reconstruct (%pathname-directory pn))
+              ,(reconstruct (%pathname-name pn))
+              ,(reconstruct (%pathname-type pn))
+              ,(reconstruct (%pathname-version pn))))))

@@ -15,12 +15,23 @@
            ;;
            #:read-only-core-space-id
            #:static-core-space-id
+           #:static-code-core-space-id
            #:dynamic-core-space-id
            #:immobile-fixedobj-core-space-id
            #:immobile-varyobj-core-space-id
            #:deflated-core-space-id-flag))
 
 (in-package "SB-COREFILE")
+
+;;; This constant is computed as
+;;;  (logior (ash (char-code #\S) 24)
+;;;          (ash (char-code #\B) 16)
+;;;          (ash (char-code #\C) 8)
+;;;          (char-code #\L))
+;;; But it needs to use SB-XC:CHAR-CODE when cross-compiling,
+;;; so it's not easily shared between genesis and editcore
+;;; without a bit of computation by hand.
+(defconstant core-magic #x5342434C)
 
 ;;; magic numbers to identify entries in a core file
 ;;;
@@ -42,4 +53,5 @@
 (defconstant read-only-core-space-id 3)
 (defconstant immobile-fixedobj-core-space-id 4)
 (defconstant immobile-varyobj-core-space-id 5)
+(defconstant static-code-core-space-id 4)
 (defconstant deflated-core-space-id-flag 8)

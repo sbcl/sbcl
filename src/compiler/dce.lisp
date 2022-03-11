@@ -40,7 +40,9 @@
        ;; question, but the LAMBDA-BIND would be NIL, so just ignore
        ;; :DELETED and :ZOMBIE CLAMBDAs here.
        (unless (member (functional-kind leaf)
-                       '(:deleted :zombie))
+                       '(:deleted :zombie
+                         ;; Follow actual combinations, not refs
+                         :mv-let :let :assignment))
          (when (eq (lambda-component leaf)
                    (node-component ref))
            (dce-analyze-one-fun leaf))))
@@ -61,12 +63,33 @@
     (do-nodes (node nil block)
       (typecase node
         (ref
-         (dce-analyze-ref node))))
+         (dce-analyze-ref node))
+        (basic-combination
+         (when (eq (basic-combination-kind node) :local)
+           (let ((fun (ref-leaf (lvar-use (basic-combination-fun node)))))
+             (unless (memq (functional-kind fun) '(:deleted :zombie))
+               (dce-analyze-one-fun fun)))))))
+    (loop for (succ . next) on (block-succ block)
+          if next
+          do (dce-analyze-block succ)
+          else
+          ;; Tail call the last block
+          return (dce-analyze-block succ))))
 
-    (dolist (succ (block-succ block))
-      (dce-analyze-block succ))))
+(defun dce-analyze-optional-dispatch (optional-dispatch)
+  (flet ((analyze (fun)
+           (when (and fun
+                      (not (memq (functional-kind fun) '(:deleted :zombie))))
+             (dce-analyze-one-fun fun))))
+    (loop for fun in (optional-dispatch-entry-points optional-dispatch)
+          do (analyze (and (promise-ready-p fun)
+                           (force fun))))
+    (analyze (optional-dispatch-more-entry optional-dispatch))))
 
 (defun dce-analyze-one-fun (clambda)
+  (when (and (eq (functional-kind clambda) :external)
+             (optional-dispatch-p (functional-entry-fun clambda)))
+    (dce-analyze-optional-dispatch (functional-entry-fun clambda)))
   (dce-analyze-block
    (node-block
     (lambda-bind clambda))))
@@ -87,3 +110,24 @@
     (unless (block-flag block)
       (delete-block-lazily block)))
   (find-dfo component))
+
+;;; Run before find-initial-dfo
+(defun initial-eliminate-dead-code (lambdas)
+  (loop for lambda in lambdas
+        for component = (lambda-component lambda)
+        do
+        (dolist (fun (component-lambdas component))
+          (when (lambda-externally-referenced-p fun)
+            (dce-analyze-one-fun fun))))
+
+  (loop for lambda in lambdas
+        for component = (lambda-component lambda)
+        do
+        (do-blocks (block component)
+          (unless (block-flag block)
+            (delete-block-lazily block))))
+
+  (loop for lambda in lambdas
+        for component = (lambda-component lambda)
+        do
+        (clear-flags component)))

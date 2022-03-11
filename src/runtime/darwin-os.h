@@ -37,7 +37,7 @@ typedef ucontext_t os_context_t;
 void darwin_init(void);
 
 #ifdef LISP_FEATURE_SB_THREAD
-#define CANNOT_USE_POSIX_SEM_T
+#define USE_DARWIN_GCD_SEMAPHORES
 #include <dispatch/dispatch.h>
 typedef dispatch_semaphore_t os_sem_t;
 #endif

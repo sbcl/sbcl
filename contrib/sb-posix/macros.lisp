@@ -99,16 +99,18 @@ a FILE-STREAM designating the underlying file-descriptor."
   (if (sb-sys:find-foreign-symbol-address c-name)
       `(progn
         (declaim (inline ,lisp-name))
-        (defun ,lisp-name ,(mapcar #'car arguments)
+        (defun ,lisp-name ,(mapcar #'car (remove '&optional arguments))
           (let ((r (alien-funcall
                     (extern-alien
                      ,c-name
                      (function ,return-type
                                ,@(mapcar
                                   (lambda (x)
-                                    (gethash (cadr x)
-                                             *designator-types*
-                                             (cadr x)))
+                                    (if (eq x '&optional)
+                                        x
+                                        (gethash (cadr x)
+                                                 *designator-types*
+                                                 (cadr x))))
                                   arguments)))
                     ,@(mapcar (lambda (x)
                                 (if (nth-value 1
@@ -118,7 +120,7 @@ a FILE-STREAM designating the underlying file-descriptor."
                                                :sb-posix)
                                       ,(car x))
                                     (car x)))
-                              arguments))))
+                              (remove '&optional arguments)))))
             (if (,error-predicate r) (syscall-error ',lisp-name) r))))
       `(sb-int:style-warn "Didn't find definition for ~S" ,c-name)))
 

@@ -7,6 +7,10 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
+# it is illogical that this makefile pulls in Makefile.features,
+# which is presumed not to exist, and which when it does exist causes
+# confusion as to what flags should be added in for a generic C compile.
+# Why do we do this???
 -include genesis/Makefile.features
 -include Config
 

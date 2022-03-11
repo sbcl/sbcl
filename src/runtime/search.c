@@ -21,7 +21,6 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
-#include "pseudo-atomic.h" // for get_alloc_pointer()
 
 lispobj *
 search_read_only_space(void *pointer)
@@ -36,11 +35,24 @@ search_read_only_space(void *pointer)
 lispobj *
 search_static_space(void *pointer)
 {
-    lispobj *start = (lispobj *)STATIC_SPACE_START;
+    lispobj *start = (lispobj *)STATIC_SPACE_OBJECTS_START;
     lispobj *end = static_space_free_pointer;
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
     return gc_search_space(start, pointer);
+}
+
+lispobj *search_all_gc_spaces(void *pointer)
+{
+    lispobj *start;
+    if (((start = search_dynamic_space(pointer)) != NULL) ||
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        ((start = search_immobile_space(pointer)) != NULL) ||
+#endif
+        ((start = search_static_space(pointer)) != NULL) ||
+        ((start = search_read_only_space(pointer)) != NULL))
+        return start;
+    return NULL;
 }
 
 static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, unsigned char* b,
@@ -67,26 +79,43 @@ static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, unsigned char*
     return a[i] - b[i]; // same return convention as strcmp()
 }
 
+struct symbol_search {
+    char *name;
+    boolean ignore_case;
+};
+static uword_t search_symbol_aux(lispobj* start, lispobj* end, uword_t arg)
+{
+    struct symbol_search* ss = (struct symbol_search*)arg;
+    return (uword_t)search_for_symbol(ss->name, (lispobj)start, (lispobj)end, ss->ignore_case);
+}
 lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignore_case)
 {
     lispobj* where = (lispobj*)start;
     lispobj* limit = (lispobj*)end;
-    struct symbol *symbol;
     lispobj namelen = make_fixnum(strlen(name));
 
+#ifdef LISP_FEATURE_GENCGC
+    // This function was never safe to use on pages that were dirtied with unboxed words.
+    // It has become even less safe now that don't prezero most pages during GC,
+    // because we will certainly encounter remnants of forwarding pointers etc.
+    // So if the specified range is all of dynamic space, defer to the space walker.
+    if (start == DYNAMIC_SPACE_START && end == dynamic_space_highwatermark()) {
+        struct symbol_search ss = {name, ignore_case};
+        return (lispobj*)walk_generation(search_symbol_aux, -1, (uword_t)&ss);
+    }
+#endif
     while (where < limit) {
         lispobj word = *where;
+        struct vector *string;
         if (header_widetag(word) == SYMBOL_WIDETAG &&
-            lowtag_of((symbol = (struct symbol *)where)->name) == OTHER_POINTER_LOWTAG) {
-            struct vector *symbol_name = VECTOR(symbol->name);
-            if (gc_managed_addr_p((lispobj)symbol_name) &&
-                ((widetag_of(&symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG
-                  && symbol_name->length == namelen
-                  && !(ignore_case ? strcasecmp : strcmp)((char *)symbol_name->data, name))
+            (string = symbol_name((struct symbol*)where)) != 0 &&
+            string->length_ == namelen) {
+            if (gc_managed_addr_p((lispobj)string) &&
+                ((widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG
+                  && !(ignore_case ? strcasecmp : strcmp)((char *)string->data, name))
 #ifdef LISP_FEATURE_SB_UNICODE
-                 || (widetag_of(&symbol_name->header) == SIMPLE_CHARACTER_STRING_WIDETAG
-                     && symbol_name->length == namelen
-                     && !strcmp_ucs4_ascii((uint32_t*)symbol_name->data,
+                 || (widetag_of(&string->header) == SIMPLE_CHARACTER_STRING_WIDETAG
+                     && !strcmp_ucs4_ascii((uint32_t*)string->data,
                                            (unsigned char*)name, ignore_case))
 #endif
                  ))
@@ -120,7 +149,7 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
         if (where >= (lispobj*)DYNAMIC_SPACE_START)
             break;
         where = (lispobj*)DYNAMIC_SPACE_START;
-        end = (lispobj*)get_alloc_pointer();
+        end = (lispobj*)dynamic_space_highwatermark();
     }
     return 0;
 }
@@ -128,9 +157,9 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
 
 static boolean sym_stringeq(lispobj sym, const char *string, int len)
 {
-    struct vector* name = VECTOR(SYMBOL(sym)->name);
+    struct vector* name = symbol_name(SYMBOL(sym));
     return widetag_of(&name->header) == SIMPLE_BASE_STRING_WIDETAG
-        && name->length == make_fixnum(len)
+        && vector_len(name) == len
         && !memcmp(name->data, string, len);
 }
 
@@ -148,7 +177,7 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
         struct vector* cells = VECTOR(symbols->slots[INSTANCE_DATA_START]);
         gc_assert(widetag_of(&cells->header) == SIMPLE_VECTOR_WIDETAG);
         lispobj namelen = strlen(symbol_name);
-        int cells_length = fixnum_value(cells->length);
+        int cells_length = vector_len(cells);
         int index = *hint >> 1;
         if (index >= cells_length)
             index = 0; // safeguard against vector shrinkage
@@ -168,39 +197,7 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
     return 0;
 }
 
-lispobj* find_symbol(char* symbol_name, char* package_name, unsigned int* hint)
+lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
 {
-    // Use SB-KERNEL::SUB-GC to get a hold of the SB-KERNEL package,
-    // which contains the symbol *PACKAGE-NAMES*.
-    static unsigned int kernelpkg_hint;
-    lispobj kernel_package = SYMBOL(FDEFN(SUB_GC_FDEFN)->name)->package;
-    lispobj* package_names = search_package_symbols(kernel_package, "*PACKAGE-NAMES*",
-                                                    &kernelpkg_hint);
-    if (!package_names)
-        return 0;
-    lispobj namelen = strlen(package_name);
-    struct instance* names = (struct instance*)
-        native_pointer(((struct symbol*)package_names)->value);
-    struct vector* cells = (struct vector*)
-        native_pointer(names->slots[INSTANCE_DATA_START]);
-#define LFHASH_KEY_OFFSET 3 /* KLUDGE */
-    int n = (fixnum_value(cells->length) - LFHASH_KEY_OFFSET) >> 1;
-    gc_assert(make_fixnum(n) == cells->data[0]);
-    int i;
-    // Search *PACKAGE-NAMES* for the package
-    for (i=0; i<n; ++i) {
-        lispobj element = cells->data[LFHASH_KEY_OFFSET+i];
-        if (is_lisp_pointer(element)) {
-            struct vector* string = (struct vector*)native_pointer(element);
-            if (widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG
-                && string->length == make_fixnum(namelen)
-                && !memcmp(string->data, package_name, namelen)) {
-                element = cells->data[LFHASH_KEY_OFFSET+n+i];
-                if (listp(element))
-                    element = CONS(element)->car;
-                return search_package_symbols(element, symbol_name, hint);
-            }
-        }
-    }
-    return 0;
+    return package ? search_package_symbols(package, symbol_name, hint) : 0;
 }

@@ -26,7 +26,14 @@
                                   0 :type ,(if (= i 64) 'sb-ext:word t))))))
   (defbiggy))
 
-(assert (typep (sb-kernel:layout-bitmap
+(macrolet ((def-100slots ()
+             `(defstruct 100slots
+               ,@(loop for i from 0 repeat 100
+                    collect `(,(sb-int:symbolicate "SLOT" (write-to-string i))
+                              ,(format nil "This is ~D" i))))))
+  (def-100slots))
+
+(assert (typep (sb-kernel:wrapper-bitmap
                 (sb-kernel::find-layout 'biggy)) 'bignum))
 
 (defvar *x* nil)
@@ -53,50 +60,29 @@
 ;; Run it twice to make sure things really worked.
 
 (let ((*y* (make-biggy))
-      (*x* (sb-kernel:layout-bitmap
+      (*x* (sb-kernel:wrapper-bitmap
             (sb-kernel::find-layout 'biggy))))
   (sb-ext:gc :gen 1))
 (princ 'did-pass-1) (terpri)
 (force-output)
 
 (let ((*y* (make-biggy))
-      (*x* (sb-kernel:layout-bitmap
+      (*x* (sb-kernel:wrapper-bitmap
             (sb-kernel::find-layout 'biggy))))
   (sb-ext:gc :gen 1))
 (princ 'did-pass-2) (terpri)
 (force-output)
 
-;; Test the C bignum bit extractor.
-;; Surprisingly, there was a bug in it, unrelated to forwarding
-;; pointers that remained dormant until the randomized
-;; HUGE-MANYRAW test in 'defstruct.impure.lisp' found it.
-(defun c-bignum-logbitp (index bignum)
-  (assert (typep bignum 'bignum))
-  (sb-sys:with-pinned-objects (bignum)
-    (alien-funcall (extern-alien "positive_bignum_logbitp"
-                                 (function boolean int system-area-pointer))
-                   index
-                   (sb-sys:int-sap
-                    (- (sb-kernel:get-lisp-obj-address bignum)
-                       sb-vm:other-pointer-lowtag)))))
+(defun collect-slot-values (struct &aux result)
+  (sb-kernel:do-instance-tagged-slot (i struct)
+    (push (sb-kernel:%instance-ref struct i) result))
+  (nreverse result))
 
-(with-test (:name :c-bignum-logbitp)
-  ;; walking 1 bit
-  (dotimes (i 256)
-    (let ((num (ash 1 i)))
-      (when (typep num 'bignum)
-        (dotimes (j 257)
-          (assert (eq (c-bignum-logbitp j num)
-                     (logbitp j num)))))))
-  ;; random bits
-  (let ((max (ash 1 768)))
-    (dotimes (i 100)
-      (let ((num (random max)))
-        (when (typep num 'bignum)
-          (dotimes (j (* (sb-bignum:%bignum-length num)
-                         sb-vm:n-word-bits))
-            (assert (eq (c-bignum-logbitp j num)
-                       (logbitp j num)))))))))
+(with-test (:name :sign-extended-bitmap
+            :fails-on :interpreter)
+  ;; could have 100 or 101 physical payload slots depending on
+  ;; presence of a padding word
+  (assert (>= (length (collect-slot-values (make-100slots))) 100)))
 
 ;; for testing the comparator
 (defstruct foo1
@@ -114,24 +100,26 @@
   (c 'cee))                                      ;    13       9
 
 (defvar *afoo* (make-foo1))
-(assert (= (sb-kernel:layout-length (sb-kernel:layout-of *afoo*))
+(assert (= (sb-kernel:wrapper-length (sb-kernel:wrapper-of *afoo*))
            (sb-kernel:%instance-length *afoo*)))
-(with-test (:name :tagged-slot-iterator-macro)
+(with-test (:name :tagged-slot-iterator-macro
+            :fails-on :interpreter)
   ;; on 32-bit, the logical length is 14, which means 15 words (with header),
   ;; but slot index 14 (word index 15) exists after padding to 16 memory words.
+  ;; It is allowed to hold a fixnum (or any non-pointer) but naught else.
   #-64-bit (progn (assert (= (sb-kernel:%instance-length *afoo*) 14))
-                  (setf (sb-kernel:%instance-ref *afoo* 14) 'magic))
+                  (setf (sb-kernel:%instance-ref *afoo* 14) #xdead))
   ;; on 64-bit, the logical length is 10, which means 11 words (with header),
   ;; but slot index 10 (word index 11) exists after padding to 12 memory words.
   #+64-bit (progn (assert (= (sb-kernel:%instance-length *afoo*) 10))
-                  (setf (sb-kernel:%instance-ref *afoo* 10) 'magic))
+                  (setf (sb-kernel:%instance-ref *afoo* 10) #xdead))
 
   (let (l)
     (sb-kernel:do-instance-tagged-slot (i *afoo*)
       (push `(,i ,(sb-kernel:%instance-ref *afoo* i)) l))
     (assert (equalp (nreverse l)
-                    #-64-bit `((3 aaay) (9 bee) (13 cee) (14 magic))
-                    #+64-bit `((2 aaay) (6 bee) (9 cee) (10 magic))))))
+                    #-64-bit `((3 aaay) (9 bee) (13 cee) (14 #xdead))
+                    #+64-bit `((2 aaay) (6 bee) (9 cee) (10 #xdead))))))
 
 (defvar *anotherfoo* (make-foo1))
 
@@ -171,7 +159,7 @@
               (slots (sb-kernel:dd-slots (sb-kernel:find-defstruct-description 'foo)))
               (valtype (sb-kernel:dsd-raw-type
                         (find 'sword slots :key #'sb-kernel:dsd-name))))
-         #-(or alpha hppa sparc) (assert (eq valtype 'sb-vm:signed-word))
+         (assert (eq valtype 'sb-vm:signed-word))
          (assert (= -9 (if (eq valtype 'sb-vm:signed-word)
                            (sb-sys:signed-sap-ref-word sap 0)
                            (sb-sys:sap-ref-lispobj sap 0))))))))

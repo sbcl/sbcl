@@ -219,15 +219,15 @@
                                ,@(unless class-slot-p
                                    `((setq slots
                                            (std-instance-slots ,instance))))
-                               (%instance-layout ,instance))
+                               (%instance-wrapper ,instance))
                               ((fsc-instance-p ,instance)
                                ,@(unless class-slot-p
                                    `((setq slots
                                            (fsc-instance-slots ,instance))))
-                               (%funcallable-instance-layout ,instance)))))
+                               (%fun-wrapper ,instance)))))
         (block access
           (when (and wrapper
-                     (not (zerop (layout-clos-hash wrapper)))
+                     (not (zerop (wrapper-clos-hash wrapper)))
                      ,@(if (eql 1 1-or-2-class)
                            `((eq wrapper wrapper-0))
                            `((or (eq wrapper wrapper-0)
@@ -304,7 +304,7 @@
 (defun emit-miss (miss-fn args applyp)
   (if applyp
       `(multiple-value-call ,miss-fn ,@args
-                            (sb-c::%more-arg-values .more-context.
+                            (sb-c:%more-arg-values .more-context.
                                                     0
                                                     .more-count.))
       `(funcall ,miss-fn ,@args)))
@@ -385,18 +385,18 @@
      (with-unique-names (wrapper)
        `(cond ((std-instance-p ,argument)
                ,(if slots-var
-                    `(let ((,wrapper (%instance-layout ,argument)))
-                       (when (layout-for-std-class-p ,wrapper)
+                    `(let ((,wrapper (%instance-wrapper ,argument)))
+                       (when (layout-for-pcl-obj-p ,wrapper)
                          (setq ,slots-var (std-instance-slots ,argument)))
                        ,wrapper)
-                    `(%instance-layout ,argument)))
+                    `(%instance-wrapper ,argument)))
               ((fsc-instance-p ,argument)
                ,(if slots-var
-                    `(let ((,wrapper (%funcallable-instance-layout ,argument)))
-                       (when (layout-for-std-class-p ,wrapper)
+                    `(let ((,wrapper (%fun-wrapper ,argument)))
+                       (when (layout-for-pcl-obj-p ,wrapper)
                          (setq ,slots-var (fsc-instance-slots ,argument)))
                        ,wrapper)
-                    `(%funcallable-instance-layout ,argument)))
+                    `(%fun-wrapper ,argument)))
                (t (go ,miss-tag)))))
     ;; Sep92 PCL used to distinguish between some of these cases (and
     ;; spuriously exclude others).  Since in SBCL
@@ -407,7 +407,7 @@
      (when slots-var
        (bug "SLOT requested for metatype ~S, but it isn't going to happen."
             metatype))
-     `(layout-of ,argument))
+     `(wrapper-of ,argument))
     ;; a metatype of NIL should never be seen here, as NIL is only in
     ;; the metatypes before a generic function is fully initialized.
     ;; T should never be seen because we never need to get a wrapper

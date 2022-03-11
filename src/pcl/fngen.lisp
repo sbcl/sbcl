@@ -48,19 +48,13 @@
                  (test-converter #'default-test-converter)
                  (code-converter #'default-code-converter)
                  (constant-converter #'default-constant-converter))
-  (function-apply (get-fun-generator lambda test-converter code-converter)
-                  (compute-constants lambda constant-converter)))
-
-(defun get-fun1 (lambda &optional
-                  (test-converter #'default-test-converter)
-                  (code-converter #'default-code-converter)
-                  (constant-converter #'default-constant-converter))
   (values (the function
             (get-fun-generator lambda test-converter code-converter))
           (compute-constants lambda constant-converter)))
 
 (defun default-constantp (form)
-  (constant-typep form '(not (or symbol fixnum cons))))
+  (and (constantp form)
+       (not (typep (constant-form-value form) '(or symbol fixnum cons wrapper)))))
 
 (defun default-test-converter (form)
   (if (default-constantp form)
@@ -83,29 +77,33 @@
   generator
   generator-lambda
   system)
+(declaim (freeze-type fgen))
 
 ;;; *FGENS* stores all the function generators we have so far. Each
 ;;; element is a FGEN structure as implemented below. Don't ever touch this
-;;; list by hand, use LOOKUP-FGEN, and ENSURE-FGEN.
-(define-load-time-global *fgens* (make-hash-table :test #'equal :synchronized t))
+;;; table by hand, use GET-FUN-GENERATOR and ENSURE-FGEN.
+;;; We use explicit locking for properly scoped R/M/W operation without
+;;; recursion on the mutex. So the table is not specified as :SYNCHRONIZED.
+(define-load-time-global *fgens* (make-hash-table :test #'equal))
 
 (defun ensure-fgen (test gensyms generator generator-lambda system)
-  (with-locked-system-table (*fgens*)
-    (let ((old (lookup-fgen test)))
-      (cond (old
-             (setf (fgen-generator old) generator)
-             (unless (fgen-system old)
-               (setf (fgen-system old) system)))
-            (t
-             (setf (gethash test *fgens*)
-                   (make-fgen gensyms generator generator-lambda system)))))))
+  (let ((table *fgens*))
+    (with-system-mutex ((hash-table-lock table))
+      (let ((old (gethash test table)))
+        (cond (old
+               (setf (fgen-generator old) generator)
+               (unless (fgen-system old)
+                 (setf (fgen-system old) system)))
+              (t
+               (setf (gethash test table)
+                     (make-fgen gensyms generator generator-lambda system))))))))
 
-(defun lookup-fgen (test)
-  (gethash test *fgens*))
 
 (defun get-fun-generator (lambda test-converter code-converter)
   (let* ((test (compute-test lambda test-converter))
-         (fgen (lookup-fgen test)))
+         (table *fgens*)
+         (fgen (with-system-mutex ((hash-table-lock table))
+                 (gethash test table))))
     (if fgen
         (fgen-generator fgen)
         (get-new-fun-generator lambda test code-converter))))
@@ -166,8 +164,8 @@
 
 (defmacro precompile-function-generators (&optional system)
   (let (collect)
-    (with-locked-system-table (*fgens*)
-      (maphash (lambda (test fgen)
+    ;; In single threaded code, only at system build time, and not used after.
+    (maphash (lambda (test fgen)
                  (when (or (null (fgen-system fgen))
                            (eq (fgen-system fgen) system))
                    (when system
@@ -179,5 +177,5 @@
                            ',(fgen-generator-lambda fgen)
                            ',system)
                          collect)))
-               *fgens*))
+               *fgens*)
     `(progn ,@collect)))

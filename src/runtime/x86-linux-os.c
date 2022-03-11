@@ -30,8 +30,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -51,7 +49,6 @@ static inline int set_thread_area(struct user_desc *u_info)
 }
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
@@ -75,11 +72,6 @@ int arch_os_thread_init(struct thread *thread) {
                           ((entry_number << 3) + 3));
 
     if(entry_number < 0) return 0;
-#ifdef LISP_FEATURE_GCC_TLS
-    current_thread = thread;
-#else
-    pthread_setspecific(specials,thread);
-#endif
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -90,13 +82,13 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
     if(sigaltstack(&sigstack,0)<0)
-        lose("Cannot sigaltstack: %s\n",strerror(errno));
+        lose("Cannot sigaltstack: %s",strerror(errno));
 #endif
     return 1;
 }
 
 struct thread *debug_get_fs() {
-    register u32 fs;
+    register uint32_t fs;
     __asm__ __volatile__ ("movl %%fs,%0" : "=r" (fs)  : );
     return (struct thread *)fs;
 }
@@ -131,12 +123,6 @@ os_context_register_addr(os_context_t *context, int offset)
     default: return 0;
     }
     return &context->uc_mcontext.gregs[offset];
-}
-
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return &context->uc_mcontext.gregs[14]; /*  REG_EIP */
 }
 
 os_context_register_t *
@@ -181,3 +167,10 @@ void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
 }
+
+// To avoid "Missing required foreign symbol" errors in os_link_runtime()
+// the executable must actually depend on libm. It would not require libm,
+// despite -lm in the link step, if there is no reference to a libm symbol
+// observable to the linker. Any one symbol suffices to resolve all of them.
+#include <math.h>
+const long libm_anchor = (long)acos;

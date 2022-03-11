@@ -92,18 +92,6 @@
     (setf (block-flag block) t)
     (dolist (succ (block-succ block))
       (find-dfo-aux succ head component))
-    (when (component-nlx-info-generated-p component)
-      ;; FIXME: We also need (and do) this walk before physenv
-      ;; analysis, but at that time we are probably not very
-      ;; interested in the actual DF order.
-      ;;
-      ;; TODO: It is probable that one of successors have the same (or
-      ;; similar) set of NLXes; try to shorten the walk (but think
-      ;; about a loop, the only exit from which is non-local).
-      (map-block-nlxes (lambda (nlx-info)
-                         (let ((nle (nlx-info-target nlx-info)))
-                         (find-dfo-aux nle head component)))
-                       block))
     (remove-from-dfo block)
     (add-to-dfo block head))
   (values))
@@ -200,10 +188,10 @@
 
 ;;; If CLAMBDA is already in COMPONENT, just return that
 ;;; component. Otherwise, move the code for CLAMBDA and all lambdas it
-;;; physically depends on (either because of calls or because of
-;;; closure relationships) into COMPONENT, or possibly into another
-;;; COMPONENT that we find to be related. Return whatever COMPONENT we
-;;; actually merged into.
+;;; depends on (either because of calls or because of closure
+;;; relationships) into COMPONENT, or possibly into another COMPONENT
+;;; that we find to be related. Return whatever COMPONENT we actually
+;;; merged into.
 ;;;
 ;;; (Note: The analogous CMU CL code only scavenged call-based
 ;;; dependencies, not closure dependencies. That seems to've been by
@@ -266,7 +254,8 @@
                          (dfo-scavenge-dependency-graph (lambda-home clambda)
                                                         res)))
                  (scavenge-possibly-deleted-lambda (clambda)
-                   (unless (eql (lambda-kind clambda) :deleted)
+                   (unless (or (eql (lambda-kind clambda) :deleted)
+                               (eql (lambda-kind (lambda-home clambda)) :deleted))
                      (scavenge-lambda clambda)))
                  ;; Scavenge call relationship.
                  (scavenge-call (called-lambda)
@@ -276,12 +265,12 @@
                  ;; CLAMBDA, then the home lambda should be in the
                  ;; same component as CLAMBDA. (sbcl-0.6.13, and CMU
                  ;; CL, didn't do this, leading to the occasional
-                 ;; failure when physenv analysis, which is local to
-                 ;; each component, would bogusly conclude that a
+                 ;; failure when environment analysis, which is local
+                 ;; to each component, would bogusly conclude that a
                  ;; closed-over variable was unused and thus delete
                  ;; it. See e.g. cmucl-imp 2001-11-29.)
                  (scavenge-closure-var (var)
-                   (unless (null (lambda-var-refs var)) ; unless var deleted
+                   (when (lambda-var-refs var) ; unless var deleted
                      (let ((var-home-home (lambda-home (lambda-var-home var))))
                        (scavenge-possibly-deleted-lambda var-home-home))))
                  ;; Scavenge closure over an entry for nonlocal exit.
@@ -423,7 +412,7 @@
   (setf (functional-kind lambda) :deleted)
   (dolist (let (lambda-lets lambda))
     (setf (lambda-home let) result-lambda)
-    (setf (lambda-physenv let) (lambda-physenv result-lambda))
+    (setf (lambda-environment let) (lambda-environment result-lambda))
     (push let (lambda-lets result-lambda)))
   (setf (lambda-entries result-lambda)
         (nconc (lambda-entries result-lambda)
@@ -496,14 +485,7 @@
          (result-return (lambda-return result-lambda)))
     (cond
       ((null (rest lambdas)))
-      ((and result-return
-            ;; KLUDGE: why is the node deleted but clambda still has a return?
-            ;; see a test-case for this in tests/merge-lambdas.lisp
-            ;; But now it can only be exercised with block
-            ;; compilation, which doesn't seem to work anyway.
-            (not (node-to-be-deleted-p
-                  (ctran-use (node-prev
-                              (lvar-uses (return-result result-return)))))))
+      (result-return
        ;; Make sure the result's return node starts a block so that we
        ;; can splice code in before it.
        (let ((prev (node-prev

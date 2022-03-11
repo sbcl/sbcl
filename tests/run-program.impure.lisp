@@ -166,14 +166,13 @@
 ;;; agressive about flushing them. So, here's another test using :PTY.
 
 #-win32
-(with-test (:name :is-/bin/ed-installed?)
-  (assert (probe-file "/bin/ed")))
+(unless (probe-file "/bin/ed") (push :no-bin-ed-installed *features*))
 
 #-win32
 (progn
   (defparameter *tmpfile* (scratch-file-name))
 
-  (with-test (:name (run-program :/bin/ed))
+  (with-test (:name (run-program :/bin/ed) :skipped-on :no-bin-ed-installed)
     (with-open-file (f *tmpfile*
                        :direction :output
                        :if-exists :supersede)
@@ -241,18 +240,27 @@
             #-sb-thread (loop repeat 10 collect (start-run))))))
 
 (with-test (:name (run-program :pty-stream) :fails-on :win32)
-  (assert (equal "OK"
-                 (handler-case
-                  (with-timeout 6
-                    (subseq
-                     (with-output-to-string (s)
-                       (assert (= 42 (process-exit-code
-                                      (run-program "/bin/sh" '("-c" "echo OK; exit 42") :wait t
-                                                                                        :pty s))))
-                       s)
-                     0
-                     2))
-                  (timeout () "timeout")))))
+  (let (process
+        stream)
+    (assert (equal "OK"
+                   (handler-bind
+                       ((timeout (lambda (c)
+                                   c
+                                   (format t "~a ~a~%" process
+                                           (when stream
+                                             (get-output-stream-string stream))))))
+                     (with-timeout 60
+                       (subseq
+                        (with-output-to-string (s)
+                          (setf stream s)
+                          (setf process
+                                (run-program "/bin/sh" '("-c" "echo OK; exit 42") :pty s
+                                                                                  :wait nil))
+                          (process-wait process)
+                          (assert (= (process-exit-code process) 42))
+                          s)
+                        0
+                        2)))))))
 
 ;; Check whether RUN-PROGRAM puts its child process into the foreground
 ;; when stdin is inherited. If it fails to do so we will receive a SIGTTIN.
@@ -260,7 +268,8 @@
 ;; We can't check for the signal itself since run-program.c resets the
 ;; forked process' signal mask to defaults. But the default is `stop'
 ;; of which we can be notified asynchronously by providing a status hook.
-(with-test (:name (run-program :inherit-stdin) :fails-on :win32)
+(with-test (:name (run-program :inherit-stdin) :fails-on :win32
+                  :skipped-on :no-bin-ed-installed)
   (let (stopped)
     (flet ((status-hook (proc)
              (case (process-status proc)
@@ -324,6 +333,10 @@
 #-win32
 (with-test (:name (run-program :if-input-does-not-exist))
   (let ((file (pathname (sb-posix:mktemp "rpXXXXXX"))))
+    (when (and (boundp 'run-tests::*allowed-inputs*)
+               ;; If the permitted inputs are :ANY then leave it be
+               (listp (symbol-value 'run-tests::*allowed-inputs*)))
+      (push (namestring file) (symbol-value 'run-tests::*allowed-inputs*)))
     (assert (null (run-program "/bin/cat" '() :input file)))
     (assert (null (run-program "/bin/cat" '() :output #.(or *compile-file-truename*
                                                             *load-truename*)
@@ -404,25 +417,45 @@
 
 (with-test (:name (run-program :malloc-deadlock)
             :broken-on :sb-safepoint
-            :skipped-on (or (not :sb-thread) :win32))
+            :skipped-on (or :ubsan (not :sb-thread) :win32))
   (let* (stop
+         (delay-between-gc
+          (or #+freebsd
+              (let* ((p (run-program "sysctl" '("hw.model") :search t :output :stream))
+                     (output (process-output p))
+                     (result (read-line output)))
+                (close output)
+                ;; With the default delay of 0 using FreeBSD on QEMU this test never
+                ;; finished because the RUN-PROGRAM thread would never get scheduled
+                ;; after its first entry into the loop.
+                ;; It wasn't hung, it just wasn't getting CPU time. For me anyway.
+                (when (search "QEMU" result)
+                  .00000001)) ; 10 nanoseconds
+              #+(and darwin arm64)
+               0.01
+              0))
          (threads (list*
                    (sb-thread:make-thread (lambda ()
-                                            (loop until stop
+                                            (loop until (progn (sb-thread:barrier (:read))
+                                                               stop)
                                                   do
-                                                  (sleep 0)
+                                                  (sleep delay-between-gc)
                                                   (gc :full t))))
                    (loop repeat 3
                          collect
                          (sb-thread:make-thread
                           (lambda ()
-                            (loop until stop
+                            (loop until (progn (sb-thread:barrier (:read))
+                                               stop)
                                   do (malloc))))))))
-    (loop for time = (get-internal-real-time)
-          for end = (+ time (* internal-time-units-per-second 4)) then end
+    (loop with dot = (get-internal-real-time)
+          with end = (+ dot (* internal-time-units-per-second 4))
+          for time = (get-internal-real-time)
           while (> end time)
           do
-          (when (zerop (mod (- time end) (truncate internal-time-units-per-second 10)))
+          (when (> (- time dot)
+                   (/ internal-time-units-per-second 10))
+            (setf dot time)
             (write-char #\.)
             (finish-output))
           (with-output-to-string (str)
@@ -431,4 +464,14 @@
                          :search t
                          :wait t)))
     (setf stop t)
+    (sb-thread:barrier (:write))
     (mapc #'sb-thread:join-thread threads)))
+
+(with-test (:name (run-program :child-fd-leak)
+            :skipped-on (or :openbsd :win32))
+  (when (probe-file "/dev/fd")
+    (with-open-file (stream "/dev/null")
+      (let* ((fd (sb-sys:fd-stream-fd stream))
+             (process (run-program "test" (list "-e" (format nil "/dev/fd/~a" fd))
+                                   :search t)))
+        (assert (not (zerop (process-exit-code process))))))))

@@ -14,6 +14,8 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+run_compiler=`pwd`/run-compiler.sh
+export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./expect.sh
 . ./subr.sh
 
@@ -30,7 +32,7 @@ PUNT=$EXIT_TEST_WIN
 
 build_so() (
   echo building $1.so
-  /bin/sh ../run-compiler.sh -sbcl-pic -sbcl-shared "$1.c" -o "$1.so"
+  /bin/sh ${run_compiler} -sbcl-pic -sbcl-shared "$1.c" -o "$1.so"
 )
 
 # We want to bail out in case any of these Unix programs fails.
@@ -131,12 +133,42 @@ echo 'int bar() { return 42; }' >> $TEST_FILESTEM-b.c
 build_so $TEST_FILESTEM-b
 
 echo 'int foo = 42;' > $TEST_FILESTEM-b2.c
+# Try not to produce two more-or-less physically identical '.so' files (modulo
+# some constants in the functions), so that the test will fail if we accidentally
+# call the new bar() at the old address - as might happen if the OS maps both '.so'
+# files at the same place - as a consequence of failing to update the linkage table.
+echo 'int bar(void);' >> $TEST_FILESTEM-b2.c
+echo 'int somerandomfun(int x) { return x?-x:bar(); }' >> $TEST_FILESTEM-b2.c
 echo 'int bar() { return 13; }' >> $TEST_FILESTEM-b2.c
 build_so $TEST_FILESTEM-b2
 
 echo 'int late_foo = 43;' > $TEST_FILESTEM-c.c
 echo 'int late_bar() { return 14; }' >> $TEST_FILESTEM-c.c
 build_so $TEST_FILESTEM-c
+
+cat > $TEST_FILESTEM-noop-dlclose-test.c <<EOF
+#include <dlfcn.h>
+#include <stddef.h>
+
+int dlclose_is_noop () {
+#ifdef RTLD_NOLOAD
+    void * handle = dlopen("./$TEST_FILESTEM-noop-dlclose-test-helper.so", RTLD_NOW | RTLD_GLOBAL);
+    dlclose(handle);
+
+    handle = dlopen("./$TEST_FILESTEM-noop-dlclose-test-helper.so", RTLD_NOW | RTLD_NOLOAD);
+    if (handle != NULL) {
+        return 1;
+    }
+#endif
+    return 0;
+}
+EOF
+build_so $TEST_FILESTEM-noop-dlclose-test
+
+cat > $TEST_FILESTEM-noop-dlclose-test-helper.c <<EOF
+int sbcl_dlclose_test = 42;
+EOF
+build_so $TEST_FILESTEM-noop-dlclose-test-helper
 
 ## Foreign definitions & load
 
@@ -244,23 +276,32 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
 
   (note "/initial assertions ok")
 
+  ;; determine if dlclose is a noop.
+  (load-shared-object (truename "$TEST_FILESTEM-noop-dlclose-test.so"))
+  (define-alien-routine dlclose-is-noop int)
+  (defparameter *dlclose-noop-p* (plusp (dlclose-is-noop)))
+
   ;; test reloading object file with new definitions
   (assert (= 13 foo))
   (assert (= 42 (bar)))
   (note "/original definitions ok")
-  (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b.bak")
-  (rename-file "$TEST_FILESTEM-b2.so" "$TEST_FILESTEM-b.so")
-  (load-shared-object (truename "$TEST_FILESTEM-b.so"))
-  (note "/reloading ok")
-  (assert (= 42 foo))
-  (assert (= 13 (bar)))
-  (note "/redefined versions ok")
-  (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b2.so")
-  (rename-file "$TEST_FILESTEM-b.bak" "$TEST_FILESTEM-b.so")
-  (note "/renamed back to originals")
+  (if *dlclose-noop-p*
+      (note "/skipping reloading tests")
+      (progn
+        (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b.bak")
+        (rename-file "$TEST_FILESTEM-b2.so" "$TEST_FILESTEM-b.so")
+        (load-shared-object (truename "$TEST_FILESTEM-b.so"))
+        (note "/reloading ok")
+        (assert (= 42 foo))
+        (assert (= 13 (bar)))
+        (note "/redefined versions ok")
+        (rename-file "$TEST_FILESTEM-b.so" "$TEST_FILESTEM-b2.so")
+        (rename-file "$TEST_FILESTEM-b.bak" "$TEST_FILESTEM-b.so")
+        (note "/renamed back to originals")))
 
   ;; test late resolution
-  #+linkage-table
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+   (setq *features* (union *features* sb-impl:+internal-features+)))
   (progn
     (note "/starting linkage table tests")
     (define-alien-variable late-foo int)
@@ -274,13 +315,16 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
     (load-shared-object (truename "$TEST_FILESTEM-c.so"))
     (assert (= 43 late-foo))
     (assert (= 14 (late-bar)))
-    (unload-shared-object (truename "$TEST_FILESTEM-c.so"))
-    (multiple-value-bind (val err) (ignore-errors late-foo)
-      (assert (not val))
-      (assert (typep err 'undefined-alien-error)))
-    (multiple-value-bind (val err) (ignore-errors (late-bar))
-      (assert (not val))
-      (assert (typep err 'undefined-alien-error)))
+    (if *dlclose-noop-p*
+        (note "/skipping linkage table unloading tests")
+        (progn
+          (unload-shared-object (truename "$TEST_FILESTEM-c.so"))
+          (multiple-value-bind (val err) (ignore-errors late-foo)
+            (assert (not val))
+            (assert (typep err 'undefined-alien-error)))
+          (multiple-value-bind (val err) (ignore-errors (late-bar))
+            (assert (not val))
+            (assert (typep err 'undefined-alien-error)))))
     (note "/linkage table ok"))
 
   (sb-ext:exit :code $EXIT_LISP_WIN) ; success convention for Lisp program
@@ -314,7 +358,9 @@ test_save() {
     echo testing save $1
     x="$1"
     run_sbcl --load $TEST_FILESTEM.$1.fasl <<EOF
-#+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$x.core")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+ (setq *features* (union *features* sb-impl:+internal-features+)))
+(save-lisp-and-die "$TEST_FILESTEM.$x.core")
 (sb-ext:exit :code 22) ; catch this
 EOF
     check_status_maybe_lose "save $1" $? \
@@ -353,7 +399,7 @@ if [ -f $TEST_FILESTEM.fast.core ] ; then
               (invoke-restart cont)))
           (print :fell-through)
           (invoke-debugger condition)))
-   #+linkage-table (save-lisp-and-die "$TEST_FILESTEM.missing.core")
+   (save-lisp-and-die "$TEST_FILESTEM.missing.core")
    (sb-ext:exit :code 22) ; catch this
 EOF
     check_status_maybe_lose "saving-missing-so-core" $? \

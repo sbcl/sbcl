@@ -15,6 +15,7 @@
 
 (defvar *in-without-gcing*)
 (defvar *gc-inhibit*)
+(defvar *gc-pin-code-pages*)
 
 ;;; When the dynamic usage increases beyond this amount, the system
 ;;; notes that a garbage collection needs to occur by setting
@@ -25,11 +26,10 @@
 #+sb-thread
 (defvar *stop-for-gc-pending*)
 
-;;; This one is initialized by the runtime, at thread creation.  On
-;;; non-x86oid gencgc targets, this is a per-thread list of objects
-;;; which must not be moved during GC.  It is frobbed by the code for
-;;; with-pinned-objects in src/compiler/target/macros.lisp.
-#+(and gencgc (not (or x86 x86-64)))
+;;; This one is initialized by the runtime, at thread creation.
+;;; It is a per-thread list of objects which must not be moved during GC,
+;;; and manipulated by WITH-PINNED-OBJECTS.
+;;; If doesn't really do anything if #+cheneygc
 (defvar sb-vm::*pinned-objects*)
 
 (defmacro without-gcing (&body body)
@@ -63,7 +63,7 @@ maintained."
                          (*interrupts-enabled* nil)
                          (*gc-inhibit* t))
                     (,without-gcing-body))
-               ;; This is not racy becuase maybe_defer_handler
+               ;; This is not racy because can_hande_now()
                ;; defers signals if *GC-INHIBIT* is NIL but there
                ;; is a pending gc or stop-for-gc.
                (when (or *interrupt-pending*
@@ -85,7 +85,7 @@ maintained."
 ;;;
 ;;; FIXME: Shouldn't these be functions instead of macros?
 (defmacro in-stream-from-designator (stream)
-  (let ((svar (gensym)))
+  (let ((svar (sb-xc:gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-input*)
              ((eq ,svar t) *terminal-io*)
@@ -110,7 +110,7 @@ maintained."
               (t (return x))))))
 |#
 (defmacro out-stream-from-designator (stream)
-  (let ((svar (gensym)))
+  (let ((svar (sb-xc:gensym)))
     `(let ((,svar ,stream))
        (cond ((null ,svar) *standard-output*)
              ((eq ,svar t) *terminal-io*)
@@ -123,35 +123,6 @@ maintained."
                          :format-control "~S isn't an output stream."
                          :format-arguments (list ,svar)))
                 ,svar)))))
-
-;;; WITH-mumble-STREAM calls the function in the given SLOT of the
-;;; STREAM with the ARGS for ANSI-STREAMs, or the FUNCTION with the
-;;; ARGS for FUNDAMENTAL-STREAMs.
-(defmacro with-in-stream (stream (slot &rest args) &optional stream-dispatch)
-  `(let ((stream (in-stream-from-designator ,stream)))
-    ,(if stream-dispatch
-         `(if (ansi-stream-p stream)
-              (funcall (,slot stream) stream ,@args)
-              ,@(when stream-dispatch
-                  `(,(destructuring-bind (function &rest args) stream-dispatch
-                       `(,function stream ,@args)))))
-         `(funcall (,slot stream) stream ,@args))))
-
-(defmacro %with-out-stream (stream (slot &rest args) &optional stream-dispatch)
-  `(let ((stream ,stream))
-    ,(if stream-dispatch
-         `(if (ansi-stream-p stream)
-              (funcall (,slot stream) stream ,@args)
-              ,@(when stream-dispatch
-                  `(,(destructuring-bind (function &rest args) stream-dispatch
-                                         `(,function stream ,@args)))))
-         `(funcall (,slot stream) stream ,@args))))
-
-(defmacro with-out-stream (stream (slot &rest args) &optional stream-dispatch)
-  `(%with-out-stream (out-stream-from-designator ,stream)
-                     (,slot ,@args)
-                     ,stream-dispatch))
-
 
 ;;;; These are hacks to make the reader win.
 
@@ -273,3 +244,21 @@ maintained."
                (incf ,index))
               (t
                (return ,result)))))))
+
+(in-package "SB-THREAD")
+
+(defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts)
+                                    &body body)
+  `(dx-flet ((with-system-mutex-thunk () ,@body))
+     (,(cond (without-gcing
+               'call-with-system-mutex/without-gcing)
+             (allow-with-interrupts
+              'call-with-system-mutex/allow-with-interrupts)
+             (t
+              'call-with-system-mutex))
+       #'with-system-mutex-thunk
+       ,mutex)))
+
+(defmacro with-recursive-system-lock ((lock) &body body)
+  `(dx-flet ((recursive-system-lock-thunk () ,@body))
+     (call-with-recursive-system-lock #'recursive-system-lock-thunk ,lock)))

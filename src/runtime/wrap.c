@@ -443,28 +443,6 @@ int sb_select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, 
     }
     return polling_write;
 }
-
-/*
- * Windows doesn't have gettimeofday(), and we need it for the compiler,
- * for serve-event, and for a couple other things. We don't need a timezone
- * yet, however, and the closest we can easily get to a timeval is the
- * seconds part. So that's what we do.
- */
-#define UNIX_EPOCH_FILETIME 116444736000000000ULL
-
-int sb_gettimeofday(long *timeval, long *timezone)
-{
-    FILETIME ft;
-    ULARGE_INTEGER uft;
-    GetSystemTimeAsFileTime(&ft);
-    uft.LowPart = ft.dwLowDateTime;
-    uft.HighPart = ft.dwHighDateTime;
-    uft.QuadPart -= UNIX_EPOCH_FILETIME;
-    timeval[0] = uft.QuadPart / 10000000;
-    timeval[1] = (uft.QuadPart % 10000000)/10;
-
-    return 0;
-}
 #endif
 
 
@@ -545,18 +523,13 @@ int s_issock(mode_t mode)
 }
 #endif /* !LISP_FEATURE_WIN32 */
 
-#ifndef LISP_FEATURE_WIN32
-int sb_getrusage(int who, struct rusage *rusage)
-{
-        return getrusage(who, rusage);
-}
-
-int sb_gettimeofday(struct timeval *tp, void *tzp)
-{
-        return gettimeofday(tp, tzp);
-}
-
-#ifndef LISP_FEATURE_DARWIN /* reimplements nanosleep in darwin-os.c  */
+#ifdef LISP_FEATURE_UNIX
+#ifdef LISP_FEATURE_DARWIN
+/* nanosleep() is not re-entrant on some versions of Darwin and is
+ * reimplemented using the underlying syscalls.
+ */
+int sb_nanosleep(time_t sec, int nsec);
+#else
 void sb_nanosleep(time_t sec, int nsec)
 {
     struct timespec rqtp = {sec, nsec};
@@ -593,11 +566,6 @@ void sb_nanosleep(time_t sec, int nsec)
         */
     }
 }
-#else
-/* nanosleep() is not re-entrant on some versions of Darwin and is
- * reimplemented it using the underlying syscalls.
- */
-int sb_nanosleep(time_t sec, int nsec);
 #endif
 
 void sb_nanosleep_double(double seconds) {
@@ -612,6 +580,20 @@ void sb_nanosleep_double(double seconds) {
 }
 void sb_nanosleep_float(float seconds) {
     sb_nanosleep_double(seconds);
+}
+#endif
+
+#ifdef LISP_FEATURE_NETBSD
+/* These thin wrappers are needed due to "linker rewriting"
+ * acording to git revision 9304704f68 */
+int sb_getrusage(int who, struct rusage *rusage)
+{
+        return getrusage(who, rusage);
+}
+
+int sb_gettimeofday(struct timeval *tp, void *tz)
+{
+        return gettimeofday(tp, tz);
 }
 
 int sb_select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
@@ -634,7 +616,23 @@ int sb_utimes(char *path, struct timeval times[2])
 {
     return utimes(path, times);
 }
-#else /* !LISP_FEATURE_WIN32 */
+
+int sb_clock_gettime(clockid_t id, struct timespec* tp)
+{
+    return clock_gettime(id, tp);
+}
+#ifndef LISP_FEATURE_SB_THREAD
+#include <signal.h>
+int sb_sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+    return sigprocmask(how, set, oldset);
+}
+#endif
+#endif
+
+#ifdef LISP_FEATURE_WIN32
+
+// These are used in src/code/irrat.lisp. Search for DEF-MATH-RTN
 #define SB_TRIG_WRAPPER(name) \
     double sb_##name (double x) {               \
         return name(x);                         \

@@ -18,6 +18,7 @@
    #:mpz-powm
    #:mpz-pow
    #:mpz-gcd
+   #:mpz-divisible-p
    #:mpz-lcm
    #:mpz-sqrt
    #:mpz-probably-prime-p
@@ -56,6 +57,8 @@
    ))
 
 (in-package "SB-GMP")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defvar *gmp-disabled* nil)
 
@@ -118,7 +121,7 @@
 ;; at some particular point can use mpz_realloc2, or clear variables
 ;; no longer needed."
 ;;
-;; We can therefore allocate a bignum of sufficiant size and use the
+;; We can therefore allocate a bignum of sufficient size and use the
 ;; space for GMP computations without the need for memory transfer
 ;; from C to Lisp space.
 (declaim (inline z-to-bignum z-to-bignum-neg))
@@ -176,14 +179,14 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
             (mp_num (struct gmpint))
             (mp_den (struct gmpint))))
 
-;;; memory initialization functions to support non-alloced results
+;;; Memory initialization functions to support non-allocated results
 ;;; since an upper bound cannot always correctly predetermined
 ;;; (e.g. the memory required for the fib function exceed the number
 ;;; of limbs that are be determined through the infamous Phi-relation
 ;;; resulting in a memory access error.
 
-;; use these for non-prealloced bignum values, but only when
-;; ultimately necessary since copying back into bignum space a the end
+;; Use these for non-preallocated bignum values, but only when
+;; ultimately necessary since copying back into bignum space at the end
 ;; of the operation is about three times slower than the shared buffer
 ;; approach.
 (declaim (inline __gmpz_init __gmpz_clear))
@@ -244,6 +247,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (declaim (inline __gmpz_mul_2exp
                  __gmpz_fdiv_q_2exp
                  __gmpz_pow_ui
+                 __gmpz_divisible_p
                  __gmpz_probab_prime_p
                  __gmpz_fac_ui
                  __gmpz_2fac_ui
@@ -267,6 +271,10 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (r (* (struct gmpint)))
   (b (* (struct gmpint)))
   (e unsigned-long))
+
+(define-alien-routine __gmpz_divisible_p int
+  (n (* (struct gmpint)))
+  (d (* (struct gmpint))))
 
 (define-alien-routine __gmpz_probab_prime_p int
   (n (* (struct gmpint)))
@@ -324,8 +332,14 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 ;;;; SBCL interface
 
-;;; utility macros for GMP mpz variable and result declaration and
+;;; Utility macros for GMP mpz variable and result declaration and
 ;;; incarnation of associated SBCL bignums
+
+(declaim (inline allocate-bignum))
+(defun allocate-bignum (size)
+  (let ((bignum (%allocate-bignum size)))
+    (dotimes (i size bignum)
+      (setf (%bignum-ref bignum i) 0))))
 
 (defmacro with-mpz-results (pairs &body body)
   (loop for (gres size) in pairs
@@ -333,7 +347,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
         collect `(when (> ,size sb-kernel:maximum-bignum-length)
                    (error "Size of result exceeds maxim bignum length")) into checks
         collect `(,gres (struct gmpint)) into declares
-        collect `(,res (%allocate-bignum ,size))
+        collect `(,res (allocate-bignum ,size))
           into resinits
         collect `(setf (slot ,gres 'mp_alloc) (%bignum-length ,res)
                        (slot ,gres 'mp_size) 0
@@ -392,7 +406,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
           into resinits
         collect `(when (> ,size (1- sb-kernel:maximum-bignum-length))
                    (error "Size of result exceeds maxim bignum length")) into checks
-        collect `(,res (%allocate-bignum (1+ ,size)))
+        collect `(,res (allocate-bignum (1+ ,size)))
           into resallocs
         collect `(setf ,res (if (minusp (slot ,gres 'mp_size)) ; check for negative result
                                 (- (gmp-z-to-bignum (slot ,gres 'mp_d) ,res ,size))
@@ -458,6 +472,14 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (when (and (minusp (slot gb 'mp_size))
                  (/= 0 (slot result 'mp_size)))
         (__gmpz_add (addr result) (addr result) (addr gb))))))
+
+(defgmpfun mpz-divisible-p (n d)
+  "Returns T if (ZEROP (MOD N D))."
+  (with-mpz-vars ((n gn) (d gd))
+    (not
+      (zerop
+        (__gmpz_divisible_p (addr gn) (addr gd))))))
+
 
 (defgmpfun mpz-cdiv (n d)
   (let ((size (1+ (max (blength n)
@@ -596,7 +618,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 (defgmpfun mpz-fib2 (n)
   ;; (let ((size (1+ (ceiling (* n (log 1.618034 2)) 64)))))
-  ;; fibonacci number magnitude in bits is assymptotic to n(log_2 phi)
+  ;; fibonacci number magnitude in bits is asymptotic to n(log_2 phi)
   ;; This is correct for the result but appears not to be enough for GMP
   ;; during computation (memory access error), so use GMP-side allocation.
   (check-type n ui)
@@ -755,8 +777,8 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                            (blength (denominator b)))
                       3)))
          (with-alien ((r (struct gmprat)))
-           (let ((num (%allocate-bignum size))
-                 (den (%allocate-bignum size)))
+           (let ((num (allocate-bignum size))
+                 (den (allocate-bignum size)))
              (sb-sys:with-pinned-objects (num den)
                (setf (slot (slot r 'mp_num) 'mp_size) 0
                      (slot (slot r 'mp_num) 'mp_alloc) size
@@ -812,13 +834,9 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 ;;;; SBCL interface and integration installation
 (macrolet ((def (name original)
-             (let ((special (intern (format nil "*~A-FUNCTION*" name))))
-               `(progn
-                  (declaim (type function ,special)
-                           (inline ,name))
-                  (defvar ,special (symbol-function ',original))
-                  (defun ,name (&rest args)
-                    (apply (load-time-value ,special t) args))))))
+             `(progn
+                (declaim (ftype function ,name))
+                (setf (fdefinition ',name) (fdefinition ',original)))))
   (def orig-mul multiply-bignums)
   (def orig-truncate bignum-truncate)
   (def orig-gcd bignum-gcd)
@@ -854,7 +872,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (mpz-tdiv a b)))
 
 (defun gmp-lcm (a b)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (type integer a b)
            (inline mpz-lcm))
   (if (or (and (typep a 'fixnum)
@@ -874,7 +892,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 ;;; rationals
 (defun gmp-two-arg-+ (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-add))
   (if (and (or (typep x 'ratio)
                (typep y 'ratio))
@@ -885,7 +903,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (orig-two-arg-+ x y)))
 
 (defun gmp-two-arg-- (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-sub))
   (if (and (or (typep x 'ratio)
                (typep y 'ratio))
@@ -896,7 +914,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (orig-two-arg-- x y)))
 
 (defun gmp-two-arg-* (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-mul))
   (if (and (or (typep x 'ratio)
                (typep y 'ratio))
@@ -907,7 +925,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (orig-two-arg-* x y)))
 
 (defun gmp-two-arg-/ (x y)
-  (declare (optimize (speed 3) (space 3))
+  (declare (optimize (speed 3) (space 3) (sb-c:verify-arg-count 0))
            (inline mpq-div))
   (if (and (rationalp x)
            (rationalp y)
@@ -918,14 +936,15 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 (defun gmp-intexp (base power)
   (declare (inline mpz-mul-2exp mpz-pow))
-  (check-type power (integer #.(1+ most-negative-fixnum) #.most-positive-fixnum))
   (cond
     ((or (and (integerp base)
               (< (abs power) 1000)
               (< (blength base) 4))
+         (member base '(0 1 -1))
          *gmp-disabled*)
      (orig-intexp base power))
     (t
+     (check-type power (integer #.(1+ most-negative-fixnum) #.most-positive-fixnum))
      (cond ((minusp power)
             (/ (the integer (gmp-intexp base (- power)))))
            ((eql base 2)
@@ -957,8 +976,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (defun uninstall-gmp-funs ()
   (sb-ext:without-package-locks
       (macrolet ((def (destination source)
-                   `(setf (fdefinition ',destination)
-                          ,(intern (format nil "*~A-FUNCTION*" source)))))
+                   `(setf (fdefinition ',destination) (fdefinition ',source))))
         (def multiply-bignums orig-mul)
         (def bignum-truncate orig-truncate)
         (def bignum-gcd orig-gcd)

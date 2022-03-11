@@ -27,37 +27,10 @@
 #include "genesis/simple-fun.h"
 #include "thread.h"
 #include "interr.h" /* for lose() */
-
+#include "gc-assert.h"
+#include "code.h"
 extern const char *widetag_names[];
 extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
-
-/// Enable extra debug-only checks if DEBUG
-#ifdef DEBUG
-# define gc_dcheck(ex) gc_assert(ex)
-#else
-# define gc_dcheck(ex) ((void)0)
-#endif
-
-/// Disable all assertions if NDEBUG
-#ifdef NDEBUG
-# define gc_assert(ex) ((void)0)
-# define gc_assert_verbose(ex, fmt, ...) ((void)0)
-#else
-# define gc_assert(ex)                                                 \
-do {                                                                   \
-    if (!(ex)) gc_abort();                                             \
-} while (0)
-# define gc_assert_verbose(ex, fmt, ...)                               \
-do {                                                                   \
-    if (!(ex)) {                                                       \
-        fprintf(stderr, fmt, ## __VA_ARGS__);                          \
-        gc_abort();                                                    \
-    }                                                                  \
-} while (0)
-#endif
-
-#define gc_abort()                                                     \
-  lose("GC invariant lost, file \"%s\", line %d\n", __FILE__, __LINE__)
 
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-internal.h"
@@ -69,50 +42,71 @@ do {                                                                   \
 
 // Offset from an fdefn raw address to the underlying simple-fun,
 // if and only if it points to a simple-fun.
+// For those of us who are too memory-impaired to know how to use the value:
+//  - it is the amount to ADD to a tagged simple-fun pointer to get its entry address
+//  - or the amount to SUBTRACT from an entry address to get a tagged fun pointer
 #if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)
 #define FUN_RAW_ADDR_OFFSET 0
 #else
-#define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, code) - FUN_POINTER_LOWTAG)
+#define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, insts) - FUN_POINTER_LOWTAG)
 #endif
 
-// For x86[-64], a simple-fun or closure's "self" slot is a fixum
+// For x86[-64], arm64, a simple-fun or closure's "self" slot is a fixum
 // On other backends, it is a lisp ointer.
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_ARM64)
 #define FUN_SELF_FIXNUM_TAGGED 1
 #else
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
-// Test for presence of a bit in vector's header.
-// As a special case, if 'val' is 0, then test for all bits clear.
-#define is_vector_subtype(header, val) \
-  (subtype_##val ? (HeaderValue(header) & subtype_##val) : \
-   !(HeaderValue(header) & 7))
+/*
+ * Predicates rather than bit extractors should be used to test the flags
+ * in a vector header, because:
+ *
+ * - while trying to place the flags into a different header byte, I found it
+ *   unobvious whether to treat flags as part of the "Header data" (which is a
+ *   3-byte or 7-byte wide field starting at bit 8) versus the entire "Header word".
+ *   So e.g. if the Lisp VECTOR-WEAK value were redefined to #x0100, which would
+ *   place a 1 bit into byte index 3 (using SET-HEADER-DATA), it isn't clear that
+ *   "vector_flags(vector) == vectorWeak" is the proper test, because vector_flags()
+ *   could reasonably be defined to right-shift by 0, 8, or 16 bits.
+ *   (i.e. leave the bits where they are, but mask out the widetag; or make them
+ *   act like "Header data"; or right-align as if we had Lisp bitfield extractors)
+ *   Looked at differently, the natural values for the first 3 flag bits should be
+ *   1, 2, and 4 but this would force you to write expressions such as:
+ *    (SET-HEADER-DATA V (ASH SB-VM:VECTOR-HASHING-FLAG SB-VM:VECTOR-FLAG-BITS-SHIFT))
+ *   which looks to be terribly inconvenient for Lisp.
+ *   Alternatively, the constants can be defined as their "natural" values for C
+ *   which would have flag_VectorWeak = 0x010000, but then you need the inverse
+ *   shift in Lisp which expects SET-HEADER-DATA to get #x0100 as the argument.
+ *   Hypothetically, that is.
+ *
+ * - With smarter macros it ought to be possible to avoid 8-byte loads and shifts.
+ *   They would need to be endian-aware, which I didn't want to do just yet.
+ */
+#define vector_flagp(header, val) ((int)header & (flag_##val << ARRAY_FLAGS_POSITION))
+#define vector_flags_zerop(header) ((int)(header) & 0x07 << ARRAY_FLAGS_POSITION) == 0
+// Return true if vector is a weak vector that is not a hash-table <k,v> vector.
+static inline int vector_is_weak_not_hashing_p(unsigned int header) {
+    return (header & ((flag_VectorWeak|flag_VectorHashing) << ARRAY_FLAGS_POSITION)) ==
+      flag_VectorWeak << ARRAY_FLAGS_POSITION;
+}
 
-// Mask out the fullcgc mark bit when asserting header validity
+// This bit can be anything that doesn't conflict with the fullcgc mark bit or a bit
+// seen by lisp. Byte index 0 is the widetag, byte indices 1 and 2 are for the array-rank
+// and vector-flags, depending on how src/compiler/generic/early-objdef assigns them.
+#define WEAK_VECTOR_VISITED_BIT (1<<30)
+
+// Assert that the 'v' is a weak (not hashing) simple-vector and was visited,
+// and then clear the visited bit.
 #define UNSET_WEAK_VECTOR_VISITED(v) \
-  gc_assert((v->header & 0xffff) == \
-    (((subtype_VectorWeakVisited|subtype_VectorWeak) << N_WIDETAG_BITS) \
-     | SIMPLE_VECTOR_WIDETAG)); \
-  v->header ^= subtype_VectorWeakVisited << N_WIDETAG_BITS
-
-#define SIMPLE_FUN_SCAV_START(fun_ptr) &fun_ptr->name
-#define SIMPLE_FUN_SCAV_NWORDS(fun_ptr) ((lispobj*)fun_ptr->code - &fun_ptr->name)
-
-/* values for the *_alloc_* parameters, also see the commentary for
- * struct page in gencgc-internal.h. These constants are used in gc-common,
- * so they can't easily be made gencgc-only */
-#define FREE_PAGE_FLAG        0
-#define PAGE_TYPE_MASK        7 // mask out the 'single-object flag'
-/* Note: MAP-ALLOCATED-OBJECTS expects this value to be 1 */
-#define BOXED_PAGE_FLAG       1
-#define UNBOXED_PAGE_FLAG     2
-#define OPEN_REGION_PAGE_FLAG 8
-#define CODE_PAGE_TYPE        (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
+  gc_assert((v->header & (WEAK_VECTOR_VISITED_BIT | 0xff << ARRAY_FLAGS_POSITION | 0xff)) == \
+    (WEAK_VECTOR_VISITED_BIT | flag_VectorWeak << ARRAY_FLAGS_POSITION | SIMPLE_VECTOR_WIDETAG)); \
+  v->header ^= WEAK_VECTOR_VISITED_BIT
 
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \
-  (is_cons_half(header)?2:sizetab[header_widetag(header)](where))
+  (is_header(header)?sizetab[header_widetag(header)](where):CONS_SIZE)
 
 lispobj *gc_search_space3(void *pointer, lispobj *start, void *limit);
 static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
@@ -120,8 +114,6 @@ static inline lispobj *gc_search_space(lispobj *start, void *pointer) {
                             start,
                             (void*)(1+((lispobj)pointer | LOWTAG_MASK)));
 }
-
-struct vector *symbol_name(lispobj*);
 
 extern void scrub_control_stack(void);
 extern void scrub_thread_control_stack(struct thread *);
@@ -145,68 +137,9 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
               lispobj *instance_ptr, sword_t n_words,
               lispobj bitmap, uword_t arg);
 
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-static inline lispobj funinstance_layout(lispobj* funinstance_ptr) { // native ptr
-    return instance_layout(funinstance_ptr);
-}
-static inline lispobj function_layout(lispobj* fun_ptr) { // native ptr
-    return instance_layout(fun_ptr);
-}
-static inline void set_function_layout(lispobj* fun_ptr, lispobj layout) {
-    instance_layout(fun_ptr) = layout;
-}
-#else
-static inline lispobj funinstance_layout(lispobj* instance_ptr) { // native ptr
-    // first 4 words are: header, trampoline, fin-fun, layout
-    return instance_ptr[3];
-}
-// No layout in simple-fun or closure, because there are no free bits
-static inline lispobj
-function_layout(lispobj __attribute__((unused)) *fun_ptr) { // native ptr
-    return 0;
-}
-static inline void set_function_layout(lispobj __attribute__((unused)) *fun_ptr,
-                                       lispobj __attribute__((unused)) layout) {
-    lose("Can't assign layout");
-}
-#endif
-
-#include "genesis/bignum.h"
-extern boolean positive_bignum_logbitp(int,struct bignum*);
-
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-
-/* The callee_lispobj of an fdefn is the value in the 'raw_addr' slot to which
- * control transfer occurs, but cast as a simple-fun or code component.
- * It can momentarily disagree with the 'fun' slot when assigning a new value.
- * Pointer tracing should almost always examine both slots, as scav_fdefn() does.
- * If the raw_addr value points to read-only space, the callee is just raw_addr
- * itself, which either looks like a simple-fun or a fixnum depending on platform.
- * It is not critical that this exceptional situation be consistent by having
- * a pointer lowtag because it only affects print_otherptr() and verify_space()
- * neither of which materially impact garbage collection. */
+extern int simple_fun_index(struct code*, struct simple_fun*);
 
 extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
-extern lispobj virtual_fdefn_callee_lispobj(struct fdefn *fdefn,uword_t);
-
-#else
-
-static inline lispobj points_to_asm_routine_p(uword_t ptr) {
-# if defined(LISP_FEATURE_IMMOBILE_SPACE)
-    extern uword_t asm_routines_start, asm_routines_end;
-    // Lisp assembly routines are in varyobj space, not readonly space
-    return asm_routines_start <= ptr && ptr < asm_routines_end;
-# else
-    return READ_ONLY_SPACE_START <= ptr && ptr < READ_ONLY_SPACE_END;
-# endif
-}
-static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
-    return (lispobj)fdefn->raw_addr -
-      (points_to_asm_routine_p((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET);
-}
-
-#endif
-
-boolean valid_widetag_p(unsigned char widetag);
-
+extern void gc_close_thread_regions(struct thread*);
+extern void gc_close_collector_regions();
 #endif /* _GC_INTERNAL_H_ */

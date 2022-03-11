@@ -1,6 +1,7 @@
 #include "globals.h"
 #include "lispregs.h"
 #include "sbcl.h"
+#include "validate.h"
 
 #include "genesis/closure.h"
 #include "genesis/funcallable-instance.h"
@@ -18,6 +19,33 @@
 
 #endif
 
+#ifdef LISP_FEATURE_DARWIN
+#define GNAME(var) _##var
+#else
+#define GNAME(var) var
+#endif
+
+#ifdef LISP_FEATURE_DARWIN
+#define TYPE(name)
+#define SIZE(name)
+#else
+#define TYPE(name) .type name,%function
+#define SIZE(name) .size name,.-name
+#endif
+
+#ifdef LISP_FEATURE_SB_THREAD
+.macro ENTER_PA
+        str reg_wNULL,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
+.endm
+
+.macro LEAVE_PA
+        str wzr,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
+        ldr reg_wTMP,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET+4]
+        cbz reg_wTMP,1f
+	brk trap_PendingInterrupt
+1:
+.endm
+#else
 #define LOAD_STATIC_SYMBOL_VALUE(value,sym) \
         mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
         ldr value,[reg_NULL, reg_TMP]
@@ -25,16 +53,6 @@
 #define STORE_STATIC_SYMBOL_VALUE(value,sym) \
         mov reg_TMP,((sym)-NIL+SYMBOL_VALUE_OFFSET) ;\
         str value,[reg_NULL, reg_TMP]
-#ifdef LISP_FEATURE_SB_THREAD
-        #define ENTER_PA \
-        str reg_wNULL,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]
-#define LEAVE_PA \
-        str wzr,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET]       ;\
-        ldr reg_wTMP,[reg_THREAD,THREAD_PSEUDO_ATOMIC_BITS_OFFSET+4] ;\
-        cbz reg_wTMP,1f                                              ;\
-	brk trap_PendingInterrupt                                   ;\
-1:
-#else
 #define ENTER_PA \
         STORE_STATIC_SYMBOL_VALUE(reg_CFP,PSEUDO_ATOMIC_ATOMIC)
 
@@ -49,10 +67,40 @@
 /* the CSP page sits right before the thread */
 # define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 #endif
-	.align
-	.global	call_into_lisp
-	.type	call_into_lisp, %function
-call_into_lisp:
+
+
+#ifdef LISP_FEATURE_OS_THREAD_STACK
+	.align 2
+	.global GNAME(funcall1_switching_stack)
+	TYPE(funcall1_switching_stack)
+GNAME(funcall1_switching_stack):
+        /* The arguments are switched, funcall1_switching_stack(arg, function)
+           to avoid shuffling registers
+        */
+	/* save FP and LR to old stack */
+	stp	x29, x30, [sp, #-16]!
+	mov	x29, sp
+	/* switch to new stack */
+	ldr	x9, [x0, #THREAD_ALIEN_STACK_START_OFFSET]
+	add	x9, x9, #ALIEN_STACK_SIZE >> 12, lsl #12
+#if ALIEN_STACK_SIZE % 0x1000 != 0
+	add	x9, x9, #ALIEN_STACK_SIZE & 0xfff
+#endif
+	sub	sp, x9, #16
+	/* call function */
+ 	blr	x1
+	/* restore old SP, FP, LR and return */
+	add	sp, x29, #16
+	ldp	x29, x30, [x29]
+	ret
+	SIZE(funcall1_switching_stack)
+#endif
+
+
+	.align 2
+	.global	GNAME(call_into_lisp)
+	TYPE(call_into_lisp)
+GNAME(call_into_lisp):
 	// At this point, we have:
 	// X0 - function
 	// X1 - pointer to args
@@ -88,10 +136,19 @@ call_into_lisp:
 
 #ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_GCC_TLS
+#ifdef LISP_FEATURE_DARWIN
+
+        adrp    x0, _current_thread@TLVPPAGE
+        ldr     x0, [x0, _current_thread@TLVPPAGEOFF]
+        ldr     x8, [x0]
+        blr     x8
+        ldr     reg_THREAD, [x0]
+#else
 	adrp	x0, :gottprel:current_thread
 	ldr	x0, [x0, #:gottprel_lo12:current_thread]
 	mrs	reg_THREAD, tpidr_el0
 	ldr	reg_THREAD, [reg_THREAD,x0]
+#endif
 #else
         ldr	x0, specials
         bl      pthread_getspecific
@@ -102,6 +159,8 @@ call_into_lisp:
 #endif
 	// Clear the boxed registers that don't already have something
 	// in them.
+        mov     reg_R0, #0
+        mov     reg_R1, #0
         mov     reg_R2, #0
         mov     reg_R3, #0
         mov     reg_R4, #0
@@ -109,34 +168,31 @@ call_into_lisp:
         mov     reg_R6, #0
         mov     reg_R7, #0
         mov     reg_R8, #0
+#ifndef LISP_FEATURE_DARWIN
+        mov     reg_R10,#0
+#ifndef LISP_FEATURE_SB_THREAD
+        mov     reg_R11,#0
+#endif
+#endif
 
-        mov     reg_CODE, #0
 
 	// Find the lisp stack and frame pointers.  We're allocating a
 	// new lisp stack frame, so load the stack pointer into CFP.
 #ifdef LISP_FEATURE_SB_THREAD
 	ldp     reg_OCFP,reg_CFP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
 #else
-	ldr	reg_OCFP, =current_control_frame_pointer
-	ldr	reg_CFP, =current_control_stack_pointer
+	ldr	reg_OCFP, =GNAME(current_control_frame_pointer)
+	ldr	reg_CFP, =GNAME(current_control_stack_pointer)
 	ldr	reg_OCFP, [reg_OCFP]
 	ldr	reg_CFP, [reg_CFP]
 #endif
         ENTER_PA
 
-
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer into the symbol.
-        ldr     reg_NL3, =dynamic_space_free_pointer
-        ldr     reg_NL3, [reg_NL3]
-        STORE_STATIC_SYMBOL_VALUE(reg_NL3, ALLOCATION_POINTER)
-#endif
-
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 #ifdef LISP_FEATURE_SB_THREAD
-        str     xzr,[reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
+        str     xzr,[reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
 #else
-	ldr     reg_NL3, =foreign_function_call_active
+	ldr     reg_NL3, =GNAME(foreign_function_call_active)
 	str     xzr, [reg_NL3]
 #endif
 	// We need to set up the lisp stack pointer and the basics of
@@ -150,10 +206,6 @@ call_into_lisp:
 
 	// Set up the "frame link"
 	str     reg_OCFP, [reg_CFP]
-
-	// Set up the return address
-	ldr	reg_NL3, =.lra
-        str     reg_NL3, [reg_CFP, #8]
 
 	LEAVE_PA
 
@@ -172,15 +224,8 @@ no_args:
 
         // Load the closure-fun (or simple-fun-self), in case we're
 	// trying to call a closure.
-        ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
-
-	// And, finally, call into Lisp!
-	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
-        br      reg_LR
-
-	.align 4
-	.equ	.lra, .+OTHER_POINTER_LOWTAG
-	.dword	RETURN_PC_WIDETAG
+        ldr     reg_LR, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
+        blr     reg_LR
 
 	// Correct stack pointer for return processing.
         csel reg_CSP, reg_OCFP, reg_CSP, eq
@@ -193,23 +238,15 @@ no_args:
 // Save the lisp stack and frame pointers.
 #ifdef LISP_FEATURE_SB_THREAD
 	stp     reg_CFP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
-        str     reg_CSP, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
 #else
-	ldr	reg_NFP, =current_control_frame_pointer
+	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
 	str	reg_CFP, [reg_NFP]
-	ldr	reg_OCFP, =current_control_stack_pointer
+	ldr	reg_OCFP, =GNAME(current_control_stack_pointer)
 	str	reg_CSP, [reg_OCFP]
 
 	// Set FFCA, so the runtime knows that we're not "in lisp".
-	ldr     reg_OCFP, =foreign_function_call_active
+	ldr     reg_OCFP, =GNAME(foreign_function_call_active)
 	str     reg_OCFP, [reg_OCFP]
-#endif
-
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer out from the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        LOAD_STATIC_SYMBOL_VALUE(reg_NFP, ALLOCATION_POINTER)
-        str     reg_NFP, [reg_OCFP]
 #endif
 
         LEAVE_PA
@@ -230,82 +267,51 @@ no_args:
         ldp     x19,x20, [sp],#160
 
 	ret
-	.size	call_into_lisp, .-call_into_lisp
+	SIZE(call_into_lisp)
 
-
-	.align
-	.global	call_into_c
-	.type	call_into_c, %function
-call_into_c:
+#ifdef LISP_FEATURE_SB_THREAD
+	.align 2
+	.global	GNAME(call_into_c)
+	TYPE(call_into_c)
+GNAME(call_into_c):
 	// At this point, we have:
-	// R8 -- C function to call.
+	// R9 -- C function to call.
         // LR -- Return address within the code component.
         // X0-X7 arguments
         // All other C arguments are already stashed on the C stack.
 
-	// We need to convert our return address to a GC-safe format,
-	// build a stack frame to count for the "foreign" frame,
-	// switch to C mode, move the register arguments to the
-        // correct locations, call the C function, move the result to
-        // the correct location, switch back to Lisp mode, tear down
-        // our stack frame, restore the return address, and return to
-        // our caller.
-
-        sub     reg_NARGS, reg_LR, reg_CODE
-        add     reg_NFP, reg_NARGS, #OTHER_POINTER_LOWTAG
-
-        // Build a Lisp stack frame.  We need to stash our frame link,
-        // the code component, and our return offset.  Frame link goes
-	// in slot 0 (OCFP-SAVE-OFFSET), the offset (a FIXNUM) goes in
-        // slot 1 (LRA-SAVE-OFFSET), and reg_CODE goes in slot 2.  The
-        // debugger knows about this layout (see COMPUTE-CALLING-FRAME
-        // in SYS:SRC;CODE;DEBUG-INT.LISP).
-        add     reg_CSP, reg_CSP, #4*8
-        stp     reg_CFP, reg_NFP, [reg_CSP, #-4*8]
-        str     reg_CODE, [reg_CSP, #-2*8]
-
-	ENTER_PA
+        // Build a Lisp stack frame.
+        // Can store two values above the stack pointer, interrupts ignore them.
+        stp     reg_CFP, reg_LR, [reg_CSP]
+        add     reg_R8, reg_CSP, #2*8
+        mov     reg_LEXENV, reg_LR
 
         // Save the lisp stack and frame pointers.
 
 #ifdef LISP_FEATURE_SB_THREAD
-        sub     reg_TMP, reg_CSP, #4*8
-        stp     reg_TMP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
-        str     reg_CSP, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
+        stp     reg_CSP, reg_R8, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
 #else
-	ldr	reg_NFP, =current_control_stack_pointer
+        ENTER_PA
+	ldr	reg_NFP, =GNAME(current_control_stack_pointer)
 	str	reg_CSP, [reg_NFP]
-	ldr	reg_NFP, =current_control_frame_pointer
-        sub     reg_TMP, reg_CSP, #4*8
-	str	reg_TMP, [reg_NFP]
+	ldr	reg_NFP, =GNAME(current_control_frame_pointer)
+	str	reg_R8, [reg_NFP]
 
         // Set FFCA, so the runtime knows that we're not "in lisp".
-	ldr     reg_OCFP, =foreign_function_call_active
+	ldr     reg_OCFP, =GNAME(foreign_function_call_active)
 	str     reg_OCFP, [reg_OCFP]
+        LEAVE_PA
 #endif
 
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer out from the symbol.
-        ldr     reg_NL9, =dynamic_space_free_pointer
-        LOAD_STATIC_SYMBOL_VALUE(reg_NFP, ALLOCATION_POINTER)
-        str     reg_NFP, [reg_NL9]
-#endif
-
-	LEAVE_PA
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* OK to run GC without stopping this thread from this point on. */
-#  ifdef LISP_FEATURE_SB_THREAD
 	str     reg_CSP, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
-#  else
-	ldr     reg_NL9, =all_threads
-	str     reg_CSP, [reg_NL9, THREAD_SAVED_CSP_OFFSET]
-#  endif
 #endif
 
         // And call the C function.
         //
-        // R8 is important for undefined_alien_function.
-        blr      reg_R8
+        // R9 is important for undefined_alien_function.
+        blr      reg_R9
 
         // We're back.  Our main tasks are to move the C return value
         // to where Lisp expects it, and to re-establish the Lisp
@@ -320,83 +326,53 @@ call_into_c:
         mov     reg_R5, #0
         mov     reg_R6, #0
         mov     reg_R7, #0
-        mov     reg_R8, #0
-        mov     reg_R9, #0
+#ifndef LISP_FEATURE_DARWIN
+        mov     reg_R10,#0
 #ifndef LISP_FEATURE_SB_THREAD
-        mov     reg_R10, #0
+        mov     reg_R11,#0
 #endif
-        mov     reg_LEXENV, #0
-        mov     reg_CODE, #0
+#endif
 
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* No longer OK to run GC except at safepoints. */
-#  ifdef LISP_FEATURE_SB_THREAD
 	str     xzr, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
-#  else
-	ldr     reg_NL9, =all_threads
-	str     xzr, [reg_NL9, THREAD_SAVED_CSP_OFFSET]
-#  endif
 # endif
 
-	ENTER_PA
 
-        // Restore the Lisp stack and frame pointers, but store the
-        // control frame pointer in reg_NFP (saving a register move
-        // later).
+        // Restore the Lisp stack and frame pointers
 #ifdef LISP_FEATURE_SB_THREAD
-        str     xzr, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
-
-	ldp     reg_NFP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
+        str     xzr, [reg_THREAD, THREAD_CONTROL_STACK_POINTER_OFFSET]
 #else
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 	str     xzr, [reg_OCFP]
-
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer into the symbol.
-        ldr     reg_NL9, =dynamic_space_free_pointer
-        ldr     reg_NL9, [reg_NL9]
-        STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
 #endif
-
-        ldr	reg_NFP, =current_control_stack_pointer
-	ldr	reg_CSP, [reg_NFP]
-	ldr	reg_NFP, =current_control_frame_pointer
-	ldr	reg_NFP, [reg_NFP]
-#endif
-	LEAVE_PA
-
-        // Restore our caller state from our stack frame.
-        ldr     reg_CODE, [reg_NFP, #16]
-        ldr     reg_CFP, [reg_NFP]
-        mov     reg_CSP, reg_NFP
-
-        // Return
-        add     reg_LR, reg_NARGS, reg_CODE // reg_NARGS has the offset from reg_CODE
+        mov     reg_LR, reg_LEXENV
         ret
 
-	.size	call_into_c, .-call_into_c
+	SIZE(call_into_c)
+#endif
 
         // FIXME-ARM: The following is random garbage, to make
         // code/debug-int compile. To get the debugger working, this
         // needs to be implemented.
-        .align
-        .global fun_end_breakpoint_guts
-        .type   fun_end_breakpoint_guts, %object
-fun_end_breakpoint_guts:
-	.global	fun_end_breakpoint_trap
-	.type	fun_end_breakpoint_trap, %function
-fun_end_breakpoint_trap:
-        b      fun_end_breakpoint_trap
-        .global fun_end_breakpoint_end
-fun_end_breakpoint_end:
-#ifdef LISP_FEATURE_GENCGC
-        .align
-	.global	do_pending_interrupt
-	.type	do_pending_interrupt, %function
-do_pending_interrupt:
+        .align 2
+        .global GNAME(fun_end_breakpoint_guts)
+        TYPE(fun_end_breakpoint_guts)
+GNAME(fun_end_breakpoint_guts):
+	.global	GNAME(fun_end_breakpoint_trap)
+	TYPE(fun_end_breakpoint_trap)
+GNAME(fun_end_breakpoint_trap):
+        b      GNAME(fun_end_breakpoint_trap)
+        .global GNAME(fun_end_breakpoint_end)
+GNAME(fun_end_breakpoint_end):
+
+        .align 2
+	.global	GNAME(do_pending_interrupt)
+	TYPE(do_pending_interrupt)
+GNAME(do_pending_interrupt):
         brk trap_PendingInterrupt
 	ret
-#endif
+
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.
 .section .note.GNU-stack,"",%progbits

@@ -11,141 +11,75 @@
 
 (in-package "SB-GRAY")
 
-;;; BUG-OR-ERROR: because we have extensible streams, wherewith the
-;;; user is responsible for some of the protocol implementation, it's
-;;; not necessarily a bug in SBCL itself if we fall through to one of
-;;; these default methods.
-;;;
-;;; FIXME: there's a lot of similarity in these Gray stream
-;;; implementation generic functions.  All of them could (maybe
-;;; should?) have two default methods: one on STREAM calling
-;;; BUG-OR-ERROR, and one on T signalling a TYPE-ERROR.
-(declaim (ftype (function * nil) bug-or-error))
-(defun bug-or-error (stream fun)
-  (declare (optimize allow-non-returning-tail-call))
-  (error
-   "~@<The stream ~S has no suitable method for ~S, ~
-     and so has fallen through to this method.  If you think that this is ~
-     a bug, please report it to the applicable authority (bugs in SBCL itself ~
-     should go to the mailing lists referenced from ~
-     <http://www.sbcl.org/>).~@:>"
-   stream fun))
+;;; See minor rant in call-next-method about this EVAL-WHEN.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defclass stream-function (standard-generic-function) ()
+  (:metaclass sb-mop:funcallable-standard-class)))
+(defmacro !def-stream-generic (name ll &rest rest)
+  `(progn (fmakunbound ',name)
+          (defgeneric ,name ,ll (:generic-function-class stream-function) ,@rest)
+          (sb-pcl::!install-cross-compiled-methods ',name)))
+(defmethod no-applicable-method ((function stream-function) &rest args)
+  (let ((stream (car args)))
+    (if (streamp stream)
+        (call-next-method)
+        (error 'type-error :datum stream :expected-type 'stream))))
 
-(fmakunbound 'stream-element-type)
-
-(defgeneric stream-element-type (stream)
+(!def-stream-generic stream-element-type (stream)
   (:documentation
    "Return a type specifier for the kind of object returned by the
   STREAM. The class FUNDAMENTAL-CHARACTER-STREAM provides a default method
   which returns CHARACTER."))
 
-(defmethod stream-element-type ((stream ansi-stream))
-  (ansi-stream-element-type stream))
-
 (defmethod stream-element-type ((stream fundamental-character-stream))
   'character)
-
-(defmethod stream-element-type ((stream stream))
-  (bug-or-error stream 'stream-element-type))
-
-(defmethod stream-element-type ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
-(fmakunbound 'open-stream-p)
-
-(defgeneric open-stream-p (stream)
+(!def-stream-generic open-stream-p (stream)
   (:documentation
    "Return true if STREAM is not closed. A default method is provided
   by class FUNDAMENTAL-STREAM which returns true if CLOSE has not been
   called on the stream."))
 
-(defmethod open-stream-p ((stream ansi-stream))
-  (ansi-stream-open-stream-p stream))
-
 (defmethod open-stream-p ((stream fundamental-stream))
   (stream-open-p stream))
-
-(defmethod open-stream-p ((stream stream))
-  (bug-or-error stream 'open-stream-p))
-
-(defmethod open-stream-p ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
-(fmakunbound 'close)
-
-(defgeneric close (stream &key abort)
+(!def-stream-generic close (stream &key abort)
   (:documentation
    "Close the given STREAM. No more I/O may be performed, but
   inquiries may still be made. If :ABORT is true, an attempt is made
   to clean up the side effects of having created the stream."))
-
-(defmethod close ((stream ansi-stream) &key abort)
-  (ansi-stream-close stream abort))
 
 (defmethod close ((stream fundamental-stream) &key abort)
   (declare (ignore abort))
   (setf (stream-open-p stream) nil)
   t)
 
-(let ()
-  (fmakunbound 'input-stream-p)
-
-  (defgeneric input-stream-p (stream)
+(progn
+  (!def-stream-generic input-stream-p (stream)
     (:documentation "Can STREAM perform input operations?"))
-
-  (defmethod input-stream-p ((stream ansi-stream))
-    (ansi-stream-input-stream-p stream))
 
   (defmethod input-stream-p ((stream fundamental-stream))
     nil)
 
   (defmethod input-stream-p ((stream fundamental-input-stream))
-    t)
-
-  (defmethod input-stream-p ((stream stream))
-    (bug-or-error stream 'input-stream-p))
-
-  (defmethod input-stream-p ((non-stream t))
-    (error 'type-error :datum non-stream :expected-type 'stream)))
+    t))
 
-(let ()
-  (fmakunbound 'interactive-stream-p)
-
-  (defgeneric interactive-stream-p (stream)
+(progn
+  (!def-stream-generic interactive-stream-p (stream)
     (:documentation "Is STREAM an interactive stream?"))
 
-  (defmethod interactive-stream-p ((stream ansi-stream))
-    (funcall (ansi-stream-misc stream) stream :interactive-p))
-
   (defmethod interactive-stream-p ((stream fundamental-stream))
-    nil)
-
-  (defmethod interactive-stream-p ((stream stream))
-    (bug-or-error stream 'interactive-stream-p))
-
-  (defmethod interactive-stream-p ((non-stream t))
-    (error 'type-error :datum non-stream :expected-type 'stream)))
+    nil))
 
-(let ()
-  (fmakunbound 'output-stream-p)
-
-  (defgeneric output-stream-p (stream)
+(progn
+  (!def-stream-generic output-stream-p (stream)
     (:documentation "Can STREAM perform output operations?"))
-
-  (defmethod output-stream-p ((stream ansi-stream))
-    (ansi-stream-output-stream-p stream))
 
   (defmethod output-stream-p ((stream fundamental-stream))
     nil)
 
   (defmethod output-stream-p ((stream fundamental-output-stream))
-    t)
-
-  (defmethod output-stream-p ((stream stream))
-    (bug-or-error stream 'output-stream-p))
-
-  (defmethod output-stream-p ((non-stream t))
-    (error 'type-error :datum non-stream :expected-type 'stream)))
+    t))
 
 ;;; character input streams
 ;;;
@@ -211,23 +145,19 @@
   calls to STREAM-READ-CHAR."))
 
 (defmethod stream-read-line ((stream fundamental-character-input-stream))
-  (let ((res (make-string 80))
-        (len 80)
-        (index 0))
-    (loop
-     (let ((ch (stream-read-char stream)))
-       (cond ((eq ch :eof)
-              (return (values (%shrink-vector res index) t)))
-             (t
-              (when (char= ch #\newline)
-                (return (values (%shrink-vector res index) nil)))
-              (when (= index len)
-                (setq len (* len 2))
-                (let ((new (make-string len)))
-                  (replace new res)
-                  (setq res new)))
-              (setf (schar res index) ch)
-              (incf index)))))))
+  (let (eof)
+    ;; This loop is simpler than the one in ansi-stream-read-line
+    ;; because here we always return a string for the primary value,
+    ;; and the caller tests for a 0-length string.
+    ;; Writing to a string-output-stream adds negligible overhead
+    ;; versus the method dispatch for each input character.
+    (values (with-output-to-string (s)
+              (loop (let ((ch (stream-read-char stream)))
+                      (case ch
+                        (#\newline (return))
+                        (:eof (return (setq eof t)))
+                        (t (funcall (ansi-stream-out s) s ch))))))
+            eof)))
 
 (defgeneric stream-clear-input (stream)
   (:documentation
@@ -236,10 +166,6 @@
 
 (defmethod stream-clear-input ((stream fundamental-character-input-stream))
   nil)
-(defmethod stream-clear-input ((stream stream))
-  (bug-or-error stream 'stream-clear-input))
-(defmethod stream-clear-input ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-read-sequence (stream seq &optional start end)
   (:documentation
@@ -369,10 +295,6 @@
 
 (defmethod stream-finish-output ((stream fundamental-output-stream))
   nil)
-(defmethod stream-finish-output ((stream stream))
-  (bug-or-error stream 'stream-finish-output))
-(defmethod stream-finish-output ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-force-output (stream)
   (:documentation
@@ -381,10 +303,6 @@
 
 (defmethod stream-force-output ((stream fundamental-output-stream))
   nil)
-(defmethod stream-force-output ((stream stream))
-  (bug-or-error stream 'stream-force-output))
-(defmethod stream-force-output ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-clear-output (stream)
   (:documentation
@@ -393,10 +311,6 @@
 
 (defmethod stream-clear-output ((stream fundamental-output-stream))
   nil)
-(defmethod stream-clear-output ((stream stream))
-  (bug-or-error stream 'stream-clear-output))
-(defmethod stream-clear-output ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
 
 (defgeneric stream-advance-to-column (stream column)
   (:documentation
@@ -452,32 +366,19 @@
    "Used by READ-BYTE; returns either an integer, or the symbol :EOF
   if the stream is at end-of-file."))
 
-(defmethod stream-read-byte ((stream stream))
-  (bug-or-error stream 'stream-read-byte))
-(defmethod stream-read-byte ((non-stream t))
-  (error 'type-error :datum non-stream :expected-type 'stream))
-
 (defgeneric stream-write-byte (stream integer)
   (:documentation
    "Implements WRITE-BYTE; writes the integer to the stream and
   returns the integer as the result."))
 
-(defmethod stream-write-byte ((stream stream) integer)
-  (bug-or-error stream 'stream-write-byte))
-(defmethod stream-write-byte ((non-stream t) integer)
-  (error 'type-error :datum non-stream :expected-type 'stream))
-
 (defgeneric stream-file-position (stream &optional position-spec)
   (:documentation
    "Used by FILE-POSITION. Returns or changes the current position within STREAM."))
+(sb-pcl::!install-cross-compiled-methods 'stream-file-position)
 
-(defmethod stream-file-position ((stream ansi-stream) &optional position-spec)
-  (ansi-stream-file-position stream position-spec))
-
-(defmethod stream-file-position ((stream t) &optional position-spec)
+(defmethod stream-file-position ((stream fundamental-stream) &optional position-spec)
   (declare (ignore stream position-spec))
   nil)
-
 
 ;;; This is not in the Gray stream proposal, so it is left here
 ;;; as example code.
@@ -554,4 +455,37 @@
 
 (defmethod stream-clear-input ((stream character-input-stream))
   (clear-input (character-input-stream-lisp-stream stream)))
+|#
+
+#|
+A small change to INVOKE-FAST-METHOD-CALL/MORE was able to get an easy 10% speedup
+ in STREAM-WRITE-STRING as shown below.
+----
+(defclass sink-stream (fundamental-character-output-stream) ())
+
+(defvar *callcount* 0)
+(defmethod sb-gray:stream-write-string ((stream sink-stream) string &optional start end)
+  (declare (ignore start end))
+  (incf *callcount*))
+
+(defun time-this (&optional (n-iter 30000000))
+  (declare (fixnum n-iter))
+  (let ((stream (make-instance 'sink-stream)))
+    (dotimes (i n-iter)
+      (write-string "zook" stream :start 0 :end 4)))
+  (format t "Calls: ~s~%" *callcount*))
+----
+
+Taking the best out of 3 runs each for old and new:
+perf stat ... --noinform --eval '(setq *evaluator-mode* :compile)' --load foo.lisp --eval '(time-this)' --quit
+Old:
+       1.272560994 seconds time elapsed
+New:
+       1.136901160 seconds time elapsed
+
+Of course a dumb thing about this particular GF is that you probably never
+invoke it directly, but only through WRITE-STRING or WRITE-LINE
+in which case it always receives 4 args. So the small patch in src/pcl/boot
+handles that afficiently, even if it was a little bit ad-hoc.
+I don't think it was too ad-hoc though, because it's valid for any GF.
 |#

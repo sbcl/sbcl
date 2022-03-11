@@ -46,14 +46,35 @@
   (:generator 5
     (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
     (inst add-sub lip lip (- (* offset n-word-bytes) lowtag))
+    (cond ((member :arm-v8.1 *backend-subfeatures*)
+           (move result old-value)
+           (inst casal result new-value lip))
+          (t
+           (assemble ()
+             (inst dsb)
+             LOOP
+             ;; If this were 'ldaxr' instead of 'ldxr' maybe we wouldn't need the 'dsb' ?
+             (inst ldxr result lip)
+             (inst cmp result old-value)
+             (inst b :ne EXIT)
+             (inst stlxr tmp-tn new-value lip)
+             (inst cbnz (32-bit-reg tmp-tn) LOOP)
+             EXIT
+             (inst clrex)
+             (inst dmb))))))
 
-    (inst dsb)
+(define-vop (set-instance-hashed)
+  (:args (object :scs (descriptor-reg)))
+  ;; oject must be pinned to mark it, so temp reg needn't be the LIP register
+  (:temporary (:sc unsigned-reg) baseptr header)
+  (:generator 5
+    (inst sub baseptr object instance-pointer-lowtag)
     LOOP
-    (inst ldxr result lip)
-    (inst cmp result old-value)
-    (inst b :ne EXIT)
-    (inst stlxr tmp-tn new-value lip)
-    (inst cbnz (32-bit-reg tmp-tn) LOOP)
-    EXIT
-    (inst clrex)
-    (inst dmb)))
+    (cond ((member :arm-v8.1 *backend-subfeatures*)
+           (inst movz header (ash 1 stable-hash-required-flag))
+           (inst ldset header header baseptr))
+          (t
+           (inst ldaxr header baseptr)
+           (inst orr header header (ash 1 stable-hash-required-flag))
+           (inst stlxr tmp-tn header baseptr)
+           (inst cbnz (32-bit-reg tmp-tn) LOOP)))))

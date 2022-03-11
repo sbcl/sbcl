@@ -5,117 +5,106 @@
 
 (in-package "SB-VM")
 
-(macrolet
-    ((def ((name c-name pseudo-atomic &key do-not-preserve (stack-delta 0))
-           move-arg
-           move-result)
-       `(define-assembly-routine
-            (,name (:return-style :none))
-            ()
-          (macrolet ((map-registers (op)
-                       (let ((registers (set-difference
-                                         '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn
-                                           r8-tn r9-tn r10-tn r11-tn)
-                                         ',do-not-preserve)))
-                         ;; Preserve alignment
-                         (when (oddp (length registers))
-                           (push (car registers) registers))
-                         `(progn
-                            ,@(loop for reg in (if (eq op 'pop)
-                                                   (reverse registers)
-                                                   registers)
-                                    collect
-                                    `(inst ,op ,reg)))))
-                     (map-floats (op)
-                       `(progn
-                          ,@(loop for i by 16
-                                  for float in
-                                  '(float0-tn float1-tn float2-tn float3-tn
-                                    float4-tn float5-tn float6-tn float7-tn
-                                    float8-tn float9-tn float10-tn float11-tn
-                                    float12-tn float13-tn float14-tn float15-tn)
-                                  collect
-                                  (if (eql op 'pop)
-                                      `(inst movaps ,float (ea ,i rsp-tn))
-                                      `(inst movaps (ea ,i rsp-tn) ,float))))))
-            (inst cld)
-            (inst push rbp-tn)
-            (inst mov rbp-tn rsp-tn)
-            (inst and rsp-tn (- (* n-word-bytes 2)))
-            (inst sub rsp-tn (* 16 16))
-            (map-floats push)
-            (map-registers push)
-            ,@move-arg
-            (pseudo-atomic (:elide-if (not ,pseudo-atomic))
-              ;; asm routines can always call foreign code with a relative operand
-              (inst call (make-fixup ,c-name :foreign)))
-            ,@move-result
-            (map-registers pop)
-            (map-floats pop)
-            (inst mov rsp-tn rbp-tn)
-            (inst pop rbp-tn)
-            (inst ret ,stack-delta)))))
+(macrolet ((do-fprs (operation regset)
+             (multiple-value-bind (mnemonic fpr-align)
+                 (ecase regset
+                   (:xmm (values 'movaps 16))
+                   (:ymm (values 'vmovaps 32)))
+               `(progn
+                  ,@(loop for regno below 16
+                       collect
+                         (ecase operation
+                           (push
+                            `(inst ,mnemonic (ea ,(+ 8 (* regno fpr-align)) rsp-tn)
+                                   (sb-x86-64-asm::get-fpr ,regset ,regno)))
+                           (pop
+                            `(inst ,mnemonic (sb-x86-64-asm::get-fpr ,regset ,regno)
+                                   (ea ,(+ 8 (* regno fpr-align)) rsp-tn)))))))))
+  ;; Caller will have allocated 512+64+256 bytes above the stack-pointer
+  ;; prior to the CALL. Use that as the save area.
+  (define-assembly-routine (save-ymm) ()
+    (inst push rax-tn)
+    (inst push rdx-tn)
+    (inst mov rax-tn 7)
+    (zeroize rdx-tn)
+    ;; Zero the header
+    (loop repeat 8
+          for i from (+ 512 24) by 8
+          do
+          (inst mov (ea i rsp-tn) rdx-tn))
+    (inst xsave (ea 24 rsp-tn))
+    (inst pop rdx-tn)
+    (inst pop rax-tn))
+  (define-assembly-routine (restore-ymm) ()
+    (inst push rax-tn)
+    (inst push rdx-tn)
+    (inst mov rax-tn 7)
+    (zeroize rdx-tn)
+    (inst xrstor (ea 24 rsp-tn))
+    (inst pop rdx-tn)
+    (inst pop rax-tn))
+  ;; As above, but only 256 bytes of the save area are needed, the rest goes to waste.
+  (define-assembly-routine (save-xmm (:export fpr-save)) ()
+    fpr-save ; KLUDGE: this is element 4 of the entry point vector
+    (do-fprs push :xmm))
+  (define-assembly-routine (restore-xmm (:export fpr-restore)) ()
+    fpr-restore ; KLUDGE: this is element 6 of the entry point vector
+    (do-fprs pop :xmm)))
 
-  (def (alloc-tramp "alloc" nil)
-    ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
-    ((inst mov (ea 16 rbp-tn) rax-tn))) ; result
+(define-assembly-routine (alloc-tramp) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-  (def (alloc-tramp-r11 "alloc" nil
-                        :do-not-preserve (r11-tn)
-                        :stack-delta 8) ;; remove the size parameter
-    ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
-    ((inst mov r11-tn rax-tn))) ; result
+(define-assembly-routine (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc_list" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-  #+immobile-space
-  (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
-    () ; no arg
-    ((inst mov r11-tn rax-tn))) ; result
+(define-assembly-routine (listify-&rest (:return-style :none)) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst call (make-fixup "listify_rest_arg" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
-  ;; These routines are for the deterministic allocation profiler.
-  ;; The C support routine's argument is the return PC
-  (def (enable-alloc-counter "allocation_tracker_counted" t)
-    ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
-    ()) ; result
+(define-assembly-routine (make-list (:return-style :none)) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst call (make-fixup "make_list" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
-  (def (enable-sized-alloc-counter "allocation_tracker_sized" t)
-    ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
-    ())) ; result
+;;; These routines are for the deterministic consing profiler.
+;;; The C support routine's argument is the return PC.
+(define-assembly-routine (enable-alloc-counter) ()
+  (with-registers-preserved (c)
+    (inst lea rdi-tn (ea 8 rbp-tn))
+    (pseudo-atomic () (inst call (make-fixup "allocation_tracker_counted" :foreign)))))
 
-(define-assembly-routine
-    (#+immobile-code undefined-fdefn
-     #-immobile-code undefined-tramp
-     (:return-style :none)
-     #+immobile-code
-     (:export undefined-tramp))
+(define-assembly-routine (enable-sized-alloc-counter) ()
+  (with-registers-preserved (c)
+    (inst lea rdi-tn (ea 8 rbp-tn))
+    (pseudo-atomic () (inst call (make-fixup "allocation_tracker_sized" :foreign)))))
+
+(define-assembly-routine (undefined-tramp (:return-style :none))
     ((:temp rax descriptor-reg rax-offset))
-  #+immobile-code
-  (progn
-    (inst pop rax) ; gets the address of the fdefn (plus some)
-    (inst sub :dword rax
-          ;; Subtract the length of the JMP instruction plus offset to the
-          ;; raw-addr-slot, and add back the lowtag. Voila, a tagged descriptor.
-          (+ 5 (ash fdefn-raw-addr-slot word-shift) (- other-pointer-lowtag))))
-  #+immobile-code
-  UNDEFINED-TRAMP
   (inst pop (ea n-word-bytes rbp-tn))
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list rax))
   (inst push (ea n-word-bytes rbp-tn))
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) rax)))
 
-#-sb-dynamic-core
+#+win32
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
-  ;; Unlike in the above UNDEFINED-TRAMP, we *should* *not* issue "POP [RBP+8]"
-  ;; because that would overwrite the PC to which the calling function is
-  ;; supposed to return with the address from which this alien call was made
-  ;; (a PC within that same function) since C convention does not arrange
-  ;; for RBP to hold the new frame pointer prior to making a call.
-  ;; This wouldn't matter much because the only restart available is to throw
-  ;; to toplevel, so a lost frame is not hugely important, but it's annoying.
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
-#+sb-dynamic-core
+#-win32
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
@@ -158,10 +147,16 @@
     (closure-tramp (:return-style :none))
     ()
   (loadw rax-tn rax-tn fdefn-fun-slot other-pointer-lowtag)
-  (inst jmp (make-ea-for-object-slot rax-tn closure-fun-slot fun-pointer-lowtag)))
+  (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine
     (funcallable-instance-tramp (:return-style :none))
     ()
   (loadw rax-tn rax-tn funcallable-instance-function-slot fun-pointer-lowtag)
-  (inst jmp (make-ea-for-object-slot rax-tn closure-fun-slot fun-pointer-lowtag)))
+  (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
+
+(define-assembly-routine (ensure-symbol-hash (:return-style :raw)) ()
+  (with-registers-preserved (lisp)
+    (inst mov rdx-tn (ea 16 rbp-tn)) ; arg
+    (call-static-fun 'ensure-symbol-hash 1)
+    (inst mov (ea 16 rbp-tn) rdx-tn))) ; result to arg passing loc

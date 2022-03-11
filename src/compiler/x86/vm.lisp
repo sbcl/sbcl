@@ -347,7 +347,7 @@
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
-    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
+    ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
          character)
      immediate-sc-number)
     (symbol
@@ -467,7 +467,7 @@
       (logbitp
        (cond
          ((and (valid-funtype '((integer 0 29) fixnum) '*)
-               (sb-c::constant-lvar-p (first (sb-c::basic-combination-args node))))
+               (sb-c:constant-lvar-p (first (sb-c::basic-combination-args node))))
           (values :transform '(lambda (index integer)
                                (%logbitp integer index))))
          ((valid-funtype '((integer 0 31) (signed-byte 32)) '*)

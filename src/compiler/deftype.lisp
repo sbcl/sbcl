@@ -30,14 +30,14 @@
 (defmacro sb-xc:deftype (name lambda-list &body body &environment env)
   "Define a new type, with syntax like DEFMACRO."
   (declare (ignore env))
-  (check-designator name deftype)
+  (check-designator name 'deftype)
   (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body t)
         (acond ((and (not lambda-list) (not decls)
                     (let ((expr `(progn ,@forms)))
                       ;; While CONSTANTP works early, %MACROEXPAND does not,
                       ;; so we can't pass ENV because it'd try to macroexpand.
-                      (if (sb-xc:constantp expr) expr)))
+                      (if (constantp expr) expr)))
                 #-sb-xc-host
                 (check-deprecated-type (constant-form-value it))
                 (values `(constant-type-expander ',name ,it) doc
@@ -55,5 +55,46 @@
     #+(and (not sb-doc) sb-xc-host) (setq doc nil)
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
-         (%compiler-deftype ',name ,expander-form ,source-location-form
-                            ,@(when doc `(,doc)))))))
+         (%deftype ',name ,expander-form ,source-location-form
+                   ,@(when doc `(,doc)))))))
+
+(defun %deftype (name expander source-location &optional doc)
+  (declare (ignorable doc))
+  (with-single-package-locked-error
+      (:symbol name "defining ~A as a type specifier"))
+  (ecase (info :type :kind name)
+    (:primitive
+     ;; Detecting illegal redefinition in the cross-compiler
+     ;; adds unnecessary complexity, so don't bother.
+     #-sb-xc-host
+     (when *type-system-initialized*
+       (error "illegal to redefine standard type: ~S" name)))
+    (:instance
+     (warn "The class ~S is being redefined to be a DEFTYPE." name)
+     (undeclare-structure (find-classoid name) t)
+     ;; FIXME: shouldn't this happen only at eval-time?
+     (setf (classoid-cell-classoid (find-classoid-cell name :create t)) nil)
+     (clear-info :type :compiler-layout name)
+     (setf (info :type :kind name) :defined))
+    (:defined
+     ;; Note: It would be nice to warn here when a type is being
+     ;; incompatibly redefined, but it's hard to tell, since type
+     ;; expanders are often function objects which can't easily be
+     ;; compared for equivalence. And just warning on redefinition
+     ;; isn't good, since DEFTYPE necessarily does its thing once at
+     ;; compile time and again at load time, so that it's very common
+     ;; and normal for types to be defined twice. So since there
+     ;; doesn't seem to be anything simple and obvious to do, and
+     ;; since mistakenly redefining a type isn't a common error
+     ;; anyway, we just don't worry about trying to warn about it.
+     )
+    ((nil :forthcoming-defclass-type)
+     (setf (info :type :kind name) :defined)))
+  (setf (info :type :expander name) expander)
+  (when source-location
+    (setf (info :type :source-location name) source-location))
+  #-sb-xc-host
+  (when doc
+    (setf (documentation name 'type) doc))
+  (sb-c::%note-type-defined name)
+  name)

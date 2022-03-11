@@ -16,12 +16,13 @@
 #include <limits.h>
 #include "core.h"
 
+// 1 page is reserved for some constant arrays.
+// Right now it is just the array that maps widetag to layout
 #define FIXEDOBJ_RESERVED_PAGES 1
 
 extern void prepare_immobile_space_for_final_gc(void);
-extern void prepare_immobile_space_for_save(lispobj init_function,
-                                            boolean verbose);
-extern void immobile_space_preserve_pointer(void*);
+extern void prepare_immobile_space_for_save(boolean verbose);
+extern boolean immobile_space_preserve_pointer(void*);
 extern void update_immobile_nursery_bits(void);
 extern void scavenge_immobile_roots(generation_index_t,generation_index_t);
 extern void scavenge_immobile_newspace(void);
@@ -112,8 +113,8 @@ extern boolean immobile_card_protected_p(void*);
 static inline boolean immobile_space_p(lispobj __attribute__((unused)) obj) { return 0; }
 #define immobile_obj_gen_bits(dummy) 0
 #define prepare_immobile_space_for_final_gc()
-#define prepare_immobile_space_for_save(dummy1,dummy2)
-#define immobile_space_preserve_pointer(dummy)
+#define prepare_immobile_space_for_save(dummy)
+#define immobile_space_preserve_pointer(dummy) 0
 #define scavenge_immobile_roots(dummy1,dummy2)
 #define scavenge_immobile_newspace(dummy)
 #define sweep_immobile_space(dummy)

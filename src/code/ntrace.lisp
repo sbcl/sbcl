@@ -565,7 +565,9 @@ The following options are defined:
 :CONDITION, :BREAK and :PRINT forms are evaluated in a context which
 mocks up the lexical environment of the called function, so that
 SB-DEBUG:VAR and SB-DEBUG:ARG can be used.
-The -AFTER and -ALL forms can use SB-DEBUG:ARG."
+The -AFTER and -ALL forms can use also use SB-DEBUG:ARG. In forms
+which are evaluated after the function call, (SB-DEBUG:ARG N) returns
+the N-th value returned by the function."
   (if specs
       (expand-trace specs)
       '(%list-traced-funs)))
@@ -582,7 +584,7 @@ The -AFTER and -ALL forms can use SB-DEBUG:ARG."
       ((not fun)
        ;; Someone has FMAKUNBOUND it.
        (let ((table *traced-funs*))
-         (with-locked-system-table (table)
+         (with-system-mutex ((hash-table-lock table))
            (maphash (lambda (fun info)
                       (when (equal function-or-name (trace-info-what info))
                         (remhash fun table)))
@@ -629,3 +631,131 @@ functions when called with no arguments."
                                 `(untrace-1 ',name))))
          t)
       '(untrace-all)))
+
+;;;; Experimental implementation of encapsulation, specifically for TRACE,
+;;;; which preserves identity of closures and simple-funs.
+
+;;; Code which is traced has simple-funs whose entry points do not point
+;;; to themselves. The garbage collector needs to visit each simple-fun
+;;; in the traced object when scavenging. Normally it does not do that,
+;;; as relocation of the etry point is performed by the transport method,
+;;; not the scavenge method.
+(defconstant code-is-traced 1)
+
+(defun set-tracing-bit (code bit)
+  (declare (ignorable code bit))
+  #+64-bit ; there are no bits to spare in a 32-bit header word
+  (with-pinned-objects (code)
+    (let ((sap (int-sap (get-lisp-obj-address code))))
+      ;; NB: This is not threadsafe on machines that don't promise that
+      ;; stores to single bytes are atomic.
+      (setf (sb-vm::sap-ref-8-jit sap #+little-endian (- 1 sb-vm:other-pointer-lowtag)
+                                      #+big-endian (- 6 sb-vm:other-pointer-lowtag))
+            bit)
+      ;; touch the card mark
+      (setf (code-header-ref code 1) (code-header-ref code 1)))))
+
+;;; FIXME: Symbol is lost by accident
+(eval-when (:compile-toplevel :load-toplevel)
+  (export 'sb-int::encapsulate-funobj 'sb-int))
+
+(defun compile-funobj-encapsulation (wrapper info actual-fun)
+  #+(or x86 x86-64)
+  (let ((code
+         ;; Don't actually "compile" - just emulate the result of compiling.
+         ;; Cloning a precompiled template object consumes only 272 bytes
+         ;; versus about 128KB to invoke the compiler.
+         (sb-c::copy-code-object
+          (load-time-value
+           (let ((c (fun-code-header
+                     ;; Immobile code might use relative fixups which won't work
+                     ;; when the code gets copied.
+                     (let ((sb-c:*compile-to-memory-space* :dynamic))
+                       (compile nil
+                                `(lambda (&rest args)
+                                   ;; The code constants will be overwritten in the copy.
+                                   ;; These are just placeholders essentially.
+                                   (apply ,#'trace-call ,(make-trace-info) #() args))))))
+                 (index (+ sb-vm:code-constants-offset sb-vm:code-slots-per-simple-fun)))
+             ;; First three args to APPLY must be at the expected offets
+             (aver (typep (code-header-ref c (+ index 0)) 'function))
+             (aver (typep (code-header-ref c (+ index 1)) 'trace-info))
+             (aver (typep (code-header-ref c (+ index 2)) 'simple-vector))
+             c)
+           t)))
+        (index (+ sb-vm:code-constants-offset sb-vm:code-slots-per-simple-fun)))
+    (setf (code-header-ref code (+ index 0)) (symbol-function wrapper)
+          (code-header-ref code (+ index 1)) info
+          (code-header-ref code (+ index 2)) actual-fun)
+    (%code-entry-point code 0))
+  #-(or x86 x86-64)
+  (values (compile nil `(lambda (&rest args)
+                          (apply #',wrapper ,info ,actual-fun args)))))
+
+;;; The usual ENCAPSULATE encapsulates NAME by changing what NAME points to,
+;;; that is, by altering the fdefinition.
+;;; In contrast, ENCAPSULATE-FUNOBJ encapsulates TRACED-FUN by changing the
+;;; entry point of the function to redirect to a tracing wrapper which then
+;;; calls back to the correct entry point.
+(defun encapsulate-funobj (traced-fun &optional fdefn)
+  (declare (type (or simple-fun closure) traced-fun))
+  (let* ((proxy-fun
+           (typecase traced-fun
+             (simple-fun
+              ;; Generate a "closure" (that closes over nothing) which calls the
+              ;; original underlying function so that the original's entry point
+              ;; can be redirected to a tracing wrapper, which will produce trace
+              ;; output and invoke the closure which invokes the original fun.
+              #+(or x86-64 arm64)
+              (with-pinned-objects ((%closure-fun traced-fun))
+                (sb-vm::%alloc-closure 0 (sb-vm::%closure-callee traced-fun)))
+              #-(or x86-64 arm64) (%primitive sb-vm::make-closure traced-fun nil 0 nil))
+             (closure
+              ;; Same as above, but simpler - the original closure will redirect
+              ;; to the tracing wraper, which will invoke a new closure that is
+              ;; behaviorally identical to the original closure.
+              (sb-impl::copy-closure traced-fun))))
+         (info (make-trace-info :what (cond (fdefn (fdefn-name fdefn))
+                                            (t (%fun-name traced-fun)))
+                                :encapsulated t
+                                :named t
+                                :report 'trace))
+         (tracing-wrapper
+           (compile-funobj-encapsulation 'trace-call info proxy-fun)))
+    (with-pinned-objects (tracing-wrapper)
+      (let (#+(or x86 x86-64 arm64)
+            (tracing-wrapper-entry
+              (+ (get-lisp-obj-address tracing-wrapper)
+                 (- sb-vm:fun-pointer-lowtag)
+                 (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
+        (typecase traced-fun
+          (simple-fun
+           (let ((code (fun-code-header traced-fun)))
+             (set-tracing-bit code code-is-traced)
+             (let ((fun-header-word-index
+                     (with-pinned-objects (code)
+                       (let ((delta (- (get-lisp-obj-address traced-fun)
+                                       (get-lisp-obj-address code)
+                                       sb-vm:fun-pointer-lowtag
+                                       (- sb-vm:other-pointer-lowtag))))
+                         (aver (not (logtest delta sb-vm:lowtag-mask)))
+                         (ash delta (- sb-vm:word-shift))))))
+               ;; the entry point in CODE points to the tracing wrapper
+               (setf (code-header-ref code (1+ fun-header-word-index))
+                     #+(or x86 x86-64 arm64) (make-lisp-obj tracing-wrapper-entry)
+                     #-(or x86 x86-64 arm64) tracing-wrapper))))
+          (closure
+           (with-pinned-objects (traced-fun)
+             ;; redirect the original closure to the tracing wrapper
+             #+(or x86 x86-64 arm64)
+             (setf (sap-ref-word (int-sap (get-lisp-obj-address traced-fun))
+                                 (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                   tracing-wrapper-entry)
+             #-(or x86 x86-64 arm64)
+             (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address traced-fun))
+                                    (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
+                   tracing-wrapper))))))
+    ;; Update fdefn's raw-addr slot to point to the tracing wrapper
+    (when (and fdefn (eq (fdefn-fun fdefn) traced-fun))
+      (setf (fdefn-fun fdefn) tracing-wrapper))
+    tracing-wrapper))

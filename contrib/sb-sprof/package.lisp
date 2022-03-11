@@ -8,7 +8,7 @@
   (:export
    ;; Recording
    #:start-sampling #:stop-sampling #:with-sampling
-   #:map-traces #:map-trace-samples #:map-all-samples
+   #:map-traces
    #:sample-pc
 
    ;; Call counting
@@ -19,6 +19,8 @@
    #:report
 
    ;; Interface
-   #:*sample-interval* #:*max-samples* #:*alloc-interval*
+   #:*sample-interval* #:*max-samples*
    #:start-profiling #:stop-profiling #:with-profiling
    #:reset))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-SPROF")) t))

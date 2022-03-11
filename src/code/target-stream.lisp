@@ -68,14 +68,11 @@
 ;;; unread-char, read-byte, listen here that was removed because these
 ;;; functions are redefined when simple-streams are loaded.
 
-#-sb-fluid (declaim (inline ansi-stream-peek-char))
+(declaim (inline ansi-stream-peek-char))
 (defun ansi-stream-peek-char (peek-type stream eof-error-p eof-value
                               recursive-p)
   (cond ((typep stream 'echo-stream)
-         (echo-misc stream
-                    :peek-char
-                    peek-type
-                    (list eof-error-p eof-value)))
+         (echo-stream-peek-char stream peek-type eof-error-p eof-value))
         (t
          (generalized-peeking-mechanism
           peek-type eof-value char
@@ -89,11 +86,15 @@
                             eof-value
                             recursive-p)
   (declare (type (or character boolean) peek-type) (explicit-check))
-  (let ((stream (in-stream-from-designator stream)))
-    (if (ansi-stream-p stream)
+  (stream-api-dispatch (stream (in-stream-from-designator stream))
+    :simple (let ((char (s-%peek-char stream peek-type eof-error-p eof-value)))
+              ;; simple-streams -%PEEK-CHAR always ignored RECURSIVE-P
+              ;; so I removed it from the call.
+              (if (eq char eof-value) char (the character char)))
+    :native
         (ansi-stream-peek-char peek-type stream eof-error-p eof-value
                                recursive-p)
-        ;; by elimination, must be Gray streams FUNDAMENTAL-STREAM
+    :gray
         (let ((char
                (generalized-peeking-mechanism
                 peek-type :eof char
@@ -108,18 +109,16 @@
                 (eof-or-lose stream eof-error-p eof-value))))
           (if (eq char eof-value)
               char
-              (the character char))))))
+              (the character char)))))
 
-(defun echo-misc (stream operation &optional arg1 arg2)
+(defun echo-misc (stream operation arg1)
   (let* ((in (two-way-stream-input-stream stream))
          (out (two-way-stream-output-stream stream)))
-    (case operation
+    (stream-misc-case (operation)
       (:listen
        (if (ansi-stream-p in)
-           (or (/= (the fixnum (ansi-stream-in-index in))
-                   +ansi-stream-in-buffer-length+)
-               (funcall (ansi-stream-misc in) in :listen))
-           (stream-misc-dispatch in :listen)))
+           (%ansi-stream-listen in)
+           (stream-misc-dispatch in operation arg1)))
       (:unread (setf (echo-stream-unread-stuff stream) t)
                (unread-char arg1 in))
       (:element-type
@@ -135,9 +134,17 @@
            in-mode)))
       (:close
        (set-closed-flame stream))
-      (:peek-char
-       ;; For the special case of peeking into an echo-stream
-       ;; arg1 is PEEK-TYPE, arg2 is (EOF-ERROR-P EOF-VALUE)
+      (t
+       (or (if (ansi-stream-p in)
+               (call-ansi-stream-misc in operation arg1)
+               (stream-misc-dispatch in operation arg1))
+           (if (ansi-stream-p out)
+               (call-ansi-stream-misc out operation arg1)
+               (stream-misc-dispatch out operation arg1)))))))
+
+(defun echo-stream-peek-char (stream peek-type eof-error-p eof-value)
+  (let* ((in (two-way-stream-input-stream stream))
+         (out (two-way-stream-output-stream stream)))
        ;; returns peeked-char, eof-value, or errors end-of-file
        ;;
        ;; Note: This code could be moved into PEEK-CHAR if desired.
@@ -163,17 +170,33 @@
                       (setf unread-p (echo-stream-unread-stuff stream))
                       (setf (echo-stream-unread-stuff stream) nil))
                   (setf initial-peek-p nil)
-                  (read-char in (first arg2) :eof)))
+                  (read-char in eof-error-p :eof)))
            (generalized-peeking-mechanism
-            arg1 (second arg2) char
+            peek-type eof-value char
             (infn)
             :eof
             (unread-char char in)
-            (outfn char)))))
-      (t
-       (or (if (ansi-stream-p in)
-               (funcall (ansi-stream-misc in) in operation arg1 arg2)
-               (stream-misc-dispatch in operation arg1 arg2))
-           (if (ansi-stream-p out)
-               (funcall (ansi-stream-misc out) out operation arg1 arg2)
-               (stream-misc-dispatch out operation arg1 arg2)))))))
+            (outfn char))))))
+
+;;; Stop wasting space with unnecessarily preserved inline definitions.
+;;; ANSI-STREAM-LISTEN, %ANSI-STREAM-LISTEN, ANSI-STREAM-CLEAR-INPUT
+;;; are needed for sb-simple-streams.
+;;; Maybe everything else can just get dropped entirely, the symbol and its
+;;; function, instead of just the inline sexpr.
+(dolist (name '(!ansi-stream-ftell
+                ansi-stream-read-line ansi-stream-read-char
+                ansi-stream-unread-char
+                ansi-stream-read-char-no-hang
+                ansi-stream-read-byte read-n-bytes
+                read-char unread-char read-byte
+                read-sequence/read-function write-sequence/write-function
+                stream-element-mode))
+  (clear-info :function :inlinep name)
+  (clear-info :function :inlining-data name))
+;;; Can all the ANSI- function names be removed now? Maybe?
+(push '("SB-IMPL" ansi-stream-peek-char ansi-stream-unread-char)
+      *!removable-symbols*)
+;;; These two wants to get invoked by simple-streams but would get tree-shaken out
+;;; were they not externalized.
+(export '(sb-impl::in-stream-from-designator sb-impl::eof-or-lose)
+        'sb-impl)

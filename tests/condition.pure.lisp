@@ -228,7 +228,7 @@
     (test (foo () :interactive) '(:interactive) ())
     (test (foo () :test) '(:test) ())
     ;; Declarations should work normally as part of the restart body.
-    (test (foo (quux) :declare ()) '(nil))
+    (test (foo () :declare ()) '(nil) ())
     (test (foo () :declare () :report "quux") '("quux") ())))
 
 (with-test (:name (restart-case :malformed-clauses))
@@ -288,18 +288,28 @@
 ;; should print the stream position information.
 (with-test (:name (reader-error :stream-error-position-info :open-stream
                                 :bug-1264902))
-  (assert
-   (search
+  (locally
+   ;; High debug avoids stack-allocating the stream.
+   ;; It would be fine to stack-allocate it, because the handler-case does not
+   ;; use the stream outside of its extent, however, because ALLOCATE-CONDITION
+   ;; doesn't know when you will use the stream, it always replaces a DX stream
+   ;; with a dummy. The dummy stream would not have position information.
+   (declare (optimize debug))
+   (assert
+    (search
     "Line: 1, Column: 22, File-Position: 22"
     (with-input-from-string (stream "no-such-package::symbol")
       (handler-case
           (read stream)
-        (reader-error (condition) (princ-to-string condition)))))))
+        (reader-error (condition) (princ-to-string condition))))))))
 
 ;; Printing a READER-ERROR when the underlying stream has been closed
 ;; should still work, but the stream information will not be printed.
 (with-test (:name (reader-error :stream-error-position-info :closed-stream
                                 :bug-1264902))
+  ;; This test operates on a closed stream that has dynamic extent (theoretically).
+  ;; SAFETY 3 prevents a memory fault by not actually stack-allocating it.
+  (declare (optimize (safety 3)))
   (assert
    (search
     "Package NO-SUCH-PACKAGE does not exist"
@@ -361,7 +371,7 @@
 (with-test (:name (handler-bind :no-sloppy-semantics))
   (multiple-value-bind (fun failure-p)
       (checked-compile '(lambda (x)
-                         (sb-impl::%handler-bind
+                         (sb-kernel::%handler-bind
                           ((condition (function (lambda (c) (print c)) garb)))
                           (print x)))
                        :allow-failure t)
@@ -413,10 +423,11 @@ is not of type
 
 ;;; Instances of LAYOUT for condition classoids created by genesis
 ;;; should resemble ones created normally. Due to a bug, they did not.
+;;; (The LENGTH slot had the wrong value)
 (with-test (:name :condition-layout-lengths)
-  (loop for layout being each hash-value of (sb-kernel:classoid-subclasses
-                                             (sb-kernel:find-classoid 'condition))
-        for len = (sb-kernel:layout-length layout)
+  (loop for wrapper being each hash-value of (sb-kernel:classoid-subclasses
+                                              (sb-kernel:find-classoid 'condition))
+        for len = (sb-kernel:wrapper-length wrapper)
         minimize len into min
         maximize len into max
         finally (assert (= min max))))
@@ -427,3 +438,33 @@ is not of type
     (declare (ignore newcond))
     (assert (string= (write-to-string error :escape nil)
                      "odd-length initializer list: (:A 1 :B)."))))
+
+(with-test (:name :type-error-on-dx-object
+            :skipped-on :interpreter)
+  (handler-case
+    (sb-int:dx-let ((a (make-array 3)))
+      (setf (aref a 0) a)
+      (print (1+ (aref a 0))))
+    (error (e)
+      (assert (equal (sb-kernel:type-error-datum-stored-type e)
+                     '(simple-vector 3))))))
+
+(with-test (:name (:handler-bind-evaluation-count :lp1916302))
+  (let (list)
+    (handler-bind ((condition (let ((x 0))
+                                (lambda (c)
+                                  (declare (ignore c))
+                                  (push (incf x) list)))))
+      (signal 'condition)
+      (signal 'condition))
+    (assert (equalp '(2 1) list))))
+
+(with-test (:name (:handler-bind-evaluation-count :separate-establishment))
+  (let (list)
+    (dotimes (i 2)
+      (handler-bind ((condition (let ((x 0))
+                                  (lambda (c)
+                                    (declare (ignore c))
+                                    (push (incf x) list)))))
+        (signal 'condition)))
+    (assert (equalp '(1 1) list))))

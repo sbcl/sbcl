@@ -514,8 +514,10 @@
 (with-test (:name (:integer-division-using-multiplication :correctness))
   (let ((*random-state* (make-random-state t)))
     (dolist (dividend-type `((unsigned-byte ,sb-vm:n-word-bits)
+                             (signed-byte ,sb-vm:n-word-bits)
                              (and fixnum unsigned-byte)
-                             (integer 10000 10100)))
+                             (integer 10000 10100)
+                             fixnum))
       (dolist (divisor `(;; Some special cases from the paper
                          7 10 14 641 274177
                          ;; Range extremes
@@ -527,7 +529,9 @@
                                  for r = (random (expt 2 i))
                                  ;; We don't want 0, 1 and powers of 2.
                                  when (not (zerop (logand r (1- r))))
-                                 collect r)))
+                                 collect r
+                                 and
+                                 collect (- r))))
         (dolist (fun '(truncate ceiling floor mod rem))
           (let ((foo (checked-compile
                       `(lambda (x)
@@ -544,7 +548,8 @@
                                 ,@(loop for i from 4 to sb-vm:n-word-bits
                                         for pow = (expt 2 (1- i))
                                         for r = (+ pow (random pow))
-                                        collect r)))
+                                        collect r
+                                        collect (- r))))
               (when (typep dividend dividend-type)
                 (multiple-value-bind (q1 r1)
                     (funcall foo dividend)
@@ -681,26 +686,6 @@
                  (the (integer 21371810342718833225 21371810343571293860) b)))
     ((16779072918521075607 21371810342718833263) 2923729245085762055)))
 
-(with-test (:name (logand :complicated-identity))
-  (loop for k from -8 upto 8 do
-    (loop for min from -16 upto 16 do
-      (loop for max from min upto 16 do
-        (let ((f (checked-compile `(lambda (x)
-                                     (declare (type (integer ,min ,max) x))
-                                     (logand x ,k)))))
-          (loop for x from min upto max do
-            (assert (eql (logand x k) (funcall f x)))))))))
-
-(with-test (:name (logior :complicated-identity))
-  (loop for k from -8 upto 8 do
-    (loop for min from -16 upto 16 do
-      (loop for max from min upto 16 do
-        (let ((f (checked-compile `(lambda (x)
-                                     (declare (type (integer ,min ,max) x))
-                                     (logior x ,k)))))
-          (loop for x from min upto max do
-            (assert (eql (logior x k) (funcall f x)))))))))
-
 (with-test (:name (ldb :negative-index-no-error))
   (checked-compile-and-assert ()
       '(lambda (x y) (ldb (byte x y) 100))
@@ -821,3 +806,201 @@
     (((1- (ash 1 32))) 32)
     (((1- (ash 1 48))) 48)
     (((1- (ash 1 54))) 54)))
+
+(with-test (:name :complex-rational-eql)
+  ;; ensure no funny business with constant sharing so that we're forced
+  ;; to do the most general form or EQL on two (complex rational)s
+  (eql (read-from-string "#c(1/2 1/3)") (read-from-string "#c(1/2 1/3)")))
+
+(with-test (:name :gcd-derive-type)
+  (checked-compile-and-assert
+   ()
+   '(lambda (a)
+     (declare (type (integer -142 -29) a))
+     (eql (gcd (setq a -29) a) 1))
+   ((-33) nil)))
+
+;;; Test that LOGIOR and LOGXOR on PPC64 can correctly perform the constant 2nd-arg
+;;; vop variant on a 32-bit immediate using op + op-shifted instructions.
+;;; (Probably we should refactor large parts of the test suite by the CPU
+;;; architecture so that you can really see clearly the areas of concern
+;;; for each backend, but I'm not about to embark on that now)
+(with-test (:name :ppc64-logxor-32-bit-const)
+  (let ((f (compile nil
+                    '(lambda (x)
+                      (declare (fixnum x))
+                      ;; The asm code went wrong only if the result was not in the same
+                      ;; register as the source, so make sure that X is live throughout
+                      ;; the test so that each result is in a different register.
+                      (let ((a (logxor x #x9516A7))
+                            (b (logior x #x2531b4))
+                            (c (ash x -1)))
+                        (list a b c x))))))
+    (let ((result (funcall f 0)))
+      (assert (equal result
+                     '(#x9516A7 #x2531b4 0 0))))))
+
+(with-test (:name :truncate-by-zero-derivation)
+  (assert
+   (not (equal (cadr
+                (cdaddr (sb-kernel:%simple-fun-type
+                         (checked-compile
+                          `(lambda ()
+                             (truncate 5 0))
+                          :allow-style-warnings t))))
+               '(integer 0 0)))))
+
+(with-test (:name :truncate-by-zero-derivation.2)
+  (checked-compile
+   `(lambda (x y)
+      (declare (type (unsigned-byte 8) x y)
+               (optimize speed (safety 0)))
+      (mod x y))
+   :allow-notes nil))
+
+(with-test (:name :ash-fixnum)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b)
+     (declare (type (integer -2 2) b))
+     (ash b (min 13 b)))
+   ((-2) -1)
+   ((-1) -1)
+   ((0) 0)
+   ((1) 2)
+   ((2) 8)))
+
+(with-test (:name :mod-ash-cut)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (logand #xFF (ash 1 (the (integer -1000 1000) b))))
+    ((1) 2)
+    ((500) 0))
+  (checked-compile-and-assert
+      ()
+      `(lambda (x b)
+         (logand #xFF (ash (the (unsigned-byte 64) x) (the (integer -1000 1000) b))))
+    (((1- (expt 2 64)) -63) 1)
+    (((1- (expt 2 64)) -64) 0)))
+
+(with-test (:name :bogus-modular-fun-widths)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (logorc2 0 (- (isqrt (abs (logand (if b -1 2) 2))))))
+    ((t) 0)
+    ((nil) 0)))
+
+(with-test (:name :lognot-type-derive)
+  (assert
+   (equal (caddr (sb-kernel:%simple-fun-type
+                  (checked-compile
+                   `(lambda (b)
+                      (lognot (if b -1 2))))))
+          '(values (or (integer -3 -3) (integer 0 0)) &optional))))
+
+(with-test (:name :logand-minus-1-type-derive)
+  (assert
+   (equal (caddr (sb-kernel:%simple-fun-type
+                   (checked-compile
+                    `(lambda (b)
+                       (logand #xf (if b -1 2))))))
+          '(values (or (integer 2 2) (integer 15 15)) &optional))))
+
+(with-test (:name :ash-vop-liftimes)
+  (checked-compile-and-assert
+      ()
+      `(lambda (A C)
+         (declare ((integer 18512171785636 25543390924355) a)
+                  ((integer -20485927966480856 54446023204744213) c))
+         (dpb a (byte 20 25) (ash a (min 2 c))))
+    ((23906959691249 -15632482499364879) 15512918556672)
+    ((23906959691249 1) 50697318833122)))
+
+
+(with-test (:name :ash-modarith-transform-loop)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p1 p2 p3)
+         (declare (type (integer * 53) p1)
+                  (type number p2)
+                  (type
+                   (member 21006398744832 16437837094852630852 2251799813685252
+                           -1597729350241882 466525164)
+                   p3))
+         (ldb (byte (the (integer -3642545987372 *) p1) p2) p3))
+    ((53 2 21006398744832) 5251599686208)))
+
+(with-test (:name :logcount-negative-fixnum)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (logcount (the fixnum x)))
+    ((54) 4)
+    ((-54) 4)))
+
+(with-test (:name :mod-ash64-signed)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (fixnum a b))
+         (logand (ash a b) (1+ most-positive-fixnum)))
+    ((-1 -3) (1+ most-positive-fixnum))
+    ((1 3) 0)))
+
+(with-test (:name :zero-shift-flags)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a m)
+         (declare ((integer 0 5000000000) a)
+                  (bit m))
+         (zerop (ash a m)))
+    ((1 0) nil)
+    ((0 1) t)))
+
+(with-test (:name :signum-merged-branch-if)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a y)
+      (declare (fixnum a y))
+      (when (< y 10)
+        (signum a)))
+   ((1 5) 1)
+   ((0 5) 0)
+   ((-1 5) -1)))
+
+(with-test (:name :cmov-merged-branch-if)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c)
+      (declare (type (integer 0 7711851432375361987) b))
+      (declare (type (integer -2 0) c))
+      (let ((v9 c))
+        (if (< c v9)
+            c
+            (if (= v9 c)
+                v9
+                b))))
+   ((0 -1) -1)))
+
+(with-test (:name :ash-amount-unsigned-comparison)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type (integer -581 900) a))
+      (ash 3 (ash (ash a -50) (1- sb-vm:n-word-bits))))
+   ((-1) 0)
+   ((1) 3)))
+
+(with-test (:name :ash-modfx-constant-folding)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type (integer -10000 5) a))
+      (ldb (byte 16 28)
+           (ash 4611686018427387913
+                (progn
+                  (multiple-value-setq (a) -10000)
+                  a))))
+   ((0) 0)))

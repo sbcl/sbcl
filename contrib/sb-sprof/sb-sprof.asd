@@ -1,3 +1,6 @@
+#-(or sb-testing-contrib sb-building-contrib)
+(error "Can't build contribs with ASDF")
+
 (defsystem "sb-sprof"
   :description "A statistical profiler."
   #+sb-building-contrib :pathname
@@ -17,6 +20,6 @@
   :depends-on ("sb-sprof")
   :components ((:file "test"))
   :perform (test-op (o c)
-             #-(or win32 darwin) ;not yet
+             #-(or win32) ;not yet
              (or (funcall (find-symbol "RUN-TESTS" "SB-SPROF-TEST"))
                  (error "test-op failed"))))

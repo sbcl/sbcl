@@ -68,6 +68,8 @@
    #:md5sum-sequence #:md5sum-string #:md5sum-stream #:md5sum-file))
 
 (in-package sb-md5)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 #+cmu
 (eval-when (:compile-toplevel)
@@ -130,7 +132,7 @@ where a is the intended low-order byte and d the high-order byte."
   #-lw-int32
   `(aref ,vector ,index))
 
-;;; Section 3.4:  Auxilliary functions
+;;; Section 3.4:  Auxiliary functions
 
 (declaim (inline f g h i)
          (ftype (function (ub32 ub32 ub32) ub32) f g h i))
@@ -372,7 +374,7 @@ starting from `offset' into the given 16 word MD5 block."
    block (* vm:vector-data-offset vm:word-bits)
    (* 64 vm:byte-bits))
   #+(and :sbcl :little-endian)
-  (sb-kernel:ub8-bash-copy buffer offset block 0 64)
+  (sb-kernel:%byte-blt buffer offset block 0 64)
   #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
   (loop for i of-type (integer 0 16) from 0
         for j of-type (integer 0 #.most-positive-fixnum)
@@ -392,13 +394,14 @@ starting from `offset' into the given 16 word MD5 block."
            (type simple-string buffer)
            (optimize (speed 3) (safety 0) (space 0) (debug 0)
                      #+lw-int32 (float 0) #+lw-int32 (hcl:fixnum-safety 0)))
+  (declare (ignorable block buffer offset))
   #+(and :cmu :little-endian)
   (kernel:bit-bash-copy
    buffer (+ (* vm:vector-data-offset vm:word-bits) (* offset vm:byte-bits))
    block (* vm:vector-data-offset vm:word-bits)
    (* 64 vm:byte-bits))
   #+(and :sbcl :little-endian)
-  (sb-kernel:ub8-bash-copy buffer offset block 0 64)
+  (error "Unexpectedly hit MD5:FILL-BLOCK-CHAR")
   #-(or (and :sbcl :little-endian) (and :cmu :little-endian))
   (loop for i of-type (integer 0 16) from 0
         for j of-type (integer 0 #.most-positive-fixnum)
@@ -637,10 +640,7 @@ The resulting MD5 message-digest is returned as an array of sixteen
   "Calculate the MD5 message-digest of data in `sequence', which should
 be a 1d simple-array with element type (unsigned-byte 8).  On CMU CL
 and SBCL non-simple and non-1d arrays with this element-type are also
-supported.  Use with strings is DEPRECATED, since this will not work
-correctly on implementations with `char-code-limit' > 256 and ignores
-character-coding issues.  Use md5sum-string instead, or convert to the
-required (unsigned-byte 8) format through other means before-hand."
+supported."
   (declare (optimize (speed 3) (safety 3) (space 0) (debug 1))
            (type (vector (unsigned-byte 8)) sequence) (type fixnum start))
   (locally

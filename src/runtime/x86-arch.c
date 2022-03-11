@@ -27,22 +27,15 @@
 #include "forwarding-ptr.h"
 #include "var-io.h"
 #include "code.h"
+#include "unaligned.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "genesis/vector.h"
 
-#define BREAKPOINT_INST 0xcc    /* INT3 */
-#define UD2_INST 0x0b0f         /* UD2 */
-
-#ifndef LISP_FEATURE_UD2_BREAKPOINTS
+#define INT3_INST 0xcc
+#define UD2_INST 0x0b0f
 #define BREAKPOINT_WIDTH 1
-#else
-#define BREAKPOINT_WIDTH 2
-#endif
-
-void arch_init(void)
-{}
 
 #ifndef LISP_FEATURE_WIN32
 os_vm_address_t
@@ -63,13 +56,15 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 int *
 context_eflags_addr(os_context_t *context)
 {
-#if defined __linux__ || defined __sun
+#if defined __linux__
     /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
      * <sys/ucontext.h> file to define symbolic names for offsets into
      * gregs[], but it's conditional on __USE_GNU and not defined, so
      * we need to do this nasty absolute index magic number thing
      * instead. */
     return &context->uc_mcontext.gregs[16];
+#elif defined(LISP_FEATURE_SUNOS)
+    return &context->uc_mcontext.gregs[EFL];
 #elif defined(LISP_FEATURE_FREEBSD) || defined(__DragonFly__)
     return &context->uc_mcontext.mc_eflags;
 #elif defined __OpenBSD__
@@ -95,7 +90,7 @@ void arch_skip_instruction(os_context_t *context)
     int code;
 
     /* Get and skip the Lisp interrupt code. */
-    code = *(char*)(*os_context_pc_addr(context))++;
+    code = *(char*)(OS_CONTEXT_PC(context)++);
     switch (code)
         {
         case trap_Error:
@@ -124,33 +119,32 @@ void arch_skip_instruction(os_context_t *context)
         }
 
     FSHOW((stderr,
-           "/[arch_skip_inst resuming at %x]\n",
-           *os_context_pc_addr(context)));
+           "/[arch_skip_inst resuming at %x]\n", OS_CONTEXT_PC(context)));
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
-    return 1 + (unsigned char *)(*os_context_pc_addr(context));
+    return 1 + (unsigned char *)(OS_CONTEXT_PC(context));
 }
 
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     set_pseudo_atomic_interrupted(thread);
 }
 
 void
 arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    struct thread *thread = arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     clear_pseudo_atomic_interrupted(thread);
 }
 
@@ -162,16 +156,8 @@ unsigned int
 arch_install_breakpoint(void *pc)
 {
     unsigned int result = *(unsigned int*)pc;
-
-#ifndef LISP_FEATURE_UD2_BREAKPOINTS
-    *(char*)pc = BREAKPOINT_INST;               /* x86 INT3       */
+    *(char*)pc = INT3_INST;
     *((char*)pc+1) = trap_Breakpoint;           /* Lisp trap code */
-#else
-    *(char*)pc = UD2_INST & 0xff;
-    *((char*)pc+1) = UD2_INST >> 8;
-    *((char*)pc+2) = trap_Breakpoint;
-#endif
-
     return result;
 }
 
@@ -180,9 +166,6 @@ arch_remove_breakpoint(void *pc, unsigned int orig_inst)
 {
     *((char *)pc) = orig_inst & 0xff;
     *((char *)pc + 1) = (orig_inst & 0xff00) >> 8;
-#if BREAKPOINT_WIDTH > 1
-    *((char *)pc + 2) = (orig_inst & 0xff0000) >> 16;
-#endif
 }
 
 /* When single stepping, single_stepping holds the original instruction
@@ -197,7 +180,7 @@ unsigned int  single_step_save3;
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int*)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int*)OS_CONTEXT_PC(context);
 
     /* Put the original instruction back. */
     arch_remove_breakpoint(pc, orig_inst);
@@ -218,7 +201,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     single_stepping = pc;
 
 #ifdef CANNOT_GET_TO_SINGLE_STEP_FLAG
-    *os_context_pc_addr(context) = (os_context_register_t)((char *)pc - 9);
+    OS_CONTEXT_PC(context) = (os_context_register_t)((char *)pc - 9);
 #endif
 }
 
@@ -235,10 +218,8 @@ restore_breakpoint_from_single_step(os_context_t * context)
     *context_eflags_addr(context) &= ~0x100;
 #endif
     /* Re-install the breakpoint if possible. */
-    if (((char *)*os_context_pc_addr(context) >
-         (char *)single_stepping) &&
-        ((char *)*os_context_pc_addr(context) <=
-         (char *)single_stepping + BREAKPOINT_WIDTH)) {
+    if (((char *)OS_CONTEXT_PC(context) > (char *)single_stepping) &&
+        ((char *)OS_CONTEXT_PC(context) <= (char *)single_stepping + BREAKPOINT_WIDTH)) {
         fprintf(stderr, "warning: couldn't reinstall breakpoint\n");
     } else {
         arch_install_breakpoint(single_stepping);
@@ -251,16 +232,15 @@ restore_breakpoint_from_single_step(os_context_t * context)
 void
 arch_handle_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) -= BREAKPOINT_WIDTH;
+    OS_CONTEXT_PC(context) -= BREAKPOINT_WIDTH;
     handle_breakpoint(context);
 }
 
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) -= BREAKPOINT_WIDTH;
-    *os_context_pc_addr(context) =
-        (int)handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) -= BREAKPOINT_WIDTH;
+    OS_CONTEXT_PC(context) = (int)handle_fun_end_breakpoint(context);
 }
 
 void
@@ -285,7 +265,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
 
     /* This is just for info in case the monitor wants to print an
      * approximation. */
-    access_control_stack_pointer(arch_os_get_current_thread()) =
+    access_control_stack_pointer(get_sb_vm_thread()) =
         (lispobj *)*os_context_sp_addr(context);
 
 #ifdef LISP_FEATURE_SUNOS
@@ -303,23 +283,20 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
      * 'kind' value (eg trap_Cerror). For error-trap and Cerror-trap a
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
-    trap = *(unsigned char *)(*os_context_pc_addr(context));
+    trap = *(unsigned char *)OS_CONTEXT_PC(context);
     handle_trap(context, trap);
 }
 
 void
 sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
-    /* Triggering SIGTRAP using int3 is unreliable on OS X/x86, so
-     * we need to use illegal instructions for traps.
-     */
-#if defined(LISP_FEATURE_UD2_BREAKPOINTS) && !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-    if (*((unsigned short *)*os_context_pc_addr(context)) == UD2_INST) {
-        *os_context_pc_addr(context) += 2;
+#ifndef LISP_FEATURE_MACH_EXCEPTION_HANDLER
+    if (*(unsigned short *)OS_CONTEXT_PC(context) == UD2_INST) {
+        OS_CONTEXT_PC(context) += 2;
         return sigtrap_handler(signal, siginfo, context);
     }
 #endif
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL at %p.", (void*)*os_context_pc_addr(context));
+    lose("Unhandled SIGILL at %p.", (void*)OS_CONTEXT_PC(context));
 }
 #endif /* not LISP_FEATURE_WIN32 */
 
@@ -339,8 +316,8 @@ arch_install_interrupt_handlers()
      * CL way, I hope there will at least be a comment to explain
      * why.. -- WHN 2001-06-07 */
 #if !defined(LISP_FEATURE_WIN32) && !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-    undoably_install_low_level_interrupt_handler(SIGILL , sigill_handler);
-    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+    ll_install_handler(SIGILL , sigill_handler);
+    ll_install_handler(SIGTRAP, sigtrap_handler);
 #endif
     SHOW("returning from arch_install_interrupt_handlers()");
 }
@@ -402,10 +379,11 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     }
 }
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 void
-arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+    // 'volatile' works around a spurious GCC warning
+    volatile char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
     if (datap) {
         *(unsigned long *)reloc_addr = (unsigned long)target_addr;
         return;
@@ -425,4 +403,5 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
     /* write a nop for good measure. */
     *reloc_addr = 0x90;
 }
-#endif
+
+#include "x86-arch-shared.inc"

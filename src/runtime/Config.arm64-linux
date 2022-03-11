@@ -9,18 +9,14 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-NM = ./linux-nm
-
-ASSEM_SRC = arm64-assem.S ldso-stubs.S
+ASSEM_SRC = arm64-assem.S
 ARCH_SRC = arm64-arch.c
 
 OS_SRC = linux-os.c linux-mman.c arm64-linux-os.c
-OS_LIBS = -ldl
+OS_LIBS = -ldl -Wl,-no-as-needed
 
 ifdef LISP_FEATURE_GENCGC
   GC_SRC = fullcgc.c gencgc.c traceroot.c
-else
-  GC_SRC = cheneygc.c
 endif
 
 ifdef LISP_FEATURE_SB_THREAD
@@ -32,9 +28,7 @@ endif
 ifdef LISP_FEATURE_LARGEFILE
   CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 endif
-ifdef LISP_FEATURE_SB_DYNAMIC_CORE
-  LINKFLAGS += -Wl,--export-dynamic
-endif
+LINKFLAGS += -Wl,--export-dynamic
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

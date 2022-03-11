@@ -24,20 +24,6 @@
   (make-instance 'no-slots))
 (compile 'make-no-slots)
 
-;; Note: this test may no longer be relevant. It asserted laziness of
-;; the hash computation, since it was slow at some point, and it was
-;; the root cause of slow instance creation. But that was fixed,
-;; and we really don't care per se that hashing is lazy.
-#-compact-instance-header ; can't create symbols in SB-PCL
-(with-test (:name :instance-hash-starts-as-zero :fails-on :interpreter)
-  ;; These first two tests look the same but they aren't:
-  ;; the second one uses a CTOR function.
-  (locally
-      (declare (optimize (sb-c::type-check 0))) ; Same as STD-INSTANCE-HASH
-    (assert (zerop (sb-pcl::standard-instance-hash-code (make-instance 'no-slots))))
-    (assert (zerop (sb-pcl::standard-instance-hash-code (make-no-slots)))))
-  (assert (not (zerop (sxhash (make-no-slots))))))
-
 (defmethod update-instance-for-redefined-class
     ((object no-slots) added discarded plist &rest initargs)
   (declare (ignore initargs))
@@ -149,7 +135,7 @@
 
 (with-test (:name (make-instance :ctor-inline-cache-resize))
   (let* ((f (checked-compile `(lambda (name) (make-instance name))))
-         (classes (loop repeat (* 2 sb-pcl::+ctor-table-max-size+)
+         (classes (loop repeat (* 2 sb-pcl:+ctor-table-max-size+)
                         collect (class-name (eval `(defclass ,(gentemp) () ())))))
          (count 0)
          (caches (find-ctor-caches f))
@@ -160,7 +146,7 @@
     (dolist (class classes)
       (assert (typep (funcall f (if (oddp count) class (find-class class))) class))
       (incf count)
-      (cond ((<= count sb-pcl::+ctor-list-max-size+)
+      (cond ((<= count sb-pcl:+ctor-list-max-size+)
              (unless (consp (cdr cache))
                (error "oops, wanted list cache, got: ~S" cache))
              (unless (= count (length (cdr cache)))

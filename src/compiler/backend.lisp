@@ -45,18 +45,13 @@
 (defglobal *backend-sbs* #())
 (declaim (type simple-vector *backend-sbs*))
 
-;;; translation from template names to template structures
-(defglobal *backend-template-names* (make-hash-table :test 'eq))
-(declaim (type hash-table *backend-template-names*))
-
 ;;; hashtables mapping from SC and SB names to the corresponding structures
-(defglobal *backend-sc-names* (make-hash-table :test 'eq))
+(defglobal *backend-sc-names* (make-hash-table))
 (declaim (type hash-table *backend-sc-names*))
 
 ;;; translations from primitive type names to the corresponding
 ;;; primitive-type structure.
-(defglobal *backend-primitive-type-names*
-  (make-hash-table :test 'eq))
+(defglobal *backend-primitive-type-names* (make-hash-table)) ; keys are symbols
 (declaim (type hash-table *backend-primitive-type-names*))
 
 ;;; This establishes a convenient handle on primitive type unions, or
@@ -72,22 +67,23 @@
 ;;; representation.
 ;;;
 ;;; The T primitive-type is kept in this variable so that people who
-;;; have to special-case it can get at it conveniently. This variable
-;;; has to be set by the machine-specific VM definition, since the
-;;; !DEF-PRIMITIVE-TYPE for T must specify the SCs that boxed objects
-;;; can be allocated in.
+;;; have to special-case it can get at it conveniently.
 (define-symbol-macro *backend-t-primitive-type*
     (the primitive-type (load-time-value (primitive-type-or-lose t) t)))
 
 ;;; a hashtable translating from VOP names to the corresponding VOP-PARSE
 ;;; structures. This information is only used at meta-compile time.
-(defglobal *backend-parsed-vops* (make-hash-table :test 'eq))
+(defglobal *backend-parsed-vops* (make-hash-table)) ; keys are symbols
 (declaim (type hash-table *backend-parsed-vops*))
 
+;;; Mapping of predicate name (a symbol) to a type.
+;;; This is an EQL table so that it uses symbol-hash.
+(defglobal *backend-predicate-types* (make-hash-table))
 ;;; mappings between CTYPE structures and the corresponding predicate.
 ;;; The type->predicate mapping is implemented as an alist because
 ;;; there is no such thing as a TYPE= hash table.
-(defglobal *backend-predicate-types* (make-hash-table :test 'eq))
+;;; (But if we could make all the types use as keys in this table
+;;; into interned types, could it become an EQ table perhaps?)
 (defglobal *backend-type-predicates* nil)
 (declaim (type hash-table *backend-predicate-types*))
 (declaim (type list *backend-type-predicates*))
@@ -164,12 +160,9 @@ conditionalization.
 |#
 
 ;;; The default value of NIL means use only unguarded VOPs. The
-;;; initial value is customizeable via
-;;; customize-backend-subfeatures.lisp
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *backend-subfeatures*
-    '#.(sort (copy-list sb-cold:*shebang-backend-subfeatures*) #'string<)))
-(declaim (always-bound *backend-subfeatures*))
+;;; initial value is customizeable via customize-backend-subfeatures.lisp
+(defvar *backend-subfeatures* '#.(sort sb-cold:backend-subfeatures #'string<))
+#-sb-xc-host (declaim (always-bound *backend-subfeatures*))
 
 ;;; possible *BACKEND-SUBFEATURES* values:
 ;;;

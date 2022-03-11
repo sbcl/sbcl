@@ -28,6 +28,23 @@
 (with-test (:name (:no-session-deadlock))
   (make-join-thread (lambda () (sb-ext:gc))))
 
+(with-test (:name (:make-thread-while-holding-session-lock))
+  (let ((thr1 nil)
+        (thr2 nil)
+        (sem1 (sb-thread:make-semaphore))
+        (sem2 (sb-thread:make-semaphore)))
+    (sb-thread::with-session-lock (sb-thread::*session*)
+      (setq thr1 (sb-thread:make-thread
+                  #'sb-thread:signal-semaphore :arguments sem1)
+            thr2 (sb-thread:make-thread
+                  #'sb-thread:signal-semaphore :arguments sem2))
+      ;; This used to hang right here because threads could not make progress
+      ;; in their lisp-side trampoline.
+      (sb-thread:wait-on-semaphore sem1)
+      (sb-thread:wait-on-semaphore sem2))
+    (sb-thread:join-thread thr1)
+    (sb-thread:join-thread thr2)))
+
 (with-test (:name (:debugger-no-hang-on-session-lock-if-interrupted)
             :broken-on :win32)
   (sb-debug::enable-debugger)

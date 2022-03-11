@@ -41,25 +41,35 @@
                    (funcall function name it))))
         (call-with-each-globaldb-name
          (lambda (name)
-           ;; In general it might be unsafe to call INFO with a NAME
-           ;; that is not valid for the kind of info being retrieved,
-           ;; as when the defaulting function tries to perform a
-           ;; sanity-check. But here it's safe.
-           (awhen (or (info :function :macro-function name)
-                      (info :function :definition name))
+           (awhen (or (and (symbolp name) (macro-function name))
+                      (and (legal-fun-name-p name) (find-fdefn name)))
              (cond
                ((and (fdefn-p it)
                      (typep (fdefn-fun it) 'generic-function))
                 (loop for method in (sb-mop:generic-function-methods (fdefn-fun it))
-                   for fun = (sb-pcl::safe-method-fast-function method)
-                   when fun do (process (sb-kernel:%fun-name fun) fun)))
+                      for fun = (sb-pcl::safe-method-fast-function method)
+                      when fun do (process (sb-kernel:%fun-name fun) fun)))
                ;; Methods are already processed above
                ((and (fdefn-p it)
                      (typep (fdefn-name it)
                             '(cons (member sb-pcl::slow-method
-                                           sb-pcl::fast-method)))))
+                                    sb-pcl::fast-method)))))
                (t
-                (process name it))))))))))
+                (process name it))))
+           #+sb-xref-for-internals
+           (let ((info (info :function :info name)))
+             (when info
+               (loop for transform in (fun-info-transforms info)
+                     for fun = (transform-function transform)
+                     ;; Defined using :defun-only and a later %deftransform.
+                     unless (symbolp fun)
+                     do (process transform fun))))))
+        #+sb-xref-for-internals
+        (dohash ((name vop) *backend-template-names*)
+          (declare (ignore name))
+          (let ((fun (vop-info-generator-function vop)))
+            (when fun
+              (process vop fun))))))))
 
 ;;; Repack all xref data vectors in the system, potentially making
 ;;; them compact, but without changing their meaning:
@@ -143,11 +153,11 @@
       (loop for (fun . unpacked) in all-unpacked do
            (let ((new-xrefs (pack-xref-data unpacked)))
              (incf new-size (xref-size new-xrefs))
-             (set-simple-fun-info
-              fun
-              (%simple-fun-lexpr fun)
-              (%simple-fun-doc fun)
-              new-xrefs))))
+             (aver (vectorp new-xrefs))
+             (let ((info (%simple-fun-info fun)))
+               (if (typep info '(cons t simple-vector))
+                   (rplacd info new-xrefs)
+                   (setf (%simple-fun-info fun) new-xrefs))))))
 
     (when (>= verbose 1)
       (format t ";   Old xref size ~11:D byte~:P~@

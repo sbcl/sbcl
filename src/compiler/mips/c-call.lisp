@@ -131,8 +131,8 @@
                                         (make-result-state))))))
 
 (deftransform %alien-funcall ((function type &rest args))
-  (aver (sb-c::constant-lvar-p type))
-  (let* ((type (sb-c::lvar-value type))
+  (aver (sb-c:constant-lvar-p type))
+  (let* ((type (sb-c:lvar-value type))
          (env (make-null-lexenv))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
@@ -223,7 +223,6 @@
   (:generator 2
     (inst li res (make-fixup foreign-symbol :foreign))))
 
-#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
@@ -232,10 +231,9 @@
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:temporary (:scs (non-descriptor-reg)) addr)
   (:generator 2
-    (inst li addr (make-fixup foreign-symbol :foreign-dataref))
-    (loadw res addr)))
+    (inst li res (make-fixup foreign-symbol :foreign-dataref))
+    (loadw res res)))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg) :target cfunc)
@@ -246,13 +244,17 @@
   (:temporary (:sc any-reg :offset cfunc-offset
                    :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:temporary (:sc any-reg :offset nl3-offset) tramp) ; = $at
   (:vop-var vop)
   (:generator 0
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (inst jal (make-fixup "call_into_c" :foreign))
-      (move cfunc function t)
+      ;; (linkage-table-entry-address 0) is "call-into-c" in mips-assem.S
+      (inst lw tramp null-tn (- (linkage-table-entry-address 0) nil-value))
+      (inst nop)
+      (inst jal tramp)
+      (inst move cfunc function)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
@@ -468,7 +470,7 @@ and a pointer to the arguments."
       (finalize-segment segment)
       ;; Now that the segment is done, convert it to a static
       ;; vector we can point foreign code to.
-      (let* ((buffer (sb-assem::segment-buffer segment))
+      (let* ((buffer (sb-assem:segment-buffer segment))
              (vector (make-static-vector (length buffer)
                                          :element-type '(unsigned-byte 8)
                                          :initial-contents buffer))

@@ -11,27 +11,23 @@
 
 (in-package "SB-VM")
 
-(defun invoke-asm-routine (routine &optional tailp)
-  (inst jal (if tailp zero-tn lr-tn) (make-fixup routine :assembly-routine)))
-
 (defun generate-call-sequence (name style vop options)
   (declare (ignore vop options))
   (ecase style
+    (:raw
+     (let ((ra (make-symbol "RA")))
+       (values
+        `((inst jal ,ra (make-fixup ',name :assembly-routine)))
+        `((:temporary (:sc descriptor-reg :from (:eval 0) :to (:eval 1)
+                       :offset ra-offset)
+                      ,ra)))))
     (:none
      (values
-      `((inst j (make-fixup ',name :assembly-routine)))
-      `()))
-    (:raw
-     (values
-      `((inst jal lr-tn (make-fixup ',name :assembly-routine)))
+      `((inst jal zero-tn (make-fixup ',name :assembly-routine)))
       `()))))
 
 (defun generate-return-sequence (style)
   (ecase style
-    (:none)
     (:raw
-     `((inst jalr zero-tn lr-tn 0)))))
-
-#-sb-xc-host ; CONTEXT-REGISTER is not defined at xc-time
-(defun return-machine-address (scp)
-  (context-register scp lr-offset))
+     `((inst jalr zero-tn ra-tn 0)))
+    (:none)))

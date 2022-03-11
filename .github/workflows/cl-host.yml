@@ -1,0 +1,91 @@
+name: CL-host
+
+on: [push]
+
+jobs:
+
+  ecl:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/cache@v1
+      id: ecl-cache2
+      with:
+        path: /tmp/ecl
+        key: ecl-cache2
+
+    - name: build host ecl
+      if: steps.ecl-cache2.outputs.cache-hit != 'true'
+      run: |
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/ecl.tgz
+        tar xf ecl.tgz
+        cd ecl
+        ./configure --prefix=/usr/
+        make
+      working-directory: /tmp
+
+    - name: install ecl
+      run: |
+        sudo make install
+        echo '(setf *debugger-hook* (lambda (c fun) (princ c) (si::tpl-backtrace) (quit 1)))' > ~/.eclrc
+      working-directory: /tmp/ecl
+
+    - name: build
+      env:  
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh --xc-host='ecl'
+
+  clisp:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: instal host clisp
+      run: |
+        sudo apt-get -qq update | true
+        sudo apt-get -qq install clisp
+    - name: build
+      env:  
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh --xc-host='clisp -on-error exit'
+    
+  ccl:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: instal host ccl
+      run: |
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/ccl-host.tgz
+        tar xf ccl-host.tgz
+    - name: build
+      env:  
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh --xc-host='ccl-host/lx86cl64 --batch'
+
+  cmucl:
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: instal host cmucl
+      run: |
+        mkdir cmucl
+        cd cmucl
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/cmucl.tar.bz2
+        tar xf cmucl.tar.bz2
+        echo '(setf ext:*gc-verbose* nil)' > ~/.cmucl-init.lisp
+      working-directory: /tmp/
+    - name: build
+      env:  
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh --xc-host='/tmp/cmucl/bin/lisp -batch'

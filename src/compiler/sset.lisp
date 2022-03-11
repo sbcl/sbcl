@@ -23,7 +23,7 @@
 ;;; SSET-ELEMENT structure. We allow an initial value of NIL to mean
 ;;; that no ordering has been assigned yet (although an ordering must
 ;;; be assigned before doing set operations.)
-(def!struct (sset-element (:constructor nil)
+(defstruct (sset-element (:constructor nil)
                          (:copier nil))
   (number nil :type (or index null)))
 
@@ -75,7 +75,7 @@
       (set-result (+ result (ash result -9)))
       (set-result (logxor result (ash result -5)))
       (set-result (+ result (ash result -2)))
-      (logand sb-xc:most-positive-fixnum result))))
+      (logand most-positive-fixnum result))))
 
 ;;; Secondary hash (for double hash probing). Needs to return an odd
 ;;; number.

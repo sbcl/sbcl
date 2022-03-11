@@ -43,6 +43,7 @@
   (cache nil :type (or cache null))
   (pv-size 0 :type fixnum)
   (slot-name-lists nil :type list))
+(declaim (freeze-type pv-table))
 
 (defun make-pv-table-type-declaration (var)
   `(type pv-table ,var))
@@ -57,7 +58,7 @@
 
 ;;; ...and one lock to rule them. Lock because for certain (rare)
 ;;; cases this lock might be grabbed in the course of method dispatch
-;;; -- and mostly this is already under the *world-lock*
+;;; -- and mostly this is already under the **world-lock**
 (define-load-time-global *pv-lock*
   (sb-thread:make-mutex :name "pv table index lock"))
 
@@ -95,8 +96,8 @@
       (dolist (slot-names slot-name-lists)
         (when slot-names
           (let* ((wrapper (pop wrappers))
-                 (std-p (layout-for-std-class-p wrapper))
-                 (class (wrapper-class* wrapper)))
+                 (std-p (layout-for-pcl-obj-p wrapper))
+                 (class (wrapper-class wrapper)))
             (dolist (slot-name slot-names)
               (destructuring-bind (location . info)
                   (or (find-slot-cell wrapper slot-name)
@@ -311,8 +312,6 @@
 
 (define-walker-template pv-offset) ; These forms get munged by mutate slots.
 (defmacro pv-offset (arg) arg)
-(define-walker-template instance-accessor-parameter)
-(defmacro instance-accessor-parameter (x) x)
 
 ;;; It is safe for these two functions to be wrong. They just try to
 ;;; guess what the most likely case will be.
@@ -766,8 +765,8 @@
                             ,@inner-decls
                             ,@body-sans-decls))))
                  (mf (%make-method-function fmf)))
-            (set-funcallable-instance-function
-             mf (method-function-from-fast-function fmf ',(getf initargs 'plist)))
+            (setf (%funcallable-instance-fun mf)
+                  (method-function-from-fast-function fmf ',(getf initargs 'plist)))
             mf)
           ',initargs)))))
 

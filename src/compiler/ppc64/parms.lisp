@@ -19,17 +19,14 @@
 (defconstant sb-assem:+inst-alignment-bytes+ 4)
 
 (defconstant +backend-fasl-file-implementation+ :ppc)
-  ;; On Linux, the ABI specifies the page size to be 4k-64k, use the
-  ;; maximum of that range. FIXME: it'd be great if somebody would
-  ;; find out whether using exact multiples of the page size actually
-  ;; matters in the few places where that's done, or whether we could
-  ;; just use 4k everywhere.
-(defconstant +backend-page-bytes+ #+linux 65536 #-linux 4096)
+;; Granularity at which memory is mapped
+(defconstant +backend-page-bytes+ 65536)
 
-;;; The size in bytes of GENCGC cards, i.e. the granularity at which
-;;; writes to old generations are logged.  With mprotect-based write
-;;; barriers, this must be a multiple of the OS page size.
-(defconstant gencgc-card-bytes +backend-page-bytes+)
+;;; The size in bytes of GENCGC pages, i.e. the granularity at which
+;;; threads claim memory from the global heap.
+(defconstant gencgc-page-bytes +backend-page-bytes+)
+;;; Granularity at which writes to old generations are logged.
+(defconstant cards-per-page 32)
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding
@@ -45,33 +42,6 @@
 ;;; the natural width of a machine word (as seen in e.g. register width,
 ;;; address space)
 (defconstant n-machine-word-bits 64)
-
-;;; flags for the generational garbage collector
-(defconstant pseudo-atomic-interrupted-flag 1)
-(defconstant pseudo-atomic-flag 4)
-
-(defconstant float-sign-shift 31)
-
-(defconstant single-float-bias 126)
-(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-
-(defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) 32 1))
-
 
 (defconstant float-inexact-trap-bit (ash 1 0))
 (defconstant float-divide-by-zero-trap-bit (ash 1 1))
@@ -101,6 +71,7 @@
 (defconstant-eqx float-sticky-bits (byte 5 25) #'equalp)
 (defconstant-eqx float-traps-byte (byte 5 3) #'equalp)
 (defconstant-eqx float-exceptions-byte (byte 5 25) #'equalp)      ; cexc
+(defconstant-eqx float-invalid-byte (byte 6 19) #'equalp)
 
 (defconstant float-fast-bit 2)         ; Non-IEEE mode
 
@@ -119,9 +90,12 @@
   (defconstant linkage-table-space-end   #x0b000000))
 
 ;;; While on gencgc we don't.
-#+gencgc (!gencgc-space-setup #x04000000 :dynamic-space-start #x1000000000)
+#+gencgc (!gencgc-space-setup #x04000000
+                              :read-only-space-size 0
+                              :dynamic-space-start #x1000000000)
 
-(defconstant linkage-table-entry-size 24)
+(defconstant linkage-table-growth-direction :up)
+(defconstant linkage-table-entry-size #+little-endian 28 #+big-endian 24)
 
 #+linux
 (progn
@@ -181,18 +155,7 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
- `#(,@+common-static-symbols+
-    ;; The C TLS pointer is technically a "reserved" register and may not be used
-    ;; by application code for anything, except that we do use it.
-    ;; You can't even run single-threaded C code if it has the wrong value.
-    ;; (At minimum, lazy binding of C symbols via the PLT needs it.)
-    ;; To avoid wasting a register, we should use the same register as the
-    ;; lisp thread, from which we can recover the C thread,
-    ;; and vice versa. Actually that may not be legal either - it might be
-    ;; that signal handlers need the correct value in r13, I don't know.
-    ;; ("Reserved" could rightly mean: touch it at all, and you die)
-    ;; We store the r13 value in a static lisp symbol.
-    r13-value)
+ `#(,@+common-static-symbols+)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

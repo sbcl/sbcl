@@ -1,7 +1,7 @@
 (in-package "SB-IMPL")
 
 ;;;; generalized function names
-(!define-load-time-global *valid-fun-names-alist* nil)
+(define-load-time-global *valid-fun-names-alist* nil)
 
 (defun %define-fun-name-syntax (symbol checker)
   (let ((found (assoc symbol *valid-fun-names-alist* :test #'eq)))
@@ -9,12 +9,6 @@
         (setf (cdr found) checker)
         (setq *valid-fun-names-alist*
               (acons symbol checker *valid-fun-names-alist*)))))
-
-#+sb-xc-host
-(setf (get '%define-fun-name-syntax :sb-cold-funcall-handler/for-effect)
-      (lambda (symbol checker)
-        (cold-target-push (cold-cons (cold-intern symbol) checker)
-                          '*valid-fun-names-alist*)))
 
 (defmacro define-function-name-syntax (symbol (var) &body body)
   "Define function names of the form of a list headed by SYMBOL to be
@@ -60,8 +54,15 @@ use as a BLOCK name in the function in question."
           (cons (unless (member (car fun) '(cas setf))
                   (valid-function-name-p fun))))))))
 
-;; CAS and SETF names should have in common the aspect that
-;; (CAS (CAS BAZ)), (SETF (CAS BAZ)), (CAS (SETF BAZ)) are not reasonable.
-;; 'cas.lisp' doesn't need to know this technique for sharing the parser,
-;; so the name syntax is defined here instead of there.
-(%define-fun-name-syntax 'cas #'%check-setf-fun-name)
+;;; FBOUNDP wants to know what names are valid early on in COLD-INIT.
+(defun !function-names-init ()
+  (setq *valid-fun-names-alist* nil)
+  ;; CAS and SETF names should have in common the aspect that
+  ;; (CAS (CAS BAZ)), (SETF (CAS BAZ)), (CAS (SETF BAZ)) are not reasonable.
+  ;; 'cas.lisp' doesn't need to know this technique for sharing the parser,
+  ;; so the name syntax is defined here instead of there.
+  (%define-fun-name-syntax 'setf #'%check-setf-fun-name)
+  (%define-fun-name-syntax 'cas #'%check-setf-fun-name))
+
+#+sb-xc-host
+(!function-names-init)

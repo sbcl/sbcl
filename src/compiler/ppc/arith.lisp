@@ -201,7 +201,7 @@
          ;; FIXME: remind me what convention we used for 64bitizing
          ;; stuff?  -- CSR, 2003-08-27
          ,@(when restore-fixnum-mask
-             `((inst clrrwi r temp (1- n-lowtag-bits))))))
+             `((inst clrrwi r temp n-fixnum-tag-bits)))))
      (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
                   fast-signed-binop)
        (:translate ,translate)
@@ -502,7 +502,7 @@
       (inst cmpwi amount 0)
       (inst neg ndesc amount)
       (inst bge positive)
-      (inst cmpwi ndesc 31)
+      (inst cmplwi ndesc 31)
       (inst srw result number ndesc)
       (inst ble done)
       (move result zero-tn)
@@ -549,7 +549,7 @@
          (inst cmpwi amount 0)
          (inst neg ndesc amount)
          (inst bge positive)
-         (inst cmpwi ndesc 31)
+         (inst cmplwi ndesc 31)
          (inst sraw result number ndesc)
          (inst ble done)
          (inst srawi result number 31)
@@ -706,7 +706,7 @@
              fast-ash-left/unsigned=>unsigned))
 (deftransform ash-left-mod32 ((integer count)
                               ((unsigned-byte 32) (unsigned-byte 5)))
-  (when (sb-c::constant-lvar-p count)
+  (when (sb-c:constant-lvar-p count)
     (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
@@ -948,7 +948,7 @@
 ;;;
 
 (define-vop (fast-eql/fixnum fast-conditional)
-  (:args (x :scs (any-reg descriptor-reg zero))
+  (:args (x :scs (any-reg zero))
          (y :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
@@ -958,11 +958,13 @@
     (inst b? (if not-p :ne :eq) target)))
 ;;;
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
+  (:args (x :scs (any-reg descriptor-reg))
+         (y :scs (any-reg)))
   (:arg-types * tagged-num)
   (:variant-cost 7))
 
 (define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg descriptor-reg zero)))
+  (:args (x :scs (any-reg zero)))
   (:arg-types tagged-num (:constant (signed-byte 14)))
   (:info target not-p y)
   (:translate eql)
@@ -971,33 +973,28 @@
     (inst b? (if not-p :ne :eq) target)))
 ;;;
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
+  (:args (x :scs (any-reg descriptor-reg)))
   (:arg-types * (:constant (signed-byte 11)))
   (:variant-cost 6))
 
 
 ;;;; 32-bit logical operations
 
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg))
-         (amount :scs (signed-reg)))
-  (:arg-types unsigned-num tagged-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "shift-towards-start")
-  (:generator 1
-    (inst rlwinm amount amount 0 27 31)
-    (inst slw r num amount)))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "shift-towards-end")
-  (:generator 1
-    (inst rlwinm amount amount 0 27 31)
-    (inst srw r num amount)))
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg))
+                       (amount :scs (signed-reg)))
+                (:arg-types unsigned-num tagged-num)
+                (:results (r :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 1
+                 (inst rlwinm amount amount 0 27 31)
+                 (inst ,operation r num amount)))))
+  (define shift-towards-start slw)
+  (define shift-towards-end   srw))
 
 ;;;; Bignum stuff.
 
@@ -1009,6 +1006,7 @@
   (:translate sb-bignum:%bignum-set-length)
   (:policy :fast-safe))
 
+#-bignum-assertions
 (define-vop (bignum-ref word-index-ref)
   (:variant bignum-digits-offset other-pointer-lowtag)
   (:translate sb-bignum:%bignum-ref)
@@ -1017,13 +1015,12 @@
 
 (define-vop (bignum-set word-index-set)
   (:variant bignum-digits-offset other-pointer-lowtag)
-  (:translate sb-bignum:%bignum-set)
+  (:translate #+bignum-assertions sb-bignum:%%bignum-set
+              #-bignum-assertions sb-bignum:%bignum-set)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate zero))
          (value :scs (unsigned-reg)))
-  (:arg-types t positive-fixnum unsigned-num)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num))
+  (:arg-types t positive-fixnum unsigned-num))
 
 (define-vop (digit-0-or-plus)
   (:translate sb-bignum:%digit-0-or-plusp)
@@ -1164,7 +1161,6 @@
   (:generator 1
     (inst srawi digit fixnum n-fixnum-tag-bits)))
 
-
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)
@@ -1200,24 +1196,6 @@
         (inst or quo quo temp)
         (maybe-subtract)))
     (inst not quo quo)))
-
-#|
-
-(define-vop (bignum-floor)
-  (:translate sb-bignum:%bigfloor)
-  (:policy :fast-safe)
-  (:args (div-high :scs (unsigned-reg) :target rem)
-         (div-low :scs (unsigned-reg) :target quo)
-         (divisor :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num unsigned-num)
-  (:results (quo :scs (unsigned-reg) :from (:argument 1))
-            (rem :scs (unsigned-reg) :from (:argument 0)))
-  (:result-types unsigned-num unsigned-num)
-  (:generator 300
-    (inst mtmq div-low)
-    (inst div quo div-high divisor)
-    (inst mfmq rem)))
-|#
 
 (define-vop (signify-digit)
   (:translate sb-bignum:%fixnum-digit-with-correct-sign)

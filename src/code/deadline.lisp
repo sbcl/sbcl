@@ -27,12 +27,12 @@
 
 ;;; Current DEADLINE or NIL.
 (declaim (type (or deadline null) *deadline*))
-(!define-thread-local *deadline* nil)
+(define-thread-local *deadline* nil)
 
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)
   (the internal-time
-       (values (truncate (* seconds sb-xc:internal-time-units-per-second)))))
+       (values (truncate (* seconds internal-time-units-per-second)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute) ; for "#."
 (defconstant safe-internal-seconds-limit
@@ -46,11 +46,10 @@
   ;; #. is needed to make the value constant per se as opposed to
   ;; constant by decree, otherwise genesis runs into a problem.
   #.(floor (ash 1 (1- sb-kernel::internal-time-bits))
-           sb-xc:internal-time-units-per-second)))
+           internal-time-units-per-second)))
 
 (declaim (inline seconds-to-maybe-internal-time))
 (defun seconds-to-maybe-internal-time (seconds)
-  (declare (optimize (speed 3)))
   (typecase seconds
     ((integer 0 #.internal-seconds-limit)
      (locally ; FIXME compiler should learn to figure that out
@@ -113,10 +112,10 @@ Experimental."
 (declaim (inline decode-internal-time))
 (defun decode-internal-time (time)
   "Returns internal time value TIME decoded into seconds and microseconds."
-  (declare (type sb-kernel:internal-time time))
+  (declare (type internal-time time))
   (multiple-value-bind (sec frac)
-      (truncate time sb-xc:internal-time-units-per-second)
-    (values sec (* frac sb-unix::micro-seconds-per-internal-time-unit))))
+      (truncate time internal-time-units-per-second)
+    (values sec (* frac sb-unix::microseconds-per-internal-time-unit))))
 
 (defun signal-timeout (datum &rest arguments)
   "Signals a timeout condition while inhibiting further timeouts due to
@@ -176,7 +175,7 @@ CONDITION, or return NIL if the restart is not found."
 ABS-SEC and ABS-USEC and current real time.
 
 If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
-  (declare (type sb-kernel:internal-seconds abs-sec)
+  (declare (type internal-seconds abs-sec)
            (type (mod 1000000) abs-usec))
   (binding* (((now-sec now-usec)
               (decode-internal-time (get-internal-real-time)))
@@ -199,9 +198,9 @@ If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
 ;;; If SECONDS is NIL and there is no *DEADLINE* all returned values
 ;;; are NIL.
 (declaim (ftype (function ((or null (real 0)))
-                          (values (or null sb-kernel:internal-seconds)
+                          (values (or null internal-seconds)
                                   (or null (mod 1000000))
-                                  (or null sb-kernel:internal-seconds)
+                                  (or null internal-seconds)
                                   (or null (mod 1000000))
                                   t))
                 decode-timeout))

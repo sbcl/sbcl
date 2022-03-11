@@ -59,6 +59,8 @@
      ;; Various
      (cons-name +exception-single-step+)
      (cons +exception-access-violation+ 'memory-fault-error)
+     #+x86-64
+     (cons +exception-heap-corruption+ 'foreign-heap-corruption)
      (cons-name +exception-array-bounds-exceeded+)
      (cons-name +exception-breakpoint+)
      (cons-name +exception-datatype-misalignment+)
@@ -80,7 +82,7 @@
             (exception-information (array system-area-pointer
                                           #.+exception-maximum-parameters+))))
 
-;;; DBG_PRINTEXCEPTION_C shouldn'tbe fatal, and even if it is related to
+;;; DBG_PRINTEXCEPTION_C shouldn't be fatal, and even if it is related to
 ;;; something bad, better to print the message than just fail with no info
 (defun dbg-printexception-c (record)
   (when (= (slot record 'number-parameters) 2)
@@ -92,6 +94,16 @@
                       (* char))
            c-string))))
 
+(defun dbg-printexception-wide-c (record)
+  (when (= (slot record 'number-parameters) 4)
+    ;; (sap-alien (deref (slot record 'exception-information) 3)) =
+    ;; WideCharToMultiByte string
+    (warn "DBG_PRINTEXCEPTION_WIDE_C: ~a"
+          (cast
+           (sap-alien (deref (slot record 'exception-information) 1)
+                      (* char))
+           system-string))))
+
 (define-condition exception (error)
   ((code :initarg :code :reader exception-code)
    (context :initarg :context :reader exception-context)
@@ -101,6 +113,19 @@
                      (exception-context c)
                      (exception-record c)
                      (exception-code c)))))
+
+;;; Undocumented exception (STATUS_HEAP_CORRUPTION). Occurs when calling free()
+;;; with a bad pointer and possibly other places. On 64-bit processes,
+;;; frame-based handlers don't get a chance to handle this exception because the
+;;; HeapSetInformation() option HeapEnableTerminationOnCorruption is enabled by
+;;; default and cannot be disabled. For the sake of interactive development and
+;;; error reporting, we special-case this exception in our vectored exception
+;;; handler, otherwise the SBCL process would be abruptly terminated.
+#+x86-64
+(define-condition foreign-heap-corruption (error) ()
+  (:report
+   #.(format nil "A foreign heap corruption exception occurred. (Exception code: ~S)"
+             +exception-heap-corruption+)))
 
 ;;; Actual exception handler. We hit something the runtime doesn't
 ;;; want to or know how to deal with (that is, not a sigtrap or gc wp
@@ -127,6 +152,8 @@
            (error condition-name))
           ((= code +dbg-printexception-c+)
            (dbg-printexception-c record))
+          ((= code +dbg-printexception-wide-c+)
+           (dbg-printexception-wide-c record))
           (t
            (cerror "Return from the exception handler"
                    'exception :context context-sap :record exception-record-sap

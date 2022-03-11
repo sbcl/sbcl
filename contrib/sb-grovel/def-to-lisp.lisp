@@ -119,12 +119,12 @@ code:
     (as-c "#define CAST_SIGNED(x) ((sizeof(x) == 4)? (long long) (long) (x): (x))")
     #+(and (not win32) x86-64)
     (as-c "#define CAST_SIGNED(x) ((sizeof(x) == 4)? (long) (int) (x): (x))")
-    ;; the C compiler on macOS warns that %ld is the wrong format for an int
+    ;; the C compiler on x86 macOS warns that %ld is the wrong format for an int
     ;; even though 'long' and 'int' are both 4 bytes.
-    #+x86
-    (as-c "#define CAST_SIGNED(x) ((long) (x))")
-    #-(or x86 x86-64)
+    #-(or x86 64-bit)
     (as-c "#define CAST_SIGNED(x) ((int) (x))")
+    #+(and (not x86-64) (or x86 64-bit))
+    (as-c "#define CAST_SIGNED(x) ((long) (x))")
     (as-c "int main(int argc, char *argv[]) {")
     (as-c "    FILE *out;")
     (as-c "    if (argc != 2) {")
@@ -148,7 +148,7 @@ code:
         (case type
           ((:integer :errno)
            (as-c "#ifdef" cname)
-           (printf "(cl:defconstant ~A %ld \"~A\")" lispname doc
+           (printf "(cl:defconstant ~A %ld~@[ \"~A\"~])" lispname doc
                    (word-cast cname))
            (when (eql type :errno)
              (printf "(cl:setf (get '~A 'errno) t)" lispname))
@@ -156,7 +156,7 @@ code:
            (printf "(sb-int:style-warn \"Couldn't grovel for ~~A (unknown to the C compiler).\" \"~A\")" cname)
            (as-c "#endif"))
           ((:integer-no-check)
-           (printf "(cl:defconstant ~A %ld \"~A\")" lispname doc (word-cast cname)))
+           (printf "(cl:defconstant ~A %ld~@[ \"~A\"~])" lispname doc (word-cast cname)))
           (:enum
            (c-for-enum lispname cname export))
           (:type

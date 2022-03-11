@@ -63,7 +63,7 @@
 ;;;
 (define-vop (push-values)
   (:args
-   (vals :more t))
+   (vals :more t :scs (descriptor-reg any-reg control-stack)))
   (:results
    (start :scs (any-reg))
    (count :scs (any-reg)))
@@ -81,7 +81,7 @@
         ((null val))
       (let ((tn (tn-ref-tn val)))
         (sc-case tn
-          (descriptor-reg
+          ((descriptor-reg any-reg)
            (storew tn start-temp i))
           (control-stack
            (load-stack-tn temp tn)
@@ -125,25 +125,18 @@
 ;;; as function arguments.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg zero immediate))
          (num :scs (any-reg) :target count))
-  (:arg-types * positive-fixnum positive-fixnum)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 0)) src)
   (:temporary (:sc any-reg :from (:argument 2)) dst)
   (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (zero
-       (move src context))
-      (immediate
-       (inst addu src context (* (tn-value skip) n-word-bytes)))
-      (any-reg
-       (inst addu src context skip)))
+    (move src context)
     (move count num)
     (inst beq num done)
-    (move start csp-tn t)
+    (emit-nop-or-move start csp-tn)
     (move dst csp-tn)
     (inst addu csp-tn count)
     LOOP

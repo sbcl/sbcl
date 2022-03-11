@@ -159,33 +159,25 @@
     (:double
      (inst fload :double result sap offset))))
 
-(defun sap-set (result value sap offset size)
+(defun sap-set (value sap offset size)
   (ecase size
     (:byte
-     (inst sb value sap offset)
-     (move result value))
+     (inst sb value sap offset))
     (:short
-     (inst sh value sap offset)
-     (move result value))
+     (inst sh value sap offset))
     (:word
-     (inst sw value sap offset)
-     (move result value))
+     (inst sw value sap offset))
     #+64-bit
     (:dword
-     (inst sd value sap offset)
-     (move result value))
+     (inst sd value sap offset))
     (:single
-     (inst fstore :single result sap offset)
-     (inst fmove :single result value))
+     (inst fstore :single value sap offset))
     (:double
-     (inst fstore :double result sap offset)
-     (inst fmove :double result value))))
+     (inst fstore :double value sap offset))))
 
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &key signed)
-             (let ((ref-name-c (symbolicate ref-name "-C"))
-                   (set-name-c (symbolicate set-name "-C")))
-               `(progn
+             `(progn
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -198,7 +190,7 @@
                     (:generator 5
                       (inst add sap object offset)
                       (sap-ref result sap 0 ,signed ,size)))
-                  (define-vop (,ref-name-c)
+                  (define-vop (,(symbolicate ref-name "-C"))
                     (:translate ,ref-name)
                     (:policy :fast-safe)
                     (:args (sap :scs (sap-reg)))
@@ -212,29 +204,24 @@
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
-                    (:args (object :scs (sap-reg) :target sap)
-                           (offset :scs (signed-reg))
-                           (value :scs (,sc) :target result))
-                    (:arg-types system-area-pointer signed-num ,type)
-                    (:results (result :scs (,sc)))
-                    (:result-types ,type)
-                    (:temporary (:scs (sap-reg) :from (:argument 0)) sap)
+                    ;; this is untested, but it matches the MIPS vop
+                    (:args (value :scs (,sc) :to :eval) ; VALUE has to conflict with SAP
+                           (object :scs (sap-reg) :target sap)
+                           (offset :scs (signed-reg)))
+                    (:arg-types ,type system-area-pointer signed-num)
+                    (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
                     (:generator 5
                       (inst add sap object offset)
-                      (sap-set result value sap 0 ,size)))
-                  (define-vop (,set-name-c)
+                      (sap-set value sap 0 ,size)))
+                  (define-vop (,(symbolicate set-name "-C"))
                     (:translate ,set-name)
                     (:policy :fast-safe)
-                    (:args (sap :scs (sap-reg))
-                           (value :scs (,sc) :target result))
-                    (:arg-types system-area-pointer
-                                (:constant short-immediate)
-                                ,type)
+                    (:args (value :scs (,sc))
+                           (sap :scs (sap-reg)))
+                    (:arg-types ,type system-area-pointer (:constant short-immediate))
                     (:info offset)
-                    (:results (result :scs (,sc)))
-                    (:result-types ,type)
                     (:generator 4
-                      (sap-set result value sap offset ,size)))))))
+                      (sap-set value sap offset ,size))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte :signed nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8
@@ -245,7 +232,6 @@
     signed-reg tagged-num :short :signed t)
   (def-system-ref-and-set sap-ref-32 %set-sap-ref-32
     unsigned-reg unsigned-num :word :signed nil)
-  #+64-bit
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
     signed-reg signed-num :word :signed t)
   #+64-bit

@@ -5,15 +5,54 @@ set -e
 
 umask 022
 
+bad_option() {
+    echo $1
+    echo "Enter \"$0 --help\" for list of valid options."
+    exit 1
+}
+
+for option
+do
+  optarg_ok=true
+  # Split --foo=bar into --foo and bar.
+  case $option in
+      *=*)
+        # For ease of scripting skip valued options with empty
+        # values.
+        optarg=`expr "X$option" : '[^=]*=\(.*\)'` || optarg_ok=false
+        option=`expr "X$option" : 'X\([^=]*=\).*'`
+        ;;
+      *)
+        optarg=""
+        ;;
+  esac
+
+  case $option in
+      --prefix=)
+      $optarg_ok || bad_option "Bad argument for --prefix="
+      INSTALL_ROOT=$optarg
+      ;;
+      --help | -help | -h)
+  cat <<EOF
+ --prefix=<path>      Specify the install location.
+
+See ./INSTALL for more information
+EOF
+          exit 0
+        ;;
+      *)
+            bad_option "Unknown command-line option to $0: \"$option\""
+        ;;
+  esac
+
+done
+
 ensure_dirs ()
 {
     for j in "$@"; do
          test -d "$j" || mkdir -p "$j"
     done;
 }
-
-. output/prefix.def
-DEFAULT_INSTALL_ROOT=$SBCL_PREFIX
 
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
     RUNTIME=sbcl.exe
@@ -22,19 +61,6 @@ else
     RUNTIME=sbcl
     OLD_RUNTIME=sbcl.old
 fi
-INSTALL_ROOT=${INSTALL_ROOT:-$DEFAULT_INSTALL_ROOT}
-MAN_DIR=${MAN_DIR:-"$INSTALL_ROOT"/share/man}
-INFO_DIR=${INFO_DIR:-"$INSTALL_ROOT"/share/info}
-DOC_DIR=${DOC_DIR:-"$INSTALL_ROOT"/share/doc/sbcl}
-
-# Does the environment look sane?
-if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
-   echo SBCL_HOME environment variable is set, and conflicts with INSTALL_ROOT.
-   echo Aborting installation.  Unset one or reset the other, then try again
-   echo INSTALL_ROOT="$INSTALL_ROOT"
-   echo SBCL_HOME="$SBCL_HOME"
-   exit 1
-fi
 
 # Before doing anything else, make sure we have an SBCL to install
 if [ -f src/runtime/$RUNTIME ]; then
@@ -42,11 +68,30 @@ if [ -f src/runtime/$RUNTIME ]; then
         true
     else
         echo "output/sbcl.core not found, aborting installation."
+        echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
         exit 1
     fi
 else
     echo "src/runtime/$RUNTIME not found, aborting installation."
+    echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
     exit 1
+fi
+
+. output/prefix.def
+DEFAULT_INSTALL_ROOT=$SBCL_PREFIX
+
+INSTALL_ROOT=${INSTALL_ROOT:-$DEFAULT_INSTALL_ROOT}
+MAN_DIR=${MAN_DIR:-"$INSTALL_ROOT"/share/man}
+INFO_DIR=${INFO_DIR:-"$INSTALL_ROOT"/share/info}
+DOC_DIR=${DOC_DIR:-"$INSTALL_ROOT"/share/doc/sbcl}
+echo $INSTALL_ROOT
+# Does the environment look sane?
+if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
+   echo SBCL_HOME environment variable is set, and conflicts with INSTALL_ROOT.
+   echo Aborting installation.  Unset one or reset the other, then try again
+   echo INSTALL_ROOT="$INSTALL_ROOT"
+   echo SBCL_HOME="$SBCL_HOME"
+   exit 1
 fi
 
 SBCL_HOME="$INSTALL_ROOT"/lib/sbcl
@@ -75,18 +120,18 @@ done
 
 # installing contrib
 
-. ./sbcl-pwd.sh
-sbcl_pwd
+# See make-target-contrib.sh for this variable.
+SBCL_TOP="../../"
 
-SBCL="$SBCL_PWD/src/runtime/sbcl --noinform --core $SBCL_PWD/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
+SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
 SBCL_BUILDING_CONTRIB=1
-export SBCL SBCL_BUILDING_CONTRIB SBCL_PWD
+export SBCL SBCL_BUILDING_CONTRIB SBCL_TOP
 
 . ./find-gnumake.sh
 find_gnumake
 
 for i in `cd obj/asdf-cache ; echo *`; do
-    test -d obj/asdf-cache/$i && test -f obj/asdf-cache/$i/test-passed.test-report || continue;
+    test -d obj/asdf-cache/$i && test -f obj/sbcl-home/contrib/$i.fasl || continue;
     INSTALL_DIR="$SBCL_HOME/contrib/"
     export INSTALL_DIR
     ensure_dirs "$BUILD_ROOT$INSTALL_DIR" && $GNUMAKE -C contrib/$i install < /dev/null

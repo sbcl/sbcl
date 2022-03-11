@@ -30,11 +30,15 @@
       (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                                 lowtag-mask))
       (inst clrrwi ndescr ndescr n-lowtag-bits)
-      (allocation header ndescr other-pointer-lowtag
+      (allocation nil ndescr other-pointer-lowtag header
                   :temp-tn gc-temp
                   :flag-tn pa-flag)
-      (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))
-      (inst slwi ndescr ndescr n-widetag-bits)
+      ;; Compute the encoded rank. See ENCODE-ARRAY-RANK.
+      (inst subi ndescr rank (fixnumize 1))
+      ;; Exercise for the reader: these next 4 instructions can be
+      ;; replaced by just 2: one RLWINM and one RLWIMI
+      (inst andi. ndescr ndescr (fixnumize array-rank-mask))
+      (inst slwi ndescr ndescr array-rank-position)
       (inst or ndescr ndescr type)
       (inst srwi ndescr ndescr n-fixnum-tag-bits)
       (storew ndescr header 0 other-pointer-lowtag))
@@ -52,17 +56,18 @@
   (:policy :fast-safe)
   (:variant array-dimensions-offset other-pointer-lowtag))
 
-(define-vop (array-rank-vop)
+(define-vop ()
   (:translate %array-rank)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:results (res :scs (any-reg descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
   (:generator 6
-    (loadw temp x 0 other-pointer-lowtag)
-    (inst srawi temp temp n-widetag-bits)
-    (inst subi temp temp (1- array-dimensions-offset))
-    (inst slwi res temp n-fixnum-tag-bits)))
+    ;; convert ARRAY-RANK-POSITION to byte index and compensate for endianness
+    ;; ASSUMPTION: n-widetag-bits = 8 and rank is adjacent to widetag
+    (inst lbz res x (- 2 other-pointer-lowtag)) ; big-endian only
+    (inst addi res res 1)
+    (inst andi. res res array-rank-mask)))
 
 ;;;; Bounds checking routine.
 
@@ -108,9 +113,7 @@
        (:arg-types ,type positive-fixnum ,element-type)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg zero immediate))
-              (value :scs ,scs))
-       (:results (result :scs ,scs))
-       (:result-types ,element-type)))))
+              (value :scs ,scs))))))
   (def-data-vector-frobs simple-base-string byte-index
     character character-reg)
   #+sb-unicode
@@ -207,10 +210,8 @@
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg) :target shift)
-                (value :scs (unsigned-reg zero immediate) :target result))
+                (value :scs (unsigned-reg zero immediate)))
          (:arg-types ,type positive-fixnum positive-fixnum)
-         (:results (result :scs (unsigned-reg)))
-         (:result-types positive-fixnum)
          (:temporary (:scs (non-descriptor-reg)) temp old offset)
          (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
          (:generator 25
@@ -236,23 +237,16 @@
                 (inst andi. temp value ,(1- (ash 1 bits)))))
              (inst slw temp temp shift)
              (inst or old old temp))
-           (inst stwx old object offset)
-           (sc-case value
-             (immediate
-              (inst lr result (tn-value value)))
-             (t
-              (move result value)))))
+           (inst stwx old object offset)))
        (define-vop (,(symbolicate 'data-vector-set-c/ type))
          (:translate data-vector-set)
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs (unsigned-reg zero immediate) :target result))
+                (value :scs (unsigned-reg zero immediate)))
          (:arg-types ,type
                      (:constant index)
                      positive-fixnum)
          (:info index)
-         (:results (result :scs (unsigned-reg)))
-         (:result-types positive-fixnum)
          (:temporary (:scs (non-descriptor-reg)) offset-reg temp old)
          (:generator 20
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
@@ -293,12 +287,7 @@
                   (inst or old old temp)))
                (if (typep offset '(signed-byte 16))
                    (inst stw old object offset)
-                   (inst stwx old object offset-reg)))
-             (sc-case value
-               (immediate
-                (inst lr result (tn-value value)))
-               (t
-                (move result value))))))))))
+                   (inst stwx old object offset-reg))))))))))
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
@@ -329,18 +318,14 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (single-reg) :target result))
+         (value :scs (single-reg)))
   (:arg-types simple-array-single-float positive-fixnum single-float)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
     (inst addi offset index
           (- (* vector-data-offset n-word-bytes)
              other-pointer-lowtag))
-    (inst stfsx value object offset)
-    (unless (location= result value)
-      (inst frsp result value))))
+    (inst stfsx value object offset)))
 
 (define-vop (data-vector-ref/simple-array-double-float)
   (:note "inline array access")
@@ -364,18 +349,14 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (double-reg) :target result))
+         (value :scs (double-reg)))
   (:arg-types simple-array-double-float positive-fixnum double-float)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 20
     (inst slwi offset index 1)
     (inst addi offset offset (- (* vector-data-offset n-word-bytes)
                         other-pointer-lowtag))
-    (inst stfdx value object offset)
-    (unless (location= result value)
-      (inst fmr result value))))
+    (inst stfdx value object offset)))
 
 
 ;;; Complex float arrays.
@@ -406,27 +387,19 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (complex-single-reg) :target result))
+         (value :scs (complex-single-reg)))
   (:arg-types simple-array-complex-single-float positive-fixnum
               complex-single-float)
-  (:results (result :scs (complex-single-reg)))
-  (:result-types complex-single-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 5
-    (let ((value-real (complex-single-reg-real-tn value))
-          (result-real (complex-single-reg-real-tn result)))
+    (let ((value-real (complex-single-reg-real-tn value)))
       (inst slwi offset index 1)
       (inst addi offset offset (- (* vector-data-offset n-word-bytes)
                                   other-pointer-lowtag))
-      (inst stfsx value-real object offset)
-      (unless (location= result-real value-real)
-        (inst frsp result-real value-real)))
-    (let ((value-imag (complex-single-reg-imag-tn value))
-          (result-imag (complex-single-reg-imag-tn result)))
+      (inst stfsx value-real object offset))
+    (let ((value-imag (complex-single-reg-imag-tn value)))
       (inst addi offset offset n-word-bytes)
-      (inst stfsx value-imag object offset)
-      (unless (location= result-imag value-imag)
-        (inst frsp result-imag value-imag)))))
+      (inst stfsx value-imag object offset))))
 
 
 (define-vop (data-vector-ref/simple-array-complex-double-float)
@@ -453,29 +426,21 @@
   (:note "inline array store")
   (:translate data-vector-set)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg) :to :result)
+  (:args (object :scs (descriptor-reg))
          (index :scs (any-reg))
-         (value :scs (complex-double-reg) :target result))
+         (value :scs (complex-double-reg)))
   (:arg-types simple-array-complex-double-float positive-fixnum
               complex-double-float)
-  (:results (result :scs (complex-double-reg)))
-  (:result-types complex-double-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 20
-    (let ((value-real (complex-double-reg-real-tn value))
-          (result-real (complex-double-reg-real-tn result)))
+    (let ((value-real (complex-double-reg-real-tn value)))
       (inst slwi offset index 2)
       (inst addi offset offset (- (* vector-data-offset n-word-bytes)
                                   other-pointer-lowtag))
-      (inst stfdx value-real object offset)
-      (unless (location= result-real value-real)
-        (inst fmr result-real value-real)))
-    (let ((value-imag (complex-double-reg-imag-tn value))
-          (result-imag (complex-double-reg-imag-tn result)))
+      (inst stfdx value-real object offset))
+    (let ((value-imag (complex-double-reg-imag-tn value)))
       (inst addi offset offset (* 2 n-word-bytes))
-      (inst stfdx value-imag object offset)
-      (unless (location= result-imag value-imag)
-        (inst fmr result-imag value-imag)))))
+      (inst stfdx value-imag object offset))))
 
 
 ;;; These vops are useful for accessing the bits of a vector irrespective of
@@ -496,8 +461,6 @@
          (index :scs (any-reg zero immediate))
          (value :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num)
   (:variant vector-data-offset other-pointer-lowtag))
 
 ;;;
@@ -517,9 +480,7 @@
   (:arg-types simple-array-signed-byte-8 positive-fixnum tagged-num)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg zero immediate))
-         (value :scs (signed-reg)))
-  (:results (result :scs (signed-reg)))
-  (:result-types tagged-num))
+         (value :scs (signed-reg))))
 
 (define-vop (data-vector-ref/simple-array-signed-byte-16
              signed-halfword-index-ref)
@@ -537,9 +498,7 @@
   (:arg-types simple-array-signed-byte-16 positive-fixnum tagged-num)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg zero immediate))
-         (value :scs (signed-reg)))
-  (:results (result :scs (signed-reg)))
-  (:result-types tagged-num))
+         (value :scs (signed-reg))))
 
 ;;;; ATOMIC-INCF for arrays
 

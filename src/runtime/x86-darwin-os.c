@@ -69,20 +69,18 @@ int arch_os_thread_init(struct thread *thread) {
     set_data_desc_addr(&ldt_entry, thread);
     set_data_desc_size(&ldt_entry, dynamic_values_bytes);
 
-    thread_mutex_lock(&modify_ldt_lock);
+    ignore_value(mutex_acquire(&modify_ldt_lock));
     n = i386_set_ldt(LDT_AUTO_ALLOC, (union ldt_entry*) &ldt_entry, 1);
 
     if (n < 0) {
         perror("i386_set_ldt");
-        lose("unexpected i386_set_ldt(..) failure\n");
+        lose("unexpected i386_set_ldt(..) failure");
     }
-    thread_mutex_unlock(&modify_ldt_lock);
+    ignore_value(mutex_release(&modify_ldt_lock));
 
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     thread->tls_cookie=n;
     arch_os_load_ldt(thread);
-
-    pthread_setspecific(specials,thread);
 #endif
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     mach_lisp_thread_init(thread);
@@ -110,9 +108,9 @@ int arch_os_thread_cleanup(struct thread *thread) {
     FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
 
     __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
-    thread_mutex_lock(&modify_ldt_lock);
+    ignore_value(mutex_acquire(&modify_ldt_lock));
     i386_set_ldt(n, NULL, 1);
-    thread_mutex_unlock(&modify_ldt_lock);
+    ignore_value(mutex_release(&modify_ldt_lock));
 #endif
     return 1;                  /* success */
 }
@@ -146,11 +144,11 @@ void update_thread_state_from_context(x86_thread_state32_t *thread_state,
 }
 
 /* Modify a context to push new data on its stack. */
-void push_context(u32 data, x86_thread_state32_t *thread_state)
+void push_context(uint32_t data, x86_thread_state32_t *thread_state)
 {
-    u32 *stack_pointer;
+    uint32_t *stack_pointer;
 
-    stack_pointer = (u32*) thread_state->ESP;
+    stack_pointer = (uint32_t*) thread_state->ESP;
     *(--stack_pointer) = data;
     thread_state->ESP = (unsigned int) stack_pointer;
 }
@@ -189,7 +187,7 @@ void *stack_allocate(x86_thread_state32_t *thread_state, size_t size)
     /* round up size to 16byte multiple */
     size = (size + 15) & -16;
 
-    thread_state->ESP = ((u32)thread_state->ESP) - size;
+    thread_state->ESP = ((uint32_t)thread_state->ESP) - size;
 
     return (void *)thread_state->ESP;
 }
@@ -206,7 +204,7 @@ void call_c_function_in_context(x86_thread_state32_t *thread_state,
 {
     va_list ap;
     int i;
-    u32 *stack_pointer;
+    uint32_t *stack_pointer;
 
     /* Set up to restore stack on exit. */
     open_stack_allocation(thread_state);
@@ -216,13 +214,13 @@ void call_c_function_in_context(x86_thread_state32_t *thread_state,
         push_context(0, thread_state);
     }
 
-    thread_state->ESP = ((u32)thread_state->ESP) - nargs * 4;
-    stack_pointer = (u32 *)thread_state->ESP;
+    thread_state->ESP = ((uint32_t)thread_state->ESP) - nargs * 4;
+    stack_pointer = (uint32_t *)thread_state->ESP;
 
     va_start(ap, nargs);
     for (i = 0; i < nargs; i++) {
-        //push_context(va_arg(ap, u32), thread_state);
-        stack_pointer[i] = va_arg(ap, u32);
+        //push_context(va_arg(ap, uint32_t), thread_state);
+        stack_pointer[i] = va_arg(ap, uint32_t);
     }
     va_end(ap);
 
@@ -289,7 +287,7 @@ void call_handler_on_thread(mach_port_t thread,
                                 x86_FLOAT_STATE32,
                                 (thread_state_t)save_float_state,
                                 &state_count)) != KERN_SUCCESS)
-        lose("thread_get_state (x86_THREAD_STATE32) failed %d\n", ret);
+        lose("thread_get_state (x86_THREAD_STATE32) failed %d", ret);
     /* Set up siginfo */
     save_siginfo = stack_allocate(&new_state, sizeof(*siginfo));
     if (siginfo == NULL)
@@ -311,7 +309,7 @@ void call_handler_on_thread(mach_port_t thread,
                                 x86_THREAD_STATE32,
                                 (thread_state_t)&new_state,
                                 state_count)) != KERN_SUCCESS)
-        lose("thread_set_state (x86_FLOAT_STATE32) failed %d\n", ret);
+        lose("thread_set_state (x86_FLOAT_STATE32) failed %d", ret);
 
 }
 
@@ -319,7 +317,7 @@ void call_handler_on_thread(mach_port_t thread,
 void dump_context(x86_thread_state32_t *thread_state)
 {
     int i;
-    u32 *stack_pointer;
+    uint32_t *stack_pointer;
 
     printf("eax: %08lx  ecx: %08lx  edx: %08lx  ebx: %08lx\n",
            thread_state->EAX, thread_state->ECX, thread_state->EDX, thread_state->EAX);
@@ -336,7 +334,7 @@ void dump_context(x86_thread_state32_t *thread_state)
            thread_state->FS,
            thread_state->GS);
 
-    stack_pointer = (u32 *)thread_state->ESP;
+    stack_pointer = (uint32_t *)thread_state->ESP;
     for (i = 0; i < 48; i+=4) {
         printf("%08x:  %08x %08x %08x %08x\n",
                thread_state->ESP + (i * 4),
@@ -394,7 +392,7 @@ catch_exception_raise(mach_port_t exception_port,
                                 x86_THREAD_STATE32,
                                 (thread_state_t)&thread_state,
                                 &state_count)) != KERN_SUCCESS)
-        lose("thread_get_state (x86_THREAD_STATE32) failed %d\n", ret);
+        lose("thread_get_state (x86_THREAD_STATE32) failed %d", ret);
     switch (exception) {
     case EXC_BAD_ACCESS:
         signal = SIGBUS;
@@ -471,12 +469,12 @@ catch_exception_raise(mach_port_t exception_port,
                                         x86_THREAD_STATE32,
                                         (thread_state_t)thread_state.EAX,
                                         x86_THREAD_STATE32_COUNT)) != KERN_SUCCESS)
-                lose("thread_set_state (x86_THREAD_STATE32) failed %d\n", ret);
+                lose("thread_set_state (x86_THREAD_STATE32) failed %d", ret);
             if ((ret = thread_set_state(thread,
                                         x86_FLOAT_STATE32,
                                         (thread_state_t)thread_state.ECX,
                                         x86_FLOAT_STATE32_COUNT)) != KERN_SUCCESS)
-                lose("thread_set_state (x86_FLOAT_STATE32) failed %d\n", ret);
+                lose("thread_set_state (x86_FLOAT_STATE32) failed %d", ret);
             break;
         }
         /* Trap call */
@@ -508,12 +506,12 @@ catch_exception_raise(mach_port_t exception_port,
   do_not_handle:
     dealloc_ret = mach_port_deallocate (mach_task_self(), thread);
     if (dealloc_ret) {
-      lose("mach_port_deallocate (thread) failed with return_code %d\n", dealloc_ret);
+      lose("mach_port_deallocate (thread) failed with return_code %d", dealloc_ret);
     }
 
     dealloc_ret = mach_port_deallocate (mach_task_self(), task);
     if (dealloc_ret) {
-      lose("mach_port_deallocate (task) failed with return_code %d\n", dealloc_ret);
+      lose("mach_port_deallocate (task) failed with return_code %d", dealloc_ret);
     }
 
     return ret;

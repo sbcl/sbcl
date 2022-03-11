@@ -210,8 +210,8 @@
 ;;; fit into registers or must go on the stack.
 #-darwin
 (deftransform %alien-funcall ((function type &rest args))
-  (aver (sb-c::constant-lvar-p type))
-  (let* ((type (sb-c::lvar-value type))
+  (aver (sb-c:constant-lvar-p type))
+  (let* ((type (sb-c:lvar-value type))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type))
          (gprs 0)
@@ -306,8 +306,8 @@
 
 #+darwin
 (deftransform %alien-funcall ((function type &rest args))
-  (aver (sb-c::constant-lvar-p type))
-  (let* ((type (sb-c::lvar-value type))
+  (aver (sb-c:constant-lvar-p type))
+  (let* ((type (sb-c:lvar-value type))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
@@ -376,7 +376,6 @@
   (:generator 2
     (inst lr res  (make-fixup foreign-symbol :foreign))))
 
-#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
@@ -385,10 +384,9 @@
   (:info foreign-symbol)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
-  (:temporary (:scs (non-descriptor-reg)) addr)
   (:generator 2
-    (inst lr addr (make-fixup foreign-symbol :foreign-dataref))
-    (loadw res addr)))
+    (inst lr res (make-fixup foreign-symbol :foreign-dataref))
+    (loadw res res)))
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg) :target cfunc)
@@ -644,8 +642,7 @@
 
               ;; Setup everything.  Now save sp, setup the frame.
               (inst mflr r0)
-              (inst stw r0 stack-pointer (* 2 n-word-bytes)) ; FIXME: magic
-                                        ; constant, copied from Darwin.
+              (inst stw r0 stack-pointer n-word-bytes)
               (inst stwu stack-pointer stack-pointer (- frame-size))
 
               ;; And make the call.
@@ -660,7 +657,7 @@
               ;; We're back!  Restore sp and lr, load the
               ;; return value from just under sp, and return.
               (inst lwz stack-pointer stack-pointer 0)
-              (inst lwz r0 stack-pointer (* 2 n-word-bytes))
+              (inst lwz r0 stack-pointer n-word-bytes)
               (inst mtlr r0)
               (cond
                 ((sb-alien::alien-single-float-type-p result-type)
@@ -687,7 +684,7 @@
 
         ;; Now that the segment is done, convert it to a static
         ;; vector we can point foreign code to.
-        (let* ((buffer (sb-assem::segment-buffer segment))
+        (let* ((buffer (sb-assem:segment-buffer segment))
                (vector (make-static-vector (length buffer)
                                            :element-type '(unsigned-byte 8)
                                            :initial-contents buffer))
@@ -829,7 +826,7 @@
         (finalize-segment segment)
         ;; Now that the segment is done, convert it to a static
         ;; vector we can point foreign code to.
-        (let* ((buffer (sb-assem::segment-buffer segment))
+        (let* ((buffer (sb-assem:segment-buffer segment))
                (vector (make-static-vector (length buffer)
                                            :element-type '(unsigned-byte 8)
                                            :initial-contents buffer))

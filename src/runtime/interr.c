@@ -36,10 +36,19 @@
 #include "gc.h"
 
 /* the way that we shut down the system on a fatal error */
+void lisp_backtrace(int frames);
 
 static void
 default_lossage_handler(void)
 {
+    static int backtrace_invoked = 0;
+    if (!backtrace_invoked) {
+        backtrace_invoked = 1;
+        // This may not be exactly the right condition for determining
+        // whether it might be possible to backtrace, but at least it prevents
+        // lose() from itself losing early in startup.
+        if (get_sb_vm_thread()) lisp_backtrace(100);
+    }
     exit(1);
 }
 static void (*lossage_handler)(void) = default_lossage_handler;
@@ -48,7 +57,6 @@ static void (*lossage_handler)(void) = default_lossage_handler;
 static void
 configurable_lossage_handler()
 {
-    void lisp_backtrace(int frames);
 
     if (dyndebug_config.dyndebug_backtrace_when_lost) {
         fprintf(stderr, "lose: backtrace follows as requested\n");
@@ -91,10 +99,7 @@ void disable_lossage_handler(void)
 static
 void print_message(char *fmt, va_list ap)
 {
-    fprintf(stderr, " in SBCL pid %d",getpid());
-#if defined(LISP_FEATURE_SB_THREAD)
-    fprintf(stderr, "(tid %p)", (void*)thread_self());
-#endif
+    fprintf(stderr, " in SBCL pid %d" THREAD_ID_LABEL, getpid(), THREAD_ID_VALUE);
     if (fmt) {
         fprintf(stderr, ":\n");
         vfprintf(stderr, fmt, ap);
@@ -119,7 +124,14 @@ lose(char *fmt, ...)
     va_list ap;
     /* Block signals to prevent other threads, timers and such from
      * interfering. If only all threads could be stopped somehow. */
-    block_blockable_signals(0);
+
+#ifdef LISP_FEATURE_WIN32
+    /* pthread_sigmask is emulated on windows, if lose() happens very early
+       it may not be ready to work yet. */
+    if (get_sb_vm_thread())
+#endif
+      block_blockable_signals(0);
+
     fprintf(stderr, "fatal error encountered");
     va_start(ap, fmt);
     print_message(fmt, ap);
@@ -128,6 +140,32 @@ lose(char *fmt, ...)
     fflush(stderr);
     call_lossage_handler();
 }
+
+#if 0
+/// thread printf. This was used to produce the 2-column output
+/// at the bottom of "src/code/final". The main thread'd os_kernel_tid
+/// must be assigned a constant in main_thread_trampoline().
+void tprintf(char *fmt, ...)
+{
+    va_list ap;
+    char buf[200];
+    char *ptr;
+    const char spaces[] = "                                           ";
+    struct thread*th = get_sb_vm_thread();
+    buf[0] = ';'; buf[1] = ' ';
+    ptr = buf+2;
+    if (th->os_kernel_tid == 'A') {
+        strcpy(ptr, spaces);
+        ptr += (sizeof spaces)-1;
+    }
+    va_start(ap, fmt);
+    int n = vsprintf(ptr, fmt, ap);
+    va_end(ap);
+    ptr += n;
+    *ptr++ = '\n';
+    write(2, buf, ptr-buf);
+}
+#endif
 
 boolean lose_on_corruption_p = 0;
 
@@ -178,21 +216,36 @@ char *internal_error_descriptions[] = {INTERNAL_ERROR_NAMES};
 char internal_error_nargs[] = INTERNAL_ERROR_NARGS;
 
 void skip_internal_error (os_context_t *context) {
-    unsigned char *ptr = (unsigned char *)*os_context_pc_addr(context);
-#ifdef LISP_FEATURE_ARM64
-    u32 trap_instruction = *(u32 *)ptr;
-    unsigned char code = trap_instruction >> 13 & 0xFF;
-    ptr += 4;
-#else
-    unsigned char code = *ptr;
-    ptr++;
-#endif
-    if (code > sizeof(internal_error_nargs)) {
-        printf("Unknown error code %d at %p\n", code, (void*)*os_context_pc_addr(context));
-    }
+    unsigned char *ptr = (unsigned char *)os_context_pc(context);
 
-    ptr += internal_error_nargs[code];
-    *((unsigned char **)os_context_pc_addr(context)) = ptr;
+#ifdef LISP_FEATURE_ARM64
+    uint32_t trap_instruction = *(uint32_t *)(ptr - 4);
+#endif
+
+    unsigned char code = *ptr;
+    ptr++; // skip the byte indicating the kind of trap
+
+    if (code > sizeof(internal_error_nargs)) {
+        printf("Unknown error code %d at %p\n", code, (void*)os_context_pc(context));
+    }
+    int nargs = internal_error_nargs[code];
+
+#ifdef LISP_FEATURE_ARM64
+    /* See SB-VM::EMIT-ERROR-BREAK for the scheme */
+    unsigned char first_arg = trap_instruction >> 13 & 0xFF;
+    if (first_arg != 31 && nargs) {
+        nargs--;
+    }
+#endif
+
+    int nbytes = 0;
+    while (nargs--) read_var_integer(ptr, &nbytes);
+    ptr += nbytes;
+#ifdef LISP_FEATURE_ARM64
+    ptr=PTR_ALIGN_UP(ptr, 4);
+#endif
+    set_os_context_pc(context, (os_context_register_t)ptr);
+
 }
 
 /* internal error handler for when the Lisp error system doesn't exist
@@ -200,120 +253,110 @@ void skip_internal_error (os_context_t *context) {
  * FIXME: Shouldn't error output go to stderr instead of stdout? (Alas,
  * this'd require changes in a number of things like brief_print(..),
  * or I'd have changed it immediately.) */
+void describe_error_arg(os_context_t *context, int sc_number, int offset) {
+{
+    int ch;
+
+    printf("    SC: %d, Offset: %d", sc_number, offset);
+    switch (sc_number) {
+    case sc_AnyReg:
+    case sc_DescriptorReg:
+        putchar('\t');
+        brief_print(*os_context_register_addr(context, offset));
+        break;
+
+    case sc_CharacterReg:
+        ch = *os_context_register_addr(context, offset);
+#ifdef LISP_FEATURE_X86
+        if (offset&1)
+            ch = ch>>8;
+        ch = ch & 0xff;
+#endif
+        switch (ch) {
+        case '\n': printf("\t'\\n'\n"); break;
+        case '\b': printf("\t'\\b'\n"); break;
+        case '\t': printf("\t'\\t'\n"); break;
+        case '\r': printf("\t'\\r'\n"); break;
+        default:
+            if (ch < 32 || ch > 127)
+                printf("\\%03o", ch);
+            else
+                printf("\t'%c'\n", ch);
+            break;
+        }
+        break;
+    case sc_SapReg:
+#ifdef sc_WordPointerReg
+    case sc_WordPointerReg:
+#endif
+        printf("\t0x%08lx\n", (unsigned long) *os_context_register_addr(context, offset));
+        break;
+    case sc_SignedReg:
+        printf("\t%ld\n", (long) *os_context_register_addr(context, offset));
+        break;
+    case sc_UnsignedReg:
+        printf("\t%lu\n", (unsigned long) *os_context_register_addr(context, offset));
+        break;
+#ifdef sc_SingleFloatReg
+    case sc_SingleFloatReg:
+        printf("\t%g\n", *(float *)&context->sc_fpregs[offset]);
+        break;
+#endif
+#ifdef sc_DoubleFloatReg
+    case sc_DoubleFloatReg:
+        printf("\t%g\n", *(double *)&context->sc_fpregs[offset]);
+        break;
+#endif
+    case sc_Constant:
+        print_constant(context, offset);
+        break;
+    default:
+        printf("\t???\n");
+        break;
+    }
+}
+};
 void
 describe_internal_error(os_context_t *context)
 {
     unsigned char *ptr = arch_internal_error_arguments(context);
     char count;
-    int position, sc_and_offset, sc_number, offset, ch;
-    void * pc = (void*)*os_context_pc_addr(context);
+    int position;
+    void * pc = (void*)os_context_pc(context);
     unsigned char code;
 
 #ifdef LISP_FEATURE_ARM64
-    u32 trap_instruction = *(u32 *)ptr;
-    code = trap_instruction >> 13 & 0xFF;
+    /* See SB-VM::EMIT-ERROR-BREAK for the scheme */
+    uint32_t trap_instruction = *(uint32_t *)ptr;
+    unsigned char trap = trap_instruction >> 5 & 0xFF;
     ptr += 4;
 #else
     unsigned char trap = *(ptr-1);
+#endif
+
     if (trap >= trap_Error) {
         code = trap - trap_Error;
     } else {
         code = *ptr;
         ptr++;
     }
-#endif
-
     if (code > sizeof(internal_error_nargs)) {
         printf("Unknown error code %d at %p\n", code, pc);
     }
     printf("Internal error #%d \"%s\" at %p\n", code, internal_error_descriptions[code], pc);
+    count = internal_error_nargs[code];
 
-    for (count = internal_error_nargs[code], position = 0;
-         count > 0;
-         --count) {
-        sc_and_offset = read_var_integer(ptr, &position);
-        sc_number = sc_and_offset_sc_number(sc_and_offset);
-        offset = sc_and_offset_offset(sc_and_offset);
-
-        printf("    SC: %d, Offset: %d", sc_number, offset);
-        switch (sc_number) {
-        case sc_AnyReg:
-        case sc_DescriptorReg:
-            putchar('\t');
-            brief_print(*os_context_register_addr(context, offset));
-            break;
-
-        case sc_CharacterReg:
-            ch = *os_context_register_addr(context, offset);
-#ifdef LISP_FEATURE_X86
-            if (offset&1)
-                ch = ch>>8;
-            ch = ch & 0xff;
-#endif
-            switch (ch) {
-            case '\n': printf("\t'\\n'\n"); break;
-            case '\b': printf("\t'\\b'\n"); break;
-            case '\t': printf("\t'\\t'\n"); break;
-            case '\r': printf("\t'\\r'\n"); break;
-            default:
-                if (ch < 32 || ch > 127)
-                    printf("\\%03o", ch);
-                else
-                    printf("\t'%c'\n", ch);
-                break;
-            }
-            break;
-        case sc_SapReg:
-#ifdef sc_WordPointerReg
-        case sc_WordPointerReg:
-#endif
-            printf("\t0x%08lx\n", (unsigned long) *os_context_register_addr(context, offset));
-            break;
-        case sc_SignedReg:
-            printf("\t%ld\n", (long) *os_context_register_addr(context, offset));
-            break;
-        case sc_UnsignedReg:
-            printf("\t%lu\n", (unsigned long) *os_context_register_addr(context, offset));
-            break;
-#ifdef sc_SingleFloatReg
-        case sc_SingleFloatReg:
-            printf("\t%g\n", *(float *)&context->sc_fpregs[offset]);
-            break;
-#endif
-#ifdef sc_DoubleFloatReg
-        case sc_DoubleFloatReg:
-            printf("\t%g\n", *(double *)&context->sc_fpregs[offset]);
-            break;
-#endif
-        case sc_Constant:
-            print_constant(context, offset);
-            break;
-        default:
-            printf("\t???\n");
-            break;
-        }
+#ifdef LISP_FEATURE_ARM64
+    unsigned char first_arg = trap_instruction >> 13 & 0xFF;
+    if (first_arg != 31) {
+        describe_error_arg(context, 0, first_arg);
+        count--;
     }
-}
-
-/* utility routines used by miscellaneous pieces of code */
+#endif
 
-lispobj debug_print(lispobj string)
-{
-    /* This is a kludge.  It's not actually safe - in general - to use
-       %primitive print on the alpha, because it skips half of the
-       number stack setup that should usually be done on a function
-       call, so the called routine (i.e. this one) ends up being able
-       to overwrite local variables in the caller.  Rather than fix
-       this everywhere that %primitive print is used (it's only a
-       debugging aid anyway) we just guarantee our safety by putting
-       an unused buffer on the stack before doing anything else
-       here */
-    char untouched[32];
-    if (header_widetag(VECTOR(string)->header) != SIMPLE_BASE_STRING_WIDETAG)
-        fprintf(stderr, "debug_print: can't display string\n");
-    else
-        fprintf(stderr, "%s\n", (char *)(VECTOR(string)->data));
-    /* shut GCC up about not using this, because that's the point.. */
-    (void)untouched;
-    return NIL;
+    for (position = 0; count > 0; --count) {
+        int sc_and_offset = read_var_integer(ptr, &position);
+        describe_error_arg(context, sc_and_offset_sc_number(sc_and_offset),
+                           sc_and_offset_offset(sc_and_offset));
+    }
 }

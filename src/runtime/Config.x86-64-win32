@@ -14,10 +14,6 @@ ARCH_SRC = x86-64-arch.c
 
 OS_SRC = win32-os.c x86-64-win32-os.c
 
-ifdef LISP_FEATURE_SB_THREAD
-  OS_SRC += pthreads_win32.c       
-endif
-
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   LIBSBCL = libsbcl.a
   USE_LIBSBCL = -Wl,--whole-archive libsbcl.a -Wl,--no-whole-archive
@@ -44,6 +40,9 @@ OS_LIBS = -l ws2_32 -ladvapi32
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
+ifdef LISP_FEATURE_SB_FUTEX
+  OS_LIBS += -lSynchronization
+endif
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
   GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c
@@ -52,12 +51,16 @@ else
 endif
 
 CFLAGS =  -g -W -Wall \
-       -Wno-unused-function \
+       -Wno-unused-function -Wno-unused-parameter -Wno-cast-function-type \
        -fno-omit-frame-pointer \
        -O5 -m64 -DWINVER=0x0501 \
        -D__W32API_USE_DLLIMPORT__
 
 CC = gcc
+
+ifeq ($(shell $(LD) --disable-dynamicbase 2>&1 | grep disable-dynamicbase),)
+LINKFLAGS += -Wl,--disable-dynamicbase
+endif
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

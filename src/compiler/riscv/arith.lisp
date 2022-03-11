@@ -53,31 +53,31 @@
 ;;; Assume that any constant operand is the second arg...
 
 (define-vop (fast-fixnum-binop fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg))
-         (y :target r :scs (any-reg)))
+  (:args (x :target r :scs (any-reg zero))
+         (y :target r :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
 (define-vop (fast-unsigned-binop fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg))
-         (y :target r :scs (unsigned-reg)))
+  (:args (x :target r :scs (unsigned-reg zero))
+         (y :target r :scs (unsigned-reg zero)))
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note #.(format nil "inline (unsigned-byte ~a) arithmetic" n-machine-word-bits)))
 
 (define-vop (fast-signed-binop fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg))
-         (y :target r :scs (signed-reg)))
+  (:args (x :target r :scs (signed-reg zero))
+         (y :target r :scs (signed-reg zero)))
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note #.(format nil "inline (signed-byte ~a) arithmetic" n-machine-word-bits)))
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg)))
+  (:args (x :target r :scs (any-reg zero)))
   (:info y)
   (:arg-types tagged-num (:constant short-immediate-fixnum))
   (:results (r :scs (any-reg)))
@@ -85,7 +85,7 @@
   (:note "inline arithmetic"))
 
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg)))
+  (:args (x :target r :scs (unsigned-reg zero)))
   (:info y)
   (:arg-types unsigned-num (:constant short-immediate))
   (:results (r :scs (unsigned-reg)))
@@ -93,7 +93,7 @@
   (:note "inline unsigned unboxed arithmetic"))
 
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg)))
+  (:args (x :target r :scs (signed-reg zero)))
   (:info y)
   (:arg-types signed-num (:constant short-immediate))
   (:results (r :scs (signed-reg)))
@@ -197,7 +197,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline ASH")
-  (:generator 3
+  (:generator 1
     (cond ((< (- n-word-bits) amount n-word-bits)
            (if (plusp amount)
                (inst slli result number amount)
@@ -214,7 +214,7 @@
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline ASH")
-  (:generator 3
+  (:generator 1
     (cond ((< (- n-word-bits) amount n-word-bits)
            (if (plusp amount)
                (inst slli result number amount)
@@ -230,22 +230,19 @@
          (amount))
   (:results (result))
   (:policy :fast-safe)
-  ;; ANY-REG is fine because N-WORD-BITS is even.
-  (:temporary (:sc any-reg) temp)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:variant-vars variant)
   (:generator 3
     (inst bge amount zero-tn positive)
-    (inst sub ndesc zero-tn amount)
-    (inst li temp n-word-bits)
-    (inst blt ndesc temp no-overflow)
-    ;; KLUDGE: Even though this gives the wrong answer for 64-bit
-    ;; values with a shift less than -63, I think that this VOP cannot
-    ;; be selected in that case, since any positive shift amount would
-    ;; overflow. In that case, a more correct VOP would be
-    ;; selected. More testing/thinking required.
-    (inst subi ndesc temp 1)
+    (inst li ndesc (- n-word-bits))
+    (inst blt ndesc amount no-overflow)
+    (ecase variant
+      (:signed (inst srai result number (1- n-word-bits)))
+      (:unsigned (move result zero-tn)))
+    (inst j done)
+
     NO-OVERFLOW
+    (inst sub ndesc zero-tn amount)
     (ecase variant
       (:signed (inst sra result number ndesc))
       (:unsigned (inst srl result number ndesc)))
@@ -378,9 +375,8 @@
       ;; optimize this.
       (loop for masker in maskers
             for shift = 1 then (ash shift 1) do
-              (inst li mask masker) ; NL1
+              (inst li mask masker)
               (let ((input (if (= shift 1) arg num)))
-                ; TEMP = NL2 ARG = NL3 NUM = NL0
                 (inst srli temp input shift)
                 (inst and num input mask))
               (inst and temp temp mask)
@@ -467,24 +463,24 @@
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)
-  (:args (x :scs (any-reg))
-         (y :scs (any-reg)))
+  (:args (x :scs (any-reg zero))
+         (y :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:generator 1
     (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/signed fast-conditional)
-  (:args (x :scs (signed-reg))
-         (y :scs (signed-reg)))
+  (:args (x :scs (signed-reg zero))
+         (y :scs (signed-reg zero)))
   (:arg-types signed-num signed-num)
   (:note #.(format nil "inline (signed-byte ~a) comparison" n-word-bits))
   (:generator 1
     (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
-  (:args (x :scs (unsigned-reg))
-         (y :scs (unsigned-reg)))
+  (:args (x :scs (unsigned-reg zero))
+         (y :scs (unsigned-reg zero)))
   (:arg-types unsigned-num unsigned-num)
   (:note #.(format nil "inline (unsigned-byte ~a) comparison" n-word-bits))
   (:generator 1
@@ -517,8 +513,8 @@
 ;;; doing this is to prevent fixnum specific operations from being
 ;;; used on word integers, spuriously consing the argument.
 (define-vop (fast-eql/fixnum fast-conditional)
-  (:args (x :scs (any-reg))
-         (y :scs (any-reg)))
+  (:args (x :scs (any-reg zero))
+         (y :scs (any-reg zero)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql)
@@ -535,26 +531,19 @@
 
 ;;;; Logical operations
 
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg))
-         (amount :scs (signed-reg)))
-  (:arg-types unsigned-num tagged-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "SHIFT-TOWARDS-START")
-  (:generator 1
-    (inst srl r num amount)))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "SHIFT-TOWARDS-END")
-  (:generator 1
-    (inst sll r num amount)))
-
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg))
+                       (amount :scs (signed-reg)))
+                (:arg-types unsigned-num tagged-num)
+                (:results (r :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 1 (inst ,operation r num amount)))))
+  (define shift-towards-start srl)
+  (define shift-towards-end   sll))
 
 ;;;; Modular arithmetic
 (defmacro define-mod-binop ((name prototype) function)
@@ -612,7 +601,7 @@
 
   (deftransform ash-left-mod32 ((integer count)
                                 ((unsigned-byte 32) (unsigned-byte 5)))
-    (when (sb-c::constant-lvar-p count)
+    (when (sb-c:constant-lvar-p count)
       (sb-c::give-up-ir1-transform))
     '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count)))
 
@@ -627,7 +616,7 @@
 
   (deftransform ash-left-mod64 ((integer count)
                                 ((unsigned-byte 64) (unsigned-byte 6)))
-    (when (sb-c::constant-lvar-p count)
+    (when (sb-c:constant-lvar-p count)
       (sb-c::give-up-ir1-transform))
     '(%primitive fast-ash-left-mod64/unsigned=>unsigned integer count)))
 

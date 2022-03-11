@@ -32,12 +32,12 @@
     `((count nil
              nil
              (etypecase count
-               (null (1- sb-xc:most-positive-fixnum))
+               (null (1- most-positive-fixnum))
                (fixnum (max 0 count))
                (integer (if (minusp count)
                             0
-                            (1- sb-xc:most-positive-fixnum))))
-             (mod #.sb-xc:most-positive-fixnum))
+                            (1- most-positive-fixnum))))
+             (mod #.most-positive-fixnum))
       ;; Entries for {start,end}{,1,2}
       ,@(mapcan (lambda (names)
                   (destructuring-bind (start end length sequence) names
@@ -190,6 +190,12 @@
                      (sb-c::%type-check-error/c
                       ,sequence 'sb-kernel::object-not-sequence-error nil)))))))
 
+(defmacro make-vector-like (vector length poison)
+  (declare (ignorable poison))
+  `(let ((type (array-underlying-widetag ,vector)))
+     (sb-vm::allocate-vector-with-widetag
+      #+ubsan ,poison type ,length (aref sb-vm::%%simple-array-n-bits-shifts%% type))))
+
 ;;; Like SEQ-DISPATCH-CHECKING, but also assert that OTHER-FORM produces
 ;;; a sequence. This assumes that the containing function declares its
 ;;; result to be explicitly checked,
@@ -203,7 +209,7 @@
   "Return a sequence of the same type as SEQUENCE and the given LENGTH."
   `(seq-dispatch ,sequence
      (make-list ,length)
-     (make-vector-like ,sequence ,length)
+     (make-vector-like ,sequence ,length t)
      (sb-sequence:make-sequence-like ,sequence ,length)))
 
 (defun bad-sequence-type-error (type-spec)
@@ -304,6 +310,7 @@
                          (1- length))))
     (error 'index-too-large-error
            :datum index
+           :sequence sequence
            :expected-type (if max-index
                               `(integer 0 ,max-index)
                               ;; This seems silly, is there something better?
@@ -361,7 +368,7 @@
                          (car list)))
                   (declare (type index count)))
                 (locally
-                    (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                    (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                   (when (>= index (length sequence))
                     (signal-index-too-large-error sequence index))
                   (aref sequence index))
@@ -469,7 +476,13 @@
 ;;;; SUBSEQ
 ;;;;
 
-(!define-array-dispatch vector-subseq-dispatch (array start end)
+;;; FIXME: surely we can emit tighter code by not having 16 copies of the
+;;; vector allocator buried inside this (and similar) functions.
+;;; Instead there can be a size calculation up front, then ALLOCATE-VECTOR
+;;; with the underlying widetag, then perform an N-way dispatch for the copy.
+;;; Also, there should only be as many different ways to copy
+;;; as there are different element sizes.
+(!define-array-dispatch :jump-table vector-subseq-dispatch (array start end)
   (declare (optimize speed (safety 0)))
   (declare (type index start end))
   (subseq array start end))
@@ -483,6 +496,12 @@
   (declare (type index start)
            (type (or null index) end)
            (optimize speed))
+  ;; This seems suboptimal in that type checking is performed in the XEP
+  ;; but we also have fallback cases in the dispatch table for catching
+  ;; all invalid widetags. Otoh, WITH-ARRAY-DATA needs to dtrt too.
+  ;; So maybe the dispatch table could dispatch to the specialization
+  ;; that handles everything needed for each widetag.
+  ;; This "outer" use of WITH-ARRAY-DATA would be removed.
   (with-array-data ((data sequence)
                     (start start)
                     (end end)
@@ -596,7 +615,8 @@
                 do (setf pointer (cdr (rplaca pointer item)))))))
   sequence)
 
-(define-load-time-global %%fill-bashers%% (make-array (1+ sb-vm:widetag-mask)))
+(define-load-time-global %%fill-bashers%% (make-array (1+ sb-vm:widetag-mask)
+                                                      :initial-element 0))
 #.`(progn
    ,@(loop for saetp across sb-vm:*specialized-array-element-type-properties*
            for et = (sb-vm:saetp-specifier saetp)
@@ -702,55 +722,53 @@
             collect `(eq ,tag ,(sb-vm:saetp-typecode saetp)))))
 
 ;;;; REPLACE
-(defun vector-replace (vector1 vector2 start1 start2 end1 diff)
-  (declare ((or (eql -1) index) start1 start2 end1)
-           (optimize (sb-c::insert-array-bounds-checks 0))
-           ((integer -1 1) diff))
-  (let ((tag1 (%other-pointer-widetag vector1))
-        (tag2 (%other-pointer-widetag vector2)))
-    (macrolet ((copy (&body body)
-                 `(do ((index1 start1 (+ index1 diff))
-                       (index2 start2 (+ index2 diff)))
-                      ((= index1 end1))
-                    (declare (fixnum index1 index2))
-                    ,@body)))
-      (cond ((= tag1 tag2 sb-vm:simple-vector-widetag)
-             (copy
-              (setf (svref vector1 index1) (svref vector2 index2))))
-            ;; TODO: can do the same with small specialized arrays
-            ((and (= tag1 tag2)
-                  (word-specialized-vector-tag-p tag1))
-             (copy
-              (setf (%vector-raw-bits vector1 index1)
-                    (%vector-raw-bits vector2 index2))))
-            (t
-             (let ((getter (the function (svref %%data-vector-reffers%% tag2)))
-                   (setter (the function (svref %%data-vector-setters%% tag1))))
-               (copy
-                (funcall setter vector1 index1
-                         (funcall getter vector2 index2))))))))
-  vector1)
 
 ;;; If we are copying around in the same vector, be careful not to copy the
 ;;; same elements over repeatedly. We do this by copying backwards.
+;;; Bounding indices were checked for validity by DEFINE-SEQUENCE-TRAVERSER.
 (defmacro vector-replace-from-vector ()
-  `(let ((nelts (min (- target-end target-start)
-                     (- source-end source-start))))
-     (with-array-data ((data1 target-sequence) (start1 target-start) (end1))
-       (declare (ignore end1))
-       (let ((end1 (the fixnum (+ start1 nelts))))
-         (if (and (eq target-sequence source-sequence)
-                  (> target-start source-start))
-             (let ((end (the fixnum (1- end1))))
-               (vector-replace data1 data1
-                               end
-                               (the fixnum (- end
-                                              (- target-start source-start)))
-                               (1- start1)
-                               -1))
-             (with-array-data ((data2 source-sequence) (start2 source-start) (end2))
-               (declare (ignore end2))
-               (vector-replace data1 data2 start1 start2 end1 1)))))
+  `(locally
+     (declare (optimize (safety 0)))
+     (let ((nelts (min (- target-end target-start)
+                       (- source-end source-start))))
+       (when (plusp nelts)
+       (with-array-data ((data1 target-sequence) (start1 target-start) (end1))
+         (progn end1)
+         (with-array-data ((data2 source-sequence) (start2 source-start) (end2))
+           (progn end2)
+           (let ((tag1 (%other-pointer-widetag data1))
+                 (tag2 (%other-pointer-widetag data2)))
+             (block replace
+               (when (= tag1 tag2)
+                 (when (= tag1 sb-vm:simple-vector-widetag) ; rely on the transform
+                   (replace (truly-the simple-vector data1)
+                            (truly-the simple-vector data2)
+                            :start1 start1 :end1 (truly-the index (+ start1 nelts))
+                            :start2 start2 :end2 (truly-the index (+ start2 nelts)))
+                   (return-from replace))
+                 (let ((copier (sb-vm::blt-copier-for-widetag tag1)))
+                   (when copier
+                     ;; these copiers figure out which direction to step.
+                     ;; arg order is FROM, TO which is the opposite of REPLACE.
+                     (funcall (truly-the function copier) data2 start2 data1 start1 nelts)
+                     (return-from replace))))
+               ;; General case is just like the code emitted by TRANSFORM-REPLACE
+               ;; but using the getter and setter.
+               (let ((getter (the function (svref %%data-vector-reffers%% tag2)))
+                     (setter (the function (svref %%data-vector-setters%% tag1))))
+                 (cond ((and (eq data1 data2) (> start1 start2))
+                        (do ((i (the (or (eql -1) index) (+ start1 nelts -1)) (1- i))
+                             (j (the (or (eql -1) index) (+ start2 nelts -1)) (1- j)))
+                            ((< i start1))
+                          (declare (index i j))
+                          (funcall setter data1 i (funcall getter data2 j))))
+                       (t
+                        (do ((i start1 (1+ i))
+                             (j start2 (1+ j))
+                             (end (the index (+ start1 nelts))))
+                            ((>= i end))
+                          (declare (index i j))
+                          (funcall setter data1 i (funcall getter data2 j))))))))))))
      target-sequence))
 
 (defmacro list-replace-from-list ()
@@ -803,50 +821,12 @@
      (declare (fixnum target-index source-index))
      (setf (aref target-sequence target-index) (car source-sequence))))
 
-;;;; The support routines for REPLACE are used by compiler transforms, so we
-;;;; worry about dealing with END being supplied or defaulting to NIL
-;;;; at this level.
-
-(defun list-replace-from-list* (target-sequence source-sequence target-start
-                                target-end source-start source-end)
-  (when (null target-end) (setq target-end (length target-sequence)))
-  (when (null source-end) (setq source-end (length source-sequence)))
-  (list-replace-from-list))
-
-(defun list-replace-from-vector* (target-sequence source-sequence target-start
-                                  target-end source-start source-end)
-  (when (null target-end) (setq target-end (length target-sequence)))
-  (when (null source-end) (setq source-end (length source-sequence)))
-  (list-replace-from-vector))
-
-(defun vector-replace-from-list* (target-sequence source-sequence target-start
-                                  target-end source-start source-end)
-  (when (null target-end) (setq target-end (length target-sequence)))
-  (when (null source-end) (setq source-end (length source-sequence)))
-  (vector-replace-from-list))
-
-(defun vector-replace-from-vector* (target-sequence source-sequence
-                                    target-start target-end source-start
-                                    source-end)
-  (when (null target-end) (setq target-end (length target-sequence)))
-  (when (null source-end) (setq source-end (length source-sequence)))
-  (vector-replace-from-vector))
-
-#+sb-unicode
-(defun simple-character-string-replace-from-simple-character-string*
-    (target-sequence source-sequence
-     target-start target-end source-start source-end)
-  (declare (type (simple-array character (*)) target-sequence source-sequence))
-  (when (null target-end) (setq target-end (length target-sequence)))
-  (when (null source-end) (setq source-end (length source-sequence)))
-  (vector-replace-from-vector))
-
 (define-sequence-traverser replace
     (target-sequence1 source-sequence2 &rest args &key start1 end1 start2 end2)
   "Destructively modifies SEQUENCE1 by copying successive elements
 into it from the SEQUENCE2.
 
-Elements are copied to the subseqeuence bounded by START1 and END1,
+Elements are copied to the subsequence bounded by START1 and END1,
 from the subsequence bounded by START2 and END2. If these subsequences
 are not of the same length, then the shorter length determines how
 many elements are copied."
@@ -919,7 +899,9 @@ many elements are copied."
                       :check-fill-pointer t)
       (declare (ignore start))
       (let* ((tag (%other-pointer-widetag vector))
-             (new-vector (sb-vm::allocate-vector-with-widetag tag length nil)))
+             (new-vector (sb-vm::allocate-vector-with-widetag
+                          #+ubsan nil tag length
+                          (aref sb-vm::%%simple-array-n-bits-shifts%% tag))))
         (cond ((= tag sb-vm:simple-vector-widetag)
                (do ((left-index 0 (1+ left-index))
                     (right-index end))
@@ -951,6 +933,7 @@ many elements are copied."
       ((atom 2nd) 3rd)
     (rplacd 2nd 3rd)))
 
+(declaim (inline nreverse-word-specialized-vector))
 (defun nreverse-word-specialized-vector (vector start end)
   (do ((left-index start (1+ left-index))
        (right-index (1- end) (1- right-index)))
@@ -1109,7 +1092,7 @@ many elements are copied."
 (macrolet ((def (name element-type &rest dispatch)
              `(defun ,name (&rest sequences)
                 (declare (explicit-check)
-                         (optimize (sb-c::insert-array-bounds-checks 0)))
+                         (optimize (sb-c:insert-array-bounds-checks 0)))
                 (let ((length 0))
                   (declare (index length))
                   (do-rest-arg ((seq) sequences)
@@ -1146,9 +1129,11 @@ many elements are copied."
     (declare (index length))
     (do-rest-arg ((seq) sequences)
       (incf length (length seq)))
-    (let ((result (sb-vm::allocate-vector-with-widetag widetag length nil))
-          (setter (the function (svref %%data-vector-setters%% widetag)))
-          (index 0))
+    (let* ((n-bits-shift (aref sb-vm::%%simple-array-n-bits-shifts%% widetag))
+           (result (sb-vm::allocate-vector-with-widetag
+                    #+ubsan nil widetag length n-bits-shift))
+           (setter (the function (svref %%data-vector-setters%% widetag)))
+           (index 0))
       (declare (index index))
       (do-rest-arg ((seq) sequences)
         (sb-sequence:dosequence (e seq)
@@ -1238,6 +1223,9 @@ many elements are copied."
                     (progn
                       (setf (car in-apply-args) (funcall elt s state))
                       (setf (caar in-iters) (funcall step s state from-end)))))))))))))
+
+(declaim (start-block map %map))
+
 (defun %map-to-list (fun sequences)
   (declare (type function fun)
            (type list sequences))
@@ -1338,6 +1326,8 @@ many elements are copied."
                :expected-type result-type
                :format-arguments (list result result-type)))))
 
+(declaim (end-block))
+
 ;;;; MAP-INTO
 
 (defmacro map-into-lambda (sequences params &body body)
@@ -1350,7 +1340,9 @@ many elements are copied."
          (apply #'%map nil #'f ,sequences)
          (loop (f)))))
 
-(!define-array-dispatch vector-map-into (data start end fun sequences)
+;;; seqtran can generate code which accesses the array of specialized
+;;; functions, so we need the array for this, not a jump table.
+(!define-array-dispatch :call vector-map-into (data start end fun sequences)
   (declare (type index start end)
            (type function fun)
            (type list sequences))
@@ -1408,17 +1400,15 @@ many elements are copied."
            (setf (car node) (apply really-fun args))
            (setf node (cdr node)))))
       (sequence
-       (multiple-value-bind (iter limit from-end)
+       (multiple-value-bind (iter limit from-end step endp elt set)
            (sb-sequence:make-sequence-iterator result-sequence)
+         (declare (ignore elt) (type function step endp set))
          (map-into-lambda sequences (&rest args)
            (declare (truly-dynamic-extent args) (optimize speed))
-           (when (sb-sequence:iterator-endp result-sequence
-                                            iter limit from-end)
+           (when (funcall endp result-sequence iter limit from-end)
              (return-from map-into result-sequence))
-           (setf (sb-sequence:iterator-element result-sequence iter)
-                 (apply really-fun args))
-           (setf iter (sb-sequence:iterator-step result-sequence
-                                                           iter from-end)))))))
+           (funcall set (apply really-fun args) result-sequence iter)
+           (setf iter (funcall step result-sequence iter from-end)))))))
   result-sequence)
 
 ;;;; REDUCE
@@ -2192,7 +2182,7 @@ many elements are copied."
                            start end count key test test-not old)
   (declare (fixnum start count end incrementer right)
            (type (or null function) key))
-  (let* ((result (make-vector-like sequence length))
+  (let* ((result (make-vector-like sequence length nil))
          (getter (the function (svref %%data-vector-reffers%%
                                       (%other-pointer-widetag sequence))))
          (setter (the function (svref %%data-vector-setters%%

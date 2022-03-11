@@ -112,7 +112,7 @@
   (inst movsd  (ea-for-df-stack y) x))
 
 (eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'cl:single-float))
+  (setf cl:*read-default-float-format* 'cl:single-float))
 
 ;;;; complex float move functions
 
@@ -173,8 +173,9 @@
   (:results (y :scs (descriptor-reg)))
   (:node-var node)
   (:note "float to pointer coercion")
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:generator 13
-     (alloc-other y double-float-widetag double-float-size node)
+     (alloc-other double-float-widetag double-float-size y node nil thread-tn)
      (inst movsd (ea-for-df-desc y) x)))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
@@ -225,10 +226,11 @@
 (define-vop (move-from-complex-single)
   (:args (x :scs (complex-single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (alloc-other y complex-single-float-widetag complex-single-float-size node)
+     (alloc-other complex-single-float-widetag complex-single-float-size y node nil thread-tn)
      (inst movlps (ea-for-csf-data-desc y) x)))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
@@ -236,10 +238,11 @@
 (define-vop (move-from-complex-double)
   (:args (x :scs (complex-double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
+  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (alloc-other y complex-double-float-widetag complex-double-float-size node)
+     (alloc-other complex-double-float-widetag complex-double-float-size y node nil thread-tn)
      (inst movapd (ea-for-cdf-data-desc y) x)))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
@@ -284,7 +287,7 @@
                       (,sc
                        (move y x))
                       (,stack-sc
-                       (if (= (tn-offset fp) esp-offset)
+                       (if (= (tn-offset fp) rsp-offset)
                            (let* ((offset (tn-byte-offset y))
                                   (ea (ea offset fp)))
                              ,@(ecase format
@@ -1070,7 +1073,7 @@
     complex-double-reg fp-complex-double-immediate complex-double-float
     movsd movapd cmppd movmskpd #b11))
 
-(macrolet ((define-</> (op single-name double-name &rest flags)
+(macrolet ((define (op single-name double-name &rest flags)
                `(progn
                   (define-vop (,double-name double-float-compare)
                     (:translate ,op)
@@ -1101,10 +1104,14 @@
                          (setf y (register-inline-constant (tn-value y))))
                         (t))
                       (inst comiss x y))))))
-  (define-</> < <single-float <double-float not :p :nc)
-  (define-</> > >single-float >double-float not :p :na)
-  (define-</> <= <=single-float <=double-float not :p :a)
-  (define-</> >= >=single-float >=double-float not :p :b))
+  ;;   UNORDERED:    ZF,PF,CF <- 111;
+  ;;   GREATER_THAN: ZF,PF,CF <- 000;
+  ;;   LESS_THAN:    ZF,PF,CF <- 001;
+  ;;   EQUAL:        ZF,PF,CF <- 100;
+  (define < <single-float <double-float not :p :nc)
+  (define > >single-float >double-float not :p :na)
+  (define <= <=single-float <=double-float not :p :a)
+  (define >= >=single-float >=double-float not :p :b))
 
 
 ;;;; conversion
@@ -1385,7 +1392,7 @@
                (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
         (descriptor-reg
          (inst mov :dword lo-bits
-               (make-ea-for-object-slot float double-float-value-slot
+               (object-slot-ea float double-float-value-slot
                                         other-pointer-lowtag))))))
 
 
@@ -1572,3 +1579,43 @@
   (:generator 2
      (move r x)
      (inst shufpd r r #b01)))
+
+#+round-float
+(progn
+  (define-vop ()
+    (:translate round-double)
+    (:policy :fast-safe)
+    (:args (x :scs (double-reg) :target r))
+    (:arg-types double-float (:constant symbol))
+    (:info mode)
+    (:results (r :scs (double-reg)))
+    (:result-types double-float)
+    (:generator 2
+      (unless (location= r x)
+        (inst xorpd r r))
+      (inst roundsd r x
+            (logior #b1000
+                    (ecase mode
+                      (:round 0)
+                      (:floor 1)
+                      (:ceiling 2)
+                      (:truncate 3))))))
+
+ (define-vop ()
+   (:translate round-single)
+   (:policy :fast-safe)
+   (:args (x :scs (single-reg) :target r))
+   (:arg-types single-float (:constant symbol))
+   (:info mode)
+   (:results (r :scs (single-reg)))
+   (:result-types single-float)
+   (:generator 2
+     (unless (location= r x)
+       (inst xorps r r))
+     (inst roundss r x
+           (logior #b1000
+                   (ecase mode
+                     (:round 0)
+                     (:floor 1)
+                     (:ceiling 2)
+                     (:truncate 3)))))))

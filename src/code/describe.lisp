@@ -9,7 +9,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; SB-IMPL, not SB-IMPL, since we're built in warm load.
 (in-package "SB-IMPL")
 
 ;;;; Utils, move elsewhere.
@@ -68,7 +67,7 @@
          (limit (truncate (- *print-right-margin* reserve) columns)))
     (flet ((trunc (&optional end)
              (let ((line-end (- limit 2)))
-               (with-simple-output-to-string (s)
+               (%with-output-to-string (s)
                  (write-string line s :end (if end
                                                (min end line-end)
                                                line-end))
@@ -101,6 +100,9 @@
 
 (defun describe (object &optional (stream-designator *standard-output*))
   "Print a description of OBJECT to STREAM-DESIGNATOR."
+  ;; This DECLARE works around a compiler bug that FTYPE does not force
+  ;; type-checking of the optional argument.
+  (declare (stream-designator stream-designator))
   (let ((stream (out-stream-from-designator stream-designator))
         (*print-right-margin* (or *print-right-margin* 72))
         (*print-circle* t)
@@ -247,6 +249,15 @@
 (defmethod describe-object ((object sb-pcl::slot-object) stream)
   (print-standard-describe-header object stream)
   (describe-instance object stream))
+
+(defmethod describe-object ((object pathname) stream)
+  (print-standard-describe-header object stream)
+  (loop for name across #(host device directory name type version)
+        for i from (get-dsd-index pathname host)
+        do (awhen (%instance-ref object i)
+             (format stream "~%  ~10A = ~A" name
+                     (prin1-to-line (if (eq name 'directory) (car it) it)))))
+  (terpri stream))
 
 (defmethod describe-object ((object character) stream)
   (print-standard-describe-header object stream)
@@ -396,6 +407,8 @@
                 (format stream "~@:_No subclasses.")))
           (unless (sb-mop:class-finalized-p class)
             (format stream "~@:_Not yet finalized."))
+          (when (eq :sealed (classoid-state (sb-pcl::class-classoid class)))
+            (format stream "~@:_Sealed."))
           (if (eq 'structure-class metaclass-name)
               (let* ((dd (find-defstruct-description name))
                      (slots (dd-slots dd)))
@@ -525,14 +538,16 @@
 (defun describe-lambda-list (lambda-list stream)
   (let ((*print-circle* nil)
         (*print-level* 24)
-        (*print-length* 24))
-    (format stream "~@:_Lambda-list: ~:S" lambda-list)))
+        (*print-length* 100))
+    (format stream "~@:_Lambda-list: ~/sb-impl:print-lambda-list/" lambda-list)))
 
 (defun describe-argument-precedence-order (argument-list stream)
   (let ((*print-circle* nil)
         (*print-level* 24)
-        (*print-length* 24))
-    (format stream "~@:_Argument precedence order: ~:A" argument-list)))
+        (*print-length* 100))
+    (format stream "~@:_Argument precedence order: ~
+                    ~/sb-impl:print-lambda-list/"
+            argument-list)))
 
 (defun describe-function-source (function stream)
   (declare (function function))
@@ -586,7 +601,7 @@
                   (t
                    (let* ((fun (or function (fdefinition name)))
                           (derived-type (and function
-                                             (%fun-type function)))
+                                             (%fun-ftype function)))
                           (legal-name-p (legal-fun-name-p name))
                           (ctype (and legal-name-p
                                       (global-ftype name)))
@@ -601,7 +616,7 @@
                                  (member from '(:defined-method :defined)))
                             (setf derived-type type)))
                      (unless derived-type
-                       (setf derived-type (%fun-type fun)))
+                       (setf derived-type (%fun-ftype fun)))
                      (if (typep fun 'standard-generic-function)
                          (values fun
                                  "a generic function"
@@ -661,7 +676,7 @@
             (when methods
               (format stream "~@:_Method-combination: ~S"
                       (sb-pcl::method-combination-type-name
-                       (sb-pcl:generic-function-method-combination fun)))
+                       (sb-mop:generic-function-method-combination fun)))
               (cond ((eq :none methods)
                      (format stream "~@:_No methods."))
                     (t
@@ -670,7 +685,8 @@
                        (format stream "Methods:")
                        (dolist (method methods)
                          (pprint-indent :block 2 stream)
-                         (format stream "~@:_(~A ~{~S ~}~:S)"
+                         (format stream "~@:_(~A ~{~S ~}~
+                                         ~/sb-impl:print-lambda-list/)"
                                  name
                                  (method-qualifiers method)
                                  (sb-pcl::unparse-specializers
@@ -683,12 +699,14 @@
       (describe-block (stream "~A has a compiler-macro:" name)
         (describe-documentation it t stream)
         (describe-function-source it stream)))
+    ;; It seems entirely bogus to claim that, for example (SETF CAR)
+    ;; has a setf expander when what we mean is that CAR has.
     (when (and (consp name) (eq 'setf (car name)) (not (cddr name)))
       (let* ((name2 (second name))
              (expander (info :setf :expander name2)))
-        (cond ((typep expander '(and symbol (not null)))
+        (cond ((typep expander '(cons symbol))
                (describe-block (stream "~A has setf-expansion: ~S"
-                                       name expander)
+                                       name (car expander))
                  (describe-documentation name2 'setf stream)))
               (expander
                (when (listp expander)
@@ -735,7 +753,7 @@
                                 maybe-inline
                                 deprecated))
                  "an SBCL-specific")
-                ((info :declaration :recognized name)
+                ((info :declaration :known name)
                  "a user-defined"))))
     (when kind
       (describe-block (stream "~A names ~A declaration." name kind)))))

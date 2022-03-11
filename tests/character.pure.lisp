@@ -45,23 +45,25 @@
     (assert (equal name (char-name (code-char code))))))
 
 ;;; bug 230: CHAR= didn't check types of &REST arguments
-(dolist (form '((code-char char-code-limit)
-                (standard-char-p "a")
-                (graphic-char-p "a")
-                (alpha-char-p "a")
-                (upper-case-p "a")
-                (lower-case-p "a")
-                (both-case-p "a")
-                (digit-char-p "a")
-                (alphanumericp "a")
-                (char= #\a "a")
-                (char/= #\a "a")
-                (char< #\a #\b "c")
-                (char-equal #\a #\a "b")
-                (digit-char -1)
-                (digit-char 4 1)
-                (digit-char 4 37)))
-  (assert-error (apply (car form) (mapcar 'eval (cdr form))) type-error))
+(with-test (:name :type-errors)
+ (dolist (form '((code-char char-code-limit)
+                 (standard-char-p "a")
+                 (graphic-char-p "a")
+                 (alpha-char-p "a")
+                 (upper-case-p "a")
+                 (lower-case-p "a")
+                 (both-case-p "a")
+                 (digit-char-p "a")
+                 (alphanumericp "a")
+                 (char= #\a "a")
+                 (char/= #\a "a")
+                 (char< #\a #\b "c")
+                 (char-equal #\a #\a "b")
+                 (digit-char -1)
+                 (digit-char 4 1)
+                 (digit-char 4 37)
+                 (sb-int:two-arg-char-equal 10 10)))
+   (assert-error (apply (car form) (mapcar 'eval (cdr form))) type-error)))
 
 ;; All of the inequality predicates when called out-of-line
 ;; were lazy in their type-checking, and would allow junk
@@ -80,6 +82,7 @@
     (assert-error (funcall f #\a #\b 'feep) type-error)
     (assert-error (funcall f #\b #\a 'feep) type-error)
     ;; 4 arg
+    (assert-error (funcall f #\a #\a #\a 'feep) type-error)
     (assert-error (funcall f #\a #\a #\a 'feep) type-error)))
 
 (dotimes (i 256)
@@ -142,7 +145,7 @@
     (assert (equal `(function (t) (values (sb-kernel:character-set
                                            ((1 . ,(1- char-code-limit))))
                                           &optional))
-                   (sb-impl::%fun-type f)))))
+                   (sb-impl::%fun-ftype f)))))
 
 (with-test (:name (:case-insensitive-char-comparisons :eacute))
   (assert (char-equal (code-char 201) (code-char 233))))

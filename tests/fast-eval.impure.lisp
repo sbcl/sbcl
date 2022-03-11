@@ -187,7 +187,7 @@
   (defun no-vals () (values))
 
   (handler-case (let ((x (the integer (no-vals)))) x)
-    (simple-error ())
+    (type-error ())
     (:no-error () (error "Should have gotten an ERROR")))
 
   (defmacro nice-macro (a b)
@@ -299,6 +299,10 @@
            'foo))
 
 (defstruct testme x)
+(test-util:with-test (:name :compiled-equalp-method)
+  (assert (compiled-function-p
+           (sb-kernel:wrapper-equalp-impl
+            (sb-kernel:find-layout 'testme)))))
 (let ((f #'testme-x))
   (let ((source-loc (sb-interpreter:fun-source-location f)))
     (setf (slot-value source-loc 'sb-c::namestring) "myfile.lisp")))
@@ -321,3 +325,16 @@
   (assert (nth-value 1 (function-lambda-expression (sb-int:info :type :expander 'thingz))))
   ;; and make sure the expander actually works
   (assert (typep "hey" '(thingz 3))))
+
+(defpackage fancypkg (:use "CL" "SB-EXT") (:export make-mystruct mystruct-x))
+(in-package fancypkg)
+(defstruct mystruct (x 3) y)
+(in-package "CL-USER")
+(lock-package "FANCYPKG")
+
+(defun f ()
+  (fancypkg:mystruct-x (fancypkg:make-mystruct)))
+(test-util:with-test (:name :jit-compiled-struct-accessor-locked-pkg)
+  (assert (eql (f) 3))
+  (assert (not (compiled-function-p #'f)))
+  (assert (compiled-function-p #'fancypkg:mystruct-x)))

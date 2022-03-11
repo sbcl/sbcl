@@ -15,37 +15,15 @@
 (defun make-nlx-entry-arg-start-location ()
     (make-wired-tn *fixnum-primitive-type* any-reg-sc-number rbx-offset))
 
-(defun catch-block-ea (tn)
+(defun catch-block-ea (tn &optional (offset 0))
   (aver (sc-is tn catch-block))
-  (ea (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size)) rbp-tn))
+  (ea (frame-byte-offset (- (+ -1 (tn-offset tn) catch-block-size) offset)) rbp-tn))
 
-(defun unwind-block-ea (tn)
+(defun unwind-block-ea (tn &optional (offset 0))
   (aver (sc-is tn unwind-block))
-  (ea (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size)) rbp-tn))
+  (ea (frame-byte-offset (- (+ -1 (tn-offset tn) unwind-block-size offset) offset)) rbp-tn))
 
 ;;;; Save and restore dynamic environment.
-;;;;
-;;;; These VOPs are used in the reentered function to restore the
-;;;; appropriate dynamic environment. Currently we only save the
-;;;; Current-Catch. (Before sbcl-0.7.0,
-;;;; when there were IR1 and byte interpreters, we had to save
-;;;; the interpreter "eval stack" too.)
-;;;;
-;;;; We don't need to save/restore the current UNWIND-PROTECT, since
-;;;; UNWIND-PROTECTs are implicitly processed during unwinding.
-;;;;
-;;;; We don't need to save the BSP, because that is handled automatically.
-
-(define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg)))
-  (:generator 13
-    (load-tl-symbol-value catch *current-catch-block*)))
-
-(define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg)))
-  (:generator 10
-    (store-tl-symbol-value catch *current-catch-block*)))
-
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg control-stack)))
   (:generator 1
@@ -60,6 +38,15 @@
 
 ;;; Compute the address of the catch block from its TN, then store into the
 ;;; block the current Fp, Env, Unwind-Protect, and the entry PC.
+#+sb-thread
+(progn
+  ;; MOVAPD instruction faults if not properly aligned
+  (assert (evenp (/ (info :variable :wired-tls '*binding-stack-pointer*) n-word-bytes)))
+  (assert (= (- (info :variable :wired-tls '*current-catch-block*)
+                (info :variable :wired-tls '*binding-stack-pointer*))
+             n-word-bytes))
+  (assert (= (- unwind-block-current-catch-slot unwind-block-bsp-slot) 1)))
+
 (define-vop (make-unwind-block)
   (:args (tn))
   (:info entry-label)
@@ -75,12 +62,9 @@
     (inst lea temp (rip-relative-ea entry-label))
     (storew temp block unwind-block-entry-pc-slot)
     #+sb-thread
-    (progn
-      (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
-        #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
-                       (= (- unwind-block-current-catch-slot unwind-block-bsp-slot) 1)))
-        (inst movapd xmm-temp (thread-tls-ea bsp))
-        (inst movupd (ea (* unwind-block-bsp-slot n-word-bytes) block) xmm-temp)))
+    (let ((bsp (info :variable :wired-tls '*binding-stack-pointer*)))
+      (inst movapd xmm-temp (thread-tls-ea bsp))
+      (inst movupd (ea (* unwind-block-bsp-slot n-word-bytes) block) xmm-temp))
     #-sb-thread
     (progn
       (load-binding-stack-pointer temp)
@@ -107,13 +91,12 @@
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
     #+sb-thread
-    (progn
-      (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
-        #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
-                       (= (- catch-block-previous-catch-slot catch-block-bsp-slot) 1)))
-        (inst movapd xmm-temp (thread-tls-ea bsp))
-        (inst movupd (ea (* catch-block-bsp-slot n-word-bytes) block) xmm-temp)
-        (store-tl-symbol-value block *current-catch-block*)))
+    (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
+      #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
+                     (= (- catch-block-previous-catch-slot catch-block-bsp-slot) 1)))
+      (inst movapd xmm-temp (thread-tls-ea bsp))
+      (inst movupd (ea (* catch-block-bsp-slot n-word-bytes) block) xmm-temp)
+      (store-tl-symbol-value block *current-catch-block*))
     #-sb-thread
     (progn
       (load-tl-symbol-value temp *current-catch-block*)
@@ -129,23 +112,23 @@
   (:generator 7
     (store-tl-symbol-value uwp *current-unwind-protect-block*)))
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
   (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
-    (load-tl-symbol-value block *current-catch-block*)
-    (loadw block block catch-block-previous-catch-slot)
+    (inst mov block (catch-block-ea current-block
+                                    catch-block-previous-catch-slot))
     (store-tl-symbol-value block *current-catch-block*)))
 
-(define-vop (unlink-unwind-protect)
-    (:temporary (:sc unsigned-reg) block)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
-    (load-tl-symbol-value block *current-unwind-protect-block*)
-    (loadw block block unwind-block-uwp-slot)
-    (store-tl-symbol-value block *current-unwind-protect-block*)))
+     (inst mov block (unwind-block-ea current-block
+                                      unwind-block-uwp-slot))
+     (store-tl-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs
 (define-vop (nlx-entry)
@@ -166,7 +149,8 @@
           ((= nvals 1)
            (let ((no-values (gen-label)))
              (inst mov (tn-ref-tn values) nil-value)
-             (inst jrcxz no-values)
+             (inst test rcx-tn rcx-tn)
+             (inst jmp :z no-values)
              (loadw (tn-ref-tn values) start -1)
              (emit-label no-values)))
           (t
@@ -202,33 +186,49 @@
                  (inst jmp defaulting-done))))))
     (inst mov rsp-tn sp)))
 
-(define-vop (nlx-entry-multiple)
-  (:args (top :target result)
-         (source :to :save)
-         (count :target rcx))
-  ;; Again, no SC restrictions for the args, 'cause the loading would
-  ;; happen before the entry label.
+(define-vop (nlx-entry-single)
+  (:args (sp)
+         (start))
+  (:results (res :from :load))
   (:info label)
-  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) rcx)
-  (:temporary (:sc unsigned-reg) loop-index temp)
-  (:results (result :scs (any-reg))
-            (num :scs (any-reg control-stack)))
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
     (emit-label label)
     (note-this-location vop :non-local-entry)
+    (inst mov res start)
+    (inst mov rsp-tn sp)))
 
+(define-vop (nlx-entry-multiple)
+  (:args (top :target result
+              :scs (any-reg))
+         (source :to :save)
+         (count :target rcx))
+  (:info label)
+  (:before-load
+    (emit-label label)
+    (note-this-location vop :non-local-entry))
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) rcx)
+  (:temporary (:sc unsigned-reg) loop-index temp)
+  (:results (result :scs (any-reg))
+            (num :scs (any-reg control-stack)))
+  (:save-p :force-to-stack)
+  (:args-var top-tn-ref)
+  (:vop-var vop)
+  (:generator 30
     ;; The 'top' arg contains the %esp value saved at the time the
     ;; catch block was created and points to where the thrown values
     ;; should sit.
-    (move result top)
+    (if (eq (tn-kind result) :unused)
+        (setf result top)
+        (move result top))
 
     (unless (eq (tn-kind num) :unused)
       (move num count))
     (move rcx count)
     (zeroize loop-index)
-    (inst jrcxz DONE)
+    (inst test rcx rcx)
+    (inst jmp :z DONE)
     LOOP
     (inst sub loop-index n-word-bytes)
     (inst mov temp (ea source loop-index))
@@ -245,12 +245,21 @@
 (define-vop (uwp-entry)
   (:info label)
   (:save-p :force-to-stack)
-  (:results (block) (start) (count))
-  (:ignore block start count)
   (:vop-var vop)
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (uwp-entry-block)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block))
+  (:vop-var vop)
+  (:generator 0
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    ;; Get the saved block in UNWIND
+    (inst mov block (ea (* 3 n-word-bytes) rsp-tn))))
 
 (define-vop (unwind-to-frame-and-call)
     (:args (ofp :scs (descriptor-reg))
@@ -262,6 +271,7 @@
   (:temporary (:sc sap-reg) temp)
   (:temporary (:sc descriptor-reg :offset rbx-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset rax-offset) block)
+  (:temporary (:sc unsigned-reg :offset r11-offset) extra-temp-reg)
   (:vop-var vop)
   (:generator 22
     ;; Store the function into a non-stack location, since we'll be
@@ -279,8 +289,8 @@
     (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
     (storew temp block unwind-block-cfp-slot)
 
-    (inst lea temp-reg-tn (rip-relative-ea entry-label))
-    (storew temp-reg-tn block unwind-block-entry-pc-slot)
+    (inst lea extra-temp-reg (rip-relative-ea entry-label))
+    (storew extra-temp-reg block unwind-block-entry-pc-slot)
     (storew bsp block unwind-block-bsp-slot)
     (storew catch-block block unwind-block-current-catch-slot)
 

@@ -15,17 +15,36 @@
 
 ;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
 ;;; should be a valid signal number
-#-sb-fluid (declaim (inline unix-kill))
+(declaim (inline unix-kill))
 (define-alien-routine ("kill" unix-kill) int
   (pid int)
   (signal int))
 
 ;;; Send the signal SIGNAL to the all the process in process group
 ;;; PGRP. SIGNAL should be a valid signal number
-#-sb-fluid (declaim (inline unix-killpg))
+(declaim (inline unix-killpg))
 (define-alien-routine ("killpg" unix-killpg) int
   (pgrp int)
   (signal int))
+
+;;; A macro, because OS-THREAD is a WORD which could cause boxing if passed
+;;; to a function.
+(defmacro pthread-kill (os-thread signal)
+  (declare (ignorable os-thread))
+  ;; If no threads, pthread_kill() won't exist since we didn't link with -lpthread.
+  ;; And raise() - as we use it - can't fail, so just ignore the result.
+  ;; (The signal number is always SIGURG or SIGINT, and the process is obviously not dead)
+  ;; This isn't used on win32 so we don't need to change the symbol to sb_pthr_kill there.
+  #-sb-thread `(raise ,signal)
+  #+sb-thread
+  `(unless (= 0 (alien-funcall (extern-alien "pthread_kill"
+                                             (function int unsigned int))
+                               ,os-thread ,signal))
+     (error "pthread_kill() failed")))
+
+;;; raise() is defined to send the signal to pthread_self() if multithreaded.
+(defmacro raise (signal)
+  `(alien-funcall (extern-alien "raise" (function int int)) ,signal))
 
 ;;; Reset the current set of masked signals (those being blocked from
 ;;; delivery).
@@ -39,88 +58,47 @@
 
 #-sb-safepoint
 (defun unblock-gc-signals ()
-  (with-alien ((%unblock-gc-signals
-                (function void unsigned-long unsigned-long) :extern
-                "unblock_gc_signals"))
-    (alien-funcall %unblock-gc-signals 0 0)
+  (with-alien ((%unblock-gc-signals (function void) :extern "unblock_gc_signals"))
+    (alien-funcall %unblock-gc-signals)
     nil))
-
 
-;;;; C routines that actually do all the work of establishing signal handlers
-(define-alien-routine ("install_handler" install-handler)
-  unsigned-long
-  (signal int)
-  (handler unsigned-long)
-  (synchronous boolean))
+;;;; interface to installing signal handlers
 
-;;;; interface to enabling and disabling signal handlers
+(defun enable-interrupt (signal handler)
+  (declare (type (or function (member :default :ignore)) handler))
+  (%install-handler signal handler)
+  ;; This used to return the previously installed handler, if any.
+  ;; It no longer does, but the old handler can be obtained via SAP-REF-LISPOBJ
+  ;; on 'lisp_sig_handlers'. The reason for not returning it is that the value was
+  ;; always a closure, and there's no easy/portable way to ask what function was
+  ;; really meant.  And you can't use that closure to reinstall the old thing
+  ;; because it would install a new closure on the old closure which, though
+  ;; feasible, is definitely not what was intended.
+  nil)
 
-;;; Note on the SYNCHRONOUS argument: On builds without pseudo-atomic,
-;;; we have no way of knowing whether interrupted code was in an
-;;; allocation sequence, and cannot delay signals until after
-;;; allocation.  Any signal that can occur asynchronously must be
-;;; considered unsafe for immediate execution, and the invocation of its
-;;; lisp handler will get delayed into a newly spawned signal handler
-;;; thread.  However, there are signals which we must handle
-;;; immediately, because they occur synchonously (hence the boolean flag
-;;; SYNCHRONOUS to this function), luckily implying that the signal
-;;; happens only in specific places (illegal instructions, floating
-;;; point instructions, certain system calls), hopefully ruling out the
-;;; possibility that we would trigger it during allocation.
-
-(defun enable-interrupt (signal handler &key synchronous)
-  (declare (type (or function fixnum (member :default :ignore)) handler))
-  (/show0 "enable-interrupt")
-  (flet ((run-handler (&rest args)
-           (declare (truly-dynamic-extent args))
-           #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
-           (unblock-gc-signals)
-           (in-interruption ()
-             (apply handler args))))
-    (without-gcing
-      (let ((result (install-handler signal
-                                     (case handler
-                                       (:default sig-dfl)
-                                       (:ignore sig-ign)
-                                       (t
-                                        (sb-kernel:get-lisp-obj-address
-                                         #'run-handler)))
-                                     synchronous)))
-        (cond ((= result sig-dfl) :default)
-              ((= result sig-ign) :ignore)
-              (t ;; MAKE-LISP-OBJ returns 2 values, which gets
-                 ;; "too complex to check". We don't want the second value.
-               (values (the (or function fixnum)
-                         (sb-kernel:make-lisp-obj result)))))))))
-
-(defun default-interrupt (signal)
-  (enable-interrupt signal :default))
-
-(defun ignore-interrupt (signal)
-  (enable-interrupt signal :ignore))
-
-;;;; Support for signal handlers which aren't.
-;;;;
-;;;; On safepoint builds, user-defined Lisp signal handlers do not run
-;;;; in the handler for their signal, because we have no pseudo atomic
-;;;; mechanism to prevent handlers from hitting during allocation.
-;;;; Rather, the signal spawns off a fresh native thread, which calls
-;;;; into lisp with a fake context through this callback:
-
-#+sb-safepoint-strictly
-(defun signal-handler-callback (run-handler signal args)
-  ;; SAPs are dx allocated, close over the values, not the SAPs.
-  (let ((thread (without-gcing
-                  ;; Hold off GCing until *current-thread* is set up
-                  (setf sb-thread:*current-thread*
-                        (sb-thread::make-signal-handling-thread :name "signal handler"
-                                                                :signal-number signal))))
-        (info (sap-ref-sap args 0))
-        (context (sap-ref-sap args sb-vm:n-word-bytes)))
-    (dx-flet ((callback ()
-                (funcall run-handler signal info context)))
-      (sb-thread::initial-thread-function-trampoline thread nil
-                                                     #'callback nil))))
+(defun %install-handler (signal handler)
+  ;; 0 and 1 should coincide with SIG_DFL and SIG_IGN, but in theory those values
+  ;; are opaque. We use our own explicit translation of 0 and 1 to them
+  ;; in the C install_handler() argument passing convention.
+  (with-alien ((%sigaction (function void int unsigned) :extern "install_handler"))
+    #+sb-safepoint
+    (alien-funcall %sigaction signal
+                   (case handler
+                     (:default 0)
+                     (:ignore 1)
+                     (t (sb-kernel:get-lisp-obj-address handler))))
+    #-sb-safepoint
+    (flet ((run-handler (signo info-sap context-sap)
+             #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
+             (unblock-gc-signals)
+             (in-interruption () (funcall handler signo info-sap context-sap))))
+      (with-pinned-objects (#'run-handler)
+        (alien-funcall %sigaction signal
+                       (case handler
+                         (:default 0)
+                         (:ignore 1)
+                         (t (sb-kernel:get-lisp-obj-address #'run-handler)))))))
+  nil)
 
 
 ;;;; default LISP signal handlers
@@ -144,7 +122,7 @@
                       (sap-int (sb-vm:context-pc context))))))))
 
 (define-signal-handler sigill-handler "illegal instruction")
-#-(or linux android)
+#-(or linux android haiku)
 (define-signal-handler sigemt-handler "SIGEMT")
 (define-signal-handler sigbus-handler "bus error")
 #-(or linux android)
@@ -157,7 +135,7 @@
   (flet ((interrupt-it ()
            ;; SB-KERNEL:*CURRENT-INTERNAL-ERROR-CONTEXT* will
            ;; either be bound in this thread by SIGINT-HANDLER or
-           ;; in the target thread by SIGPIPE-HANDLER.
+           ;; in the target thread by SIGURG-HANDLER.
            (with-alien ((context (* os-context-t)
                                  sb-kernel:*current-internal-error-context*))
              (with-interrupts
@@ -172,9 +150,9 @@
     (let ((target (sb-thread::foreground-thread)))
       ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
       ;; interrupt right away, because deferrables are blocked.  Rather,
-      ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
+      ;; the kernel would arrange for the SIGURG to hit when the SIGINT
       ;; handler is done.  However, on safepoint builds, we don't use
-      ;; SIGPIPE and lack an appropriate mechanism to handle pending
+      ;; SIGURG and lack an appropriate mechanism to handle pending
       ;; thruptions upon exit from signal handlers (and this situation is
       ;; unlike WITHOUT-INTERRUPTS, which handles pending interrupts
       ;; explicitly at the end).  Only as long as safepoint builds pretend
@@ -187,23 +165,24 @@
     (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                 #'interrupt-it)))
 
-#-sb-wtimer
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))
-  (declare (type system-area-pointer context))
+  ;; Safepoint invokes the "signal handler" without a signal context,
+  ;; since it's not a signal handler.
+  #-sb-safepoint (declare (type system-area-pointer context))
   (sb-impl::run-expired-timers))
 
 (defun sigterm-handler (signal code context)
   (declare (ignore signal code context))
   (exit))
 
-#-sb-thruption
-;;; SIGPIPE is not used in SBCL for its original purpose, instead it's
+#-sb-safepoint
+;;; SIGURG is not used in SBCL for its original purpose, instead it's
 ;;; for signalling a thread that it should look at its interruption
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
-;;; nothing to do so it's safe to receive spurious SIGPIPEs coming
+;;; nothing to do so it's safe to receive spurious SIGURGs coming
 ;;; from the kernel.
-(defun sigpipe-handler (signal code sb-kernel:*current-internal-error-context*)
+(defun sigurg-handler (signal code sb-kernel:*current-internal-error-context*)
   (declare (ignore signal code))
   (sb-thread::run-interruption))
 
@@ -214,26 +193,37 @@
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
-  (enable-interrupt sigint #'sigint-handler)
-  (enable-interrupt sigterm #'sigterm-handler)
-  (enable-interrupt sigill #'sigill-handler :synchronous t)
-  #-(or linux android)
-  (enable-interrupt sigemt #'sigemt-handler)
-  (enable-interrupt sigfpe #'sb-vm:sigfpe-handler :synchronous t)
+  (%install-handler sigint #'sigint-handler)
+  (%install-handler sigterm #'sigterm-handler)
+  (%install-handler sigill #'sigill-handler)
+  #-(or linux android haiku) (%install-handler sigemt #'sigemt-handler)
+  (%install-handler sigfpe #'sb-vm:sigfpe-handler)
   (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
-      (enable-interrupt sigbus #'sigbus-handler :synchronous t)
+      (%install-handler sigbus #'sigbus-handler)
       (write-string ";;;; SIGBUS handler not installed
 " sb-sys:*stderr*))
-  #-(or linux android)
-  (enable-interrupt sigsys #'sigsys-handler :synchronous t)
-  #-sb-wtimer
-  (enable-interrupt sigalrm #'sigalrm-handler)
-  #-sb-thruption
-  (enable-interrupt sigpipe #'sigpipe-handler)
-  (enable-interrupt sigchld #'sigchld-handler)
-  #+hpux (ignore-interrupt sigxcpu)
-  #-sb-safepoint (unblock-gc-signals)
-  (unblock-deferrable-signals)
+  #-(or linux android) (%install-handler sigsys #'sigsys-handler)
+  (%install-handler sigalrm #'sigalrm-handler)
+  #-sb-safepoint (%install-handler sigurg #'sigurg-handler)
+  (%install-handler sigchld #'sigchld-handler)
+  ;; Don't want to silently quit on broken pipes.
+  (%install-handler sigpipe :ignore)
+  ;; Undo the effect of block_blockable_signals() from right at the top of sbcl_main()
+  ;; and (if pertinent) blocking stop-for-GC somewhere thereafter.
+  (dx-let ((mask (make-array sizeof-sigset_t :element-type '(unsigned-byte 8)
+                                             :initial-element 0)))
+    (with-pinned-objects (mask)
+      #+(and unix sb-safepoint)
+      ;; For safepoints we unblock SIGURG (to receive interrupt-thread),
+      ;; SIGPROF (because why not), and SIGPIPE (because it's synchronous
+      ;; and not in deferrables). Everything else stays blocked.
+      (with-alien ((sigaddset (function int system-area-pointer int) :extern "sigaddset"))
+        (alien-funcall sigaddset (vector-sap mask) sigurg)
+        (alien-funcall sigaddset (vector-sap mask) sigprof)
+        (alien-funcall sigaddset (vector-sap mask) sigpipe)
+        (pthread-sigmask SIG_UNBLOCK mask nil))
+      ;; The normal thing is to start with no signals blocked
+      #-(and unix sb-safepoint) (pthread-sigmask SIG_SETMASK mask nil)))
   (values))
 
 ;;;; etc.
@@ -241,3 +231,28 @@
 ;;; extract si_code from siginfo_t
 (define-alien-routine ("siginfo_code" siginfo-code) int
   (info system-area-pointer))
+
+;;;; On safepoint builds, user-defined Lisp signal handlers all run
+;;;; in one thread that waits for signals.
+;;;; Keyboard interrupts work by forwarding SIGINT from that thread
+;;;; to the foreground thread via INTERRUPT-THREAD, which is the only
+;;;; quasi-asynchronous signal allowed to run in arbitrary threads.
+#+sb-safepoint
+(progn
+(define-load-time-global *sighandler-thread* nil)
+(declaim (type (or sb-thread:thread null) *sighandler-thread*))
+(defun signal-handler-loop ()
+  ;; We could potentially use sigwaitinfo() to obtain more information about the signal,
+  ;; but I don't see the point. This is just minimal functionality.
+  (with-alien ((sigwait (function int system-area-pointer (* int)) :extern "sigwait")
+               (mask (array (unsigned 8) #.sizeof-sigset_t))
+               (num int))
+    (pthread-sigmask SIG_BLOCK nil (alien-sap mask)) ; Retrieve current mask
+    (loop (let ((result (alien-funcall sigwait (alien-sap mask) (addr num))))
+            (when (and (= result 0) (= num sigterm) (not *sighandler-thread*))
+              (return))
+            (when (and (= result 0) (> num 0))
+              (let ((fun (sap-ref-lispobj (foreign-symbol-sap "lisp_sig_handlers" t)
+                                          (ash num sb-vm:word-shift))))
+                (when (functionp fun)
+                  (funcall fun num nil nil)))))))))

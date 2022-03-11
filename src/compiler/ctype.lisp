@@ -34,8 +34,9 @@
 ;;; the function that we use for type checking. The derived type is
 ;;; its first argument and the type we are testing against is its
 ;;; second argument. The function should return values like CSUBTYPEP.
+;;; Can be NIL when no type testing is needed. (When ir1 converting,
+;;; as opposed to checking whether an ir1-transform is applicable.)
 (defvar *ctype-test-fun*)
-;;; FIXME: Why is this a variable? Explain.
 
 ;;; *LOSSAGE-DETECTED* is set when a "definite incompatibility" is
 ;;; detected. *UNWINNAGE-DETECTED* is set when we can't tell whether the
@@ -69,15 +70,6 @@
 
 
 ;;;; stuff for checking a call against a function type
-;;;;
-;;;; FIXME: This is stuff to look at when I get around to fixing
-;;;; function type inference and declarations.
-
-;;; A dummy version of SUBTYPEP useful when we want a functional like
-;;; SUBTYPEP that always returns true.
-(defun always-subtypep (type1 type2)
-  (declare (ignore type1 type2))
-  (values t t))
 
 ;;; Determine whether a use of a function is consistent with its type.
 ;;; These values are returned:
@@ -125,15 +117,16 @@
                (caller (loop for annotation in (lvar-annotations fun)
                              when (typep annotation 'lvar-function-designator-annotation)
                              do (setf *compiler-error-context* annotation)
-                                (return (lvar-function-designator-annotation-caller annotation)))))
+                                (return (lvar-function-designator-annotation-caller annotation))))
+               (name (nth-value 1 (lvar-fun-type fun))))
           (cond
-            ((report-arg-count-mismatch (nth-value 1 (lvar-fun-type fun))
+            ((report-arg-count-mismatch name
                                         caller type nargs nil
                                         :lossage-fun #'note-lossage))
             (t
              (check-fixed-and-rest args (append required optional) rest)
              (when (and keyp
-                        (check-key-args args max-args type))
+                        (check-key-args name args max-args type))
                (setf unknown-keys t))))
 
           (when result-test
@@ -215,7 +208,7 @@
                                   (dsd-default slot))))
                 ;; Return T if value-form definitely does not satisfy
                 ;; the type-check for DSD. Return NIL if we can't decide.
-                (when (if (sb-xc:constantp initform)
+                (when (if (constantp initform)
                           (not (sb-xc:typep (constant-form-value initform)
                                             (dsd-type slot)))
                           ;; Find uses of nil-returning functions as defaults,
@@ -242,21 +235,19 @@ and no value was provided for it." name))))))))))
 (defun check-arg-type (lvar type n)
   (declare (type lvar lvar) (type ctype type) (type index n))
   (cond
-   ((not (constant-type-p type))
-    (let ((ctype (lvar-type lvar)))
-      (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype type)
-        (cond ((not win)
-               (note-unwinnage "can't tell whether the ~:R argument is a ~S"
-                               n (type-specifier type))
-               nil)
-              ((not int)
-               (note-lossage "The ~:R argument is a ~S, not a ~S."
-                             n (type-specifier ctype) (type-specifier type))
-               nil)
-              ((eq ctype *empty-type*)
-               (note-unwinnage "The ~:R argument never returns a value." n)
-               nil)
-              (t t)))))
+    ((not *ctype-test-fun*))
+    ((not (constant-type-p type))
+     (let* ((ctype (lvar-type lvar))
+            (int (funcall *ctype-test-fun* ctype type)))
+       (cond ((not int)
+              (unless (type= ctype (specifier-type '(member dummy)))
+                (note-lossage "The ~:R argument is a ~S, not a ~S."
+                              n (type-specifier ctype) (type-specifier type)))
+              nil)
+             ((eq ctype *empty-type*)
+              (note-unwinnage "The ~:R argument never returns a value." n)
+              nil)
+             (t t))))
     ((not (constant-lvar-p lvar))
      (note-unwinnage "The ~:R argument is not a constant." n)
      nil)
@@ -296,8 +287,9 @@ and no value was provided for it." name))))))))))
 ;;; be known and the corresponding argument should be of the correct
 ;;; type. If the key isn't a constant, then we can't tell, so we can
 ;;; complain about absence of manifest winnage.
-(declaim (ftype (function (list fixnum fun-type) boolean) check-key-args))
-(defun check-key-args (args pre-key type)
+(declaim (ftype (function (t list fixnum fun-type) boolean) check-key-args))
+(defun check-key-args (name args pre-key type)
+  (declare (ignorable name))
   (let (lossages allow-other-keys
         unknown-keys)
     (do ((key (nthcdr pre-key args) (cddr key))
@@ -307,7 +299,9 @@ and no value was provided for it." name))))))))))
       (let ((k (first key))
             (v (second key)))
         (cond
-          ((not (check-arg-type k (specifier-type 'symbol) n)))
+          ((not (types-equal-or-intersect (lvar-type k) (specifier-type 'symbol)))
+           (note-lossage "The ~:R argument of type ~s cannot be used as a keyword."
+                         n (type-specifier (lvar-type k))))
           ((not (constant-lvar-p k))
            (setf unknown-keys t)
            ;; An unknown key may turn out to be :ALLOW-OTHER-KEYS at runtime,
@@ -333,12 +327,18 @@ and no value was provided for it." name))))))))))
                                     (1+ n)))))))))
     (when (and lossages (member allow-other-keys '(nil :no)))
       (setf lossages (nreverse lossages))
-      (if (cdr lossages)
-          (note-lossage "~@<~{~S~^, ~} and ~S are not a known argument keywords.~:@>"
-                        (butlast lossages)
-                        (car (last lossages)))
-          (note-lossage "~S is not a known argument keyword."
-                        (car lossages))))
+
+      (cond #-sb-xc-host
+            ((or (eq (info :function :type name) :generic-function)
+                 (eq (info :function :where-from name) :defined-method))
+             (note-key-arg-mismatch name lossages))
+            ((cdr lossages)
+             (note-lossage "~@<~{~S~^, ~} and ~S are not a known argument keywords.~:@>"
+                           (butlast lossages)
+                           (car (last lossages))))
+            (t
+             (note-lossage "~S is not a known argument keyword."
+                           (car lossages)))))
     unknown-keys))
 
 ;;; Construct a function type from a definition.
@@ -379,9 +379,11 @@ and no value was provided for it." name))))))))))
            :keywords (keys)
            :keyp (optional-dispatch-keyp functional)
            :allowp (optional-dispatch-allowp functional)
-           :returns (tail-set-type
-                     (lambda-tail-set
-                      (optional-dispatch-main-entry functional))))))))
+           :returns (let ((tail-set (lambda-tail-set
+                                     (optional-dispatch-main-entry functional))))
+                      (if tail-set
+                          (tail-set-type tail-set)
+                          *wild-type*)))))))
 
 ;;;; approximate function types
 ;;;;
@@ -398,10 +400,10 @@ and no value was provided for it." name))))))))))
 (defstruct (approximate-fun-type (:copier nil))
   ;; the smallest and largest numbers of arguments that this function
   ;; has been called with.
-  (min-args sb-xc:call-arguments-limit
-            :type (integer 0 #.sb-xc:call-arguments-limit))
+  (min-args call-arguments-limit
+            :type (integer 0 #.call-arguments-limit))
   (max-args 0
-            :type (integer 0 #.sb-xc:call-arguments-limit))
+            :type (integer 0 #.call-arguments-limit))
   ;; a list of lists of the all the types that have been used in each
   ;; argument position
   (types () :type list)
@@ -419,7 +421,7 @@ and no value was provided for it." name))))))))))
   ;; The position at which this keyword appeared. 0 if it appeared as the
   ;; first argument, etc.
   (position (missing-arg)
-            :type (integer 0 #.sb-xc:call-arguments-limit))
+            :type (integer 0 #.call-arguments-limit))
   ;; a list of all the argument types that have been used with this keyword
   (types nil :type list)
   ;; true if this keyword has appeared only in calls with an obvious
@@ -565,23 +567,24 @@ and no value was provided for it." name))))))))))
 (declaim (ftype (function (list ctype string &rest t) (values))
                 check-approximate-arg-type))
 (defun check-approximate-arg-type (call-types decl-type context &rest args)
-  (let ((losers *empty-type*))
-    (dolist (ctype call-types)
-      (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype decl-type)
-        (cond
-         ((not win)
-          (note-unwinnage "can't tell whether previous ~? ~
+  (when *ctype-test-fun*
+    (let ((losers *empty-type*))
+      (dolist (ctype call-types)
+        (multiple-value-bind (int win) (funcall *ctype-test-fun* ctype decl-type)
+          (cond
+            ((not win)
+             (note-unwinnage "can't tell whether previous ~? ~
                            argument type ~S is a ~S"
-                          context
-                          args
-                          (type-specifier ctype)
-                          (type-specifier decl-type)))
-         ((not int)
-          (setq losers (type-union ctype losers))))))
+                             context
+                             args
+                             (type-specifier ctype)
+                             (type-specifier decl-type)))
+            ((not int)
+             (setq losers (type-union ctype losers))))))
 
-    (unless (eq losers *empty-type*)
-      (note-lossage "~:(~?~) argument should be a ~S but was a ~S in a previous call."
-                    context args (type-specifier decl-type) (type-specifier losers))))
+      (unless (eq losers *empty-type*)
+        (note-lossage "~:(~?~) argument should be a ~S but was a ~S in a previous call."
+                      context args (type-specifier decl-type) (type-specifier losers)))))
   (values))
 
 ;;; Check the types of each manifest keyword that appears in a keyword
@@ -652,20 +655,10 @@ and no value was provided for it." name))))))))))
 ;;; defaults. Returning the actual vars allows us to use the right
 ;;; variable name in warnings.
 ;;;
-;;; A slightly subtle point: with keywords and optionals, the type in
-;;; the function type is only an assertion on calls --- it doesn't
-;;; constrain the type of default values. So we have to union in the
-;;; type of the default. With optionals, we can't do any assertion
-;;; unless the default is constant.
-;;;
-;;; With keywords, we exploit our knowledge about how hairy keyword
-;;; defaulting is done when computing the type assertion to put on the
-;;; main-entry argument. In the case of hairy keywords, the default
-;;; has been clobbered with NIL, which is the value of the main-entry
-;;; arg in the unsupplied case, whatever the actual default value is.
-;;; So we can just assume the default is constant, effectively
-;;; unioning in NULL, and not totally blow off doing any type
-;;; assertion.
+;; Despite FTYPE proclamations affecting only the calls and not the
+;; function itself, it would be very weird to see a default of &key or
+;; &optional be different from the proclaimed type. Accept NULL only
+;; when there's no default form.
 (defun find-optional-dispatch-types (od type where)
   (declare (type optional-dispatch od)
            (type fun-type type)
@@ -716,47 +709,50 @@ and no value was provided for it." name))))))))))
             (arglist (optional-dispatch-arglist od)))
         (dolist (arg arglist)
           (cond
-           ((lambda-var-arg-info arg)
-            (let* ((info (lambda-var-arg-info arg))
-                   (default (arg-info-default info))
-                   (def-type (when (sb-xc:constantp default)
-                               (ctype-of (constant-form-value default)))))
-              (ecase (arg-info-kind info)
-                (:keyword
-                 (let* ((key (arg-info-key info))
-                        (kinfo (find key keys :key #'key-info-name)))
-                   (cond
-                    (kinfo
-                     (res (type-union (key-info-type kinfo)
-                                      (or def-type (specifier-type 'null)))))
-                    (t
-                     (note-lossage
-                      "Defining a ~S keyword not present in ~A."
-                      key where)
-                     (res *universal-type*)))))
-                (:required (res (pop type-required)))
-                (:optional
-                 ;; We can exhaust TYPE-OPTIONAL when the type was
-                 ;; simplified as described above.
-                 (res (type-union (or (pop type-optional)
-                                      *universal-type*)
-                                  (or def-type *universal-type*))))
-                (:rest
-                 (when (fun-type-rest type)
-                   (res (specifier-type 'list))))
-                (:more-context
-                 (when (fun-type-rest type)
-                   (res *universal-type*)))
-                (:more-count
-                 (when (fun-type-rest type)
-                   (res (specifier-type 'fixnum)))))
-              (vars arg)
-              (when (arg-info-supplied-p info)
-                (res *universal-type*)
-                (vars (arg-info-supplied-p info)))))
-           (t
-            (res (pop type-required))
-            (vars arg))))
+            ((lambda-var-arg-info arg)
+             (let* ((info (lambda-var-arg-info arg))
+                    (default-p (arg-info-default-p info)))
+               (ecase (arg-info-kind info)
+                 (:keyword
+                  (let* ((key (arg-info-key info))
+                         (kinfo (find key keys :key #'key-info-name)))
+                    (cond
+                      (kinfo
+                       (res (if default-p
+                                (key-info-type kinfo)
+                                (type-union (key-info-type kinfo)
+                                            (specifier-type 'null)))))
+                      (t
+                       (note-lossage
+                        "Defining a ~S keyword not present in ~A."
+                        key where)
+                       (res *universal-type*)))))
+                 (:required (res (pop type-required)))
+                 (:optional
+                  ;; We can exhaust TYPE-OPTIONAL when the type was
+                  ;; simplified as described above.
+                  (res (let ((type (or (pop type-optional)
+                                       *universal-type*)))
+                         (if default-p
+                             type
+                             (type-union type
+                                         (specifier-type 'null))))))
+                 (:rest
+                  (when (fun-type-rest type)
+                    (res (specifier-type 'list))))
+                 (:more-context
+                  (when (fun-type-rest type)
+                    (res *universal-type*)))
+                 (:more-count
+                  (when (fun-type-rest type)
+                    (res (specifier-type 'fixnum)))))
+               (vars arg)
+               (when (arg-info-supplied-p info)
+                 (res *universal-type*)
+                 (vars (arg-info-supplied-p info)))))
+            (t
+             (res (pop type-required))
+             (vars arg))))
 
         (dolist (key keys)
           (unless (find (key-info-name key) arglist
@@ -1148,7 +1144,8 @@ and no value was provided for it." name))))))))))
           ((eq cast-context :ftype)
            (warn condition
                  :format-control
-                 "~@<Derived type of ~S is ~2I~_~S, ~
+                 "~@<Derived type of ~/sb-impl:print-type-specifier/ is ~
+                    ~2I~_~/sb-impl:print-type-specifier/, ~
                     ~I~_conflicting with the declared function return type ~
                     ~2I~_~/sb-impl:print-type-specifier/.~@:>"
                  :format-arguments (list detail dtype atype)))
@@ -1163,7 +1160,8 @@ and no value was provided for it." name))))))))))
                        :format-arguments (list (constant-form-value detail) atype))
                  (warn condition
                        :format-control
-                       "~@<Derived type of ~S is ~2I~_~S, ~
+                       "~@<Derived type of ~/sb-impl:print-type-specifier/ is ~
+                            ~2I~_~/sb-impl:print-type-specifier/, ~
                             ~I~_conflicting with its asserted type ~
                             ~2I~_~/sb-impl:print-type-specifier/.~@:>"
                        :format-arguments (list detail dtype atype)))))
@@ -1177,30 +1175,3 @@ and no value was provided for it." name))))))))))
                       ~2I~_~/sb-impl:print-type-specifier/.~@:>"
                  :format-arguments (list (rest detail) (first detail)
                                          dtype atype))))))
-
-
-(defoptimizer (%compile-time-type-error ir2-convert)
-    ((objects atype dtype detail code-context cast-context) node block)
-  (declare (ignore objects code-context))
-  ;; Remove %COMPILE-TIME-TYPE-ERROR bits
-  (setf (node-source-path node)
-        (cdr (node-source-path node)))
-  (%compile-time-type-error-warn node
-                                 (lvar-value atype)
-                                 (lvar-value dtype)
-                                 (lvar-value detail)
-                                 :cast-context (lvar-value cast-context))
-  (ir2-convert-full-call node block))
-
-(defoptimizer (%compile-time-type-style-warn ir2-convert)
-    ((objects atype dtype detail code-context cast-context) node block)
-  (declare (ignore objects code-context block))
-  ;; Remove %COMPILE-TIME-TYPE-ERROR bits
-  (setf (node-source-path node)
-        (cddr (node-source-path node)))
-  (%compile-time-type-error-warn node
-                                 (lvar-value atype)
-                                 (lvar-value dtype)
-                                 (lvar-value detail)
-                                 :cast-context (lvar-value cast-context)
-                                 :condition 'type-style-warning))

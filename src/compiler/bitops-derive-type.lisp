@@ -17,7 +17,8 @@
 ;;; is T if the integer can be positive (negative) and NIL if not.
 ;;; Zero counts as positive.
 (defun integer-type-length (type)
-  (if (numeric-type-p type)
+  (if (and (numeric-type-p type)
+           (eq (numeric-type-class type) 'integer))
       (let ((min (numeric-type-low type))
             (max (numeric-type-high type)))
         (values (and min max (max (integer-length min) (integer-length max)))
@@ -138,6 +139,12 @@
 (defun logand-derive-type-aux (x y &optional same-leaf)
   (when same-leaf
     (return-from logand-derive-type-aux x))
+  (flet ((minus-one (x y)
+           (when (eql (nth-value 1 (type-singleton-p x))
+                      -1)
+             (return-from logand-derive-type-aux y))))
+    (minus-one x y)
+    (minus-one y x))
   (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
     (declare (ignore x-pos))
     (multiple-value-bind (y-len y-pos y-neg) (integer-type-length y)
@@ -173,34 +180,6 @@
                   (specifier-type `(signed-byte ,(1+ (max x-len y-len))))
                   ;; We can't tell squat about the result.
                   (specifier-type 'integer)))))))
-
-(defun make-modular-fun-type-deriver (prototype kind width signedp)
-  (declare (ignore kind))
-  #-sb-fluid
-  (binding* ((info (info :function :info prototype) :exit-if-null)
-             (fun (fun-info-derive-type info) :exit-if-null)
-             (mask-type (specifier-type
-                         (ecase signedp
-                             ((nil) (let ((mask (1- (ash 1 width))))
-                                      `(integer ,mask ,mask)))
-                             ((t) `(signed-byte ,width))))))
-    (lambda (call)
-      (let ((res (funcall fun call)))
-        (when res
-          (if (eq signedp nil)
-              (logand-derive-type-aux res mask-type))))))
-  #+sb-fluid
-  (lambda (call)
-    (binding* ((info (info :function :info prototype) :exit-if-null)
-               (fun (fun-info-derive-type info) :exit-if-null)
-               (res (funcall fun call) :exit-if-null)
-               (mask-type (specifier-type
-                           (ecase signedp
-                             ((nil) (let ((mask (1- (ash 1 width))))
-                                      `(integer ,mask ,mask)))
-                             ((t) `(signed-byte ,width))))))
-      (if (eq signedp nil)
-          (logand-derive-type-aux res mask-type)))))
 
 (defun logior-derive-unsigned-bounds (x y)
   (let* ((a (numeric-type-low x))

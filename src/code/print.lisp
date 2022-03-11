@@ -13,50 +13,49 @@
 
 ;;;; exported printer control variables
 
-;; NB: all of the following are initialized during genesis
-(defparameter *print-readably* nil
+(defvar *print-readably* nil
   "If true, all objects will be printed readably. If readable printing
   is impossible, an error will be signalled. This overrides the value of
   *PRINT-ESCAPE*.")
-(defparameter *print-escape* t
+(defvar *print-escape* t
   "Should we print in a reasonably machine-readable way? (possibly
   overridden by *PRINT-READABLY*)")
-(defparameter *print-pretty* nil ; (set later when pretty-printer is initialized)
+(defvar *print-pretty* nil ; (set later when pretty-printer is initialized)
   "Should pretty printing be used?")
-(defparameter *print-base* 10.
+(defvar *print-base* 10.
   "The output base for RATIONALs (including integers).")
-(defparameter *print-radix* nil
+(defvar *print-radix* nil
   "Should base be verified when printing RATIONALs?")
-(defparameter *print-level* nil
+(defvar *print-level* nil
   "How many levels should be printed before abbreviating with \"#\"?")
-(defparameter *print-length* nil
+(defvar *print-length* nil
   "How many elements at any level should be printed before abbreviating
   with \"...\"?")
-(defparameter *print-vector-length* nil
+(defvar *print-vector-length* nil
   "Like *PRINT-LENGTH* but works on strings and bit-vectors.
 Does not affect the cases that are already controlled by *PRINT-LENGTH*")
-(defparameter *print-circle* nil
+(defvar *print-circle* nil
   "Should we use #n= and #n# notation to preserve uniqueness in general (and
   circularity in particular) when printing?")
-(defparameter *print-case* :upcase
+(defvar *print-case* :upcase
   "What case should the printer should use default?")
-(defparameter *print-array* t
+(defvar *print-array* t
   "Should the contents of arrays be printed?")
-(defparameter *print-gensym* t
+(defvar *print-gensym* t
   "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
-(defparameter *print-lines* nil
+(defvar *print-lines* nil
   "The maximum number of lines to print per object.")
-(defparameter *print-right-margin* nil
+(defvar *print-right-margin* nil
   "The position of the right margin in ems (for pretty-printing).")
-(defparameter *print-miser-width* nil
+(defvar *print-miser-width* nil
   "If the remaining space between the current column and the right margin
    is less than this, then print using ``miser-style'' output. Miser
    style conditional newlines are turned on, and all indentations are
    turned off. If NIL, never use miser mode.")
 (defvar *print-pprint-dispatch*
-  (sb-pretty::make-pprint-dispatch-table) ; for type-correctness
+  (sb-pretty::make-pprint-dispatch-table #() nil nil)
   "The pprint-dispatch-table that controls how to pretty-print objects.")
-(defparameter *suppress-print-errors* nil
+(defvar *suppress-print-errors* nil
   "Suppress printer errors when the condition is of the type designated by this
 variable: an unreadable object representing the error is printed instead.")
 
@@ -66,6 +65,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
   (declare (dynamic-extent function))
+  (declare (special sb-pretty::*standard-pprint-dispatch-table*))
   (let ((*package* #.(find-package "COMMON-LISP-USER"))
         (*print-array* t)
         (*print-base* 10)
@@ -193,9 +193,8 @@ variable: an unreadable object representing the error is printed instead.")
      (multiple-value-bind (fun pretty)
          (and *print-pretty* (pprint-dispatch object))
        (if pretty
-           (with-simple-output-to-string (stream)
-              (sb-pretty::with-pretty-stream (stream)
-                (funcall fun stream object)))
+           (%with-output-to-string (stream)
+              (sb-pretty:output-pretty-object stream fun object))
            (let ((buffer-size (approx-chars-in-repr object)))
              (let* ((string (make-string buffer-size :element-type 'base-char))
                     (stream (%make-finite-base-string-output-stream string)))
@@ -206,7 +205,7 @@ variable: an unreadable object representing the error is printed instead.")
                                (finite-base-string-output-stream-pointer stream)))))))
     ;; Could do something for other numeric types, symbols, ...
     (t
-     (with-simple-output-to-string (stream)
+     (%with-output-to-string (stream)
        (output-object object stream)))))
 
 ;;; Estimate the number of chars in the printed representation of OBJECT.
@@ -218,7 +217,7 @@ variable: an unreadable object representing the error is printed instead.")
   ;; This is exact for bases which are exactly a power-of-2, or an overestimate
   ;; otherwise, as mandated by the finite output stream.
   (let ((bits-per-char
-         (aref #.(sb-xc:coerce
+         (aref #.(coerce
                   ;; base 2 or base 3  = 1 bit per character
                   ;; base 4 .. base 7  = 2 bits per character
                   ;; base 8 .. base 15 = 3 bits per character, etc
@@ -271,8 +270,7 @@ variable: an unreadable object representing the error is printed instead.")
                    (write-char #\space stream))
                  ;; Nor here.
                  (write-char #\{ stream)
-                 (write (get-lisp-obj-address object) :stream stream
-                                                      :radix nil :base 16)
+                 (%output-integer-in-base (get-lisp-obj-address object) 16 stream)
                  (write-char #\} stream))))
         (cond ((print-pretty-on-stream-p stream)
                ;; Since we're printing prettily on STREAM, format the
@@ -286,6 +284,208 @@ variable: an unreadable object representing the error is printed instead.")
                (print-description)
                (write-char #\> stream)))))
   nil)
+
+
+;;;; circularity detection stuff
+
+;;; When *PRINT-CIRCLE* is T, this gets bound to a hash table that
+;;; (eventually) ends up with entries for every object printed. When
+;;; we are initially looking for circularities, we enter a T when we
+;;; find an object for the first time, and a 0 when we encounter an
+;;; object a second time around. When we are actually printing, the 0
+;;; entries get changed to the actual marker value when they are first
+;;; printed.
+(defvar *circularity-hash-table* nil)
+
+;;; When NIL, we are just looking for circularities. After we have
+;;; found them all, this gets bound to 0. Then whenever we need a new
+;;; marker, it is incremented.
+(defvar *circularity-counter* nil)
+
+;;; Check to see whether OBJECT is a circular reference, and return
+;;; something non-NIL if it is. If ASSIGN is true, reference
+;;; bookkeeping will only be done for existing entries, no new
+;;; references will be recorded. If ASSIGN is true, then the number to
+;;; use in the #n= and #n# noise is assigned at this time.
+;;;
+;;; Note: CHECK-FOR-CIRCULARITY must be called *exactly* once with
+;;; ASSIGN true, or the circularity detection noise will get confused
+;;; about when to use #n= and when to use #n#. If this returns non-NIL
+;;; when ASSIGN is true, then you must call HANDLE-CIRCULARITY on it.
+;;; If CHECK-FOR-CIRCULARITY returns :INITIATE as the second value,
+;;; you need to initiate the circularity detection noise, e.g. bind
+;;; *CIRCULARITY-HASH-TABLE* and *CIRCULARITY-COUNTER* to suitable values
+;;; (see #'OUTPUT-OBJECT for an example).
+;;;
+;;; Circularity detection is done in two places, OUTPUT-OBJECT and
+;;; WITH-CIRCULARITY-DETECTION (which is used from PPRINT-LOGICAL-BLOCK).
+;;; These checks aren't really redundant (at least I can't really see
+;;; a clean way of getting by with the checks in only one of the places).
+;;; This causes problems when mixed with pprint-dispatching; an object is
+;;; marked as visited in OUTPUT-OBJECT, dispatched to a pretty printer
+;;; that uses PPRINT-LOGICAL-BLOCK (directly or indirectly), leading to
+;;; output like #1=#1#. The MODE parameter is used for detecting and
+;;; correcting this problem.
+(defun check-for-circularity (object &optional assign (mode t))
+  (when (null *print-circle*)
+         ;; Don't bother, nobody cares.
+    (return-from check-for-circularity nil))
+  (let ((circularity-hash-table *circularity-hash-table*))
+    (cond
+        ((null circularity-hash-table)
+          (values nil :initiate))
+        ((null *circularity-counter*)
+         (ecase (gethash object circularity-hash-table)
+           ((nil)
+            ;; first encounter
+            (setf (gethash object circularity-hash-table) mode)
+            ;; We need to keep looking.
+            nil)
+           ((:logical-block)
+            (setf (gethash object circularity-hash-table)
+                  :logical-block-circular)
+            t)
+           ((t)
+            (cond ((eq mode :logical-block)
+                   ;; We've seen the object before in output-object, and now
+                   ;; a second time in a PPRINT-LOGICAL-BLOCK (for example
+                   ;; via pprint-dispatch). Don't mark it as circular yet.
+                   (setf (gethash object circularity-hash-table)
+                         :logical-block)
+                   nil)
+                  (t
+                   ;; second encounter
+                   (setf (gethash object circularity-hash-table) 0)
+                   ;; It's a circular reference.
+                   t)))
+           ((0 :logical-block-circular)
+            ;; It's a circular reference.
+            t)))
+        (t
+         (let ((value (gethash object circularity-hash-table)))
+           (case value
+             ((nil t :logical-block)
+              ;; If NIL, we found an object that wasn't there the
+              ;; first time around. If T or :LOGICAL-BLOCK, this
+              ;; object appears exactly once. Either way, just print
+              ;; the thing without any special processing. Note: you
+              ;; might argue that finding a new object means that
+              ;; something is broken, but this can happen. If someone
+              ;; uses the ~@<...~:> format directive, it conses a new
+              ;; list each time though format (i.e. the &REST list),
+              ;; so we will have different cdrs.
+              nil)
+             ;; A circular reference to something that will be printed
+             ;; as a logical block. Wait until we're called from
+             ;; PPRINT-LOGICAL-BLOCK with ASSIGN true before assigning the
+             ;; number.
+             ;;
+             ;; If mode is :LOGICAL-BLOCK and assign is false, return true
+             ;; to indicate that this object is circular, but don't assign
+             ;; it a number yet. This is necessary for cases like
+             ;; #1=(#2=(#2# . #3=(#1# . #3#))))).
+             (:logical-block-circular
+              (cond ((and (not assign)
+                          (eq mode :logical-block))
+                     t)
+                    ((and assign
+                          (eq mode :logical-block))
+                     (let ((value (incf *circularity-counter*)))
+                       ;; first occurrence of this object: Set the counter.
+                       (setf (gethash object circularity-hash-table) value)
+                       value))
+                    (t
+                     nil)))
+             (0
+              (if (eq assign t)
+                  (let ((value (incf *circularity-counter*)))
+                    ;; first occurrence of this object: Set the counter.
+                    (setf (gethash object circularity-hash-table) value)
+                    value)
+                  t))
+             (t
+              ;; second or later occurrence
+              (- value))))))))
+
+;;; Handle the results of CHECK-FOR-CIRCULARITY. If this returns T then
+;;; you should go ahead and print the object. If it returns NIL, then
+;;; you should blow it off.
+(defun handle-circularity (marker stream)
+  (case marker
+    (:initiate
+     ;; Someone forgot to initiate circularity detection.
+     (let ((*print-circle* nil))
+       (error "trying to use CHECK-FOR-CIRCULARITY when ~
+               circularity checking isn't initiated")))
+    ((t :logical-block)
+     ;; It's a second (or later) reference to the object while we are
+     ;; just looking. So don't bother groveling it again.
+     nil)
+    (t
+     (write-char #\# stream)
+     (output-integer (abs marker) stream 10 nil)
+     (cond ((minusp marker)
+            (write-char #\# stream)
+            nil)
+           (t
+            (write-char #\= stream)
+            t)))))
+
+(defmacro with-circularity-detection ((object stream) &body body)
+  (with-unique-names (marker body-name)
+    `(labels ((,body-name ()
+                ,@body))
+       (cond ((or (not *print-circle*)
+                  (uniquely-identified-by-print-p ,object))
+              (,body-name))
+             (*circularity-hash-table*
+              (let ((,marker (check-for-circularity ,object t :logical-block)))
+                (if ,marker
+                    (when (handle-circularity ,marker ,stream)
+                      (,body-name))
+                    (,body-name))))
+             (t
+              (let ((*circularity-hash-table* (make-hash-table :test 'eq)))
+                (output-object ,object *null-broadcast-stream*)
+                (let ((*circularity-counter* 0))
+                  (let ((,marker (check-for-circularity ,object t
+                                                        :logical-block)))
+                    (when ,marker
+                      (handle-circularity ,marker ,stream)))
+                  (,body-name))))))))
+
+;;;; level and length abbreviations
+
+;;; The current level we are printing at, to be compared against
+;;; *PRINT-LEVEL*. See the macro DESCEND-INTO for a handy interface to
+;;; depth abbreviation.
+(defvar *current-level-in-print* 0)
+(declaim (index *current-level-in-print*))
+
+;;; Automatically handle *PRINT-LEVEL* abbreviation. If we are too
+;;; deep, then a #\# is printed to STREAM and BODY is ignored.
+(defmacro descend-into ((stream) &body body)
+  (let ((flet-name (sb-xc:gensym "DESCEND")))
+    `(flet ((,flet-name ()
+              ,@body))
+       (cond ((and (null *print-readably*)
+                   (let ((level *print-level*))
+                     (and level (>= *current-level-in-print* level))))
+              (write-char #\# ,stream))
+             (t
+              (let ((*current-level-in-print* (1+ *current-level-in-print*)))
+                (,flet-name)))))))
+
+;;; Punt if INDEX is equal or larger then *PRINT-LENGTH* (and
+;;; *PRINT-READABLY* is NIL) by outputting \"...\" and returning from
+;;; the block named NIL.
+(defmacro punt-print-if-too-long (index stream)
+  `(when (and (not *print-readably*)
+              (let ((len *print-length*))
+                (and len (>= ,index len))))
+     (write-string "..." ,stream)
+     (return)))
+
 
 ;;;; OUTPUT-OBJECT -- the main entry point
 
@@ -310,8 +510,7 @@ variable: an unreadable object representing the error is printed instead.")
              (multiple-value-bind (fun pretty)
                  (and *print-pretty* (pprint-dispatch object))
                (if pretty
-                   (sb-pretty::with-pretty-stream (stream)
-                     (funcall fun stream object))
+                   (sb-pretty:output-pretty-object stream fun object)
                    (output-ugly-object stream object))))
            (handle-it (stream)
              (if *suppress-print-errors*
@@ -343,7 +542,7 @@ variable: an unreadable object representing the error is printed instead.")
                (if (eq initiate :initiate)
                    (let ((*circularity-hash-table*
                           (make-hash-table :test 'eq)))
-                     (check-it (make-broadcast-stream))
+                     (check-it *null-broadcast-stream*)
                      (let ((*circularity-counter* 0))
                        (check-it stream)))
                    ;; otherwise
@@ -371,18 +570,32 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; just not for OBJECT itself.
 (defun output-ugly-object (stream object)
   (when (%instancep object)
-    (let* ((layout (layout-of object))
-           (classoid (layout-classoid layout)))
-      ;; If an instance has no layout, it has no PRINT-OBJECT method.
-      ;; Additionally, if the object is an obsolete CONDITION, don't crash.
-      ;; (There is no update-instance protocol for conditions)
-      (when (or (sb-kernel::undefined-classoid-p classoid)
-                (and (layout-invalid layout)
-                     (logtest (layout-%bits layout) +condition-layout-flag+)))
-        ;; not only is this unreadable, it's unprintable too.
+    (let ((layout (%instance-layout object)))
+      ;; If an instance has no layout, do something sensible. Can't compare layout
+      ;; to 0 using EQ or EQL because that would be tautologically NIL as per fndb.
+      ;; This is better than declaring EQ or %INSTANCE-LAYOUT notinline.
+      (unless (logtest (get-lisp-obj-address layout) sb-vm:widetag-mask)
         (return-from output-ugly-object
           (print-unreadable-object (object stream :identity t)
-            (format stream "UNPRINTABLE instance of ~W" classoid))))))
+            (prin1 'instance stream))))
+      (let* ((wrapper (layout-friend layout))
+             (classoid (wrapper-classoid wrapper)))
+        ;; Additionally, don't crash if the object is an obsolete thing with
+        ;; no update protocol.
+        (when (or (sb-kernel::undefined-classoid-p classoid)
+                  (and (wrapper-invalid wrapper)
+                       (logtest (layout-flags layout)
+                                (logior +structure-layout-flag+
+                                        +condition-layout-flag+))))
+          (return-from output-ugly-object
+            (print-unreadable-object (object stream :identity t)
+              (format stream "UNPRINTABLE instance of ~W" classoid)))))))
+  (when (funcallable-instance-p object)
+    (let ((layout (%fun-layout object)))
+      (unless (logtest (get-lisp-obj-address layout) sb-vm:widetag-mask)
+        (return-from output-ugly-object
+          (print-unreadable-object (object stream :identity t)
+            (prin1 'funcallable-instance stream))))))
   (print-object object stream))
 
 ;;;; symbols
@@ -393,14 +606,14 @@ variable: an unreadable object representing the error is printed instead.")
       (output-symbol object (sb-xc:symbol-package object) stream)
       ;; Write only the characters of the name, never the package
       (let ((rt *readtable*))
-        (funcall (truly-the function
-                  (choose-symbol-out-fun *print-case* (%readtable-case rt)))
-                 (symbol-name object) stream rt))))
+        (output-symbol-case-dispatch *print-case* (readtable-case rt)
+                                     (symbol-name object) stream rt))))
 
 (defun output-symbol (symbol package stream)
   (let* ((readably *print-readably*)
          (readtable (if readably *standard-readtable* *readtable*))
-         (out-fun (choose-symbol-out-fun *print-case* (%readtable-case readtable))))
+         (print-case *print-case*)
+         (readtable-case (readtable-case readtable)))
     (flet ((output-token (name)
              (declare (type simple-string name))
              (cond ((or (and (readtable-normalization readtable)
@@ -419,7 +632,8 @@ variable: an unreadable object representing the error is printed instead.")
                         (write-char char stream)))
                     (write-char #\| stream))
                    (t
-                    (funcall (truly-the function out-fun) name stream readtable)))))
+                    (output-symbol-case-dispatch print-case readtable-case
+                                                 name stream readtable)))))
       (let ((name (symbol-name symbol))
             (current (sane-package)))
         (cond
@@ -484,20 +698,23 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; For each character, the value of the corresponding element is the
 ;;; lowest base in which that character is a digit.
-(defconstant +digit-bases+
-  #.(let ((a (sb-xc:make-array 128 ; FIXME
+(defconstant-eqx +digit-bases+
+  #.(let ((a (sb-xc:make-array base-char-code-limit
+                               :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 8)
                                :initial-element 36)))
       (dotimes (i 36 a)
         (let ((char (digit-char i 36)))
-          (setf (aref a (sb-xc:char-code char)) i)))))
+          (setf (aref a (char-code char)) i))))
+  #'equalp)
 
-(defconstant +character-attributes+
+(defconstant-eqx +character-attributes+
   #.(let ((a (sb-xc:make-array 160 ; FIXME
+                               :retain-specialization-for-after-xc-core t
                                :element-type '(unsigned-byte 16)
                                :initial-element 0)))
       (flet ((set-bit (char bit)
-               (let ((code (sb-xc:char-code char)))
+               (let ((code (char-code char)))
                  (setf (aref a code) (logior bit (aref a code))))))
 
         (dolist (char '(#\! #\@ #\$ #\% #\& #\* #\= #\~ #\[ #\] #\{ #\}
@@ -507,12 +724,12 @@ variable: an unreadable object representing the error is printed instead.")
         (dotimes (i 10)
           (set-bit (digit-char i) number-attribute))
 
-        (do ((code (sb-xc:char-code #\A) (1+ code))
-             (end (sb-xc:char-code #\Z)))
+        (do ((code (char-code #\A) (1+ code))
+             (end (char-code #\Z)))
             ((> code end))
           (declare (fixnum code end))
-          (set-bit (sb-xc:code-char code) uppercase-attribute)
-          (set-bit (char-downcase (sb-xc:code-char code)) lowercase-attribute))
+          (set-bit (code-char code) uppercase-attribute)
+          (set-bit (char-downcase (code-char code)) lowercase-attribute))
 
         (set-bit #\- sign-attribute)
         (set-bit #\+ sign-attribute)
@@ -525,7 +742,8 @@ variable: an unreadable object representing the error is printed instead.")
         (dotimes (i 160) ; FIXME
           (when (zerop (aref a i))
             (setf (aref a i) funny-attribute))))
-      a))
+      a)
+  #'equalp)
 
 ;;; A FSM-like thingie that determines whether a symbol is a potential
 ;;; number or has evil characters in it.
@@ -560,13 +778,13 @@ variable: an unreadable object representing the error is printed instead.")
                      (< (the fixnum (aref bases code)) base))))
 
     (prog ((len (length name))
-           (attributes +character-attributes+)
-           (bases +digit-bases+)
+           (attributes #.+character-attributes+)
+           (bases #.+digit-bases+)
            (base *print-base*)
            (letter-attribute
-            (case (%readtable-case readtable)
-              (#.+readtable-upcase+ uppercase-attribute)
-              (#.+readtable-downcase+ lowercase-attribute)
+            (case (readtable-case readtable)
+              (:upcase uppercase-attribute)
+              (:downcase lowercase-attribute)
               (t (logior lowercase-attribute uppercase-attribute))))
            (index 0)
            (bits 0)
@@ -690,6 +908,8 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;; case hackery: One of these functions is chosen to output symbol
 ;;;; names according to the values of *PRINT-CASE* and READTABLE-CASE.
 
+(declaim (start-block output-symbol-case-dispatch))
+
 ;;; called when:
 ;;; READTABLE-CASE      *PRINT-CASE*
 ;;; :UPCASE             :UPCASE
@@ -724,7 +944,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun output-capitalize-symbol (pname stream readtable)
   (declare (simple-string pname))
   (let ((prev-not-alphanum t)
-        (up (eql (%readtable-case readtable) +readtable-upcase+)))
+        (up (eq (readtable-case readtable) :upcase)))
     (dotimes (i (length pname))
       (let ((char (char pname i)))
         (write-char (if up
@@ -755,37 +975,23 @@ variable: an unreadable object representing the error is printed instead.")
           (t
            (write-string pname stream)))))
 
-(defun choose-symbol-out-fun (print-case readtable-case)
-  (macrolet
-      ((compute-fun-vector (&aux (vector (make-array 12)))
-         ;; Pack a 2D array of functions into a simple-vector.
-         ;; Major axis is *PRINT-CASE*, minor axis is %READTABLE-CASE.
-         (dotimes (readtable-case-index 4)
-           (dotimes (print-case-index 3)
-             (let ((readtable-case
-                    (elt '(:upcase :downcase :preserve :invert) readtable-case-index))
-                   (print-case
-                    (elt '(:upcase :downcase :capitalize) print-case-index)))
-               (setf (aref vector (logior (ash print-case-index 2)
-                                          readtable-case-index))
-                     (case readtable-case
-                       (:upcase
-                        (case print-case
-                          (:upcase 'output-preserve-symbol)
-                          (:downcase 'output-lowercase-symbol)
-                          (:capitalize 'output-capitalize-symbol)))
-                       (:downcase
-                        (case print-case
-                          (:upcase 'output-uppercase-symbol)
-                          (:downcase 'output-preserve-symbol)
-                          (:capitalize 'output-capitalize-symbol)))
-                       (:preserve 'output-preserve-symbol)
-                       (:invert 'output-invert-symbol))))))
-         `(load-time-value (vector ,@(map 'list (lambda (x) `(function ,x)) vector))
-                           t)))
-    (aref (compute-fun-vector)
-          (logior (case print-case (:upcase 0) (:downcase 4) (t 8))
-                  (truly-the (mod 4) readtable-case)))))
+;;; Call an output function based on PRINT-CASE and READTABLE-CASE.
+(defun output-symbol-case-dispatch (print-case readtable-case name stream readtable)
+  (ecase readtable-case
+    (:upcase
+     (ecase print-case
+       (:upcase (output-preserve-symbol name stream readtable))
+       (:downcase (output-lowercase-symbol name stream readtable))
+       (:capitalize (output-capitalize-symbol name stream readtable))))
+    (:downcase
+     (ecase print-case
+       (:upcase (output-uppercase-symbol name stream readtable))
+       (:downcase (output-preserve-symbol name stream readtable))
+       (:capitalize (output-capitalize-symbol name stream readtable))))
+    (:preserve (output-preserve-symbol name stream readtable))
+    (:invert (output-invert-symbol name stream readtable))))
+
+(declaim (end-block))
 
 ;;;; recursive objects
 
@@ -831,7 +1037,8 @@ variable: an unreadable object representing the error is printed instead.")
                     (write-char #\" stream))
                    (t
                     (write-string vector stream))))
-            ((not (or *print-array* readably))
+            ((or (null (array-element-type vector))
+                 (not (or *print-array* readably)))
              (output-terse-array vector stream))
             ((bit-vector-p vector)
              (cond ((cut-length))
@@ -882,7 +1089,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; Output the printed representation of any array in either the #< or #A
 ;;; form.
 (defmethod print-object ((array array) stream)
-  (if (or *print-array* *print-readably*)
+  (if (and (or *print-array* *print-readably*) (array-element-type array))
       (output-array-guts array stream)
       (output-terse-array array stream)))
 
@@ -890,7 +1097,10 @@ variable: an unreadable object representing the error is printed instead.")
 (defun output-terse-array (array stream)
   (let ((*print-level* nil)
         (*print-length* nil))
-    (print-unreadable-object (array stream :type t :identity t))))
+    (if (and (not (array-element-type array)) *print-readably* *read-eval*)
+        (format stream "#.(~S '~D :ELEMENT-TYPE ~S)"
+                'make-array (array-dimensions array) nil)
+        (print-unreadable-object (array stream :type t :identity t)))))
 
 ;;; Convert an array into a list that can be used with MAKE-ARRAY's
 ;;; :INITIAL-CONTENTS keyword argument.
@@ -972,23 +1182,8 @@ variable: an unreadable object representing the error is printed instead.")
                 (2 #\b)
                 (8 #\o)
                 (16 #\x)
-                (t (%output-reasonable-integer-in-base base 10 stream)
-                   #\r))
+                (t (%output-integer-in-base base 10 stream) #\r))
               stream))
-
-(defun %output-reasonable-integer-in-base (n base stream)
-  (multiple-value-bind (q r)
-      (truncate n base)
-    ;; Recurse until you have all the digits pushed on
-    ;; the stack.
-    (unless (zerop q)
-      (%output-reasonable-integer-in-base q base stream))
-    ;; Then as each recursive call unwinds, turn the
-    ;; digit (in remainder) into a character and output
-    ;; the character.
-    (write-char
-     (schar "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" r)
-     stream)))
 
 ;;; *POWER-CACHE* is an alist mapping bases to power-vectors. It is
 ;;; filled and probed by POWERS-FOR-BASE. SCRUB-POWER-CACHE is called
@@ -1071,17 +1266,111 @@ variable: an unreadable object representing the error is printed instead.")
                         (bisect r k (or exactp (plusp q))))))))
       (bisect n k-start nil))))
 
+;;; Not all architectures can stack-allocate lisp strings,
+;;; but we can fake it using aliens.
+;;; %output-integer-in-base always needs 8 lispwords:
+;;;  if n-word-bytes = 4 then 8 * 4 = 32 characters
+;;;  if n-word-bytes = 8 then 8 * 8 = 64 characters
+;;; This allows for output in base 2 worst case.
+;;; We don't need a trailing null.
+(defmacro with-lisp-string-on-alien-stack ((string size-in-chars) &body body)
+  (let ((size-in-lispwords ; +2 words for lisp string header
+          (+ 2 (align-up (ceiling (symbol-value size-in-chars) sb-vm:n-word-bytes)
+                         2)))
+        (alien '#:a)
+        (sap '#:sap))
+    ;; +1 is for alignment if needed
+    `(with-alien ((,alien (array unsigned ,(1+ size-in-lispwords))))
+       (let ((,sap (alien-sap ,alien)))
+         (when (logtest (sap-int ,sap) sb-vm:lowtag-mask)
+           (setq ,sap (sap+ ,sap sb-vm:n-word-bytes)))
+         (setf (sap-ref-word ,sap 0) sb-vm:simple-base-string-widetag
+               (sap-ref-word ,sap sb-vm:n-word-bytes) (ash sb-vm:n-word-bits
+                                                           sb-vm:n-fixnum-tag-bits))
+         (let ((,string
+                (truly-the simple-base-string
+                           (%make-lisp-obj (logior (sap-int ,sap)
+                                                   sb-vm:other-pointer-lowtag)))))
+           ,@body)))))
+
+;;; Using specialized routines for the various cases seems to work nicely.
+;;;
+;;; Testing with 100,000 random integers, output to a sink stream, x86-64:
+;;; word-sized integers, base >= 10
+;;;   old=.062 sec, 4MiB consed; new=.031 sec, 0 bytes consed
+;;; word-sized integers, base < 10
+;;;   old=.104 sec, 4MiB consed; new=.075 sec, 0 bytes consed
+;;; bignums in base 16:
+;;;   old=.125 sec, 20 MiB consed; new=.08 sec, 0 bytes consed
+;;;
+;;; Not sure why this didn't reduce consing on ppc64 when I tried it.
 (defun %output-integer-in-base (integer base stream)
+  (declare (type (integer 2 36) base))
   (when (minusp integer)
     (write-char #\- stream)
     (setf integer (- integer)))
-  ;; The ideal cutoff point between these two algorithms is almost
-  ;; certainly quite platform dependent: this gives 87 for 32 bit
-  ;; SBCL, which is about right at least for x86/Darwin.
-  (if (or (fixnump integer)
-          (< (integer-length integer) (* 3 sb-vm:n-positive-fixnum-bits)))
-      (%output-reasonable-integer-in-base integer base stream)
-      (%output-huge-integer-in-base integer base stream)))
+  ;; Grrr - a LET binding here causes a constant-folding problem
+  ;;   "The function SB-KERNEL:SIMPLE-CHARACTER-STRING-P is undefined."
+  ;; but a symbol-macrolet is ok. This is a FIXME except I don't care.
+  (symbol-macrolet ((chars "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+    (declare (optimize (sb-c:insert-array-bounds-checks 0) speed))
+    (macrolet ((iterative-algorithm ()
+                 `(loop (multiple-value-bind (q r)
+                            (truncate (truly-the word integer) base)
+                          (decf ptr)
+                          (setf (aref buffer ptr) (schar chars r))
+                          (when (zerop (setq integer q)) (return)))))
+               (recursive-algorithm (dividend-type)
+                 `(named-let recurse ((n integer))
+                    (multiple-value-bind (q r) (truncate (truly-the ,dividend-type n) base)
+                      ;; Recurse until you have all the digits pushed on
+                      ;; the stack.
+                      (unless (zerop q) (recurse q))
+                      ;; Then as each recursive call unwinds, turn the
+                      ;; digit (in remainder) into a character and output
+                      ;; the character.
+                      (write-char (schar chars r) stream)))))
+      (cond ((typep integer 'word) ; Division vops can handle this all inline.
+             #+(and gencgc c-stack-is-control-stack) ; strings can be DX
+             ;; For bases exceeding 10 we know how many characters (at most)
+             ;; will be output. This allows for a single %WRITE-STRING call.
+             ;; There's diminishing payback for other bases because the fixed array
+             ;; size increases, and we don't have a way to elide initial 0-fill.
+             ;; Calling APPROX-CHARS-IN-REPL doesn't help much - we still 0-fill.
+             (if (< base 10)
+                 (recursive-algorithm word)
+                 (let* ((ptr #.(length (write-to-string sb-ext:most-positive-word
+                                                        :base 10)))
+                        (buffer (make-array ptr :element-type 'base-char)))
+                   (declare (truly-dynamic-extent buffer))
+                   (iterative-algorithm)
+                   (%write-string buffer stream ptr (length buffer))))
+             #-(and gencgc c-stack-is-control-stack) ; strings can not be DX
+             ;; Use the alien stack, which is not as fast as using the control stack
+             ;; (when we can). Even the absence of 0-fill doesn't make up for it.
+             ;; Since we've no choice in the matter, might as well allow
+             ;; any value of BASE - it's just a few more words of storage.
+             (let ((ptr sb-vm:n-word-bits))
+               (with-lisp-string-on-alien-stack (buffer sb-vm:n-word-bits)
+                 (iterative-algorithm)
+                 (%write-string buffer stream ptr sb-vm:n-word-bits))))
+            ((eql base 16)
+             ;; No division is involved at all.
+             ;; could also specialize for bases 32, 8, 4, and 2 if desired
+             (loop for pos from (* 4 (1- (ceiling (integer-length integer) 4)))
+                   downto 0 by 4
+                   do (write-char (schar chars (sb-bignum::ldb-bignum=>fixnum 4 pos
+                                                                              integer))
+                                  stream)))
+            ;; The ideal cutoff point between this and the "huge" algorithm
+            ;; might be platform-specific, and it also could depend on the output base.
+            ;; Nobody has cared to tweak it in so many years that I think we can
+            ;; arbitrarily say 3 bigdigits is fine.
+            ((<= (sb-bignum:%bignum-length (truly-the bignum integer)) 3)
+             (recursive-algorithm integer))
+            (t
+             (%output-huge-integer-in-base integer base stream)))))
+  nil)
 
 ;;; This gets both a method and a specifically named function
 ;;; since the latter is called from a few places.
@@ -1265,8 +1554,14 @@ variable: an unreadable object representing the error is printed instead.")
             (double-float double-float-min-e)
             #+long-float
             (long-float long-float-min-e))))
-    (multiple-value-bind (f e)
-        (integer-decode-float float)
+    (multiple-value-bind (f e) (integer-decode-float float)
+      ;; An extra step became necessary here for subnormals because the
+      ;; algorithm assumes that the fraction is left-aligned in a field
+      ;; that is FLOAT-DIGITS wide.
+      (when (< (float-precision float) float-digits)
+        (let ((shift (- float-digits (integer-length f))))
+          (setq f (ash f shift)
+                e (- e shift))))
       (let ( ;; FIXME: these even tests assume normal IEEE rounding
             ;; mode.  I wonder if we should cater for non-normal?
             (high-ok (evenp f))
@@ -1606,7 +1901,7 @@ variable: an unreadable object representing the error is printed instead.")
                       (write-string ", " stream)
                       (output-object (sb-c::debug-info-name dinfo) stream)))))))))
 
-#-(or x86 x86-64)
+#-(or x86 x86-64 arm64 riscv)
 (defmethod print-object ((lra lra) stream)
   (print-unreadable-object (lra stream :identity t)
     (write-string "return PC object" stream)))
@@ -1715,9 +2010,9 @@ variable: an unreadable object representing the error is printed instead.")
     ;; ":TYPE T" is no good, since CLOSURE doesn't have full-fledged status.
     (print-unreadable-object (object stream :identity (not proper-name-p))
       (format stream "~A~@[ ~S~]"
-              ;; TYPE-OF is so that GFs print as #<STANDARD-GENERIC-FUNCTION>
-              ;; and not #<FUNCTION> before SRC;PCL;PRINT-OBJECT is loaded.
-              (if (closurep object) 'closure (type-of object))
+              ;; CLOSURE and SIMPLE-FUN should print as #<FUNCTION>
+              ;; but anything else prints as its exact type.
+              (if (funcallable-instance-p object) (type-of object) 'function)
               name))))
 
 ;;;; catch-all for unknown things
@@ -1730,6 +2025,9 @@ variable: an unreadable object representing the error is printed instead.")
     ;; If specifically the unbound marker with 0 data,
     ;; as opposed to any other unbound marker.
     (print-unreadable-object (object stream) (write-string "unbound" stream))
+    (return-from print-object))
+  (when (eql (get-lisp-obj-address object) sb-vm:no-tls-value-marker-widetag)
+    (print-unreadable-object (object stream) (write-string "novalue" stream))
     (return-from print-object))
   (print-unreadable-object (object stream :identity t)
     (let ((lowtag (lowtag-of object)))

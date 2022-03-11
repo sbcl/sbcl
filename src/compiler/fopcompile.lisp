@@ -36,15 +36,7 @@
 ;;; since PROCESS-TOPLEVEL-FORM only expands the macros at the first
 ;;; position.
 
-(flet ((setq-fopcompilable-p (args)
-         (loop for (name value) on args by #'cddr
-               always (and (symbolp name)
-                           (member (info :variable :kind name)
-                                   '(:special :global))
-                           (fopcompilable-p value)))))
-
- #-sb-xc-host
- (defun fopcompilable-p (form &optional (expand t))
+(defun fopcompilable-p (form &optional (expand t))
   ;; We'd like to be able to handle
   ;;   -- simple funcalls, nested recursively, e.g.
   ;;      (SET '*PACKAGE* (FIND-PACKAGE "CL-USER"))
@@ -62,10 +54,6 @@
   ;; Special forms which we don't currently handle, but might consider
   ;; supporting in the future are LOCALLY (with declarations),
   ;; MACROLET, SYMBOL-MACROLET and THE.
-  ;; Also, if (FLET ((F () ...)) (DEFUN A () ...) (DEFUN B () ...))
-  ;; were handled, then it would probably automatically work in
-  ;; the cold loader too, providing definitions for A and B before
-  ;; executing all other toplevel forms.
   (flet ((expand (form)
            (if expand
                (handler-case
@@ -129,7 +117,11 @@
                              (every #'fopcompilable-p args)))
                        ;; Allow SETQ only on special or global variables
                        ((setq)
-                        (setq-fopcompilable-p args))
+                        (loop for (name value) on args by #'cddr
+                              always (and (symbolp name)
+                                          (member (info :variable :kind name)
+                                                  '(:special :global))
+                                          (fopcompilable-p value))))
                        ;; The real toplevel form processing has already been
                        ;; done, so EVAL-WHEN handling will be easy.
                        ((eval-when)
@@ -164,55 +156,6 @@
                              (not (special-operator-p operator))
                              (not (macro-function operator)) ; redundant check
                              (every #'fopcompilable-p args)))))))))))
-
- ;; Special version of FOPCOMPILABLE-P which recognizes toplevel calls
- ;; that the cold loader is able to perform in the host to create the
- ;; desired effect upon the target core.
- ;; If an effect should occur "sooner than cold-init",
- ;; this is probably where you need to make it happen.
- #+sb-xc-host
- (defun fopcompilable-p (form &optional (expand t))
-   (declare (ignore expand))
-   (or (and (self-evaluating-p form)
-            (constant-fopcompilable-p form))
-       ;; Arbitrary computed constants aren't supported because we don't know
-       ;; where in FOPCOMPILE's recursion it should stop recursing and just dump
-       ;; whatever the constant piece is. For example in (cons `(a ,(+ 1 2)) (f))
-       ;; the CAR is built wholly from foldable operators but the CDR is not.
-       ;; Constant symbols and QUOTE forms are generally fine to use though.
-       (and (symbolp form)
-            (eq (info :variable :kind form) :constant))
-       (and (typep form '(cons (eql quote) (cons t null)))
-            (constant-fopcompilable-p (constant-form-value form)))
-       (and (listp form)
-            (let ((function (car form)))
-              ;; Certain known functions have a special way of checking
-              ;; their fopcompilability in the cross-compiler.
-              (or ;; allow %DEFUN, also ensuring that any inline lambda gets
-                  ;; its constant structures (possibly containing COMMAs) noted
-                  ;; as dumpable literals.
-                  (and (eq function 'sb-impl::%defun) (fopcompilable-p (fourth form)))
-                  (member function '(sb-pcl::!trivial-defmethod
-                                     sb-kernel::%defstruct))
-                  ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
-                  (and (member function '(%defconstant sb-impl::%defparameter))
-                       (fopcompilable-p (third form)))
-                  (and (symbolp function) ; no ((lambda ...) ...)
-                       (get-properties (symbol-plist function)
-                                       '(:sb-cold-funcall-handler/for-effect
-                                         :sb-cold-funcall-handler/for-value)))
-                  (and (eq function 'setf)
-                       (fopcompilable-p (%macroexpand form *lexenv*)))
-                  (and (eq function 'sb-kernel:%svset)
-                       (destructuring-bind (thing index value) (cdr form)
-                         (and (symbolp thing)
-                              (integerp index)
-                              (eq (info :variable :kind thing) :global)
-                              (typep value
-                                     '(cons (member lambda function named-lambda))))))
-                  (and (eq function 'setq)
-                       (setq-fopcompilable-p (cdr form))))))))
-) ; end FLET
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
@@ -251,19 +194,6 @@
        (member (car form)
                '(lambda named-lambda lambda-with-lexenv))))
 
-;;; Return T if and only if OBJ's nature as an externalizable thing renders
-;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
-;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
-(defun dumpable-leaflike-p (obj)
-  (or (sb-xc:typep obj '(or symbol number character unboxed-array
-                            debug-name-marker
-                            #+sb-simd-pack simd-pack
-                            #+sb-simd-pack-256 simd-pack-256))
-      ;; The cross-compiler wants to dump CTYPE instances as leaves,
-      ;; but CLASSOIDs are excluded since they have a MAKE-LOAD-FORM method.
-      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))
-      (sb-fasl:dumpable-layout-p obj)))
-
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
 ;;; In particular, pathnames are not trivially dumpable because the HOST slot
@@ -275,7 +205,7 @@
 (defun constant-fopcompilable-p (constant)
   (declare (optimize (debug 1))) ;; TCO
   (let ((xset (alloc-xset))
-        (dumpable-instances))
+        (dumpable-structures))
     (named-let grovel ((value constant))
       ;; Unless VALUE is an object which which obviously
       ;; can't contain other objects
@@ -315,11 +245,11 @@
              (return-from constant-fopcompilable-p nil))
            (do-instance-tagged-slot (i value)
              (grovel (%instance-ref value i)))
-           (push value dumpable-instances))
+           (push value dumpable-structures))
           (t
            (return-from constant-fopcompilable-p nil)))))
-    (dolist (instance dumpable-instances)
-      (fasl-note-dumpable-instance instance *compile-object*))
+    (dolist (structure dumpable-structures)
+      (fasl-validate-structure structure *compile-object*))
     t))
 
 ;;; FOR-VALUE-P is true if the value will be used (i.e., pushed onto
@@ -357,19 +287,20 @@
                        (fopcompile `(symbol-global-value ',form) path for-value-p))
                       (t
                        ;; Lexical
-                       (let* ((lambda-var (cdr (assoc form (lexenv-vars *lexenv*))))
-                              (handle (when lambda-var
-                                        (lambda-var-fop-value lambda-var))))
+                       (let* ((var (cdr (assoc form (lexenv-vars *lexenv*))))
+                              (handle (and (lambda-var-p var)
+                                           (leaf-info var))))
                          (cond (handle
-                                (setf (lambda-var-ever-used lambda-var) t)
+                                (setf (lambda-var-ever-used var) t)
                                 (when for-value-p
                                   (sb-fasl::dump-push handle fasl)))
                                (t
-                                ;; Undefined variable. Signal a warning, and
-                                ;; treat it as a special variable reference, like
-                                ;; the real compiler does -- do not elide even if
-                                ;; the value is unused.
-                                (note-undefined-reference form :variable)
+                                (unless var
+                                  ;; Undefined variable. Signal a warning, and
+                                  ;; treat it as a special variable reference, like
+                                  ;; the real compiler does -- do not elide even if
+                                  ;; the value is unused.
+                                  (note-undefined-reference form :variable))
                                 (fopcompile `(symbol-value ',form)
                                             path
                                             for-value-p))))))))))
@@ -417,7 +348,7 @@
                            (loop for (arg . next) on args
                              do (fopcompile arg path
                                             (if next nil for-value-p)))))
-                      ((setq #+sb-xc-host sb-fasl::setq-no-questions-asked)
+                      ((setq)
                        (if (and for-value-p (endp args))
                            (fopcompile nil path t)
                            (loop for (name value . next) on args by #'cddr
@@ -448,7 +379,7 @@
                                (let* ((obj (sb-fasl::dump-pop fasl))
                                       (var (make-lambda-var
                                             :%source-name name
-                                            :fop-value obj)))
+                                            :info obj)))
                                  (push var vars)
                                  (setf *lexenv*
                                        (make-lexenv
@@ -461,12 +392,13 @@
                                   (*compiler-error-context*
                                     (make-compiler-error-context
                                      :original-form form
-                                     :file-name (file-info-name file-info)
+                                     :file-name (file-info-truename file-info)
                                      :initialized t
                                      :file-position
                                      (nth-value 1 (find-source-root tlf *source-info*))
                                      :original-source-path (source-path-original-source path)
-                                     :lexenv *lexenv*)))
+                                     :handled-conditions
+                                     (lexenv-handled-conditions *lexenv*))))
                              (note-unreferenced-vars vars *policy*)))))
                       ;; Otherwise it must be an ordinary funcall.
                       (otherwise

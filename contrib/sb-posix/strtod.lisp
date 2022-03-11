@@ -28,7 +28,7 @@ and a secondary value, the number of characters consumed."
     (when (typep string 'base-string)
       (sb-kernel:with-array-data ((data string) (start) (end) :check-fill-pointer t)
         (when (eql (locally
-                    (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+                    (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                     (schar data (1+ end))) #\Nul)
           (return-from strtod (strtod/base-string data start)))))
     ;; Short simple non-base string, or base-string w/o a null in the right place

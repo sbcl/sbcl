@@ -33,14 +33,8 @@
 (deftransform make-symbol ((string) (simple-string))
   `(%make-symbol 0 string))
 
-#-immobile-space
-(define-source-transform %make-symbol (kind string)
-  (declare (ignore kind))
-  ;; Set "logically read-only" bit in pname.
-  `(sb-vm::%%make-symbol (set-header-data ,string ,sb-vm:+vector-shareable+)))
-
 ;;; We don't want to clutter the bignum code.
-#+(or x86 x86-64)
+#+(and (or x86 x86-64) (not bignum-assertions))
 (define-source-transform sb-bignum:%bignum-ref (bignum index)
   ;; KLUDGE: We use TRULY-THE here because even though the bignum code
   ;; is (currently) compiled with (SAFETY 0), the compiler insists on
@@ -55,6 +49,15 @@
 #+(or x86 x86-64)
 (defun fold-index-addressing (fun-name element-size lowtag data-offset
                               index offset &optional setter-p)
+  ;; UNINITIALIZED-ELEMENT-ERROR does not take the ADDEND,
+  ;; so we need to make sure that it's always 0 for #+ubsan.
+  ;; #-ubsan has a minor problem in terms of error-reporting.
+  ;; The condition report method does not try to show the index of the
+  ;; trapping element, so we're at least not wrong. A good solution might be
+  ;; to have separate 2-arg and 3-arg variants of UNINITIALIZED-ELEMENT,
+  ;; or else always emit the addend even if zero. As things are, a 0 in the
+  ;; error payload eats 4 bytes due to design choices in sc+offset encoding.
+  #+ubsan (give-up-ir1-transform)
   (multiple-value-bind (func index-args) (extract-fun-args index '(+ -) 2)
     (destructuring-bind (x constant) index-args
       (unless (and (constant-lvar-p constant)
@@ -84,19 +87,90 @@
                          sb-vm:bignum-digits-offset
                          index offset))
 
-;;; The layout is stored in slot 0.
-;;; *** These next two transforms should be the only code, aside from
-;;;     some parts of the C runtime, with knowledge of the layout index.
+(defun dd-contains-raw-slots-p (dd)
+  (dolist (dsd (dd-slots dd))
+    (unless (eq (dsd-raw-type dsd) t) (return t))))
+
+(deftransform copy-structure ((instance) * * :result result :node node)
+  (let* ((classoid (lvar-type instance))
+         (name (and (structure-classoid-p classoid) (classoid-name classoid)))
+         (layout (and name
+                      (sb-kernel::compiler-layout-ready-p name)
+                      (sb-kernel::compiler-layout-or-lose name)))
+         ;; CLASS-EQ is T if the layout at runtime will be EQ to the
+         ;; layout of the specified type, and not that of a subtype thereof.
+         (class-eq (and name
+                        (eq (classoid-state classoid) :sealed)
+                        (not (classoid-subclasses classoid))))
+         (dd (and class-eq (wrapper-info layout)))
+         (max-inlined-words 5))
+    (unless (and result ; could be unused result (but entire call wasn't flushed?)
+                 layout
+                 ;; And don't copy if raw slots are present on the precisely GCed backends.
+                 ;; To enable that, we'd want variants for {"all-raw", "all-boxed", "mixed"}
+                 ;; Also note that VAR-ALLOC can not cope with dynamic-extent except where
+                 ;; support has been added (x86oid so far); so requiring an exact type here
+                 ;; causes VAR-ALLOC to become FIXED-ALLOC which works on more architectures.
+                 #-c-stack-is-control-stack (and dd (not (dd-contains-raw-slots-p dd)))
+
+                 ;; Definitely do this if copying to stack
+                 (or (lvar-dynamic-extent result)
+                     ;; Or if it's a small fixed number of words
+                     ;; and speed at least as important as size.
+                     (and class-eq
+                          (<= (dd-length dd) max-inlined-words)
+                          (policy node (>= speed space)))))
+      (give-up-ir1-transform))
+    ;; There are some benefits to using the simple case for a known exact type:
+    ;; - the layout can be wired in which might or might not save 1 instruction
+    ;;   depending on whether layouts are in immobile space.
+    ;; - for a small number of slots, copying them is inlined
+    (cond ((not dd) ; it's going to be some subtype of NAME
+           `(%copy-instance (%make-instance (%instance-length instance)) instance))
+          ((<= (dd-length dd) max-inlined-words)
+           `(let ((copy (%make-structure-instance ,dd nil)))
+              ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,
+              ;; or the GC will treat random bit patterns as conservative pointers
+              ;; (i.e. not alter them if %INSTANCE-REF is not the correct accessor)
+              ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
+                      collect `(%instance-set copy ,i (%instance-ref instance ,i)))
+              copy))
+          (t
+           `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)))))
+
+(defun varying-length-struct-p (classoid)
+  ;; This is a nice feature to have in general, but at present it is only possible
+  ;; to make varying length instances of SB-VM:LAYOUT (or WRAPPER if that is the same type),
+  ;; and nothing else.
+  (eq classoid (load-time-value (find-classoid #+metaspace 'sb-vm:layout
+                                               #-metaspace 'wrapper))))
+
+(deftransform %instance-length ((instance))
+  (let ((classoid (lvar-type instance)))
+    (if (and (structure-classoid-p classoid)
+             (sb-kernel::compiler-layout-ready-p (classoid-name classoid))
+             (eq (classoid-state classoid) :sealed)
+             (not (varying-length-struct-p classoid))
+             ;; TODO: if sealed with subclasses which add no slots, use the fixed length
+             (not (classoid-subclasses classoid)))
+        (dd-length (wrapper-dd (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
+        (give-up-ir1-transform))))
+
+(define-source-transform %instance-wrapper (x) `(layout-friend (%instance-layout ,x)))
+(define-source-transform %fun-wrapper (x) `(layout-friend (%fun-layout ,x)))
+
+;;; *** These transforms should be the only code, aside from the C runtime
+;;;     with knowledge of the layout index.
+#+compact-instance-header
+(define-source-transform function-with-layout-p (x) `(functionp ,x))
 #-compact-instance-header
 (progn
   (define-source-transform %instance-layout (x)
-    `(truly-the layout (%instance-ref ,x 0)))
-  (define-source-transform %set-instance-layout (x val)
-    `(%instance-set ,x 0 (the layout ,val)))
-  (define-source-transform %funcallable-instance-layout (x)
-    `(truly-the layout (%funcallable-instance-info ,x 0)))
-  (define-source-transform %set-funcallable-instance-layout (x val)
-    `(setf (%funcallable-instance-info ,x 0) (the layout ,val))))
+    `(truly-the sb-vm:layout (%instance-ref ,x 0)))
+  (define-source-transform %set-instance-layout (instance layout)
+    `(%instance-set ,instance 0 (the sb-vm:layout ,layout)))
+  (define-source-transform function-with-layout-p (x)
+    `(funcallable-instance-p ,x)))
 
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 
@@ -110,9 +184,7 @@
            (data-vector-ref string index))
           #+sb-unicode
           ((simple-array base-char (*))
-           (data-vector-ref string index))
-          ((simple-array nil (*))
-           (data-nil-vector-ref string index))))))
+           (data-vector-ref string index))))))
 
 ;;; This and the corresponding -SET transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
@@ -122,7 +194,7 @@
   "avoid runtime dispatch on array element type"
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
-         (declared-element-ctype (array-type-declared-element-type type)))
+         (declared-element-ctype (declared-array-element-type type)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform
@@ -141,8 +213,7 @@
                   ((type= element-ctype declared-element-ctype)
                    bare-form)
                   (t
-                   `(the ,(type-specifier declared-element-ctype)
-                         ,bare-form))))))))
+                   (the-unwild declared-element-ctype bare-form))))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
@@ -195,16 +266,18 @@
     (if (array-type-p ctype)
         ;; the other transform will kick in, so that's OK
         (give-up-ir1-transform)
+        ;; HAIRY-DATA-VECTOR-SET returns a value but DATA-VECTOR-SET does not,
+        ;; so explicitly return the NEW-VALUE
         `(typecase string
            ((simple-array character (*))
-            (data-vector-set string index (the* (character :context :aref) new-value)))
+            (let ((c (the* (character :context :aref) new-value)))
+              (data-vector-set string index c)
+              c))
            #+sb-unicode
            ((simple-array base-char (*))
-            (data-vector-set string index (the* (base-char :context :aref
-                                                           :silent-conflict t)
-                                                new-value)))
-           (t
-            (%type-check-error/c string 'nil-array-accessed-error nil))))))
+            (let ((c (the* (base-char :context :aref :silent-conflict t) new-value)))
+              (data-vector-set string index c)
+              c))))))
 
 ;;; This and the corresponding -REF transform work equally well on non-simple
 ;;; arrays, but after benchmarking (on x86), Nikodemus didn't find any cases
@@ -216,7 +289,7 @@
   "avoid runtime dispatch on array element type"
   (let* ((type (lvar-type array))
          (element-ctype (array-type-upgraded-element-type type))
-         (declared-element-ctype (array-type-declared-element-type type)))
+         (declared-element-ctype (declared-array-element-type type)))
     (declare (type ctype element-ctype))
     (when (eq *wild-type* element-ctype)
       (give-up-ir1-transform
@@ -227,11 +300,11 @@
          (declare (type (simple-array ,element-type-specifier 1) array)
                   (type ,element-type-specifier new-value))
          ,(if (type= element-ctype declared-element-ctype)
-              '(data-vector-set array index new-value)
-              `(truly-the ,(type-specifier declared-element-ctype)
-                 (data-vector-set array index
-                  (the ,(type-specifier declared-element-ctype)
-                       new-value))))))))
+              '(progn (data-vector-set array index new-value)
+                      new-value)
+              `(progn (data-vector-set array index
+                       ,(the-unwild declared-element-ctype 'new-value))
+                      ,(truly-the-unwild declared-element-ctype 'new-value)))))))
 
 ;;; Transform multi-dimensional array to one dimensional data vector
 ;;; access.
@@ -323,7 +396,7 @@
                 ,(if (and (integer-type-p index-type)
                           (numeric-type-low index-type))
                      `(integer ,(numeric-type-low index-type)
-                               (,sb-xc:array-dimension-limit))
+                               (,array-dimension-limit))
                      `index))))))
 
 (deftransform %data-vector-and-index ((%array %index)
@@ -352,52 +425,37 @@
 ;;;; BIT-VECTOR hackery
 
 ;;; SIMPLE-BIT-VECTOR bit-array operations are transformed to a word
-;;; loop that does 32 bits at a time.
-;;;
-;;; FIXME: This is a lot of repeatedly macroexpanded code. It should
-;;; be a function call instead.
-(macrolet ((def (bitfun wordfun)
-             `(deftransform ,bitfun ((bit-array-1 bit-array-2 result-bit-array)
-                                     (simple-bit-vector
-                                      simple-bit-vector
-                                      simple-bit-vector)
-                                     *
-                                     :node node :policy (>= speed space))
-                `(progn
-                   ,@(unless (policy node (zerop safety))
-                             '((unless (= (length bit-array-1)
-                                          (length bit-array-2)
-                                          (length result-bit-array))
-                                 (error "Argument and/or result bit arrays are not the same length:~
+;;; loop that does N-WORD-BITS bits at a time.
+;;; Note that all of these array operations cause the unused bits
+;;; of the last word to be operated on, so they are effectively
+;;; in an indeterminate state which is why equality testing, COUNT,
+;;; and FIND have to ignore them.
+(deftransform bit-op->word-op ((bit-array-1 bit-array-2 result-bit-array)
+                               (simple-bit-vector simple-bit-vector simple-bit-vector)
+                               *
+                               :node node :defun-only t :info wordfun)
+  `(let ((length (vector-length result-bit-array)))
+     ,@(unless (policy node (zerop safety))
+         `((unless (= length
+                      ,@(unless (same-leaf-ref-p bit-array-1 result-bit-array)
+                          '((vector-length bit-array-1)))
+                      (vector-length bit-array-2))
+             (error "Argument and/or result bit arrays are not the same length:~
                          ~%  ~S~%  ~S  ~%  ~S"
-                                        bit-array-1
-                                        bit-array-2
-                                        result-bit-array))))
-                  (let ((length (length result-bit-array)))
-                    (if (= length 0)
-                        ;; We avoid doing anything to 0-length
-                        ;; bit-vectors, or rather, the memory that
-                        ;; follows them. Other divisible-by-32 cases
-                        ;; are handled by the (1- length), below.
-                        ;; CSR, 2002-04-24
-                        result-bit-array
-                        (do ((index 0 (1+ index))
-                             ;; bit-vectors of length 1-32 need
-                             ;; precisely one (SETF %VECTOR-RAW-BITS),
-                             ;; done here in the epilogue. - CSR,
-                             ;; 2002-04-24
-                             (end-1 (truncate (truly-the index (1- length))
-                                              sb-vm:n-word-bits)))
-                            ((>= index end-1)
-                             (setf (%vector-raw-bits result-bit-array index)
-                                   (,',wordfun (%vector-raw-bits bit-array-1 index)
-                                               (%vector-raw-bits bit-array-2 index)))
-                             result-bit-array)
-                          (declare (optimize (speed 3) (safety 0))
-                                   (type index index end-1))
-                          (setf (%vector-raw-bits result-bit-array index)
-                                (,',wordfun (%vector-raw-bits bit-array-1 index)
-                                            (%vector-raw-bits bit-array-2 index))))))))))
+                    bit-array-1 bit-array-2 result-bit-array))))
+     (dotimes (index (ceiling length sb-vm:n-word-bits))
+       (declare (optimize (speed 3) (safety 0)) (type index index))
+       (setf (%vector-raw-bits result-bit-array index)
+             (,wordfun (%vector-raw-bits bit-array-1 index)
+                       (%vector-raw-bits bit-array-2 index))))
+     result-bit-array))
+
+(flet ((policy-test (node) (policy node (>= speed space))))
+(macrolet ((def (bitfun wordfun)
+             `(%deftransform ',bitfun #'policy-test
+                             '(function (simple-bit-vector simple-bit-vector simple-bit-vector)
+                                        *)
+                             (cons #'bit-op->word-op ',wordfun))))
  (def bit-and word-logical-and)
  (def bit-ior word-logical-or)
  (def bit-xor word-logical-xor)
@@ -407,175 +465,108 @@
  (def bit-andc1 word-logical-andc1)
  (def bit-andc2 word-logical-andc2)
  (def bit-orc1 word-logical-orc1)
- (def bit-orc2 word-logical-orc2))
+ (def bit-orc2 word-logical-orc2)))
 
 (deftransform bit-not
               ((bit-array result-bit-array)
                (simple-bit-vector simple-bit-vector) *
                :node node :policy (>= speed space))
   `(progn
-     ,@(unless (policy node (zerop safety))
-         '((unless (= (length bit-array)
-                      (length result-bit-array))
+     ,@(unless (or (policy node (zerop safety))
+                   (same-leaf-ref-p bit-array result-bit-array))
+         '((unless (= (vector-length bit-array)
+                      (vector-length result-bit-array))
              (error "Argument and result bit arrays are not the same length:~
                      ~%  ~S~%  ~S"
                     bit-array result-bit-array))))
-    (let ((length (length result-bit-array)))
-      (if (= length 0)
-          ;; We avoid doing anything to 0-length bit-vectors, or rather,
-          ;; the memory that follows them. Other divisible-by
-          ;; n-word-bits cases are handled by the (1- length), below.
-          ;; CSR, 2002-04-24
-          result-bit-array
-          (do ((index 0 (1+ index))
-               ;; bit-vectors of length 1 to n-word-bits need precisely
-               ;; one (SETF %VECTOR-RAW-BITS), done here in the
-               ;; epilogue. - CSR, 2002-04-24
-               (end-1 (truncate (truly-the index (1- length))
-                                sb-vm:n-word-bits)))
-              ((>= index end-1)
-               (setf (%vector-raw-bits result-bit-array index)
-                     (word-logical-not (%vector-raw-bits bit-array index)))
-               result-bit-array)
-            (declare (optimize (speed 3) (safety 0))
-                     (type index index end-1))
-            (setf (%vector-raw-bits result-bit-array index)
-                  (word-logical-not (%vector-raw-bits bit-array index))))))))
+    (let ((length (vector-length result-bit-array)))
+      (dotimes (index (ceiling length sb-vm:n-word-bits))
+        (declare (optimize (speed 3) (safety 0)) (type index index))
+        (setf (%vector-raw-bits result-bit-array index)
+              (word-logical-not (%vector-raw-bits bit-array index))))
+      result-bit-array)))
 
+;;; This transform has to deal with the fact that unused bits
+;;; in the last data word of a simple-bit-vector can be random.
 (deftransform bit-vector-= ((x y) (simple-bit-vector simple-bit-vector))
-  `(and (= (length x) (length y))
-        (let ((length (length x)))
-          (or (= length 0)
-              (do* ((i 0 (+ i 1))
-                    (end-1 (floor (1- length) sb-vm:n-word-bits)))
-                   ((>= i end-1)
-                    (let* ((extra (1+ (mod (1- length) sb-vm:n-word-bits)))
-                           ;; Why do we need to mask anything? Do we allow use of
-                           ;; the extra bits to record data steganographically?
-                           ;; Or maybe we didn't zero-fill trailing bytes of stack-allocated
-                           ;; bit-vectors?
-                           (mask (ash sb-ext:most-positive-word (- extra sb-vm:n-word-bits)))
-                           (numx
-                            (logand
-                             (ash mask
-                                  ,(ecase sb-c:*backend-byte-order*
-                                     (:little-endian 0)
-                                     (:big-endian
-                                      '(- sb-vm:n-word-bits extra))))
-                             (%vector-raw-bits x i)))
-                           (numy
-                            (logand
-                             (ash mask
-                                  ,(ecase sb-c:*backend-byte-order*
-                                     (:little-endian 0)
-                                     (:big-endian
-                                      '(- sb-vm:n-word-bits extra))))
-                             (%vector-raw-bits y i))))
-                      (declare (type (integer 1 #.sb-vm:n-word-bits) extra)
-                               (type sb-vm:word mask numx numy))
-                      (= numx numy)))
-                (declare (type index i end-1))
-                (let ((numx (%vector-raw-bits x i))
-                      (numy (%vector-raw-bits y i)))
-                  (declare (type sb-vm:word numx numy))
-                  (unless (= numx numy)
-                    (return nil))))))))
+  ;; TODO: unroll if length is known and not more than a few words
+  `(let ((length (vector-length x)))
+     (and (= (vector-length y) length)
+          (let ((words (floor length sb-vm:n-word-bits)))
+            (and (dotimes (i words t)
+                   (unless (= (%vector-raw-bits x i) (%vector-raw-bits y i))
+                     (return nil)))
+                 (let ((remainder (mod length sb-vm:n-word-bits)))
+                   (or (zerop remainder)
+                       ;; - To examine 1 bit, shift over 63 bits, 0-filling on the other side
+                       ;; - To examine 2 bits, shift over 62 bits, etc
+                       ;; SHIFT-TOWARDS-END accepts a negative shift COUNT which is
+                       ;; congruent to desired shift modulo the maximum shift.
+                       (zerop (shift-towards-end (logxor (%vector-raw-bits x words)
+                                                         (%vector-raw-bits y words))
+                                                 (- remainder))))))))))
 
+;;; This transform has to deal with the fact that unused bits
+;;; in the last data word of a simple-bit-vector can be random.
 (deftransform count ((item sequence) (bit simple-bit-vector) *
                      :policy (>= speed space))
-  `(let ((length (length sequence)))
-    (if (zerop length)
-        0
-        (do ((index 0 (1+ index))
-             (count 0)
-             (end-1 (truncate (truly-the index (1- length))
-                              sb-vm:n-word-bits)))
-            ((>= index end-1)
-             ;; "(mod (1- length) ...)" is the bit index within the word
-             ;; of the array index of the ultimate bit to be examined.
-             ;; "1+" it is the number of bits in that word.
-             ;; But I don't get why people are allowed to store random data that
-             ;; we mask off, as if we could accomodate all possible ways that
-             ;; unsafe code can spew bits where they don't belong.
-             ;; Does it have to do with %shrink-vector, perhaps?
-             ;; Some rationale would be nice...
-             (let* ((extra (1+ (mod (1- length) sb-vm:n-word-bits)))
-                    (mask (ash most-positive-word (- extra sb-vm:n-word-bits)))
-                    ;; The above notwithstanding, for big-endian wouldn't it
-                    ;; be possible to write this expression as a single shift?
-                    ;;  (LOGAND MOST-POSITIVE-WORD (ASH most-positive-word (- n-word-bits extra)))
-                    ;; rather than a right-shift to fill in zeros on the left
-                    ;; then by a left-shift to left-align the 1s?
-                    (bits (logand (ash mask
-                                       ,(ecase sb-c:*backend-byte-order*
-                                               (:little-endian 0)
-                                               (:big-endian
-                                                '(- sb-vm:n-word-bits extra))))
-                                  (%vector-raw-bits sequence index))))
-               (declare (type (integer 1 #.sb-vm:n-word-bits) extra))
-               (declare (type sb-vm:word mask bits))
-               (incf count (logcount bits))
-               ,(if (constant-lvar-p item)
-                    (if (zerop (lvar-value item))
-                        '(- length count)
-                        'count)
-                    '(if (zerop item)
-                         (- length count)
-                         count))))
-          (declare (type index index count end-1)
-                   (optimize (speed 3) (safety 0)))
-          (incf count (logcount (%vector-raw-bits sequence index)))))))
+  `(let* ((length (vector-length sequence))
+          (count 0)
+          (words (floor length sb-vm:n-word-bits)))
+     (declare (index count))
+     (declare (optimize (speed 3) (safety 0)))
+     (dotimes (i words)
+       (incf count (logcount (%vector-raw-bits sequence i))))
+     (let ((remainder (mod length sb-vm:n-word-bits)))
+       (unless (zerop remainder)
+         (incf count (logcount (shift-towards-end (%vector-raw-bits sequence words)
+                                                  (- sb-vm:n-word-bits remainder))))))
+     ,(if (constant-lvar-p item)
+          (if (zerop (lvar-value item)) '(- length count) 'count)
+          '(if (zerop item) (- length count) count))))
 
-(deftransform fill ((sequence item) (simple-bit-vector bit) *
+;;; This transform does not require that ITEM be derived as BIT,
+;;; but at runtime it has to be.
+(deftransform fill ((sequence item) (simple-bit-vector t) *
                     :policy (>= speed space))
-  (let ((value (if (constant-lvar-p item)
-                   (if (= (lvar-value item) 0)
-                       0
-                       most-positive-word)
-                   `(if (= item 0) 0 ,most-positive-word))))
-    `(let ((length (length sequence))
-           (value ,value))
-       (if (= length 0)
-           sequence
-           (do ((index 0 (1+ index))
-                ;; bit-vectors of length 1 to n-word-bits need precisely
-                ;; one (SETF %VECTOR-RAW-BITS), done here in the
-                ;; epilogue. - CSR, 2002-04-24
-                (end-1 (truncate (truly-the index (1- length))
-                                 sb-vm:n-word-bits)))
-               ((>= index end-1)
-                (setf (%vector-raw-bits sequence index) value)
-                sequence)
-             (declare (optimize (speed 3) (safety 0))
-                      (type index index end-1))
-             (setf (%vector-raw-bits sequence index) value))))))
+  `(let ((value (logand (- (the bit item)) most-positive-word)))
+     ;; Unlike for the SIMPLE-BASE-STRING case, we are allowed to touch
+     ;; bits beyond LENGTH with impunity.
+     (dotimes (index (ceiling (vector-length sequence) sb-vm:n-word-bits))
+       (declare (optimize (speed 3) (safety 0))
+                (type index index))
+       (setf (%vector-raw-bits sequence index) value))
+     sequence))
 
-(deftransform fill ((sequence item) (simple-base-string base-char) *
-                    :policy (>= speed space))
-  (let ((value (if (constant-lvar-p item)
-                   (let* ((char (lvar-value item))
-                          (code (sb-xc:char-code char))
-                          (accum 0))
-                     (dotimes (i sb-vm:n-word-bytes accum)
-                       (setf accum (logior accum (ash code (* 8 i))))))
-                   `(let ((code (sb-xc:char-code item)))
-                     (logior ,@(loop for i from 0 below sb-vm:n-word-bytes
-                                     collect `(ash code ,(* 8 i))))))))
-    `(let ((length (length sequence))
-           (value ,value))
-      (multiple-value-bind (times rem)
-          (truncate length sb-vm:n-word-bytes)
-        (do ((index 0 (1+ index))
-             (end times))
-            ((>= index end)
-             (let ((place (* times sb-vm:n-word-bytes)))
-               (declare (fixnum place))
-               (dotimes (j rem sequence)
-                 (declare (index j))
-                 (setf (schar sequence (the index (+ place j))) item))))
-          (declare (optimize (speed 3) (safety 0))
-                   (type index index))
-          (setf (%vector-raw-bits sequence index) value))))))
+(deftransform fill ((sequence item) (simple-base-string t) *
+                                    :policy (>= speed space))
+  (let ((multiplier (logand #x0101010101010101 most-positive-word)))
+    `(let* ((value ,(if (and (constant-lvar-p item) (typep item 'base-char))
+                        (* multiplier (char-code (lvar-value item)))
+                        ;; Use multiplication if it's known to be cheap
+                        #+(or x86 x86-64)
+                        `(* ,multiplier (char-code (the base-char item)))
+                        #-(or x86 x86-64)
+                        '(let ((code (char-code (the base-char item))))
+                          (setf code (dpb code (byte 8 8) code))
+                          (setf code (dpb code (byte 16 16) code))
+                          #+64-bit (dpb code (byte 32 32) code))))
+            (len (vector-length sequence))
+            (words (truncate len sb-vm:n-word-bytes)))
+       (dotimes (index words)
+         (declare (optimize (speed 3) (safety 0))
+                  (type index index))
+         (setf (%vector-raw-bits sequence index) value))
+       ;; For 64-bit:
+       ;;  if 1 more byte should be written, then shift-towards-start 56
+       ;;  if 2 more bytes ...               then shift-towards-start 48
+       ;;  etc
+       ;; This correctly rewrites the trailing null in its proper place.
+       (let ((bits (ash (mod len sb-vm:n-word-bytes) 3)))
+         (when (plusp bits)
+           (setf (%vector-raw-bits sequence words)
+                 (shift-towards-start value (- bits)))))
+       sequence)))
 
 ;;;; %BYTE-BLT
 
@@ -624,15 +615,15 @@
      (values)))
 
 ;;;; transforms for EQL of floating point values
-#-(vop-named sb-vm::eql/single-float)
+(unless (vop-existsp :named sb-vm::eql/single-float)
 (deftransform eql ((x y) (single-float single-float))
-  '(= (single-float-bits x) (single-float-bits y)))
+  '(= (single-float-bits x) (single-float-bits y))))
 
-#-(vop-named sb-vm::eql/double-float)
+(unless (vop-existsp :named sb-vm::eql/double-float)
 (deftransform eql ((x y) (double-float double-float))
   #-64-bit '(and (= (double-float-low-bits x) (double-float-low-bits y))
                   (= (double-float-high-bits x) (double-float-high-bits y)))
-  #+64-bit '(= (double-float-bits x) (double-float-bits y)))
+  #+64-bit '(= (double-float-bits x) (double-float-bits y))))
 
 
 ;;;; modular functions
@@ -706,6 +697,8 @@
 ;;; position of the last set bit. We can't use this second method when
 ;;; the high order bit is bit 31 because shifting by 32 doesn't work
 ;;; too well.
+;;; This is used only for ppc + sparc.
+;;; FIXME: ppc64 should have a UB64-STRENGTH-REDUCE-
 (defun ub32-strength-reduce-constant-multiply (arg num)
   (declare (type (unsigned-byte 32) num))
   (let ((adds 0) (shifts 0)
@@ -752,11 +745,11 @@
 ;;; VOP can't handle them.
 
 (deftransform sb-vm::get-lisp-obj-address ((obj) ((constant-arg fixnum)))
-  (ash (lvar-value obj) sb-vm::n-fixnum-tag-bits))
+  (ash (lvar-value obj) sb-vm:n-fixnum-tag-bits))
 
 (deftransform sb-vm::get-lisp-obj-address ((obj) ((constant-arg character)))
-  (logior sb-vm::character-widetag
-          (ash (char-code (lvar-value obj)) sb-vm::n-widetag-bits)))
+  (logior sb-vm:character-widetag
+          (ash (char-code (lvar-value obj)) sb-vm:n-widetag-bits)))
 
 ;; So that the PCL code walker doesn't observe any use of %PRIMITIVE,
 ;; MAKE-UNBOUND-MARKER is an ordinary function, not a macro.
@@ -769,3 +762,19 @@
 ;; because %PRIMITIVE is not generally fopcompilable.
 (sb-c:define-source-transform make-unbound-marker ()
   `(sb-sys:%primitive make-unbound-marker))
+
+(deftransform (cas symbol-value) ((old new symbol))
+  (let ((cname (and (constant-lvar-p symbol) (lvar-value symbol))))
+    (case (and cname (info :variable :kind cname))
+      ((:special :global)
+       (let ((type (info :variable :type cname)))
+         `(truly-the ,type
+                     (%compare-and-swap-symbol-value ',cname old (the ,type new)))))
+      (t
+       `(progn
+          (about-to-modify-symbol-value symbol 'compare-and-swap new)
+          (%compare-and-swap-symbol-value symbol old new))))))
+
+(deftransform (cas svref) ((old new vector index))
+  '(let ((v (the simple-vector vector)))
+    (%compare-and-swap-svref v (check-bound v (length v) index) old new)))

@@ -165,7 +165,7 @@
 ;;; mutex is needed. More importantly the sigchld signal handler also
 ;;; accesses it, that's why we need without-interrupts.
 (defmacro with-active-processes-lock (() &body body)
-  `(sb-thread::with-system-mutex (*active-processes-lock*)
+  `(with-system-mutex (*active-processes-lock*)
      ,@body))
 
 (deftype process-status ()
@@ -187,6 +187,7 @@
   #+win32 (handle nil :type (or null (signed-byte 32)))
   #-win32
   serve-event-pipe)
+(declaim (freeze-type process))
 
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
@@ -306,7 +307,8 @@ PROCESS."
   "Hand SIGNAL to PROCESS. If WHOM is :PID, use the kill Unix system call. If
    WHOM is :PROCESS-GROUP, use the killpg Unix system call. If WHOM is
    :PTY-PROCESS-GROUP deliver the signal to whichever process group is
-   currently in the foreground."
+   currently in the foreground.
+   Returns T if successful, otherwise returns NIL and error number (two values)."
   (let ((pid (ecase whom
                ((:pid :process-group)
                 (process-pid process))
@@ -424,11 +426,10 @@ status slot."
 
   (defun find-a-pty ()
     ;; First try to use the Unix98 pty api.
-    (let* ((master-name (coerce (format nil "/dev/ptmx") 'base-string))
-           (master-fd (sb-unix:unix-open master-name
-                                         (logior sb-unix:o_rdwr
-                                                 sb-unix:o_noctty)
-                                         #o666)))
+    (let ((master-fd (sb-unix:unix-open "/dev/ptmx"
+                                        (logior sb-unix:o_rdwr
+                                                sb-unix:o_noctty)
+                                        #o666)))
       (when master-fd
         (grantpt master-fd)
         (unlockpt master-fd)
@@ -447,15 +448,15 @@ status slot."
     ;; No dice, try using the old-school method.
     (dolist (char '(#\p #\q))
       (dotimes (digit 16)
-        (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit)
-                                    'base-string))
+        (let* ((master-name (with-output-to-string (str nil :element-type 'base-char)
+                              (format str "/dev/pty~C~X" char digit)))
                (master-fd (sb-unix:unix-open master-name
                                              (logior sb-unix:o_rdwr
                                                      sb-unix:o_noctty)
                                              #o666)))
           (when master-fd
-            (let* ((slave-name (coerce (format nil "/dev/tty~C~X" char digit)
-                                       'base-string))
+            (let* ((slave-name (with-output-to-string (str nil :element-type 'base-char)
+                                 (format str "/dev/tty~C~X" char digit)))
                    (slave-fd (sb-unix:unix-open slave-name
                                                 (logior sb-unix:o_rdwr
                                                         sb-unix:o_noctty)
@@ -541,9 +542,12 @@ status slot."
       (declare (type (simple-array (unsigned-byte 8) (*)) octets))
       (let ((size (length octets)))
         ;; Copy string.
-        (sb-kernel:copy-ub8-to-system-area octets 0 string-sap 0 size)
+        (copy-ub8-to-system-area octets 0 string-sap 0 size)
         ;; NULL-terminate it
-        (sb-kernel:system-area-ub8-fill 0 string-sap size 4)
+        ;; (As it says up top: "assume 4 byte is enough for everyone.")
+        (let ((sap (sap+ string-sap size)))
+          (setf (sap-ref-8 sap 0) 0 (sap-ref-8 sap 1) 0
+                (sap-ref-8 sap 2) 0 (sap-ref-8 sap 3) 0))
         ;; Put the pointer in the vector.
         (setf (sap-ref-sap vec-sap vec-index-offset) string-sap)
         ;; Advance string-sap for the next string.
@@ -589,7 +593,8 @@ status slot."
   (envp (* c-string))
   (pty-name c-string)
   (channel (array int 2))
-  (dir c-string))
+  (dir c-string)
+  (preserve-fds (* int)))
 
 #-win32
 (define-alien-routine wait-for-exec
@@ -630,7 +635,7 @@ status slot."
 
 #+win32
 (defun prepare-args (args escape)
-  (with-simple-output-to-string (str)
+  (%with-output-to-string (str)
     (loop for (arg . rest) on args
           do
           (cond ((and escape
@@ -648,6 +653,11 @@ status slot."
       args
       (loop for arg in args
             collect (coerce arg 'simple-string))))
+
+(defmacro coerce-or-copy (object type)
+  `(if (typep ,object ,type)
+       (copy-seq ,object)
+       (coerce ,object ,type)))
 
 ;;; FIXME: There shouldn't be two semiredundant versions of the
 ;;; documentation. Since this is a public extension function, the
@@ -694,26 +704,34 @@ status slot."
 ;;; the fork worked, and NIL if it did not.
 (defun run-program (program args
                     &key
-                    (env nil env-p)
-                    (environment
-                     (when env-p
-                       (unix-environment-sbcl-from-cmucl env))
-                     environment-p)
-                    (wait t)
-                    search
-                    #-win32 pty
-                    input
-                    if-input-does-not-exist
-                    output
-                    (if-output-exists :error)
-                    (error :output)
-                    (if-error-exists :error)
-                    status-hook
-                    (external-format :default)
-                    directory
-                    #+win32 (escape-arguments t))
+                      (env nil env-p)
+                      (environment
+                       (when env-p
+                         (unix-environment-sbcl-from-cmucl env))
+                       environment-p)
+                      (wait t)
+                      search
+                      #-win32 pty
+                      input
+                      if-input-does-not-exist
+                      output
+                      (if-output-exists :error)
+                      (error :output)
+                      (if-error-exists :error)
+                      status-hook
+                      (external-format :default)
+                      directory
+                      preserve-fds
+                      #+win32 (escape-arguments t)
+                      #+win32 (window nil))
   "RUN-PROGRAM creates a new process specified by PROGRAM.
-ARGS are passed as the arguments to the program.
+ARGS is a list of strings to be passed literally to the new program.
+In POSIX environments, this list becomes the array supplied as the second
+parameter to the execv() or execvp() system call, each list element becoming
+one array element. The strings should not contain shell escaping, as there is
+no shell involvement. Further note that while conventionally the process
+receives its own pathname in argv[0], that is automatic, and the 0th string
+should not be present in ARGS.
 
 The program arguments and the environment are encoded using the
 default external format for streams.
@@ -799,9 +817,22 @@ Users Manual for details about the PROCESS structure.
       Specifies the directory in which the program should be run.
       NIL (the default) means the directory is unchanged.
 
+   :PRESERVE-FDS
+      A sequence of file descriptors which should remain open in the child
+      process.
+
    Windows specific options:
    :ESCAPE-ARGUMENTS (default T)
-      Controls escaping of the arguments passed to CreateProcess."
+      Controls escaping of the arguments passed to CreateProcess.
+   :WINDOW (default NIL)
+      When NIL, the subprocess decides how it will display its window. The
+      following options control how the subprocess window should be displayed:
+      :HIDE, :SHOW-NORMAL, :SHOW-MAXIMIZED, :SHOW-MINIMIZED, :SHOW-NO-ACTIVATE,
+      :SHOW-MIN-NO-ACTIVE, :SHOW-NA.
+      Note: console application subprocesses may or may not display a console
+      window depending on whether the SBCL runtime is itself a console or GUI
+      application. Invoke CMD /C START to consistently display a console window
+      or use the :WINDOW :HIDE option to consistently hide the console window."
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to
@@ -855,11 +886,13 @@ Users Manual for details about the PROCESS structure.
                                       output cookie
                                       :direction :output
                                       :if-exists if-output-exists
+                                      :if-does-not-exist :create
                                       :external-format external-format)
                (with-fd-and-stream-for ((stderr error-stream)  :error
                                         error cookie
                                         :direction :output
                                         :if-exists if-error-exists
+                                        :if-does-not-exist :create
                                         :external-format external-format)
                  ;; Make sure we are not notified about the child
                  ;; death before we have installed the PROCESS
@@ -871,21 +904,32 @@ Users Manual for details about the PROCESS structure.
                        (with-open-pty ((pty-name pty-stream) (pty cookie))
                          (setf (values child #+win32 handle)
                                #+win32
-                               (sb-thread::with-system-mutex (*spawn-lock*)
+                               (with-system-mutex (*spawn-lock*)
                                  (sb-win32::mswin-spawn
                                   progname
                                   args
                                   stdin stdout stderr
-                                  search environment-vec directory))
+                                  search environment-vec directory
+                                  window
+                                  preserve-fds))
                                #-win32
-                               (with-args (args-vec args)
-                                 (sb-thread::with-system-mutex (*spawn-lock*)
-                                   (spawn progname args-vec
-                                          stdin stdout stderr
-                                          (if search 1 0)
-                                          environment-vec pty-name
-                                          channel
-                                          directory))))
+                               (let ((preserve-fds
+                                       (and preserve-fds
+                                            (sort (coerce-or-copy preserve-fds
+                                                                  '(simple-array (signed-byte #.(alien-size int)) (*)))
+                                                  #'<))))
+                                 (with-pinned-objects (preserve-fds)
+                                   (with-args (args-vec args)
+                                     (with-system-mutex (*spawn-lock*)
+                                       (spawn progname args-vec
+                                              stdin stdout stderr
+                                              (if search 1 0)
+                                              environment-vec pty-name
+                                              channel
+                                              directory
+                                              (if preserve-fds
+                                                  (vector-sap preserve-fds)
+                                                  (int-sap 0))))))))
                          (unless (minusp child)
                            #-win32
                            (setf child (wait-for-exec child channel))
@@ -1105,7 +1149,7 @@ Users Manual for details about the PROCESS structure.
                  (sb-unix:unix-close fd)
                  (fail "failed to unlink ~A" name/errno))
                fd)))
-    (let ((dev-null #.(coerce #-win32 "/dev/null" #+win32 "nul" 'base-string)))
+    (let ((dev-null #-win32 "/dev/null" #+win32 "nul"))
       (cond ((eq object t)
              ;; No new descriptor is needed.
              (values -1 nil))
@@ -1279,13 +1323,21 @@ Users Manual for details about the PROCESS structure.
           (t
            (fail "invalid option: ~S" object))))))
 
-#+(or linux sunos hpux)
+#+(or linux sunos haiku)
 (defun software-version ()
   "Return a string describing version of the supporting software, or NIL
   if not available."
   (or sb-sys::*software-version*
       (setf sb-sys::*software-version*
-            (string-trim '(#\newline)
-                         (sb-kernel:with-simple-output-to-string (stream)
-                           (run-program "/bin/uname" `("-r")
-                                        :output stream))))))
+            (possibly-base-stringize
+             #+linux
+             (with-open-file (f "/proc/sys/kernel/osrelease") (read-line f))
+             #-linux
+             (string-trim '(#\newline)
+                          (%with-output-to-string (stream)
+                           (run-program "/bin/uname"
+                                        ;; "-r" on haiku just prints "1"
+                                        ;; but "-v" prints some detail.
+                                        #+haiku '("-v")
+                                        #-haiku '("-r")
+                                        :output stream)))))))

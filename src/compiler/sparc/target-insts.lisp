@@ -81,7 +81,7 @@
        ;; foreign routine, if possible.  If not, just note the
        ;; final value.
        (let ((addr (+ immed-val (ash (cdr sethi) 10))))
-         (or (note-code-constant-absolute addr dstate)
+         (or (note-code-constant addr dstate :absolute)
              (maybe-note-assembler-routine addr t dstate)
              (note (format nil "~A = #x~8,'0X" (get-reg-name rd) addr) dstate)))
        (setf *note-sethi-inst* (delete sethi *note-sethi-inst*)))
@@ -89,20 +89,6 @@
        ;; We have an ADD %NULL, <n>, RD instruction.  This is a
        ;; reference to a static symbol.
        (maybe-note-nil-indexed-object immed-val dstate))
-      ((= rs1 alloc-offset)
-       ;; ADD %ALLOC, n.  This must be some allocation or
-       ;; pseudo-atomic stuff
-       (cond ((and (= immed-val 4) (= rd alloc-offset)
-                   (not *pseudo-atomic-set*))
-              ;; "ADD 4, %ALLOC" sets the flag
-              (note "Set pseudo-atomic flag" dstate)
-              (setf *pseudo-atomic-set* t))
-             ((= rd alloc-offset)
-              ;; "ADD n, %ALLOC" is reseting the flag, with extra
-              ;; allocation.
-              (note (format nil "Reset pseudo-atomic, allocated ~D bytes"
-                            (+ immed-val 4)) dstate)
-              (setf *pseudo-atomic-set* nil))))
       #+nil ((and (= rs1 zero-offset) *pseudo-atomic-set*)
        ;; "ADD %ZERO, num, RD" inside a pseudo-atomic is very
        ;; likely loading up a header word.  Make a note to that
@@ -146,8 +132,9 @@
            (setf *note-sethi-inst* (delete sethi *note-sethi-inst*))))))))
 
 (defun handle-andcc-inst (rs1 immed-val rd dstate)
+  (declare (ignorable rs1 immed-val rd dstate))
   ;; ANDCC %ALLOC, 3, %ZERO instruction
-  (when (and (= rs1 alloc-offset) (= rd zero-offset) (= immed-val 3))
+  (when nil
     (note "pseudo-atomic interrupted?" dstate)))
 
 (defun unimp-control (chunk inst stream dstate)
@@ -155,9 +142,6 @@
   (flet ((nt (x) (if stream (note x dstate))))
     (let ((trap (format-2-unimp-data chunk dstate)))
      (case trap
-       (#.cerror-trap
-        (nt "Cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
        (#.breakpoint-trap
         (nt "Breakpoint trap"))
        (#.pending-interrupt-trap
@@ -167,4 +151,6 @@
        (#.fun-end-breakpoint-trap
         (nt "Function end breakpoint trap"))
        (t
-        (handle-break-args #'snarf-error-junk trap stream dstate))))))
+        (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
+                  (>= trap error-trap))
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))

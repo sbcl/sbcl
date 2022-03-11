@@ -30,15 +30,12 @@
 (define-vop (branch-if)
   (:info dest not-p flags)
   (:generator 0
-    (flet ((negate-condition (name)
-             (let ((code (logxor 1 (conditional-opcode name))))
-               (aref +condition-name-vec+ code))))
       (aver (null (rest flags)))
       (inst b
             (if not-p
                 (negate-condition (first flags))
                 (first flags))
-            dest))))
+            dest)))
 
 (defun convert-conditional-move-p (node dst-tn x-tn y-tn)
   (declare (ignore node dst-tn x-tn y-tn))

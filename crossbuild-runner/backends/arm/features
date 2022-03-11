@@ -1,0 +1,6 @@
+:gencgc :alien-callbacks
+; As opposed to soft-float or FPA, we support VFP only (and
+; possibly VFPv2 and higher only), but we'll leave the obvious
+; hooks in for someone to add the support later.
+:arm-vfp :arm-vfpv2
+:fp-and-pc-standard-save

@@ -24,93 +24,36 @@
 (declaim (type list sb-xc:*features*))
 (defvar sb-xc:*features*)
 
-(defun target-platform-keyword (&optional (features sb-xc:*features*))
-  (let ((arch (intersection '(:alpha :arm :arm64 :hppa :mips :ppc :ppc64 :riscv :sparc :x86 :x86-64)
+(defun target-platform-keyword (&aux (features sb-xc:*features*))
+  (let ((arch (intersection '(:arm :arm64 :mips :ppc :ppc64 :riscv :sparc :x86 :x86-64)
                             features)))
     (cond ((not arch) (error "No architecture selected"))
           ((> (length arch) 1) (error "More than one architecture selected")))
     (car arch)))
 
 ;;; Not necessarily the logical place to define BACKEND-ASM-PACKAGE-NAME,
-;;; but a convenient one, because sb-xc:*features* needs to have been
-;;; DEFVARed, and because 'chill' loads this and only this file.
+;;; but a convenient one.
+(defun backend-assembler-target-name ()
+  (let ((keyword (target-platform-keyword)))
+    (case keyword
+      (:ppc :ppc64)
+      (t keyword))))
 (defun backend-asm-package-name ()
-  (concatenate 'string "SB-" (string (target-platform-keyword)) "-ASM"))
+  (concatenate 'string "SB-" (string (backend-assembler-target-name)) "-ASM"))
 
-(defun any-vop-named-p (vop-name)
-  (let ((ht (symbol-value (find-symbol "*BACKEND-PARSED-VOPS*" "SB-C"))))
-    (not (null (gethash vop-name ht)))))
-
-(defun any-vop-translates-p (fun-name)
-  (let ((f (intern "INFO" "SB-INT")))
-    (when (fboundp f)
-      (let ((info (funcall f :function :info fun-name)))
-        (if info
-            (let ((f (intern "FUN-INFO-TEMPLATES" "SB-C")))
-              (and (fboundp f) (not (null (funcall f info))))))))))
-
-(defvar *feature-eval-results-file* "output/feature-tests.lisp-expr")
-(defvar *feature-evaluation-results*)
-
-(defun recording-feature-eval (expression value)
-  ;; This safety check does not work for parallel build, but that produces
-  ;; different code anyway due to missing derived types in any file that would
-  ;; have been compiled in the serial order but was interpreted instead.
-  (when (boundp '*feature-evaluation-results*)
-    ; (format t "~&FEATURE EXPR: ~S -> ~S~%" expression value)
-    (push (cons expression value) *feature-evaluation-results*))
-  value)
-
-(defun write-feature-eval-results ()
-  (with-open-file (f *feature-eval-results-file*
-                     :direction :output
-                     :if-exists :supersede :if-does-not-exist :create)
-    (let ((*print-readably* t))
-      (format f "(~{~S~^~% ~})~%" *feature-evaluation-results*))))
-
-(defun sanity-check-feature-evaluation ()
-  (flet ((check (phase list)
-           (dolist (x list)
-             (let ((answer
-                     (ecase (caar x)
-                      (:vop-named (any-vop-named-p (cadar x)))
-                      (:vop-translates (any-vop-translates-p (cadar x))))))
-               (unless (eq answer (cdr x))
-                 (error "make-host-~D DEFINE-VOP ordering bug:~@
- ~S should be ~S, was ~S at xc time" phase x answer (cdr x)))))))
-    (check 1 (with-open-file (f *feature-eval-results-file*) (read f)))
-    (check 2 *feature-evaluation-results*)))
-
-;;; We should never call this with a selector of :HOST any more,
-;;; but I'm keeping it in case of emergency.
-(defun feature-in-list-p (feature selector
-                          &aux (list (ecase selector
-                                       (:host cl:*features*)
-                                       (:target sb-xc:*features*))))
+;;; Like the real FEATUREP but using SB-XC:*FEATURES* instead of CL:*FEATURES*
+(defun target-featurep (feature)
   (etypecase feature
     (symbol
-     (if (and (string= feature "SBCL") (eq selector :target))
+     (if (string= feature "SBCL")
          (error "Testing SBCL as a target feature is obviously bogus")
-         (member feature list :test #'eq)))
-    (cons (flet ((subfeature-in-list-p (subfeature)
-                   (feature-in-list-p subfeature selector)))
-            (ecase (first feature)
-              (:or  (some  #'subfeature-in-list-p (rest feature)))
-              (:and (every #'subfeature-in-list-p (rest feature)))
-              (:not (destructuring-bind (subexpr) (cdr feature)
-                      (not (subfeature-in-list-p subexpr))))
-              ((:vop-named :vop-translates)
-               (when (eq selector :host)
-                 (error "Invalid host feature test: ~S" feature))
-               (destructuring-bind (subexpr) (cdr feature)
-                 (case (first feature)
-                   (:vop-named
-                    (recording-feature-eval feature
-                                      (any-vop-named-p subexpr)))
-                   (:vop-translates
-                    (recording-feature-eval
-                     feature (any-vop-translates-p subexpr)))))))))))
-(compile 'feature-in-list-p)
+         (member feature sb-xc:*features* :test #'eq)))
+    (cons (ecase (first feature)
+            (:or  (some  #'target-featurep (rest feature)))
+            (:and (every #'target-featurep (rest feature)))
+            (:not (destructuring-bind (subexpr) (cdr feature)
+                    (not (target-featurep subexpr))))))))
+(compile 'target-featurep)
 
 (defun read-targ-feature-expr (stream sub-character infix-parameter)
   (when infix-parameter
@@ -118,7 +61,7 @@
   (if (char= (if (let* ((*package* (find-package "KEYWORD"))
                         (*read-suppress* nil)
                         (feature (read stream t nil t)))
-                   (feature-in-list-p feature :target))
+                   (target-featurep feature))
                  #\+ #\-)
              sub-character)
       (read stream t nil t)
@@ -138,19 +81,6 @@
                            (funcall 'read-target-float stream char))
                      t ; non-terminating so that symbols may contain a dollar sign
                      *xc-readtable*)
-
-;;;; variables like SB-XC:*FEATURES* but different
-
-;;; This variable is declared here (like SB-XC:*FEATURES*) so that
-;;; things like chill.lisp work (because the variable has properties
-;;; similar to SB-XC:*FEATURES*, and chill.lisp was set up to work
-;;; for that). For an explanation of what it really does, look
-;;; elsewhere.
-;;; FIXME: Can we just assign SB-C:*BACKEND-SUBFEATURES* directly?
-;;; (This has nothing whatsoever to do with the so-called "shebang" reader)
-(export '*shebang-backend-subfeatures*)
-(declaim (type list *shebang-backend-subfeatures*))
-(defvar *shebang-backend-subfeatures*)
 
 ;;;; string checker, for catching non-portability early
 

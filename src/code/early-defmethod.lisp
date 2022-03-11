@@ -9,91 +9,106 @@
 
 (in-package "SB-PCL")
 
+(define-condition specialized-lambda-list-error
+    (reference-condition simple-program-error)
+  ()
+  (:default-initargs :references '((:ansi-cl :section (3 4 3)))))
+
+(defun specialized-lambda-list-error (format-control &rest format-arguments)
+  (error 'specialized-lambda-list-error
+         :format-control format-control
+         :format-arguments format-arguments))
+
+;; Return 3 values:
+;; - the bound variables, without defaults, supplied-p vars, or &AUX vars.
+;; - the lambda list without specializers.
+;; - just the specializers
+(defun parse-specialized-lambda-list (arglist)
+  (binding* (((llks specialized optional rest key aux)
+              (parse-lambda-list
+               arglist
+               :context 'defmethod
+               :accept (lambda-list-keyword-mask
+                        '(&optional &rest &key &allow-other-keys &aux))
+               :silent t         ; never signal &OPTIONAL + &KEY style-warning
+               :condition-class 'specialized-lambda-list-error))
+             (required (mapcar (lambda (x) (if (listp x) (car x) x)) specialized))
+             (specializers (mapcar (lambda (x) (if (listp x) (cadr x) t)) specialized)))
+    (check-lambda-list-names
+     llks required optional rest key aux nil nil
+     :context "a method lambda list" :signal-via #'specialized-lambda-list-error)
+    (values (append required
+                    (mapcar #'parse-optional-arg-spec optional)
+                    rest
+                    ;; Preserve keyword-names when given as (:KEYWORD var)
+                    (mapcar (lambda (x)
+                              (if (typep x '(cons cons))
+                                  (car x)
+                                  (parse-key-arg-spec x)))
+                            key))
+            (make-lambda-list llks nil required optional rest key aux)
+            specializers)))
+
+
+;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument
+;;; into the 'real' arguments. This is where the syntax of DEFMETHOD
+;;; is really implemented.
+(defun parse-defmethod (cdr-of-form)
+  (declare (list cdr-of-form))
+  (let ((qualifiers ())
+        (spec-ll ()))
+    (loop (if (and (car cdr-of-form) (atom (car cdr-of-form)))
+              (push (pop cdr-of-form) qualifiers)
+              (return (setq qualifiers (nreverse qualifiers)))))
+    (setq spec-ll (pop cdr-of-form))
+    (values qualifiers spec-ll cdr-of-form)))
+
 ;;;; Rudimentary DEFMETHOD
 
-(sb-xc:defmacro defmethod (&whole form name lambda-list &rest body
-                           &aux qualifier)
-  (when (member name '((setf documentation) documentation) :test 'equal)
-    (return-from defmethod `(push ',form *!documentation-methods*)))
-  (when (keywordp lambda-list)
-    ;; Allow an :AFTER method in 'condition.lisp'.
-    ;; It's ignored during cold-init, but eventually takes effect.
-    (assert (eq lambda-list :after))
-    (setq qualifier lambda-list lambda-list (pop body)))
-  (ecase name
-    (make-load-form
-     ;; Expect one mandatory class-name and the optional environment.
-     (assert (typep lambda-list
-                    '(cons (cons symbol (cons symbol null))
-                           (cons (eql &optional) (cons symbol null))))))
-    (print-object
-     ;; Expect one unqualified mandatory arg and one unqualified.
-     (assert (typep lambda-list '(cons (cons symbol (cons symbol null))
-                                       (cons symbol null))))))
-  (binding* ((specializer (cadar lambda-list)) ; only one allowd
-             (unspecialized-ll `(,(caar lambda-list) ,@(cdr lambda-list)))
-             ((forms decls) (parse-body body nil))) ; Note: disallowing docstring
-    `(!trivial-defmethod
-      ;; An extra NIL in front puts the GF name is the same position it would be in
-      ;; for a normal LOAD-DEFMETHOD.
-      nil ',name ',specializer ,qualifier ',unspecialized-ll
-      ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
-      (named-lambda (fast-method ,name
-                     (,specializer ,@(if (eq name 'print-object) '(t))))
-          (.pv. .next-method-call. .arg0. ,@(cdr unspecialized-ll)
-                ;; Rebind specialized arg with unchecked type assertion.
-                &aux (,(car unspecialized-ll) (truly-the ,specializer .arg0.)))
-        (declare (ignore .pv. .next-method-call.)
-                 (ignorable ,(car unspecialized-ll)))
-        ,@decls
-        ;; Fail at compile-time if any transformational magic needs to happen.
-        (macrolet ,(mapcar (lambda (f)
-                             `(,f (&rest args)
-                                  (declare (ignore args))
-                                  (error "can't use ~A in trivial method" ',f)))
-                           '(slot-boundp slot-value %set-slot-value call-next-method))
-          (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
-            (declare (inline (setf slot-value)))
-            (block ,name ,@forms))))
-      ;; Why is SOURCE-LOC needed? Lambdas should know their location.
-      (sb-c::source-location))))
+;;; This expander avoids the use of the rest of CLOS in order to help
+;;; with bootstrapping.
+(sb-xc:defmacro defmethod (name &rest args)
+  (check-designator name 'defmethod #'legal-fun-name-p "function name")
+  (multiple-value-bind (qualifiers lambda-list body)
+      (parse-defmethod args)
+    (multiple-value-bind (parameters unspecialized-ll specializers)
+        (parse-specialized-lambda-list lambda-list)
+      (multiple-value-bind (forms decls)
+          (parse-body body nil) ; Note: disallowing docstring
+        `(!early-load-method 'standard-method
+          ',name ',qualifiers ',specializers ',unspecialized-ll
+          ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
+          (named-lambda (fast-method ,name ,@qualifiers ,specializers)
+              (.pv. .next-method-call. ,@unspecialized-ll)
+            ,@decls
+            (declare (ignore .pv. .next-method-call.))
+            ;; Rebind arguments, asserting specialized types. (unchecked)
+            (let ,(mapcar (lambda (parameter specializer)
+                            `(,parameter (truly-the ,specializer ,parameter)))
+                   parameters specializers)
+              (declare ,@(mapcar (lambda (parameter specializer)
+                                   (declare (ignore specializer))
+                                   `(ignorable ,parameter))
+                                 parameters specializers))
+              ;; Fail at compile-time if any fancy slot access would happen, if compiled
+              ;; by the eventual implementation.
+              ;; (SETF SLOT-VALUE) is not a legal macro name, so transform it as a
+              ;; an ignorable function that uses a legal macro name.
+              (macrolet ,(mapcar (lambda (f)
+                                   `(,f (&rest args)
+                                        (declare (ignore args))
+                                        (error "can't use ~A in initial method" ',f)))
+                                 '(slot-boundp slot-value %set-slot-value call-next-method))
+                (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
+                  (declare (inline (setf slot-value)) (ignorable #'(setf slot-value)))
+                  (block ,(fun-name-block-name name) ,@forms)))))
+          (sb-c:source-location))))))
 
-(defvar *!trivial-methods* '()) ; necessary methods for system startup
-(defvar *!documentation-methods* nil) ; saved up for after PCL bootstrap
-(defun !trivial-defmethod (dummy name specializer qualifier lambda-list lambda source-loc)
-  (declare (ignore dummy)) ; this would be the method class in LOAD-DEFMETHOD
-  (let ((gf (assoc name *!trivial-methods*)))
-    ;; Append the method but don't bother finding a predicate for it.
-    ;; Methods occurring in early warm load (notably from SB-FASTEVAL)
-    ;; wil be properly installed when 'pcl/print-object.lisp' is loaded.
-    (rplacd gf (concatenate 'vector (cdr gf)
-                            (list (list nil lambda specializer qualifier
-                                        lambda-list source-loc))))))
-
-;;; Slow-but-correct logic for single-dispatch sans method combination,
-;;; allowing exactly one primary method. Methods are sorted most-specific-first,
-;;; so we can stop looking as soon as a match is found.
-(defun !call-a-method (gf-name specialized-arg &rest rest)
-  (let* ((methods (the simple-vector
-                    (cdr (or (assoc gf-name *!trivial-methods*)
-                             (error "No methods on ~S" gf-name)))))
-         (applicable-method
-          (find specialized-arg methods
-                :test (lambda (arg method &aux (guard (car method)))
-                        (and (or (functionp guard) (fboundp guard))
-                             (funcall guard arg))))))
-    (unless applicable-method
-      (error "No applicable method for ~S on ~S~%" gf-name
-             (type-of specialized-arg)))
-    ;; The "method" is a list: (GUARD LAMBDA . OTHER-STUFF)
-    ;; Call using no permutation-vector / no precomputed next method.
-    (apply (cadr applicable-method) nil nil specialized-arg rest)))
-
-(defun make-load-form (object &optional environment)
-  (!call-a-method 'make-load-form object environment))
-(defun print-object (object stream)
-  (!call-a-method 'print-object object stream))
-
-;;; FIXME: this no longer holds methods, but it seems to have an effect
-;;; on the caching of a discriminating function for PRINT-OBJECT
-(defvar *!delayed-defmethod-args* nil)
+(define-source-context defmethod (name &rest stuff)
+  (let ((arg-pos (position-if #'listp stuff)))
+    (if arg-pos
+        `(defmethod ,name ,@(subseq stuff 0 arg-pos)
+           ,(handler-case
+                (nth-value 2 (parse-specialized-lambda-list (elt stuff arg-pos)))
+              (error () "<illegal syntax>")))
+        `(defmethod ,name "<illegal syntax>"))))

@@ -29,6 +29,7 @@
 ;;; can implement some primitive stuff in Lisp.)
 (define-type-predicate double-float-p double-float)
 (define-type-predicate fixnump fixnum)
+#+long-float
 (define-type-predicate long-float-p long-float)
 (define-type-predicate ratiop ratio)
 (define-type-predicate short-float-p short-float)
@@ -108,7 +109,6 @@
 (define-type-predicate simd-pack-p simd-pack)
 #+sb-simd-pack-256
 (define-type-predicate simd-pack-256-p simd-pack-256)
-(define-type-predicate vector-nil-p (vector nil))
 (define-type-predicate weak-pointer-p weak-pointer)
 (define-type-predicate code-component-p code-component)
 #-(or x86 x86-64) (define-type-predicate lra-p lra)
@@ -126,7 +126,7 @@
 (defglobal *backend-type-predicates-grouped*
     (let (plist)
       (loop for (type . pred) in *backend-type-predicates*
-            for class = (#-sb-xc-host %instance-layout
+            for class = (#-sb-xc-host %instance-wrapper
                          #+sb-xc-host type-of
                          type)
             do (push type (getf plist class))
@@ -155,7 +155,7 @@
     (declare (inline vector-getf))
     (let ((group (truly-the (or simple-vector null)
                             (vector-getf *backend-type-predicates-grouped*
-                                         (#-sb-xc-host %instance-layout
+                                         (#-sb-xc-host %instance-wrapper
                                           #+sb-xc-host type-of type)
                                          #'eq))))
       (when group
@@ -163,3 +163,32 @@
                  (sb-kernel::ctype-eq-comparable type))
             (vector-getf (truly-the simple-vector group) type #'eq 1)
             (vector-getf (truly-the simple-vector group) type #'type= 1))))))
+
+(defglobal *backend-union-type-predicates*
+    (let ((unions (sort
+                   (loop for (type . pred) in *backend-type-predicates*
+                         when (union-type-p type)
+                         collect (cons type pred))
+                   #'>
+                   :key (lambda (x)
+                          (length (union-type-types (car x)))))))
+      (coerce (loop for (key . value) in unions
+                    collect key
+                    collect value)
+              'vector)))
+(declaim (simple-vector *backend-union-type-predicates*))
+
+(defun split-union-type-tests (type)
+  (let ((predicates *backend-union-type-predicates*)
+        (types (union-type-types type)))
+    (loop for x below (length predicates) by 2
+          for union-types = (union-type-types (aref predicates x))
+          when (subsetp union-types types :test #'type=)
+          return (values (aref predicates (1+ x))
+                         (set-difference types union-types)))))
+
+(sb-c::unless-vop-existsp (:translate keywordp)
+(define-source-transform keywordp (x)
+  `(let ((object ,x))
+     (and (non-null-symbol-p object)
+          (= (sb-impl::symbol-package-id object) ,sb-impl::+package-id-keyword+)))))

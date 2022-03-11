@@ -37,14 +37,54 @@
 
 (in-package "SB-PCL")
 
+;;; The PCL package is internal and is used by code in potential
+;;; bottlenecks. And since it's internal, no one should be
+;;; doing things like deleting and recreating it in a running target Lisp.
+(define-symbol-macro *pcl-package* #.(find-package "SB-PCL"))
+
+(declaim (inline defstruct-classoid-p))
+(defun defstruct-classoid-p (classoid)
+  ;; It is non-obvious to me why STRUCTURE-CLASSOID-P doesn't
+  ;; work instead of this. -- NS 2008-03-14
+  (typep (sb-kernel::wrapper-%info (classoid-wrapper classoid))
+         'defstruct-description))
+
+;;; This excludes structure types created with the :TYPE option to
+;;; DEFSTRUCT. It also doesn't try to deal with types created by
+;;; hairy DEFTYPEs, e.g.
+;;;   (DEFTYPE CACHE-STRUCTURE (SIZE)
+;;;     (IF (> SIZE 11) 'BIG-CS 'SMALL-CS)).
+;;; KLUDGE: In fact, it doesn't seem to deal with DEFTYPEs at all. Perhaps
+;;; it needs a more mnemonic name. -- WHN 19991204
+(defun structure-type-p (type)
+  (and (symbolp type)
+       (let ((classoid (find-classoid type nil)))
+         (and classoid
+              (not (condition-classoid-p classoid))
+              (defstruct-classoid-p classoid)))))
+
+;;; Symbol contruction utilities
+(defun format-symbol (package format-string &rest format-arguments)
+  (without-package-locks
+   (intern (possibly-base-stringize
+            (apply #'format nil format-string format-arguments))
+           package)))
+
+(defun condition-type-p (type)
+  (and (symbolp type)
+       (condition-classoid-p (find-classoid type nil))))
+
 (defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
   `(dotimes (,var (the fixnum ,count) ,result)
      (declare (fixnum ,var))
      ,@body))
 
+(define-load-time-global *pcl-misc-random-state* (make-random-state))
+
 (declaim (inline random-fixnum))
 (defun random-fixnum ()
-  (random (1+ sb-xc:most-positive-fixnum)))
+  (random (1+ most-positive-fixnum)
+          (load-time-value *pcl-misc-random-state*)))
 
 ;;; Lambda which executes its body (or not) randomly. Used to drop
 ;;; random cache entries.
@@ -64,30 +104,28 @@
            (setf ,drops (random-fixnum)
                  ,drop-pos sb-vm:n-positive-fixnum-bits))))))
 
-(import 'sb-kernel:funcallable-instance-p) ; why?
-
 (defun set-funcallable-instance-function (fin new-value)
-  (declare (type function new-value)
-           ;; KLUDGE: it might be nice to restrict
-           ;; SB-MOP:SET-FUNCALLABLE-INSTANCE-FUNCTION to operate only
-           ;; on generalized instances of
-           ;; SB-MOP:FUNCALLABLE-STANDARD-OBJECT; at present, even
-           ;; PCL's internal use of SET-FUNCALLABLE-INSTANCE-FUNCTION
-           ;; doesn't obey this restriction.
-           (type funcallable-instance fin))
+  (declare (type function new-value))
+  ;; It's not worth bothering to teach the compiler to efficiently transform
+  ;; a type test involving FUNCALLABLE-STANDARD-OBJECT, not the least
+  ;; of the problems being that the type isn't known during make-host-2.
+  (unless (and (function-with-layout-p fin)
+               (logtest (layout-flags (%fun-layout fin))
+                        +pcl-object-layout-flag+))
+    (error 'type-error :datum fin :expected-type 'funcallable-standard-object))
   (setf (%funcallable-instance-fun fin) new-value))
 
 ;;; FIXME: these macros should just go away.  It's not clear whether
 ;;; the inline functions defined by
 ;;; !DEFSTRUCT-WITH-ALTERNATE-METACLASS are as efficient as they could
 ;;; be; ordinary defstruct accessors are defined as source transforms.
+;;; Another thing: if weakening STD-INSTANCE-P to %INSTANCEP is legal within
+;;; PCL code, wouldn't it be legal to weaken FSC-INSTANCE-P to FUNCTIONP?
+;;; And technically this weaker than the real constraint anyway, as it returns
+;;; T on funcallable instances lacking CLOS slots.
 (declaim (inline fsc-instance-p))
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
-(defmacro fsc-instance-slots (fin)
-  `(truly-the simple-vector
-              (%funcallable-instance-info
-               ,fin ,(get-dsd-index standard-funcallable-instance clos-slots))))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector t) t) clos-slots-ref))
@@ -102,6 +140,12 @@
 ;;; and normal instances, so we can return true on structures also. A
 ;;; few uses of (OR STD-INSTANCE-P FSC-INSTANCE-P) are changed to
 ;;; PCL-INSTANCE-P.
+;;; FIXME: this fuction seriously needs to die.  Sometimes "STD-" means things
+;;; that are STANDARD-OBJECT including possibly FUNCALLABLE-STANDARD-OBJECT,
+;;; but here it means something which is expressly not FUNCALLABLE-STANDARD-OBJECT.
+;;; The converse of this is FSC-INSTANCE-P, meaning not STD-INSTANCE-P.
+;;; I'm less bothered by that one since "funcallable standard class instance" mostly says
+;;; what it means, whereas "standard" is virtually devoid of meaning within this setting.
 (declaim (inline std-instance-p))
 (defun std-instance-p (x)
   (%instancep x))
@@ -145,37 +189,15 @@
     (setf (fdefinition new-name) fun))
   fun)
 
-;;; FIXME: probably no longer needed after init
-(defmacro precompile-random-code-segments (&optional system)
-  `(progn
-     (eval-when (:compile-toplevel)
-       (update-dispatch-dfuns))
-     (precompile-function-generators ,system)
-     (precompile-dfun-constructors ,system)
-     (precompile-ctors)))
-
-;;; Return true of any object which is either a funcallable-instance,
-;;; or an ordinary instance that is not a structure-object.
-;;; This used to be implemented as (LAYOUT-FOR-STD-CLASS-P (LAYOUT-OF x))
-;;; but LAYOUT-OF is more general than need be here. So this bails out
-;;; after the first two clauses of the equivalent COND in LAYOUT-OF
-;;; because nothing else could possibly return T.
-(declaim (inline %pcl-instance-p))
-(defun %pcl-instance-p (x)
-  (layout-for-std-class-p
-   (cond ((%instancep x) (%instance-layout x))
-         ((funcallable-instance-p x) (%funcallable-instance-layout x))
-         (t (return-from %pcl-instance-p nil)))))
-
 ;;; This definition is for interpreted code.
+;;; FIXME: (1) is EXPLICIT-CHECK really doing anything here?
+;;;        (2) why isn't this named STANDARD-OBJECT-P?
 (defun pcl-instance-p (x) (declare (explicit-check)) (%pcl-instance-p x))
 
-;;; Both of these operations "work" on structures, which allows the above
-;;; weakening of STD-INSTANCE-P.
-;;; FIXME: what does the preceding comment mean? You can't use instance-slots
-;;; on a structure. (Consider especially a structure of 0 slots.)
 (defmacro std-instance-slots (x)
-  `(truly-the simple-vector (%instance-ref ,x ,(get-dsd-index standard-instance slots))))
+  `(truly-the simple-vector (%instance-ref ,x ,sb-vm:instance-data-start)))
+(defmacro fsc-instance-slots (x)
+  `(truly-the simple-vector (%funcallable-instance-info ,x 0)))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth
@@ -193,16 +215,11 @@
   ;; integrating PCL more with the compiler, would remove the need for
   ;; this icky stuff.
   (declare (optimize (inhibit-warnings 3)))
-  (when (pcl-instance-p instance)
-    (get-slots instance)))
-
-;; This macro is used only by %CHANGE-CLASS. Can we just do this there?
-;; [The code in 'fsc.lisp' which looks like it needs it is commented out]
-(defmacro get-wrapper (inst)
-  (once-only ((wrapper `(layout-of ,inst)))
-    `(progn
-       (aver (layout-for-std-class-p ,wrapper))
-       ,wrapper)))
+  ;; Was: (WHEN (PCL-INSTANCE-P INSTANCE) (GET-SLOTS INSTANCE))
+  ;; but we can do better then to perform STD-/FSC- discrimination twice
+  ;; (once in the test of PCL-INSTANCE-P and once in GET-SLOTS).
+  (cond ((std-instance-p instance) (std-instance-slots instance))
+        ((fsc-instance-p instance) (fsc-instance-slots instance))))
 
 ;;;; structure-instance stuff
 ;;;;
@@ -276,7 +293,7 @@
       (let ((setter 0))
         (lambda (newval instance)
           (if (eql setter 0)
-              (let* ((dd (layout-info (%instance-layout instance)))
+              (let* ((dd (wrapper-info (%instance-wrapper instance)))
                      (f (compile nil (slot-setter-lambda-form dd slotd))))
                 (if (functionp f)
                     (funcall (setq setter f) newval instance)

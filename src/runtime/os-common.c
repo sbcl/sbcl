@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "sbcl.h"
 #include "globals.h"
@@ -23,7 +24,6 @@
 #include "genesis/symbol.h"
 #include "genesis/static-symbols.h"
 #include "thread.h"
-#include "sbcl.h"
 #include "os.h"
 #include "arch.h"
 #include "interr.h"
@@ -32,13 +32,21 @@
 # include <dlfcn.h>
 #endif
 
+/*
+ * historically, this used sysconf to select the runtime page size
+ * per recent changes on other arches and discussion on sbcl-devel,
+ * however, this is not necessary -- the VM page size need not match
+ * the OS page size (and the default backend page size has been
+ * ramped up accordingly for efficiency reasons).
+*/
+os_vm_size_t os_vm_page_size = BACKEND_PAGE_BYTES;
+
 /* Expose to Lisp the value of the preprocessor define. Don't touch! */
 int install_sig_memory_fault_handler = INSTALL_SIG_MEMORY_FAULT_HANDLER;
 
 /* Except for os_zero, these routines are only called by Lisp code.
  * These routines may also be replaced by os-dependent versions
- * instead. See hpux-os.c for some useful restrictions on actual
- * usage. */
+ * instead. */
 
 #ifdef LISP_FEATURE_CHENEYGC
 void
@@ -66,18 +74,29 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
          * zero-filled. */
 
         os_invalidate(block_start, block_size);
-        addr = os_validate(NOT_MOVABLE, block_start, block_size);
+        addr = os_validate(NOT_MOVABLE, block_start, block_size, 0, 0);
 
         if (addr == NULL || addr != block_start)
-            lose("os_zero: block moved! %p ==> %p\n", block_start, addr);
+            lose("os_zero: block moved! %p ==> %p", block_start, addr);
     }
 }
 #endif
 
+#include "sys_mmap.inc"
+#ifdef LISP_FEATURE_USE_SYS_MMAP
+os_vm_address_t os_allocate(os_vm_size_t len) {
+    void* answer = sbcl_mmap(0, len, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
+    if (answer == MAP_FAILED) return 0;
+    return answer;
+}
+void os_deallocate(os_vm_address_t addr, os_vm_size_t len) {
+    sbcl_munmap(addr, len);
+}
+#else
 os_vm_address_t
 os_allocate(os_vm_size_t len)
 {
-    return os_validate(MOVABLE, (os_vm_address_t)NULL, len);
+    return os_validate(MOVABLE, (os_vm_address_t)NULL, len, 0, 0);
 }
 
 void
@@ -85,6 +104,7 @@ os_deallocate(os_vm_address_t addr, os_vm_size_t len)
 {
     os_invalidate(addr,len);
 }
+#endif
 
 int
 os_get_errno(void)
@@ -92,9 +112,7 @@ os_get_errno(void)
     return errno;
 }
 
-
-#if defined(LISP_FEATURE_SB_THREAD) && (!defined(CANNOT_USE_POSIX_SEM_T) || defined(LISP_FEATURE_WIN32))
-
+#if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_UNIX && !defined USE_DARWIN_GCD_SEMAPHORES
 void
 os_sem_init(os_sem_t *sem, unsigned int value)
 {
@@ -130,10 +148,9 @@ os_sem_destroy(os_sem_t *sem)
 
 #endif
 
-/* When :SB-DYNAMIC-CORE is enabled, the special category of /static/ foreign
- * symbols disappears. Foreign fixups are resolved to linkage table locations
- * during genesis, and for each of them a record is added to
- * REQUIRED_FOREIGN_SYMBOLS vector, of the form "name" for a function reference,
+/* Genesis-time foreign fixups are resolved to linkage table locations
+ * and for each of them a record is added to the REQUIRED_FOREIGN_SYMBOLS
+ * vector, of the form "name" for a function reference,
  * or ("name") for a data reference. "name" is a base-string.
  *
  * Before any code in lisp image can be called, we have to resolve all
@@ -141,7 +158,7 @@ os_sem_destroy(os_sem_t *sem)
  * table entry for each element of REQUIRED_FOREIGN_SYMBOLS.
  */
 
-#if defined(LISP_FEATURE_SB_DYNAMIC_CORE) && !defined(LISP_FEATURE_WIN32)
+#ifndef LISP_FEATURE_WIN32
 void *
 os_dlsym_default(char *name)
 {
@@ -153,9 +170,7 @@ os_dlsym_default(char *name)
 int lisp_linkage_table_n_prelinked;
 void os_link_runtime()
 {
-#ifdef LISP_FEATURE_SB_DYNAMIC_CORE
-    char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
-    void *validated_end = link_target;
+    int entry_index = 0;
     lispobj symbol_name;
     char *namechars;
     boolean datap;
@@ -166,7 +181,7 @@ void os_link_runtime()
         return; // Linkage was already performed by coreparse
 
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
-    lisp_linkage_table_n_prelinked = fixnum_value(symbols->length);
+    lisp_linkage_table_n_prelinked = vector_len(symbols);
     for (j = 0 ; j < lisp_linkage_table_n_prelinked ; ++j)
     {
         lispobj item = symbols->data[j];
@@ -175,24 +190,18 @@ void os_link_runtime()
         namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
         result = os_dlsym_default(namechars);
 
-        if (link_target == validated_end) {
-            validated_end = (char*)validated_end + os_vm_page_size;
-#ifdef LISP_FEATURE_WIN32
-            os_validate_recommit(link_target,os_vm_page_size);
-#endif
-        }
         if (result) {
-            arch_write_linkage_table_entry(link_target, result, datap);
+            arch_write_linkage_table_entry(entry_index, result, datap);
         } else { // startup might or might not work. ymmv
-            printf("Missing required foreign symbol '%s'\n", namechars);
+            fprintf(stderr, "Missing required foreign symbol '%s'\n", namechars);
         }
 
-        link_target += LINKAGE_TABLE_ENTRY_SIZE;
+        ++entry_index;
     }
-#endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
-#ifdef LISP_FEATURE_X86_64
-    SetSymbolValue(CPUID_FN1_ECX, (lispobj)make_fixnum(cpuid_fn1_ecx), 0);
-#endif
+}
+
+void os_unlink_runtime()
+{
 }
 
 boolean
@@ -210,6 +219,9 @@ gc_managed_heap_space_p(lispobj addr)
         || (DYNAMIC_1_SPACE_START <= addr &&
             addr < DYNAMIC_1_SPACE_START + dynamic_space_size)
 #endif
+#ifdef LISP_FEATURE_DARWIN_JIT
+        || (STATIC_CODE_SPACE_START <= addr && addr < STATIC_CODE_SPACE_END)
+#endif
         )
         return 1;
     return 0;
@@ -217,19 +229,103 @@ gc_managed_heap_space_p(lispobj addr)
 
 #ifndef LISP_FEATURE_WIN32
 
-/* Remap a part of an already existing mapping to a file */
-void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
+#if defined LISP_FEATURE_MIPS
+#include <sys/utsname.h>
+#endif
+/* Remap a part of an already existing memory mapping from a file,
+ * and/or create a new mapping as need be */
+void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
+                      int __attribute__((unused)) execute)
 {
-    os_vm_address_t actual;
-
-    actual = mmap(addr, len, OS_VM_PROT_ALL, MAP_PRIVATE | MAP_FIXED,
-                  fd, (off_t) offset);
-    if (actual == MAP_FAILED || (addr && (addr != actual))) {
-        perror("mmap");
-        lose("unexpected mmap(%"OBJ_FMTX", %"OBJ_FMTX") failure\n",
-             (lispobj)addr, (lispobj)len);
+#if defined LISP_FEATURE_MIPS
+    /* Of the few MIPS machines I have access to, one definitely exhibits a
+     * horrible bug that mmap() persists MAP_PRIVATE pages back to disk,
+     * even though we alwayas open a core file as O_RDONLY. This is a kooky criterion
+     * to restrict the test by, but I didn't want it to be more general */
+    static int buggy_map_private;
+    if (!buggy_map_private) {
+        struct utsname name;
+        uname(&name);
+        if (!strcmp(name.version, "#1 SMP PREEMPT Mon Aug 3 14:22:54 PDT 2015") &&
+            !strcmp(name.release, "4.1.4")) {
+            buggy_map_private = 1;
+            fprintf(stderr, "WARNING: assuming that MAP_PRIVATE does not work on this kernel\n");
+        } else {
+            // fprintf(stderr, "INFO: kernel looks OK: [%s] [%s]\n", name.release, name.version);
+            buggy_map_private = -1;
+        }
     }
+    if (buggy_map_private == 1) {
+        off_t old = lseek(fd, 0, SEEK_CUR);
+        lseek(fd, offset, SEEK_SET);
+        read(fd, addr, len);
+        lseek(fd, old, SEEK_SET);
+        return addr;
+    }
+#endif
+    int fail = 0;
+    os_vm_address_t actual;
+#ifdef LISP_FEATURE_64_BIT
+    actual = sbcl_mmap(addr, len,
+#else
+    /* FIXME: why does using sbcl_mmap cause failure here? I would guess that it can't
+     * pass 'offset' correctly if LARGEFILE is mandatory, which it isn't on 64-bit.
+     * Deadlock should be impossible this early in core loading, I suppose, hence
+     * on one hand I don't care; but on the other, it would be nice to not to see
+     * any use of a potentially hooked mmap() API within this file. */
+    actual = mmap(addr, len,
+#endif
+                  // If mapping to a random address, then the assumption is
+                  // that we're not going to execute the core; nor should we write to it.
+                  // However, the addr=0 case is for 'editcore' which unfortunately _does_
+                  // write the memory. I'd prefer that it not,
+                  // but that's not the concern here.
+#ifdef LISP_FEATURE_DARWIN_JIT
+                  OS_VM_PROT_READ | (execute ?  OS_VM_PROT_EXECUTE : OS_VM_PROT_WRITE),
+#else
+                  addr ? OS_VM_PROT_ALL : OS_VM_PROT_READ | OS_VM_PROT_WRITE,
+#endif
+                  // Do not pass MAP_FIXED with addr of 0, because most OSes disallow that.
+                  MAP_PRIVATE | (addr ? MAP_FIXED : 0),
+                  fd, (off_t) offset);
+    if (actual == MAP_FAILED) {
+        perror("mmap");
+        fail = 1;
+    } else if (addr && (addr != actual)) {
+        fail = 1;
+    }
+    if (fail)
+        lose("load_core_bytes(%d,%p,%p,%zx) failed", fd, (void*)offset, addr, len);
+    return (void*)actual;
 }
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+void* load_core_bytes_jit(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len)
+{
+    ssize_t count;
+
+    lseek(fd, offset, SEEK_SET);
+
+    size_t n_bytes = 65536;
+    char* buf = malloc(n_bytes);
+
+    while (len) {
+        count = read(fd, buf, n_bytes);
+
+        if (count <= -1) {
+            perror("read");
+        }
+
+        memcpy(addr, buf, count);
+        addr += count;
+        len -= count;
+    }
+    free(buf);
+    return (void*)0;
+}
+#endif
+
+#endif
 
 boolean
 gc_managed_addr_p(lispobj addr)
@@ -249,4 +345,28 @@ gc_managed_addr_p(lispobj addr)
     return 0;
 }
 
-#endif
+uword_t os_context_pc(os_context_t* context) {
+    return OS_CONTEXT_PC(context);
+}
+void set_os_context_pc(os_context_t* context, uword_t pc) {
+    OS_CONTEXT_PC(context) = pc;
+}
+os_context_register_t* os_context_pc_addr(os_context_t* context) {
+    return (os_context_register_t*)&(OS_CONTEXT_PC(context));
+}
+
+void *successful_malloc(size_t size)
+{
+    void* result = malloc(size);
+    if (0 == result) {
+        lose("malloc failure");
+    } else {
+        return result;
+    }
+    return (void *) NULL; /* dummy value: return something ... */
+}
+
+char *copied_string(char *string)
+{
+    return strcpy(successful_malloc(1+strlen(string)), string);
+}

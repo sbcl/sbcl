@@ -14,7 +14,7 @@
   (without-scheduling ()
     (inst word simple-fun-widetag)
     (inst word (make-fixup 'undefined-tramp :assembly-routine))
-    (dotimes (i (- simple-fun-code-offset 2))
+    (dotimes (i (- simple-fun-insts-offset 2))
       (inst word nil-value))
 
     (error-call nil 'undefined-fun-error cname-tn)))
@@ -29,12 +29,12 @@
   (without-scheduling ()
     (inst word simple-fun-widetag)
     (inst word (make-fixup 'closure-tramp :assembly-routine))
-    (dotimes (i (- simple-fun-code-offset 2))
+    (dotimes (i (- simple-fun-insts-offset 2))
       (inst word nil-value))
 
     (loadw lexenv-tn cname-tn fdefn-fun-slot other-pointer-lowtag)
     (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-    (inst j code-tn (- (ash simple-fun-code-offset word-shift)
+    (inst j code-tn (- (ash simple-fun-insts-offset word-shift)
                        fun-pointer-lowtag))
     (inst nop)))
 
@@ -48,11 +48,11 @@
   (without-scheduling ()
     (inst word simple-fun-widetag)
     (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine))
-    (dotimes (i (- simple-fun-code-offset 2))
+    (dotimes (i (- simple-fun-insts-offset 2))
       (inst word nil-value))
 
     (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
     (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-    (inst j code-tn (- (ash simple-fun-code-offset word-shift)
+    (inst j code-tn (- (ash simple-fun-insts-offset word-shift)
                        fun-pointer-lowtag))
     (inst nop)))

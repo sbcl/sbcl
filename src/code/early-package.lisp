@@ -16,12 +16,7 @@
 ;;; packages for which locks are ignored, T when locks for
 ;;; all packages are ignored, and :invalid outside package-lock
 ;;; context.
-(!define-thread-local *ignored-package-locks* :invalid)
-
-;; This proclamation avoids a ton of style warnings due to so many calls
-;; that get cross-compiled prior to compiling "target-package.lisp"
-(declaim (ftype (sfunction ((or symbol list) &optional (or string function) &rest t) t)
-                assert-symbol-home-package-unlocked))
+(define-thread-local *ignored-package-locks* :invalid)
 
 (defmacro with-single-package-locked-error ((&optional kind thing &rest format)
                                             &body body)

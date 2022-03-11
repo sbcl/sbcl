@@ -46,7 +46,7 @@
            (fixnum value)
            (ignore dstate))
   (unless (= value 14) ;; Don't print :al
-    (princ (aref sb-vm::+condition-name-vec+ value) stream)))
+    (princ (aref +condition-name-vec+ value) stream)))
 
 (defun print-reg (value stream dstate)
   (declare (type stream stream)
@@ -160,9 +160,6 @@
          (nt "Halt trap"))
         (#.pending-interrupt-trap
          (nt "Pending interrupt trap"))
-        (#.cerror-trap
-         (nt "Cerror trap")
-         (handle-break-args #'snarf-error-junk trap stream dstate))
         (#.breakpoint-trap
          (nt "Breakpoint trap"))
         (#.fun-end-breakpoint-trap
@@ -172,4 +169,6 @@
         (#.single-step-before-trap
          (nt "Single step before trap"))
         (t
-         (handle-break-args #'snarf-error-junk trap stream dstate))))))
+         (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
+                   (>= trap error-trap))
+           (handle-break-args #'snarf-error-junk trap stream dstate)))))))

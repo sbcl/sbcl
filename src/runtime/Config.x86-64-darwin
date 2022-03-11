@@ -31,20 +31,18 @@ endif
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
-ifndef LISP_FEATURE_SB_DYNAMIC_CORE
-  LINKFLAGS +=-Wl,-no_pie
-endif
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   LIBSBCL = libsbcl.a
   USE_LIBSBCL = -Wl,-force_load libsbcl.a
 endif
 
-ASSEM_SRC = x86-64-assem.S ldso-stubs.S
+ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 
 LINKFLAGS += -arch x86_64 -dynamic -twolevel_namespace -bind_at_load -pagezero_size 0x100000
 
 CFLAGS += -arch x86_64 -fno-omit-frame-pointer
+DISABLE_PIE=no
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
   GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c

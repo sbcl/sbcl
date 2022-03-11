@@ -143,6 +143,7 @@
                  ((< key node-key) (find-in (avlnode-left tree)))
                  (t tree))))))
 
+;;; Find a node with key less than or equal to KEY and as near it as possible.
 (defun avl-find<= (key root)
   (declare (sb-vm:word key))
   (named-let find-in ((tree root) (result nil))
@@ -153,6 +154,18 @@
                 (t tree)))
         result)))
 
+;;; Find a node with key greater than or equal to KEY and as near it as possible.
+(defun avl-find>= (key root)
+  (declare (sb-vm:word key))
+  (named-let find-in ((tree root) (result nil))
+    (if tree
+        (let ((node-key (avlnode-key tree)))
+          (cond ((> key node-key) (find-in (avlnode-right tree) result))
+                ((< key node-key) (find-in (avlnode-left tree) tree))
+                (t tree)))
+        result)))
+
+(export '(avltree-list avl-find>= avl-find<=))
 (defun avltree-list (tree &optional (transducer #'avlnode-data))
   (let (result)
     (named-let recurse ((node tree))
@@ -162,8 +175,19 @@
         (recurse (avlnode-right node))))
     result))
 
+(defun avltree-filter (predicate tree)
+  (let (result)
+    (named-let recurse ((node tree))
+      (when node
+        (let ((value (funcall predicate node)))
+          (when value
+            (push value result)))
+        (recurse (avlnode-left node))
+        (recurse (avlnode-right node))))
+    result))
+
 (defmethod print-object ((self avlnode) stream)
-  (write-string "#<avltree " stream)
+  (format stream "#<avltree key=~s " (avlnode-key self))
   (let ((ct (avl-count self)))
     (cond ((< ct 20) ; print in order if not too many
            (let ((c #\[))

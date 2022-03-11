@@ -5,6 +5,8 @@
   )
 
 (cl:in-package :sb-executable)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defvar *stream-buffer-size* 8192)
 (defun copy-stream (from to &key (element-type (stream-element-type from) element-type-passed-p))
@@ -58,7 +60,7 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
          (out-name (namestring (translate-logical-pathname output-file)))
          (prot (elt (multiple-value-list (sb-unix:unix-stat out-name)) 3)))
     (if prot
-        (sb-unix::void-syscall ("chmod" c-string int)
+        (sb-unix:void-syscall ("chmod" c-string int)
                                out-name
                                (logior prot
                                        (if (logand prot #o400) #o100)

@@ -24,26 +24,26 @@
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
   :type (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
 (/show0 "primtype.lisp 27")
-#-64-bit-registers
+#-(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 31))
 (/show0 "primtype.lisp 31")
-#-64-bit-registers
+#-(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 32))
 (/show0 "primtype.lisp 35")
-#+64-bit-registers
+#+(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 63))
-#+64-bit-registers
+#+(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ n-positive-fixnum-bits)))
-#-64-bit-registers
+#-(or 64-bit 64-bit-registers)
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
-#+64-bit-registers
+#+(or 64-bit 64-bit-registers)
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
@@ -51,16 +51,17 @@
 
 (/show0 "primtype.lisp 53")
 (!def-primitive-type-alias tagged-num '(:or positive-fixnum fixnum))
-(multiple-value-bind (unsigned signed)
+(multiple-value-bind (unsigned signed untagged)
     (case sb-vm:n-machine-word-bits
       (64 (values '(unsigned-byte-64 unsigned-byte-63 positive-fixnum)
-                  '(signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)))
+                  '(signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)
+                  '(signed-byte-64 unsigned-byte-64 unsigned-byte-63 fixnum positive-fixnum)))
       (32 (values '(unsigned-byte-32 unsigned-byte-31 positive-fixnum)
-                  '(signed-byte-32 fixnum unsigned-byte-31 positive-fixnum))))
+                  '(signed-byte-32 fixnum unsigned-byte-31 positive-fixnum)
+                  '(signed-byte-32 unsigned-byte-32 unsigned-byte-31 fixnum positive-fixnum))))
   (!def-primitive-type-alias unsigned-num `(:or ,@unsigned))
   (!def-primitive-type-alias signed-num `(:or ,@signed))
-  (!def-primitive-type-alias untagged-num
-    `(:or ,@(sort (copy-list (union unsigned signed)) #'string<))))
+  (!def-primitive-type-alias untagged-num `(:or ,@untagged)))
 
 ;;; other primitive immediate types
 (/show0 "primtype.lisp 68")
@@ -77,6 +78,7 @@
 
 ;;; primitive other-pointer number types
 (/show0 "primtype.lisp 81")
+(!def-primitive-type integer (descriptor-reg))
 (!def-primitive-type bignum (descriptor-reg))
 (!def-primitive-type ratio (descriptor-reg))
 (!def-primitive-type complex (descriptor-reg))
@@ -141,13 +143,12 @@
 ;;; Return the most restrictive primitive type that contains OBJECT.
 (/show0 "primtype.lisp 147")
 (defun primitive-type-of (object)
-  (let ((type (ctype-of object)))
-    (cond ((not (member-type-p type)) (primitive-type type))
-          ((and (eql 1 (member-type-size type))
-                (equal (member-type-members type) '(nil)))
-           (primitive-type-or-lose 'list))
-          (t
-           *backend-t-primitive-type*))))
+  (if (null object)
+      (load-time-value (primitive-type-or-lose 'list) t)
+      (let ((type (ctype-of object)))
+        (if (member-type-p type)
+            *backend-t-primitive-type*
+            (primitive-type type)))))
 
 ;;; Return the primitive type corresponding to a type descriptor
 ;;; structure. The second value is true when the primitive type is
@@ -233,7 +234,7 @@
                 (integer
                  (cond ((and hi lo)
                         (dolist (spec
-                                  `((positive-fixnum 0 ,sb-xc:most-positive-fixnum)
+                                  `((positive-fixnum 0 ,most-positive-fixnum)
                                     ,@(ecase n-machine-word-bits
                                         (32
                                          `((unsigned-byte-31
@@ -245,8 +246,8 @@
                                             0 ,(1- (ash 1 63)))
                                            (unsigned-byte-64
                                             0 ,(1- (ash 1 64))))))
-                                    (fixnum ,sb-xc:most-negative-fixnum
-                                            ,sb-xc:most-positive-fixnum)
+                                    (fixnum ,most-negative-fixnum
+                                            ,most-positive-fixnum)
                                     ,(ecase n-machine-word-bits
                                        (32
                                         `(signed-byte-32 ,(ash -1 31)
@@ -254,10 +255,10 @@
                                        (64
                                         `(signed-byte-64 ,(ash -1 63)
                                                          ,(1- (ash 1 63))))))
-                                 (if (or (< hi sb-xc:most-negative-fixnum)
-                                         (> lo sb-xc:most-positive-fixnum))
+                                 (if (or (< hi most-negative-fixnum)
+                                         (> lo most-positive-fixnum))
                                      (part-of bignum)
-                                     (any)))
+                                     (part-of integer)))
                           (let ((type (car spec))
                                 (min (cadr spec))
                                 (max (caddr spec)))
@@ -265,11 +266,11 @@
                               (return (values
                                        (primitive-type-or-lose type)
                                        (and (= lo min) (= hi max))))))))
-                       ((or (and hi (< hi sb-xc:most-negative-fixnum))
-                            (and lo (> lo sb-xc:most-positive-fixnum)))
+                       ((or (and hi (< hi most-negative-fixnum))
+                            (and lo (> lo most-positive-fixnum)))
                         (part-of bignum))
                        (t
-                        (any))))
+                        (part-of integer))))
                 (float
                  (let ((exact (and (null lo) (null hi))))
                    (case (numeric-type-format type)
@@ -389,35 +390,42 @@
              (part-of character)))
         #+sb-simd-pack
         (simd-pack-type
-         (let ((eltypes (simd-pack-type-element-type type)))
-           (cond ((member 'integer eltypes)
+         (let* ((eltypes (simd-pack-type-element-type type))
+                (count (count 1 eltypes))
+                (position (position 1 eltypes)))
+           (if (= count 1)
+               (cond
+                 ((eql position (position 'integer *simd-pack-element-types*))
                   (exactly simd-pack-int))
-                 ((member 'single-float eltypes)
+                 ((eql position (position 'single-float *simd-pack-element-types*))
                   (exactly simd-pack-single))
-                 ((member 'double-float eltypes)
-                  (exactly simd-pack-double)))))
+                 ((eql position (position 'double-float *simd-pack-element-types*))
+                  (exactly simd-pack-double))
+                 (t (any)))
+               (any))))
         #+sb-simd-pack-256
         (simd-pack-256-type
-         (let ((eltypes (simd-pack-256-type-element-type type)))
-           (cond ((member 'integer eltypes)
+         (let* ((eltypes (simd-pack-256-type-element-type type))
+                (count (count 1 eltypes))
+                (position (position 1 eltypes)))
+           (if (= count 1)
+               (cond
+                 ((eql position (position 'integer *simd-pack-element-types*))
                   (exactly simd-pack-256-int))
-                 ((member 'single-float eltypes)
+                 ((eql position (position 'single-float *simd-pack-element-types*))
                   (exactly simd-pack-256-single))
-                 ((member 'double-float eltypes)
-                  (exactly simd-pack-256-double)))))
+                 ((eql position (position 'double-float *simd-pack-element-types*))
+                  (exactly simd-pack-256-double))
+                 (t (any)))
+               (any))))
+        (cons-type
+         (part-of list))
         (built-in-classoid
          (case (classoid-name type)
-           #+sb-simd-pack
-           ;; Can't tell what specific type; assume integers.
-           (simd-pack
-            (exactly simd-pack-int))
-           #+sb-simd-pack-256
-           (simd-pack-256
-            (exactly simd-pack-256-int))
            ((complex function system-area-pointer weak-pointer)
             (values (primitive-type-or-lose (classoid-name type)) t))
-           (cons-type
-            (part-of list))
+           ((pathname logical-pathname)
+            (part-of instance))
            (t
             (any))))
         (fun-designator-type

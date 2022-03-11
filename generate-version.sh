@@ -2,7 +2,8 @@
 
 git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
-    if ( command -v git >/dev/null && git describe >/dev/null 2>/dev/null )
+    if ( command -v git >/dev/null && git describe >/dev/null 2>/dev/null && \
+       test -f `git rev-parse --show-toplevel`/run-sbcl.sh)
     then
         echo "ok"
     else
@@ -17,7 +18,7 @@ then
     exit 0
 elif [ -z "$AVAILABLE" ]
 then
-    echo "Can't run 'git describe' and version.lisp-expr is missing." >&2
+    echo "Can't 'git describe' SBCL source and version.lisp-expr is missing." >&2
     echo "To fix this, either install git or create a fake version.lisp-expr file." >&2
     echo "You can create a fake version.lisp-expr file like this:" >&2
     echo "    \$ echo '\"1.0.99.999\"' > version.lisp-expr" >&2
@@ -34,14 +35,7 @@ else
 fi
 if [ -z "$SBCL_BUILDING_RELEASE_FROM" ]
 then
-    if [ "`git rev-list HEAD --not origin/master`" = '' ]
-    then
-        # If origin/master contains all the commits on current
-        # branch, use current head as the root instead.
-        version_root="$version_branchname"
-    else
-        version_root="origin/master"
-    fi
+    version_root=`git merge-base HEAD origin/master`
 else
     version_root="$SBCL_BUILDING_RELEASE_FROM"
 fi
@@ -62,7 +56,7 @@ if git diff HEAD --no-ext-diff --quiet --exit-code
 then
     version_dirty=""
 else
-    version_dirty="-dirty"
+    version_dirty="-WIP"
 fi
 # Now that we have all the pieces, put them together.
 cat >version.lisp-expr <<EOF

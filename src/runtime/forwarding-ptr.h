@@ -8,11 +8,13 @@ in_gc_p(void) {
 }
 #endif
 
+#define FORWARDING_HEADER 1
+
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {
     lispobj first_word=*pointer;
 #ifdef LISP_FEATURE_GENCGC
-    return (first_word == 0x01);
+    return (first_word == FORWARDING_HEADER);
 #else
     // FIXME: change 5c0d71f92c371769f911e6a2ac60b2dd9fbde349 added
     // an extra test here, which theoretically slowed things down.
@@ -39,9 +41,8 @@ forwarding_pointer_value(lispobj *pointer) {
     return pointer[0];
 #endif
 }
-static inline lispobj
-set_forwarding_pointer(lispobj *pointer, lispobj newspace_copy) {
-  // The object at 'pointer' might already have been forwarded,
+static inline void set_forwarding_pointer(lispobj *addr, lispobj newspace_copy) {
+  // The object at 'addr' might already have been forwarded,
   // but that's ok. Such occurs primarily when dealing with
   // code components, because code can be forwarded by scavenging any
   // pointer to a function that resides within the code.
@@ -51,12 +52,24 @@ set_forwarding_pointer(lispobj *pointer, lispobj newspace_copy) {
   // that we're operating on a not-yet-forwarded object here.
 #ifdef LISP_FEATURE_GENCGC
     gc_dcheck(compacting_p());
-    pointer[0]=0x01;
-    pointer[1]=newspace_copy;
+    addr[0] = FORWARDING_HEADER;
+    addr[1] = newspace_copy;
 #else
-    pointer[0]=newspace_copy;
+    addr[0] = newspace_copy;
 #endif
-    return newspace_copy;
+}
+
+/// Chase the pointer in 'word' if it points to a forwarded object.
+static inline lispobj follow_maybe_fp(lispobj word)
+{
+    return (is_lisp_pointer(word) && forwarding_pointer_p(native_pointer(word)))
+        ? forwarding_pointer_value(native_pointer(word)) : word;
+}
+/// As above, but 'ptr' MUST be a pointer.
+static inline lispobj follow_fp(lispobj ptr)
+{
+  return forwarding_pointer_p(native_pointer(ptr))
+      ? forwarding_pointer_value(native_pointer(ptr)) : ptr;
 }
 
 #endif

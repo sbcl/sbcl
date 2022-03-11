@@ -242,6 +242,10 @@
 
 #+sb-unicode
 (with-test (:name :unicode-dispatch-macros)
+  ;; Smoke test: (set-syntax-from-char unicode-char ordinary-constituent-char)
+  ;; should not fail
+  (set-syntax-from-char (code-char 300) #\a)
+  ;;
   (let ((*readtable* (copy-readtable)))
     (make-dispatch-macro-character (code-char #x266F)) ; musical sharp
     (set-dispatch-macro-character
@@ -252,9 +256,12 @@
     (let ((x (read-from-string
               (map 'string #'code-char '(#x266F #x221E)))))
       (assert (eq x :infinity))
+      ;; I don't know what this was testing, and it's "noisy". Can we fix that?
+      ;; I think we used to treat NIL as *removing* the macro function, which is not
+      ;; a specified action. But neither could NIL ever be a function designator.
       (set-dispatch-macro-character (code-char #x266F) (code-char #x221E) nil)
       (assert (zerop (hash-table-count
-                      (car (sb-impl::%dispatch-macro-char-table
+                      (cdr (sb-impl::%dispatch-macro-char-table
                             (get-macro-character (code-char #x266F)))))))))
 
   (let ((*readtable* (copy-readtable)))

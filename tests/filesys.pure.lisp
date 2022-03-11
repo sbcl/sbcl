@@ -67,12 +67,29 @@
 
 ;;; DIRECTORY used to treat */** as **.
 (with-test (:name (directory :*/**))
+  ;; FIXME: this test should be redone to construct a controlled file
+  ;; hierarchy for listing. If test files or test runners ever get
+  ;; reorganized and it turns out there are no subdirectories under
+  ;; the *DEFAULT-PATHNAME-DEFAULTS* when this gets run, this test
+  ;; will pass but fail to test the behavior it's supposed to.
   (assert (equal (directory "*/**/*.*")
-                 (mapcan (lambda (directory)
-                           (directory (merge-pathnames "**/*.*" directory)))
-                         (directory "*/")))))
+                 ;; Each call to DIRECTORY sorts its results, but if
+                 ;; our files' truenames are random (e.g., if files
+                 ;; here are symlinks to hashes of file content), then
+                 ;; we need to merge the results of the inner
+                 ;; DIRECTORY calls.
+                 (reduce
+                  (lambda (list1 list2)
+                    ;; Depends on all truenames having namestrings.
+                    ;; (Which they do; noted for future reference.)
+                    (merge 'list list1 list2 'string< :key 'namestring))
+                  (mapcar (lambda (directory)
+                            (directory (merge-pathnames "**/*.*" directory)))
+                          (directory "*/"))))))
 
 (with-test (:name (directory *default-pathname-defaults* :bug-1740563))
+  ;; FIXME: this writes into the source directory depending on whether
+  ;; TEST_DIRECTORY has been made to point elsewhere or not.
   (let ((test-directory (concatenate 'string (sb-ext:posix-getenv "TEST_DIRECTORY") "/")))
     (ensure-directories-exist test-directory)
     (close (open (merge-pathnames "a.txt" test-directory) :if-does-not-exist :create))
@@ -287,37 +304,23 @@
                      "a-really-non-existing-file")
                  :direction direction
                  :if-exists if-exists :if-does-not-exist if-does-not-exist)))
-    (assert-error
-     (do-open nil nil :error))
-    (assert (not
-             (do-open nil :error nil)))
-    (assert (not
-             (do-open t nil :error)))
-    (assert-error
-     (do-open t :error nil))
-    (assert (not
-             (do-open nil nil nil)))
-    (assert-error
-     (do-open nil :error :error))
-    (assert (not
-             (do-open t nil nil)))
+    (assert-error (do-open nil nil :error) file-error)
+    (assert (not (do-open nil :error nil)))
+    (assert (not (do-open t nil :error)))
+    (assert-error (do-open t :error nil) file-error)
+    (assert (not (do-open nil nil nil)))
+    (assert-error (do-open nil :error :error) file-error)
+    (assert (not (do-open t nil nil)))
     (assert-error (do-open t :error :error))
 
-    (assert-error
-     (do-open nil nil :error :io))
-    (assert (not
-             (do-open nil :error nil :io)))
-    (assert (not
-             (do-open t nil :error :io)))
-    (assert-error
-     (do-open t :error nil :io))
-    (assert (not
-             (do-open nil nil nil :io)))
-    (assert-error
-     (do-open nil :error :error :io))
-    (assert (not
-             (do-open t nil nil :io)))
-    (assert-error (do-open t :error :error :io))))
+    (assert-error (do-open nil nil :error :io) file-error)
+    (assert (not (do-open nil :error nil :io)))
+    (assert (not (do-open t nil :error :io)))
+    (assert-error (do-open t :error nil :io) file-error)
+    (assert (not (do-open nil nil nil :io)))
+    (assert-error (do-open nil :error :error :io) file-error)
+    (assert (not (do-open t nil nil :io)))
+    (assert-error (do-open t :error :error :io) file-error)))
 
 (with-test (:name (open :new-version))
   (multiple-value-bind (value error)
@@ -326,11 +329,55 @@
                            :if-exists :new-version))
     (assert (not value))
     (assert error)
-    (assert (equal (simple-condition-format-control error)
-                   "OPEN :IF-EXISTS :NEW-VERSION is not supported ~
-                            when a new version must be created."))))
+    (let ((control (simple-condition-format-control error)))
+      (assert (search "OPEN :IF-EXISTS :NEW-VERSION is not supported" control))
+      (assert (search "when a new version must be created." control)))))
 
-(with-test (:name :parse-native-namestring-canon :skipped-on (not :unix))
+(with-test (:name (open :if-does-not-exist restart))
+  (flet ((do-open (restart)
+           (let ((filename "does-not-exist"))
+             (unwind-protect
+                  (handler-bind
+                      ((file-does-not-exist
+                         (lambda (condition)
+                           (let ((restart (find-restart restart condition)))
+                             (invoke-restart restart)))))
+                    (close (open filename :direction :output)))
+               (assert (probe-file filename))
+               (delete-file filename)))))
+    (do-open 'sb-impl::create)))
+
+(with-test (:name (open :if-exists restart))
+  (labels ((read-file (filename)
+             (with-open-file (stream filename)
+               (let ((result (make-string (file-length stream))))
+                 (read-sequence result stream)
+                 result)))
+           (do-open (restart expected-content)
+             (let ((filename "exists"))
+               (with-open-file (stream filename :direction :output
+                                                :if-does-not-exist :create)
+                 (write-string "foo" stream))
+               (unwind-protect
+                    (progn
+                      (handler-bind
+                          ((file-exists
+                             (lambda (condition)
+                               (let ((restart (find-restart restart condition)))
+                                 (invoke-restart restart)))))
+                        (let ((stream (open filename :direction :output)))
+                          (write-string "bar" stream)
+                          (close stream)))
+                      (assert (equal expected-content (read-file filename))))
+                 (delete-file filename)
+                 (ignore-errors
+                  (delete-file (concatenate 'string filename ".bak")))))))
+    (do-open 'sb-impl::supersede "bar")
+    (do-open 'sb-impl::overwrite "bar")
+    (do-open 'sb-impl::rename "bar")
+    (do-open 'append "foobar")))
+
+(with-test (:name (parse-native-namestring :canon) :skipped-on (not :unix))
   (let ((pathname (parse-native-namestring "foo/bar//baz")))
     (assert (string= (car (last (pathname-directory pathname))) "bar"))))
 

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-IMPL") ;(SB-IMPL, not SB-IMPL, since we're built in warm load.)
+(in-package "SB-IMPL")
 
 (defparameter *inspect-length* 10)
 
@@ -165,7 +165,7 @@ evaluated expressions.
 
 (defun inspected-structure-elements (object)
   (let ((parts-list '())
-        (info (layout-info (sb-kernel:layout-of object))))
+        (info (wrapper-info (sb-kernel:wrapper-of object))))
     (when (sb-kernel::defstruct-description-p info)
       (dolist (dd-slot (dd-slots info) (nreverse parts-list))
         (push (cons (dsd-name dd-slot)
@@ -175,6 +175,11 @@ evaluated expressions.
 (defmethod inspected-parts ((object structure-object))
   (values (format nil "The object is a STRUCTURE-OBJECT of type ~S.~%"
                   (type-of object))
+          t
+          (inspected-structure-elements object)))
+
+(defmethod inspected-parts ((object pathname))
+  (values (format nil "The object is a ~S.~%" (type-of object))
           t
           (inspected-structure-elements object)))
 
@@ -216,7 +221,7 @@ evaluated expressions.
           ;; to DESCRIBE from the inspector.
           (list*
            (cons "Lambda-list" (%fun-lambda-list object))
-           (cons "Ftype" (%fun-type object))
+           (cons "Ftype" (%fun-ftype object))
            (when (closurep object)
              (list
               (cons "Closed over values" (%closure-values object)))))))
@@ -236,15 +241,14 @@ evaluated expressions.
              (cons "Documentation" (documentation object t))))))
 
 (defmethod inspected-parts ((object vector))
-  (values (format nil
-                  "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
-                  (and (array-header-p object)
-                       (%array-displaced-p object))
-                  (length object))
-          nil
-          ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what
-          ;; does *INSPECT-LENGTH* mean?
-          (coerce object 'list)))
+  (let ((length (min (length object) *inspect-length*)))
+    (values (format nil
+                    "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
+                    (and (array-header-p object)
+                         (%array-displaced-p object))
+                    (length object))
+            nil
+            (coerce (subseq object 0 length) 'list))))
 
 (defun inspected-index-string (index rev-dimensions)
   (if (null rev-dimensions)
@@ -263,19 +267,17 @@ evaluated expressions.
                                       :displaced-to object))
          (dimensions (array-dimensions object))
          (reversed-elements nil))
-    ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what does
-    ;; *INSPECT-LENGTH* mean?
     (dotimes (i length)
       (push (cons (format nil
                           "~A "
                           (inspected-index-string i (reverse dimensions)))
                   (aref reference-array i))
             reversed-elements))
-    (values (format nil "The object is ~:[a displaced~;an~] ARRAY of ~A.~%~
-                         Its dimensions are ~S.~%"
-                    (array-element-type object)
+    (values (format nil "The object is ~:[an~;a displaced~] ARRAY of ~A.~%~
+                         Its dimensions are ~:S.~%"
                     (and (array-header-p object)
                          (%array-displaced-p object))
+                    (array-element-type object)
                     dimensions)
             t
             (nreverse reversed-elements))))

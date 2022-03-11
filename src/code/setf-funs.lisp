@@ -14,10 +14,18 @@
 
 (eval-when (:compile-toplevel :execute)
 
+(defun c*r-function-p (string)
+  (and (char= (char string 0) #\C)
+       (char= (char string (1- (length string))) #\R)
+       (loop for i from 1 below (1- (length string))
+             always (member (char string i) '(#\A #\D)))))
+
 (defun compute-one-setter (name type)
   (let ((args (second type)))
     (cond
      ((null (intersection args lambda-list-keywords))
+      (when (c*r-function-p (string name))
+        (setq args '(cons)))
       (let ((res (type-specifier
                   (single-value-type
                    (values-specifier-type (third type)))))
@@ -57,7 +65,7 @@
            (let ((type (type-specifier (global-ftype sym))))
              (aver (consp type))
              (list
-              #-sb-fluid `(declaim (inline (setf ,sym)))
+              `(declaim (inline (setf ,sym)))
               (compute-one-setter sym type))))
          (sort (res) #'string<)))))
 

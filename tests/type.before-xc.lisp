@@ -21,6 +21,19 @@
 
 (in-package "BEFORE-XC-TESTS")
 
+;;; Assert that some of the type specifiers which we claim have unique internal
+;;; representations do, and that parsing does not rely critically on
+;;; memoization performed in SPECIFIER-TYPE, which is only a best effort
+;;; to produce the EQ model object given an EQUAL specifier.
+(dolist (type sb-kernel::*special-union-types*)
+  (dolist (constituent-type (union-type-types (specifier-type type)))
+    (let ((specifier (type-specifier constituent-type)))
+      (drop-all-hash-caches)
+      (let ((parse (specifier-type specifier)))
+        (drop-all-hash-caches)
+        (let ((reparse (specifier-type specifier)))
+          (aver (eq parse reparse)))))))
+
 (assert (type= (specifier-type '(and fixnum (satisfies foo)))
                (specifier-type '(and (satisfies foo) fixnum))))
 (assert (type= (specifier-type '(member 1 2 3))
@@ -121,12 +134,13 @@
                (type-union (specifier-type 'vector) (specifier-type 'list))))
 (assert (type= (specifier-type 'list)
                (type-union (specifier-type 'cons) (specifier-type 'list))))
-(assert (not (csubtypep (type-union (specifier-type 'list)
-                                    (specifier-type '(satisfies foo)))
-                        (specifier-type 'list))))
-(assert (csubtypep (specifier-type 'list)
-                   (type-union (specifier-type 'list)
-                               (specifier-type '(satisfies foo)))))
+(let ((sb-kernel::*xtypep-uncertainty-action* nil))
+  (assert (not (csubtypep (type-union (specifier-type 'list)
+                                      (specifier-type '(satisfies foo)))
+                          (specifier-type 'list))))
+  (assert (csubtypep (specifier-type 'list)
+                     (type-union (specifier-type 'list)
+                                 (specifier-type '(satisfies foo))))))
 
 ;;; Identities should be identities.
 (dolist (type-specifier '(nil
@@ -227,22 +241,14 @@
 (assert (type= (type-intersection (specifier-type 'number)
                                   (specifier-type 'integer))
                (specifier-type 'integer)))
-(assert (null (type-intersection2 (specifier-type 'symbol)
-                                  (specifier-type '(satisfies foo)))))
-(assert (intersection-type-p (specifier-type '(and symbol (satisfies foo)))))
-;; the target compiler returns NIL for this CTYPEP call involving KEYWORDP.
-;; therefore the cross-compiler should too.
-(assert (not (ctypep :x86 (specifier-type '(satisfies keywordp)))))
-(let* ((info (sb-int:info :function :info 'keywordp))
-       (attributes (sb-c::fun-info-attributes info)))
-  (unwind-protect
-       (progn
-         (setf (sb-c::fun-info-attributes info)
-               (logior attributes (sb-c::ir1-attributes sb-c::foldable)))
-         (assert (ctypep :x86 (specifier-type '(satisfies keywordp)))))
-    (setf (sb-c::fun-info-attributes info) attributes)))
-(assert (not (type= (specifier-type '(member :x86))
-                    (specifier-type '(and (member :x86) (satisfies keywordp))))))
+(let ((sb-kernel::*xtypep-uncertainty-action* nil))
+  (assert (null (type-intersection2 (specifier-type 'symbol)
+                                    (specifier-type '(satisfies foo)))))
+  (assert (intersection-type-p (specifier-type '(and symbol (satisfies foo))))))
+(assert (ctypep :x86 (specifier-type '(satisfies keywordp))))
+(assert (not (ctypep 'cons (specifier-type '(satisfies keywordp)))))
+(assert (type= (specifier-type '(member :x86))
+               (specifier-type '(and (member :x86) (satisfies keywordp)))))
 #+nil
 (let* ((type1 (specifier-type '(member :x86)))
        (type2 (specifier-type '(or keyword null)))
@@ -351,11 +357,12 @@
   (assert (not yes))
   (assert win))
 ;; Used to run out of stack.
-(multiple-value-bind (yes win)
-    (handler-bind ((sb-kernel::cross-type-giving-up #'muffle-warning))
-      (subtypep 'null '(or unk0 unk1)))
-  (assert (not yes))
-  (assert (not win)))
+(let ((sb-kernel::*xtypep-uncertainty-action* nil))
+  (multiple-value-bind (yes win)
+      (handler-bind ((sb-kernel::cross-type-giving-up #'muffle-warning))
+        (subtypep 'null '(or unk0 unk1)))
+    (assert (not yes))
+    (assert (not win))))
 
 (multiple-value-bind (yes win)
     (subtypep '(and function instance) nil)
@@ -422,3 +429,80 @@
              sb-vm::fp-complex-single-zero-sc-number))
   (assert (= (sb-vm::immediate-constant-sc (complex $0.0d0 $0.0d0))
              sb-vm::fp-complex-double-zero-sc-number)))
+
+;;; Unparse a union of (up to) 3 things depending on :sb-unicode as 2 things.
+(assert (sb-kernel::brute-force-type-specifier-equalp
+         (type-specifier (specifier-type '(or string null)))
+         '(or #+sb-unicode string #-sb-unicode base-string null)))
+
+(multiple-value-bind (result exactp)
+    (sb-vm::primitive-type (specifier-type 'list))
+  (assert (and (eq result (sb-vm::primitive-type-or-lose 'list))
+               exactp)))
+(multiple-value-bind (result exactp)
+    (sb-vm::primitive-type (specifier-type 'cons))
+  (assert (and (eq result (sb-vm::primitive-type-or-lose 'list))
+               (not exactp))))
+
+(let ((bs (specifier-type 'base-string))
+      (not-sbs (specifier-type '(not simple-base-string)))
+      (not-ss (specifier-type '(not simple-string))))
+  (let ((intersect (type-intersection bs not-sbs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array))))))
+  ;; should be commutative
+  (let ((intersect (type-intersection not-sbs bs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array))))))
+  ;; test when the righthand side is a larger negation type
+  (let ((intersect (type-intersection bs not-ss)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array))))))
+  (let ((intersect (type-intersection not-sbs bs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and base-string (not simple-array)))))))
+
+#+sb-unicode
+(let ((cs (specifier-type 'sb-kernel::character-string))
+      (not-scs (specifier-type '(not sb-kernel:simple-character-string)))
+      (not-ss (specifier-type '(not simple-string))))
+  (let ((intersect (type-intersection cs not-scs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array))))))
+  (let ((intersect (type-intersection not-scs cs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array))))))
+  ;; test when the righthand side is a larger negation type
+  (let ((intersect (type-intersection cs not-ss)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array))))))
+  (let ((intersect (type-intersection not-ss cs)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type '(and sb-kernel::character-string (not simple-array)))))))
+
+#+sb-unicode
+(let ((s (specifier-type 'string))
+      (not-ss (specifier-type '(not simple-string))))
+  (let ((intersect (type-intersection s not-ss)))
+    (assert (union-type-p intersect))
+    (assert (type= intersect (specifier-type '(and string (not simple-array))))))
+  (let ((intersect (type-intersection not-ss s)))
+    (assert (union-type-p intersect))
+    (assert (type= intersect (specifier-type '(and string (not simple-array)))))))
+
+(let ((left (specifier-type '(array bit (2 2))))
+      (right (specifier-type '(not (simple-array bit)))))
+  (let ((intersect (type-intersection left right)))
+    (assert (array-type-p intersect))
+    (assert (type= intersect (specifier-type
+                              '(and (array bit (2 2))
+                                    (not simple-array)))))))
+
+;;; The instance-typep transform shouldn't need two different lowtag tests
+;;; on instance types other than [funcallable-]standard-object.
+;;; And for some reason we suppose that STREAM may be either funcallable or not.
+(dolist (type '(pathname logical-pathname condition))
+  (multiple-value-bind (answer certain)
+      (csubtypep (find-classoid type) (specifier-type 'funcallable-instance))
+    (assert (and (not answer) certain)))
+  (aver (csubtypep (find-classoid type) (specifier-type 'instance))))

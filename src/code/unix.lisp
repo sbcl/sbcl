@@ -32,7 +32,7 @@
 (defun c-strings->string-list (c-strings)
   (declare (type (alien (* c-string)) c-strings))
   (let ((reversed-result nil))
-    (dotimes (i sb-xc:most-positive-fixnum (error "argh! can't happen"))
+    (dotimes (i most-positive-fixnum (error "argh! can't happen"))
       (declare (type index i))
       (let ((c-string (deref c-strings i)))
         (if c-string
@@ -42,7 +42,7 @@
 ;;;; Lisp types used by syscalls
 
 (deftype unix-pathname () 'simple-string)
-(deftype unix-fd () `(integer 0 ,sb-xc:most-positive-fixnum))
+(deftype unix-fd () `(integer 0 ,most-positive-fixnum))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
 (deftype unix-pid () '(unsigned-byte 32))
@@ -53,13 +53,25 @@
 
 (/show0 "unix.lisp 74")
 
-;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
-;;; macros in this file, are only used in this file, and could be
-;;; implemented using SB-XC:DEFMACRO wrapped in EVAL-WHEN.
-;;;
-;;; SB-EXECUTABLE, at least, uses one of these macros; other libraries
-;;; and programs have been known to use them as well.  Perhaps they
-;;; should live in SB-SYS or even SB-EXT?
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun libc-name-for (x)
+    (assert (stringp x))
+    ;; This function takes a possibly-wrapped C name and strips off "sb_"
+    ;; if it doesn't need a wrapper. The list of functions that can be
+    ;; called directly is listed explicitly, because there are also others
+    ;; that might want to be wrapped even if they don't need to be,
+    ;; like sb_opendir and sb_closedir. Why are those wrapped in fact?
+    #+netbsd x
+    #-netbsd (if (member x '("sb_getrusage" ; syscall*
+                             "sb_gettimeofday" ;syscall*
+                             "sb_select" ; int-syscall
+                             "sb_getitimer" ; syscall*
+                             "sb_setitimer" ; syscall*
+                             "sb_clock_gettime" ; alien-funcall
+                             "sb_utimes") ; posix
+                         :test #'string=)
+                 (subseq x 3)
+                 x)))
 
 (defmacro syscall ((name &rest arg-types) success-form &rest args)
   (when (eql 3 (mismatch "[_]" name))
@@ -67,7 +79,8 @@
           (concatenate 'string #+win32 "_" (subseq name 3))))
   `(locally
     (declare (optimize (sb-c::float-accuracy 0)))
-    (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
+    (let ((result (alien-funcall (extern-alien ,(libc-name-for name)
+                                               (function int ,@arg-types))
                                 ,@args)))
       (if (minusp result)
           (values nil (get-errno))
@@ -79,14 +92,15 @@
 (defmacro syscall* ((name &rest arg-types) success-form &rest args)
   `(locally
     (declare (optimize (sb-c::float-accuracy 0)))
-    (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
+    (let ((result (alien-funcall (extern-alien ,(libc-name-for name)
+                                               (function int ,@arg-types))
                                  ,@args)))
       (if (minusp result)
           (error "Syscall ~A failed: ~A" ,name (strerror))
           ,success-form))))
 
 (defmacro int-syscall ((name &rest arg-types) &rest args)
-  `(syscall (,name ,@arg-types) (values result 0) ,@args))
+  `(syscall (,(libc-name-for name) ,@arg-types) (values result 0) ,@args))
 
 (defmacro with-restarted-syscall ((&optional (value (gensym))
                                              (errno (gensym)))
@@ -165,11 +179,13 @@ corresponds to NAME, or NIL if there is none."
   #+win32 (sb-win32:unixlike-open path flags :overlapped overlapped)
   #-win32
   (with-restarted-syscall (value errno)
-    (int-syscall ("open" c-string int int)
-                 path
-                 (logior #+largefile o_largefile
-                         flags)
-                 mode)))
+    (locally
+        (declare (optimize (sb-c::float-accuracy 0)))
+      (let ((result (alien-funcall (extern-alien "open" (function int c-string int &optional int))
+                                   path (logior flags) mode)))
+        (if (minusp result)
+            (values nil (get-errno))
+            (values result 0))))))
 
 ;;; UNIX-CLOSE accepts a file descriptor and attempts to close the file
 ;;; associated with it.
@@ -387,17 +403,17 @@ corresponds to NAME, or NIL if there is none."
   ;;
   ;; Signal an error at compile-time, since it's needed for the
   ;; runtime to start up
-  #-(or android linux openbsd freebsd netbsd sunos darwin hpux dragonfly)
+  #-(or android linux openbsd freebsd netbsd sunos darwin dragonfly haiku)
   #.(error "POSIX-GETCWD is not implemented.")
   (or
-   #+(or linux openbsd freebsd netbsd sunos darwin hpux dragonfly)
+   #+(or linux openbsd freebsd netbsd sunos darwin dragonfly haiku)
    (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                     (function (* char)
                                                               (* char)
                                                               size-t))
                                       nil
-                                      #+(or linux openbsd freebsd netbsd darwin dragonfly) 0
-                                      #+(or sunos hpux) 1025))
+                                      #+(or linux openbsd freebsd netbsd darwin dragonfly haiku) 0
+                                      #+(or sunos) 1025))
    #+android
    (with-alien ((ptr (array char #.path-max)))
      ;; Older bionic versions do not have the above feature.
@@ -536,26 +552,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (void-syscall ("ioctl" int unsigned-long (* char)) fd cmd arg))
 
 ;;;; sys/resource.h
-
-;;; FIXME: All we seem to need is the RUSAGE_SELF version of this.
-;;;
-;;; This is like getrusage(2), except it returns only the system and
-;;; user time, and returns the seconds and microseconds as separate
-;;; values.
-#-win32 (declaim (inline unix-fast-getrusage))
-#-win32
-(defun unix-fast-getrusage (who)
-  (declare (values (member t)
-                   unsigned-byte fixnum
-                   unsigned-byte fixnum))
-  (with-alien ((usage (struct rusage)))
-    (syscall* ("sb_getrusage" int (* (struct rusage)))
-              (values t
-                      (slot (slot usage 'ru-utime) 'tv-sec)
-                      (slot (slot usage 'ru-utime) 'tv-usec)
-                      (slot (slot usage 'ru-stime) 'tv-sec)
-                      (slot (slot usage 'ru-stime) 'tv-usec))
-              who (addr usage))))
 
 ;;; Return information about the resource usage of the process
 ;;; specified by WHO. WHO can be either the current process
@@ -1003,14 +999,13 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 #-win32
 (defun unix-setitimer (which int-secs int-usec val-secs val-usec)
-  "UNIX-SETITIMER sets the INTERVAL and VALUE slots of one of
-   three system timers (:real :virtual or :profile). A SIGALRM signal
-   will be delivered VALUE <seconds+microseconds> from now. INTERVAL,
-   when non-zero, is <seconds+microseconds> to be loaded each time
-   the timer expires. Setting INTERVAL and VALUE to zero disables
-   the timer. See the Unix man page for more details. On success,
-   unix-setitimer returns the old contents of the INTERVAL and VALUE
-   slots as in unix-getitimer."
+  "UNIX-SETITIMER sets the INTERVAL and VALUE slots of one of three system
+   timers (:real :virtual or :profile). A SIGALRM, SIGVTALRM, or SIGPROF
+   respectively will be delivered in VALUE <seconds+microseconds> from now.
+   INTERVAL, when non-zero, is reloaded into the timer on each expiration.
+   Setting VALUE to zero disables the timer. See the Unix man page for more
+   details. On success, unix-setitimer returns the
+   old contents of the INTERVAL and VALUE slots as in unix-getitimer."
   (declare (type (member :real :virtual :profile) which)
            (type unsigned-byte int-secs val-secs)
            (type (integer 0 (1000000)) int-usec val-usec)
@@ -1027,13 +1022,13 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
             (slot (slot itvn 'it-interval) 'tv-usec) int-usec
             (slot (slot itvn 'it-value   ) 'tv-sec ) val-secs
             (slot (slot itvn 'it-value   ) 'tv-usec) val-usec)
-      (syscall* ("sb_setitimer" int (* (struct timeval))(* (struct timeval)))
+      (syscall* ("sb_setitimer" int (* (struct timeval)) (* (struct timeval)))
                 (values t
                         (slot (slot itvo 'it-interval) 'tv-sec)
                         (slot (slot itvo 'it-interval) 'tv-usec)
                         (slot (slot itvo 'it-value) 'tv-sec)
                         (slot (slot itvo 'it-value) 'tv-usec))
-                which (alien-sap (addr itvn))(alien-sap (addr itvo))))))
+                which (alien-sap (addr itvn)) (alien-sap (addr itvo))))))
 
 
 ;;; FIXME: Many Unix error code definitions were deleted from the old
@@ -1043,59 +1038,65 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; enough of them all in one place here that they should probably be
 ;;; removed by hand.
 
-(defconstant micro-seconds-per-internal-time-unit
-  (/ 1000000 sb-xc:internal-time-units-per-second))
+(defconstant microseconds-per-internal-time-unit
+  (/ 1000000 internal-time-units-per-second))
+(defconstant nanoseconds-per-internal-time-unit
+  (* microseconds-per-internal-time-unit 1000))
 
 ;;; UNIX specific code, that has been cleanly separated from the
 ;;; Windows build.
 #-win32
 (progn
 
-  #-sb-fluid (declaim (inline get-time-of-day))
+  (declaim (inline clock-gettime))
+  (defun clock-gettime (clockid)
+    (declare (type (signed-byte 32) clockid))
+    (with-alien ((ts (struct timespec)))
+      (alien-funcall (extern-alien #.(libc-name-for "sb_clock_gettime")
+                                   (function int int (* (struct timespec))))
+                     clockid (addr ts))
+      ;; 'seconds' is definitely a fixnum for 64-bit, because most-positive-fixnum
+      ;; can express 1E11 years in seconds.
+      (values #+64-bit (truly-the fixnum (slot ts 'tv-sec))
+              #-64-bit (slot ts 'tv-sec)
+              (truly-the (integer 0 #.(expt 10 9)) (slot ts 'tv-nsec)))))
+
+  (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
-    #+(or darwin netbsd)
     (with-alien ((tv (struct timeval)))
-      ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
-      ;; gettimeofday occasionally fails. passing in a null pointer for the
-      ;; timezone struct seems to work around the problem. NS notes: Darwin
-      ;; manpage says the timezone is not used anymore in their implementation
-      ;; at all.
-      (syscall* ("sb_gettimeofday" (* (struct timeval))
-                                (* (struct timezone)))
+      (syscall* ("sb_gettimeofday" (* (struct timeval)) system-area-pointer)
                 (values (slot tv 'tv-sec)
                         (slot tv 'tv-usec))
-                (addr tv)
-                nil))
-    #-(or darwin netbsd)
-    (with-alien ((tv (struct timeval))
-                 (tz (struct timezone)))
-      (syscall* ("sb_gettimeofday" (* (struct timeval))
-                                (* (struct timezone)))
-                (values (slot tv 'tv-sec)
-                        (slot tv 'tv-usec))
-                (addr tv)
-                (addr tz))))
+                (addr tv) (int-sap 0))))
 
-  (declaim (inline system-internal-run-time
-                   system-real-time-values))
+  ;; The "optimizations that actually matter" don't actually matter for 64-bit.
+  ;; Microseconds can express at least 1E5 years of uptime:
+  ;; (float (/ most-positive-fixnum (* 1000000 60 60 24 (+ 365 1/4))))
+  ;;   = microseconds-per-second * seconds-per-minute * minutes-per-hour
+  ;;     * hours-per-day * days-per-year
 
-  (defun system-real-time-values ()
-    (multiple-value-bind (sec usec) (get-time-of-day)
-      (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
-      (values sec (truncate usec micro-seconds-per-internal-time-unit))))
+  (defun get-internal-real-time ()
+    (with-alien ((base (struct timespec) :extern "lisp_init_time"))
+      (multiple-value-bind (c-sec c-nsec)
+          ;; By scaling down we end up with far less resolution than clock-realtime
+          ;; offers, and COARSE is about twice as fast, so use that, but only for linux.
+          ;; BSD has something similar.
+          (clock-gettime #+linux clock-monotonic-coarse #-linux clock-monotonic)
 
-  ;; There are two optimizations here that actually matter (on 32-bit
-  ;; systems): substract the epoch from seconds and milliseconds
-  ;; separately, as those should remain fixnums for the first 17 years
-  ;; or so of runtime. Also, avoid doing consing a new bignum if the
-  ;; result would be = to the last result given.
-  ;;
-  ;; Note: the next trick would be to spin a separate thread to update
-  ;; a global value once per internal tick, so each individual call to
-  ;; get-internal-real-time would be just a memory read... but that is
-  ;; probably best left for user-level code. ;)
+        #+64-bit ;; I know that my math is valid for 64-bit.
+        (declare (optimize (sb-c::type-check 0)))
+        #+64-bit
+        (let ((delta-sec (the fixnum (- c-sec (the fixnum (slot base 'tv-sec)))))
+              (delta-nsec (the fixnum (- c-nsec (the fixnum (slot base 'tv-nsec))))))
+          (the sb-kernel:internal-time
+               (+ (the fixnum (* delta-sec internal-time-units-per-second))
+                  (truncate delta-nsec nanoseconds-per-internal-time-unit))))
+
+  ;; There are two optimizations here that actually matter on 32-bit systems:
+  ;;  (1) subtract the epoch from seconds and milliseconds separately,
+  ;;  (2) avoid consing a new bignum if the result is unchanged.
   ;;
   ;; Thanks to James Anderson for the optimization hint.
   ;;
@@ -1103,60 +1104,40 @@ the UNIX epoch (January 1st 1970.)"
   ;; bound.
   ;;
   ;; --NS 2007-04-05
-  (let ((e-sec 0)
-        (e-msec 0)
-        (c-sec 0)
-        (c-msec 0)
-        (now 0))
-    (declare (type sb-kernel:internal-seconds e-sec c-sec)
-             (type sb-kernel:internal-seconds e-msec c-msec)
-             (type sb-kernel:internal-time now))
-    (defun reinit-internal-real-time ()
-      (setf (values e-sec e-msec) (system-real-time-values)
-            c-sec 0
-            c-msec 0))
-    ;; If two threads call this at the same time, we're still safe, I
-    ;; believe, as long as NOW is updated before either of C-MSEC or
-    ;; C-SEC. Same applies to interrupts. --NS
-    ;;
-    ;; I believe this is almost correct with x86/x86-64 cache
-    ;; coherency, but if the new value of C-SEC, C-MSEC can become
-    ;; visible to another CPU without NOW doing the same then it's
-    ;; unsafe. It's `almost' correct on x86 because writes by other
-    ;; processors may become visible in any order provided transitity
-    ;; holds. With at least three cpus, C-MSEC and C-SEC may be from
-    ;; different threads and an incorrect value may be returned.
-    ;; Considering that this failure is not detectable by the caller -
-    ;; it looks like time passes a bit slowly - and that it should be
-    ;; an extremely rare occurance I'm inclinded to leave it as it is.
-    ;; --MG
-    (defun get-internal-real-time ()
-      (multiple-value-bind (sec msec) (system-real-time-values)
-        (unless (and (= msec c-msec) (= sec c-sec))
-          (setf now (+ (* (- sec e-sec)
-                          sb-xc:internal-time-units-per-second)
-                       (- msec e-msec))
-                c-msec msec
-                c-sec sec))
-        now)))
+        #-64-bit
+        (symbol-macrolet ((observed-sec
+                           (sb-thread::thread-observed-internal-real-time-delta-sec thr))
+                          (observed-msec
+                           (sb-thread::thread-observed-internal-real-time-delta-millisec thr))
+                          (time (sb-thread::thread-internal-real-time thr)))
+          (let* ((delta-sec (- c-sec (slot base 'tv-sec)))
+                 ;; I inadvertently had too many THE casts in here, so I'd prefer
+                 ;; to err on the side of caution rather than cause GC lossage
+                 ;; (which I accidentally did). So assert that nanoseconds are <= 10^9
+                 ;; and the compiler will do as best it can with that information.
+                 (delta-nsec (- c-nsec (the (integer 0 #.(expt 10 9))
+                                            (slot base 'tv-nsec))))
+                 ;; ROUND, FLOOR? Who cares, it's a number that's going to change.
+                 ;; More math = more self-induced jitter.
+                 (delta-millisec (floor delta-nsec 1000000))
+                 (thr sb-thread:*current-thread*))
+            (if (and (= delta-sec observed-sec) (= delta-millisec observed-msec))
+                time
+                (let ((current (+ (* delta-sec internal-time-units-per-second)
+                                  ;; ASSUMPTION: delta-millisec = delta-itu
+                                  delta-millisec)))
+                  (setf time current
+                        observed-msec delta-millisec
+                        observed-sec delta-sec)
+                  current)))))))
 
+  (declaim (inline system-internal-run-time))
+  #-sunos ; defined in sunos-os
   (defun system-internal-run-time ()
-    (multiple-value-bind (ignore utime-sec utime-usec stime-sec stime-usec)
-        (unix-fast-getrusage rusage_self)
-      (declare (ignore ignore)
-               (type unsigned-byte utime-sec stime-sec)
-               ;; (Classic CMU CL had these (MOD 1000000) instead, but
-               ;; at least in Linux 2.2.12, the type doesn't seem to
-               ;; be documented anywhere and the observed behavior is
-               ;; to sometimes return 1000000 exactly.)
-               (type fixnum utime-usec stime-usec))
-      (let ((result (+ (* (+ utime-sec stime-sec)
-                          sb-xc:internal-time-units-per-second)
-                       (floor (+ utime-usec
-                                 stime-usec
-                                 (floor micro-seconds-per-internal-time-unit 2))
-                              micro-seconds-per-internal-time-unit))))
-        result))))
+    (multiple-value-bind (sec nsec) (clock-gettime clock-process-cputime-id)
+      (+ (* sec internal-time-units-per-second)
+         (floor (+ nsec (floor nanoseconds-per-internal-time-unit 2))
+                nanoseconds-per-internal-time-unit)))))
 
 ;;; FIXME, KLUDGE: GET-TIME-OF-DAY used to be UNIX-GETTIMEOFDAY, and had a
 ;;; primary return value indicating sucess, and also returned timezone
@@ -1216,13 +1197,3 @@ the UNIX epoch (January 1st 1970.)"
   (alien-funcall
    (extern-alien "sb_dirent_name" (function c-string system-area-pointer))
    ent))
-
-;;;; A magic constant for wait3().
-;;;;
-;;;; FIXME: This used to be defined in run-program.lisp as
-;;;; (defconstant wait-wstopped #-svr4 #o177 #+svr4 wait-wuntraced)
-;;;; According to some of the man pages, the #o177 is part of the API
-;;;; for wait3(); that said, under SunOS there is a WSTOPPED thing in
-;;;; the headers that may or may not be the same thing. To be
-;;;; investigated. -- CSR, 2002-03-25
-(defconstant wstopped #o177)

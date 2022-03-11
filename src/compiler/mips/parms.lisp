@@ -18,6 +18,9 @@
   ;; The o32 ABI specifies 4k-64k as page size. We have to pick the
   ;; maximum since mprotect() works only with page granularity.
 (defconstant +backend-page-bytes+ 65536)
+(defconstant gencgc-page-bytes +backend-page-bytes+)
+(defconstant gencgc-alloc-granularity 0)
+(defconstant gencgc-release-granularity +backend-page-bytes+)
 
 ;;;; Machine Architecture parameters:
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -28,28 +31,6 @@
 ;;; the natural width of a machine word (as seen in e.g. register width,
 ;;; address space)
 (defconstant n-machine-word-bits 32)
-
-(defconstant float-sign-shift 31)
-
-(defconstant single-float-bias 126)
-(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-
-(defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
 (defconstant float-inexact-trap-bit (ash 1 0))
 (defconstant float-underflow-trap-bit (ash 1 1))
@@ -72,38 +53,13 @@
 
 ;;;; Description of the target address space.
 
-#+irix
-(progn
-  ;; Where to put the different spaces.
-  ;; Old definitions, might be still relevant for an IRIX port.
-  ;;
-  (defconstant read-only-space-start #x01000000)
-  (defconstant read-only-space-end   #x05000000)
-
-  (defconstant static-space-start    #x06000000)
-  (defconstant static-space-end      #x08000000)
-
-  (defparameter dynamic-0-space-start #x08000000)
-  (defparameter dynamic-0-space-end   #x0c000000))
-
 #+linux
 (progn
-  ;; Where to put the address spaces on Linux.
-  ;;
-  ;; C runtime executable segment starts at 0x00400000
-  (defconstant read-only-space-start #x01000000)
-  (defconstant read-only-space-end   #x07ff0000)
+  (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
-  (defconstant static-space-start    #x08000000)
-  (defconstant static-space-end      #x0fff0000)
-  ;; C runtime read/write segment starts at 0x10000000, heap and DSOs
-  ;; start at 0x2a000000
-  (defparameter dynamic-0-space-start #x30000000)
-  (defparameter dynamic-0-space-end   #x4fff0000)
-
-  (defconstant linkage-table-space-start #x70000000)
-  (defconstant linkage-table-space-end   #x71000000)
-  (defconstant linkage-table-entry-size 16)
+  (defconstant linkage-table-entry-size 4)
+  (defconstant linkage-table-growth-direction :down)
+  (setq *linkage-space-predefined-entries* '(("call_into_c" nil)))
 
   ;; C stack grows downward from 0x80000000
   )
@@ -113,14 +69,12 @@
 
 ;;;; Other non-type constants.
 
-(defenum ()
-  atomic-flag
-  interrupted-flag)
-
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
   cerror-trap
+  invalid-arg-count-trap
+  allocation-trap
   breakpoint-trap
   fun-end-breakpoint-trap
   after-breakpoint-trap
@@ -138,7 +92,9 @@
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 (defconstant-eqx +static-symbols+
-  `#(,@+common-static-symbols+)
+  `#(,@+common-static-symbols+
+     *pseudo-atomic-atomic*
+     *pseudo-atomic-interrupted*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

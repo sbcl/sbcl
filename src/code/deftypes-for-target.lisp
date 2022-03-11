@@ -17,10 +17,11 @@
 ;;;; be honored.
 
 #+sb-xc-host
-(progn
-  (/show "about to force delayed DEF!TYPEs")
-  (force-delayed-def!types)
-  (/show "done forcing delayed DEF!TYPEs"))
+(macrolet ((do-delayed-def!types ()
+             `(progn ,@(nreverse *delayed-def!types*))))
+  (do-delayed-def!types)
+  (makunbound '*delayed-def!types*))
+
 
 ;;;; standard types
 
@@ -100,11 +101,9 @@
   `(simple-array base-char (,size)))
 (sb-xc:deftype string (&optional size)
   `(or (array character (,size))
-       (array nil (,size))
        (base-string ,size)))
 (sb-xc:deftype simple-string (&optional size)
   `(or (simple-array character (,size))
-       (simple-array nil (,size))
        (simple-base-string ,size)))
 ;;; On Unicode builds, SIMPLE-CHARACTER-STRING is a builtin type.
 ;;; For non-Unicode it is convenient to be able to use the type name
@@ -119,11 +118,24 @@
 (sb-xc:deftype simple-bit-vector (&optional size)
   `(simple-array bit (,size)))
 
+;;; We'd like tye COMPILED-FUNCTION type to be available as soon it can be,
+;;; because the :UNPARSE type-method on INTERSECTION wants to decide whether its arg
+;;; is TYPE= to one of the standardized types implemented as an intersection of
+;;; types, namely: RATIO, KEYWORD, COMPILED-FUNCTION, so that it can unparse
+;;; to an atom rather than an expression involving the AND and NOT combinators.
+;;; i.e. because unparsing any random thing might need those three, it's best
+;;; that they be defined, lest we work around the parse-unknown condition
+;;; which in general signifies suboptimal compination, if not an outright bug.
+;;; And it's unfortunate if the location of the definition of COMPILED-FUNCTION
+;;; depends on which (if either) of the evaluators is built in.
+;;; This definition just kicks the can down the road a little,
+;;; because we lack a definition of INTERPRETED-FUNCTION until later.
 (sb-xc:deftype compiled-function ()
   '(and function #+(or sb-eval sb-fasteval) (not interpreted-function)))
 
-;;; Stub type in case there are no interpreted functions
-#-(or sb-eval sb-fasteval) (sb-xc:deftype interpreted-function () nil)
+#-(or sb-eval sb-fasteval)
+(sb-xc:deftype interpreted-function ()
+  nil)
 
 (sb-xc:deftype simple-fun () '(satisfies simple-fun-p))
 
@@ -155,12 +167,17 @@
   '(or list symbol classoid class))
 
 ;;; array rank, total size...
-(sb-xc:deftype array-rank () `(integer 0 (,sb-xc:array-rank-limit)))
+(sb-xc:deftype array-rank () `(integer 0 (,array-rank-limit)))
 (sb-xc:deftype array-total-size ()
-  `(integer 0 (,sb-xc:array-total-size-limit)))
+  `(integer 0 (,array-total-size-limit)))
 
 ;;; The range returned by SXHASH and PSXHASH
-(sb-xc:deftype hash () `(integer 0 ,sb-xc:most-positive-fixnum))
+;;; Do not confuse this type with the type that EQ-HASH and related hash
+;;; calculations may return! Internally to the hash-table logic nothing
+;;; precludes us from using the entire fixnum range. Doing so avoids
+;;; an extra AND operation, which is pretty much effectless in as much as
+;;; the hash code is masked down to a much smaller value anyway.
+(sb-xc:deftype hash-code () `(integer 0 ,most-positive-fixnum))
 
 ;;; something legal in an evaluated context
 ;;; FIXME: could probably go away
@@ -189,7 +206,7 @@
   '(or float (complex float)))
 
 ;;; character components
-(sb-xc:deftype char-code () `(integer 0 (,sb-xc:char-code-limit)))
+(sb-xc:deftype char-code () `(integer 0 (,char-code-limit)))
 
 ;;; a consed sequence result. If a vector, is a simple array.
 (sb-xc:deftype consed-sequence ()
@@ -209,11 +226,6 @@
 ;;; COMPILE-FILE and friends.
 (sb-xc:deftype external-format-designator ()
   '(or keyword (cons keyword)))
-
-;;; a thing that can be passed to FUNCALL & friends
-;;;
-;;; FIXME: should be FUNCTION-DESIGNATOR?
-(sb-xc:deftype callable () '(or function symbol))
 
 ;;; decomposing floats into integers
 (sb-xc:deftype single-float-exponent ()
@@ -245,51 +257,9 @@
 (sb-xc:deftype double-float-significand ()
   `(integer 0 (,(ash 1 sb-vm:double-float-digits))))
 
-;;; Common logic for %%TYPEP and CROSS-TYPEP
-(defmacro number-typep (object type)
-  `(let ((object ,object) (type ,type))
-     (and (numberp object)
-          (let ((num (if (complexp object) (realpart object) object)))
-            (ecase (numeric-type-class type)
-              (integer (and (integerp num)
-                            ;; If the type is (COMPLEX INTEGER), it can
-                            ;; only match the object if both real and imag
-                            ;; parts are integers.
-                            (or (not (complexp object))
-                                (integerp (imagpart object)))))
-              (rational (rationalp num))
-              (float
-               (ecase (numeric-type-format type)
-                 ;; (short-float (typep num 'short-float))
-                 (single-float (typep num 'single-float))
-                 (double-float (typep num 'double-float))
-                 ;; (long-float (typep num 'long-float))
-                 ((nil) (floatp num))))
-              ((nil) t)))
-          (flet ((bound-test (val)
-                   (let ((low (numeric-type-low type))
-                         (high (numeric-type-high type)))
-                     (and (cond ((null low) t)
-                                ((listp low) (sb-xc:> val (car low)))
-                                (t (sb-xc:>= val low)))
-                          (cond ((null high) t)
-                                ((listp high) (sb-xc:< val (car high)))
-                                (t (sb-xc:<= val high)))))))
-            (ecase (numeric-type-complexp type)
-              ((nil) t)
-              (:complex
-               (and (complexp object)
-                    (bound-test (realpart object))
-                    (bound-test (imagpart object))))
-              (:real
-               (and (not (complexp object))
-                    (bound-test object))))))))
+(sb-xc:deftype extended-function-designator ()
+               '(satisfies extended-function-designator-p))
 
-(declaim (inline character-in-charset-p))
-(defun character-in-charset-p (char set &aux (code (sb-xc:char-code char)))
-  (dolist (pair (character-set-type-pairs set) nil)
-    (destructuring-bind (low . high) pair
-      (when (<= low code high)
-        (return t)))))
+#-metaspace (sb-xc:deftype sb-vm:layout () 'wrapper)
 
 (/show0 "deftypes-for-target.lisp end of file")

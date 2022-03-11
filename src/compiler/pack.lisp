@@ -323,7 +323,7 @@
   (let* ((vop (tn-ref-vop op))
          (args (vop-args vop))
          (results (vop-results vop))
-         (name (with-simple-output-to-string (stream)
+         (name (%with-output-to-string (stream)
                  (print-tn-guts tn stream)))
          (2comp (component-info *component-being-compiled*))
          temp)
@@ -340,9 +340,7 @@
      ((setq temp (position-in #'tn-ref-across tn (vop-temps vop)
                               :key #'tn-ref-tn))
       `("~2D: ~A (temporary ~A)" ,loc ,name
-        ,(operand-parse-name (elt (vop-parse-temps
-                                   (vop-parse-or-lose
-                                    (vop-info-name  (vop-info vop))))
+        ,(operand-parse-name (elt (vop-parse-temps (vop-parse-or-lose (vop-name vop)))
                                   temp))))
      ((eq (tn-kind tn) :component)
       `("~2D: ~A (component live)" ,loc ,name))
@@ -391,7 +389,7 @@
                 time. Recompile.~%Compilation order may be incorrect.~]"
                (mapcar #'sc-name scs)
                n arg-p
-               (vop-info-name (vop-info (tn-ref-vop op)))
+               (vop-name (tn-ref-vop op))
                (unused) (used)
                incon))))
 
@@ -419,6 +417,9 @@
              incon))))
 
 ;;;; register saving
+
+(declaim (start-block optimized-emit-saves emit-saves assign-tn-costs
+                      pack-save-tn))
 
 ;;; Do stuff to note that TN is spilled at VOP for the debugger's benefit.
 (defun note-spilled-tn (tn vop)
@@ -467,7 +468,7 @@
     (aver (eq (ir2-block-block block) (ir2-block-block (vop-block vop))))
     (do ((current last (vop-prev current)))
         ((null current))
-      (when (eq (vop-info-name (vop-info current)) name)
+      (when (eq (vop-name current) name)
         (return-from reverse-find-vop current)))))
 
 ;;; For TNs that have other than one writer, we save the TN before
@@ -518,8 +519,7 @@
                       (return nil))))
          (tn-ref-vop res)))
 
-    (unless (eq (vop-info-name (vop-info (tn-ref-vop write)))
-                'move-operand)
+    (unless (eq (vop-name (tn-ref-vop write)) 'move-operand)
       (when res (return nil))
       (setq res write))))
 
@@ -658,7 +658,7 @@
       (do ((vop (ir2-block-last-vop block) (vop-prev vop)))
           ((null vop))
         (let ((info (vop-info vop)))
-          (case (vop-info-name info)
+          (case (vop-name vop)
             (allocate-frame
              (aver skipping)
              (setq skipping nil))
@@ -825,8 +825,22 @@
               ;; race conditions in the debugger involving
               ;; backtraces from asynchronous interrupts.
               (setf (tn-sc tn) (tn-sc save-tn)))))))))
+
+(declaim (end-block))
+
+;; Misc. utilities
+(declaim (maybe-inline unbounded-sc-p))
+(defun unbounded-sc-p (sc)
+  (eq (sb-kind (sc-sb sc)) :unbounded))
+
+(defun unbounded-tn-p (tn)
+  #-sb-xc-host (declare (inline unbounded-sc-p))
+  (unbounded-sc-p (tn-sc tn)))
+
 
 ;;;; load TN packing
+
+(declaim (start-block pack-load-tns load-tn-conflicts-in-sc))
 
 ;;; These variables indicate the last location at which we computed
 ;;; the Live-TNs. They hold the BLOCK and VOP values that were passed
@@ -1074,7 +1088,7 @@
              (do ((ref refs (tn-ref-next ref)))
                  ((null ref))
                (let ((vop (tn-ref-vop ref)))
-                 (if (eq (vop-info-name (vop-info vop)) 'move-operand)
+                 (if (eq (vop-name vop) 'move-operand)
                      (delete-vop vop)
                      (pushnew (vop-block vop) *repack-blocks*))))))
       (zot (tn-reads tn))
@@ -1184,7 +1198,7 @@
 ;;; the restriction, we pack a Load-TN and load the operand into it.
 ;;; If a load-tn has already been allocated, we can assume that the
 ;;; restriction is satisfied.
-#-sb-fluid (declaim (inline check-operand-restrictions))
+(declaim (inline check-operand-restrictions))
 (defun check-operand-restrictions (scs ops)
   (declare (list scs) (type (or tn-ref null) ops))
 
@@ -1195,7 +1209,8 @@
     (let ((target (tn-ref-target op))
           (tn (tn-ref-tn op)))
       (when (and target
-                 (not (eq (tn-kind tn) :unused)))
+                 (not (eq (tn-kind tn) :unused))
+                 (tn-primitive-type tn))
         (let* ((load-tn (tn-ref-load-tn op))
                (load-scs (svref (car scs)
                                 (sc-number
@@ -1212,7 +1227,8 @@
     (let ((target (tn-ref-target op))
           (tn (tn-ref-tn op)))
       (unless (or target
-                  (eq (tn-kind tn) :unused))
+                  (eq (tn-kind tn) :unused)
+                  (not (tn-primitive-type tn)))
         (let* ((load-tn (tn-ref-load-tn op))
                (load-scs (svref (car scs)
                                 (sc-number
@@ -1242,6 +1258,10 @@
   (values))
 
 ;;;; targeting
+
+(declaim (start-block pack pack-tn target-if-desirable
+                      ;; needed for pack-iterative
+                      pack-wired-tn))
 
 ;;; Link the TN-REFS READ and WRITE together using the TN-REF-TARGET
 ;;; when this seems like a good idea. Currently we always do, as this
@@ -1385,15 +1405,6 @@
 
 ;;;; pack interface
 
-;; Misc. utilities
-(declaim (inline unbounded-sc-p))
-(defun unbounded-sc-p (sc)
-  (eq (sb-kind (sc-sb sc)) :unbounded))
-
-(defun unbounded-tn-p (tn)
-  (unbounded-sc-p (tn-sc tn)))
-(declaim (notinline unbounded-sc-p))
-
 ;;; Attempt to pack TN in all possible SCs, first in the SC chosen by
 ;;; representation selection, then in the alternate SCs in the order
 ;;; they were specified in the SC definition. If the TN-COST is
@@ -1467,43 +1478,29 @@
     ;; For non-x86 ports the presence of a save-tn associated with a
     ;; tn is used to identify the old-fp and return-pc tns. It depends
     ;; on the old-fp and return-pc being passed in registers.
-    #-fp-and-pc-standard-save
-    (when (and (not (eq (tn-kind tn) :specified-save))
+    (when (and #-fp-and-pc-standard-save
+               (not (eq (tn-kind tn) :specified-save))
                (conflicts-in-sc original sc offset))
-      (error "~S is wired to a location that it conflicts with." tn))
+      (error "~S is wired to location ~D in SC ~A of kind ~S that it conflicts with."
+             tn offset sc (tn-kind tn)))
 
     ;; Use the above check, but only print a verbose warning. This can
     ;; be helpful for debugging the x86 port.
     #+nil
     (when (and (not (eq (tn-kind tn) :specified-save))
                (conflicts-in-sc original sc offset))
-          (format t "~&* Pack-wired-tn possible conflict:~%  ~
+      (format t "~&* Pack-wired-tn possible conflict:~%  ~
                      tn: ~S; tn-kind: ~S~%  ~
                      sc: ~S~%  ~
                      sb: ~S; sb-name: ~S; sb-kind: ~S~%  ~
                      offset: ~S; end: ~S~%  ~
                      original ~S~%  ~
                      tn-save-tn: ~S; tn-kind of tn-save-tn: ~S~%"
-                  tn (tn-kind tn) sc
-                  sb (sb-name sb) (sb-kind sb)
-                  offset end
-                  original
-                  (tn-save-tn tn) (tn-kind (tn-save-tn tn))))
-
-    ;; On the x86 ports the old-fp and return-pc are often passed on
-    ;; the stack so the above hack for the other ports does not always
-    ;; work. Here the old-fp and return-pc tns are identified by being
-    ;; on the stack in their standard save locations.
-    #+fp-and-pc-standard-save
-    (when (and (not (and
-                     (= (sc-number sc) #.(sc+offset-scn old-fp-passing-offset))
-                     (= offset #.(sc+offset-offset old-fp-passing-offset))))
-               (not (and
-                     (= (sc-number sc) #.(sc+offset-scn return-pc-passing-offset))
-                     (= offset #.(sc+offset-offset return-pc-passing-offset))))
-               (conflicts-in-sc original sc offset))
-      (error "~S is wired to location ~D in SC ~A of kind ~S that it conflicts with."
-             tn offset sc (tn-kind tn)))
+              tn (tn-kind tn) sc
+              sb (sb-name sb) (sb-kind sb)
+              offset end
+              original
+              (tn-save-tn tn) (tn-kind (tn-save-tn tn))))
 
     (unless (eq (sb-kind sb) :unbounded)
       (setf (ldb (byte 1 (truly-the sb-vm:finite-sc-offset offset))
@@ -1570,7 +1567,7 @@
       (walk-tn-refs (tn-reads tn))
       (walk-tn-refs (tn-writes tn))
       (if (eql path t)
-          sb-xc:most-positive-fixnum
+          most-positive-fixnum
           (length path)))))
 
 (declaim (type (member :iterative :greedy :adaptive)

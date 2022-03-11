@@ -154,3 +154,10 @@
                   (with-output-to-string (stream)
                     (describe (make-array 1 :displaced-to (make-array 1))
                               stream)))))
+
+(with-test (:name :bad-second-arg)
+  (assert-error
+   (describe 'describe
+             (opaque-identity
+              (make-array 256 :element-type 'character :fill-pointer 0)))
+   type-error))

@@ -24,7 +24,7 @@ You can set up the LD_LIBRARY_PATH environment variable if necessary.
 Examples
 --------
 
-An example on using the bindings can be found on the tests. We rely on sb-alien heavily for passing system addresses to Capstone (where pointers where used in the C analog)
+An example on using the bindings can be found on the tests. We rely on sb-alien heavily for passing system addresses to Capstone (where pointers were used in the C analog)
 
 Example: using Capstone's cs_open to create a handle
 

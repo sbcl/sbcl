@@ -23,6 +23,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "alloc.h"
+#include "pseudo-atomic.h"
 
 #if defined(LISP_FEATURE_GENCGC)
 #include "gencgc-alloc-region.h"
@@ -55,11 +56,12 @@
 #endif
 #endif
 
-/* Magic encoding for the instruction used for traps. */
+#ifdef LISP_FEATURE_64_BIT
+#define TRAP_INSTRUCTION(trap) ((2<<26) | (1 << 21) | reg_NULL << 16 | (trap))
+#else
 #define TRAP_INSTRUCTION(trap) ((3<<26) | (6 << 21) | (trap))
+#endif
 
-void arch_init() {
-}
 
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
@@ -78,69 +80,32 @@ arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 void
 arch_skip_instruction(os_context_t *context)
 {
-    char** pcptr;
-    pcptr = (char**) os_context_pc_addr(context);
-    *pcptr += 4;
+    OS_CONTEXT_PC(context) += 4;
 }
 
 unsigned char *
 arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)(*os_context_pc_addr(context)+4);
+    return (unsigned char *)(OS_CONTEXT_PC(context)+4);
 }
 
 
 boolean
 arch_pseudo_atomic_atomic(os_context_t *context)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *thread = arch_os_get_current_thread();
-
-    if (foreign_function_call_active_p(thread)) {
-        return get_pseudo_atomic_atomic(thread);
-    } else return
-#else
-    /* FIXME: this foreign_function_call_active test is dubious at
-     * best. If a foreign call is made in a pseudo atomic section
-     * (?) or more likely a pseudo atomic section is in a foreign
-     * call then an interrupt is executed immediately. Maybe it
-     * has to do with C code not maintaining pseudo atomic
-     * properly. MG - 2005-08-10
-     *
-     * The foreign_function_call_active used to live at each call-site
-     * to arch_pseudo_atomic_atomic, but this seems clearer.
-     * --NS 2007-05-15 */
-    return (!foreign_function_call_active_p(arch_os_get_current_thread())) &&
-#endif
-        ((*os_context_register_addr(context,reg_ALLOC)) & flag_PseudoAtomic);
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 }
 
 void
 arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *thread = arch_os_get_current_thread();
-
-    if (foreign_function_call_active_p(thread)) {
-        set_pseudo_atomic_interrupted(thread);
-    } else
-#endif
-        *os_context_register_addr(context,reg_ALLOC)
-            |= flag_PseudoAtomicInterrupted;
+    set_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 void
 arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *thread = arch_os_get_current_thread();
-
-    if (foreign_function_call_active_p(thread)) {
-        clear_pseudo_atomic_interrupted(thread);
-    } else
-#endif
-        *os_context_register_addr(context,reg_ALLOC)
-            &= ~flag_PseudoAtomicInterrupted;
+    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 unsigned int
@@ -207,7 +172,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
     /* not sure how we ensure that we get the breakpoint reinstalled
      * after doing this -dan */
-    unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
     unsigned int *next_pc;
     int op = orig_inst >> 26;
     int sub_op = (orig_inst & 0x7fe) >> 1;  /* XL-form sub-opcode */
@@ -261,37 +226,43 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 }
 
 #define INLINE_ALLOC_DEBUG 0
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_CHENEYGC
+#define handle_allocation_trap(x) (0)
+#else
 /*
  * Return non-zero if the current instruction is an allocation trap
  */
 static int
 allocation_trap_p(os_context_t * context)
 {
-    unsigned int *pc;
-    unsigned inst;
-    unsigned opcode;
-    unsigned src;
-    unsigned __attribute__((unused)) dst;
-
     /*
-     * First, the instruction has to be a TWLGT temp, NL3, which has the
+     * First, the instruction has to be "Tx {LGT|LGE} temp, NL3, which has the
      * format.
-     * | 6| 5| 5 | 5 | 10|1|  field width
-     * |31| 1|dst|src|  4|0|  value
+     * | 6|  5| 5 | 5 | 10|1|  field width
+     * ----------------------
+     * |31| TO|dst|src|  4|0|  TW - trap word
+     * |31| TO|dst|src| 68|0|  TD - trap doubleword
+     *
+     *   TO = #b00001 for LGT
+     *        #b00101 for LGE
      */
-    pc = (unsigned int *) (*os_context_pc_addr(context));
-    inst = *pc;
+    unsigned *pc = (unsigned int *)OS_CONTEXT_PC(context);
+    unsigned inst = *pc;
+    unsigned opcode = inst >> 26;
+    unsigned src = (inst >> 11) & 0x1f;
+    // unsigned dst = (inst >> 16) & 0x1f;
+    unsigned to = (inst >> 21) & 0x1f;
+    unsigned subcode = inst & 0x7ff;
 
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "allocation_trap_p at %p:  inst = 0x%08x\n", pc, inst);
-#endif
+    if (opcode == 31 && (to == 1 || to == 5) && src == reg_NL3
+        && (subcode == 4<<1 || subcode == 68<<1)) {
+        /* It doesn't much matter which trap option we pick for "could be large"
+         * but I've chosen "TGE" because of the choices, that one is subject to spurious
+         * failure, and I'd prefer not to spuriously fail on a 2-word cons.
+         * (Spurious failure occurs when the EQ condition is met, meaning the allocation
+         * would have worked, but the trap happens regardless) */
+        int success = (to == 5) ? 1 : -1; // 1 = single-object page ok, -1 = not ok
 
-    opcode = inst >> 26;
-    src = (inst >> 11) & 0x1f;
-    dst = (inst >> 16) & 0x1f;
-    if ((opcode == 31) && (src == reg_NL3) && (1 == ((inst >> 21) & 0x1f))
-        && (4 == ((inst >> 1) & 0x3ff))) {
         /*
          * We got the instruction.  Now, look back to make sure it was
          * proceeded by what we expected.  The previous instruction
@@ -300,15 +271,11 @@ allocation_trap_p(os_context_t * context)
         unsigned int add_inst;
 
         add_inst = pc[-1];
-#if INLINE_ALLOC_DEBUG
-        fprintf(stderr, "   add inst at %p:  inst = 0x%08x\n",
-                pc - 1, add_inst);
-#endif
         opcode = add_inst >> 26;
         if ((opcode == 31) && (266 == ((add_inst >> 1) & 0x1ff))) {
-            return 1;
+            return success;
         } else if ((opcode == 14)) {
-            return 1;
+            return success;
         } else {
             fprintf(stderr,
                     "Whoa! Got allocation trap but could not find ADD or ADDI instruction: 0x%08x in the proper place\n",
@@ -318,77 +285,33 @@ allocation_trap_p(os_context_t * context)
     return 0;
 }
 
-#ifndef boxed_region
-#define boxed_region gc_alloc_region[0]
-#endif
-
-void
+static int
 handle_allocation_trap(os_context_t * context)
 {
-    unsigned int *pc;
-    unsigned int inst;
-    unsigned int target;
-    uword_t __attribute__((unused)) target_ptr, end_addr;
-    unsigned int opcode;
-    int size;
-    boolean were_in_lisp;
-    char *memory;
+    int alloc_trap_p = allocation_trap_p(context);
 
-    target = 0;
-    size = 0;
+    if (!alloc_trap_p) return 0;
 
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "In handle_allocation_trap\n");
-#endif
-
-    /* I don't think it's possible for us NOT to be in lisp when we get
-     * here.  Remove this later? */
-    were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
-
-    if (were_in_lisp) {
-        fake_foreign_function_call(context);
-    } else {
-        fprintf(stderr, "**** Whoa! allocation trap and we weren't in lisp!\n");
-    }
-
-    /*
-     * Look at current instruction: TWNE temp, NL3. We're here because
-     * temp > NL3 and temp is the end of the allocation, and NL3 is
-     * current-region-end-addr.
-     *
-     * We need to adjust temp and alloc-tn.
-     */
-
-    pc = (unsigned int *) (*os_context_pc_addr(context));
-    inst = pc[0];
-    end_addr = (inst >> 11) & 0x1f;
-    target = (inst >> 16) & 0x1f;
-
-    target_ptr = *os_context_register_addr(context, target);
-
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "handle_allocation_trap at %p:\n", pc);
-    fprintf(stderr, "boxed_region.free_pointer: %p\n", boxed_region.free_pointer);
-    fprintf(stderr, "boxed_region.end_addr: %p\n", boxed_region.end_addr);
-    fprintf(stderr, "target reg: %d, end_addr reg: %ld\n", target, end_addr);
-    fprintf(stderr, "target: %"OBJ_FMTX"\n",
-            (uword_t)*os_context_register_addr(context, target));
-    fprintf(stderr, "end_addr: %"OBJ_FMTX"\n",
-            (uword_t)*os_context_register_addr(context, end_addr));
-    fprintf(stderr, "trap inst = 0x%08x\n", inst);
-    fprintf(stderr, "target reg = %s\n", lisp_register_names[target]);
-#endif
+    struct thread* thread = get_sb_vm_thread();
+    gc_assert(!foreign_function_call_active_p(thread));
+    if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
+        record_backtrace_from_context(context, thread);
+    fake_foreign_function_call(context);
+    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
 
     /*
      * Go back and look at the add/addi instruction.  The second src arg
      * is the size of the allocation.  Get it and call alloc to allocate
      * new space.
      */
-    inst = pc[-1];
-    opcode = inst >> 26;
+
+    unsigned int inst = pc[-1];
+    int target = (inst >> 21) & 0x1f;
+    unsigned int opcode = inst >> 26;
 #if INLINE_ALLOC_DEBUG
     fprintf(stderr, "  add inst  = 0x%08x, opcode = %d\n", inst, opcode);
 #endif
+    sword_t size = 0;
     if (opcode == 14) {
         /*
          * ADDI temp-tn, alloc-tn, size
@@ -414,42 +337,16 @@ handle_allocation_trap(os_context_t * context)
 
 #if INLINE_ALLOC_DEBUG
     fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
-    if ((((unsigned long)boxed_region.end_addr + size) / GENCGC_CARD_BYTES) ==
-        (((unsigned long)boxed_region.end_addr) / GENCGC_CARD_BYTES)) {
-      fprintf(stderr,"*** possibly bogus trap allocation of %d bytes at %p\n",
-              size, (void*)target_ptr);
-      fprintf(stderr, "    dynamic_space_free_pointer: %p, boxed_region.end_addr %p\n",
-              dynamic_space_free_pointer, boxed_region.end_addr);
-    }
-    fprintf(stderr, "Ready to alloc\n");
-    fprintf(stderr, "free_pointer = %p\n", dynamic_space_free_pointer);
 #endif
 
-    /*
-     * alloc-tn was incremented by size.  Need to decrement it by size
-     * to restore its original value. This is not true on GENCGC
-     * anymore. d_s_f_p and reg_alloc get out of sync, but the p_a
-     * bits stay intact and we set it to the proper value when it
-     * needs to be. Keep this comment here for the moment in case
-     * somebody tries to figure out what happened here.
-     */
-    /*    dynamic_space_free_pointer =
-        (lispobj *) ((long) dynamic_space_free_pointer - size);
-    */
-
+    char *memory;
     {
-        extern lispobj* alloc(sword_t);
-        struct interrupt_data *data =
-            arch_os_get_current_thread()->interrupt_data;
+        extern lispobj *alloc(sword_t), *alloc_list(sword_t);
+        struct interrupt_data *data = &thread_interrupt_data(thread);
         data->allocation_trap_context = context;
-        memory = (char *) alloc(size);
+        memory = (char*)(alloc_trap_p < 0 ? alloc_list(size) : alloc(size));
         data->allocation_trap_context = 0;
     }
-
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "alloc returned %p\n", memory);
-    fprintf(stderr, "free_pointer = %p\n", dynamic_space_free_pointer);
-#endif
 
     /*
      * The allocation macro wants the result to point to the end of the
@@ -462,29 +359,97 @@ handle_allocation_trap(os_context_t * context)
 #endif
 
     *os_context_register_addr(context, target) = (unsigned long) memory;
-#ifndef LISP_FEATURE_SB_THREAD
-    /* This is handled by the fake_foreign_function_call machinery on
-     * threaded targets. */
-    *os_context_register_addr(context, reg_ALLOC) =
-      (unsigned long) dynamic_space_free_pointer
-      | (*os_context_register_addr(context, reg_ALLOC)
-         & LOWTAG_MASK);
+
+    undo_fake_foreign_function_call(context);
+
+    // Skip 2 instructions: the trap, and the writeback of free pointer
+    OS_CONTEXT_PC(context) = (uword_t)(pc + 2); // ('pc' is of type int*)
+    return 1; // handled
+}
 #endif
 
-    if (were_in_lisp) {
-        undo_fake_foreign_function_call(context);
-    }
-
-    /* Skip the allocation trap and the write of the updated free
-     * pointer back to the allocation region.  This is two
-     * instructions when threading is enabled and four instructions
-     * otherwise. */
-#ifdef LISP_FEATURE_SB_THREAD
-    (*os_context_pc_addr(context)) = (uword_t)(pc + 2);
+#if defined LISP_FEATURE_SB_THREAD
+static int
+handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
+{
+#ifdef LISP_FEATURE_PPC64
+# ifdef LISP_FEATURE_LITTLE_ENDIAN
+#  define TLS_INDEX_FIELD_DISPLACEMENT (4-OTHER_POINTER_LOWTAG)
+# else
+#  define TLS_INDEX_FIELD_DISPLACEMENT (-OTHER_POINTER_LOWTAG)
+# endif
 #else
-    (*os_context_pc_addr(context)) = (uword_t)(pc + 4);
+# define TLS_INDEX_FIELD_DISPLACEMENT \
+    (offsetof(struct symbol,tls_index)-OTHER_POINTER_LOWTAG)
 #endif
 
+    /* LWZ ra,-k(rb) followed by TWI :eq ra,0 is the "unassigned symbol TLS" trap.
+     * LWZ and TWI coincidentally have a similar format as follows:
+     *      | 6|  5|  5| 16|  field width
+     *      ----------------------
+     * LWZ: |32| RT| RA|  D|
+     * TWI: | 3| TO| RA|imm|  TO bits: EQ = 4
+     *
+     */
+
+    boolean handle_it = 0;
+    unsigned prev_inst;
+    if ((code & ~(31 << 16)) == ((3<<26)|(4<<21))) { // mask out RA for test
+        prev_inst= ((uint32_t*)pc)[-1];
+        int16_t disp = (prev_inst & 0xFFFF);
+        handle_it = (prev_inst >> 26) == 32 // a load
+          // RT of the load must be RA of the trap
+          && ((prev_inst >> 21) & 31) == ((code >> 16) & 31)
+          && (disp == TLS_INDEX_FIELD_DISPLACEMENT);
+    }
+    if (!handle_it) return 0;
+
+    struct thread *thread = get_sb_vm_thread();
+    set_pseudo_atomic_atomic(thread);
+
+    int symbol_reg = (prev_inst >> 16) & 31;
+    struct symbol *specvar =
+      SYMBOL(*os_context_register_addr(context, symbol_reg));
+    struct symbol *free_tls_index = SYMBOL(FREE_TLS_INDEX);
+
+    // *FREE-TLS-INDEX* value is [lock][tls-index]
+    uword_t* pvalue = &free_tls_index->value;
+    uword_t old;
+    const uword_t spinlock_bit = (uword_t)1<<31;
+    do {
+        old = __sync_fetch_and_or(pvalue, spinlock_bit);
+        if (old & spinlock_bit) sched_yield(); else break;
+    } while (1);
+    // sync_fetch_and_or acts as a barrier which prevents
+    // speculatively loading tls_index_of().
+    uint32_t tls_index = tls_index_of(specvar);
+    if (tls_index != 0) { // someone else assigned
+        free_tls_index->value = old; // just release the spinlock
+        // fprintf(stderr, "TLS index trap: special var = %p, data race\n", specvar);
+    } else {
+        tls_index = old;
+        // XXX: need to be careful here if GC uses any bits of the header
+        // for concurrent marking. Would need to do a 4-byte write in that case.
+        // This is simpler because it works for either endianness.
+#ifdef LISP_FEATURE_PPC64
+        specvar->header |= (uword_t)tls_index << 32;
+#else
+        specvar->tls_index = tls_index;
+#endif
+        // A barrier here ensures that nobody else thinks this symbol
+        // doesn't have a TLS index.  compare-and-swap is the barrier.
+        // It doesn't really need to be a CAS, because we hold the spinlock.
+        int res = __sync_bool_compare_and_swap(pvalue,
+                                               old | spinlock_bit,
+                                               old + N_WORD_BYTES);
+        gc_assert(res);
+        // fprintf(stderr, "TLS index trap: special var = %p, assigned %x\n", specvar, tls_index);
+    }
+    // This is actually always going to be 0 for 64-bit code
+    int tlsindex_reg = (code >> 16) & 31; // the register we trapped on
+    *os_context_register_addr(context, tlsindex_reg) = tls_index;
+    clear_pseudo_atomic_atomic(thread);
+    return 1; // handled this signal
 }
 #endif
 
@@ -497,7 +462,7 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (uword_t)handle_fun_end_breakpoint(context);
+    OS_CONTEXT_PC(context) = (uword_t)handle_fun_end_breakpoint(context);
 }
 
 void
@@ -507,28 +472,77 @@ arch_handle_after_breakpoint(os_context_t *context)
     os_flush_icache((os_vm_address_t) skipped_break_addr,
                     sizeof(unsigned int));
     skipped_break_addr = NULL;
-    *(unsigned int *)*os_context_pc_addr(context)
-        = displaced_after_inst;
+    // This writes an instruction, NOT assigns to the pc.
+    *(unsigned int *)OS_CONTEXT_PC(context) = displaced_after_inst;
     *os_context_sigmask_addr(context)= orig_sigmask;
-    os_flush_icache((os_vm_address_t) *os_context_pc_addr(context),
+    os_flush_icache((os_vm_address_t) OS_CONTEXT_PC(context),
                     sizeof(unsigned int));
 }
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
+    unsigned int code = *(uint32_t *)OS_CONTEXT_PC(context);
     int register_offset = code >> 8 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);
 }
 
+#if 0
+static void dump_cpu_state(char *reason, os_context_t* context)
+{
+    int i,j,r=0;
+    sigset_t cur_sigset;
+    char buf[100];
+    sigset_t *sigset = os_context_sigmask_addr(context); sigset_tostring(sigset, buf, sizeof buf);
+    fprintf(stderr, "%s\n", reason);
+    fprintf(stderr, " oldmask=%s\n", buf);
+    pthread_sigmask(0, 0, &cur_sigset); sigset_tostring(&cur_sigset, buf, sizeof buf);
+    fprintf(stderr, " curmask=%s\n", buf);
+    fprintf(stderr, "  $pc=%16lx  $lr=%16lx $ctr=%16lx  $cr=%16lx\n",
+            OS_CONTEXT_PC(context),
+            *os_context_lr_addr(context),
+            *os_context_ctr_addr(context),
+            *os_context_cr_addr(context));
+    for(i=0; i<4; ++i) {
+        for(j=0; j<8 && r<32; ++j,++r)
+            fprintf(stderr, " %s%d=%16lx",
+                    r<10 ? " $r" : "$r", r,
+                    *os_context_register_addr(context, r));
+        putchar('\n');
+    }
+}
+#endif
+
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    unsigned int code;
+  uword_t pc = OS_CONTEXT_PC(context);
+  unsigned int code = *(uint32_t*)pc;
 
-    code=*((u32 *)(*os_context_pc_addr(context)));
+#ifdef LISP_FEATURE_SIGILL_TRAPS
+    if (signal == SIGILL) {
+        if (code == 0x7C0002A6) { // allocation region overflow trap
+            // there is an actual trap instruction located 2 instructions later.
+            // pretend the trap happened there.
+            OS_CONTEXT_PC(context) = pc + 8;
+            if (handle_allocation_trap(context)) return;
+        }
+        if (code == 0x7C2002A6) { // pending interrupt
+            arch_clear_pseudo_atomic_interrupted(context);
+            arch_skip_instruction(context);
+            interrupt_handle_pending(context);
+            return;
+        }
+        lose("sigill traps enabled but got unexpected sigill");
+    }
+#endif
+    if (signal == SIGTRAP && handle_allocation_trap(context)) return;
+
+#ifdef LISP_FEATURE_SB_THREAD
+    if (signal == SIGTRAP && handle_tls_trap(context, pc, code)) return;
+#endif
+
     if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))||
         /* trap instruction from do_pending_interrupt */
         code == 0x7fe00008) {
@@ -539,21 +553,22 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         interrupt_handle_pending(context);
         return;
     }
-
-#ifdef LISP_FEATURE_GENCGC
-    /* Is this an allocation trap? */
-    if (allocation_trap_p(context)) {
-        handle_allocation_trap(context);
+#ifdef LISP_FEATURE_64_BIT
+    /* TDI LGT,$NULL,code */
+    if ((code >> 16) == ((2 << 10) | (1 << 5) | reg_NULL)) {
+        int trap = code & 0xff;
+        handle_trap(context,trap);
         return;
     }
-#endif
-
+#else
     if ((code >> 16) == ((3 << 10) | (6 << 5))) {
         /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
         int trap = code & 0xff;
         handle_trap(context,trap);
         return;
     }
+#endif
+
     /* twi :ne ... or twi ... nargs */
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24
                                 || ((code >> 16) & 31) == reg_NARGS
@@ -568,8 +583,8 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 
 void arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGILL, sigtrap_handler);
-    undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+    ll_install_handler(SIGILL, sigtrap_handler);
+    ll_install_handler(SIGTRAP, sigtrap_handler);
 }
 
 void
@@ -583,8 +598,6 @@ ppc_flush_icache(os_vm_address_t address, os_vm_size_t length)
     address += 32;
   }
 }
-
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 
 /* Linkage tables for PowerPC
  *
@@ -606,12 +619,96 @@ ppc_flush_icache(os_vm_address_t address, os_vm_size_t length)
  * Insert the necessary jump instructions at the given address.
  */
 void
-arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+  char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
   if (datap) {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
     return;
   }
+
+#if defined LISP_FEATURE_64_BIT
+  extern long call_into_c; // actually a function entry address,
+  // but trick the compiler into thinking it isn't, so that it does not
+  // indirect through a descriptor, but instead we get its logical address.
+  if (target_addr != &call_into_c) {
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
+      int* inst_ptr;
+      unsigned long a0,a16,a32,a48;
+      unsigned int inst;
+
+      inst_ptr = (int*) reloc_addr;
+
+      a48 = (unsigned long) target_addr >> 48 & 0xFFFF;
+      a32 = (unsigned long) target_addr >> 32 & 0xFFFF;
+      a16 = (unsigned long) target_addr >> 16 & 0xFFFF;
+      a0 =  (unsigned long) target_addr       & 0xFFFF;
+
+
+      /* addis 12, 0, a48 */
+
+      inst = (15 << 26) | (12 << 21) | (0 << 16) | a48;
+      *inst_ptr++ = inst;
+
+      /* ori 12, 12, a32 */
+
+      inst = (24 << 26) | (12 << 21) | (12 << 16) | a32;
+      *inst_ptr++ = inst;
+
+      /* sldi 12, 12, 32 */
+      inst = (30 << 26) | (12 << 21) | (12 << 16) | 0x07C6;
+      *inst_ptr++ = inst;
+
+      /* oris 12, 12, a16 */
+
+      inst = (25 << 26) | (12 << 21) | (12 << 16) | a16;
+      *inst_ptr++ = inst;
+
+      /* ori 12, 12, a0 */
+
+      inst = (24 << 26) | (12 << 21) | (12 << 16) | a0;
+      *inst_ptr++ = inst;
+
+      /*
+       * mtctr 12
+       */
+
+      inst = (31 << 26) | (12 << 21) | (9 << 16) | (467 << 1);
+      *inst_ptr++ = inst;
+
+      /*
+       * bctr
+       */
+
+      inst = (19 << 26) | (20 << 21) | (528 << 1);
+      *inst_ptr++ = inst;
+
+      os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
+
+#else
+      // Could use either ABI, but we're assuming v1
+      /* In the 64-bit v1 ABI, function pointers are alway passed around
+       * as "function descriptors", not directly the jump target address.
+       * A descriptor is 3 words:
+       *   word 0 = address to jump to
+       *   word 1 = value to place in r2
+       *   word 2 = value to place in r11
+       * For foreign calls, the value that we hand off to call_into_c
+       * is therefore a function descriptor. To make things consistent,
+       * this linkage table entry itself has to look like a function descriptor.
+       * We can just copy the real descriptor to here, except in one case:
+       * call_into_c is not itself an ABI-compatible call. It really should be
+       * a lisp assembly routine, but then we have a turtles-all-the-way-down problem:
+       * it's tricky to access C global data from lisp assembly routines.
+       */
+      memcpy(reloc_addr, target_addr, 24);
+#endif
+      return;
+  }
+  // Can't encode more than 32 bits of jump address
+  gc_assert(((unsigned long) target_addr >> 32) == 0);
+#endif
+
   /*
    * Make JMP to function entry.
    *
@@ -664,4 +761,19 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
+
+void gcbarrier_patch_code(void* where, int nbits)
+{
+#ifdef LISP_FEATURE_64_BIT
+    int m_operand = 64 - nbits;
+    // the M field has a kooky encoding
+    int m_encoded = ((m_operand & 0x1F) << 1) | (m_operand >> 5);
+    unsigned int* pc = where;
+    unsigned int inst = *pc;
+    // .... ____ _xxx xxx_ ____ = 0x7E0;
+    //                  ^ deposit it here, in (BYTE 6 5) of the instruction.
+    *pc = (inst & ~0x7E0) | (m_encoded << 5);
+#else
+    lose("can't patch rldicl in 32-bit"); // illegal instruction
 #endif
+}

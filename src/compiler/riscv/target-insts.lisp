@@ -28,21 +28,20 @@ Otherwise, use the RISC-V register names")
 
 ;; FIXME: Can this be a property of DSTATE instead?
 (defvar *note-u-inst* (make-array 32 :initial-element nil)
-  "An map for the disassembler indicating the target register and
-value used in a u-type instruction.  This is used to make annotations
-about function addresses and register values.")
+  "A map for the disassembler indicating the target register and value
+used in a u-type instruction.  This is used to make annotations about
+function addresses and register values.")
 
 (defconstant-eqx lisp-reg-symbols
-  (map 'vector
-       (lambda (name)
-         (and name (make-symbol (concatenate 'string "$" name))))
-       sb-vm::*register-names*)
+  #.(map 'vector
+         (lambda (name)
+           (and name (make-symbol (concatenate 'string "$" name))))
+         sb-vm::*register-names*)
   #'equalp)
 
 (defconstant-eqx riscv-reg-symbols
-  (coerce
-   (loop for n from 0 to 31 collect (make-symbol (format nil "x~d" n)))
-   'vector)
+  #.(coerce (loop for n from 0 to 31 collect (make-symbol (format nil "x~d" n)))
+            'vector)
   #'equalp)
 
 (defun print-reg (value stream dstate)
@@ -75,9 +74,8 @@ about function addresses and register values.")
                                    (coerce-signed u-imm 12))))
 
 (defconstant-eqx float-reg-symbols
-  (coerce
-   (loop for n from 0 to 31 collect (make-symbol (format nil "ft~d" n)))
-   'vector)
+  #.(coerce (loop for n from 0 to 31 collect (make-symbol (format nil "ft~d" n)))
+            'vector)
   #'equalp)
 
 (defun print-fp-reg (value stream dstate)
@@ -141,6 +139,24 @@ about function addresses and register values.")
                value)
          stream))
 
+(defun print-a-ordering (value stream dstate)
+  (declare (ignore dstate)
+           (stream stream)
+           (type (unsigned-byte 2) value))
+  (when (logbitp 0 value)
+    (princ 'aq stream)
+    (princ #\Space stream))
+  (when (logbitp 1 value)
+    (princ 'rl stream)))
+
+(defun print-fence-ordering (value stream dstate)
+  (declare (ignore dstate)
+           (stream stream)
+           (type (unsigned-byte 4) value))
+  (dotimes (index 4)
+    (when (logbitp (- 3 index) value)
+      (princ (aref #(i o r w) index) stream))))
+
 (defun maybe-augment (rd i-imm)
   (+ (ash (or (aref *note-u-inst* rd) 0) 12)
      (coerce-signed i-imm 12)))
@@ -150,7 +166,7 @@ about function addresses and register values.")
     (#.sb-vm::code-offset
      (note-code-constant offset dstate))
     (#.sb-vm::null-offset
-     (let ((offset (+ sb-vm::nil-value offset)))
+     (let ((offset (+ sb-vm:nil-value offset)))
        (maybe-note-assembler-routine offset nil dstate)
        (maybe-note-static-symbol (logior offset other-pointer-lowtag)
                                  dstate)))
@@ -158,9 +174,8 @@ about function addresses and register values.")
     (#.sb-vm::thread-offset
      (let* ((thread-slots
               (load-time-value
-               (primitive-object-slots
-                (find 'sb-vm::thread *primitive-objects*
-                      :key #'primitive-object-name)) t))
+               (primitive-object-slots (sb-vm::primitive-object 'sb-vm::thread))
+               t))
             (slot (find (ash offset (- word-shift)) thread-slots
                         :key #'slot-offset)))
        (when slot
@@ -211,8 +226,7 @@ about function addresses and register values.")
         (nt "single-step trap (before)"))
        (#.invalid-arg-count-trap
         (nt "Invalid argument count trap"))
-       (#.cerror-trap
-        (nt "cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
        (t
-        (handle-break-args #'snarf-error-junk trap stream dstate))))))
+        (when (or (and (= trap error-trap) (progn (nt "cerror trap") t))
+                  (>= trap error-trap))
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))

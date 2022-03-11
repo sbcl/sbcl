@@ -245,7 +245,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 
 ;;; This function generates a 32bit integer between 0 and #xffffffff
 ;;; inclusive.
-#-sb-fluid (declaim (inline random-chunk))
+
 ;;; portable implementation
 #-x86
 (defun random-mt19937-update (state)
@@ -274,6 +274,11 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
           (logxor (aref state (+ 3 (1- mt19937-m)))
                   (ash y -1) (aref state (logand y 1)))))
   (values))
+
+(declaim (start-block random %random-single-float %random-double-float
+                      random-chunk big-random-chunk))
+
+(declaim (inline random-chunk))
 #-x86
 (defun random-chunk (state)
   (declare (type random-state state))
@@ -302,7 +307,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (declare (type random-state state))
   (sb-vm::random-mt19937 (random-state-state state)))
 
-#-sb-fluid (declaim (inline big-random-chunk))
+(declaim (inline big-random-chunk))
 (defun big-random-chunk (state)
   (declare (type random-state state))
   (logior (ash (random-chunk state) 32)
@@ -312,20 +317,25 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; float between 0.0 and 1.0 by clobbering the significand of 1.0
 ;;; with random bits, then subtracting 1.0. This hides the fact that
 ;;; we have a hidden bit.
-#-sb-fluid (declaim (inline %random-single-float %random-double-float))
+(declaim (inline %random-single-float %random-double-float))
 (declaim (ftype (function ((single-float ($0f0)) random-state)
                           (single-float $0f0))
                 %random-single-float))
 (defun %random-single-float (arg state)
   (declare (type (single-float ($0f0)) arg)
            (type random-state state))
-  (* arg
-     (- (make-single-float
-         (dpb (ash (random-chunk state)
-                   (- sb-vm:single-float-digits n-random-chunk-bits))
-              sb-vm:single-float-significand-byte
-              (single-float-bits $1.0)))
-        $1.0)))
+  (loop for candidate of-type single-float
+        = (* arg
+             (- (make-single-float
+                 (dpb (ash (random-chunk state)
+                           (- sb-vm:single-float-digits n-random-chunk-bits))
+                      sb-vm:single-float-significand-byte
+                      (single-float-bits $1.0)))
+                $1.0))
+        while (#+x86 eql ;; Can't use = due to 80-bit precision
+               #-x86 =
+               candidate arg)
+        finally (return candidate)))
 (declaim (ftype (function ((double-float ($0d0)) random-state)
                           (double-float $0d0))
                 %random-double-float))
@@ -342,14 +352,17 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 (defun %random-double-float (arg state)
   (declare (type (double-float ($0d0)) arg)
            (type random-state state))
-  (* arg
-     (- (sb-impl::make-double-float
-         (dpb (ash (random-chunk state)
-                   (- sb-vm:double-float-digits n-random-chunk-bits 32))
-              sb-vm:double-float-significand-byte
-              (sb-impl::double-float-high-bits $1d0))
-         (random-chunk state))
-        $1d0)))
+  (loop for candidate of-type double-float
+        = (* arg
+             (- (sb-impl::make-double-float
+                 (dpb (ash (random-chunk state)
+                           (- sb-vm:double-float-digits n-random-chunk-bits 32))
+                      sb-vm:double-float-significand-byte
+                      (sb-impl::double-float-high-bits $1d0))
+                 (random-chunk state))
+                $1d0))
+        while (= candidate arg)
+        finally (return candidate)))
 
 ;;; using a faster inline VOP
 #+x86
@@ -357,15 +370,19 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (declare (type (double-float ($0d0)) arg)
            (type random-state state))
   (let ((state-vector (random-state-state state)))
-    (* arg
-       (- (sb-impl::make-double-float
-           (dpb (ash (sb-vm::random-mt19937 state-vector)
-                     (- sb-vm:double-float-digits n-random-chunk-bits
-                        sb-vm:n-word-bits))
-                sb-vm:double-float-significand-byte
-                (sb-impl::double-float-high-bits $1d0))
-           (sb-vm::random-mt19937 state-vector))
-          $1d0))))
+    (loop for candidate of-type double-float
+          = (* arg
+               (- (sb-impl::make-double-float
+                   (dpb (ash (sb-vm::random-mt19937 state-vector)
+                             (- sb-vm:double-float-digits n-random-chunk-bits
+                                sb-vm:n-word-bits))
+                        sb-vm:double-float-significand-byte
+                        (sb-impl::double-float-high-bits $1d0))
+                   (sb-vm::random-mt19937 state-vector))
+                  $1d0))
+          ;; Can't use = due to 80-bit precision
+          while (eql candidate arg)
+          finally (return candidate))))
 
 
 ;;;; random fixnums
@@ -384,9 +401,9 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; as the speed gains due to needing fewer loop iterations are by far
 ;;; outweighted by the cost of the two divisions required (one to find
 ;;; the multiplier and one to bring the result into the correct range).
-#-sb-fluid (declaim (inline %random-fixnum))
+(declaim (inline %random-fixnum))
 (defun %random-fixnum (arg state)
-  (declare (type (integer 1 #.sb-xc:most-positive-fixnum) arg)
+  (declare (type (integer 1 #.most-positive-fixnum) arg)
            (type random-state state))
   (if (= arg 1)
       0

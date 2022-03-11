@@ -21,7 +21,7 @@
 ;;;;     existence of slots, and whether they should be scavenged, is
 ;;;;     not automatically propagated. Thus e.g. if you add a
 ;;;;     SIMPLE-FUN-DEBUG-INFO slot holding a tagged object which needs
-;;;;     to be GCed, you need to tweak scav_code_header() and
+;;;;     to be GCed, you need to tweak scav_code_blob() and
 ;;;;     verify_space() in gencgc.c, and the corresponding code in gc.c.
 ;;;;   * Various code (e.g. STATIC-FSET in genesis.lisp) is hard-wired
 ;;;;     to know the name of the last slot of the object the code works
@@ -32,9 +32,7 @@
 
 ;;;; the primitive objects themselves
 
-(define-primitive-object (cons :type cons
-                               :lowtag list-pointer-lowtag
-                               :alloc-trans cons)
+(define-primitive-object (cons :type cons :lowtag list-pointer-lowtag)
   (car :ref-trans car :set-trans %rplaca :init :arg
        :cas-trans %compare-and-swap-car)
   (cdr :ref-trans cdr :set-trans %rplacd :init :arg
@@ -47,8 +45,8 @@
 
 (define-primitive-object (bignum :lowtag other-pointer-lowtag
                                  :widetag bignum-widetag
-                                 :alloc-trans sb-bignum::%allocate-bignum)
-  (digits :rest-p t :c-type #-alpha "sword_t" #+alpha "u32"))
+                                 :alloc-trans sb-bignum:%allocate-bignum)
+  (digits :rest-p t :c-type "sword_t"))
 
 (define-primitive-object (ratio :type ratio
                                 :lowtag other-pointer-lowtag
@@ -98,32 +96,27 @@
   ;; VECTOR -- see SHRINK-VECTOR.
   (fill-pointer :type index
                 :ref-trans %array-fill-pointer
-                :ref-known (flushable foldable)
+                :ref-known (flushable)
                 :set-trans (setf %array-fill-pointer)
                 :set-known ())
-  (fill-pointer-p :type (member t nil)
-                  :ref-trans %array-fill-pointer-p
-                  :ref-known (flushable foldable)
-                  :set-trans (setf %array-fill-pointer-p)
-                  :set-known ())
   (elements :type index
             :ref-trans %array-available-elements
-            :ref-known (flushable foldable)
+            :ref-known (flushable)
             :set-trans (setf %array-available-elements)
             :set-known ())
   (data :type array
         :ref-trans %array-data ; might be a vector, might not be
-        :ref-known (flushable foldable)
+        :ref-known (flushable)
         :set-trans (setf %array-data)
         :set-known ())
   (displacement :type index
                 :ref-trans %array-displacement
-                :ref-known (flushable foldable)
+                :ref-known (flushable)
                 :set-trans (setf %array-displacement)
                 :set-known ())
   (displaced-p :type t
                :ref-trans %array-displaced-p
-               :ref-known (flushable foldable)
+               :ref-known (flushable)
                :set-trans (setf %array-displaced-p)
                :set-known ())
   (displaced-from :type list
@@ -140,7 +133,7 @@
   ;; VECTOR -- see SHRINK-VECTOR.
   (length :ref-trans sb-c::vector-length
           :type index)
-  (data :rest-p t :c-type #-alpha "uword_t" #+alpha "u32"))
+  (data :rest-p t :c-type "uword_t"))
 
 #|
 Code header representation:
@@ -155,8 +148,8 @@ Code header representation:
   |            total words          | gc_gen | 0 | 0 | widetag |
   |            (4 bytes)            |        |   |   |         |
   +------------------------------------------------------------+  [64-bit words]
-  |            serial#              |   N boxed header bytes   |
-  |            (4 bytes)            |        (4 bytes)         |
+  |                                 |   N boxed header bytes   |
+  |                                 |        (4 bytes)         |
   +------------------------------------------------------------+
 
   the two zero bytes are reserved for future use
@@ -187,28 +180,31 @@ during backtrace.
 ;;; hidden dependencies on primitive object sizes for the most part,
 ;;; 'ppc-assem.S' contains a literal constant that relies on knowing
 ;;; the precise size of a code object. Yes, there is a FIXME there :-)
-;;; So, if you touch this, then fix that.
+;;; So, if you touch this, then fix that. REALLY REALLY.
 (define-primitive-object (code :type code-component
                                 :lowtag other-pointer-lowtag
                                 :widetag code-header-widetag)
   ;; This is the length of the boxed section, in bytes, not tagged.
   ;; It will be a multiple of the word size.
   ;; It can be accessed as a tagged value in Lisp by shifting.
-  ;; The upper 4 bytes store code-serial# on 64-bit words.
   (boxed-size :type fixnum ; see above figure
               :ref-known (flushable movable)
               :ref-trans %code-boxed-size)
+  ;; This slot usually holds an instance of SB-C::COMPILED-DEBUG-FUN
+  ;; but the debugger can replace it with a cons of that and something else.
+  ;; It could also be the symbol :BPT-LRA, or, as a special case
+  ;; for the assembler code component, a cons holding a hash-table.
+  ;; (the cons points from read-only to static space, but the hash-table
+  ;; wants to be in dynamic space)
+  ;; The corresponding SETF function is defined using code-header-set
+  ;; on the slot index; and there's a special variant if #+darwin-jit.
   (debug-info :type t
               :ref-known (flushable)
-              :ref-trans %code-debug-info
-              :set-known ()
-              :set-trans (setf %code-debug-info))
-  #+(or x86 immobile-space)
-  (fixups :type t
-          :ref-known (flushable)
-          :ref-trans %code-fixups
-          :set-known ()
-          :set-trans (setf %code-fixups))
+              :ref-trans %%code-debug-info)
+  ;; Not all architectures use fixups. The slot is always present for consistency.
+  ;; The corresponding SETF function is defined using code-header-set
+  ;; on the slot index.
+  (fixups :type t :ref-known (flushable) :ref-trans %code-fixups)
   (constants :rest-p t))
 
 (define-primitive-object (fdefn :type fdefn
@@ -227,7 +223,7 @@ during backtrace.
   ;;   pertain to undefined functions, FINs, and closures.
   ;; - all others store a native pointer to the function entry address
   ;;   or closure tramp
-  (raw-addr :c-type #-alpha "char *" #+alpha "u32"))
+  (raw-addr :c-type "char *"))
 
 ;;; a simple function (as opposed to hairier things like closures
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
@@ -236,52 +232,42 @@ during backtrace.
                                      :widetag simple-fun-widetag)
   ;; All three function primitive-objects have the first word after the header
   ;; as some kind of entry point, either the address to jump to, in the case
-  ;; of x86, or the Lisp function to jump to, for everybody else.
+  ;; of x86oids and arm64, or the Lisp function to jump to, for everybody else.
   (self :set-known ()
         :set-trans (setf %simple-fun-self))
-  (name :ref-known (flushable)
-        :ref-trans %simple-fun-name
-        :set-known ()
-        :set-trans (setf %simple-fun-name))
-  (arglist :type list
-           :ref-known (flushable)
-           :ref-trans %simple-fun-arglist
-           :set-known ()
-           :set-trans (setf %simple-fun-arglist))
-  (type :ref-known (flushable)
-        ;; %%SIMPLE-FUN-TYPE is used only by %SIMPLE-FUN-TYPE.
-        ;; Nobody should care that %SIMPLE-FUN-TYPE isn't open-coded.
-        :ref-trans %%simple-fun-type
-        :set-known ()
-        :set-trans (setf %simple-fun-type))
-  ;; NIL for empty, STRING for a docstring, SIMPLE-VECTOR for XREFS, and (CONS
-  ;; STRING SIMPLE-VECTOR) for both.
-  (info :init :null
-        :ref-trans %simple-fun-info
-        :ref-known (flushable)
-        :set-trans (setf %simple-fun-info)
-        :set-known ())
-  ;; FIXME: This is a poor name for this slot, because SIMPLE-FUN-CODE
-  ;; ought to mean the code object in which this simple-fun is contained.
-  ;; Probably a better name would be INSTS, especially as SIMPLE-FUN-CODE-OFFSET
-  ;; is the constant naming the displacement of this slot from the beginning of
-  ;; the fun, but it ought to mean how far this fun is from the code header.
-  ;; This will be quite disastrous to clean up and not make mistakes about it.
-  (code :rest-p t :c-type "unsigned char"))
+  ;; This slot used to be named CODE, but that was misleaing because the
+  ;; generated constant SIMPLE-FUN-CODE-OFFSET did not mean the offset from here
+  ;; back to the containing object (which isn't constant), but instead the offset
+  ;; forward to the first instruction, i.e. what is now SIMPLE-FUN-INSTS-OFFSET.
+  (insts :rest-p t :c-type "unsigned char"))
 
-#-(or x86 x86-64)
+(defconstant code-slots-per-simple-fun 4)
+;;; These are word numbers beyond the base of the simple-fun's metadata
+;;; in the code header. The mnemonic device here is that the first 3 slots
+;;; essentially comprise the function-lambda-expression,
+;;; and the last is a derived piece of information.
+(defconstant simple-fun-name-slot    0)
+(defconstant simple-fun-arglist-slot 1)
+(defconstant simple-fun-source-slot  2) ; form and/or docstring
+(defconstant simple-fun-info-slot    3) ; type and possibly xref
+
+#-(or x86 x86-64 arm64 riscv)
 (define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))
 
 (define-primitive-object (closure :lowtag fun-pointer-lowtag
-                                   :widetag closure-widetag
-                                   ;; This allocator is %COPY-foo because it's only
-                                   ;; used when renaming a closure. The compiler has
-                                   ;; its own way of making closures, which requires
-                                   ;; that the length be a compile-time constant.
-                                   :alloc-trans %copy-closure)
-  (fun :init :arg :ref-trans #+(or x86 x86-64) %closure-callee
-                             #-(or x86 x86-64) %closure-fun)
+                                  :widetag closure-widetag
+                                  ;; This allocator is used when renaming or cloning
+                                  ;; a closure. The compiler has its own way of making
+                                  ;; closures which requires that the length be
+                                  ;; a compile-time constant.
+                                  :alloc-trans %alloc-closure)
+  (fun :init :arg :ref-trans #+(or x86 x86-64 arm64) %closure-callee
+                             #-(or x86 x86-64 arm64) %closure-fun)
+  ;; 'fun' is an interior pointer to code, but we also need the base pointer
+  ;; for MPS. I'm trying to figure out how to avoid this word of overhead,
+  ;; but it works for the time being.
+  #+metaspace (code :ref-known (flushable) :ref-trans %closure-code)
   (info :rest-p t))
 
 (define-primitive-object (funcallable-instance
@@ -289,6 +275,7 @@ during backtrace.
                           :widetag funcallable-instance-widetag
                           :alloc-trans %make-funcallable-instance)
   (trampoline :init :funcallable-instance-tramp)
+  #-compact-instance-header (layout :set-trans %set-fun-layout :ref-trans %fun-layout)
   ;; TODO: if we can switch places of 'function' and 'fsc-instance-slots'
   ;; (at least for the builds with compact-instance-header)
   ;; then for both funcallable and non-funcallable instances,
@@ -322,7 +309,8 @@ during backtrace.
                                        :alloc-trans make-weak-pointer)
   (value :ref-trans %weak-pointer-value :ref-known (flushable)
          :init :arg)
-  (next :c-type #-alpha "struct weak_pointer *" #+alpha "u32"))
+  ;; 64-bit uses spare header bytes to store the 'next' link
+  #-64-bit (next :c-type "struct weak_pointer *"))
 
 ;;;; other non-heap data blocks
 
@@ -331,25 +319,28 @@ during backtrace.
   symbol) ;; on sb-thread, this is actually a tls-index
 
 (define-primitive-object (unwind-block)
-  (uwp :c-type #-alpha "struct unwind_block *" #+alpha "u32")
-  (cfp :c-type #-alpha "lispobj *" #+alpha "u32")
-  #-(or x86 x86-64) code
+  (uwp :c-type "struct unwind_block *")
+  (cfp :c-type "lispobj *")
+  #-(or x86 x86-64 arm64) code
   entry-pc
   #+(and win32 x86) next-seh-frame
   #+(and win32 x86) seh-frame-handler
-  #+x86-64 bsp
-  #+x86-64
-  current-catch)
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nfp
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nsp
+  #+unbind-in-unwind bsp
+  #+unbind-in-unwind current-catch)
 
 (define-primitive-object (catch-block)
-  (uwp :c-type #-alpha "struct unwind_block *" #+alpha "u32")
-  (cfp :c-type #-alpha "lispobj *" #+alpha "u32")
-  #-(or x86 x86-64) code
+  (uwp :c-type "struct unwind_block *")
+  (cfp :c-type "lispobj *")
+  #-(or x86 x86-64 arm64) code
   entry-pc
   #+(and win32 x86) next-seh-frame
   #+(and win32 x86) seh-frame-handler
-  #+x86-64 bsp
-  (previous-catch :c-type #-alpha "struct catch_block *" #+alpha "u32")
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nfp
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nsp
+  #+unbind-in-unwind bsp
+  (previous-catch :c-type "struct catch_block *")
   tag)
 
 ;;;; symbols
@@ -367,32 +358,65 @@ during backtrace.
   ;; OTHER-POINTER-LOWTAG is 7, LIST-POINTER-LOWTAG is 3, so if you
   ;; subtract 3 from (SB-KERNEL:GET-LISP-OBJ-ADDRESS 'NIL) you get the
   ;; first data slot, and if you subtract 7 you get a symbol header.
+  ;; (The numbers mentioned pertain to the 32-bit machines, not 64-bit)
 
-  ;; also the CAR of NIL-as-end-of-list
+  ;; HASH and VALUE are the first two slots.
+  ;; Traditionally VALUE was the first slot, corresponding to the CAR of
+  ;; NIL-as-end-of-list; and HASH was the second, corresponding to CDR.
+  ;; By storing HASH in the word after the object header it becomes a memory-safe
+  ;; operation to read SYMBOL-HASH-SLOT from _any_ object whatsoever
+  ;; using lisp code equivalent to "native_pointer(ptr)[1]".
+  ;; This improves the code for CASE and ECASE over symbols
+  ;; regardless of whether the object being tested is known to be a symbol.
+  ;; Accessing the hash requires masking off bits to yield a fixnum result,
+  ;; all the more so if the object is any random type.
+  (hash :set-trans %set-symbol-hash)
   (value :init :unbound
          :set-trans %set-symbol-global-value
          :set-known ())
-  ;; also the CDR of NIL-as-end-of-list.  Its reffer needs special
-  ;; care for this reason, as hash values must be fixnums.
-  (hash :set-trans %set-symbol-hash)
 
-  (info :ref-trans symbol-info :ref-known (flushable)
-        :set-trans (setf symbol-info)
-        :set-known ()
-        :cas-trans %compare-and-swap-symbol-info
-        :type (or simple-vector list)
+  ;; The private accessor for INFO reads the slot verbatim.
+  ;; In contrast, the SYMBOL-INFO function always returns a PACKED-INFO
+  ;; instance (see info-vector.lisp) or NIL. The slot itself may hold a cons
+  ;; of the user's PLIST and a PACKED-INFO or just a PACKED-INFO.
+  ;; It can't hold a PLIST alone without wrapping in an extra cons cell.
+  (info :ref-trans symbol-%info :ref-known (flushable)
+        ;; IR2-CONVERT-CASSER only knows the arg order as (OBJECT OLD NEW),
+        ;; so as much as I'd like to name this (CAS SYMBOL-%INFO),
+        ;; it can't be that, because it'd need args of (OLD NEW OBJECT).
+        ;; This is a pretty close approximation of the desired name.
+        :cas-trans sb-impl::cas-symbol-%info
+        :type (or instance list)
         :init :null)
-  (name :ref-trans symbol-name :init :arg)
-  (package :ref-trans sb-xc:symbol-package
-           :set-trans %set-symbol-package
-           :init :null)
+  (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
+  ;; This slot holds an FDEFN. It's almost unnecessary to have FDEFNs at all
+  ;; for symbols. If we ensured that any function bound to a symbol had a
+  ;; call convention rendering it callable in the manner of a SIMPLE-FUN,
+  ;; then we would only need to store that function's raw entry address here,
+  ;; thereby removing the FDEFN for any global symbol. Any closure assigned
+  ;; to a symbol would need a tiny trampoline, which is already the case
+  ;; for #+immobile-code.
+  (fdefn :ref-trans %symbol-fdefn :ref-known ()
+         :cas-trans cas-symbol-fdefn)
+  #-compact-symbol
+  (package-id :type index ; actually 16 bits. (Could go in the header)
+              :ref-trans sb-impl::symbol-package-id
+              :set-trans sb-impl::set-symbol-package-id :set-known ())
   ;; 0 tls-index means no tls-index is allocated
   ;; 64-bit put the tls-index in the header word.
   ;; For the 32-bit architectures, reading this slot as a descriptor
   ;; makes it "off" by N-FIXNUM-TAG-BITS, which is bothersome,
   ;; so there's a transform on SYMBOL-TLS-INDEX to make it sane.
+  ;; The issue with not having this in the header - supposing we used
+  ;; the high 2 bytes for it - is that NIL's 0th word would suggest
+  ;; that it has a nonzero TLS index, namely:
+  ;; * (sb-vm:hexdump nil)
+  ;;   1100008: 0110000B = NIL ; looks like NIL's TLS index is 0x110
+  ;;   110000C: 0110000B = NIL
   #+(and sb-thread (not 64-bit))
-  (tls-index :ref-known (flushable) :ref-trans %symbol-tls-index))
+  (tls-index :type (and fixnum unsigned-byte) ; too generous still?
+             :ref-known (flushable)
+             :ref-trans %symbol-tls-index))
 
 (define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag
@@ -439,22 +463,26 @@ during backtrace.
 ;;; If we can't do that for some reason - like, say, the safepoint page
 ;;; is located prior to 'struct thread', then these just become ordinary slots.
 (defglobal *thread-header-slot-names*
-  (append #+immobile-space '(function-layout
+  (append #+x86-64
+          '(t-nil-constants
+            msan-xor-constant
+            ;; The following slot's existence must NOT be conditional on #+msan
+            msan-param-tls) ; = &__msan_param_tls
+          #+immobile-space '(function-layout
                              varyobj-space-addr
                              varyobj-card-count
                              varyobj-card-marks)))
 
-#+sb-safepoint
-(defglobal *thread-trailer-slots* (mapcar #'list *thread-header-slot-names*))
-#-sb-safepoint
 (macrolet ((assign-header-slot-indices ()
              (let ((i 0))
                `(progn
                   ,@(mapcar (lambda (x)
                               `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
                             *thread-header-slot-names*)))))
-  (assign-header-slot-indices)
-  (defglobal *thread-trailer-slots* nil))
+  (assign-header-slot-indices))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+(defconstant histogram-small-bins 32)) ; for consing size histogram
 
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
@@ -462,16 +490,22 @@ during backtrace.
 ;;; can take care of maintaining Lisp and C versions.
 (define-primitive-object (thread :size primitive-thread-object-length)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
-  ;; pass the address of initial-function into new_thread_trampoline.
+  ;; pass the address of the start routine into new_thread_trampoline.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
+
   ;; Technically this slot violates our requirement that the size of the thread
   ;; primitive object be computable by assuming one word per slot. POSIX says
   ;; "IEEE Std 1003.1-2001/Cor 2-2004, item XBD/TC2/D6/26 is applied,
   ;;  adding pthread_t to the list of types that are not required to be arithmetic
   ;;  types, thus allowing pthread_t to be defined as a structure."
-  (os-thread :c-type "os_thread_t")
+  ;;
+  ;; Furthermore, it is technically possibly for a pthread_t to be smaller than a word
+  ;; (a 4-byte identifier, not a pointer, on 64-bit) but that seems not to be true
+  ;; for any system that we care about.
+  (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj" ; actually is HANDLE
+                     #-(or win32 (not sb-thread)) "pthread_t")
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
   ;; near the beginning of the structure so that x86[-64] assembly code
@@ -483,24 +517,21 @@ during backtrace.
   (binding-stack-pointer :c-type "lispobj *" :pointer t
                          :special *binding-stack-pointer*)
   ;; next two not used in C, but this wires the TLS offsets to small values
-  #+(and x86-64 sb-thread)
+  #+(and (or riscv x86-64 arm64) sb-thread)
   (current-catch-block :special *current-catch-block*)
-  #+(and x86-64 sb-thread)
+  #+(and (or riscv x86-64 arm64) sb-thread)
   (current-unwind-protect-block :special *current-unwind-protect-block*)
-  #+sb-thread (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*)
+  #+(or sb-thread sparc ppc)
+  (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*
+                      :c-type "pa_bits_t")
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
   (stepping)
-  ;; The following slot's existence must NOT be conditional on #+msan
-  #+x86-64 (msan-param-tls) ; = &__msan_param_tls
-  (dynspace-addr)
-  (dynspace-card-count)
-  (dynspace-pte-base)
   ;; Deterministic consing profile recording area.
   (profile-data :c-type "uword_t *" :pointer t)
-  ;; Lisp needs only the first two fields of the alloc_region, so it's OK if the
-  ;; final 2 fields have offsets >= 128 from the base of the thread structure.
-  #+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
+  ;; Thread-local allocation buffers
+  #+gencgc (mixed-tlab :c-type "struct alloc_region" :length 4)
+  #+gencgc (cons-tlab :c-type "struct alloc_region" :length 4)
   ;; END of slots to keep near the beginning.
 
   ;; This is the original address at which the memory was allocated,
@@ -508,6 +539,7 @@ during backtrace.
   ;; Kept here so that when the thread dies we can release the whole
   ;; memory we reserved.
   (os-address :c-type "void *" :pointer t)
+  (os-kernel-tid) ; the kernel's thread identifier, 32 bits on linux
 
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.
@@ -515,37 +547,26 @@ during backtrace.
   (binding-stack-start :c-type "lispobj *" :pointer t
                        :special *binding-stack-start*)
 
-  #+(and sb-thread (not sb-safepoint))
-  (state-sem :c-type "os_sem_t *" :pointer t)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-running-sem :c-type "os_sem_t *" :pointer t)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-running-waitcount :c-type "int" :length 1)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-stopped-sem :c-type "os_sem_t *" :pointer t)
-  #+(and sb-thread (not sb-safepoint))
-  (state-not-stopped-waitcount :c-type "int" :length 1)
   (control-stack-start :c-type "lispobj *" :pointer t
                        :special *control-stack-start*)
   (control-stack-end :c-type "lispobj *" :pointer t
                      :special *control-stack-end*)
-  (control-stack-guard-page-protected)
-  #+win32 (private-events :c-type "struct private_events" :length 2)
   (this :c-type "struct thread *" :pointer t)
   (prev :c-type "struct thread *" :pointer t)
   (next :c-type "struct thread *" :pointer t)
-  ;; starting, running, suspended, dead
-  (state :c-type "lispobj")
+  ;; a struct containing {starting, running, suspended, dead}
+  ;; and some other state fields.
+  (state-word :c-type "struct thread_state_word")
+  ;; Statistical CPU profiler data recording buffer
+  (sprof-data)
 
   #+x86 (tls-cookie)                          ;  LDT index
   #+sb-thread (tls-size)
-  (interrupt-data :c-type "struct interrupt_data *"
-                  :pointer t)
   ;; For various reasons related to pseudo-atomic and interrupt
   ;; handling, we need to know if the machine context is in Lisp code
   ;; or not.  On non-threaded targets, this is a global variable in
   ;; the runtime, but it's clearly a per-thread value.
-  #+sb-thread
+  #+(and sb-thread (not arm64))
   (foreign-function-call-active :c-type "boolean")
   ;; Same as above for the location of the current control stack frame.
   #+(and sb-thread (not (or x86 x86-64)))
@@ -557,27 +578,26 @@ during backtrace.
   (control-stack-pointer :c-type "lispobj *")
   #+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
-  ;; Context base pointer for running on top of system libraries built using
-  ;; -fomit-frame-pointer.  Currently truly required and implemented only
-  ;; for (and win32 x86-64), but could be generalized to other platforms if
-  ;; needed:
-  #+win32 (carried-base-pointer :c-type "os_context_register_t")
-  #+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
-  #+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
-  #+(and sb-safepoint-strictly (not win32))
-  (sprof-alloc-region :c-type "struct alloc_region" :length 4)
-  ;; If we need the header slots, but they can't precede this structure
-  ;; for technical reasons having to do with no writable memory being there,
-  ;; then stuff them at the end, for lack of any place better.
-  . #.*thread-trailer-slots*)
+  #+ppc64 (card-table)
 
-;;; Compute the smallest TLS index that will be assigned to a special variable
-;;; that does not map onto a thread slot.
-;;; Given N thread slots, the tls indices are 0..N-1 scaled by word-shift.
-;;; This constant is the index prior to scaling.
-#+sb-thread (defconstant sb-thread::tls-index-start primitive-thread-object-length)
+  ;; allocation instrumenting
+  (tot-bytes-alloc-boxed)
+  (tot-bytes-alloc-unboxed)
+  (slow-path-allocs)
+  (et-allocator-mutex-acq) ; elapsed times
+  (et-find-freeish-page)
+  (et-bzeroing)
+  (obj-size-histo :c-type "size_histogram"
+                  :length #.(+ histogram-small-bins sb-vm:n-word-bits))
+
+  ;; The *current-thread* MUST be the last slot in the C thread structure.
+  ;; It it the only slot that needs to be noticed by the garbage collector.
+  (lisp-thread :pointer t :special sb-thread:*current-thread*))
 
 (defconstant code-header-size-shift #+64-bit 32 #-64-bit n-widetag-bits)
+(defconstant-eqx code-serialno-byte
+  #+64-bit (byte 32 32) #-64-bit (byte 18 14)
+  #'equalp)
 (declaim (inline code-object-size code-header-words %code-code-size))
 #-sb-xc-host
 (progn
@@ -599,9 +619,100 @@ during backtrace.
     (declare (code-component code))
     (- (code-object-size code) (ash (code-header-words code) word-shift)))
 
+  ;; Possibly not the best place for this definition, but other accessors
+  ;; for primitive objects are here too.
+  (defun code-jump-table-words (code)
+    (declare (code-component code))
+    (if (eql (code-header-ref code code-boxed-size-slot) 0)
+        0
+        (with-pinned-objects (code)
+          (ldb (byte 14 0) (sap-ref-word (code-instructions code) 0)))))
+
+  ;; Serial# is stored in 18 bits of the first unboxed data word, the same word
+  ;; which holds the count of jump table entries. The primary purpose of the serial#
+  ;; is to uniquely identify code objects independent of any naming.
+  ;; The serial# is globally unique unless the global counter wraps around.
   (defun %code-serialno (code)
-    (declare (code-component code) (ignorable code))
-    #+64-bit ; extract high 4 bytes of boxed-size slot
-    (ash (%code-boxed-size code) (- n-fixnum-tag-bits 32)))
+    (declare (code-component code))
+    (if (eql (code-header-ref code code-boxed-size-slot) 0)
+        0
+        (with-pinned-objects (code)
+          (ldb code-serialno-byte (sap-ref-word (code-instructions code) 0)))))
 
 ) ; end PROGN
+
+;;; The definitions below want to use ALIGN-UP, which is not defined
+;;; in time to put these in early-objdef, but it turns out that we don't
+;;; need them there.
+(defconstant nil-value
+    (+ static-space-start
+       ;; mixed_region precedes NIL
+       ;; 8 is the number of words to reserve at the beginning of static space
+       ;; prior to the words of NIL.
+       ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
+       #+(and gencgc (not sb-thread) (not 64-bit)) (ash 8 word-shift)
+       ;; This offset of #x100 has to do with some edge cases where a vop
+       ;; might treat UNBOUND-MARKER as a pointer. So it has an address
+       ;; that is somewhere near NIL which makes it sort of "work"
+       ;; to dereference it. See git rev f1a956a6a771 for more info.
+       #+64-bit #x100
+       ;; magic padding because of NIL's symbol/cons-like duality
+       (* 2 n-word-bytes)
+       list-pointer-lowtag))
+
+;;; MIXED-REGION is at the beginning of static space
+#-sb-thread
+(progn (defconstant mixed-region static-space-start)
+       (defconstant cons-region (+ mixed-region (* 4 n-word-bytes))))
+
+;;; Start of static objects:
+;;;
+;;;   32-bit w/threads     |   32-bit no threads     |      64-bit
+;;;  --------------------  | --------------------    | ---------------------
+;;;       padding          |      padding            |      padding
+;;;  NIL: header (#x07__)  | NIL: header (#x06__)    | NIL: header (#x05__)
+;;;       hash             |      hash               |      hash
+;;;       value            |      value              |      value
+;;;       info             |      info               |      info
+;;;       name             |      name               |      name
+;;;       fdefn            |      fdefn              |      fdefn
+;;;       package          |      package            |      (unused)
+;;;       tls_index        |   T: header             |   T: header
+;;;       (unused)         |                         |
+;;;    T: header           |                         |
+;;;  -------------------   | --------------------    | ---------------------
+;;;    SYMBOL_SIZE=8       |   SYMBOL_SIZE=7         |   SYMBOL_SIZE=6
+;;;    NIL is 10 words     |   NIL is 8 words        |   NIL is 8 words
+
+;;; This constant is the address at which to scan NIL as a root.
+;;; To ensure that scav_symbol is invoked, we have to see the widetag
+;;; in the 0th word, which is at 1 word prior to the word containing the CAR of
+;;; nil-as-a-list. So subtract the lowtag and then go back one more word.
+;;; This address is NOT double-lispword-aligned, but the scavenge method
+;;; does not assert that.
+(defconstant nil-symbol-slots-start
+  (- nil-value list-pointer-lowtag n-word-bytes))
+
+;;; NIL as a symbol contains the usual number of words for a symbol,
+;;; aligned to a double-lispword. This will NOT end at a double-lispword boundary.
+;;; In all 3 scenarios depicted above, the number of slots that the 'scav' function
+;;; returns suggests that it would examine the header word of the *next* symbol.
+;;; But it does not, because it confines itself to looking only at the number of
+;;; words indicated in the symbol header of NIL. But we have to pass in the aligned
+;;; count because of the assertion in heap_scavenge that the scan ends as expected,
+;;; and scavenge methods must return an even number because nothing can be smaller
+;;; than 1 cons cell or not a multiple thereof.
+(defconstant nil-symbol-slots-end
+  (+ nil-symbol-slots-start (ash (align-up symbol-size 2) word-shift)))
+
+;;; This constant is the number of words to report that NIL consumes
+;;; when Lisp asks for its primitive-object-size. So we say that it consumes
+;;; all words from the start of static-space objects up to the next object.
+(defconstant sizeof-nil-in-words (+ 2 (sb-int:align-up (1- sb-vm:symbol-size) 2)))
+
+;;; Address at which to start scanning static symbols when heap-walking.
+;;; Basically skip over MIXED-REGION (if it's in static space) and NIL.
+;;; Or: go to NIL's header word, subtract 1 word, and add in the physical
+;;; size of NIL in bytes that we report for primitive-object-size.
+(defconstant static-space-objects-start
+  (+ nil-symbol-slots-start (ash (1- sizeof-nil-in-words) word-shift)))

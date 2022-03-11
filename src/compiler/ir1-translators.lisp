@@ -102,7 +102,6 @@ Evaluate the FORMS as a PROGN. Within the lexical scope of the body,
 RETURN-FROM can be used to exit the form."
   (unless (symbolp name)
     (compiler-error "The block name ~S is not a symbol." name))
-  (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
          (entry (make-entry))
@@ -116,7 +115,6 @@ RETURN-FROM can be used to exit the form."
     (let* ((env-entry (list entry next result))
            (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
                                   :cleanup cleanup)))
-      (push env-entry (ctran-entries next))
       (ir1-convert-progn-body dummy next result forms))))
 
 (def-ir1-translator return-from ((name &optional value) start next result)
@@ -201,7 +199,6 @@ TAGS, and NIL is returned. If a statement contains a GO to a defined TAG
 within the lexical scope of the form, then control is transferred to the next
 statement following that tag. A TAG must be an integer or a symbol. A
 STATEMENT must be a list. Other objects are illegal within the body."
-  (start-block start)
   (ctran-starts-block next)
   (let* ((dummy (make-ctran))
          (entry (make-entry))
@@ -298,7 +295,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
     ;; Do this after processing, since the definitions can be malformed.
     (unless (= (length definitions)
                (length (remove-duplicates definitions :key #'first)))
-      (compiler-style-warn "Duplicate definitions in ~S" definitions))
+      (compiler-warn "Duplicate definitions in ~S" definitions))
     (funcall fun processed-definitions)))
 
 ;;; Tweak LEXENV to include the DEFINITIONS from a MACROLET, then
@@ -464,7 +461,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
       (bug "%PRIMITIVE was used with an unknown values template."))
 
     (ir1-convert start next result
-                 `(%%primitive ',name
+                 `(%%primitive ',template
                                ',(eval-info-args
                                   (subseq args required min))
                                ,@(subseq args 0 required)
@@ -536,8 +533,8 @@ Return VALUE without evaluating it."
                             (lexenv-blocks *lexenv*) :from-end t))
               *source-namestring*
               (awhen (case *name-context-file-path-selector*
-                       (pathname (or sb-xc:*compile-file-pathname* *load-pathname*))
-                       (truename (or sb-xc:*compile-file-truename* *load-truename*)))
+                       (pathname (or *compile-file-pathname* *load-pathname*))
+                       (truename (or *compile-file-truename* *load-truename*)))
                 (namestring it)))))
     (when context
       (list :in context))))
@@ -557,63 +554,65 @@ Return VALUE without evaluating it."
      (compiler-error "Not a valid lambda expression:~%  ~S"
                      thing))))
 
-(defun fun-name-leaf (thing)
+(defun enclose (start next funs)
+  (let ((enclose (make-enclose :funs funs)))
+    (link-node-to-previous-ctran enclose start)
+    (use-ctran enclose next)
+    (dolist (fun funs)
+      (setf (functional-enclose fun) enclose))))
+
+;;; Get the leaf corresponding to THING, allocating and converting it
+;;; if it's a lambda expression or otherwise finding the lexically
+;;; apparent function associated to it.
+(defun find-or-convert-fun-leaf (thing start)
   (cond
-    ((typep thing
-            '(cons (member lambda named-lambda lambda-with-lexenv)))
-     (values (ir1-convert-lambdalike
-              thing :debug-name (name-lambdalike thing))
-             t))
+    ((typep thing '(cons (member lambda named-lambda lambda-with-lexenv)))
+     (let ((ctran (make-ctran))
+           (leaf (ir1-convert-lambdalike thing
+                                         :debug-name (name-lambdalike thing))))
+       (enclose start ctran (list leaf))
+       (values leaf ctran)))
     ((legal-fun-name-p thing)
-     (values (find-lexically-apparent-fun
-              thing "as the argument to FUNCTION")
-             nil))
+     (values (find-lexically-apparent-fun thing "as the argument to FUNCTION")
+             start))
     (t
      (compiler-error "~S is not a legal function name." thing))))
 
-(def-ir1-translator %%allocate-closures ((&rest leaves) start next result)
-  (aver (eq result 'nil))
-  (let ((lambdas leaves))
-    ;; Opaquely quoting this list avoids recursing in find-constant
-    ;; to check for dumpability of sub-parts as it would otherwise do.
-    (ir1-convert start next result `(%allocate-closures ,(opaquely-quote lambdas)))
-    (let ((allocator (node-dest (ctran-next start))))
-      (dolist (lambda lambdas)
-        (setf (functional-allocator lambda) allocator)))))
-
-(defmacro with-fun-name-leaf ((leaf thing start &key global-function) &body body)
-  `(multiple-value-bind (,leaf allocate-p)
-       (if ,global-function
-           (find-global-fun ,thing t)
-           (fun-name-leaf ,thing))
-     (if allocate-p
-         (let ((.new-start. (make-ctran)))
-           (ir1-convert ,start .new-start. nil `(%%allocate-closures ,leaf))
-           (let ((,start .new-start.))
-             ,@body))
-         (locally
-             ,@body))))
+;;; Convert a lambda without referencing it, side-effecting the
+;;; compile-time environment. This is useful for converting named
+;;; lambdas not meant to have entry points during block compilation,
+;;; since references will create entry points.
+(def-ir1-translator %refless-defun ((thing) start next result)
+  (ir1-convert-lambdalike thing :debug-name (name-lambdalike thing))
+  (ir1-convert start next result nil))
 
 (def-ir1-translator function ((thing) start next result)
   "FUNCTION name
 
 Return the lexically apparent definition of the function NAME. NAME may also
 be a lambda expression."
-  (with-fun-name-leaf (leaf thing start)
+  (multiple-value-bind (leaf start)
+      (find-or-convert-fun-leaf thing start)
     (reference-leaf start next result leaf)))
 
 ;;; Like FUNCTION, but ignores local definitions and inline
 ;;; expansions, and doesn't nag about undefined functions.
 ;;; Used for optimizing things like (FUNCALL 'FOO).
 (def-ir1-translator global-function ((thing) start next result)
-  (with-fun-name-leaf (leaf thing start :global-function t)
-    (reference-leaf start next result leaf)))
+  (reference-leaf start next result (find-global-fun thing t)))
 
-(defun constant-global-fun-name (thing)
-  (let ((constantp (sb-xc:constantp thing)))
+;;; Return T if THING is a constant value and either a symbol (if EXTENDEDP is NIL)
+;;; or an extended-function-name (if EXTENDEDP is T).
+;;; Note however that whether THING actually names something is irrelevant.
+;;; This test is only if it _could_ name something. Return NIL if THING is a function
+;;; or a constant form evaluating to a function, or not a legal designator at all.
+(defun constant-global-fun-name (thing lexenv extendedp)
+  (let ((constantp (constantp thing lexenv)))
     (when constantp
-      (let ((name (constant-form-value thing)))
-        (when (legal-fun-name-p name)
+      (let ((name (constant-form-value thing lexenv)))
+        (when (if extendedp
+                  (legal-fun-name-p name)
+                  (symbolp name))
           name)))))
 
 (defun lvar-constant-global-fun-name (lvar)
@@ -622,14 +621,15 @@ be a lambda expression."
       (when (legal-fun-name-p name)
         name))))
 
-(defun ensure-source-fun-form (source &key (coercer '%coerce-callable-for-call) give-up)
+(defun ensure-source-fun-form (source lexenv &key (coercer '%coerce-callable-for-call)
+                                             (extendedp t) give-up)
   (let ((op (when (consp source) (car source))))
     (cond ((memq op '(%coerce-callable-to-fun %coerce-callable-for-call))
-           (ensure-source-fun-form (second source) :coercer coercer))
+           (ensure-source-fun-form (second source) lexenv :coercer coercer))
           ((member op '(function global-function lambda named-lambda))
            (values source nil))
           (t
-           (let ((cname (constant-global-fun-name source)))
+           (let ((cname (constant-global-fun-name source lexenv extendedp)))
              (if cname
                  (values `(global-function ,cname) nil)
                  (values `(,coercer ,source) give-up)))))))
@@ -671,10 +671,14 @@ be a lambda expression."
   (let ((function (handler-case (%macroexpand function *lexenv*)
                     (error () function))))
     (if (typep function '(cons (member function global-function) (cons t null)))
-        (with-fun-name-leaf (leaf (cadr function) start
-                                  :global-function (eq (car function)
-                                                       'global-function))
-          (ir1-convert start next result `(,leaf ,@args)))
+        ;; We manually frob the function to get the leaf like this so
+        ;; we let setf functions have their source transforms fire.
+        (destructuring-bind (operator definition) function
+          (multiple-value-bind (leaf start)
+              (ecase operator
+                (function (find-or-convert-fun-leaf definition start))
+                (global-function (values (find-global-fun definition t) start)))
+            (ir1-convert start next result `(,leaf ,@args))))
         (let ((ctran (make-ctran))
               (fun-lvar (make-lvar)))
           (ir1-convert start ctran fun-lvar `(the function ,function))
@@ -687,8 +691,14 @@ be a lambda expression."
 ;;; compiler. If the called function is a FUNCTION form, then convert
 ;;; directly to %FUNCALL, instead of waiting around for type
 ;;; inference.
-(define-source-transform funcall (function &rest args)
-  `(%funcall ,(ensure-source-fun-form function :coercer '%coerce-callable-for-call) ,@args))
+(define-source-transform funcall (function &rest args &environment env)
+  ;; This transform should not allow violating the type constraint on FUNCALL
+  ;; by sneaking in a use of #'name via %FUNCALL in cases where the name is
+  ;; an extended-function-designator instead of just function-designator.
+  `(%funcall ,(ensure-source-fun-form function env
+                                      :coercer '%coerce-callable-for-call
+                                      :extendedp nil)
+             ,@args))
 
 (deftransform %coerce-callable-to-fun ((thing) * * :node node)
   "optimize away possible call to FDEFINITION at runtime"
@@ -699,8 +709,8 @@ be a lambda expression."
   "optimize away possible call to FDEFINITION at runtime"
   (ensure-lvar-fun-form thing 'thing :give-up t :coercer '%coerce-callable-for-call))
 
-(define-source-transform %coerce-callable-to-fun (thing)
-  (ensure-source-fun-form thing :give-up t))
+(define-source-transform %coerce-callable-to-fun (thing &environment env)
+  (ensure-source-fun-form thing env :give-up t))
 
 
 ;;;; LET and LET*
@@ -737,7 +747,7 @@ be a lambda expression."
              name :context context :allow-symbol-macro nil)
             (unless (eq context 'let*)
               (funcall names name))
-            (vars (varify-lambda-arg name))
+            (vars (varify-lambda-arg name spec))
             (vals value)))))
     (values (vars) (vals))))
 
@@ -843,7 +853,11 @@ also processed as top level forms."
                      ,@decls
                      (block ,(fun-name-block-name name)
                        . ,forms)))))))
-    (values (names) (defs))))
+    (let ((names (names)))
+      (unless (= (length names)
+                 (length (remove-duplicates names :test #'equal)))
+        (compiler-warn "Duplicate definitions in ~S" definitions))
+      (values names (defs)))))
 
 (defun parse-fletish (definitions body context)
   (multiple-value-bind (forms declarations) (parse-body body nil)
@@ -853,28 +867,28 @@ also processed as top level forms."
       (multiple-value-call #'values
         (extract-fletish-vars definitions context) forms declarations))))
 
+;;; This is similar to IR1-CONVERT-PROGN-BODY except that code to
+;;; potentially make a closure for each FUN in FUNS is emitted, and
+;;; then the body is converted as usual.
+;;;
+;;; When one of these FUNS is declared dynamic extent, we make a
+;;; cleanup with the ENCLOSE as the MESS-UP node and introduce it into
+;;; the lexical environment to convert the body in. We force NEXT to
+;;; start a block outside of this cleanup, causing cleanup code to be
+;;; emitted when the scope is exited.
 (defun ir1-convert-fbindings (start next result funs body)
-  (let ((ctran (make-ctran))
-        (dx-p (find-if #'leaf-dynamic-extent funs)))
-    (when dx-p
-      (ctran-starts-block ctran)
-      (ctran-starts-block next))
-    (ir1-convert start ctran nil `(%%allocate-closures ,@funs))
-    (cond (dx-p
-           (let* ((dummy (make-ctran))
-                  (entry (make-entry))
-                  (cleanup (make-cleanup :kind :dynamic-extent
-                                         :mess-up entry
-                                         :info (list (node-dest
-                                                      (ctran-next start))))))
-             (push entry (lambda-entries (lexenv-lambda *lexenv*)))
-             (setf (entry-cleanup entry) cleanup)
-             (link-node-to-previous-ctran entry ctran)
-             (use-ctran entry dummy)
-
+  (let ((enclose-ctran (make-ctran)))
+    (enclose start enclose-ctran funs)
+    (cond ((some #'leaf-dynamic-extent funs)
+           (ctran-starts-block next)
+           (let ((cleanup (make-cleanup :kind :dynamic-extent
+                                        :mess-up (ctran-use enclose-ctran)))
+                 (cleanup-ctran (make-ctran)))
              (let ((*lexenv* (make-lexenv :cleanup cleanup)))
-               (ir1-convert-progn-body dummy next result body))))
-          (t (ir1-convert-progn-body ctran next result body)))))
+               (ir1-convert enclose-ctran cleanup-ctran nil '(%cleanup-point))
+               (ir1-convert-progn-body cleanup-ctran next result body))))
+          (t
+           (ir1-convert-progn-body enclose-ctran next result body)))))
 
 (def-ir1-translator flet ((definitions &body body)
                           start next result)
@@ -970,7 +984,7 @@ other."
                     (values-subtypep (make-single-value-type (leaf-type value))
                                      type))
                (and (not (fun-designator-type-p type))
-                    (sb-xc:constantp value)
+                    (constantp value)
                     (or (not (values-type-p type))
                         (values-type-may-be-single-value-p type))
                     (ctypep (constant-form-value value)
@@ -1027,9 +1041,23 @@ care."
 ;;; THE with some options for the CAST
 (def-ir1-translator the* (((value-type &key context silent-conflict
                                        derive-type-only
-                                       truly) form)
+                                       truly
+                                       source-form
+                                       use-annotations
+                                       restart)
+                           form)
                           start next result)
-  (let ((value-type (values-specifier-type value-type)))
+  (let ((value-type (if (ctype-p value-type)
+                        value-type
+                        (values-specifier-type value-type)))
+        (*current-path* (if source-form
+                            (ensure-source-path source-form)
+                            *current-path*))
+        (context (cond (restart
+                        ;; For now, these share the same place in the debug info
+                        (aver (not context))
+                        :restart)
+                       (context))))
     (cond (derive-type-only
            ;; For something where we really know the type and need no mismatch checking,
            ;; e.g. structure accessors
@@ -1050,6 +1078,13 @@ care."
                                          (t
                                           new-uses))
                                    value-type)))))
+          (use-annotations
+           (ir1-convert start next result form)
+           (when result
+             (add-annotation result
+                             (make-lvar-type-annotation :type value-type
+                                                        :source-path *current-path*
+                                                        :context context))))
           (t
            (let* ((policy (lexenv-policy *lexenv*))
                   (cast (the-in-policy value-type form (if truly
@@ -1068,6 +1103,13 @@ care."
           do (add-annotation
               result
               annotation))))
+
+(def-ir1-translator with-source-form ((source-form form)
+                                      start next result)
+  (let ((*current-path* (if source-form
+                            (ensure-source-path source-form)
+                            *current-path*)))
+    (ir1-convert start next result form)))
 
 (def-ir1-translator bound-cast ((array bound index) start next result)
   (let ((check-bound-tran (make-ctran))
@@ -1091,7 +1133,7 @@ care."
                                   :derived derived
                                   :array array
                                   :bound bound)))
-      (push cast (lvar-dependent-casts array))
+      (push cast (lvar-dependent-nodes array))
       (link-node-to-previous-ctran cast index-ctran)
       (setf (lvar-dest index-lvar) cast)
       (use-continuation cast next result))))
@@ -1104,7 +1146,11 @@ care."
       (info :function :macro-function 'the*)
       (lambda (whole env)
         (declare (ignore env))
-        `(the ,(caadr whole) ,@(cddr whole))))
+        `(the ,(caadr whole) ,@(cddr whole)))
+      (info :function :macro-function 'with-source-form)
+      (lambda (whole env)
+        (declare (ignore env))
+                `(progn ,@(cddr whole))))
 
 ;;;; SETQ
 
@@ -1168,7 +1214,11 @@ care."
                                                   ,value))
     (let ((res (make-set :var var :value dest-lvar)))
       (setf (lvar-dest dest-lvar) res)
-      (setf (leaf-ever-used var) t)
+      (cond (result ; SETQ with a result counts as a REF also
+             (setf (leaf-ever-used var) t))
+            ((not (leaf-ever-used var)) ; doesn't count as a REF
+             ;; (EVER-USED might already be T, leave it alone if so)
+             (setf (leaf-ever-used var) 'set)))
       (push res (basic-var-sets var))
       (link-node-to-previous-ctran res dest-ctran)
       (use-continuation res next result))))
@@ -1224,7 +1274,7 @@ to TAG."
                 :debug-name (debug-name 'escape-fun tag))))
         (ctran (make-ctran)))
     (setf (functional-kind fun) :escape)
-    (ir1-convert start ctran nil `(%%allocate-closures ,fun))
+    (enclose start ctran (list fun))
     (reference-leaf ctran next result fun)))
 
 ;;; Yet another special special form. This one looks up a local
@@ -1248,16 +1298,13 @@ the thrown values will be returned."
   ;; We represent the possibility of the control transfer by making an
   ;; "escape function" that does a lexical exit, and instantiate the
   ;; cleanup using %WITHIN-CLEANUP.
-  (let* ((tag-ctran (make-ctran))
-         (tag-lvar (make-lvar)))
-    (ir1-convert start tag-ctran tag-lvar tag)
-    (ir1-convert
-     tag-ctran next result
-     (with-unique-names (exit-block)
-       `(block ,exit-block
-          (%within-cleanup
-           :catch (%catch (%escape-fun ,exit-block) ,tag-lvar)
-           ,@body))))))
+  (ir1-convert
+   start next result
+   (with-unique-names (exit-block)
+     `(block ,exit-block
+        (%within-cleanup
+         :catch (%catch (%escape-fun ,exit-block) ,tag)
+         ,@body)))))
 
 ;;; Since NSP is restored on unwind we only need to protect against
 ;;; local transfers of control, basically the same as special
@@ -1296,15 +1343,14 @@ due to normal completion or a non-local exit such as THROW)."
   ;; an XEP.
   (ir1-convert
    start next result
-   (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
+   (with-unique-names (cleanup-fun drop-thru-tag exit-tag . #-no-continue-unwind (next start count)
+                                                            #+no-continue-unwind ())
      `(flet ((,cleanup-fun ()
                ,@cleanup
                (values)))
-        ;; FIXME: If we ever get DYNAMIC-EXTENT working, then
-        ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
-        ;; and something can be done to make %ESCAPE-FUN have
-        ;; dynamic extent too.
+        ;; FIXME: Maybe %ESCAPE-FUN could dynamic extent too.
         (declare (dynamic-extent #',cleanup-fun))
+        #-no-continue-unwind
         (block ,drop-thru-tag
           (multiple-value-bind (,next ,start ,count)
               (block ,exit-tag
@@ -1315,14 +1361,28 @@ due to normal completion or a non-local exit such as THROW)."
                  (return-from ,drop-thru-tag ,protected)))
             (declare (optimize (insert-debug-catch 0)))
             (,cleanup-fun)
-            (%continue-unwind ,next ,start ,count)))))))
+            (%unwind ,next ,start ,count)))
+        #+no-continue-unwind
+        (block ,drop-thru-tag
+          (block ,exit-tag
+            (%within-cleanup
+             :unwind-protect
+             (%unwind-protect (%escape-fun ,exit-tag)
+                              (%cleanup-fun ,cleanup-fun))
+             (return-from ,drop-thru-tag ,protected)))
+          (locally
+              (declare (optimize (insert-debug-catch 0)))
+            (,cleanup-fun)
+            (%continue-unwind)))))))
 
 (def-ir1-translator inspect-unwinding
     ((protected inspect-fun) start next result)
   (ir1-convert
    start next result
-   (with-unique-names (drop-thru-tag exit-tag next start count)
+   (with-unique-names (drop-thru-tag exit-tag next . #-no-continue-unwind (start count)
+                                                     #+no-continue-unwind ())
      `(block ,drop-thru-tag
+        #-no-continue-unwind
         (multiple-value-bind (,next ,start ,count)
             (block ,exit-tag
               (%within-cleanup
@@ -1332,15 +1392,40 @@ due to normal completion or a non-local exit such as THROW)."
                (return-from ,drop-thru-tag ,protected)))
           (declare (optimize (insert-debug-catch 0)))
           (funcall ,inspect-fun ,next)
-          (%continue-unwind ,next ,start ,count))))))
+          (%unwind ,next ,start ,count))
+        #+no-continue-unwind
+        (let ((,next
+                (block ,exit-tag
+                  (%within-cleanup
+                   :unwind-protect
+                   (%unwind-protect (%escape-fun ,exit-tag)
+                                    nil)
+                   (return-from ,drop-thru-tag ,protected)))))
+          (declare (optimize (insert-debug-catch 0)))
+          (funcall ,inspect-fun ,next)
+          (%continue-unwind))))))
 
 ;;; Evaluate CLEANUP iff PROTECTED does a non-local exit.
 (def-ir1-translator nlx-protect
     ((protected &body cleanup) start next result)
   (ir1-convert
    start next result
-   (with-unique-names (drop-thru-tag exit-tag next start count)
+   (with-unique-names (drop-thru-tag exit-tag . #-no-continue-unwind (next start count)
+                                                #+no-continue-unwind ())
      `(block ,drop-thru-tag
+        #+no-continue-unwind
+        (progn
+          (block ,exit-tag
+            (%within-cleanup
+             :unwind-protect
+             (%unwind-protect (%escape-fun ,exit-tag)
+                              nil)
+             (return-from ,drop-thru-tag ,protected)))
+          (locally
+              (declare (optimize (insert-debug-catch 0)))
+            ,@cleanup
+            (%continue-unwind)))
+        #-no-continue-unwind
         (multiple-value-bind (,next ,start ,count)
             (block ,exit-tag
               (%within-cleanup
@@ -1350,7 +1435,7 @@ due to normal completion or a non-local exit such as THROW)."
                (return-from ,drop-thru-tag ,protected)))
           (declare (optimize (insert-debug-catch 0)))
           ,@cleanup
-          (%continue-unwind ,next ,start ,count))))))
+          (%unwind ,next ,start ,count))))))
 
 ;;;; multiple-value stuff
 
@@ -1372,7 +1457,10 @@ values from the first VALUES-FORM making up the first argument, etc."
                    ;; important for simplifying compilation of
                    ;; MV-COMBINATIONS.
                    (make-combination fun-lvar))))
-    (ir1-convert start ctran fun-lvar (ensure-source-fun-form fun :coercer '%coerce-callable-for-call))
+    (ir1-convert start ctran fun-lvar
+                 (ensure-source-fun-form fun *lexenv*
+                                         :coercer '%coerce-callable-for-call
+                                         :extendedp nil))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start ctran))
@@ -1386,6 +1474,15 @@ values from the first VALUES-FORM making up the first argument, etc."
         (use-continuation node next result)
         (setf (basic-combination-args node) (arg-lvars))))))
 
+;;; MULTIPLE-VALUE-PROG1 is represented in IR1 by having the
+;;; VALUES-FORM code use a VALUE lvar that gets handed off to
+;;; RESULT. In other words, as the result continuation isn't
+;;; IMMEDIATELY-USED-P by the nodes that compute the result, we have
+;;; to interpose a DELAY node using RESULT immediately so that the
+;;; result continuation can assume that it is immediately used. This
+;;; is important here because MULTIPLE-VALUE-PROG1 is the only special
+;;; form which receives unknown values with multiple uses, some (in
+;;; this case one) of which are not immediate.
 (def-ir1-translator multiple-value-prog1
     ((values-form &rest forms) start next result)
   "MULTIPLE-VALUE-PROG1 values-form form*
@@ -1395,17 +1492,13 @@ VALUES-FORM."
   (let* ((value-ctran (make-ctran))
          (forms-ctran (make-ctran))
          (value-lvar (make-lvar))
-         ;; This is to avoid writing in the RESULT LVAR before the
-         ;; body is executed, because the body may overwrite it.
-         ;; See MAY-DELETE-VESTIGIAL-EXIT.
-         (cast (make-vestigial-exit-cast
-                :value value-lvar)))
+         (delay (make-delay :value value-lvar)))
     (ctran-starts-block value-ctran)
     (ir1-convert start value-ctran value-lvar values-form)
     (ir1-convert-progn-body value-ctran forms-ctran nil forms)
-    (link-node-to-previous-ctran cast forms-ctran)
-    (setf (lvar-dest value-lvar) cast)
-    (use-continuation cast next result)))
+    (link-node-to-previous-ctran delay forms-ctran)
+    (setf (lvar-dest value-lvar) delay)
+    (use-continuation delay next result)))
 
 
 ;;;; interface to defining macros

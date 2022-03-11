@@ -94,6 +94,8 @@
     ((head-var tail-var &optional user-head-var) &body body)
   (let ((l (and user-head-var (list (list user-head-var nil)))))
     `(let* ((,head-var (list nil)) (,tail-var ,head-var) ,@l)
+       (declare (truly-dynamic-extent ,head-var)
+                ,@(and user-head-var `((list ,user-head-var))))
        ,@body)))
 
 (sb-xc:defmacro loop-collect-rplacd
@@ -139,13 +141,13 @@
         (when user-head-var
           (setq answer
                 `(progn ,answer
-                        (setq ,user-head-var (cdr ,head-var)))))
+                        (setq ,user-head-var (sb-ext:truly-the list (cdr ,head-var))))))
         answer))))
 
 (sb-xc:defmacro loop-collect-answer (head-var
-                                                   &optional user-head-var)
-  (or user-head-var
-      `(cdr ,head-var)))
+                                     &optional user-head-var)
+  `(sb-ext:truly-the list ,(or user-head-var
+                               `(cdr ,head-var))))
 
 ;;;; maximization technology
 
@@ -173,17 +175,18 @@ constructed.
   (flag-variable nil)
   (operations nil)
   (infinity-data nil :read-only t))
+(declaim (sb-ext:freeze-type loop-minimax))
 
 (defconstant-eqx +loop-minimax-type-infinities-alist+
-  ;; FIXME: Now that SBCL supports floating point infinities again, we
-  ;; should have floating point infinities here, as cmucl-2.4.8 did.
-  '((fixnum sb-xc:most-positive-fixnum sb-xc:most-negative-fixnum))
+    '((fixnum            most-positive-fixnum                  most-negative-fixnum)
+      (single-float      sb-ext:single-float-positive-infinity sb-ext:single-float-negative-infinity)
+      (double-float      sb-ext:double-float-positive-infinity sb-ext:double-float-negative-infinity))
   #'equal)
 
 (defun make-loop-minimax (answer-variable type)
   (let ((infinity-data (cdr (assoc type
                                    +loop-minimax-type-infinities-alist+
-                                   :test #'sb-xc:subtypep))))
+                                   :test #'subtypep))))
     (make-loop-minimax-internal
       :answer-variable answer-variable
       :type type
@@ -291,6 +294,7 @@ code to be loaded.
   iteration-keywords   ; hash table, value = (fn-name . extra-data)
   for-keywords         ; hash table, value = (fn-name . extra-data)
   path-keywords)       ; hash table, value = (fn-name . extra-data)
+(declaim (sb-ext:freeze-type loop-universe))
 (defmethod print-object ((u loop-universe) stream)
   (print-unreadable-object (u stream :type t :identity t)))
 
@@ -413,35 +417,35 @@ code to be loaded.
 
 ;;; This is the pointer to the original, for things like NAMED that
 ;;; insist on being in a particular position
-  (original-source-code)
+  (original-source-code nil)
 
 ;;; This is (source-code *loop*) as of the "last" clause. It is used
 ;;; primarily for generating error messages (see loop-error, loop-warn).
-  (source-context)
+  (source-context nil)
 
 ;;; list of names for the LOOP, supplied by the NAMED clause
-  (names)
+  (names nil)
 
 ;;; The macroexpansion environment given to the macro.
   (macro-environment)
 
 ;;; This holds variable names specified with the USING clause.
 ;;; See LOOP-NAMED-VAR.
-  (named-vars)
+  (named-vars nil)
 
 ;;; LETlist-like list being accumulated for current group of bindings.
-  (vars)
+  (vars nil)
 
 ;;; List of declarations being accumulated in parallel with
 ;;; VARS.
-  (declarations)
+  (declarations nil)
 
 ;;; Declarations for destructuring bindings
-  (desetq-declarations)
+  (desetq-declarations nil)
 
 ;;; This is used by LOOP for destructuring binding, if it is doing
 ;;; that itself. See LOOP-MAKE-VAR.
-  (desetq)
+  (desetq nil)
 
 ;;; list of wrapping forms, innermost first, which go immediately
 ;;; inside the current set of parallel bindings being accumulated in
@@ -450,60 +454,61 @@ code to be loaded.
 ;;;   ((WITH-OPEN-FILE (G0001 G0002 ...))),
 ;;; with G0002 being one of the bindings in VARS (This is why the
 ;;; wrappers go inside of the variable bindings).
-  (wrappers)
+  (wrappers nil)
 
 ;;; This accumulates lists of previous values of VARS and the other
 ;;; lists above, for each new nesting of bindings. See
 ;;; LOOP-BIND-BLOCK.
-  (bind-stack)
+  (bind-stack nil)
 
 ;;; list of prologue forms of the loop, accumulated in reverse order
-  (prologue)
+  (prologue nil)
 
-  (before-loop)
-  (after-body)
+  (before-loop nil)
+  (after-body nil)
 
 ;;; This is T if we have emitted any body code, so that iteration
 ;;; driving clauses can be disallowed. This is not strictly the same
 ;;; as checking (BODY *LOOP*), because we permit some clauses such as
 ;;; RETURN to not be considered "real" body (so as to permit the user
 ;;; to "code" an abnormal return value "in loop").
-  (emitted-body)
+  (emitted-body nil)
 
 ;;; list of epilogue forms (supplied by FINALLY generally), accumulated
 ;;; in reverse order
-  (epilogue)
+  (epilogue nil)
 
 ;;; list of epilogue forms which are supplied after the above "user"
 ;;; epilogue. "Normal" termination return values are provide by
 ;;; putting the return form in here. Normally this is done using
 ;;; LOOP-EMIT-FINAL-VALUE, q.v.
-  (after-epilogue)
+  (after-epilogue nil)
 
 ;;; the "culprit" responsible for supplying a final value from the
 ;;; loop. This is so LOOP-DISALLOW-AGGREGATE-BOOLEANS can moan about
 ;;; disallowed anonymous collections.
-  (final-value-culprit)
+  (final-value-culprit nil)
 
 ;;; If not NIL, this is a temporary bound around the loop for holding
 ;;; the temporary value for "it" in things like "when (f) collect it".
 ;;; It may be used as a supertemporary by some other things.
-  (when-it-var)
+  (when-it-var nil)
 
 ;;; Sometimes we decide we need to fold together parts of the loop,
 ;;; but some part of the generated iteration code is different for the
 ;;; first and remaining iterations. This variable will be the
 ;;; temporary which is the flag used in the loop to tell whether we
 ;;; are in the first or remaining iterations.
-  (never-stepped-var)
+  (never-stepped-var nil)
 
 ;;; list of all the value-accumulation descriptor structures in the
 ;;; loop. See LOOP-GET-COLLECTION-INFO.
-  (collection-cruft) ; for multiple COLLECTs (etc.)
+  (collection-cruft nil) ; for multiple COLLECTs (etc.)
 
 ;;; This is the "current" loop context in use when we are expanding a
 ;;; loop. It gets bound on each invocation of LOOP.
   (universe nil :type loop-universe))
+(declaim (sb-ext:freeze-type macro-state))
 
 (defvar *loop*)
 (declaim (type macro-state *loop*))
@@ -517,7 +522,7 @@ code to be loaded.
 ;;;; code analysis stuff
 
 (defun loop-constant-fold-if-possible (form &optional expected-type)
-  (let* ((constantp (sb-xc:constantp form))
+  (let* ((constantp (constantp form))
          (value (and constantp (constant-form-value form))))
     (when (and constantp expected-type)
       (unless (sb-xc:typep value expected-type)
@@ -572,7 +577,7 @@ code to be loaded.
                              &optional (default-type required-type))
   (if (null specified-type)
       default-type
-      (multiple-value-bind (a b) (sb-xc:subtypep specified-type required-type)
+      (multiple-value-bind (a b) (subtypep specified-type required-type)
         (cond ((not b)
                (loop-warn "LOOP couldn't verify that ~S is a subtype of the required type ~S."
                           specified-type required-type))
@@ -756,13 +761,18 @@ code to be loaded.
                              '(complex float)))
                       (t
                        init)))))
-           ((csubtypep ctype (specifier-type 'vector))
-            (when (array-type-p ctype)
-              (let ((etype (type-*-to-t
-                            (array-type-specialized-element-type ctype))))
-                (make-array 0 :element-type (type-specifier etype)))))
+          ((csubtypep ctype (specifier-type 'vector))
+           (cond ((array-type-p ctype)
+                  (let ((etype (type-*-to-t
+                                (array-type-specialized-element-type ctype))))
+                    (make-array 0 :element-type (type-specifier etype))))
+                 ((csubtypep ctype (specifier-type 'string))
+                  "")))
            #+sb-unicode
            ((csubtypep ctype (specifier-type 'extended-char))
+            #+sb-xc-host
+            (error "Unimplemented on cross-compiler.")
+            #-sb-xc-host
             (code-char base-char-code-limit))
            ((csubtypep ctype (specifier-type 'character))
             #\x)
@@ -899,6 +909,12 @@ code to be loaded.
          (check-var-name name)
          (loop-declare-var name dtype :step-var-p step-var-p
                                       :initialization initialization)
+         ;; IGNORABLEize every variable because neither binding nor assignment constitutes
+         ;; a "use". Unfortunately there is no syntax for declaring what to ignore in LOOP.
+         ;; The idiom is to use NIL as a variable, but sometimes users don't, because they
+         ;; want variables names as information within a destructuring operation,
+         ;;  e.g. (for (this . that-not-used) in stuff do (frob this))
+         (push `(ignorable ,name) (declarations loop))
          ;; We use ASSOC on this list to check for duplications (above),
          ;; so don't optimize out this list:
          (push (list name (or initialization (loop-typed-init dtype step-var-p)))
@@ -952,7 +968,7 @@ code to be loaded.
                                          desetq &aux (loop *loop*))
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
-         (unless (or (sb-xc:subtypep t dtype)
+         (unless (or (subtypep t dtype)
                      (and (eq (sb-xc:symbol-package name) *cl-package*)
                           (eq :special (info :variable :kind name))))
            (let ((dtype `(type ,(if initialization
@@ -1064,6 +1080,7 @@ code to be loaded.
   specified-type
   dtype
   (data nil)) ;collector-specific data
+(declaim (sb-ext:freeze-type loop-collector))
 
 (sb-xc:defmacro with-sum-count (lc &body body)
   (let* ((type (loop-collector-dtype lc))
@@ -1351,7 +1368,7 @@ code to be loaded.
 
 (defun loop-for-across (var val data-type)
   (loop-make-var var nil data-type)
-  (let ((vector-var (gensym "LOOP-ACROSS-VECTOR-"))
+  (let ((vector-var (sb-xc:gensym "LOOP-ACROSS-VECTOR-"))
         (index-var (gensym "LOOP-ACROSS-INDEX-")))
     (multiple-value-bind (vector-form constantp vector-value)
         (loop-constant-fold-if-possible val 'vector)
@@ -1375,19 +1392,11 @@ code to be loaded.
 ;;;; list iteration
 
 (defun loop-list-step (listvar)
-  ;; We are not equipped to analyze whether 'FOO is the same as #'FOO
-  ;; here in any sensible fashion, so let's give an obnoxious warning
-  ;; whenever 'FOO is used as the stepping function.
-  ;;
-  ;; While a Discerning Compiler may deal intelligently with
-  ;; (FUNCALL 'FOO ...), not recognizing FOO may defeat some LOOP
-  ;; optimizations.
   (let ((stepper (cond ((loop-tequal (car (source-code *loop*)) :by)
                         (loop-pop-source)
                         (loop-get-form))
                        (t '(function cdr)))))
     (cond ((and (consp stepper) (eq (car stepper) 'quote))
-           (loop-warn "Use of QUOTE around stepping function in LOOP will be left verbatim.")
            `(funcall ,stepper ,listvar))
           ((and (consp stepper) (eq (car stepper) 'function))
            (list (cadr stepper) listvar))
@@ -1400,15 +1409,17 @@ code to be loaded.
       (loop-constant-fold-if-possible val)
     (let ((listvar var))
       (cond ((and var (symbolp var))
-             (loop-make-var var list data-type))
+             (loop-make-var var
+                            ;; Don't want to assert the type, as ENDP will do that
+                            `(the* (list :use-annotations t :source-form ,list) ,list)
+                            data-type))
             (t
              (loop-make-var (setq listvar (gensym)) list 't)
              (loop-make-var var nil data-type)))
       (let ((list-step (loop-list-step listvar)))
         (let* ((first-endtest
-                ;; mysterious comment from original CMU CL sources:
-                ;;   the following should use `atom' instead of `endp',
-                ;;   per [bug2428]
+                ;; the following should use `atom' instead of `endp',
+                ;; per 6.1.2.1.3
                 `(atom ,listvar))
                (other-endtest first-endtest))
           (when (and constantp (listp list-value))
@@ -1429,7 +1440,10 @@ code to be loaded.
       (loop-constant-fold-if-possible val)
     (let ((listvar (gensym "LOOP-LIST-")))
       (loop-make-var var nil data-type)
-      (loop-make-var listvar list t)
+      (loop-make-var listvar
+                     ;; Don't want to assert the type, as ENDP will do that
+                     `(the* (list :use-annotations t :source-form ,list) ,list)
+                     t)
       (let ((list-step (loop-list-step listvar)))
         (let* ((first-endtest `(endp ,listvar))
                (other-endtest first-endtest)
@@ -1451,6 +1465,7 @@ code to be loaded.
   (inclusive-permitted nil :read-only t)
   (function nil :read-only t)
   (user-data nil :read-only t))
+(declaim (sb-ext:freeze-type loop-path))
 
 (defun add-loop-path (names function universe
                       &key preposition-groups inclusive-permitted user-data)
@@ -1635,14 +1650,14 @@ code to be loaded.
             (setq endform (if limit-constantp
                               `',limit-value
                               (loop-make-var
-                                 (gensym "LOOP-LIMIT-") form
+                                 (sb-xc:gensym "LOOP-LIMIT-") form
                                  `(and ,indexv-type real)))))
            (:by
             (multiple-value-setq (form stepby-constantp stepby)
               (loop-constant-fold-if-possible form
                                               `(and ,indexv-type (real (0)))))
             (unless stepby-constantp
-              (loop-make-var (setq stepby (gensym "LOOP-STEP-BY-"))
+              (loop-make-var (setq stepby (sb-xc:gensym "LOOP-STEP-BY-"))
                  form
                  `(and ,indexv-type (real (0)))
                  t)))

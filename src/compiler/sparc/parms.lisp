@@ -19,7 +19,7 @@
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
 ;;; barriers, this must be a multiple of the OS page size.
-(defconstant gencgc-card-bytes +backend-page-bytes+)
+(defconstant gencgc-page-bytes +backend-page-bytes+)
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding
@@ -39,28 +39,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 32)
 
-;;; flags for the generational garbage collector
-(defconstant pseudo-atomic-interrupted-flag 1)
-(defconstant pseudo-atomic-flag
-    ;; Must be (ash 1 (1- sb-vm:n-lowtag-bits)) for cheneygc ALLOCATION.
-    4)
-
-(defconstant float-sign-shift 31)
-
-(defconstant single-float-bias 126)
-(defconstant-eqx single-float-exponent-byte (byte 8 23) #'equalp)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-
-(defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0) #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-
 ;;; CMUCL COMMENT:
 ;;;   X These values are for the x86 80 bit format and are no doubt
 ;;;   incorrect for the sparc.
@@ -71,12 +49,6 @@
 (defconstant long-float-normal-exponent-min 1)
 (defconstant long-float-normal-exponent-max #x7FFE)
 (defconstant long-float-hidden-bit (ash 1 31))
-
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
 ;;; This looks wrong - CSR
 (defconstant long-float-digits
@@ -109,55 +81,12 @@
 
 ;;;; Description of the target address space.
 
-#+gencgc ; sensibly small read-only and static spaces
 (!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
-
-;;; Where to put the different spaces.  Must match the C code!
-#+(and linux cheneygc)
-(progn
-  (defconstant linkage-table-space-start #x0f800000)
-  (defconstant linkage-table-space-end   #x10000000)
-
-  (defconstant read-only-space-start     #x11000000)
-  (defconstant read-only-space-end       #x15000000)
-
-  (defconstant static-space-start        #x28000000)
-  (defconstant static-space-end          #x2c000000)
-
-  (defparameter dynamic-0-space-start #x30000000)
-  (defparameter dynamic-0-space-end   #x38000000))
-
-#+(and sunos cheneygc) ; might as well start by trying the same numbers
-(progn
-  (defconstant linkage-table-space-start #x0f800000)
-  (defconstant linkage-table-space-end   #x10000000)
-
-  (defconstant read-only-space-start     #x11000000)
-  (defconstant read-only-space-end       #x15000000)
-
-  (defconstant static-space-start        #x28000000)
-  (defconstant static-space-end          #x2c000000)
-
-  (defparameter dynamic-0-space-start    #x30000000)
-  (defparameter dynamic-0-space-end      #x38000000))
-
-#+(and netbsd cheneygc) ; Need a gap at 0x4000000 for shared libraries
-(progn
-  (defconstant linkage-table-space-start #x0f800000)
-  (defconstant linkage-table-space-end   #x10000000)
-
-  (defconstant read-only-space-start     #x11000000)
-  (defconstant read-only-space-end       #x15000000)
-
-  (defconstant static-space-start        #x18000000)
-  (defconstant static-space-end          #x1c000000)
-
-  (defparameter dynamic-0-space-start    #x48000000)
-  (defparameter dynamic-0-space-end      #x5ffff000))
 
 ;; Size of one linkage-table entry in bytes. See comment in
 ;; src/runtime/sparc-arch.c
 (defconstant linkage-table-entry-size 16)
+(defconstant linkage-table-growth-direction :up)
 
 
 (defenum (:start 8)
@@ -169,7 +98,7 @@
   after-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
-  #+gencgc allocation-trap
+  allocation-trap
   error-trap)
 
 ;;;; static symbols.

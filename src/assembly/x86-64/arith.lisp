@@ -13,47 +13,48 @@
 
 #-sb-assembling ; avoid redefinition warning
 (progn
-(defun !both-fixnum-p (temp x y)
+(defun both-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst or :dword temp y)
   (inst test :byte temp fixnum-tag-mask))
 
-(defun !some-fixnum-p (temp x y)
+(defun some-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst and :dword temp y)
   (inst test :byte temp fixnum-tag-mask))
 
-(defun !static-fun-addr (name)
+(defun static-fun-addr (name)
   #+immobile-code (make-fixup name :static-call)
   #-immobile-code (ea (+ nil-value (static-fun-offset name))))
 
-(defun !call-static-fun (fun arg-count)
+(defun call-static-fun (fun arg-count)
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn (* n-word-bytes 2))
   (inst mov (ea rsp-tn) rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst mov rcx-tn (fixnumize arg-count))
-  (inst call (!static-fun-addr fun))
+  (inst call (static-fun-addr fun))
   (inst pop rbp-tn))
 
-(defun !tail-call-static-fun (fun arg-count)
+(defun tail-call-static-fun (fun arg-count)
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn n-word-bytes)
   (inst push (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
   (inst mov rcx-tn (fixnumize arg-count))
-  (inst jmp (!static-fun-addr fun))))
+  (inst jmp (static-fun-addr fun))))
 
 
 ;;;; addition, subtraction, and multiplication
 
 #+sb-assembling
 (defun return-single-word-bignum (dest alloc-tn source)
-  (instrument-alloc 16 nil)
-  (let ((header (logior (ash 1 n-widetag-bits) bignum-widetag)))
+  (let ((header (logior (ash 1 n-widetag-bits) bignum-widetag))
+        (nbytes #+bignum-assertions 32 #-bignum-assertions 16))
+    (instrument-alloc bignum-widetag nbytes nil alloc-tn)
     (pseudo-atomic ()
-      (allocation alloc-tn 16 nil nil 0)
+      (allocation bignum-widetag nbytes 0 alloc-tn nil nil nil)
       (storew* header alloc-tn 0 0 t)
       (storew source alloc-tn bignum-digits-offset 0)
       (if (eq dest alloc-tn)
@@ -72,9 +73,13 @@
 
                  (:res res (descriptor-reg any-reg) rdx-offset)
 
-                 (:temp rax unsigned-reg rax-offset)
+                 ;; + and - can make do with only 1 temp.
+                 ;; RCX is always needed for lisp call.
+                 ,@(if (eq fun '*)
+                       '((:temp rax unsigned-reg rax-offset)))
                  (:temp rcx unsigned-reg rcx-offset))
-                (!both-fixnum-p rax x y)
+                ;; AL encodes in one byte less than CL
+                (both-fixnum-p ,(if (eq fun '*) 'rax 'rcx) x y)
                 (inst jmp :nz DO-STATIC-FUN)    ; no - do generic
 
                 ,@body
@@ -82,7 +87,7 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                (!tail-call-static-fun ',(symbolicate "TWO-ARG-" fun) 2))))
+                (tail-call-static-fun ',(symbolicate "TWO-ARG-" fun) 2))))
 
   (define-generic-arith-routine (+ 10)
     (move res x)
@@ -128,7 +133,7 @@
     (inst cmp x rcx)
     (inst jmp :e SINGLE-WORD-BIGNUM)
 
-    (alloc-other res bignum-widetag (+ bignum-digits-offset 2) nil)
+    (alloc-other bignum-widetag (+ bignum-digits-offset 2) res nil nil nil)
     (storew rax res bignum-digits-offset other-pointer-lowtag)
     (storew rcx res (1+ bignum-digits-offset) other-pointer-lowtag)
     (inst clc) (inst ret)
@@ -158,7 +163,7 @@
   (return-single-word-bignum res rcx res)
   (inst clc) (inst ret)
   GENERIC
-  (!tail-call-static-fun '%negate 1))
+  (tail-call-static-fun '%negate 1))
 
 ;;;; comparison
 
@@ -174,14 +179,14 @@
 
                    (:temp rcx unsigned-reg rcx-offset))
 
-                (!both-fixnum-p rcx x y)
+                (both-fixnum-p rcx x y)
                 (inst jmp :nz DO-STATIC-FUN)
 
                 (inst cmp x y)
                 (inst ret)
 
                 DO-STATIC-FUN
-                (!call-static-fun ',static-fn 2)
+                (call-static-fun ',static-fn 2)
                 ;; HACK: We depend on NIL having the lowest address of all
                 ;; static symbols (including T)
                 ,@(ecase test
@@ -190,28 +195,6 @@
                     (:g `((inst cmp x (1+ nil-value))))))))
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
-
-(define-assembly-routine (generic-eql
-                          (:translate eql)
-                          (:policy :safe)
-                          (:save-p t)
-                          (:conditional :e)
-                          (:cost 10))
-                         ((:arg x (descriptor-reg any-reg) rdx-offset)
-                          (:arg y (descriptor-reg any-reg) rdi-offset)
-
-                          (:temp rcx unsigned-reg rcx-offset))
-
-  (!some-fixnum-p rcx x y)
-  (inst jmp :nz DO-STATIC-FUN)
-
-  ;; At least one fixnum
-  (inst cmp x y)
-  (inst ret)
-
-  DO-STATIC-FUN
-  (!call-static-fun 'eql 2)
-  (inst cmp x (+ nil-value (static-symbol-offset t))))
 
 (define-assembly-routine (generic-=
                           (:translate =)
@@ -223,7 +206,7 @@
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
                           (:temp rcx unsigned-reg rcx-offset))
-  (!both-fixnum-p rcx x y)
+  (both-fixnum-p rcx x y)
   (inst jmp :nz DO-STATIC-FUN)
 
   ;; Both fixnums
@@ -231,7 +214,7 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (!call-static-fun 'two-arg-= 2)
+  (call-static-fun 'two-arg-= 2)
   (inst cmp x (+ nil-value (static-symbol-offset t))))
 
 #+sb-assembling
@@ -318,43 +301,207 @@
                  (inst jmp :ge POSITIVE)
                  (inst not rdx)
                  POSITIVE))
-           (unless (memq :popcnt *backend-subfeatures*)
-             ;; POPCNT = ECX bit 23
-             (multiple-value-bind (bytes bits) (floor (+ 23 n-fixnum-tag-bits)
-                                                      n-byte-bits)
-               ;; FIXME: should be
-               ;;    (INST TEST :BYTE (STATIC-SYMBOL-VALUE-EA '*BLAH*) CONST)
-               ;; but can't do that until sizes are removed from EAs
-               ;; because STATIC-SYMBOL-VALUE-EA returns a :QWORD ea for now.
-               (inst test :byte
-                     (ea (+ nil-value
-                            (static-symbol-offset '*cpuid-fn1-ecx*)
-                            (ash symbol-value-slot word-shift)
-                            (- other-pointer-lowtag)
-                            bytes))
-                     (ash 1 bits)))
-             (inst jmp :z slow))
+           (when (memq :popcnt *backend-subfeatures*) ; always use POPCNT
            ;; Intel's implementation of POPCNT on some models treats it as
            ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
            ;; it falsely appears to need data from the destination register.
            ;; The workaround is to clear the destination.
            ;; See http://stackoverflow.com/questions/25078285
-           (unless (location= result arg)
+             (unless (location= result arg)
              ;; We only break the spurious dep. chain if result isn't the same
              ;; register as arg. (If they're location=, don't trash the arg!)
-             (inst xor result result))
+               (inst xor :dword result result))
+             (inst popcnt result arg)
+             (return-from ,name))
+
+           ;; Conditionally use POPCNT
+           (test-cpu-feature cpu-has-popcnt)
+           (inst jmp :z slow)
+           (unless (location= result arg)
+             (inst xor :dword result result))
            (inst popcnt result arg)
            (inst jmp done)
          slow
-           (unless (memq :popcnt *backend-subfeatures*)
-             (move rdx arg)
-             (invoke-asm-routine 'call 'logcount vop)
-             (move result rdx))
+           (move rdx arg)
+           (invoke-asm-routine 'call 'logcount vop)
+           (move result rdx)
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
   (def-it signed-byte-64-count 15 signed-reg signed-num :signed t)
   (def-it positive-fixnum-count 12 any-reg positive-fixnum)
-  (def-it positive-fixnum-count 13 any-reg fixnum :signed t))
+  (def-it signed-fixnum-count 13 any-reg fixnum :signed t))
+
+;;; General case of EQL
+
+(defconstant cplx-dfloat-real-offs (+ (ash complex-double-float-real-slot word-shift)
+                                   (- other-pointer-lowtag)))
+(defconstant cplx-dfloat-imag-offs (+ (ash complex-double-float-imag-slot word-shift)
+                                   (- other-pointer-lowtag)))
+
+#+sb-assembling ; the vop lives in compiler/x86-64/pred (for historical reasons)
+(progn
+;;; KLUDGE: The ASSEMBLE macro can't pick assembler statement labels out of
+;;; a LET body, so having a global variable for the eql-dispatch table seems like
+;;; the lesser evil, allowing use of the convenient syntax afforded by ASSEMBLE
+;;; to label statements. The alternative, a lexical var, would require
+;;; the GEN-LABEL/EMIT-LABEL pattern everywhere below.
+;;; EMIT-ASSEMBLE could accept an initial LET form, but ultimately ASSEMBLE would
+;;; still have to understand that the binding occurs after it calls GEN-LABEL
+;;; for all implicit labels. In source code it would look something like:
+;;;   (define-assembly-routine ... ((:temp ...)) (:let ((c (register-inline-constant ...)))))
+;;; It just doesn't seem worth the effort to do all that.
+(defparameter eql-dispatch nil)
+(define-assembly-routine (generic-eql (:return-style :none))
+    ((:temp rcx unsigned-reg rcx-offset)  ; callee-saved
+     (:temp rax unsigned-reg rax-offset)  ; vop temps
+     (:temp rsi unsigned-reg rsi-offset)
+     (:temp rdi unsigned-reg rdi-offset)
+     (:temp r11 unsigned-reg r11-offset))
+  ;; SINGLE-FLOAT is included in this table because its widetag within the range
+  ;; of accepted widetags in the precondition for calling this routine.
+  ;; Technically it would be an error to see an other-pointer object with that tag.
+  ;; Would it be right for EQL to fail and report heap corruption? Maybe.
+  ;; Or, better, would it be possible on 64-bit platforms to give single-float a
+  ;; widetag that is numerically less than bignum?
+  ;; We're obliged to special-case single-float in NUMBERP etc anyway.
+  (setq eql-dispatch
+        (register-inline-constant :jump-table
+                                  `(,eql-bignum
+                                    ,eql-ratio
+                                    ,eql-single-float
+                                    ,eql-double-float
+                                    ,eql-complex-rational
+                                    ,eql-complex-single
+                                    ,eql-complex-double)))
+
+  ;; widetags are spaced 4 apart, and we've subtracted BIGNUM_WIDETAG,
+  ;; so scaling by 2 gets a multiple of 8 with bignum at offset 0 etc.
+  ;; But the upper 3 bytes of EAX hold junk presently, so clear them.
+  (inst and :dword rax #x7f)
+  (inst lea r11 eql-dispatch)
+  (inst jmp (ea r11 rax 2))
+
+  EQL-SINGLE-FLOAT       ; should not get here
+  (inst xor :dword rax rax)
+  FLIP-ZF-AND-RETURN
+  (inst xor :byte rax 1) ;  ZF <- 0, i.e. not EQL
+  (inst ret)
+
+  ;; for either of these two types, do a bitwise comparison of 8 bytes
+  (inst .align 4 :long-nop)
+  EQL-DOUBLE-FLOAT
+  EQL-COMPLEX-SINGLE
+  (inst mov rax (ea -7 rsi))
+  (inst cmp rax (ea -7 rdi))
+  (inst ret) ; if ZF set then EQL
+
+  (inst .align 4 :long-nop)
+  EQL-COMPLEX-DOUBLE
+  ;;; This could be done as one XMM register comparison.
+  ;;; It's just as well to use GPRs though since the vop
+  ;;; does not specify any xmm register temps.
+  (inst mov rax (ea cplx-dfloat-real-offs rsi))
+  (inst xor rax (ea cplx-dfloat-real-offs rdi))
+  ;; rsi,rdi are clobberable as they are vop :temps, not :args
+  (inst mov rsi (ea cplx-dfloat-imag-offs rsi))
+  (inst xor rsi (ea cplx-dfloat-imag-offs rdi))
+  (inst or rsi rax)
+  (inst ret) ; if ZF set then realpart and imagpart were each EQL
+
+  (inst .align 4 :long-nop)
+  EQL-RATIO
+  (inst push rsi)
+  (inst push rdi)
+  (loadw rdi rdi ratio-numerator-slot other-pointer-lowtag)
+  (loadw rsi rsi ratio-numerator-slot other-pointer-lowtag)
+  (inst call eql-integer)
+  (inst pop rdi) ; restore stack before jne
+  (inst pop rsi)
+  (inst jmp :ne done)
+  (loadw rdi rdi ratio-denominator-slot other-pointer-lowtag)
+  (loadw rsi rsi ratio-denominator-slot other-pointer-lowtag)
+  ;; fall into eql-integer
+  EQL-INTEGER
+  (inst cmp rdi rsi)
+  (inst jmp :e done)
+  ;; both have to be non-fixnum to be EQL now. To test for that,
+  ;; it suffices to check that the AND has a 1 in the low bit.
+  (inst mov :dword rax rdi)
+  (inst and :dword rax rsi)
+  (inst and :byte rax 1)
+  ;; %al is 1 if they are both bignums, or 0 if not. 0 is failure (*not* EQL)
+  ;; so we have to do an operation that inverts the Z flag.
+  (inst jmp :e flip-ZF-and-return)
+  EQL-BIGNUM
+  (inst mov rax (ea (- other-pointer-lowtag) rdi))
+  (inst xor rax (ea (- other-pointer-lowtag) rsi))
+  ;; kill the GC mark bit by shifting out (as if we'd actually get fullcgc
+  ;; to concurrently mark the heap. Well, I can hope can't I?)
+  (inst shl rax 1)
+  (inst jmp :ne done) ; not equal
+  ;; Preserve rcx and compute the header length in words.
+  ;; Maybe we should deem that bignums have at most (2^32-1) payload words
+  ;; so that I can use an unaligned 'movl'. Or, maybe I should put the length
+  ;; in the high 4 bytes of the header so that the same GC mark bit would work
+  ;; as for all other objects (in byte index 3 of the header)
+  (inst push rcx)
+  (inst mov rcx (ea (- other-pointer-lowtag) rdi))
+  (inst shl rcx 1) ; shift out GC mark bit
+  (inst shr rcx (1+ n-widetag-bits))
+  #+bignum-assertions
+  (progn (inst mov r11 rcx)
+         (inst or r11 1)) ; align to start of ubsan bits
+  compare-loop
+  #+bignum-assertions
+  (let ((ok1 (gen-label)) (ok2 (gen-label)))
+    (inst dec rcx)
+    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rsi r11 8) rcx)
+    (inst jmp :nc ok1)
+    (inst break halt-trap)
+    (emit-label ok1)
+    (inst bt (ea (- n-word-bytes other-pointer-lowtag) rdi r11 8) rcx)
+    (inst jmp :nc ok2)
+    (inst break halt-trap)
+    (emit-label ok2)
+    (inst inc rcx))
+  (inst mov rax (ea (- other-pointer-lowtag) rsi rcx 8))
+  (inst cmp rax (ea (- other-pointer-lowtag) rdi rcx 8))
+  (inst jmp :ne epilogue)
+  (inst dec rcx)
+  (inst jmp :ne compare-loop) ; exiting with ZF set means we win
+  epilogue
+  (inst pop rcx)
+  done
+  (inst ret)
+
+  (inst .align 4 :long-nop)
+  EQL-COMPLEX-RATIONAL
+  (inst push rsi)
+  (inst push rdi)
+  (loadw rdi rdi complex-real-slot other-pointer-lowtag)
+  (loadw rsi rsi complex-real-slot other-pointer-lowtag)
+  (inst call eql-rational)
+  (inst pop rdi) ; restore stack balance prior to possibly returning
+  (inst pop rsi)
+  (inst jmp :ne done)
+  (loadw rdi rdi complex-imag-slot other-pointer-lowtag)
+  (loadw rsi rsi complex-imag-slot other-pointer-lowtag)
+  ;; fall into eql-rational
+  EQL-RATIONAL
+  ;; First pick off fixnums like in eql_integer
+  (inst cmp rdi rsi)
+  (inst jmp :e done)
+  (inst mov :dword rax rdi)
+  (inst and :dword rax rsi)
+  (inst and :dword rax 1)
+  ;; %eax is 1 if they are both other-pointer objects, 0 if not
+  (inst jmp :e flip-ZF-and-return)
+  (inst mov :byte rax (ea (- other-pointer-lowtag) rsi))
+  (inst cmp :byte rax (ea (- other-pointer-lowtag) rdi))
+  (inst jmp :ne done)
+  ;; widetags matched, so they are both bignums or both ratios
+  (inst lea r11 eql-dispatch)
+  (inst jmp (ea (* -2 bignum-widetag) r11 rax 2))))
 
 ;;; EQL for integers that are either fixnum or bignum
 
@@ -395,8 +542,6 @@
   (inst cmp rcx (ea (- other-pointer-lowtag) y))
   (inst jmp :ne done)
   (inst shr rcx n-widetag-bits)
-  ;; can you have 0 payload words? probably not, but let's be safe here.
-  (inst jrcxz done)
   loop
   (inst mov rax (ea (- other-pointer-lowtag) x rcx 8))
   (inst cmp rax (ea (- other-pointer-lowtag) y rcx 8))

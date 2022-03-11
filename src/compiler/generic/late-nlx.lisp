@@ -13,6 +13,7 @@
 
 ;;; Return a list of TNs that can be used to snapshot the dynamic
 ;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.
+#-unbind-in-unwind
 (defun make-dynamic-state-tns ()
   (make-n-tns #.(let ((nsave
                        (sb-c::vop-info-num-results

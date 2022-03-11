@@ -47,6 +47,15 @@
     (error-p (&rest foo &rest bar))
     (error-p (&rest foo &optional bar))))
 
+(with-test (:name :lp1738638)
+  ;; I really don't like that the name of the keyword to *expect* a failure
+  ;; is ":allow-failure". It sounds like it's a permission, not a requirement.
+  (checked-compile '(lambda (&key ((x) 1)) x) :allow-failure t))
+
+(with-test (:name :lp1740756)
+  (checked-compile '(lambda () (declare (special 1))) :allow-failure t)
+  (checked-compile '(lambda () (declare (special (foo)))) :allow-failure t))
+
 (with-test (:name (:lambda-list :supplied-p-order 1))
   (let ((* 10))
     (assert (eql ((lambda (&key (x * *)) () x)) 10))
@@ -458,4 +467,8 @@
   (assert-no-signal
    (sb-int:parse-lambda-list
     '(sb-pcl::.pv. sb-pcl::.next-method-call. self &optional o &key k
-       &allow-other-keys))))
+      &allow-other-keys))))
+
+(with-test (:name :macro-nested-&key-defaults)
+  (assert (equal (sb-kernel:%fun-lambda-list (macro-function (eval `(defmacro ,(gensym) ((&key (x 7))) x))))
+                 '((&key (x 7))))))

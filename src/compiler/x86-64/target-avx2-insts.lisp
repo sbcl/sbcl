@@ -12,13 +12,14 @@
 (in-package "SB-X86-64-ASM")
 
 (defun print-ymmreg (value stream dstate)
-  (let ((offset (etypecase value
+  (let* ((offset (etypecase value
                   ((unsigned-byte 4) value)
-                  (reg (reg-num value)))))
-    (write-string (reg-name (if (dstate-getprop dstate +vex-l+)
-                                (get-avx2 offset)
-                                (get-fpr offset)))
-                  stream)))
+                  (reg (reg-num value))))
+         (reg (get-fpr (if (dstate-getprop dstate +vex-l+) :ymm :xmm) offset))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (operand name dstate))))
 
 (defun print-ymmreg/mem (value stream dstate)
   (if (machine-ea-p value)
@@ -36,3 +37,27 @@
 (defun print-vmx (value stream dstate)
   (print-mem-ref :ref value :qword stream dstate
                  :index-reg-printer #'print-xmmreg))
+
+(defun print-xmmreg/mem-with-width (value width sized-p stream dstate)
+  (declare (type (member :byte :word :dword :qword) width)
+           (type boolean sized-p))
+  (if (machine-ea-p value)
+      (print-mem-ref (if sized-p :sized-ref :ref) value width stream dstate)
+      (print-xmmreg value stream dstate)))
+
+(defun print-sized-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width
+   value (inst-operand-size dstate) t stream dstate))
+
+(defun print-sized-byte-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width value :byte t stream dstate))
+
+(defun print-sized-word-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width value :word t stream dstate))
+
+(defun print-sized-dword-xmmreg/mem (value stream dstate)
+  (print-xmmreg/mem-with-width value :dword t stream dstate))
+
+(defun print-sized-xmmreg/mem-default-qword (value stream dstate)
+  (print-xmmreg/mem-with-width
+   value (inst-operand-size-default-qword dstate) t stream dstate))

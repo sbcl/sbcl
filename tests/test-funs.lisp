@@ -37,7 +37,8 @@
         (start-time (get-internal-real-time)))
     (declare (special test-util::*deferred-test-forms*))
     (makunbound 'test-util::*deferred-test-forms*)
-    (load file :external-format :utf-8)
+    (let ((*features* (append *features* sb-impl:+internal-features+)))
+      (load file :external-format :utf-8))
     (when (boundp 'test-util::*deferred-test-forms*)
       ;; Execute all tests that were wrapped in WITH-TEST
       (let ((holder test-util::*deferred-test-forms*))
@@ -64,7 +65,13 @@
   (let ((test-util:*elapsed-times*)
         (start-time (get-internal-real-time)))
     (with-scratch-file (fasl "fasl")
-      (compile-file file :print nil :output-file fasl)
+      (let ((*features* (append *features* sb-impl:+internal-features+)))
+        (multiple-value-bind (fasl warnings failure)
+            (compile-file file :print nil :output-file fasl)
+          (declare (ignorable fasl warnings))
+          (when (or #|warnings|# failure) ; FIXME: disallow warnings
+            (push (list :unexpected-failure file :compile-failed) *failures*)
+            (return-from cload-test))))
       (test-util::record-test-elapsed-time "(compile-file)" start-time)
       (load fasl)
       ;; TODO: as above, execute queued tests if within-file concurrency was enabled.
@@ -76,7 +83,8 @@
   (progn
     (test-util::setenv "TEST_SBCL_EVALUATOR_MODE"
                         (string-downcase *test-evaluator-mode*))
-    (let ((process (sb-ext:run-program "/bin/sh"
+    (let ((process (sb-ext:run-program (or #+sunos (posix-getenv "SHELL")
+                                           "/bin/sh")
                                        (list (native-namestring file))
                                        :output *error-output*)))
       (let ((*results* '()))

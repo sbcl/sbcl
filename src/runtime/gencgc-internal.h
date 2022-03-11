@@ -29,33 +29,60 @@
 #error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
 #endif
 
+#define GENCGC_PAGE_WORDS (GENCGC_PAGE_BYTES/N_WORD_BYTES)
 extern char *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
 
 #if N_WORD_BITS == 64
   // It's more economical to store scan_start_offset using 4 bytes than 8.
-  // Doing so makes struct page fit in 8 bytes if bytes_used takes 2 bytes.
+  // Doing so makes struct page fit in 8 bytes if words_used takes 2 bytes.
   //   scan_start_offset = 4
-  //   bytes_used        = 2
+  //   words_used        = 2
   //   flags             = 1
   //   gen               = 1
-  // If bytes_used takes 4 bytes, then the above is 10 bytes which is padded to
+  // If words_used takes 4 bytes, then the above is 10 bytes which is padded to
   // 12, which is still an improvement over the 16 that it would have been.
 # define CONDENSED_PAGE_TABLE 1
 #else
 # define CONDENSED_PAGE_TABLE 0
 #endif
 
-#if GENCGC_CARD_BYTES > USHRT_MAX
-# if GENCGC_CARD_BYTES > UINT_MAX
-#   error "GENCGC_CARD_BYTES unexpectedly large."
+#if GENCGC_PAGE_WORDS > USHRT_MAX
+# if GENCGC_PAGE_WORDS > UINT_MAX
+#   error "GENCGC_PAGE_WORDS unexpectedly large."
 # else
-    typedef unsigned int page_bytes_t;
+    typedef unsigned int page_words_t;
 # endif
 #else
-  typedef unsigned short page_bytes_t;
+  typedef unsigned short page_words_t;
 #endif
+
+/* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
+/* If you change these constants, then possibly also change the following
+ * functions in 'room.lisp':
+ *  MAP-CODE-OBJECTS
+ *  PRINT-ALL-CODE
+ *  PRINT-LARGE-CODE
+ *  PRINT-LARGE-UNBOXED
+ */
+
+// 4 bits for the type, 1 bit for SINGLE_OBJECT, 1 bit for OPEN_REGION
+
+#define PAGE_TYPE_MASK        15 // mask out 'single-object' and 'open-region' flags
+#define PAGE_TYPE_UNBOXED      1 // #b001
+#define PAGE_TYPE_BOXED        2 // #b010
+#define PAGE_TYPE_MIXED        3 // #b011
+/* Small-Mixed pages hold objects that don't span cards. This is relatively easy to
+ * arrange for by adding filler at the end of a card to align prior to the next object,
+ * subject to a maximum allowable waste. Root scavenging can respect card boundaries
+ * and use scavenge functions specific to each object - the best of both worlds */
+#define PAGE_TYPE_SMALL_MIXED  4 // #b100
+#define PAGE_TYPE_CONS         5 // #b101
+#define PAGE_TYPE_CODE         7 // #b111
+#define SINGLE_OBJECT_FLAG    16
+#define OPEN_REGION_PAGE_FLAG 32
+#define FREE_PAGE_FLAG        0
 
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently
@@ -84,42 +111,32 @@ struct page {
     os_vm_size_t scan_start_offset_;
 #endif
 
-    /* the number of bytes of this page that are used. This may be less
-     * than the actual bytes used for pages within the current
+    /* the number of lispwords of this page that are used. This may be less
+     * than the usage at an instant in time for pages within the current
      * allocation regions. MUST be 0 for unallocated pages.
-     * When read, the low bit has to be masked off.
      */
-    page_bytes_t bytes_used_;
+    page_words_t words_used_;
 
     // !!! If bit positions are changed, be sure to reflect the changes into
     // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
+    // and WALK-DYNAMIC-SPACE.
     unsigned char
         /*
-         * The low 4 bits of 'type' are interpreted as:
+         * The 4 low bits of 'type' are defined by PAGE_TYPE_x constants.
          *  0000 free
-         *  ?001 boxed data
-         *  ?010 unboxed data
-         *  ?011 code
-         *  1??? open region
-         * The high bit indicates that the page holds part of or the entirety
-         * of a single object and no other objects.
-         * Constants for this field are defined in gc-internal.h, the
-         * xxx_PAGE_FLAG definitions.
-         *
-         * If the page is free, all the following fields are zero. */
-        type :5,
-        /* This is set when the page is write-protected. This should
-         * always reflect the actual write_protect status of a page.
-         * (If the page is written into, we catch the exception, make
-         * the page writable, and clear this flag.) */
-        write_protected :1,
-        /* This flag is set when the above write_protected flag is
-         * cleared by the SIGBUS handler (or SIGSEGV handler, for some
-         * OSes). This is useful for re-scavenging pages that are
-         * written during a GC. */
-        write_protected_cleared :1,
+         *  ?001 strictly boxed data (pointers, immediates, object headers)
+         *  ?010 strictly unboxed data
+         *  ?011 mixed boxed/unboxed non-code objects
+         *  ?111 code
+         * The next two bits are SINGLE_OBJECT and OPEN_REGION */
+        type :6,
+        /* Whether the page was used at all. This is the only bit that can
+         * be 1 on a free page */
+        need_zerofill :1,
         /* If this page should not be moved during a GC then this flag
-         * is set. It's only valid during a GC for allocated pages. */
+         * is set. It's only valid during a GC for allocated pages,
+         * and only meaningful for pages in the condemned set.
+         * (It can be spuriously 1 on a page in any generation) */
         pinned :1;
 
     /* the generation that this page belongs to. This should be valid
@@ -129,17 +146,85 @@ struct page {
     generation_index_t gen;
 };
 extern struct page *page_table;
-#ifdef LISP_FEATURE_BIG_ENDIAN
-# define WP_CLEARED_FLAG      (1<<1)
-# define WRITE_PROTECTED_FLAG (1<<2)
-#else
-# define WRITE_PROTECTED_FLAG (1<<5)
-# define WP_CLEARED_FLAG      (1<<6)
-#endif
+
+/* a structure to hold the state of a generation
+ *
+ * CAUTION: If you modify this, make sure to touch up the alien
+ * definition in src/code/gc.lisp accordingly. ...or better yes,
+ * deal with the FIXME there...
+ */
+struct generation {
+    /* the bytes allocated to this generation */
+    os_vm_size_t bytes_allocated;
+
+    /* the number of bytes at which to trigger a GC */
+    os_vm_size_t gc_trigger;
+
+    /* to calculate a new level for gc_trigger */
+    os_vm_size_t bytes_consed_between_gc;
+
+    /* the number of GCs since the last raise */
+    int num_gc;
+
+    /* the number of GCs to run on the generations before raising objects to the
+     * next generation */
+    int number_of_gcs_before_promotion;
+
+    /* the cumulative sum of the bytes allocated to this generation. It is
+     * cleared after a GC on this generations, and update before new
+     * objects are added from a GC of a younger generation. Dividing by
+     * the bytes_allocated will give the average age of the memory in
+     * this generation since its last GC. */
+    os_vm_size_t cum_sum_bytes_allocated;
+
+    /* a minimum average memory age before a GC will occur helps
+     * prevent a GC when a large number of new live objects have been
+     * added, in which case a GC could be a waste of time */
+    double minimum_age_before_gc;
+};
+
+/* When computing a card index we never subtract the heap base, which simplifies
+ * code generation. The heap base is guaranteed to be GC-page-aligned.
+ * The low bits can wraparound from all 1s to all 0s such that lowest numbered
+ * page index in linear order may have a higher card index.
+ * Two small examples of the distinction between page index and card index.
+ * For both examples: heap base = 0xEB00, page-size = 256b, npages = 8.
+ *
+ * Scenario A:
+ *   CARDS_PER_PAGE = 1, card-size = 256b, ncards = 8, right-shift = 8, mask = #b111
+ *     page     page      card
+ *    index     base     index
+ *       0      EB00        3
+ *       1      EC00        4
+ *       2      ED00        5
+ *       3      EE00        6
+ *       4      EF00        7
+ *       5      F000        0
+ *       6      F100        1
+ *       7      F200        2
+ *
+ * Scenario B:
+ *   CARDS_PER_PAGE = 2, card-size = 128b, ncards = 16, right-shift = 7, mask = #b1111
+ *     page     page            card
+ *    index     base         indices
+ *       0      EB00, EB80      6, 7
+ *       1      EC00, EC80      8, 9
+ *       2      ED00, ED80    10, 11
+ *       3      EE00, EE80    12, 13
+ *       4      EF00, EF80    14, 15
+ *       5      F000, F080      0, 1
+ *       6      F100, F180      2, 3
+ *       7      F200, F280      4, 5
+ *
+ */
+extern unsigned char *gc_card_mark;
+extern long gc_card_table_mask;
+#define addr_to_card_index(addr) ((((uword_t)addr)>>GENCGC_CARD_SHIFT) & gc_card_table_mask)
+#define page_to_card_index(n) addr_to_card_index(page_address(n))
 
 struct __attribute__((packed)) corefile_pte {
   uword_t sso; // scan start offset
-  page_bytes_t bytes_used;
+  page_words_t words_used; // low bit is the 'large object' flag
 };
 
 /* values for the page.allocated field */
@@ -150,20 +235,24 @@ extern page_index_t page_table_pages;
 
 /* forward declarations */
 
-void update_dynamic_space_free_pointer(void);
-void gc_close_region(struct alloc_region *alloc_region, int page_type_flag);
+void gc_close_region(struct alloc_region *alloc_region, int page_type);
 static inline void ensure_region_closed(struct alloc_region *alloc_region,
-                                        int page_type_flag)
+                                        int page_type)
 {
     if (alloc_region->start_addr)
-        gc_close_region(alloc_region, page_type_flag);
+        gc_close_region(alloc_region, page_type);
 }
 
 static inline void gc_set_region_empty(struct alloc_region *region)
 {
+    /* Free-pointer has to be not equal to 0 because it's undefined behavior
+     * to add any value whatsoever to the null pointer.
+     * Annoying, isn't it.  http://c-faq.com/null/machexamp.html */
+    region->free_pointer = region->end_addr = (void*)0x1000;
+    /* Start 0 is the indicator of closed-ness. */
+    region->start_addr = 0;
     /* last_page is not reset. It can be used as a hint where to resume
      * allocating after closing and re-opening the region */
-    region->start_addr = region->free_pointer = region->end_addr = 0;
 }
 
 static inline void gc_init_region(struct alloc_region *region)
@@ -185,37 +274,31 @@ find_page_index(void *addr)
 {
     if (addr >= (void*)DYNAMIC_SPACE_START) {
         page_index_t index = ((uintptr_t)addr -
-                              (uintptr_t)DYNAMIC_SPACE_START) / GENCGC_CARD_BYTES;
+                              (uintptr_t)DYNAMIC_SPACE_START) / GENCGC_PAGE_BYTES;
         if (index < page_table_pages)
             return (index);
     }
     return (-1);
 }
 
-#define SINGLE_OBJECT_FLAG (1<<4)
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
 
-#define page_has_smallobj_pins(page) \
-  (page_table[page].pinned && !page_single_obj_p(page))
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
-    gc_dcheck(compacting_p());
-#if !GENCGC_IS_PRECISE
-    return page_has_smallobj_pins(page)
-        && hopscotch_containsp(&pinned_objects, obj);
-#else
-    /* There is almost never anything in the hashtable on precise platforms */
-    if (!pinned_objects.count || !page_has_smallobj_pins(page))
-        return 0;
-# ifdef RETURN_PC_WIDETAG
-    /* Conceivably there could be a precise GC without RETURN-PC objects */
+    // Single-object pages can be pinned, but the object doesn't go
+    // in the hashtable. I'm a little surprised that the return value
+    // should be 0 in such case, but I think this never gets called
+    // on large objects because they've all been "moved" to newspace
+    // by adjusting the page table. Perhaps this should do:
+    //   gc_assert(!page_single_obj_p(page))
+    if (!page_table[page].pinned || page_single_obj_p(page)) return 0;
+#ifdef RETURN_PC_WIDETAG
     if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG)
         obj = make_lispobj(fun_code_header(native_pointer(obj)),
                            OTHER_POINTER_LOWTAG);
-# endif
-    return hopscotch_containsp(&pinned_objects, obj);
 #endif
+    return hopscotch_containsp(&pinned_objects, obj);
 }
 
 // Return true only if 'obj' must be *physically* transported to survive gc.
@@ -244,10 +327,8 @@ struct fixedobj_page { // 12 bytes per page
       int packed;
       struct {
         unsigned char flags;
-        /* space per object in Lisp words. Can exceed obj_size
-           to align on a larger boundary */
-        unsigned char obj_align;
-        unsigned char obj_size; /* in Lisp words, incl. header */
+        unsigned char obj_align; // object spacing expressed in lisp words
+        unsigned char unused1;
         /* Which generations have data on this page */
         unsigned char gens_; // a bitmap
       } parts;
@@ -259,7 +340,6 @@ struct fixedobj_page { // 12 bytes per page
 };
 extern struct fixedobj_page *fixedobj_pages;
 #define fixedobj_page_obj_align(i) (fixedobj_pages[i].attr.parts.obj_align<<WORD_SHIFT)
-#define fixedobj_page_obj_size(i) fixedobj_pages[i].attr.parts.obj_size
 #endif
 
 extern page_index_t next_free_page;

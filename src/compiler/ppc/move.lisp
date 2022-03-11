@@ -177,6 +177,8 @@
   (:note "signed word to integer coercion")
   (:generator 20
     (move x arg)
+    ;; Don't even think about using mcrxr, you couldn't make up a
+    ;; slower instruction
     (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
     (inst addo temp x x)              ; set XER OV if top two bits differ
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
@@ -201,7 +203,7 @@
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
     (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
     (inst bns done)
-    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
+    (load-constant vop (emit-constant (1+ most-positive-fixnum))
                    y)
     DONE))
 
@@ -213,7 +215,7 @@
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
     (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
     (inst bns done)
-    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
+    (load-constant vop (emit-constant (1- most-negative-fixnum))
                    y)
     DONE))
 

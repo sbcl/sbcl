@@ -16,7 +16,7 @@
 
 (declaim (inline code->ascii-mapper))
 (defun code->ascii-mapper (code)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type char-code code))
   (if (> code 127)
       nil
@@ -24,13 +24,13 @@
 
 (declaim (inline get-ascii-bytes))
 (defun get-ascii-bytes (string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range pos))
   (get-latin-bytes #'code->ascii-mapper :ascii string pos))
 
 (defun string->ascii (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send))
   (values (string->latin% string sstart send #'get-ascii-bytes null-padding)))
@@ -74,13 +74,13 @@
 
 (declaim (inline get-latin1-bytes))
 (defun get-latin1-bytes (string pos)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range pos))
   (get-latin-bytes #'identity :latin-1 string pos))
 
 (defun string->latin1 (string sstart send null-padding)
-  (declare (optimize speed (safety 0))
+  (declare (optimize speed #.*safety-0*)
            (type simple-string string)
            (type array-range sstart send))
   (values (string->latin% string sstart send #'get-latin1-bytes null-padding)))
@@ -117,8 +117,8 @@
 
 (declaim (inline char-len-as-utf8))
 (defun char-len-as-utf8 (code)
-  (declare (optimize speed (safety 0))
-           (type (integer 0 (#.sb-xc:char-code-limit)) code))
+  (declare (optimize speed #.*safety-0*)
+           (type (integer 0 (#.char-code-limit)) code))
   (cond ((< code 0) (bug "can't happen"))
         ((< code #x80) 1)
         ((< code #x800) 2)
@@ -127,7 +127,7 @@
         (t (bug "can't happen"))))
 
 (defun string->utf8 (string sstart send null-padding)
-  (declare (optimize (speed 3) (safety 0))
+  (declare (optimize (speed 3) #.*safety-0*)
            (type simple-string string)
            (type (integer 0 1) null-padding)
            (type array-range sstart send))
@@ -204,12 +204,7 @@
        ;; so we can take a fast path -- and get benefit of the element
        ;; type information. On non-unicode build BASE-CHAR ==
        ;; CHARACTER, handled above.
-       (ascii-bash))
-      ((simple-array nil (*))
-       (if (= send sstart)
-           (make-array null-padding :element-type '(unsigned-byte 8))
-           ;; Just get the error...
-           (aref string sstart))))))
+       (ascii-bash)))))
 
 ;;; from UTF-8
 
@@ -218,11 +213,11 @@
     `(progn
       ;;(declaim (inline ,name))
       (let ((lexically-max
-             (string->utf8 (string (code-char ,(1- sb-xc:char-code-limit)))
+             (string->utf8 (string (code-char ,(1- char-code-limit)))
                            0 1 0)))
         (declare (type (simple-array (unsigned-byte 8) (#+sb-unicode 4 #-sb-unicode 2)) lexically-max))
         (defun ,name (array pos end)
-          (declare (optimize speed (safety 0))
+          (declare (optimize speed #.*safety-0*)
                    (type ,type array)
                    (type array-range pos end))
           ;; returns the number of bytes consumed and nil if it's a
@@ -339,7 +334,7 @@
     `(progn
       (declaim (inline ,name))
       (defun ,name (array pos bytes)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range pos)
                  (type (integer 1 4) bytes))
@@ -363,7 +358,7 @@
   (let ((name (make-od-name 'utf8->string accessor)))
     `(progn
       (defun ,name (array astart aend)
-        (declare (optimize speed (safety 0))
+        (declare (optimize speed #.*safety-0*)
                  (type ,type array)
                  (type array-range astart aend))
         (let ((string (make-array 0 :adjustable t :fill-pointer 0 :element-type 'character)))

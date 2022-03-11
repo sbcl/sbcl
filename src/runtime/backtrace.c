@@ -35,78 +35,58 @@
 #include "gc.h"
 #include "code.h"
 #include "var-io.h"
+#include "gc-internal.h"
+#include "forwarding-ptr.h"
+#include "lispstring.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
 # include <dlfcn.h>
 #endif
 
-static void
-sbcl_putwc(wchar_t c, FILE *file)
-{
-#ifdef LISP_FEATURE_OS_PROVIDES_PUTWC
-    putwc(c, file);
-#else
-    if (c < 256) {
-        fputc(c, file);
-    } else {
-        fputc('?', file);
-    }
-#endif
-}
-
-unsigned int decode_elsewhere_pc(lispobj packed_integer)
+int df_decode_locs(lispobj encoded, int *offset, int *elsewhere)
 {
     struct varint_unpacker unpacker;
-    int value;
+    lispobj packed_integer = listp(encoded) ? CONS(encoded)->cdr : encoded;
     varint_unpacker_init(&unpacker, packed_integer);
-    varint_unpack(&unpacker, &value);
-    return value;
+    return varint_unpack(&unpacker, offset) && varint_unpack(&unpacker, elsewhere);
 }
 
 struct compiled_debug_fun *
 debug_function_from_pc (struct code* code, void *pc)
 {
-    uword_t offset = (char*)pc - code_text_start(code);
-    struct compiled_debug_fun *df;
     struct compiled_debug_info *di;
-    struct vector *v;
-    int i, len;
 
-    if (!instancep(code->debug_info))
+    if (instancep(code->debug_info))
+        di = (void*)native_pointer(code->debug_info);
+    else if (listp(code->debug_info) && instancep(CONS(code->debug_info)->car))
+        di = (void*)native_pointer(CONS(code->debug_info)->car);
+    else
         return NULL;
-
-    di = (struct compiled_debug_info *) native_pointer(code->debug_info);
 
     if (!instancep(di->fun_map))
         return NULL;
 
-    v = VECTOR(di->fun_map);
-
-    len = fixnum_value(v->length);
-
-    if (!instancep(v->data[0]))
+    struct compiled_debug_fun *df = (struct compiled_debug_fun*)native_pointer(di->fun_map);
+    int begin, end, elsewhere_begin, elsewhere_end;
+    if (!df_decode_locs(df->encoded_locs, &begin, &elsewhere_begin))
         return NULL;
-
-    df = (struct compiled_debug_fun *) native_pointer(v->data[0]);
-
-    if (len == 1)
-        return df;
-
-    for (i = 1;; i += 2) {
-        unsigned next_pc;
-
-        if (i == len)
-            return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
-
-        if (offset >= (uword_t)decode_elsewhere_pc(df->encoded_locs)) {
-            struct compiled_debug_fun *p
-                = ((struct compiled_debug_fun *) native_pointer(v->data[i + 1]));
-            next_pc = decode_elsewhere_pc(p->encoded_locs);
-        } else
-            next_pc = fixnum_value(v->data[i]);
-
-        if (offset < next_pc)
-            return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
+    sword_t offset = (char*)pc - code_text_start(code);
+    while (df) {
+        struct compiled_debug_fun *next;
+        if (df->next != NIL) {
+            next = (struct compiled_debug_fun*) native_pointer(df->next);
+            if (!df_decode_locs(next->encoded_locs, &end, &elsewhere_end))
+                return NULL;
+        } else {
+            next = 0;
+            end = elsewhere_end = code_text_size(code);
+        }
+        if ((begin <= offset && offset < end) ||
+            (elsewhere_begin <= offset && offset < elsewhere_end))
+            return df;
+        begin = end;
+        elsewhere_begin = elsewhere_end;
+        df = next;
     }
 
     return NULL;
@@ -115,46 +95,56 @@ debug_function_from_pc (struct code* code, void *pc)
 static void
 print_string (struct vector *vector, FILE *f)
 {
-  int tag = widetag_of(&vector->header);
-
-#define doit(TYPE)                              \
-  do {                                          \
-    int i;                                      \
-    int n = fixnum_value(vector->length);       \
-    TYPE *data = (TYPE *) vector->data;         \
-    for (i = 0; i < n; i++) {                   \
-      wchar_t c = (wchar_t) data[i];            \
-      if (c == '\\' || c == '"')                \
-        putc('\\', f);                          \
-      sbcl_putwc(c, f);                         \
-    }                                           \
-  } while (0)
-
-  switch (tag) {
-  case SIMPLE_BASE_STRING_WIDETAG:
-    doit(unsigned char);
-    break;
-#ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-  case SIMPLE_CHARACTER_STRING_WIDETAG:
-    doit(unsigned int);
-    break;
-#endif
-  default:
-    fprintf(f, "<??? type %d>", tag);
-  }
-#undef doit
+    if (!string_widetag_p(widetag_of(&vector->header))) {
+        fprintf(f, "<??? type %d>", widetag_of(&vector->header));
+        return;
+    }
+    int i;
+    int n = vector_len(vector);
+    for (i = 0; i < n; i++) {
+        unsigned int c = schar(vector, i);
+        if (c > 0xFFFF) fprintf(f,"\\U%08x", c);
+        // without knowing whether the terminal can accept
+        // character codes 128 through 255, it's conservative
+        // to just output unicode escapes.
+        else if (c > 0x7F) fprintf(f,"\\u%04x", c);
+        else {
+            if (c == '\\' || c == '"') putc('\\', f);
+            putc(c, f);
+        }
+    }
 }
 
-static int string_equal (struct vector *vector, char *string)
+lispobj debug_print(lispobj string)
 {
-    if (widetag_of(&vector->header) != SIMPLE_BASE_STRING_WIDETAG)
-        return 0;
-    return !strcmp((char *) vector->data, string);
+    print_string(VECTOR(string), stderr);
+    putc('\n', stderr);
+    return 0;
+}
+
+lispobj symbol_package(struct symbol* s)
+{
+    static int warned;
+    // If using ldb when debugging cold-init, this can be confusing to see all symbols
+    // as if they were uninterned, but package-IDs are always available in the symbol.
+    // End-users should never see this failure.
+    if (!lisp_package_vector) {
+        if (!warned) {
+          fprintf(stderr, "Warning: package vector has not been initialized yet\n");
+          warned = 1;
+        }
+        return NIL;
+    }
+    struct vector* v = VECTOR(lisp_package_vector);
+    int id = symbol_package_id(s);
+    if (id < vector_len(v)) return v->data[id];
+    lose("can't decode package ID %d", id);
 }
 
 static void
 print_entry_name (lispobj name, FILE *f)
 {
+    name = follow_maybe_fp(name);
     if (listp(name)) {
         putc('(', f);
         while (name != NIL) {
@@ -164,42 +154,42 @@ print_entry_name (lispobj name, FILE *f)
                 return;
             }
             print_entry_name(CONS(name)->car, f);
-            name = CONS(name)->cdr;
+            name = follow_maybe_fp(CONS(name)->cdr);
             if (name != NIL)
                 putc(' ', f);
         }
         putc(')', f);
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
-        lispobj *object = native_pointer(name);
-        if (widetag_of(object) == SYMBOL_WIDETAG) {
-            struct symbol *symbol = (struct symbol *) object;
-            if (symbol->package != NIL) {
-                struct package *pkg
-                    = (struct package *) native_pointer(symbol->package);
-                struct vector *pkg_name = VECTOR(pkg->_name);
-                if (string_equal(pkg_name, "COMMON-LISP"))
-                    ;
-                else if (string_equal(pkg_name, "COMMON-LISP-USER")) {
-                    fputs("CL-USER::", f);
-                }
-                else if (string_equal(pkg_name, "KEYWORD")) {
-                    putc(':', f);
-                } else {
-                    print_string(pkg_name, f);
-                    fputs("::", f);
-                }
+        struct symbol *symbol = SYMBOL(name);
+        char* prefix = 0;
+        int widetag = header_widetag(symbol->header);
+        switch (widetag) {
+        case SYMBOL_WIDETAG:
+            switch (symbol_package_id(symbol)) {
+            case PACKAGE_ID_NONE: prefix = "#:"; break;
+            case PACKAGE_ID_LISP: prefix = ""; break;
+            case PACKAGE_ID_USER: prefix = "CL-USER::"; break;
+            case PACKAGE_ID_KEYWORD: prefix = ":"; break;
             }
-            print_string(VECTOR(symbol->name), f);
-        } else if (widetag_of(object) == SIMPLE_BASE_STRING_WIDETAG
+            if (prefix) fputs(prefix, f); else {
+                struct package *pkg
+                    = (struct package *)native_pointer(symbol_package(symbol));
+                struct vector *pkg_name = VECTOR(follow_maybe_fp(pkg->_name));
+                print_string(pkg_name, f);
+                fputs("::", f);
+            }
+            print_string(symbol_name(symbol), f);
+            break;
+        case SIMPLE_BASE_STRING_WIDETAG:
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-                   || widetag_of(object) == SIMPLE_CHARACTER_STRING_WIDETAG
+        case SIMPLE_CHARACTER_STRING_WIDETAG:
 #endif
-            ) {
             putc('"', f);
-            print_string((struct vector*)object, f);
+            print_string((struct vector*)symbol, f);
             putc('"', f);
-        } else {
-            fprintf(f, "<??? type %d>", widetag_of(object));
+            break;
+        default:
+            fprintf(f, "<??? type %d>", widetag);
         }
     } else if (fixnump(name)) {
         fprintf(f, "%d", (int)fixnum_value(name));
@@ -208,7 +198,7 @@ print_entry_name (lispobj name, FILE *f)
     }
 }
 
-static void
+static void __attribute__((unused))
 print_entry_points (struct code *code, FILE *f)
 {
     int n_funs = code_n_funs(code);
@@ -217,7 +207,7 @@ print_entry_points (struct code *code, FILE *f)
             fprintf(f, "%p: bogus function entry", fun);
             return;
         }
-        print_entry_name(fun->name, f);
+        print_entry_name(code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index], f);
         if ((index + 1) < n_funs) fprintf(f, ", ");
     });
 }
@@ -228,38 +218,7 @@ print_entry_points (struct code *code, FILE *f)
 /* KLUDGE: Sigh ... I know what the call frame looks like and it had
  * better not change. */
 
-struct call_frame {
-#ifndef LISP_FEATURE_ALPHA
-        struct call_frame *old_cont;
-#else
-        u32 old_cont;
-#endif
-        lispobj saved_lra;
-        lispobj code;
-        lispobj other_state[5];
-};
-
-struct call_info {
-#ifndef LISP_FEATURE_ALPHA
-    struct call_frame *frame;
-#else
-    u32 frame;
-#endif
-    int interrupted;
-#ifndef LISP_FEATURE_ALPHA
-    struct code *code;
-#else
-    u32 code;
-#endif
-    lispobj lra;
-    int pc; /* Note: this is the trace file offset, not the actual pc. */
-};
-
-// simple-fun headers have a pointer to layout-of-function in the
-// upper bytes if words are 8 bytes, so mask off those bytes.
-#define HEADER_LENGTH(header) (((header)>>8) & FUN_HEADER_NWORDS_MASK)
-
-static int previous_info(struct call_info *info);
+#include "callframe.inc"
 
 static struct code *
 code_pointer(lispobj object)
@@ -269,9 +228,11 @@ code_pointer(lispobj object)
     switch (widetag_of(headerp)) {
         case CODE_HEADER_WIDETAG:
             break;
+#ifdef RETURN_PC_WIDETAG
         case RETURN_PC_WIDETAG:
+#endif
         case SIMPLE_FUN_WIDETAG:
-            len = HEADER_LENGTH(*headerp);
+            len = (HeaderValue(*headerp) & FUN_HEADER_NWORDS_MASK);
             if (len == 0)
                 headerp = NULL;
             else
@@ -285,23 +246,10 @@ code_pointer(lispobj object)
 }
 
 static boolean
-cs_valid_pointer_p(struct call_frame *pointer)
+cs_valid_pointer_p(struct thread *thread, struct call_frame *pointer)
 {
-    struct thread *thread=arch_os_get_current_thread();
     return (((char *) thread->control_stack_start <= (char *) pointer) &&
             ((char *) pointer < (char *) access_control_stack_pointer(thread)));
-}
-
-static void
-call_info_from_lisp_state(struct call_info *info)
-{
-    info->frame = (struct call_frame *)access_control_frame_pointer(arch_os_get_current_thread());
-    info->interrupted = 0;
-    info->code = NULL;
-    info->lra = 0;
-    info->pc = 0;
-
-    previous_info(info);
 }
 
 static void
@@ -317,43 +265,44 @@ call_info_from_context(struct call_info *info, os_context_t *context)
         info->frame =
             (struct call_frame *)(uword_t)
                 (*os_context_register_addr(context, reg_OCFP));
+#ifdef reg_LRA
         info->lra = (lispobj)(*os_context_register_addr(context, reg_LRA));
+#else
+        info->lra = (lispobj)(*os_context_register_addr(context, reg_RA));
+#endif
         info->code = code_pointer(info->lra);
         pc = (uword_t)native_pointer(info->lra);
     } else
 #endif
     {
+        pc = os_context_pc(context);
         info->frame =
             (struct call_frame *)(uword_t)
                 (*os_context_register_addr(context, reg_CFP));
         info->code =
+#ifdef reg_CODE
             code_pointer(*os_context_register_addr(context, reg_CODE));
-        info->lra = NIL;
-        pc = *os_context_pc_addr(context);
-    }
-    if (info->code != NULL)
-        info->pc = pc - (uword_t) info->code -
-#ifndef LISP_FEATURE_ALPHA
-            (HEADER_LENGTH(info->code->header) * sizeof(lispobj));
 #else
-            (HEADER_LENGTH(((struct code *)info->code)->header) * sizeof(lispobj));
+        (struct code *)dynamic_space_code_from_pc((char *)pc);
 #endif
+        info->lra = NIL;
+
+    }
+
+    if (info->code != NULL)
+        info->pc = (char*)pc - (char*)info->code;
     else
         info->pc = 0;
 }
 
-static int
-previous_info(struct call_info *info)
+// Return 1 if we have a valid frame, 0 if not.
+int lisp_frame_previous(struct thread *thread, struct call_info *info)
 {
     struct call_frame *this_frame;
-    struct thread *thread=arch_os_get_current_thread();
     int free_ici;
     lispobj lra;
 
-    if (!cs_valid_pointer_p(info->frame)) {
-        printf("Bogus callee value (0x%lx).\n", (long)info->frame);
-        return 0;
-    }
+    if (!cs_valid_pointer_p(thread, info->frame)) return 0;
 
     this_frame = info->frame;
     info->lra = this_frame->saved_lra;
@@ -376,15 +325,20 @@ previous_info(struct call_info *info)
             }
         }
     } else if (fixnump(lra)) {
-        info->code = (struct code*)native_pointer(this_frame->code);
-        // FIXME: is this right? fixnumish LRAs are based off the object base address
-        // and not the code text start?
-        info->pc = (uword_t)(info->code + lra);
+        info->code =
+#ifdef reg_CODE
+        (struct code*)native_pointer(this_frame->code);
+        info->pc = lra;
+#else
+        (struct code *)dynamic_space_code_from_pc((char *)lra);
+        info->pc = (char*)native_pointer(lra) - (char*)info->code;
+#endif
+
         info->lra = NIL;
     } else {
         info->code = code_pointer(lra);
         if (info->code != NULL)
-            info->pc = (char*)native_pointer(info->lra) - code_text_start(info->code);
+            info->pc = (char*)native_pointer(info->lra) - (char*)info->code;
         else
             info->pc = 0;
     }
@@ -395,46 +349,91 @@ previous_info(struct call_info *info)
 void
 lisp_backtrace(int nframes)
 {
+    struct thread *thread = get_sb_vm_thread();
     struct call_info info;
+
+    info.frame = (struct call_frame *)access_control_frame_pointer(thread);
+    info.interrupted = 0;
+    info.code = NULL;
+    info.lra = 0;
+    info.pc = 0;
+
     int i = 0;
-    call_info_from_lisp_state(&info);
-
+    int footnotes = 0;
     do {
+        if (!lisp_frame_previous(thread, &info)) {
+            if (info.frame) // 0 is normal termination of the call chain
+                printf("Bad frame pointer %p [valid range=%p..%p]\n", info.frame,
+                       thread->control_stack_start, thread->control_stack_end);
+            break;
+        }
         printf("%4d: ", i);
+        // Print spaces to keep the alignment nice
+        if (info.interrupted
+#ifdef reg_LRA
+            || info.lra == NIL
+#endif
+            ) {
+            putchar('[');
+            if (info.interrupted) { footnotes |= 1; putchar('I'); }
+#ifdef reg_LRA
+            if (info.lra == NIL) { footnotes |= 2; putchar('*'); }
+#endif
+            putchar(']');
+            if (!(info.lra == NIL && info.interrupted)) putchar(' ');
+        } else {
+            printf("    ");
+        }
+        printf("%p ", info.frame);
+        void* absolute_pc = 0;
+        if (info.code) {
+            absolute_pc = (char*)info.code + info.pc;
+            printf("pc=%p {%p+%04x} ", absolute_pc, info.code, (int)info.pc);
+        } else {
+            absolute_pc = (char*)info.pc;
+            printf("pc=%p ", absolute_pc);
+        }
 
-        if (info.code != (struct code *) 0) {
-            struct compiled_debug_fun *df ;
-            if (info.lra != NIL &&
-                (df = debug_function_from_pc((struct code *)info.code, (void *)info.lra)))
+        // If LRA does not match the PC, print it. This should not happen.
+        if (info.lra != make_lispobj(absolute_pc, OTHER_POINTER_LOWTAG)
+            && info.lra != NIL)
+            printf("LRA=%p ", (void*)info.lra);
+
+        int fpvalid = (lispobj*)info.frame >= thread->control_stack_start
+          && (lispobj*)info.frame < thread->control_stack_end;
+
+        // If the FP is invalid, then quite likely we'd crash trying to find a
+        // compiled-debug-fun because info.code is a wild pointer
+        if (!fpvalid) { printf(" BAD FRAME\n"); break; }
+
+        if (info.code) {
+            struct compiled_debug_fun *df;
+            if (absolute_pc &&
+                (df = debug_function_from_pc((struct code *)info.code, absolute_pc)))
                 print_entry_name(df->name, stdout);
             else
-                print_entry_points((struct code *)info.code, stdout);
-
-            printf(" %p", (void*)((uword_t) info.code | OTHER_POINTER_LOWTAG));
+                // I can't imagine a scenario where we have info.code
+                // but do not have an absolute_pc, or debug-fun can't be found.
+                // Anyway, we can uniquely identify code by serial# now.
+                printf("{code_serialno=%x}", code_serialno(info.code));
         }
-        else
-            printf("CODE = ???");
-        printf("%s fp = %p", info.interrupted ? " [interrupted]" : "",
-               info.frame);
 
-        if (info.lra != NIL)
-            printf(" LRA = %p", (void*)info.lra);
-        else
-            printf(" <no LRA>");
-
-        if (info.pc)
-            printf(" pc_ofs = %p", (void*)(long)info.pc);
         putchar('\n');
 
-    } while (i++ < nframes && previous_info(&info));
+    } while (++i <= nframes);
+    if (footnotes) printf("Note: [I] = interrupted"
+#ifdef reg_LRA
+                          ", [*] = no LRA"
+#endif
+                          "\n");
 }
 
 #else
 
 static int
-altstack_pointer_p (void __attribute__((unused)) *p) {
+altstack_pointer_p(__attribute__((unused)) struct thread* thread,
+                   __attribute__((unused)) void *p) {
 #ifndef LISP_FEATURE_WIN32
-    struct thread* thread = arch_os_get_current_thread();
     // FIXME: shouldn't this be testing '>=' start and '<' end ?
     //        i.e. Was it only right because the calculations themselves were wrong ?
     return (p > calc_altstack_base(thread) && p <= calc_altstack_end(thread));
@@ -445,19 +444,18 @@ altstack_pointer_p (void __attribute__((unused)) *p) {
 }
 
 static int
-stack_pointer_p (void *p)
+stack_pointer_p(struct thread* thread, void *p)
 {
     /* we are using sizeof(long) here, because that is the right value on both
      * x86 and x86-64.  (But note that false positives would not cause much harm
      * given the heuristical nature of x86_call_context.) */
     uword_t stack_alignment = sizeof(void*);
     void *stack_start;
-    struct thread *thread = arch_os_get_current_thread();
 
-    if (altstack_pointer_p(p))
+    if (altstack_pointer_p(thread, p))
         return 1;
 
-    if (altstack_pointer_p(&p)) {
+    if (altstack_pointer_p(thread, &p)) {
         stack_start = (void *) thread->control_stack_start;
     } else {
         /* Use the current frame address, since there should be no
@@ -470,30 +468,30 @@ stack_pointer_p (void *p)
 }
 
 static int
-ra_pointer_p (void *ra)
+ra_pointer_p (struct thread* th, void *ra)
 {
   /* the check against 4096 is still a mystery to everyone interviewed about
    * it, but recent changes to sb-sprof seem to suggest that such values
    * do occur sometimes. */
-  return ((uword_t) ra) > 4096 && !stack_pointer_p (ra);
+  return ((uword_t) ra) > 4096 && !stack_pointer_p (th, ra);
 }
 
-static int
-x86_call_context (void *fp, void **ra, void **ocfp)
+static int NO_SANITIZE_MEMORY
+x86_call_context (struct thread* th, void *fp, void **ra, void **ocfp)
 {
   void *c_ocfp;
   void *c_ra;
   int c_valid_p;
 
-  if (!stack_pointer_p(fp))
+  if (!stack_pointer_p(th, fp))
     return 0;
 
   c_ocfp    = *((void **) fp);
   c_ra      = *((void **) fp + 1);
 
   c_valid_p = (c_ocfp > fp
-               && stack_pointer_p(c_ocfp)
-               && ra_pointer_p(c_ra));
+               && stack_pointer_p(th, c_ocfp)
+               && ra_pointer_p(th, c_ra));
 
   if (c_valid_p)
     *ra = c_ra, *ocfp = c_ocfp;
@@ -506,18 +504,14 @@ x86_call_context (void *fp, void **ra, void **ocfp)
 void
 describe_thread_state(void)
 {
-    struct thread *thread = arch_os_get_current_thread();
-    struct interrupt_data *data = thread->interrupt_data;
+    struct thread *thread = get_sb_vm_thread();
+    struct interrupt_data *data = &thread_interrupt_data(thread);
 #ifndef LISP_FEATURE_WIN32
     sigset_t mask;
-    get_current_sigmask(&mask);
-    printf("Signal mask:\n");
-    printf(" SIGALRM = %d\n", sigismember(&mask, SIGALRM));
-    printf(" SIGINT = %d\n", sigismember(&mask, SIGINT));
-    printf(" SIGPROF = %d\n", sigismember(&mask, SIGPROF));
-#ifdef SIG_STOP_FOR_GC
-    printf(" SIG_STOP_FOR_GC = %d\n", sigismember(&mask, SIG_STOP_FOR_GC));
-#endif
+    char string[180];
+    thread_sigmask(SIG_BLOCK, 0, &mask);
+    sigset_tostring(&mask, string, sizeof string);
+    if (string[0]) printf("Signal mask: %s\n", string);
 #endif
     printf("Specials:\n");
     printf(" *GC-INHIBIT* = %s\n", (read_TLS(GC_INHIBIT, thread) == T) ? "T" : "NIL");
@@ -530,27 +524,38 @@ describe_thread_state(void)
 }
 
 static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
-    lispobj *p;
-    fprintf(f, "%4d: ", i);
-
-    p = component_ptr_from_pc(pc);
-
-    if (p) {
-        struct code *cp = (struct code *) p;
-        struct compiled_debug_fun *df = debug_function_from_pc(cp, pc);
+    fprintf(f, "%4d: fp=%p pc=%p ", i, fp, pc);
+    struct code *code = (void*)component_ptr_from_pc(pc);
+    if (code) {
+        struct compiled_debug_fun *df = debug_function_from_pc(code, pc);
         if (df)
             print_entry_name(df->name, f);
+        else if (pc >= (char*)asm_routines_start && pc < (char*)asm_routines_end)
+            fprintf(f, "(assembly routine)");
         else
-            print_entry_points(cp, f);
-        fprintf(f, ", pc = %p, fp = %p", pc, fp);
+            fprintf(f, "{code_serialno=%x}", code_serialno(code));
+    } else if (gc_managed_heap_space_p((uword_t)pc)) {
+#ifdef LISP_FEATURE_X86
+        // can't actually have a PC inside a random object, it's got to be a frame
+        // that didn't set up the pointer chain, quite possibly a signal frame such as:
+        //   7: fp=0xd78c8460 pc=0xf7fb51b0 Foreign function __kernel_rt_sigreturn
+        //   8: fp=0xd78c8478 pc=0xd9c43159 (bad PC)
+        //   9: fp=0xd78c84ec pc=0xd849a17e (FLET SB-C::DO-1-USE :IN SB-C::TENSION-IF-IF-1)
+        // where, if you print the PC actually from the context, line 8 would be 0xd823ea78.
+        fprintf(f, "(bad PC)");
+#else
+        // It could be a generic-function with self-contained tramponline code,
+        // or the executable JMP instruction in an fdefn.
+        fprintf(f, "(unknown lisp object)");
+#endif
     } else {
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
         Dl_info info;
         if (dladdr(pc, &info)) {
-            fprintf(f, "Foreign function %s, pc = %p, fp = %p", info.dli_sname, pc, fp);
+            fprintf(f, "Foreign function %s", info.dli_sname);
         } else
 #endif
-            fprintf(f, "Foreign function, pc = %p, fp = %p", pc, fp);
+            fprintf(f, "Foreign function");
     }
 
     putc('\n', f);
@@ -560,8 +565,8 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
  * backtraces from gdb with call backtrace_from_fp(...). Useful for
  * example when debugging threading deadlocks.
  */
-void
-log_backtrace_from_fp(void *fp, int nframes, int start, FILE *f)
+void NO_SANITIZE_MEMORY
+log_backtrace_from_fp(struct thread* th, void *fp, int nframes, int start, FILE *f)
 {
   int i = start;
 
@@ -569,30 +574,26 @@ log_backtrace_from_fp(void *fp, int nframes, int start, FILE *f)
     void *ra;
     void *next_fp;
 
-    if (!x86_call_context(fp, &ra, &next_fp))
+    if (!x86_call_context(th, fp, &ra, &next_fp))
       break;
     print_backtrace_frame(ra, next_fp, i, f);
     fp = next_fp;
   }
 }
 void backtrace_from_fp(void *fp, int nframes, int start) {
-    log_backtrace_from_fp(fp, nframes, start, stdout);
+    log_backtrace_from_fp(get_sb_vm_thread(), fp, nframes, start, stdout);
 }
 
 void backtrace_from_context(os_context_t *context, int nframes) {
-#ifdef LISP_FEATURE_X86
-    void *fp = (void *)*os_context_register_addr(context,reg_EBP);
-#elif defined (LISP_FEATURE_X86_64)
-    void *fp = (void *)*os_context_register_addr(context,reg_RBP);
-#endif
-    print_backtrace_frame((void *)*os_context_pc_addr(context), fp, 0, stdout);
+    void *fp = (void *)os_context_frame_pointer(context);
+    print_backtrace_frame((void *)os_context_pc(context), fp, 0, stdout);
     backtrace_from_fp(fp, nframes - 1, 1);
 }
 
 void
 lisp_backtrace(int nframes)
 {
-    struct thread *thread=arch_os_get_current_thread();
+    struct thread *thread = get_sb_vm_thread();
     int free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (free_ici) {
@@ -608,5 +609,177 @@ lisp_backtrace(int nframes)
 #endif
         backtrace_from_fp(fp, nframes, 0);
     }
+}
+#endif
+
+// Find the simple_fun that contains 'pc' in 'code'
+int simple_fun_index_from_pc(struct code* code, char *pc)
+{
+    char *instruction_area = code_text_start(code);
+    unsigned int* offsets = code_fun_table(code) - 1;
+    int index;
+    for (index = code_n_funs(code) - 1; index >= 0; --index) {
+        char *base = instruction_area + offsets[-index];
+        if (pc >= base) return index;
+    }
+    return -1;
+}
+
+static boolean __attribute__((unused)) print_lisp_fun_name(char* pc)
+{
+  struct code* code;
+  if (gc_managed_heap_space_p((uword_t)pc) &&
+      (code = (void*)component_ptr_from_pc(pc)) != 0) {
+      struct compiled_debug_fun* df = debug_function_from_pc(code, pc);
+      if (df) {
+          fprintf(stderr, " %p [", pc);
+          print_entry_name(df->name, stderr);
+          fprintf(stderr, "]\n");
+          return 1;
+      }
+  }
+  return 0;
+}
+
+#ifdef LISP_FEATURE_BACKTRACE_ON_SIGNAL
+#define UNW_LOCAL_ONLY
+#ifdef HAVE_LIBUNWIND
+#include <libunwind.h>
+#endif
+#include "genesis/thread-instance.h"
+#include "genesis/mutex.h"
+static __attribute__((unused))int backtrace_completion_pipe[2] = {-1,-1};
+void libunwind_backtrace(struct thread *th, os_context_t *context)
+{
+    fprintf(stderr, "Lisp thread @ %p, tid %d", th, (int)th->os_kernel_tid);
+#ifdef LISP_FEATURE_SB_THREAD
+    // the TLS area is not used if #-sb-thread. And if so, it must be "main thred"
+    struct thread_instance* lispthread = (void*)native_pointer(th->lisp_thread);
+    if (lispthread->name != NIL) {
+        fprintf(stderr, " (\"");
+        print_string(VECTOR(lispthread->name), stderr);
+        fprintf(stderr, "\")");
+    }
+    putc('\n', stderr);
+    if (lispthread->waiting_for != NIL) {
+        fprintf(stderr, "waiting for %p", (void*)lispthread->waiting_for);
+        if (instancep(lispthread->waiting_for)) {
+            // THREAD-WAITING-FOR can be a mutex or a waitqueue (if not a cons).
+            // Accessing it as if it's a mutex works because both a waitqueue
+            // and a mutex have a name at the same slot offset (if #+sb-futex).
+            // So to reiterate the comment from linux-os.c -
+            // "Use this only if you know what you're doing"
+            struct mutex* lispmutex = (void*)native_pointer(lispthread->waiting_for);
+            if (lispmutex->name != NIL) {
+                fprintf(stderr, " (MUTEX:\"");
+                print_string(VECTOR(lispmutex->name), stderr);
+                fprintf(stderr, "\")");
+            }
+        }
+        putc('\n', stderr);
+    }
+#endif
+#ifdef HAVE_LIBUNWIND
+    char procname[100];
+    unw_cursor_t cursor;
+    // "unw_init_local() is thread-safe as well as safe to use from a signal handler."
+    // "unw_get_proc_name() is thread-safe. If cursor cp is in the local address-space,
+    //  this routine is also safe to use from a signal handler."
+    if (context) {
+        unw_init_local(&cursor, context);
+    } else {
+        unw_context_t here;
+        unw_getcontext(&here);
+        unw_init_local(&cursor, &here);
+    }
+    do {
+        uword_t offset;
+        char *pc;
+        unw_get_reg(&cursor, UNW_TDEP_IP, (uword_t*)&pc);
+        if (print_lisp_fun_name(pc)) {
+            // printed
+        } else if (!unw_get_proc_name(&cursor, procname, sizeof procname, &offset)) {
+            fprintf(stderr, " %p [%s]\n", pc, procname);
+        } else {
+            fprintf(stderr, " %p ?\n", pc);
+        }
+    } while (unw_step(&cursor));
+#else
+    // If you don't have libunwind, this will almost surely not work,
+    // because we can't figure out how to get backwards past a signal frame.
+    log_backtrace_from_fp(th, (void*)*os_context_fp_addr(context), 100, 0, stderr);
+#endif
+}
+void backtrace_lisp_threads(int __attribute__((unused)) signal,
+                                   siginfo_t __attribute__((unused)) *info,
+                                   os_context_t *context)
+{
+    struct thread* this_thread = get_sb_vm_thread();
+#ifdef LISP_FEATURE_SB_THREAD
+    if (backtrace_completion_pipe[1] >= 0) {
+        libunwind_backtrace(current_thread, context);
+        write(backtrace_completion_pipe[1], context /* any random byte */, 1);
+        return;
+    }
+    struct thread *th;
+    int nthreads = 0;
+    for_each_thread(th) { ++nthreads; }
+    if (signal)
+        fprintf(stderr, "Caught backtrace-all signal in tid %d, %d threads\n",
+                (int)this_thread->os_kernel_tid, nthreads);
+    // Would be nice if we could forcibly stop all the other threads,
+    // but pthread_mutex_trylock is not safe to use in a signal handler.
+    if (nthreads > 1) {
+        pipe(backtrace_completion_pipe);
+    }
+    for_each_thread(th) {
+        if (th == this_thread)
+            libunwind_backtrace(th, context);
+        else {
+            char junk;
+            pthread_kill(th->os_thread, SIGXCPU);
+            read(backtrace_completion_pipe[0], &junk, 1);
+        }
+    }
+    if (nthreads > 1) {
+        close(backtrace_completion_pipe[1]);
+        close(backtrace_completion_pipe[0]);
+        backtrace_completion_pipe[0] = backtrace_completion_pipe[1] = -1;
+    }
+#else
+    libunwind_backtrace(this_thread, context);
+#endif
+}
+static int watchdog_pipe[2] = {-1,-1};
+static pthread_t watchdog_tid;
+static void* watchdog_thread(void* arg) {
+    struct timeval timeout;
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(watchdog_pipe[0], &fds);
+    timeout.tv_sec = (long)arg;
+    timeout.tv_usec = 0;
+    int nfds = select(watchdog_pipe[0]+1, &fds, 0, 0, &timeout);
+    if (nfds == 0) {
+        // Ensure this message comes out in one piece even if nothing following it does.
+        char msg[] = "Watchdog timer expired\n"; write(2, msg, sizeof msg-1);
+        backtrace_lisp_threads(0, 0, 0);
+        _exit(1); // cause the test suite to exit with failure
+    }
+    return 0;
+}
+void start_watchdog(int sec) {
+    if (pipe(watchdog_pipe)) lose("Can't make watchdog pipe");
+    pthread_create(&watchdog_tid, 0, watchdog_thread, (void*)(long)sec);
+    char msg[] = "Started watchdog thread\n"; write(2, msg, sizeof msg-1);
+}
+void stop_watchdog() {
+    char c[1] = {0};
+    write(watchdog_pipe[1], c, 1);
+    close(watchdog_pipe[1]);
+    void* result;
+    pthread_join(watchdog_tid, &result);
+    close(watchdog_pipe[0]);
+    watchdog_pipe[0] = watchdog_pipe[1] = -1;
 }
 #endif

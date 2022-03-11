@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-C") ;(SB-C, not SB-C, since we're built in warm load.)
+(in-package "SB-C")
 
 (defun describe-compiler-policy (&optional spec)
   "Print all global optimization settings, augmented by SPEC."

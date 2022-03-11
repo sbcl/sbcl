@@ -31,7 +31,7 @@
             (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 13
-    (load-symbol-value catch *current-catch-block*)
+    (load-current-catch-block catch)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (move nfp cur-nfp)))
@@ -43,7 +43,7 @@
          (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 10
-    (store-symbol-value catch *current-catch-block*)
+    (store-current-catch-block catch)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (move cur-nfp nfp)))
@@ -82,11 +82,11 @@
   (:temporary (:scs (interior-reg)) lip)
   (:generator 22
     (inst addi block cfp-tn (tn-byte-offset tn))
-    (load-symbol-value temp *current-unwind-protect-block*)
+    (load-current-unwind-protect-block temp)
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
-    (inst compute-lra temp lip entry-label code-tn)
+    (inst compute-ra-from-code temp code-tn lip entry-label)
     (storew temp block catch-block-entry-pc-slot)))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
@@ -101,17 +101,17 @@
   (:temporary (:scs (interior-reg)) lip)
   (:generator 44
     (inst addi result cfp-tn (tn-byte-offset tn))
-    (load-symbol-value temp *current-unwind-protect-block*)
+    (load-current-unwind-protect-block temp)
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
     (storew code-tn result catch-block-code-slot)
-    (inst compute-lra temp lip entry-label code-tn)
+    (inst compute-ra-from-code temp code-tn lip entry-label)
     (storew temp result catch-block-entry-pc-slot)
 
     (storew tag result catch-block-tag-slot)
-    (load-symbol-value temp *current-catch-block*)
+    (load-current-catch-block temp)
     (storew temp result catch-block-previous-catch-slot)
-    (store-symbol-value result *current-catch-block*)
+    (store-current-catch-block result)
 
     (move block result)))
 
@@ -120,25 +120,27 @@
 (define-vop (set-unwind-protect)
   (:args (uwp :scs (any-reg)))
   (:generator 7
-    (store-symbol-value uwp *current-unwind-protect-block*)))
+    (store-current-unwind-protect-block uwp)))
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
-    (load-symbol-value block *current-catch-block*)
+    (load-current-catch-block block)
     (loadw block block catch-block-previous-catch-slot)
-    (store-symbol-value block *current-catch-block*)))
+    (store-current-catch-block block)))
 
-(define-vop (unlink-unwind-protect)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
-    (load-symbol-value block *current-unwind-protect-block*)
+    (load-current-unwind-protect-block block)
     (loadw block block unwind-block-uwp-slot)
-    (store-symbol-value block *current-unwind-protect-block*)))
+    (store-current-unwind-protect-block block)))
 
 ;;;; NLX entry VOPs:
 
@@ -153,7 +155,7 @@
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
     (cond ((zerop nvals))
           ((= nvals 1)
@@ -184,22 +186,37 @@
                     (store-stack-tn tn move-temp))))))))
     (load-stack-tn csp-tn sp)))
 
+(define-vop (nlx-entry-single)
+  (:args (sp)
+         (value))
+  (:results (res :from :load))
+  (:info label)
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    (move res value)
+    (load-stack-tn csp-tn sp)))
+
 (define-vop (nlx-entry-multiple)
   (:args (top :target result)
          (src)
-         (count :target count-words))
+         (count . #.(cl:when sb-vm::fixnum-as-word-index-needs-temp
+                      '(:target count-words))))
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
   (:temporary (:scs (any-reg)) dst)
   (:temporary (:scs (descriptor-reg)) temp)
+  #+#.(cl:if sb-vm::fixnum-as-word-index-needs-temp '(and) '(or))
   (:temporary (:scs (any-reg) :from (:argument 2)) count-words)
   (:results (result :scs (any-reg) :from (:argument 0))
             (num :scs (any-reg) :from (:argument 0)))
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)
 
     (let ((loop (gen-label))
@@ -209,11 +226,8 @@
       (load-stack-tn result top)
       (move num count)
       ;; Reset the CSP.
-      (cond ((= word-shift n-fixnum-tag-bits)
-             (inst add csp-tn result count))
-            (t
-             (inst slli count-words count (- word-shift n-fixnum-tag-bits))
-             (inst add csp-tn result count-words)))
+      (with-fixnum-as-word-index (count count-words)
+        (inst add csp-tn result count))
       (inst beq count zero-tn done)
 
       (move dst result)
@@ -236,5 +250,5 @@
   (:ignore block start count)
   (:vop-var vop)
   (:generator 0
-    (emit-return-pc label)
+    (emit-label label)
     (note-this-location vop :non-local-entry)))

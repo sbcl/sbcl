@@ -125,19 +125,21 @@
   (:generator 7
     (store-symbol-value uwp *current-unwind-protect-block*)))
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
     (load-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
     (store-symbol-value block *current-catch-block*)))
 
-(define-vop (unlink-unwind-protect)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
     (load-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-uwp-slot)
@@ -177,6 +179,21 @@
                   (loadw move-temp start i 0 :ge)
                   (store-stack-tn tn move-temp :ge)
                   (store-stack-tn tn null-tn :lt)))))))
+    (load-stack-tn move-temp sp)
+    (store-csp move-temp)))
+
+(define-vop (nlx-entry-single)
+  (:args (sp)
+         (value))
+  (:results (res :from :load))
+  (:temporary (:scs (descriptor-reg)) move-temp)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)
+    (move res value)
     (load-stack-tn move-temp sp)
     (store-csp move-temp)))
 
@@ -230,6 +247,8 @@
     (emit-return-pc label)
     (note-this-location vop :non-local-entry)))
 
+;;; Doesn't handle NSP and is disabled.
+#+unwind-to-frame-and-call-vop
 (define-vop (unwind-to-frame-and-call)
   (:args (ofp :scs (descriptor-reg))
          (uwp :scs (descriptor-reg))

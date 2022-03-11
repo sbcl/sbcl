@@ -12,10 +12,9 @@
 CFLAGS += -m32 -fno-PIC
 ASFLAGS = -m32 -fno-PIC -g -Wall -Wa,-xarch=v8plus
 LINKFLAGS += -rdynamic -m32
-NM = ./linux-nm
 
-ASSEM_SRC = sparc-assem.S ldso-stubs.S
-ARCH_SRC = sparc-arch.c #undefineds.c 
+ASSEM_SRC = sparc-assem.S
+ARCH_SRC = sparc-arch.c
 
 OS_SRC = linux-os.c linux-mman.c sparc-linux-os.c
 OS_LIBS = -ldl
@@ -23,11 +22,7 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
 
-ifdef LISP_FEATURE_GENCGC
-  GC_SRC = fullcgc.c gencgc.c traceroot.c
-else
-  GC_SRC = cheneygc.c
-endif
+GC_SRC = fullcgc.c gencgc.c traceroot.c
 
 # Nothing to do for after-grovel-headers.
 .PHONY: after-grovel-headers

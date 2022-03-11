@@ -12,7 +12,9 @@
 (in-package "SB-VM")
 
 (defun zeroize (tn)
-  (inst xor :dword tn tn))
+  (if (stack-tn-p tn)
+      (inst mov tn 0)
+      (inst xor :dword tn tn)))
 
 (define-move-fun (load-immediate 1) (vop x y)
   ((immediate)
@@ -63,10 +65,11 @@
                (not (or (location= x y)
                         (and (sc-is x any-reg descriptor-reg immediate)
                              (sc-is y control-stack))))))
+  (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)) temp)
   (:generator 0
     (if (and (sc-is x immediate)
              (sc-is y any-reg descriptor-reg control-stack))
-        (move-immediate y (encode-value-if-immediate x) temp-reg-tn)
+        (move-immediate y (encode-value-if-immediate x) temp)
         (move y x))))
 
 (define-move-vop move :move
@@ -122,20 +125,20 @@
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
+  (:temporary (:sc unsigned-reg) val-temp) ; for oversized immediate operand
   (:generator 0
+    (let ((val (encode-value-if-immediate x)))
     (sc-case y
       ((any-reg descriptor-reg)
        (if (sc-is x immediate)
-           (let ((val (encode-value-if-immediate x)))
-             (if (eql val 0) (zeroize y) (inst mov y val)))
+           (if (eql val 0) (zeroize y) (inst mov y val))
            (move y x)))
       ((control-stack)
-       (if (= (tn-offset fp) esp-offset)
+       (if (= (tn-offset fp) rsp-offset)
            ;; C-call
-           (storew (encode-value-if-immediate x) fp (tn-offset y))
+           (storew val fp (tn-offset y) 0 val-temp)
            ;; Lisp stack
-           (storew (encode-value-if-immediate x) fp
-               (frame-word-offset (tn-offset y))))))))
+           (storew val fp (frame-word-offset (tn-offset y)) 0 val-temp)))))))
 
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -246,16 +249,17 @@
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
 (eval-when (:compile-toplevel :execute)
-  ;; Don't use a macro for this, because define-vop is weird.
+  ;; This is like a macro, but not a macro, because define-vop is weird.
   (defun bignum-from-reg (tn signedp)
-    `(aref ',(map 'vector
+    (flet ((make-vector ()
+             (map 'vector
                   (lambda (x)
                     ;; At present R11 can not occur here,
                     ;; but let's be future-proof and allow for it.
                     (unless (member x '(rsp rbp) :test 'string=)
                       (symbolicate "ALLOC-" signedp "-BIGNUM-IN-" x)))
-                  +qword-register-names+)
-           (tn-offset ,tn))))
+                  +qword-register-names+)))
+      `(aref ,(make-vector) (tn-offset ,tn)))))
 
 ;;; Convert an untagged signed word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly
@@ -289,18 +293,30 @@
 (define-vop (move-from-fixnum+1)
   (:args (x :scs (signed-reg unsigned-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
+  (:args-var arg-ref)
+  (:vop-var vop)
   (:generator 4
-    #.(aver (= n-fixnum-tag-bits 1))
-    (move y x)
-    (inst shl y 1)
-    (inst cmov :o y (emit-constant (1+ sb-xc:most-positive-fixnum)))))
+    (let ((const (case (vop-name vop)
+                  (move-from-fixnum-1 (1- most-negative-fixnum))
+                  (t                  (1+ most-positive-fixnum)))))
+      (cond ((= n-fixnum-tag-bits 1)
+             (cond ((csubtypep (tn-ref-type arg-ref) (specifier-type 'fixnum))
+                    ;; I think MAYBE-MOVE-FROM-FIXNUM+-1 could select MOVE-FROM-WORD/FIXNUM
+                    ;; if Y is known to fit in a fixnum, but this works, albeit redundant.
+                    (if (location= x y) (inst shl y 1) (inst lea y (ea x x))))
+                   (t
+                    (move y x)
+                    (inst shl y 1)
+                    (inst cmov :o y (emit-constant const)))))
+            (t
+             ;; not worth optimizing into SHL. The processor doesn't set OF for
+             ;; for shift count > 1 so we'd have to detect overflow differently.
+             (inst imul y x (ash 1 n-fixnum-tag-bits))
+             (inst jmp :no DONE)
+             (move y (emit-constant const)))))
+    DONE))
 
-(define-vop (move-from-fixnum-1 move-from-fixnum+1)
-  (:generator 4
-    #.(aver (= n-fixnum-tag-bits 1))
-    (move y x)
-    (inst shl y 1)
-    (inst cmov :o y (emit-constant (1- sb-xc:most-negative-fixnum)))))
+(define-vop (move-from-fixnum-1 move-from-fixnum+1))
 
 ;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly
@@ -358,7 +374,7 @@
       ((signed-reg unsigned-reg)
        (move y x))
       ((signed-stack unsigned-stack)
-       (if (= (tn-offset fp) esp-offset)
+       (if (= (tn-offset fp) rsp-offset)
            (storew x fp (tn-offset y))  ; c-call
            (storew x fp (frame-word-offset (tn-offset y))))))))
 (define-move-vop move-word-arg :move-arg

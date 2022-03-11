@@ -72,14 +72,14 @@
       (unless (or (eq :deleted (functional-kind functional))
                   ;; If the block came from an inlined global
                   ;; function, ignore it.
-                  (and (functional-inlinep functional)
+                  (and (functional-inline-expanded functional)
                        (symbolp (functional-debug-name functional))))
         (handle-functional functional)))))
 
 (defun record-node-xrefs (node context)
   (declare (type node node))
   (etypecase node
-    ((or creturn cif entry mv-combination cast exit))
+    ((or creturn cif entry mv-combination cast exit enclose))
     (combination
      ;; Record references to globals made using SYMBOL-VALUE.
      (let ((fun (principal-lvar-use (combination-fun node)))
@@ -252,7 +252,8 @@
   ;;; space-efficient form, and return that packed form.
   (defun pack-xref-data (xref-data)
     (unless xref-data (return-from pack-xref-data))
-    (let* ((result (make-array 1 :adjustable t :fill-pointer 1))
+    (let* ((result (make-array 1 :adjustable t :fill-pointer 1
+                                 :initial-element 0))
            (ensure-index (name->index result))
            (entries '())
            (max-index 0)
@@ -287,7 +288,7 @@
              (number-bits (integer-length max-number))
              (encoder (index-and-number-encoder name-bits number-bits))
              (vector (make-array 0 :element-type '(unsigned-byte 8)
-                                 :adjustable t :fill-pointer 0)))
+                                 :adjustable t :fill-pointer 0 :initial-element 0)))
         (write-var-integer name-bits vector)
         (write-var-integer number-bits vector)
         (loop for (kind-number . kind-entries) in entries
@@ -299,7 +300,7 @@
                 do (dolist (number numbers)
                      (write-var-integer (funcall encoder index number) vector))))
         (setf (aref result 0)
-              (sb-xc:coerce vector '(simple-array (unsigned-byte 8) 1))))
+              (coerce vector '(simple-array (unsigned-byte 8) 1))))
       ;; RESULT is adjustable. Make it simple.
       (coerce result 'simple-vector)))
 

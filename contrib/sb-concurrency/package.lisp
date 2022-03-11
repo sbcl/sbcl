@@ -57,3 +57,5 @@
    "GRAB-FRLOCK-WRITE-LOCK"
    "RELEASE-FRLOCK-WRITE-LOCK"
    ))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-CONCURRENCY")) t))

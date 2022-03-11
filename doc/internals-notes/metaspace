@@ -1,0 +1,101 @@
+Metaspace will hold all instances of LAYOUT when SBCL is
+built with the :METASPACE feature enabled.
+In that case, LAYOUTs may only be directly pointed to by:
+ * thread stacks and registers
+ * the header word of an INSTANCE or FUNCALLABLE-INSTANCE
+ * a code header's boxed constant pool
+
+The reason for pointing to LAYOUTs only from a restricted set of heap
+objects has to do with complications to pointer tracing.
+Bear in mind that there will be a finalizer attached to each WRAPPER
+which is responsibile for freeing the manually-managed LAYOUT when the
+wrapper is deleted by the garbage collector.
+
+Consider the following hypothetical example in which an arbitrary
+simple-vector could allegedly point to a layout.
+
+          DYNAMIC SPACE        |           MANUAL POOL
+    --------------------------------------------------------------
+
+             "V": vector
+            +---------+        |
+            | header  |        |
+            +---------+        |
+            | length  |        
+            +---------+    pointer "a"
+            | elt 0   | ------------------\
+            +---------+                    \
+            | elt 1   |        |            \
+            +---------+        |             \
+                               |              v
+                               |
+         "I": instance         |           "L": instance of LAYOUT
+         of SOME-OBJECT        |           for SOME-OBJECT type
+        +---------------|      |           +---------------+
+        | header word   | ------------->   | header word   |
+        | ptr to LAYOUT |   pointer "b"    | layout-layout |
+        +---------------+      |           +---------------+
+        | payload       |      |           | pointer to    |
+        | ...           |      |         / | WRAPPER       |
+        +---------------+      |        /  +---------------+
+                               |       /   |               |
+                               |      /    | type IDs      |
+                                     /     | ...           |
+                      pointer "c"   /      +---------------+
+                  ------------------       | bitmap        |
+                  v                        +---------------+
+                                
+        "W": WRAPPER for       |
+        SOME-OBJECT type       |
+        +-------------|        |
+        | header word |        |
+        |             |        |
+        +-------------+        |
+        | payload     |        |
+        | ...         |        |
+        +-------------+        |
+                               |
+------------------------------------------------------------------
+
+Tracing the instance "I" obviously needs to read the metadata from LAYOUT "L".
+In particular, scanning requires knowledge of the raw slot bitmap.
+Because the tracing algorithm needs to access the LAYOUT anyway, it can additionally
+treat pointer "c" as if it originated from instance "I" by calling the pointer fixing
+method on "c", thereby enlivening wrapper "W".  Fixing may require writing back
+pointer "c" into "L" if the pointer's value changed.  From that perspective, pointer
+"b" acts like a strangely encoded pointer from "I" to to "W",
+and the tracing logic is totally agnostic of the encoding/decoding mechanism.
+
+But now consider that pointer "b" can be changed (via CHANGE-CLASS), or more simply,
+instance "I" could become unreachable. Then as far as the pointer graph looks,
+there is no path from a live instance of SOME-OBJECT to the wrapper "W".
+Therefore the garbage collector could free W and trigger W's finalizer which
+should (eventually) free the manually allocated L despite that both L (and hence W)
+are still reachable through the vector V. Nothing prevents user code from reading
+the vector and so on, which would constitute use-after-free error.
+
+We could attempt to rememdy this by saying that *every* potential pointer
+into the manual pool should be examined to see whether the target is a LAYOUT.
+Such an approach would add considerable overhead, quite literally every pointer
+might have to be doubly-dereferenced. Without loss of generality, we have depicted
+a 2-element vector, but it could be a million-element vector, or a 100-element list.
+Such overhead in determining whether every pointer points to manually-managed
+memory is unacceptable.
+
+In contrast, the cost of reading the pointer "b" from "I" to "L" has to be paid
+no matter what. So confining the extra check for LAYOUT -> WRAPPER pointers to
+only the scan of instance header words represents a significant decrease from the
+theoretical maximum number of heap words that would be scanned using
+the pessimistic (or "conservative") approach. That is, treating as few
+pointers as possible as potential pointers to manual pools is to be preferred.
+
+However, a similar situation with code objects arises. A code object must be
+allowed to point directly to a LAYOUT because the code needs to assign the layout
+into an instance. Conceivably the code could point to the wrapper instead,
+but we don't necessarily have an extra machine register available exactly
+when needed in the allocation sequence - a register that would be needed to
+extract the layout from the wrapper. As with instance scanning, it should be
+relatively benign to perform a small amount of extra work in GC to facilitate
+assigning layouts in object constructors. This is definitely a trade-off,
+however, code blobs are not as frequently occurring as say cons cells,
+vectors, and general instances.

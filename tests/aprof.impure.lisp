@@ -9,27 +9,26 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(and x86-64 sb-thread) (sb-ext:exit :code 104) ;; not implemented elsewhere
+#-(and x86-64 sb-thread (not win32)) (sb-ext:exit :code 104) ;; not implemented elsewhere
 
+(defstruct fruitbasket x y z)
 (with-test (:name :aprof-smoketest-struct
+                  :skipped-on :darwin
             ;; reverse-engineering the allocation instructions fails but should not
-            :fails-on (or (not :immobile-space)
-                          :sb-safepoint))
+            :fails-on (not :immobile-space))
   (let ((nbytes
          (sb-aprof:aprof-run
             (checked-compile
              '(sb-int:named-lambda "test" ()
-                (declare (inline sb-thread:make-mutex)
+                (declare (inline make-fruitbasket)
                          (optimize sb-c::instrument-consing))
-                (loop repeat 50 collect (sb-thread:make-mutex))))
+                (loop repeat 50 collect (make-fruitbasket))))
             :stream nil)))
     (assert (= nbytes
-                (+ (* 51 2 sb-vm:n-word-bytes) ; list (extra for dummy head)
-                   (* 50 (sb-vm::primitive-object-size
-                          (sb-thread:make-mutex))))))))
+               (* 50 (+ (sb-ext:primitive-object-size (make-fruitbasket))
+                        (* 2 sb-vm:n-word-bytes))))))) ; cons cells
 
-(with-test (:name :aprof-smoketest-non-constant-size-vector
-            :broken-on :win32)
+(with-test (:name :aprof-smoketest-non-constant-size-vector)
   (let ((nbytes
          (sb-aprof:aprof-run
             (checked-compile
@@ -42,8 +41,7 @@
 ;;; The profiler's disassembler expected to see a store at alloc-ptr
 ;;; or that + n-word-bytes, when in fact the code might write to 1 byte
 ;;; positioned anywhere in the word after the object header.
-(with-test (:name :aprof-smoketest-bit-vector
-            :fails-on :win32)
+(with-test (:name :aprof-smoketest-bit-vector)
   (let ((nbytes
          (sb-aprof:aprof-run
             (checked-compile
@@ -51,11 +49,10 @@
                 (declare (optimize sb-c::instrument-consing))
                 (make-array (* 128 16) :element-type 'bit)))
             :stream nil)))
-    (assert (= nbytes (sb-vm::primitive-object-size
+    (assert (= nbytes (sb-ext:primitive-object-size
                        (make-array (* 128 16) :element-type 'bit))))))
 
-(with-test (:name :aprof-smoketest-large-vector
-            :fails-on :win32)
+(with-test (:name :aprof-smoketest-large-vector)
   (let ((nbytes
          (sb-aprof:aprof-run
              (checked-compile
@@ -71,17 +68,16 @@ sb-vm::
   (:node-var node)
   (:generator 1
     (let* ((bytes large-object-size) ; payload + header total
+           (temp sb-vm::r11-tn)
            (words (- (/ bytes n-word-bytes) vector-data-offset)))
-      (instrument-alloc bytes node)
+      (instrument-alloc nil bytes node temp)
       (pseudo-atomic ()
-       (allocation result bytes node nil other-pointer-lowtag)
-       (storew* simple-array-unsigned-byte-64-widetag result 0
-                other-pointer-lowtag t)
-       (storew* (fixnumize words) result vector-length-slot
-                other-pointer-lowtag t)))))
+       (allocation nil bytes 0 result node temp nil)
+       (storew* simple-array-unsigned-byte-64-widetag result 0 0 t)
+       (storew* (fixnumize words) result vector-length-slot 0 t)
+       (inst or :byte result other-pointer-lowtag)))))
 
-(with-test (:name :aprof-smoketest-large-vector-to-upper-register
-            :fails-on :win32)
+(with-test (:name :aprof-smoketest-large-vector-to-upper-register)
   (let ((nbytes
          (sb-aprof:aprof-run
              (checked-compile
@@ -101,60 +97,10 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (list* (load-time-value(gensym)) :if-exists x))
 
-#-win32
-(with-test (:name :aprof-list-length-2)
-  ;; Rather than figuring out how to get some minimal piece of Lisp code to
-  ;; compile into exactly these instruction encodings below which caused aprof
-  ;; to fail, just check the assembled code directly.
-  ;; (This special case for 2 conses caused aprof not to recognize the pattern)
-  (let ((bytes
-         (test-util:assemble
-          ;; our reader extension is semi-useless in that you can't read
-          ;; a symbol that didn't exist in the designated package, which is why
-          ;; some mnemonics below are spelled using string quotes.
-          sb-vm::
-          `(("INC" :qword ,(ea 1024 temp-reg-tn) :lock)
-            (mov ,(ea (* thread-pseudo-atomic-bits-slot 8) thread-base-tn) ,rbp-tn)
-            (mov ,r10-tn ,(ea (* thread-alloc-region-slot 8) thread-base-tn))
-            ("LEA" ,temp-reg-tn ,(ea (* 2 cons-size n-word-bytes) r10-tn))
-            (cmp ,temp-reg-tn ,(ea (* (1+ thread-alloc-region-slot) 8) thread-base-tn))
-            (jmp :a label)
-            (mov ,(ea (* thread-alloc-region-slot 8) thread-base-tn) ,temp-reg-tn)
-            (mov ,r9-tn ,(ea -56 rbp-tn)) ; arbitrary load
-            (mov ,(ea r10-tn) ,r9-tn)     ; store to newly allocated cons
-            ("LEA" ,r9-tn ,(ea (+ 16 list-pointer-lowtag) r10-tn))
-            (mov ,(ea 8 r10-tn) ,r9-tn)
-            (mov ,(ea 16 r10-tn) ,rsi-tn)
-            (mov :dword ,(ea 24 r10-tn) ,nil-value)
-            (or :byte ,r10-tn ,list-pointer-lowtag)))))
-    (sb-sys:with-pinned-objects (bytes)
-      (multiple-value-bind (type size)
-          (sb-aprof::infer-type (sb-sys:sap-int (sb-sys:vector-sap bytes)) bytes)
-        (assert (eq type 'list))
-        (assert (= size (* 2 sb-vm:cons-size sb-vm:n-word-bytes))))))
-  (compile 'f1)
-  (compile 'f2)
-  (assert (= (sb-aprof:aprof-run #'f1 :stream nil) 32))
-  (assert (= (sb-aprof:aprof-run #'f2 :stream nil) 32)))
-
-#-win32
-(with-test (:name :aprof-bignum)
-  (let ((bytes
-         (test-util:assemble
-          sb-vm::
-          `(("INC" :qword ,(ea 1024 temp-reg-tn) :lock)
-            (mov ,(ea (* thread-pseudo-atomic-bits-slot 8) thread-base-tn) ,rbp-tn)
-            (mov ,rcx-tn ,(ea (* thread-alloc-region-slot 8) thread-base-tn))
-            ("LEA" ,temp-reg-tn ,(ea (* 2 n-word-bytes) rcx-tn))
-            (cmp ,temp-reg-tn ,(ea (* (1+ thread-alloc-region-slot) 8) thread-base-tn))
-            (jmp :a label)
-            (mov ,(ea (* thread-alloc-region-slot 8) thread-base-tn) ,temp-reg-tn)
-            (mov :word ,(ea rcx-tn) ,(logior #x100 bignum-widetag))))))
-    (sb-sys:with-pinned-objects (bytes)
-      (multiple-value-bind (type size)
-          (sb-aprof::infer-type (sb-sys:sap-int (sb-sys:vector-sap bytes)) bytes)
-        (assert (eq type 'bignum))
-        (assert (= size (* 2 sb-vm:n-word-bytes)))))))
+(import '(sb-vm::rcx-tn sb-vm::rbp-tn sb-vm::r9-tn sb-vm::r10-tn sb-vm::rsi-tn
+          sb-vm:cons-size sb-vm:n-word-bytes
+          sb-vm::ea sb-vm:nil-value
+          sb-vm:list-pointer-lowtag sb-vm:bignum-widetag))
 
 (defstruct this-struct)
 (defstruct that-struct)
@@ -163,9 +109,7 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (values (make-this-struct) (make-that-struct)))
 (compile 'make-structs)
-#-win32
-(with-test (:name :aprof-instance
-            :fails-on :sb-safepoint)
+(with-test (:name :aprof-instance :skipped-on (not :immobile-space))
   (let (seen-this seen-that)
     (dolist (line (split-string
                    (with-output-to-string (s)
@@ -174,3 +118,48 @@ sb-vm::
       (when (search "THIS-STRUCT" line) (setq seen-this t))
       (when (search "THAT-STRUCT" line) (setq seen-that t)))
     (assert (and seen-this seen-that))))
+
+(defun my-list (&rest x)
+  (declare (optimize sb-c::instrument-consing))
+  x)
+(compile 'my-list)
+
+(with-test (:name :listify-rest-arg)
+  (let ((nbytes (let ((*standard-output* (make-broadcast-stream)))
+                  (sb-aprof:aprof-run #'my-list :arguments '(a b c)))))
+    (assert (= nbytes (* sb-vm:n-word-bytes 6)))))
+
+(defun make-new-code (n)
+  (let ((f
+         (compile nil
+                   '(lambda (n)
+                     (declare (optimize sb-c::instrument-consing))
+                     (make-array (the fixnum n))))))
+    (sb-aprof:aprof-reset) ; In case the counts are already nonzero
+    (loop for i below n
+       do (funcall f i))
+    f))
+(with-test (:name :make-new-code)
+  (let* ((n 20)
+         (nbytes (sb-aprof:aprof-run #'make-new-code :arguments n
+                                     :stream (make-broadcast-stream)
+                                     ;; FIXME: need to return nbytes with or without a report
+                                     #|:report nil|#
+                                     )))
+    ;; If the lisp image was compiled with cons profiling, then the COMPILE
+    ;; inside MAKE-NEW-CODE was also instrumented, messing up the result.
+    ;; (The compiler conses about ~128Kb but there's no way to predict how much)
+    (unless (sb-c:policy nil (> sb-c:instrument-consing 0))
+      (assert (= (loop for i below n
+                       sum (sb-ext:primitive-object-size (make-array i)))
+                 nbytes)))))
+
+(with-test (:name :aprof-brutal-test)
+  (with-scratch-file (fasl "fasl")
+    ;; Just compile anything that exercises the compiler.
+    ;; This is only useful if the compiler was compiled with cons profiling.
+    (sb-aprof:aprof-run #'compile-file
+                        :stream (make-broadcast-stream)
+                        :arguments `("../src/code/shaketree"
+                                     :output-file ,fasl
+                                     :print nil :verbose nil))))

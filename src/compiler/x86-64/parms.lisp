@@ -20,21 +20,18 @@
 (defconstant-eqx +fixup-kinds+ #(:absolute :relative :absolute64)
   #'equalp)
 
-;;; KLUDGE: It would seem natural to set this by asking our C runtime
-;;; code for it, but mostly we need it for GENESIS, which doesn't in
-;;; general have our C runtime code running to ask, so instead we set
-;;; it by hand. -- WHN 2001-04-15
-;;;
-;;; Actually any information that we can retrieve C-side would be
-;;; useless in SBCL, since it's possible for otherwise binary
-;;; compatible systems to return different values for getpagesize().
-;;; -- JES, 2007-01-06
+;;; This size is supposed to indicate something about the actual granularity
+;;; at which you can map memory.  We just hardwire it, but that may or may not
+;;; be necessary any more.
 (defconstant +backend-page-bytes+ #+win32 65536 #-win32 32768)
 
-;;; The size in bytes of GENCGC cards, i.e. the granularity at which
-;;; writes to old generations are logged.  With mprotect-based write
-;;; barriers, this must be a multiple of the OS page size.
-(defconstant gencgc-card-bytes +backend-page-bytes+)
+;;; The size in bytes of GENCGC pages. A page is the smallest amount of memory
+;;; that a thread can claim for a thread-local region, and also determines
+;;; the granularity at which we can find the start of a sequence of objects.
+(defconstant gencgc-page-bytes 32768)
+;;; The divisor relative to page-bytes which computes the granularity
+;;; at which writes to old generations are logged.
+(defconstant cards-per-page 32)
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding
@@ -63,35 +60,6 @@
 ;;; the natural width of a machine word (as seen in e.g. register width,
 ;;; address space)
 (defconstant n-machine-word-bits 64)
-
-(defconstant float-sign-shift 31)
-
-;;; comment from CMU CL:
-;;;   These values were taken from the alpha code. The values for
-;;;   bias and exponent min/max are not the same as shown in the 486 book.
-;;;   They may be correct for how Python uses them.
-(defconstant single-float-bias 126)    ; Intel says 127.
-(defconstant-eqx single-float-exponent-byte    (byte 8 23) #'equalp)
-(defconstant-eqx single-float-significand-byte (byte 23 0) #'equalp)
-;;; comment from CMU CL:
-;;;   The 486 book shows the exponent range -126 to +127. The Lisp
-;;;   code that uses these values seems to want already biased numbers.
-(defconstant single-float-normal-exponent-min 1)
-(defconstant single-float-normal-exponent-max 254)
-(defconstant single-float-hidden-bit (ash 1 23))
-
-(defconstant double-float-bias 1022)
-(defconstant-eqx double-float-exponent-byte    (byte 11 20) #'equalp)
-(defconstant-eqx double-float-significand-byte (byte 20 0)  #'equalp)
-(defconstant double-float-normal-exponent-min 1)
-(defconstant double-float-normal-exponent-max #x7FE)
-(defconstant double-float-hidden-bit (ash 1 20))
-
-(defconstant single-float-digits
-  (+ (byte-size single-float-significand-byte) 1))
-
-(defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) 32 1))
 
 ;;; from AMD64 Architecture manual
 (defconstant float-invalid-trap-bit       (ash 1 0))
@@ -124,20 +92,24 @@
 ;;; would be possible, but probably not worth the time and code bloat
 ;;; it would cause. -- JES, 2005-12-11
 
-#+linux
+#+(or linux darwin)
 (!gencgc-space-setup #x50000000
-                     :fixedobj-space-size #.(* 30 1024 1024)
+                     :read-only-space-size #+metaspace #.(* 2 1024 1024)
+                                           #-metaspace 0
+                     :fixedobj-space-size #.(* 40 1024 1024)
                      :varyobj-space-size #.(* 130 1024 1024)
                      :dynamic-space-start #x1000000000)
 
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
 ;;; run under the default 512M data size limit.
 
-#-linux
+#-(or linux darwin)
 (!gencgc-space-setup #x20000000
+                     #-win32 :read-only-space-size #-win32 0
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
 
+(defconstant linkage-table-growth-direction :up)
 (defconstant linkage-table-entry-size 16)
 
 
@@ -149,10 +121,14 @@
   fun-end-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
+  undefined-function-trap
   invalid-arg-count-trap
   memory-fault-emulation-trap
   #+sb-safepoint global-safepoint-trap
   #+sb-safepoint csp-safepoint-trap
+  uninitialized-load-trap
+  ;; ERROR-TRAP has to be numerically highest.
+  ;; The various internal errors are numbered from here upward.
   error-trap)
 
 ;;;; static symbols
@@ -170,6 +146,10 @@
 ;;;     Note these spaces grow from low to high addresses.
 (defvar *binding-stack-pointer*)
 
+;;; Bit indices into *CPU-FEATURE-BITS*
+(defconstant cpu-has-ymm-registers   0)
+(defconstant cpu-has-popcnt          1)
+
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
     #+(and immobile-space (not sb-thread)) function-layout
@@ -177,11 +157,9 @@
      ;; interrupt handling
     #-sb-thread *pseudo-atomic-bits*     ; ditto
     #-sb-thread *binding-stack-pointer* ; ditto
-    *cpuid-fn1-ecx*)
+    *cpu-feature-bits*)
   #'equalp)
 
-;;; FIXME: with #+immobile-space, this should be the empty list,
-;;; because *all* fdefns are permanently placed.
 (defconstant-eqx +static-fdefns+
   #(length
     two-arg-+
@@ -198,8 +176,22 @@
     two-arg-xor
     two-arg-gcd
     two-arg-lcm
+    ensure-symbol-hash
+    sb-impl::install-hash-table-lock
+    update-object-layout
     %coerce-callable-to-fun)
   #'equalp)
 
 #+sb-simd-pack
 (defglobal *simd-pack-element-types* '(integer single-float double-float))
+
+(defconstant undefined-fdefn-header
+  ;; This constant is constructed as follows: Take the INT opcode
+  ;; plus the undefined-fun trap byte, then the bytes of the 'disp' field
+  ;; of the JMP instruction that would overwrite the INT instruction.
+  ;;   INT3 <trap-code> = CC **
+  ;;   JMP [RIP+16]     = FF 25 10 00 00 00 00
+  ;; When assigning a function we'll change the first two bytes to 0xFF 0x25.
+  ;; The 'disp' field will aready be correct.
+  (logior (ash undefined-function-trap 8)
+          (+ #x100000 (or #+int4-breakpoints #xCE #xCC))))

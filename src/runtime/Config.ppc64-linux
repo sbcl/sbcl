@@ -9,20 +9,17 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -m64
-LINKFLAGS += -rdynamic -m64
-NM = ./linux-nm
+CFLAGS += -m64 -std=gnu99
+LINKFLAGS += -m64 -Wl,--export-dynamic
 
-ASSEM_SRC = ppc64-assem.S ldso-stubs.S
+ASSEM_SRC = ppc64-assem.S
 ARCH_SRC = ppc-arch.c
 
 OS_SRC = linux-os.c linux-mman.c ppc-linux-os.c
-OS_LIBS = -ldl
+OS_LIBS = -ldl -Wl,-no-as-needed
 
 ifdef LISP_FEATURE_GENCGC
   GC_SRC = fullcgc.c gencgc.c traceroot.c
-else
-  GC_SRC = cheneygc.c
 endif
 
 ifdef LISP_FEATURE_SB_THREAD

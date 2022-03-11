@@ -57,7 +57,7 @@
 ;;; operand, but this seems unworthwhile.
 ;;;
 (define-vop (push-values)
-  (:args (vals :more t))
+  (:args (vals :more t :scs (descriptor-reg any-reg control-stack)))
   (:results (start :scs (any-reg) :from :load)
             (count :scs (any-reg)))
   (:info nvals)
@@ -71,7 +71,7 @@
         ((null val))
       (let ((tn (tn-ref-tn val)))
         (sc-case tn
-          (descriptor-reg
+          ((descriptor-reg any-reg)
            (storew tn start i))
           (control-stack
            (load-stack-tn temp tn)
@@ -107,40 +107,27 @@
 
     DONE
     (inst sub count csp-tn start)
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst srai count count (- word-shift n-fixnum-tag-bits)))))
+    (with-word-index-as-fixnum (count count))))
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg immediate))
          (num :scs (any-reg) :target count))
-  (:arg-types * positive-fixnum positive-fixnum)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 0)) src)
   (:temporary (:sc any-reg :from (:argument 2)) dst)
   (:temporary (:sc descriptor-reg) temp)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (immediate
-       (inst addi src context (* (tn-value skip) n-word-bytes)))
-      (any-reg
-       (cond ((zerop (- word-shift n-fixnum-tag-bits))
-              (inst add src context skip))
-             (t
-              (inst slli temp skip (- word-shift n-fixnum-tag-bits))
-              (inst add src context temp)))))
+    (move src context)
     (move count num)
     (move start csp-tn)
     (inst beq count zero-tn done)
     (move dst start)
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst add csp-tn csp-tn count))
-          (t
-           (inst slli temp count (- word-shift n-fixnum-tag-bits))
-           (inst add csp-tn csp-tn temp)))
+    (with-fixnum-as-word-index (count temp)
+      (inst add csp-tn csp-tn count))
     LOOP
     (loadw temp src 0)
     (storew temp dst 0)

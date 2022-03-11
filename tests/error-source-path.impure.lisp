@@ -93,6 +93,62 @@
   (assert-condition-source-paths (declare (1)) (1))
   (assert-condition-source-paths (declare (type integer) (1)) (2)))
 
+(with-test (:name (:source-path defclass :slot :type :initform))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type string :initform 1)))
+   (0 3))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type string :initform (+ 1 5))))
+   (4 0 3)))
+
+(with-test (:name (:source-path defclass :slot :type :malformed))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type 1)))
+   (0 3))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type (null cons))))
+   (2 0 3))
+  (assert-condition-source-paths
+   (define-condition foo () ((x :type 1)))
+   (0 3))
+  (assert-condition-source-paths
+   (define-condition foo () ((x :type (null cons))))
+   (2 0 3)))
+
+(with-test (:name (:source-path :&key :initform))
+  (assert-condition-source-paths
+   (defun foo (&key (x 15))
+     (declare (float x))
+     x)
+   (1 2))
+  (assert-condition-source-paths
+   (defun foo (&key (x /))
+     (declare (float x))
+     x)
+   (1 2))
+  (assert-condition-source-paths
+   (defun foo (&key (x (print 16)))
+     (declare (float x))
+     x)
+   (1 1 2)))
+
+(with-test (:name (:source-path :defstruct :initform))
+  (assert-condition-source-paths
+   (locally (declare (optimize (safety 0)))
+    (defstruct f
+      (x (print t) :type fixnum)))
+   (2 2))
+  (assert-condition-source-paths
+   (locally (declare (optimize (safety 0)))
+     (defstruct f
+       (x 33 :type cons)))
+   (2 2))
+  (assert-condition-source-paths
+   (locally (declare (optimize (safety 0)))
+     (defstruct f
+       (x mm)))
+   (2 2)))
+
 (with-test (:name (:source-path defgeneric :lambda-list))
   (assert-condition-source-paths
    (defgeneric foo (x x))
@@ -110,6 +166,16 @@
   (assert-condition-source-paths
    (defmethod using-deprecated ((thing deprecated-class)))
    (0 2)))
+
+(with-test (:name (:source-path defclass deprecated :slot :type))
+  (assert-condition-source-paths
+   (defclass foo ()
+     ((bar :type deprecated-class)))
+   (0 3))
+  (assert-condition-source-paths
+   (define-condition foo ()
+     ((bar :type deprecated-class)))
+   (0 3)))
 
 (with-test (:name (:source-path defmethod :walk-body))
   (assert-condition-source-paths
@@ -207,3 +273,56 @@
   (assert-condition-source-paths
    (let* #())
    ()))
+
+(with-test (:name (:source-path typep :invalid-type-specifier))
+  (assert-condition-source-paths
+   (typep 1 'undefined-type)
+   ;; both the style-warning and the note count
+   (2) (2)))
+
+(with-test (:name :dead-code-note-after-transforms)
+  (assert
+   (typep (nth-value 4
+                     (checked-compile
+                      `(lambda (x)
+                         (when nil
+                           (funcall x)))))
+          '(cons sb-ext:code-deletion-note null))))
+
+(with-test (:name :ignore-deleted-subforms)
+  (assert-condition-source-paths
+   (lambda (x m)
+     (when nil
+       (funcall x
+                (if m
+                    (print 20)
+                    (print x)))))
+   (2 2)))
+
+(with-test (:name :ignore-deleted-subforms.2)
+  (assert-condition-source-paths
+   (lambda ()
+     (when nil
+       (let ((z (print 10)))
+         z)))
+   (2 2)))
+
+(with-test (:name :ignore-deleted-subforms.3)
+  (assert-condition-source-paths
+   (lambda (x)
+     (when x
+       (unless x
+         (let ((z (print 10)))
+           (if z
+               10
+               (funcall x))))))
+   (2 2 2)))
+
+(with-test (:name :ignore-deleted-subforms.4)
+  (assert-condition-source-paths
+   (lambda (x)
+     (when nil
+       (if (print 10)
+           10
+           x)))
+   (2 2)))

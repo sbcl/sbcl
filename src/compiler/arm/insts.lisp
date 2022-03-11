@@ -14,11 +14,11 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(conditional-opcode emit-word
+  (import '(conditional-opcode negate-condition emit-word
             composite-immediate-instruction encodable-immediate
             lsl lsr asr ror cpsr @) "SB-VM")
   ;; Imports from SB-VM into this package
-  (import '(sb-vm::nil-value sb-vm::registers sb-vm::null-tn sb-vm::null-offset
+  (import '(sb-vm:nil-value sb-vm::registers sb-vm::null-tn sb-vm::null-offset
             sb-vm::pc-tn sb-vm::pc-offset sb-vm::code-offset)))
 
 
@@ -40,7 +40,7 @@
     (:le . 13)
     (:al . 14))
   #'equal)
-(defconstant-eqx sb-vm::+condition-name-vec+
+(defconstant-eqx +condition-name-vec+
   #.(let ((vec (make-array 16 :initial-element nil)))
       (dolist (cond +conditions+ vec)
         (when (null (aref vec (cdr cond)))
@@ -49,6 +49,9 @@
 
 (defun conditional-opcode (condition)
   (cdr (assoc condition +conditions+ :test #'eq)))
+(defun negate-condition (name)
+  (let ((code (logxor 1 (conditional-opcode name))))
+    (aref +condition-name-vec+ code)))
 
 ;;;; disassembler field definitions
 
@@ -151,6 +154,33 @@
   (opcode-0 :field (byte 1 4))
   (rn :field (byte 4 16) :type 'reg)
   (rd :field (byte 4 12) :type 'reg))
+
+;;; Not sure if we can coerce our disassembler to print anything resembling this:
+;;; <LDM|STM>{cond}<FD|ED|FA|EA|IA|IB|DA|DB> Rn{!},<Rlist>{^} where:
+;;;   {cond}  two-character condition mnemonic. See Table 4-2: Condition code
+;;;           summary on page 4-5.
+;;;   Rn      is an expression evaluating to a valid register number
+;;;   <Rlist> is a list of registers and register ranges enclosed in {} (For example,
+;;;           {R0,R2-R7,R10}).
+;;;   {!}     if present requests write-back (W=1), otherwise W=0
+;;;   {^}     if present set S bit to load the CPSR along with the PC, or force transfer
+;;;           of user bank when in privileged mode
+;;; not to mention the alternative mnemonics PUSH and POP
+;;; when using the native stack pointer as base register.
+(define-instruction-format
+    ;; This is just to show something in the disassembly other than BYTE ...
+    (ldm/stm 32 :default-printer '(:name cond :tab bits ", " rn ", " reglist))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-3 :field (byte 3 25))
+  (bits :field (byte 4 21)) ; complicated
+  (opcode-l :field (byte 1 20))
+  (rn :field (byte 4 16) :type 'reg)
+  (reglist :field (byte 16 0)
+           :printer (lambda (value stream dstate)
+                      (declare (ignore dstate))
+                      (format stream "{~{R~d~^,~}}"
+                              (loop for i below 16
+                                    when (logbitp i value) collect i)))))
 
 (define-instruction-format (swi 32
                             :default-printer '(:name cond :tab "#" swi-number))
@@ -689,6 +719,31 @@
 (define-data-processing-instruction movs #x1b t nil)
 (define-data-processing-instruction mvn  #x1e t nil)
 (define-data-processing-instruction mvns #x1f t nil)
+
+(define-instruction-format (movw-format 32
+                            :default-printer '(:name :tab rd ", #" immediate))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-8 :field (byte 8 20))
+  (immediate :fields (list (byte 4 16) (byte 12 0))
+             :prefilter (lambda (dstate high low)
+                          (declare (ignore dstate))
+                          (logior (ash high 12) low)))
+  (rd :field (byte 4 12) :type 'reg))
+
+(macrolet ((mov-imm-16 (segment rd imm half)
+             `(emit-dp-instruction ,segment 14 #b00 #b1
+                                   ,(ecase half
+                                      (:low  #b10000)
+                                      (:high #b10100))
+                                   (ldb (byte 4 12) ,imm)
+                                   (tn-offset ,rd)
+                                   (ldb (byte 12 0) ,imm))))
+(define-instruction movw (segment rd imm) ; move wide (zero-extend)
+  (:printer movw-format ((opcode-8 #b00110000)))
+  (:emitter (mov-imm-16 segment rd imm :low)))
+(define-instruction movt (segment rd imm) ; move top bits (and keep bottom)
+  (:printer movw-format ((opcode-8 #b00110100)))
+  (:emitter (mov-imm-16 segment rd imm :high))))
 
 ;;;; Exception-generating instructions
 
@@ -725,10 +780,10 @@
 ;;; generation instruction, or breakpoint.
 (define-instruction debug-trap (segment)
   (:printer debug-trap ((opcode-32 #+linux #xe7f001f0
-                                   #+netbsd #xe7ffdefe))
+                                   #+(or netbsd openbsd) #xe7ffdefe))
             :default :control #'debug-trap-control)
   (:emitter
-   (emit-word segment #+linux #xe7f001f0 #+netbsd #xe7ffdefe)))
+   (emit-word segment #+linux #xe7f001f0 #+(or netbsd openbsd) #xe7ffdefe)))
 
 ;;;; Miscellaneous arithmetic instructions
 
@@ -1050,6 +1105,11 @@
   (define-load/store-instruction str :store :word)
   (define-load/store-instruction strb :store :byte))
 
+(define-instruction ldm (segment &rest args) ; load multiple
+  (:printer ldm/stm ((opcode-3 #b100) (opcode-l 1))))
+(define-instruction stm (segment &rest args) ; store multiple
+  (:printer ldm/stm ((opcode-3 #b100) (opcode-l 0))))
+
 ;;; Emit a miscellaneous load/store instruction.  CONDITION is a
 ;;; condition code name, OPCODE1 is the low bit of the first opcode
 ;;; field, OPCODE2 is the second opcode field, DATA is a register TN
@@ -1251,6 +1311,9 @@
 (define-instruction load-from-label (segment &rest args)
   (:vop-var vop)
   (:emitter
+   ;; ISTM this use of an interior-pointer is unnecessary. Since we know the
+   ;; displacement of the label from the base of the CODE, we could load
+   ;; either from [code+X] or [PC+X] where X is in an unsigned-reg.
    (with-condition-defaulted (args (condition dest lip label))
      ;; We can load the word addressed by a label in a single
      ;; instruction if the overall offset puts it to within a 12-bit
@@ -1259,7 +1322,7 @@
      ;; apply the final 12 bits with LDR.  For now, we'll allow up to 20
      ;; bits of displacement, as that should be easy to implement, and a
      ;; megabyte large code object is already a bit unwieldly.  If
-     ;; neccessary, we can expand to a 28 bit displacement.
+     ;; necessary, we can expand to a 28 bit displacement.
      (labels ((compute-delta (position &optional magic-value)
                 (- (label-position label
                                    (when magic-value position)
@@ -1702,3 +1765,47 @@
 (define-two-reg-transfer-fp-instruction fmrrs :single :to-arm)
 (define-two-reg-transfer-fp-instruction fmdrr :double :from-arm)
 (define-two-reg-transfer-fp-instruction fmrrd :double :to-arm)
+
+(sb-assem::%def-inst-encoder
+ '.layout-id
+ (lambda (segment layout)
+   (sb-c:note-fixup segment :layout-id (sb-c:make-fixup layout :layout-id))))
+
+(defun sb-vm:fixup-code-object (code offset value kind flavor)
+  (declare (type index offset) (ignore flavor))
+  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+    (error "Unaligned instruction?  offset=#x~X." offset))
+  (let ((sap (code-instructions code)))
+    (ecase kind
+      (:layout-id
+       (aver (typep value '(unsigned-byte 24)))
+       (setf (sap-ref-word sap offset)
+             (dpb (ldb (byte 8 16) value) (byte 8 0) (sap-ref-word sap offset))
+             (sap-ref-word sap (+ offset 4))
+             (dpb (ldb (byte 8  8) value) (byte 8 0) (sap-ref-word sap (+ offset 4)))
+             (sap-ref-word sap (+ offset 8))
+             (dpb (ldb (byte 8  0) value) (byte 8 0) (sap-ref-word sap (+ offset 8)))))
+      (:absolute
+       (setf (sap-ref-32 sap offset) value))))
+  nil)
+
+(define-instruction store-coverage-mark (segment mark-index temp)
+  (:emitter
+   ;; No backpatch is needed to compute the offset into the code header
+   ;; because COMPONENT-HEADER-LENGTH is known at this point.
+   (let* ((offset (+ (component-header-length)
+                     ;; skip over jump table word and entries
+                     (* (1+ (component-n-jump-table-entries))
+                        n-word-bytes)
+                     mark-index
+                     (- other-pointer-lowtag)))
+          (addr
+           (@ sb-vm::code-tn
+              (etypecase offset
+                ((integer 0 4095) offset)
+                ((unsigned-byte 31)
+                 (inst* segment 'movw temp (logand offset #xffff))
+                 (when (ldb-test (byte 16 16) offset)
+                   (inst* segment 'movt temp (ldb (byte 16 16) offset)))
+                 temp)))))
+     (inst* segment 'strb sb-vm::null-tn addr))))

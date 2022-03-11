@@ -3,41 +3,45 @@
 #include <errno.h>
 
 #include "genesis/config.h"
+#include "genesis/constants.h"
+#include "globals.h"
 #include "os.h"
 #include "interr.h"
+#include "sys_mmap.inc"
 
 os_vm_address_t
-os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
+            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
 {
+    int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
+    attributes &= ~IS_GUARD_PAGE;
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     os_vm_address_t actual;
 
-#ifdef LISP_FEATURE_ALPHA
-    if (!addr) {
-        addr=under_2gb_free_pointer;
-    }
-#endif
 #ifdef MAP_32BIT
-    if (movable & MOVABLE_LOW)
+    if (attributes & ALLOCATE_LOW)
         flags |= MAP_32BIT;
 #endif
-    actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+    actual = sbcl_mmap(addr, len, protection, flags, -1, 0);
     if (actual == MAP_FAILED) {
         perror("mmap");
         return 0;               /* caller should check this */
     }
 
-    if (!movable && (addr!=actual)) {
-        fprintf(stderr, "mmap: wanted %lu bytes at %p, actually mapped at %p\n",
+    // If requested addr was 0, the MOVABLE attribute means nothing.
+    if (addr && !(attributes & MOVABLE) && (addr != actual)) {
+        fprintf(stderr, "mmap: wanted %lu bytes at %p, actually mapped at %p\n"
+                "Dump of /proc/self/maps:\n",
                 (unsigned long) len, addr, actual);
+        FILE *maps = fopen("/proc/self/maps","r");
+        if (maps) {
+            char line[512];
+            while (fgets(line, sizeof line, maps))
+                ignore_value(write(2, line, strlen(line)));
+            fclose(maps);
+        }
         return 0;
     }
-
-#ifdef LISP_FEATURE_ALPHA
-
-    len=(len+(os_vm_page_size-1))&(~(os_vm_page_size-1));
-    under_2gb_free_pointer+=len;
-#endif
 
     return actual;
 }
@@ -45,7 +49,7 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
 void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
-    if (munmap(addr,len) == -1) {
+    if (sbcl_munmap(addr,len) == -1) {
         perror("munmap");
     }
 }

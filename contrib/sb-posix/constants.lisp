@@ -6,6 +6,7 @@
 (#||#
  "sys/types.h"
  "sys/stat.h"
+ #+haiku "sys/time.h"
  #-win32 "utime.h"
  #-win32 "sys/socket.h"
  #-win32 "sys/un.h"

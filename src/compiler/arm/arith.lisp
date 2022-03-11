@@ -436,28 +436,22 @@
     (inst bic result temp fixnum-tag-mask)))
 
 ;;; Only the lower 5 bits of the shift amount are significant.
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg))
-         (amount :scs (signed-reg)))
-  (:arg-types unsigned-num tagged-num)
-  (:temporary (:sc signed-reg) temp)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "SHIFT-TOWARDS-START")
-  (:generator 1
-    (inst and temp amount #b11111)
-    (inst mov r (lsr num temp))))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "SHIFT-TOWARDS-END")
-  (:generator 1
-    (inst and temp amount #b11111)
-    (inst mov r (lsl num temp))))
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg))
+                       (amount :scs (signed-reg)))
+                (:arg-types unsigned-num tagged-num)
+                (:temporary (:sc signed-reg) temp)
+                (:results (r :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 1
+                  (inst and temp amount #b11111)
+                  (inst mov r (,operation num temp))))))
+  (define shift-towards-start lsr)
+  (define shift-towards-end   lsl))
 
 (define-vop (signed-byte-32-len)
   (:translate integer-length)

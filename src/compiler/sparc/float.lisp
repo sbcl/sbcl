@@ -1305,7 +1305,7 @@
   (:generator 3
     (let ((nfp (current-nfp-tn vop))
           (offset (* n-word-bytes (tn-offset temp))))
-      (pseudo-atomic ()
+      (pseudo-atomic (my-fsr)
         ;; Get the current FSR, so we can get the new %fcc's
         (inst stxfsr nfp offset)
         (inst ldx my-fsr nfp offset)

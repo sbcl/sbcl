@@ -17,7 +17,7 @@
 (declaim (type byte-buffer *byte-buffer*))
 (defvar *contexts*)
 (declaim (type (vector t) *contexts*))
-
+(defvar *local-call-context*)
 
 ;;;; debug blocks
 
@@ -38,11 +38,12 @@
   ;; The VOP that emitted this location (for node, save-set, ir2-block, etc.)
   (vop nil :type vop))
 
-(def!struct (restart-location
+(defstruct (restart-location
             (:constructor make-restart-location (&optional label tn))
             (:copier nil))
   (label nil :type (or null label))
   (tn nil :type (or null tn) :read-only t))
+(!set-load-form-method restart-location (:xc :target) :ignore-it)
 
 ;;; This is called during code generation in places where there is an
 ;;; "interesting" location: someplace where we are likely to end up
@@ -77,10 +78,10 @@
                          (- posn (segment-header-skew segment))))))
   (values))
 
-#-sb-fluid (declaim (inline ir2-block-physenv))
-(defun ir2-block-physenv (2block)
+(declaim (inline ir2-block-environment))
+(defun ir2-block-environment (2block)
   (declare (type ir2-block 2block))
-  (block-physenv (ir2-block-block 2block)))
+  (block-environment (ir2-block-block 2block)))
 
 (defun make-lexenv-var-cache (lexenv)
   (or (lexenv-var-cache lexenv)
@@ -104,6 +105,37 @@
 (defun leaf-visible-to-debugger-p (leaf node)
   (gethash leaf (make-lexenv-var-cache (node-lexenv node))))
 
+(defun optional-leaf-p (leaf)
+  (let ((home (lambda-var-home leaf)))
+    (case (functional-kind home)
+      (:external
+       (let ((entry (lambda-entry-fun home)))
+         (when (optional-dispatch-p entry)
+           (let ((pos (position leaf (lambda-vars home))))
+             (and pos
+                  (>= (1- pos) (optional-dispatch-min-args entry))))))))))
+
+;;; Type checks of the arguments in an external function happen before
+;;; all the &optionals are initialized. PROPAGATE-TO-ARGS marks such
+;;; locations with the entry point, which allows to deduce if an
+;;; optional is alive at that point.
+(defun optional-processed (leaf)
+  (let ((home (lambda-var-home leaf)))
+    (case (functional-kind home)
+      (:external
+       (let ((entry (lambda-entry-fun home)))
+         (if (and (optional-dispatch-p entry)
+                  *local-call-context*)
+             (let ((pos (position leaf (lambda-vars home)))
+                   (entry-pos (position *local-call-context*
+                                        (optional-dispatch-entry-points entry)
+                                        :key #'force)))
+               (not (and pos
+                         entry-pos
+                         (>= (1- pos) (+ (optional-dispatch-min-args entry) entry-pos)))))
+             t)))
+      (t t))))
+
 ;;; Given a local conflicts vector and an IR2 block to represent the
 ;;; set of live TNs, and the VAR-LOCS hash-table representing the
 ;;; variables dumped, compute a bit-vector representing the set of
@@ -126,9 +158,11 @@
                                     '(:environment :debug-environment)))
                        (leaf-visible-to-debugger-p leaf node))
                    (or (null spilled)
-                       (not (member tn spilled))))
+                       (not (member tn spilled)))
+                   (optional-processed leaf))
           (let ((num (gethash leaf var-locs)))
             (when num
+
               (setf (sbit res num) 1))))))
     res))
 
@@ -173,6 +207,12 @@
   (let* ((byte-buffer *byte-buffer*)
          (stepping (and (combination-p node)
                         (combination-step-info node)))
+         (*local-call-context*
+           (if (local-call-context-p context)
+               (local-call-context-fun context)))
+         (context (if (local-call-context-p context)
+                      (local-call-context-var context)
+                      context))
          (live (and live
                     (compute-live-vars live node block var-locs vop)))
          (anything-alive (and live
@@ -272,13 +312,13 @@
   (let ((*previous-location* 0)
         *previous-live*
         *previous-form-number*
-        (physenv (lambda-physenv fun))
+        (env (lambda-environment fun))
         (byte-buffer *byte-buffer*)
         prev-block
         locations
         elsewhere-locations)
     (setf (fill-pointer byte-buffer) 0)
-    (do-physenv-ir2-blocks (2block physenv)
+    (do-environment-ir2-blocks (2block env)
       (let ((block (ir2-block-block 2block)))
         (when (eq (block-info block) 2block)
           (when prev-block
@@ -305,20 +345,19 @@
   (declare (type source-info info))
   (let ((file-info (get-toplevelish-file-info info)))
     (multiple-value-call
-        (if function #'sb-c::make-core-debug-source #'make-debug-source)
-     :compiled (source-info-start-time info)
+        (if function 'sb-di::make-core-debug-source 'make-debug-source)
      :namestring (or *source-namestring*
                      (make-file-info-namestring
                       (let ((pathname
                              (case *name-context-file-path-selector*
-                               (pathname (file-info-untruename file-info))
-                               (truename (file-info-name file-info)))))
+                               (pathname (file-info-pathname file-info))
+                               (truename (file-info-truename file-info)))))
                         (if (pathnamep pathname) pathname))
                       file-info))
      :created (file-info-write-date file-info)
      (if function
          (values :form (let ((direct-file-info (source-info-file-info info)))
-                         (when (eq :lisp (file-info-name direct-file-info))
+                         (when (eq :lisp (file-info-truename direct-file-info))
                            (elt (file-info-forms direct-file-info) 0)))
                  :function function)
          (values)))))
@@ -366,12 +405,12 @@
       (if (zerop length)
           #()
           (logically-readonlyize
-           (sb-xc:coerce seq
-                         `(simple-array
-                            ,(smallest-element-type (max max-positive
-                                                         (1- max-negative))
-                                                    (plusp max-negative))
-                            1)))))))
+           (coerce seq
+                   `(simple-array
+                     ,(smallest-element-type (max max-positive
+                                                  (1- max-negative))
+                                             (plusp max-negative))
+                     1)))))))
 
 (defun compact-vector (sequence)
   (cond ((and (= (length sequence) 1)
@@ -387,16 +426,6 @@
   (declare (type tn tn))
   (make-sc+offset (sc-number (tn-sc tn))
                   (tn-offset tn)))
-
-(defun lambda-ancestor-p (maybe-ancestor maybe-descendant)
-  (declare (type clambda maybe-ancestor)
-           (type (or clambda null) maybe-descendant))
-  (loop
-     (when (eq maybe-ancestor maybe-descendant)
-       (return t))
-     (setf maybe-descendant (lambda-parent maybe-descendant))
-     (when (null maybe-descendant)
-       (return nil))))
 
 ;;; Dump info to represent VAR's location being TN. ID is an integer
 ;;; that makes VAR's name unique in the function. BUFFER is the vector
@@ -416,10 +445,12 @@
          (info (lambda-var-arg-info var))
          (indirect (and (lambda-var-indirect var)
                         (not (lambda-var-explicit-value-cell var))
-                        (neq (lambda-physenv fun)
-                             (lambda-physenv (lambda-var-home var)))))
+                        (neq (lambda-environment fun)
+                             (lambda-environment (lambda-var-home var)))))
+         ;; Keep this condition in sync with PARSE-COMPILED-DEBUG-VARS
+         (large-fixnums (>= (integer-length most-positive-fixnum) 62))
          more)
-    (declare (type index flags))
+    (declare (type (and sb-xc:fixnum unsigned-byte) flags))
     (when minimal
       (setq flags (logior flags compiled-debug-var-minimal-p))
       (unless (and tn (tn-offset tn))
@@ -429,7 +460,9 @@
                         (null (basic-var-sets var))))
                (not (gethash tn (ir2-component-spilled-tns
                                  (component-info *component-being-compiled*))))
-               (lambda-ancestor-p (lambda-var-home var) fun))
+               (lexenv-contains-lambda fun
+                                       (lambda-lexenv (lambda-var-home var)))
+               (not (optional-leaf-p var))) ;; not always initialized
       (setq flags (logior flags compiled-debug-var-environment-live)))
     (when save-tn
       (setq flags (logior flags compiled-debug-var-save-loc-p)))
@@ -446,18 +479,17 @@
     (when (and same-name-p
                (not (or more minimal)))
       (setf flags (logior flags compiled-debug-var-same-name-p)))
-    #+64-bit ; FIXME: fails if SB-VM:N-FIXNUM-TAG-BITS is 3
-              ; which early-vm.lisp claims to work
-    (cond (indirect
-           (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
-           (when save-tn
-             (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))
-          (t
-           (if (and tn (tn-offset tn))
-               (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
-               (aver minimal))
-           (when save-tn
-             (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn)))))
+    (when large-fixnums
+      (cond (indirect
+             (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
+             (when save-tn
+               (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))
+            (t
+             (if (and tn (tn-offset tn))
+                 (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
+                 (aver minimal))
+             (when save-tn
+               (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))))
     (vector-push-extend flags buffer)
     (unless (or minimal
                 same-name-p
@@ -475,14 +507,12 @@
            ;; accessed through a saved frame pointer.
            ;; The first one/two sc-offsets are for the frame pointer,
            ;; the third is for the stack offset.
-           #-64-bit
-           (vector-push-extend (tn-sc+offset tn) buffer)
-           #-64-bit
-           (when save-tn
-             (vector-push-extend (tn-sc+offset save-tn) buffer))
+           (unless large-fixnums
+             (vector-push-extend (tn-sc+offset tn) buffer)
+             (when save-tn
+               (vector-push-extend (tn-sc+offset save-tn) buffer)))
            (vector-push-extend (tn-sc+offset (leaf-info var)) buffer))
-          #-64-bit
-          (t
+          ((not large-fixnums)
            (if (and tn (tn-offset tn))
                (vector-push-extend (tn-sc+offset tn) buffer)
                (aver minimal))
@@ -520,7 +550,7 @@
                  (frob-leaf leaf (leaf-info leaf) gensym-p))))
       (frob-lambda fun t)
       (when (>= level 1)
-        (dolist (x (ir2-physenv-closure (physenv-info (lambda-physenv fun))))
+        (dolist (x (ir2-environment-closure (environment-info (lambda-environment fun))))
           (let ((thing (car x)))
             (when (lambda-var-p thing)
               (frob-leaf thing (cdr x) (>= level 2)))))
@@ -628,9 +658,9 @@
 ;;;; debug functions
 
 ;;; Return a C-D-F structure with all the mandatory slots filled in.
-(defun dfun-from-fun (fun)
+(defun dfun-from-fun (fun tlf)
   (declare (type clambda fun))
-  (let* ((2env (physenv-info (lambda-physenv fun)))
+  (let* ((2env (environment-info (lambda-environment fun)))
          (dispatch (lambda-optional-dispatch fun))
          (main-p (and dispatch
                       (eq fun (optional-dispatch-main-entry dispatch))))
@@ -649,37 +679,46 @@
                       (second name))
                      (t
                       name))
-                   name)))
+                   name))
+         (encoded-locs
+           (cdf-encode-locs
+            (label-position (ir2-environment-environment-start 2env))
+            (label-position (ir2-environment-elsewhere-start 2env))
+            (source-path-form-number (node-source-path (lambda-bind fun)))
+            (label-position (block-label (lambda-block fun)))
+            (when (ir2-environment-closure-save-tn 2env)
+              (tn-sc+offset (ir2-environment-closure-save-tn 2env)))
+            #+unwind-to-frame-and-call-vop
+            (when (ir2-environment-bsp-save-tn 2env)
+              (tn-sc+offset (ir2-environment-bsp-save-tn 2env)))
+            #-fp-and-pc-standard-save
+            (label-position (ir2-environment-lra-saved-pc 2env))
+            #-fp-and-pc-standard-save
+            (label-position (ir2-environment-cfp-saved-pc 2env)))))
     (funcall (compiled-debug-fun-ctor kind)
              :name name
              #-fp-and-pc-standard-save :return-pc
-             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc 2env))
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-return-pc 2env))
              #-fp-and-pc-standard-save :return-pc-pass
-             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc-pass 2env))
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-return-pc-pass 2env))
              #-fp-and-pc-standard-save :old-fp
-             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-old-fp 2env))
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-old-fp 2env))
              :encoded-locs
-             (cdf-encode-locs
-              (label-position (ir2-physenv-environment-start 2env))
-              (label-position (ir2-physenv-elsewhere-start 2env))
-              (source-path-form-number (node-source-path (lambda-bind fun)))
-              (label-position (block-label (lambda-block fun)))
-              (when (ir2-physenv-closure-save-tn 2env)
-                (tn-sc+offset (ir2-physenv-closure-save-tn 2env)))
-              #+unwind-to-frame-and-call-vop
-              (when (ir2-physenv-bsp-save-tn 2env)
-                (tn-sc+offset (ir2-physenv-bsp-save-tn 2env)))
-              #-fp-and-pc-standard-save
-              (label-position (ir2-physenv-lra-saved-pc 2env))
-              #-fp-and-pc-standard-save
-              (label-position (ir2-physenv-cfp-saved-pc 2env))))))
+             (if tlf
+                 (cons (pack-tlf-num+offset
+                        tlf
+                        (aref (file-info-positions
+                               (source-info-file-info *source-info*))
+                              tlf))
+                       encoded-locs)
+                 encoded-locs))))
 
 ;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as
 ;;; appropriate.
-(defun compute-1-debug-fun (fun var-locs)
+(defun compute-1-debug-fun (fun var-locs tlf)
   (declare (type clambda fun) (type hash-table var-locs))
-  (let* ((dfun (dfun-from-fun fun))
+  (let* ((dfun (dfun-from-fun fun tlf))
          (actual-level (policy (lambda-bind fun) compute-debug-fun))
          (level (cond #+sb-dyncount
                       (*collect-dynamic-statistics*
@@ -722,6 +761,18 @@
         do (setf (compiled-debug-fun-next fun) next))
   (car sorted))
 
+(defun empty-fun-p (fun)
+  (let* ((2block (block-info (lambda-block fun)))
+         (start (ir2-block-start-vop 2block))
+         (next (ir2-block-next 2block)))
+    (and
+     start
+     (eq start (ir2-block-last-vop 2block))
+     (eq (vop-name start) 'note-environment-start)
+     next
+     (neq (ir2-block-environment 2block)
+          (ir2-block-environment next)))))
+
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.
 (defun debug-info-for-component (component)
@@ -737,13 +788,24 @@
                                 :adjustable t))
         component-tlf-num)
     (dolist (lambda (component-lambdas component))
-      (clrhash var-locs)
-      (let ((tlf-num (source-path-tlf-number
-                      (node-source-path (lambda-bind lambda)))))
-        (if component-tlf-num
-            (aver (= component-tlf-num tlf-num))
-            (setf component-tlf-num tlf-num))
-        (push (compute-1-debug-fun lambda var-locs) dfuns)))
+      (unless (empty-fun-p lambda)
+        (let ((tlf-num (source-path-tlf-number
+                        (node-source-path (lambda-bind lambda)))))
+          (cond ((not component-tlf-num)
+                 (setf component-tlf-num tlf-num))
+                ((= component-tlf-num tlf-num))
+                ((block-compile *compilation*)
+                 (setf component-tlf-num :multiple)
+                 (return))
+                (t
+                 (bug "tlf-num mismatch"))))))
+    (dolist (lambda (component-lambdas component))
+      (unless (empty-fun-p lambda)
+        (clrhash var-locs)
+        (let ((tlf-num (and (eq component-tlf-num :multiple)
+                            (source-path-tlf-number
+                             (node-source-path (lambda-bind lambda))))))
+          (push (compute-1-debug-fun lambda var-locs tlf-num) dfuns))))
     (let* ((sorted (sort dfuns #'< :key #'compiled-debug-fun-offset))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info
@@ -757,12 +819,14 @@
                         (sb-c::entry-info-name (car entries)))
                    (component-name component)))
        :fun-map fun-map
-       :tlf-num+offset (pack-tlf-num+offset
-                        component-tlf-num
-                        (and component-tlf-num
-                             (aref (file-info-positions
-                                    (source-info-file-info *source-info*))
-                                   component-tlf-num)))
+       :tlf-num+offset (if (eq component-tlf-num :multiple)
+                           component-tlf-num
+                           (pack-tlf-num+offset
+                            component-tlf-num
+                            (and component-tlf-num
+                                 (aref (file-info-positions
+                                        (source-info-file-info *source-info*))
+                                       component-tlf-num))))
        :contexts (compact-vector *contexts*)))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of

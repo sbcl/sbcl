@@ -11,62 +11,72 @@
 
 (in-package "SB-VM")
 
-(define-vop (list-or-list*)
-  (:args (things :more t :scs (control-stack)))
-  (:temporary (:scs (descriptor-reg)) ptr)
+(define-vop (list)
+  (:args (things :more t :scs (descriptor-reg any-reg control-stack constant immediate)))
+  (:temporary (:scs (descriptor-reg)) ptr temp)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
-  (:temporary (:sc non-descriptor-reg) pa-flag temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
-  (:info num)
+  (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
-  (:variant-vars star)
-  (:policy :fast-safe)
   (:node-var node)
+  (:vop-var vop)
   (:generator 0
-    (cond ((zerop num)
-           (move result null-tn))
-          ((and star (= num 1))
-           (move result (tn-ref-tn things)))
-          (t
-           (macrolet
-               ((maybe-load (tn)
+    (let ((alloc (* (pad-data-block cons-size) cons-cells))
+          (dx (node-stack-allocate-p node))
+          (prev-constant))
+     (macrolet ((maybe-load (tn &optional (temp 'temp))
                   (once-only ((tn tn))
                     `(sc-case ,tn
                        ((any-reg descriptor-reg)
                         ,tn)
+                       ((immediate constant)
+                        (cond ((eql (tn-value ,tn) 0)
+                               zr-tn)
+                              ((or (eql prev-constant (tn-value ,tn))
+                                   (progn
+                                     (setf prev-constant (tn-value ,tn))
+                                     nil))
+                               temp)
+                              ((sc-is ,tn constant)
+                               (load-constant vop ,tn ,temp)
+                               ,temp)
+                              (t
+                               (load-immediate vop ,tn ,temp)
+                               ,temp)))
                        (control-stack
-                        (load-stack-tn temp ,tn)
-                        temp)))))
-             (let* ((cons-cells (if star (1- num) num))
-                    (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag)
-                 (allocation res alloc list-pointer-lowtag
-                             :flag-tn pa-flag
-                             :stack-allocate-p (node-stack-allocate-p node)
-                             :lip lip)
-                 (move ptr res)
-                 (dotimes (i (1- cons-cells))
-                   (storew (maybe-load (tn-ref-tn things)) ptr
-                       cons-car-slot list-pointer-lowtag)
-                   (setf things (tn-ref-across things))
-                   (inst add ptr ptr (pad-data-block cons-size))
-                   (storew ptr ptr
-                       (- cons-cdr-slot cons-size)
-                       list-pointer-lowtag))
-                 (storew (maybe-load (tn-ref-tn things)) ptr
-                     cons-car-slot list-pointer-lowtag)
-                 (storew (if star
-                             (maybe-load (tn-ref-tn (tn-ref-across things)))
-                             null-tn)
-                     ptr cons-cdr-slot list-pointer-lowtag))
-               (move result res)))))))
-
-(define-vop (list list-or-list*)
-  (:variant nil))
-
-(define-vop (list* list-or-list*)
-  (:variant t))
+                        (setf prev-constant nil)
+                        (load-stack-tn ,temp ,tn)
+                        ,temp)))))
+       (pseudo-atomic (pa-flag :sync nil :elide-if dx)
+         (allocation 'list alloc list-pointer-lowtag res
+                     :flag-tn pa-flag
+                     :stack-allocate-p dx
+                     :lip lip)
+         (cond ((= cons-cells 1)
+                (inst stp (maybe-load (tn-ref-tn things))
+                      (if star
+                          (maybe-load (tn-ref-tn (tn-ref-across things)) ptr)
+                          null-tn)
+                      (@ tmp-tn)))
+               (t
+                (move ptr res)
+                (dotimes (i (1- cons-cells))
+                  (storew (maybe-load (tn-ref-tn things)) ptr
+                      cons-car-slot list-pointer-lowtag)
+                  (setf things (tn-ref-across things))
+                  (inst add ptr ptr (pad-data-block cons-size))
+                  (storew ptr ptr
+                      (- cons-cdr-slot cons-size)
+                      list-pointer-lowtag))
+                (storew (maybe-load (tn-ref-tn things)) ptr
+                    cons-car-slot list-pointer-lowtag)
+                (storew (if star
+                            (maybe-load (tn-ref-tn (tn-ref-across things)))
+                            null-tn)
+                    ptr cons-cdr-slot list-pointer-lowtag))))
+       (move result res)))))
 
 ;;;; Special purpose inline allocators.
 
@@ -85,9 +95,7 @@
       (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
-  (:args (function :to :save :scs (descriptor-reg)))
   (:info label length stack-allocate-p)
-  (:ignore label)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
@@ -95,17 +103,14 @@
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
       (pseudo-atomic (pa-flag)
-        (allocation result alloc-size
-                    fun-pointer-lowtag
+        (allocation nil alloc-size fun-pointer-lowtag result
                     :flag-tn pa-flag
                     :stack-allocate-p stack-allocate-p
                     :lip lip)
         (load-immediate-word pa-flag
-                             (logior
-                              (ash (1- size) n-widetag-bits)
-                              closure-widetag))
-        (storew pa-flag result 0 fun-pointer-lowtag)
-        (storew function result closure-fun-slot fun-pointer-lowtag)))))
+                             (logior (ash (1- size) n-widetag-bits) closure-widetag))
+        (inst adr lip label (ash simple-fun-insts-offset word-shift))
+        (storew-pair pa-flag 0 lip closure-fun-slot tmp-tn)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 ;;;
@@ -118,8 +123,9 @@
   (:generator 10
     (with-fixed-allocation (result pa-flag value-cell-widetag
                             value-cell-size :stack-allocate-p stack-allocate-p
-                            :lip lip)
-      (storew value result value-cell-value-slot other-pointer-lowtag))))
+                            :lip lip
+                            :store-type-code nil)
+      (storew-pair pa-flag 0 value value-cell-value-slot tmp-tn))))
 
 ;;;; Automatic allocators for primitive objects.
 
@@ -152,19 +158,18 @@
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
-  (:info name words type lowtag)
-  (:ignore name)
+  (:info name words type lowtag stack-allocate-p)
+  (:ignore name stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (any-reg) :from :argument) bytes)
   (:temporary (:sc non-descriptor-reg) pa-flag header)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 6
-    #+cheneygc (bug "cheneygc not working for arm64")
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
     (inst lsl bytes extra (- word-shift n-fixnum-tag-bits))
     (inst add bytes bytes (add-sub-immediate (* (1- words) n-word-bytes)))
-    (inst lsl header bytes (- n-widetag-bits word-shift))
+    (inst lsl header bytes (- (length-field-shift type) word-shift))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity
@@ -172,5 +177,5 @@
     (inst and bytes bytes (bic-mask lowtag-mask))
     ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag :flag-tn pa-flag :lip lip)
+      (allocation nil bytes lowtag result :flag-tn pa-flag :lip lip)
       (storew header result 0 lowtag))))

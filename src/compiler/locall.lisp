@@ -21,6 +21,13 @@
 
 (in-package "SB-C")
 
+(defstruct (local-call-context
+            (:constructor make-local-call-context (fun var))
+            (:copier nil))
+  (fun nil :read-only t)
+  (var nil :read-only t))
+(!set-load-form-method local-call-context (:xc :target) :ignore-it)
+
 ;;; This function propagates information from the variables in the
 ;;; function FUN to the actual arguments in CALL. This is also called
 ;;; by the VALUES IR1 optimizer when it sleazily converts MV-BINDs to
@@ -36,41 +43,53 @@
   (declare (type combination call) (type clambda fun))
   (loop with policy = (lexenv-policy (node-lexenv call))
         for args on (basic-combination-args call)
-        and var in (lambda-vars fun)
+        for var in (lambda-vars fun)
+        for name = (lambda-var-%source-name var)
         do (assert-lvar-type (car args) (leaf-type var) policy
-                             (lambda-var-%source-name var))
-        do (unless (leaf-refs var)
+                             (if (eq (functional-kind fun) :optional)
+                                 (make-local-call-context fun name)
+                                 name))
+           (unless (leaf-refs var)
              (flush-dest (car args))
              (setf (car args) nil)))
   (values))
 
+;;; Given a local call CALL to FUN, find the associated argument LVARs
+;;; of CALL corresponding to declared dynamic extent LAMBDA-VARs and
+;;; note them as dynamic extent LVARs. This operation is transitive,
+;;; because dynamic extent is contagious. In particular, the arguments
+;;; of any COMBINATIONs returning a stack-allocatable object in a
+;;; dynamic extent LVAR are dynamic extent as well if the argument
+;;; LVARs contain otherwise-inaccessible stack-allocatable subobjects
+;;; themselves.
 (defun recognize-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
-  (loop for arg in (basic-combination-args call)
-        for var in (lambda-vars fun)
-        for dx = (leaf-dynamic-extent var)
-        when (and dx arg (not (lvar-dynamic-extent arg)))
-        append (handle-nested-dynamic-extent-lvars dx arg) into dx-lvars
-        ;; The block may end up being deleted due to cast optimization
-        ;; caused by USE-GOOD-FOR-DX-P
-        when (node-to-be-deleted-p call) return nil
-        finally (when dx-lvars
-                  ;; Stack analysis requires that the CALL ends the block, so
-                  ;; that MAP-BLOCK-NLXES sees the cleanup we insert here.
-                  (node-ends-block call)
-                  (let* ((entry (with-ir1-environment-from-node call
-                                  (make-entry)))
-                         (cleanup (make-cleanup :kind :dynamic-extent
-                                                :mess-up entry
-                                                :info dx-lvars)))
-                    (setf (entry-cleanup entry) cleanup)
-                    (insert-node-before call entry)
-                    (setf (node-lexenv call)
-                          (make-lexenv :default (node-lexenv call)
-                                       :cleanup cleanup))
-                    (push entry (lambda-entries (node-home-lambda entry)))
-                    (dolist (cell dx-lvars)
-                      (setf (lvar-dynamic-extent (cdr cell)) cleanup)))))
+  ;; The block may end up being deleted due to cast optimization
+  ;; caused by USE-GOOD-FOR-DX-P
+  (unless (node-to-be-deleted-p call)
+    (let ((dx-lvars
+            (loop for arg in (basic-combination-args call)
+                  for var in (lambda-vars fun)
+                  for dx = (leaf-dynamic-extent var)
+                  when (and dx arg (not (lvar-dynamic-extent arg)))
+                    append (handle-nested-dynamic-extent-lvars dx arg))))
+      (when dx-lvars
+        (let* ((entry (with-ir1-environment-from-node call
+                        (make-entry)))
+               (cleanup (make-cleanup :kind :dynamic-extent
+                                      :mess-up entry
+                                      :nlx-info dx-lvars)))
+          (setf (entry-cleanup entry) cleanup)
+          (insert-node-before call entry)
+          (setf (node-lexenv call)
+                (make-lexenv :default (node-lexenv call)
+                             :cleanup cleanup))
+          ;; Make CALL end its block, so that we have a place to
+          ;; insert cleanup code.
+          (node-ends-block call)
+          (push entry (lambda-entries (node-home-lambda entry)))
+          (dolist (cell dx-lvars)
+            (setf (lvar-dynamic-extent (cdr cell)) cleanup))))))
   (values))
 
 ;;; This function handles merging the tail sets if CALL is potentially
@@ -156,7 +175,7 @@
   (declare (type functional fun))
   (etypecase fun
     (clambda
-     (let* ((n-supplied (gensym))
+     (let* ((n-supplied (sb-xc:gensym))
             (nargs (length (lambda-vars fun)))
             (temps (make-gensym-list nargs)))
        `(lambda (,n-supplied ,@temps)
@@ -164,12 +183,12 @@
                    (ignore ,n-supplied))
           (%funcall ,fun ,@temps))))
     (optional-dispatch
-     ;; Force convertion of all entries
+     ;; Force conversion of all entries
      (optional-dispatch-entry-point-fun fun 0)
      (let* ((min (optional-dispatch-min-args fun))
             (max (optional-dispatch-max-args fun))
             (more (optional-dispatch-more-entry fun))
-            (n-supplied (gensym))
+            (n-supplied (sb-xc:gensym))
             (temps (make-gensym-list max))
             (main (optional-dispatch-main-entry fun))
             (optional-vars (nthcdr min (lambda-vars main)))
@@ -195,13 +214,10 @@
           (declare (type index ,n-supplied)
                    (ignorable ,n-supplied))
           (cond
-            ,@(loop for previous-n = (1- min) then n
-                    for ((ep . n) . next) on used-eps
+            ,@(loop for ((ep . n) . next) on used-eps
                     collect
                     (cond (next
-                           `(,(if (= (1+ previous-n) n)
-                                  `(eql ,n-supplied ,n)
-                                  `(<= ,n-supplied ,n))
+                           `((eq ,n-supplied ,n)
                              (%funcall ,ep ,@(subseq temps 0 n))))
                           (more
                            (with-unique-names (n-context n-count)
@@ -265,10 +281,14 @@
   (declare (type functional fun))
   (aver (null (functional-entry-fun fun)))
   (with-ir1-environment-from-node (lambda-bind (main-entry fun))
-    (let ((xep (ir1-convert-lambda (make-xep-lambda-expression fun)
-                                   :debug-name (debug-name
-                                                'xep (leaf-debug-name fun))
-                                   :system-lambda t)))
+    (let* ((*lexenv* (if (neq (lexenv-policy (functional-lexenv fun))
+                              (lexenv-policy *lexenv*))
+                         (make-lexenv :policy (lexenv-policy (functional-lexenv fun)))
+                         *lexenv*))
+           (xep (ir1-convert-lambda (make-xep-lambda-expression fun)
+                                    :debug-name (debug-name
+                                                 'xep (leaf-debug-name fun))
+                                    :system-lambda t)))
       (setf (functional-kind xep) :external
             (leaf-ever-used xep) t
             (functional-entry-fun xep) fun
@@ -366,37 +386,23 @@
   (declare (type component component))
   (aver-live-component component)
   (loop
-    (let* ((new-functional (pop (component-new-functionals component)))
-           (functional (or new-functional
-                           (pop (component-reanalyze-functionals component)))))
-      (unless functional
+    (let* ((new (pop (component-new-functionals component)))
+           (fun (or new (pop (component-reanalyze-functionals component)))))
+      (unless fun
         (return))
-      (let ((kind (functional-kind functional)))
-        (cond ((or (functional-somewhat-letlike-p functional)
-                   (memq kind '(:deleted :zombie)))
-               (values)) ; nothing to do
-              ((and (null (leaf-refs functional)) (eq kind nil)
-                    (not (functional-entry-fun functional)))
-               (delete-functional functional))
+      (let ((kind (functional-kind fun)))
+        (cond ((or (functional-somewhat-letlike-p fun)
+                   (memq kind '(:deleted :zombie))))
+              ((and (null (leaf-refs fun)) (eq kind nil)
+                    (not (functional-entry-fun fun)))
+               (delete-functional fun))
               (t
-               ;; Fix/check FUNCTIONAL's relationship to COMPONENT-LAMDBAS.
-               (cond ((not (lambda-p functional))
-                      ;; Since FUNCTIONAL isn't a LAMBDA, this doesn't
-                      ;; apply: no-op.
-                      (values))
-                     (new-functional ; FUNCTIONAL came from
-                                     ; NEW-FUNCTIONALS, hence is new.
-                      ;; FUNCTIONAL becomes part of COMPONENT-LAMBDAS now.
-                      (aver (not (member functional
-                                         (component-lambdas component))))
-                      (push functional (component-lambdas component)))
-                     (t ; FUNCTIONAL is old.
-                      ;; FUNCTIONAL should be in COMPONENT-LAMBDAS already.
-                      (aver (member functional (component-lambdas
-                                                component)))))
-               (locall-analyze-fun-1 functional)
-               (when (lambda-p functional)
-                 (maybe-let-convert functional component)))))))
+               (when (and new (lambda-p fun))
+                 (push fun (component-lambdas component)))
+               (locall-analyze-fun-1 fun)
+               (when (lambda-p fun)
+                 (or (maybe-let-convert fun component)
+                     (maybe-convert-to-assignment fun))))))))
   (values))
 
 (defun locall-analyze-clambdas-until-done (clambdas)
@@ -411,9 +417,11 @@
          (when (or (component-new-functionals component)
                    (component-reanalyze-functionals component))
            (setf did-something t)
-           (locall-analyze-component component))))
+           (locall-analyze-component component)
+           (clean-component component))))
      (unless did-something
        (return))))
+  (initial-eliminate-dead-code clambdas)
   (values))
 
 ;;; If policy is auspicious and CALL is not in an XEP and we don't seem
@@ -422,22 +430,23 @@
 ;;; reference.
 (defun maybe-expand-local-inline (original-functional ref call)
   (if (and (policy call
-                   (and (>= speed space)
-                        (>= speed compilation-speed)))
+               (and (>= speed space)
+                    (>= speed compilation-speed)))
            (not (eq (functional-kind (node-home-lambda call)) :external))
-           (inline-expansion-ok call))
+           (inline-expansion-ok call original-functional))
       (let* ((end (component-last-block (node-component call)))
              (pred (block-prev end)))
         (multiple-value-bind (losing-local-object converted-lambda)
             (catch 'locall-already-let-converted
               (with-ir1-environment-from-node call
-                (let ((*lexenv* (functional-lexenv original-functional)))
+                (let* ((*inline-expansions*
+                         (register-inline-expansion original-functional call))
+                       (*lexenv* (functional-lexenv original-functional)))
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)
                            :debug-name (debug-name 'local-inline
-                                                   (leaf-debug-name
-                                                    original-functional)))))))
+                                                   (leaf-%source-name original-functional)))))))
           (cond (losing-local-object
                  (if (functional-p losing-local-object)
                      (let ((*compiler-error-context* call))
@@ -501,15 +510,18 @@
                      original-fun))
             (*compiler-error-context* call))
 
-        (when (and (eq (functional-inlinep fun) :inline)
+        (when (and (eq (functional-inlinep fun) 'inline)
                    (rest (leaf-refs original-fun))
                    ;; Some REFs are already unused bot not yet deleted,
-                   ;; avoid unneccessary inlining
-                   (> (count-if #'node-lvar (leaf-refs original-fun)) 1))
+                   ;; avoid unnecessary inlining
+                   (> (count-if #'node-lvar (leaf-refs original-fun)) 1)
+                   ;; Don't inline if the function is not going to be
+                   ;; let-converted.
+                   (let-convertable-p call fun))
           (setq fun (maybe-expand-local-inline fun ref call)))
 
         (aver (member (functional-kind fun)
-                      '(nil :escape :cleanup :optional)))
+                      '(nil :escape :cleanup :optional :assignment)))
         (cond ((mv-combination-p call)
                (convert-mv-call ref call fun))
               ((lambda-p fun)
@@ -518,6 +530,15 @@
                (convert-hairy-call ref call fun))))))
 
   (values))
+
+(defun let-convertable-p (call fun)
+  (cond ((mv-combination-p call)
+         (and (looks-like-an-mv-bind fun)
+              (not (functional-entry-fun fun))))
+        ((lambda-p fun)
+         t)
+        (t ;; Hairy
+         t)))
 
 ;;; Attempt to convert a multiple-value call. The only interesting
 ;;; case is a call to a function that LOOKS-LIKE-AN-MV-BIND, has
@@ -577,7 +598,8 @@
   (with-ir1-environment-from-node node
     (transform-call node lambda
                     (or (combination-fun-source-name node nil)
-                        default-name))))
+                        default-name)
+                    nil)))
 
 (defun warn-invalid-local-call (node count &rest warn-arguments)
   (declare (notinline warn)) ; See COMPILER-WARN for rationale
@@ -929,10 +951,10 @@
   ;; information.
   (setf (tail-set-info (lambda-tail-set clambda)) nil))
 
-;;; Handle the PHYSENV semantics of LET conversion. We add CLAMBDA and
-;;; its LETs to LETs for the CALL's home function. We merge the calls
-;;; for CLAMBDA with the calls for the home function, removing CLAMBDA
-;;; in the process. We also merge the ENTRIES.
+;;; Handle the environment semantics of LET conversion. We add CLAMBDA
+;;; and its LETs to LETs for the CALL's home function. We merge the
+;;; calls for CLAMBDA with the calls for the home function, removing
+;;; CLAMBDA in the process. We also merge the ENTRIES.
 ;;;
 ;;; We also unlink the function head from the component head and set
 ;;; COMPONENT-REANALYZE to true to indicate that the DFO should be
@@ -951,28 +973,28 @@
   (depart-from-tail-set clambda)
 
   (let* ((home (node-home-lambda call))
-         (home-physenv (lambda-physenv home))
-         (physenv (lambda-physenv clambda)))
+         (home-env (lambda-environment home))
+         (env (lambda-environment clambda)))
 
     (aver (not (eq home clambda)))
 
     ;; CLAMBDA belongs to HOME now.
     (push clambda (lambda-lets home))
     (setf (lambda-home clambda) home)
-    (setf (lambda-physenv clambda) home-physenv)
+    (setf (lambda-environment clambda) home-env)
 
-    (when physenv
-      (unless home-physenv
-        (setf home-physenv (get-lambda-physenv home)))
-      (setf (physenv-nlx-info home-physenv)
-            (nconc (physenv-nlx-info physenv)
-                   (physenv-nlx-info home-physenv))))
+    (when env
+      (unless home-env
+        (setf home-env (get-lambda-environment home)))
+      (setf (environment-nlx-info home-env)
+            (nconc (environment-nlx-info env)
+                   (environment-nlx-info home-env))))
 
     ;; All of CLAMBDA's LETs belong to HOME now.
     (let ((lets (lambda-lets clambda)))
       (dolist (let lets)
         (setf (lambda-home let) home)
-        (setf (lambda-physenv let) home-physenv))
+        (setf (lambda-environment let) home-env))
       (setf (lambda-lets home) (nconc lets (lambda-lets home))))
     ;; CLAMBDA no longer has an independent existence as an entity
     ;; which has LETs.
@@ -1004,6 +1026,10 @@
 ;;; Handle the value semantics of LET conversion. Delete FUN's return
 ;;; node, and change the control flow to transfer to NEXT-BLOCK
 ;;; instead. Move all the uses of the result lvar to CALL's lvar.
+;;;
+;;; We also intersect the derived type of the CALL with the derived
+;;; type of all the dummy continuation's uses. This serves mainly to
+;;; propagate TRULY-THE through LETs.
 (defun move-return-uses (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
            (type cblock next-block))
@@ -1037,32 +1063,42 @@
 ;;; the RETURN-RESULT, because the return might have been deleted (if
 ;;; all calls were TR.)
 (defun unconvert-tail-calls (fun call next-block)
-  (do-sset-elements (called (lambda-calls-or-closes fun))
-    (when (lambda-p called)
-      (dolist (ref (leaf-refs called))
-        (let ((this-call (node-dest ref)))
-          (when (and this-call
-                     (node-tail-p this-call)
-                     (not (node-to-be-deleted-p this-call))
-                     (eq (node-home-lambda this-call) fun))
-            (setf (node-tail-p this-call) nil)
-            (ecase (functional-kind called)
-              ((nil :cleanup :optional)
-               (let ((block (node-block this-call))
-                     (lvar (node-lvar call)))
-                 (unlink-blocks block (first (block-succ block)))
-                 (link-blocks block next-block)
-                 (if (eq (node-derived-type this-call) *empty-type*)
-                     (maybe-terminate-block this-call nil)
-                     (add-lvar-use this-call lvar))))
-              (:deleted)
-              ;; The called function might be an assignment in the
-              ;; case where we are currently converting that function.
-              ;; In steady-state, assignments never appear as a called
-              ;; function.
-              (:assignment
-               (aver (eq called fun)))))))))
-  (values))
+  (let (maybe-terminate)
+    (do-sset-elements (called (lambda-calls-or-closes fun))
+      (when (lambda-p called)
+        (dolist (ref (leaf-refs called))
+          (let ((this-call (node-dest ref)))
+            (when (and this-call
+                       (node-tail-p this-call)
+                       (not (node-to-be-deleted-p this-call))
+                       (eq (node-home-lambda this-call) fun))
+              (setf (node-tail-p this-call) nil)
+              (ecase (functional-kind called)
+                ((nil :cleanup :optional)
+                 (let ((block (node-block this-call))
+                       (lvar (node-lvar call)))
+                   (unlink-blocks block (first (block-succ block)))
+                   (link-blocks block next-block)
+                   (if (eq (node-derived-type this-call) *empty-type*)
+                       ;; Delay terminating the block, because there may be more calls
+                       ;; to be processed here and this may prematurely delete NEXT-BLOCK
+                       ;; before we attach more preceding blocks to it.
+                       ;; Although probably if one call to a function
+                       ;; is derived to be NIL all other calls would
+                       ;; be NIL too, but that may not be available at the same time.
+                       ;; (Or something is smart in the future to
+                       ;; derive different results from different
+                       ;; calls.)
+                       (push this-call maybe-terminate)
+                       (add-lvar-use this-call lvar))))
+                (:deleted)
+                ;; The called function might be an assignment in the
+                ;; case where we are currently converting that function.
+                ;; In steady-state, assignments never appear as a called
+                ;; function.
+                (:assignment
+                 (aver (eq called fun)))))))))
+    maybe-terminate))
 
 ;;; Deal with returning from a LET or assignment that we are
 ;;; converting. FUN is the function we are calling, CALL is a call to
@@ -1090,22 +1126,17 @@
 (defun move-return-stuff (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
            (type (or cblock null) next-block))
-  (when next-block
-    (unconvert-tail-calls fun call next-block))
-  (let* ((return (lambda-return fun))
+  (let* ((maybe-terminate-calls (when next-block
+                                  (unconvert-tail-calls fun call next-block)))
+         (return (lambda-return fun))
          (call-fun (node-home-lambda call))
          (call-return (lambda-return call-fun)))
     (when (and call-return
                (block-delete-p (node-block call-return)))
       (flush-dest (return-result call-return))
       (delete-return call-return)
-      ;; A new return will be put into that lambda, don't want
-      ;; DELETE-RETURN called by DELETE-BLOCK to delete the new return
-      ;; from the lambda.
-      ;; (Previously, UNLINK-NODE was called on the return, but it
-      ;; doesn't work well on deleted blocks)
-      (setf (return-lambda call-return) nil
-            call-return nil))
+      (unlink-node call-return)
+      (setq call-return nil))
     (cond ((not return))
           ((or next-block call-return)
            (unless (block-delete-p (node-block return))
@@ -1117,15 +1148,18 @@
            (aver (node-tail-p call))
            (setf (lambda-return call-fun) return)
            (setf (return-lambda return) call-fun)
-           (setf (lambda-return fun) nil))))
-  (delete-lvar-use call) ; LET call does not have value semantics
+           (setf (lambda-return fun) nil)))
+    ;; Delayed because otherwise next-block could become deleted
+    (dolist (call maybe-terminate-calls)
+      (maybe-terminate-block call nil)))
+  (delete-lvar-use call)      ; LET call does not have value semantics
   (values))
 
 ;;; Actually do LET conversion. We call subfunctions to do most of the
 ;;; work. We do REOPTIMIZE-LVAR on the args and CALL's lvar so that
 ;;; LET-specific IR1 optimizations get a chance. We blow away any
-;;; entry for the function in *FREE-FUNS* so that nobody will create
-;;; new references to it.
+;;; entry for the function in (FREE-FUNS *IR1-NAMSPACE*) so that nobody
+;;; will create new references to it.
 (defun let-convert (fun call)
   (declare (type clambda fun) (type basic-combination call))
   (let* ((next-block (insert-let-body fun call))
@@ -1134,11 +1168,7 @@
                          next-block)))
     (move-return-stuff fun call next-block)
     (merge-lets fun call)
-    (setf (node-tail-p call) nil)
-    ;; If CALL has a derive type NIL, it means that "its return" is
-    ;; unreachable, but the next BIND is still reachable; in order to
-    ;; not confuse MAYBE-TERMINATE-BLOCK...
-    (setf (node-derived-type call) *wild-type*)))
+    (setf (node-tail-p call) nil)))
 
 ;;; Reoptimize all of CALL's args and its result.
 (defun reoptimize-call (call)
@@ -1160,18 +1190,18 @@
   ;;
   ;; A functional that is already inline-expanded in this componsne definitely
   ;; deserves let-conversion -- and in case of main entry points for inline
-  ;; expanded optional dispatch, the main-etry isn't explicitly marked :INLINE
+  ;; expanded optional dispatch, the main-etry isn't explicitly marked INLINE
   ;; even if the function really is.
   (when (and (leaf-has-source-name-p clambda)
              (not (functional-inline-expanded clambda)))
     ;; ANSI requires that explicit NOTINLINE be respected.
-    (or (eq (lambda-inlinep clambda) :notinline)
+    (or (eq (lambda-inlinep clambda) 'notinline)
         ;; If (= LET-CONVERSION 0) we can guess that inlining
         ;; generally won't be appreciated, but if the user
         ;; specifically requests inlining, that takes precedence over
         ;; our general guess.
         (and (policy clambda (= let-conversion 0))
-             (not (eq (lambda-inlinep clambda) :inline))))))
+             (not (eq (lambda-inlinep clambda) 'inline))))))
 
 ;;; We also don't convert calls to named functions which appear in the
 ;;; initial component, delaying this until optimization. This
@@ -1343,53 +1373,123 @@
         (values t (maybe-convert-to-assignment fun))))))
 
 ;;; This is called when we believe it might make sense to convert
-;;; CLAMBDA to an assignment. All this function really does is
+;;; FUN to an assignment. All this function really does is
 ;;; determine when a function with more than one call can still be
 ;;; combined with the calling function's environment. We can convert
 ;;; when:
 ;;; -- The function is a normal, non-entry function, and
-;;; -- Except for one call, all calls must be tail recursive calls
-;;;    in the called function (i.e. are self-recursive tail calls)
+;;; -- All calls must return to the same place, so some
+;;;    may be tail recursive calls in the called function (i.e. are
+;;;    self-recursive tail calls)
 ;;; -- OK-INITIAL-CONVERT-P is true.
 ;;;
-;;; There may be one outside call, and it need not be tail-recursive.
-;;; Since all tail local calls have already been converted to direct
-;;; transfers, the only control semantics needed are to splice in the
-;;; body at the non-tail call. If there is no non-tail call, then we
-;;; need only merge the environments. Both cases are handled by
-;;; LET-CONVERT.
+;;; There may be any number of outside calls, and they need not be
+;;; tail-recursive. The only constraint is that they return to the
+;;; same place (taking into account cleanup actions). Note that in
+;;; particular, this is also satisfied when the calls to FUN are
+;;; derived to not return at all. Since all tail local calls have
+;;; already been converted to direct transfers, the only control
+;;; semantics needed are to splice in the body at some non-tail
+;;; call. If there is no non-tail call, then we need only merge the
+;;; environments. Both cases are handled by LET-CONVERT.
 ;;;
 ;;; ### It would actually be possible to allow any number of outside
 ;;; calls as long as they all return to the same place (i.e. have the
-;;; same conceptual continuation.) A special case of this would be
-;;; when all of the outside calls are tail recursive.
-(defun maybe-convert-to-assignment (clambda)
-  (declare (type clambda clambda))
-  (when (and (not (functional-kind clambda))
-             (not (functional-entry-fun clambda))
-             (not (functional-has-external-references-p clambda)))
-    (let ((outside-non-tail-call nil)
-          (outside-call nil))
-      (when (and (dolist (ref (leaf-refs clambda) t)
+;;; same conceptual continuation.) Some currently unhandled cases of
+;;; this are outside tail calls from multiple functions which
+;;; themselves return to the same place transitively. The paper
+;;; "Contification using dominators" by Fluet and Weeks describes a
+;;; maximal algorithm for detecting all such calls returning to the
+;;; same place.
+(defun maybe-convert-to-assignment (fun)
+  (declare (type clambda fun))
+  (when (and (not (functional-kind fun))
+             (not (functional-entry-fun fun))
+             (not (functional-has-external-references-p fun))
+             ;; If a functional is explicitly inlined, we don't want
+             ;; to assignment convert it, as more call-site
+             ;; specialization can be done with inlining.
+             (not (functional-inlinep fun))
+             (not (block-delete-p (lambda-block fun))))
+    (let ((outside-calls nil)
+          (outside-calls-ctran nil)
+          (outside-calls-env nil)
+          (outside-calls-cleanup nil))
+      (when (and (dolist (ref (leaf-refs fun) t)
                    (let ((dest (node-dest ref)))
                      (when (or (not dest)
                                (node-to-be-deleted-p ref)
                                (node-to-be-deleted-p dest))
                        (return nil))
                      (let ((home (node-home-lambda ref)))
-                       (unless (eq home clambda)
-                         (when outside-call
-                           (return nil))
-                         (setq outside-call dest))
-                       (unless (node-tail-p dest)
-                         (when (or outside-non-tail-call (eq home clambda))
-                           (return nil))
-                         (setq outside-non-tail-call dest)))))
-                 (ok-initial-convert-p clambda))
-        (cond (outside-call (setf (functional-kind clambda) :assignment)
-                            (let-convert clambda outside-call)
-                            (when outside-non-tail-call
-                              (reoptimize-call outside-non-tail-call))
-                            t)
-              (t (delete-lambda clambda)
-                 nil))))))
+                       (if (eq home fun)
+                           (unless (node-tail-p dest)
+                             (return nil))
+                           (let ((dest-ctran
+                                   (or (node-next dest)
+                                       (block-start (first (block-succ (node-block dest))))))
+                                 (dest-env
+                                   (node-home-lambda dest))
+                                 (dest-cleanup
+                                   (node-enclosing-cleanup dest)))
+                             (aver dest-env)
+                             (cond (outside-calls-env
+                                    ;; We can only convert multiple
+                                    ;; outside calls when they are all
+                                    ;; in the same environment, so we
+                                    ;; don't muck up tail sets. This
+                                    ;; is not a conceptual restriction
+                                    ;; though; it may be possible to
+                                    ;; lift this if things are
+                                    ;; reworked. The cleanup checking
+                                    ;; here is also overly
+                                    ;; conservative. A better approach
+                                    ;; would be to check for harmful
+                                    ;; cleanups with respect to the
+                                    ;; messiest common ancestor.
+                                    (unless (and (or (eq (node-derived-type dest) *empty-type*)
+                                                     (and (eq outside-calls-ctran dest-ctran)))
+                                                 (eq outside-calls-env dest-env)
+                                                 (eq outside-calls-cleanup dest-cleanup))
+                                      (return nil)))
+                                   (t
+                                    (setq outside-calls-env dest-env)
+                                    (setq outside-calls-ctran dest-ctran)
+                                    (setq outside-calls-cleanup dest-cleanup)))
+                             (push dest outside-calls))))))
+                 (ok-initial-convert-p fun))
+        (cond (outside-calls
+               (setf (functional-kind fun) :assignment)
+               ;; The only time OUTSIDE-CALLS contains a mix of both
+               ;; tail and non-tail calls is when calls to FUN are
+               ;; derived to not return, in which case it doesn't
+               ;; matter whether a given call is tail, so there is no
+               ;; harm in the arbitrary choice here.
+               (let ((first-outside-call (first outside-calls)))
+                 (let ((original-tail-p (node-tail-p first-outside-call)))
+                   (let-convert fun first-outside-call)
+                   (unless original-tail-p
+                     (reoptimize-call first-outside-call)))
+                 (dolist (outside-call outside-calls)
+                   ;; Splice in the other calls, without the rest of
+                   ;; the let converting return semantics machinery,
+                   ;; since we've already let converted the function.
+                   (unless (eq outside-call first-outside-call)
+                     (insert-let-body fun outside-call))
+                   (delete-lvar-use outside-call)
+                   ;; Make sure these calls are local converted as
+                   ;; soon as possible, to avoid having a window of
+                   ;; time where there are :ASSIGNMENT lambdas
+                   ;; floating around which are still called by :FULL
+                   ;; combinations, as this confuses stuff like
+                   ;; MAYBE-TERMINATE-BLOCK.
+                   (convert-call-if-possible (lvar-use (combination-fun outside-call))
+                                             outside-call)
+                   (unless (or (eq outside-call first-outside-call)
+                               (node-tail-p outside-call))
+                     (reoptimize-call first-outside-call))
+                   (setf (node-tail-p outside-call) nil)))
+               t)
+              (t
+               (delete-lambda fun)
+               nil))))))

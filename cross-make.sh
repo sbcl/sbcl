@@ -8,6 +8,7 @@
 # SSH is invoked to compile the C runtime.
 # Passwordless login to the target machine is required.
 
+#config_options="--without-gencgc --with-cheneygc"
 if [ $1 = -p ]
 then
   ssh_port_opt="-p $2"
@@ -47,16 +48,15 @@ scp $scp_port_opt $host:$root/{remote-version.lisp-expr,local-target-features.li
 mv build-id.inc output
 #diff version.lisp-expr remote-version.lisp-expr || exit 1
 
-# make-host-1 and copy over the artifacts
+# make-host-1 and copy the generated C headers to the target machine
 sh make-host-1.sh
-tar cf - src/runtime/genesis src/runtime/ldso-stubs.S \
-  | ssh $ssh_port_opt $host tar xf - -C $root
+# workaround small amounts of clock skew by using --touch on the extraction
+# You'll probably have to remove the --touch when building for SunOS
+tar cf - src/runtime/genesis | ssh $ssh_port_opt $host cd $root \; tar xf - --touch
 
 # make-target-1 and copy back the artifacts
 ssh $ssh_port_opt $host cd $root \; $ENV sh make-target-1.sh
-scp $scp_port_opt $host:$root/{src/runtime/sbcl.nm,output/stuff-groveled-from-headers.lisp} .
-mv sbcl.nm src/runtime
-mv stuff-groveled-from-headers.lisp output
+scp $scp_port_opt $host:$root/output/stuff-groveled-from-headers.lisp output
 
 # make-host-2 and copy over the artifact
 sh make-host-2.sh

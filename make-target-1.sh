@@ -27,24 +27,15 @@ if [ -n "$SBCL_HOST_LOCATION" ]; then
     echo //copying host-1 output files to target
     rsync -a "$SBCL_HOST_LOCATION/output/" output/
     rsync -a "$SBCL_HOST_LOCATION/src/runtime/genesis" src/runtime
-    rsync -a "$SBCL_HOST_LOCATION/src/runtime/ldso-stubs.S" src/runtime/
 fi
 
 # Build the runtime system and symbol table (.nm) file.
 #
 # (This C build has to come after the first genesis in order to get
-# the sbcl.h the C build needs, and come before the second genesis in
-# order to produce the symbol table file that second genesis needs. It
-# could come either before or after running the cross compiler; that
-# doesn't matter.)
-#
-# Note that the latter requirement does not apply to sb-dynamic-core
-# builds, since the cross compiler does not depend on symbol tables in
-# that case.  Only because sbcl.nm is convenient for debugging purposes
-# is its generation left enabled even for those builds.
+# 'sbcl.h' which the C build. It could come either before or after running
+# the cross compiler; that doesn't matter.)
 echo //building runtime system and symbol table file
 
-# The clean is needed for Darwin's readonlyspace hack.
 $GNUMAKE -C src/runtime clean
 # $GNUMAKE -C src/runtime depend
 $GNUMAKE $SBCL_MAKE_JOBS -C src/runtime all
@@ -58,6 +49,5 @@ $GNUMAKE -C src/runtime after-grovel-headers
 
 if [ -n "$SBCL_HOST_LOCATION" ]; then
     echo //copying target-1 output files to host
-    rsync -a src/runtime/sbcl.nm "$SBCL_HOST_LOCATION/src/runtime/"
     rsync -a output/stuff-groveled-from-headers.lisp "$SBCL_HOST_LOCATION/output"
 fi

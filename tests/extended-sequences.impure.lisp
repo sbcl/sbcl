@@ -95,3 +95,44 @@
           (x :from-end t)
         (loop until (stop) collect (value) do (next))))
    (('(a b c d)) '(d c b a) :test #'equal)))
+
+(defclass my-list (sequence standard-object)
+  ((%nilp :initarg :nilp :initform nil :accessor nilp)
+   (%kar :initarg :kar :accessor kar)
+   (%kdr :initarg :kdr :accessor kdr)))
+
+(defun my-list (&rest elems)
+  (if (null elems)
+      (load-time-value (make-instance 'my-list :nilp t) t)
+      (make-instance 'my-list
+        :kar (first elems) :kdr (apply #'my-list (rest elems)))))
+
+(defmethod sequence:length ((sequence my-list))
+  (if (nilp sequence)
+      0
+      (1+ (length (kdr sequence)))))
+
+(defmethod sequence:make-sequence-iterator
+    ((sequence my-list) &key from-end start end)
+  (declare (ignore from-end start end))
+  (values sequence (my-list) nil
+          (lambda (sequence iterator from-end)
+            (declare (ignore sequence from-end))
+            (kdr iterator))
+          (lambda (sequence iterator limit from-end)
+            (declare (ignore sequence from-end))
+            (eq iterator limit))
+          (lambda (sequence iterator)
+            (declare (ignore sequence))
+            (kar iterator))
+          (lambda (new sequence iterator)
+            (declare (ignore sequence))
+            (setf (kar iterator) new))
+          (constantly 0)
+          (lambda (sequence iterator)
+            (declare (ignore sequence))
+            iterator)))
+
+(with-test (:name :map-into)
+  (assert (equal (coerce (map-into (my-list 1 2 3) #'identity '(4 5 6)) 'list)
+                 '(4 5 6))))

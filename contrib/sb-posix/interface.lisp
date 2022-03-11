@@ -100,8 +100,8 @@
 ;;; variable.
 (eval-when (:compile-toplevel :load-toplevel)
   (setf *c-functions-in-runtime*
-        #+netbsd '("stat" "lstat" "fstat" "readdir" "opendir")
-        #-netbsd '()))
+        (append #+netbsd '("stat" "lstat" "fstat" "readdir" "opendir")
+                #+(and (or arm64 riscv ppc ppc64) linux) '("stat" "lstat" "fstat"))))
 
 
 ;;; filesystem access
@@ -128,7 +128,7 @@
 (macrolet ((def (x)
                `(progn
                  (define-call-internally open-with-mode ,x int minusp
-                   (pathname filename) (flags int) (mode mode-t))
+                   (pathname filename) (flags int) &optional (mode mode-t))
                  (define-call-internally open-without-mode ,x int minusp
                    (pathname filename) (flags int))
                  (define-entry-point ,x
@@ -245,9 +245,10 @@
   (define-call-internally fcntl-without-arg "fcntl" int minusp
                           (fd file-descriptor) (cmd int))
   (define-call-internally fcntl-with-int-arg "fcntl" int minusp
-                          (fd file-descriptor) (cmd int) (arg int))
+                          (fd file-descriptor) (cmd int) &optional (arg int))
   (define-call-internally fcntl-with-pointer-arg "fcntl" int minusp
                           (fd file-descriptor) (cmd int)
+                          &optional
                           (arg alien-pointer-to-anything-or-nil))
   (define-protocol-class flock alien-flock ()
    ((type :initarg :type :accessor flock-type
@@ -340,24 +341,36 @@
     "Forks the current process, returning 0 in the new process and the PID of
 the child process in the parent. Forking while multiple threads are running is
 not supported."
-    (tagbody
-       (let ()
-         #+sb-thread
-         (sb-impl::finalizer-thread-stop)
-         (sb-thread::with-all-threads-lock
-           (when (let ((avltree sb-thread::*all-threads*))
-                   (or (sb-thread::avlnode-left avltree)
-                       (sb-thread::avlnode-right avltree)))
-             (go :error))
-           (let ((pid (posix-fork)))
-             #+darwin
-             (when (= pid 0)
-               (darwin-reinit))
-             #+sb-thread
-             (setf sb-impl::*finalizer-thread* t)
-             (return-from fork pid))))
-     :error
-       (error "Cannot fork with multiple threads running.")))
+    ;; It would be easy enough to to allow fork in multithreaded code - we'd need the new
+    ;; process to set *ALL-THREADS* to contain only one thread, and unmap other threads'
+    ;; stack to avoid a memory leak. The tricky part would be adhering the the POSIX caveats.
+    ;; Linux:
+    ;;   After a fork() in a multithreaded program, the child can safely call only async-signal-safe
+    ;;   functions (see signal-safety(7)) until such time as it calls execve(2).
+    ;; FreeBSD:
+    ;;   If the process has more than one thread, locks and other resources held by the other
+    ;;   threads are not released and therefore only async-signal-safe functions are guaranteed
+    ;;   to work in the child process until a call to execve(2) or a similar function.
+    ;; macOS:
+    ;;   To be totally safe you should restrict yourself to only executing async-signal safe
+    ;;   operations until such time as one of the exec functions is called.
+    #+sb-thread
+    (when (cdr (sb-int:with-system-mutex (sb-thread::*make-thread-lock*)
+                 (sb-impl::finalizer-thread-stop)
+                 ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
+                 ;; Do that now so that the forked process has only the main thread
+                 ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.
+                 (sb-thread::join-pthread-joinables #'identity)
+                 ;; Threads are added to ALL-THREADS before they have an OS thread,
+                 ;; but newborn threads are not exposed in SB-THREAD:LIST-ALL-THREADS.
+                 ;; So we need to go lower-level to sense whether any exist.
+                 (sb-thread:avltree-list sb-thread::*all-threads*)))
+      (sb-impl::finalizer-thread-start)
+      (error "Cannot fork with multiple threads running."))
+    (let ((pid (posix-fork)))
+      #+darwin (when (= pid 0) (darwin-reinit))
+      #+sb-thread (sb-impl::finalizer-thread-start)
+      pid))
   (export 'fork :sb-posix)
 
   (define-call "getpgid" pid-t minusp (pid pid-t))
@@ -430,14 +443,12 @@ not supported."
  (declaim (inline wait))
  (defun wait (&optional statusptr)
    (declare (type (or null (simple-array (signed-byte 32) (1))) statusptr))
-   (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-          (pid (sb-sys:with-pinned-objects (ptr)
-                 (alien-funcall
-                  (extern-alien "wait" (function pid-t (* int)))
-                  (sb-sys:vector-sap ptr)))))
-     (if (minusp pid)
-         (syscall-error 'wait)
-         (values pid (aref ptr 0))))))
+   (with-alien ((wait (function pid-t (* int)) :extern "wait")
+                (status int))
+     (let ((pid (alien-funcall wait (addr status))))
+       (when (minusp pid) (syscall-error 'wait))
+       (when statusptr (setf (aref statusptr 0) status))
+       (values pid status)))))
 
 #-win32
 (progn
@@ -447,15 +458,12 @@ not supported."
    (declare (type (sb-alien:alien pid-t) pid)
             (type (sb-alien:alien int) options)
             (type (or null (simple-array (signed-byte 32) (1))) statusptr))
-   (let* ((ptr (or statusptr (make-array 1 :element-type '(signed-byte 32))))
-          (pid (sb-sys:with-pinned-objects (ptr)
-                 (alien-funcall
-                  (extern-alien "waitpid" (function pid-t
-                                                    pid-t (* int) int))
-                  pid (sb-sys:vector-sap ptr) options))))
-     (if (minusp pid)
-         (syscall-error 'waitpid)
-         (values pid (aref ptr 0)))))
+   (with-alien ((waitpid (function pid-t pid-t (* int) int) :extern "waitpid")
+                (status int))
+     (let ((pid (alien-funcall waitpid pid (addr status) options)))
+       (when (minusp pid) (syscall-error 'waitpid))
+       (when statusptr (setf (aref statusptr 0) status))
+       (values pid status))))
  ;; waitpid macros
  (define-call "wifexited" boolean never-fails (status int))
  (define-call "wexitstatus" int never-fails (status int))
@@ -504,11 +512,9 @@ not supported."
 (define-call "mlockall" int minusp (flags int))
 (define-call "munlockall" int minusp)
 
-#-win32
-(define-call "getpagesize" int minusp)
-#+win32
-;;; KLUDGE: This could be taken from GetSystemInfo
-(export (defun getpagesize () 4096))
+(export 'getpagesize)
+(declaim (inline getpagesize))
+(defun getpagesize () (extern-alien "os_reported_page_size" (unsigned 32)))
 
 ;;; passwd database
 ;; The docstrings are copied from the descriptions in SUSv3,
@@ -654,16 +660,13 @@ not supported."
  (declaim (inline pipe))
  (defun pipe (&optional filedes2)
    (declare (type (or null (simple-array (signed-byte 32) (2))) filedes2))
-   (unless filedes2
-     (setq filedes2 (make-array 2 :element-type '(signed-byte 32))))
-   (let ((r (sb-sys:with-pinned-objects (filedes2)
-              (alien-funcall
-               ;; FIXME: (* INT)?  (ARRAY INT 2) would be better
-               (extern-alien "pipe" (function int (* int)))
-               (sb-sys:vector-sap filedes2)))))
-     (when (minusp r)
-       (syscall-error 'pipe)))
-   (values (aref filedes2 0) (aref filedes2 1))))
+   (multiple-value-bind (fd0 fd1)
+       (with-alien ((pipe (function int (array int 2)) :extern "pipe")
+                    (fds (array int 2)))
+         (let ((r (alien-funcall pipe fds)))
+           (if (minusp r) (syscall-error 'pipe) (values (deref fds 0) (deref fds 1)))))
+     (when filedes2 (setf (aref filedes2 0) fd0 (aref filedes2 1) fd1))
+     (values fd0 fd1))))
 
 #-win32
 (define-protocol-class termios alien-termios ()
@@ -801,7 +804,8 @@ not supported."
              (if (minusp value)
                  (syscall-error 'utimes)
                  value)))
-      (let ((fun (extern-alien "sb_utimes" (function int (c-string :not-null t)
+      (let ((fun (extern-alien #-netbsd "utimes" #+netbsd "sb_utimes"
+                               (function int (c-string :not-null t)
                                                   (* (array alien-timeval 2)))))
             (name (filename filename)))
         (if (not (and access-time modification-time))

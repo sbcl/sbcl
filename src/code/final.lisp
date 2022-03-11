@@ -12,24 +12,22 @@
 (in-package "SB-IMPL")
 
 (defmacro with-finalizer-store ((var) &body body)
-  `(let ((mutex (hash-table-lock (finalizer-id-map **finalizer-store**))))
-     ;; This does not inhibit GC, though the hashtable operations will,
-     ;; as is (currently) required for tables with non-null weakness.
-     (sb-thread::with-recursive-system-lock (mutex)
-       ;; Grab the store again inside the lock in case the array was enlarged
-       ;; after we referenced the mutex but before we acquired it.
-       (let ((,var **finalizer-store**))
-         ,@body))))
+  `(with-system-mutex ((hash-table-lock (finalizer-id-map **finalizer-store**)))
+     ;; Grab the global var inside the lock in case the array was enlarged
+     ;; after we referenced the mutex but before we acquired it.
+     ;; It's OK to reference the FINALIZER-ID-MAP because that is always
+     ;; in element 1 of the array regardless of what happens to the array.
+     (let ((,var **finalizer-store**))
+       ,@body)))
 
 (defmacro finalizer-recycle-bin (store) `(cdr (elt ,store 0)))
 (defmacro finalizer-id-map (store) `(elt ,store 1))
 (defmacro finalizer-max-id (store) `(elt ,store 2))
 
 (defun make-finalizer-store (array-length)
-  (let* ((v (make-array (the index array-length)))
-         (ht (make-hash-table :test 'eq :weakness :key)))
-    (setf (%instance-ref ht (get-dsd-index hash-table flags))
-          (logior (%instance-ref ht (get-dsd-index hash-table flags)) 4))
+  (let* ((v (make-array (the index array-length) :initial-element 0))
+         (ht (make-system-hash-table :test 'eq :weakness :key :synchronized nil
+                                     :finalizer t)))
     ;; The recycle bin has a dummy item in front so that the simple-vector
     ;; is growable without messing up RUN-PENDING-FINALIZERS when it atomically
     ;; pushes items into the recycle bin - it is unaffected by looking at
@@ -45,7 +43,8 @@
 (declaim (simple-vector **finalizer-store**))
 
 (defun finalize (object function &key dont-save
-                        &aux (item (if dont-save (list function) function)))
+                        &aux (function (%coerce-callable-to-fun function))
+                             (item (if dont-save (list function) function)))
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
@@ -134,6 +133,25 @@ Examples:
                    (gethash object (finalizer-id-map store)) id)))))
   object)
 
+(defun invalidate-fd-streams ()
+  (with-finalizer-store (store)
+    (maphash (lambda (object id)
+               (declare (ignore id))
+               (when (fd-stream-p object)
+                 (push (list object
+                             (ansi-stream-in object)
+                             (ansi-stream-bin object)
+                             (ansi-stream-n-bin object)
+                             (ansi-stream-out object)
+                             (ansi-stream-bout object)
+                             (ansi-stream-sout object)
+                             (ansi-stream-misc object))
+                       *streams-closed-by-slad*)
+                 ;; Nobody asked us to actually close the fd,
+                 ;; so just make it unusable.
+                 (set-closed-flame-by-slad object)))
+             (finalizer-id-map store))))
+
 (defun finalizers-deinit ()
   ;; remove :dont-save finalizers
   ;; Renumber the ID range as well, but leave the array size as-is. We could
@@ -141,10 +159,12 @@ Examples:
   ;; finalizers can in practice almost never be run, as pseudo-static objects
   ;; don't die, making this more-or-less an exercise in futility.
   (with-finalizer-store (old-store)
-    (without-gcing
+    ;; This doesn't need WITHOUT-GCING. MAPHASH will never present its funarg
+    ;; with a culled entry. GC during the MAPHASH could remove some items
+    ;; before we get to them, and that's fantastic.
       (let ((new-store
-             (make-finalizer-store (max (1+ (finalizer-max-id old-store))
-                                        +finalizers-initial-size+)))
+              (make-finalizer-store (max (1+ (finalizer-max-id old-store))
+                                         +finalizers-initial-size+)))
             (old-objects (finalizer-id-map old-store)))
         (maphash (lambda (object old-id &aux (old (svref old-store old-id)))
                    ;; OLD is either a vector of finalizers or a single finalizer.
@@ -154,7 +174,7 @@ Examples:
                    (awhen (cond ((simple-vector-p old)
                                  (let ((new (remove-if #'consp old)))
                                    (case (length new)
-                                     (0 nil) ; all deleted
+                                     (0 nil)           ; all deleted
                                      (1 (svref new 0)) ; reduced to singleton
                                      (t new))))
                                 ((atom old) old)) ; a single finalizer to be saved
@@ -164,7 +184,7 @@ Examples:
                  old-objects)
         (clrhash old-objects)
         (fill old-store 0)
-        (setq **finalizer-store** new-store)))))
+        (setq **finalizer-store** new-store))))
 
 ;;; Replace the finalizer store with a copy.  Tenured (gen6 = pseudo-static)
 ;;; vectors are problematic in many ways for gencgc, unless immutable.
@@ -214,15 +234,23 @@ Examples:
     object))
 
 ;;; Drain the queue of finalizers and return when empty.
-;;; Concurrent invocations of this function are ok.
-(defun scan-finalizers ()
+;;; Concurrent invocations of this function in different threads are ok.
+;;; Nested invocations (from a GC forced by a finalizer) are not ok.
+;;; See the trace at the bottom of this file.
+(defvar *in-a-finalizer* nil)
+#+sb-thread (define-alien-variable finalizer-thread-runflag int)
+(defun run-pending-finalizers ()
   ;; This never acquires the finalizer store lock. Code accordingly.
   (let ((hashtable (finalizer-id-map **finalizer-store**)))
     (loop
+     ;; Perform no further work if trying to stop the thread, even if there is work.
+     #+sb-thread (when (zerop finalizer-thread-runflag) (return))
      (let ((cell (hash-table-culled-values hashtable)))
        ;; This is like atomic-pop, but its obtains the first cons cell
        ;; in the list, not the car of the first cons.
-       (loop (unless cell (return-from scan-finalizers))
+       ;; Possible TODO: when no other work remains, free the *JOINABLE-THREADS*,
+       ;; though MAKE-THREAD and JOIN-THREAD do that also, so there's no memory leak.
+       (loop (unless cell (return-from run-pending-finalizers))
              (let ((actual (cas (hash-table-culled-values hashtable)
                                 cell (cdr cell))))
                (if (eq actual cell) (return) (setq cell actual))))
@@ -233,7 +261,7 @@ Examples:
               ;; so always load the vector again before dereferencing.
               (store **finalizer-store**)
               ;; I don't think we need a barrier; this has a data dependency
-              ;; on (CAR CELL) and STORE. (Alpha with threads, anyone?)
+              ;; on (CAR CELL) and STORE.
               (finalizers (svref store id))) ; [1] load
          (setf (svref store id) 0)           ; [2] store
          ;; The ID can be reused right away. Link it into the recycle list,
@@ -246,7 +274,7 @@ Examples:
          ;; Now call the function(s)
          (flet ((call (finalizer)
                   (let ((fun (if (consp finalizer) (car finalizer) finalizer)))
-                    (handler-case (funcall fun)
+                    (handler-case (let ((*in-a-finalizer* t)) (funcall fun))
                       (error (c)
                         (warn "Error calling finalizer ~S:~%  ~S" fun c))))))
            (if (simple-vector-p finalizers)
@@ -271,63 +299,187 @@ Examples:
          (cond ((simple-vector-p finalizers) (fill finalizers 0))
                ((consp finalizers) (rplaca finalizers 0))))))))
 
+(define-load-time-global *finalizer-thread* nil)
+(declaim (type (or sb-thread:thread (eql :start) null) *finalizer-thread*))
 #+sb-thread
 (progn
-  ;; *FINALIZER-THREAD* is either a boolean value indicating whether to start a
-  ;; thread, or a thread object (which is created no sooner than needed).
-  ;; Saving a core sets the flag to NIL so that finalizers which execute
-  ;; between stopping the thread and writing to disk will be synchronous.
-  ;; Restarting a saved core resets the flag to T.
-  (define-load-time-global *finalizer-thread* t)
-  (declaim (type (or sb-thread:thread boolean) *finalizer-thread*))
-  (define-load-time-global *finalizer-queue-lock*
-      (sb-thread:make-mutex :name "finalizer"))
-  (define-load-time-global *finalizer-queue*
-      (sb-thread:make-waitqueue :name "finalizer")))
+(defun finalizer-thread-notify ()
+  (alien-funcall (extern-alien "finalizer_thread_wake" (function void)))
+  nil)
 
-(defun run-pending-finalizers ()
-  (when (hash-table-culled-values (finalizer-id-map **finalizer-store**))
-    (cond #+sb-thread
-          ((%instancep *finalizer-thread*)
-           (sb-thread::with-system-mutex (*finalizer-queue-lock*)
-             (sb-thread:condition-notify *finalizer-queue*)))
-          #+sb-thread
-          ((eq *finalizer-thread* t) ; Create a new thread
-           (sb-thread:make-thread
+;;; The following operations are synchronized by *MAKE-THREAD-LOCK* -
+;;;   FINALIZER-THREAD-{START,STOP}, S-L-A-D, SB-POSIX:FORK
+(defun finalizer-thread-start ()
+  (with-system-mutex (sb-thread::*make-thread-lock*)
+    #+(and unix sb-safepoint)
+    (sb-thread::make-system-thread "sigwait"
+                                   #'sb-unix::signal-handler-loop
+                                   nil 'sb-unix::*sighandler-thread*)
+    (aver (not *finalizer-thread*))
+    (setf finalizer-thread-runflag 1)
+    (setq *finalizer-thread* :start)
+    (let ((thread
+           (sb-thread::make-system-thread
+            "finalizer"
             (lambda ()
-              (when (eq t (cas *finalizer-thread* t
-                               sb-thread:*current-thread*))
-                ;; Don't enter the loop if this thread lost the
-                ;; competition to become a finalizer thread.
-                (loop
-                  (scan-finalizers)
-                  ;; Wait for a notification
-                  (sb-thread::with-system-mutex (*finalizer-queue-lock*)
-                    ;; Don't go to sleep if *FINALIZER-THREAD* became NIL
-                    (unless *finalizer-thread*
-                      (return))
-                    ;; The return value of CONDITION-WAIT is irrelevant
-                    ;; since it is always legal to call SCAN-FINALIZERS
-                    ;; even when it has nothing to do.
-                    ;; Spurious wakeup is of no concern to us here.
-                    (sb-thread:condition-wait
-                     *finalizer-queue* *finalizer-queue-lock*)))))
-            :name "finalizer"
-            :ephemeral t))
-          (t
-           (scan-finalizers)))))
+              (setf *finalizer-thread* sb-thread:*current-thread*)
+              (loop (run-pending-finalizers)
+                    (alien-funcall (extern-alien "finalizer_thread_wait" (function void)))
+                    (when (zerop finalizer-thread-runflag) (return)))
+              (setq *finalizer-thread* nil))
+            nil nil)))
+      ;; Don't return from this function until *FINALIZER-THREAD* has a good value,
+      ;; but don't set it to a thread if the thread was not created, or exited already.
+      (cas *finalizer-thread* :start thread))))
 
-;;; If a finalizer thread was started, stop it and wait for it to finish.
-;;; Make no attempt to drain the queue of pending finalizers.
-;;; (When called from EXIT, the user must invoke a final GC if there is
-;;; an expectation that GC-based things run. Similarly when saving a core)
+;;; You should almost always invoke this with *MAKE-THREAD-LOCK* held.
+;;; Some tests violate that, but they know what they're doing.
 (defun finalizer-thread-stop ()
-  #+sb-thread
+  #+(and unix sb-safepoint)
+  (let ((thread sb-unix::*sighandler-thread*))
+    (aver (sb-thread::thread-p thread))
+    (setq sb-unix::*sighandler-thread* nil)
+    ;; This kill causes the thread's sigwait() syscall to return normally
+    ;; and then not invoke any handler.
+    (sb-unix:pthread-kill (sb-thread::thread-os-thread thread) sb-unix:sigterm)
+    (sb-thread:join-thread thread))
   (let ((thread *finalizer-thread*))
-    (when thread ; if it was NIL it can't become a thread. So there's no race.
-      ;; Setting to NIL causes the thread to exit after waking
-      (setq thread (cas *finalizer-thread* thread nil))
-      (when (%instancep thread) ; only if it was a thread, do this
-        (sb-thread::with-system-mutex (*finalizer-queue-lock*)
-          (sb-thread:condition-notify *finalizer-queue*))
-        (sb-thread:join-thread thread))))) ; wait for it
+    (aver (sb-thread::thread-p thread))
+    (alien-funcall (extern-alien "finalizer_thread_stop" (function void)))
+    (sb-thread:join-thread thread)))
+)
+
+#|
+;;; This is a display produced by annotating parts of gc-common.c and
+;;; interrupt.c with each thread's output in its own column.
+;;; The main thread is on the right.
+
+;;; This output shows that if the finalizer thread calls a function that
+;;; triggers a GC, the interrupt nesting depth can grow without limit.
+;;; The finalizer thread does not have to be a memory hog - it just has
+;;; to be unlucky enough to be the thread that triggers the collection.
+;;; _Any_ thread can bring the GC trigger up to the threshold,
+;;; and as long as the finalizer thread is the one to cross the
+;;; the threshold, it is tasked with triggering the next scan
+;;; of finalizers, but it MUST NOT do so recursively.
+;;;
+;;; The same thing can happen without using a finalizer thread,
+;;; but it's actually easier to understand the output this way.
+
+Thread 2                                     Main
+--------                                     --------
+|                                            Enter SB-EXT:GC 0
+|                                            Stopping world
+|                                            Stopped world
+|                                            SUB-GC calling gc(0)
+|                                            set auto_gc_trig=4858833
+|                                            completed GC
+|                                            Restarted world
+|                                            SB-EXT:GC calling POST-GC
+|                                            ENTER run-pending-finalizers
+|                                            Enter SB-EXT:GC 0
+|                                            Stopping world
+|                                            Stopped world
+|                                            SUB-GC calling gc(6)
+|                                            set auto_gc_trig=5075473
+|                                            completed GC
+|                                            Restarted world
+|                                            SB-EXT:GC calling POST-GC
+|                                            ENTER run-pending-finalizers
+|                                            Trying to start finalizer thread
+| starting
+|                                            Enter SB-EXT:GC 0
+|                                            Stopping world
+| Caught SIGUSR2, pc=52a946bd
+| STOP_FOR_GC PA=1 inh=N sigmask=0
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 1 >handle_pending
+| STOP_FOR_GC PA=0 inh=N sigmask=0
+| fake ffcall "stop_for_gc"
+| bind(free_ICI, 1)
+|                                            Stopped world
+|                                            SUB-GC calling gc(6)
+|                                            set auto_gc_trig=520eeb3
+|                                            completed GC
+|                                            Restarted world
+|                                            SB-EXT:GC calling POST-GC
+|                                            ENTER run-pending-finalizers
+|                                            Notify finalizer thread
+| unbind free_ICI -> 0
+| leave STOP_FOR_GC
+| evt 1 <handle_pending
+| gc_trig=52bcf80, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 2 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 1)
+| maybe_gc calling SUB-GC
+| Stopping world
+|                                            Caught SIGUSR2, pc=7ff010deef47
+|                                            STOP_FOR_GC PA=0 inh=N sigmask=0
+|                                            fake ffcall "stop_for_gc"
+|                                            bind(free_ICI, 1)
+| Stopped world
+| SUB-GC calling gc(0)
+| set auto_gc_trig=552b033
+| completed GC
+| Restarted world
+| maybe_gc calling POST-GC
+| ENTER run-pending-finalizers
+|                                            unbind free_ICI -> 0
+|                                            leave STOP_FOR_GC
+| gc_trig=55d9110, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 3 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 2)
+| maybe_gc calling SUB-GC
+| Stopping world
+|                                            Caught SIGUSR2, pc=7ff010deef47
+|                                            STOP_FOR_GC PA=0 inh=N sigmask=0
+|                                            fake ffcall "stop_for_gc"
+|                                            bind(free_ICI, 1)
+| Stopped world
+| SUB-GC calling gc(0)
+| set auto_gc_trig=56c0423
+| completed GC
+| Restarted world
+| maybe_gc calling POST-GC
+| ENTER run-pending-finalizers
+|                                            unbind free_ICI -> 0
+|                                            leave STOP_FOR_GC
+| gc_trig=576e500, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 4 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 3)
+| maybe_gc calling SUB-GC
+| Stopping world
+|                                            Caught SIGUSR2, pc=7ff010deef47
+|                                            STOP_FOR_GC PA=0 inh=N sigmask=0
+|                                            fake ffcall "stop_for_gc"
+|                                            bind(free_ICI, 1)
+| Stopped world
+| SUB-GC calling gc(0)
+| set auto_gc_trig=59dc213
+| completed GC
+| Restarted world
+| maybe_gc calling POST-GC
+| ENTER run-pending-finalizers
+|                                            unbind free_ICI -> 0
+|                                            leave STOP_FOR_GC
+| gc_trig=5a8a2f0, setting PA-int
+| Caught SIGILL, pc=52a946cc code 0x9
+| evt 5 >handle_pending
+| ENTER maybe_gc (pc was 52a946ce)
+| fake ffcall "maybe_gc"
+| bind(free_ICI, 4)
+| maybe_gc calling SUB-GC
+| Stopping world
+|
+;;; This pattern of binding FREE_INTERRUPT_CONTEXT_INDEX to successively
+;;; higher values will continue forever until reaching the limit and crashing.
+|#

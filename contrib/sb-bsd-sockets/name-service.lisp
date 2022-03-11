@@ -25,7 +25,7 @@
 #-sb-bsd-sockets-addrinfo
 (defun make-host-ent (h &optional errno)
   (when (sb-alien:null-alien h)
-    (name-service-error "gethostbyname" errno))
+    (name-service-error "gethostbyname" (get-name-service-errno)))
   (let* ((length (sockint::hostent-length h))
          (aliases (loop for i = 0 then (1+ i)
                         for al = (sb-alien:deref (sockint::hostent-aliases h) i)
@@ -68,14 +68,14 @@
     "Returns a HOST-ENT instance for HOST-NAME or signals a NAME-SERVICE-ERROR.
 HOST-NAME may also be an IP address in dotted quad notation or some other
 weird stuff - see gethostbyname(3) for the details."
-    (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+    (sb-int:with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
       (make-host-ent (sockint::gethostbyname host-name))))
 
   (defun get-host-by-address (address)
     "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
  (integer 0 255), or signals a NAME-SERVICE-ERROR. See gethostbyaddr(3)
  for details."
-    (sb-thread::with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
+    (sb-int:with-system-mutex (**gethostby-lock** :allow-with-interrupts t)
       (sockint::with-in-addr packed-addr ()
         (let ((addr-vector (coerce address 'vector)))
           (loop for i from 0 below (length addr-vector)
@@ -108,6 +108,7 @@ weird stuff - see getaddrinfo(3) for the details."
                                           :type sockint::af-inet
                                           :aliases nil
                                           :addresses nil))
+                #-win32
                 (host-ent6 (make-instance 'host-ent
                                           :name node
                                           :type sockint::af-inet6
@@ -128,6 +129,7 @@ weird stuff - see getaddrinfo(3) for the details."
                             (adjoin (naturalize-unsigned-byte-8-array address 4)
                                     (host-ent-addresses host-ent4)
                                     :test 'equalp))))
+                   #-win32
                    ((= (sockint::addrinfo-family info*) sockint::af-inet6)
                     (let ((address (sockint::sockaddr-in6-addr
                                     (sb-alien:cast
@@ -138,7 +140,7 @@ weird stuff - see getaddrinfo(3) for the details."
                                     (host-ent-addresses host-ent6)
                                     :test 'equalp))))))
             (sockint::freeaddrinfo info)
-            (values host-ent4 host-ent6)))))
+            (values host-ent4 #-win32 host-ent6)))))
 
   (defun get-host-by-address (address)
     "Returns a HOST-ENT instance for ADDRESS, which should be a vector of
@@ -146,7 +148,7 @@ weird stuff - see getaddrinfo(3) for the details."
 elements in case of an IPv6 address, or signals a NAME-SERVICE-ERROR.
 See gethostbyaddr(3) for details."
     (declare (optimize speed))
-    (multiple-value-bind (sockaddr sockaddr-free sockaddr-size address-family)
+    (multiple-value-bind (sockaddr sockaddr-size address-family)
         (etypecase address
           ((vector (unsigned-byte 8) 4)
            (let ((sockaddr (sb-alien:make-alien sockint::sockaddr-in)))
@@ -155,16 +157,17 @@ See gethostbyaddr(3) for details."
              (dotimes (i (length address))
                (setf (sb-alien:deref (sockint::sockaddr-in-addr sockaddr) i)
                      (aref address i)))
-             (values sockaddr #'sockint::free-sockaddr-in
+             (values sockaddr
                      (sb-alien:alien-size sockint::sockaddr-in :bytes)
                      sockint::af-inet)))
+          #-win32
           ((vector (unsigned-byte 8) 16)
            (let ((sockaddr (sb-alien:make-alien sockint::sockaddr-in6)))
              (setf (sockint::sockaddr-in6-family sockaddr) sockint::af-inet6)
              (dotimes (i (length address))
                (setf (sb-alien:deref (sockint::sockaddr-in6-addr sockaddr) i)
                      (aref address i)))
-             (values sockaddr #'sockint::free-sockaddr-in6
+             (values sockaddr
                      (sb-alien:alien-size sockint::sockaddr-in6 :bytes)
                      sockint::af-inet6))))
       (unwind-protect
@@ -183,116 +186,70 @@ See gethostbyaddr(3) for details."
                                 :type address-family
                                 :aliases nil
                                 :addresses (list address))))
-        (funcall sockaddr-free sockaddr)))))
+        (sb-alien:free-alien sockaddr)))))
 
 ;;; Error handling
 
-(defvar *name-service-errno* 0
-  "The value of h_errno, after it's been fetched from Unix-land by calling
-GET-NAME-SERVICE-ERRNO")
-
-(defun name-service-error (where &optional errno)
-  (let ((*name-service-errno* (get-name-service-errno errno)))
-    ;; Comment next to NETDB_INTERNAL in netdb.h says "See errno.".
-    ;; This special case treatment hasn't actually been tested yet.
-    (if (and #-win32 (= *name-service-errno* sockint::NETDB-INTERNAL))
-        (socket-error where)
-        (let ((condition
-               (condition-for-name-service-errno *name-service-errno*)))
-          (error condition :errno *name-service-errno* :syscall where)))))
-
-(defun addrinfo-error (where error-code)
-  (let ((condition (condition-for-name-service-error-code error-code)))
-    (error condition :error-code error-code :syscall where)))
+(defun name-service-error (where errno)
+  (cond #-sb-bsd-sockets-addrinfo
+        ((= errno sockint::NETDB-INTERNAL)
+         ;; Comment next to NETDB_INTERNAL in netdb.h says "See errno.".
+         ;; This special case treatment hasn't actually been tested yet.
+         (socket-error where))
+        (t
+         (error (condition-for-name-service-errno errno)
+                :errno errno :syscall where))))
 
 (define-condition name-service-error (error)
   ((errno :initform nil :initarg :errno :reader name-service-error-errno)
-   (error-code :initform nil :initarg :error-code
-               :reader name-service-error-error-code)
    (symbol :initform nil :initarg :symbol :reader name-service-error-symbol)
    (syscall :initform "an unknown location" :initarg :syscall :reader name-service-error-syscall))
   (:report (lambda (c s)
-             (let* ((errno (name-service-error-errno c))
-                    (error-code (name-service-error-error-code c)))
+             (let* ((errno (name-service-error-errno c)))
                (format s "Name service error in \"~A\": ~A (~A)"
                        (name-service-error-syscall c)
                        (or (name-service-error-symbol c)
-                           errno
-                           error-code)
-                       (get-name-service-error-message errno error-code))))))
+                           errno)
+                       (get-name-service-error-message errno))))))
 
 (defparameter *conditions-for-name-service-errno* nil)
-;; getaddrinfo and getnameinfo return an error code, rather than using
-;; h_errno.  While on Linux there's no overlap between their possible
-;; values, this doesn't seem to be guaranteed on all systems.
-(defparameter *conditions-for-name-service-error-code* nil)
 
 ;; Define a special name-service-error for variour error cases, and associate
 ;; them with the matching h_errno / error code.
-(defmacro define-name-service-condition (errno-symbol error-code-symbol name)
-  `(progn
-     (define-condition ,name (name-service-error)
-       ((errno-symbol :reader name-service-error-errno-symbol
-                      :initform (quote ,errno-symbol))
-        (error-code-symbol :reader name-service-error-error-code-symbol
-                           :initform (quote ,error-code-symbol))))
-     (push (cons ,errno-symbol (quote ,name))
-           *conditions-for-name-service-errno*)
-     #+sb-bsd-sockets-addrinfo
-     (push (cons ,error-code-symbol (quote ,name))
-           *conditions-for-name-service-error-code*)))
-
-#-win32
-(define-name-service-condition
-    sockint::NETDB-INTERNAL
-    nil ;; Doesn't map directly to any getaddrinfo error code
-    netdb-internal-error)
-#-win32
-(define-name-service-condition
-    sockint::NETDB-SUCCESS
-    nil ;; Doesn't map directly to any getaddrinfo error code
-    netdb-success-error)
-(define-name-service-condition
-    sockint::HOST-NOT-FOUND
-    sockint::EAI-NONAME
-    host-not-found-error)
-(define-name-service-condition
-    sockint::TRY-AGAIN
-    sockint::EAI-AGAIN
-    try-again-error)
-(define-name-service-condition
-    sockint::NO-RECOVERY
-    sockint::EAI-FAIL
-    no-recovery-error)
-(define-name-service-condition
-    ;; Also defined as NO-DATA, with the same value
-    sockint::NO-ADDRESS
+(macrolet ((def (errno gai-errno name)
+             (declare (ignorable errno gai-errno))
+             `(progn
+                (define-condition ,name (name-service-error)
+                  ())
+                ,(let ((errno #-sb-bsd-sockets-addrinfo errno
+                              #+sb-bsd-sockets-addrinfo gai-errno))
+                   (when errno
+                     `(push (cons ,(find-symbol errno 'sockint)
+                                  (quote ,name))
+                            *conditions-for-name-service-errno*))))))
+  (def "NETDB-INTERNAL" nil netdb-internal-error)
+  (def "NETDB-SUCCESS" nil netdb-success-error)
+  (def "HOST-NOT-FOUND" "EAI-NONAME" host-not-found-error)
+  (def "TRY-AGAIN" "EAI-AGAIN" try-again-error)
+  (def "NO-RECOVERY" "EAI-FAIL" no-recovery-error)
+  (def "NO-ADDRESS" ;; Also defined as NO-DATA, with the same value
     ;; getaddrinfo() as of RFC 3493 can no longer distinguish between
     ;; host no found and address not found
     nil
-    no-address-error)
+    no-address-error))
 
 (defun condition-for-name-service-errno (err)
-  (or (cdr (assoc err *conditions-for-name-service-errno* :test #'eql))
+  (or (cdr (assoc err *conditions-for-name-service-errno*))
       'name-service-error))
 
-(defun condition-for-name-service-error-code (err)
-  (or (cdr (assoc err *conditions-for-name-service-error-code* :test #'eql))
-      'name-service-error))
+#-sb-bsd-sockets-addrinfo
+(defun get-name-service-errno ()
+  (sb-alien:alien-funcall
+   (sb-alien:extern-alien #-win3 "get_h_errno" #+win32 "WSAGetLastError"
+                          (function integer))))
 
-(defun get-name-service-errno (&optional errno)
-  (setf *name-service-errno*
-        (or errno
-            (sb-alien:alien-funcall
-             #-win32
-             (sb-alien:extern-alien "get_h_errno" (function integer))
-             #+win32
-             (sb-alien:extern-alien "WSAGetLastError" (function integer))))))
-
-(defun get-name-service-error-message (errno error-code)
-  (declare (ignorable errno error-code))
-  #-win32
-  (if errno
-      (sockint::h-strerror errno)
-      #+sb-bsd-sockets-addrinfo
-      (sockint::gai-strerror error-code)))
+(defun get-name-service-error-message (errno)
+  #-sb-bsd-sockets-addrinfo
+  (sockint::h-strerror errno)
+  #+sb-bsd-sockets-addrinfo
+  (sockint::gai-strerror errno))

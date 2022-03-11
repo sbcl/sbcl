@@ -30,6 +30,16 @@
 (defun sb-xc:ldb (cross-byte int)
   (cl:ldb (uncross-byte cross-byte) int))
 
+(define-compiler-macro sb-xc:ldb (&whole whole byte int)
+  (if (typep byte '(cons (eql sb-xc:byte) (cons t (cons t null))))
+      `(cl:ldb (cl:byte ,(second byte) ,(third byte)) ,int)
+      whole))
+
+(define-compiler-macro sb-xc:dpb (&whole whole new byte int)
+  (if (typep byte '(cons (eql sb-xc:byte) (cons t (cons t null))))
+      `(cl:dpb ,new (cl:byte ,(second byte) ,(third byte)) ,int)
+      whole))
+
 (defun sb-xc:ldb-test (cross-byte int)
   (cl:ldb-test (uncross-byte cross-byte) int))
 
@@ -45,7 +55,7 @@
 (declaim (ftype function bug))
 (define-setf-expander sb-xc:ldb (cross-byte int &environment env)
   (multiple-value-bind (temps vals stores store-form access-form)
-      (get-setf-expansion int env)
+      (cl:get-setf-expansion int env)
     (when (cdr stores)
       (bug "SETF SB-XC:LDB too hairy!"))
     (let ((btemp (gensym))
@@ -59,8 +69,8 @@
               `(cl:ldb (uncross-byte ,btemp) ,access-form)))))
 
 (define-setf-expander sb-xc:mask-field (cross-byte int &environment env)
-    (multiple-value-bind (temps vals stores store-form access-form)
-      (get-setf-expansion int env)
+  (multiple-value-bind (temps vals stores store-form access-form)
+      (cl:get-setf-expansion int env)
     (when (cdr stores)
       (bug "SETF SB-XC:MASK-FIELD too hairy!"))
     (let ((btemp (gensym))

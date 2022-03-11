@@ -1,0 +1,36 @@
+;;; exceptions to Unicode LineBreakTest.txt
+;;;
+;;; our test code removes the last character (a tab) before the # on
+;;; each affected line, so this file does too.
+(
+ "× 007D ÷ 0025 ÷" ; "}%" UAX#14 25.1: CL × PO
+ "× 007D × 0308 ÷ 0025 ÷" ; "}<combining diaresis>%" UAX#14 25.1: CL × PO
+ "× 007D ÷ 0024 ÷" ; "}$" UAX#14 25.3: CL × PR
+ "× 007D × 0308 ÷ 0024 ÷" ; "}<combining diaresis>$" UAX#14 25.3: CL × PR
+ "× 0029 ÷ 0025 ÷" ; ")%" UAX#14 25.2: CP × PO
+ "× 0029 × 0308 ÷ 0025 ÷" ; ")<combining diaresis>%" UAX#14 25.2: CP × PO
+ "× 0029 ÷ 0024 ÷" ; ")$" UAX#14 25.4: CP × PR
+ "× 0029 × 0308 ÷ 0024 ÷" ; ")<combining diaresis>$" UAX#14 25.4: CP × PR
+ "× 002C ÷ 0030 ÷" ; ",0" UAX#14 25.12: IS × NU
+ "× 002C × 0308 ÷ 0030 ÷" ; ",<combining diaresis>0" UAX#14 25.12: IS × NU
+ "× 0025 ÷ 0028 ÷" ; "%(" UAX#14 25.7: PO × OP
+ "× 0025 × 0308 ÷ 0028 ÷" ; "%<combining diaresis>(" UAX#14 25.7: PO × OP
+ "× 0024 ÷ 0028 ÷" ; "$(" UAX#14 25.9: PR × OP
+ "× 0024 × 0308 ÷ 0028 ÷" ; "$<combining diaresis>(" UAX#14 25.9: PR × OP
+ "× 002F ÷ 0030 ÷" ; "/0" UAX#14 25.14: SY × NU
+ "× 002F × 0308 ÷ 0030 ÷" ; "/<combining diaresis>0" UAX#14 25.14: SY × NU
+ "× 0065 × 0071 × 0075 × 0061 × 006C × 0073 × 0020 × 002E ÷ 0033 × 0035 × 0020 ÷ 0063 × 0065 × 006E × 0074 × 0073 ÷" ; "equals .35 cents" UAX#14 25.12: IS × NU
+ "× 0063 × 006F × 0064 × 0065 ÷ 005C ÷ 0028 × 0073 ÷ 005C × 0029 ÷" ; "code\(s\)" UAX#14 25.9: PR × OP
+ "× 0063 × 006F × 0064 × 0065 ÷ 005C ÷ 007B × 0073 ÷ 005C × 007D ÷" ; "code\{s\}" UAX#14 25.9: PR × OP
+ "× 0061 × 002E ÷ 0032 × 0020 ÷" ; "a.2 " UAX#14 25.12: IS × NU
+ "× 0061 × 002E ÷ 0032 × 0020 ÷ 0915 ÷" ; "a.2 क" UAX#14 25.12: IS × NU
+ "× 0061 × 002E ÷ 0032 × 0020 ÷ 672C ÷" ; "a.2 本" UAX#14 25.12: IS × NU
+ "× 0061 × 002E ÷ 0032 × 3000 ÷ 672C ÷" ; "a.2　本" UAX#14 25.12: IS × NU
+ "× 0061 × 002E ÷ 0032 × 3000 ÷ 307E ÷" ; "a.2　ま" UAX#14 25.12: IS × NU
+ "× 0061 × 002E ÷ 0032 × 3000 ÷ 0033 ÷" ; "a.2　3" UAX#14 25.12: IS × NU
+ "× 0041 × 002E ÷ 0031 × 0020 ÷ BABB ÷" ; "A.1 못" UAX#14 25.12: IS × NU
+ "× BD24 ÷ C5B4 × 002E × 0020 ÷ 0041 × 002E ÷ 0032 × 0020 ÷ BCFC ÷" ; "봤어. A.2 볼" UAX#14 25.12: IS × NU
+ "× BD10 ÷ C694 × 002E × 0020 ÷ 0041 × 002E ÷ 0033 × 0020 ÷ BABB ÷" ; "봐요. A.3 못" UAX#14 25.12: IS × NU
+ "× C694 × 002E × 0020 ÷ 0041 × 002E ÷ 0034 × 0020 ÷ BABB ÷" ; "요. A.4 못" UAX#14 25.12: IS × NU
+ "× 0061 × 002E ÷ 0032 × 3000 ÷ 300C ÷" ; "a.2　「" UAX#14 25.12: IS × NU
+ )

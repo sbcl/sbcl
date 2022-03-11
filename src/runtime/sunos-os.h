@@ -19,7 +19,7 @@
 #include "target-arch.h"
 
 /* FIXME: Stolen from CMUCL. Investigate. */
-typedef unsigned long os_vm_address_t;
+typedef char* os_vm_address_t;
 typedef size_t os_vm_size_t;
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;
@@ -33,3 +33,15 @@ typedef int os_vm_prot_t;
 #define SIG_MEMORY_FAULT SIGSEGV
 
 #define SIG_STOP_FOR_GC (SIGUSR2)
+
+/*
+ * On SunOS systems the trace bit being set when setcontext(2) is called, such
+ * as on return from a signal handler, causes the process to be flagged to
+ * take a single step trap immediately on return to user level.  That is, _on_
+ * the instruction of the program counter in the context.  This leaves us
+ * looping infinitely hitting the same breakpoint.
+ *
+ * Act as if we can't set the flag at all, since setting it has a different
+ * meaning.
+ */
+#define CANNOT_GET_TO_SINGLE_STEP_FLAG

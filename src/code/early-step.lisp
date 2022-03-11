@@ -22,20 +22,21 @@
 #-sb-thread
 (defvar *stepping* 0)
 
+#-sb-xc-host
+(progn
+
 ;; Used for implementing the STEP-OUT restart. The step-wrapper will
 ;; bind this to :MAYBE, before calling the wrapped code. When
 ;; unwinding, the wrapper will check whether it's been set to T. If
 ;; so, it'll re-enable the stepper. This is a tri-state variable (NIL,
 ;; :MAYBE, T) so that the debugger can detect in advance whether the
 ;; OUT debugger command will actually have a wrapper to step out to.
-(!define-thread-local *step-out* nil)
+(define-thread-local *step-out* nil)
 
 ;; These functions make no sense on the host, but putting them in
 ;; 'step.lisp' is too late, because 'step' is compiled in warm load,
 ;; but the REPL calls DISABLE-STEPPING right way.
 ;; Adding a file of target-only code for these isn't worth the trouble.
-#-sb-xc-host
-(progn
 (symbol-macrolet ((place
                    #+sb-thread (sb-thread::thread-stepping)
                    #-sb-thread *stepping*))

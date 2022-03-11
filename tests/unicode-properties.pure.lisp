@@ -313,7 +313,7 @@ Wanted ~S, got ~S."
 
 (defun test-line-break-class ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "../tools-for-build/LineBreakProperty.txt"
+  (with-open-file (s "../tools-for-build/LineBreak.txt"
                      :external-format :ascii)
     (with-test (:name (:line-break-class))
       (loop for line = (read-line s nil nil)

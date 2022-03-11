@@ -47,7 +47,7 @@
            (ensure-roundtrip-latin :latin9))
 
          (ensure-roundtrip-utf8 ()
-           (let ((string (make-string char-code-limit)))
+           (let ((string (make-string char-code-limit :initial-element #\nul)))
              (dotimes (i char-code-limit)
                (unless (<= #xd800 i #xdfff)
                  (setf (char string i) (code-char i))))
@@ -81,7 +81,7 @@
 
   (ensure-roundtrip-ascii)
   (ensure-roundtrip-latin1)
-  #+sb-unicode
+  #+(and sb-unicode (not unicode-lite))
   (progn
     (ensure-roundtrip-latin9)
     ;; Latin-9 chars; the previous test checked roundtrip from
@@ -243,22 +243,21 @@
 ;;; START argument.
 (assert (equalp #(50) (string-to-octets "42" :start 1 :external-format :utf-8)))
 
-;;; STRING->UTF8 should cope with NIL strings if a null range is required
 (assert (equalp #() (string-to-octets "" :external-format :utf-8)))
-(assert (equalp #() (string-to-octets (make-array 0 :element-type nil)
+(assert (equalp #() (string-to-octets (make-string 0)
                                       :external-format :utf-8)))
-(assert (equalp #() (string-to-octets (make-array 5 :element-type nil)
+(assert (equalp #() (string-to-octets (make-string 5)
                                       :start 3 :end 3 :external-format :utf-8)))
-(assert (equalp #(0) (string-to-octets (make-array 5 :element-type nil)
+(assert (equalp #(0) (string-to-octets (make-string 5)
                                        :start 3 :end 3 :null-terminate t
                                        :external-format :utf-8)))
 
 ;;; whoops: the iso-8859-2 format referred to an undefined symbol.
-#+sb-unicode
+#+(and sb-unicode (not unicode-lite))
 (assert (equalp #(251) (string-to-octets (string (code-char 369))
                                          :external-format :latin-2)))
 
-(with-test (:name (:euc-jp :decoding-errors) :skipped-on (not :sb-unicode))
+(with-test (:name (:euc-jp :decoding-errors) :skipped-on (or (not :sb-unicode) :unicode-lite))
   (handler-bind ((sb-int:character-decoding-error
                   (lambda (c) (use-value #\? c))))
     (assert (string= "?{?"

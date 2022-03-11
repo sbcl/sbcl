@@ -18,7 +18,7 @@
 
 /* Do anything we need to do when starting up the runtime environment
  * on this architecture. */
-extern void arch_init(void);
+extern void arch_init(void); // Most architectures don't have this one
 extern void tune_asm_routines_for_microarch(void);
 extern void untune_asm_routines_for_microarch(void);
 extern void asm_routine_poke(const char*, int, char);
@@ -49,6 +49,7 @@ extern lispobj funcall2(lispobj function, lispobj arg0, lispobj arg1);
 extern lispobj funcall3(lispobj function, lispobj arg0, lispobj arg1,
                         lispobj arg2);
 extern lispobj *component_ptr_from_pc(char *pc);
+extern lispobj *dynamic_space_code_from_pc(char *pc);
 
 #if defined(LISP_FEATURE_X86)||defined(LISP_FEATURE_X86_64)
 extern unsigned int * single_stepping;
@@ -64,6 +65,6 @@ extern void arch_handle_after_breakpoint(os_context_t *context);
 extern void arch_handle_single_step_trap(os_context_t *context, int trap);
 #endif
 
-extern void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap);
+extern void arch_write_linkage_table_entry(int index, void *target_addr, int datap);
 
 #endif /* __ARCH_H__ */

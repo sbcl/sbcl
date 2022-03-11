@@ -51,37 +51,11 @@ Most functions interacting with external formats use a default external
 format if none is explicitly specified. In some cases, the default
 external format is used unconditionally.
 
-SBCL determines the default external format according to the following
-rules:
+The default external format is UTF-8. It can be changed via
 
-@itemize
-
-@item
-On non-Unicode builds, the default external format is @code{:latin-1}.
-
-@item
-On Unicode builds, the default external format is determined using
-@code{nl_langinfo(3)} on UNIX and @code{GetACP} on Windows.
-
-@quotation note
-On UNIX, the values of the @code{LANG} and @code{LC_*} variables in the
-environment of the SBCL process determine the external format (via
-@code{nl_langinfo(3)}).
-@end quotation
-
-@item
-If either mechanism fails, the @code{:latin-1} external format is used
-as a fallback.
-
-@end itemize
-
-Example:
-@example
-$ LANG=C.UTF-8 sbcl --noinform --no-userinit --eval "(print (map 'string #'code-char (list 97 98 246)))" --quit
-"abö"
-$ LANG=C sbcl --noinform --no-userinit --eval "(print (map 'string #'code-char (list 97 98 246)))" --quit
-"ab?"
-@end example
+@var{sb-ext:*default-external-format*}
+and
+@var{sb-ext:*default-c-string-external-format*}
 
 @node External Format Designators
 @section External Format Designators

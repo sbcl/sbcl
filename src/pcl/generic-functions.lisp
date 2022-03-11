@@ -211,7 +211,7 @@
 
 (defgeneric generic-function-lambda-list (generic-function))
 
-(defgeneric generic-function-pretty-arglist (generic-function))
+(defgeneric generic-function-pretty-arglist (generic-function &optional current-defmethod))
 
 (defgeneric gf-fast-method-function-p (gf))
 
@@ -227,11 +227,7 @@
 
 (defgeneric method-specializers (m))
 
-(defgeneric raw-instance-allocator (class))
-
 (defgeneric slot-definition-allocation (slotd))
-
-(defgeneric slots-fetcher (class))
 
 (defgeneric specializer-class (specializer))
 
@@ -244,8 +240,6 @@
 (defgeneric specializer-method-holder (specializer &optional create))
 
 (defgeneric update-constructors (class))
-
-(defgeneric wrapper-fetcher (class))
 
 ;;;; 2 arguments
 

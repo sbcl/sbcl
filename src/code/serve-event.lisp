@@ -29,6 +29,7 @@
   (function nil :type function)
   ;; T if this descriptor is bogus.
   bogus)
+(declaim (freeze-type handler))
 
 (defstruct (pollfds (:constructor make-pollfds (list))
                     (:copier nil))
@@ -44,6 +45,7 @@
   #+os-provides-poll (n-fds)
   ;; map from index in LIST to index into alien FDS
   #+os-provides-poll (map))
+(declaim (freeze-type pollfds))
 
 (defmethod print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)
@@ -54,7 +56,7 @@
             (handler-descriptor handler)
             (handler-function handler))))
 
-(!define-thread-local *descriptor-handlers* nil
+(define-thread-local *descriptor-handlers* nil
   "List of all the currently active handlers for file descriptors")
 
 (defmacro with-descriptor-handlers (&body forms)
@@ -190,6 +192,8 @@
 
 ;;;; SERVE-ALL-EVENTS, SERVE-EVENT, and friends
 
+(declaim (start-block wait-until-fd-usable serve-event serve-all-events compute-pollfds))
+
 ;;; When a *periodic-polling-function* is defined the server will not
 ;;; block for more than the maximum event timeout and will call the
 ;;; polling function if it does time out.
@@ -255,7 +259,7 @@ waiting."
                                      (+ (* 1000 to-sec) (truncate to-usec 1000))
                                      -1)
                    when (or #+win32 (eq direction :output)
-                            #+win32 (sb-win32:handle-listen fd)
+                            #+win32 (sb-win32:handle-listen fd (or to-sec 0) (or to-usec 0))
                             #-win32
                             (sb-unix:unix-simple-poll fd direction to-msec))
                    do (return-from wait-until-fd-usable t)
@@ -338,8 +342,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                                     (addr read-fds)
                                     (addr write-fds)
                                     nil to-sec to-usec)
-        #+win32
-        (declare (ignore err))
+        (declare (ignorable err)) ; unused if win32
         ;; Now see what it was (if anything)
         (cond ((not value)
                ;; Interrupted or one of the file descriptors is bad.

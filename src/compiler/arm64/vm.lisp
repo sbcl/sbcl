@@ -11,6 +11,10 @@
 
 (in-package "SB-VM")
 
+(defconstant-eqx +fixup-kinds+ #(:absolute :cond-branch :uncond-branch :layout-id
+                                 :ldr-str :move-wide)
+  #'equalp)
+
 
 ;;;; register specs
 
@@ -48,41 +52,40 @@
   (defreg r5 15)
   (defreg r6 16)
   (defreg r7 17)
-  (defreg r8 18)
+  (defreg #-darwin r8 #+darwin reserved 18)
   (defreg r9 19)
 
+  (defreg #+darwin r8 #-darwin r10 20)
   #+sb-thread
-  (defreg thread 20)
+  (defreg thread 21)
   #-sb-thread
-  (defreg r10 20)
+  (defreg r11 21)
 
-  (defreg lexenv 21)
+  (defreg lexenv 22)
 
-  (defreg nargs 22)
-  (defreg nfp 23)
-  (defreg ocfp 24)
-  (defreg cfp 25)
-  (defreg csp 26)
-  (defreg tmp 27)
-  (defreg null 28)
-  (defreg code 29)
+  (defreg nargs 23)
+  (defreg nfp 24)
+  (defreg ocfp 25)
+  (defreg cfp 26)
+  (defreg csp 27)
+  (defreg tmp 28)
+  (defreg null 29)
   (defreg lr 30)
   (defreg nsp 31)
   (defreg zr 31)
 
   (defregset system-regs
-      null cfp nsp lr code)
+      null cfp nsp lr)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #-sb-thread r10 lexenv)
+      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #-darwin r10 #-sb-thread r11 lexenv)
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
 
-  ;; OAOOM: Same as runtime/arm64-lispregs.h
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
-      r7 r8 r9 #-sb-thread r10 #+sb-thread thread lexenv code)
+      r7 r8 r9 #-darwin r10 #-sb-thread r11 #+sb-thread thread lexenv)
 
   ;; registers used to pass arguments
   ;;
@@ -216,7 +219,8 @@
                       :alternate-scs (complex-double-stack))
 
   (catch-block control-stack :element-size catch-block-size)
-  (unwind-block control-stack :element-size unwind-block-size))
+  (unwind-block control-stack :element-size unwind-block-size)
+  (zero immediate-constant))
 
 ;;;; Make some random tns for important registers.
 
@@ -230,7 +234,6 @@
 
   (defregtn null descriptor-reg)
   (defregtn lexenv descriptor-reg)
-  (defregtn code descriptor-reg)
   (defregtn tmp any-reg)
 
   (defregtn nargs any-reg)
@@ -249,13 +252,16 @@
   (typecase value
     (null
      (values descriptor-reg-sc-number null-offset))
-    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
+    ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
          character)
      immediate-sc-number)
     (symbol
      (if (static-symbol-p value)
          immediate-sc-number
-         nil))))
+         nil))
+    ((eql $0.0)
+     ;; Can be encoded in a single instruction
+     immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
@@ -326,20 +332,21 @@
                                (%logbitp integer index))))
          (t (values :default nil))))
       (%ldb
-       (flet ((validp (type width)
-                (and (valid-funtype `((constant-arg (integer 1 ,(1- width)))
-                                      (constant-arg (mod ,width))
+       (flet ((validp (type)
+                (and (valid-funtype `((constant-arg (integer 1 ,(1- n-word-bits)))
+                                      (constant-arg integer)
                                       ,type)
                                     'unsigned-byte)
                      (destructuring-bind (size posn integer)
                          (sb-c::basic-combination-args node)
                        (declare (ignore integer))
-                       (and (plusp (sb-c::lvar-value posn))
-                            (<= (+ (sb-c::lvar-value size)
-                                   (sb-c::lvar-value posn))
-                                width))))))
-         (if (or (validp 'word (1- n-word-bits))
-                 (validp 'signed-word (1- n-word-bits)))
+                       (and (plusp (sb-c:lvar-value posn))
+                            (or (= (sb-c:lvar-value size) 1)
+                                (<= (+ (sb-c:lvar-value size)
+                                       (sb-c:lvar-value posn))
+                                    n-word-bits)))))))
+         (if (or (validp 'word)
+                 (validp 'signed-word))
              (values :transform '(lambda (size posn integer)
                                   (%%ldb integer size posn)))
              (values :default nil))))
@@ -373,3 +380,17 @@
 #+sb-thread
 (defconstant pseudo-atomic-interrupted-flag
     (ash list-pointer-lowtag #+little-endian 32 #+big-endian 0))
+
+#+sb-xc-host
+(setq *backend-cross-foldable-predicates*
+      '(char-immediate-p
+        abs-add-sub-immediate-p
+        fixnum-abs-add-sub-immediate-p
+        sb-arm64-asm::add-sub-immediate-p
+        sb-arm64-asm::fixnum-add-sub-immediate-p
+        sb-arm64-asm::encode-logical-immediate
+        sb-arm64-asm::fixnum-encode-logical-immediate
+        bic-encode-immediate
+        bic-fixnum-encode-immediate
+        logical-immediate-or-word-mask
+        sb-arm64-asm::ldr-str-offset-encodable))

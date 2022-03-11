@@ -64,10 +64,38 @@
                        (length interactive) (list interactive)
                        (length other) (list other))))))
 
+;;; This variable is accessed by C code when saving. Export it to survive tree-shaker.
+;;; The symbols in this set are clobbered just in time to avoid saving them to the core
+;;; but not so early that we kill the running image.
+(export 'sb-kernel::*save-lisp-clobbered-globals* 'sb-kernel)
+(define-load-time-global sb-kernel::*save-lisp-clobbered-globals*
+    '#(sb-impl::*exit-lock*
+       sb-thread::*make-thread-lock*
+       sb-thread::*initial-thread*
+       ;; Saving *JOINABLE-THREADS* could cause catastophic failure on restart.
+       ;; SAVE-LISP-AND-DIE should have cleaned up, but there's a timing problem
+       ;; with the finalizer thread, and I'm loathe to put in a SLEEP delay.
+       sb-thread::*joinable-threads*
+       sb-thread::*all-threads*
+       sb-thread::*session*
+       sb-kernel::*gc-epoch*))
+
+(defun start-lisp (toplevel callable-exports)
+  (named-lambda start-lisp ()
+    (cond (callable-exports
+           (reinit t)
+           (dolist (export callable-exports)
+             (sb-alien::initialize-alien-callable-symbol export)))
+          (t
+           (handling-end-of-the-world
+            (reinit t)
+            (funcall toplevel))))))
+
 (defun save-lisp-and-die (core-file-name &key
-                                         (toplevel #'toplevel-init)
+                                         (toplevel #'toplevel-init toplevel-supplied)
                                          (executable nil)
                                          (save-runtime-options nil)
+                                         (callable-exports ())
                                          (purify t)
                                          (root-structures ())
                                          (environment-name "auxiliary")
@@ -102,6 +130,13 @@ The following &KEY arguments are defined:
      run. This also inhibits normal runtime option processing, causing
      all command line arguments to be passed to the toplevel.
      Meaningless if :EXECUTABLE is NIL.
+
+  :CALLABLE-EXPORTS
+     This should be a list of symbols to be initialized to the
+     appropriate alien callables on startup. All exported symbols should
+     be present as global symbols in the symbol table of the runtime
+     before the saved core is loaded. When this list is non-empty, the
+     :TOPLEVEL argument cannot be supplied.
 
   :PURIFY
      If true (the default on cheneygc), do a purifying GC which moves all
@@ -172,9 +207,12 @@ sufficiently motivated to do lengthy fixes."
   (declare (ignore environment-name))
   #+gencgc
   (declare (ignore purify) (ignorable root-structures))
+  (when (and callable-exports toplevel-supplied)
+    (error ":TOPLEVEL cannot be supplied when there are callable exports."))
   ;; If the toplevel function is not defined, this will signal an
   ;; error before saving, not at startup time.
-  (let ((toplevel (%coerce-callable-to-fun toplevel)))
+  (let ((toplevel (%coerce-callable-to-fun toplevel))
+        *streams-closed-by-slad*)
     #+sb-core-compression
     (check-type compression (or boolean (integer -1 9)))
     #-sb-core-compression
@@ -190,20 +228,11 @@ sufficiently motivated to do lengthy fixes."
           (return-from save-lisp-and-die))))
     (when (eql t compression)
       (setf compression -1))
-    (labels ((restart-lisp ()
-               (handling-end-of-the-world
-                 (reinit)
-                 ;; REINIT can not discern between a restarted image and a
-                 ;; failure to save. It doesn't make a lot of sense to start
-                 ;; a finalizer thread in the failed case, so we set the flag
-                 ;; here, not in REINIT which would do it for both cases.
-                 #+sb-thread (setq *finalizer-thread* t)
-                 #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
-                 (funcall toplevel)))
-             (foreign-bool (value)
-               (if value 1 0)))
+    (flet ((foreign-bool (value)
+             (if value 1 0)))
       (let ((name (native-namestring (physicalize-pathname core-file-name)
-                                     :as-file t)))
+                                     :as-file t))
+            (startfun (start-lisp toplevel callable-exports)))
         (deinit)
         ;; FIXME: Would it be possible to unmix the PURIFY logic from this
         ;; function, and just do a GC :FULL T here? (Then if the user wanted
@@ -215,10 +244,16 @@ sufficiently motivated to do lengthy fixes."
           ;; prior causes compilation to occur into immobile space.
           ;; Failing to see all immobile code would miss some relocs.
           #+immobile-code (sb-vm::choose-code-component-order root-structures)
+          ;; Must clear this cache if asm routines are movable.
+          (setq sb-disassem::*assembler-routines-by-addr* nil
+                ;; and save some space by deleting the instruction decoding table
+                ;; which can be rebuilt on demand. Must be done after DEINIT
+                ;; and CHOOSE-CODE-COMPONENT-ORDER both of which disassemble.
+                sb-disassem::*disassem-inst-space* nil)
           ;; Save the restart function. Logically a passed argument, but can't be,
           ;; as it would require pinning around the whole save operation.
-          (with-pinned-objects (#'restart-lisp)
-            (setf lisp-init-function (get-lisp-obj-address #'restart-lisp)))
+          (with-pinned-objects (startfun)
+            (setf lisp-init-function (get-lisp-obj-address startfun)))
           ;; Do a destructive non-conservative GC, and then save a core.
           ;; A normal GC will leave huge amounts of storage unreclaimed
           ;; (over 50% on x86). This needs to be done by a single function
@@ -240,7 +275,7 @@ sufficiently motivated to do lengthy fixes."
           (if purify (purify :root-structures root-structures) (gc))
           (without-gcing
             (save name
-                  (get-lisp-obj-address #'restart-lisp)
+                  (get-lisp-obj-address startfun)
                   (foreign-bool executable)
                   (foreign-bool save-runtime-options)
                   (foreign-bool compression)
@@ -250,7 +285,8 @@ sufficiently motivated to do lengthy fixes."
 
     ;; Something went very wrong -- reinitialize to have a prayer
     ;; of being able to report the error.
-    (reinit)
+    (restore-fd-streams)
+    (reinit nil)
     (error 'save-error)))
 
 (defun tune-image-for-dump ()
@@ -267,31 +303,45 @@ sufficiently motivated to do lengthy fixes."
          (if shared-info
              (setf (info :function :info name) shared-info)
              (setf (gethash info ht) info))))))
-  (sb-c::coalesce-debug-info) ; Share even more things
+
+  ;; Don't try to assign header slots of code objects. Any of them could be in
+  ;; readonly space. It's not worth the trouble to try to figure out which aren't.
+  #-cheneygc (sb-c::coalesce-debug-info) ; Share even more things
+
   #+sb-fasteval (sb-interpreter::flush-everything)
   (tune-hashtable-sizes-of-all-packages))
 
 (defun deinit ()
   (call-hooks "save" *save-hooks*)
-  #+sb-wtimer
-  (itimer-emulation-deinit)
-  ;; Terminate finalizer thread now, especially given that the thread runs
-  ;; user-supplied code that might not even work in later steps of deinit.
-  ;; See also the comment at definition of THREAD-EPHEMERAL-P.
-  #+sb-thread (finalizer-thread-stop)
-  (let ((threads (sb-thread:list-all-threads)))
-    (unless (= 1 (length threads))
-      (let* ((interactive (sb-thread::interactive-threads))
-             (other (set-difference threads interactive)))
-        (error 'save-with-multiple-threads-error
-               :interactive-threads interactive
-               :other-threads other))))
+  #+win32 (itimer-emulation-deinit)
+  #+sb-thread
+  (let (error)
+    (with-system-mutex (sb-thread::*make-thread-lock*)
+      (finalizer-thread-stop)
+      #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
+      (let ((threads (sb-thread:list-all-threads))
+            (starting
+             (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD
+                   (delete 0 sb-thread::*starting-threads*)))
+            (joinable sb-thread::*joinable-threads*))
+        (when (or (cdr threads) starting joinable)
+          (let* ((interactive (sb-thread::interactive-threads))
+                 (other (union (set-difference threads interactive)
+                               (union starting joinable))))
+            (setf error (make-condition 'save-with-multiple-threads-error
+                                        :interactive-threads interactive
+                                        :other-threads other))))))
+    (when error (error error))
+    #+allocator-metrics (setq sb-thread::*allocator-metrics* nil)
+    (setq sb-thread::*sprof-data* nil))
   (tune-image-for-dump)
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  (finalizers-deinit)
-  (fill *pathnames* nil)
+  ;; To have any hope of making pathname interning actually work,
+  ;; this CLRHASH would need to be removed. But removing it causes excess
+  ;; garbage retention because weakness doesn't work. It's a catch-22.
+  (clrhash *pathnames*)
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))
@@ -299,12 +349,12 @@ sufficiently motivated to do lengthy fixes."
   ;; because coalescing compares by TYPE= which creates more cache entries.
   (coalesce-ctypes)
   (drop-all-hash-caches)
-  ;; Must clear this cache if asm routines are movable.
-  (setq sb-disassem::*assembler-routines-by-addr* nil)
   (os-deinit)
   ;; Perform static linkage. Functions become un-statically-linked
   ;; on demand, for TRACE, redefinition, etc.
   #+immobile-code (sb-vm::statically-link-core)
+  (invalidate-fd-streams)
+  (finalizers-deinit)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
   (setf * nil ** nil *** nil
@@ -332,6 +382,7 @@ sufficiently motivated to do lengthy fixes."
 ;;; Doing too much consing within MAP-ALLOCATED-OBJECTS can lead to heap
 ;;; exhaustion (due to inhibited GC), so this takes several passes.
 (defun coalesce-ctypes (&optional verbose)
+  (declare (optimize (sb-c::aref-trapping 0)))
   (let* ((table (make-hash-table :test 'equal))
          interned-ctypes
          referencing-objects)
@@ -346,8 +397,9 @@ sufficiently motivated to do lengthy fixes."
                     ;; ctype, because that's already a canonical object.
                     (not (minusp (type-hash-value part)))))
              (coalesce (type &aux
-                             ;; Deal with ctypes instances whose unparser fails.
-                             (spec (ignore-errors (type-specifier type))))
+                               ;; Deal with ctypes instances whose unparser fails.
+                               (spec (and (not (contains-unknown-type-p type))
+                                          (ignore-errors (type-specifier type)))))
                ;; There are ctypes that unparse to the same s-expression
                ;; but are *NOT* TYPE=. Some examples:
                ;;   classoid LIST  vs UNION-TYPE LIST  = (OR CONS NULL)
@@ -410,7 +462,9 @@ sufficiently motivated to do lengthy fixes."
                                (%set-symbol-global-value obj (coalesce part)))))
                          ((not (memq accessor
                                      '(%closure-fun
-                                       symbol-package symbol-name fdefn-name
+                                       %fun-layout %instance-layout
+                                       symbol-package symbol-name symbol-%info
+                                       fdefn-name
                                        %numerator %denominator
                                        %realpart %imagpart
                                        %make-lisp-obj ; fdefn referent
@@ -422,16 +476,16 @@ sufficiently motivated to do lengthy fixes."
             (sb-vm:do-referenced-object (obj examine)
               (simple-vector
                :extend
-               (when (and written (eql sb-vm:vector-valid-hashing-subtype
-                                       (get-header-data obj)))
+               (when (and written (logtest sb-vm:vector-addr-hashing-flag
+                                           (get-header-data obj)))
                  (setf (svref obj 1) 1)))))))))) ; set need-to-rehash
 
 sb-c::
 (defun coalesce-debug-info ()
+  #+cheneygc (clrhash sb-di::*compiled-debug-funs*)
   (flet ((debug-source= (a b)
            (and (equal (debug-source-plist a) (debug-source-plist b))
-                (eql (debug-source-created a) (debug-source-created b))
-                (eql (debug-source-compiled a) (debug-source-compiled b)))))
+                (eql (debug-source-created a) (debug-source-created b)))))
     ;; Coalesce the following:
     ;;  DEBUG-INFO-SOURCE, DEBUG-FUN-NAME
     ;;  SIMPLE-FUN-ARGLIST, SIMPLE-FUN-TYPE
@@ -446,20 +500,31 @@ sb-c::
          (declare (ignore size))
          (case widetag
           (#.sb-vm:code-header-widetag
+           (let ((di (sb-vm::%%code-debug-info obj)))
+             ;; Discard memoized debugger's debug info
+             (when (typep di 'sb-c::compiled-debug-info)
+               (let ((thing (sb-c::compiled-debug-info-tlf-num+offset di)))
+                 (when (consp thing)
+                   (setf (sb-c::compiled-debug-info-tlf-num+offset di) (car thing))))))
            (dotimes (i (sb-kernel:code-n-entries obj))
              (let* ((fun (sb-kernel:%code-entry-point obj i))
                     (arglist (%simple-fun-arglist fun))
-                    (type (sb-vm::%%simple-fun-type fun)))
+                    (info (%simple-fun-info fun))
+                    (type (typecase info
+                            ((cons t simple-vector) (car info))
+                            ((not simple-vector) info)))
+                    (type  (ensure-gethash type type-hash type))
+                    (xref (%simple-fun-xrefs fun)))
                (setf (%simple-fun-arglist fun)
                      (ensure-gethash arglist arglist-hash arglist))
-               (setf (sb-kernel:%simple-fun-type fun)
-                     (ensure-gethash type type-hash type)))))
+               (setf (sb-impl::%simple-fun-info fun)
+                     (if (and type xref) (cons type xref) (or type xref))))))
           (#.sb-vm:instance-widetag
            (typecase obj
             (compiled-debug-info
              (let ((source (compiled-debug-info-source obj)))
                (typecase source
-                 (core-debug-source)    ; skip
+                 (core-debug-source)    ; skip - uh, why?
                  (debug-source
                   (let* ((namestring (debug-source-namestring source))
                          (canonical-repr
@@ -478,8 +543,7 @@ sb-c::
                      (cond ((not foundp)
                             (setf (gethash name name-ht) name))
                            ((neq name new)
-                            (setf (%instance-ref debug-fun
-                                                 (get-dsd-index compiled-debug-fun name))
+                            (%instance-set debug-fun (get-dsd-index compiled-debug-fun name)
                                   new))))
                    while next))
             (sb-lockless::linked-list
@@ -491,3 +555,256 @@ sb-c::
              ;; can not deal with the untagged pointer convention.
              (sb-lockless::finish-incomplete-deletions obj))))))
        :all))))
+
+(in-package "SB-VM")
+
+;;; Return the caller -> callee graph as an array grouped by caller.
+;;; i.e. each element is (CALLING-CODE-COMPONENT . CODE-COMPONENT*)).
+;;; A call is assumed only if we see a function or fdefn in the calling
+;;; component. This underestimates the call graph of course,
+;;; because it's impossible to predict whether calls occur through symbols,
+;;; arrays of functions, or anything else. But it's a good approximation.
+(defun compute-direct-call-graph (&optional verbose)
+  (let ((graph (make-array 10000 :adjustable t :fill-pointer 0))
+        (gf-code-cache (make-hash-table :test 'eq))
+        (n-code-objs 0))
+    (labels ((get-gf-code (gf)
+               (ensure-gethash
+                gf gf-code-cache
+                (let (result)
+                  (dolist (method (sb-mop:generic-function-methods gf) result)
+                    (let ((fun (sb-mop:method-function method)))
+                      (if (typep fun 'sb-pcl::%method-function)
+                          (setq result
+                                (list* (code-from-fun (sb-pcl::%method-function-fast-function fun))
+                                       (code-from-fun (%funcallable-instance-fun fun))
+                                       result))
+                          (pushnew (code-from-fun fun) result)))))))
+             (code-from-fun (fun)
+               (ecase (%fun-pointer-widetag fun)
+                 (#.simple-fun-widetag
+                  (fun-code-header fun))
+                 (#.funcallable-instance-widetag
+                  (code-from-fun (%funcallable-instance-fun fun)))
+                 (#.closure-widetag
+                  (fun-code-header (%closure-fun fun))))))
+      (map-allocated-objects
+       (lambda (obj type size)
+         obj size
+         (when (and (= type code-header-widetag)
+                    (plusp (code-n-entries obj)))
+           (incf n-code-objs)
+           (let (list)
+             (loop for j from code-constants-offset
+                   below (code-header-words obj)
+                   do (let* ((const (code-header-ref obj j))
+                             (fun (typecase const
+                                    (fdefn (fdefn-fun const))
+                                    (function const))))
+                        (when fun
+                          (if (typep fun 'generic-function)
+                              ;; Don't claim thousands of callees
+                              (unless (and (typep const 'fdefn)
+                                           (eq (fdefn-name const) 'print-object))
+                                (setf list (union (copy-list (get-gf-code fun))
+                                                  list)))
+                              (pushnew (code-from-fun fun) list :test 'eq)))))
+             (when list
+               (vector-push-extend (cons obj list) graph)))))
+       :immobile))
+    (when verbose
+      (format t "~&Call graph: ~D nodes, ~D with out-edges, max-edges=~D~%"
+              n-code-objs
+              (length graph)
+              (reduce (lambda (x y) (max x (length (cdr y))))
+                      graph :initial-value 0)))
+    graph))
+
+;;; Return list of code components ordered in a quasi-predictable way,
+;;; provided that LOAD happened in a most 1 thread.
+;;; In general: user code sorts before system code, never-called code sorts
+;;; to the end, and ties are impossible due to uniqueness of serial#.
+(defun deterministically-sort-immobile-code ()
+  (let ((forward-graph (compute-direct-call-graph))
+        (reverse-graph (make-hash-table :test 'eq))
+        (ranking))
+    ;; Compute the inverted call graph as a hash-table
+    ;; for O(1) lookup of callers of any component.
+    (dovector (item forward-graph)
+      (let ((caller (car item))
+            (callees (cdr item)))
+        (dolist (callee callees)
+          (push caller (gethash callee reverse-graph)))))
+    ;; Compute popularity of each code component in varyobj space
+    (map-allocated-objects
+     (lambda (obj type size)
+       (declare (ignore size))
+       (when (and (= type code-header-widetag)
+                  (plusp (code-n-entries obj))
+                  (immobile-space-addr-p (get-lisp-obj-address obj)))
+         (push (cons (length (gethash obj reverse-graph)) obj) ranking)))
+     :immobile)
+    ;; Sort by a 4-part key:
+    ;; -  1 bit  : 0 = ever called, 1 = apparently un-called
+    ;; -  1 bit  : system/non-system source file (system has lower precedence)
+    ;; -  8 bits : popularity (as computed above)
+    ;; - 32 bits : code component serial# (as stored on creation)
+    (flet ((calc-key (item &aux (code (cdr item)))
+             (let ((systemp
+                    (or (let ((di (%code-debug-info code)))
+                          (and (typep di 'sb-c::compiled-debug-info)
+                               (let ((src (sb-c::compiled-debug-info-source di)))
+                                 (and (typep src 'sb-c::debug-source)
+                                      (let ((str (debug-source-namestring src)))
+                                        (if (= (mismatch str "SYS:") 4) 1))))))
+                        0))
+                   ;; cap the popularity index to 255 and negate so that higher
+                   ;; sorts earlier
+                   (popularity (- 255 (min (car item) 255)))
+                   (serialno (sb-impl::%code-serialno code)))
+               (logior (ash (if (= (car item) 0) 1 0) 41)
+                       (ash systemp 40)
+                       (ash popularity 32)
+                       serialno))))
+      (mapcar #'cdr (sort ranking #'< :key #'calc-key)))))
+
+#+nil
+(defun order-by-in-degree ()
+  (let ((compiler-stuff (make-hash-table :test 'eq))
+        (other-stuff (make-hash-table :test 'eq)))
+    (flet ((pick-table (fun-name)
+             (if (symbolp fun-name)
+                 (let ((package (symbol-package fun-name)))
+                   (if (member package
+                               (load-time-value
+                                (cons sb-assem::*backend-instruction-set-package*
+                                      (mapcar 'find-package
+                                              '("SB-C" "SB-VM" "SB-FASL"
+                                                "SB-ASSEM" "SB-DISASSEM"
+                                                "SB-REGALLOC")))
+                                t))
+                       compiler-stuff
+                       other-stuff))
+                 other-stuff))
+           (hashtable-keys-sorted (table)
+             (mapcar #'car
+              (sort (%hash-table-alist table)
+                    (lambda (a b)
+                      (cond ((> (cdr a) (cdr b)) t) ; higher in-degree
+                            ((< (cdr a) (cdr b)) nil) ; lower in-degree
+                            ;; break ties by name, and failing that,
+                            ;; by address (which = random)
+                            (t
+                             (let ((name1
+                                    (%simple-fun-name (%code-entry-point (car a) 0)))
+                                   (name2
+                                    (%simple-fun-name (%code-entry-point (car b) 0))))
+                               (if (and (symbolp name1) (symbol-package name1)
+                                        (symbolp name2) (symbol-package name2))
+                                   (let ((p1 (package-name (symbol-package name1)))
+                                         (p2 (package-name (symbol-package name2))))
+                                     (cond ((string< p1 p2) t)
+                                           ((string> p1 p2) nil)
+                                           ((string< name1 name2))))
+                                   (< (get-lisp-obj-address (car a))
+                                      (get-lisp-obj-address (car b))))))))))))
+      (sb-vm:map-allocated-objects
+       (lambda (obj type size)
+         size
+         (when (= type sb-vm:code-header-widetag)
+           (loop for i from sb-vm:code-constants-offset
+                 below (code-header-words obj)
+                 do (let ((ref (code-header-ref obj i))
+                          (fun))
+                      (when (and (fdefn-p ref)
+                                 (simple-fun-p (setq fun (fdefn-fun ref)))
+                                 (immobile-space-obj-p fun))
+                        (let* ((code (fun-code-header fun))
+                               (ht (pick-table (%simple-fun-name
+                                                (%code-entry-point code 0)))))
+                          (incf (gethash code ht 0))))))))
+       :immobile)
+      (append (hashtable-keys-sorted other-stuff)
+              (hashtable-keys-sorted compiler-stuff)))))
+
+;;; Passing your own toplevel functions as the root set
+;;; will encourage the defrag procedure to place them early
+;;; in the space, which should be better than leaving the
+;;; organization to random chance.
+;;; Note that these aren't roots in the GC sense, just a locality sense.
+#+immobile-code
+(defun choose-code-component-order (&optional roots)
+  (declare (ignore roots))
+  (let ((ordering (make-array 10000 :adjustable t :fill-pointer 0))
+        (hashset (make-hash-table :test 'eq)))
+
+    (labels ((emplace (code)
+               (unless (gethash code hashset)
+                 (setf (gethash code hashset) t)
+                 (vector-push-extend code ordering)))
+             (visit (thing)
+               (typecase thing
+                 (code-component (visit-code thing))
+                 (simple-fun (visit-code (fun-code-header thing)))
+                 (closure (visit (%closure-fun thing)))
+                 (symbol (when (and (fboundp thing)
+                                    (not (special-operator-p thing))
+                                    (not (macro-function thing)))
+                           (visit (symbol-function thing))))))
+             (visit-code (code-component)
+               (when (or (not (immobile-space-obj-p code-component))
+                         (gethash code-component hashset))
+                 (return-from visit-code))
+               (setf (gethash code-component hashset) t)
+               (vector-push-extend code-component ordering)
+               (loop for i from sb-vm:code-constants-offset
+                     below (code-header-words code-component)
+                     do (let ((obj (code-header-ref code-component i)))
+                          (typecase obj
+                            (fdefn  (awhen (fdefn-fun obj) (visit it)))
+                            (symbol (visit obj))
+                            (vector (map nil #'visit obj)))))))
+
+      ;; Place assembler routines first.
+      (emplace sb-fasl:*assembler-routines*)
+      ;; Place functions called by assembler routines next.
+      (dovector (f +static-fdefns+)
+        (emplace (fun-code-header (symbol-function f))))
+      #+nil
+      (mapc #'visit
+            (mapcan (lambda (x)
+                      (let ((f (coerce x 'function)))
+                        (when (simple-fun-p f)
+                          (list (fun-code-header f)))))
+                    (or roots '(read eval print compile))))
+
+      (mapc #'emplace (deterministically-sort-immobile-code))
+
+      (map-allocated-objects
+       (lambda (obj type size)
+         (declare (ignore size))
+         (when (and (= type code-header-widetag)
+                    (not (typep (%code-debug-info obj) 'function)))
+           (emplace obj)))
+       :immobile))
+
+    (let* ((n (length ordering))
+           (array (make-alien int (1+ (* n 2)))))
+      (loop for i below n
+            do (setf (deref array (* i 2))
+                     (get-lisp-obj-address (aref ordering i))))
+      (setf (deref array (* n 2)) 0) ; null-terminate the array
+      (setf (extern-alien "code_component_order" unsigned)
+            (sap-int (alien-value-sap array)))))
+
+  (multiple-value-bind (index relocs) (collect-immobile-code-relocs)
+    (let* ((n (length index))
+           (array (make-alien int n)))
+      (dotimes (i n) (setf (deref array i) (aref index i)))
+      (setf (extern-alien "immobile_space_reloc_index" unsigned)
+            (sap-int (alien-value-sap array))))
+    (let* ((n (length relocs))
+           (array (make-alien int n)))
+      (dotimes (i n) (setf (deref array i) (aref relocs i)))
+      (setf (extern-alien "immobile_space_relocs" unsigned)
+            (sap-int (alien-value-sap array))))))

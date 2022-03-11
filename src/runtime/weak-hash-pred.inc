@@ -1,3 +1,5 @@
+/* -*- Mode: C -*- */
+
 static int survived_gc_yet_KEY(lispobj key, lispobj __attribute__((unused)) value) {
     return !is_lisp_pointer(key) || pointer_survived_gc_yet(key);
 }

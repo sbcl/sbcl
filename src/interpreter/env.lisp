@@ -53,7 +53,7 @@
   ;; with a block name, or a BLOCK and some bindings.
   (def-subtype lambda-env (block)))
 
-;;; This implementation of lexical environments takes a fairly unconvential
+;;; This implementation of lexical environments takes a fairly unconventional
 ;;; approach to dealing with sequential (LET*) binding. [Anything said here
 ;;; about LET* pertains to LAMBDA as well]. The conceptual model for LET* is
 ;;; that it is a sequence of nested LET forms, each creating one binding.
@@ -120,7 +120,7 @@
 ;;; freezing must do a non-trivial amount of work are quite rare.
 
 ;;; All that said, the representation of "mutable" is that instead of
-;;; a vector of sybols, we have a cons of a fixnum and a vector, so ...
+;;; a vector of symbols, we have a cons of a fixnum and a vector, so ...
 ;;; Return T if the ENV is currently undergoing sequential variable binding.
 (declaim (inline env-mutable-p))
 (defun env-mutable-p (env) (consp (env-symbols env)))
@@ -270,7 +270,7 @@
                            (recurse it (and globalp (not (lambda-env-p env)))))
                           (globalp
                            (member symbol sb-c::*disabled-package-locks*))))
-      ;; Ambigous case: both in the same decl list. Oh well...
+      ;; Ambiguous case: both in the same decl list. Oh well...
       (case (car declaration)
         (disable-package-locks
          (when (member symbol (cdr declaration)) (return t)))
@@ -346,7 +346,8 @@
 (defmacro with-environment-vars ((symbols end) env &body body)
   `(awhen (env-symbols ,env)
      (let ((,symbols (truly-the simple-vector (if (listp it) (cdr it) it)))
-           (,end (locally (declare (optimize (safety 0))) (car it))))
+           (,end #+ubsan (if (listp it) (car it) (sb-c::vector-length it))
+                 #-ubsan (locally (declare (optimize (safety 0))) (car it))))
        (declare (index-or-minus-1 ,end))
        ,@body)))
 (eval-when (:compile-toplevel)
@@ -547,7 +548,7 @@
       (values (proto-fn-%frame proto-fn) (proto-fn-cookie proto-fn))
       (digest-lambda env proto-fn)))
 
-(defun %fun-type (fun)
+(defun %fun-ftype (fun)
   (let ((proto-fn (fun-proto-fn fun)))
     (or (proto-fn-type proto-fn)
         (setf (proto-fn-type proto-fn)
@@ -678,7 +679,7 @@
             (values 0 lambda-list body)))
     ;; Choke now if the list can't be parsed.
     ;; If lexical environment is NIL, :silent will be passed as NIL,
-    ;; and we can warn about "suspcious variables" and such.
+    ;; and we can warn about "suspicious variables" and such.
     (parse-lambda-list lambda-list :silent silent)
     (multiple-value-bind (forms decls docstring) (parse-body body t t)
       (%make-proto-fn name lambda-list decls forms docstring
@@ -893,7 +894,7 @@
   ;; then insert assertions for all variables bound by this scope.
   (when (and (policy env (>= safety 1))
              (find-if #'cdr symbols :end n-var-bindings))
-    (let ((checks (make-array n-var-bindings)))
+    (let ((checks (make-array n-var-bindings :initial-element 0)))
       (dotimes (i n-var-bindings (setf (binding-typechecks decl-scope) checks))
         (awhen (cdr (svref symbols i))
           (setf (svref checks i) (type-checker it))))))
@@ -1143,7 +1144,9 @@
                          (specialize binding))
                         ((eq reason 'compile)
                          ;; access interpreter's lexical vars
-                         (macroize sym `(svref ,payload ,i)))
+                         ;; Prevent SETF on the variable from getting
+                         ;; "Destructive function (SETF SVREF) called on constant data"
+                         (macroize sym `(svref (load-time-value ,payload) ,i)))
                         (t
                          (let ((leaf (make-lambda-var
                                       :%source-name sym
@@ -1190,9 +1193,7 @@
                    (setf (sb-c::lambda-var-flags var) 1)))))
             ((inline notinline)
              ;; This is just enough to get sb-cltl2 tests to pass.
-             (let ((inlinep (case (car spec)
-                              (inline :inline)
-                              (notinline :notinline))))
+             (let ((inlinep (car spec)))
                (dolist (fname (cdr spec))
                  (let ((fun (cdr (assoc fname funs :test 'equal))))
                    (typecase fun
@@ -1216,8 +1217,8 @@
             ((ignorable type optimize special dynamic-extent)
              )
             (t
-             (let ((fn (info :declaration :handler (first spec))))
-               (when fn
+             (let ((fn (info :declaration :known (first spec))))
+               (when (functionp fn)
                  (setq lexenv
                        (funcall
                         fn lexenv spec
@@ -1273,7 +1274,7 @@
     (unless (setq env (env-parent env))
       (return (car guts)))))
 
-;;; Return :INLINE or :NOTINLINE if FNAME has a lexical declaration,
+;;; Return INLINE or NOTINLINE if FNAME has a lexical declaration,
 ;;; otherwise NIL for no information.
 ;;; FIXME: obviously this does nothing
 (defun fun-lexically-notinline-p (fname env)

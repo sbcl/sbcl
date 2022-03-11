@@ -194,9 +194,6 @@
             (sb-ext:with-timeout 2
               (sleep 2))))))
 
-(defun wait-for-threads (threads)
-  (loop while (some #'sb-thread:thread-alive-p threads) do (sleep 0.01)))
-
 (with-test (:name (:with-timeout :many-at-the-same-time)
                   :skipped-on (not :sb-thread)
                   :broken-on :win32)
@@ -209,28 +206,11 @@
                                   (sleep 5)
                                   (setf ok nil)
                                   (format t "~%not ok~%"))
-                              (timeout ()
-                                )))))))
+                              (timeout ())))))))
       (assert (not (raises-timeout-p
                     (sb-ext:with-timeout 20
-                      (wait-for-threads threads)))))
+                      (mapc #'sb-thread:join-thread threads)))))
       (assert ok))))
-
-;;; FIXME: Since timeouts do not work on Windows this would loop
-;;; forever.
-(with-test (:name (:hash-cache :interrupt) :skipped-on :win32)
-  (let* ((type1 (random-type 500))
-         (type2 (random-type 500))
-         (wanted (subtypep type1 type2)))
-    (dotimes (i 100)
-      (block foo
-        (sb-ext:schedule-timer (sb-ext:make-timer
-                                (lambda ()
-                                  (assert (eq wanted (subtypep type1 type2)))
-                                    (return-from foo)))
-                               0.05)
-        (loop
-           (assert (eq wanted (subtypep type1 type2))))))))
 
 ;;; Used to hang occasionally at least on x86. Two bugs caused it:
 ;;; running out of stack (due to repeating timers being rescheduled
@@ -247,16 +227,17 @@
       (sb-sys:with-deadline (:seconds 30)
         (loop repeat 5
               do (mapcar #'sb-thread:join-thread
-                           (loop for i from 1 upto 10
-                                 collect (let* ((thread (sb-thread:make-thread #'flop
-                                                                               :name (format nil "scheduler ~A" i)))
-                                                (ticker (make-limited-timer (lambda () 13)
-                                                                            1000
-                                                                            :thread (or other thread)
-                                                                            :name (format nil "ticker ~A" i))))
-                                           (setf other thread)
-                                           (sb-ext:schedule-timer ticker 0 :repeat-interval 0.00001)
-                                           thread))))))))
+                         (loop for i from 1 upto 10
+                               collect (let* ((thread (sb-thread:make-thread #'flop
+                                                                             :name (format nil "scheduler ~A" i)))
+                                              (ticker (make-limited-timer (lambda () 13)
+                                                                          1000
+                                                                          :thread (or other thread)
+                                                                          :name (format nil "ticker ~A" i))))
+                                         (setf other thread)
+                                         (sb-ext:schedule-timer ticker 0 :repeat-interval 0.00001)
+                                         thread)))))
+      (sb-ext:unschedule-timer timer))))
 
 ;;;; FIXME: OS X 10.4 doesn't like these being at all, and gives us a SIGSEGV
 ;;;; instead of using the Mach expection system! 10.5 on the other tends to
@@ -317,7 +298,7 @@
           (dolist (thread threads)
             (sched thread)))
         (loop for thread in threads
-              do (sb-thread:join-thread thread :timeout 20))))))
+              do (sb-thread:join-thread thread :timeout 40))))))
 
 ;; A timer with a repeat interval can be configured to "catch up" in
 ;; case of missed calls.

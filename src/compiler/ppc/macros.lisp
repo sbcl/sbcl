@@ -20,6 +20,13 @@
     `(unless (location= ,n-dst ,n-src)
        (inst mr ,n-dst ,n-src))))
 
+(defmacro load-asm-rtn-addr (reg name)
+  ;; Gencgc has asm code in static space and we can reference it relative to NIL.
+  #+gencgc `(inst addi ,reg null-tn (make-fixup ,name :asm-routine-nil-offset))
+  ;; Cheneygc has asm code in read-only space which is not within
+  ;; a sufficiently small displacement.
+  #+cheneygc `(inst lr ,reg (make-fixup ,name :assembly-routine)))
+
 (macrolet
     ((def (op inst shift)
        `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
@@ -30,62 +37,41 @@
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
 
-(macrolet
-    ((frob (slot)
-       (let ((loader (intern (concatenate 'simple-string
-                                          "LOAD-SYMBOL-"
-                                          (string slot))))
-             (storer (intern (concatenate 'simple-string
-                                          "STORE-SYMBOL-"
-                                          (string slot))))
-             (offset (intern (concatenate 'simple-string
-                                          "SYMBOL-"
-                                          (string slot)
-                                          "-SLOT")
-                             (find-package "SB-VM"))))
-         `(progn
-            (defmacro ,loader (reg symbol)
-              `(inst lwz ,reg null-tn
-                     (+ (static-symbol-offset ',symbol)
-                        (ash ,',offset word-shift)
-                        (- other-pointer-lowtag))))
-            (defmacro ,storer (reg symbol)
-              `(inst stw ,reg null-tn
-                     (+ (static-symbol-offset ',symbol)
-                        (ash ,',offset word-shift)
-                        (- other-pointer-lowtag))))))))
-  (frob value)
-  (frob function)
+(defmacro load-symbol-value (reg symbol)
+  `(inst lwz ,reg null-tn (+ (static-symbol-offset ',symbol)
+                             (ash symbol-value-slot word-shift)
+                             (- other-pointer-lowtag))))
+(defmacro store-symbol-value (reg symbol)
+  `(inst stw ,reg null-tn (+ (static-symbol-offset ',symbol)
+                             (ash symbol-value-slot word-shift)
+                             (- other-pointer-lowtag))))
 
-  ;; FIXME: These are only good for static-symbols, so why not
-  ;; statically-allocate the static-symbol TLS slot indices at
-  ;; cross-compile time so we can just use a fixed offset within the
-  ;; TLS block instead of mucking about with the extra memory access
-  ;; (and temp register, for stores)?
-  #+sb-thread
-  (defmacro load-tl-symbol-value (reg symbol)
-    `(progn
-       (inst lwz ,reg null-tn
-             (+ (static-symbol-offset ',symbol)
-                (ash symbol-tls-index-slot word-shift)
-                (- other-pointer-lowtag)))
-       (inst lwzx ,reg thread-base-tn ,reg)))
-  #-sb-thread
-  (defmacro load-tl-symbol-value (reg symbol)
-    `(load-symbol-value ,reg ,symbol))
-
-  #+sb-thread
-  (defmacro store-tl-symbol-value (reg symbol temp)
-    `(progn
-       (inst lwz ,temp null-tn
-             (+ (static-symbol-offset ',symbol)
-                (ash symbol-tls-index-slot word-shift)
-                (- other-pointer-lowtag)))
-       (inst stwx ,reg thread-base-tn ,temp)))
-  #-sb-thread
-  (defmacro store-tl-symbol-value (reg symbol temp)
-    (declare (ignore temp))
-    `(store-symbol-value ,reg ,symbol)))
+;; FIXME: These are only good for static-symbols, so why not
+;; statically-allocate the static-symbol TLS slot indices at
+;; cross-compile time so we can just use a fixed offset within the
+;; TLS block instead of mucking about with the extra memory access
+;; (and temp register, for stores)?
+#+sb-thread
+(progn
+(defmacro load-tl-symbol-value (reg symbol)
+  `(progn
+     (inst lwz ,reg null-tn (+ (static-symbol-offset ',symbol)
+                               (ash symbol-tls-index-slot word-shift)
+                               (- other-pointer-lowtag)))
+     (inst lwzx ,reg thread-base-tn ,reg)))
+(defmacro store-tl-symbol-value (reg symbol temp)
+  `(progn
+     (inst lwz ,temp null-tn (+ (static-symbol-offset ',symbol)
+                                (ash symbol-tls-index-slot word-shift)
+                                (- other-pointer-lowtag)))
+     (inst stwx ,reg thread-base-tn ,temp))))
+#-sb-thread
+(progn
+(defmacro load-tl-symbol-value (reg symbol)
+  `(load-symbol-value ,reg ,symbol))
+(defmacro store-tl-symbol-value (reg symbol temp)
+  (declare (ignore temp))
+  `(store-symbol-value ,reg ,symbol)))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
@@ -107,7 +93,7 @@
   `(progn
     ;; something is deeply bogus.  look at this
     ;; (loadw ,lip ,function function-code-offset function-pointer-type)
-    (inst addi ,lip ,function (- (* n-word-bytes simple-fun-code-offset) fun-pointer-lowtag))
+    (inst addi ,lip ,function (- (* n-word-bytes simple-fun-insts-offset) fun-pointer-lowtag))
     (inst mtctr ,lip)
     (inst bctr)))
 
@@ -179,15 +165,14 @@
 ;;; because a temp register is needed to do inline allocation.
 ;;; TEMP-TN, in this case, can be any register, since it holds a
 ;;; double-word aligned address (essentially a fixnum).
-(defun allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
+(defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
   ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
   ;; set.  If the lowtag also has a 1 bit in the same position, we're all
   ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
   (declare (ignore stack-p node)
-           #-gencgc
-           (ignore temp-tn flag-tn))
+           (ignorable type temp-tn flag-tn))
   #-gencgc
   (progn
          (if (logbitp (1- n-lowtag-bits) lowtag)
@@ -200,27 +185,19 @@
              (inst addi alloc-tn alloc-tn size)
              (inst add alloc-tn alloc-tn size)))
   #+gencgc
-  (let ((imm-size (typep size '(unsigned-byte 15))))
+  (binding*  ((imm-size (typep size '(unsigned-byte 15)))
+              ((region-base-tn field-offset)
+               #-sb-thread (values null-tn (- mixed-region nil-value))
+               #+sb-thread (values thread-base-tn
+                                   (* thread-mixed-tlab-slot n-word-bytes))))
+
     (unless imm-size ; Make temp-tn be the size
       (if (numberp size)
           (inst lr temp-tn size)
           (move temp-tn size)))
 
-    #-sb-thread
-    (inst lr flag-tn (make-fixup "gc_alloc_region" :foreign))
-    #-sb-thread
-    (inst lwz result-tn flag-tn 0)
-    #+sb-thread
-    (inst lwz result-tn thread-base-tn (* thread-alloc-region-slot
-                                          n-word-bytes))
-
-       ;; we can optimize this to only use one fixup here, once we get
-       ;; it working
-       ;; (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign 4))
-       ;; (inst lwz ,flag-tn ,flag-tn 0)
-    #-sb-thread (inst lwz flag-tn flag-tn 4)
-    #+sb-thread (inst lwz flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
-                                                    n-word-bytes))
+    (inst lwz result-tn region-base-tn field-offset)
+    (inst lwz flag-tn region-base-tn (+ field-offset n-word-bytes)) ; region->end_addr
 
     (without-scheduling ()
          ;; CAUTION: The C code depends on the exact order of
@@ -240,18 +217,13 @@
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         (inst tw :lgt result-tn flag-tn)
+         ;; See the ppc64 file for more explanation about this.
+         ;; (Or better yet, merge the two codebases)
+         (inst tw (if (eq type 'list) :lgt :lge) result-tn flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
-         ;; #-sb-thread three #+sb-thread one machine instruction.
-         ;; The lr of a fixup counts as two instructions.
-         #-sb-thread
-         (inst lr flag-tn (make-fixup "gc_alloc_region" :foreign))
-         #-sb-thread
-         (inst stw result-tn flag-tn 0)
-         #+sb-thread
-         (inst stw result-tn thread-base-tn (* thread-alloc-region-slot
-                                               n-word-bytes)))
+         ;; one machine instruction.
+         (inst stw result-tn region-base-tn field-offset))
 
        ;; Should the allocation trap above have fired, the runtime
        ;; arranges for execution to resume here, just after where we
@@ -277,28 +249,27 @@
   initializes the object."
   (once-only ((result-tn result-tn) (temp-tn temp-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag))
-    `(pseudo-atomic (,flag-tn)
+    `(pseudo-atomic (,flag-tn :sync ,type-code)
        (if ,stack-allocate-p
            (progn
              (align-csp ,temp-tn)
              (inst ori ,result-tn csp-tn ,lowtag)
              (inst addi csp-tn csp-tn (pad-data-block ,size)))
-         (allocation ,result-tn (pad-data-block ,size) ,lowtag
+         (allocation nil
+                     (* (pad-data-block ,size)
+                        #+bignum-assertions (if (eql ,type-code bignum-widetag) 2 1))
+                     ,lowtag ,result-tn
                      :temp-tn ,temp-tn
                      :flag-tn ,flag-tn))
-       (when ,type-code
-         (inst lr ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
-         (storew ,temp-tn ,result-tn 0 ,lowtag))
+       (inst lr ,temp-tn (compute-object-header ,size ,type-code))
+       (storew ,temp-tn ,result-tn 0 ,lowtag)
        ,@body)))
 
 (defun align-csp (temp)
   ;; is used for stack allocation of dynamic-extent objects
-  (let ((aligned (gen-label)))
-    (inst andi. temp csp-tn lowtag-mask)
-    (inst beq aligned)
-    (inst addi csp-tn csp-tn n-word-bytes)
-    (storew zero-tn csp-tn -1)
-    (emit-label aligned)))
+  (storew null-tn csp-tn 0 0) ; store a known-good value (don't want wild pointers below CSP)
+  (inst addi temp csp-tn lowtag-mask)
+  (inst clrrwi csp-tn temp n-lowtag-bits))
 
 
 ;;;; Error Code
@@ -330,32 +301,17 @@
 ;;; aligns ALLOC-TN again and (b) makes ALLOC-TN go negative. We then
 ;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
-(defmacro pseudo-atomic ((flag-tn) &body forms)
-  #+sb-safepoint-strictly
-  `(progn ,flag-tn ,@forms (emit-safepoint))
-  #-sb-safepoint-strictly
+(defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
+  (declare (ignorable sync))
   `(progn
      (without-scheduling ()
-       ;; Extra debugging stuff:
-       #+debug
-       (progn
-         (inst andi. ,flag-tn alloc-tn lowtag-mask)
-         (inst twi :ne ,flag-tn 0))
-       (inst ori alloc-tn alloc-tn pseudo-atomic-flag))
+       (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot)))
      ,@forms
-     (inst sync)
+     #+sb-thread
+     (when ,sync
+       (inst sync))
      (without-scheduling ()
-       (inst subi alloc-tn alloc-tn pseudo-atomic-flag)
+       (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
        ;; Now test to see if the pseudo-atomic interrupted bit is set.
-       (inst andi. ,flag-tn alloc-tn pseudo-atomic-interrupted-flag)
-       (inst twi :ne ,flag-tn 0))
-     #+debug
-     (progn
-       (inst andi. ,flag-tn alloc-tn lowtag-mask)
-       (inst twi :ne ,flag-tn 0))
-     #+sb-safepoint
-     (emit-safepoint)))
-
-#+sb-safepoint
-(defun emit-safepoint ()
-  (inst lwz zero-tn null-tn (- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))
+       (inst lhz ,flag-tn thread-base-tn (+ 2 (* n-word-bytes thread-pseudo-atomic-bits-slot)))
+       (inst twi :ne ,flag-tn 0))))

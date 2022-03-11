@@ -299,6 +299,14 @@
 (define-condition condition-foo2 (condition-foo1) ())
 (define-condition condition-foo3 (condition-foo2) ())
 (define-condition condition-foo4 (condition-foo3) ())
+(with-test (:name :add-subclassoid)
+  (flet ((has-subs (name n)
+           (= n (length (sb-kernel:classoid-subclasses
+                         (sb-kernel:find-classoid name))))))
+  (assert (has-subs 'condition-foo1 3)) ; has foo{2,3,4}
+  (assert (has-subs 'condition-foo2 2)) ; has foo{3,4}
+  (assert (has-subs 'condition-foo3 1)) ; has foo4
+  (assert (has-subs 'condition-foo4 0))))
 
 ;;; inline type tests
 (format t "~&/setting up *TESTS-OF-INLINE-TYPE-TESTS*~%")
@@ -348,7 +356,7 @@
      (assert (subtypep 'simple-error 'error))
      (assert (not (subtypep 'condition 'simple-condition)))
      (assert (not (subtypep 'error 'simple-error)))
-     (assert (eq (car (sb-pcl:class-direct-superclasses
+     (assert (eq (car (sb-mop:class-direct-superclasses
                        (find-class 'simple-condition)))
                  (find-class 'condition)))
 
@@ -360,37 +368,37 @@
                                  sb-int:simple-file-error
                                  sb-int:simple-style-warning))))
        (assert (null (set-difference
-                      (sb-pcl:class-direct-subclasses (find-class
+                      (sb-mop:class-direct-subclasses (find-class
                                                        'simple-condition))
                       subclasses))))
 
      ;; precedence lists
-     (assert (equal (sb-pcl:class-precedence-list
+     (assert (equal (sb-mop:class-precedence-list
                      (find-class 'simple-condition))
                     (mapcar #'find-class '(simple-condition
                                            condition
                                            sb-pcl::slot-object
                                            t))))
-
+    (sb-mop:finalize-inheritance (find-class 'fundamental-stream))
      ;; stream classes
-     (assert (equal (sb-pcl:class-direct-superclasses (find-class
+     (assert (equal (sb-mop:class-direct-superclasses (find-class
                                                        'fundamental-stream))
                     (mapcar #'find-class '(standard-object stream))))
      (assert (null (set-difference
-                    (sb-pcl:class-direct-subclasses (find-class
+                    (sb-mop:class-direct-subclasses (find-class
                                                      'fundamental-stream))
                     (mapcar #'find-class '(fundamental-binary-stream
                                            fundamental-character-stream
                                            fundamental-output-stream
                                            fundamental-input-stream)))))
-     (assert (equal (sb-pcl:class-precedence-list (find-class
+     (assert (equal (sb-mop:class-precedence-list (find-class
                                                    'fundamental-stream))
                     (mapcar #'find-class '(fundamental-stream
                                            standard-object
                                            sb-pcl::slot-object
                                            stream
                                            t))))
-     (assert (equal (sb-pcl:class-precedence-list (find-class
+     (assert (equal (sb-mop:class-precedence-list (find-class
                                                    'fundamental-stream))
                     (mapcar #'find-class '(fundamental-stream
                                            standard-object
@@ -884,11 +892,11 @@
             (pop answers))))))
 
     ;; The algorithm is indifferent to non-array types.
-    (assert
-     (equal (sb-kernel:type-specifier
-             (sb-kernel:specifier-type
-              `(or list ,@(huge-union (lambda (x) `(array ,x (1 1 1)))))))
-            '(or cons null (array * (1 1 1)))))
+    (let ((result (sb-kernel:type-specifier
+                   (sb-kernel:specifier-type
+                    `(or list ,@(huge-union (lambda (x) `(array ,x (1 1 1)))))))))
+      (assert (or (equal result '(or list (array * (1 1 1))))
+                  (equal result '(or (array * (1 1 1)) list)))))
 
     ;; And unions of unions of distinct array types should reduce.
     (assert
@@ -928,7 +936,8 @@
   (let* ((hair (sb-kernel:specifier-type '(sb-kernel:unboxed-array 1)))
          (xform (sb-c::source-transform-union-typep 'myobj hair)))
     (assert (equal xform
-                   '(or (typep myobj '(and vector (not (array t))))))))
+                   '(or (typep myobj
+                               '(and vector (not (array t)) (not (array nil))))))))
 
   ;; Exclude one subtype at a time and make sure they all work.
   (dotimes (i (length sb-vm:*specialized-array-element-type-properties*))
@@ -1002,3 +1011,23 @@
     (assert (handler-case (not (sb-kernel:specifier-type class))
               (sb-kernel:parse-unknown-type ()
                 t)))))
+
+;;; Try depthoid in excess of sb-kernel::layout-id-vector-fixed-capacity
+(defstruct d2)                ; depthoid = 2
+(defstruct (d3(:include d2))) ; = 3
+(defstruct (d4(:include d3))) ; and so on
+(defstruct (d5(:include d4)))
+(defstruct (d6(:include d5)))
+(defstruct (d7(:include d6)))
+(defstruct (d8(:include d7)))
+(compile 'd8-p)
+(with-test (:name :deep-structure-is-a)
+  (assert (d8-p (opaque-identity (make-d8)))))
+
+(with-test (:name :intersection-complex-=)
+  (let ((unk (sb-kernel:specifier-type '(and unknown unknown2))))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type t) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'integer) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'float) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'pathname) unk))
+    (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'sequence) unk))))

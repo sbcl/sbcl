@@ -19,7 +19,7 @@ struct Qblock {
 };
 
 #if 1
-#define QBLOCK_BYTES GENCGC_CARD_BYTES
+#define QBLOCK_BYTES GENCGC_PAGE_BYTES
 // 1+ because struct QBlock has space for a single element within it
 #define QBLOCK_CAPACITY (1+(QBLOCK_BYTES-sizeof(struct Qblock))/sizeof(lispobj))
 #else

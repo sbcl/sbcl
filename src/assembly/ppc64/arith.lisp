@@ -10,6 +10,11 @@
 ;;; Note that there is only one use of static-fun-offset outside this
 ;;; file (in genesis.lisp)
 
+(defmacro maybe-call-static-fun ()
+  '(progn (inst or temp x y)
+          (inst andi. temp temp fixnum-tag-mask)
+          (inst bne DO-STATIC-FUN)))
+
 (define-assembly-routine
   (generic-+
    (:cost 10)
@@ -30,11 +35,8 @@
    (:temp lip interior-reg lip-offset)
    (:temp ocfp any-reg ocfp-offset))
 
-  ; Clear the damned "sticky overflow" bit in :cr0 and :xer
-  (inst mtxer zero-tn)
-  (inst or temp x y)
-  (inst andi. temp temp fixnum-tag-mask)
-  (inst bne DO-STATIC-FUN)
+  (maybe-call-static-fun)
+  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
   (inst addo. temp x y)
   (inst bns done)
 
@@ -78,13 +80,8 @@
    (:temp nargs any-reg nargs-offset)
    (:temp ocfp any-reg ocfp-offset))
 
-  ; Clear the damned "sticky overflow" bit in :cr0
-  (inst mtxer zero-tn)
-
-  (inst or temp x y)
-  (inst andi. temp temp fixnum-tag-mask)
-  (inst bne DO-STATIC-FUN)
-
+  (maybe-call-static-fun)
+  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
   (inst subo. temp x y)
   (inst bns done)
 
@@ -133,43 +130,31 @@
    (:temp nargs any-reg nargs-offset)
    (:temp ocfp any-reg ocfp-offset))
 
-  ;; If either arg is not a fixnum, call the static function.  But first ...
-  (inst mtxer zero-tn)
+  (maybe-call-static-fun)
+  (inst sradi temp x n-fixnum-tag-bits) ; Remove the tag from X
+  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
+  (inst mulldo. lo y temp)
+  (inst bns DONE)
 
-  (inst or temp x y)
-  (inst andi. temp temp fixnum-tag-mask)
-  ;; Remove the tag from both args, so I don't get so confused.
-  (inst sradi temp x n-fixnum-tag-bits)
-  (inst sradi nargs y n-fixnum-tag-bits)
-  (inst bne DO-STATIC-FUN)
-
-  (inst mulldo. lo nargs temp)
-  (inst sradi hi lo 63)                 ; hi = 64 copies of lo's sign bit
-  (inst bns ONE-WORD-ANSWER)
-  (inst mulhd hi nargs temp)
-  (inst b CONS-BIGNUM)
-
-  ONE-WORD-ANSWER                       ; We know that all of the overflow bits are clear.
-  (inst addo. res lo lo)
-  (inst bns GO-HOME)
-
-  CONS-BIGNUM
-  ;; Allocate a BIGNUM for the result.
-  (with-fixed-allocation (res pa-flag temp bignum-widetag
-                              (+ bignum-digits-offset 2))
-    (let ((one-word (gen-label)))
-      ;; We start out assuming that we need one word.  Is that correct?
-      (inst sradi temp lo 63)
-      (inst xor. temp temp hi)
-      (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
-      (inst beq one-word)
-      (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
-      (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag)
-      (emit-label one-word)
-      (storew temp res 0 other-pointer-lowtag)
-      (storew lo res bignum-digits-offset other-pointer-lowtag)))
-  ;; Out of here
-  GO-HOME
+  ;; Compute upper bits of the double-precision product.
+  (inst mulhd hi y temp)
+  ;; Perform double-precision right shift of hi:lo by n-fixnum-tag-bits.
+  (inst sldi temp hi (- 64 n-fixnum-tag-bits))
+  (inst sradi hi hi n-fixnum-tag-bits)
+  (inst srdi lo lo n-fixnum-tag-bits)
+  (inst or lo temp lo)
+  ;; Determine whether 'hi' is just the extension of lo's sign bit.
+  (inst sradi temp lo 63) ; temp <- 64 replicas of sign bit
+  (inst cmpd hi temp)
+  (inst bne TWO-WORD-BIGNUM)
+  ;; one word bignum
+  (with-fixed-allocation (res pa-flag temp bignum-widetag (1+ bignum-digits-offset))
+    (storew lo res bignum-digits-offset other-pointer-lowtag))
+  (lisp-return lra lip :offset 2)
+  TWO-WORD-BIGNUM
+  (with-fixed-allocation (res pa-flag temp bignum-widetag (+ bignum-digits-offset 2))
+    (storew lo res bignum-digits-offset other-pointer-lowtag)
+    (storew hi res (1+ bignum-digits-offset) other-pointer-lowtag))
   (lisp-return lra lip :offset 2)
 
   DO-STATIC-FUN
@@ -181,7 +166,7 @@
   (inst mr cfp-tn csp-tn)
   (inst j lip 0)
 
-  LOW-FITS-IN-FIXNUM
+  DONE
   (move res lo))
 
 (macrolet
@@ -331,7 +316,6 @@
 
                           (:res res descriptor-reg a0-offset)
 
-                          (:temp lra descriptor-reg lra-offset)
                           (:temp lip interior-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))

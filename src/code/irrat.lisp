@@ -34,6 +34,7 @@
     `(progn
        (declaim (inline ,function))
        (defun ,function ,args
+         (declare (sb-c:flushable sb-c:%alien-funcall))
          (truly-the ;; avoid checking the result
           ,(type-specifier (fun-type-returns (info :function :type function)))
           (alien-funcall
@@ -76,6 +77,7 @@
 #-x86 (def-math-rtn "atan" 1)
 #-x86 (def-math-rtn "atan2" 2)
 
+;;; See src/runtime/wrap.c for the definitions of the "sb_"-prefixed things.
 (def-math-rtn "acos" 1 #+win32 t)
 (def-math-rtn "asin" 1 #+win32 t)
 (def-math-rtn "cosh" 1 #+win32 t)
@@ -119,6 +121,12 @@
          (if (evenp power)
              1
              base))
+        ((eql base 0)
+         (cond ((= power 0) 1)
+               ((> power 0) 0)
+               (t (error 'division-by-zero
+                         :operands (list 0 power)
+                         :operation 'expt))))
         ((ratiop base)
          (let ((den (denominator base))
                (num (numerator base)))
@@ -253,7 +261,7 @@
                            (when (< x-hi 0)
                              (cond ((and (= x-ihi #x3ff00000) (zerop yisint))
                                     ;; (-1)**non-int
-                                    (let ((y*pi (* y sb-xc:pi)))
+                                    (let ((y*pi (* y pi)))
                                       (declare (double-float y*pi))
                                       (return-from real-expt
                                         (complex
@@ -276,7 +284,7 @@
                                (2 ; even
                                 (coerce pow rtype))
                                (t ; non-integer
-                                (let ((y*pi (* y sb-xc:pi)))
+                                (let ((y*pi (* y pi)))
                                   (declare (double-float y*pi))
                                   (complex
                                    (coerce (* pow (%cos y*pi))
@@ -375,11 +383,11 @@
       (number-dispatch ((number number))
         (((foreach fixnum bignum))
          (if (minusp number)
-             (complex (log (- number)) (coerce sb-xc:pi 'single-float))
+             (complex (log (- number)) (coerce pi 'single-float))
              (coerce (/ (log2 number) (log (exp $1.0d0) $2.0d0)) 'single-float)))
         ((ratio)
          (if (minusp number)
-             (complex (log (- number)) (coerce sb-xc:pi 'single-float))
+             (complex (log (- number)) (coerce pi 'single-float))
              (let ((numerator (numerator number))
                    (denominator (denominator number)))
                (if (= (integer-length numerator)
@@ -394,7 +402,7 @@
          ;; Since this doesn't seem to be an implementation issue
          ;; I (pw) take the Kahan result.
          (if (= (float-sign-bit number) 1) ; MINUSP
-             (complex (log (- number)) (coerce sb-xc:pi '(dispatch-type number)))
+             (complex (log (- number)) (coerce pi '(dispatch-type number)))
              (coerce (%log (coerce number 'double-float))
                      '(dispatch-type number))))
         ((complex)
@@ -449,15 +457,15 @@
   (number-dispatch ((number number))
     ((rational)
      (if (minusp number)
-         (coerce sb-xc:pi 'single-float)
+         (coerce pi 'single-float)
          $0.0f0))
     ((single-float)
      (if (minusp (float-sign number))
-         (coerce sb-xc:pi 'single-float)
+         (coerce pi 'single-float)
          $0.0f0))
     ((double-float)
      (if (minusp (float-sign number))
-         (coerce sb-xc:pi 'double-float)
+         (coerce pi 'double-float)
          $0.0d0))
     (handle-complex
      (atan (imagpart number) (realpart number)))))
@@ -548,8 +556,8 @@
                    (if (zerop y)
                        (if (= (float-sign-bit x) 0) ; PLUSP
                            y
-                           (float-sign y sb-xc:pi))
-                       (float-sign y (sb-xc:/ sb-xc:pi 2)))
+                           (float-sign y pi))
+                       (float-sign y (sb-xc:/ pi 2)))
                    (%atan2 y x))))
         (number-dispatch ((y real) (x real))
           ((double-float
@@ -750,8 +758,7 @@
         ((zerop x)
          ;; The answer is negative infinity, but we are supposed to
           ;; signal divide-by-zero, so do the actual division
-         (/ $-1.0d0 x)
-         )
+         (/ $-1.0d0 x))
         (t
           (logb-finite x))))
 
@@ -910,9 +917,9 @@
   (declare (muffle-conditions compiler-note))
   (declare (type (or rational complex) z))
   (let* (;; constants
-         (theta (sb-xc:/ (sb-xc:sqrt sb-xc:most-positive-double-float) $4.0d0))
-         (rho (sb-xc:/ $4.0d0 (sb-xc:sqrt sb-xc:most-positive-double-float)))
-         (half-pi (sb-xc:/ sb-xc:pi $2.0d0))
+         (theta (sb-xc:/ (sb-xc:sqrt most-positive-double-float) $4.0d0))
+         (rho (sb-xc:/ $4.0d0 (sb-xc:sqrt most-positive-double-float)))
+         (half-pi (sb-xc:/ pi $2.0d0))
          (rp (float (realpart z) $1.0d0))
          (beta (float-sign rp $1.0d0))
          (x (* beta rp))

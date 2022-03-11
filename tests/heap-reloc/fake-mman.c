@@ -61,15 +61,16 @@ void pick_fuzzed_addresses(unsigned long *addr1,
 }
 
 os_vm_address_t
-os_validate(int option, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
+            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
 {
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     void *fuzzed = addr;
     os_vm_address_t actual;
-    int movable = option & (MOVABLE | MOVABLE_LOW);
+    int movable = attributes & MOVABLE;
 
 #ifdef MAP_32BIT
-    if (option & MOVABLE_LOW)
+    if (attributes & ALLOCATE_LOW)
         flags |= MAP_32BIT;
 #endif
     if (addr && movable) {
@@ -77,7 +78,7 @@ os_validate(int option, os_vm_address_t addr, os_vm_size_t len)
         if (!addr1)
             pick_fuzzed_addresses(&addr1, &addr2);
 #ifdef LISP_FEATURE_64_BIT
-        if (!(option & MOVABLE_LOW))
+        if (!(attributes & ALLOCATE_LOW))
             fuzzed = (void*)addr2;
         else
 #endif

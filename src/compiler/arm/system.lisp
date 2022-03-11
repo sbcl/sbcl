@@ -59,6 +59,30 @@
     ;; And, finally, pick out the widetag from the header.
     (inst ldrb :ne result (@ object (- result)))))
 
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional :eq)
+  (:info test-layout)
+  (:temporary (:sc unsigned-reg) this-id)
+  (:generator 4
+    (let ((test-id (layout-id test-layout))
+          (offset (+ (id-bits-offset)
+                     (ash (- (wrapper-depthoid test-layout) 2) 2)
+                     (- instance-pointer-lowtag))))
+      (inst ldr this-id (@ x offset))
+      ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
+      (cond ((typep test-id '(and (unsigned-byte 8) (not (eql 0))))
+             (inst cmp this-id test-id))
+            (t
+             (inst .layout-id test-layout)
+             ;; The fixupper will rewrite these three instructions.
+             (inst eor this-id this-id (ash 255 16))
+             (inst eor this-id this-id (ash 255 8))
+             (inst cmp this-id 255))))))
+
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)
@@ -68,24 +92,14 @@
   (:generator 6
     (load-type result object (- other-pointer-lowtag))))
 
-(define-vop (fun-subtype)
-  (:translate fun-subtype)
+(define-vop ()
+  (:translate %fun-pointer-widetag)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
-
-(define-vop (fun-header-data)
-  (:translate fun-header-data)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    (inst mov res (lsr res n-widetag-bits))))
 
 (define-vop (get-header-data)
   (:translate get-header-data)
@@ -100,10 +114,9 @@
 (define-vop (set-header-data)
   (:translate set-header-data)
   (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg) :target res)
+  (:args (x :scs (descriptor-reg))
          (data :scs (any-reg immediate)))
   (:arg-types * positive-fixnum)
-  (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1)
   (:generator 6
     (load-type t1 x (- other-pointer-lowtag))
@@ -116,8 +129,7 @@
        ;; See SYS:SRC;COMPILER;ARM;MOVE.LISP for a partial fix...  And
        ;; maybe it should be promoted to an instruction-macro?
        (inst orr t1 t1 (ash (tn-value data) n-widetag-bits))))
-    (storew t1 x 0 other-pointer-lowtag)
-    (move res x)))
+    (storew t1 x 0 other-pointer-lowtag)))
 
 
 (define-vop (pointer-hash)
@@ -126,18 +138,9 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst bic res ptr lowtag-mask)
-    (inst mov res (lsr res 1))))
+    (inst bic res ptr fixnum-tag-mask)))
 
 ;;;; Allocation
-
-(define-vop (dynamic-space-free-pointer)
-  (:results (int :scs (sap-reg)))
-  (:result-types system-area-pointer)
-  (:translate dynamic-space-free-pointer)
-  (:policy :fast-safe)
-  (:generator 1
-    (load-symbol-value int *allocation-pointer*)))
 
 (define-vop (binding-stack-pointer-sap)
   (:results (int :scs (sap-reg)))
@@ -205,9 +208,9 @@
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
 ;;;
-(define-vop (symbol-info-vector)
+(define-vop (symbol-dbinfo)
   (:policy :fast-safe)
-  (:translate symbol-info-vector)
+  (:translate symbol-dbinfo)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) temp)
@@ -217,19 +220,6 @@
     (inst and temp res lowtag-mask)
     (inst cmp temp list-pointer-lowtag)
     (loadw res res cons-cdr-slot list-pointer-lowtag :eq)))
-
-(define-vop (symbol-plist)
-  (:policy :fast-safe)
-  (:translate symbol-plist)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (descriptor-reg)))
-  (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; Instruction pun: (CAR x) is the same as (VECTOR-LENGTH x)
-    ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
-    (loadw res res cons-car-slot list-pointer-lowtag)
-    (inst tst res fixnum-tag-mask)
-    (inst mov :eq res null-tn)))
 
 ;;;; other miscellaneous VOPs
 
@@ -254,7 +244,15 @@
     (emit-alignment word-shift)))
 
 ;;;; Dummy definition for a spin-loop hint VOP
-(define-vop (spin-loop-hint)
+(define-vop ()
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0))
+
+(define-vop (sb-c::mark-covered)
+ (:info x)
+ (:temporary (:sc unsigned-reg) tmp)
+ (:generator 4
+   ;; Can't compute code-tn-relative index until the boxed header length
+   ;; is known. Some vops emit new boxed words via EMIT-CONSTANT.
+   (inst store-coverage-mark x tmp)))

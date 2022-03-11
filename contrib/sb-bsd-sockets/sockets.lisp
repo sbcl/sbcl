@@ -177,8 +177,8 @@ directly instantiated.")))
                                    ((or (eql element-type 'character) (eql element-type 'base-char))
                                     (code-char (sb-alien:deref (sb-alien:deref copy-buffer) i)))
                                    (t (sb-alien:deref (sb-alien:deref copy-buffer) i)))))
-                     (apply #'values buffer len (multiple-value-list
-                                                 (bits-of-sockaddr socket sockaddr))))
+                     (multiple-value-call #'values buffer len
+                       (bits-of-sockaddr socket sockaddr)))
                  (:interrupted nil)))
           (sb-alien:free-alien copy-buffer))))))
 
@@ -235,44 +235,6 @@ directly instantiated.")))
   (if (slot-boundp socket 'stream)
       (open-stream-p (slot-value socket 'stream))
       (/= -1 (socket-file-descriptor socket))))
-
-(defmethod socket-close ((socket socket) &key abort)
-  ;; the close(2) manual page has all kinds of warning about not
-  ;; checking the return value of close, on the grounds that an
-  ;; earlier write(2) might have returned successfully w/o actually
-  ;; writing the stuff to disk.  It then goes on to define the only
-  ;; possible error return as EBADF (fd isn't a valid open file
-  ;; descriptor).  Presumably this is an oversight and we could also
-  ;; get anything that write(2) would have given us.
-
-  ;; note that if you have a socket _and_ a stream on the same fd,
-  ;; the socket will avoid doing anything to close the fd in case
-  ;; the stream has done it already - if so, it may have been
-  ;; reassigned to some other file, and closing it would be bad
-  (let ((fd (socket-file-descriptor socket)))
-    (flet ((drop-it (&optional streamp)
-             (setf (slot-value socket 'file-descriptor) -1)
-             (if streamp
-                 (slot-makunbound socket 'stream)
-                 (sb-ext:cancel-finalization socket))
-             t))
-      (cond ((eql fd -1)
-             ;; already closed
-             nil)
-           ((slot-boundp socket 'stream)
-            (close (slot-value socket 'stream) :abort abort)
-            ;; Don't do this if there was an error from CLOSE -- the stream is
-            ;; still live.
-            (drop-it t))
-           (t
-            (handler-case
-                (socket-error-case ("close" (sockint::close fd)
-                                            result (minusp result)))
-              (bad-file-descriptor-error ()
-                (drop-it))
-              (:no-error (r)
-                (declare (ignore r))
-                (drop-it))))))))
 
 (defmethod socket-shutdown ((socket socket) &key direction)
   (let* ((fd  (socket-file-descriptor socket))
@@ -401,3 +363,44 @@ When supplied, ERRNO should be the UNIX error number associated to the
 failed call. The default behavior is to use the current value of the
 errno variable."
   (error (condition-for-errno errno) :errno errno :syscall where))
+
+;;; This wants to refer to the BAD-FILE-DESCRIPTOR-ERROR condition class.
+;;; :BLOCK-COMPILE would have handled it correctly, but I don't know how
+;;; to pass that flag through our contrib-building steps.
+(defmethod socket-close ((socket socket) &key abort)
+  ;; the close(2) manual page has all kinds of warning about not
+  ;; checking the return value of close, on the grounds that an
+  ;; earlier write(2) might have returned successfully w/o actually
+  ;; writing the stuff to disk.  It then goes on to define the only
+  ;; possible error return as EBADF (fd isn't a valid open file
+  ;; descriptor).  Presumably this is an oversight and we could also
+  ;; get anything that write(2) would have given us.
+
+  ;; note that if you have a socket _and_ a stream on the same fd,
+  ;; the socket will avoid doing anything to close the fd in case
+  ;; the stream has done it already - if so, it may have been
+  ;; reassigned to some other file, and closing it would be bad
+  (let ((fd (socket-file-descriptor socket)))
+    (flet ((drop-it (&optional streamp)
+             (setf (slot-value socket 'file-descriptor) -1)
+             (if streamp
+                 (slot-makunbound socket 'stream)
+                 (sb-ext:cancel-finalization socket))
+             t))
+      (cond ((eql fd -1)
+             ;; already closed
+             nil)
+           ((slot-boundp socket 'stream)
+            (close (slot-value socket 'stream) :abort abort)
+            ;; Don't do this if there was an error from CLOSE -- the stream is
+            ;; still live.
+            (drop-it t))
+           (t
+            (handler-case
+                (socket-error-case ("close" (sockint::close fd)
+                                            result (minusp result)))
+              (bad-file-descriptor-error ()
+                (drop-it))
+              (:no-error (r)
+                (declare (ignore r))
+                (drop-it))))))))

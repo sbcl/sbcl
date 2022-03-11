@@ -26,15 +26,6 @@
                 nil)
                ((find name result :test #'string= :key #'car)
                 nil)
-               ((not (probe-file (merge-pathnames
-                                  (make-pathname
-                                   :directory (list :relative name)
-                                   :name "test-passed"
-                                   :type "test-report")
-                                  *asdf-object-cache-directory*)))
-                (error "The documented contrib ~A seems to have ~
-                        failed its tests."
-                       name))
                (t
                 t))
         collect (cons name package) into result
@@ -93,9 +84,10 @@
                            canonical-name names))
              (format stream "@end table~%")))
       (let (result)
-        (sb-int:dohash ((key val) sb-impl::*external-formats*)
-          (declare (ignore key))
-          (pushnew (sb-impl::ef-names val) result :test #'equal))
+        (loop for ef across sb-impl::*external-formats*
+              when (sb-impl::external-format-p ef)
+              do
+              (pushnew (sb-impl::ef-names ef) result :test #'equal))
         (table (sort result #'string< :key #'car))))))
 
 ;;;; Entry point

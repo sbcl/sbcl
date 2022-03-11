@@ -27,6 +27,7 @@
 #include "genesis/funcallable-instance.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
+#include "genesis/symbol.h"
 
 #define zero $0
 #define AT $1
@@ -56,7 +57,7 @@
 #define t9 $25
 #define k0 $26
 #define k1 $27
-#define gp $28
+//#define gp $28
 #define sp $29
 #define s8 $30
 #define ra $31
@@ -103,6 +104,17 @@ symbol:
 		.type	symbol,@function;		\
 symbol:
 
+/* zero (or anything non-nil) -> atomic=true and NIL -> atomic=false  */
+#define BEGIN_PSEUDO_ATOMIC \
+	.set	noreorder ; \
+	sw 	zero, (PSEUDO_ATOMIC_ATOMIC+SYMBOL_VALUE_OFFSET-NIL)(reg_NIL) ; \
+	.set	reorder
+#define END_PSEUDO_ATOMIC(temp) \
+	.set	noreorder ; \
+	sw	reg_NIL, (PSEUDO_ATOMIC_ATOMIC+SYMBOL_VALUE_OFFSET-NIL)(reg_NIL) ; \
+	lw	temp, (PSEUDO_ATOMIC_INTERRUPTED+SYMBOL_VALUE_OFFSET-NIL)(reg_NIL) ; \
+	tne	zero, temp, 0 ; \
+	.set	reorder
 
 	.text
 
@@ -120,8 +132,8 @@ symbol:
 	.mask	0xc0ff0000, -8
 	sw	ra, framesize-8(sp)
 	sw	s8, framesize-12(sp)
-	/* No .cprestore, we don't want automatic gp restauration. */
-	sw	gp, framesize-16(sp)
+	sw	$gp, framesize-16(sp)
+	/* No .cprestore, we don't want automatic gp restoration. */
 	sw	s7, framesize-20(sp)
 	sw	s6, framesize-24(sp)
 	sw	s5, framesize-28(sp)
@@ -137,27 +149,14 @@ symbol:
 	li	reg_FDEFN, 0		# t6
 	li	reg_L1, 0		# t8
 
-	/* Turn on pseudo-atomic. */
-	.set	noreorder
-	li	reg_NL4, 0
-	li	reg_ALLOC, 1
-        .set    reorder
-
-	/* Load the allocation pointer, preserving the low-bit of alloc */
-	lw	reg_BSP, dynamic_space_free_pointer
-	addu	reg_ALLOC, reg_BSP
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Load the rest of the LISP state. */
 	lw	reg_BSP, current_binding_stack_pointer
 	lw	reg_CSP, current_control_stack_pointer
 	lw	reg_OCFP, current_control_frame_pointer
 
-	/* Check for interrupt */
-        .set    noreorder
-	bgez	reg_NL4, 1f
-	 subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-1:	.set	reorder
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Pass in args */
 	move	reg_LEXENV, a0
@@ -176,7 +175,7 @@ symbol:
 	/* Indirect closure */
 	lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
 
-	addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
+	addu	reg_LIP, reg_CODE, SIMPLE_FUN_INSTS_OFFSET
 
 	/* Mark us as in Lisp land. */
 	sw	zero, foreign_function_call_active
@@ -195,29 +194,19 @@ lra:	.word	RETURN_PC_WIDETAG
 	/* Single value return spot. */
 
 	/* Nested lisp -> C calls may have clobbered gp. */
-	lw	gp, framesize-16(sp)
+	lw	$gp, framesize-16(sp)
 
 	/* Mark us as in C land. */
 	sw	reg_CSP, foreign_function_call_active
 
-	/* Set the pseudo-atomic flag. */
-	li	reg_NL4, 0
-	addu	reg_ALLOC, 1
-	.set	reorder
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Save LISP state. */
-	subu	reg_NL0, reg_ALLOC, 1
-	sw	reg_NL0, dynamic_space_free_pointer
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
 
-	/* Check for interrupt */
-	.set	noreorder
-	bgez	reg_NL4, 1f
-	 subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-1:	.set	reorder
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Pass one return value back to C land. For a 64bit value, we may
 	   need to clobber v1 aka reg_NL4. */
@@ -248,19 +237,6 @@ lra:	.word	RETURN_PC_WIDETAG
  * Transfering control from Lisp into C
  */
  	NESTED(call_into_c, 0, ra)
-	/* The C stack frame was already set up from lisp, and the
-	   argument registers as well. We have to fake the correct
-	   gp value for this function, though. */
-	.set	noreorder
-	/* reg_NL3 is AT. */
-	.set	noat
-	lui	gp, %hi(_gp_disp)
-	addiu	gp, %lo(_gp_disp)
-	lui	reg_NL3, %hi(call_into_c)
-	addiu	reg_NL3, %lo(call_into_c)
-	addu	gp, reg_NL3
-	.set	at
-	.set	reorder
 
 	/* Setup the lisp stack. */
 	move	reg_OCFP, reg_CFP
@@ -270,11 +246,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	/* Mark us as in C land. */
 	sw	reg_CSP, foreign_function_call_active
 
-	/* Set the pseudo-atomic flag. */
-	.set	noreorder
-	li	reg_NL4, 0
-	addu	reg_ALLOC, 1
-	.set	reorder
+	BEGIN_PSEUDO_ATOMIC
 
 	/* Convert the return address to an offset and save it on the stack. */
 	subu	reg_NFP, reg_LIP, reg_CODE
@@ -282,27 +254,23 @@ lra:	.word	RETURN_PC_WIDETAG
         sw      reg_OCFP, (reg_CFP)
 	sw	reg_NFP, 4(reg_CFP)
 	sw	reg_CODE, 8(reg_CFP)
-	sw	gp, 12(reg_CFP) // should this be saved? on the control stack?
+	sw	$gp, 12(reg_CFP) // should this be saved? on the control stack?
 
 	/* Save LISP state. */
-	subu	reg_A0, reg_ALLOC, 1
-	sw	reg_A0, dynamic_space_free_pointer
 	sw	reg_BSP, current_binding_stack_pointer
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
 
-	/* Check for interrupt */
-	.set	noreorder
-	bgez	reg_NL4, 1f
-	subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-1:	.set	reorder
+	/* from the ABI: "When calling position independent functions
+	   $25 must cotain the address of the called function." */
+	lw	$25, (reg_CFUNC) /* linkage-table indirection */
+
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Into C land we go. */
-	move    t9, reg_CFUNC		# reg_ALLOC
-	jalr	t9
+	jalr	$25
 
-	lw	gp, 12(reg_CFP)
+	lw	$gp, 12(reg_CFP)
 
 	/* Pass 64bit return value to lisp land. */
 	move	reg_NL0, v0		# reg_CFUNC
@@ -331,15 +299,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	li	reg_CODE, 0		# s8
 	li	reg_LIP, 0		# ra
 
-	/* Turn on pseudo-atomic. */
-	.set	noreorder
-	li	reg_NL4, 0
-	li	reg_ALLOC, 1
-	.set	reorder
-
-	/* Load the allocation pointer, preserving the low-bit of alloc */
-	lw	reg_BSP, dynamic_space_free_pointer
-	addu	reg_ALLOC, reg_BSP
+	BEGIN_PSEUDO_ATOMIC
 
 	lw	reg_BSP, current_binding_stack_pointer
 
@@ -349,12 +309,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	subu	reg_LIP, reg_NFP, OTHER_POINTER_LOWTAG
 	addu	reg_LIP, reg_CODE
 
-	/* Check for interrupt */
-	.set	noreorder
-	bgez	reg_NL4, 1f
-	 subu	reg_ALLOC, 1
-	break	0x0, trap_PendingInterrupt
-1:	.set	reorder
+	END_PSEUDO_ATOMIC(reg_NL4)
 
 	/* Reset the lisp stack. */
 	/* Note: OCFP and CFP are in saved regs. */

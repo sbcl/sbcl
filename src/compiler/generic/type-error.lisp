@@ -44,26 +44,7 @@
          (index :scs (unsigned-reg))
          (value :scs (descriptor-reg)))
   (:arg-types simple-array-nil positive-fixnum *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:ignore index value result)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 1
-    (error-call vop 'nil-array-accessed-error object)))
-
-(define-vop (data-vector-set/simple-array-nil)
-  (:translate data-vector-set)
-  (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (unsigned-reg))
-         (value :scs (descriptor-reg)))
-  (:info offset)
-  (:arg-types simple-array-nil positive-fixnum *
-              (:constant (integer 0 0)))
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:ignore index value result offset)
+  (:ignore index value)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 1
@@ -90,7 +71,7 @@
   (cond ((sc-is thing immediate)
          (let ((obj (tn-value thing)))
            (typecase obj
-             (layout nil)
+             (wrapper nil)
              ;; non-static symbols can be referenced as error-break args
              ;; because they appear in the code constants.
              ;; static symbols can't be referenced as error-break args
@@ -99,7 +80,9 @@
              (t t))))
         (t t)))
 
-(macrolet ((def (name error translate context &rest args)
+(macrolet ((def (error-name-prefix translate context &rest args)
+             (let* ((error (package-symbolicate "SB-KERNEL" error-name-prefix "-ERROR"))
+                    (name (or translate error)))
              `(define-vop (,name)
                 ,@(when translate
                     `((:policy :fast-safe)
@@ -110,7 +93,7 @@
                                                 single-reg double-reg
                                                 complex-single-reg complex-double-reg)
                                           #+immobile-space
-                                          ,@(if (eq name 'type-check-error)
+                                          ,@(if (eq name 'sb-c::%type-check-error)
                                                 `(:load-if (type-err-type-tn-loadp ,arg)))))
                                  args))
                 ,@(and context
@@ -120,36 +103,27 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop ',error ,@args)))))
-  (def arg-count-error invalid-arg-count-error
-    sb-c::%arg-count-error nil nargs)
-  (def local-arg-count-error local-invalid-arg-count-error
-    sb-c::%local-arg-count-error nil nargs fname)
-  (def type-check-error object-not-type-error sb-c::%type-check-error t
-    object ptype)
-  (def layout-invalid-error layout-invalid-error sb-c::%layout-invalid-error nil
-    object layout)
-  (def odd-key-args-error odd-key-args-error
-    sb-c::%odd-key-args-error nil)
-  (def unknown-key-arg-error unknown-key-arg-error
-    sb-c::%unknown-key-arg-error t key)
-  (def nil-fun-returned-error nil-fun-returned-error nil nil fun)
-  (def failed-aver sb-kernel::failed-aver-error
-    sb-impl::%failed-aver
-    nil form))
+                  (error-call vop ',error ,@args))))))
+  (def "INVALID-ARG-COUNT"       sb-c::%arg-count-error       nil nargs)
+  (def "LOCAL-INVALID-ARG-COUNT" sb-c::%local-arg-count-error nil nargs fname)
+  (def "OBJECT-NOT-TYPE"         sb-c::%type-check-error      t   object ptype)
+  (def "ODD-KEY-ARGS"            sb-c::%odd-key-args-error    nil)
+  (def "UNKNOWN-KEY-ARG"         sb-c::%unknown-key-arg-error t   key)
+  (def "ECASE-FAILURE"           ecase-failure                nil value keys)
+  (def "ETYPECASE-FAILURE"       etypecase-failure            nil value keys)
+  (def "NIL-FUN-RETURNED"        nil                          nil fun)
+  (def "UNREACHABLE"             sb-impl::unreachable         nil)
+  (def "FAILED-AVER"             sb-impl::%failed-aver        nil form))
 
 
-(defun emit-internal-error (kind code values &key trap-emitter
-                                                  (compact-error-trap t))
-  (let ((trap-number (if (and (eq kind error-trap)
-                              compact-error-trap)
+(defun emit-internal-error (kind code values &key trap-emitter)
+  (let ((trap-number (if (eq kind error-trap)
                          (+ kind code)
                          kind)))
     (if trap-emitter
         (funcall trap-emitter trap-number)
         (inst byte trap-number)))
-  (unless (and (eq kind error-trap)
-               compact-error-trap)
+  (unless (eq kind error-trap)
     (inst byte code))
   (encode-internal-error-args values))
 
@@ -165,7 +139,7 @@
               (make-sc+offset immediate-sc-number (tn-value where)))
              (t
               (make-sc+offset (if (and (sc-is where immediate)
-                                       (typep (tn-value where) '(or symbol layout)))
+                                       (typep (tn-value where) '(or symbol wrapper)))
                                   constant-sc-number
                                   (sc-number (tn-sc where)))
                               (or (tn-offset where) 0))))

@@ -25,8 +25,6 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "lispregs.h"
-#include <sys/socket.h>
-#include <sys/utsname.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -36,18 +34,9 @@
 #include <errno.h>
 
 #include "validate.h"
-size_t os_vm_page_size;
-
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;
-#ifdef LISP_FEATURE_SB_THREAD
-#ifdef LISP_FEATURE_GCC_TLS
-    current_thread = thread;
-#else
-    pthread_setspecific(specials,thread);
-#endif
-#endif
     /* Signal handlers are normally run on the main stack, but we've
      * swapped stacks, require that the control stack contain only
      * boxed data, and expands upwards while the C stack expands
@@ -56,7 +45,7 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
     if(sigaltstack(&sigstack,0)<0)
-        lose("Cannot sigaltstack: %s\n",strerror(errno));
+        lose("Cannot sigaltstack: %s",strerror(errno));
 
     return 1;                   /* success */
 }
@@ -68,12 +57,6 @@ os_context_register_t   *
 os_context_register_addr(os_context_t *context, int offset)
 {
     return (os_context_register_t *)&(context->uc_mcontext.regs[offset]);
-}
-
-os_context_register_t *
-os_context_pc_addr(os_context_t *context)
-{
-    return (os_context_register_t *)&(context->uc_mcontext.pc);
 }
 
 os_context_register_t *
@@ -111,3 +94,17 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
         = (os_vm_address_t)(((uintptr_t) address) + length);
     __clear_cache(address, end_address);
 }
+
+// To avoid "Missing required foreign symbol" errors in os_link_runtime()
+// the executable must actually depend on libm. It would not require libm,
+// despite -lm in the link step, if there is no reference to a libm symbol
+// observable to the linker. Any one symbol suffices to resolve all of them.
+#include <math.h>
+const long libm_anchor = (long)acos;
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+int _stat(const char *pathname, struct stat *sb) {return stat(pathname, sb); }
+int _lstat(const char *pathname, struct stat *sb) { return lstat(pathname, sb); }
+int _fstat(int fd, struct stat *sb) { return fstat(fd, sb); }

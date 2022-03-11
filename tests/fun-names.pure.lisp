@@ -12,7 +12,7 @@
 ;;;; more information.
 
 (defun makec1 (a) (lambda () "doc" (values a)))
-(defun makec2 (a b) (lambda () (values a b)))
+(defun makec2 (a b) (lambda () "doc" (values a b)))
 (compile 'makec1)
 (compile 'makec2)
 
@@ -48,7 +48,8 @@
   (dolist (name `("afun" afun (afun) (afun . "guy") (afun . guy) (afun guy)
                   ,sb-pcl:+slot-unbound+ nil))
     (dolist (doc `("what's up" nil ,sb-pcl:+slot-unbound+))
-      (let ((closure (makec1 :a)))
+      (dolist (closure (list (makec1 :a)
+                             (makec2 :a :b)))
         (sb-impl::set-closure-extra-values
          closure nil (sb-impl::pack-closure-extra-values name doc))
         (multiple-value-bind (stored-name stored-doc)
@@ -57,3 +58,15 @@
           (assert (eq stored-doc doc)))
         (assert (string= (documentation closure t)
                          (if (eq doc sb-pcl:+slot-unbound+) "doc" doc)))))))
+
+(with-test (:name :no-funcall-of-extended-name)
+  (multiple-value-bind (fun warnp errorp)
+      (checked-compile '(lambda (x y) (funcall '(setf foo) x y))
+                       :allow-warnings t)
+    (assert (and warnp errorp))
+    (assert-error (funcall fun nil 1) type-error))
+  (multiple-value-bind (fun warnp errorp)
+      (checked-compile '(lambda (x y) (multiple-value-call '(setf foo) x (floor y 2)))
+                       :allow-warnings t)
+    (assert (and warnp errorp))
+    (assert-error (funcall fun nil 1) type-error)))

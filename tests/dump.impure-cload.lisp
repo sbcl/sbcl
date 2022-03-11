@@ -11,6 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (load "compiler-test-util.lisp"))
+
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 
 ;;; this would fail an AVER in NOTE-POTENTIAL-CIRCULARITY
@@ -242,8 +245,8 @@
       (assert-canonical '(x y)) ; specifying all slots explicitly is still canonical
       (assert-canonical '(y x)))
     ;; specifying only one slot is not canonical
-    (assert (equal (let ((*foo-save-slots* '(x))) (sb-c::%make-load-form foo))
-                   '(sb-kernel::new-instance foo)))))
+    (let ((*foo-save-slots* '(x)))
+      (assert (not (sb-fasl:load-form-is-default-mlfss-p foo))))))
 
 ;; A huge constant vector. This took 9 seconds to compile (on a MacBook Pro)
 ;; prior to the optimization for using fops to dump.
@@ -332,7 +335,7 @@
 
 ;; Track the make-load-form FOPs as they fly by at load-time.
 (defvar *call-tracker* nil)
-(dolist (fop-name 'sb-fasl::(fop-allocate-instance fop-set-slot-values))
+(dolist (fop-name '(sb-fasl::fop-instance))
   (let* ((index (position fop-name sb-fasl::**fop-funs**
                           :key
                           (lambda (x) (and (functionp x) (sb-kernel:%fun-name x)))))
@@ -351,8 +354,7 @@
         (b p q r s)
         (c d e g))))
 
-(assert (= 14 (count 'sb-fasl::fop-allocate-instance *call-tracker*)))
-(assert (= 14 (count 'sb-fasl::fop-set-slot-values *call-tracker*)))
+(assert (= 14 (count 'sb-fasl::fop-instance *call-tracker*)))
 
 (with-test (:name :tree-with-parent-m-l-f-s-s)
   (verify-tree *y*))
@@ -403,3 +405,122 @@
 (with-test (:name :dump-std-obj-literal-layout)
   (assert (eq (try-literal-layout)
               (sb-kernel:find-layout 'class-with-shared-slot))))
+
+(defparameter *some-hash-table*
+  #.(let ((ht (make-hash-table)))
+      (setf (gethash 'first ht) :a)
+      (setf (gethash 'second ht) :b)
+      ht))
+;;; In the interest of producing repeatable results from externalized
+;;; hash-tables, the make-load-form method iterates in such a way that
+;;; the k/v vector should be ordered the same as it originally was.
+;;; This also has implications on the order of items in each bucket
+;;; when there are collisions.
+(with-test (:name :reconstructed-hash-table)
+  (let ((pairs (sb-impl::hash-table-pairs *some-hash-table*)))
+    (assert (eq (aref pairs 2) 'first))
+    (assert (eq (aref pairs 4) 'second))))
+
+(defun int= (a b) (= (the integer a) (the integer b)))
+(define-hash-table-test int= sb-impl::number-sxhash)
+(defun get-sync-hash-table () #.(make-hash-table :synchronized t))
+(with-test (:name :dump-hash-tables)
+  ;; Don't lose the :synchronized option.
+  (assert (hash-table-synchronized-p (get-sync-hash-table)))
+  ;; Disallow nonstandard hash that disagrees with test.
+  (assert-error (make-load-form (make-hash-table :test 'int= :hash-function 'sxhash)))
+  ;; Allow nonstandard test as long as it was registered
+  (assert (make-load-form (make-hash-table :test 'int=))))
+
+(defun list-coalescing-test-fun-1 ()
+  (declare (optimize (debug 1)))
+  ;; base coalesces with base, non-base coalesces with non-base
+  (values '#.`(foo ,(coerce "a" 'base-string))
+          '#.`(foo ,(coerce "a" '(array character)))
+          '#.`(foo ,(coerce "a" 'base-string))
+          '#.`(foo ,(coerce "a" '(array character)))))
+
+(defun list-coalescing-test-fun-2 ()
+  (declare (optimize (debug 1)))
+  (values '#.`(foo ,(coerce "a" '(array character)))
+          '#.`(foo ,(coerce "a" 'base-string))))
+
+(with-test (:name :more-code-constant-coalescing
+                  :skipped-on (:not :sb-unicode))
+  (let ((l1 (ctu:find-code-constants #'list-coalescing-test-fun-1))
+        (l2 (ctu:find-code-constants #'list-coalescing-test-fun-2)))
+    (assert (equal (length l1) 2))
+    (assert (equal (length l2) 2))
+    (multiple-value-bind (c1 c2 c3 c4) (list-coalescing-test-fun-1)
+      (assert (typep (second c1) 'simple-base-string))
+      (assert (typep (second c2) 'sb-kernel:simple-character-string))
+      (assert (typep (second c3) 'simple-base-string))
+      (assert (typep (second c4) 'sb-kernel:simple-character-string)))
+    (assert (or (equal l1 l2)
+                (equal l1 (reverse l2))))))
+
+(defun cons-on-list-p (cons list)
+  (assert (consp cons))
+  (loop for cdr on list thereis (eq cons cdr)))
+
+(defun constant-folding-cdr-test-fun ()
+  (let ((list '(a b c)))
+    (dolist (x (list list (cdr list) (cddr list)))
+      (assert (cons-on-list-p x list)))))
+
+(with-test (:name (:cdr-eq-detection :lp1583753))
+  (constant-folding-cdr-test-fun))
+
+(locally
+    (declare (optimize (debug 2) (safety 3)))
+  (defconstant +consy-constant+ (if (boundp '+consy-constant+) (symbol-value '+consy-constant+) '(message-id CAOrNaszM=eSufoqA4KFVNq4CUpjSJym-ktQnufQgj7a5g2sHmg@mail.gmail.com)))
+  (defun test-constant-identity (x)
+    (list '(message-id CAOrNaszM=eSufoqA4KFVNq4CUpjSJym-ktQnufQgj7a5g2sHmg@mail.gmail.com)
+          (eq x +consy-constant+))))
+
+(with-test (:name (defconstant :reference :identity))
+  (let ((z (eval `(test-constant-identity ,(intern "+CONSY-CONSTANT+")))))
+    (assert (equal (car z) +consy-constant+))
+    (assert (cadr z))))
+
+(macrolet ((expand ()
+             `(progn
+                ,@(loop for i from 0 below sb-vm:n-word-bits
+                        collect
+                        `(sb-int:defconstant-eqx ,(intern (format nil "MYSAP~d" i))
+                             ,(sb-sys:int-sap (ash 1 i))
+                           #'sb-sys:sap=)))))
+  (expand))
+(with-test (:name :dump-sap)
+  (dotimes (i sb-vm:n-word-bits)
+    (let ((s (intern (format nil "MYSAP~d" i))))
+      (assert (= (sb-sys:sap-int (symbol-value s))
+                 (ash 1 i))))))
+
+(eval-when (:compile-toplevel :load-toplevel)
+  (defstruct monkey
+    (x t)
+    (y 1 :type fixnum)
+    (data (cons 1 2))
+    (str "hi"))
+
+  (defmethod make-load-form ((self monkey) &optional e)
+    (make-load-form-saving-slots self :slot-names '(data) :environment e)))
+
+(defvar *amonkey* #.(make-monkey :x nil :y 3 :data '(ok)))
+(eval-when (:compile-toplevel) (makunbound '*amonkey*))
+(with-test (:name :dump-monkey)
+  (let ((a *amonkey*))
+    (assert (sb-kernel::unbound-marker-p (monkey-x a)))
+    (assert (sb-kernel::unbound-marker-p (monkey-y a)))
+    (assert (sb-kernel::unbound-marker-p (monkey-str a)))
+    (assert (equal (monkey-data a) '(ok)))))
+
+(defun use-numeric-vector-a ()
+  #.(make-array 5 :element-type '(signed-byte 8) :initial-contents '(90 100 5 -2 3)))
+
+(defun use-numeric-vector-b ()
+  #.(make-array 5 :element-type '(signed-byte 8) :initial-contents '(90 100 5 -2 3)))
+
+(with-test (:name :coalesce-numeric-arrays)
+  (assert (eq (use-numeric-vector-a) (use-numeric-vector-b))))

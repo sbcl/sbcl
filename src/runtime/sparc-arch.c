@@ -23,74 +23,16 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "monitor.h"
-
-#ifdef LISP_FEATURE_LINUX
-extern int linux_sparc_siginfo_bug;
-#endif
-
-void arch_init(void)
-{
-    return;
-}
+#include "pseudo-atomic.h"
 
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
-#if 1 /* New way. */
     return (os_vm_address_t)code->si_addr;
-#else /* Old way, almost certainly predates sigaction(2)-style handlers */
-    unsigned int badinst;
-    unsigned int *pc;
-    int rs1;
-
-    pc = (unsigned int *)(*os_context_pc_addr(context));
-
-    /* On the sparc, we have to decode the instruction. */
-
-    /* Make sure it's not the pc thats bogus, and that it was lisp code */
-    /* that caused the fault. */
-    if ((unsigned long) pc & 3) {
-      /* Unaligned */
-      return NULL;
-    }
-    if ((pc < READ_ONLY_SPACE_START ||
-         pc >= READ_ONLY_SPACE_START+READ_ONLY_SPACE_SIZE) &&
-        (pc < current_dynamic_space ||
-         pc >= current_dynamic_space + dynamic_space_size)) {
-      return NULL;
-    }
-
-    badinst = *pc;
-
-    if ((badinst >> 30) != 3)
-        /* All load/store instructions have op = 11 (binary) */
-        return 0;
-
-    rs1 = (badinst>>14)&0x1f;
-
-    if (badinst & (1<<13)) {
-        /* r[rs1] + simm(13) */
-        int simm13 = badinst & 0x1fff;
-
-        if (simm13 & (1<<12))
-            simm13 |= -1<<13;
-
-        return (os_vm_address_t)
-            (*os_context_register_addr(context, rs1)+simm13);
-    }
-    else {
-        /* r[rs1] + r[rs2] */
-        int rs2 = badinst & 0x1f;
-
-        return (os_vm_address_t)
-            (*os_context_register_addr(context, rs1) +
-             *os_context_register_addr(context, rs2));
-    }
-#endif
 }
 
 void arch_skip_instruction(os_context_t *context)
 {
-    *os_context_pc_addr(context) = *os_context_npc_addr(context);
+    OS_CONTEXT_PC(context) = *os_context_npc_addr(context);
     /* Note that we're doing integer arithmetic here, not pointer. So
      * the value that the return value of os_context_npc_addr() points
      * to will be incremented by 4, not 16.
@@ -100,33 +42,22 @@ void arch_skip_instruction(os_context_t *context)
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char *)(*os_context_pc_addr(context) + 4);
+    return (unsigned char *)(OS_CONTEXT_PC(context) + 4);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
 {
-    /* FIXME: this foreign_function_call_active test is dubious at
-     * best. If a foreign call is made in a pseudo atomic section
-     * (?) or more likely a pseudo atomic section is in a foreign
-     * call then an interrupt is executed immediately. Maybe it
-     * has to do with C code not maintaining pseudo atomic
-     * properly. MG - 2005-08-10
-     *
-     * The foreign_function_call_active used to live at each call-site
-     * to arch_pseudo_atomic_atomic, but this seems clearer.
-     * --NS 2007-05-15 */
-    return (!foreign_function_call_active)
-        && ((*os_context_register_addr(context,reg_ALLOC)) & 4);
+    return get_pseudo_atomic_atomic(get_sb_vm_thread());
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) |=  1;
+    set_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    *os_context_register_addr(context,reg_ALLOC) &= ~1;
+    clear_pseudo_atomic_interrupted(get_sb_vm_thread());
 }
 
 unsigned int arch_install_breakpoint(void *pc)
@@ -167,7 +98,7 @@ static unsigned int *skipped_break_addr, displaced_after_inst;
 
 void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
-    unsigned int *pc = (unsigned int *)(*os_context_pc_addr(context));
+    unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
     unsigned int *npc = (unsigned int *)(*os_context_npc_addr(context));
 
   /*  orig_sigmask = context->sigmask;
@@ -184,41 +115,34 @@ void arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 
 }
 
+static int is_btst_reg_self(unsigned int inst)
+{
+    // Refer to EMIT-FORMAT-3-REG for the bit packing.
+    int src1 = (inst >> 14) && 0x1f;
+    int src2 = (inst >>  0) && 0x1f;
+    /* Fix both src fields to the known value of 0x1f by ORing in a constant
+     * and check whether it matches BTST %rN, %rn ("bit test")
+     * which is the same as the ANDCC instruction.
+     * The constant is #b1111100000000011111 = #x7C01F
+     *                   -----         -----
+     *                   src1          src2
+     */
+    return (inst | 0x7C01F) == 0x808FC01F && src1 == src2;
+}
+
 static int pseudo_atomic_trap_p(os_context_t *context)
 {
-    unsigned int* pc;
-    unsigned int badinst;
-    int result;
+    unsigned int* pc = (unsigned int*) OS_CONTEXT_PC(context);
 
-
-    pc = (unsigned int*) *os_context_pc_addr(context);
-    badinst = *pc;
-    result = 0;
-
-    /* Check to see if the current instruction is a pseudo-atomic-trap */
-    if (((badinst >> 30) == 2) && (((badinst >> 19) & 0x3f) == 0x3a)
-        && (((badinst >> 13) & 1) == 1) && ((badinst & 0x7f) == PSEUDO_ATOMIC_TRAP))
-        {
-            unsigned int previnst;
-            previnst = pc[-1];
-            /*
-             * Check to see if the previous instruction was an andcc alloc-tn,
-             * 3, zero-tn instruction.
-             */
-            if (((previnst >> 30) == 2) && (((previnst >> 19) & 0x3f) == 0x11)
-                && (((previnst >> 14) & 0x1f) == reg_ALLOC)
-                && (((previnst >> 25) & 0x1f) == reg_ZERO)
-                && (((previnst >> 13) & 1) == 1)
-                && ((previnst & 0x1fff) == 3))
-                {
-                    result = 1;
-                }
-            else
-                {
-                    fprintf(stderr, "Oops!  Got a PSEUDO-ATOMIC-TRAP without a preceeding andcc!\n");
-                }
-        }
-    return result;
+    // As to the choice of bit patterns, see KLUDGE at
+    // (defconstant pseudo-atomic-trap) in sparc/parms.lisp
+    return pc[0] ==
+#ifdef LISP_FEATURE_LINUX
+        0x93D02040 // TNE 64. pseudo-atomic-trap = #x40
+#else
+        0x93D02010 // TNE 16. pseudo-atomic-trap = #x10
+#endif
+        && is_btst_reg_self(pc[-1]);
 }
 
 void
@@ -230,8 +154,8 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(context);
-    *os_context_npc_addr(context) = *os_context_pc_addr(context) + 4;
+    OS_CONTEXT_PC(context) = (int) handle_fun_end_breakpoint(context);
+    *os_context_npc_addr(context) = OS_CONTEXT_PC(context) + 4;
 }
 
 void
@@ -240,37 +164,35 @@ arch_handle_after_breakpoint(os_context_t *context)
     *skipped_break_addr = trap_Breakpoint;
     os_flush_icache(skipped_break_addr, sizeof(unsigned int));
     skipped_break_addr = NULL;
-    *(unsigned long *) os_context_pc_addr(context) = displaced_after_inst;
+    *(unsigned long *)OS_CONTEXT_PC(context) = displaced_after_inst;
     /* context->sigmask = orig_sigmask; */
-    os_flush_icache((os_vm_address_t) os_context_pc_addr(context), sizeof(unsigned int));
+    os_flush_icache((os_vm_address_t)OS_CONTEXT_PC(context), sizeof(unsigned int));
 }
 
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
+    unsigned int code = *(uint32_t *)OS_CONTEXT_PC(context);
     int register_offset = code >> 8 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);
 }
 
-#ifdef LISP_FEATURE_GENCGC
-void
-arch_handle_allocation_trap(os_context_t *context)
+static void handle_allocation_trap(os_context_t *context, unsigned int *pc)
 {
-    unsigned int* pc;
     unsigned int or_inst;
     int rs1;
     int size;
     int immed;
-    int context_index;
-    boolean were_in_lisp;
-    char* memory;
+    extern void mixed_region_rollback(sword_t);
 
     if (foreign_function_call_active)
       lose("Allocation trap inside foreign code.");
 
-    pc = (unsigned int*) *os_context_pc_addr(context);
+    struct thread* thread = get_sb_vm_thread();
+    if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
+        record_backtrace_from_context(context, thread);
+
     or_inst = pc[-1];
 
     /*
@@ -278,67 +200,60 @@ arch_handle_allocation_trap(os_context_t *context)
      * instruction!
      */
     if (!(((or_inst >> 30) == 2) && (((or_inst >> 19) & 0x1f) == 2)))
-        lose("Allocation trap not preceded by an OR instruction: 0x%08x",
-             or_inst);
+        lose("Allocation trap @ %p not preceded by an OR instruction: 0x%08x",
+             pc, or_inst);
 
     /*
      * An OR instruction.  RS1 is the register we want to allocate to.
      * RS2 (or an immediate) is the size.
      */
+    int rd = (or_inst >> 25) & 0x1f; // just a 1 bit flag essentially
     rs1 = (or_inst >> 14) & 0x1f;
     immed = (or_inst >> 13) & 1;
 
     if (immed == 1)
         size = or_inst & 0x1fff;
-    else {
-        size = or_inst & 0x1f;
-        size = *os_context_register_addr(context, size);
-    }
+    else
+        size = *os_context_register_addr(context, or_inst & 0x1f);
+    mixed_region_rollback(size);
 
     fake_foreign_function_call(context);
 
     /*
      * Allocate some memory, store the memory address in rs1.
      */
-    {
-        struct interrupt_data *data =
-            arch_os_get_current_thread()->interrupt_data;
-        data->allocation_trap_context = context;
-        memory = alloc(size);
-        data->allocation_trap_context = 0;
-    }
-    *os_context_register_addr(context, rs1) = memory;
+    lispobj* memory;
+    struct interrupt_data *data = &thread_interrupt_data(thread);
+    data->allocation_trap_context = context;
+    extern lispobj *alloc(sword_t), *alloc_list(sword_t);
+    memory = (rd & 1) ? alloc_list(size) : alloc(size);
+    data->allocation_trap_context = 0;
+
+    *os_context_register_addr(context, rs1) = (lispobj)memory;
+    arch_skip_instruction(context);
 
     undo_fake_foreign_function_call(context);
 }
-#endif
 
 static void sigill_handler(int signal, siginfo_t *siginfo,
                            os_context_t *context)
 {
-    if ((siginfo->si_code) == ILL_ILLOPC
-#ifdef LISP_FEATURE_LINUX
-        || (linux_sparc_siginfo_bug && (siginfo->si_code == 2))
-#endif
-        ) {
+    if (siginfo->si_code == ILL_ILLOPC) {
         int trap;
         unsigned int inst;
         unsigned int* pc = (unsigned int*) siginfo->si_addr;
 
+        if (!gc_managed_heap_space_p((lispobj)pc))
+          lose("Illegal instruction not in lisp: %p [%x]\n", pc, *pc);
+
         inst = *pc;
         trap = inst & 0xff;
-        handle_trap(context,trap);
+        if (trap == trap_Allocation) handle_allocation_trap(context, pc);
+        else handle_trap(context,trap);
     }
-    else if ((siginfo->si_code) == ILL_ILLTRP
-#ifdef LISP_FEATURE_LINUX
-             || (linux_sparc_siginfo_bug && (siginfo->si_code) == 192)
-#endif
-             ) {
+    else if (siginfo->si_code == ILL_ILLTRP) {
         if (pseudo_atomic_trap_p(context)) {
-            /* A trap instruction from a pseudo-atomic.  We just need
-               to fixup up alloc-tn to remove the interrupted flag,
-               skip over the trap instruction, and then handle the
-               pending interrupt(s). */
+            /* A trap instruction from a pseudo-atomic. */
             arch_clear_pseudo_atomic_interrupted(context);
             arch_skip_instruction(context);
             interrupt_handle_pending(context);
@@ -354,11 +269,10 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
 
 void arch_install_interrupt_handlers()
 {
-    undoably_install_low_level_interrupt_handler(SIGILL, sigill_handler);
+    ll_install_handler(SIGILL, sigill_handler);
 }
 
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 
 /* This a naive port from CMUCL/sparc, which was mostly stolen from the
  * CMUCL/x86 version, with adjustments for sparc
@@ -388,8 +302,9 @@ void arch_install_interrupt_handlers()
  * Insert the necessary jump instructions at the given address.
  */
 void
-arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+  char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
   if (datap) {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
     return;
@@ -405,7 +320,10 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
    *        nop
    *
    */
-  int* inst_ptr;
+
+  // 'volatile' works around
+  //   "warning: writing 4 bytes into a region of size 0 [-Wstringop-overflow=]"
+  volatile int* inst_ptr;
   unsigned long hi;                   /* Top 22 bits of address */
   unsigned long lo;                   /* Low 10 bits of address */
   unsigned int inst;
@@ -444,4 +362,3 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
-#endif

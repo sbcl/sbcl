@@ -11,213 +11,219 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(assert (equal (symbol-name '#:|fd\sA|) "fdsA"))
+(with-test (:name :random-describe)
+  (describe sb-impl::*empty-extended-char-table* (make-broadcast-stream)))
 
-;;; Prior to sbcl-0.7.2.10, SBCL disobeyed the ANSI requirements on
-;;; returning NIL for unset dispatch-macro-character functions. (bug
-;;; 151, fixed by Alexey Dejenka sbcl-devel "bug 151" 2002-04-12)
-(assert (not (get-dispatch-macro-character #\# #\{)))
-(assert (not (get-dispatch-macro-character #\# #\0)))
-;;; And we might as well test that we don't have any cross-compilation
-;;; shebang residues left...
-(assert (not (get-dispatch-macro-character #\# #\!)))
-;;; Also test that all the illegal sharp macro characters are
-;;; recognized as being illegal.
-(loop for char in '(#\Backspace #\Tab #\Newline #\Linefeed
-                    #\Page #\Return #\Space #\) #\<)
-   do (assert (get-dispatch-macro-character #\# char)))
+(with-test (:name (:reader symbol :escape))
+  (assert (equal (symbol-name '#:|fd\sA|) "fdsA")))
 
-(assert (not (ignore-errors (get-dispatch-macro-character #\! #\0)
-                            t)))
+(with-test (:name (get-dispatch-macro-character :return-value))
+  ;; Prior to sbcl-0.7.2.10, SBCL disobeyed the ANSI requirements on
+  ;; returning NIL for unset dispatch-macro-character functions. (bug
+  ;; 151, fixed by Alexey Dejenka sbcl-devel "bug 151" 2002-04-12)
+  (assert (not (get-dispatch-macro-character #\# #\{)))
+  (assert (not (get-dispatch-macro-character #\# #\0)))
+  ;; And we might as well test that we don't have any cross-compilation
+  ;; shebang residues left...
+  (assert (not (get-dispatch-macro-character #\# #\!)))
+  ;; Also test that all the illegal sharp macro characters are
+  ;; recognized as being illegal.
+  (loop for char in '(#\Backspace #\Tab #\Newline #\Linefeed
+                      #\Page #\Return #\Space #\) #\<)
+        do (assert (get-dispatch-macro-character #\# char)))
 
-;;; In sbcl-0.7.3, GET-MACRO-CHARACTER and SET-MACRO-CHARACTER didn't
-;;; use NIL to represent the no-macro-attached-to-this-character case
-;;; as ANSI says they should. (This problem is parallel to the
-;;; GET-DISPATCH-MACRO misbehavior fixed in sbcl-0.7.2.10, but
-;;; was fixed a little later.)
-(dolist (customizable-char
-         ;; According to ANSI "2.1.4 Character Syntax Types", these
-         ;; characters are reserved for the programmer.
-         '(#\? #\! #\[ #\] #\{ #\}))
-  ;; So they should have no macro-characterness.
-  (multiple-value-bind (macro-fun non-terminating-p)
-      (get-macro-character customizable-char)
-    (assert (null macro-fun))
-    ;; Also, in a bit of ANSI weirdness, NON-TERMINATING-P can be
-    ;; true only when MACRO-FUN is true. (When the character
-    ;; is not a macro character, it can be embedded in a token,
-    ;; so it'd be more logical for NON-TERMINATING-P to be T in
-    ;; this case; but ANSI says it's NIL in this case.
-    (assert (null non-terminating-p))))
+  (assert-error (get-dispatch-macro-character #\! #\0)))
 
-;;; rudimentary test of SET-SYNTAX-FROM-CHAR, just to verify that it
-;;; wasn't totally broken by the GET-MACRO-CHARACTER/SET-MACRO-CHARACTER
-;;; fixes in 0.7.3.16
-(assert (= 123579 (read-from-string "123579")))
-(let ((*readtable* (copy-readtable)))
-  (set-syntax-from-char #\7 #\;)
-  (assert (= 1235 (read-from-string "123579"))))
+(with-test (:name (get-macro-character :return-value))
+  ;; In sbcl-0.7.3, GET-MACRO-CHARACTER and SET-MACRO-CHARACTER didn't
+  ;; use NIL to represent the no-macro-attached-to-this-character case
+  ;; as ANSI says they should. (This problem is parallel to the
+  ;; GET-DISPATCH-MACRO misbehavior fixed in sbcl-0.7.2.10, but was
+  ;; fixed a little later.)
+  (dolist (customizable-char
+           ;; According to ANSI "2.1.4 Character Syntax Types", these
+           ;; characters are reserved for the programmer.
+           '(#\? #\! #\[ #\] #\{ #\}))
+    ;; So they should have no macro-characterness.
+    (multiple-value-bind (macro-fun non-terminating-p)
+        (get-macro-character customizable-char)
+      (assert (null macro-fun))
+      ;; Also, in a bit of ANSI weirdness, NON-TERMINATING-P can be
+      ;; true only when MACRO-FUN is true. (When the character is not
+      ;; a macro character, it can be embedded in a token, so it'd be
+      ;; more logical for NON-TERMINATING-P to be T in this case; but
+      ;; ANSI says it's NIL in this case.
+      (assert (null non-terminating-p)))))
+
+(with-test (:name (set-syntax-from-char :smoke))
+  ;; rudimentary test of SET-SYNTAX-FROM-CHAR, just to verify that it
+  ;; wasn't totally broken by the GET-MACRO-CHARACTER/SET-MACRO-CHARACTER
+  ;; fixes in 0.7.3.16
+  (assert (= 123579 (read-from-string "123579")))
+  (let ((*readtable* (copy-readtable)))
+    (set-syntax-from-char #\7 #\;)
+    (assert (= 1235 (read-from-string "123579")))))
 
 ;;; PARSE-INTEGER must signal an error of type PARSE-ERROR if it is
 ;;; unable to parse an integer and :JUNK-ALLOWED is NIL.
-(macrolet ((assert-parse-error (form)
-             `(multiple-value-bind (val cond)
-                  (ignore-errors ,form)
-                (assert (null val))
-                (assert (typep cond 'parse-error)))))
-  (assert-parse-error (parse-integer "    "))
-  (assert-parse-error (parse-integer "12 a"))
-  (assert-parse-error (parse-integer "12a"))
-  (assert-parse-error (parse-integer "a"))
-  (assert (= (parse-integer "12") 12))
-  (assert (= (parse-integer "   12   ") 12))
-  (assert (= (parse-integer "   12asdb" :junk-allowed t) 12)))
+(with-test (:name (parse-integer :smoke))
+  (macrolet ((assert-parse-error (form)
+               `(assert-error ,form parse-error)))
+    (assert-parse-error (parse-integer "    "))
+    (assert-parse-error (parse-integer "12 a"))
+    (assert-parse-error (parse-integer "12a"))
+    (assert-parse-error (parse-integer "a"))
+    (assert (= (parse-integer "12") 12))
+    (assert (= (parse-integer "   12   ") 12))
+    (assert (= (parse-integer "   12asdb" :junk-allowed t) 12))))
 
 ;;; #A notation enforces that once one 0 dimension has been found, all
 ;;; subsequent ones are also 0.
-(assert (equal (array-dimensions (read-from-string "#3A()"))
-               '(0 0 0)))
-(assert (equal (array-dimensions (read-from-string "#3A(())"))
-               '(1 0 0)))
-(assert (equal (array-dimensions (read-from-string "#3A((() ()))"))
-               '(1 2 0)))
+(with-test (:name (:sharpsign-a-reader-macro :initial-elements))
+  (assert (equal (array-dimensions (read-from-string "#3A()"))
+                 '(0 0 0)))
+  (assert (equal (array-dimensions (read-from-string "#3A(())"))
+                 '(1 0 0)))
+  (assert (equal (array-dimensions (read-from-string "#3A((() ()))"))
+                 '(1 2 0))))
 
 ;;; Bug reported by Nikodemus Siivola on sbcl-devel 2003-07-21:
 ;;; package misconfiguration
-(assert (eq
-         (handler-case (with-input-from-string (s "cl:") (read s))
-           (end-of-file (c)
-             (declare (ignore c))
-             'good))
-         'good))
+(with-test (:name (with-input-from-string :package-misconfiguration))
+  (assert-error (with-input-from-string (s "cl:") (read s)) end-of-file))
 
 ;;; Bugs found by Paul Dietz
-(assert (equal (multiple-value-list
-                (parse-integer "   123      "))
-               '(123 12)))
-
-(let* ((base "xxx 123  yyy")
-       (intermediate (make-array 8 :element-type (array-element-type base)
-                                 :displaced-to base
-                                 :displaced-index-offset 2))
-       (string (make-array 6 :element-type (array-element-type base)
-                           :displaced-to intermediate
-                           :displaced-index-offset 1)))
+(with-test (:name (parse-integer 1))
   (assert (equal (multiple-value-list
-                  (parse-integer string))
-                 '(123 6))))
+                  (parse-integer "   123      "))
+                 '(123 12))))
 
-(let ((*read-base* *read-base*))
-  (dolist (float-string '(".9" ".9e9" ".9e+9" ".9e-9"
-                          "-.9" "-.9e9" "-.9e+9" "-.9e-9"
-                          "+.9" "+.9e9" "+.9e+9" "+.9e-9"
-                          "0.9" "0.9e9" "0.9e+9" "0.9e-9"
-                          "9.09" "9.09e9" "9.09e+9" "9.09e-9"
-                          #|"9e9" could be integer|# "9e+9" "9e-9"))
-    (loop for i from 2 to 36
-          do (setq *read-base* i)
-          do (assert (typep (read-from-string float-string)
-                            *read-default-float-format*))
-          do (assert (typep
-                      (read-from-string (substitute #\E #\e float-string))
-                      *read-default-float-format*))
-          if (position #\e float-string)
-          do (assert (typep
-                      (read-from-string (substitute #\s #\e float-string))
-                      'short-float))
-          and do (assert (typep
-                          (read-from-string (substitute #\S #\e float-string))
-                          'short-float))
-          and do (assert (typep
-                          (read-from-string (substitute #\f #\e float-string))
-                          'single-float))
-          and do (assert (typep
-                          (read-from-string (substitute #\F #\e float-string))
-                          'single-float))
-          and do (assert (typep
-                          (read-from-string (substitute #\d #\e float-string))
-                          'double-float))
-          and do (assert (typep
-                          (read-from-string (substitute #\D #\e float-string))
-                          'double-float))
-          and do (assert (typep
-                          (read-from-string (substitute #\l #\e float-string))
-                          'long-float))
-          and do (assert (typep
-                          (read-from-string (substitute #\L #\e float-string))
-                          'long-float)))))
+(with-test (:name (parse-integer 2))
+  (let* ((base "xxx 123  yyy")
+         (intermediate (make-array 8 :element-type (array-element-type base)
+                                     :displaced-to base
+                                     :displaced-index-offset 2))
+         (string (make-array 6 :element-type (array-element-type base)
+                               :displaced-to intermediate
+                               :displaced-index-offset 1)))
+    (assert (equal (multiple-value-list
+                    (parse-integer string))
+                   '(123 6)))))
 
-(let ((*read-base* *read-base*))
-  (dolist (integer-string '("1." "2." "3." "4." "5." "6." "7." "8." "9." "0."))
-    (loop for i from 2 to 36
-          do (setq *read-base* i)
-          do (assert (typep (read-from-string integer-string) 'integer)))))
+(with-test (:name (*read-base* 1))
+  (let ((*read-base* *read-base*))
+    (dolist (float-string '(".9" ".9e9" ".9e+9" ".9e-9"
+                            "-.9" "-.9e9" "-.9e+9" "-.9e-9"
+                            "+.9" "+.9e9" "+.9e+9" "+.9e-9"
+                            "0.9" "0.9e9" "0.9e+9" "0.9e-9"
+                            "9.09" "9.09e9" "9.09e+9" "9.09e-9"
+                            #|"9e9" could be integer|# "9e+9" "9e-9"))
+      (loop for i from 2 to 36
+            do (setq *read-base* i)
+            do (assert (typep (read-from-string float-string)
+                              *read-default-float-format*))
+            do (assert (typep
+                        (read-from-string (substitute #\E #\e float-string))
+                        *read-default-float-format*))
+            if (position #\e float-string)
+            do (assert (typep
+                        (read-from-string (substitute #\s #\e float-string))
+                        'short-float))
+            and do (assert (typep
+                            (read-from-string (substitute #\S #\e float-string))
+                            'short-float))
+            and do (assert (typep
+                            (read-from-string (substitute #\f #\e float-string))
+                            'single-float))
+            and do (assert (typep
+                            (read-from-string (substitute #\F #\e float-string))
+                            'single-float))
+            and do (assert (typep
+                            (read-from-string (substitute #\d #\e float-string))
+                            'double-float))
+            and do (assert (typep
+                            (read-from-string (substitute #\D #\e float-string))
+                            'double-float))
+            and do (assert (typep
+                            (read-from-string (substitute #\l #\e float-string))
+                            'long-float))
+            and do (assert (typep
+                            (read-from-string (substitute #\L #\e float-string))
+                            'long-float))))))
 
-(let ((*read-base* *read-base*))
-  (dolist (symbol-string '("A." "a." "Z." "z."
+(with-test (:name (*read-base* 2))
+  (let ((*read-base* *read-base*))
+    (dolist (integer-string '("1." "2." "3." "4." "5." "6." "7." "8." "9." "0."))
+      (loop for i from 2 to 36
+            do (setq *read-base* i)
+            do (assert (typep (read-from-string integer-string) 'integer))))))
 
-                           "+.9eA" "+.9ea"
+(with-test (:name (*read-base* 3))
+  (let ((*read-base* *read-base*))
+    (dolist (symbol-string '("A." "a." "Z." "z."
 
-                           "0.A" "0.a" "0.Z" "0.z"
+                             "+.9eA" "+.9ea"
 
-                           #|"9eA" "9ea"|# "9e+A" "9e+a" "9e-A" "9e-a"
-                           #|"Ae9" "ae9"|# "Ae+9" "ae+9" "Ae-9" "ae-9"
+                             "0.A" "0.a" "0.Z" "0.z"
 
-                           "ee+9" "Ee+9" "eE+9" "EE+9"
-                           "ee-9" "Ee-9" "eE-9" "EE-9"
+                             #|"9eA" "9ea"|# "9e+A" "9e+a" "9e-A" "9e-a"
+                             #|"Ae9" "ae9"|# "Ae+9" "ae+9" "Ae-9" "ae-9"
 
-                           "A.0" "A.0e10" "a.0" "a.0e10"
+                             "ee+9" "Ee+9" "eE+9" "EE+9"
+                             "ee-9" "Ee-9" "eE-9" "EE-9"
 
-                           "1e1e+9"))
-    (loop for i from 2 to 36
-          do (setq *read-base* i)
-          do (assert (typep (read-from-string symbol-string) 'symbol)))))
+                             "A.0" "A.0e10" "a.0" "a.0e10"
 
-(let ((standard-chars " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+                             "1e1e+9"))
+      (loop for i from 2 to 36
+            do (setq *read-base* i)
+            do (assert (typep (read-from-string symbol-string) 'symbol))))))
+
+(with-test (:name (readtable :specified-macro-characters))
+  (let ((standard-chars " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~
 ")
-      (standard-terminating-macro-chars "\"'(),;`")
-      (standard-nonterminating-macro-chars "#"))
-  (flet ((frob (char)
-           (multiple-value-bind (fun non-terminating-p)
-               (get-macro-character char)
-             (cond
-               ((find char standard-terminating-macro-chars)
-                (unless (and fun (not non-terminating-p))
-                  (list char)))
-               ((find char standard-nonterminating-macro-chars)
-                (unless (and fun non-terminating-p)
-                  (list char)))
-               (t (unless (and (not fun) (not non-terminating-p))
-                    (list char)))))))
-    (let ((*readtable* (copy-readtable nil)))
-      (assert (null (loop for c across standard-chars append (frob c)))))))
+        (standard-terminating-macro-chars "\"'(),;`")
+        (standard-nonterminating-macro-chars "#"))
+    (flet ((frob (char)
+             (multiple-value-bind (fun non-terminating-p)
+                 (get-macro-character char)
+               (cond ((find char standard-terminating-macro-chars)
+                      (unless (and fun (not non-terminating-p))
+                        (list char)))
+                     ((find char standard-nonterminating-macro-chars)
+                      (unless (and fun non-terminating-p)
+                        (list char)))
+                     (t (unless (and (not fun) (not non-terminating-p))
+                          (list char)))))))
+      (let ((*readtable* (copy-readtable nil)))
+        (assert (null (loop for c across standard-chars append (frob c))))))))
 
-(let ((standard-chars " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~
+(with-test (:name (readtable :specified-dispatch-macro-characters))
+  (let ((standard-chars " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~
 ")
-      (undefined-chars "!\"$%&,;>?@[]^_`~{}/dDeEfFgGhHiIjJkKlLmMnNqQtTuUvVwWyYzZ"))
-  (flet ((frob (char)
-           (let ((fun (get-dispatch-macro-character #\# char)))
-             (cond
-               ((find char undefined-chars)
-                (when fun (list char)))
-               ((digit-char-p char 10)
-                (when fun (list char)))
-               (t
-                (unless fun (list char)))))))
-    (let ((*readtable* (copy-readtable nil)))
-      (assert (null (loop for c across standard-chars append (frob c)))))))
+        (undefined-chars "!\"$%&,;>?@[]^_`~{}/dDeEfFgGhHiIjJkKlLmMnNqQtTuUvVwWyYzZ"))
+    (flet ((frob (char)
+             (let ((fun (get-dispatch-macro-character #\# char)))
+               (cond ((find char undefined-chars)
+                      (when fun (list char)))
+                     ((digit-char-p char 10)
+                      (when fun (list char)))
+                     (t
+                      (unless fun (list char)))))))
+      (let ((*readtable* (copy-readtable nil)))
+        (assert (null (loop for c across standard-chars append (frob c))))))))
 
-(with-test (:name :copy-readtable-with-unicode-macro
+(with-test (:name (copy-readtable :with-unicode-macro)
                   :skipped-on (not :sb-unicode))
   (let ((rt (copy-readtable)))
     (set-macro-character (code-char #x100fa) #'error nil rt)
-    (assert (plusp (hash-table-count (sb-impl::character-macro-hash-table rt))))
+    (assert (plusp (hash-table-count (sb-impl::extended-char-table rt))))
     (copy-readtable nil rt)
     (assert (null (get-macro-character #\UFC rt)))))
 
 ;;; All these must return a primary value of NIL when *read-suppress* is T
 ;;; Reported by Bruno Haible on cmucl-imp 2004-10-25.
-(with-test (:name :read-suppress-char-macros)
+(with-test (:name (*read-suppress* :char-macros))
   (let ((*read-suppress* t))
     (assert (null (read-from-string "(1 2 3)")))
     (assert (null (with-input-from-string (s "abc xyz)")
@@ -235,7 +241,7 @@
 
 ;;; System code that asks whether %READ-PRESERVING-WHITESPACE hit EOF
 ;;; mistook NIL as an object returned normally for NIL the default eof mark.
-(with-test (:name :read-preserving-whitespace-file-position)
+(with-test (:name (read-preserving-whitespace file-position))
   (multiple-value-bind (obj pos1) (read-from-string "NIL A")
     (declare (ignore obj))
     (multiple-value-bind (obj pos2) (read-from-string "NNN A")
@@ -272,23 +278,27 @@
 
 ;;; EOF-ERROR-P defaults to true. Reported by Bruno Haible on
 ;;; cmucl-imp 2004-10-18.
-(multiple-value-bind (res err) (ignore-errors (read-from-string ""))
-  (assert (not res))
-  (assert (typep err 'end-of-file)))
+(with-test (:name (read-from-string :eof-error))
+  (assert-error (read-from-string "") end-of-file)
+  (assert (equal '((0 . "A") (1 . "B"))
+                 (coerce (read-from-string "#((0 . \"A\") (1 . \"B\"))")
+                         'list))))
 
-(assert (equal '((0 . "A") (1 . "B"))
-               (coerce (read-from-string "#((0 . \"A\") (1 . \"B\"))")
-                       'list)))
+(with-test (:name (read-delimited-list :non-recursive :circularity))
+  (let* ((stream (make-string-input-stream "#1=(nil) #1#)"))
+         (result (read-delimited-list #\) stream)))
+    (assert (eq (first result) (second result)))))
 
 ;;; parse-integer uses whitespace[1] not whitespace[2] as its
 ;;; definition of whitespace to skip.
-(let ((*readtable* (copy-readtable)))
-  (set-syntax-from-char #\7 #\Space)
-  (assert (= 710 (parse-integer "710"))))
+(with-test (:name (parse-integer :whitespace-handling))
+  (let ((*readtable* (copy-readtable)))
+    (set-syntax-from-char #\7 #\Space)
+    (assert (= 710 (parse-integer "710"))))
 
-(let ((*readtable* (copy-readtable)))
-  (set-syntax-from-char #\7 #\Space)
-  (assert (string= (format nil "~7D" 1) "      1")))
+  (let ((*readtable* (copy-readtable)))
+    (set-syntax-from-char #\7 #\Space)
+    (assert (string= (format nil "~7D" 1) "      1"))))
 
 (with-test (:name :report-reader-error)
   ;; Apparently this wants to test the printing of the error string
@@ -302,12 +312,13 @@
 ;;; The GET-MACRO-CHARACTER in SBCL <= "1.0.34.2" bogusly computed its
 ;;; second return value relative to *READTABLE* rather than the passed
 ;;; readtable.
-(let* ((*readtable* (copy-readtable nil)))
-  (set-syntax-from-char #\" #\A)
-  (multiple-value-bind (reader-fn non-terminating-p)
-      (get-macro-character #\" (copy-readtable nil))
-    (declare (ignore reader-fn))
-    (assert (not non-terminating-p))))
+(with-test (:name (get-macro-character :argument))
+  (let* ((*readtable* (copy-readtable nil)))
+    (set-syntax-from-char #\" #\A)
+    (multiple-value-bind (reader-fn non-terminating-p)
+        (get-macro-character #\" (copy-readtable nil))
+      (declare (ignore reader-fn))
+      (assert (not non-terminating-p)))))
 
 (with-test (:name :bug-309093)
   (assert (eq :error
@@ -316,7 +327,7 @@
                 (reader-error ()
                   :error)))))
 
-(with-test (:name :set-syntax-from-char-dispatch-macro-char)
+(with-test (:name (set-syntax-from-char :dispatch-macro-char))
   (let ((rt (copy-readtable)))
     (make-dispatch-macro-character #\! nil rt)
     (set-dispatch-macro-character #\! #\! (constantly 'bang^2) rt)
@@ -327,7 +338,7 @@
       (set-syntax-from-char #\! #\! rt)
       (assert (eq '!! (maybe-bang))))))
 
-(with-test (:name :read-in-package-syntax)
+(with-test (:name :read-in-package-syntax :skipped-on :sb-devel)
   (assert (equal '(sb-c::a (sb-kernel::x sb-kernel::y) sb-c::b)
                  (read-from-string "sb-c::(a sb-kernel::(x y) b)")))
   (assert (equal '(cl-user::yes-this-is-sbcl)
@@ -359,15 +370,21 @@
 ;;  - calling SUBSEQ for package names
 ;;  - multiple-value-call in WITH-CHAR-MACRO-RESULT
 ;;  - the initial cons cell in READ-LIST
-(with-test (:name :read-does-not-cons-per-se
-                  :skipped-on (:or :interpreter (:not :x86-64)))
+(with-test (:name :read-does-not-cons-per-se :skipped-on :interpreter)
   (flet ((test-reading (string)
            (let ((s (make-string-input-stream string)))
              (read s) ; once outside the loop, to make A-SYMBOL
              (ctu:assert-no-consing
               (progn (file-position s 0)
                      (read s))
-              40000))))
+              40000))
+           ;; WITH-INPUT-FROM-STRING doesn't heap-allocate a stream
+           (ctu:assert-no-consing
+            (with-input-from-string (s string)
+              (opaque-identity s)))
+           ;; READ-FROM-STRING doesn't heap-allocate a stream
+           (ctu:assert-no-consing
+            (read-from-string string))))
     ;; These each used to produce at least 20 MB of garbage,
     ;; a result of using 128-character (= 512 bytes for Unicode) buffers.
     ;; Now we use exactly one buffer, or maybe two for package + symbol-name.
@@ -382,7 +399,7 @@
     ;; impossible to cons 1 byte per run.
     ;; If this still fails, it might be due to somebody changing the
     ;; backend-page-bytes to exceed 32KB. Not sure what to do about that.
-    (test-reading "4.0s0")
+    #+64-bit (test-reading "4.0s0")
     (test-reading "COMMON-LISP-USER::A-SYMBOL")
     (test-reading "()")
     (test-reading "#\\-") ; should not copy the token buffer
@@ -401,9 +418,14 @@
                 (sb-int:simple-reader-error () :win))
               :win)))
 
+(with-test (:name :sharp-star-default-fill :skipped-on :sbcl)
+  ;; can't assert anything about bits beyond the supplied ones
+  (let ((bv (opaque-identity #*11)))
+    (assert (= (sb-kernel:%vector-raw-bits bv 0) 3))))
+
 ;;; The WITH-FAST-READ-BYTE macro accidentally left the package lock
 ;;; of FAST-READ-BYTE disabled during its body.
-(with-test (:name :fast-read-byte-package-lock)
+(with-test (:name :fast-read-byte-package-lock :skipped-on :sb-devel)
   (let ((fun
          ;; Suppress the compiler output to avoid noise when running the
          ;; test. (There are a warning and an error about the package

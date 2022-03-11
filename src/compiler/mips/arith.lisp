@@ -195,7 +195,7 @@
     (inst bne temp done)
     (inst srl result number ndesc)
     (inst b done)
-    (move result zero-tn t)
+    (zeroize result)
 
     POSITIVE
     ;; The result-type assures us that this shift will not overflow.
@@ -297,7 +297,7 @@
           (test (gen-label)))
       (move shift arg)
       (inst bgez shift test)
-      (move res zero-tn t)
+      (zeroize res)
       (inst b test)
       (inst nor shift shift)
 
@@ -581,33 +581,19 @@
 
 ;;;; 32-bit logical operations
 
-(define-vop (shift-towards-someplace)
-  (:policy :fast-safe)
-  (:args (num :scs (unsigned-reg))
-         (amount :scs (signed-reg)))
-  (:arg-types unsigned-num tagged-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num))
-
-(define-vop (shift-towards-start shift-towards-someplace)
-  (:translate shift-towards-start)
-  (:note "SHIFT-TOWARDS-START")
-  (:generator 1
-    (ecase *backend-byte-order*
-      (:big-endian
-       (inst sll r num amount))
-      (:little-endian
-       (inst srl r num amount)))))
-
-(define-vop (shift-towards-end shift-towards-someplace)
-  (:translate shift-towards-end)
-  (:note "SHIFT-TOWARDS-END")
-  (:generator 1
-    (ecase *backend-byte-order*
-      (:big-endian
-       (inst srl r num amount))
-      (:little-endian
-       (inst sll r num amount)))))
+(macrolet ((define (translate operation)
+             `(define-vop ()
+                (:translate ,translate)
+                (:note ,(string translate))
+                (:policy :fast-safe)
+                (:args (num :scs (unsigned-reg))
+                       (amount :scs (signed-reg)))
+                (:arg-types unsigned-num tagged-num)
+                (:results (r :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 1 (inst ,operation r num amount)))))
+  (define shift-towards-start #+big-endian sll #+little-endian srl)
+  (define shift-towards-end   #+big-endian srl #+little-endian sll))
 
 ;;;; Modular arithmetic
 (define-modular-fun +-mod32 (x y) + :untagged nil 32)
@@ -629,7 +615,7 @@
              fast-ash-left/unsigned=>unsigned))
 (deftransform ash-left-mod32 ((integer count)
                               ((unsigned-byte 32) (unsigned-byte 5)))
-  (when (sb-c::constant-lvar-p count)
+  (when (sb-c:constant-lvar-p count)
     (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 

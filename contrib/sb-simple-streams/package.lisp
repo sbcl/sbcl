@@ -14,7 +14,7 @@
   (:import-from #:sb-impl
                 #:in-stream-from-designator #:out-stream-from-designator)
   ;; FIXME: Using deffoo! or equivalent might be nicer.
-  (:implement #:common-lisp #:sb-kernel #:sb-int)
+  (:implement #:common-lisp #:sb-impl)
   (:export ;; Stream classes
    #:STREAM
    #:SIMPLE-STREAM
@@ -70,6 +70,8 @@
    #:PRIN1-TO-STRING #:PRINC #:PRINC-TO-STRING #:PRINT #:READ
    #:READ-DELIMITED-LIST #:READ-FROM-STRING #:WRITE #:WRITE-LINE
    #:WRITE-TO-STRING #:READ-PRESERVING-WHITESPACE))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-SIMPLE-STREAMS")) t))
 
 #||
 (in-package "SB-EXT")

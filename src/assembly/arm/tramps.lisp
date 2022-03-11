@@ -14,7 +14,7 @@
   HEADER
   (inst word simple-fun-widetag)
   (inst word (make-fixup 'undefined-tramp :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
 
   (inst adr code-tn header fun-pointer-lowtag)
@@ -36,7 +36,7 @@
   (inst word simple-fun-widetag)
   (inst word (make-fixup 'undefined-alien-tramp-tagged
                          :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
 
   UNDEFINED-ALIEN-TRAMP
@@ -56,12 +56,12 @@
     ((:temp lexenv-tn descriptor-reg lexenv-offset))
   (inst word simple-fun-widetag)
   (inst word (make-fixup 'closure-tramp :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
 
   (loadw lexenv-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add pc-tn code-tn (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag)))
+  (inst add pc-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))
 
 (define-assembly-routine
     (xfuncallable-instance-tramp (:return-style :none)
@@ -72,9 +72,9 @@
     ((:temp lexenv-tn descriptor-reg lexenv-offset))
   (inst word simple-fun-widetag)
   (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
 
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst add pc-tn code-tn (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag)))
+  (inst add pc-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))

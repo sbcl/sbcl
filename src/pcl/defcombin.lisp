@@ -29,7 +29,7 @@
 ;;;
 (defmacro define-method-combination (&whole form name . args)
   (declare (ignore args))
-  (check-designator name define-method-combination)
+  (check-designator name 'define-method-combination)
   `(progn
      (with-single-package-locked-error
          (:symbol ',name "defining ~A as a method combination"))
@@ -39,6 +39,7 @@
           (expand-short-defcombin form))))
 
 (defstruct method-combination-info
+  (lambda-list nil :type list)
   (constructor (error "missing arg") :type function)
   (cache nil :type list)
   (source-location nil :type (or null sb-c:definition-source-location)))
@@ -101,8 +102,20 @@
              documentation)
       (sb-c:source-location))))
 
+(defun random-documentation (name type)
+  (cdr (assoc type (info :random-documentation :stuff name))))
+
+(defun (setf random-documentation) (new-value name type)
+  (let ((pair (assoc type (info :random-documentation :stuff name))))
+    (if pair
+        (setf (cdr pair) new-value)
+        (push (cons type new-value)
+              (info :random-documentation :stuff name))))
+  new-value)
+
 (defun load-short-defcombin (type-name operator ioa doc source-location)
   (let ((info (make-method-combination-info
+               :lambda-list '(&optional (order :most-specific-first))
                :source-location source-location
                :constructor (lambda (options)
                               (short-combine-methods type-name options operator ioa source-location doc))))
@@ -182,12 +195,13 @@
           type-name lambda-list method-group-specifiers args-option gf-var
           body)
       `(load-long-defcombin ',type-name ',documentation #',function
-                            ',args-option (sb-c:source-location)))))
+                            ',lambda-list ',args-option (sb-c:source-location)))))
 
 (define-load-time-global *long-method-combination-functions* (make-hash-table :test 'eq))
 
-(defun load-long-defcombin (type-name doc function args-lambda-list source-location)
+(defun load-long-defcombin (type-name doc function lambda-list args-lambda-list source-location)
   (let ((info (make-method-combination-info
+               :lambda-list lambda-list
                :constructor (lambda (options)
                               (make-instance 'long-method-combination
                                              :type-name type-name
@@ -314,7 +328,8 @@
                             (setq ,name (nreverse ,name)))
                            (:most-specific-last))))
                   order-cleanups))))
-      `(let (,@(nreverse names) ,@(nreverse specializer-caches))
+      `(let (,@(nreverse names) ,@specializer-caches)
+        (declare (ignorable ,@specializer-caches))
         ,@declarations
         (dolist (.method. .applicable-methods.)
           (let ((.qualifiers. (method-qualifiers .method.))

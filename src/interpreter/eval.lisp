@@ -217,7 +217,7 @@
                           :format-control
                           "~@<Lexical environment is too complex to evaluate in: ~S~:@>"
                           :format-arguments (list env)))))
-        ;; FIXME: should this be (OR INTERPTER-ENV (CAPTURE-TOPLEVEL-ENV)) ?
+        ;; FIXME: should this be (OR INTERPRETER-ENV (CAPTURE-TOPLEVEL-ENV)) ?
         ;; Whether we decide to capture the policy here or not, there will always
         ;; be some use-case that comes out wrong. Capturing it is necessary for
         ;; the following to work in the interpreter:

@@ -39,8 +39,8 @@
 ;;;; Conditional VOPs:
 
 (define-vop (if-eq)
-  (:args (x :scs (any-reg descriptor-reg))
-         (y :scs (any-reg descriptor-reg)))
+  (:args (x :scs (any-reg descriptor-reg zero))
+         (y :scs (any-reg descriptor-reg zero)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe)

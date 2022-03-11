@@ -163,10 +163,6 @@ RPC INTERFACE
 
   For talking with other processes.
 
-BLOCK COMPILATION
-
-  You know, like CMUCL does.
-
 (MOSTLY) PARALLEL GC
 
   Several algorithms exist, even one would be nice.

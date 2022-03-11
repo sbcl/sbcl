@@ -1,0 +1,38 @@
+
+Detection of access to unitialized arrays will be performed in one
+of two ways, depending on whether the vector is specialized on T or
+or a "bits" type. T vectors will use no-tls-marker as a poison value.
+Char/numeric will contain one extra bit per element.
+The reason for not using unbound-marker on simple-vector is that
+it simplifies uses of simple-vectors that have language-level semantics
+for UNBOUND-MARKER, including at least the CLOS implementation
+and hash-table key/value pairs. A distinct poison value avoids having
+to revise a lot of code that needs to read the unbound-marker without
+trapping at the vop level.
+
+Without array-ubsan it should nonetheless be possible to obtain a similar
+effect of array-ubsan for simple-vector.  The setter / getter remain the same,
+but there is no tracking of the origin of the array.
+Origin tracking provides an indicator of which function to "blame"
+for creating the array without initializing it, such as:
+
+debugger invoked on a SB-KERNEL:UNINITIALIZED-ELEMENT-ERROR @539A5AF1 in thread
+#<THREAD "main thread" RUNNING {1001A78183}>:
+  Element 0 of array
+  #<(SIMPLE-VECTOR 4) {1004FFA01F}>
+  was not assigned a value.
+Origin=#<code id=8F10 [2] PROCESS-TYPEDECLS, MAKE-PACKAGE-LOCK-LEXENV {53993EBF}>
+
+Additionally, it should be possible to create uninitialized dynamic-extent
+simple-vectors on non-precise gencgc platforms.
+This is related to array-ubsan in as much as array-ubsan provides a good
+indication as to where something might be going wrong before causing
+application corruption. To do this, you want to compile your code in 0 safety
+with array-ubsan, which will initialize dynamic-extent arrays with the trap
+value. If all your tests pass (and assuming you have good coverage
+in your tests), then you can remove array-ubsan, and the dynamic-extent
+simple-vectors will (pending further changes) be uninitialized.
+This affords a measurable speedup. In a test of creating 1000-element arrays
+(repeated sufficiently many times to be able to eliminate measurement error),
+it was observed that a vector takes 29 CPU cycles to create, vs 597 CPU cycles
+to zero-initialize it.

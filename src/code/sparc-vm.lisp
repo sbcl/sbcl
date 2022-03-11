@@ -11,39 +11,18 @@
 (in-package "SB-VM")
 
 ;;; See x86-vm.lisp for a description of this.
-#-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "SPARC")
-
-(defconstant-eqx +fixup-kinds+ #(:call :sethi :add :absolute) #'equalp)
-(!with-bigvec-or-sap
-(defun fixup-code-object (code offset fixup kind flavor)
-  (declare (type index offset))
-  (declare (ignore flavor))
-  (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
-    (error "Unaligned instruction?  offset=#x~X." offset))
-  (let ((sap (code-instructions code)))
-    (ecase kind
-       (:call
-        (error "Can't deal with CALL fixups, yet."))
-       (:sethi
-        (setf (ldb (byte 22 0) (sap-ref-32 sap offset))
-              (ldb (byte 22 10) fixup)))
-       (:add
-        (setf (ldb (byte 10 0) (sap-ref-32 sap offset))
-              (ldb (byte 10 0) fixup)))
-       (:absolute
-        (setf (sap-ref-32 sap offset)
-              fixup))))
-  nil))
+
+(defun return-machine-address (scp)
+  (+ (context-register scp lip-offset) 8))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from alpha-vm.lisp.
 ;;;;
 ;;;; See also x86-vm for commentary on signed vs unsigned.
 
-#-sb-xc-host (progn
 ;;; This is like CONTEXT-REGISTER, but returns the value of a float
 ;;; register. FORMAT is the type of float to return.
 
@@ -54,13 +33,15 @@
   (* long)
   (context (* os-context-t))
   (index int))
-#+nil
 (defun context-float-register (context index format)
   (declare (type (alien (* os-context-t)) context))
+  (error "context-float-register not working yet? ~S" (list context index format))
+  #+nil
   (coerce (deref (context-float-register-addr context index)) format))
-#+nil
 (defun %set-context-float-register (context index format new)
   (declare (type (alien (* os-context-t)) context))
+  (error "%set-context-float-register not working yet? ~S" (list context index format new))
+  #+nil
   (setf (deref (context-float-register-addr context index))
         (coerce new format)))
 
@@ -87,4 +68,3 @@
          (trap-number (sap-ref-8 pc 3)))
     (declare (type system-area-pointer pc))
     (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number)))
-) ; end PROGN

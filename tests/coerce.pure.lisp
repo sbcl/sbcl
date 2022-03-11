@@ -121,9 +121,9 @@
   ;; But at least it's generally an improvement
   ;; to fail earlier than later in many cases.
   (multiple-value-bind (fun failure-p warnings)
-      (checked-compile '(lambda ()
+      (checked-compile '(lambda (z)
                          (locally (declare (notinline sort))
-                           (sort () #'< :key 'and)))
+                           (sort () z :key 'and)))
                        :allow-warnings t)
     (declare (ignore failure-p))
     (assert (= 1 (length warnings)))
@@ -137,3 +137,30 @@
     ((10) 10.0)
     ((1/2) 0.5)
     ((30d0) 30d0)))
+
+(with-test (:name :no-coerce-to-values-type)
+  (multiple-value-bind (fun warnp errorp)
+      (checked-compile '(lambda (x) (coerce (list x) '(values list)))
+                       :allow-warnings t)
+    (assert (and warnp errorp))
+    (assert-error (funcall fun 1))))
+
+;; lp#1929614
+(with-test (:name :no-coerce-to-union-of-array)
+  (let ((fun
+         (checked-compile '(lambda (x)
+                            (declare (optimize speed)) ; want to see notes
+                            ;; safety doesn't matter now (in terms of getting
+                            ;; the transform to try to run), but it used to matter,
+                            ;; so keep it in.
+                            (declare (optimize (safety 0)))
+                            (coerce x '(or (array (signed-byte 8) (*))
+                                           (array (unsigned-byte 8) (*))))))))
+    (assert-error (funcall fun '(1 2 1)))))
+
+(with-test (:name :coerce-array)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (coerce a 'array))
+    ((#(1)) #(1) :test #'equalp)))

@@ -223,6 +223,63 @@ Extensions}.
 @include fun-sb-ext-generation-number-of-gcs-before-promotion.texinfo
 @include fun-sb-ext-generation-number-of-gcs.texinfo
 
+@subsection Tracing Live Objects Back to Roots
+
+@quotation note
+This feature is intended to help expert users diagnose rare low-level
+issues and should not be needed during normal usage.  On top of that,
+the interface and implementation are experimental and may change at any
+time without further notice.
+@end quotation
+
+It is sometimes important to understand why a given object is retained
+in the Lisp image instead of being garbage collected.  To help with this
+problem, SBCL provides a mechanism that searches through the different
+memory spaces, builds a path of references from a root to the object in
+question and finally reports this paths:
+
+@include fun-sb-ext-search-roots.texinfo
+
+An example of using this could look like this:
+
+@lisp
+* (defvar *my-string* (list 1 2 "my string"))
+*MY-STRING*
+
+* (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)))
+ -> ((SIMPLE-VECTOR 3)) #x10004E9EAF[2] -> (SYMBOL) #x5044100F[1] -> (CONS) #x100181FAE7[1] -> (CONS) #x100181FAF7[1] -> (CONS) #x100181FB07[0] -> #x100181F9AF
+@end lisp
+
+The single line of output on @code{cl:*standard-output*} shows the path
+from a root to @t{"my string"}: the path starts with SBCL's internal
+package system data structures followed by the symbol
+(@t{cl-user:*my-string*}) followed the three cons cells of the list.
+
+The @code{:print :verbose} argument produces similar behavior but
+describe the path elements in more detail:
+
+@lisp
+* (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)) :print :verbose)
+Path to "my string":
+ 6       10004E9EAF [   2] a (simple-vector 3)
+ 0         5044100F [   1] COMMON-LISP-USER::*MY-STRING*
+ 0       100181FAE7 [   1] a cons
+ 0       100181FAF7 [   1] a cons
+ 0       100181FB07 [   0] a cons
+@end lisp
+
+The @code{:print nil} argument is a bit different:
+
+@lisp
+* (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)) :print nil)
+(("my string" :STATIC (#(*MY-STRING* 0 0) . 2) (*MY-STRING* . 1)
+  ((1 2 "my string") . 1) ((2 "my string") . 1) (("my string") . 0)))
+@end lisp
+
+There is no output on @code{cl:*standard-output*} and the return value
+is a single path for the target object @t{"my string"}. As before, the
+path shows the symbol and the three cons cells.
+
 @node Metaobject Protocol
 @comment  node-name,  next,  previous,  up
 @section Metaobject Protocol
@@ -405,6 +462,26 @@ class named @code{t}.  Also, ANSI specifies that classes with metaclass
 @code{built-in-class} may not be subclassed using @code{defclass}, and
 also that the class named @code{t} is the universal superclass,
 inconsistent with it being a @code{built-in-class}.
+
+@item
+@findex @cl{change-class}
+@findex @cl{defclass}
+@findex @sbmop{ensure-class}
+@findex @sbmop{ensure-class-using-class}
+@findex @sbmop{slot-value-using-class}
+@findex @setf{@sbmop{slot-value-using-class}}
+@findex @sbmop{slot-boundp-using-class}
+@findex @sbmop{slot-definition-allocation}
+uses of @code{change-class} and redefinitions of classes with
+@code{defclass} (or the functional interfaces @code{ensure-class} or
+@code{ensure-class-using-class}) must ensure that for each slot with
+allocation @code{:instance} or @code{:class}, the set of applicable
+methods on the @code{slot-value-using-class} family of generic
+functions is the same before and after the change.
+
+This is required for correct operation of the protocol to update
+instances for the new or redefined class, and can be seen as part of
+the contract of the @code{:instance} or @code{:class} allocations.
 
 @end itemize
 

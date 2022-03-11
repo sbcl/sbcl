@@ -19,6 +19,8 @@
 ;;;; +SC+OFFSET-OFFSET-BYTES+ and exported to sc-offset.h during
 ;;;; genesis for use by the runtime.
 
+;;; This has to be DEF!TYPE because it appears in COMPILED-DEBUG-FUN
+;;; which is DEF!STRUCT.
 (def!type sc+offset ()
   `(unsigned-byte ,(+ sb-vm:sc-number-bits sb-vm:sc-offset-bits)))
 

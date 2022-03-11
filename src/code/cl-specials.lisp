@@ -89,7 +89,7 @@
                          cl:*print-readably* cl:*read-eval*
                          cl:*read-suppress*))
 
-(declaim (type sb-pretty::pprint-dispatch-table cl:*print-pprint-dispatch*))
+(declaim (type sb-pretty:pprint-dispatch-table cl:*print-pprint-dispatch*))
 
 (declaim (type readtable cl:*readtable*))
 
@@ -121,7 +121,7 @@
                        cl:*query-io*
                        cl:*terminal-io*))
 
-(declaim (type (or function symbol) cl:*debugger-hook* cl:*macroexpand-hook*))
+(declaim (type sb-kernel:function-designator cl:*debugger-hook* cl:*macroexpand-hook*))
 
 (declaim (type unsigned-byte cl:*gensym-counter*))
 
@@ -135,77 +135,27 @@
 
 (declaim (type pathname cl:*default-pathname-defaults*))
 
-(declaim (type (or pathname null)
-                       cl:*load-pathname*
-                       cl:*load-truename*
-                       cl:*compile-file-pathname*
-                       cl:*compile-file-truename*))
-
-;;;; DEFGLOBAL and DEFINE-LOAD-TIME-GLOBAL
-;;;; These have alternate definitions (in cross-misc) which rely on
-;;;; the underlying host DEFVAR when building the cross-compiler.
+;;; Some functions for which we should *never* (or almost never) bind eagerly
+;;; to the functional definition.
+;;; IR2-CONVERT-GLOBAL-VAR won't use a :KNOWN-FUN constant-tn, but will instead
+;;; dereference the fdefinition like for most function calls.
+;;; They aren't actually "inlined", but they were bypassing the fdefinition in
+;;; situations involving (APPLY ...) which rendered encapsulation impossible.
+(declaim (notinline open compile-file load compile))
 
 (in-package "SB-IMPL")
 
-;;; Generate a consistent error message for all the standard
-;;; defining macros when given an invalid NAME argument.
-;;; DEFCLASS has its own thing, which is CHECK-CLASS-NAME.
-;;; [This is possibly the wrong place for this, but it's needed
-;;; earlier than anything else, even primordial-extensions.]
-(defmacro check-designator (name macro &optional (arg-reference "NAME"))
-  (multiple-value-bind (predicate explanation)
-      (case macro
-        ((defun defgeneric defmethod define-compiler-macro)
-         (values 'legal-fun-name-p "function name"))
-        (t
-         (values 'symbolp "symbol")))
-    ;; If we decide that the correct behavior is to actually macroexpand
-    ;; and then fail later, well, I suppose we could express all macros
-    ;; such that they perform their LEGAL-FUN-NAME-P/SYMBOLP check as part
-    ;; of the ordinary code, as in:
-    ;;  (DEFPARAMETER "foo" 3) -> (%defparameter (the symbol '"foo") ...)
-    ;; which seems at least slightly preferable to failing in the
-    ;; internal function that would store the globaldb info.
-    `(unless (,predicate ,name)
-       (error ,(format nil "The ~A argument to ~A, ~~S, is not a ~A."
-                       arg-reference macro explanation)
-              ,name))))
 
-(defmacro defglobal (name value &optional (doc nil docp))
-  "Defines NAME as a global variable that is always bound. VALUE is evaluated
-and assigned to NAME both at compile- and load-time, but only if NAME is not
-already bound.
-
-Global variables share their values between all threads, and cannot be
-locally bound, declared special, defined as constants, and neither bound
-nor defined as symbol macros.
-
-See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
-  (check-designator name defglobal)
-  (let ((boundp (make-symbol "BOUNDP")))
-    `(progn
-       (eval-when (:compile-toplevel)
-         (let ((,boundp (boundp ',name)))
-           (%compiler-defglobal ',name :always-bound
-                                (not ,boundp) (unless ,boundp ,value))))
-       (%defglobal ',name
-                   (if (%boundp ',name) (make-unbound-marker) ,value)
-                   (sb-c:source-location)
-                   ,@(and docp `(',doc))))))
-
-(defmacro define-load-time-global (name value &optional (doc nil docp))
-  "Defines NAME as a global variable that is always bound. VALUE is evaluated
-and assigned to NAME at load-time, but only if NAME is not already bound.
-
-Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
-unless it has otherwise been assigned a value.
-
-See also DEFGLOBAL which assigns the VALUE at compile-time too."
-  (check-designator name define-load-time-global)
-  `(progn
-     (eval-when (:compile-toplevel)
-       (%compiler-defglobal ',name :eventually nil nil))
-     (%defglobal ',name
-                 (if (%boundp ',name) (make-unbound-marker) ,value)
-                 (sb-c:source-location)
-                 ,@(and docp `(',doc)))))
+;;; Ensure some VM symbols get wired TLS.
+(in-package "SB-VM")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (entry '#.per-thread-c-interface-symbols)
+    (let ((symbol (if (consp entry) (car entry) entry)))
+      (declare (notinline sb-int:info (setf sb-int:info)))
+      ;; CURRENT-{CATCH/UWP}-BLOCK are thread slots,
+      ;; so the TLS indices were already assigned.
+      ;; There may be other symbols too.
+      (unless (sb-int:info :variable :wired-tls symbol)
+        (setf (sb-int:info :variable :wired-tls symbol) :always-thread-local))
+      (unless (sb-int:info :variable :always-bound symbol)
+        (setf (sb-int:info :variable :always-bound symbol) :always-bound)))))

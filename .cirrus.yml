@@ -1,0 +1,22 @@
+freebsd_build_task:
+
+  freebsd_instance:
+    matrix:
+      image_family: freebsd-11-3-snap
+      image_family: freebsd-12-1-snap
+      # image_family: freebsd-13-0-snap
+    cpu: 1
+    memory: 1G
+
+  prepare_script:
+    - pkg install -y sbcl gmake git
+
+  build_script:
+    - echo '"1.9.99.999"' > version.lisp-expr
+    - ./make.sh
+
+  test_script:
+    - cd tests; ./run-tests.sh
+
+  ansi_test_script:
+    - cd tests; ./ansi-tests.sh

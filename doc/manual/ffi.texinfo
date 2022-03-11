@@ -26,6 +26,7 @@ notably in the name of the @code{SB-ALIEN} package.
 * Foreign Data Structure Examples::
 * Loading Shared Object Files::
 * Foreign Function Calls::
+* Calling Lisp From C::
 * Step-By-Step Example of the Foreign Function Interface::
 @end menu
 
@@ -718,7 +719,6 @@ the only documentation.  Users of a Lisp built with the
 * The alien-funcall Primitive::
 * The define-alien-routine Macro::
 * define-alien-routine Example::
-* Calling Lisp From C::
 @end menu
 
 @node  The alien-funcall Primitive
@@ -883,41 +883,6 @@ This can be described by the following call to
 The Lisp function @code{cfoo} will have two arguments (@var{str} and
 @var{a}) and two return values (@var{a} and @var{i}).
 
-@node  Calling Lisp From C
-@comment  node-name,  next,  previous,  up
-@subsection Calling Lisp From C
-
-Calling Lisp functions from C is sometimes possible, but is extremely
-hackish and poorly supported as of SBCL 0.7.5.  See @code{funcall0}
-@dots{} @code{funcall3} in the runtime system. The arguments must be
-valid SBCL object descriptors (so that e.g. fixnums must be
-left-shifted by 2.) As of SBCL 0.7.5, the format of object descriptors
-is documented only by the source code and, in parts, by the old CMUCL
-@file{INTERNALS} documentation.
-
-Note that the garbage collector moves objects, and won't be
-able to fix up any references in C variables.  There are three
-mechanisms for coping with this:
-
-@enumerate
-@item
-The @code{sb-ext:purify} moves all live Lisp
-data into static or read-only areas such that it will never be moved
-(or freed) again in the life of the Lisp session
-
-@item
-@code{sb-sys:with-pinned-objects} is a macro which arranges for some
-set of objects to be pinned in memory for the dynamic extent of its
-body forms.  On ports which use the generational garbage collector (as
-of SBCL 0.8.3, only the x86) this has a page granularity - i.e. the
-entire 4k page or pages containing the objects will be locked down. On
-other ports it is implemented by turning off GC for the duration (so
-could be said to have a whole-world granularity).
-
-@item
-Disable GC, using the @code{without-gcing} macro.
-@end enumerate
-
 @c <!-- FIXME: This is a "changebar" section from the CMU CL manual.
 @c      I (WHN 2002-07-14) am not very familiar with this content, so
 @c      I'm not immediately prepared to try to update it for SBCL, and
@@ -1059,6 +1024,68 @@ Disable GC, using the @code{without-gcing} macro.
 @c LaTeX
 @c -->
 
+@node  Calling Lisp From C
+@comment  node-name,  next,  previous,  up
+@section Calling Lisp From C
+
+SBCL supports the calling of Lisp functions using the C calling
+convention. This is useful for both defining callbacks and for creating
+an interface for calling into Lisp as a shared library directly from C.
+
+The @code{define-alien-callable} macro wraps Lisp code and creates a C
+foreign function which can be called with the C calling convention.
+
+@include macro-sb-alien-define-alien-callable.texinfo
+
+The @code{alien-callable-function} function returns the foreign callable
+value associated with any name defined by @code{define-alien-callable},
+so that we can, for example, pass the callable value to C as a callback.
+
+@include fun-sb-alien-alien-callable-function.texinfo
+
+Note that the garbage collector moves objects, and won't be able to fix
+up any references in C variables.  There are three mechanisms for coping
+with this:
+
+@enumerate
+@item
+The @code{sb-ext:purify} moves all live Lisp data into static or
+read-only areas such that it will never be moved (or freed) again in the
+life of the Lisp session
+
+@item
+@code{sb-sys:with-pinned-objects} is a macro which arranges for some set
+of objects to be pinned in memory for the dynamic extent of its body
+forms.  On ports which use the generational garbage collector (most, as
+of this writing) this affects exactly the specified objects. On other
+ports it is implemented by turning off GC for the duration (so could be
+said to have a whole-world granularity).
+
+@item
+Disable GC, using the @code{without-gcing} macro.
+@end enumerate
+
+@menu
+* Lisp as a Shared Library::
+@end menu
+
+@node  Lisp as a Shared Library
+@comment  node-name,  next,  previous,  up
+@subsection Lisp as a Shared Library
+SBCL supports the use of Lisp as a shared library that can be used by C
+programs using the @code{define-alien-callable} interface. See the
+@code{:callable-exports} keyword to @code{save-lisp-and-die} for how to
+save the Lisp image in a way that allows a C program to initialize the
+Lisp runtime and the exported symbols. When SBCL is built as a library,
+it exposes the symbol @code{initialize_lisp} which can be used in
+conjunction with a core initializing global symbols to foreign callables
+as function pointers and with object code allocating those symbols to
+initialize the runtime properly. The arguments to @code{initialize_lisp}
+are the same as the arguments to the main @code{sbcl}
+program.
+
+Note: There is currently no way to run exit hooks or otherwise undo
+Lisp initialization gracefully from C.
 
 @node  Step-By-Step Example of the Foreign Function Interface
 @comment  node-name,  next,  previous,  up

@@ -55,9 +55,10 @@
                             (type-specifier
                              (specifier-type
                               `(simple-array ,(sb-vm:saetp-specifier saetp) (*)))))
-                          (remove t sb-vm:*specialized-array-element-type-properties*
-                                  :key 'sb-vm:saetp-specifier))))
-                `(((integer 0 ,sb-xc:array-dimension-limit)
+                          (remove-if (lambda (x) (member x '(nil t)))
+                                     sb-vm:*specialized-array-element-type-properties*
+                                     :key 'sb-vm:saetp-specifier))))
+                `(((mod ,(1+ array-dimension-limit))
                    object-not-array-dimension)
                   ;; Union of all unboxed array specializations,
                   ;; for type-checking the argument to VECTOR-SAP
@@ -93,6 +94,9 @@
    ("An attempt was made to use an undefined FDEFINITION." undefined-fun 1)
    #+(or arm arm64 x86-64)
    ("An attempt was made to use an undefined alien function" undefined-alien-fun 1)
+   ;; Only x86-64 can detect uninitialized C memory
+   ;; but there's no harm in defining this error.
+   ("Read of uninitialized memory" uninitialized-memory 0)
    ("invalid argument count" invalid-arg-count 1)
    ("invalid argument count" local-invalid-arg-count 2)
    ("bogus argument to VALUES-LIST" bogus-arg-to-values-list 1)
@@ -101,14 +105,20 @@
    ("attempt to THROW to a non-existent tag" unseen-throw-tag 1)
    ("division by zero" division-by-zero 2)
    ("Object is of the wrong type." object-not-type 2)
+   ("ECASE failure" ecase-failure 2)
+   ("ETYPECASE failure" etypecase-failure 2)
    ("odd number of &KEY arguments" odd-key-args 0)
    ("unknown &KEY argument" unknown-key-arg 1)
    ("invalid array index" invalid-array-index 3)
+   ("invalid vector index" invalid-vector-index 2)
+   ("uninitialized element" uninitialized-element 2)
    ("A function with declared result type NIL returned." nil-fun-returned 1)
    ("An array with element-type NIL was accessed." nil-array-accessed 1)
    ("Object layout is invalid. (indicates obsolete instance)" layout-invalid 2)
    ("Thread local storage exhausted." tls-exhausted 0)
-   ("Failed aver" failed-aver 1))
+   ("Unreachable code reached" unreachable 0)
+   ("Failed aver" failed-aver 1)
+   ("Fixnum multiplication overflow" mul-overflow 2))
 
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
@@ -179,7 +189,7 @@
   sb-c::vop
   sb-c::basic-combination
   sb-sys:fd-stream
-  layout
+  wrapper
   (sb-assem:segment object-not-assem-segment)
   sb-c::cblock
   sb-disassem:disassem-state
@@ -225,20 +235,3 @@
   (if (array-in-bounds-p sb-c:+backend-internal-errors+ error-number)
       (cddr (svref sb-c:+backend-internal-errors+ error-number))
       0))
-
-#-sb-xc-host ; no SB-C:SAP-READ-VAR-INTEGERF
-(defun decode-internal-error-args (sap trap-number &optional error-number)
-  (let ((error-number (cond (error-number)
-                            ((>= trap-number sb-vm:error-trap)
-                             (prog1
-                                 (- trap-number sb-vm:error-trap)
-                               (setf trap-number sb-vm:error-trap)))
-                            (t
-                             (prog1 (sap-ref-8 sap 0)
-                               (setf sap (sap+ sap 1)))))))
-    (let ((length (sb-kernel::error-length error-number)))
-      (declare (type (unsigned-byte 8) length))
-      (values error-number
-              (loop repeat length with index = 0
-                    collect (sb-c:sap-read-var-integerf sap index))
-              trap-number))))

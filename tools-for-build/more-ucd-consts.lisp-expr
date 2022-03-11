@@ -34,7 +34,9 @@
      "Bassa_Vah" "Mahajani" "Pahawh_Hmong" "Caucasian_Albanian" "Manichaean"
      "Palmyrene" "Duployan" "Mende_Kikakui" "Pau_Cin_Hau" "Elbasan" "Modi"
      "Psalter_Pahlavi" "Grantha" "Mro" "Siddham" "Khojki" "Nabataean" "Tirhuta"
-     "Khudawadi" "Old_North_Arabian" "Warang_Citi" "Linear_A" "Old_Permic"))
+     "Khudawadi" "Old_North_Arabian" "Warang_Citi" "Linear_A" "Old_Permic"
+     "Ahom" "Anatolian_Hieroglyphs" "Hatran" "Multani" "Old_Hungarian"
+     "SignWriting"))
 
  (*line-break-classes*
     ("XX" "AI" "AL" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP" "CR" "EX" "GL"

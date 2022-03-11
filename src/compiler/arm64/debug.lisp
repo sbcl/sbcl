@@ -11,24 +11,24 @@
 
 (in-package "SB-VM")
 
-(define-vop (debug-cur-sp)
-  (:translate sb-di::current-sp)
+(define-vop ()
+  (:translate current-sp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move res csp-tn)))
 
-(define-vop (debug-cur-fp)
-  (:translate sb-di::current-fp)
+(define-vop (current-fp-sap)
+  (:translate current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move res cfp-tn)))
 
-(define-vop (read-control-stack)
-  (:translate sb-kernel:stack-ref)
+(define-vop ()
+  (:translate stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg) :target temp))
@@ -40,20 +40,17 @@
     (inst lsl temp offset (- word-shift n-fixnum-tag-bits))
     (inst ldr result (@ sap temp))))
 
-(define-vop (write-control-stack)
-  (:translate sb-kernel:%set-stack-ref)
+(define-vop ()
+  (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg) :target temp)
-         (value :scs (descriptor-reg) :target result))
+         (value :scs (descriptor-reg)))
   (:arg-types system-area-pointer positive-fixnum *)
   (:temporary (:scs (any-reg)) temp)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
   (:generator 5
     (inst lsl temp offset (- word-shift n-fixnum-tag-bits))
-    (inst str value (@ sap temp))
-    (move result value)))
+    (inst str value (@ sap temp))))
 
 (define-vop (code-from-mumble)
   (:policy :fast-safe)
@@ -71,10 +68,6 @@
       (inst sub temp temp (- other-pointer-lowtag lowtag)))
     (inst sub code thing temp)
     DONE))
-
-(define-vop (code-from-lra code-from-mumble)
-  (:translate sb-di::lra-code-header)
-  (:variant other-pointer-lowtag))
 
 (define-vop (code-from-fun code-from-mumble)
   (:translate sb-di::fun-code-header)

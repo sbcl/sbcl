@@ -26,7 +26,7 @@
 (defun compile-in-lexenv (form *lexenv* name source-info tlf ephemeral errorp)
   (let ((source-paths (when source-info *source-paths*)))
     (with-compilation-values
-      (sb-xc:with-compilation-unit ()
+      (with-compilation-unit ()
         ;; FIXME: These bindings were copied from SUB-COMPILE-FILE with
         ;; few changes. Once things are stable, the shared bindings
         ;; probably be merged back together into some shared utility
@@ -47,7 +47,8 @@
                    (make-compilation
                     :msan-unpoison
                     (and (member :msan *features*)
-                         (find-dynamic-foreign-symbol-address "__msan_unpoison"))))
+                         (find-dynamic-foreign-symbol-address "__msan_unpoison"))
+                    :block-compile nil))
                   (*current-path* nil)
                   (*last-message-count* (list* 0 nil nil))
                   (*last-error-context* nil)
@@ -73,6 +74,13 @@
                   ;; controlled by function arguments and lexical variables.
                   (*compile-verbose* nil)
                   (*compile-print* nil)
+                  ;; in some circumstances, we can trigger execution
+                  ;; of user code during optimization, which can
+                  ;; re-enter the compiler through explicit calls to
+                  ;; EVAL or COMPILE.  Those inner evaluations
+                  ;; shouldn't attempt to report any compiler problems
+                  ;; using the outer compiler error context.
+                  (*compiler-error-context* nil)
                   (oops nil))
              (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
                (unless source-paths
@@ -271,7 +279,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 ;; answers. (Modulo any bugs due to near-total lack of testing)
 
 (defun compile-file-position-helper (file-info path-to-find)
-  (let (found-form start-char)
+  (let (start-char)
     (labels
         ((recurse (subpath upper-bound queue)
            (let ((index -1))
@@ -287,8 +295,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                   ;; This does not eagerly declare victory, because we want
                   ;; to find the rightmost match. In "#1=(FOO)" there are two
                   ;; different annotations pointing to (FOO).
-                  (setq found-form (cdr item)
-                        start-char (caar item)))
+                  (setq start-char (caar item)))
                 (unless queue (return))
                 (let* ((next (car queue))
                        (next-end (cdar next)))
@@ -318,9 +325,6 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
     start-char))
 
 ;;;; Coverage helpers
-
-(defun record-code-coverage (namestring cc)
-  (setf (gethash namestring (car *code-coverage-info*)) cc))
 
 (defun clear-code-coverage ()
   (clrhash (car *code-coverage-info*))

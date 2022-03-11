@@ -17,7 +17,7 @@
     ((:raw :none)
      (let ((jump (make-symbol "JUMP")))
        (values
-        `((inst lr ,jump (make-fixup ',name :assembly-routine))
+        `((load-asm-rtn-addr ,jump ',name)
           (inst mtlr ,jump)
           (inst blrl))
         `((:temporary (:sc any-reg) ,jump)))))
@@ -33,7 +33,7 @@
               (store-stack-tn ,nfp-save cur-nfp))
             (inst compute-lra-from-code ,lra code-tn lra-label ,temp)
             (note-next-instruction ,vop :call-site)
-            (inst lr ,jump (make-fixup ',name :assembly-routine))
+            (load-asm-rtn-addr ,jump ',name)
             (inst mtlr ,jump)
             (inst blr)
             (emit-return-pc lra-label)
@@ -68,7 +68,3 @@
                                     :offset lip-offset)
                     :offset 2)))
     (:none)))
-
-#-sb-xc-host ; CONTEXT-LR is not defined at xc-time
-(defun return-machine-address (scp)
-  (sap-int (context-lr scp)))

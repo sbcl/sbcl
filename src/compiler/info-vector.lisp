@@ -44,35 +44,35 @@
 ;;; * Names which are lists of length other than 2, or improper lists,
 ;;;   or whose elements are not both symbols, are disqualified.
 
-;;; Packed vector layout
-;;; --------------------
+;;; Packed format
+;;; -------------
 ;;; Because the keys to the inner lists are integers in the range 0 to 63,
 ;;; either 5 or 10 keys will fit into a fixnum depending on word size.
 ;;; This permits one memory read to retrieve a collection of keys. In packed
 ;;; format, an ordered set of keys ("fields") is called a "descriptor".
 ;;;
-;;; Descriptors are stored from element 0 upward in the packed vector,
-;;; and data are indexed downward from the last element of the vector.
+;;; Descriptors are stored from element 0 upward in the packed-info,
+;;; and data are indexed downward from the last element.
 ;;;
-;;;  #(descriptor0 descriptor1 ... descriptorN valueN ... value1 value0)
+;;;  [descriptor0 descriptor1 ... descriptorN valueN ... value1 value0]
 ;;;
-;;; e.g. The field at absolute index 3 - vector element 0, bit position 18 -
+;;; e.g. The field at absolute index 3 (physical element 0, bit position 18)
 ;;; will find its data at index (- END 3).  In this manner, it doesn't matter
 ;;; how many more descriptors exist.
 
 ;;; A "group" comprises all the info for a particular Name, and its list
 ;;; of types may may span descriptors, though rarely.
-;;; An "auxilliary key" is the first element of a 2-list Name. It is interposed
-;;; within the data portion of the vector after the preceding info group.
+;;; An "auxiliary key" is the first element of a 2-list Name. It is interposed
+;;; within the data portion of the packed-info after the preceding info group.
 ;;; Descriptors are self-delimiting in that the first field in a group
 ;;; indicates the number of additional fields in the group.
 
-;;; Unpacked vector layout
-;;; ----------------------
+;;; Unpacked format
+;;; ---------------
 ;;; This representation is used transiently during insertion/deletion.
 ;;; It is a concatenation of plists as a vector, interposing at the splice
-;;; points the auxilliary key for the group, except for the root name which
-;;; does not store an auxilliary key.
+;;; points the auxiliary key for the group, except for the root name which
+;;; does not store an auxiliary key.
 ;;;
 ;;; Unpacked vector format looks like:
 ;;;
@@ -82,13 +82,17 @@
 ;;;    ^
 ;;;    info group for the primary Name, a/k/a "root symbol", starts here
 ;;;
-;;; One can envision that the first info group stores its auxilliary key
+;;; One can envision that the first info group stores its auxiliary key
 ;;; at vector index -1 when thinking about the correctness of algorithms
 ;;; that process unpacked info-vectors.
-;;; See !TEST-PACKIFY-INFOS for examples of each format.
+;;; See TEST-PACKIFY-INFOS for examples of each format.
 
 ;;;;; Some stuff moved from 'globaldb.lisp':
 
+;;; The structure constructor is never called
+(sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil) (:copier nil))
+  cells)
+;;(declaim (freeze-type packed-info)) ; crashes?
 (defconstant info-num-mask (ldb (byte info-number-bits 0) -1)) ; #b111111
 
 ;; Using 6 bits per packed field, 5 infos can be described in a 30-bit fixnum,
@@ -101,20 +105,44 @@
 (deftype info-descriptor () `(signed-byte ,sb-vm:n-fixnum-bits))
 
 ;; An empty info-vector. Its 0th field describes that there are no more fields.
-(defconstant-eqx +nil-packed-infos+ #(0) #'equalp)
+(defglobal +nil-packed-infos+
+    (let ((v (make-packed-info 1)))
+      (setf (%info-ref v 0) 0)
+      v))
+
+;;; %SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
+;;; But in the host Lisp, there is no such thing. Instead, SYMBOL-%INFO
+;;; is kept as a property on the host symbol.
+;;; The compatible "primitive" accessor must be a SETFable place.
+#+sb-xc-host
+(progn
+  (declaim (inline symbol-%info))
+  (defun symbol-%info (symbol)
+    (get symbol :sb-xc-globaldb-info))
+  (defun symbol-dbinfo (symbol) (symbol-%info symbol))
+  ;; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
+  (defun update-symbol-info (symbol update-fn)
+    ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
+    ;; a vector describing 0 infos and 0 auxiliary keys.
+    (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
+      (when newval
+        (setf (get symbol :sb-xc-globaldb-info) newval))
+      (values))))
 
 ;; FDEFINITIONs have an info-number that admits slightly clever logic
-;; for INFO-VECTOR-FDEFN. Do not change this constant without
+;; for PACKED-INFO-FDEFN. Do not change this constant without
 ;; careful examination of that function.
 (defconstant +fdefn-info-num+ info-num-mask)
 
 ;; Extract a field from a packed info descriptor.
 ;; A field is either a count of info-numbers, or an info-number.
 (declaim (inline packed-info-field))
-(defun packed-info-field (vector desc-index field-index)
+(defun packed-info-field (packed-info desc-index field-index)
+  ;; (declare (optimize (safety 0))) ; comment out when debugging
   (ldb (byte info-number-bits
              (* (the (mod #.+infos-per-word+) field-index) info-number-bits))
-       (the info-descriptor (svref vector desc-index))))
+       (the info-descriptor
+                  (%info-ref (the packed-info packed-info) desc-index))))
 
 ;; Compute the number of elements needed to hold unpacked VECTOR after packing.
 ;; This is not "compute-packed-info-size" since that could be misconstrued
@@ -127,7 +155,7 @@
     (declare (type index index end n-fields))
     (loop
        ;; 'length' is the number of vector elements in this info group,
-       ;; including itself but not including its auxilliary key.
+       ;; including itself but not including its auxiliary key.
        (let ((length (the index (svref vector index))))
          ;; Divide by 2 because we only count one field for the entry, but the
          ;; input vector had 2 cells per entry. Add 1 because the group's field
@@ -150,7 +178,7 @@
 (defmacro make-info-descriptor (val shift)
   (if (> sb-vm:n-fixnum-bits 30)
       `(ash ,val ,shift)
-      `(logior (if (logbitp (- 29 ,shift) ,val) sb-xc:most-negative-fixnum 0)
+      `(logior (if (logbitp (- 29 ,shift) ,val) most-negative-fixnum 0)
                (ash ,val ,shift))))
 
 ;; Convert unpacked vector to packed vector.
@@ -159,10 +187,10 @@
 ;;
 (defun packify-infos (input &optional (end (length input)))
   (declare (simple-vector input))
-  (let* ((output (make-array (compute-packified-info-size input end)))
+  (let* ((output (make-packed-info (compute-packified-info-size input end)))
          (i -1) ; input index: pre-increment to read the next datum
          (j -1) ; descriptor index: pre-increment to write
-         (k (length output)) ; data index: pre-decrement to write
+         (k (packed-info-len output)) ; data index: pre-decrement to write
          (field-shift 0)
          (word 0))
     (declare (type index-or-minus-1 i j k end)
@@ -174,19 +202,19 @@
              (setq word (logior (make-info-descriptor val field-shift) word))
              (if (< field-shift (* (1- +infos-per-word+) info-number-bits))
                  (incf field-shift info-number-bits)
-                 (setf (svref output (incf j)) word field-shift 0 word 0))))
+                 (setf (%info-ref output (incf j)) word field-shift 0 word 0))))
       ;; Truncating divide by 2: count = n-elements in the group @ 2 per entry,
       ;; +1 for count itself but not including its aux-key.
       (loop (let ((count (ash (the index (svref input (incf i))) -1)))
               (put-field count) ; how many infos to follow
               (dotimes (iter count)
                 (put-field (svref input (incf i))) ; an info-number
-                (setf (svref output (decf k)) (svref input (incf i)))) ; value
+                (setf (%info-ref output (decf k)) (svref input (incf i)))) ; value
               (when (>= (incf i) end)
                 (return))
-              (setf (svref output (decf k)) (svref input i))))) ; an aux-key
+              (setf (%info-ref output (decf k)) (svref input i))))) ; an aux-key
     (unless (zerop field-shift) ; store the final descriptor word
-      (setf (svref output (incf j)) word))
+      (setf (%info-ref output (incf j)) word))
     (aver (eql (1+ j) k)) ; last descriptor must be adjacent final data cell
     output))
 
@@ -194,11 +222,11 @@
 ;; returns the next field from a descriptor in INPUT-VAR, a packed vector.
 ;; The generator uses DESCRIPTOR-INDEX and updates it as a side-effect.
 ;;
-(defmacro !with-packed-info-iterator ((generator input-var
+(defmacro with-packed-info-iterator ((generator input-var
                                                  &key descriptor-index)
                                       &body body)
   (with-unique-names (input word count)
-    `(let* ((,input (the simple-vector ,input-var))
+    `(let* ((,input (the packed-info ,input-var))
             (,descriptor-index -1)
             (,count 0)
             (,word 0))
@@ -208,21 +236,21 @@
        (flet ((,generator ()
                 (when (zerop ,count)
                   (incf ,descriptor-index)
-                  (setq ,word (svref ,input ,descriptor-index)
+                  (setq ,word (%info-ref ,input ,descriptor-index)
                         ,count +infos-per-word+))
                 (prog1 (logand ,word info-num-mask)
                   (setq ,word (ash ,word (- info-number-bits)))
                   (decf ,count))))
          ,@body))))
 
-;; Iterate over VECTOR, binding DATA-INDEX to the index of each aux-key in turn.
+;; Iterate over PACKED-INFO, binding DATA-INDEX to the index of each aux-key in turn.
 ;; TOTAL-N-FIELDS is deliberately exposed to invoking code.
 ;;
-(defmacro !do-packed-info-vector-aux-key ((vector &optional (data-index (gensym)))
+(defmacro do-packed-info-aux-key ((packed-info &optional (data-index (gensym)))
                                           step-form &optional result-form)
-  (with-unique-names (descriptor-idx field-idx)
-    (once-only ((vector vector))
-      `(let ((,data-index (length ,vector))
+  (with-unique-names (descriptor-idx field-idx info)
+     `(let* ((,info ,packed-info)
+             (,data-index (packed-info-len ,info))
              (,descriptor-idx 0)
              (,field-idx 0)
              (total-n-fields 0))
@@ -231,8 +259,7 @@
          ;; Loop through the descriptors in random-access fashion.
          ;; Skip 1+ n-infos each time, because the 'n-infos' is itself a field
          ;; that is not accounted for in its own value.
-         (loop (let ((n (1+ (packed-info-field ,vector
-                                               ,descriptor-idx ,field-idx))))
+         (loop (let ((n (1+ (packed-info-field ,info ,descriptor-idx ,field-idx))))
                  (incf total-n-fields n)
                  (multiple-value-setq (,descriptor-idx ,field-idx)
                    (floor total-n-fields +infos-per-word+))
@@ -240,36 +267,21 @@
                ;; Done when the ascending index and descending index meet
                (unless (< ,descriptor-idx ,data-index)
                  (return ,result-form))
-               ,@(if step-form (list step-form)))))))
+               ,@(if step-form (list step-form))))))
 
-;; Return all function names that are stored in SYMBOL's info-vector.
-;; As an example, (INFO-VECTOR-NAME-LIST 'SB-PCL::DIRECT-SUPERCLASSES) =>
-;; ((SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES SB-PCL::READER)
-;;  (SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES BOUNDP)
-;;  (SB-PCL::SLOT-ACCESSOR :GLOBAL SB-PCL::DIRECT-SUPERCLASSES SB-PCL::WRITER))
-(defun info-vector-name-list (symbol)
-  (let ((vector (symbol-info-vector symbol))
-        (list))
-    (when vector
-      (!do-packed-info-vector-aux-key (vector key-index)
-        (push (construct-globaldb-name (svref vector key-index) symbol)
-              list))
-      (nconc (and (plusp (packed-info-field vector 0 0)) (list symbol))
-             (nreverse list)))))
-
-;; Compute the number of elements needed to hold packed VECTOR after unpacking.
-;; The unpacked size is the number of auxilliary keys plus the number of entries
+;; Compute the number of elements needed to hold PACKED-INFO after unpacking.
+;; The unpacked size is the number of auxiliary keys plus the number of entries
 ;; @ 2 cells per entry, plus the number of length cells which indicate the
 ;; number of data cells used (including length cells but not aux key cells).
 ;; Equivalently, it's the number of packed fields times 2 minus 1.
 ;;
-(defun compute-unpackified-info-size (vector)
-  (declare (simple-vector vector))
-  (!do-packed-info-vector-aux-key (vector) ()
-    ;; off-by-one: the first info group's auxilliary key is imaginary
+(defun compute-unpackified-info-size (packed-info)
+  (declare (packed-info packed-info))
+  (do-packed-info-aux-key (packed-info) ()
+    ;; off-by-one: the first info group's auxiliary key is imaginary
     (1- (truly-the fixnum (ash total-n-fields 1)))))
 
-;; Convert packed INPUT vector to unpacked.
+;; Convert packed INPUT to unpacked.
 ;; If optional OUTPUT is supplied, it is used, otherwise output is allocated.
 ;; For efficiency the OUTPUT should be provided as a dynamic-extent array.
 ;;
@@ -277,28 +289,28 @@
                                          (make-array
                                           (compute-unpackified-info-size input))
                                          output-supplied-p))
-  (declare (simple-vector input output))
-  (let ((i (length input)) (j -1))  ; input index and output index respectively
+  (declare (type packed-info input) (simple-vector output))
+  (let ((i (packed-info-len input)) (j -1))  ; input index and output index respectively
     (declare (type index-or-minus-1 i j))
-    (!with-packed-info-iterator (next-field input :descriptor-index desc-idx)
+    (with-packed-info-iterator (next-field input :descriptor-index desc-idx)
       (loop ; over name
          (let ((n-infos (next-field)))
            ;; store the info group length, including the length cell in the length
            (setf (svref output (incf j)) (1+ (ash n-infos 1)))
            (dotimes (iter n-infos) ; over info-types
              (setf (svref output (incf j)) (next-field) ; type-num
-                   (svref output (incf j)) (svref input (decf i))))) ; value
+                   (svref output (incf j)) (%info-ref input (decf i))))) ; value
          (if (< desc-idx (decf i)) ; as long as the indices haven't met
-             (setf (svref output (incf j)) (svref input i)) ; copy next aux-key
+             (setf (svref output (incf j)) (%info-ref input i)) ; copy next aux-key
              (return (if output-supplied-p nil output))))))) ; else done
 
 ;; Return the index of the 'length' item for an info group having
-;; auxilliary-key KEY in unpacked VECTOR bounded by END (exclusive),
+;; auxiliary-key KEY in unpacked VECTOR bounded by END (exclusive),
 ;; or NIL if not found.
 ;;
 (defun info-find-aux-key/unpacked (key vector end)
   (declare (type index end))
-  (if (eql key +no-auxilliary-key+)
+  (if (eql key +no-auxiliary-key+)
       0 ; the first group's length (= end) is stored here always
       (let ((index 0))
         (declare (type index index))
@@ -311,20 +323,20 @@
                  ((eq (svref vector (1- index)) key)
                   (return index)))))))
 
-;; In packed info VECTOR try to find the auxilliary key SYMBOL.
+;; Try to find the auxiliary key SYMBOL in PACKED-INFO.
 ;; If found, return indices of its data, info descriptor word, and field.
 ;; If not found, the first value is NIL and the descriptor indices
 ;; arbitrarily point to the next available descriptor field.
 ;;
-(defun info-find-aux-key/packed (vector symbol)
+(defun info-find-aux-key/packed (packed-info symbol)
   ;; explicit bounds checking is done by the code below
-  (declare (optimize (safety 0)))
-  (aver (simple-vector-p vector))
-  (let ((descriptor-idx 0) ; physical index to vector
+;  (declare (optimize (safety 0)))
+  (aver (typep packed-info 'packed-info))
+  (let ((descriptor-idx 0) ; physical index to packed-info
         (field-idx 0) ; relative index within current descriptor
         ;; On each iteration DATA-IDX points to an aux-key cell
         ;; The first group's imaginary aux-key cell is past the end.
-        (data-idx (length (the simple-vector vector))))
+        (data-idx (packed-info-len (the packed-info packed-info))))
     (declare (type index descriptor-idx data-idx)
              (fixnum field-idx)) ; can briefly exceed +infos-per-word+
     ;; Efficiently skip past N-INFOS infos. If decrementing the data index
@@ -343,31 +355,31 @@
       (declare (inline skip))
       ;; While this could compare aux-keys with #'EQUAL, it is not obvious how
       ;; in general one would pick a symbol from the name as that which
-      ;; is delegated as the one to hold the info-vector.
-      (values (cond ((not (skip (packed-info-field vector 0 0))) nil)
+      ;; is delegated as the one to hold the packed-info
+      (values (cond ((not (skip (packed-info-field packed-info 0 0))) nil)
                     ;; At least one aux key is present.
-                    ((eq (aref vector data-idx) symbol) data-idx) ; yay
+                    ((eq (%info-ref packed-info data-idx) symbol) data-idx) ; yay
                     ;; aux-key order invariant allows early fail on SETF
                     ((eq symbol 'setf) nil)
                     (t
                      (loop
-                      (cond ((not (skip (packed-info-field vector descriptor-idx
+                      (cond ((not (skip (packed-info-field packed-info descriptor-idx
                                                            field-idx)))
                              (return nil))
-                            ((eq (aref vector data-idx) symbol)
+                            ((eq (%info-ref packed-info data-idx) symbol)
                              (return data-idx))))))
               descriptor-idx field-idx)))) ; can be ignored if 1st val is nil
 
-;; Take a packed info-vector INPUT and insert (AUX-KEY,INFO-NUMBER,VALUE).
+;; Take a packed-info INPUT and insert (AUX-KEY,INFO-NUMBER,VALUE).
 ;; Packed info-vectors are immutable. Any alteration must create a copy.
 ;; This is done by unpacking/repacking - it's easy enough and fairly
 ;; efficient since the temporary vector is stack-allocated.
 ;;
 (defun %packed-info-insert (input aux-key info-number value)
-  (declare (simple-vector input) (type info-number info-number))
+  (declare (type packed-info input) (type info-number info-number))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
-          (if (and (not (eql aux-key +no-auxilliary-key+))
+          (if (and (not (eql aux-key +no-auxiliary-key+))
                    (not (info-find-aux-key/packed input aux-key)))
               4   ; need space for [aux-key, length, type-num, value]
               2)) ; only space for [type-num, value]
@@ -410,15 +422,15 @@
 ;; exactly one descriptor for the root name, space for >= 1 more field,
 ;; and no aux-keys.
 (declaim (inline info-quickly-insertable-p))
-(defun info-quickly-insertable-p (input)
-  (let ((n-infos (packed-info-field input 0 0)))
+(defun info-quickly-insertable-p (packed-info)
+  (let ((n-infos (packed-info-field packed-info 0 0)))
     ;; We can easily determine if the no-aux-keys constraint is satisfied,
     ;; because a secondary name's info occupies at least two cells,
     ;; one for its aux-key and >= 1 for info values.
     (and (< n-infos (1- +infos-per-word+))
-         (eql n-infos (1- (length input))))))
+         (eql n-infos (1- (packed-info-len packed-info))))))
 
-;; Take a packed info-vector INPUT and return a new one with INFO-NUMBER/VALUE
+;; Take a packed-info INPUT and return a new one with INFO-NUMBER/VALUE
 ;; added for the root name. The vector must satisfy INFO-QUICKLY-INSERTABLE-P.
 ;; This code is separate from PACKED-INFO-INSERT to facilitate writing
 ;; a unit test of this logic against the complete logic.
@@ -426,57 +438,57 @@
 (defun quick-packed-info-insert (input info-number value)
   ;; Because INPUT contains 1 descriptor and its corresponding values,
   ;; the current length is exactly NEW-N, the new number of fields.
-  (let* ((descriptor (svref input 0))
-         (new-n (truly-the info-number (length input)))
-         (new-vect (make-array (1+ new-n))))
+  (let* ((descriptor (%info-ref input 0))
+         (new-n (truly-the info-number (packed-info-len input)))
+         (output (make-packed-info (1+ new-n))))
     ;; Two cases: we're either inserting info for the fdefn, or not.
     (cond ((eq info-number +fdefn-info-num+)
            ;; fdefn, if present, must remain the first packed field.
            ;; Replace the lowest field (the count) with +fdefn-info-num+,
            ;; shift everything left 6 bits, then OR in the new count.
-           (setf (svref new-vect 0)
+           (setf (%info-ref output 0)
                  (logior (make-info-descriptor
                           (dpb +fdefn-info-num+ (byte info-number-bits 0)
                                descriptor) info-number-bits) new-n)
                  ;; Packed vectors are indexed "backwards". The first
                  ;; field's info is in the highest numbered cell.
-                 (svref new-vect new-n) value)
+                 (%info-ref output new-n) value)
            (loop for i from 1 below new-n
-                 do (setf (svref new-vect i) (svref input i))))
+                 do (setf (%info-ref output i) (%info-ref input i))))
           (t
            ;; Add a field on the high end and increment the count.
-           (setf (svref new-vect 0)
+           (setf (%info-ref output 0)
                  (logior (make-info-descriptor
                           info-number (* info-number-bits new-n))
                          (1+ descriptor))
-                 (svref new-vect 1) value)
+                 (%info-ref output 1) value)
            ;; Slide the old data up 1 cell.
            (loop for i from 2 to new-n
-                 do (setf (svref new-vect i) (svref input (1- i))))))
-    new-vect))
+                 do (setf (%info-ref output i) (%info-ref input (1- i))))))
+    output))
 
 (declaim (maybe-inline packed-info-insert))
-(defun packed-info-insert (vector aux-key info-number newval)
-  (if (and (eql aux-key +no-auxilliary-key+)
-           (info-quickly-insertable-p vector))
-      (quick-packed-info-insert vector info-number newval)
-      (%packed-info-insert vector aux-key info-number newval)))
+(defun packed-info-insert (packed-info aux-key info-number newval)
+  (if (and (eql aux-key +no-auxiliary-key+)
+           (info-quickly-insertable-p packed-info))
+      (quick-packed-info-insert packed-info info-number newval)
+      (%packed-info-insert packed-info aux-key info-number newval)))
 
 ;; Search packed VECTOR for AUX-KEY and INFO-NUMBER, returning
 ;; the index of the data if found, or NIL if not found.
 ;;
-(defun packed-info-value-index (vector aux-key type-num)
-  (declare (optimize (safety 0))) ; vector bounds are AVERed
-  (let ((data-idx (length vector)) (descriptor-idx 0) (field-idx 0))
+(defun packed-info-value-index (packed-info aux-key type-num)
+  ;;(declare (optimize (safetya 0))) ; bounds are AVERed
+  (let ((data-idx (packed-info-len packed-info)) (descriptor-idx 0) (field-idx 0))
     (declare (type index descriptor-idx)
              (type (mod #.+infos-per-word+) field-idx))
-    (unless (eql aux-key +no-auxilliary-key+)
+    (unless (eql aux-key +no-auxiliary-key+)
       (multiple-value-setq (data-idx descriptor-idx field-idx)
-        (info-find-aux-key/packed vector aux-key))
+        (info-find-aux-key/packed packed-info aux-key))
       (unless data-idx
         (return-from packed-info-value-index nil)))
     ;; Fetch a descriptor and shift out trailing bits that won't be scanned.
-    (let* ((descriptor (ash (the info-descriptor (aref vector descriptor-idx))
+    (let* ((descriptor (ash (the info-descriptor (%info-ref packed-info descriptor-idx))
                             (* (- info-number-bits) field-idx)))
            (n-infos (logand descriptor info-num-mask))
            ;; Compute n things in this descriptor after extracting one field. e.g.
@@ -500,11 +512,11 @@
          (incf descriptor-idx)
          (decf data-idx swath)
          (aver (< descriptor-idx data-idx))
-         (setq descriptor (svref vector descriptor-idx)
+         (setq descriptor (%info-ref packed-info descriptor-idx)
                swath (min n-infos +infos-per-word+))))))
 
 ;; Helper for CLEAR-INFO-VALUES when Name has the efficient form.
-;; Given packed info-vector INPUT and auxilliary key KEY2
+;; Given packed-info INPUT and auxiliary key KEY2
 ;; return a new vector in which TYPE-NUMS are absent.
 ;; When none of TYPE-NUMs were present to begin with, return NIL.
 ;;
@@ -512,9 +524,9 @@
 ;; clearing does not happen often enough to warrant the pre-check.
 ;;
 (defun packed-info-remove (input key2 type-nums)
-  (declare (simple-vector input))
-  (when (or (eql (length input) (length +nil-packed-infos+))
-            (and (not (eql key2 +no-auxilliary-key+))
+  (declare (type packed-info input))
+  (when (or (eql (packed-info-len input) #.(packed-info-len +nil-packed-infos+))
+            (and (not (eql key2 +no-auxiliary-key+))
                  (not (info-find-aux-key/packed input key2))))
     (return-from packed-info-remove nil)) ; do nothing
   (let* ((end (compute-unpackified-info-size input))
@@ -533,7 +545,7 @@
                      return probe)))
         ;; N.B. the early termination checks aren't just optimizations,
         ;; they're requirements, because otherwise the loop could smash
-        ;; data that does not belong to this auxilliary key.
+        ;; data that does not belong to this auxiliary key.
         (cond ((not i)) ; not found - ignore
               ;; Squash out 2 cells if deleting an info for primary name,
               ;; or for secondary name with at least one more entry.
@@ -557,9 +569,9 @@
             (t (packify-infos new end)))))) ; otherwise repack
 
 ;; We need a few magic constants to be shared between the next two functions.
-(defconstant-eqx !+pcl-reader-name+ (make-symbol "READER") (constantly t))
-(defconstant-eqx !+pcl-writer-name+ (make-symbol "WRITER") (constantly t))
-(defconstant-eqx !+pcl-boundp-name+ (make-symbol "BOUNDP") (constantly t))
+(defconstant-eqx !+pcl-reader-name+ '#.(make-symbol "READER") (constantly t))
+(defconstant-eqx !+pcl-writer-name+ '#.(make-symbol "WRITER") (constantly t))
+(defconstant-eqx !+pcl-boundp-name+ '#.(make-symbol "BOUNDP") (constantly t))
 
 ;; PCL names are physically 4-lists (see "pcl/slot-name")
 ;; that get treated as 2-component names for globaldb's purposes.
@@ -602,27 +614,27 @@
 
 ;; Call FUNCTION with each piece of info in packed VECT using ROOT-SYMBOL
 ;; as the primary name. FUNCTION must accept 3 values (NAME INFO-NUMBER VALUE).
-(defun %call-with-each-info (function vect root-symbol)
+(defun %call-with-each-info (function packed-info root-symbol)
   (let ((name root-symbol)
-        (data-idx (length vect)))
+        (data-idx (packed-info-len packed-info)))
     (declare (type index data-idx))
-    (!with-packed-info-iterator (next-field vect :descriptor-index desc-idx)
+    (with-packed-info-iterator (next-field packed-info :descriptor-index desc-idx)
       (loop ; over name
          (dotimes (i (next-field)) ; number of infos for this name
-           (funcall function name (next-field) (svref vect (decf data-idx))))
+           (funcall function name (next-field) (%info-ref packed-info (decf data-idx))))
          (if (< desc-idx (decf data-idx))
              (setq name
-                   (construct-globaldb-name (svref vect data-idx) root-symbol))
+                   (construct-globaldb-name (%info-ref packed-info data-idx) root-symbol))
              (return))))))
 
 #|
-Info packing example. This example has 2 auxilliary-keys: SETF and CAS.
+Info packing example. This example has 2 auxiliary-keys: SETF and CAS.
 
-(!test-packify-infos '(13 :XYZ 18 "nine" 28 :BAR 7 T)
-                     '(SETF 8 NIL 17 :FGX)
-                     '(CAS 6 :MUMBLE 2 :BAZ 47 :FOO))
+(test-packify-infos '(13 :XYZ 18 "nine" 28 :BAR 7 T)
+                    '(SETF 8 NIL 17 :FGX)
+                    '(CAS 6 :MUMBLE 2 :BAZ 47 :FOO))
 =>
-#(109006134805865284 3010 :FOO :BAZ :MUMBLE CAS :FGX NIL SETF T :BAR "nine" :XYZ)
+[109006134805865284 3010 :FOO :BAZ :MUMBLE CAS :FGX NIL SETF T :BAR "nine" :XYZ]
 
 (format nil "~4,'0o ~20,'0o" 3010 109006134805865284)
 => "5702 06032110020734221504"
@@ -630,10 +642,10 @@ Reading from right-to-left, converting each 2-digit octal number to decimal:
   4, 13, 18, 28, 7, 2, 8, 17, 3, 6, 2, 47
 Which is interpreted as:
   4 infos for the root name.       type numbers: 13, 18, 28, 7
-  2 infos for SETF auxilliary-key. type numbers: 8, 17
-  3 infos for CAS auxilliary-key.  type numbers: 6, 2, 47
+  2 infos for SETF auxiliary-key. type numbers: 8, 17
+  3 infos for CAS auxiliary-key.  type numbers: 6, 2, 47
 
-(unpackify-infos (!test-packify-infos ...)) ; same input
+(unpackify-infos (test-packify-infos ...)) ; same input
 => #(9 13 :XYZ 18 "nine" 28 :BAR 7 T
      SETF 5 8 NIL 17 :FGX
      CAS 7 6 :MUMBLE 2 :BAZ 47 :FOO)
@@ -647,12 +659,12 @@ This is interpreted as
 ;; The info for a symbol's fdefn must precede other info-numbers.
 ;; and SETF must be the first aux key if other aux keys are present.
 ;; The test function does not enforce these invariants.
-#+nil ; for debugging only
-(defun !test-packify-infos (&rest lists)
+(defun test-packify-infos (&rest lists)
   (flet ((check (plist)
            (and (evenp (length plist))
                 (loop for (indicator value) on plist by #'cddr
-                      always (typep indicator 'info-number))))
+                      always (progn #+host-quirks-ccl value ; shut up the host
+                                    (typep indicator 'info-number)))))
          (add-length-prefix (list) ; computers count better than people
            (cons (1+ (length list)) list)))
     (unless (and (check (first lists))
@@ -677,12 +689,12 @@ This is interpreted as
 ;; If NAME is "simple", bind KEY2 and KEY1 to the elements
 ;; in that order, and execute the SIMPLE code, otherwise execute the HAIRY code.
 ;; If ALLOW-ATOM is T - the default - then NAME can be just a symbol
-;; in which case its second component is +NO-AUXILLIARY-KEY+.
+;; in which case its second component is +NO-AUXILIARY-KEY+.
 ;;
 (defmacro with-globaldb-name ((key1 key2 &optional (allow-atom t))
                               name &key simple hairy)
   (with-unique-names (rest)
-    `(let ((,key1 ,name) (,key2 +NO-AUXILLIARY-KEY+))
+    `(let ((,key1 ,name) (,key2 +NO-AUXILIARY-KEY+))
        (if (or ,@(if allow-atom `((symbolp ,key1)))
                (if (listp ,key1)
                    (let ((,rest (cdr ,key1)))
@@ -700,17 +712,6 @@ This is interpreted as
 ;;; Some of this stuff might belong in 'symbol.lisp', but can't be,
 ;;; because 'symbol.lisp' is :NOT-HOST in build-order.
 
-;; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
-#+sb-xc-host
-(defun update-symbol-info (symbol update-fn)
-  ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
-  ;; a vector describing 0 infos and 0 auxilliary keys.
-  (let ((newval (funcall update-fn (or (symbol-info-vector symbol)
-                                       +nil-packed-infos+))))
-    (when newval
-      (setf (symbol-info-vector symbol) newval))
-    (values)))
-
 ;;; The current *INFO-ENVIRONMENT*, a structure of type INFO-HASHTABLE.
 ;;; Cheat by setting to nil before the type is proclaimed
 ;;; so that we can then also proclaim ALWAYS-BOUND.
@@ -720,6 +721,9 @@ This is interpreted as
 (progn (defvar *info-environment* nil)
        (declaim (type info-hashtable *info-environment*)
                 (always-bound *info-environment*)))
+
+(defmacro pcl-methodfn-name-p (name)
+  `(typep ,name '(cons (member sb-pcl::slow-method sb-pcl::fast-method))))
 
 ;;; Update the INFO-NUMBER for NAME in the global environment,
 ;;; setting it to NEW-VALUE. This is thread-safe in the presence
@@ -771,17 +775,19 @@ This is interpreted as
       (warn "Globaldb storing info for ~S~% ~S ~S~% -> ~S"
             name (meta-info-category i) (meta-info-kind i) new-value)))
 
+  (when (pcl-methodfn-name-p name)
+    (error "Can't SET-INFO-VALUE on PCL-internal function"))
   (let ((name (uncross name)))
     ;; If the INFO-NUMBER already exists in VECT, then copy it and
     ;; alter one cell; otherwise unpack it, grow the vector, and repack.
-    (dx-flet ((augment (vect aux-key) ; VECT is a packed vector, never NIL
-                (declare (simple-vector vect))
+    (dx-flet ((augment (packed-info aux-key) ; PACKED-INFO must not be NIL
+                (declare (type packed-info packed-info))
                 (let ((index
-                       (packed-info-value-index vect aux-key info-number)))
+                       (packed-info-value-index packed-info aux-key info-number)))
                   (if (not index)
-                      (packed-info-insert vect aux-key info-number new-value)
-                      (let ((copy (copy-seq vect)))
-                        (setf (svref copy index) new-value)
+                      (packed-info-insert packed-info aux-key info-number new-value)
+                      (let ((copy (copy-packed-info packed-info)))
+                        (setf (%info-ref copy index) new-value)
                         copy)))))
       (with-globaldb-name (key1 key2) name
         :simple
@@ -791,8 +797,7 @@ This is interpreted as
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (dx-flet ((hairy-name (old-info)
-                    (augment (or old-info +nil-packed-infos+)
-                             +no-auxilliary-key+)))
+                    (augment (or old-info +nil-packed-infos+) +no-auxiliary-key+)))
           (info-puthash *info-environment* name #'hairy-name)))))
   new-value)
 
@@ -805,21 +810,23 @@ This is interpreted as
   (declare (function new-value-fun))
   (when (typep name 'fixnum)
     (error "~D is not a legal INFO name." name))
+  (when (pcl-methodfn-name-p name)
+    (error "Can't SET-INFO-VALUE on PCL-internal function"))
   (let ((name (uncross name)) new-value)
-    (dx-flet ((augment (vect aux-key) ; VECT is a packed vector, never NIL
-                (declare (simple-vector vect))
+    (dx-flet ((augment (packed-info aux-key) ; PACKED-INFO must not be NIL
+                (declare (type packed-info packed-info))
                 (let ((index
-                       (packed-info-value-index vect aux-key info-number)))
+                       (packed-info-value-index packed-info aux-key info-number)))
                   (if (not index)
                       (packed-info-insert
-                       vect aux-key info-number
+                       packed-info aux-key info-number
                        (setq new-value (funcall new-value-fun nil nil)))
-                      (let ((oldval (svref vect index)))
+                      (let ((oldval (%info-ref packed-info index)))
                         (setq new-value (funcall new-value-fun oldval t))
                         (if (eq new-value oldval)
-                            vect ; return the old vector
-                            (let ((copy (copy-seq vect)))
-                              (setf (svref copy index) new-value)
+                            packed-info ; return the old packed-info
+                            (let ((copy (copy-packed-info packed-info)))
+                              (setf (%info-ref copy index) new-value)
                               copy)))))))
       (with-globaldb-name (key1 key2) name
         :simple
@@ -830,7 +837,7 @@ This is interpreted as
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (dx-flet ((hairy-name (old-info)
                     (augment (or old-info +nil-packed-infos+)
-                             +no-auxilliary-key+)))
+                             +no-auxiliary-key+)))
           (info-puthash *info-environment* name #'hairy-name))))
     new-value))
 
@@ -848,19 +855,19 @@ This is interpreted as
     (error "~D is not a legal INFO name." name))
   (let ((name (uncross name))
         result)
-    (dx-flet ((get-or-set (info-vect aux-key)
+    (dx-flet ((get-or-set (packed-info aux-key)
                 (let ((index
-                       (packed-info-value-index info-vect aux-key info-number)))
+                       (packed-info-value-index packed-info aux-key info-number)))
                   (cond (index
-                         (setq result (svref info-vect index))
-                         nil) ; no update to info-vector
+                         (setq result (%info-ref packed-info index))
+                         nil) ; no update
                         (t
                          ;; Update conflicts possibly for unrelated info-number
                          ;; can force re-execution. (UNLESS result ...) tries
                          ;; to avoid calling the thunk more than once.
                          (unless result
                            (setq result (funcall creation-thunk)))
-                         (packed-info-insert info-vect aux-key info-number
+                         (packed-info-insert packed-info aux-key info-number
                                              result))))))
       (with-globaldb-name (key1 key2) name
         :simple
@@ -870,8 +877,7 @@ This is interpreted as
         :hairy
         ;; INFO-PUTHASH supplies NIL for OLD-INFO if NAME was absent.
         (dx-flet ((hairy-name (old-info)
-                    (or (get-or-set (or old-info +nil-packed-infos+)
-                                    +no-auxilliary-key+)
+                    (or (get-or-set (or old-info +nil-packed-infos+) +no-auxiliary-key+)
                         ;; Return OLD-INFO to elide writeback. Unlike for
                         ;; UPDATE-SYMBOL-INFO, NIL is not a no-op marker.
                         old-info)))

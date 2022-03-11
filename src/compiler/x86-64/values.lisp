@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 (define-vop (reset-stack-pointer)
-  (:args (ptr :scs (any-reg)))
+  (:args (ptr :scs (any-reg control-stack)))
   (:generator 1
     (move rsp-tn ptr)))
 
@@ -25,6 +25,7 @@
             )
   (:temporary (:sc any-reg :offset rsi-offset) rsi)
   (:temporary (:sc any-reg :offset rdi-offset) rdi)
+  (:temporary (:sc descriptor-reg) temp-qword)
   (:ignore r-moved-ptrs)
   (:generator 1
     (move rdi last-nipped-ptr)
@@ -33,12 +34,13 @@
     (inst sub rdi n-word-bytes)
     (inst cmp rsp-tn rsi)
     (inst jmp :a DONE)
-    (inst std)
     LOOP
-    (inst movs :qword)
+    (inst mov temp-qword (ea rsi))
+    (inst mov (ea rdi) temp-qword)
+    (inst sub rsi n-word-bytes)
+    (inst sub rdi n-word-bytes)
     (inst cmp rsp-tn rsi)
-    (inst jmp :be LOOP)
-    (inst cld)
+    (inst jmp :be loop)
     DONE
     (inst lea rsp-tn (ea n-word-bytes rdi))
     (inst sub rdi rsi)
@@ -54,18 +56,26 @@
 ;;; bogus SC that reflects the costs of the memory-to-memory moves for each
 ;;; operand, but this seems unworthwhile.
 (define-vop (push-values)
-  (:args (vals :more t
-               :scs (descriptor-reg)))
+  (:args (vals :more t :scs (descriptor-reg any-reg immediate constant)))
   (:results (start :from :load) (count))
   (:info nvals)
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:vop-var vop)
   (:generator 20
-    (move start rsp-tn)
-    (do ((val vals (tn-ref-across val)))
-        ((null val))
-      (inst push (let ((value (encode-value-if-immediate (tn-ref-tn val))))
-                   (if (integerp value)
-                       (constantize value)
-                       value))))
+    (unless (eq (tn-kind start) :unused)
+      (move start rsp-tn))
+    (do ((tn-ref vals (tn-ref-across tn-ref)))
+        ((null tn-ref))
+      (let ((tn (tn-ref-tn tn-ref)))
+        (inst push (sc-case tn
+                     (constant
+                      (load-constant vop tn temp)
+                      temp)
+                     (t
+                      (let ((value (encode-value-if-immediate tn)))
+                        (if (integerp value)
+                            (constantize value)
+                            value)))))))
     (unless (eq (tn-kind count) :unused)
       (inst mov count (fixnumize nvals)))))
 
@@ -83,7 +93,9 @@
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (move start rsp-tn)                 ; WARN pointing 1 below
+
+    (unless (eq (tn-kind start) :unused)
+      (move start rsp-tn))               ; WARN pointing 1 below
 
     LOOP
     (inst cmp list nil-value)
@@ -110,40 +122,24 @@
 ;;; defining a new stack frame.
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg immediate))
          (num :scs (any-reg) :target loop-index))
-  (:arg-types * positive-fixnum positive-fixnum)
+  (:arg-types * positive-fixnum)
   (:temporary (:sc any-reg :offset rsi-offset :from (:argument 0)) src)
   (:temporary (:sc descriptor-reg :offset rax-offset) temp)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) loop-index)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
-    (sc-case skip
-      (immediate
-       (if (zerop (tn-value skip))
-           (move src context)
-           (inst lea src (ea (- (* (tn-value skip) n-word-bytes)) context))))
-      (any-reg
-       (cond ((= word-shift n-fixnum-tag-bits)
-              (move src context)
-              (inst sub src skip))
-             (t
-              ;; TODO: Reducing CALL-ARGUMENTS-LIMIT to something reasonable to
-              ;; allow DWORD ops without it looking like a bug would make sense.
-              ;; With a stack size of about 2MB, the limit is absurd anyway.
-              (inst neg skip)
-              (inst lea src
-                    (ea context skip (ash 1 (- word-shift n-fixnum-tag-bits))))
-              (inst neg skip)))))
-
+    (move src context)
     (unless (eq (tn-kind count) :unused)
       (move count num))
     (if (location= loop-index num)
         (inst shl num (- word-shift n-fixnum-tag-bits))
         (inst lea loop-index (ea nil num (ash 1 (- word-shift n-fixnum-tag-bits)))))
-    (inst mov start rsp-tn)
-    (inst jrcxz DONE)  ; check for 0 count?
+    (unless (eq (tn-kind start) :unused)
+      (inst mov start rsp-tn))
+    (inst test rcx-tn rcx-tn)
+    (inst jmp :z DONE)  ; check for 0 count?
 
     (inst sub rsp-tn loop-index)
     (inst sub src loop-index)

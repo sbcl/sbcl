@@ -11,6 +11,7 @@
 
 (in-package "SB-VM")
 
+(defconstant-eqx +fixup-kinds+ #(:absolute :layout-id) #'equalp)
 
 ;;;; register specs
 
@@ -55,7 +56,6 @@
   (defregset non-descriptor-regs
       ocfp nfp nargs nl2 nl3)
 
-  ;; OAOOM: Same as runtime/arm-lispregs.h
   (defregset boxed-regs
       r0 r1 r2 lexenv r8 code)
 
@@ -230,7 +230,7 @@
   (typecase value
     (null
      null-sc-number)
-    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
+    ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
          character)
      immediate-sc-number)
     (symbol

@@ -42,5 +42,9 @@ typedef int os_vm_prot_t;
 /* Note that this must be higher than the highest numbered
  * synchronously generated signal that we handle (that is SIGSEGV),
  * due to Linux signal handling pecularities. See thread "Signal
- * delivery order" from 2009-03-14 on kernel-devel@vger.kernel.org. */
+ * delivery order" from 2009-03-14 on kernel-devel@vger.kernel.org.
+ * https://lkml.org/lkml/2009/3/14/133
+ */
+#ifndef SIG_STOP_FOR_GC // choose you own signal if you must
 #define SIG_STOP_FOR_GC (SIGUSR2)
+#endif

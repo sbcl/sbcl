@@ -1,0 +1,100 @@
+;;; This comment might make sourceforge stop thinking that the file
+;;; is binary its diff view.
+;;; Or not.
+(("aprof.impure.lisp"
+  "src/code/aprof.lisp"
+  "src/code/shaketree.lisp")
+ ("avltree.pure.lisp" "tests/bbtree-test-util.lisp")
+ ("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
+ ("case.pure.lisp" "tests/case-test.lisp")
+ ("chill.test.sh"
+  "src/cold/chill.lisp"
+  "package-data-list.lisp-expr")
+ ("clos.impure.lisp"
+  "contrib/sb-cltl2.fasl"
+  "tests/package-ctor-bug.lisp"
+  "tests/bug-503095.lisp"
+  "tests/bug-503095-2.lisp")
+ ("compiler.impure.lisp"
+  "tests/bad-mlf-test.lisp"
+  "tests/bug-255.lisp"
+  "tests/bug204-test.lisp"
+  "tests/bug-417.lisp"
+  "tests/bug-943953.lisp"
+  "tests/bug-doug-mcnaught-20030914.lisp"
+  "tests/circ-tree-test.lisp"
+  "tests/compiler-output-test.lisp"
+  "tests/defmacro-test.lisp"
+  "tests/derived-function-type-casts.lisp"
+  "tests/macro-policy-test.lisp"
+  "tests/merge-lambdas.lisp"
+  "tests/symbol-macrolet-test.lisp"
+  "tests/block-compile-test.lisp"
+  "tests/block-compile-test-2.lisp"
+  "tests/block-compile-test-3.lisp"
+  "tests/block-compile-test-4.lisp"
+  "tests/block-compile-test-5.lisp")
+ ("debug.impure.lisp" "tests/bug-414.lisp")
+ ("defstruct.impure-cload.lisp" "tests/block-compile-defstruct-test.lisp")
+ ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
+ ("exit-hang.impure.lisp" "tests/fcb-threads.so")
+ ("fcb-threads.impure.lisp" "tests/fcb-threads.so")
+ ("filecompile.impure.lisp"
+  "tests/data/wonky1.lisp"
+  "tests/data/wonky2.lisp"
+  "tests/data/wonky3.lisp"
+  "tests/data/wonky4.lisp"
+  "src/code/primordial-extensions.lisp")
+ ("init.test.sh"
+  "contrib/sb-introspect.fasl"
+  "tests/custom-sysinit.lisp"
+  "tests/custom-userinit.lisp")
+ ("kill-non-lisp-thread.impure.lisp" "tests/kill-non-lisp-thread.so")
+ ("load.impure.lisp"
+  "tests/parallel-fasl-load-test.lisp"
+  "tests/data/wonky1.lisp"
+  "tests/data/wonky2.lisp"
+  "tests/data/wonky3.lisp"
+  "tests/data/wonky4.lisp")
+ ("load.pure.lisp"
+  "tests/data/wonky1.lisp")
+ ("octets.pure.lisp"
+  "tests/data/compile-file-pos.lisp"
+  "tests/data/compile-file-pos-utf16be.lisp")
+ ("redblack.pure.lisp" "tests/bbtree-test-util.lisp")
+ ("run-program.impure.lisp" "contrib/sb-posix.fasl")
+ ("sb-graph.impure.lisp" "contrib/sb-graph.fasl" "contrib/uiop.fasl")
+ ("signals.impure.lisp" "contrib/sb-posix.fasl")
+ ("stream.impure.lisp" "contrib/sb-posix.fasl")
+ ("sprof.impure.lisp" "../contrib/sb-sprof/test.lisp" "../contrib/sb-sprof/graph.lisp")
+ ("threads.impure.lisp"
+  "tests/alloca.so"
+  "tests/threads-foreign.so")
+ ("threads.test.sh" "tests/condition-wait-sigcont.lisp")
+ ("unicode-breaking.pure.lisp"
+  "tests/data/GraphemeBreakTest.txt"
+  "tests/data/WordBreakTest.txt"
+  "tests/data/SentenceBreakTest.txt"
+  "tests/data/LineBreakTest.txt"
+  "tests/data/line-break-exceptions.lisp-expr")
+ ("unicode-collation.pure.lisp" "tests/data/CollationTest_SHIFTED_SHORT.txt")
+ ("unicode-normalization.pure.lisp" "tests/data/NormalizationTest.txt")
+ ("unicode-properties.pure.lisp"
+  "tools-for-build/UnicodeData.txt"
+  "tools-for-build/EastAsianWidth.txt"
+  "tools-for-build/Scripts.txt"
+  "tools-for-build/Blocks.txt"
+  "tools-for-build/PropList.txt"
+  "tools-for-build/BidiMirroring.txt"
+  "tools-for-build/DerivedAge.txt"
+  "tools-for-build/LineBreak.txt"
+  "tests/data/DerivedBidiClass.txt"
+  "tests/data/HangulSyllableType.txt"
+  "tests/data/GraphemeBreakProperty.txt"
+  "tests/data/WordBreakProperty.txt"
+  "tests/data/SentenceBreakProperty.txt")
+ ("undefined-classoid-bug.test.sh"
+  "tests/undefined-classoid-bug-1.lisp"
+  "tests/undefined-classoid-bug-2.lisp")
+ ("x86-64-codegen.impure.lisp"
+  "tests/typep-golden-data.txt"))

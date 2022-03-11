@@ -373,7 +373,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
      (lambda (new arg)
        (accessor-miss gf new arg dfun-info)))))
 
-#-sb-fluid (declaim (sb-ext:freeze-type dfun-info))
+(declaim (sb-ext:freeze-type dfun-info))
 
 (defun make-one-class-accessor-dfun (gf type wrapper index)
   (let ((emit (ecase type
@@ -667,7 +667,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (declaim (inline make-callable))
 (defun make-callable (generator method-alist wrappers)
-  (function-funcall generator method-alist wrappers))
+  (funcall (the function generator) method-alist wrappers))
 
 (defun make-dispatch-dfun (gf)
   (values (get-dispatch-function gf) nil (dispatch-dfun-info)))
@@ -715,16 +715,20 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (when (and ,applicable (not (memq ,gf *dfun-miss-gfs-on-stack*)))
       (let ((*dfun-miss-gfs-on-stack* (cons ,gf *dfun-miss-gfs-on-stack*)))
         ,@body))
-    ;; Create a FAST-INSTANCE-BOUNDP structure instance for a cached
-    ;; SLOT-BOUNDP so that INVOKE-EMF does the right thing, that is,
-    ;; does not signal a SLOT-UNBOUND error for a boundp test.
-    ,@(if type
-          ;; FIXME: could the NEMF not be a CONS (for :CLASS-allocated
-          ;; slots?)
-          `((if (and (eq ,type 'boundp) (integerp ,nemf))
-                (invoke-emf (make-fast-instance-boundp :index ,nemf) ,args)
-                (invoke-emf ,nemf ,args)))
-          `((invoke-emf ,nemf ,args)))))
+    ,(if type
+         ;; Munge the EMF so that INVOKE-EMF can do the right thing:
+         ;; BOUNDP gets a structure, WRITER the logical not of the
+         ;; index, so that READER can use the raw index.
+         ;;
+         ;; FIXME: could the NEMF not be a CONS (for :CLASS-allocated
+         ;; slots?)
+         `(if (integerp ,nemf)
+              (case ,type
+                (boundp (invoke-emf (make-fast-instance-boundp :index ,nemf) ,args))
+                (reader (invoke-emf ,nemf ,args))
+                (writer (invoke-emf (lognot ,nemf) ,args)))
+              (invoke-emf ,nemf ,args))
+         `(invoke-emf ,nemf ,args))))
 
 ;;; The dynamically adaptive method lookup algorithm is implemented is
 ;;; implemented as a kind of state machine. The kinds of
@@ -885,8 +889,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           (t
            (make-final-caching-dfun gf classes-list new-class)))))
 
-(define-load-time-global *pcl-misc-random-state* (make-random-state))
-
 (defun accessor-miss (gf new object dfun-info)
   (let* ((ostate (type-of dfun-info))
          (otype (dfun-info-accessor-type dfun-info))
@@ -900,7 +902,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
       ;; which are the parameters of the new state, and get other
       ;; information from the lexical variables bound above.
       (flet ((two-class (index w0 w1)
-               (when (zerop (random 2 *pcl-misc-random-state*))
+               (when (zerop (random 2 (load-time-value *pcl-misc-random-state*)))
                  (psetf w0 w1 w1 w0))
                (dfun-update gf
                             #'make-two-class-accessor-dfun
@@ -1601,21 +1603,13 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                     root)))
     nil))
 
-;;; Not synchronized, as all the uses we have for it are multiple ones
-;;; and need WITH-LOCKED-SYSTEM-TABLE in any case.
-;;;
-;;; FIXME: Is it really more efficient to store this stuff in a global
-;;; table instead of having a slot in each method?
-;;;
-;;; FIXME: This table also seems to contain early methods, which should
-;;; presumably be dropped during the bootstrap.
-(define-load-time-global *effective-method-cache* (make-hash-table :test 'eq))
-
 (defun flush-effective-method-cache (generic-function)
-  (let ((cache *effective-method-cache*))
-    (with-locked-system-table (cache)
-      (dolist (method (generic-function-methods generic-function))
-        (remhash method cache)))))
+  (dolist (method (generic-function-methods generic-function))
+    (let ((cache
+           (if (listp method) (sixth method) (method-em-cache method))))
+      (when cache
+        (rplaca cache nil)
+        (rplacd cache nil)))))
 
 (defun get-secondary-dispatch-function (gf methods types
                                         &optional method-alist wrappers)
@@ -1637,24 +1631,26 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         (lambda (&rest args)
           (call-no-applicable-method gf args)))
       (let* ((key (car methods))
-             (ht *effective-method-cache*)
-             (ht-value (with-locked-system-table (ht)
-                         (ensure-gethash key ht (cons nil nil)))))
+             (cache
+              (if (listp key) ; early method
+                  (sixth key) ; See !EARLY-MAKE-A-METHOD
+                  (or (method-em-cache key)
+                      (setf (method-em-cache key) (cons nil nil))))))
         (if (and (null (cdr methods)) all-applicable-p ; the most common case
                  (null method-alist-p) wrappers-p (not function-p))
-            (or (car ht-value)
-                (setf (car ht-value)
+            (or (car cache)
+                (setf (car cache)
                       (get-secondary-dispatch-function2
                        gf methods types method-alist-p wrappers-p
                        all-applicable-p all-sorted-p function-p)))
             (let ((akey (list methods
                               (if all-applicable-p 'all-applicable types)
                               method-alist-p wrappers-p function-p)))
-              (or (cdr (assoc akey (cdr ht-value) :test #'equal))
+              (or (cdr (assoc akey (cdr cache) :test #'equal))
                   (let ((value (get-secondary-dispatch-function2
                                 gf methods types method-alist-p wrappers-p
                                 all-applicable-p all-sorted-p function-p)))
-                    (push (cons akey value) (cdr ht-value))
+                    (push (cons akey value) (cdr cache))
                     value)))))))
 
 (defun get-secondary-dispatch-function2 (gf methods types method-alist-p
@@ -1703,6 +1699,15 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 (defun update-dfun (generic-function &optional dfun cache info)
   (let ((early-p (early-gf-p generic-function)))
     (flet ((update ()
+             ;; If GENERIC-FUNCTION has a CALL-NEXT-METHOD argument
+             ;; checker, the methods of the checker (the checker is a
+             ;; generic function, each method caches a computation for
+             ;; a combination of original and C-N-M argument classes)
+             ;; must be re-computed.
+             (when (eq **boot-state** 'complete)
+               (let ((checker (gf-info-cnm-checker (gf-arg-info generic-function))))
+                 (when checker
+                   (remove-methods checker))))
              ;; Save DFUN-STATE, so that COMPUTE-DISCRIMINATING-FUNCTION can
              ;; access it, and so that it's there for eg. future cache updates.
              (set-dfun generic-function dfun cache info)

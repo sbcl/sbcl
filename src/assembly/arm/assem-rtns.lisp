@@ -35,7 +35,7 @@
 
   ;; We don't need to copy stack values at this point, so default any
   ;; unsupplied values that should be in arg-passing registers.  First
-  ;; piece of black magic: A computed jump.
+  ;; piece of deep magic: A computed jump.
   (inst add pc-tn pc-tn nvals)
   ;; Eat a word of padding for the computed jump.
   (inst word 0)
@@ -47,7 +47,7 @@
   (inst mov r2 null-tn)
 
   ;; We've defaulted any unsupplied parameters, but now we need to
-  ;; load the supplied parameters.  Second piece of black magic: A
+  ;; load the supplied parameters.  Second piece of deep magic: A
   ;; hairier computed jump.
   (inst rsb count nvals (fixnumize 2))
   (inst add pc-tn pc-tn count)
@@ -201,7 +201,7 @@
 
 (define-assembly-routine (unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) r0-offset)
                           (:arg start (any-reg descriptor-reg) r8-offset)

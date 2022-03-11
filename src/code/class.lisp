@@ -14,21 +14,50 @@
 (in-package "SB-KERNEL")
 
 (!begin-collecting-cold-init-forms)
+;;; Has the type system been properly initialized? (I.e. is it OK to
+;;; use it?)
+(define-load-time-global *type-system-initialized* nil)
+(!cold-init-forms (setq *type-system-initialized* nil))
+
+(in-package "SB-PCL")
+
+(declaim (#+sb-xc-host special #-sb-xc-host global *the-class-t*
+                  *the-class-slot-object*
+                  *the-class-structure-object*
+                  *the-class-standard-object*
+                  *the-class-function*
+                  *the-class-funcallable-standard-object*
+                  *the-class-system-class*
+                  *the-class-slot-class*
+                  *the-class-condition-class*
+                  *the-class-structure-class*
+                  *the-class-standard-class*
+                  *the-class-funcallable-standard-class*
+                  *the-class-forward-referenced-class*
+                  *the-class-method*
+                  *the-class-standard-method*
+                  *the-class-standard-reader-method*
+                  *the-class-standard-writer-method*
+                  *the-class-standard-boundp-method*
+                  *the-class-global-reader-method*
+                  *the-class-global-writer-method*
+                  *the-class-global-boundp-method*
+                  *the-class-standard-generic-function*
+                  *the-class-standard-direct-slot-definition*
+                  *the-class-standard-effective-slot-definition*
+
+                  *the-eslotd-standard-class-slots*
+                  *the-eslotd-funcallable-standard-class-slots*))
+
+(in-package "SB-KERNEL")
+
 
 ;;;; the CLASSOID structure
 
 ;;; The CLASSOID structure is a supertype of all classoid types.
 ;;; Its definition occurs in 'early-classoid.lisp'
-
-(defmethod make-load-form ((self classoid) &optional env)
-  (declare (ignore env))
-  (let ((name (classoid-name self)))
-    (if (and name (eq (find-classoid name nil) self))
-        `(find-classoid ',name)
-        (error "can't use anonymous or undefined class as constant:~%  ~S"
-               self))))
 #+sb-xc-host
-(defmethod sb-xc:make-load-form ((self classoid) &optional env)
+(defmethod make-load-form ((self classoid) &optional env)
   (declare (ignore env))
   `(find-classoid ',(classoid-name self)))
 
@@ -39,196 +68,136 @@
 ;;;
 ;;; In each cons, the car is the symbol naming the layout, and the
 ;;; cdr is the layout itself.
-(defvar *!initial-layouts*)
-
-;;; a generator for random values suitable for the CLOS-HASH slots of
-;;; LAYOUTs. We use our own RANDOM-STATE here because we'd like
-;;; pseudo-random values to come the same way in the target even when
-;;; we make minor changes to the system, in order to reduce the
-;;; mysteriousness of possible CLOS bugs.
-(define-load-time-global *layout-clos-hash-random-state*
-    (make-random-state))
+;;; If #+metaspace then the cdr is actually of type WRAPPER,
+;;; and if #-metaspace then the wrapper is a LAYOUT.
+(defvar *!initial-wrappers*)
 
 ;;; a table mapping class names to layouts for classes we have
 ;;; referenced but not yet loaded. This is initialized from an alist
 ;;; created by genesis describing the layouts that genesis created at
 ;;; cold-load time.
-(define-load-time-global *forward-referenced-layouts*
+(define-load-time-global *forward-referenced-wrappers*
     ;; FIXME: why is the test EQUAL and not EQ? Aren't the keys all symbols?
     (make-hash-table :test 'equal))
+#-sb-xc-host
 (!cold-init-forms
-  ;; *forward-referenced-layouts* is protected by *WORLD-LOCK*
+  ;; *forward-referenced-wrappers* is protected by *WORLD-LOCK*
   ;; so it does not need a :synchronized option.
-  #-sb-xc-host (progn
-                 (/show0 "processing *!INITIAL-LAYOUTS*")
-                 (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
-                 (setq *layout-clos-hash-random-state* (make-random-state))
-                 (dovector (x *!initial-layouts*)
-                   (setf (layout-clos-hash (cdr x)) (random-layout-clos-hash))
-                   (setf (gethash (car x) *forward-referenced-layouts*)
-                         (cdr x)))
-                 (/show0 "done processing *!INITIAL-LAYOUTS*")))
+ (setq *forward-referenced-wrappers* (make-hash-table :test 'equal))
+ (dovector (x *!initial-wrappers*)
+   (let ((expected (hash-layout-name (car x)))
+         (actual (wrapper-clos-hash (cdr x))))
+     (unless (= actual expected) (bug "XC layout hash calculation failed")))
+   (setf (gethash (car x) *forward-referenced-wrappers*) (cdr x))))
+
+;;; FIXME: This lock is only seized in the classoid/layout/class
+;;; system, and is now a misnomer.
+#-sb-xc-host
+(define-load-time-global **world-lock** nil)
+#-sb-xc-host
+(!cold-init-forms
+ (setq **world-lock** (sb-thread:make-mutex :name "World Lock")))
+
+(defmacro with-world-lock (() &body body)
+  #+sb-xc-host `(progn ,@body)
+  #-sb-xc-host `(sb-thread:with-recursive-lock (**world-lock**) ,@body))
 
 ;;; The LAYOUT structure itself is defined in 'early-classoid.lisp'
 
-(defmethod print-object ((layout layout) stream)
-  (print-unreadable-object (layout stream :type t :identity t)
+#+sb-xc-host
+(progn
+(defun make-layout (hash classoid &rest keys)
+  (macrolet ((make (&rest extra)
+               `(apply #'host-make-wrapper
+                       (cdr (assq (classoid-name classoid) *popular-structure-types*))
+                       hash classoid ,@extra :allow-other-keys t keys)))
+    #-metaspace (make)
+    #+metaspace (let* ((layout (%make-layout))
+                       (wrapper (make :friend layout)))
+                  (setf (layout-friend layout) wrapper)
+                  wrapper)))
+;; The target reconstructs wrappers using FOP-LAYOUT but the host uses MAKE-LOAD-FORM.
+(defmethod cl:make-load-form ((wrapper wrapper) &optional env)
+  (declare (ignore env))
+  (labels ((externalize (wrapper &aux (classoid (wrapper-classoid wrapper))
+                                      (name (classoid-name classoid)))
+             (when (or (wrapper-invalid wrapper)
+                       (not name)
+                       (typep classoid 'undefined-classoid))
+               (sb-c:compiler-error "can't dump ~S" wrapper))
+             `(xc-load-wrapper ',name
+                               ,(wrapper-depthoid wrapper)
+                               (vector ,@(map 'list #'externalize (wrapper-inherits wrapper)))
+                               ,(wrapper-length wrapper)
+                               ,(wrapper-bitmap wrapper))))
+    (externalize wrapper)))
+(defun xc-load-wrapper (name depthoid inherits length bitmap)
+  (let ((classoid (find-classoid name)))
+    (aver (and classoid (not (undefined-classoid-p classoid))))
+    (let ((wrapper (classoid-wrapper classoid)))
+      (unless (and (= (wrapper-depthoid wrapper) depthoid)
+                   (= (length (wrapper-inherits wrapper)) (length inherits))
+                   (every #'eq (wrapper-inherits wrapper) inherits)
+                   (= (wrapper-length wrapper) length)
+                   (= (wrapper-bitmap wrapper) bitmap))
+        (error "XC can't reload layout for ~S with ~S vs ~A"
+               name (list depthoid inherits length bitmap) wrapper))
+      wrapper)))
+) ; end PROGN
+
+(defmethod print-object ((wrapper wrapper) stream)
+  (print-unreadable-object (wrapper stream :type t :identity t)
     (format stream
-            "for ~S~@[, INVALID=~S~]"
-            (layout-proper-name layout)
-            (layout-invalid layout))))
+            "~@[(ID=~d) ~]for ~S~@[, INVALID=~S~]"
+            (layout-id wrapper)
+            (wrapper-proper-name wrapper)
+            (wrapper-invalid wrapper))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun layout-proper-name (layout)
-    (classoid-proper-name (layout-classoid layout))))
+  (defun wrapper-proper-name (wrapper)
+    (classoid-proper-name (wrapper-classoid wrapper))))
 
-;;;; support for the hash values used by CLOS when working with LAYOUTs
-
-(defun random-layout-clos-hash ()
-  ;; FIXME: I'm not sure why this expression is (1+ (RANDOM FOO)),
-  ;; returning a strictly positive value. I copied it verbatim from
-  ;; CMU CL INITIALIZE-LAYOUT-HASH, so presumably it works, but I
-  ;; dunno whether the hash values are really supposed to be 1-based.
-  ;; They're declared as INDEX.. Or is this a hack to try to avoid
-  ;; having to use bignum arithmetic? Or what? An explanation would be
-  ;; nice.
-  ;;
-  ;; an explanation is provided in Kiczales and Rodriguez, "Efficient
-  ;; Method Dispatch in PCL", 1990.  -- CSR, 2005-11-30
-  (1+ (random (1- layout-clos-hash-limit)
-              *layout-clos-hash-random-state*)))
-
-;;; If we can't find any existing layout, then we create a new one
-;;; storing it in *FORWARD-REFERENCED-LAYOUTS*. In classic CMU CL, we
-;;; used to immediately check for compatibility, but for
-;;; cross-compilability reasons (i.e. convenience of using this
-;;; function in a MAKE-LOAD-FORM expression) that functionality has
-;;; been split off into INIT-OR-CHECK-LAYOUT.
-(declaim (ftype (sfunction (symbol) layout) find-layout))
-;; The comment "This seems ..." is misleading but I don't have a better one.
-;; FIND-LAYOUT is used by FIND-AND-INIT-OR-CHECK-LAYOUT which is used
-;; by FOP-LAYOUT, so clearly it's used when reading fasl files.
+;;; Return the layout currently installed in the classoid named NAME.
+;;; If there is none, then make a layout referring for an undefined classoid.
+;;; NB: for #+metaspace this returns a WRAPPER, not a LAYOUT.
+(declaim (ftype (sfunction (symbol) wrapper) find-layout))
 (defun find-layout (name)
-  ;; This seems to be currently used only from the compiler, but make
-  ;; it thread-safe all the same. We need to lock *F-R-L* before doing
-  ;; FIND-CLASSOID in case (SETF FIND-CLASSOID) happens in parallel.
-  (let ((table *forward-referenced-layouts*))
+  (binding* ((classoid (find-classoid name nil) :exit-if-null) ; threadsafe
+             (wrapper (classoid-wrapper classoid) :exit-if-null))
+    (return-from find-layout wrapper))
+  (let ((table *forward-referenced-wrappers*))
     (with-world-lock ()
       (let ((classoid (find-classoid name nil)))
-        (or (and classoid (classoid-layout classoid))
+        (or (and classoid (classoid-wrapper classoid))
             (values (ensure-gethash name table
                                     (make-layout
+                                     (hash-layout-name name)
                                      (or classoid
                                          (make-undefined-classoid name))))))))))
-
-;;; If LAYOUT is uninitialized, initialize it with CLASSOID, LENGTH,
-;;; INHERITS, DEPTHOID, and BITMAP.
-;;; Otherwise require that it be consistent with the existing values.
-;;;
-;;; UNDEFINED-CLASS values are interpreted specially as "we don't know
-;;; anything about the class", so if LAYOUT is initialized, any
-;;; preexisting class slot value is OK, and if it's not initialized,
-;;; its class slot value is set to an UNDEFINED-CLASS. -- FIXME: This
-;;; is no longer true, :UNINITIALIZED used instead.
-(declaim (ftype (sfunction (layout classoid layout-length fixnum simple-vector
-                            layout-depthoid layout-bitmap) layout)
-                %init-or-check-layout))
-(defun %init-or-check-layout (layout classoid length flags inherits depthoid bitmap)
-  (cond ((eq (layout-invalid layout) :uninitialized)
-         ;; There was no layout before, we just created one which
-         ;; we'll now initialize with our information.
-         (macrolet ((inherit (n) `(if (> struct-depth ,n) (svref inherits ,n) 0)))
-           ;; struct-depth is generally the depthoid when the depthoid is >0,
-           ;; but not for FILE-STREAM which has depthoid=4 but is not a structure.
-           (let ((struct-depth
-                  (if (logtest +structure-layout-flag+ flags) depthoid 0)))
-             (setf (layout-length layout) length
-                   (layout-flags layout) flags
-                   (layout-inherits layout) inherits
-                   (layout-depthoid layout) depthoid
-                   (layout-depth2-ancestor layout) (inherit 2)
-                   (layout-depth3-ancestor layout) (inherit 3)
-                   (layout-depth4-ancestor layout) (inherit 4)
-                   (layout-bitmap layout) bitmap
-                   (layout-classoid layout) classoid
-                   (layout-invalid layout) nil))))
-        ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
-        ;; clause is not needed?
-        ((not *type-system-initialized*)
-         (setf (layout-classoid layout) classoid))
-        (t
-         ;; There was an old layout already initialized with old
-         ;; information, and we'll now check that old information
-         ;; which was known with certainty is consistent with current
-         ;; information which is known with certainty.
-         (check-layout layout classoid length inherits depthoid bitmap)))
-  layout)
-
-;;; In code for the target Lisp, we don't dump LAYOUTs using the
-;;; standard load form mechanism, we use special fops instead, in
-;;; order to make cold load come out right. But when we're building
-;;; the cross-compiler, we can't do that because we don't have access
-;;; to special non-ANSI low-level things like special fops, and we
-;;; don't need to do that anyway because our code isn't going to be
-;;; cold loaded, so we use the ordinary load form system.
-#+sb-xc-host
-(defmethod make-load-form ((layout layout) &optional env)
-  (declare (ignore env))
-  (when (layout-invalid layout)
-    (sb-c::compiler-error "can't dump reference to obsolete class: ~S"
-                          (layout-classoid layout)))
-  (let* ((classoid (layout-classoid layout))
-         (name (classoid-name classoid)))
-    (aver (= (layout-flags layout)
-             (typecase classoid
-               (structure-classoid +structure-layout-flag+)
-               (condition-classoid +condition-layout-flag+)
-               (undefined-classoid
-                (bug "xc MAKE-LOAD-FORM on undefined layout"))
-               (t 0))))
-    (unless name
-      (sb-c::compiler-error "can't dump anonymous LAYOUT: ~S" layout))
-    ;; Since LAYOUT refers to a class which refers back to the LAYOUT,
-    ;; we have to do this in two stages, like the TREE-WITH-PARENT
-    ;; example in the MAKE-LOAD-FORM entry in the ANSI spec.
-    (values
-     ;; "creation" form (which actually doesn't create a new LAYOUT if
-     ;; there's a preexisting one with this name)
-     `(find-layout ',name)
-     ;; "initialization" form (which actually doesn't initialize
-     ;; preexisting LAYOUTs, just checks that they're consistent).
-     `(%init-or-check-layout ',layout
-                             ',(layout-classoid layout)
-                             ',(layout-length layout)
-                             ',(layout-flags layout)
-                             ',(layout-inherits layout)
-                             ',(layout-depthoid layout)
-                             ',(layout-bitmap layout)))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
 (declaim (ftype (function (simple-string
-                           layout
+                           wrapper
                            simple-string
                            index
                            simple-vector
                            layout-depthoid
                            layout-bitmap))
-                redefine-layout-warning))
-(defun redefine-layout-warning (old-context old-layout
-                                context length inherits depthoid bitmap)
-  (declare (type layout old-layout) (type simple-string old-context context))
-  (let ((name (layout-proper-name old-layout))
-        (old-inherits (layout-inherits old-layout)))
-    (or (when (mismatch old-inherits inherits :key #'layout-proper-name)
+                warn-if-altered-layout))
+(defun warn-if-altered-layout (old-context old-layout context
+                               length inherits depthoid bitmap)
+  (let ((name (wrapper-proper-name old-layout))
+        (old-inherits (wrapper-inherits old-layout)))
+    (or (when (mismatch old-inherits inherits :key #'wrapper-proper-name)
           (warn "change in superclasses of class ~S:~%  ~
                        ~A superclasses: ~S~%  ~
                        ~A superclasses: ~S"
                       name
                       old-context
-                      (map 'list #'layout-proper-name old-inherits)
+                      (map 'list #'wrapper-proper-name old-inherits)
                       context
-                      (map 'list #'layout-proper-name inherits))
+                      (map 'list #'wrapper-proper-name inherits))
           t)
         (let ((diff (mismatch old-inherits inherits)))
           (when diff
@@ -237,10 +206,10 @@
                     ~A definition."
                    name
                    old-context
-                   (layout-proper-name (svref old-inherits diff))
+                   (wrapper-proper-name (svref old-inherits diff))
                    context)
             t))
-        (let ((old-length (layout-length old-layout)))
+        (let ((old-length (wrapper-length old-layout)))
           (unless (= old-length length)
             (warn "change in instance length of class ~S:~%  ~
                    ~A length: ~W~%  ~
@@ -249,62 +218,130 @@
                   old-context old-length
                   context length)
             t))
-        (let ((old-bitmap (layout-bitmap old-layout)))
+        (let ((old-bitmap (wrapper-bitmap old-layout)))
           (unless (= old-bitmap bitmap)
             (warn "change in placement of raw slots of class ~S ~
 between the ~A definition and the ~A definition"
                   name old-context context)
             t))
-        (unless (= (layout-depthoid old-layout) depthoid)
+        (unless (= (wrapper-depthoid old-layout) depthoid)
           (warn "change in the inheritance structure of class ~S~%  ~
                  between the ~A definition and the ~A definition"
                 name old-context context)
           t))))
 
-;;; Require that LAYOUT data be consistent with CLASSOID, LENGTH,
-;;; INHERITS, DEPTHOID, and BITMAP.
-(declaim (ftype (function (layout classoid index simple-vector layout-depthoid layout-bitmap))
-                check-layout))
-(defun check-layout (layout classoid length inherits depthoid bitmap)
-  (aver (eq (layout-classoid layout) classoid))
-  (when (redefine-layout-warning "current" layout
-                                 "compile time" length inherits depthoid bitmap)
-    ;; Classic CMU CL had more options here. There are several reasons
-    ;; why they might want more options which are less appropriate for
-    ;; us: (1) It's hard to fit the classic CMU CL flexible approach
-    ;; into the ANSI-style MAKE-LOAD-FORM system, and having a
-    ;; non-MAKE-LOAD-FORM-style system is painful when we're trying to
-    ;; make the cross-compiler run under vanilla ANSI Common Lisp. (2)
-    ;; We have CLOS now, and if you want to be able to flexibly
-    ;; redefine classes without restarting the system, it'd make sense
-    ;; to use that, so supporting complexity in order to allow
-    ;; modifying DEFSTRUCTs without restarting the system is a low
-    ;; priority. (3) We now have the ability to rebuild the SBCL
-    ;; system from scratch, so we no longer need this functionality in
-    ;; order to maintain the SBCL system by modifying running images.
-    (error "The loaded code expects an incompatible layout for class ~S."
-           (layout-proper-name layout)))
-  (values))
+(defun load-layout (name depthoid inherits length bitmap flags)
+  (let* ((layout
+          (or (binding* ((classoid (find-classoid name nil) :exit-if-null))
+                (classoid-wrapper classoid))
+              (let ((table *forward-referenced-wrappers*))
+                (with-world-lock ()
+                 (let ((classoid (find-classoid name nil)))
+                   (or (and classoid (classoid-wrapper classoid))
+                       (ensure-gethash
+                        name table
+                        (make-layout
+                         (hash-layout-name name)
+                         (or classoid (make-undefined-classoid name))
+                         :depthoid depthoid :inherits inherits
+                         :length length :bitmap bitmap :flags flags))))))))
+         (classoid
+          (or (find-classoid name nil) (wrapper-classoid layout))))
+    (if (or (eq (wrapper-invalid layout) :uninitialized)
+            (not *type-system-initialized*))
+        (setf (wrapper-classoid layout) classoid)
+        ;; There was an old layout already initialized with old
+        ;; information, and we'll now check that old information
+        ;; which was known with certainty is consistent with current
+        ;; information which is known with certainty.
+        (when (warn-if-altered-layout "current" layout "compile time"
+                                    length inherits depthoid bitmap)
+          (error "The loaded code expects an incompatible layout for class ~S."
+                 (wrapper-proper-name layout))))
+    layout))
 
-;;; a common idiom (the same as CMU CL FIND-LAYOUT) rolled up into a
-;;; single function call
-;;;
-;;; Used by the loader to forward-reference layouts for classes whose
-;;; definitions may not have been loaded yet. This allows type tests
-;;; to be loaded when the type definition hasn't been loaded yet.
-(defun find-and-init-or-check-layout (name depthoid flags length bitmap inherits)
-  (truly-the ; avoid an "assertion too complex to check" optimizer note
-   (values layout &optional)
-   (with-world-lock ()
-    (let ((layout (find-layout name)))
-      (%init-or-check-layout layout
-                             (or (find-classoid name nil)
-                                 (layout-classoid layout))
-                             length
-                             flags
-                             inherits
-                             depthoid
-                             bitmap)))))
+(defun classoid-lock (classoid)
+  #+sb-xc-host (declare (ignore classoid))
+  #-sb-xc-host
+  (or (classoid-%lock classoid)
+      (let* ((lock (sb-thread:make-mutex :name "classoid lock"))
+             (oldval (cas (classoid-%lock classoid) nil lock)))
+        (if (eq oldval nil) lock oldval))))
+
+(defun add-subclassoid (super sub wrapper)
+  (with-system-mutex ((classoid-lock super))
+    (let ((table (classoid-subclasses super))
+          (count 0))
+      (cond ((hash-table-p table)
+             (setf (gethash sub table) wrapper))
+            ((dolist (cell table)
+               (when (eq (car cell) sub)
+                 (return (setf (cdr cell) wrapper)))
+               (incf (truly-the fixnum count))))
+            ((<= count 7)
+             (setf (classoid-subclasses super) (acons sub wrapper table))
+             ;; Is this barrier really necessary? mutex release is a release barrier.
+             ;; I was probably struggling with crashes in the 'classoid-typep.impure'
+             ;; test, and was just trying anything and everything.
+             (sb-thread:barrier (:write))
+             wrapper)
+            (t
+             ;; Upgrade to a hash-table
+             (let ((new #+sb-xc-host (make-hash-table :test 'eq)
+                        #-sb-xc-host (make-hash-table :hash-function #'type-hash-value
+                                                      :test 'eq)))
+               (loop for (key . val) in table do (setf (gethash key new) val))
+               (setf (gethash sub new) wrapper)
+               (setf (classoid-subclasses super) new)
+               (sb-thread:barrier (:write))
+               wrapper))))))
+
+;;; Mnemonic device: the argument order is as GETHASH (1st = key, 2nd = table).
+;;; But the 2nd arg is the superclassoid, *not* its subclassoid table,
+;;; because the mutex is stored in the classoid, not the table.
+(defun get-subclassoid (sub super)
+  (sb-thread:barrier (:read))
+  (let ((table (classoid-subclasses super)))
+  (when table
+    (cond ((listp table) (cdr (assq sub table)))
+          (t
+           ;; our hash-table are not safe to read with a single writer
+           (with-system-mutex ((classoid-lock super))
+             (values (gethash sub table))))))))
+
+;;; Mnemonic device: it's like REMHASH (1st = key, 2nd = table)
+(defun remove-subclassoid (sub super)
+  (sb-thread:barrier (:read))
+  (when (classoid-subclasses super)
+    (with-system-mutex ((classoid-lock super))
+      (let ((table (classoid-subclasses super)))
+        (cond ((listp table)
+               (setf (classoid-subclasses super)
+                     (delete sub table :key #'car :test #'eq)))
+              (t
+               ;; There's no reason to demote a table to a list ever.
+               (remhash sub table))))))
+  nil)
+
+(defmacro do-subclassoids (((classoid-var wrapper-var) super) &body body)
+  (let ((f (make-symbol "FUNCTION")))
+    `(dx-flet ((,f (,classoid-var ,wrapper-var) ,@body))
+       (call-with-subclassoids #',f (the classoid ,super)))))
+
+(defun call-with-subclassoids (function super &aux (table (classoid-subclasses super)))
+  ;; Uses of DO-SUBCLASSOIDS don't need to acquire the classoid lock on SUPER.
+  ;; Even if there are readers or writers, hash-table iteration is safe.
+  ;; This was not always so - iteration could overrun the k/v array because it always
+  ;; re-fetched the scan limit, which could see a higher limit than corresponded
+  ;; to the k/v vector that it had gotten initially.
+  ;; If you're doing concurrent modification of the class heterarchy, there are no
+  ;; real guarantees. We dont' always hold a lock at a wider scope than the table lock,
+  ;; but sometimes we do, such as in REGISTER-LAYOUT.
+  (if (listp table)
+      (loop for (key . value) in table do (funcall function key value))
+      (maphash (lambda (key value) (funcall function key value))
+               table))
+  nil)
 
 ;;; Record LAYOUT as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
@@ -315,13 +352,21 @@ between the ~A definition and the ~A definition"
 ;;;    and subclasses are invalidated, and the SUBCLASSES slot is cleared.
 ;;; -- If DESTRUCT-LAYOUT, then this is some old layout, and is to be
 ;;;    destructively modified to hold the same type information.
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-(defun register-layout (layout &key (invalidate t) destruct-layout)
-  (declare (type layout layout) (type (or layout null) destruct-layout))
+(macrolet ((set-bitmap-from-layout (to-layout from-layout)
+             `(let ((to-index
+                     (+ (type-dd-length sb-vm:layout)
+                        (calculate-extra-id-words (layout-depthoid ,to-layout))))
+                    (from-index
+                     (+ (type-dd-length sb-vm:layout)
+                        (calculate-extra-id-words (layout-depthoid ,from-layout)))))
+                (dotimes (i (bitmap-nwords ,from-layout))
+                  (%raw-instance-set/word ,to-layout (+ to-index i)
+                        (%raw-instance-ref/word ,from-layout (+ from-index i)))))))
+(defun register-layout (wrapper &key (invalidate t) modify)
+  (declare (type wrapper wrapper) (type (or wrapper null) modify))
   (with-world-lock ()
-    (let* ((classoid (layout-classoid layout))
-           (classoid-layout (classoid-layout classoid))
-           (subclasses (classoid-subclasses classoid)))
+    (let* ((classoid (wrapper-classoid wrapper))
+           (classoid-wrapper (classoid-wrapper classoid)))
 
       ;; Attempting to register ourselves with a temporary undefined
       ;; class placeholder is almost certainly a programmer error. (I
@@ -331,59 +376,73 @@ between the ~A definition and the ~A definition"
       ;; This assertion dates from classic CMU CL. The rationale is
       ;; probably that calling REGISTER-LAYOUT more than once for the
       ;; same LAYOUT is almost certainly a programmer error.
-      (aver (not (eq classoid-layout layout)))
+      (aver (not (eq classoid-wrapper wrapper)))
 
       ;; Figure out what classes are affected by the change, and issue
       ;; appropriate warnings and invalidations.
-      (when classoid-layout
+      (when classoid-wrapper
         (%modify-classoid classoid)
-        (when subclasses
-          (dohash ((subclass subclass-layout) subclasses :locked t)
+        (do-subclassoids ((subclass subclass-wrapper) classoid) ; under WORLD-LOCK
             (%modify-classoid subclass)
             (when invalidate
-              (%invalidate-layout subclass-layout))))
+              (%invalidate-layout subclass-wrapper)))
         (when invalidate
-          (%invalidate-layout classoid-layout)
+          (%invalidate-layout classoid-wrapper)
           (setf (classoid-subclasses classoid) nil)))
 
-      (if destruct-layout
+      (if modify
+          #+sb-xc-host (error "Why mutate a layout in XC host?")
+          #-sb-xc-host
           ;; Destructively modifying a layout is not threadsafe at all.
           ;; Use at your own risk (interactive use only).
-          (let ((inherits (layout-inherits layout))
-                (depthoid (layout-depthoid layout)))
-            (aver (logtest +structure-layout-flag+ (layout-%bits layout)))
+          (let ((inherits (wrapper-inherits wrapper))
+                (depthoid (wrapper-depthoid wrapper)) ; "new" depthoid
+                (extra-id-words ; "old" extra words
+                 (calculate-extra-id-words (wrapper-depthoid modify)))
+                (layout (wrapper-friend wrapper))
+                (id ; read my ID before screwing with the depthoid
+                 (layout-id modify)))
+            (aver (logtest +structure-layout-flag+ (layout-flags layout)))
             (aver (= (length inherits) depthoid))
-            (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
-              (setf (layout-invalid destruct-layout) nil
-                    (layout-inherits destruct-layout) inherits
-                    (layout-depthoid destruct-layout) (layout-depthoid layout)
-                    (layout-depth2-ancestor destruct-layout) (inherit 2)
-                    (layout-depth3-ancestor destruct-layout) (inherit 3)
-                    (layout-depth4-ancestor destruct-layout) (inherit 4)
-                    (layout-length destruct-layout) (layout-length layout)
-                    (layout-bitmap destruct-layout) (layout-bitmap layout)
-                    (layout-info destruct-layout) (layout-info layout)
-                    (classoid-layout classoid) destruct-layout)))
-          (setf (layout-invalid layout) nil
-                (classoid-layout classoid) layout))
+            ;; DEPTHOID implies the number of words of "extra" IDs preceding the bitmap.
+            ;; Layout alteration is forbidden if it would affect the number of such words.
+            ;; So MUTABLE-LAYOUT-P should have checked that this is OK, but assert it
+            ;; again to be certain. Heap corruption is the greater evil versus a minor
+            ;; inconvenience of not offering the RECKLESSLY-CONTINUE restart.
+            (aver (= (calculate-extra-id-words depthoid) extra-id-words))
+            #-64-bit (setf (wrapper-depthoid modify) (wrapper-depthoid wrapper)
+                           (wrapper-length modify) (wrapper-length wrapper))
+            (setf (layout-flags (wrapper-friend modify)) (layout-flags layout)
+                  (wrapper-info modify) (wrapper-info wrapper))
+            ;; Zero out the inherited ID values one word at a time.
+            ;; This makes self-ID transiently disappear, but what else can we do?
+            ;; It's may be in the wrong slot anyway, depending on whether depthoid changed.
+            ;; The calculation of the min word count of 3 or 6 is done as
+            ;;   (/ (- (1+ layout-id-vector-fixed-capacity) 2) number-of-ids-per-word)
+            ;; which is surely more confusing than spelling it as 3 or 6.
+            (dotimes (i (+ extra-id-words #+64-bit 3 #-64-bit 6))
+              (%raw-instance-set/word (wrapper-friend modify)
+                                      (+ (get-dsd-index sb-vm:layout id-word0) i)
+                                      0))
+            (set-layout-inherits modify inherits t id)
+            (let ((dst (wrapper-friend modify))
+                  (src (wrapper-friend wrapper)))
+              (set-bitmap-from-layout dst src))
+            (setf (wrapper-invalid modify) nil
+                  (classoid-wrapper classoid) modify))
+          (setf (wrapper-invalid wrapper) nil
+                (classoid-wrapper classoid) wrapper))
 
-      (dovector (super-layout (layout-inherits layout))
-        (let* ((super (layout-classoid super-layout))
-               (subclasses (or (classoid-subclasses super)
-                               (setf (classoid-subclasses super)
-                                     (make-hash-table :test 'eq
-                                                      #-sb-xc-host #-sb-xc-host
-                                                      :synchronized t)))))
+      (dovector (super-wrapper (wrapper-inherits wrapper))
+        (let ((super (wrapper-classoid super-wrapper)))
           (when (and (eq (classoid-state super) :sealed)
-                     (not (gethash classoid subclasses)))
+                     (not (get-subclassoid classoid super)))
             (warn "unsealing sealed class ~S in order to subclass it"
                   (classoid-name super))
             (setf (classoid-state super) :read-only))
-          (setf (gethash classoid subclasses)
-                (or destruct-layout layout))))))
+          (add-subclassoid super classoid (or modify wrapper))))))
 
-  (values))
-); EVAL-WHEN
+  (values)))
 
 ;;; Arrange the inherited layouts to appear at their expected depth,
 ;;; ensuring that hierarchical type tests succeed. Layouts with
@@ -393,6 +452,18 @@ between the ~A definition and the ~A definition"
 ;;; elements are filled with their successors, ensuring that each
 ;;; element contains a valid layout.
 ;;;
+;;; *** FIXME *** the preceding comment seems dubious, and I'm not sure whether
+;;; to fix the code or the comment or both. The code works as-is, but is too hairy.
+;;; I fail to see how "still-empty" elements can exist after filling in mandatory
+;;; elements. It seems to anticipate being able to create a type whose INHERITS vector
+;;; length exceeds depthoid, or, say, a type at depthoid 5 which inherits STREAM but
+;;; might lack an entry at depth index 1 for example. As to why I think the comment
+;;; is false: FILE-STREAM and STRING-STREAM each have depthoid 4, but their INHERITS
+;;; vector has length 2. So they don't store elements that would be at index 2 and 3.
+;;; Length less than depthoid is opposite of what the fill-in logic supports.
+;;; How, in practice, could a user achieve such weird states as need this logic?
+;;; If impossible, then simplify it.
+
 ;;; This reordering may destroy CPL ordering, so the inherits should
 ;;; not be read as being in CPL order.
 (defun order-layout-inherits (layouts)
@@ -400,7 +471,7 @@ between the ~A definition and the ~A definition"
   (let ((length (length layouts))
         (max-depth -1))
     (dotimes (i length)
-      (let ((depth (layout-depthoid (svref layouts i))))
+      (let ((depth (wrapper-depthoid (svref layouts i))))
         (when (> depth max-depth)
           (setf max-depth depth))))
     (let* ((new-length (max (1+ max-depth) length))
@@ -411,7 +482,7 @@ between the ~A definition and the ~A definition"
            (inherits (make-array new-length :initial-element 0)))
       (dotimes (i length)
         (let* ((layout (svref layouts i))
-               (depth (layout-depthoid layout)))
+               (depth (wrapper-depthoid layout)))
           (unless (eql depth -1)
             (let ((old-layout (svref inherits depth)))
               (unless (or (eql old-layout 0) (eq old-layout layout))
@@ -422,7 +493,7 @@ between the ~A definition and the ~A definition"
           ((>= i length))
         (declare (type index i j))
         (let* ((layout (svref layouts i))
-               (depth (layout-depthoid layout)))
+               (depth (wrapper-depthoid layout)))
           (when (eql depth -1)
             (loop (when (eql (svref inherits j) 0)
                     (return))
@@ -504,31 +575,48 @@ between the ~A definition and the ~A definition"
       (note-class class)
       (topological-sort classes constraints #'std-cpl-tie-breaker))))
 
-;;;; object types to represent classes
 
-;;; BUILT-IN-CLASS is used to represent the standard classes that
-;;; aren't defined with DEFSTRUCT and other specially implemented
-;;; primitive types whose only attribute is their name.
-;;; It is defined in 'early-classoid.lisp'
+;;; Return the layout for an object. This is the basic operation for
+;;; finding out the "type" of an object, and is used for generic
+;;; function dispatch. The standard doesn't seem to say as much as it
+;;; should about what this returns for built-in objects. For example,
+;;; it seems that we must return NULL rather than LIST when X is NIL
+;;; so that GF's can specialize on NULL.
+;;; x86-64 has a vop that implements this without even needing to place
+;;; the vector of layouts in the constant pool of the containing code.
+#-(or sb-xc-host (and compact-instance-header x86-64))
+(progn
+(declaim (inline wrapper-of))
+(defun wrapper-of (x)
+  (declare (optimize (speed 3) (safety 0)))
+  (cond ((%instancep x) (%instance-wrapper x))
+        ((funcallable-instance-p x) (%fun-wrapper x))
+        ;; Compiler can dump literal layouts, which handily sidesteps
+        ;; the question of when cold-init runs L-T-V forms.
+        ((null x) #.(find-layout 'null))
+        (t
+         ;; Note that WIDETAG-OF is slightly suboptimal here and could be
+         ;; improved - we've already ruled out some of the lowtags.
+         (layout-friend
+          (svref (load-time-value **primitive-object-layouts** t)
+                 (widetag-of x)))))))
 
-;;; STRUCTURE-CLASS represents what we need to know about structure
-;;; classes. Non-structure "typed" defstructs are a special case, and
-;;; don't have a corresponding class.
-(def!struct (structure-classoid (:include classoid)
-                                (:copier nil)
-                                (:constructor %make-structure-classoid
-                                    (hash-value name))))
-(defun make-structure-classoid (&key name)
-  (%make-structure-classoid (interned-type-hash name) name))
+#-sb-xc-host
+(progn
+(declaim (inline classoid-of))
+(defun classoid-of (object)
+  "Return the class of the supplied object, which may be any Lisp object, not
+   just a CLOS STANDARD-OBJECT."
+  (wrapper-classoid (wrapper-of object))))
+
 
 ;;;; classoid namespace
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun (setf find-classoid) (new-value name)
-    #-sb-xc (declare (type (or null classoid) new-value))
+    (declare (type (or null classoid) new-value))
     (aver new-value)
-    (let ((table *forward-referenced-layouts*))
-      (with-world-lock ()
+    (with-world-lock ()
         (let ((cell (find-classoid-cell name :create t)))
           (ecase (info :type :kind name)
             ((nil))
@@ -551,12 +639,12 @@ between the ~A definition and the ~A definition"
                ;; modulo potential differences with respect to
                ;; conditions).
                #+sb-xc-host
-               (let ((old (class-of old-value))
-                     (new (class-of new-value)))
+               (let ((old (cl:class-of old-value))
+                     (new (cl:class-of new-value)))
                  (unless (eq old new)
                    (bug "Trying to change the metaclass of ~S from ~S to ~S in the ~
                             cross-compiler."
-                        name (class-name old) (class-name new))))
+                        name (cl:class-name old) (cl:class-name new))))
                #-sb-xc-host
                (let ((old (classoid-of old-value))
                      (new (classoid-of new-value)))
@@ -572,7 +660,7 @@ between the ~A definition and the ~A definition"
              (clear-info :type :expander name)
              (clear-info :type :source-location name)))
 
-          (remhash name table)
+          (remhash name *forward-referenced-wrappers*)
           (%note-type-defined name)
           ;; FIXME: I'm unconvinced of the need to handle either of these.
           ;; Package locks preclude the latter, and in the former case,
@@ -594,9 +682,9 @@ between the ~A definition and the ~A definition"
                  (setf (info :type :kind name) :instance)))
           (setf (classoid-cell-classoid cell) new-value)
           (unless (eq (info :type :compiler-layout name)
-                      (classoid-layout new-value))
+                      (classoid-wrapper new-value))
             (setf (info :type :compiler-layout name)
-                  (classoid-layout new-value))))))
+                  (classoid-wrapper new-value)))))
     new-value)
 
   (defun %clear-classoid (name cell)
@@ -627,6 +715,26 @@ between the ~A definition and the ~A definition"
        (clear-info :type :compiler-layout name)
        (values-specifier-type-cache-clear)))))
 
+(defun find-classoid-cell (name &key create)
+  (let ((real-name (uncross name)))
+    (cond ((info :type :classoid-cell real-name))
+          (create
+           (get-info-value-initializing :type :classoid-cell real-name
+                                        (make-classoid-cell real-name))))))
+
+;;; Return the classoid with the specified NAME. If ERRORP is false,
+;;; then NIL is returned when no such class exists.
+(defun find-classoid (name &optional (errorp t))
+  (declare (type symbol name))
+  (let ((cell (find-classoid-cell name)))
+    (cond ((and cell (classoid-cell-classoid cell)))
+          (errorp
+           (error 'simple-type-error
+                  :datum nil
+                  :expected-type 'class
+                  :format-control "Class not yet defined: ~S"
+                  :format-arguments (list name))))))
+
 ;;; Called when we are about to define NAME as a class meeting some
 ;;; predicate (such as a meta-class type test.) The first result is
 ;;; always of the desired class. The second result is any existing
@@ -635,23 +743,24 @@ between the ~A definition and the ~A definition"
 ;;; Again, this should be compiler-only, but easier to make this
 ;;; thread-safe.
 (defun insured-find-classoid (name predicate constructor)
-  (declare (type function predicate constructor))
-  (let ((table *forward-referenced-layouts*))
-    (with-locked-system-table (table)
+  (declare (type function predicate)
+           (type (or function symbol) constructor))
+  (let ((table *forward-referenced-wrappers*))
+    (with-system-mutex ((hash-table-lock table))
       (let* ((old (find-classoid name nil))
              (res (if (and old (funcall predicate old))
                       old
                       (funcall constructor :name name)))
              (found (or (gethash name table)
-                        (when old (classoid-layout old)))))
+                        (when old (classoid-wrapper old)))))
         (when found
-          (setf (layout-classoid found) res))
+          (setf (wrapper-classoid found) res))
         (values res found)))))
 
 ;;; If the classoid has a proper name, return the name, otherwise return
 ;;; the classoid.
 (defun classoid-proper-name (classoid)
-  #-sb-xc (declare (type classoid classoid))
+  (declare (type classoid classoid))
   (let ((name (classoid-name classoid)))
     (if (and name (eq (find-classoid name nil) classoid))
         name
@@ -682,23 +791,23 @@ between the ~A definition and the ~A definition"
   (let ((super (if (symbolp super-or-name)
                    (find-classoid super-or-name)
                    super-or-name)))
-    (find (classoid-layout super)
-          (layout-inherits (classoid-layout sub)))))
+    (find (classoid-wrapper super)
+          (wrapper-inherits (classoid-wrapper sub)))))
 
 ;;; We might be passed classoids with invalid layouts; in any pairwise
 ;;; class comparison, we must ensure that both are valid before
 ;;; proceeding.
 (defun %ensure-classoid-valid (classoid layout error-context)
   (declare (ignorable error-context)) ; not used on host
-  (aver (eq classoid (layout-classoid layout)))
-  (or (not (layout-invalid layout))
+  (aver (eq classoid (wrapper-classoid layout)))
+  (or (not (wrapper-invalid layout))
       ;; Avoid accidentally reaching code that can't work.
       #+sb-xc-host (bug "(TYPEP x 'STANDARD-CLASSOID) can't be tested")
       #-sb-xc-host
       (if (typep classoid 'standard-classoid)
           (let ((class (classoid-pcl-class classoid)))
             (cond
-              ((sb-pcl:class-finalized-p class)
+              ((sb-mop:class-finalized-p class)
                (sb-pcl::%force-cache-flushes class)
                t)
               ((sb-pcl::class-has-a-forward-referenced-superclass-p class)
@@ -710,29 +819,22 @@ between the ~A definition and the ~A definition"
                       error-context))
                nil)
               (t
-               (sb-pcl:finalize-inheritance class)
+               (sb-mop:finalize-inheritance class)
                t)))
           (bug "~@<Don't know how to ensure validity of ~S (not a STANDARD-CLASSOID) ~
                 for ~A.~%~:@>"
                classoid (or error-context 'subtypep)))))
 
 (defun %ensure-both-classoids-valid (class1 class2 &optional errorp)
-  (do ((layout1 (classoid-layout class1) (classoid-layout class1))
-       (layout2 (classoid-layout class2) (classoid-layout class2))
+  (do ((layout1 (classoid-wrapper class1) (classoid-wrapper class1))
+       (layout2 (classoid-wrapper class2) (classoid-wrapper class2))
        (i 0 (+ i 1)))
-      ((and (not (layout-invalid layout1)) (not (layout-invalid layout2)))
+      ((and (not (wrapper-invalid layout1)) (not (wrapper-invalid layout2)))
        t)
     (aver (< i 2))
     (unless (and (%ensure-classoid-valid class1 layout1 errorp)
                  (%ensure-classoid-valid class2 layout2 errorp))
       (return-from %ensure-both-classoids-valid nil))))
-
-#-sb-xc-host ; No such thing as LAYOUT-OF, never mind the rest
-(defun update-object-layout-or-invalid (object layout)
-  ;; FIXME: explain why this isn't (LAYOUT-FOR-STD-CLASS-P LAYOUT).
-  (if (layout-for-std-class-p (layout-of object))
-      (sb-pcl::check-wrapper-validity object)
-      (sb-c::%layout-invalid-error object layout)))
 
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those
@@ -743,10 +845,10 @@ between the ~A definition and the ~A definition"
 
 (define-type-method (classoid :simple-subtypep) (class1 class2)
   (aver (not (eq class1 class2)))
-  (with-world-lock ()
+  (with-world-lock () ; FIXME: why such coarse lock granularity here?
     (if (%ensure-both-classoids-valid class1 class2)
-        (let ((subclasses2 (classoid-subclasses class2)))
-          (if (and subclasses2 (gethash class1 subclasses2))
+        (let ()
+          (if (get-subclassoid class1 class2)
               (values t t)
               (if (and (typep class1 'standard-classoid)
                        (typep class2 'standard-classoid)
@@ -769,10 +871,12 @@ between the ~A definition and the ~A definition"
   (let ((s-sub (classoid-subclasses sealed))
         (o-sub (classoid-subclasses other)))
     (if (and s-sub o-sub)
+        ;; FIXME: should we put more locking here?
+        ;; [contrast with define-type-method (classoid :simple-subtypep)]
         (collect ((res *empty-type* type-union))
-          (dohash ((subclass layout) s-sub :locked t)
-            (declare (ignore layout))
-            (when (gethash subclass o-sub)
+          (do-subclassoids ((subclass wrapper) sealed)
+            (declare (ignore wrapper))
+            (when (get-subclassoid subclass other)
               (res (specifier-type subclass))))
           (res))
         *empty-type*)))
@@ -785,12 +889,8 @@ between the ~A definition and the ~A definition"
            class1)
           ;; If one is a subclass of the other, then that is the
           ;; intersection.
-          ((let ((subclasses (classoid-subclasses class2)))
-             (and subclasses (gethash class1 subclasses)))
-           class1)
-          ((let ((subclasses (classoid-subclasses class1)))
-             (and subclasses (gethash class2 subclasses)))
-           class2)
+          ((get-subclassoid class1 class2) class1)
+          ((get-subclassoid class2 class1) class2)
           ;; Otherwise, we can't in general be sure that the
           ;; intersection is empty, since a subclass of both might be
           ;; defined. But we can eliminate it for some special cases.
@@ -824,7 +924,7 @@ between the ~A definition and the ~A definition"
 (declaim (type cons **non-instance-classoid-types**))
 (defglobal **non-instance-classoid-types**
   '(symbol system-area-pointer weak-pointer code-component
-    #-(or x86 x86-64) lra
+    #-(or x86 x86-64 arm64 riscv) lra
     fdefn random-class))
 
 (defun classoid-non-instance-p (classoid)
@@ -886,312 +986,407 @@ between the ~A definition and the ~A definition"
 ;;;     List of the direct superclasses of this class.
 ;;;
 ;;; NB: not to be confused with SB-PCL::*BUILT-IN-CLASSES*
-(defconstant-eqx +!built-in-classes+
-  ;; constant-quasiquote-form-p is not smart enough to notice
-  ;; that this entire thing is constant, so we kind of have to force it.
-'#.`((t :state :read-only :translation t)
-     (character :codes (,sb-vm:character-widetag)
-                :translation (character-set)
-                :prototype-form (code-char 42))
-     (symbol :codes (,sb-vm:symbol-widetag)
-             :prototype-form '*)
+;;; (note the difference in spelling, to help keep things unconfusing)
+#+sb-xc-host
+(defvar *builtin-classoids*
+  ;; This variable holds data expressed as conses, some of which are "similar" (in
+  ;; this case, EQUAL) to each other, but not EQL to each other at read-time.
+  ;; Host compilers can differ in how they treat "similar" data on
+  ;; file-compilation; they are entitled to coalesce data to be EQL.  Differences
+  ;; in those host choices then manifest (cosmetically) in target data, where the
+  ;; resulting value of *BUILTIN-CLASSOIDS* at cold-load time differs in its
+  ;; structure between e.g. SBCL and CCL hosts.
+  ;;
+  ;; To avoid this difference, we postprocess the data structure to
+  ;; convert all similar data within it to be EQL, at which point the
+  ;; host compiler no longer has choices: EQL data must remain EQL
+  ;; after file-compilation.
+  ;;
+  ;; FIXME: it might be nice if our cross-compile backquote reader
+  ;; did hash-consing for us automatically.  Without thinking too
+  ;; hard about it, though, it might need to be sufficiently smart
+  ;; to be able to handle nested backquotations and/or
+  ;; backquotations within unquotations.
+  (let ((table (make-hash-table :test 'equal)))
+    (labels ((hash-cons (thing)
+               (cond
+                 ((atom thing) thing)
+                 ((gethash thing table))
+                 (t (setf (gethash thing table)
+                          (cons (hash-cons (car thing)) (hash-cons (cdr thing))))))))
+      (hash-cons
+       `((t :state :read-only :translation t)
+         (character :codes (,sb-vm:character-widetag)
+                    :translation (character-set)
+                    :prototype-form (code-char 42))
+         (symbol :codes (,sb-vm:symbol-widetag)
+                 :predicate symbolp
+                 :prototype-form '*)
 
-     (system-area-pointer :codes (,sb-vm:sap-widetag)
-                          :prototype-form (int-sap 0))
-     (weak-pointer :codes (,sb-vm:weak-pointer-widetag)
-      :prototype-form (make-weak-pointer (find-package "CL")))
-     (code-component :codes (,sb-vm:code-header-widetag))
-     #-(or x86 x86-64) (lra :codes (,sb-vm:return-pc-widetag))
-     (fdefn :codes (,sb-vm:fdefn-widetag)
-            :prototype-form (make-fdefn nil))
-     (random-class) ; used for unknown type codes
+         (system-area-pointer :codes (,sb-vm:sap-widetag)
+                              :predicate system-area-pointer-p
+                              :prototype-form (int-sap 0))
+         (weak-pointer :codes (,sb-vm:weak-pointer-widetag)
+                       :predicate weak-pointer-p
+                       :prototype-form (make-weak-pointer 0))
+         (code-component :codes (,sb-vm:code-header-widetag)
+                         :predicate code-component-p
+                         :prototype-form (fun-code-header #'identity))
+         #-(or x86 x86-64 arm64 riscv)
+         (lra :codes (,sb-vm:return-pc-widetag)
+              :predicate lra-p
+              ;; Make the PROTOTYPE slot unbound.
+              :prototype-form sb-pcl:+slot-unbound+)
+         (fdefn :codes (,sb-vm:fdefn-widetag)
+                :predicate fdefn-p
+                :prototype-form (find-or-create-fdefn 'sb-mop:class-prototype))
+         (random-class             ; used for unknown type codes
+          ;; Make the PROTOTYPE slot unbound.
+          :prototype-form sb-pcl:+slot-unbound+)
+         (function
+          :codes (,sb-vm:closure-widetag ,sb-vm:simple-fun-widetag)
+          :predicate functionp
+          :state :read-only
+          :prototype-form #'identity)
 
-     (function
-      :codes (,sb-vm:closure-widetag ,sb-vm:simple-fun-widetag)
-      :state :read-only
-      :prototype-form (function (lambda () 42)))
+         (number :translation number :prototype-form 0)
+         (complex
+          :translation complex
+          :inherits (number)
+          :codes (,sb-vm:complex-widetag)
+          :prototype-form ,(complex 0 1))
+         (complex-single-float
+          :translation (complex single-float)
+          :inherits (complex number)
+          :codes (,sb-vm:complex-single-float-widetag)
+          :prototype-form ,(complex $0f0 $0f0))
+         (complex-double-float
+          :translation (complex double-float)
+          :inherits (complex number)
+          :codes (,sb-vm:complex-double-float-widetag)
+          :prototype-form ,(complex $0d0 $0d0))
+         #+long-float
+         (complex-long-float
+          :translation (complex long-float)
+          :inherits (complex number)
+          :codes (,sb-vm:complex-long-float-widetag)
+          :prototype-form ,(complex $0L0 $0L0))
+         #+sb-simd-pack
+         (simd-pack
+          :translation simd-pack
+          :codes (,sb-vm:simd-pack-widetag)
+          :prototype-form (%make-simd-pack-ub64 42 42))
+         #+sb-simd-pack-256
+         (simd-pack-256
+          :translation simd-pack-256
+          :codes (,sb-vm:simd-pack-256-widetag)
+          :prototype-form
+          ;; KLUDGE: doesn't work without AVX2 support from the CPU
+          ;; (%make-simd-pack-256-ub64 42 42 42 42)
+          sb-pcl:+slot-unbound+)
+         (real :translation real :inherits (number) :prototype-form 0)
+         (float :translation float :inherits (real number) :prototype-form $0f0)
+         (single-float
+          :translation single-float
+          :inherits (float real number)
+          :codes (,sb-vm:single-float-widetag)
+          :prototype-form $0f0)
+         (double-float
+          :translation double-float
+          :inherits (float real number)
+          :codes (,sb-vm:double-float-widetag)
+          :prototype-form $0d0)
+         #+long-float
+         (long-float
+          :translation long-float
+          :inherits (float real number)
+          :codes (,sb-vm:long-float-widetag)
+          :prototype-form $0L0)
+         (rational
+          :translation rational :inherits (real number) :prototype-form 0)
+         (ratio
+          :translation (and rational (not integer))
+          :inherits (rational real number)
+          :codes (,sb-vm:ratio-widetag)
+          :prototype-form 1/42)
+         (integer
+          :translation integer :inherits (rational real number) :prototype-form 0)
+         (fixnum
+          :translation (integer ,most-negative-fixnum ,most-positive-fixnum)
+          :inherits (integer rational real number)
+          :codes ,(mapcar #'symbol-value sb-vm::fixnum-lowtags)
+          :prototype-form 42)
+         (bignum
+          :translation (and integer (not fixnum))
+          :inherits (integer rational real number)
+          :codes (,sb-vm:bignum-widetag)
+          :prototype-form ,(1+ most-positive-fixnum))
 
-     (number :translation number)
-     (complex
-      :translation complex
-      :inherits (number)
-      :codes (,sb-vm:complex-widetag)
-      :prototype-form ,(complex 0 1))
-     (complex-single-float
-      :translation (complex single-float)
-      :inherits (complex number)
-      :codes (,sb-vm:complex-single-float-widetag)
-      :prototype-form ,(complex $0f0 $0f0))
-     (complex-double-float
-      :translation (complex double-float)
-      :inherits (complex number)
-      :codes (,sb-vm:complex-double-float-widetag)
-      :prototype-form ,(complex $0d0 $0d0))
-     #+long-float
-     (complex-long-float
-      :translation (complex long-float)
-      :inherits (complex number)
-      :codes (,sb-vm:complex-long-float-widetag)
-      :prototype-form ,(complex $0L0 $0L0))
-     #+sb-simd-pack
-     (simd-pack
-      :translation simd-pack
-      :codes (,sb-vm:simd-pack-widetag)
-      :prototype-form (%make-simd-pack-ub64 42 42))
-     #+sb-simd-pack-256
-     (simd-pack-256
-      :translation simd-pack-256
-      :codes (,sb-vm:simd-pack-256-widetag)
-      :prototype-form
-      ;; KLUDGE: doesn't work without AVX2 support from the CPU
-      ;; (%make-simd-pack-256-ub64 42 42 42 42)
-      42)
-     (real :translation real :inherits (number))
-     (float
-      :translation float
-      :inherits (real number))
-     (single-float
-      :translation single-float
-      :inherits (float real number)
-      :codes (,sb-vm:single-float-widetag)
-      :prototype-form $0f0)
-     (double-float
-      :translation double-float
-      :inherits (float real number)
-      :codes (,sb-vm:double-float-widetag)
-      :prototype-form $0d0)
-     #+long-float
-     (long-float
-      :translation long-float
-      :inherits (float real number)
-      :codes (,sb-vm:long-float-widetag)
-      :prototype-form $0L0)
-     (rational
-      :translation rational
-      :inherits (real number))
-     (ratio
-      :translation (and rational (not integer))
-      :inherits (rational real number)
-      :codes (,sb-vm:ratio-widetag)
-      :prototype-form 1/42)
-     (integer
-      :translation integer
-      :inherits (rational real number))
-     (fixnum
-      :translation (integer ,sb-xc:most-negative-fixnum ,sb-xc:most-positive-fixnum)
-      :inherits (integer rational real number)
-      :codes ,(mapcar #'symbol-value sb-vm::fixnum-lowtags)
-      :prototype-form 42)
-     (bignum
-      :translation (and integer (not fixnum))
-      :inherits (integer rational real number)
-      :codes (,sb-vm:bignum-widetag)
-      :prototype-form ,(1+ sb-xc:most-positive-fixnum))
+         (array :translation array :codes (,sb-vm:complex-array-widetag)
+                :hierarchical-p nil
+                :prototype-form (make-array nil :adjustable t))
+         (simple-array
+          :translation simple-array :codes (,sb-vm:simple-array-widetag)
+          :inherits (array)
+          :prototype-form (make-array nil))
+         (sequence
+          :translation (or cons (member nil) vector extended-sequence)
+          :state :read-only
+          :depth 1)
+         (vector
+          :translation vector :codes (,sb-vm:complex-vector-widetag)
+          :direct-superclasses (array sequence)
+          :inherits (array sequence)
+          :prototype-form (make-array 0 :adjustable t))
+         (simple-vector
+          :translation simple-vector :codes (,sb-vm:simple-vector-widetag)
+          :direct-superclasses (vector simple-array)
+          :inherits (vector simple-array array sequence)
+          :prototype-form (make-array 0))
+         (bit-vector
+          :translation bit-vector :codes (,sb-vm:complex-bit-vector-widetag)
+          :inherits (vector array sequence)
+          :prototype-form (make-array 0 :element-type 'bit :fill-pointer t))
+         (simple-bit-vector
+          :translation simple-bit-vector :codes (,sb-vm:simple-bit-vector-widetag)
+          :direct-superclasses (bit-vector simple-array)
+          :inherits (bit-vector vector simple-array
+                                array sequence)
+          :prototype-form #*)
+         (string
+          :translation string
+          :direct-superclasses (vector)
+          :inherits (vector array sequence)
+          :prototype-form "")
+         (simple-string
+          :translation simple-string
+          :direct-superclasses (string simple-array)
+          :inherits (string vector simple-array array sequence)
+          :prototype-form "")
+         (vector-nil
+          :translation (vector nil)
+          :inherits (vector array sequence)
+          :prototype-form (make-array 0 :element-type 'nil :fill-pointer t))
+         ;; This name is imperfect. It should be SIMPLE-RANK1-ARRAY-NIL
+         ;; to clearly convey that the dimensions are '(*) and not '*.
+         (simple-array-nil
+          :translation (simple-array nil (*))
+          :codes (,sb-vm:simple-array-nil-widetag)
+          :direct-superclasses (vector-nil)
+          :inherits (vector-nil vector simple-array array sequence)
+          :prototype-form (make-array 0 :element-type 'nil))
+         (base-string
+          :translation base-string
+          :codes (,sb-vm:complex-base-string-widetag)
+          :direct-superclasses (string)
+          :inherits (string vector array sequence)
+          :prototype-form (make-array 0 :element-type 'base-char :fill-pointer t))
+         (simple-base-string
+          :translation simple-base-string
+          :codes (,sb-vm:simple-base-string-widetag)
+          :direct-superclasses (base-string simple-string)
+          :inherits (base-string simple-string string vector simple-array
+                                 array sequence)
+          :prototype-form (make-array 0 :element-type 'base-char))
+         #+sb-unicode
+         (character-string
+          :translation (vector character)
+          :codes (,sb-vm:complex-character-string-widetag)
+          :direct-superclasses (string)
+          :inherits (string vector array sequence)
+          :prototype-form (make-array 0 :element-type 'character :fill-pointer t))
+         #+sb-unicode
+         (simple-character-string
+          :translation (simple-array character (*))
+          :codes (,sb-vm:simple-character-string-widetag)
+          :direct-superclasses (character-string simple-string)
+          :inherits (character-string simple-string string vector simple-array
+                                      array sequence)
+          :prototype-form (make-array 0 :element-type 'character))
+         (list
+          :translation (or cons (member nil))
+          :inherits (sequence)
+          :prototype-form 'nil)
+         (cons
+          :codes (,sb-vm:list-pointer-lowtag)
+          :translation cons
+          :inherits (list sequence)
+          :prototype-form (cons nil nil))
+         (null
+          :translation (member nil)
+          :inherits (symbol list sequence)
+          :direct-superclasses (symbol list)
+          :prototype-form 'nil)
 
-     (array :translation array :codes (,sb-vm:complex-array-widetag)
-            :hierarchical-p nil
-            :prototype-form (make-array nil :adjustable t))
-     (simple-array
-      :translation simple-array :codes (,sb-vm:simple-array-widetag)
-      :inherits (array)
-      :prototype-form (make-array nil))
-     (sequence
-      :translation (or cons (member nil) vector extended-sequence)
-      :state :read-only
-      :depth 1)
-     (vector
-      :translation vector :codes (,sb-vm:complex-vector-widetag)
-      :direct-superclasses (array sequence)
-      :inherits (array sequence))
-     (simple-vector
-      :translation simple-vector :codes (,sb-vm:simple-vector-widetag)
-      :direct-superclasses (vector simple-array)
-      :inherits (vector simple-array array sequence)
-      :prototype-form (make-array 0))
-     (bit-vector
-      :translation bit-vector :codes (,sb-vm:complex-bit-vector-widetag)
-      :inherits (vector array sequence)
-      :prototype-form (make-array 0 :element-type 'bit :fill-pointer t))
-     (simple-bit-vector
-      :translation simple-bit-vector :codes (,sb-vm:simple-bit-vector-widetag)
-      :direct-superclasses (bit-vector simple-array)
-      :inherits (bit-vector vector simple-array
-                 array sequence)
-      :prototype-form (make-array 0 :element-type 'bit))
-     (string
-      :translation string
-      :direct-superclasses (vector)
-      :inherits (vector array sequence))
-     (simple-string
-      :translation simple-string
-      :direct-superclasses (string simple-array)
-      :inherits (string vector simple-array array sequence))
-     (vector-nil
-      :translation (vector nil)
-      :codes (,sb-vm:complex-vector-nil-widetag)
-      :direct-superclasses (string)
-      :inherits (string vector array sequence)
-      :prototype-form (make-array 0 :element-type 'nil :fill-pointer t))
-     (simple-array-nil
-      :translation (simple-array nil (*))
-      :codes (,sb-vm:simple-array-nil-widetag)
-      :direct-superclasses (vector-nil simple-string)
-      :inherits (vector-nil simple-string string vector simple-array
-                 array sequence)
-      :prototype-form (make-array 0 :element-type 'nil))
-     (base-string
-      :translation base-string
-      :codes (,sb-vm:complex-base-string-widetag)
-      :direct-superclasses (string)
-      :inherits (string vector array sequence)
-      :prototype-form (make-array 0 :element-type 'base-char :fill-pointer t))
-     (simple-base-string
-      :translation simple-base-string
-      :codes (,sb-vm:simple-base-string-widetag)
-      :direct-superclasses (base-string simple-string)
-      :inherits (base-string simple-string string vector simple-array
-                 array sequence)
-      :prototype-form (make-array 0 :element-type 'base-char))
-     #+sb-unicode
-     (character-string
-      :translation (vector character)
-      :codes (,sb-vm:complex-character-string-widetag)
-      :direct-superclasses (string)
-      :inherits (string vector array sequence)
-      :prototype-form (make-array 0 :element-type 'character :fill-pointer t))
-     #+sb-unicode
-     (simple-character-string
-      :translation (simple-array character (*))
-      :codes (,sb-vm:simple-character-string-widetag)
-      :direct-superclasses (character-string simple-string)
-      :inherits (character-string simple-string string vector simple-array
-                 array sequence)
-      :prototype-form (make-array 0 :element-type 'character))
-     (list
-      :translation (or cons (member nil))
-      :inherits (sequence))
-     (cons
-      :codes (,sb-vm:list-pointer-lowtag)
-      :translation cons
-      :inherits (list sequence)
-      :prototype-form (cons nil nil))
-     (null
-      :translation (member nil)
-      :inherits (symbol list sequence)
-      :direct-superclasses (symbol list)
-      :prototype-form 'nil)
-     ;; These last few are strange. STREAM has only T as an ancestor,
-     ;; so you'd think it would be at depth 1. FILE- and STRING-STREAM
-     ;; each have STREAM and T as ancestors, so you'd think they'd be at depth
-     ;; 1 greater than STREAM, instead of 2 greater. But changing any of
-     ;; these to the "obvious" value makes various type checks go wrong.
-     ;;
-     ;; Essentially the hardwiring corresponds to the indices of the
-     ;; respective types in the inherits vector for FD-STREAM.
-     ;;  * (layout-inherits (find-layout 'fd-stream))
-     ;;  #(#<LAYOUT for T {50300003}>
-     ;;    #<LAYOUT for STRUCTURE-OBJECT {50300103}>
-     ;;    #<LAYOUT for STREAM {50301003}>
-     ;;    #<LAYOUT for ANSI-STREAM {50301183}>
-     ;;    #<LAYOUT for FILE-STREAM {50303303}>)
+         (sb-pcl::slot-object
+          :translation (or structure-object standard-object condition)
+          :predicate slot-object-p
+          :hierarchical-p nil
+          :state :read-only
+          :prototype-form (make-defstruct-description t 'arbitrary))
 
-     (stream
-      :state :read-only
-      :depth 2)
-     (file-stream
-      :state :read-only
-      :depth 4
-      :inherits (stream))
-     (string-stream
-      :state :read-only
-      :depth 4
-      :inherits (stream))
-     ,@(loop for x across sb-vm:*specialized-array-element-type-properties*
-             unless (member (sb-vm:saetp-specifier x) '(t character base-char nil bit))
-             collect
-             ;; I'm not sure if it's an accident that there are distinct SB-KERNEL
-             ;; versus SB-VM symbols for the specialized arrays. The former are types
-             ;; in the language, and the latter are primitive object types,
-             ;; but istm they should be designated by the same symbols.
-             `(,(intern (string (sb-vm:saetp-primitive-type-name x)) *package*)
-               :translation (simple-array ,(sb-vm:saetp-specifier x) (*))
-               :codes (,(sb-vm:saetp-typecode x))
-               :direct-superclasses (vector simple-array)
-               :inherits (vector simple-array array sequence)
-               :prototype-form
-               (logically-readonlyize
-                (make-array 0 :element-type ',(sb-vm:saetp-specifier x))))))
-  #'equal)
+         ;; KLUDGE: the length must match the subsequent defstruct.
+         (pathname :depth 1
+                   :predicate pathnamep
+                   :length ,(+ 7 sb-vm:instance-data-start)
+                   :prototype-form (make-trivial-default-pathname))
+         (logical-pathname :depth 2
+                           :predicate logical-pathname-p
+                           :length ,(+ 7 sb-vm:instance-data-start)
+                           :prototype-form (make-trivial-default-logical-pathname)
+                           :inherits (pathname))
 
-;;; See also src/code/class-init.lisp where we finish setting up the
+         ;; These last few are strange. STREAM has only T as an ancestor,
+         ;; so you'd think it would be at depth 1. FILE- and STRING-STREAM
+         ;; each have STREAM and T as ancestors, so you'd think they'd be at depth
+         ;; 1 greater than STREAM, instead of 2 greater. But changing any of
+         ;; these to the "obvious" value makes various type checks go wrong.
+         ;;
+         ;; Essentially the hardwiring corresponds to the indices of the
+         ;; respective types in the inherits vector for FD-STREAM.
+         ;;  * (wrapper-inherits (find-layout 'fd-stream))
+         ;;  #(#<LAYOUT for T {50300003}>
+         ;;    #<LAYOUT for STRUCTURE-OBJECT {50300103}>
+         ;;    #<LAYOUT for STREAM {50301003}>
+         ;;    #<LAYOUT for ANSI-STREAM {50301183}>
+         ;;    #<LAYOUT for FILE-STREAM {50303303}>)
+
+         (stream
+          :predicate streamp
+          :state :read-only
+          :depth 2)
+         (file-stream
+          :predicate file-stream-p
+          :state :read-only
+          :depth 4
+          :inherits (stream))
+         (string-stream
+          :predicate string-stream-p
+          :state :read-only
+          :depth 4
+          :inherits (stream))
+         ,@(loop for x across sb-vm:*specialized-array-element-type-properties*
+                 unless (member (sb-vm:saetp-specifier x) '(t character base-char nil bit))
+                   collect
+                 ;; I'm not sure if it's an accident that there are distinct SB-KERNEL
+                 ;; versus SB-VM symbols for the specialized arrays. The former are types
+                 ;; in the language, and the latter are primitive object types,
+                 ;; but istm they should be designated by the same symbols.
+                 `(,(intern (string (sb-vm:saetp-primitive-type-name x)) *package*)
+                   :translation (simple-array ,(sb-vm:saetp-specifier x) (*))
+                   :codes (,(sb-vm:saetp-typecode x))
+                   :direct-superclasses (vector simple-array)
+                   :inherits (vector simple-array array sequence)
+                   :prototype-form
+                   (logically-readonlyize
+                    (make-array 0 :element-type ',(sb-vm:saetp-specifier x))))))))))
+
+(eval-when (#-sb-xc-host :compile-toplevel)
+  (defun compute-builtin-classoids ()
+    (mapcar (lambda (x)
+              (let* ((name (car x))
+                     (classoid (find-classoid name))
+                     (translation (built-in-classoid-translation classoid))
+                     (predicate
+                       (if (member name '(t random-class))
+                           'error
+                           (or (getf (cdr x) :predicate)
+                               (sb-c::backend-type-predicate translation)))))
+                (assert predicate)
+                ;; destructuring-bind will see the first :translation
+                ;; keyword; we don't need to delete the other one.
+                (list* name :predicate predicate :translation translation (cdr x))))
+            *builtin-classoids*)))
+
+;;; The read interceptor has to be disabled to avoid infinite recursion on CTYPEs
+(eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* nil))
+#-sb-xc-host
+(define-load-time-global *builtin-classoids* nil)
+#-sb-xc-host
+(!cold-init-forms
+ (setq *builtin-classoids* '#.(compute-builtin-classoids)))
+(eval-when (:compile-toplevel) (setq sb-cold::*choke-on-host-irrationals* t))
+
+;;; See also src/code/type-init.lisp where we finish setting up the
 ;;; translations for built-in types.
 (!cold-init-forms
-  (dolist (x +!built-in-classes+)
-    #-sb-xc-host (/show0 "at head of loop over +!BUILT-IN-CLASSES+")
-    (destructuring-bind
-        (name &key
-              (translation nil trans-p)
-              inherits
-              codes
-              state
-              depth
-              prototype-form
-              (hierarchical-p t) ; might be modified below
-              (direct-superclasses (if inherits
-                                     (list (car inherits))
-                                     '(t))))
-        x
-      (declare (ignore codes state translation prototype-form))
-      (let ((inherits-list (if (eq name t)
+ (dolist (x *builtin-classoids*)
+   #-sb-xc-host (/show0 "at head of loop over *BUILTIN-CLASSOIDS*")
+   (destructuring-bind
+       (name &key
+               (translation nil trans-p)
+               predicate
+               inherits
+               codes
+               state
+               depth
+               (length 0)
+               prototype-form
+               (hierarchical-p t) ; might be modified below
+               (direct-superclasses (if inherits
+                                        (list (car inherits))
+                                        '(t))))
+       x
+     (declare (ignorable codes state translation trans-p predicate))
+     ;; instance metatypes and T don't need a prototype, everything else does
+     (unless (or prototype-form depth (eq name 't))
+       (error "Missing prototype in ~S" x))
+     (let* ((pred-fn (if (fboundp predicate) (symbol-function predicate) #'error))
+            (inherits-list (if (eq name t)
                                ()
                                (cons t (reverse inherits))))
             (classoid
-             (acond #+sb-xc ; genesis dumps some classoid literals
-                    ((find-classoid name nil)
-                     ;; Unseal it so that REGISTER-LAYOUT doesn't warn
-                     (setf (classoid-state it) nil)
-                     it)
-                    (t
-                     (setf (classoid-cell-classoid
-                            (find-classoid-cell name :create t))
-                           (!make-built-in-classoid
-                             :hash-value (interned-type-hash name)
+              (acond #-sb-xc-host ; genesis dumps some classoid literals
+                     ((find-classoid name nil)
+                      (%instance-set it (get-dsd-index built-in-classoid predicate)
+                                     pred-fn)
+                      ;; Unseal it so that REGISTER-LAYOUT doesn't warn
+                      (setf (classoid-state it) nil)
+                      it)
+                     (t
+                      (setf (classoid-cell-classoid
+                             (find-classoid-cell name :create t))
+                            (!make-built-in-classoid
+                             :%bits (pack-ctype-bits classoid name)
                              :name name
-                             :translation (if trans-p :initializing nil)
+                             :translation #+sb-xc-host (if trans-p :initializing nil)
+                                          #-sb-xc-host translation
+                             :allow-other-keys t :predicate pred-fn
                              :direct-superclasses
                              (if (eq name t)
                                  nil
                                  (mapcar #'find-classoid
                                          direct-superclasses))))))))
-        (setf (info :type :kind name) :primitive)
-        (unless trans-p
-          (setf (info :type :builtin name) classoid))
-        (let* ((inherits-vector
+       (setf (info :type :kind name) :primitive)
+       #+sb-xc-host
+       (unless trans-p
+         (setf (info :type :builtin name) classoid))
+       #-sb-xc-host (setf (info :type :builtin name) (or translation classoid))
+       (let* ((inherits-vector
                 (map 'simple-vector
                      (lambda (x)
                        (let ((super-layout
-                              (classoid-layout (find-classoid x))))
-                         (when (minusp (layout-depthoid super-layout))
+                               (classoid-wrapper (find-classoid x))))
+                         (when (minusp (wrapper-depthoid super-layout))
                            (setf hierarchical-p nil))
                          super-layout))
                      inherits-list))
-               (depthoid (if hierarchical-p
-                           (or depth (length inherits-vector))
-                           -1)))
-          (register-layout
-           (find-and-init-or-check-layout name
-                                          depthoid
-                                          0 ; flags
-                                          0 ; length
-                                          +layout-all-tagged+
-                                          inherits-vector)
-           :invalidate nil)))))
-  (/show0 "done with loop over +!BUILT-IN-CLASSES+"))
+              (depthoid (if hierarchical-p
+                            (or depth (length inherits-vector))
+                            -1)))
+         (register-layout (load-layout name
+                                       depthoid
+                                       inherits-vector
+                                       length
+                                       +layout-all-tagged+
+                                       0) ; flags
+                          :invalidate nil)))))
+ (/show0 "done with loop over *!BUILTIN-CLASSOIDS*"))
 
-;;; Now that we have set up the class heterarchy, seal the sealed
+;;; Now that we have set up the class hierarchy, seal the sealed
 ;;; classes. This must be done after the subclasses have been set up.
 (!cold-init-forms
-  (dolist (x +!built-in-classes+)
+  (dolist (x *builtin-classoids*)
     (destructuring-bind (name &key (state :sealed) &allow-other-keys) x
       (setf (classoid-state (find-classoid name)) state))))
 
@@ -1208,24 +1403,29 @@ between the ~A definition and the ~A definition"
     (warn "making ~(~A~) class ~S writable" it (classoid-name classoid))
     (setf (classoid-state classoid) nil)))
 
-;;; Mark LAYOUT as invalid. Setting DEPTHOID -1 helps cause unsafe
-;;; structure type tests to fail. Remove class from all superclasses
+;;; Mark LAYOUT as invalid. This is called only on CONDITION and STRUCTURE
+;;; subtypes when redefining incompatibly. PCL objects use invalidate-wrapper.
+;;; Remove class from all superclasses
 ;;; too (might not be registered, so might not be in subclasses of the
 ;;; nominal superclasses.)  We set the layout-clos-hash slots to 0 to
 ;;; invalidate the wrappers for specialized dispatch functions, which
 ;;; use those slots as indexes into tables.
-(defun %invalidate-layout (layout)
-  (declare (type layout layout))
-  (setf (layout-invalid layout) t
-        (layout-depthoid layout) -1)
-  (setf (layout-clos-hash layout) 0)
-  (let ((inherits (layout-inherits layout))
-        (classoid (layout-classoid layout)))
-    (%modify-classoid classoid)
-    (dovector (super inherits)
-      (let ((subs (classoid-subclasses (layout-classoid super))))
-        (when subs
-          (remhash classoid subs)))))
+(defun %invalidate-layout (wrapper)
+  (declare (type wrapper wrapper))
+  #+sb-xc-host (error "Can't invalidate layout ~S" wrapper)
+  #-sb-xc-host
+  (progn
+    (setf (wrapper-invalid wrapper) t)
+    ;; Ensure that the INVALID slot conveying ancillary data describing the
+    ;; invalidity reason is published before causing the invalid layout trap.
+    (sb-thread:barrier (:write))
+    #+metaspace (setf (layout-clos-hash (wrapper-friend wrapper)) 0)
+    (setf (wrapper-clos-hash wrapper) 0)
+    (let ((inherits (wrapper-inherits wrapper))
+          (classoid (wrapper-classoid wrapper)))
+      (%modify-classoid classoid)
+      (dovector (super inherits)
+        (remove-subclassoid classoid (wrapper-classoid super)))))
   (values))
 
 ;;;; cold loading initializations
@@ -1236,14 +1436,14 @@ between the ~A definition and the ~A definition"
 ;;; late in the build-order.lisp-expr sequence, and be put in
 ;;; !COLD-INIT-FORMS there?
 (defun !class-finalize ()
-  (dohash ((name layout) *forward-referenced-layouts*)
+  (dohash ((name wrapper) *forward-referenced-wrappers*)
     (let ((class (find-classoid name nil)))
       (cond ((not class)
-             (setf (layout-classoid layout) (make-undefined-classoid name)))
-            ((eq (classoid-layout class) layout)
-             (remhash name *forward-referenced-layouts*))
+             (error "How is there no classoid for ~S ?" name))
+            ((eq (classoid-wrapper class) wrapper)
+             (remhash name *forward-referenced-wrappers*))
             (t
              (error "Something strange with forward layout for ~S:~%  ~S"
-                    name layout))))))
+                    name wrapper))))))
 
 (!defun-from-collected-cold-init-forms !classes-cold-init)

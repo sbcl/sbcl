@@ -139,7 +139,7 @@
   (:note "inline constant comparison")
   (:variant-vars condition not-condition)
   (:generator 2
-    (inst cmp x (sb-xc:char-code y))
+    (inst cmp x (char-code y))
     (inst b (if not-p not-condition condition) target)
     (inst nop)))
 

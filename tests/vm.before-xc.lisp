@@ -25,10 +25,10 @@
           (not (immediate-constant-sc x)))))
   ;; target fixnums can be dealt with as immediates; target bignums
   ;; can not.
-  (yes #.sb-xc:most-positive-fixnum)
-  (yes #.sb-xc:most-negative-fixnum)
-  (no #.(1+ sb-xc:most-positive-fixnum))
-  (no #.(1- sb-xc:most-negative-fixnum)))
+  (yes #.most-positive-fixnum)
+  (yes #.most-negative-fixnum)
+  (no #.(1+ most-positive-fixnum))
+  (no #.(1- most-negative-fixnum)))
 
 ;; Assert that DO-PACKED-TNS has unsurprising behavior if the body RETURNs.
 ;; This isn't a test in the problem domain of CL - it's of an internal macro,
@@ -50,7 +50,7 @@
            (expect     (append normal restricted wired))
            (comp       (sb-c::make-empty-component))
            (ir2-comp   (sb-c::make-ir2-component)))
-      (setf (sb-c::component-info comp) ir2-comp
+      (setf (sb-c:component-info comp) ir2-comp
             (sb-c::ir2-component-normal-tns ir2-comp) (link normal)
             (sb-c::ir2-component-restricted-tns ir2-comp) (link restricted)
             (sb-c::ir2-component-wired-tns ir2-comp) (link wired))

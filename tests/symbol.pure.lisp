@@ -65,3 +65,10 @@
                "DEFINE-TYPE-VOP"
                "DEFINE-PRIMITIVE-OBJECT"))
     (assert (not (apropos-list s)))))
+
+(with-test (:name :progv-no-body)
+  (checked-compile-and-assert
+   ()
+   '(lambda (vars vals)
+     (progv vars vals))
+   ((nil nil) nil)))

@@ -17,7 +17,7 @@
 ;;; and is one of the lower bounds on the number of argument-
 ;;; passing registers), and thus don't need a call frame, which
 ;;; simplifies things for the normal call/return case. When it
-;;; is neccessary for one of the assembly-functions to call a
+;;; is necessary for one of the assembly-functions to call a
 ;;; static-function it will construct the required call frame.
 ;;; Also, none of the assembly-routines return other than one
 ;;; value, which again simplifies the return path.
@@ -30,7 +30,7 @@
      (values
       `((inst call (make-fixup ',name :assembly-routine)))
       nil))
-    (:full-call
+    ((:full-call :full-call-no-return)
      (values
       `((note-this-location ,vop :call-site)
         (inst call (make-fixup ',name :assembly-routine))
@@ -44,4 +44,4 @@
     (:full-call
      `((inst clc)
        (inst ret)))
-    (:none)))
+    ((:none :full-call-no-return))))

@@ -52,6 +52,7 @@
   ;; which is used for a fixed #\NULL so that when we call out to C
   ;; we don't need to cons a new copy)
   (n-pad-elements (missing-arg) :type index :read-only t))
+(declaim (freeze-type specialized-array-element-type-properties))
 
 (define-load-time-global *specialized-array-element-type-properties*
   (map 'simple-vector
@@ -59,25 +60,23 @@
          (apply #'!make-saetp args))
        `(;; Erm.  Yeah.  There aren't a lot of things that make sense
          ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
-         (nil #:mu 0 simple-array-nil
-              :complex-typecode #.complex-vector-nil-widetag)
+         (nil #:mu 0 simple-array-nil)
          #-sb-unicode
-         (character ,(code-char 0) 8 simple-base-string
+         (character ,(cl:code-char 0) 8 simple-base-string
                     ;; (SIMPLE-BASE-STRINGs are stored with an extra
                     ;; trailing #\NULL for convenience in calling out
                     ;; to C.)
                     :n-pad-elements 1
                     :complex-typecode #.complex-base-string-widetag)
          #+sb-unicode
-         (base-char ,(code-char 0) 8 simple-base-string
+         (base-char ,(cl:code-char 0) 8 simple-base-string
                     ;; (SIMPLE-BASE-STRINGs are stored with an extra
                     ;; trailing #\NULL for convenience in calling out
                     ;; to C.)
                     :n-pad-elements 1
                     :complex-typecode #.complex-base-string-widetag)
          #+sb-unicode
-         (character ,(code-char 0) 32 simple-character-string
-                    :n-pad-elements 1
+         (character ,(cl:code-char 0) 32 simple-character-string
                     :complex-typecode #.complex-character-string-widetag)
          (single-float $0.0f0 32 simple-array-single-float)
          (double-float $0.0d0 64 simple-array-double-float)
@@ -171,15 +170,88 @@
   #-sb-xc-host
   '#.*vector-without-complex-typecode-infos*)
 
-;;; Return the shift amount needed to turn length into bits
+;;; Return the shift amount needed to turn length as number of elements
+;;; into length as number of bits.
 (defun saetp-n-bits-shift (saetp)
   (max (1- (integer-length (saetp-n-bits saetp)))
        0)) ;; because of NIL
+
+#-sb-xc-host ; not computable as constant in make-host-1
+(defconstant-eqx %%simple-array-n-bits-shifts%%
+    #.(let ((a (sb-xc:make-array (1+ widetag-mask) :initial-element -1 ; "illegal"
+                                 :retain-specialization-for-after-xc-core t ; what a kludge!
+                                 :element-type '(signed-byte 8))))
+        (dovector (saetp *specialized-array-element-type-properties* a)
+          (setf (aref a (saetp-typecode saetp)) (saetp-n-bits-shift saetp))))
+  #'equalp)
+(defun simple-array-widetag->bits-per-elt (widetag)
+  #+sb-xc-host (saetp-n-bits (find widetag *specialized-array-element-type-properties*
+                                   :key #'saetp-typecode))
+  #-sb-xc-host (if (= widetag simple-array-nil-widetag)
+                   0
+                   (ash 1 (aref %%simple-array-n-bits-shifts%% widetag))))
 
 (defun saetp-index-or-lose (element-type)
   (or (position element-type sb-vm:*specialized-array-element-type-properties*
                 :key #'sb-vm:saetp-specifier :test #'equal)
       (error "No saetp for ~S" element-type)))
+
+;;; I don't understand why we didn't use this more often, instead of
+;;; having introduced special cases. Oh well, what's done is done.
+;;; At least you can grep for SAETP-N-PAD-ELEMENTS in the comments
+;;; as a signal that the padding is calculated in yet another place.
+(defun vector-n-data-octets (vector saetp)
+  (declare (type (simple-array * (*)) vector))
+  (let* ((length (+ (length vector) (saetp-n-pad-elements saetp)))
+         (n-bits (saetp-n-bits saetp))
+         (alignment-pad (floor 7 n-bits)))
+    ;; This math confuses me. So there's a self-test
+    ;; against the C code which is known good.
+    (if (>= n-bits 8)
+        (* length (ash n-bits -3))
+        (ash (* (+ length alignment-pad) n-bits) -3))))
+
+;;; Access the shadow bits for a simple rank-1 array
+;;; It is important that the pointer to these bits be a normal full-lispword
+;;; pointer, because otherwise update_page_write_prot() would fail to see
+;;; the pointer to the shadow bits.
+;;; Alternatively we could place them in malloc()'ed memory
+;;; but then we'd need a finalizer per array.
+#+ubsan
+(progn
+(export '(vector-extra-data))
+(defmacro vector-extra-data (vector)
+  `(%primitive slot ,vector 'length 1 other-pointer-lowtag))
+(defmacro set-vector-extra-data (vector data)
+  `(%primitive set-slot ,vector ,data 'length 1 other-pointer-lowtag))
+(defmacro unpoison (vector)
+  `(set-vector-extra-data ,vector 0)))
+#-ubsan
+(defmacro unpoison (vector)
+  (declare (ignore vector)))
+
+;;; Return T if arrays with the given WIDETAG may contain random data
+;;; initially unless expressly initialized.
+;;; Some types such as SB-VM:SIMPLE-ARRAY-FIXNUM-WIDETAG must not have
+;;; random bits in them because a 1 in the LSB of a word would not be
+;;; a fixnum, and could lead to corruption on use.
+(defun array-may-contain-random-bits-p (widetag)
+  (if (member widetag
+              `(,simple-bit-vector-widetag
+                ,simple-base-string-widetag
+                #+sb-unicode ,simple-character-string-widetag
+                ,simple-array-unsigned-byte-2-widetag
+                ,simple-array-unsigned-byte-4-widetag
+                ,simple-array-unsigned-byte-8-widetag
+                ,simple-array-unsigned-byte-16-widetag
+                ,simple-array-unsigned-byte-32-widetag
+                #+64-bit ,simple-array-unsigned-byte-64-widetag
+                ,simple-array-signed-byte-8-widetag
+                ,simple-array-signed-byte-16-widetag
+                ,simple-array-signed-byte-32-widetag
+                #+64-bit ,simple-array-signed-byte-64-widetag))
+      t
+      nil))
 
 (in-package "SB-C")
 

@@ -11,44 +11,66 @@
 
 (in-package "SB-VM")
 
-;;; #+SB-ASSEMBLING as we don't need VOPS, just the asm routines:
-;;; these are out-of-line versions called by VOPs.
-(fmakunbound 'define-per-register-allocation-routines)
-(defmacro define-per-register-allocation-routines ()
-  #+sb-assembling
-  ;; Don't include r11 or r13 since those are temp and thread-base respectively
-  '(progn (def rax) (def rcx) (def rdx) (def rbx) (def rsi) (def rdi)
-          (def r8) (def r9) (def r10) (def r12) (def r14) (def r15)))
-
 ;;;; Signed and unsigned bignums from word-sized integers. Argument
 ;;;; and return in the same register. No VOPs, as these are only used
 ;;;; as out-of-line versions: MOVE-FROM-[UN]SIGNED VOPs handle the
 ;;;; fixnum cases inline.
+#+sb-assembling
 (macrolet
-    ((def (reg)
+    ((signed (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
-          (inst push number)
-          (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
-          (popw number bignum-digits-offset other-pointer-lowtag))))
-  (define-per-register-allocation-routines))
-
-(macrolet
-    ((def (reg)
+          ,@(cond
+              ((eq reg 'r12) ; problematic case for INSTRUMENT-ALLOC
+               '((inst push rax-tn)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil nil)
+                 (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
+                 (inst mov number rax-tn)
+                 (inst pop rax-tn)))
+              (t
+               '((inst push number)
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
+                 (popw number bignum-digits-offset other-pointer-lowtag))))))
+     (unsigned (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst ror number (1+ n-fixnum-tag-bits)) ; restore unrotated value
-          (inst push number)
-          (inst test number number) ; rotates do not update SF
-          (inst jmp :ns one-word-bignum)
-          ;; Two word bignum
-          (alloc-other number bignum-widetag (+ bignum-digits-offset 2) nil)
-          (popw number bignum-digits-offset other-pointer-lowtag)
-          (inst ret)
-          ONE-WORD-BIGNUM
-          (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
-          (popw number bignum-digits-offset other-pointer-lowtag))))
-  (define-per-register-allocation-routines))
+          (inst test number number)     ; rotates do not update SF
+          ,@(cond
+              ((eq reg 'r12) ; problematic case for INSTRUMENT-ALLOC
+               '((inst push rax-tn)
+                 (inst jmp :ns one-word-bignum)
+                 ;; Two word bignum
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) rax-tn nil nil nil)
+                 (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
+                 (inst mov number rax-tn)
+                 (inst pop rax-tn)
+                 (inst ret)
+                 ONE-WORD-BIGNUM
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) rax-tn nil nil nil)
+                 (storew number rax-tn bignum-digits-offset other-pointer-lowtag)
+                 (inst mov number rax-tn)
+                 (inst pop rax-tn)))
+              (t
+               '((inst push number)
+                 (inst jmp :ns one-word-bignum)
+                 ;; Two word bignum
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 2) number nil nil nil)
+                 (popw number bignum-digits-offset other-pointer-lowtag)
+                 (inst ret)
+                 ONE-WORD-BIGNUM
+                 (alloc-other bignum-widetag (+ bignum-digits-offset 1) number nil nil nil)
+                 (popw number bignum-digits-offset other-pointer-lowtag))))))
+     (define (op)
+       ;; R13 is usually the thread register, but might not be
+       `(progn
+          ,@(loop for reg in '(rax rcx rdx rbx rsi rdi
+                               r8 r9 r10 r11 r12
+                               #+gs-seg r13
+                               r14 r15)
+                  collect `(,op ,reg)))))
+  (define signed)
+  (define unsigned))
 
 #+sb-thread
 (define-assembly-routine (alloc-tls-index
@@ -74,7 +96,7 @@
     (pseudo-atomic ()
      (assemble () ; for conversion of tagbody-like labels to assembler labels
      RETRY
-       (inst bts :qword free-tls-index-ea lock-bit :lock)
+       (inst bts :qword :lock free-tls-index-ea lock-bit)
        (inst jmp :nc got-tls-index-lock)
        (inst pause) ; spin loop hint
        ;; TODO: yielding the CPU here might be a good idea
@@ -87,7 +109,7 @@
        ;; CMP against memory showed the tls-index to be valid, so clear the lock
        ;; and re-read the memory (safe because transition can only occur to
        ;; a nonzero value), then jump out to end the PA section.
-       (inst btr :qword free-tls-index-ea lock-bit :lock)
+       (inst btr :qword :lock free-tls-index-ea lock-bit)
        (inst mov :dword symbol (tls-index-of symbol))
        (inst jmp done)
      NEW-TLS-INDEX
@@ -103,7 +125,7 @@
        ;; Load scratch-reg with a constant that clears the lock bit
        ;; and bumps the free index in one go.
        (inst mov scratch-reg (+ (- (ash 1 lock-bit)) n-word-bytes))
-       (inst add :qword free-tls-index-ea scratch-reg :lock)
+       (inst add :qword :lock free-tls-index-ea scratch-reg)
        (inst pop scratch-reg)
      DONE)) ; end PSEUDO-ATOMIC
     (inst ret)
@@ -111,7 +133,7 @@
     ;; The disassembly of this code looks nicer when the failure path
     ;; immediately follows the ordinary path vs. being in *ELSEWHERE*.
     (inst pop scratch-reg) ; balance the stack
-    (inst btr :qword free-tls-index-ea lock-bit :lock)
+    (inst btr :qword :lock free-tls-index-ea lock-bit)
     (%clear-pseudo-atomic)
     ;; There's a spurious RET instruction auto-inserted, but no matter.
     (error-call nil 'tls-exhausted-error)))

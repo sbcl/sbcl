@@ -17,14 +17,16 @@
 (with-test (:name :weak-vector)
   (let ((a *weak-vect*)
         (random-symbol (make-symbol "FRED")))
-    (setf (aref a 0) (cons 'foo 'bar)
-          (aref a 1) (format nil "Time is: ~D~%" (get-internal-real-time))
-          (aref a 2) 'interned-symbol
-          (aref a 3) random-symbol
-          (aref a 4) 18
-          (aref a 5) (+ most-positive-fixnum (random 100) (random 100))
-          (aref a 6) (make-hash-table))
-    (assert (typep (aref a 5) 'bignum))
+    (flet ((x ()
+             (setf (aref a 0) (cons 'foo 'bar)
+                   (aref a 1) (format nil "Time is: ~D~%" (get-internal-real-time))
+                   (aref a 2) 'interned-symbol
+                   (aref a 3) random-symbol
+                   (aref a 4) 18
+                   (aref a 5) (+ most-positive-fixnum 1 (random 100) (random 100))
+                   (aref a 6) (make-hash-table))))
+      (declare (notinline x)) ;; Leave all the values below the stack pointer for
+      (x))                    ;; scrub-control-stack to work
     (assert (weak-vector-p a))
     (sb-sys:scrub-control-stack)
     (gc)
@@ -33,22 +35,7 @@
     (assert (= (aref a 4) 18))
     ;; broken cells are the cons, string, bignum, hash-table, plus one NIL
     ;; cell that was never assigned into
-    (assert (= (count nil *weak-vect*) 5))))
-
-;;; Make sure MAP-REFERENCING-OBJECTS doesn't spuriously treat raw bits as
-;;; potential pointers. Also make sure it sees the SYMBOL-INFO slot.
-(defstruct afoo (slot nil :type sb-ext:word))
-(defvar *afoo* (make-afoo :slot (sb-kernel:get-lisp-obj-address '*posix-argv*)))
-(with-test (:name :map-referencing-objs)
-  (sb-vm::map-referencing-objects (lambda (x) (assert (not (typep x 'afoo))))
-                                  :dynamic '*posix-argv*)
-  (let ((v (sb-kernel:symbol-info 'satisfies)) referers)
-    (sb-vm::map-referencing-objects (lambda (referer) (push referer referers))
-                                    #+gencgc :dynamic #-gencgc :static v)
-    #+immobile-space
-    (sb-vm::map-referencing-objects (lambda (referer) (push referer referers))
-                                    :immobile v)
-    (assert (member 'satisfies referers))))
+    *weak-vect*))
 
 ;; Assert something about *CURRENT-THREAD* seeing objects that it just consed.
 (with-test (:name :m-a-o-threadlocally-precise
@@ -99,8 +86,7 @@
 ;;; (I don't know what platforms it passes on, but at least these two it does)
 (with-test (:name :repeatably-count-allocated-objects
             :skipped-on (or (not (or :x86 :x86-64))
-                            :interpreter)
-            :fails-on (not :sb-thread))
+                            :interpreter))
   (let ((a (make-array 5)))
     (dotimes (i (length a))
       (setf (aref a i) (count-dynamic-space-objects))
@@ -121,16 +107,6 @@
     ;; Really we could just assert /= 1000.
     (assert (< (length l) 15))))
 
-(defparameter *x* ())
-
-(defun cons-madly ()
-  (loop repeat 10000 do
-        (setq *x* (make-string 100000))))
-
-;; check that WITHOUT-INTERRUPTS doesn't block the gc trigger
-(with-test (:name :cons-madly-without-interrupts)
-  (sb-sys:without-interrupts (cons-madly)))
-
 ;; check that WITHOUT-INTERRUPTS doesn't block SIG_STOP_FOR_GC
 (with-test (:name :gc-without-interrupts
             :skipped-on (not :sb-thread))
@@ -138,33 +114,50 @@
    (let ((thread (sb-thread:make-thread (lambda () (sb-ext:gc)))))
      (loop while (sb-thread:thread-alive-p thread)))))
 
-(with-test (:name :without-gcing)
-  (let ((gc-happend nil))
-    (push (lambda () (setq gc-happend t)) sb-ext:*after-gc-hooks*)
+(defglobal *some-object-handles* nil)
+(defun make-some-objects ()
+  (declare (notinline format))
+  (let* ((string-one (format nil "~a~a~a" "pot" "ayt" "o"))
+         (string-two (concatenate 'string "two " string-one))
+         (afunction
+          (let (#+immobile-space (sb-c::*compile-to-memory-space* :dynamic))
+            (compile nil `(sb-int:named-lambda ,string-two (x) (coerce x 'float))))))
+    (setq *some-object-handles*
+          (list (sb-kernel:get-lisp-obj-address afunction)
+                (sb-kernel:get-lisp-obj-address string-one)
+                (sb-kernel:get-lisp-obj-address string-two)))))
+#+gencgc
+(with-test (:name :pin-all-code-with-gc-enabled
+                  :skipped-on :interpreter)
+  (gc)
+  #+sb-thread (sb-thread:join-thread (sb-thread:make-thread #'make-some-objects))
+  #-sb-thread (progn (make-some-objects) (sb-sys:scrub-control-stack))
+  (sb-sys:with-code-pages-pinned (:dynamic) (gc))
+  ;; this should not fail to find FUN at its old address
+  (let ((fun (sb-kernel:make-lisp-obj (first *some-object-handles*))))
+    ;; this should fail to find a string at its old address
+    (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (second *some-object-handles*) nil))))
+    ;; this should similarly fail- STRING-TWO was transitively reachable but movable
+    (multiple-value-bind (obj validp) (sb-kernel:make-lisp-obj (third *some-object-handles*) nil)
+      (if validp
+          (warn "Weird: obj=~s" obj)))
+    ;; (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (third *some-object-handles*) nil))))
+    (assert (string= (sb-kernel:%simple-fun-name fun) "two potayto"))))
 
-    ;; check that WITHOUT-GCING defers explicit gc
-    (sb-sys:without-gcing
-      (gc)
-      (assert (not gc-happend)))
-    (assert gc-happend)
+#+immobile-space
+(with-test (:name :generation-of-fdefn)
+  ;; generation-of broke when fdefns stopped storing a generation in word 0
+  (assert (= (sb-kernel:generation-of (sb-int:find-fdefn 'car))
+             sb-vm:+pseudo-static-generation+)))
 
-    ;; check that WITHOUT-GCING defers SIG_STOP_FOR_GC
-    #+sb-thread
-    (let ((in-without-gcing nil))
-      (setq gc-happend nil)
-      (sb-thread:make-thread (lambda ()
-                               (loop while (not in-without-gcing))
-                               (sb-ext:gc)))
-      (sb-sys:without-gcing
-        (setq in-without-gcing t)
-        (sleep 3)
-        (assert (not gc-happend)))
-      ;; give the hook time to run
-      (sleep 1)
-      (assert gc-happend))))
+(with-test (:name :static-fdefn-space)
+  (sb-int:dovector (name sb-vm:+static-fdefns+)
+    (assert (eq (sb-ext:heap-allocated-p (sb-int:find-fdefn name))
+                (or #+immobile-code :immobile :static)))))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
-(with-test (:name :bug-529014 :skipped-on (not :gencgc))
+#+gencgc ; sb-ext: symbol was removed for cheneygc
+(with-test (:name :bug-529014)
   (loop for i from 0 to sb-vm:+pseudo-static-generation+
      do (assert (= (sb-ext:generation-bytes-consed-between-gcs i)
                    (truncate (sb-ext:bytes-consed-between-gcs)
@@ -206,12 +199,13 @@
                   :skipped-on :cheneygc)
   ;; The interpreters (both sb-eval and sb-fasteval) special-case
   ;; WITH-PINNED-OBJECTS as a "special form", because the x86oid
-  ;; version of WITH-PINNED-OBJECTS uses black magic that isn't
-  ;; supportable outside of the compiler.  The non-x86oid versions of
-  ;; WITH-PINNED-OBJECTS don't use black magic, but are overridden
-  ;; anyway.  But the special-case logic was, historically broken, and
-  ;; this affects all gencgc targets (cheneygc isn't affected because
-  ;; cheneygc WITH-PINNED-OBJECTS devolves to WITHOUT-GC>ING).
+  ;; version of WITH-PINNED-OBJECTS uses special functionality that
+  ;; isn't supportable outside of the compiler.  The non-x86oid
+  ;; versions of WITH-PINNED-OBJECTS don't use this special
+  ;; functionality, but are overridden anyway.  But the special-case
+  ;; logic was, historically broken, and this affects all gencgc
+  ;; targets (cheneygc isn't affected because cheneygc
+  ;; WITH-PINNED-OBJECTS devolves to WITHOUT-GCING).
   ;;
   ;; Our basic approach is to allocate some kind of object and stuff
   ;; it where it doesn't need to be on the control stack.  We then pin
@@ -229,8 +223,8 @@
 #+gencgc
 (defun ensure-code/data-separation ()
   (let* ((n-bits (+ sb-vm:next-free-page 10))
-         (code-bits (make-array n-bits :element-type 'bit))
-         (data-bits (make-array n-bits :element-type 'bit))
+         (code-bits (make-array n-bits :element-type 'bit :initial-element 0))
+         (data-bits (make-array n-bits :element-type 'bit :initial-element 0))
          (total-code-size 0))
     (sb-vm:map-allocated-objects
      (lambda (obj type size)
@@ -253,7 +247,7 @@
      :dynamic)
     (assert (not (find 1 (bit-and code-bits data-bits))))
     (let* ((code-bytes-consumed
-             (* (count 1 code-bits) sb-vm:gencgc-card-bytes))
+             (* (count 1 code-bits) sb-vm:gencgc-page-bytes))
            (waste
              (- total-code-size code-bytes-consumed)))
       ;; This should be true for all platforms.
@@ -275,42 +269,7 @@
                    sb-vm:fixedobj-space-size
                    sb-vm:varyobj-space-size)))))
 
-;;; After each iteration of FOO there are a few pinned conses.
-;;; On alternate GC cycles, those get promoted to generation 1.
-;;; When the logic for page-spanning-object zeroing incorrectly decreased
-;;; the upper bound on bytes used for partially pinned pages, it caused
-;;; an accumulation of pages in generation 1 each with 2 objects' worth
-;;; of bytes, and the remainder waste. Because the waste was not accounted
-;;; for, it did not trigger GC enough to avoid heap exhaustion.
-(with-test (:name :smallobj-auto-gc-trigger)
-  ;; Ensure that these are compiled functions because the interpreter
-  ;; would make lots of objects of various sizes which is insufficient
-  ;; to provoke the bug.
-  (setf (symbol-function 'foo)
-        (compile nil '(lambda () (list 1 2))))
-  ;; 500 million iterations of this loop seems to be reliable enough
-  ;; to show that GC happens.
-  (setf (symbol-function 'callfoo)
-        (compile nil '(lambda () (loop repeat 500000000 do (foo)))))
-  (funcall 'callfoo))
-
-;;; Pseudo-static large objects should retain the single-object flag
-#+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
-(with-test (:name :pseudostatic-large-objects)
-  (sb-vm:map-allocated-objects
-   (lambda (obj type size)
-     (declare (ignore type size))
-     (when (>= (sb-vm::primitive-object-size obj) (* 4 sb-vm:gencgc-card-bytes))
-       (let* ((addr (sb-kernel:get-lisp-obj-address obj))
-              (pte (deref sb-vm:page-table (sb-vm:find-page-index addr))))
-         (when (eq (slot pte 'sb-vm::gen) sb-vm:+pseudo-static-generation+)
-           (let* ((flags (slot pte 'sb-vm::flags))
-                  (type (ldb (byte 5 (+ #+big-endian 3)) flags)))
-             (assert (logbitp 4 type)))))))
-   :all))
-
-#+64-bit ; code-serialno not defined unless 64-bit
-(with-test (:name :unique-code-serialno)
+(with-test (:name :unique-code-serialno :skipped-on :interpreter)
   (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))
     (sb-vm:map-allocated-objects
      (lambda (obj type size)
@@ -322,27 +281,199 @@
            (setf (aref a serial) 1))))
      :all)))
 
-(defvar *foo*)
-#+gencgc
-(with-test (:name :traceroot-simple-fun)
-  (setq *foo* (compile nil '(lambda () 42)))
-  (let ((wp (sb-ext:make-weak-pointer *foo*)))
-    (assert (eql (sb-ext:search-roots wp) 1))))
+(defun parse-address-range (line)
+  ;; I hope nothing preceding the match of "-" could be a false positive.
+  ;; If there is, I suspect we should parse the legend that contains
+  ;;  "REGION TYPE                      START - END" to determine the column
+  ;; with a #\- which appears consistently in the same place on each following line.
+  (let ((separator (position #\- line)))
+    (assert separator)
+    (let* ((start separator))
+      (loop (if (digit-char-p (char line (1- start)) 16) (decf start) (return)))
+      (values (parse-integer line :start start :end separator :radix 16)
+              (multiple-value-bind (value end)
+                (parse-integer line :start (1+ separator) :radix 16 :junk-allowed t)
+                (assert (and (> end (+ separator 3))
+                             (or (= end (length line))
+                                 (char= (char line end) #\space))))
+                value)))))
 
-#+gencgc
-(with-test (:name :traceroot-ignore-immediate)
-  (gc-and-search-roots (make-weak-pointer 48)))
+(defun get-shared-library-maps ()
+  (let (result)
+    #+linux
+    (with-open-file (f "/proc/self/maps")
+      (loop (let ((line (read-line f nil)))
+              (unless line (return))
+              (when (and (search "r-xp" line) (search ".so" line))
+                (let ((p (position #\- line)))
+                  (let ((start (parse-integer line :end p :radix 16))
+                        (end (parse-integer line :start (1+ p) :radix 16
+                                                 :junk-allowed t)))
+                    (push `(,start . ,end) result)))))))
+    #+darwin
+    (let ((p (run-program "/usr/bin/vmmap" (list (write-to-string (sb-unix:unix-getpid)))
+                          :output :stream
+                          :wait nil)))
+      (with-open-stream (s (process-output p))
+        (loop (let ((line (read-line s)))
+                (when (search "regions for" line) (return))))
+        (assert (search "REGION TYPE" (read-line s)))
+        (loop (let ((line (read-line s)))
+                (when (zerop (length line)) (return))
+                ;; Look for lines that look like
+                ;; "{mumble} 7fff646c8000-7fff646ca000 {mumble}.dylib"
+                (when (search ".dylib" line)
+                  (multiple-value-bind (start end) (parse-address-range line)
+                    (push `(,start . ,end) result))))))
+      (process-wait p))
+    result))
+
+;;; Change 7143001bbe7d50c6 contained little to no rationale for why Darwin could
+;;; deadlock, and how adding a WITHOUT-GCING to SAP-FOREIGN-SYMBOL fixed anything.
+;;; Verify that it works fine while invoking GC in another thread
+;;; despite removal of the mysterious WITHOUT-GCING.
+#+sb-thread
+(with-test (:name :sap-foreign-symbol-no-deadlock
+                  :skipped-on :interpreter) ;; needlessly slow when interpreted
+  (let* ((worker-thread
+          (sb-thread:make-thread
+           (lambda (ranges)
+             (dolist (range ranges)
+               (let ((start (car range))
+                     (end (cdr range))
+                     (prevsym "")
+                     (nsyms 0))
+                 (loop for addr from start to end by 8
+                       repeat 100
+                       do (let ((sym (sb-sys:sap-foreign-symbol (sb-sys:int-sap addr))))
+                            (when (and sym (string/= sym prevsym))
+                              (incf nsyms)
+                              (setq prevsym sym))))
+                 #+nil (format t "~x ~x: ~d~%" start end nsyms))))
+           :arguments (list (get-shared-library-maps))))
+         (working t)
+         (gc-thread
+          (sb-thread:make-thread
+           (lambda ()
+             (loop while working do (gc) (sleep .01))))))
+    (sb-thread:join-thread worker-thread)
+    (setq working nil)
+    (sb-thread:join-thread gc-thread)))
+
+;;; This loop doesn't work for #+use-cons-region (it will run forever)
+;;; because you can't hit the end of a page. Also, it's not clear that it should
+;;; ever have worked, because the check at the bottom of lisp_alloc() for whether
+;;; we're near the end of a page will discard the last few objects in favor of
+;;; returning a brand new region.  I guess as long as the inline allocator is
+;;; always used, it's fine. But the inline code wasn't always used on x86.
+;;; So how did that work?
+(defun use-up-thread-region ()
+  ;; cons until the thread-local allocation buffer uses up a page
+  (loop
+   (let* ((c (cons 1 2))
+          (end (+ (sb-kernel:get-lisp-obj-address c)
+                  (- sb-vm:list-pointer-lowtag)
+                  (* 2 sb-vm:n-word-bytes))))
+     (when (zerop (logand end (1- sb-vm:gencgc-page-bytes)))
+       (return)))))
+(defglobal *go* nil)
 
 #+sb-thread
-(with-test (:name :concurrently-alloc-code)
-  (let ((gc-thread
-         (sb-thread:make-thread
-          (let ((stop (+ (get-internal-real-time)
-                         internal-time-units-per-second)))
-            (lambda ()
-              (loop while (<= (get-internal-real-time) stop)
-                    do (gc) (sleep 0)))))))
-    (loop (compile nil `(lambda () (print 20)))
-          (unless (sb-thread:thread-alive-p gc-thread)
-            (return)))
-    (sb-thread:join-thread gc-thread)))
+(with-test (:name :c-call-save-p :skipped-on (or :interpreter
+                                                 :use-cons-region))
+  ;; Surely there's a better way to assert that registers get onto the stack
+  ;; (so they can be seen by GC) than by random hammering on (LIST (LIST ...)).
+  ;; This should probably be in gc-testlib.c. Or better yet: get rid of #+sb-safepoint
+  ;; for #+win32, and store the machine context the same as for #-sb-safepoint.
+  (let* ((fun (compile nil '(lambda (a b c d e f g h i j k l m)
+                             (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
+                             (setq *go* t)
+                             #+win32
+                             (alien-funcall (extern-alien "Sleep" (function void int))  300)
+                             #-win32
+                             (alien-funcall (extern-alien "sb_nanosleep" (function void int int)) 0 300000000)
+                             (values a b c d e f g h i j k l m))))
+         (thr (sb-thread:make-thread (lambda ()
+                                       (let ((args #1=(list (LIST 'A) (LIST 'B) (LIST 'C)
+                                                            (LIST 'D) (LIST 'E) (LIST 'F) (LIST 'G)
+                                                            (LIST 'H) (LIST 'I) (LIST 'J) (LIST 'K)
+                                                            (LIST 'L) (LIST 'M))))
+                                         (use-up-thread-region)
+                                         (apply fun
+                                                args))))))
+    (loop (sb-thread:barrier (:read))
+          (if *go* (return))
+          (sleep .1))
+    (gc)
+    (assert (equal (multiple-value-list (sb-thread:join-thread thr)) #1#))))
+
+#+gencgc
+(progn
+(defun code-iterator (how)
+  (let ((n 0) (tot-bytes 0))
+    (sb-int:dx-flet ((visit (obj type size)
+                       (declare (ignore obj))
+                       (when (= type sb-vm:code-header-widetag)
+                         (incf n)
+                         (incf tot-bytes size))))
+    (ecase how
+      (:slow (sb-vm:map-allocated-objects #'visit :dynamic))
+      (:fast (sb-vm::walk-dynamic-space #'visit #x7f 3 3)))
+    (values n tot-bytes))))
+(compile 'code-iterator)
+
+(with-test (:name :code-iteration-fast)
+  (sb-int:binding* (((slow-n slow-bytes) (code-iterator :slow))
+                    ((fast-n fast-bytes) (code-iterator :fast)))
+    ;; Fast should be 20x to 50x faster than slow, but that's kinda sensitive
+    ;; to the machine and can't be reliably asserted.
+    (assert (= slow-n fast-n))
+    (assert (= slow-bytes fast-bytes)))))
+
+(defglobal *wp-for-signal-handler-gc-test* nil)
+#+(and gencgc unix sb-thread)
+(with-test (:name :signal-handler-gc-test)
+  (sb-thread:join-thread
+   (sb-thread:make-thread
+    (lambda ()
+      (let ((foo (make-symbol "hey")))
+        (setf *wp-for-signal-handler-gc-test* (make-weak-pointer foo))
+        (sb-sys:enable-interrupt
+         23
+         (lambda (&rest x) (declare (ignore x)) (constantly foo)))))))
+  (sb-ext:gc :gen 7)
+  ;; If fullcgc fails to see the closure that is installed as a signal handler
+  ;; (actually a closure around a closure) then the weak pointer won't survive.
+  ;; Was broken in https://sourceforge.net/p/sbcl/sbcl/ci/04296434
+  (assert (weak-pointer-value *wp-for-signal-handler-gc-test*)))
+
+;;; We can be certain that the marked status pertains to exactly one
+;;; object by ensuring that it can not share pages with other objects.
+#+gencgc (defvar *vvv* (make-array
+               (/ sb-vm:large-object-size sb-vm:n-word-bytes)))
+(gc)
+#+gencgc
+(with-test (:name :page-protected-p :broken-on :x86)
+  (if (= (sb-kernel:generation-of *vvv*) 0) (gc))
+  (assert (= (sb-kernel:generation-of *vvv*) 1))
+  (assert (sb-kernel:page-protected-p *vvv*))
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (assert (not (find 1 marks))))
+  (setf (svref *vvv* (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes))
+        (gensym))
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (assert (eql (bit marks 1) 1))) ; should be marked
+  (gc)
+  ;; Depending whether the gensym was promoted (it's now in gen1)
+  ;; the vector is or isn't marked on one of its cards.
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (ecase (sb-kernel:generation-of
+            (svref *vvv* (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes)))
+      (0
+       (assert (eql (bit marks 1) 1))) ; should be marked
+      (1
+       (assert (eql (bit marks 1) 0))))) ; should not be marked
+  (setf (svref *vvv* (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes)) 0)
+  (gc)
+  (let ((marks (sb-kernel:object-card-marks *vvv*)))
+    (assert (not (find 1 marks)))))

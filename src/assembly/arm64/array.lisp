@@ -17,35 +17,32 @@
                           (:arg-types positive-fixnum
                                       positive-fixnum
                                       positive-fixnum))
-    ((:arg type any-reg r0-offset)
+    ((:arg type any-reg r2-offset)
      (:arg length any-reg r1-offset)
-     (:arg words any-reg r2-offset)
+     (:arg words any-reg r0-offset)
      (:res result descriptor-reg r0-offset)
 
      (:temp ndescr non-descriptor-reg nl2-offset)
      (:temp pa-flag non-descriptor-reg nl3-offset)
      (:temp lra-save non-descriptor-reg nl5-offset)
-     (:temp vector descriptor-reg r8-offset)
      (:temp lr interior-reg lr-offset))
   (pseudo-atomic (pa-flag)
     (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
     (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
     (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
     (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
-    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag
-                                                   :lip nil) ;; keep LR intact as per above
+    (allocation nil ndescr other-pointer-lowtag result
+                :flag-tn pa-flag :lip nil) ;; keep LR intact as per above
 
     (move lr lra-save)
     (inst lsr ndescr type n-fixnum-tag-bits)
-    (storew ndescr vector 0 other-pointer-lowtag)
     ;; Touch the last element, to ensure that null-terminated strings
     ;; passed to C do not cause a WP violation in foreign code.
     ;; Do that before storing length, since nil-arrays don't have any
     ;; space, but may have non-zero length.
     #-gencgc
     (storew zr-tn pa-flag -1)
-    (storew length vector vector-length-slot other-pointer-lowtag)
-    (move result vector)))
+    (storew-pair ndescr 0 length vector-length-slot tmp-tn)))
 
 (define-assembly-routine (allocate-vector-on-stack
                           (:policy :fast-safe)
@@ -63,16 +60,15 @@
     (inst lsl words words (- word-shift n-fixnum-tag-bits))
     (inst add words words (* (1+ vector-data-offset) n-word-bytes))
     (inst and words words (bic-mask lowtag-mask)) ; double-word align
-    (allocation result words nil :stack-allocate-p t)
+    (allocation nil words other-pointer-lowtag result :stack-allocate-p t)
 
-    (inst stp temp length (@ result))
+    (inst stp temp length (@ tmp-tn))
     ;; Zero fill
     (assemble ()
       ;; The header word has already been set, skip it.
-      (inst add temp result (* n-word-bytes 2))
-      (inst add words result words)
+      (inst add temp tmp-tn (* n-word-bytes 2))
+      (inst add words tmp-tn words)
       LOOP
       (inst stp zr-tn zr-tn (@ temp (* n-word-bytes 2) :post-index))
       (inst cmp temp words)
-      (inst b :lt LOOP))
-    (inst orr result result other-pointer-lowtag)))
+      (inst b :lt LOOP))))

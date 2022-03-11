@@ -65,10 +65,13 @@ set -e
 #######################################################################
 
 warm_option=""
-if [ "$1" == --load ]; then
-    warm_option="--load"
+if [ "$1" == --load -o "$1" == --load-with-sb-devel ]; then
+    warm_option="$1"
     shift
 fi
+
+# Load our build configuration
+. output/build-config
 
 HOST_TYPE="${1:-sbcl}"
 
@@ -85,7 +88,7 @@ case "$HOST_TYPE" in
            INIT="-noinit"
            CORE="-core"
            ;;
-    sbcl)  LISP="${XC_LISP:-sbcl}"
+    sbcl)  LISP="${SBCL_XC_HOST%% *}"
            INIT="--no-sysinit --no-userinit"
            CORE="--core"
            ;;

@@ -87,12 +87,19 @@
   ;; as a consistency checking mechanism inside the compiler during IR2
   ;; transformation.
   always-translatable
+  ;; Function's funarg can safely skip its argument count check.
+  callee-omit-arg-count-check
   ;; If a function is called with two arguments and the first one is a
   ;; constant, then the arguments will be swapped.
-  commutative)
+  commutative
+  ;; Reoptimize this function if the node that follows it gets unlinked.
+  reoptimize-when-unlinking
+  ;; The function does not verify the arg count and must be always
+  ;; called with the right arguments and can avoid passing NARGS.
+  no-verify-arg-count)
 
-(def!struct (fun-info #-sb-xc-host (:pure t)
-                     (:copier nil))
+(defstruct (fun-info (:copier nil)
+                     #-sb-xc-host (:pure t))
   ;; boolean attributes of this function.
   (attributes (missing-arg) :type attributes)
   ;; TRANSFORM structures describing transforms for this function
@@ -148,6 +155,7 @@
   ;; a sequence of constraints (see CONSTRAINT-PROPAGATE), for the
   ;; consequent and alternative branches, respectively.
   (constraint-propagate-if nil :type (or function null))
+  (equality-constraint nil :type (or function null))
   ;; all the templates that could be used to translate this function
   ;; into IR2, sorted by increasing cost.
   (templates nil :type list)

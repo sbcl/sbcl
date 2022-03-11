@@ -11,3 +11,5 @@
            #:parse-macro
            #:enclose
            ))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-CLTL2")) t))

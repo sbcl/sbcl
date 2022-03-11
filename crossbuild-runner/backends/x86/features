@@ -1,0 +1,8 @@
+:gencgc
+:stack-grows-downward-not-upward
+:c-stack-is-control-stack
+:compare-and-swap-vops
+:unwind-to-frame-and-call-vop
+:alien-callbacks
+:cycle-counter
+:fp-and-pc-standard-save

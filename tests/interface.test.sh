@@ -19,11 +19,17 @@ use_test_subdirectory
 
 tmpscript=$TEST_FILESTEM.lisp-script
 
+# Since we execute shell scripts with "set -u" by default
+# (as performed in "subr.sh") this would correctly exit with
+# an error if SBCL_MACHINE_TYPE were unset.
+# test-util.lisp performs the setenv.
+
 # bug 881445
 case "$SBCL_MACHINE_TYPE" in
     X86-64)
         cat > $tmpscript <<EOF
-(let ((x (make-array (1- (expt 2 32)) :element-type '(unsigned-byte 8))))
+(let ((x (make-array (min (1- array-total-size-limit) (1- (expt 2 32)))
+                     :element-type '(unsigned-byte 8))))
   (assert (> (sb-kernel:dynamic-usage) (length x)))
   ;; prevent compiler from getting too smart...
   (eval x)
