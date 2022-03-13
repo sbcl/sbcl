@@ -41,22 +41,16 @@
 (defun generate-call-sequence (name style vop options)
   (declare (ignore options))
   (ecase style
-      (:raw
-       (values
-        `((note-this-location ,vop :call-site)
-          (invoke-asm-routine 'call ',name ,vop)
-          (note-this-location ,vop :single-value-return))
-        nil))
-      ((:full-call :full-call-no-return)
-       (values
-        `((note-this-location ,vop :call-site)
-          (invoke-asm-routine 'call ',name ,vop)
-          (note-this-location ,vop :single-value-return))
-        '((:save-p :compute-only))))
-      (:none
-       (values
-        `((invoke-asm-routine 'jmp ',name ,vop))
-        nil))))
+    ((:raw :full-call :full-call-no-return)
+     (values
+      `((note-this-location ,vop :call-site)
+        (invoke-asm-routine 'call ',name ,vop)
+        (note-this-location ,vop :single-value-return))
+      (if (eql style :raw) nil '((:save-p :compute-only)))))
+    (:none
+     (values
+      `((invoke-asm-routine 'jmp ',name ,vop))
+      nil))))
 
 (defun generate-return-sequence (style)
   (ecase style
