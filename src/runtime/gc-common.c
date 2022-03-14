@@ -2525,7 +2525,7 @@ scavenge_interrupt_context(os_context_t * context)
      * compile out for the registers that don't exist on a given
      * platform? */
 
-#ifdef reg_CODE
+#ifdef reg_LRA
     INTERIOR_POINTER_VARS(pc);
 #endif
 
