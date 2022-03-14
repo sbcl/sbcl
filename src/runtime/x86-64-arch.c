@@ -788,4 +788,16 @@ allocation_tracker_sized(uword_t* sp)
     gc_assert(ret);
 }
 
+lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs) {
+    extern lispobj call_into_lisp_(lispobj, lispobj *, int, struct thread *)
+        __attribute__((sysv_abi));
+    return call_into_lisp_(fun, args, nargs, get_sb_vm_thread());
+}
+
+lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs) {
+    extern lispobj call_into_lisp_first_time_(lispobj, lispobj *, int, struct thread *)
+        __attribute__((sysv_abi));
+    return call_into_lisp_first_time_(fun, args, nargs, get_sb_vm_thread());
+}
+
 #include "x86-arch-shared.inc"

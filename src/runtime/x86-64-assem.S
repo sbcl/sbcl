@@ -37,10 +37,8 @@
 // Produce position-independent code.
 // macOS does not like the general way we do this, so do something different.
 #if defined(LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_WIN32)
-#define PIC_CALL(x) x
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
 #else
-#define PIC_CALL(x) x@PLT
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
 #endif
 
@@ -116,8 +114,8 @@ GNAME(funcall1_switching_stack):
 #endif
 
 	.text
-	.globl  GNAME(call_into_lisp_first_time)
-	TYPE(GNAME(call_into_lisp_first_time))
+	.globl  GNAME(call_into_lisp_first_time_)
+	TYPE(GNAME(call_into_lisp_first_time_))
 
 /* We don't worry too much about saving registers
  * here, because we never expect to return from the initial call to lisp
@@ -125,7 +123,7 @@ GNAME(funcall1_switching_stack):
 
 	.align	align_16byte,0x90
 	.cfi_startproc
-GNAME(call_into_lisp_first_time):
+GNAME(call_into_lisp_first_time_):
 GNAME(lspmain): # so much easier to type 'b lspmain' in gdb
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
@@ -134,8 +132,8 @@ GNAME(lspmain): # so much easier to type 'b lspmain' in gdb
 	jmp     Lstack
 
 	.text
-	.globl  GNAME(call_into_lisp)
-	TYPE(GNAME(call_into_lisp))
+	.globl  GNAME(call_into_lisp_)
+	TYPE(GNAME(call_into_lisp_))
 
 /*
  * amd64 calling convention: C expects that
@@ -147,7 +145,7 @@ GNAME(lspmain): # so much easier to type 'b lspmain' in gdb
 # define SUPPORT_FOMIT_FRAME_POINTER
 #endif
 	.align	align_16byte,0x90
-GNAME(call_into_lisp):
+GNAME(call_into_lisp_):
 #ifdef SUPPORT_FOMIT_FRAME_POINTER
 	mov	%rbp,%rax
 #endif
@@ -171,19 +169,7 @@ Lstack:
 	push	%rdi	# args from C
 	push	%rsi	#
 	push	%rdx	#
-#if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GS_SEGMENT_THREAD
-#ifdef LISP_FEATURE_GCC_TLS
-	movq	GNAME(current_thread)@GOTTPOFF(%rip), THREAD_BASE_REG
-	movq	%fs:(THREAD_BASE_REG), THREAD_BASE_REG
-#elif defined LISP_FEATURE_WIN32
-	call    PIC_CALL(GNAME(read_current_thread))
-	mov	%rax, THREAD_BASE_REG
-#else
-	LOAD_PIC_VAR(specials, %rdi)
-	call    PIC_CALL(GNAME(pthread_getspecific))
-	mov	%rax, THREAD_BASE_REG
-#endif
-#endif
+	movq	%rcx, THREAD_BASE_REG
 	pop	%rcx	# num args
 	pop	%rbx	# arg vector
 	pop	%rax	# function ptr/lexenv
@@ -244,7 +230,7 @@ LsingleValue:
 #endif
 	ret
 	.cfi_endproc
-	SIZE(GNAME(call_into_lisp))
+	SIZE(GNAME(call_into_lisp_))
 
 	.text
 	.globl  GNAME(funcall_alien_callback)
