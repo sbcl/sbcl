@@ -142,106 +142,6 @@
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
 
-;;;; Storage allocation:
-
-;;; This is the main mechanism for allocating memory in the lisp heap.
-;;;
-;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
-;;; applied.  The amount of space to be allocated is SIZE bytes (which
-;;; must be a multiple of the lisp object size).
-;;;
-;;; On other platforms (Non-PPC), if STACK-P is given, then allocation
-;;; occurs on the control stack (for dynamic-extent).  In this case,
-;;; you MUST also specify NODE, so that the appropriate compiler
-;;; policy can be used, and TEMP-TN, which is needed for work-space.
-;;; TEMP-TN MUST be a non-descriptor reg. FIXME: This is not yet
-;;; implemented on PPC. We should implement this and replace the
-;;; inline stack-based allocation that presently occurs in the
-;;; VOPs. The stack-p argument is ignored on PPC.
-;;;
-;;; If generational GC is enabled, you MUST supply a value for TEMP-TN
-;;; because a temp register is needed to do inline allocation.
-;;; TEMP-TN, in this case, can be any register, since it holds a
-;;; double-word aligned address (essentially a fixnum).
-;;;
-;;; Using trap instructions for not-very-exceptional situations, such as
-;;; allocating, is clever but not very convenient when using gdb to debug.
-;;; Set the :sigill-traps feature to use SIGILL instead of SIGTRAP.
-;;;
-(defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
-  ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
-  ;; set.  If the lowtag also has a 1 bit in the same position, we're all
-  ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
-  ;; then or in the lowtag.
-  ;; Normal allocation to the heap.
-  (declare (ignore stack-p node))
-  (binding* ((imm-size (typep size '(unsigned-byte 15)))
-             ((region-base-tn field-offset)
-              (values thread-base-tn (* thread-mixed-tlab-slot n-word-bytes))))
-
-    (unless imm-size ; Make temp-tn be the size
-      (if (numberp size)
-          (inst lr temp-tn size)
-          (move temp-tn size)))
-
-    (inst ld result-tn region-base-tn field-offset)
-    (inst ld flag-tn region-base-tn (+ field-offset n-word-bytes)) ; region->end_addr
-
-    (without-scheduling ()
-         ;; CAUTION: The C code depends on the exact order of
-         ;; instructions here.  In particular, immediately before the
-         ;; TW instruction must be an ADD or ADDI instruction, so it
-         ;; can figure out the size of the desired allocation and
-         ;; storing the new base pointer back to the allocation region
-         ;; must take two instructions (one on threaded targets).
-
-         ;; Now make result-tn point at the end of the object, to
-         ;; figure out if we overflowed the current region.
-         (if imm-size
-             (inst addi result-tn result-tn size)
-             (inst add result-tn result-tn temp-tn))
-
-         ;; result-tn points to the new end of the region.  Did we go past
-         ;; the actual end of the region?  If so, we need a full alloc.
-         ;; The C code depends on this exact form of instruction.  If
-         ;; either changes, you have to change the other appropriately!
-         ;;
-         ;; We use the EQ bit of the 5-bit TO field to indicate whether this
-         ;; allocation can go on large-object pages. The trap condition
-         ;; is :LGE in that case which "spuriously fails" in the edge case
-         ;; when it could have actually used the current open region,
-         ;; exactly touching the end pointer. But that's fine, the trap
-         ;; handler doesn't bother to see whether the failure was spurious,
-         ;; because lisp_alloc() just works.
-         (let ((ok (gen-label)))
-           (declare (ignorable ok))
-           #+sigill-traps
-           (progn (inst cmpld result-tn flag-tn)
-                  (inst ble ok)
-                  (inst mfmq temp-reg-tn) ; an illegal instructions
-                  ;; KLUDGE: emit another ADD so that the sigtrap handler
-                  ;; can behave just as if the trap happened at the TD.
-                  (if imm-size
-                      (inst addi result-tn result-tn size)
-                      (inst add result-tn result-tn temp-tn)))
-           (inst td (if (eq type 'list) :lgt :lge) result-tn flag-tn)
-           #+sigill-traps (emit-label ok))
-         ;; The C code depends on exactly 1 instruction here.
-         (inst std result-tn region-base-tn field-offset))
-
-       ;; Should the allocation trap above have fired, the runtime
-       ;; arranges for execution to resume here, just after where we
-       ;; would have updated the free pointer in the alloc region.
-
-       ;; At this point, result-tn points at the end of the object.
-       ;; Adjust to point to the beginning.
-    (cond (imm-size
-           (inst addi result-tn result-tn (+ (- size) lowtag)))
-          (t
-           (inst sub result-tn result-tn temp-tn)
-           ;; Set the lowtag appropriately
-           (inst ori result-tn result-tn lowtag)))))
-
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
                                                  stack-allocate-p)
@@ -266,11 +166,6 @@
        (storew ,temp-tn ,result-tn 0 ,lowtag)
        ,@body)))
 
-(defun align-csp (temp)
-  ;; is used for stack allocation of dynamic-extent objects
-  (storew null-tn csp-tn 0 0) ; store a known-good value (don't want wild pointers below CSP)
-  (inst addi temp csp-tn lowtag-mask)
-  (inst clrrdi csp-tn temp n-lowtag-bits))
 
 ;;;; Error Code
 (defun emit-error-break (vop kind code values)
@@ -294,24 +189,23 @@
 ;;;; PSEUDO-ATOMIC
 
 ;;; handy macro for making sequences look atomic with respect to GC
-;;;
-;;; FLAG-TN must be wired to NL3.
-(defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
-  (declare (ignorable sync))
+(defmacro pseudo-atomic ((flag-tn &key elide-if (sync t)) &body forms)
   `(progn
-     (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
+     (unless ,elide-if
+       (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot)))
      ,@forms
-     (when ,sync
-       (inst sync))
-     (without-scheduling ()
-       ;; Clear PA. The low byte of THREAD-BASE-TN contains 0 as the value to store
-       (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
-       ;; Now test to see if pseudo-atomic interrupted is set.
-       (inst lhz ,flag-tn thread-base-tn (+ 2 (* n-word-bytes thread-pseudo-atomic-bits-slot)))
-       #+sigill-traps
-       (let ((continue (gen-label)))
-         (inst beq continue)
-         (inst mfmq (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg) :offset 1))
-         (emit-label continue))
-       #-sigill-traps
-       (inst twi :ne ,flag-tn 0))))
+     (unless ,elide-if
+       (when ,sync
+         (inst sync))
+       (without-scheduling ()
+         ;; Clear PA. The low byte of THREAD-BASE-TN contains 0 as the value to store
+         (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
+         ;; Now test to see if the pseudo-atomic interrupted bit is set.
+         (inst lhz ,flag-tn thread-base-tn (+ 2 (* n-word-bytes thread-pseudo-atomic-bits-slot)))
+         #+sigill-traps
+         (let ((continue (gen-label)))
+           (inst beq continue)
+           (inst mfmq (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg) :offset 1))
+           (emit-label continue))
+         #-sigill-traps
+         (inst twi :ne ,flag-tn 0)))))

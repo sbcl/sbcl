@@ -143,101 +143,6 @@
           ((control-stack)
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
-
-;;;; Storage allocation:
-
-;;; This is the main mechanism for allocating memory in the lisp heap.
-;;;
-;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
-;;; applied.  The amount of space to be allocated is SIZE bytes (which
-;;; must be a multiple of the lisp object size).
-;;;
-;;; On other platforms (Non-PPC), if STACK-P is given, then allocation
-;;; occurs on the control stack (for dynamic-extent).  In this case,
-;;; you MUST also specify NODE, so that the appropriate compiler
-;;; policy can be used, and TEMP-TN, which is needed for work-space.
-;;; TEMP-TN MUST be a non-descriptor reg. FIXME: This is not yet
-;;; implemented on PPC. We should implement this and replace the
-;;; inline stack-based allocation that presently occurs in the
-;;; VOPs. The stack-p argument is ignored on PPC.
-;;;
-;;; If generational GC is enabled, you MUST supply a value for TEMP-TN
-;;; because a temp register is needed to do inline allocation.
-;;; TEMP-TN, in this case, can be any register, since it holds a
-;;; double-word aligned address (essentially a fixnum).
-(defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
-  ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
-  ;; set.  If the lowtag also has a 1 bit in the same position, we're all
-  ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
-  ;; then or in the lowtag.
-  ;; Normal allocation to the heap.
-  (declare (ignore stack-p node)
-           (ignorable type temp-tn flag-tn))
-  #-gencgc
-  (progn
-         (if (logbitp (1- n-lowtag-bits) lowtag)
-             (progn
-               (inst ori result-tn alloc-tn lowtag))
-             (progn
-               (inst clrrwi result-tn alloc-tn n-lowtag-bits)
-               (inst ori result-tn result-tn lowtag)))
-         (if (numberp size)
-             (inst addi alloc-tn alloc-tn size)
-             (inst add alloc-tn alloc-tn size)))
-  #+gencgc
-  (binding*  ((imm-size (typep size '(unsigned-byte 15)))
-              ((region-base-tn field-offset)
-               #-sb-thread (values null-tn (- mixed-region nil-value))
-               #+sb-thread (values thread-base-tn
-                                   (* thread-mixed-tlab-slot n-word-bytes))))
-
-    (unless imm-size ; Make temp-tn be the size
-      (if (numberp size)
-          (inst lr temp-tn size)
-          (move temp-tn size)))
-
-    (inst lwz result-tn region-base-tn field-offset)
-    (inst lwz flag-tn region-base-tn (+ field-offset n-word-bytes)) ; region->end_addr
-
-    (without-scheduling ()
-         ;; CAUTION: The C code depends on the exact order of
-         ;; instructions here.  In particular, immediately before the
-         ;; TW instruction must be an ADD or ADDI instruction, so it
-         ;; can figure out the size of the desired allocation and
-         ;; storing the new base pointer back to the allocation region
-         ;; must take two instructions (one on threaded targets).
-
-         ;; Now make result-tn point at the end of the object, to
-         ;; figure out if we overflowed the current region.
-         (if imm-size
-             (inst addi result-tn result-tn size)
-             (inst add result-tn result-tn temp-tn))
-
-         ;; result-tn points to the new end of the region.  Did we go past
-         ;; the actual end of the region?  If so, we need a full alloc.
-         ;; The C code depends on this exact form of instruction.  If
-         ;; either changes, you have to change the other appropriately!
-         ;; See the ppc64 file for more explanation about this.
-         ;; (Or better yet, merge the two codebases)
-         (inst tw (if (eq type 'list) :lgt :lge) result-tn flag-tn)
-
-         ;; The C code depends on this instruction sequence taking up
-         ;; one machine instruction.
-         (inst stw result-tn region-base-tn field-offset))
-
-       ;; Should the allocation trap above have fired, the runtime
-       ;; arranges for execution to resume here, just after where we
-       ;; would have updated the free pointer in the alloc region.
-
-       ;; At this point, result-tn points at the end of the object.
-       ;; Adjust to point to the beginning.
-    (cond (imm-size
-           (inst addi result-tn result-tn (+ (- size) lowtag)))
-          (t
-           (inst sub result-tn result-tn temp-tn)
-           ;; Set the lowtag appropriately
-           (inst ori result-tn result-tn lowtag)))))
-
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
                                                  stack-allocate-p)
@@ -264,13 +169,6 @@
        (inst lr ,temp-tn (compute-object-header ,size ,type-code))
        (storew ,temp-tn ,result-tn 0 ,lowtag)
        ,@body)))
-
-(defun align-csp (temp)
-  ;; is used for stack allocation of dynamic-extent objects
-  (storew null-tn csp-tn 0 0) ; store a known-good value (don't want wild pointers below CSP)
-  (inst addi temp csp-tn lowtag-mask)
-  (inst clrrwi csp-tn temp n-lowtag-bits))
-
 
 ;;;; Error Code
 (defun emit-error-break (vop kind code values)
@@ -293,25 +191,18 @@
 
 ;;;; PSEUDO-ATOMIC
 
-;;; handy macro for making sequences look atomic
-;;;
-;;; FLAG-TN must be wired to NL3. If a deferred interrupt happens
-;;; while we have the low bits of ALLOC-TN set, we add a "large"
-;;; constant to FLAG-TN. On exit, we add FLAG-TN to ALLOC-TN which (a)
-;;; aligns ALLOC-TN again and (b) makes ALLOC-TN go negative. We then
-;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
-;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
-(defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
-  (declare (ignorable sync))
+;;; handy macro for making sequences look atomic with respect to GC
+(defmacro pseudo-atomic ((flag-tn &key elide-if (sync #+sb-thread t)) &body forms)
   `(progn
-     (without-scheduling ()
-       (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot)))
+     (unless ,elide-if
+       (without-scheduling ()
+         (inst stb null-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))))
      ,@forms
-     #+sb-thread
-     (when ,sync
-       (inst sync))
-     (without-scheduling ()
-       (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
-       ;; Now test to see if the pseudo-atomic interrupted bit is set.
-       (inst lhz ,flag-tn thread-base-tn (+ 2 (* n-word-bytes thread-pseudo-atomic-bits-slot)))
-       (inst twi :ne ,flag-tn 0))))
+     (unless ,elide-if
+       (when ,sync ; why???
+         (inst sync))
+       (without-scheduling ()
+         (inst stb thread-base-tn thread-base-tn (* n-word-bytes thread-pseudo-atomic-bits-slot))
+         ;; Now test to see if the pseudo-atomic interrupted bit is set.
+         (inst lhz ,flag-tn thread-base-tn (+ 2 (* n-word-bytes thread-pseudo-atomic-bits-slot)))
+         (inst twi :ne ,flag-tn 0)))))

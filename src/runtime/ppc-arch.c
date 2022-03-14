@@ -226,9 +226,9 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 }
 
 #define INLINE_ALLOC_DEBUG 0
-#ifdef LISP_FEATURE_CHENEYGC
-#define handle_allocation_trap(x) (0)
-#else
+#define ALLOC_TRAP_LISTIFY 1
+#define ALLOC_TRAP_CONS    2
+#define ALLOC_TRAP_GENERAL 3
 /*
  * Return non-zero if the current instruction is an allocation trap
  */
@@ -243,25 +243,29 @@ allocation_trap_p(os_context_t * context)
      * |31| TO|dst|src|  4|0|  TW - trap word
      * |31| TO|dst|src| 68|0|  TD - trap doubleword
      *
-     *   TO = #b00001 for LGT
-     *        #b00101 for LGE
+     *   TO = #b00100 for EQ
+     *        #b00001 for LGT (logical greater-than)
+     *        #b00101 for LGE (logical greater-or-equal)
+     *        #b00010 for LLT (logical less-than)
+     *        #b00110 for LLE (logical less-or-equal)
      */
     unsigned *pc = (unsigned int *)OS_CONTEXT_PC(context);
     unsigned inst = *pc;
     unsigned opcode = inst >> 26;
     unsigned src = (inst >> 11) & 0x1f;
-    // unsigned dst = (inst >> 16) & 0x1f;
+    unsigned dst = (inst >> 16) & 0x1f;
     unsigned to = (inst >> 21) & 0x1f;
     unsigned subcode = inst & 0x7ff;
 
-    if (opcode == 31 && (to == 1 || to == 5) && src == reg_NL3
+    // recognize the listify-rest-args allocation trap
+    if (opcode == 31 && to == 5 && src == dst && subcode == 4<<1)
+        return ALLOC_TRAP_LISTIFY;
+
+    // FIXME: we can remove the wired use of NL3 in the allocator
+    if (opcode == 31 && (to == 1 || to == 2)
+        && (src == reg_NL3 || dst == reg_NL3)
         && (subcode == 4<<1 || subcode == 68<<1)) {
-        /* It doesn't much matter which trap option we pick for "could be large"
-         * but I've chosen "TGE" because of the choices, that one is subject to spurious
-         * failure, and I'd prefer not to spuriously fail on a 2-word cons.
-         * (Spurious failure occurs when the EQ condition is met, meaning the allocation
-         * would have worked, but the trap happens regardless) */
-        int success = (to == 5) ? 1 : -1; // 1 = single-object page ok, -1 = not ok
+        int success = (to == 2) ? ALLOC_TRAP_CONS : ALLOC_TRAP_GENERAL;
 
         /*
          * We got the instruction.  Now, look back to make sure it was
@@ -274,7 +278,7 @@ allocation_trap_p(os_context_t * context)
         opcode = add_inst >> 26;
         if ((opcode == 31) && (266 == ((add_inst >> 1) & 0x1ff))) {
             return success;
-        } else if ((opcode == 14)) {
+        } else if (opcode == 14) {
             return success;
         } else {
             fprintf(stderr,
@@ -288,85 +292,70 @@ allocation_trap_p(os_context_t * context)
 static int
 handle_allocation_trap(os_context_t * context)
 {
-    int alloc_trap_p = allocation_trap_p(context);
+    int alloc_trap_kind = allocation_trap_p(context);
 
-    if (!alloc_trap_p) return 0;
+    if (!alloc_trap_kind) return 0;
 
     struct thread* thread = get_sb_vm_thread();
     gc_assert(!foreign_function_call_active_p(thread));
     if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
         record_backtrace_from_context(context, thread);
+
     fake_foreign_function_call(context);
+    struct interrupt_data *data = &thread_interrupt_data(thread);
+    data->allocation_trap_context = context;
+
     unsigned int *pc = (unsigned int *)OS_CONTEXT_PC(context);
 
-    /*
-     * Go back and look at the add/addi instruction.  The second src arg
-     * is the size of the allocation.  Get it and call alloc to allocate
-     * new space.
-     */
-
-    unsigned int inst = pc[-1];
-    int target = (inst >> 21) & 0x1f;
-    unsigned int opcode = inst >> 26;
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "  add inst  = 0x%08x, opcode = %d\n", inst, opcode);
-#endif
-    sword_t size = 0;
-    if (opcode == 14) {
+    if (alloc_trap_kind == ALLOC_TRAP_LISTIFY) {
+        unsigned inst = pc[0];
+        int count_reg = (inst >> 11) & 0x1f;
+        // There's a dummy trap instruction which encodes the context and result.
+        inst = pc[1];
+        unsigned context_reg = (inst >> 16) & 0x1f;
+        unsigned result_reg = (inst >> 11) & 0x1f;
+        lispobj* argv = (void*)*os_context_register_addr(context, context_reg);
+        lispobj nbytes = *os_context_register_addr(context, count_reg);
+        extern lispobj listify_rest_arg(lispobj*, sword_t);
+        lispobj result = listify_rest_arg(argv, nbytes);
+        *os_context_register_addr(context, result_reg) = result;
+        // Skip this and the next instruction
+        OS_CONTEXT_PC(context) += 8;
+    } else {
         /*
-         * ADDI temp-tn, alloc-tn, size
-         *
-         * Extract the size
+         * Go back and look at the add/addi instruction.  The second src arg
+         * is the size of the allocation.  Get it and call alloc to allocate
+         * new space.
+         * (Alternatively we could look at the trap instruction to see which
+         * register was compared against the region free pointer. Subtracting
+         * the region base would yield the size)
          */
-        size = (inst & 0xffff);
-    } else if (opcode == 31) {
-        /*
-         * ADD temp-tn, alloc-tn, size-tn
-         *
-         * Extract the size
-         */
-        int reg;
-
-        reg = (inst >> 11) & 0x1f;
-#if INLINE_ALLOC_DEBUG
-        fprintf(stderr, "  add, reg = %s\n", lisp_register_names[reg]);
-#endif
-        size = *os_context_register_addr(context, reg);
-
-    }
-
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
-#endif
-
-    char *memory;
-    {
+        unsigned int inst = pc[-1];
+        int target = (inst >> 21) & 0x1f;
+        unsigned int opcode = inst >> 26;
+        sword_t size = 0;
+        if (opcode == 14) {        // ADDI temp-tn, alloc-tn, size
+            size = (inst & 0xffff);
+        } else if (opcode == 31) { // ADD temp-tn, alloc-tn, size-tn
+            int reg;
+            reg = (inst >> 11) & 0x1f;
+            size = *os_context_register_addr(context, reg);
+        }
+        char *memory;
         extern lispobj *alloc(sword_t), *alloc_list(sword_t);
-        struct interrupt_data *data = &thread_interrupt_data(thread);
-        data->allocation_trap_context = context;
-        memory = (char*)(alloc_trap_p < 0 ? alloc_list(size) : alloc(size));
-        data->allocation_trap_context = 0;
+        memory = (char*)(alloc_trap_kind==ALLOC_TRAP_CONS ? alloc_list(size) : alloc(size));
+        // ALLOCATION wants the result to point to the end of the object!
+        *os_context_register_addr(context, target) =
+          (os_context_register_t)(memory + size);
+        // Skip 2 instructions: the trap, and the writeback of free pointer
+        OS_CONTEXT_PC(context) = (uword_t)(pc + 2); // ('pc' is of type int*)
     }
 
-    /*
-     * The allocation macro wants the result to point to the end of the
-     * object!
-     */
-    memory += size;
-
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "object end at %p\n", memory);
-#endif
-
-    *os_context_register_addr(context, target) = (unsigned long) memory;
-
+    data->allocation_trap_context = 0;
     undo_fake_foreign_function_call(context);
 
-    // Skip 2 instructions: the trap, and the writeback of free pointer
-    OS_CONTEXT_PC(context) = (uword_t)(pc + 2); // ('pc' is of type int*)
     return 1; // handled
 }
-#endif
 
 #if defined LISP_FEATURE_SB_THREAD
 static int
@@ -543,9 +532,9 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     if (signal == SIGTRAP && handle_tls_trap(context, pc, code)) return;
 #endif
 
-    if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))||
+    if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))|| // TWI NE,$NL3,0
         /* trap instruction from do_pending_interrupt */
-        code == 0x7fe00008) {
+        code == 0x7fe00008) { // TW T,0,0
         arch_clear_pseudo_atomic_interrupted(context);
         arch_skip_instruction(context);
         /* interrupt or GC was requested in PA; now we're done with the

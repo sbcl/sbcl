@@ -1170,8 +1170,7 @@ default-value-8
       (move result null-tn)
       (inst beq done)
 
-    ;; We need to do this atomically.
-    (pseudo-atomic (pa-flag :sync nil)
+    (pseudo-atomic (pa-flag :sync nil :elide-if dx-p)
       ;; Allocate a cons (2 words) for each item.
       (if dx-p
           (progn

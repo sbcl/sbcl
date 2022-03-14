@@ -10,6 +10,83 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
+
+;;;; Storage allocation:
+
+;;; This is the main mechanism for allocating memory in the lisp heap.
+;;;
+;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
+;;; applied.  The amount of space to be allocated is SIZE bytes (which
+;;; must be a multiple of the lisp object size).
+;;;
+;;; On other platforms (Non-PPC), if STACK-P is given, then allocation
+;;; occurs on the control stack (for dynamic-extent).  In this case,
+;;; you MUST also specify NODE, so that the appropriate compiler
+;;; policy can be used, and TEMP-TN, which is needed for work-space.
+;;; TEMP-TN MUST be a non-descriptor reg. FIXME: This is not yet
+;;; implemented on PPC. We should implement this and replace the
+;;; inline stack-based allocation that presently occurs in the
+;;; VOPs. The stack-p argument is ignored on PPC.
+(defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
+  (declare (ignore stack-p node))
+  (binding*  ((cons-region-p (or #+use-cons-region (eq type 'list)))
+              ((region-base-tn field-offset)
+               #-sb-thread
+               (values null-tn (- (if cons-region-p cons-region mixed-region) nil-value))
+               #+sb-thread
+               (values thread-base-tn
+                       (ash (if cons-region-p thread-cons-tlab-slot thread-mixed-tlab-slot)
+                            word-shift)))
+              (imm-size (typep size '(unsigned-byte 15))))
+
+    (unless imm-size ; Make temp-tn be the size
+      (if (numberp size)
+          (inst lr temp-tn size)
+          (move temp-tn size)))
+
+    (inst lwz result-tn region-base-tn field-offset)
+    (inst lwz flag-tn region-base-tn (+ field-offset n-word-bytes)) ; region->end_addr
+
+    ;; CAUTION: The C code depends on the exact order of
+    ;; instructions here.  In particular, immediately before the
+    ;; TW instruction must be an ADD or ADDI instruction, so it
+    ;; can figure out the size of the desired allocation, and
+    ;; storing the new base pointer back to the allocation region
+    ;; must take one instruction.
+    (without-scheduling ()
+      ;; Make result-tn point at the end of the object, to
+      ;; figure out if we overflowed the current region.
+      (if imm-size
+          (inst addi result-tn result-tn size)
+          (inst add result-tn result-tn temp-tn))
+
+      ;; result-tn points to the new end of the region.  Did we go past
+      ;; the actual end of the region?  If so, we need a full alloc.
+      ;; The C code depends on this exact form of instruction.  If
+      ;; either changes, you have to change the other appropriately!
+      ;; These two trap instructions are behaviorally the same,
+      ;; but the encoding of the TO field informs the runtime
+      ;; whether the allocation is a list or general object.
+      (if (eq type 'list)
+          (inst tw :llt flag-tn result-tn)  ; trap if region.end < new_freeptr
+          (inst tw :lgt result-tn flag-tn)) ; trap if new_freeptr > region.end
+      (inst stw result-tn region-base-tn field-offset))
+
+    ;; Execution resumes here if the trap fires.
+    ;; At this point, result-tn points at the end of the object.
+    ;; Adjust to point to the beginning.
+    (cond (imm-size
+           (inst addi result-tn result-tn (+ (- size) lowtag)))
+          (t
+           (inst sub result-tn result-tn temp-tn)
+           ;; Set the lowtag appropriately
+           (inst ori result-tn result-tn lowtag)))))
+
+(defun align-csp (temp)
+  ;; is used for stack allocation of dynamic-extent objects
+  (storew null-tn csp-tn 0 0) ; store a known-good value (don't want wild pointers below CSP)
+  (inst addi temp csp-tn lowtag-mask)
+  (inst clrrwi csp-tn temp n-lowtag-bits))
 
 ;;;; LIST and LIST*
 (define-vop (list)
@@ -34,7 +111,7 @@
                         temp)))))
       (let ((dx-p (node-stack-allocate-p node))
             (alloc (* (pad-data-block cons-size) cons-cells)))
-        (pseudo-atomic (pa-flag :sync nil)
+        (pseudo-atomic (pa-flag :sync nil :elide-if dx-p)
                  (if dx-p
                      (progn
                        (align-csp res)
@@ -86,7 +163,7 @@
   (:generator 10
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
-      (pseudo-atomic (pa-flag)
+      (pseudo-atomic (pa-flag :elide-if stack-allocate-p)
         (if stack-allocate-p
             (progn
               (align-csp result)
