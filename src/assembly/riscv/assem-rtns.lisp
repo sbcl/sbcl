@@ -320,11 +320,10 @@
   (move cfp-tn csp-tn)
   (inst addi csp-tn cfp-tn 32)
 
-  (storew ocfp-tn cfp-tn)
-  (storew ra-tn cfp-tn 1)
-  (storew code-tn cfp-tn 2)
-
   (pseudo-atomic (pa-temp)
+    (storew ocfp-tn cfp-tn)
+    (storew ra-tn cfp-tn 1)
+    (storew code-tn cfp-tn 2)
     (save-lisp-context csp-tn cfp-tn temp))
 
   ;; Call into C.

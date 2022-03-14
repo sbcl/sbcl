@@ -2542,7 +2542,11 @@ scavenge_interrupt_context(os_context_t * context)
     INTERIOR_POINTER_VARS(ctr);
 #endif
 
-#ifdef reg_CODE
+    /* Platforms without LRA pin on-stack code. Furthermore, the PC
+       must not be paired, as even on platforms with $CODE, there is
+       nothing valid to pair PC with immediately upon function
+       return. */
+#ifdef reg_LRA
     PAIR_INTERIOR_POINTER(pc);
 #endif
 
@@ -2601,7 +2605,7 @@ scavenge_interrupt_context(os_context_t * context)
 
     /* Now that the scavenging is done, repair the various interior
      * pointers. */
-#ifdef reg_CODE
+#ifdef reg_LRA
     FIXUP_INTERIOR_POINTER(pc);
 #endif
 

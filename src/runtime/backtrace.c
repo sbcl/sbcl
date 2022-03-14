@@ -328,12 +328,14 @@ int lisp_frame_previous(struct thread *thread, struct call_info *info)
         info->code =
 #ifdef reg_CODE
         (struct code*)native_pointer(this_frame->code);
-        info->pc = lra;
 #else
         (struct code *)dynamic_space_code_from_pc((char *)lra);
+#endif
+#ifdef reg_LRA
+        info->pc = lra;
+#else
         info->pc = (char*)native_pointer(lra) - (char*)info->code;
 #endif
-
         info->lra = NIL;
     } else {
         info->code = code_pointer(lra);
