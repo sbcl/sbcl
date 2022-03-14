@@ -2556,8 +2556,10 @@ scavenge_interrupt_context(os_context_t * context)
 
 #ifdef ARCH_HAS_LINK_REGISTER
 #ifndef reg_CODE
-    /* If LR has code in it don't pair it with anything else, since
-       there's reg_CODE and it may match something bogus. It will be pinned by pin_stack. */
+    /* If LR points inside a code object, and there's no reg_CODE,
+       don't pair it with anything, as there is nothing valid to pair
+       LR with. On-stack code is pinned, so there is no need to fix up
+       LR */
     int code_in_lr = 0;
 
     if (dynamic_space_code_from_pc((char *)*os_context_register_addr(context, reg_LR))) {
