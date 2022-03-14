@@ -21,5 +21,6 @@ extern void reset_printer(void);
 #include "genesis/vector.h"
 #include <stdio.h>
 extern void safely_show_lstring(struct vector*, int, FILE*);
+extern void print_list_car_ptrs(lispobj, FILE*);
 
 #endif

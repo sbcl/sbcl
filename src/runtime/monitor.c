@@ -213,33 +213,56 @@ static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
 static cmd grab_sigs_cmd;
 static cmd kill_cmd;
+static cmd threads_cmd;
 
-static int save_cmd(char **ptr) {
-#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
-    extern void gc_stop_the_world(), gc_start_the_world();
-    char *name  = parse_token(ptr);
-    if (!name) {
-        fprintf(stderr, "Need filename\n");
-        return 1;
-    }
+extern void gc_stop_the_world(), gc_start_the_world();
+static void suspend_other_threads() {
+#ifdef LISP_FEATURE_SB_THREAD
     gc_stop_the_world();
+#endif
     // It might make sense for each thread's stop-for-gc handler to close its region
     // versus doing this loop
     struct thread *th;
     for_each_thread(th) { gc_close_thread_regions(th); }
     gc_close_collector_regions();
-    save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
+}
+static void unsuspend_other_threads() {
+#ifdef LISP_FEATURE_SB_THREAD
     gc_start_the_world();
+#endif
+}
+
+static int save_cmd(char **ptr) {
+#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
+    char *name  = parse_token(ptr);
+    if (!name) {
+        fprintf(stderr, "Need filename\n");
+        return 1;
+    }
+    suspend_other_threads();
+    save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
+    unsuspend_other_threads();
 #else
     fprintf(stderr, "Unimplemented\n");
 #endif
     return 0;
 }
 
-#ifdef STANDALONE
+static int threads_cmd(char **ptr) {
+    struct thread* th;
+    fprintf(stderr, "(thread*,pthread,sb-vm:thread)\n");
+    void* pthread;
+    for_each_thread(th) {
+        memcpy(&pthread, &th->os_thread, N_WORD_BYTES);
+        fprintf(stderr, "%p %p %p\n", th, pthread, (void*)th->lisp_thread);
+    }
+    return 0;
+}
 static int verify_cmd(char **ptr) {
     gencgc_verbose = 1;
+    suspend_other_threads();
     verify_heap(0);
+    unsuspend_other_threads();
     return 0;
 }
 static int gc_cmd(char **ptr) {
@@ -250,10 +273,11 @@ static int gc_cmd(char **ptr) {
     gencgc_verbose = 2;
     pre_verify_gen_0 = 1;
     verify_gens = 0;
+    suspend_other_threads();
     collect_garbage(last_gen);
+    unsuspend_other_threads();
     return 0;
 }
-#endif
 
 static struct cmd {
     char *cmd, *help;
@@ -283,10 +307,9 @@ static struct cmd {
     {"regs", "Display current Lisp registers.", regs_cmd},
     {"search", "Search heap for object.", search_cmd},
     {"save", "Produce crashdump", save_cmd},
-#ifdef STANDALONE
+    {"threads", "List threads", threads_cmd},
     {"verify", "Check heap invariants", verify_cmd},
     {"gc", "Collect garbage", gc_cmd},
-#endif
     {NULL, NULL, NULL}
 };
 
