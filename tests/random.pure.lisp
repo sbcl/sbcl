@@ -181,7 +181,7 @@
       (assert (not (find 0.0d0 values :test-not #'=))))))
 
 (with-test (:name :float-no-consing
-            :fails-on :ppc
+            :fails-on (or :mips :ppc)
             :skipped-on :interpreter)
   (let ((fun (checked-compile `(lambda ()
                                  (declare (optimize speed))

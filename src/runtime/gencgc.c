@@ -4776,17 +4776,24 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
         large_allocation = nbytes;
 
     /* maybe we can do this quickly ... */
+    /* I'd really like this "quick" case to be more uniform in terms of whether
+     * it's allowed to occur at all. Some of the inconsistencies are:
+     * - 32-bit x86 will (or would, not sure any more) choose to use
+     *   out-of-line allocation if lexical policy favors space.
+     * - PPC at git rev 28aaa39f4e had a subtle "but-not-wrong" bug at the edge
+     *   where it trapped to C if the new free pointer was ':lge' instead of ':lgt'
+     *   the region end, fixed in rev 05047647.
+     * - other architectures may have similar issues.
+     * So because of those reasons, even if we satisfy the allocation
+     * from the TLAB it might be worth a check of whether to refill
+     * the TLAB now. */
     void *new_obj = region->free_pointer;
     char *new_free_pointer = (char*)new_obj + nbytes;
     if (new_free_pointer <= (char*)region->end_addr) {
         region->free_pointer = new_free_pointer;
-#ifdef LISP_FEATURE_X86_64
-        // Non-code allocations should never get here - it would mean there's
-        // something wrong in the inline allocator. This assertion pertains
-        // to any architecture that always uses an inline allocator.
-        // That's actually most of them, but I haven't tested that they're right.
-        // e.g. x86 forgoes inline allocation depending on policy,
-        // and git revision 05047647 tweaked the edge case for PPC.
+#if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC || \
+    defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_X86_64
+        // Most allocations should never get here, but two page types are special.
         gc_assert(page_type == PAGE_TYPE_CONS || page_type == PAGE_TYPE_CODE);
 #endif
         return(new_obj);        /* yup */

@@ -191,7 +191,7 @@
   (:generator 3
     (inst bgez amount positive)
     (inst subu ndesc zero-tn amount)
-    (inst slt temp ndesc 32)
+    (inst slt temp ndesc 32) ; FIXME: should be sltu here ?
     (inst bne temp done)
     (inst srl result number ndesc)
     (inst b done)
@@ -217,7 +217,7 @@
   (:generator 3
     (inst bgez amount positive)
     (inst subu ndesc zero-tn amount)
-    (inst slt temp ndesc 31)
+    (inst sltu temp ndesc 31)
     (inst bne temp done)
     (inst sra result number ndesc)
     (inst b done)

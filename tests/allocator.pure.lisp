@@ -50,8 +50,7 @@
 ;;; The 32-bit architectures that use GENCGC-PAGE-BYTES = 65536 are unaffected
 ;;; by the change that took the size test out of the allocator fast path.
 
-#+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
-(with-test (:name :pseudostatic-large-objects :fails-on :x86)
+(with-test (:name :pseudostatic-large-objects :fails-on (or :mips :x86))
   (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
