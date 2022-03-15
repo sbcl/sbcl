@@ -10,7 +10,7 @@
 # files for more information.
 
 CC = gcc
-CFLAGS += -g -Wall -O2
+CFLAGS += -g -Wall
 LINKFLAGS += -export-dynamic
 NM = nm -t x -p
 
