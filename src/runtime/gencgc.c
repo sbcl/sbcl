@@ -3565,11 +3565,12 @@ static void conservative_pin_code_from_return_addresses(struct thread* th) {
          object_ptr++)
         maybe_pin_code(*object_ptr);
     int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-    // Scan return registers in interrupted frames: They may contain
-    // interior code pointers that weren't spilled onto the stack, as
-    // is the case for leaf functions.
+    // Scan program counters and return registers in interrupted
+    // frames: They may contain interior code pointers that weren't
+    // spilled onto the stack, as is the case for leaf functions.
     for (i = i - 1; i >= 0; --i) {
         os_context_t* context = nth_interrupt_context(i, th);
+        maybe_pin_code(os_context_pc(context));
         maybe_pin_code((lispobj)*os_context_register_addr(context, reg_RA));
     }
 }
