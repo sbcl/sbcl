@@ -2705,13 +2705,26 @@
          (len (1- (integer-length y-abs))))
     (unless (or (not (csubtypep (lvar-type x) (specifier-type 'fixnum)))
                 (csubtypep type (specifier-type 'word))
-                (csubtypep type (specifier-type 'sb-vm:signed-word)))
+                (csubtypep type (specifier-type 'sb-vm:signed-word))
+                (>= len sb-vm:n-word-bits))
       (give-up-ir1-transform))
     (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
       (give-up-ir1-transform))
     (if (minusp y)
         `(- (ash x ,len))
         `(ash x ,len))))
+
+;;; * deals better with ASH that overflows
+(deftransform ash ((integer amount) (fixnum (constant-arg (integer 2 *))) *
+                   :result result
+                   :important nil)
+  (let ((type (lvar-type result))
+        (shift (lvar-value amount)))
+    (when (or (csubtypep type (specifier-type 'word))
+              (csubtypep type (specifier-type 'sb-vm:signed-word))
+              (>= shift sb-vm:n-word-bits))
+      (give-up-ir1-transform))
+    `(* integer ,(ash 1 shift))))
 
 (when-vop-existsp (:translate fixnum*)
   (defun fixnum* (x y type)
