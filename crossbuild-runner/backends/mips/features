@@ -1,2 +1,2 @@
-:gencgc :use-cons-region
+:gencgc :use-cons-region :soft-card-marks
 :alien-callbacks

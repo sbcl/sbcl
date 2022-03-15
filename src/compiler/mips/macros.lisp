@@ -281,33 +281,44 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
                                    &optional translate)
+  (aver translate)
   `(progn
      (define-vop (,name)
-       ,@(when translate
-           `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (index :scs (any-reg))
               (value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type)
-       (:temporary (:scs (interior-reg)) lip)
+       (:temporary (:scs (non-descriptor-reg)) temp)
+       (:vop-var vop)
        (:generator 2
-         (inst addu lip object index)
-         (storew value lip ,offset ,lowtag)))
+         ,@(if (member name '(instance-index-set %closure-index-set))
+               `((without-scheduling ()
+                   (emit-gc-store-barrier object nil temp (vop-nth-arg 2 vop) value)
+                   (inst addu temp object index)
+                   (storew value temp ,offset ,lowtag)))
+               `((inst addu temp object index)
+                 (storew value temp ,offset ,lowtag)))))
      (define-vop (,(symbolicate name "-C"))
-       ,@(when translate
-           `((:translate ,translate)))
+       (:translate ,translate)
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg))
               (value :scs ,scs))
        (:info index)
+       ,@(when (member name '(instance-index-set %closure-index-set))
+           '((:temporary (:scs (non-descriptor-reg)) temp)))
        (:arg-types ,type
                    (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
                                                 ,(eval offset)))
                    ,el-type)
+       (:vop-var vop)
        (:generator 1
-         (storew value object (+ ,offset index) ,lowtag)))))
-
+         ,@(if (member name '(instance-index-set %closure-index-set))
+               `((without-scheduling ()
+                   (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)
+                   (storew value object (+ ,offset index) ,lowtag)))
+               `((storew value object (+ ,offset index) ,lowtag)))))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs
                                       el-type &optional translate)

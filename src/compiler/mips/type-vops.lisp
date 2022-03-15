@@ -61,7 +61,6 @@
       (assemble ()
         (%test-lowtag value temp when-false t lowtag)
         (load-type temp value (- lowtag))
-        (inst nop)
         (let ((delta 0))
           (do ((remaining headers (cdr remaining)))
               ((null remaining))

@@ -1436,8 +1436,21 @@
       (:absolute
        (setf (sap-ref-32 sap offset) value))
       (:sll-sa
-       (bug "Not done yet")
-       (return-from fixup-code-object :immediate))
+       ;; VALUE is the number of bits we'd like to mask the card table index to.
+       ;; But instead of using an AND instruction, we use left-shift + right-shift.
+       ;; So it's the same as right-shift + AND but weird.
+       (let* ((inst (sap-ref-32 sap offset))
+              (next (sap-ref-32 sap (+ offset 4)))
+              (rd (ldb (byte 5 11) inst))
+              (left-shamt (- 32 (+ sb-vm::gencgc-card-shift value)))
+              (right-shamt (+ left-shamt sb-vm::gencgc-card-shift)))
+         ;; the next instruction has to be SRL rd, d, #
+         (aver (and (= (ldb (byte 11 21) next) #b00000000000)
+                    (= (ldb (byte 10 11) next) (logior (ash rd 5) rd))
+                    (= (ldb (byte 6 0) next) #b000010)))
+         (setf (sap-ref-32 sap offset) (dpb left-shamt (byte 5 6) inst))
+         (setf (sap-ref-32 sap (+ offset 4)) (dpb right-shamt (byte 5 6) next))
+         (return-from fixup-code-object :immediate)))
       (:jump
        (aver (zerop (ash value -28)))
        (setf (ldb (byte 26 0) (sap-ref-32 sap offset))

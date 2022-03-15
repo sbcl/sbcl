@@ -31,7 +31,7 @@
 #define reg_CFP     REG(22)
 #define reg_CSP     REG(23)
 #define reg_L1      REG(24)
-#define reg_DONTUSE REG(25)
+#define reg_CARDBASE REG(25)
 #define reg_NSP     REG(29)
 #define reg_CODE    REG(30)
 #define reg_LIP     REG(31)

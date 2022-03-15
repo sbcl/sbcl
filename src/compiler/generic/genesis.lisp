@@ -4019,6 +4019,7 @@ III. initially undefined function references (alphabetically):
           (cond ((and (= sb-vm:n-word-bytes 8) (= ncards 32)) 4)
                 ((and (= sb-vm:n-word-bytes 8) (= ncards 16)) 2)
                 ((and (= sb-vm:n-word-bytes 8) (= ncards 8)) 1)
+                ((and (= sb-vm:n-word-bytes 4) (= ncards 8)) 2)
                 (t (error "bad cards-per-page"))))
          (indices (loop for i below n-markwords collect i)))
     (format stream "static inline int cardseq_all_marked_nonsticky(long card) {

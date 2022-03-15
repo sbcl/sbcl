@@ -86,27 +86,58 @@
 ;;; elements are represented in integer registers and are built out of
 ;;; 8, 16, or 32 bit elements.
 (macrolet ((def-full-data-vector-frobs (type element-type &rest scs)
-  `(progn
-     (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
-       vector-data-offset other-pointer-lowtag
-       ,(remove-if #'(lambda (x) (member x '(null zero))) scs)
-       ,element-type
-       data-vector-ref)
-     (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
-       vector-data-offset other-pointer-lowtag ,scs ,element-type
-       data-vector-set)))
-
+             `(progn (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
+                       vector-data-offset other-pointer-lowtag
+                       ,(remove-if #'(lambda (x) (member x '(null zero))) scs)
+                       ,element-type
+                       data-vector-ref)
+                     (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
+                       vector-data-offset other-pointer-lowtag ,scs ,element-type
+                       data-vector-set)))
            (def-partial-data-vector-frobs (type element-type size signed &rest scs)
-  `(progn
-     (define-partial-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
-       ,size ,signed vector-data-offset other-pointer-lowtag ,scs
-       ,element-type data-vector-ref)
-     (define-partial-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
-       ,size vector-data-offset other-pointer-lowtag ,scs
-       ,element-type data-vector-set))))
+             `(progn
+                (define-partial-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
+                  ,size ,signed vector-data-offset other-pointer-lowtag ,scs
+                  ,element-type data-vector-ref)
+                (define-partial-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
+                  ,size vector-data-offset other-pointer-lowtag ,scs
+                  ,element-type data-vector-set))))
 
-  (def-full-data-vector-frobs simple-vector *
-    descriptor-reg any-reg null zero)
+  ;; SIMPLE-VECTOR
+  (define-full-reffer data-vector-ref/simple-vector simple-vector
+    vector-data-offset other-pointer-lowtag (descriptor-reg any-reg) * data-vector-ref)
+  (define-vop (data-vector-set/simple-vector)
+    (:translate data-vector-set)
+    (:policy :fast-safe)
+    (:args (object :scs (descriptor-reg)) (index :scs (any-reg))
+           (value :scs (descriptor-reg any-reg null zero)))
+    (:arg-types simple-vector tagged-num *)
+    (:temporary (:scs (non-descriptor-reg)) ea temp)
+    (:vop-var vop)
+    (:generator 6
+      ;; We could potentially eliminate the ADDIU by ensuring that a simple-vector
+      ;; never starts 2 words before the end of a card.
+      ;; However, that's tricky to reason about and I don't care to do it.
+      ;; (and also it's maybe not correct for card-spanning vectors)
+      (inst addu ea object index)
+      (inst addu ea ea (- (ash vector-data-offset word-shift) other-pointer-lowtag))
+      (without-scheduling ()
+        (emit-gc-store-barrier object ea temp (vop-nth-arg 2 vop) value)
+        (storew value ea 0 0))))
+  (define-vop (data-vector-set/simple-vector-c)
+    (:translate data-vector-set)
+    (:policy :fast-safe)
+    (:args (object :scs (descriptor-reg)) (value :scs (descriptor-reg any-reg null zero)))
+    (:temporary (:scs (non-descriptor-reg)) ea temp)
+    (:info index)
+    ;; not sure if the load/store-index is off by something now
+    (:arg-types simple-vector (:constant (load/store-index 4 7 2)) *)
+    (:vop-var vop)
+    (:generator 5
+      (inst addu ea object (- (ash (+ vector-data-offset index) word-shift) other-pointer-lowtag))
+      (without-scheduling ()
+        (emit-gc-store-barrier object ea temp (vop-nth-arg 1 vop) value)
+        (storew value object (+ vector-data-offset index) other-pointer-lowtag))))
 
   (def-partial-data-vector-frobs simple-base-string character
     :byte nil character-reg)

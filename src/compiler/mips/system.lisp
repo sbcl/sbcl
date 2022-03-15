@@ -53,7 +53,6 @@
 
     OTHER-PTR
     (load-type result object (- other-pointer-lowtag))
-    (inst nop)
 
     DONE))
 
@@ -93,8 +92,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (load-type result function (- fun-pointer-lowtag))
-    (inst nop)))
+    (load-type result function (- fun-pointer-lowtag))))
 
 (define-vop (get-header-data)
   (:translate get-header-data)

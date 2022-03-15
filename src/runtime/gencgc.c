@@ -2519,8 +2519,11 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word)
  * It seems like the stop-for-GC handler must be enforcing that GC sees things
  * stored in the correct order for out-of-order memory models */
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-static void sticky_preserve_pointer(os_context_register_t word)
+// registers can be wider than words. This could accept uword_t as the arg type
+// but I like it to be directly callable with os_context_register.
+static void sticky_preserve_pointer(os_context_register_t register_word)
 {
+    uword_t word = register_word;
     if (is_lisp_pointer(word)) {
         page_index_t page = find_page_index((void*)word);
         if (page >= 0 && page_boxed_p(page) // stores to raw bytes are uninteresting
@@ -3593,7 +3596,8 @@ static void semiconservative_pin_stack(struct thread* th,
         for(j=1; j<32; ++j) {
             // context registers have more significant bits than lispobj.
             uword_t word = mctx->gregs[j];
-            preserve_pointer(word);
+            if (gen == 0) sticky_preserve_pointer(word);
+            else preserve_pointer(word);
         }
 #elif defined LISP_FEATURE_PPC64
         static int boxed_registers[] = BOXED_REGISTERS;
@@ -4672,7 +4676,7 @@ void gc_allocate_ptes()
 
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.
-    int nbits = 14;
+    int nbits = 13;
     long num_gc_cards = 1L << nbits;
 
     // Sure there's a fancier way to round up to a power-of-2
@@ -4686,7 +4690,8 @@ void gc_allocate_ptes()
     // 'nbits' is what we need, 'gc_card_table_nbits' is what the core was compiled for.
     if (nbits > gc_card_table_nbits) {
         gc_card_table_nbits = nbits;
-#if defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+#if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64 \
+  || defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
         // The value needed based on dynamic space size exceeds the value that the
         // core was compiled for, so we need to patch all code blobs.
         gcbarrier_patch_code_range(READ_ONLY_SPACE_START, read_only_space_free_pointer);
@@ -4770,23 +4775,17 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
         large_allocation = nbytes;
 
     /* maybe we can do this quickly ... */
-    /* I'd really like this "quick" case to be more uniform in terms of whether
-     * it's allowed to occur at all. Some of the inconsistencies are:
-     * - 32-bit x86 will (or would, not sure any more) choose to use
-     *   out-of-line allocation if lexical policy favors space.
-     * - PPC at git rev 28aaa39f4e had a subtle "but-not-wrong" bug at the edge
-     *   where it trapped to C if the new free pointer was ':lge' instead of ':lgt'
-     *   the region end, fixed in rev 05047647.
-     * - other architectures may have similar issues.
-     * So because of those reasons, even if we satisfy the allocation
-     * from the TLAB it might be worth a check of whether to refill
-     * the TLAB now. */
     void *new_obj = region->free_pointer;
     char *new_free_pointer = (char*)new_obj + nbytes;
     if (new_free_pointer <= (char*)region->end_addr) {
         region->free_pointer = new_free_pointer;
-#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_X86_64
-        // Most allocations should never get here, but two page types are special.
+#ifdef LISP_FEATURE_X86_64
+        // Non-code allocations should never get here - it would mean there's
+        // something wrong in the inline allocator. This assertion pertains
+        // to any architecture that always uses an inline allocator.
+        // That's actually most of them, but I haven't tested that they're right.
+        // e.g. x86 forgoes inline allocation depending on policy,
+        // and git revision 05047647 tweaked the edge case for PPC.
         gc_assert(page_type == PAGE_TYPE_CONS || page_type == PAGE_TYPE_CODE);
 #endif
         return(new_obj);        /* yup */
