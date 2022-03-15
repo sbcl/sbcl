@@ -1336,7 +1336,7 @@
 (define-vop (*/fixnum=>integer)
   (:translate *)
   (:args (x :scs (signed-reg))
-         (y :scs (signed-reg)))
+         (y :scs (signed-reg immediate)))
   (:arg-types tagged-num tagged-num)
   (:temporary (:sc signed-reg) high low)
   (:temporary (:sc signed-reg :from (:argument 2)) header pa-flag)
