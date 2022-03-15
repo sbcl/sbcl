@@ -2719,10 +2719,16 @@
                    :result result
                    :important nil)
   (let ((type (lvar-type result))
-        (shift (lvar-value amount)))
+        (shift (lvar-value amount))
+        (dest (lvar-dest result)))
     (when (or (csubtypep type (specifier-type 'word))
               (csubtypep type (specifier-type 'sb-vm:signed-word))
-              (>= shift sb-vm:n-word-bits))
+              (>= shift sb-vm:n-word-bits)
+              ;; x86 transforms modular * back to ASH.
+              #+x86
+              (and (combination-p dest)
+                   (memq (combination-fun-source-name dest nil)
+                         '(mask-signed-field logand))))
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
