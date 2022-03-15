@@ -2717,18 +2717,15 @@
 ;;; * deals better with ASH that overflows
 (deftransform ash ((integer amount) (fixnum (constant-arg (integer 2 *))) *
                    :result result
-                   :important nil)
+                   :important nil
+                   :node node)
   (let ((type (lvar-type result))
-        (shift (lvar-value amount))
-        (dest (lvar-dest result)))
+        (shift (lvar-value amount)))
+    ;; Give modular arithmetic optimizers a chance
+    (delay-ir1-transform node :optimize)
     (when (or (csubtypep type (specifier-type 'word))
               (csubtypep type (specifier-type 'sb-vm:signed-word))
-              (>= shift sb-vm:n-word-bits)
-              ;; x86 transforms modular * back to ASH.
-              #+x86
-              (and (combination-p dest)
-                   (memq (combination-fun-source-name dest nil)
-                         '(mask-signed-field logand))))
+              (>= shift sb-vm:n-word-bits))
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
