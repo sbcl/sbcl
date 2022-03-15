@@ -2697,19 +2697,21 @@
 ;;;; converting special case multiply/divide to shifts
 
 ;;; If arg is a constant power of two, turn * into a shift.
-(deftransform * ((x y) (integer integer) *)
+(deftransform * ((x y) (integer (constant-arg integer)) * :result result)
   "convert x*2^k to shift"
-  (unless (constant-lvar-p y)
-    (give-up-ir1-transform))
-  (let* ((y (lvar-value y))
+  (let* ((type (lvar-type result))
+         (y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
+    (unless (or (not (csubtypep (lvar-type x) (specifier-type 'fixnum)))
+                (csubtypep type (specifier-type 'word))
+                (csubtypep type (specifier-type 'sb-vm:signed-word)))
+      (give-up-ir1-transform))
     (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
       (give-up-ir1-transform))
     (if (minusp y)
         `(- (ash x ,len))
         `(ash x ,len))))
-
 
 (when-vop-existsp (:translate fixnum*)
   (defun fixnum* (x y type)
@@ -2719,14 +2721,14 @@
         (error 'type-error :expected-type type :datum r))
       r))
 
-  (deftransform * ((x y) (fixnum fixnum) * :node node)
+  (deftransform * ((x y) (fixnum fixnum) * :node node :result result)
     (let ((dest (node-dest node))
           (fixnum (specifier-type 'fixnum))
-          type
+          (type (lvar-type result))
           type-to-check)
       (if (and (cast-p dest)
                (cast-type-check dest)
-               (types-equal-or-intersect fixnum (setf type (single-value-type (node-derived-type node))))
+               (types-equal-or-intersect fixnum type)
                (not (csubtypep type fixnum))
                (csubtypep (setf type-to-check (single-value-type (cast-type-to-check dest))) fixnum))
           `(fixnum* x y ',(if (type= type-to-check (specifier-type 'sb-int:index))
