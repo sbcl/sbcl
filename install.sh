@@ -113,6 +113,7 @@ test -f "$BUILD_ROOT$SBCL_HOME"/sbcl.core && \
 
 cp src/runtime/$RUNTIME "$BUILD_ROOT$INSTALL_ROOT"/bin/
 cp output/sbcl.core "$BUILD_ROOT$SBCL_HOME"/sbcl.core
+cp src/runtime/libsbcl.so "$BUILD_ROOT$INSTALL_ROOT"/lib/
 cp src/runtime/sbcl.mk "$BUILD_ROOT$SBCL_HOME"/sbcl.mk
 for i in $(grep '^LIBSBCL=' src/runtime/sbcl.mk | cut -d= -f2-) ; do
     cp "src/runtime/$i" "$BUILD_ROOT$SBCL_HOME/$i"
