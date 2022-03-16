@@ -206,7 +206,7 @@
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,
 ;;; depending on #+gs-seg.
-(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if) &rest forms)
+(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if) &body forms)
   (declare (ignorable thread))
   #+sb-safepoint
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))
