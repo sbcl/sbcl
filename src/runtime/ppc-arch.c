@@ -46,10 +46,8 @@
 
      Caveat callers.  */
 
-#if defined (LISP_FEATURE_DARWIN) || defined(LISP_FEATURE_LINUX)
 #ifndef PT_DAR
 #define PT_DAR          41
-#endif
 
 #ifndef PT_DSISR
 #define PT_DSISR        42
