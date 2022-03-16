@@ -858,11 +858,11 @@
     (:emitter
      (emit-s-inst segment offset rs1 rs2 (fmt-funct3 fmt) #b0100111))))
 
-;;;; Boxed-object computation instructions (for LRA and CODE)
+;;;; Boxed-object computation instructions (for RA and CODE)
 
 ;;; Try to compute DEST from SRC if possible. Otherwise, fall back to
 ;;; using a PC relative calculation as the worst case.
-(defun emit-compute (segment vop dest lip pc-relative-delta src-relative-delta &optional src)
+(defun emit-compute (segment vop dest src lip pc-relative-delta src-relative-delta)
   (labels ((pc-relative-emitter (segment position)
              (multiple-value-bind (u i)
                  (u-and-i-inst-immediate (funcall pc-relative-delta position))
@@ -884,33 +884,40 @@
      #'maybe-shrink
      #'pc-relative-emitter)))
 
-;;; FIXME: Could potentially optimize away an instruction in
-;;; XEP-ALLOCATE-FRAME in some cases when the code can be computed off
-;;; of the register used to call the function, like MIPS. Probably
-;;; requires always using LR as a lip tn though. Also, if the return
-;;; register is fixed, could compute code in one instruction in values
-;;; receiving routines.
-(define-instruction compute-code (segment code lip label &optional src)
+(define-instruction compute-code-from-fn (segment dest src lip label)
   (:vop-var vop)
   (:emitter
-   (emit-compute segment vop code lip
+   (emit-compute segment vop dest src lip
                  (lambda (position)
                    (- other-pointer-lowtag
                       position
                       (component-header-length)))
-                 ;; code = ra - header - label-offset + other-pointer-tagged
+                 ;; code = fn - fn-ptr-type - header - label-offset + other-pointer-tag
+                 (lambda (position delta-if-after)
+                   (- other-pointer-lowtag
+                      (+ fun-pointer-lowtag
+                         (label-position label position delta-if-after)
+                         (component-header-length)))))))
+
+(define-instruction compute-code-from-ra (segment dest src lip label)
+  (:vop-var vop)
+  (:emitter
+   (emit-compute segment vop dest src lip
+                 (lambda (position)
+                   (- other-pointer-lowtag
+                      position
+                      (component-header-length)))
+                 ;; code = ra - header - label-offset + other-pointer-tag
                  ;;      = ra + other-pointer-tag - (header + label-offset)
                  (lambda (position delta-if-after)
                    (- other-pointer-lowtag
                       (+ (label-position label position delta-if-after)
-                         (component-header-length))))
-                 src)))
-
+                         (component-header-length)))))))
 
 (define-instruction compute-ra-from-code (segment dest src lip label)
   (:vop-var vop)
   (:emitter
-   (emit-compute segment vop dest lip
+   (emit-compute segment vop dest src lip
                  (lambda (position)
                    (- (label-position label) position))
                  ;; ra = code - other-pointer-tag + header + label-offset
@@ -918,8 +925,7 @@
                  (lambda (position delta-if-after)
                    (- (+ (label-position label position delta-if-after)
                          (component-header-length))
-                      other-pointer-lowtag))
-                 src)))
+                      other-pointer-lowtag)))))
 
 (defun emit-header-data (segment type)
   (emit-back-patch

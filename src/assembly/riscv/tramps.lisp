@@ -142,27 +142,27 @@
                       (:align n-lowtag-bits)
                       (:export (closure-tramp
                                 (+ xclosure-tramp fun-pointer-lowtag))))
-    ()
+    ((:temp function descriptor-reg l0-offset))
   (inst machine-word simple-fun-widetag)
   (inst machine-word (make-fixup 'closure-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst machine-word nil-value))
 
   (loadw lexenv-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst jalr zero-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))
+  (loadw function lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (inst jalr zero-tn function (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))
 
 (define-assembly-routine
     (xfuncallable-instance-tramp (:return-style :none)
                       (:align n-lowtag-bits)
                       (:export (funcallable-instance-tramp
                                 (+ xfuncallable-instance-tramp fun-pointer-lowtag))))
-    ()
+    ((:temp function descriptor-reg l0-offset))
   (inst machine-word simple-fun-widetag)
   (inst machine-word (make-fixup 'funcallable-instance-tramp :assembly-routine))
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst machine-word nil-value))
 
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
-  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst jalr zero-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))
+  (loadw function lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (inst jalr zero-tn function (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))
