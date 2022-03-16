@@ -2699,6 +2699,8 @@
 ;;; If arg is a constant power of two, turn * into a shift.
 (deftransform * ((x y) (integer (constant-arg integer)) * :node node)
   "convert x*2^k to shift"
+  ;; Delay to make sure the surrounding casts are apparent.
+  (delay-ir1-transform node :optimize)
   (let* ((type (single-value-type (node-asserted-type node)))
          (y (lvar-value y))
          (y-abs (abs y))
@@ -2718,10 +2720,10 @@
 (deftransform ash ((integer amount) (fixnum (constant-arg (integer 2 *))) *
                    :important nil
                    :node node)
+  ;; Give modular arithmetic optimizers a chance
+  (delay-ir1-transform node :optimize)
   (let ((type (single-value-type (node-asserted-type node)))
         (shift (lvar-value amount)))
-    ;; Give modular arithmetic optimizers a chance
-    (delay-ir1-transform node :optimize)
     (when (or (csubtypep type (specifier-type 'word))
               (csubtypep type (specifier-type 'sb-vm:signed-word))
               (>= shift sb-vm:n-word-bits))
