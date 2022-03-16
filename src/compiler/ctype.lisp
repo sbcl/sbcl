@@ -75,8 +75,7 @@
      (binding* ((lvar (node-lvar node) :exit-if-null)
                 (dest (lvar-dest lvar)))
        (when (and (cast-p dest)
-                  (eq (cast-type-to-check dest) *wild-type*)
-                  (immediately-used-p lvar node))
+                  (eq (cast-type-to-check dest) *wild-type*))
          (values-type-intersection
           dtype (cast-asserted-type dest))))
      dtype)))

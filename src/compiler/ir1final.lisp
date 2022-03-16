@@ -123,8 +123,7 @@
     (do-nodes-backwards (node lvar block :restart-p t)
       (let ((dest (when lvar (lvar-dest lvar))))
         (cond ((and (cast-p dest)
-                    (not (cast-type-check dest))
-                    (almost-immediately-used-p lvar node))
+                    (not (cast-type-check dest)))
                (let ((dtype (node-derived-type node))
                      (atype (node-derived-type dest)))
                  (when (values-types-equal-or-intersect
