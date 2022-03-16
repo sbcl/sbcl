@@ -3513,9 +3513,17 @@ package is deprecated in favour of SB-MOP.")
 
 (defpackage* "SB-RBTREE"
   (:documentation "internal: red/black tree")
-  (:use "CL" "SB-INT" "SB-EXT")
+  (:use "CL" "SB-INT" "SB-EXT"))
+(defpackage* "SB-RBTREE.WORD"
+  (:documentation nil)
+  (:use "CL")
   (:shadow "DELETE")
-  (:export "INSERT" "DELETE" "FIND=" "FIND<="))
+  (:export "INSERT" "DELETE"))
+(defpackage* "SB-RBTREE.MAP"
+  (:documentation nil)
+  (:use "CL")
+  (:shadow "DELETE")
+  (:export "INSERT" "DELETE"))
 
 (defpackage* "SB-LOCKLESS"
   (:documentation "internal: lockfree lists")
