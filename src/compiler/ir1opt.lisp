@@ -2116,10 +2116,6 @@
              ;; we should not change lifetime of unknown values lvars
              (cast
               (and (type-single-value-p (lvar-derived-type arg))
-                   (multiple-value-bind (pdest pprev)
-                       (principal-lvar-end lvar)
-                     (declare (ignore pdest))
-                     (lvar-single-value-p pprev))
                    ;; CASTs can disappear, don't substitute if
                    ;; DEST-LVAR has other uses
                    (block nil
