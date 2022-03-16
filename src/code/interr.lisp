@@ -436,10 +436,13 @@
 (deferr mul-overflow-error (low high)
   (let ((type (or (sb-di:error-context)
                   'fixnum)))
-   (object-not-type-error (ash (logior
-                                (ash high sb-vm:n-word-bits)
-                                (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
-                               (- sb-vm:n-fixnum-tag-bits))
+    (object-not-type-error #+x86-64
+                           (* low high)
+                           #-x86-64
+                           (ash (logior
+                                 (ash high sb-vm:n-word-bits)
+                                 (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
+                                (- sb-vm:n-fixnum-tag-bits))
                           type
                           nil)))
 
