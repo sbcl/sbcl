@@ -2697,9 +2697,9 @@
 ;;;; converting special case multiply/divide to shifts
 
 ;;; If arg is a constant power of two, turn * into a shift.
-(deftransform * ((x y) (integer (constant-arg integer)) * :result result)
+(deftransform * ((x y) (integer (constant-arg integer)) * :node node)
   "convert x*2^k to shift"
-  (let* ((type (lvar-type result))
+  (let* ((type (single-value-type (node-derived-type node)))
          (y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
@@ -2716,10 +2716,9 @@
 
 ;;; * deals better with ASH that overflows
 (deftransform ash ((integer amount) (fixnum (constant-arg (integer 2 *))) *
-                   :result result
                    :important nil
                    :node node)
-  (let ((type (lvar-type result))
+  (let ((type (single-value-type (node-derived-type node)))
         (shift (lvar-value amount)))
     ;; Give modular arithmetic optimizers a chance
     (delay-ir1-transform node :optimize)
@@ -2737,10 +2736,10 @@
         (error 'type-error :expected-type type :datum r))
       r))
 
-  (deftransform * ((x y) (fixnum fixnum) * :node node :result result)
+  (deftransform * ((x y) (fixnum fixnum) * :node node)
     (let ((dest (node-dest node))
           (fixnum (specifier-type 'fixnum))
-          (type (lvar-type result))
+          (type (single-value-type (node-derived-type node)))
           type-to-check)
       (if (and (cast-p dest)
                (cast-type-check dest)
