@@ -56,25 +56,21 @@
   ;; Obviously we need a C function to call the Lisp function, so here's one,
   ;; carefully hand-crafted so as to need no input arguments,
   ;; using only a static Lisp symbol, two non-pointers, and a pinned function.
-  (let ((carg0 #-win32 rdi-tn #+win32 rcx-tn) ; Lisp function
-        (carg1 #-win32 rsi-tn #+win32 rdx-tn) ; argv
-        (carg2 #-win32 rdx-tn #+win32 r8-tn)  ; argc
-        )
-    (with-pinned-objects (#'monkeybiz)
-      (try-call-into-lisp
-       ;; Making room for 3 args aligns the stack to a 16-byte boundary
-       ;; presuming it was at CALL to me. Darwin requires the alignment, others don't care.
-       `((sub ,rsp-tn 24)
-         (mov :qword ,(ea 16 rsp-tn) ,(get-lisp-obj-address T))
-         (mov :qword ,(ea  8 rsp-tn) ,(fixnumize 311))
-         (mov :qword ,(ea  0 rsp-tn) ,(get-lisp-obj-address #\A))
-         (mov ,carg0 ,(get-lisp-obj-address #'monkeybiz))
-         (mov ,carg1 ,rsp-tn)
-         (mov ,carg2 :ARGC)
-         (mov ,rax-tn ,(sap-int
-                        (alien-value-sap
-                         (extern-alien "call_into_lisp"
-                                       (function long long long long)))))
-         (call ,rax-tn)
-         (add ,rsp-tn 24)
-         (ret))))))
+  (with-pinned-objects (#'monkeybiz)
+    (try-call-into-lisp
+     ;; Making room for 3 args aligns the stack to a 16-byte boundary
+     ;; presuming it was at CALL to me. Darwin requires the alignment, others don't care.
+     `((sub ,rsp-tn 24)
+       (mov :qword ,(ea 16 rsp-tn) ,(get-lisp-obj-address T))
+       (mov :qword ,(ea  8 rsp-tn) ,(fixnumize 311))
+       (mov :qword ,(ea  0 rsp-tn) ,(get-lisp-obj-address #\A))
+       (mov ,rdi-tn ,(get-lisp-obj-address #'monkeybiz)) ; C arg 0 = Lisp function
+       (mov ,rsi-tn ,rsp-tn)                             ; C arg 1 = argv
+       (mov ,rdx-tn :ARGC)                               ; C arg 2 = argc
+       (mov ,rax-tn ,(sap-int
+                      (alien-value-sap
+                       (extern-alien "call_into_lisp"
+                                     (function long long long long)))))
+       (call ,rax-tn)
+       (add ,rsp-tn 24)
+       (ret)))))

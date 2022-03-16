@@ -20,7 +20,11 @@
 #include "globals.h"
 #include "interrupt.h"
 
-extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs)
+#ifdef LISP_FEATURE_X86_64
+    __attribute__((sysv_abi))
+#endif
+    ;
 
 #if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK) || defined(LISP_FEATURE_ARM64) \
     || defined(LISP_FEATURE_ARM)
