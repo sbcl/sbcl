@@ -69,6 +69,18 @@
   (values))
 
 
+(defun node-asserted-type (node)
+  (let ((dtype (node-derived-type node)))
+    (or
+     (binding* ((lvar (node-lvar node) :exit-if-null)
+                (dest (lvar-dest lvar)))
+       (when (and (cast-p dest)
+                  (eq (cast-type-to-check dest) *wild-type*)
+                  (immediately-used-p lvar node))
+         (values-type-intersection
+          dtype (cast-asserted-type dest))))
+     dtype)))
+
 ;;;; stuff for checking a call against a function type
 
 ;;; Determine whether a use of a function is consistent with its type.
@@ -130,16 +142,7 @@
                (setf unknown-keys t))))
 
           (when result-test
-            (let* ((dtype (node-derived-type call))
-                   (out-type (or
-                              (binding* ((lvar (node-lvar call) :exit-if-null)
-                                         (dest (lvar-dest lvar)))
-                                (when (and (cast-p dest)
-                                           (eq (cast-type-to-check dest) *wild-type*)
-                                           (immediately-used-p lvar call))
-                                  (values-type-intersection
-                                   dtype (cast-asserted-type dest))))
-                              dtype))
+            (let* ((out-type (node-asserted-type call))
                    (return-type (fun-type-returns type)))
               (multiple-value-bind (int win) (funcall result-test out-type return-type)
                 (cond ((not win)
