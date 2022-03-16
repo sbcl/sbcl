@@ -44,6 +44,7 @@ $GNUMAKE $SBCL_MAKE_JOBS -C src/runtime all
 # smash it into Lisp source code.
 $GNUMAKE -C tools-for-build -I../src/runtime grovel-headers
 tools-for-build/grovel-headers > output/stuff-groveled-from-headers.lisp
+touch -r tools-for-build/grovel-headers.c output/stuff-groveled-from-headers.lisp
 
 $GNUMAKE -C src/runtime after-grovel-headers
 

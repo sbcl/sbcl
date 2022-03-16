@@ -863,13 +863,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                :pathname (if *merge-pathnames* (merge-pathnames file) file)
                :external-format external-format
                :subforms (if form-tracking-p (make-array 100 :fill-pointer 0 :adjustable t))
-               :write-date
-               #+sb-xc-host
-               (cond
-                 ((equal (pathname file) (pathname "output/stuff-groveled-from-headers.lisp"))
-                  (file-write-date "tools-for-build/grovel-headers.c"))
-                 (t (file-write-date file)))
-               #-sb-xc-host (file-write-date file))))
+               :write-date (file-write-date file))))
 
 ;; LOAD-AS-SOURCE uses this.
 (defun make-file-stream-source-info (file-stream)
