@@ -2195,3 +2195,6 @@
 (defknown fixnum* (fixnum fixnum t) fixnum
   (movable foldable unsafely-flushable commutative
            always-translatable))
+(defknown signed-word* (sb-vm:signed-word sb-vm:signed-word t) sb-vm:signed-word
+  (movable foldable unsafely-flushable commutative
+           always-translatable))

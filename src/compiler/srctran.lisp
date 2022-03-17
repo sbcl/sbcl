@@ -2730,6 +2730,38 @@
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
+(when-vop-existsp (:translate signed-word*)
+  (defun signed-word* (x y type)
+    (declare (sb-vm:signed-word x y))
+    (let ((r (* x y)))
+      (unless (typep r type)
+        (error 'type-error :expected-type type :datum r))
+      r))
+
+  (deftransform * ((x y) (sb-vm:signed-word sb-vm:signed-word) * :node node)
+    (let ((dest (node-dest node))
+          (sword (specifier-type 'sb-vm:signed-word))
+          (type (single-value-type (node-derived-type node)))
+          type-to-check)
+      (if (and (cast-p dest)
+               (cast-type-check dest)
+               (types-equal-or-intersect sword type)
+               (not (csubtypep type sword))
+               (csubtypep (setf type-to-check (single-value-type (cast-type-to-check dest))) sword))
+          `(signed-word* x y ',(type-specifier type-to-check))
+          (give-up-ir1-transform))))
+
+  (deftransform signed-word* ((x y type-to-check) (sb-vm:signed-word sb-vm:signed-word t) * :node node)
+    (let (type
+          (type-to-check (lvar-value type-to-check))
+          (sword (specifier-type 'sb-vm:signed-word)))
+      (cond ((or (csubtypep (setf type (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
+                            sword)
+                 (not (types-equal-or-intersect sword type)))
+             `(the ,type-to-check (* x y)))
+            (t
+             (give-up-ir1-transform))))))
+
 (when-vop-existsp (:translate fixnum*)
   (defun fixnum* (x y type)
     (declare (fixnum x y))
