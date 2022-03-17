@@ -2815,10 +2815,7 @@
                (types-equal-or-intersect fixnum type)
                (not (csubtypep type fixnum))
                (csubtypep (setf type-to-check (single-value-type (cast-type-to-check dest))) fixnum))
-          `(fixnum* x y ',(if (type= type-to-check (specifier-type 'sb-int:index))
-                              ;; That's how the error is reported
-                              'sb-int:index
-                              (type-specifier type-to-check)))
+          `(fixnum* x y ',(type-specifier type-to-check))
           (give-up-ir1-transform))))
 
   (deftransform fixnum* ((x y type-to-check) (fixnum fixnum t) * :node node)
