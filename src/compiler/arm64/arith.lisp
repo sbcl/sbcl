@@ -1423,8 +1423,48 @@
     (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
     allocate
     (with-fixed-allocation
-        (r pa-flag bignum-widetag (+ 2 bignum-digits-offset) :lip lip
-                                                             :store-type-code nil)
+        (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)
+      (storew-pair header 0 low bignum-digits-offset tmp-tn)
+      (storew high tmp-tn 2))
+    DONE))
+
+(define-vop (*/word=>integer)
+  (:translate *)
+  (:args (x :scs (unsigned-reg))
+         (y :scs (unsigned-reg immediate)))
+  (:arg-types unsigned-num unsigned-num)
+  (:temporary (:sc unsigned-reg) high low)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header pa-flag)
+  (:temporary (:scs (interior-reg)) lip)
+  (:results (r :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 12
+    (let ((value (and (sc-is y immediate)
+                        (tn-value y))))
+        (cond ((and value
+                    (plusp value)
+                    (= (logcount value) 1))
+               (let ((shift (1- (integer-length value))))
+                 (inst lsl low x shift)
+                 (inst lsr high x (- n-word-bits shift))))
+              (t
+               (when (sc-is y immediate)
+                 (load-immediate-word high value)
+                 (setf y high))
+               (inst mul low x y)
+               (inst umulh high x y))))
+    (inst mov header (compute-object-header (+ 3 bignum-digits-offset) bignum-widetag))
+    (inst tbnz high 63 allocate)
+    (inst mov header (compute-object-header (+ 2 bignum-digits-offset) bignum-widetag))
+    (inst cbnz high allocate)
+    (inst tbnz low 63 allocate)
+    (inst adds r low low)
+    (inst b :vc done)
+    (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+    allocate
+    (with-fixed-allocation
+        (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
