@@ -314,38 +314,36 @@
   (define-branch-instruction bltu #b110)
   (define-branch-instruction bgeu #b111))
 
-(macrolet ((define-load-instruction (name funct3 &optional wordp)
+(macrolet ((define-load-instruction (name funct3)
              `(define-instruction ,name (segment rd rs offset)
                 (:printer i
                           ((funct3 ,funct3)
                            (opcode #b0000011)
                            (i-annotation nil :type 'load-annotation))
-                          '(:name :tab rd ", (" imm ")" rs1
-                            ,(when wordp 'i-annotation)))
+                          '(:name :tab rd ", (" imm ")" rs1 i-annotation))
                 (:emitter
                  (emit-i-inst segment offset rs ,funct3 rd #b0000011)))))
   (define-load-instruction lb #b000)
   (define-load-instruction lh #b001)
-  (define-load-instruction lw #b010 #-64-bit t)
+  (define-load-instruction lw #b010)
   #+64-bit
   (progn
-    (define-load-instruction ld #b011 t)
+    (define-load-instruction ld #b011)
     (define-load-instruction lwu #b110))
   (define-load-instruction lbu #b100)
   (define-load-instruction lhu #b101))
 
-(macrolet ((define-store-instruction (name funct3 &optional wordp)
+(macrolet ((define-store-instruction (name funct3)
              `(define-instruction ,name (segment rs2 rs1 offset)
                 (:printer s ((funct3 ,funct3) (opcode #b0100011))
-                          '(:name :tab rs2 ", " "(" imm ")" rs1
-                            ,(when wordp 'store-annotation)))
+                          '(:name :tab rs2 ", " "(" imm ")" rs1 store-annotation))
                 (:emitter
                  (emit-s-inst segment offset rs2 rs1 ,funct3 #b0100011)))))
   (define-store-instruction sb #b000)
   (define-store-instruction sh #b001)
-  (define-store-instruction sw #b010 #-64-bit t)
+  (define-store-instruction sw #b010)
   #+64-bit
-  (define-store-instruction sd #b011 t))
+  (define-store-instruction sd #b011))
 
 (macrolet ((define-immediate-arith-instruction (name funct3 &optional word-name)
              `(progn
