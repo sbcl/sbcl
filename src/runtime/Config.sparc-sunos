@@ -13,7 +13,6 @@ CC = gcc
 CFLAGS += -D__EXTENSIONS__ -DSVR4 -D_REENTRANT
 ASFLAGS = -g -DSVR4 -Wa,-xarch=v8plus
 #LINKFLAGS += -v
-NM = nm -t x -p 
 # This next line has nothing to do with disabling PIE. It has only to
 # do with the problem that "grep" on the build machine I'm using can't
 # parse "-e '[^f]nopie" and so gets an error in GNUmakefile.
@@ -29,7 +28,3 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 endif
 
 GC_SRC = fullcgc.c gencgc.c traceroot.c
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:

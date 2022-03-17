@@ -42,7 +42,3 @@ ifdef LISP_FEATURE_IMMOBILE_SPACE
 else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:

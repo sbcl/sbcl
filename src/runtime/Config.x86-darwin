@@ -45,8 +45,3 @@ ARCH_SRC = x86-arch.c
 CPPFLAGS += -no-cpp-precomp
 
 GC_SRC = fullcgc.c gencgc.c traceroot.c
-
-.PHONY: after-grovel-headers
-
-# Nothing to do.
-after-grovel-headers:
