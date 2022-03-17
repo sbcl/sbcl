@@ -2705,7 +2705,7 @@
          (y (lvar-value y))
          (y-abs (abs y))
          (len (1- (integer-length y-abs))))
-    (unless (or (not (csubtypep (lvar-type x) (specifier-type 'fixnum)))
+    (unless (or (not (csubtypep (lvar-type x) (specifier-type '(or word sb-vm:signed-word))))
                 (csubtypep type (specifier-type 'word))
                 (csubtypep type (specifier-type 'sb-vm:signed-word))
                 (>= len sb-vm:n-word-bits))
@@ -2717,7 +2717,8 @@
         `(ash x ,len))))
 
 ;;; * deals better with ASH that overflows
-(deftransform ash ((integer amount) (fixnum (constant-arg (integer 2 *))) *
+(deftransform ash ((integer amount) ((or word sb-vm:signed-word)
+                                     (constant-arg (integer 1 *))) *
                    :important nil
                    :node node)
   ;; Give modular arithmetic optimizers a chance
@@ -2755,6 +2756,40 @@
     (let (type
           (type-to-check (lvar-value type-to-check))
           (sword (specifier-type 'sb-vm:signed-word)))
+      (cond ((or (csubtypep (setf type (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
+                            sword)
+                 (not (types-equal-or-intersect sword type)))
+             `(the ,type-to-check (* x y)))
+            (t
+             (give-up-ir1-transform))))))
+
+(when-vop-existsp (:translate word*)
+  (defun word* (x y type)
+    (declare (word x y))
+    (let ((r (* x y)))
+      (unless (typep r type)
+        (error 'type-error :expected-type type :datum r))
+      r))
+
+  (deftransform * ((x y) (word word) * :node node)
+    (let ((dest (node-dest node))
+          (sword (specifier-type 'word))
+          (type (single-value-type (node-derived-type node)))
+          type-to-check)
+      (if (and (cast-p dest)
+               (cast-type-check dest)
+               (types-equal-or-intersect sword type)
+               (not (csubtypep type sword))
+               (csubtypep (type-intersection (setf type-to-check (single-value-type (cast-type-to-check dest)))
+                                             (specifier-type 'unsigned-byte))
+                          sword))
+          `(word* x y ',(type-specifier type-to-check))
+          (give-up-ir1-transform))))
+
+  (deftransform word* ((x y type-to-check) (word word t) * :node node)
+    (let (type
+          (type-to-check (lvar-value type-to-check))
+          (sword (specifier-type 'word)))
       (cond ((or (csubtypep (setf type (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
                             sword)
                  (not (types-equal-or-intersect sword type)))

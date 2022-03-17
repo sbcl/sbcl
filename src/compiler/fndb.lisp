@@ -2198,3 +2198,7 @@
 (defknown signed-word* (sb-vm:signed-word sb-vm:signed-word t) sb-vm:signed-word
   (movable foldable unsafely-flushable commutative
            always-translatable))
+
+(defknown word* (word word t) word
+  (movable foldable unsafely-flushable commutative
+           always-translatable))
