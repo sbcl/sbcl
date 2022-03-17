@@ -435,7 +435,7 @@
 
 (deferr mul-overflow-error (low high)
   (destructuring-bind (raw-low raw-high) *current-internal-error-args*
-    (declare (ignorable raw-high raw-high))
+    (declare (ignorable raw-low raw-high))
     (let ((type (or (sb-di:error-context)
                     'fixnum)))
       (object-not-type-error #+x86-64
