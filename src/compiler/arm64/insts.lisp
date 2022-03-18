@@ -115,6 +115,7 @@
   (define-arg-type sys-reg :printer #'print-sys-reg)
 
   (define-arg-type cond :printer #'print-cond)
+  (define-arg-type negated-cond :printer #'print-negated-cond)
 
   (define-arg-type ldr-str-annotation :printer #'annotate-ldr-str-imm)
   (define-arg-type ldr-str-pair-annotation :printer #'annotate-ldr-str-pair)
@@ -1031,10 +1032,12 @@
 
 (def-cond-select csel 0 0)
 (def-cond-select csinc 0 1
-  (:printer cond-select ((op 0) (op2 1) (rn 31) (rm 31))
+  (:printer cond-select ((op 0) (op2 1) (rn 31) (rm 31)
+                         (cond nil :type 'negated-cond))
             '('cset :tab rd  ", " cond)))
 (def-cond-select csinv 1 0
-  (:printer cond-select ((op 1) (op2 0) (rn 31) (rm 31))
+  (:printer cond-select ((op 1) (op2 0) (rn 31) (rm 31)
+                         (cond nil :type 'negated-cond))
             '('csetm :tab rd  ", " cond)))
 (def-cond-select csneg 1 1)
 

@@ -307,6 +307,9 @@
   (declare (ignore dstate))
   (princ (svref +condition-name-vec+ value) stream))
 
+(defun print-negated-cond (value stream dstate)
+  (print-cond (logxor 1 value) stream dstate))
+
 (defun use-label (value dstate)
   (let* ((value (if (consp value)
                     (logior (ldb (byte 2 0) (car value))
