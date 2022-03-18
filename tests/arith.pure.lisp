@@ -1011,7 +1011,7 @@
    `(lambda (a b)
       (declare ((integer -8394154896 -1950772105) b))
       a
-      (round (+ b most-positive-fixnum)
+      (round (+ b 4611686013427387903)
              (let ((divisor (expt b 2)))
                divisor)))
    ((0 -5000000000) (values 0 4611686013427387903))))
