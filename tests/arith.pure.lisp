@@ -1004,3 +1004,14 @@
                   (multiple-value-setq (a) -10000)
                   a))))
    ((0) 0)))
+
+(with-test (:name :fixnum*-lifetimes)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare ((integer -8394154896 -1950772105) b))
+      a
+      (round (+ b most-positive-fixnum)
+             (let ((divisor (expt b 2)))
+               divisor)))
+   ((0 -5000000000) (values 0 4611686013427387903))))
