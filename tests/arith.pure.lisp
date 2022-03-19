@@ -1015,3 +1015,10 @@
              (let ((divisor (expt b 2)))
                divisor)))
    ((0 -5000000000) (values 0 4611686013427387903))))
+
+(with-test (:name :ash-*-cycle)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (truly-the fixnum (* (the fixnum x) -4)))
+   ((4) -16)))

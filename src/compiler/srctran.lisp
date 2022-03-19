@@ -2697,24 +2697,21 @@
 ;;;; converting special case multiply/divide to shifts
 
 ;;; If arg is a constant power of two, turn * into a shift.
-(deftransform * ((x y) (integer (constant-arg integer)) * :node node)
+(deftransform * ((x y) (integer (constant-arg unsigned-byte)) * :node node)
   "convert x*2^k to shift"
   ;; Delay to make sure the surrounding casts are apparent.
   (delay-ir1-transform node :optimize)
   (let* ((type (single-value-type (node-asserted-type node)))
          (y (lvar-value y))
-         (y-abs (abs y))
-         (len (1- (integer-length y-abs))))
+         (len (1- (integer-length y))))
     (unless (or (not (csubtypep (lvar-type x) (specifier-type '(or word sb-vm:signed-word))))
                 (csubtypep type (specifier-type 'word))
                 (csubtypep type (specifier-type 'sb-vm:signed-word))
                 (>= len sb-vm:n-word-bits))
       (give-up-ir1-transform))
-    (unless (and (> y-abs 0) (= y-abs (ash 1 len)))
+    (unless (= y (ash 1 len))
       (give-up-ir1-transform))
-    (if (minusp y)
-        `(- (ash x ,len))
-        `(ash x ,len))))
+    `(ash x ,len)))
 
 ;;; * deals better with ASH that overflows
 (deftransform ash ((integer amount) ((or word sb-vm:signed-word)
