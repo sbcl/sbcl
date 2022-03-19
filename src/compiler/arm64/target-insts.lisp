@@ -434,6 +434,8 @@
                           (prog1 (sap-ref-8 sap offset)
                             (incf offset)))))
          (first-arg (ldb (byte 8 13) inst))
+         (first-offset (ldb (byte 5 0) first-arg))
+         (first-sc (ldb (byte 2 5) first-arg))
          (length (sb-kernel::error-length error-number))
          (index offset))
     (declare (type sb-sys:system-area-pointer sap)
@@ -447,8 +449,11 @@
           (t
            (collect ((sc+offsets)
                      (lengths))
-             (unless (= first-arg sb-vm::zr-offset)
-               (sc+offsets (make-sc+offset sb-vm:descriptor-reg-sc-number first-arg))
+             (unless (= first-offset sb-vm::zr-offset)
+               (sc+offsets (make-sc+offset (case first-sc
+                                             (1 sb-vm:unsigned-reg-sc-number)
+                                             (2 sb-vm:signed-reg-sc-number)
+                                             (t sb-vm:descriptor-reg-sc-number)) first-offset))
                (lengths 0))
              (loop repeat length do
                    (let ((old-index index))

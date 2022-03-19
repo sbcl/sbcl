@@ -270,9 +270,14 @@
           (t
            (let ((first-value (car values)))
              (inst brk (dpb (cond ((and (tn-p first-value)
-                                        (sc-is first-value descriptor-reg any-reg))
+                                        (sc-is first-value descriptor-reg any-reg unsigned-reg signed-reg))
                                    (pop values)
-                                   (tn-offset first-value))
+                                   (dpb (sc-case first-value
+                                          (unsigned-reg 1)
+                                          (signed-reg 2)
+                                          (t 0))
+                                        (byte 2 5)
+                                        (tn-offset first-value)))
                                   (t
                                    zr-offset))
                             (byte 8 8)
