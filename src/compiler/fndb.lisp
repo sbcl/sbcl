@@ -2192,13 +2192,20 @@
   (defknown round-single (single-float #1#) single-float
       (foldable flushable movable always-translatable)))
 
-(defknown fixnum* (fixnum fixnum t) fixnum
-  (movable foldable unsafely-flushable commutative
-           always-translatable))
-(defknown signed-word* (sb-vm:signed-word sb-vm:signed-word t) sb-vm:signed-word
+(defknown fixnum*
+  (fixnum fixnum t)
+  fixnum
   (movable foldable unsafely-flushable commutative
            always-translatable))
 
-(defknown word* (word word t) word
+(defknown (signed-word* signed-word+ signed-word-)
+  (sb-vm:signed-word sb-vm:signed-word t)
+  sb-vm:signed-word
+  (movable foldable unsafely-flushable commutative
+           always-translatable))
+
+(defknown (word* word+ word-)
+  (word word t)
+  word
   (movable foldable unsafely-flushable commutative
            always-translatable))

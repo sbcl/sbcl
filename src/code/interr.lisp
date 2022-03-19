@@ -452,6 +452,16 @@
                                   (ldb (byte sb-vm:n-word-bits 0) low)))
                              type
                              nil))))
+
+(deferr add-overflow-error (x y)
+  (let ((type (or (sb-di:error-context)
+                  'fixnum)))
+    (object-not-type-error (+ x y) type nil)))
+
+(deferr sub-overflow-error (x y)
+  (let ((type (or (sb-di:error-context)
+                  'fixnum)))
+    (object-not-type-error (- x y) type nil)))
 
 ;;;; INTERNAL-ERROR signal handler
 

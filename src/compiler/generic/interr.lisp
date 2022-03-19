@@ -122,7 +122,9 @@
    ("Thread local storage exhausted." tls-exhausted 0)
    ("Unreachable code reached" unreachable 0)
    ("Failed aver" failed-aver 1)
-   ("Fixnum multiplication overflow" mul-overflow 2))
+   ("Multiplication overflow" mul-overflow 2)
+   ("Addition overflow" add-overflow 2)
+   ("Subtraction overflow" sub-overflow 2))
 
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
