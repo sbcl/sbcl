@@ -453,15 +453,27 @@
                              type
                              nil))))
 
-(deferr add-overflow-error (x y)
-  (let ((type (or (sb-di:error-context)
-                  'fixnum)))
-    (object-not-type-error (+ x y) type nil)))
-
-(deferr sub-overflow-error (x y)
-  (let ((type (or (sb-di:error-context)
-                  'fixnum)))
-    (object-not-type-error (- x y) type nil)))
+(sb-c::when-vop-existsp  (:translate sb-c::word+)
+  (deferr add-sub-overflow-error (x)
+    (let* ((raw-x (car *current-internal-error-args*))
+           (signed (= (sb-c:sc+offset-scn raw-x) sb-vm:signed-reg-sc-number)))
+      (multiple-value-bind (sf cf) (sb-vm::context-sign-carry-flags *current-internal-error-context*)
+        (let ((type (or (sb-di:error-context)
+                        'fixnum))
+              (x (if signed
+                     (cond ((and sf cf)
+                            (dpb x (byte sb-vm:n-word-bits 0) -1))
+                           (sf
+                            (ldb (byte sb-vm:n-word-bits 0) x))
+                           (t
+                            (bug "flags")))
+                     (cond (cf
+                            (dpb 1 (byte 1 sb-vm:n-word-bits) x))
+                           (sf
+                            (sb-c::mask-signed-field sb-vm:n-word-bits x))
+                           (t
+                            (dpb x (byte sb-vm:n-word-bits 0) -1))))))
+          (object-not-type-error x type nil))))))
 
 ;;;; INTERNAL-ERROR signal handler
 

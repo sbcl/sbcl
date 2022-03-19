@@ -85,6 +85,18 @@
   (context (* os-context-t))
     (index int))
 
+(sb-c::when-vop-existsp  (:translate sb-c::word+)
+  (declaim (inline os-context-flags-addr))
+  (define-alien-routine ("os_context_flags_addr" os-context-flags-addr)
+      (* unsigned)
+    (context (* os-context-t)))
+
+  (defun context-flags (context)
+    (declare (type (alien (* os-context-t)) context))
+    (let ((addr (os-context-flags-addr context)))
+      (declare (type (alien (* unsigned)) addr))
+      (deref addr))))
+
 (declaim (inline context-register))
 (defun context-register (context index)
   (declare (type (alien (* os-context-t)) context))
