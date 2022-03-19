@@ -1610,8 +1610,8 @@
       (if (sc-is y immediate)
           (let ((y (tn-value y)))
             (if (minusp y)
-                (inst subs r x (add-sub-immediate (- y) r))
-                (inst adds r x (add-sub-immediate y r))))
+                (inst subs r x (add-sub-immediate (- y)))
+                (inst adds r x (add-sub-immediate y))))
           (inst adds r x y))
       (inst b :vs error))))
 
@@ -1632,8 +1632,8 @@
       (if (sc-is y immediate)
           (let ((y (tn-value y)))
             (if (minusp y)
-                (inst adds r x (add-sub-immediate (- y) r))
-                (inst subs r x (add-sub-immediate y r))))
+                (inst adds r x (add-sub-immediate (- y)))
+                (inst subs r x (add-sub-immediate y))))
           (inst subs r x y))
       (inst b :vs error))))
 
@@ -1652,7 +1652,7 @@
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
       (when (sc-is y immediate)
-        (setf y (add-sub-immediate (tn-value y) r)))
+        (setf y (add-sub-immediate (tn-value y))))
       (inst adds r x y)
       (inst b :cs error))))
 
@@ -1671,6 +1671,6 @@
                                  type))
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
       (when (sc-is y immediate)
-        (setf y (add-sub-immediate (tn-value y) r)))
+        (setf y (add-sub-immediate (tn-value y))))
       (inst subs r x y)
       (inst b :cc error))))
