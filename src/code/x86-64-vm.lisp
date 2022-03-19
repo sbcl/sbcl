@@ -480,3 +480,13 @@
                 (setf (code-header-ref code wordindex)
                       (cons (code-header-ref code wordindex) locs)))))))))
   code)
+
+(sb-c::when-vop-existsp (:translate sb-c::word+)
+  (defconstant cf-bit 0)
+  (defconstant sf-bit 7)
+  (defconstant of-bit 11)
+
+  (defun context-overflow-carry-flags (context)
+    (let ((flags (context-flags context)))
+      (values (logbitp of-bit flags)
+              (logbitp cf-bit flags)))))

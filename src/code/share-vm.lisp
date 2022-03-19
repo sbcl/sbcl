@@ -91,6 +91,7 @@
       (* unsigned)
     (context (* os-context-t)))
 
+  (declaim (inline context-flags))
   (defun context-flags (context)
     (declare (type (alien (* os-context-t)) context))
     (let ((addr (os-context-flags-addr context)))

@@ -175,7 +175,7 @@
 (defconstant c-bit 29)
 (defconstant v-bit 28)
 
-(defun context-sign-carry-flags (context)
-  (let ((flags (sb-vm::context-flags context)))
-    (values (logbitp sb-vm::v-bit flags)
-            (logbitp sb-vm::c-bit flags))))
+(defun context-overflow-carry-flags (context)
+  (let ((flags (context-flags context)))
+    (values (logbitp v-bit flags)
+            (logbitp c-bit flags))))

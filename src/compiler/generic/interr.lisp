@@ -123,7 +123,9 @@
    ("Unreachable code reached" unreachable 0)
    ("Failed aver" failed-aver 1)
    ("Multiplication overflow" mul-overflow 2)
-   ("Addition overflow" add-sub-overflow 1))
+   ("Addition overflow" add-sub-overflow 1)
+   #+x86-64
+   ("Subtraction overflow" sub-overflow 1))
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
   function

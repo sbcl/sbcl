@@ -453,27 +453,34 @@
                              type
                              nil))))
 
-(sb-c::when-vop-existsp  (:translate sb-c::word+)
-  (deferr add-sub-overflow-error (x)
-    (let* ((raw-x (car *current-internal-error-args*))
-           (signed (= (sb-c:sc+offset-scn raw-x) sb-vm:signed-reg-sc-number)))
-      (multiple-value-bind (sf cf) (sb-vm::context-sign-carry-flags *current-internal-error-context*)
-        (let ((type (or (sb-di:error-context)
-                        'fixnum))
-              (x (if signed
-                     (cond ((and sf cf)
-                            (dpb x (byte sb-vm:n-word-bits 0) -1))
-                           (sf
-                            (ldb (byte sb-vm:n-word-bits 0) x))
-                           (t
-                            (bug "flags")))
-                     (cond (cf
-                            (dpb 1 (byte 1 sb-vm:n-word-bits) x))
-                           (sf
-                            (sb-c::mask-signed-field sb-vm:n-word-bits x))
-                           (t
-                            (dpb x (byte sb-vm:n-word-bits 0) -1))))))
-          (object-not-type-error x type nil))))))
+(sb-c::when-vop-existsp (:translate sb-c::word+)
+  (flet ((err (x of cf)
+           (let* ((raw-x (car *current-internal-error-args*))
+                  (signed (= (sb-c:sc+offset-scn raw-x) sb-vm:signed-reg-sc-number)))
+             (let ((type (or (sb-di:error-context)
+                             'fixnum))
+                   (x (if signed
+                          (cond ((and of cf)
+                                 (dpb x (byte sb-vm:n-word-bits 0) -1))
+                                (of
+                                 (ldb (byte sb-vm:n-word-bits 0) x))
+                                (t
+                                 (bug "flags")))
+                          (cond (cf
+                                 (dpb 1 (byte 1 sb-vm:n-word-bits) x))
+                                (of
+                                 (sb-c::mask-signed-field sb-vm:n-word-bits x))
+                                (t
+                                 (dpb x (byte sb-vm:n-word-bits 0) -1))))))
+               (object-not-type-error x type nil)))))
+    (deferr add-sub-overflow-error (x)
+      (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
+        (err x of cf)))
+
+   #+x86-64
+    (deferr sub-overflow-error (x)
+      (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
+        (err x of (not cf))))))
 
 ;;;; INTERNAL-ERROR signal handler
 
