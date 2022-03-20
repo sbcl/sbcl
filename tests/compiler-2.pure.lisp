@@ -3636,3 +3636,13 @@
       (x #.#'list))))~%"))
     (with-scratch-file (fasl "fasl")
       (compile-file lisp :output-file fasl))))
+
+(with-test (:name :substitute-single-use-lvar-mv-cast)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((r (random 10))
+               (x (list 1)))
+           (declare (special x)
+                    (dynamic-extent x))
+           (throw 'c (the (integer 0 10) r))))))
