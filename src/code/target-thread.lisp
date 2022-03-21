@@ -1760,7 +1760,7 @@ session."
 (defun pthread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
   #+(or arm mips)
-  (aver "This and many other things will crash on MIPS/ARM either
+  (bug "This and many other things will crash on MIPS/ARM either
   until they do linkage tables like everyone else, or until all those
   things can deal with either way of doing linkage.")
   (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t))
