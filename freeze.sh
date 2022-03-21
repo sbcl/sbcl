@@ -51,9 +51,8 @@ GIT_DIR=$PWD/release.sbcl
 LOGFILE=$SBCL_RELEASE_DIR/log.txt
 
 if [ ! -d $SBCL_DIR ]; then
-    cd $GIT_DIR
-
     sbcl_directory="$(cd "$(dirname $0)"; pwd)"
+    cd $GIT_DIR
 
     echo "Checking that the tree is clean."
     if ! [ $(git status --porcelain | wc -l) = 0 ]
