@@ -7,7 +7,6 @@ changes relative to sbcl-2.2.2:
   * minor incompatible change: building the system with the simple semi-space
     copying collector is no longer supported.
   * platform support:
-    ** make calling into Lisp from C more reliable on Windows.
     ** fix regressions in threads on RISC-V.  (lp#1962598)
     ** threads are now enabled by default on RISC-V.
     ** The generational garbage collector is now supported on MIPS.
