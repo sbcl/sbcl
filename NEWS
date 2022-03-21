@@ -6,6 +6,7 @@ changes relative to sbcl-2.2.2:
     mutex (and is not now the owner), or died and never released it.
   * minor incompatible change: building the system with the simple semi-space
     copying collector is no longer supported.
+  * minor incompatible change: support for PPC/Darwin has been removed.
   * platform support:
     ** fix regressions in threads on RISC-V.  (lp#1962598)
     ** threads are now enabled by default on RISC-V.
