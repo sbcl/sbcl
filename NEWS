@@ -13,8 +13,8 @@ changes relative to sbcl-2.2.2:
     ** The generational garbage collector is now supported on MIPS.
   * optimization: fasls containing standard object literals are now smaller
     and load more efficiently.
-  * optimization: faster multiplication of fixnums when the result is not
-    known to be a fixnum.
+  * optimization: faster arithmetic (*-+) on word-sized integers when the
+    result is not known to fit into a word (ARM64 and x86-64).
   * bug fix: EQness of constants is now always preserved when block compiling.
 
 changes in sbcl-2.2.2 relative to sbcl-2.2.1:
