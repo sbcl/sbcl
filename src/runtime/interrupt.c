@@ -1524,7 +1524,7 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
  */
 
 #if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
-extern int *context_eflags_addr(os_context_t *context);
+extern int *os_context_flags_addr(os_context_t *context);
 #endif
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
@@ -1613,7 +1613,7 @@ arrange_return_to_c_function(os_context_t *context,
     *(register_save_area + 5) = *os_context_register_addr(context,reg_ECX);
     *(register_save_area + 6) = *os_context_register_addr(context,reg_EBX);
     *(register_save_area + 7) = *os_context_register_addr(context,reg_EAX);
-    *(register_save_area + 8) = *context_eflags_addr(context);
+    *(register_save_area + 8) = *os_context_flags_addr(context);
 
     set_os_context_pc(context, (os_context_register_t) funptr);
     *os_context_register_addr(context,reg_ECX) =
@@ -1637,7 +1637,7 @@ arrange_return_to_c_function(os_context_t *context,
     *(sp-6)=*os_context_register_addr(context,reg_EDX);
     *(sp-5)=*os_context_register_addr(context,reg_ECX);
     *(sp-4)=*os_context_register_addr(context,reg_EAX);
-    *(sp-3)=*context_eflags_addr(context);
+    *(sp-3)=*os_context_flags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_EBP);
     *(sp-1)=os_context_pc(context);
 
@@ -1664,7 +1664,7 @@ arrange_return_to_c_function(os_context_t *context,
     *(sp-6)=*os_context_register_addr(context,reg_RDX);
     *(sp-5)=*os_context_register_addr(context,reg_RCX);
     *(sp-4)=*os_context_register_addr(context,reg_RAX);
-    *(sp-3)=*context_eflags_addr(context);
+    *(sp-3)=*os_context_flags_addr(context);
     *(sp-2)=*os_context_register_addr(context,reg_RBP);
     *(sp-1)=os_context_pc(context);
 

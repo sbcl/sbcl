@@ -160,7 +160,7 @@ arch_get_bad_addr(int __attribute__((unused)) sig,
  */
 
 os_context_register_t *
-context_eflags_addr(os_context_t *context)
+os_context_flags_addr(os_context_t *context)
 {
 #if defined __linux__
     /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
@@ -312,7 +312,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     *(pc-2) = 0x00240c81;
     *(pc-1) = 0x9d000001;
 #else
-    *context_eflags_addr(context) |= 0x100;
+    *os_context_flags_addr(context) |= 0x100;
 #endif
 
     single_stepping = pc;
@@ -355,7 +355,7 @@ restore_breakpoint_from_single_step(os_context_t * context)
     *(single_stepping-2) = single_step_save2;
     *(single_stepping-1) = single_step_save3;
 #else
-    *context_eflags_addr(context) &= ~0x100;
+    *os_context_flags_addr(context) &= ~0x100;
 #endif
     /* Re-install the breakpoint if possible. */
     if (((char *)OS_CONTEXT_PC(context) > (char *)single_stepping) &&

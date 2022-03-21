@@ -174,13 +174,6 @@ os_context_sigmask_addr(os_context_t *context)
     return &context->uc_sigmask;
 }
 
-os_context_register_t *
-os_context_flags_addr(os_context_t *context)
-{
-    return (os_context_register_t*)&context->uc_mcontext.gregs[REG_EFL];
-}
-
-
 void NO_SANITIZE_ADDRESS
 os_restore_fp_control(os_context_t *context)
 {

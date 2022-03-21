@@ -732,7 +732,6 @@
       (inst or r other-pointer-lowtag))
     DONE))
 
-#+linux ;; no support for os_context_flags_addr yet
 (define-vop ()
   (:translate sb-c::word+)
   (:args (x :scs (unsigned-reg))
@@ -751,7 +750,6 @@
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
       (inst jmp :c error))))
 
-#+linux
 (define-vop ()
   (:translate sb-c::word-)
   (:args (x :scs (unsigned-reg))
@@ -770,7 +768,6 @@
            (error (generate-error-code vop 'sb-kernel::sub-overflow-error r)))
       (inst jmp :c error))))
 
-#+linux
 (define-vop ()
   (:translate sb-c::signed-word+)
   (:args (x :scs (signed-reg))
@@ -789,7 +786,6 @@
            (error (generate-error-code vop 'sb-kernel::add-sub-overflow-error r)))
       (inst jmp :o error))))
 
-#+linux
 (define-vop ()
   (:translate sb-c::signed-word-)
   (:args (x :scs (signed-reg))
