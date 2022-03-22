@@ -449,6 +449,19 @@
   ;; unsigned is different because MUL always uses RAX:RDX as 1st operand.
   )
 
+(define-vop (fast--/unsigned=>signed fast-safe-arith-op)
+  (:translate -)
+  (:args (x :scs (unsigned-reg unsigned-stack immediate) :target r :load-if nil)
+         (y :scs (unsigned-reg unsigned-stack immediate) :load-if nil))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (r :scs (signed-reg signed-stack) :load-if nil))
+  (:result-types signed-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:vop-var vop)
+  (:note "inline (unsigned-byte 64) arithmetic")
+  (:generator 4
+    (emit-inline-add-sub 'sub x y r temp vop 'identity)))
+
 ;;;; Special logand cases: (logand signed unsigned) => unsigned
 
 (define-vop (fast-logand/signed-unsigned=>unsigned

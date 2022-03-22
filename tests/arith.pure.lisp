@@ -1022,3 +1022,13 @@
    `(lambda (x)
       (truly-the fixnum (* (the fixnum x) -4)))
    ((4) -16)))
+
+(with-test (:name :-unsigned=>signed)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare ((integer #.(- (expt 2 sb-vm:n-word-bits) 10)
+                         #.(- (expt 2 sb-vm:n-word-bits) 1))
+                a b))
+      (- a b))
+   (((- (expt 2 sb-vm:n-word-bits) 10) (- (expt 2 sb-vm:n-word-bits) 9)) -1)))

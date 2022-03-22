@@ -211,6 +211,13 @@
 (define-binop logior 2 orr)
 (define-binop logxor 2 eor)
 
+(define-vop (fast--/unsigned=>signed fast-unsigned-binop)
+  (:translate -)
+  (:results (r :scs (signed-reg)))
+  (:result-types signed-num)
+  (:generator 5
+    (inst sub r x y)))
+
 (define-binop logandc1 2 bic :swap t
   :constant-test bic-encode-immediate
   :constant-fixnum-test bic-fixnum-encode-immediate
