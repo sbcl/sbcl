@@ -143,36 +143,34 @@
                                              (t
                                               (dotimes (i len)
                                                 (push (read-codepoint) ret))
-                                              (nreverse ret))))))
-                            (loop until (>= index length)
-                                  for key = (read-codepoint)
-                                  for upper = (read-length-tagged)
-                                  for lower = (read-length-tagged)
-                                  for page = (aref %*character-case-pages*% (ash key -6))
-                                  for i = (+ (ash page 6) (ldb (byte 6 0) key))
-                                  do
-                                  (setf (aref unicode-table i)
-                                        (if (or (consp upper)
-                                                (consp lower))
-                                            (cons upper lower)
-                                            (dpb upper (byte 21 21) lower)))
-                                  when
-                                  (flet (#+sb-unicode
-                                         (both-case-p-local (code)
-                                           (logbitp 7 (aref misc-database
-                                                            (+ 5 (misc-index-from-char-code
-                                                                  code high-pages low-pages))))))
-                                    (and (atom upper)
-                                         (atom lower)
-                                         ;; Some characters are only equal under unicode rules,
-                                         ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
-                                         #+sb-unicode
-                                         (both-case-p-local lower)
-                                         #+sb-unicode
-                                         (both-case-p-local upper)))
-                                  do
-                                  (setf (aref table (* i 2)) lower
-                                        (aref table (1+ (* i 2))) upper)))
+                                              (nreverse ret)))))
+                                   #+sb-unicode
+                                   (both-case-p-local (code)
+                                     (logbitp 7 (aref misc-database
+                                                      (+ 5 (misc-index-from-char-code
+                                                            code high-pages low-pages))))))
+                            (loop
+                              until (>= index length)
+                              do (let* ((key (read-codepoint))
+                                        (upper (read-length-tagged))
+                                        (lower (read-length-tagged))
+                                        (page (aref %*character-case-pages*% (ash key -6)))
+                                        (i (+ (ash page 6) (ldb (byte 6 0) key))))
+                                   (setf (aref unicode-table i)
+                                         (if (or (consp upper)
+                                                 (consp lower))
+                                             (cons upper lower)
+                                             (dpb upper (byte 21 21) lower)))
+                                   (when (and (atom upper)
+                                              (atom lower)
+                                              ;; Some characters are only equal under unicode rules,
+                                              ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
+                                              #+sb-unicode
+                                              (both-case-p-local lower)
+                                              #+sb-unicode
+                                              (both-case-p-local upper))
+                                     (setf (aref table (* i 2)) lower
+                                           (aref table (1+ (* i 2))) upper)))))
                           `((defconstant-eqx +character-unicode-cases+ ,unicode-table #'equalp)
                             (defconstant-eqx +character-cases+ ,table #'equalp)))
 
