@@ -3239,7 +3239,33 @@ scavenge_newspace(generation_index_t generation)
  * start of a GC else there may be many page faults while scavenging
  * the newspace (I've seen drive the system time to 99%). These pages
  * would need to be unprotected anyway before unmapping in
- * free_oldspace; not sure what effect this has on paging.. */
+ * free_oldspace; not sure what effect this has on paging..
+ *
+ * Here is a real-life example of what can go wrong if we don't
+ * unprotect oldspace:
+ * Scenario:
+ *   - gc-with-promotion (raise=1) of gen2 to gen3
+ *   - symbol FOO in gen 3 on page 1000
+ *   - large vector 'v' in gen 2 on page 1300..1305
+ *   - 'v' points only to gen 2 objects (so it is unmarked, or "protected")
+ *   - symbol-value of FOO is 'v'
+ *   - root generations are 4 and higher
+ *   - no roots point to vector 'v' or any of its contents
+ * Thence:
+ *   - scavenge_newspace_full_scan visits page 1000
+ *   - assigns 'record_new_regions_below' = 1001
+ *   - traces slots of FOO, calls copy_possibly_large_object(v)
+ *   - 'v' is promoted into gen3
+ *   - call add_new_area on page 1300..1305
+ *   - 1300 exceeds 1001 so we skip this area
+ * So because 'v' is ahead of the wavefront, and theoretically page 1300
+ * will be picked up by the remainder of the full_scan loop, we optimized out
+ * the addition of the area. But then the scan loop sees that page 1300
+ * is protected and it decides that it can can skip it even though it was
+ * originally part of 'from_space' and points to other 'from_space' things.
+ * The consequence is that everything 'v' pointed to in gen2 becomes freed
+ * while 'v' holds dangling pointers to all that garbage.
+ */
 static void
 unprotect_oldspace(void)
 {
@@ -3871,8 +3897,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
      * which need to be scavenged. It also helps avoid unnecessary page
      * faults as forwarding pointers are written into them. They need to
      * be un-protected anyway before unmapping later. */
-        if (ENABLE_PAGE_PROTECTION)
-            unprotect_oldspace();
+        unprotect_oldspace();
 
     } else { // "full" [sic] GC
 
