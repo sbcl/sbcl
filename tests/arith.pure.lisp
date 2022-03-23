@@ -1067,7 +1067,7 @@
                                                         for result = (funcall op a b)
                                                         when (typep b b-type)
                                                         do
-                                                        (handler-case 
+                                                        (handler-case
                                                             (funcall fun a b)
                                                           (error (c)
                                                             (if (typep result result-type)
