@@ -3646,3 +3646,43 @@
            (declare (special x)
                     (dynamic-extent x))
            (throw 'c (the (integer 0 10) r))))))
+
+(with-test (:name :type-constraint-joining)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda ()
+                (let ((x 'foo))
+                  (if (read)
+                      (setq x 3)
+                      (setq x 5))
+                  x)))))
+          '(values (or (integer 5 5) (integer 3 3)) &optional))))
+
+(with-test (:name :type-constraint-joining-terminates)
+  (checked-compile
+   sb-c::
+   `(lambda (name vop)
+      (block foo
+        (do* ((block (vop-block vop) (ir2-block-prev block))
+              (last vop (ir2-block-last-vop block)))
+             (nil)
+          (aver (eq (ir2-block-block block) (ir2-block-block (vop-block vop))))
+          (do ((current last (vop-prev current)))
+              ((null current))
+            (when (eq (vop-name current) name)
+              (return-from foo current))))))))
+
+(with-test (:name :type-constraint-joining-conflicts)
+  (assert (nth-value
+           1
+           (checked-compile
+            '(lambda (y)
+               (let ((x 'foo))
+                 (ecase y
+                   (1 (setq x (random 10)))
+                   (2 (setq x (make-array 10)))
+                   (3 (setq x (make-hash-table))))
+                 (symbol-name x)))
+            :allow-warnings t))))

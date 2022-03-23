@@ -417,6 +417,18 @@
 ;;; equality or emptiness testing.  There's also union, but that's only an
 ;;; optimisation to avoid useless copies in ADD-TEST-CONSTRAINTS and
 ;;; FIND-BLOCK-TYPE-CONSTRAINTS.
+(defmacro do-conset-elements ((constraint conset &optional result) &body body)
+  (let ((index (gensym "INDEX"))
+        (conset-vector (gensym "CONSET-VECTOR"))
+        (universe (gensym "UNIVERSE")))
+    `(let ((,conset-vector (conset-vector ,conset))
+           (,universe *constraint-universe*))
+       (loop for ,index from (conset-min ,conset) below (conset-max ,conset)
+             do (when (eql (sbit ,conset-vector ,index) 1)
+                  (let ((,constraint (aref ,universe ,index)))
+                    ,@body))
+             finally (return ,result)))))
+
 (defmacro do-conset-constraints-intersection ((symbol (conset constraints) &optional result)
                                               &body body)
   (let ((min (gensym "MIN"))
@@ -1265,7 +1277,38 @@
                  (if-alternative-constraints last))))
         (block-out pred))))
 
-(defun compute-block-in (block)
+;;; Join the type constraints coming from CONSET1 and CONSET2 on every
+;;; constrained variable. The potentially new constraints are then
+;;; added to the intersection of CONSET1 and CONSET2.
+(defun join-type-constraints (conset1 conset2)
+  (let ((joined-constraints))
+    (do-conset-elements (con1 conset1)
+      (let ((x (constraint-x con1))
+            (y (constraint-y con1)))
+        (when (and (eq (constraint-kind con1) 'typep)
+                   (not (conset-member con1 conset2))
+                   ;; FIXME: Handling complemented type constraints as
+                   ;; negation types here seems to cause infinite regress.
+                   (not (constraint-not-p con1)))
+          (do-propagatable-constraints (con2 (conset2 x))
+            (when (and (eq (constraint-kind con2) 'typep)
+                       (not (conset-member con2 conset1))
+                       (not (constraint-not-p con2)))
+              (let ((other (constraint-y con2)))
+                (aver (neq y other))
+                (let ((new-type (type-union y other)))
+                  (unless (eq new-type *universal-type*)
+                    (push
+                     (find-or-create-constraint 'typep
+                                                x
+                                                new-type
+                                                nil)
+                     joined-constraints)))))))))
+    (conset-intersection conset1 conset2)
+    (dolist (joined-constraint joined-constraints)
+      (conset-adjoin joined-constraint conset1))))
+
+(defun compute-block-in (block join-types-p)
   (let ((in nil))
     (dolist (pred (block-pred block))
       ;; If OUT has not been calculated, assume it to be the universal
@@ -1273,12 +1316,14 @@
       (let ((out (block-out-for-successor pred block)))
         (when out
           (if in
-              (conset-intersection in out)
+              (if join-types-p
+                  (join-type-constraints in out)
+                  (conset-intersection in out))
               (setq in (copy-conset out))))))
     (or in (make-conset))))
 
-(defun update-block-in (block)
-  (let ((in (compute-block-in block)))
+(defun update-block-in (block join-types-p)
+  (let ((in (compute-block-in block join-types-p)))
     (cond ((and (block-in block) (conset= in (block-in block)))
            nil)
           (t
@@ -1341,25 +1386,33 @@
                  (setq blocks-to-process (nconc-new block blocks-to-process))))))
       (multiple-value-bind (leading-blocks rest-of-blocks)
           (leading-component-blocks component)
-        ;; Update every block once to account for changes in the
-        ;; IR1. The constraints of the lead blocks cannot be changed
-        ;; after the first pass so we might as well use them and skip
-        ;; USE-RESULT-CONSTRAINTS later.
-        (dolist (block leading-blocks)
-          (setf (block-in block) (compute-block-in block))
-          (find-block-type-constraints block t))
-        (setq blocks-to-process (copy-list rest-of-blocks))
-        ;; The rest of the blocks.
-        (dolist (block rest-of-blocks)
-          (aver (eq block (pop blocks-to-process)))
-          (setf (block-in block) (compute-block-in block))
-          (enqueue (find-block-type-constraints block nil)))
-        ;; Propagate constraints
-        (loop for block = (pop blocks-to-process)
-              while block do
-              (unless (eq block (component-tail component))
-                (when (update-block-in block)
-                  (enqueue (find-block-type-constraints block nil)))))
+        ;; We can only start joining types once all type constraints
+        ;; are definitely correct. They may not be the first time
+        ;; around because EQL constraint propagation is optimistic,
+        ;; i.e. un-EQL variables may be considered EQL before
+        ;; constraint propagation is done, hence any inherited type
+        ;; constraints from such constraints will be wrong as well.
+        (dolist (join-types-p '(nil t))
+          ;; Update every block once to account for changes in the
+          ;; IR1. The constraints of the lead blocks cannot be changed
+          ;; after the first pass so we might as well use them and skip
+          ;; USE-RESULT-CONSTRAINTS later.
+          (dolist (block leading-blocks)
+            (setf (block-in block) (compute-block-in block join-types-p))
+            (find-block-type-constraints block t))
+          (setq blocks-to-process (copy-list rest-of-blocks))
+          ;; The rest of the blocks.
+          (dolist (block rest-of-blocks)
+            (aver (eq block (pop blocks-to-process)))
+            (setf (block-in block) (compute-block-in block join-types-p))
+            (enqueue (find-block-type-constraints block nil)))
+          ;; Propagate constraints
+          (loop for block = (pop blocks-to-process)
+                while block do
+                  (unless (eq block (component-tail component))
+                    (when (update-block-in block join-types-p)
+                      (enqueue (find-block-type-constraints block nil))))))
+
         rest-of-blocks))))
 
 (defun constraint-propagate (component)
