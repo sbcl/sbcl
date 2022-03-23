@@ -248,7 +248,7 @@ static int save_cmd(char **ptr) {
     return 0;
 }
 
-static int threads_cmd(char **ptr) {
+static int threads_cmd(char __attribute__((unused)) **ptr) {
     struct thread* th;
     fprintf(stderr, "(thread*,pthread,sb-vm:thread)\n");
     void* pthread;
@@ -258,7 +258,7 @@ static int threads_cmd(char **ptr) {
     }
     return 0;
 }
-static int verify_cmd(char **ptr) {
+static int verify_cmd(char __attribute__((unused)) **ptr) {
     gencgc_verbose = 1;
     suspend_other_threads();
     verify_heap(0);
@@ -338,14 +338,14 @@ dump_cmd(char **ptr)
     int force = 0, decode = 0;
 
     if (more_p(ptr)) {
-        // you can't both "force" and "decode" - only one or the other,
-        // or neither
-        if (!strncmp(*ptr, "-f ", 3)) {
-          force = 1;
-          *ptr += 3;
-        } else if (!strncmp(*ptr, "-d ", 3)) {
-          decode = 1;
-          *ptr += 3;
+        while (1) {
+            if (!strncmp(*ptr, "-f ", 3)) {
+              force = 1;
+              *ptr += 3;
+            } else if (!strncmp(*ptr, "-d ", 3)) {
+              decode = 1;
+              *ptr += 3;
+            } else break;
         }
         if (!parse_addr(ptr, !force, &addr)) return 0;
 
