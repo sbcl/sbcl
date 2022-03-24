@@ -974,15 +974,16 @@ IF-NOT-OWNER is :FORCE)."
     nil)
   (defun %waitqueue-wakeup (queue n)
     (declare (fixnum n))
-    (loop while (plusp n)
-          for next = (let ((head (waitqueue-%head queue))
-                           (tail (waitqueue-%tail queue)))
-                       (when head
-                         (if (eq head tail)
-                             (setf (waitqueue-%head queue) nil
-                                   (waitqueue-%tail queue) nil)
-                             (setf (waitqueue-%head queue) (cdr head)))
-                         (car head)))
+    (loop with next = nil
+          while (plusp n)
+          do (setq next (let ((head (waitqueue-%head queue))
+                              (tail (waitqueue-%tail queue)))
+                          (when head
+                            (if (eq head tail)
+                                (setf (waitqueue-%head queue) nil
+                                      (waitqueue-%tail queue) nil)
+                                (setf (waitqueue-%head queue) (cdr head)))
+                            (car head))))
           while next
           do (when (eq queue (sb-ext:compare-and-swap
                               (thread-waiting-for next) queue nil))
