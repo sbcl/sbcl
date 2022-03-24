@@ -1044,13 +1044,20 @@
                              (unsigned-byte ,sb-vm:n-word-bits)
                              (signed-byte 8)
                              (unsigned-byte 8))))
-          (arguments `(0 1 2 -1 -2
-                         ,(- (expt 2 sb-vm:n-word-bits) 1)
-                         ,(- (expt 2 sb-vm:n-word-bits) 5)
-                         ,(- (expt 2 (1- sb-vm:n-word-bits)) 1)
-                         ,(- (expt 2 (1- sb-vm:n-word-bits)) 5)
-                         ,(- (expt 2 (1- sb-vm:n-word-bits)))
-                         ,(- 10 (expt 2 (1- sb-vm:n-word-bits))))))
+          (arguments (list 0 1 2 3 4 -1 -2 -3 -4
+                           (- (expt 2 sb-vm:n-word-bits) 1)
+                           (- (expt 2 sb-vm:n-word-bits) 5)
+                           (- (expt 2 (1- sb-vm:n-word-bits)) 1)
+                           (- (expt 2 (1- sb-vm:n-word-bits)) 5)
+                           (- (expt 2 (1- sb-vm:n-word-bits)))
+                           (- 10 (expt 2 (1- sb-vm:n-word-bits)))
+                           (expt 2 (1- sb-vm:n-word-bits))
+                           most-positive-fixnum
+                           most-negative-fixnum
+                           (1- most-positive-fixnum)
+                           (1+ most-negative-fixnum)
+                           (floor most-positive-fixnum 2)
+                           (floor most-negative-fixnum 2))))
       (loop for op in ops
             do (loop for a-type in types
                      do (loop for b-type in types
