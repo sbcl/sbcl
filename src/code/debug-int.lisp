@@ -1709,47 +1709,48 @@ register."
                  :deleted
                  (compact-vector-ref vars index-or-deleted))))
       (loop
-         :while (< i len)
-         :for ele = (compact-vector-ref args i) :do
-         (cond
-           ((eq ele sb-c::debug-info-var-optional)
-            (setf optionalp t))
-           ((eq ele sb-c::debug-info-var-rest)
-            (push-var '(:rest) 1))
-           ;; The next two args are the &MORE arg context and
-           ;; count.
-           ((eq ele sb-c::debug-info-var-more)
-            (push-var '(:more) 2))
-           ;; SUPPLIED-P var immediately following keyword or
-           ;; optional. Stick the extra var in the result element
-           ;; representing the keyword or optional, which is the
-           ;; previous one.
-           ((eq ele sb-c::debug-info-var-supplied-p)
-            (push-var (pop result) 1))
-           ;; The keyword of a keyword parameter. Store it so the next
-           ;; element can be used to form a (:keyword KEYWORD VALUE)
-           ;; entry.
-           ((typep ele 'symbol)
-            (setf keyword ele))
-           ;; The previous element was the keyword of a keyword
-           ;; parameter and is stored in KEYWORD. The current element
-           ;; is the index of the value (or a deleted
-           ;; marker). Construct and push the complete entry.
-           (keyword
-            (push-var (list :keyword keyword (var-or-deleted ele))))
-           ;; We saw an optional marker, so the following non-symbols
-           ;; are indexes (or deleted markers) indicating optional
-           ;; variables.
-           (optionalp
-            (push-var (list :optional (var-or-deleted ele))))
-           ;; Deleted required, optional or keyword argument.
-           ((eq ele sb-c::debug-info-var-deleted)
-            (push-var :deleted))
-           ;; Required arg at beginning of args array.
-           (t
-            (push-var (compact-vector-ref vars ele))))
-         (incf i)
-         :finally (return (nreverse result))))))
+        while (< i len)
+        do
+           (let ((ele (compact-vector-ref args i)))
+             (cond
+               ((eq ele sb-c::debug-info-var-optional)
+                (setf optionalp t))
+               ((eq ele sb-c::debug-info-var-rest)
+                (push-var '(:rest) 1))
+               ;; The next two args are the &MORE arg context and
+               ;; count.
+               ((eq ele sb-c::debug-info-var-more)
+                (push-var '(:more) 2))
+               ;; SUPPLIED-P var immediately following keyword or
+               ;; optional. Stick the extra var in the result element
+               ;; representing the keyword or optional, which is the
+               ;; previous one.
+               ((eq ele sb-c::debug-info-var-supplied-p)
+                (push-var (pop result) 1))
+               ;; The keyword of a keyword parameter. Store it so the next
+               ;; element can be used to form a (:keyword KEYWORD VALUE)
+               ;; entry.
+               ((typep ele 'symbol)
+                (setf keyword ele))
+               ;; The previous element was the keyword of a keyword
+               ;; parameter and is stored in KEYWORD. The current element
+               ;; is the index of the value (or a deleted
+               ;; marker). Construct and push the complete entry.
+               (keyword
+                (push-var (list :keyword keyword (var-or-deleted ele))))
+               ;; We saw an optional marker, so the following non-symbols
+               ;; are indexes (or deleted markers) indicating optional
+               ;; variables.
+               (optionalp
+                (push-var (list :optional (var-or-deleted ele))))
+               ;; Deleted required, optional or keyword argument.
+               ((eq ele sb-c::debug-info-var-deleted)
+                (push-var :deleted))
+               ;; Required arg at beginning of args array.
+               (t
+                (push-var (compact-vector-ref vars ele))))
+             (incf i))
+        finally (return (nreverse result))))))
 
 ;;; This is used in COMPILED-DEBUG-FUN-LAMBDA-LIST.
 (defun compiled-debug-fun-lambda-list-var (args i vars)
