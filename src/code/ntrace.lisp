@@ -621,8 +621,9 @@ the N-th value returned by the function."
 functions when called with no arguments."
   (if specs
       `(progn
-         ,@(loop while specs
-                 for name = (pop specs)
+         ,@(loop for name = (car specs)
+                 while specs
+                 do (pop specs)
                  collect (cond ((eq name :function)
                                 `(untrace-1 ,(pop specs)))
                                ((stringp name)

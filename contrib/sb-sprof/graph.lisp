@@ -86,13 +86,14 @@
                  (unless (in-component w)
                    (setf (vertex-root v) (min-root v w))))
                (if (eq v (vertex-root v))
-                   (loop while (and stack (vertex-> (car stack) v))
-                      as w = (pop stack)
-                      collect w into this-component
-                      do (setf (in-component w) t)
-                      finally
-                        (setf (in-component v) t)
-                        (push (cons v this-component) components))
+                   (loop for w = (car stack)
+                         while (and stack (vertex-> (car stack) v))
+                         do (pop stack)
+                         collect w into this-component
+                         do (setf (in-component w) t)
+                         finally
+                            (setf (in-component v) t)
+                            (push (cons v this-component) components))
                    (push v stack))))
       (map-vertices #'visit vertices)
       components)))

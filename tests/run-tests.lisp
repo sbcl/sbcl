@@ -25,30 +25,32 @@
 
 (defun run-all (&aux (start-time (get-internal-real-time)))
   (loop :with remainder = (rest *posix-argv*)
-     :while remainder
-     :for arg = (pop remainder)
-     :do (cond
-           ((string= arg "--evaluator-mode")
-            (let ((mode (pop remainder)))
-              (cond
-                ((string= mode "interpret")
-                 (setf *test-evaluator-mode* :interpret))
-                ((string= mode "compile")
-                 (setf *test-evaluator-mode* :compile))
-                (t
-                 (error "~@<Invalid evaluator mode: ~A. Must be one ~
+        :for arg = (car remainder)
+        :while remainder
+        :do
+           (pop remainder)
+           (cond
+             ((string= arg "--evaluator-mode")
+              (let ((mode (pop remainder)))
+                (cond
+                  ((string= mode "interpret")
+                   (setf *test-evaluator-mode* :interpret))
+                  ((string= mode "compile")
+                   (setf *test-evaluator-mode* :compile))
+                  (t
+                   (error "~@<Invalid evaluator mode: ~A. Must be one ~
                            of interpret, compile.~@:>"
-                        mode)))))
-           ((string= arg "--break-on-failure")
-            (setf *break-on-error* t)
-            (setf test-util:*break-on-failure* t))
-           ((string= arg "--break-on-expected-failure")
-            (setf test-util:*break-on-expected-failure* t))
-           ((string= arg "--report-skipped-tests")
-            (setf *report-skipped-tests* t))
-           ((string= arg "--no-color"))
-           (t
-            (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
+                          mode)))))
+             ((string= arg "--break-on-failure")
+              (setf *break-on-error* t)
+              (setf test-util:*break-on-failure* t))
+             ((string= arg "--break-on-expected-failure")
+              (setf test-util:*break-on-expected-failure* t))
+             ((string= arg "--report-skipped-tests")
+              (setf *report-skipped-tests* t))
+             ((string= arg "--no-color"))
+             (t
+              (push (merge-pathnames (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
   (with-open-file (log "test.log" :direction :output
                        :if-exists :supersede
@@ -60,9 +62,7 @@
     #-win32 (impure-runner (sh-files) 'sh-test log)
     (log-file-elapsed-time "GRAND TOTAL" start-time log))
   (report)
-  (sb-ext:exit :code (if (unexpected-failures)
-                         1
-                         104)))
+  (sb-ext:exit :code (if (unexpected-failures) 1 104)))
 
 (defun report ()
   (terpri)
