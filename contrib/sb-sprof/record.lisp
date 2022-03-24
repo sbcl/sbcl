@@ -56,11 +56,11 @@ EXPERIMENTAL: Interface subject to change."
     (when (plusp index)
       (sb-int:aver (typep (aref vector 0) '(cons (eql trace-start) index)))
       (loop for start = 0 then end
-            while (< start index)
             for end = (cdr (aref vector start))
             for thread = (aref vector (+ start 1))
             do (let ((trace (list vector start end)))
-                 (funcall function thread trace))))))
+                 (funcall function thread trace))
+            while (< end index)))))
 
 ;;; Call FUNCTION on each PC location in TRACE.
 ;;; The signature of FUNCTION must be compatible with (info pc-or-offset).
