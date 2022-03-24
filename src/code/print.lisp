@@ -62,10 +62,10 @@ variable: an unreadable object representing the error is printed instead.")
 ;; duplicate defglobal because this file is compiled before "reader"
 (define-load-time-global *standard-readtable* nil)
 
+(define-load-time-global sb-pretty::*standard-pprint-dispatch-table* nil)
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
   (declare (dynamic-extent function))
-  (declare (special sb-pretty::*standard-pprint-dispatch-table*))
   (let ((*package* #.(find-package "COMMON-LISP-USER"))
         (*print-array* t)
         (*print-base* 10)
