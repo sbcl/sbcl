@@ -872,6 +872,11 @@ there"))))
     (let ((str (write-to-string x :pretty nil)))
       (assert (search "#<SB-KERNEL:FUNCALLABLE-INSTANCE {" str)))))
 
+(with-test (:name :functionless-funcallable-instance)
+  (let ((x (sb-pcl::%make-standard-funcallable-instance #() #xdead)))
+    (assert (search "#<SB-PCL::STANDARD-FUNCALLABLE-INSTANCE"
+                    (write-to-string x :pretty nil))))) ; should not crash
+
 (with-test (:name :bug-885320)
   (let* ((form `(format nil "~E"))
          (fun (compile nil `(lambda (x) (,@form x)))))

@@ -2004,6 +2004,19 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;; functions
 
 (defmethod print-object ((object function) stream)
+  (macrolet ((unprintable-instance-p ()
+               ;; Guard against calling %FUN-FUN if it would return 0.
+               ;; %FUNCALLABLE-INSTANCE-FUN is known to return FUNCTION so determining
+               ;; whether it is actually assigned requires a low-level trick.
+               (let ((s (sb-vm::primitive-object-slot
+                         (sb-vm:primitive-object 'funcallable-instance)
+                         'function)))
+                 `(and (funcallable-instance-p object)
+                       (eql 0 (%primitive sb-alien:slot object 'function ,(sb-vm:slot-offset s)
+                                          ,sb-vm:other-pointer-lowtag))))))
+    (when (unprintable-instance-p)
+      (return-from print-object
+        (print-unreadable-object (object stream :type t :identity t)))))
   (let* ((name (%fun-name object))
          (proper-name-p (and (legal-fun-name-p name) (fboundp name)
                              (eq (fdefinition name) object))))
