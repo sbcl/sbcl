@@ -733,15 +733,13 @@
      (lambda (chunk inst)
        (declare (type dchunk chunk) (type instruction inst))
        (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-       (loop with list = (inst-labeller inst)
-             while list
-             ;; item = #(FUNCTION PREFILTERED-VALUE-INDEX)
-             ;;      | #(FUNCTION SIGN-EXTEND-P BYTE-SPEC ...)
-             for item = (if (listp list) (pop list) (prog1 list (setq list nil)))
-             then (pop list)
-          do (let* ((item-length (length item))
-                    (index/signedp (svref item 1))
-                    (adjusted-value
+       (loop
+         ;; item = #(FUNCTION PREFILTERED-VALUE-INDEX)
+         ;;      | #(FUNCTION SIGN-EXTEND-P BYTE-SPEC ...)
+         for item in (ensure-list (inst-labeller inst))
+         do (let* ((item-length (length item))
+                   (index/signedp (svref item 1))
+                   (adjusted-value
                      (funcall
                       (svref item 0)
                       (flet ((extract-byte (spec-index)
@@ -753,7 +751,7 @@
                         (case item-length
                           (2 (svref (dstate-filtered-values dstate) index/signedp))
                           (3 (extract-byte 2)) ; extract exactly one byte
-                          (t ; extract >1 byte.
+                          (t                   ; extract >1 byte.
                            ;; FIXME: this is strictly redundant.
                            ;; You should combine fields in the prefilter
                            ;; so that the labeller receives a single byte.
@@ -761,10 +759,10 @@
                            (loop for i from 2 below item-length
                                  collect (extract-byte i)))))
                       dstate)))
-               ;; If non-integer, the value is not a label.
-               (when (and (integerp adjusted-value)
-                          (not (assoc adjusted-value labels)))
-                 (push (cons adjusted-value nil) labels)))))
+              ;; If non-integer, the value is not a label.
+              (when (and (integerp adjusted-value)
+                         (not (assoc adjusted-value labels)))
+                (push (cons adjusted-value nil) labels)))))
      segment
      dstate)
     ;; erase any notes that got there by accident
