@@ -82,8 +82,8 @@
                       (zerop length))
             (decf length))
           (setf pc (sap+ pc 4))
-          (let ((args (loop repeat length
-                            with index = 0
+          (let ((args (loop with index = 0
+                            repeat length
                             collect (sb-c:sap-read-var-integerf pc index))))
             (values error-number
                     (if (= first-offset zr-offset)

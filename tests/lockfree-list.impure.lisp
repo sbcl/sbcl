@@ -245,7 +245,7 @@
 (defparameter *l* nil)
 (defun construct (n)
   (setq *l* (make-ordered-list :key-type 'fixnum))
-  (loop repeat n for key from 10 by 10 do (lfl-insert *l* key (make-foo :a key))))
+  (loop for key from 10 by 10 repeat n do (lfl-insert *l* key (make-foo :a key))))
 
 (defun scan-lfl-gens (deletep &aux page-indices)
   (do ((node (get-next (list-head *l*)) ; can't delete the dummy node (list head)

@@ -601,15 +601,15 @@
         (oops))
     (loop for f = most-positive-single-float then (/ f 2.0)
           while (> f 0.0)
-          do (loop repeat 10
-                   for fr = (random f)
+          do (loop for fr = (random f)
+                   repeat 10
                    do (unless (eql fr (read-from-string (prin1-to-string fr)))
                         (push fr oops)
                         (return))))
     (loop for f = most-negative-single-float then (/ f 2.0)
           while (< f -0.0)
-          do (loop repeat 10
-                   for fr = (- (random (- f)))
+          do (loop for fr = (- (random (- f)))
+                   repeat 10
                    do (unless (eql fr (read-from-string (prin1-to-string fr)))
                         (push fr oops)
                         (return))))
@@ -625,16 +625,16 @@
     ;; FIXME skipping denormalized floats due to bug 793774.
     (loop for f = most-positive-double-float then (/ f 2d0)
           while (> f 0d0)
-          do (loop repeat 10
-                   for fr = (random f)
+          do (loop for fr = (random f)
+                   repeat 10
                    do (unless (float-denormalized-p fr)
                         (unless (eql fr (read-from-string (prin1-to-string fr)))
                           (push fr oops)
                           (return)))))
     (loop for f = most-negative-double-float then (/ f 2d0)
           while (< f -0d0)
-          do (loop repeat 10
-                   for fr = (- (random (- f)))
+          do (loop for fr = (- (random (- f)))
+                   repeat 10
                    do (unless (float-denormalized-p fr)
                         (unless (eql fr (read-from-string (prin1-to-string fr)))
                           (push fr oops)

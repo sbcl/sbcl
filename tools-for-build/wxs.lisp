@@ -59,11 +59,10 @@
   "Turns something like 0.pre7.14.flaky4.13 (see version.lisp-expr)
   into an acceptable form for WIX (up to four dot-separated numbers)."
   (with-output-to-string (output)
-    (loop repeat 4
-          with position = 0
+    (loop with position = 0
           for separator = "" then "."
-          for next-digit = (position-if #'digit-char-p horrible-thing
-                                    :start position)
+          for next-digit = (position-if #'digit-char-p horrible-thing :start position)
+          repeat 4
           while next-digit
           do (multiple-value-bind (number end)
                  (parse-integer horrible-thing :start next-digit :junk-allowed t)

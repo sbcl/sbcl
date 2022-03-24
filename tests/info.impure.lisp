@@ -598,8 +598,8 @@
                    for val = (info :variable :macro-expansion name)
                    do (assert (eql (or val 0) count))))))
     ;; Try it when names are symbols or "simple" 2-list names
-    (run (coerce (loop repeat 50
-                       for sym = (gensym)
+    (run (coerce (loop for sym = (gensym)
+                       repeat 50
                        nconc (list `(setf ,sym) sym))
                  'vector))
     ;; For hairy names, the tricky piece is in the rehash algorithm,

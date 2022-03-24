@@ -28,8 +28,8 @@
     (inst mov rax-tn 7)
     (zeroize rdx-tn)
     ;; Zero the header
-    (loop repeat 8
-          for i from (+ 512 24) by 8
+    (loop for i from (+ 512 24) by 8
+          repeat 8
           do
           (inst mov (ea i rsp-tn) rdx-tn))
     (inst xsave (ea 24 rsp-tn))

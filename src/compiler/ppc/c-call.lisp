@@ -536,10 +536,10 @@
                  )
                 (t
                  (loop with gprs = (mapcar #'make-gpr '(3 4))
-                       repeat n-return-area-words
                        for gpr = (pop gprs)
                        for offset from (- return-area-pos)
                        by n-word-bytes
+                       repeat n-return-area-words
                        do
                        (unless gpr
                          (bug "Out of return registers in alien-callback trampoline."))

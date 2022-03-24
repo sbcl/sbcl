@@ -26,7 +26,8 @@
     (let ((length (error-length error-number)))
       (declare (type (unsigned-byte 8) length))
       (values error-number
-              (loop repeat length with index = 0
+              (loop with index = 0
+                    repeat length
                     collect (sb-c:sap-read-var-integerf sap index))
               trap-number))))
 

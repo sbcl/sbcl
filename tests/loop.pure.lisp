@@ -428,7 +428,7 @@
   (assert-no-signal
    (compile nil '(lambda ()
                    (declare (optimize speed))
-                   (loop repeat (+ 1 5) for baz = 'this then 'that
+                   (loop for baz = 'this then 'that repeat (+ 1 5)
                          do (print baz))))))
 
 (with-test (:name :loop-default-init-type)

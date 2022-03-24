@@ -361,8 +361,9 @@ and a pointer to the arguments."
                         (incf words-processed)
                         (incf offset n-word-bytes))
                       (when gprs
-                        (loop repeat words
+                        (loop
                           for gpr = (pop gprs)
+                          repeat words
                           when gpr do
                             (inst sw gpr nsp-tn offset)
                           do
