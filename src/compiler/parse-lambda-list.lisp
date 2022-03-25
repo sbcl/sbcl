@@ -555,7 +555,9 @@
                  (if (ll-kwds-keyp llks) (cons '&key keys)) ; KEYS can be nil
                  (if (ll-kwds-allowp llks) '(&allow-other-keys))
                  ;; Should &AUX be inserted even if empty? Probably not.
-                 (if aux (cons '&aux aux)))))))
+                 (if aux (cons '&aux aux))
+                 ;; fresh lambda list spine everywhere
+                 nil)))))
 
 ;;; Produce a destructuring lambda list from its internalized representation,
 ;;; excluding any parts that don't constrain the shape of the expected input.
