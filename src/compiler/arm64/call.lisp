@@ -310,30 +310,38 @@
 ;;;    Args and Nargs are TNs wired to the named locations.  We must
 ;;; explicitly allocate these TNs, since their lifetimes overlap with the
 ;;; results Start and Count (also, it's nice to be able to target them).
-(defun receive-unknown-values (args nargs start count)
+(defun receive-unknown-values (node args nargs start count)
   (declare (type tn args nargs start count))
   (let ((unused-count-p (eq (tn-kind count) :unused))
-        (unused-start-p (eq (tn-kind start) :unused)))
-    (assemble ()
-      (inst b :eq MULTIPLE)
-      (unless unused-start-p
-        (move start csp-tn))
-      (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
-      (unless unused-count-p
-        (inst mov count (fixnumize 1)))
-      (inst b DONE)
-      MULTIPLE
-      #.(assert (evenp register-arg-count))
-      (do ((arg *register-arg-tns* (cddr arg))
-           (i 0 (+ i 2)))
-          ((null arg))
-        (inst stp (first arg) (second arg)
-              (@ args (* i n-word-bytes))))
-      (unless unused-start-p
-        (move start args))
-      (unless unused-count-p
-        (move count nargs))
-      DONE)))
+        (unused-start-p (eq (tn-kind start) :unused))
+        (type (sb-c::node-derived-type node)))
+    (if (type-single-value-p type)
+        (assemble ()
+          (unless unused-start-p
+            (move start csp-tn))
+          (unless unused-count-p
+            (inst mov count (fixnumize 1)))
+          (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index)))
+        (assemble ()
+          (inst b :eq MULTIPLE)
+          (unless unused-start-p
+            (move start csp-tn))
+          (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
+          (unless unused-count-p
+            (inst mov count (fixnumize 1)))
+          (inst b DONE)
+          MULTIPLE
+          #.(assert (evenp register-arg-count))
+          (do ((arg *register-arg-tns* (cddr arg))
+               (i 0 (+ i 2)))
+              ((null arg))
+            (inst stp (first arg) (second arg)
+                  (@ args (* i n-word-bytes))))
+          (unless unused-start-p
+            (move start args))
+          (unless unused-count-p
+            (move count nargs))
+          DONE))))
 
 ;;; VOP that can be inherited by unknown values receivers.  The main
 ;;; thing this handles is allocation of the result temporaries.
@@ -735,6 +743,7 @@
   (:info save callee target)
   (:ignore args save r0-temp)
   (:vop-var vop)
+  (:node-var node)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:generator 20
     (let ((cur-nfp (current-nfp-tn vop)))
@@ -748,7 +757,7 @@
       (note-this-location vop :call-site)
       (inst bl target)
       (note-this-location vop :unknown-return)
-      (receive-unknown-values values-start nvals start count)
+      (receive-unknown-values node values-start nvals start count)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
@@ -852,7 +861,6 @@
 ;;; In tail call with fixed arguments, the passing locations are passed as a
 ;;; more arg, but there is no new-FP, since the arguments have been set up in
 ;;; the current frame.
-;(defvar fun-type :function)
 (defmacro define-full-call (name named return variable)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
@@ -899,7 +907,7 @@
       ,@(ecase return
           (:fixed '(ocfp-temp))
           (:tail '(old-fp return-pc node))
-          (:unknown '(r0-temp node))))
+          (:unknown '(r0-temp))))
 
      ,@(unless (eq named :direct)
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
@@ -1050,7 +1058,7 @@
                             (load-stack-tn cur-nfp nfp-save))))
                        (:unknown
                         '((note-this-location vop :unknown-return)
-                          (receive-unknown-values values-start nvals start count)
+                          (receive-unknown-values node values-start nvals start count)
                           (when cur-nfp
                             (load-stack-tn cur-nfp nfp-save))))
                        (:tail))))))
