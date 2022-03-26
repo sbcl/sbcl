@@ -301,6 +301,101 @@
                    (1 (method (setf trace-gf) (number)) :exit 42.0)
                    (0 (method (setf trace-gf) (float)) :exit 42.0)))))
 
+(defun global-fact (x)
+  (declare (optimize (debug 3))) ; suppress inlining
+  (labels ((fact (x)
+             (flet ((multiply (x y)
+                      (* x y)))
+               (if (zerop x)
+                   1
+                   (multiply x (fact (1- x)))))))
+    (fact x)))
+
+(with-test (:name (trace :labels))
+  (assert (equal (collecting-traces ((labels fact :in global-fact)
+                                     (flet multiply :in global-fact))
+                   (global-fact 1))
+                 '((0 (labels fact :in global-fact) :enter 1)
+                   (1 (labels fact :in global-fact) :enter 0)
+                   (1 (labels fact :in global-fact) :exit 1)
+                   (1 (flet multiply :in global-fact) :enter 1 1)
+                   (1 (flet multiply :in global-fact) :exit 1)
+                   (0 (labels fact :in global-fact) :exit 1)))))
+
+(defgeneric gfact (x)
+  (:method ((x number))
+    (declare (optimize (debug 3))) ; suppress inlining
+    (flet ((fact (x) (global-fact x)))
+      (fact x))))
+
+(with-test (:name (trace :labels :within-method))
+  (assert (equal (collecting-traces ((flet fact :in (method gfact (number))))
+                   (gfact 3))
+                 '((0 (flet fact :in (method gfact (number))) :enter 3)
+                   (0 (flet fact :in (method gfact (number))) :exit 6)))))
+
+(with-test (:name (trace :labels :within-untraced-method))
+  (assert (equal (collecting-traces ((method gfact (number))
+                                     (flet fact :in (method gfact (number))))
+                   (untrace (method gfact (number)))
+                   (gfact 3))
+                 '((0 (flet fact :in (method gfact (number))) :enter 3)
+                   (0 (flet fact :in (method gfact (number))) :exit 6)))))
+
+(defun trace-foo ()
+  (declare (optimize (debug 3)))
+  (flet ((body () 'original-foo))
+    (body)))
+
+(defun call-with-trace-foo-redefined (fn)
+  (let ((original (fdefinition 'trace-foo)))
+    ;; the local function will be named (FLET BODY) instead of (FLET
+    ;; BODY :IN TRACE-FOO) unless we use EVAL here.
+    (eval '(defun trace-foo ()
+            (declare (optimize (debug 3)))
+            (flet ((body () 'redefined-foo))
+              (body))))
+    (unwind-protect
+         (funcall fn)
+      (setf (fdefinition 'trace-foo) original))))
+
+(with-test (:name (trace :labels :redefined))
+  (assert (equal (collecting-traces ((flet body :in trace-foo))
+                   (trace-foo)
+                   (call-with-trace-foo-redefined 'trace-foo))
+                 '((0 (flet body :in trace-foo) :enter)
+                   (0 (flet body :in trace-foo) :exit original-foo)
+                   (0 (flet body :in trace-foo) :enter)
+                   (0 (flet body :in trace-foo) :exit redefined-foo)))))
+
+(defmethod trace-foo-gf ()
+  (declare (optimize (debug 3)))
+  (flet ((body () 'original-foo))
+    (body)))
+
+(defun call-with-trace-foo-gf-redefined (fn)
+  ;; using ADD-METHOD and REMOVE-METHOD yields outdated DEBUG-FUN
+  ;; info, so work around that using EVAL.
+  (eval '(defmethod trace-foo-gf ()
+          (declare (optimize (debug 3)))
+          (flet ((body () 'redefined-foo))
+            (body))))
+  (unwind-protect
+       (funcall fn)
+    (eval '(defmethod trace-foo-gf ()
+            (declare (optimize (debug 3)))
+            (flet ((body () 'original-foo))
+              (body))))))
+
+(with-test (:name (trace :labels :redefined-method))
+  (assert (equal (collecting-traces ((flet body :in (method trace-foo-gf ())))
+                   (trace-foo-gf)
+                   (call-with-trace-foo-gf-redefined 'trace-foo-gf))
+                 '((0 (flet body :in (method trace-foo-gf ())) :enter)
+                   (0 (flet body :in (method trace-foo-gf ())) :exit original-foo)
+                   (0 (flet body :in (method trace-foo-gf ())) :enter)
+                   (0 (flet body :in (method trace-foo-gf ())) :exit redefined-foo)))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")

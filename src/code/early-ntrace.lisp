@@ -34,6 +34,12 @@
 (define-load-time-global *traced-funs*
     (make-hash-table :test 'equal :synchronized t))
 
+;;; a hash-table that maps the name of outer functions to local
+;;; functions keys in the *TRACED-FUNS* hash-table, e.g.: NAME-X ->
+;;; ((NAME-Y :IN NAME-X) (NAME-Z :IN NAME-X)).
+(define-load-time-global *traced-locals*
+    (make-hash-table :test 'equal :synchronized t))
+
 (deftype trace-report-type ()
   '(or symbol function))
 

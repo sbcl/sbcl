@@ -1492,10 +1492,10 @@ register."
              (sub-access-debug-var-slot (frame-pointer frame) it)))))))
 
 ;;; Return a DEBUG-FUN that represents debug information for FUN.
-(defun fun-debug-fun (fun)
+(defun fun-debug-fun (fun &key local-name)
   (declare (type function fun))
   (let ((simple-fun (%fun-fun fun)))
-    (let* ((name (%simple-fun-name simple-fun))
+    (let* ((name (or local-name (%simple-fun-name simple-fun)))
            (component (fun-code-header simple-fun))
            (res (loop for fmap-entry = (sb-c::compiled-debug-info-fun-map
                                         (%code-debug-info component))
@@ -1503,22 +1503,23 @@ register."
                       for next = (sb-c::compiled-debug-fun-next fmap-entry)
                       ;; Is NAME really the right thing to match on given how bogus
                       ;; it might be? I would think PC range is better.
-                      when (and (eq (sb-c::compiled-debug-fun-name fmap-entry) name)
+                      when (and (equal (sb-c::compiled-debug-fun-name fmap-entry) name)
                                 (eq (sb-c::compiled-debug-fun-kind fmap-entry) nil))
                       return fmap-entry
                       while next)))
-      (if res
-          (make-compiled-debug-fun res component)
-          ;; KLUDGE: comment from CMU CL:
-          ;;   This used to be the non-interpreted branch, but
-          ;;   William wrote it to return the debug-fun of fun's XEP
-          ;;   instead of fun's debug-fun. The above code does this
-          ;;   more correctly, but it doesn't get or eliminate all
-          ;;   appropriate cases. It mostly works, and probably
-          ;;   works for all named functions anyway.
-          ;; -- WHN 20000120
-          (debug-fun-from-pc component
-                             (function-start-pc-offset simple-fun))))))
+      (cond (res
+             (make-compiled-debug-fun res component))
+            ((null local-name)
+             ;; KLUDGE: comment from CMU CL:
+             ;;   This used to be the non-interpreted branch, but
+             ;;   William wrote it to return the debug-fun of fun's XEP
+             ;;   instead of fun's debug-fun. The above code does this
+             ;;   more correctly, but it doesn't get or eliminate all
+             ;;   appropriate cases. It mostly works, and probably
+             ;;   works for all named functions anyway.
+             ;; -- WHN 20000120
+             (debug-fun-from-pc component
+                                (function-start-pc-offset simple-fun)))))))
 
 ;;; Return the kind of the function, which is one of :OPTIONAL, :MORE
 ;;; :EXTERNAL, :TOPLEVEL, :CLEANUP, or NIL.

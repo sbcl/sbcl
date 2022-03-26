@@ -33,7 +33,7 @@
                    (warn "~/sb-ext:print-symbol-with-prefix/ is ~
                           undefined, not tracing." name))
                (warn "~S is not a valid function name, not tracing." name))))
-    (multiple-value-bind (res named-p method)
+    (multiple-value-bind (res named-p method local)
         (typecase x
           (symbol
            (cond ((special-operator-p x)
@@ -43,7 +43,20 @@
                   (values (get-def x) t))))
           (function
            x)
-          ((cons (eql method))
+          ((cons (member flet labels)) ; ({FLET,LABELS} name :IN outer-function)
+           (multiple-value-bind (fun local-name)
+               (let ((outer (car (last x))))
+                 (typecase outer
+                   ((cons (eql method))
+                    (values (get-def `(sb-pcl::fast-method ,@(rest outer)))
+                            `(,(first x) ,(second x) :in ,(second outer))))
+                   (t
+                    (values (get-def outer) x))))
+             (when fun
+               (if (sb-di:fun-debug-fun fun :local-name local-name)
+                   (values fun nil nil x)
+                   (warn "~S not found, not tracing." x)))))
+          ((cons (eql method))        ; (METHOD name qualifiers (specializers*))
            (let ((gf (get-def (second x))))
              (when gf
                (if (find-method gf (butlast (cddr x)) (car (last x)) nil)
@@ -53,13 +66,19 @@
            (values (get-def x) t)))
       (typecase res
         (closure
-         (values (%closure-fun res) named-p :compiled-closure method))
+         (values (%closure-fun res) named-p :compiled-closure method local))
         (funcallable-instance
-         (values res named-p :funcallable-instance method))
+         (values res named-p :funcallable-instance method local))
         ;; FIXME: What about SB-KERNEL:INTERPRETED-FUNCTION -- it gets
         ;; picked off by the FIN above, is that right?
         (t
-         (values res named-p :compiled method))))))
+         (values res named-p :compiled method local))))))
+
+(defun retrace-local-funs (fname &optional new-value)
+  (dolist (local (gethash fname *traced-locals*))
+    (let ((trace-info (gethash local *traced-funs*)))
+      (untrace-1 local)
+      (trace-1 local trace-info new-value))))
 
 ;;; When a function name is redefined, and we were tracing that name,
 ;;; then untrace the old definition and trace the new one.
@@ -69,7 +88,8 @@
            (info (gethash fun *traced-funs*)))
       (when (and info (trace-info-named info))
         (untrace-1 fname)
-        (trace-1 fname info new-value)))))
+        (trace-1 fname info new-value))
+      (retrace-local-funs fname new-value))))
 (push #'trace-redefined-update *setf-fdefinition-hook*)
 
 ;;; Annotate a FORM to evaluate with pre-converted functions. FORM is
@@ -303,30 +323,41 @@
 ;;; If non-null, DEFINITION is the new definition of a function that
 ;;; we are automatically retracing.
 (defun trace-1 (function-or-name info &optional definition)
-  (multiple-value-bind (fun named kind method)
+  (multiple-value-bind (fun named kind method local)
       (if definition
-          (values definition t
-                  (nth-value 2 (trace-fdefinition definition)))
+          (multiple-value-bind (fun named kind)
+              (trace-fdefinition definition)
+            (declare (ignore named))
+            (if (typep function-or-name '(cons (member flet labels)))
+                (values fun t kind nil function-or-name)
+                (values definition t kind)))
           (trace-fdefinition function-or-name))
     (when fun
-      (let ((trace-key (or method fun)))
+      (let ((trace-key (or local method fun)))
         (when (gethash trace-key *traced-funs*)
           (warn "~S is already TRACE'd, untracing it first." function-or-name)
           (untrace-1 trace-key))
-        (let* ((debug-fun (sb-di:fun-debug-fun fun))
+        (let* ((local-name (when local
+                             (let ((outer (car (last local))))
+                               (typecase outer
+                                 ((cons (eql method))
+                                  `(,(first local) ,(second local) :in ,(second outer)))
+                                 (t local)))))
+               (debug-fun (sb-di:fun-debug-fun fun :local-name local-name))
                (encapsulated
-                 (if (eq (trace-info-encapsulated info) :default)
-                     (ecase kind
-                       (:compiled nil)
-                       (:compiled-closure
-                        (unless (functionp function-or-name)
-                          (warn "tracing shared code for ~S:~%  ~S"
-                                function-or-name
-                                fun))
-                        nil)
-                       ((:interpreted :interpreted-closure :funcallable-instance)
-                        t))
-                     (trace-info-encapsulated info)))
+                 (and named
+                      (if (eq (trace-info-encapsulated info) :default)
+                          (ecase kind
+                            (:compiled nil)
+                            (:compiled-closure
+                             (unless (functionp function-or-name)
+                               (warn "tracing shared code for ~S:~%  ~S"
+                                     function-or-name
+                                     fun))
+                             nil)
+                            ((:interpreted :interpreted-closure :funcallable-instance)
+                             t))
+                          (trace-info-encapsulated info))))
                (loc (if encapsulated
                         :encapsulated
                         (sb-di:debug-fun-start-location debug-fun)))
@@ -354,9 +385,6 @@
 
           (cond
             (encapsulated
-             (unless named
-               (error "can't use encapsulation to trace anonymous function ~S"
-                      fun))
              (if method
                  (reinitialize-instance fun)
                  (encapsulate function-or-name 'trace
@@ -382,6 +410,8 @@
                  (sb-di:activate-breakpoint start)
                  (sb-di:activate-breakpoint end)))))
 
+          (when local
+            (push local (gethash (fourth local) *traced-locals*)))
           (setf (gethash trace-key *traced-funs*) info)))
 
       (when (and (typep fun 'generic-function)
@@ -607,10 +637,10 @@ the N-th value returned by the function."
 
 ;;; Untrace one function.
 (defun untrace-1 (function-or-name)
-  (multiple-value-bind (fun named kind method)
+  (multiple-value-bind (fun named kind method local)
       (trace-fdefinition function-or-name)
     (declare (ignore named kind))
-    (let* ((trace-key (or method fun))
+    (let* ((trace-key (or local method fun))
            (info (when fun (gethash trace-key *traced-funs*))))
       (cond
         ((and fun (not info))
@@ -633,6 +663,15 @@ the N-th value returned by the function."
             (sb-di:delete-breakpoint (trace-info-start-breakpoint info))
             (sb-di:delete-breakpoint (trace-info-end-breakpoint info))))
          (setf (trace-info-untraced info) t)
+         (when local
+           (let ((table *traced-locals*)
+                 (outer (fourth local)))
+             (with-system-mutex ((hash-table-lock table))
+               (let* ((locals (gethash outer table))
+                      (remaining (remove local locals :test #'equal)))
+                 (if remaining
+                     (setf (gethash outer table) remaining)
+                     (remhash outer table))))))
          (remhash trace-key *traced-funs*))))))
 
 ;;; Untrace all traced functions.
