@@ -1086,6 +1086,8 @@ function entry or exit.
 
 @include var-sb-debug-star-trace-encapsulate-default-star.texinfo
 
+@include var-sb-debug-star-trace-report-default-star.texinfo
+
 @comment FIXME rudi 2004-03-26: encapsulate is (per TODO file as of
 @comment 0.8.9) in a state of flux.  When it's sorted out, revive the
 @comment cmucl documentation.

@@ -161,7 +161,9 @@
 (defun trace-start-breakpoint-fun (info)
   (let (conditionp)
     (values
-     (lambda (frame bpt &rest args)
+     ;; HOOK-ARGS holds the function arguments when tracing via
+     ;; encapsulation and but is NIL when tracing via breakpoints.
+     (lambda (frame bpt &rest hook-args)
        (declare (ignore bpt))
        (discard-invalid-entries frame)
        (let ((condition (trace-info-condition info))
@@ -169,7 +171,7 @@
          (setq conditionp
                (and (not *in-trace*)
                     (or (not condition)
-                        (apply (cdr condition) frame args))
+                        (apply (cdr condition) frame hook-args))
                     (or (not wherein)
                         (trace-wherein-p frame wherein)))))
        (when conditionp
@@ -178,23 +180,31 @@
                  (*current-level-in-print* 0)
                  (*standard-output* (make-string-output-stream))
                  (*in-trace* t))
-             (ecase (trace-info-report info)
+             (case (trace-info-report info)
                (trace
                 (fresh-line)
                 (print-trace-indentation)
                 (if (trace-info-encapsulated info)
                     (prin1 `(,(trace-info-what info)
-                            ,@(mapcar #'ensure-printable-object args)))
+                             ,@(mapcar #'ensure-printable-object hook-args)))
                     (print-frame-call frame *standard-output*))
                 (terpri)
-                (apply #'trace-print frame (trace-info-print info) args))
+                (apply #'trace-print frame (trace-info-print info) hook-args))
                ((nil)
-                (apply #'trace-print-unadorned frame (trace-info-print info) args)))
+                (apply #'trace-print-unadorned frame (trace-info-print info) hook-args))
+               (t
+                (funcall (trace-info-report info)
+                         (count-if #'cdr *traced-entries*)
+                         (trace-info-what info) :enter frame
+                         (if (trace-info-encapsulated info)
+                             hook-args
+                             (nth-value 1 (frame-call frame))))
+                (apply #'trace-print-unadorned frame (trace-info-print info) hook-args)))
              (write-sequence (get-output-stream-string *standard-output*)
                              *trace-output*)
              (finish-output *trace-output*))
            (apply #'trace-maybe-break info (trace-info-break info) "before"
-                  frame args))))
+                  frame hook-args))))
      (lambda (frame cookie)
        (declare (ignore frame))
        (push (cons cookie conditionp) *traced-entries*)))))
@@ -221,7 +231,7 @@
         (let ((*current-level-in-print* 0)
               (*standard-output* (make-string-output-stream))
               (*in-trace* t))
-          (ecase (trace-info-report info)
+          (case (trace-info-report info)
             (trace
              (fresh-line)
              (let ((*print-pretty* t))
@@ -236,6 +246,11 @@
                (terpri))
              (apply #'trace-print frame (trace-info-print-after info) values))
             ((nil)
+             (apply #'trace-print-unadorned frame (trace-info-print-after info) values))
+            (t
+             (funcall (trace-info-report info)
+                      (count-if #'cdr *traced-entries*)
+                      (trace-info-what info) :exit frame values)
              (apply #'trace-print-unadorned frame (trace-info-print-after info) values)))
           (write-sequence (get-output-stream-string *standard-output*)
                           *trace-output*)
@@ -514,7 +529,12 @@ The following options are defined:
        If Report-Type is TRACE (the default) then information is
        reported by printing immediately. If Report-Type is NIL, then
        the only effect of the trace is to execute other
-       options (e.g. PRINT or BREAK).
+       options (e.g. PRINT or BREAK). Otherwise, Report-Type is
+       treated as a function designator and, for each trace event,
+       funcalled with 5 arguments: trace depth (a non-negative
+       integer), a function name or a function object,
+       :ENTER or :EXIT, a stack frame, and a list of values (arguments
+       or return values).
 
    :CONDITION Form
    :CONDITION-AFTER Form

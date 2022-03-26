@@ -20,6 +20,10 @@
 
 (defvar *trace-encapsulate-default* t
   "the default value for the :ENCAPSULATE option to TRACE")
+
+(defvar *trace-report-default* 'trace
+  "the default value for the :REPORT option to TRACE")
+
 
 ;;;; internal state
 
@@ -29,7 +33,7 @@
     (make-hash-table :test 'eq :synchronized t))
 
 (deftype trace-report-type ()
-  '(member nil trace))
+  '(or symbol function))
 
 ;;; A TRACE-INFO object represents all the information we need to
 ;;; trace a given function.
@@ -64,7 +68,7 @@
   ;; (the default.)
 
   ;; report type
-  (report 'trace :type trace-report-type)
+  (report *trace-report-default* :type trace-report-type)
   ;; current environment forms
   (condition nil)
   (break nil)

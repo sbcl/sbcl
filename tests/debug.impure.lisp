@@ -148,6 +148,24 @@
                                          1~@
                                          0~%")))))
 
+(defvar *collected-traces*)
+(defun custom-trace-report (depth what when frame values)
+  (push (list* depth what when (sb-debug::frame-p frame) values)
+        *collected-traces*))
+
+(with-test (:name (trace :custom-report))
+  (let ((*collected-traces* nil))
+    (let ((output (with-traced-function (trace-fact :report custom-trace-report)
+                    (trace-fact 2))))
+      (assert (zerop (length output)))
+      (assert (equalp (reverse *collected-traces*)
+                      '((0 trace-fact :enter t 2)
+                        (1 trace-fact :enter t 1)
+                        (2 trace-fact :enter t 0)
+                        (2 trace-fact :exit  t 1)
+                        (1 trace-fact :exit  t 1)
+                        (0 trace-fact :exit  t 2)))))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")

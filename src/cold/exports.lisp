@@ -721,6 +721,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "INTERNAL-DEBUG" "VAR"
            "*STACK-TOP-HINT*"
            "*TRACE-ENCAPSULATE-DEFAULT*"
+           "*TRACE-REPORT-DEFAULT*"
            "FRAME-HAS-DEBUG-TAG-P"
            "UNWIND-TO-FRAME-AND-CALL"
            ;; Deprecated
