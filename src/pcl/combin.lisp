@@ -146,12 +146,20 @@
       `(combined-method ,(generic-function-name gf))))
 
 (defun maybe-trace-method (gf method fun fmf-p)
-  (let ((info (gethash gf sb-debug::*traced-funs*)))
-    (if (and info (sb-debug::trace-info-methods info))
-        (let ((minfo (copy-structure info)))
-          (setf (sb-debug::trace-info-what minfo) (method-trace-name gf method))
-          (lambda (&rest args)
-            (apply #'sb-debug::trace-method-call minfo fun fmf-p args)))
+  (let ((info (when (plusp (hash-table-count sb-debug::*traced-funs*))
+		;; KLUDGE: testing if *TRACE-FUNS* has anything to avoid
+                ;; calling METHOD-TRACE-NAME during PCL bootstrapping when
+                ;; the generic-function type is not yet defined.
+		(let ((m-name (method-trace-name gf method)))
+		  (or (gethash m-name sb-debug::*traced-funs*)
+		      (let ((gf-info (gethash gf sb-debug::*traced-funs*)))
+			(when (and gf-info (sb-debug::trace-info-methods gf-info))
+			  (let ((copy (copy-structure gf-info)))
+			    (setf (sb-debug::trace-info-what copy) m-name)
+			    copy))))))))
+    (if info
+        (lambda (&rest args)
+          (apply #'sb-debug::trace-method-call info fun fmf-p args))
         fun)))
 
 (defun make-emf-from-method

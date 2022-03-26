@@ -28,9 +28,11 @@
 ;;;; internal state
 
 ;;; a hash table that maps each traced function to the TRACE-INFO. The
-;;; entry for a closure is the shared function entry object.
+;;; entry for a closure is the shared function entry object. The entry
+;;; for a method is a (CL:METHOD name qualifiers* (specializers*))
+;;; list.
 (define-load-time-global *traced-funs*
-    (make-hash-table :test 'eq :synchronized t))
+    (make-hash-table :test 'equal :synchronized t))
 
 (deftype trace-report-type ()
   '(or symbol function))
