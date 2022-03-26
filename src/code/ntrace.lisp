@@ -143,13 +143,16 @@
     (format t "~V,0@T~W: " indent depth)))
 
 ;;; Return true if any of the NAMES appears on the stack below FRAME.
-(defun trace-wherein-p (frame names)
-  (do ((frame (sb-di:frame-down frame) (sb-di:frame-down frame)))
-      ((not frame) nil)
-    (when (member (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))
-                  names
-                  :test #'equal)
-      (return t))))
+(defun trace-wherein-p (encapsulated frame names)
+  ;; When tracing without encapsulation (i.e. when using breakpoints),
+  ;; FRAME points to the function being traced, so skip it.
+  (let ((initial-frame (if encapsulated frame (sb-di:frame-down frame))))
+    (do ((frame initial-frame (sb-di:frame-down frame)))
+        ((not frame) nil)
+      (when (member (sb-di:debug-fun-name (sb-di:frame-debug-fun frame))
+                    names
+                    :test #'equal)
+        (return t)))))
 
 ;;; Handle PRINT and PRINT-AFTER options.
 (defun trace-print (frame forms &rest args)
@@ -210,7 +213,7 @@
                     (or (not condition)
                         (apply (cdr condition) frame hook-args))
                     (or (not wherein)
-                        (trace-wherein-p frame wherein)))))
+                        (trace-wherein-p (trace-info-encapsulated info) frame wherein)))))
        (when conditionp
          (with-standard-io-syntax
            (let ((*print-readably* nil)

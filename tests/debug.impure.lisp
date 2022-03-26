@@ -432,6 +432,41 @@
                   (catch-foo))))
     (assert (search "exited non-locally" output))))
 
+(defun trace-inner-function (x)
+  x)
+
+(defun trace-outer-function (x)
+  (declare (optimize (debug 3))) ; avoid tail call optimization
+  (trace-inner-function x))
+
+(defun test-trace-inner-function (&key encapsulate)
+  (assert (equal (let ((sb-debug:*trace-encapsulate-default* encapsulate))
+                   (collecting-traces (trace-inner-function
+                                       :wherein trace-outer-function)
+                     (trace-outer-function 'outer-value)
+                     (trace-inner-function 'inner-value)))
+                 '((0 trace-inner-function :enter outer-value)
+                   (0 trace-inner-function :exit outer-value)))))
+
+(with-test (:name (trace :wherein :encapsulate t))
+  (test-trace-inner-function :encapsulate t))
+
+(with-test (:name (trace :wherein :encapsulate nil))
+  (test-trace-inner-function :encapsulate nil))
+
+(defun test-trace-fact-wherein (&key encapsulate)
+  (assert (equal (let ((sb-debug:*trace-encapsulate-default* encapsulate))
+                   (collecting-traces (trace-fact :wherein trace-fact)
+                     (trace-fact 1)))
+                 '((0 trace-fact :enter 0)
+                   (0 trace-fact :exit 1)))))
+
+(with-test (:name (trace :wherein :recursive :encapsulate t))
+  (test-trace-fact-wherein :encapsulate t))
+
+(with-test (:name (trace :wherein :recursive :encapsulate nil))
+  (test-trace-fact-wherein :encapsulate nil))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")
