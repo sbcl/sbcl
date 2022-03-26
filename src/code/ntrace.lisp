@@ -29,11 +29,12 @@
   (flet ((get-def (name)
            (cond ((typep name '(cons (eql compiler-macro)))
                   (compiler-macro-function (second name)))
+                 ((and (symbolp name) (macro-function name)))
                  ((valid-function-name-p name)
                   (if (fboundp name)
                       (fdefinition name)
                       (warn "~/sb-ext:print-symbol-with-prefix/ is ~
-                          undefined, not tracing." name)))
+                             undefined, not tracing." name)))
                  (t
                   (warn "~S is not a valid function name, not tracing." name)))))
     (multiple-value-bind (res named-p method local)

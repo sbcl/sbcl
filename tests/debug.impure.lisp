@@ -477,6 +477,12 @@
                  '((0 macro-fact :enter (macro-fact 3) "unused argument")
                    (0 macro-fact :exit 6)))))
 
+(with-test (:name (trace :labels :within-macro))
+  (assert (equal (collecting-traces ((labels fact :in macro-fact))
+                   (macroexpand-1 '(macro-fact 0)))
+                 '((0 (labels fact :in macro-fact) :enter 0)
+                   (0 (labels fact :in macro-fact) :exit 1)))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")
