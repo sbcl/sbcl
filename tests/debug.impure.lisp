@@ -396,6 +396,25 @@
                    (0 (flet body :in (method trace-foo-gf ())) :enter)
                    (0 (flet body :in (method trace-foo-gf ())) :exit redefined-foo)))))
 
+(defun fn-with-cmac (x) x)
+
+(define-compiler-macro fn-with-cmac (x)
+  (declare (ignore x) (optimize (debug 3))) ; suppress flet inlining
+  (flet ((body () 42))
+    (body)))
+
+(with-test (:name (trace :compiler-macro))
+  (assert (equal (collecting-traces ((compiler-macro fn-with-cmac))
+                   (compile nil '(lambda () (fn-with-cmac 0))))
+                 '((0 (compiler-macro fn-with-cmac) :enter (fn-with-cmac 0) "unused argument")
+                   (0 (compiler-macro fn-with-cmac) :exit 42)))))
+
+(with-test (:name (trace :flet :within-compiler-macro))
+  (assert (equal (collecting-traces ((flet body :in (compiler-macro fn-with-cmac)))
+                   (compile nil '(lambda () (fn-with-cmac 0))))
+                 '((0 (flet body :in (compiler-macro fn-with-cmac)) :enter)
+                   (0 (flet body :in (compiler-macro fn-with-cmac)) :exit 42)))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")

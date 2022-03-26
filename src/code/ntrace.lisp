@@ -27,12 +27,15 @@
 ;;; applicable.
 (defun trace-fdefinition (x)
   (flet ((get-def (name)
-           (if (valid-function-name-p name)
-               (if (fboundp name)
-                   (fdefinition name)
-                   (warn "~/sb-ext:print-symbol-with-prefix/ is ~
-                          undefined, not tracing." name))
-               (warn "~S is not a valid function name, not tracing." name))))
+           (cond ((typep name '(cons (eql compiler-macro)))
+                  (compiler-macro-function (second name)))
+                 ((valid-function-name-p name)
+                  (if (fboundp name)
+                      (fdefinition name)
+                      (warn "~/sb-ext:print-symbol-with-prefix/ is ~
+                          undefined, not tracing." name)))
+                 (t
+                  (warn "~S is not a valid function name, not tracing." name)))))
     (multiple-value-bind (res named-p method local)
         (typecase x
           (symbol
@@ -43,15 +46,21 @@
                   (values (get-def x) t))))
           (function
            x)
+          ((cons (eql compiler-macro))
+           (values (get-def x) nil))
           ((cons (member flet labels)) ; ({FLET,LABELS} name :IN outer-function)
            (multiple-value-bind (fun local-name)
                (let ((outer (car (last x))))
-                 (typecase outer
-                   ((cons (eql method))
-                    (values (get-def `(sb-pcl::fast-method ,@(rest outer)))
-                            `(,(first x) ,(second x) :in ,(second outer))))
-                   (t
-                    (values (get-def outer) x))))
+                 (flet ((simple-local-name ()
+                          `(,(first x) ,(second x) :in ,(second outer))))
+                   (typecase outer
+                     ((cons (eql method))
+                      (values (get-def `(sb-pcl::fast-method ,@(rest outer)))
+                              (simple-local-name)))
+                     ((cons (eql compiler-macro))
+                      (values (get-def outer) (simple-local-name)))
+                     (t
+                      (values (get-def outer) x)))))
              (when fun
                (if (sb-di:fun-debug-fun fun :local-name local-name)
                    (values fun nil nil x)
@@ -340,7 +349,7 @@
         (let* ((local-name (when local
                              (let ((outer (car (last local))))
                                (typecase outer
-                                 ((cons (eql method))
+                                 ((cons (member method compiler-macro))
                                   `(,(first local) ,(second local) :in ,(second outer)))
                                  (t local)))))
                (debug-fun (sb-di:fun-debug-fun fun :local-name local-name))
