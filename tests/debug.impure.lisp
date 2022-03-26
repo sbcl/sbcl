@@ -467,6 +467,16 @@
 (with-test (:name (trace :wherein :recursive :encapsulate nil))
   (test-trace-fact-wherein :encapsulate nil))
 
+(defmacro macro-fact (x)
+  (labels ((fact (x) (if (zerop x) 1 (* x (fact (1- x))))))
+    (fact x)))
+
+(with-test (:name (trace :macro))
+  (assert (equal (collecting-traces (macro-fact)
+                   (macroexpand-1 '(macro-fact 3)))
+                 '((0 macro-fact :enter (macro-fact 3) "unused argument")
+                   (0 macro-fact :exit 6)))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")
