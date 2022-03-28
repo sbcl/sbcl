@@ -196,6 +196,7 @@
               sb-impl::*available-buffers*
               sb-impl::*token-buf-pool*
               sb-impl::*user-hash-table-tests*
+              sb-impl::**finalizer-store**
               ,(maybe "SB-KERNEL" "*EVAL-CALLS*")
               sb-kernel::*type-cache-nonce*
               sb-ext:*gc-run-time*
