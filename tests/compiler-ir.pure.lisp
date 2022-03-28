@@ -315,6 +315,7 @@
                          (let (*))
                          10))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
+
 (with-test (:name :flushable-alien-fp-math)
   (assert (not (find 'sb-c:%alien-funcall
                      (ir-calls
@@ -322,4 +323,15 @@
                          (declare (double-float x))
                          (exp x)
                          10))
+                     :key (lambda (x) (combination-fun-source-name x nil))))))
+
+(with-test (:name :values-let-conversion-reoptimization)
+  (assert (not (find 'list
+                     (ir-calls
+                      `(lambda (a)
+                         (values
+                          (flet ((f ()
+                                   (values a (catch 'c)
+                                           (list 1))))
+                            (f)))))
                      :key (lambda (x) (combination-fun-source-name x nil))))))
