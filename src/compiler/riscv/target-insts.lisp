@@ -205,6 +205,34 @@ function addresses and register values.")
   (destructuring-bind (rs i-imm) value
     (maybe-note-assembler-routine (maybe-augment rs i-imm) t dstate)))
 
+;;;; printers for RISC-V C extension
+
+(defun print-rvc-reg (value stream dstate)
+  (declare (stream stream) (fixnum value))
+  (print-reg (+ value 8) stream dstate))
+
+(macrolet ((define-rvc-imm-printer (name)
+             `(defun ,name (value stream dstate)
+                (declare (stream stream) (ignore value stream dstate))
+                (error "Not written yet"))))
+  (define-rvc-imm-printer print-ci-imm)
+  (define-rvc-imm-printer print-ci-load-32-imm)
+  (define-rvc-imm-printer print-ci-load-64-imm)
+  (define-rvc-imm-printer print-css-32-imm)
+  (define-rvc-imm-printer print-css-64-imm)
+  (define-rvc-imm-printer print-ciw-imm)
+  (define-rvc-imm-printer print-cl/cs-32-imm)
+  (define-rvc-imm-printer print-cl/cs-64-imm)
+  (define-rvc-imm-printer print-cb-arith-imm))
+
+(defun print-relative-cb-label (value stream dstate)
+  (declare (stream stream) (ignore value stream dstate))
+  (error "Not written yet"))
+
+(defun print-relative-cj-label (value stream dstate)
+  (declare (stream stream) (ignore value stream dstate))
+  (error "Not written yet"))
+
 ;;;; interrupt instructions
 
 (defun break-control (chunk inst stream dstate)

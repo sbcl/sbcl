@@ -989,18 +989,18 @@
 
 ;;;; The RISC-V C extension.
 
-(define-arg-type rvc-reg :printer print-rvc-reg)
-(define-arg-type ci-imm :printer print-ci-imm)
-(define-arg-type ci-load-32-imm :printer print-ci-load-32-imm)
-(define-arg-type ci-load-64-imm :printer print-ci-load-64-imm)
-(define-arg-type css-32-imm :printer print-css32-imm)
-(define-arg-type css-64-imm :printer print-css64-imm)
-(define-arg-type ciw-imm :printer print-ciw-imm)
-(define-arg-type cl/cs-32-imm :printer print-cl/cs-32-imm)
-(define-arg-type cl/cs-64-imm :printer print-cl/cs-64-imm)
-(define-arg-type cb-arith-imm :printer print-cb-arith-imm)
-(define-arg-type relative-cb-label :printer print-relative-cb-label)
-(define-arg-type relative-cj-label :printer print-relative-cj-label)
+(define-arg-type rvc-reg :printer #'print-rvc-reg)
+(define-arg-type ci-imm :printer #'print-ci-imm)
+(define-arg-type ci-load-32-imm :printer #'print-ci-load-32-imm)
+(define-arg-type ci-load-64-imm :printer #'print-ci-load-64-imm)
+(define-arg-type css-32-imm :printer #'print-css-32-imm)
+(define-arg-type css-64-imm :printer #'print-css-64-imm)
+(define-arg-type ciw-imm :printer #'print-ciw-imm)
+(define-arg-type cl/cs-32-imm :printer #'print-cl/cs-32-imm)
+(define-arg-type cl/cs-64-imm :printer #'print-cl/cs-64-imm)
+(define-arg-type cb-arith-imm :printer #'print-cb-arith-imm)
+(define-arg-type relative-cb-label :printer #'print-relative-cb-label)
+(define-arg-type relative-cj-label :printer #'print-relative-cj-label)
 
 
 (defun rvc-reg-tn-encoding (tn)
@@ -1112,7 +1112,7 @@
     '(:name :tab rd* ", " imm)
   #'equal)
 
-(define-instruction-format (ciw 16 :default-printer cwi-printer)
+(define-instruction-format (ciw 16 :default-printer ciw-printer)
   (funct3 :field (byte 3 13))
   (imm :fields (list (byte 4 7) (byte 2 11) (byte 1 5) (byte 1 6)) :type 'ciw-imm)
   (rd* :field (byte 3 2) :type 'rvc-reg)
@@ -1267,7 +1267,7 @@
                            (opcode #b10)))
                 (:emitter
                  (,emitter segment ,funct3 rs2 offset #b10)))))
-  
+
   (define-rvc-sp-store-instruction c.swsp  #b110 emit-css-32-inst)
   #+64-bit
   (define-rvc-sp-store-instruction c.sdsp  #b111 emit-css-64-inst)
