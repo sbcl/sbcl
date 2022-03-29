@@ -225,12 +225,12 @@ function addresses and register values.")
   (define-rvc-imm-printer print-cl/cs-64-imm)
   (define-rvc-imm-printer print-cb-arith-imm))
 
-(defun print-relative-cb-label (value stream dstate)
-  (declare (stream stream) (ignore value stream dstate))
+(defun use-cb-label (value dstate)
+  (declare (type disassem-state dstate) (ignore value dstate))
   (error "Not written yet"))
 
-(defun print-relative-cj-label (value stream dstate)
-  (declare (stream stream) (ignore value stream dstate))
+(defun use-cj-label (value dstate)
+  (declare (type disassem-state dstate) (ignore value dstate))
   (error "Not written yet"))
 
 ;;;; interrupt instructions

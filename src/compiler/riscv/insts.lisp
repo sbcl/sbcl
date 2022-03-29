@@ -83,11 +83,11 @@
      (integer
       (emit-machine-word segment word)))))
 
-(defconstant-eqx reg-printer
+(defconstant-eqx r-printer
     '(:name :tab rd ", " rs1 ", " rs2)
-  #'equalp)
+  #'equal)
 
-(define-instruction-format (r 32 :default-printer reg-printer)
+(define-instruction-format (r 32 :default-printer r-printer)
   (funct7 :field (byte 7 25))
   (rs2 :field (byte 5 20) :type 'reg)
   (rs1 :field (byte 5 15) :type 'reg)
@@ -102,7 +102,7 @@
 
 (defconstant-eqx i-printer
     '(:name :tab rd ", " rs1 ", " imm)
-  #'equalp)
+  #'equal)
 
 (define-instruction-format (i 32 :default-printer i-printer)
   (i-annotation :fields (list (byte 5 15) (byte 12 20)))
@@ -126,7 +126,7 @@
 
 (defconstant-eqx s-printer
     '(:name :tab rs2 ", " "(" imm ")" rs1)
-  #'equalp)
+  #'equal)
 
 (define-instruction-format (s 32 :default-printer s-printer)
   (store-annotation :fields (list (byte 5 15) (byte 7 25) (byte 5 7)) :type 'store-annotation)
@@ -154,7 +154,7 @@
 
 (defconstant-eqx cond-branch-printer
   '(:name :tab rs1 ", " rs2 ", " imm)
-  #'equalp)
+  #'equal)
 
 (define-instruction-format (b 32 :default-printer cond-branch-printer)
   (imm :fields (list (byte 1 31) (byte 1 7) (byte 6 25) (byte 4 8)) :type 'relative-b-label)
@@ -174,7 +174,7 @@
 
 (defconstant-eqx u-printer
     '(:name :tab rd ", " imm)
-  #'equalp)
+  #'equal)
 
 (define-instruction-format (u 32 :default-printer u-printer)
   (imm :field (byte 20 12) :printer "#x~5,'0X")
@@ -193,7 +193,7 @@
 
 (defconstant-eqx j-printer
   '(:name :tab rd ", " imm)
-  #'equalp)
+  #'equal)
 
 (define-instruction-format (j 32 :default-printer j-printer)
   (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)) :type 'relative-j-label)
@@ -999,9 +999,8 @@
 (define-arg-type cl/cs-32-imm :printer #'print-cl/cs-32-imm)
 (define-arg-type cl/cs-64-imm :printer #'print-cl/cs-64-imm)
 (define-arg-type cb-arith-imm :printer #'print-cb-arith-imm)
-(define-arg-type relative-cb-label :printer #'print-relative-cb-label)
-(define-arg-type relative-cj-label :printer #'print-relative-cj-label)
-
+(define-arg-type relative-cb-label :use-label #'use-cb-label)
+(define-arg-type relative-cj-label :use-label #'use-cj-label)
 
 (defun rvc-reg-tn-encoding (tn)
   (declare (type tn tn))
@@ -1223,7 +1222,7 @@
                         opcode))
 
 (defconstant-eqx cj-printer
-    '(:name :tab target)
+    '(:name :tab imm)
   #'equal)
 
 (define-instruction-format (cj 16 :default-printer cj-printer)
@@ -1260,20 +1259,24 @@
   (define-rvc-sp-load-instruction c.flwsp #b011 emit-ci-load-32-inst)
   (define-rvc-sp-load-instruction c.fldsp #b001 emit-ci-load-64-inst))
 
-(macrolet ((define-rvc-sp-store-instruction (name funct3 emitter)
-             `(define-instruction ,name (segment rs2 offset)
-                (:printer css
-                          ((funct3 ,funct3)
-                           (opcode #b10)))
-                (:emitter
-                 (,emitter segment ,funct3 rs2 offset #b10)))))
+(macrolet ((define-rvc-sp-store-instruction (name funct3 size)
+             (multiple-value-bind (emitter type)
+                 (ecase size
+                   (32 (values 'emit-css-32-inst 'css-32))
+                   (64 (values 'emit-css-64-inst 'css-64)))
+                 `(define-instruction ,name (segment rs2 offset)
+                    (:printer ,type
+                              ((funct3 ,funct3)
+                               (opcode #b10)))
+                    (:emitter
+                     (,emitter segment ,funct3 rs2 offset #b10))))))
 
-  (define-rvc-sp-store-instruction c.swsp  #b110 emit-css-32-inst)
+  (define-rvc-sp-store-instruction c.swsp  #b110 32)
   #+64-bit
-  (define-rvc-sp-store-instruction c.sdsp  #b111 emit-css-64-inst)
+  (define-rvc-sp-store-instruction c.sdsp  #b111 64)
   #-(and 64-bit soft-doubles)
-  (define-rvc-sp-store-instruction c.fswsp #b111 emit-css-32-inst)
-  (define-rvc-sp-store-instruction c.fsdsp #b101 emit-css-64-inst))
+  (define-rvc-sp-store-instruction c.fswsp #b111 32)
+  (define-rvc-sp-store-instruction c.fsdsp #b101 64))
 
 (macrolet ((define-rvc-load/store-instruction (name funct3 size arg)
              (multiple-value-bind (emitter type)
@@ -1408,7 +1411,7 @@
   (:printer ci
             ((funct3 #b000)
              (rd/rs1 0)
-             (imm 0)
+             (imm '(0 0))
              (opcode #b01)))
   (:emitter
    (%emit-ci-inst segment #b000 0 0 0 #b01)))
