@@ -53,12 +53,16 @@
            (multiple-value-bind (fun local-name)
                (let ((outer (car (last x))))
                  (flet ((simple-local-name ()
-                          `(,(first x) ,(second x) :in ,(second outer))))
+                          (labels ((simplify (name)
+                                     (if (symbolp name)
+                                         name
+                                         (simplify (second name)))))
+                            `(,(first x) ,(second x) :in ,(simplify outer)))))
                    (typecase outer
                      ((cons (eql method))
                       (values (get-def `(sb-pcl::fast-method ,@(rest outer)))
                               (simple-local-name)))
-                     ((cons (eql compiler-macro))
+                     ((cons (member compiler-macro cas))
                       (values (get-def outer) (simple-local-name)))
                      (t
                       (values (get-def outer) x)))))
@@ -375,8 +379,10 @@
         (let* ((local-name (when local
                              (let ((outer (car (last local))))
                                (typecase outer
-                                 ((cons (member method compiler-macro))
-                                  `(,(first local) ,(second local) :in ,(second outer)))
+                                 ((cons (member method compiler-macro cas))
+                                  (labels ((simplify (name)
+                                             (if (symbolp name) name (simplify (second name)))))
+                                    `(,(first local) ,(second local) :in ,(simplify outer))))
                                  (t local)))))
                (debug-fun (sb-di:fun-debug-fun fun :local-name local-name))
                (encapsulated
