@@ -339,10 +339,10 @@
     (:nle . 15) (:g . 15))
   #'equal)
 (defconstant-eqx +condition-name-vec+
-  #.(let ((vec (make-array 16 :initial-element nil)))
-      (dolist (cond +conditions+ vec)
-        (when (null (aref vec (cdr cond)))
-          (setf (aref vec (cdr cond)) (car cond)))))
+  (let ((vec (make-array 16 :initial-element nil)))
+    (dolist (cond +conditions+ vec)
+      (when (null (aref vec (cdr cond)))
+        (setf (aref vec (cdr cond)) (car cond)))))
   #'equalp)
 
 ;;; SSE shuffle patterns. The names end in the number of bits of the

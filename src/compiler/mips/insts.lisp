@@ -146,7 +146,7 @@
   '(:f :un :eq :ueq :olt :ult :ole :ule :sf :ngle :seq :ngl :lt :nge :le :ngt)
   #'equalp)
 
-(defconstant-eqx compare-kinds-vec #.(apply #'vector compare-kinds)
+(defconstant-eqx compare-kinds-vec (apply #'vector compare-kinds)
   #'equalp)
 
 (deftype compare-kind ()

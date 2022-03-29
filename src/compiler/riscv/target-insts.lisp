@@ -33,15 +33,15 @@ used in a u-type instruction.  This is used to make annotations about
 function addresses and register values.")
 
 (defconstant-eqx lisp-reg-symbols
-  #.(map 'vector
-         (lambda (name)
-           (and name (make-symbol (concatenate 'string "$" name))))
-         sb-vm::*register-names*)
+  (map 'vector
+       (lambda (name)
+         (and name (make-symbol (concatenate 'string "$" name))))
+       sb-vm::*register-names*)
   #'equalp)
 
 (defconstant-eqx riscv-reg-symbols
-  #.(coerce (loop for n from 0 to 31 collect (make-symbol (format nil "x~d" n)))
-            'vector)
+  (coerce (loop for n from 0 to 31 collect (make-symbol (format nil "x~d" n)))
+          'vector)
   #'equalp)
 
 (defun print-reg (value stream dstate)
@@ -74,8 +74,8 @@ function addresses and register values.")
                                    (coerce-signed u-imm 12))))
 
 (defconstant-eqx float-reg-symbols
-  #.(coerce (loop for n from 0 to 31 collect (make-symbol (format nil "ft~d" n)))
-            'vector)
+  (coerce (loop for n from 0 to 31 collect (make-symbol (format nil "ft~d" n)))
+          'vector)
   #'equalp)
 
 (defun print-fp-reg (value stream dstate)

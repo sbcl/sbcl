@@ -569,9 +569,9 @@
             (t (packify-infos new end)))))) ; otherwise repack
 
 ;; We need a few magic constants to be shared between the next two functions.
-(defconstant-eqx !+pcl-reader-name+ '#.(make-symbol "READER") (constantly t))
-(defconstant-eqx !+pcl-writer-name+ '#.(make-symbol "WRITER") (constantly t))
-(defconstant-eqx !+pcl-boundp-name+ '#.(make-symbol "BOUNDP") (constantly t))
+(defconstant-eqx !+pcl-reader-name+ (make-symbol "READER") (constantly t))
+(defconstant-eqx !+pcl-writer-name+ (make-symbol "WRITER") (constantly t))
+(defconstant-eqx !+pcl-boundp-name+ (make-symbol "BOUNDP") (constantly t))
 
 ;; PCL names are physically 4-lists (see "pcl/slot-name")
 ;; that get treated as 2-component names for globaldb's purposes.

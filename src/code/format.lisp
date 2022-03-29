@@ -1106,9 +1106,9 @@
 ;;;; format directives and support functions for justification
 
 (defconstant-eqx !illegal-inside-justification
-  '#.(mapcar (lambda (x) (directive-bits (parse-directive x 0 nil)))
-             '("~:>" "~:@>"
-               "~:T" "~:@T"))
+  (mapcar (lambda (x) (directive-bits (parse-directive x 0 nil)))
+          '("~:>" "~:@>"
+            "~:T" "~:@T"))
   #'equal)
 
 ;;; Reject ~W, ~_, ~I and certain other specific values of modifier+character.
