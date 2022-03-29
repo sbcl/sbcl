@@ -3168,7 +3168,7 @@ is :ANY, the function name is not checked."
                            'slot-initform-type-style-warning
                            (return-from process-lvar-type-annotation)))
                       (t
-                       'sb-int:type-warning)))
+                       'type-warning)))
          (type (lvar-type-annotation-type annotation))
          (dest (lvar-dest lvar)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
@@ -3181,15 +3181,18 @@ is :ANY, the function name is not checked."
                                                  (car path))))
                                           :condition condition))
           ((consp uses)
-           (loop for use in uses
-                 for dtype = (node-derived-type use)
-                 unless (or (cast-mismatch-from-inlined-p dest use)
-                            (values-types-equal-or-intersect dtype type))
-                 do (%compile-time-type-error-warn annotation
-                                                   (type-specifier type)
-                                                   (type-specifier dtype)
-                                                   (list (node-source-form use))
-                                                   :condition condition))))))
+           (let ((condition (case condition
+                              (type-warning 'type-style-warning)
+                              (t condition))))
+             (loop for use in uses
+                   for dtype = (node-derived-type use)
+                   unless (or (cast-mismatch-from-inlined-p dest use)
+                              (values-types-equal-or-intersect dtype type))
+                   do (%compile-time-type-error-warn use
+                                                     (type-specifier type)
+                                                     (type-specifier dtype)
+                                                     (list (node-source-form use))
+                                                     :condition condition)))))))
 
 (defun process-annotations (lvar)
   (unless (and (combination-p (lvar-dest lvar))
