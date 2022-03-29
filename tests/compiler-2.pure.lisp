@@ -3349,6 +3349,13 @@
          (1+ (position x (the list y))))
     ((1 '(1)) 1)))
 
+(with-test (:name :lvar-annotation-inline-type-mismatch)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (sb-kernel:the* (float :use-annotations t) (inline-deletion-note x y)))
+    ((1.0 nil) 1.0)))
+
 (with-test (:name :cast-type-preservation)
   (assert
    (equal (caddr

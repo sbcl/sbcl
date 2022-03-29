@@ -3169,7 +3169,8 @@ is :ANY, the function name is not checked."
                            (return-from process-lvar-type-annotation)))
                       (t
                        'sb-int:type-warning)))
-         (type (lvar-type-annotation-type annotation)))
+         (type (lvar-type-annotation-type annotation))
+         (dest (lvar-dest lvar)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
            (%compile-time-type-error-warn annotation (type-specifier type)
                                           (type-specifier (lvar-type lvar))
@@ -3182,7 +3183,8 @@ is :ANY, the function name is not checked."
           ((consp uses)
            (loop for use in uses
                  for dtype = (node-derived-type use)
-                 unless (values-types-equal-or-intersect dtype type)
+                 unless (or (cast-mismatch-from-inlined-p dest use)
+                            (values-types-equal-or-intersect dtype type))
                  do (%compile-time-type-error-warn annotation
                                                    (type-specifier type)
                                                    (type-specifier dtype)
