@@ -243,6 +243,14 @@
  ;; This doesn't affect the build at all, merely declares how things are.
  :package-local-nicknames
 
+ ;; CLHS says that *LOAD-TRUENAME* has to be bound whenever *LOAD-PATHNAME* is,
+ ;; because obviously the spec wanted to mandate that one system call turn into
+ ;; an unlimited number. At least you're correct in saying
+ ;; "it's not my code, it's the OS that's slow."
+ ;; Remove this feature if you want to ignore the technical requirement
+ ;; that *LOAD-TRUENAME* be a variable (as opposed to a symbol-macro).
+ :ansi-compliant-load-truename
+
  ;; This is set in classic CMU CL, and presumably there it means
  ;; that the floating point arithmetic implementation
  ;; conforms to IEEE's standard. Here it definitely means that the

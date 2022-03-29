@@ -513,6 +513,7 @@ Return VALUE without evaluating it."
 ;;; un-merged pathnames. I'm not daring enough to change it for everyone.
 ;;; It defaults to what it should, and is changed before saving the image.
 ;;;
+;;; FIXME: can't we just get rid of this and _never_ use TRUENAME?
 (declaim (type (member pathname truename) *name-context-file-path-selector*))
 (defglobal *name-context-file-path-selector* 'pathname)
 

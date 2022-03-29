@@ -191,6 +191,7 @@
     PATHNAME-NAME 10 PATHNAME-TYPE 10 PATHNAME-VERSION 10 PATHNAMEP 2 PEEK-CHAR 2
     PHASE 2 PI 5 PLUSP 2 POP 2 POSITION 2 POSITION-IF 2 POSITION-IF-NOT 2 PPRINT 2
     PPRINT-DISPATCH 2 PPRINT-EXIT-IF-LIST-EXHAUSTED 2))
+(when (find-symbol "%LOAD-TRUENAME" "SB-FASL") (remf *cl-classification* '*load-truename*))
 
 (defun check-symbols (classification)
   (loop for (symbol expected) on classification by #'cddr

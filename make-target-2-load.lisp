@@ -35,6 +35,10 @@
           ;; more-or-less confined to serve-event, except for a test which now
           ;; detects whether COMPUTE-POLLFDS is defined and therefore testable.
           :OS-PROVIDES-POLL
+          ;; Silly feature we add in because additive features are more sensible
+          ;; than subtractive ones. So you opt out, not in, to having *LOAD-TRUENAME*
+          ;; eagerly bound.
+          :ANSI-COMPLIANT-LOAD-TRUENAME
           ;; The final batch of symbols is strictly for C. The LISP_FEATURE_
           ;; prefix on the corresponding #define is unfortunate.
           :GCC-TLS :USE-SYS-MMAP

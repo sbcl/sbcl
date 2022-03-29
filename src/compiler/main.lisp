@@ -868,7 +868,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;; LOAD-AS-SOURCE uses this.
 (defun make-file-stream-source-info (file-stream)
   (make-source-info
-   :file-info (make-file-info :truename (truename file-stream)
+   :file-info (make-file-info :truename (truename file-stream) ; FIXME: WHY USE TRUENAME???
                               ;; This T-L-P has been around since at least 2011.
                               ;; It's unclear why an LPN isn't good enough.
                               :pathname (translate-logical-pathname file-stream)
