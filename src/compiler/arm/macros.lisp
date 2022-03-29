@@ -218,7 +218,6 @@
   (inst b back-label))
 
 (defun allocation (type size lowtag result-tn &key flag-tn stack-allocate-p)
-  #+cheneygc (declare (ignore type))
   ;; Normal allocation to the heap.
   (cond (stack-allocate-p
          (load-csp result-tn)
@@ -232,15 +231,6 @@
          ;; stack pointer has been stored.
          (storew null-tn result-tn -1 0 :ne)
          (inst orr result-tn result-tn lowtag))
-        #-gencgc
-        (t
-         (load-symbol-value flag-tn *allocation-pointer*)
-         (inst add result-tn flag-tn lowtag)
-         (if (integerp size)
-             (composite-immediate-instruction add flag-tn flag-tn size)
-             (inst add flag-tn flag-tn size))
-         (store-symbol-value flag-tn *allocation-pointer*))
-        #+gencgc
         (t
          (let ((region-disp (- mixed-region nil-value))
                (alloc (gen-label))

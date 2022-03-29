@@ -211,7 +211,6 @@
               ,(maybe "SB-VM" "*FREE-TLS-INDEX*")
               ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
               ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
-              ,(maybe "SB-VM" "*ALLOCATION-POINTER*")
               ,(maybe "SB-INTERPRETER" "*LAST-TOPLEVEL-ENV*")
               sb-pcl::*dfun-constructors*
               #+win32

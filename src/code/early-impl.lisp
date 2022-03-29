@@ -30,8 +30,6 @@
                   #+sb-safepoint *thruption-pending*
                   #+sb-safepoint *in-safepoint*
                   *free-interrupt-context-index*
-                  #-gencgc
-                  sb-vm::*allocation-pointer*
                   sb-vm::*binding-stack-pointer*
                   sb-pcl::*cache-miss-values-stack*
                   sb-pcl::*dfun-miss-gfs-on-stack*))

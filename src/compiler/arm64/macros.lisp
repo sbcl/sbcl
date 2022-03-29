@@ -185,13 +185,6 @@
         (inst and tmp-tn tmp-tn (lognot lowtag-mask))
         (inst add csp-tn tmp-tn (add-sub-immediate size result-tn))
         (inst add result-tn tmp-tn lowtag))
-      #-gencgc
-      (progn
-        (load-symbol-value flag-tn *allocation-pointer*)
-        (inst add result-tn flag-tn lowtag)
-        (inst add flag-tn flag-tn (add-sub-immediate size))
-        (store-symbol-value flag-tn *allocation-pointer*))
-      #+gencgc
       (let ((alloc (gen-label))
             #+sb-thread (tlab (if (eq type 'list) thread-cons-tlab-slot thread-mixed-tlab-slot))
             #-sb-thread (region (if (eq type 'list) cons-region mixed-region))
