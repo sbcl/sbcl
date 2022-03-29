@@ -1277,36 +1277,40 @@
                  (if-alternative-constraints last))))
         (block-out pred))))
 
-;;; Join the type constraints coming from CONSET1 and CONSET2 on every
-;;; constrained variable. The potentially new constraints are then
-;;; added to the intersection of CONSET1 and CONSET2.
-(defun join-type-constraints (conset1 conset2)
-  (let ((joined-constraints))
-    (do-conset-elements (con1 conset1)
-      (let ((x (constraint-x con1))
-            (y (constraint-y con1)))
-        (when (and (eq (constraint-kind con1) 'typep)
-                   (not (conset-member con1 conset2))
-                   ;; FIXME: Handling complemented type constraints as
-                   ;; negation types here seems to cause infinite regress.
-                   (not (constraint-not-p con1)))
-          (do-propagatable-constraints (con2 (conset2 x))
-            (when (and (eq (constraint-kind con2) 'typep)
-                       (not (conset-member con2 conset1))
-                       (not (constraint-not-p con2)))
-              (let ((other (constraint-y con2)))
-                (aver (neq y other))
-                (let ((new-type (type-union y other)))
-                  (unless (eq new-type *universal-type*)
-                    (push
-                     (find-or-create-constraint 'typep
-                                                x
-                                                new-type
-                                                nil)
-                     joined-constraints)))))))))
-    (conset-intersection conset1 conset2)
-    (dolist (joined-constraint joined-constraints)
-      (conset-adjoin joined-constraint conset1))))
+;;; Join the type constraints coming from the predecessors of BLOCK on
+;;; every constrained variable into the constraint set IN.
+(defun join-type-constraints (in block)
+  (let ((vars '()))
+    ;; Find some set of constrained variables in the predecessors.
+    (dolist (pred (block-pred block))
+      (let ((out (block-out-for-successor pred block)))
+        (when out
+          (do-conset-elements (con out)
+            (when (and (eq (constraint-kind con) 'typep)
+                       (not (constraint-not-p con)))
+              (pushnew (constraint-x con) vars)))
+          (return))))
+    (dolist (var vars)
+      (let ((in-var-type *empty-type*))
+        (dolist (pred (block-pred block))
+          (let ((out (block-out-for-successor pred block))
+                (out-var-type *universal-type*))
+            (when out
+              (do-propagatable-constraints (con (out var))
+                (when (and (eq (constraint-kind con) 'typep)
+                           ;; FIXME: Handling complemented type constraints as
+                           ;; negation types here seems to cause infinite regress.
+                           (not (constraint-not-p con)))
+                  (setq out-var-type
+                        (type-approx-intersection2 out-var-type
+                                                   (constraint-y con))))))
+            (setq in-var-type (type-union in-var-type out-var-type))))
+        (unless (eq in-var-type *universal-type*)
+          (conset-adjoin (find-or-create-constraint 'typep
+                                                    var
+                                                    in-var-type
+                                                    nil)
+                         in))))))
 
 (defun compute-block-in (block join-types-p)
   (let ((in nil))
@@ -1316,10 +1320,10 @@
       (let ((out (block-out-for-successor pred block)))
         (when out
           (if in
-              (if join-types-p
-                  (join-type-constraints in out)
-                  (conset-intersection in out))
+              (conset-intersection in out)
               (setq in (copy-conset out))))))
+    (when join-types-p
+      (join-type-constraints in block))
     (or in (make-conset))))
 
 (defun update-block-in (block join-types-p)
