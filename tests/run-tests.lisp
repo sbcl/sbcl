@@ -191,36 +191,34 @@
 (defparameter *ignore-symbol-value-change*
   (flet ((maybe (p s) (and (find-package p)
                            (find-symbol s p))))
-    (append `(sb-c::*code-serialno*
-              sb-impl::*package-names-cookie*
-              sb-impl::*available-buffers*
-              sb-impl::*token-buf-pool*
-              sb-impl::*user-hash-table-tests*
-              sb-impl::**finalizer-store**
-              ,(maybe "SB-KERNEL" "*EVAL-CALLS*")
-              sb-kernel::*type-cache-nonce*
-              sb-ext:*gc-run-time*
-              sb-kernel::*gc-epoch*
-              sb-int:*n-bytes-freed-or-purified*
-              ,(maybe "SB-VM" "*BINDING-STACK-POINTER*")
-              ,(maybe "SB-VM" "*CONTROL-STACK-POINTER*")
-              ,(maybe "SB-THREAD" "*JOINABLE-THREADS*")
-              ,(maybe "SB-THREAD" "*STARTING-THREADS*")
-              ,(maybe "SB-THREAD" "*SPROF-DATA*")
-              sb-thread::*all-threads*
-              ,(maybe "SB-VM" "*FREE-TLS-INDEX*")
-              ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
-              ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
-              ,(maybe "SB-INTERPRETER" "*LAST-TOPLEVEL-ENV*")
-              sb-pcl::*dfun-constructors*
-              #+win32
-              sb-impl::*waitable-timer-handle*
-              #+win32
-              sb-impl::*timer-thread*)
-            sb-impl::*cache-vector-symbols*)))
+    `(sb-c::*code-serialno*
+      sb-impl::*package-names-cookie*
+      sb-impl::*available-buffers*
+      sb-impl::*token-buf-pool*
+      sb-impl::*user-hash-table-tests*
+      sb-impl::**finalizer-store**
+      ,(maybe "SB-KERNEL" "*EVAL-CALLS*")
+      sb-kernel::*type-cache-nonce*
+      sb-ext:*gc-run-time*
+      sb-kernel::*gc-epoch*
+      sb-int:*n-bytes-freed-or-purified*
+      ,(maybe "SB-VM" "*BINDING-STACK-POINTER*")
+      ,(maybe "SB-VM" "*CONTROL-STACK-POINTER*")
+      ,(maybe "SB-THREAD" "*JOINABLE-THREADS*")
+      ,(maybe "SB-THREAD" "*STARTING-THREADS*")
+      ,(maybe "SB-THREAD" "*SPROF-DATA*")
+      sb-thread::*all-threads*
+      ,(maybe "SB-VM" "*FREE-TLS-INDEX*")
+      ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
+      ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
+      ,(maybe "SB-INTERPRETER" "*LAST-TOPLEVEL-ENV*")
+      sb-pcl::*dfun-constructors*
+      #+win32 sb-impl::*waitable-timer-handle*
+      #+win32 sb-impl::*timer-thread*)))
 
 (defun collect-symbol-values ()
   (let (result)
+    (sb-int:drop-all-hash-caches)
     (do-all-symbols (s)
       (when (and (not (keywordp s))
                  (boundp s)
@@ -231,6 +229,7 @@
     result))
 
 (defun compare-symbol-values (expected)
+  (sb-int:drop-all-hash-caches)
   (dolist (item expected)
     (let ((val (symbol-value (car item))))
       (unless (eq val (cdr item))
