@@ -481,7 +481,7 @@
                       (cons (code-header-ref code wordindex) locs)))))))))
   code)
 
-(sb-c::when-vop-existsp (:translate sb-c::word+)
+(sb-c::when-vop-existsp (:translate sb-c::unsigned+)
   (defconstant cf-bit 0)
   (defconstant sf-bit 7)
   (defconstant of-bit 11)

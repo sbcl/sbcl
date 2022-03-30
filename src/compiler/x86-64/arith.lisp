@@ -746,7 +746,7 @@
     DONE))
 
 (define-vop ()
-  (:translate sb-c::word+)
+  (:translate sb-c::unsigned+)
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num (:constant t))
@@ -764,7 +764,7 @@
       (inst jmp :c error))))
 
 (define-vop ()
-  (:translate sb-c::word-)
+  (:translate sb-c::unsigned-)
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num (:constant t))
@@ -782,7 +782,7 @@
       (inst jmp :c error))))
 
 (define-vop ()
-  (:translate sb-c::signed-word+)
+  (:translate sb-c::signed+)
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num (:constant t))
@@ -800,7 +800,7 @@
       (inst jmp :o error))))
 
 (define-vop ()
-  (:translate sb-c::signed-word-)
+  (:translate sb-c::signed-)
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num (:constant t))

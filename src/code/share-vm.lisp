@@ -85,7 +85,7 @@
   (context (* os-context-t))
     (index int))
 
-(sb-c::when-vop-existsp  (:translate sb-c::word+)
+(sb-c::when-vop-existsp  (:translate sb-c::unsigned+)
   (declaim (inline os-context-flags-addr))
   (define-alien-routine ("os_context_flags_addr" os-context-flags-addr)
       (* unsigned)

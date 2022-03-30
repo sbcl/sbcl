@@ -2198,14 +2198,20 @@
   (movable foldable unsafely-flushable commutative
            always-translatable))
 
-(defknown (signed-word* signed-word+ signed-word-)
+(defknown (signed* signed+ signed-)
   (sb-vm:signed-word sb-vm:signed-word t)
   sb-vm:signed-word
   (movable foldable unsafely-flushable commutative
            always-translatable))
 
-(defknown (word* word+ word-)
+(defknown (unsigned* unsigned+ unsigned-)
   (word word t)
+  word
+  (movable foldable unsafely-flushable commutative
+           always-translatable))
+
+(defknown (unsigned+signed unsigned-signed)
+  (word sb-vm:signed-word t)
   word
   (movable foldable unsafely-flushable commutative
            always-translatable))

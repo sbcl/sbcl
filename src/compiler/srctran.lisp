@@ -2728,7 +2728,7 @@
       (give-up-ir1-transform))
     `(* integer ,(ash 1 shift))))
 
-(macrolet ((def (name fun type)
+(macrolet ((def (name fun type &optional (types `(,type ,type)))
              `(when-vop-existsp (:translate ,name)
                 (defun ,name (x y type)
                   (declare (,type x y))
@@ -2737,7 +2737,7 @@
                       (error 'type-error :expected-type type :datum r))
                     r))
 
-                (deftransform ,fun ((x y) (,type ,type) * :node node :important nil)
+                (deftransform ,fun ((x y) ,types * :node node :important nil)
                   (delay-ir1-transform node :optimize)
                   (let ((dest (node-dest node))
                         (target-type (specifier-type ',type))
@@ -2753,7 +2753,7 @@
                         `(,',name x y ',(type-specifier type-to-check))
                         (give-up-ir1-transform))))
 
-                (deftransform ,name ((x y type-to-check) (,type ,type t) * :node node)
+                (deftransform ,name ((x y type-to-check) * * :node node)
                   (let (type
                         (type-to-check (lvar-value type-to-check))
                         (sword (specifier-type ',type)))
@@ -2766,15 +2766,28 @@
                           (t
                            (give-up-ir1-transform))))))))
 
-  (def signed-word* * sb-vm:signed-word)
-  (def signed-word+ + sb-vm:signed-word)
-  (def signed-word- - sb-vm:signed-word)
 
-  (def word* * word)
-  (def word+ + word)
-  (def word- - word)
+  (def unsigned+signed + word (word sb-vm:signed-word))
+  (def unsigned-signed - word (word sb-vm:signed-word))
+
+  (def signed* * sb-vm:signed-word)
+  (def signed+ + sb-vm:signed-word)
+  (def signed- - sb-vm:signed-word)
+
+  (def unsigned* * word)
+  (def unsigned+ + word)
+  (def unsigned- - word)
 
   (def fixnum* * fixnum))
+
+(when-vop-existsp (:translate unsigned+signed)
+  (deftransform unsigned+signed
+      ((x y type-to-check) (word word t) * :node node :important nil)
+    `(the ,(lvar-value type-to-check) (+ x y)))
+
+  (deftransform unsigned-signed
+      ((x y type-to-check) (word word t) * :node node :important nil)
+    `(the ,(lvar-value type-to-check) (- x y))))
 
 ;;; These must come before the ones below, so that they are tried
 ;;; first.

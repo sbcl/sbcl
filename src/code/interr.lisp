@@ -453,7 +453,7 @@
                              type
                              nil))))
 
-(sb-c::when-vop-existsp (:translate sb-c::word+)
+(sb-c::when-vop-existsp (:translate sb-c::unsigned+)
   (flet ((err (x of cf)
            (let* ((raw-x (car *current-internal-error-args*))
                   (signed (= (sb-c:sc+offset-scn raw-x) sb-vm:signed-reg-sc-number)))
