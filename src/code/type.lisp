@@ -5234,7 +5234,7 @@ used for a COMPLEX component.~:@>"
     (declare (type simd-pack-type type1 type2))
     (let ((intersection (bit-and (simd-pack-type-element-type type1)
                                  (simd-pack-type-element-type type2))))
-      (if intersection
+      (if (find 1 intersection)
           (%make-simd-pack-type intersection)
           *empty-type*)))
 
@@ -5299,7 +5299,7 @@ used for a COMPLEX component.~:@>"
     (declare (type simd-pack-256-type type1 type2))
     (let ((intersection (bit-and (simd-pack-256-type-element-type type1)
                                  (simd-pack-256-type-element-type type2))))
-      (if intersection
+      (if (find 1 intersection)
           (%make-simd-pack-256-type intersection)
           *empty-type*)))
 
