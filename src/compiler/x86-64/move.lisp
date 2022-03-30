@@ -207,19 +207,23 @@
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg) :target y))
   (:results (y :scs (signed-reg unsigned-reg)))
+  (:results-var results)
   (:note "integer to untagged word coercion")
   (:temporary (:sc unsigned-reg) backup)
   (:generator 4
-    (move y x)
-    (if (location= x y)
-        ;; It would be great if a principled way existed to advise GC of
-        ;; algebraic transforms such as 2*R being a conservative root.
-        ;; Until that is possible, emit straightforward code that uses
-        ;; a copy of the potential reference.
-        (move backup x)
-        (setf backup x))
-    (inst sar y 1)      ; optimistically assume it's a fixnum
-    (inst jmp :nc DONE) ; no carry implies tag was 0
+    (cond ((types-equal-or-intersect (tn-ref-type results) (specifier-type 'fixnum))
+           (move y x)
+           (if (location= x y)
+               ;; It would be great if a principled way existed to advise GC of
+               ;; algebraic transforms such as 2*R being a conservative root.
+               ;; Until that is possible, emit straightforward code that uses
+               ;; a copy of the potential reference.
+               (move backup x)
+               (setf backup x))
+           (inst sar y 1)        ; optimistically assume it's a fixnum
+           (inst jmp :nc DONE))  ; no carry implies tag was 0
+          (t
+           (setf backup x)))
     (loadw y backup bignum-digits-offset other-pointer-lowtag)
     DONE))
 

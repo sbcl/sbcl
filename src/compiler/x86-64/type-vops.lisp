@@ -294,8 +294,9 @@
   (:conditional :z)
   (:args-var arg-ref)
   (:generator 6
-    (inst test :byte value fixnum-tag-mask)
-    (inst jmp :z out) ; good
+    (when (types-equal-or-intersect (tn-ref-type arg-ref) (specifier-type 'fixnum))
+      (inst test :byte value fixnum-tag-mask)
+      (inst jmp :z out)) ; good
     ;; No lowtag test is needed if it's definitely an OTHER-POINTER.
     ;; Even more cleverness could be imparted here based on arg-ref's type,
     ;; but SINGLE-FLOAT always has to be ruled out somehow.
@@ -322,14 +323,16 @@
   (:translate unsigned-byte-64-p)
   (:generator 45
     (let ((not-target (gen-label))
-          (single-word (gen-label)))
+          (single-word (gen-label))
+          (fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
               (values target not-target))
-        ;; Is it a fixnum with the sign bit clear?
-        (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
-        (inst jmp :z yep)
+        (when fixnum-p
+          ;; Is it a fixnum with the sign bit clear?
+          (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
+          (inst jmp :z yep))
         ;; If not, is it an other pointer?
         (%lea-for-lowtag-test temp value other-pointer-lowtag)
         (inst test :byte temp lowtag-mask)
