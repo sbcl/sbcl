@@ -79,7 +79,7 @@
   (declare (type ref node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
          (leaf (ref-leaf node))
-         (locs (lvar-result-tns lvar (list (leaf-type leaf))))
+         (locs (lvar-result-tns lvar (list (single-value-type (node-derived-type node)))))
          (res (first locs)))
     (etypecase leaf
       (lambda-var
