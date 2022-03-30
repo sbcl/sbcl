@@ -946,11 +946,16 @@
 
 ;;; Compute the tightest type possible for a variable given a set of
 ;;; CONSTRAINTS.
-(defun type-from-constraints (variable constraints initial-type
-                              &key constrain-symbols)
+(defun type-from-constraints (variable constraints initial-type)
   ;; FIXME: Try to share some of this logic with CONSTRAIN-REF. It was
   ;; copied out of that.
   (let ((type        initial-type)
+        ;; FIXME: see the comment in CONSTRAIN-REF-TYPES. This makes
+        ;; LINE-BREAK-ANNOTATE compile a lot slower in self
+        ;; build. Reconsider whether we want this policy dependent and
+        ;; have that function add LINE-BREAK-ANNOTATE once we merge
+        ;; the functions.
+        (constrain-symbols nil)
         (not-type    *empty-type*)
         (not-set     nil)
         (not-numeric nil)
@@ -1386,8 +1391,7 @@
             (when out
               (setq in-var-type
                     (type-union in-var-type
-                                (type-from-constraints var out *universal-type*
-                                                       :constrain-symbols t))))))
+                                (type-from-constraints var out *universal-type*))))))
         (unless (eq in-var-type *universal-type*)
           (conset-adjoin (find-or-create-constraint 'typep
                                                     var
