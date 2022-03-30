@@ -181,12 +181,13 @@
               (values not-target target)
               (values target not-target))
         (assemble ()
-          ;; Move to a temporary and mask off the lowtag,
-          ;; but leave the sign bit for testing for positive fixnums.
-          ;; When using 32-bit registers that bit will not be visible.
-          (when (or fixnum-p
-                    (not other-pointer-p))
-            (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask)))
+          (cond ((not other-pointer-p)
+                 ;; Move to a temporary and mask off the lowtag,
+                 ;; but leave the sign bit for testing for positive fixnums.
+                 ;; When using 32-bit registers that bit will not be visible.
+                 (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask)))
+                (fixnum-p
+                 (move temp value)))
           (when fixnum-p
            (%test-fixnum temp nil fixnum nil))
           (unless other-pointer-p
