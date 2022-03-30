@@ -165,8 +165,7 @@
   ;; in dynamic space, are they? We could put it in static space maybe.
   (let ((bignum (register-inline-constant
                  :oword (logior (ash (- most-negative-fixnum) 64)
-                                (compute-object-header (+ 1 bignum-digits-offset)
-                                                       bignum-widetag)))))
+                                (bignum-header-for-length 1)))))
     (inst lea res (rip-relative-ea (ea-disp bignum) other-pointer-lowtag)))
   FIXNUM
   (inst clc) (inst ret)

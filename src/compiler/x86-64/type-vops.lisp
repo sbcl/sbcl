@@ -275,9 +275,6 @@
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
 
-(defmacro bignum-header-for-length (n)
-  (logior (ash n n-widetag-bits) bignum-widetag))
-
 (define-vop (pointerp)
   (:args (value :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)

@@ -1422,12 +1422,12 @@
           (inst lsl low x (1- (integer-length value)))
           (inst mul low x y))
       (inst smulh high x y))
-    (inst mov header (compute-object-header (+ 2 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 2))
     (inst cmp high (asr low 63))
     (inst b :ne allocate)
     (inst adds r low low)
     (inst b :vc done)
-    (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
         (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)
@@ -1461,14 +1461,14 @@
                  (setf y high))
                (inst mul low x y)
                (inst umulh high x y))))
-    (inst mov header (compute-object-header (+ 3 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 3))
     (inst tbnz high 63 allocate)
-    (inst mov header (compute-object-header (+ 2 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 2))
     (inst cbnz high allocate)
     (inst tbnz low 63 allocate)
     (inst adds r low low)
     (inst b :vc done)
-    (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
         (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)
@@ -1495,11 +1495,11 @@
               (inst adds low x (add-sub-immediate y high))))
         (inst adds low x y))
     (inst csetm high :cs)
-    (inst mov header (compute-object-header (+ 2 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 2))
     (inst b :vs allocate)
     (inst adds r low low)
     (inst b :vc done)
-    (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
         (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)
@@ -1526,11 +1526,11 @@
               (inst subs low x (add-sub-immediate y high))))
         (inst subs low x y))
     (inst csetm high :cs)
-    (inst mov header (compute-object-header (+ 2 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 2))
     (inst b :vs allocate)
     (inst adds r low low)
     (inst b :vc done)
-    (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
         (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)
@@ -1553,13 +1553,13 @@
     (inst adds low x (if (sc-is y immediate)
                          (add-sub-immediate (tn-value y) high)
                          y))
-    (inst mov header (compute-object-header (+ 2 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 2))
     (inst cset high :cs)
     (inst b :cs allocate)
     (inst b :mi allocate)
     (inst adds r low low)
     (inst b :vc done)
-    (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
         (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)
@@ -1582,7 +1582,7 @@
     (inst subs low x (if (sc-is y immediate)
                          (add-sub-immediate (tn-value y) high)
                          y))
-    (inst mov header (compute-object-header (+ 2 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 2))
     (inst csetm high :cc)
     (inst b :cc negative)
     (inst b :mi allocate)
@@ -1592,7 +1592,7 @@
     positive
     (inst adds r low low)
     (inst b :vc done)
-    (inst mov header (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+    (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
         (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)

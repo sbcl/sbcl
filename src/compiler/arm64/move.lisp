@@ -508,7 +508,7 @@
       ;; value we're boxing is CLEAR, we need to shrink the bignum by
       ;; one word, hence the following:
       (inst tbnz x (1- n-word-bits) STORE)
-      (load-immediate-word pa-flag (compute-object-header (+ 1 bignum-digits-offset) bignum-widetag))
+      (load-immediate-word pa-flag (bignum-header-for-length 1))
       STORE
       ;; See the comment in move-from-signed
       (storew-pair pa-flag 0 x bignum-digits-offset tmp-tn))
