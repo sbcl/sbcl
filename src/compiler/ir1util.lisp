@@ -1740,14 +1740,6 @@
     (setf (lvar-uses lvar) nil))
   (values))
 
-(defun delete-dest (lvar)
-  (when lvar
-    (let* ((dest (lvar-dest lvar))
-           (prev (node-prev dest)))
-      (let ((block (ctran-block prev)))
-        (unless (block-delete-p block)
-          (mark-for-deletion block))))))
-
 ;;; Queue the block for deletion
 (defun delete-block-lazily (block)
   (declare (type cblock block))

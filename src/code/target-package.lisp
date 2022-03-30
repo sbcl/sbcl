@@ -842,9 +842,7 @@ Experimental: interface subject to change."
                (floor (info-storage-capacity (info-env-storage table)) 4))
         ;; Otherwise, when >1/4th of the table consists of tombstones,
         ;; then rebuild the table.
-        (%rebuild-package-names table)
-        (when (eq oldval :deleted)
-          (setq oldval nil))))
+        (%rebuild-package-names table)))
     (setf (info-gethash name table) object)
     (when (eq oldval :deleted)
       (decf (info-env-tombstones table)))))

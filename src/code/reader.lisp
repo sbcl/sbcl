@@ -1540,13 +1540,15 @@ extended <package-name>::<form-in-package> syntax."
       (case (char-class char attribute-array attribute-hash-table)
         (#.+char-attr-delimiter+
          (unread-char char stream)
-         (if package-designator
-             (let* ((*reader-package*
-                     (reader-find-package package-designator stream nil)))
-               (return (read stream t nil t)))
-             (simple-reader-error stream
-                                  "illegal terminating character after a double-colon: ~S"
-                                  char)))
+         (let* ((*reader-package*
+                  (reader-find-package package-designator stream nil)))
+           (return (read stream t nil t)))
+         ;; We used to signal this error before package::(form) syntax
+         ;; was added.
+         #+(or)
+         (simple-reader-error stream
+                              "illegal terminating character after a double-colon: ~S"
+                              char))
         (#.+char-attr-single-escape+ (go SINGLE-ESCAPE))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-package-delimiter+
