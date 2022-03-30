@@ -944,6 +944,89 @@
         ((xset-member-p 0 xset)
          (make-numeric-type :class 'integer :low 0 :high 0))))
 
+;;; Compute the tightest type possible for a variable given a set of
+;;; CONSTRAINTS.
+(defun type-from-constraints (variable constraints initial-type
+                              &key constrain-symbols)
+  ;; FIXME: Try to share some of this logic with CONSTRAIN-REF. It was
+  ;; copied out of that.
+  (let ((type        initial-type)
+        (not-type    *empty-type*)
+        (not-set     nil)
+        (not-numeric nil)
+        (not-fpz     '()))
+    (flet ((note-not (x)
+             (if (fp-zero-p x)
+                 (push x not-fpz)
+                 (when (or constrain-symbols (null x) (not (symbolp x)))
+                   (when (null not-set)
+                     (setf not-set (alloc-xset)))
+                   (add-to-xset x not-set))))
+           (intersect-result (other-type)
+             (setf type (type-approx-intersection2 type other-type))))
+      (declare (inline intersect-result))
+      (do-propagatable-constraints (con (constraints variable))
+        (let* ((kind (constraint-kind con))
+               (x (constraint-x con))
+               (y (constraint-y con))
+               (not-p (constraint-not-p con))
+               (other (if (eq x variable) y x)))
+          (case kind
+            (typep
+             (cond ((not not-p)
+                    (intersect-result other))
+                   ((member-type-p other)
+                    (mapc-member-type-members #'note-not other))
+                   (t
+                    (setq not-type (type-union not-type other)))))
+            (eql
+             (let ((other-type (leaf-type other)))
+               (cond ((not not-p)
+                      (intersect-result other-type))
+                     ((constant-p other)
+                      (cond ((member-type-p other-type)
+                             (note-not (constant-value other)))
+                            ;; Numeric types will produce interesting
+                            ;; negations, other than just "not equal"
+                            ;; which can be handled by the equality
+                            ;; constraints.
+                            ((numeric-type-p other-type)
+                             (when (null not-numeric)
+                               (setf not-numeric (alloc-xset)))
+                             (add-to-xset (constant-value other) not-numeric)))))))
+            ((< >)
+             (let* ((greater (eq kind '>))
+                    (greater (if not-p (not greater) greater)))
+               (cond ((and (integer-type-p type) (integer-type-p y))
+                      (setf type (constrain-integer-type type y greater not-p)))
+                     ((and (float-type-p type) (float-type-p y))
+                      (setf type (constrain-float-type type y greater not-p)))
+                     ((integer-type-p y)
+                      (let ((real-type (constrain-real-to-integer y greater not-p)))
+                        (when real-type (intersect-result real-type)))))))
+            (=
+             (when (and (numeric-type-p y)
+                        (not not-p))
+               (let* ((low (numeric-type-low y))
+                      (high (numeric-type-high y))
+                      (real (make-numeric-type :low low :high high))
+                      (complex (make-numeric-type :complexp :complex :low low :high high)))
+                 (intersect-result (type-union real complex)))))))))
+    (let* ((negated not-type)
+           (negated (if (and (null not-set) (null not-fpz))
+                        negated
+                        (let ((excluded (make-member-type
+                                         (or not-set (alloc-xset)) not-fpz)))
+                          (type-union negated excluded))))
+           (numeric (when not-numeric
+                      (contiguous-numeric-set-type not-numeric)))
+           (negated (if numeric
+                        (type-union negated numeric)
+                        negated)))
+      (if (eq negated *empty-type*)
+          type
+          (type-difference type negated)))))
+
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly.
@@ -1059,8 +1142,8 @@
                                 (make-member-type not-set not-fpz)))
                   (numeric (contiguous-numeric-set-type not-numeric))
                   (type (type-difference res
-                                         (if  numeric
-                                              (type-union union numeric)
+                                         (if numeric
+                                             (type-union union numeric)
                                              union))))
              ;; CHANGE-CLASS can change the type, lower down to standard-object,
              ;; type propagation for classes is not as important anyway.
@@ -1286,33 +1369,25 @@
       (let ((out (block-out-for-successor pred block)))
         (when out
           (do-conset-elements (con out)
-            (when (and (or (eq (constraint-kind con) 'typep)
-                           (and (eq (constraint-kind con) 'eql)
-                                (constant-p (constraint-y con))))
-                       (not (constraint-not-p con)))
-              (pushnew (constraint-x con) vars)))
+            (let ((kind  (constraint-kind con))
+                  (y     (constraint-y con))
+                  (not-p (constraint-not-p con)))
+              (when (or (member kind '(typep < >))
+                        (and (eq kind 'eql) (or (not not-p)
+                                                (constant-p y)))
+                        (and (eq kind '=) (and (numeric-type-p y)
+                                               (not not-p))))
+                (pushnew (constraint-x con) vars))))
           (return))))
     (dolist (var vars)
       (let ((in-var-type *empty-type*))
         (dolist (pred (block-pred block))
-          (let ((out (block-out-for-successor pred block))
-                (out-var-type *universal-type*))
+          (let ((out (block-out-for-successor pred block)))
             (when out
-              (do-propagatable-constraints (con (out var))
-                ;; FIXME: Actually handle complemented type
-                ;; constraints here.
-                (unless (constraint-not-p con)
-                  (case (constraint-kind con)
-                    (typep
-                     (setq out-var-type
-                           (type-approx-intersection2 out-var-type
-                                                      (constraint-y con))))
-                    (eql
-                     (let ((y (constraint-y con)))
-                       (when (constant-p y)
-                         (setq out-var-type (leaf-type y))
-                         (return))))))))
-            (setq in-var-type (type-union in-var-type out-var-type))))
+              (setq in-var-type
+                    (type-union in-var-type
+                                (type-from-constraints var out *universal-type*
+                                                       :constrain-symbols t))))))
         (unless (eq in-var-type *universal-type*)
           (conset-adjoin (find-or-create-constraint 'typep
                                                     var

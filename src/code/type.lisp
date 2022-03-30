@@ -2604,8 +2604,11 @@ expansion happened."
 ;;; exclusive bounds.
 (defun coerce-numeric-bound (bound type)
   (flet ((c (thing)
+           #+sb-xc-host (declare (ignore thing))
            (case type
-             (rational (rational thing))
+             (rational
+              #+sb-xc-host (return-from coerce-numeric-bound)
+              #-sb-xc-host (rational thing))
              ((float single-float)
               (cond #-sb-xc-host
                     ((<= most-negative-single-float thing most-positive-single-float)
@@ -2903,8 +2906,7 @@ expansion happened."
                  ;; Calling (EQL (- X) Y) might cons. Using = would be almost the same
                  ;; but not cons, however I prefer not to assume that the caller has
                  ;; already checked for matching float formats. EQL enforces that.
-                 ;; Change to use SB-XC:- here if anything requires it.
-                 (and (fp-zero-p x) (fp-zero-p y) (eql (- x) y)))))
+                 (and (fp-zero-p x) (fp-zero-p y) (eql (sb-xc:- x) y)))))
       (cond ((not (and low-bound high-bound)) nil)
             ((and (consp low-bound) (consp high-bound)) nil)
             ((consp low-bound) (float-zeros-eqlish (car low-bound) high-bound))

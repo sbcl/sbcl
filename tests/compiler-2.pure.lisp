@@ -3679,6 +3679,18 @@
                 x))))
           '(values (or float integer) &optional))))
 
+(with-test (:name :type-constraint-joining.3)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (if (read)
+                    (setq x (random 10))
+                    (setq x (random 10.0)))
+                x))))
+          '(values (or (single-float 0.0 (10.0)) (mod 10)) &optional))))
+
 (with-test (:name :type-constraint-joining-terminates)
   (checked-compile
    sb-c::
@@ -3717,3 +3729,86 @@
                   (2 (read)))
                 x))))
           '(values (integer 1 2) &optional))))
+
+(with-test (:name :type-constraint-joining.</=)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (declare (integer x))
+                (cond ((= x 20))
+                      ((< x 5))
+                      ((< x 10))
+                      (t (error ""))) x))))
+          '(values (or
+                    (integer * 9)
+                    (integer 20 20))
+            &optional))))
+
+(with-test (:name :type-constraint-joining.</=.2)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (if (typep x 'rational)
+                    (cond ((= x 20))
+                          ((< x 5))
+                          ((< x 10))
+                          (t (error "")))
+                    (setf x :foo))
+                x))))
+          '(values (or
+                    (integer 20 20)
+                    (rational * (10))
+                    (member :foo))
+            &optional))))
+
+(with-test (:name :type-constraint-joining.</=.3)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (cond ((< x 5))
+                      ((< x 10))
+                      (t (error "")))
+                x))))
+          '(values (or
+                    (double-float * (10.0d0))
+                    (single-float * (10.0))
+                    (rational * (10)))
+            &optional))))
+
+(with-test (:name :type-constraint-joining.>/=)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+              (declare (integer x))
+                (cond ((= x 5))
+                      ((> x 20))
+                      ((> x 10))
+                      (t (error ""))) x))))
+          '(values (or
+                    (integer 11)
+                    (integer 5 5))
+            &optional))))
+
+(with-test (:name :type-constraint-joining.complement)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (if (read)
+                    (cond ((typep x 'integer)
+                           (error ""))
+                          (t (print "")))
+                    (cond ((typep x 'float)
+                           (print ""))
+                          (t (error ""))))
+                x))))
+          '(values (not integer) &optional))))
