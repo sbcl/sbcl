@@ -541,7 +541,8 @@
 (deftransform fill ((sequence item) (simple-base-string t) *
                                     :policy (>= speed space))
   (let ((multiplier (logand #x0101010101010101 most-positive-word)))
-    `(let* ((value ,(if (and (constant-lvar-p item) (typep item 'base-char))
+    `(let* ((value ,(if (and (constant-lvar-p item)
+                             (typep (lvar-value item) 'base-char))
                         (* multiplier (char-code (lvar-value item)))
                         ;; Use multiplication if it's known to be cheap
                         #+(or x86 x86-64)
