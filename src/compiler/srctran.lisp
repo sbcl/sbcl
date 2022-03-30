@@ -4529,14 +4529,11 @@
                         (acond ((assoc string (constant-cache *compilation*) :test 'equal)
                                 (cdr it))
                                (t
-                                (let ((new (if symbols
-                                               (let ((proxy (sb-format::make-fmt-control-proxy
-                                                             new-string symbols)))
-                                                 (maybe-emit-make-load-forms proxy)
-                                                 proxy)
-                                               new-string)))
-                                  (push (cons string new) (constant-cache *compilation*))
-                                  new))))
+                                (let ((proxy (sb-format::make-fmt-control-proxy
+                                                         new-string symbols)))
+                                  (maybe-emit-make-load-forms proxy)
+                                  (push (cons string proxy) (constant-cache *compilation*))
+                                  proxy))))
                        #-sb-xc-host ; no such object as a FMT-CONTROL
                        (t
                         (sb-format::make-fmt-control new-string symbols)))))))))
