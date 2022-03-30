@@ -297,10 +297,7 @@
     (when (types-equal-or-intersect (tn-ref-type arg-ref) (specifier-type 'fixnum))
       (inst test :byte value fixnum-tag-mask)
       (inst jmp :z out)) ; good
-    ;; No lowtag test is needed if it's definitely an OTHER-POINTER.
-    ;; Even more cleverness could be imparted here based on arg-ref's type,
-    ;; but SINGLE-FLOAT always has to be ruled out somehow.
-    (let ((ea (cond ((csubtypep (tn-ref-type arg-ref) (specifier-type 'rational))
+    (let ((ea (cond ((fixnum-or-other-pointer-tn-ref-p arg-ref)
                      (ea (- other-pointer-lowtag) value))
                     (t
                      (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
@@ -333,10 +330,14 @@
           ;; Is it a fixnum with the sign bit clear?
           (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
           (inst jmp :z yep))
-        ;; If not, is it an other pointer?
-        (%lea-for-lowtag-test temp value other-pointer-lowtag)
-        (inst test :byte temp lowtag-mask)
-        (inst jmp :ne nope)
+        (cond ((fixnum-or-other-pointer-tn-ref-p args)
+               (when fixnum-p
+                 (inst test :byte value fixnum-tag-mask)
+                 (inst jmp :z nope)))
+              (t
+               (%lea-for-lowtag-test temp value other-pointer-lowtag)
+               (inst test :byte temp lowtag-mask)
+               (inst jmp :ne nope)))
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
