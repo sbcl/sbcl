@@ -408,16 +408,18 @@
 ;;; ARG is a fixnum or bignum; figure out which and load if necessary.
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg)))
+  (:results-var results)
   (:results (y :scs (signed-reg unsigned-reg)))
   (:note "integer to untagged word coercion")
   (:generator 4
     #.(assert (= fixnum-tag-mask 1))
-    (sc-case y
-      (signed-reg
-       (inst asr y x n-fixnum-tag-bits))
-      (unsigned-reg
-       (inst lsr y x n-fixnum-tag-bits)))
-    (inst tbz x 0 DONE)
+    (when (types-equal-or-intersect (tn-ref-type results) (specifier-type 'fixnum))
+      (sc-case y
+        (signed-reg
+         (inst asr y x n-fixnum-tag-bits))
+        (unsigned-reg
+         (inst lsr y x n-fixnum-tag-bits)))
+      (inst tbz x 0 DONE))
     (loadw y x bignum-digits-offset other-pointer-lowtag)
     DONE))
 

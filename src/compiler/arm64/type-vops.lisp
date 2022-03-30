@@ -153,16 +153,18 @@
 (define-vop (signed-byte-64-p type-predicate)
   (:translate signed-byte-64-p)
   (:generator 45
-    (multiple-value-bind (yep nope)
-        (if not-p
-            (values not-target target)
-            (values target not-target))
-      (assemble ()
-        (inst tbz* value 0 yep)
-        (test-type value temp nope t (other-pointer-lowtag))
-        (loadw temp value 0 other-pointer-lowtag)
-        (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-        (inst b (if not-p :ne :eq) target)))
+    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (when fixnum-p
+            (inst tbz* value 0 yep))
+          (test-type value temp nope t (other-pointer-lowtag))
+          (loadw temp value 0 other-pointer-lowtag)
+          (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+          (inst b (if not-p :ne :eq) target))))
     not-target))
 
 ;;; An (UNSIGNED-BYTE 64) can be represented with either a positive
@@ -171,45 +173,45 @@
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
   (:generator 45
-   (let ((single-word (gen-label))
-         (fixnum (gen-label)))
-     (multiple-value-bind (yep nope)
-         (if not-p
-             (values not-target target)
-             (values target not-target))
-       (assemble ()
-         ;; Move to a temporary and mask off the lowtag,
-         ;; but leave the sign bit for testing for positive fixnums.
-         ;; When using 32-bit registers that bit will not be visible.
-         (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask))
-         (%test-fixnum temp nil fixnum nil)
-         (inst cmp (32-bit-reg temp) other-pointer-lowtag)
-         (inst b :ne nope)
-         ;; Get the header.
-         (loadw temp value 0 other-pointer-lowtag)
-         ;; Is it one?
-         (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-         (inst b :eq single-word)
-         ;; If it's other than two, it can't be an (unsigned-byte 64)
-         (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
-         (inst b :ne nope)
-         ;; Get the second digit.
-         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-         ;; All zeros, it's an (unsigned-byte 64).
-         (inst cbz temp yep)
-         (inst b nope)
+    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          ;; Move to a temporary and mask off the lowtag,
+          ;; but leave the sign bit for testing for positive fixnums.
+          ;; When using 32-bit registers that bit will not be visible.
+          (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask))
+          (when fixnum-p
+           (%test-fixnum temp nil fixnum nil))
+          (inst cmp (32-bit-reg temp) other-pointer-lowtag)
+          (inst b :ne nope)
+          ;; Get the header.
+          (loadw temp value 0 other-pointer-lowtag)
+          ;; Is it one?
+          (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+          (inst b :eq single-word)
+          ;; If it's other than two, it can't be an (unsigned-byte 64)
+          (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
+          (inst b :ne nope)
+          ;; Get the second digit.
+          (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+          ;; All zeros, it's an (unsigned-byte 64).
+          (inst cbz temp yep)
+          (inst b nope)
 
-         (emit-label single-word)
-         ;; Get the single digit.
-         (loadw temp value bignum-digits-offset other-pointer-lowtag)
+          single-word
+          ;; Get the single digit.
+          (loadw temp value bignum-digits-offset other-pointer-lowtag)
 
-         ;; positive implies (unsigned-byte 64).
-         (emit-label fixnum)
-         (if not-p
-             (inst tbnz* temp (1- n-word-bits) target)
-             (inst tbz* temp (1- n-word-bits) target))))
-     (values))
-   NOT-TARGET))
+          ;; positive implies (unsigned-byte 64).
+          fixnum
+          (if not-p
+              (inst tbnz* temp (1- n-word-bits) target)
+              (inst tbz* temp (1- n-word-bits) target))))
+      (values))
+    NOT-TARGET))
 
 (define-vop (fixnump/unsigned-byte-64)
   (:policy :fast-safe)
