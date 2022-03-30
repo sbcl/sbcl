@@ -365,7 +365,6 @@
  ("src/compiler/ir1opt")
  ("src/compiler/loop")
 
- ("src/compiler/ir1final")
  ("src/compiler/constraint")
  ("src/compiler/equality-constraints")
  ("src/compiler/array-tran")
@@ -411,6 +410,7 @@
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")
+ ("src/compiler/ir1final")
  ("src/compiler/generic/vm-tran")
  ("src/compiler/generic/type-vops")
  ("src/compiler/{arch}/type-vops")

@@ -262,8 +262,7 @@
            (canonical-complex (* (realpart x) y) (* (imagpart x) y))))
     (number-dispatch ((x number) (y number))
       (float-contagion * x y)
-
-      ((fixnum fixnum) (multiply-fixnums x y))
+      ((fixnum fixnum) (* x y))
       ((bignum fixnum) (multiply-bignum-and-fixnum x y))
       ((fixnum bignum) (multiply-bignum-and-fixnum y x))
       ((bignum bignum) (multiply-bignums x y))
