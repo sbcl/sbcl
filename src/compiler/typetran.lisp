@@ -1378,7 +1378,7 @@
         tval)))))
 
 (deftransform #+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p
-  ((value) (fixnum) * :important nil)
+  ((value) (sb-vm:signed-word) * :important nil)
   `(>= value 0))
 
 (deftransform %other-pointer-p ((object))
