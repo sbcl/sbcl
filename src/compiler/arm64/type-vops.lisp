@@ -161,7 +161,8 @@
         (assemble ()
           (when fixnum-p
             (inst tbz* value 0 yep))
-          (test-type value temp nope t (other-pointer-lowtag))
+          (unless (fixnum-or-other-pointer-tn-ref-p args)
+            (test-type value temp nope t (other-pointer-lowtag)))
           (loadw temp value 0 other-pointer-lowtag)
           (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
           (inst b (if not-p :ne :eq) target))))
@@ -173,7 +174,8 @@
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
   (:generator 45
-    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
+    (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
+          (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args)))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
@@ -182,11 +184,14 @@
           ;; Move to a temporary and mask off the lowtag,
           ;; but leave the sign bit for testing for positive fixnums.
           ;; When using 32-bit registers that bit will not be visible.
-          (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask))
+          (when (or fixnum-p
+                    (not other-pointer-p))
+            (inst and temp value (logior (ash 1 (1- n-word-bits)) lowtag-mask)))
           (when fixnum-p
            (%test-fixnum temp nil fixnum nil))
-          (inst cmp (32-bit-reg temp) other-pointer-lowtag)
-          (inst b :ne nope)
+          (unless other-pointer-p
+            (inst cmp (32-bit-reg temp) other-pointer-lowtag)
+            (inst b :ne nope))
           ;; Get the header.
           (loadw temp value 0 other-pointer-lowtag)
           ;; Is it one?

@@ -180,7 +180,6 @@
 ;;; Does the TN definitely hold *any* of the 4 pointer types
 (defun pointer-tn-ref-p (tn-ref)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
-       (tn-ref-type tn-ref)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
              (specifier-type '(or fixnum
@@ -196,7 +195,6 @@
 ;;; Does the TN definitely hold an OTHER pointer
 (defun other-pointer-tn-ref-p (tn-ref)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
-       (tn-ref-type tn-ref)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
              (specifier-type '(or fixnum
@@ -206,10 +204,19 @@
                                instance
                                character))))))
 
+(defun fixnum-or-other-pointer-tn-ref-p (tn-ref)
+  (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
+       (not (types-equal-or-intersect
+             (tn-ref-type tn-ref)
+             (specifier-type '(or #+64-bit single-float
+                               function
+                               list
+                               instance
+                               character))))))
+
 (defun not-nil-tn-ref-p (tn-ref)
-  (and (tn-ref-type tn-ref)
-       (not (types-equal-or-intersect (tn-ref-type tn-ref)
-                                      (specifier-type '(eql nil))))))
+  (not (types-equal-or-intersect (tn-ref-type tn-ref)
+                                 (specifier-type '(eql nil)))))
 
 (defun stack-consed-p (object)
   (let ((write (sb-c::tn-writes object))) ; list of write refs
