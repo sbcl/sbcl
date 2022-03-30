@@ -3667,6 +3667,18 @@
                   x)))))
           '(values (or (integer 5 5) (integer 3 3)) &optional))))
 
+(with-test (:name :type-constraint-joining.2)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (etypecase x
+                  (integer (read))
+                  (float (read)))
+                x))))
+          '(values (or float integer) &optional))))
+
 (with-test (:name :type-constraint-joining-terminates)
   (checked-compile
    sb-c::
@@ -3693,3 +3705,15 @@
                    (3 (setq x (make-hash-table))))
                  (symbol-name x)))
             :allow-warnings t))))
+
+(with-test (:name :type-constraint-joining.eql)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (ecase x
+                  (1 (read))
+                  (2 (read)))
+                x))))
+          '(values (integer 1 2) &optional))))

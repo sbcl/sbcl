@@ -1,5 +1,14 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.2.3:
+  * enhancement: better constraint propagation in the compiler. Specifically,
+    the compiler can now derive the type of X in control flow join situations
+    such as
+    (LAMBDA (X) (ECASE (1 ...) (2 ...)) X)
+    or
+    (LAMBDA (X) (ETYPECASE (INTEGER ...) (SYMBOL ...)) X)
+    instead of forgetting all information about X after the E(TYPE)CASE.
+
 changes in sbcl-2.2.3 relative to sbcl-2.2.2:
   * minor incompatible change: SB-THREAD:MUTEX-OWNER may return :THREAD-DEAD
     if the apparent owner either exited nearly instantly after releasing the

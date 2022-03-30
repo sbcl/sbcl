@@ -1277,7 +1277,7 @@
                  (if-alternative-constraints last))))
         (block-out pred))))
 
-;;; Join the type constraints coming from the predecessors of BLOCK on
+;;; Join the constraints coming from the predecessors of BLOCK on
 ;;; every constrained variable into the constraint set IN.
 (defun join-type-constraints (in block)
   (let ((vars '()))
@@ -1286,7 +1286,9 @@
       (let ((out (block-out-for-successor pred block)))
         (when out
           (do-conset-elements (con out)
-            (when (and (eq (constraint-kind con) 'typep)
+            (when (and (or (eq (constraint-kind con) 'typep)
+                           (and (eq (constraint-kind con) 'eql)
+                                (constant-p (constraint-y con))))
                        (not (constraint-not-p con)))
               (pushnew (constraint-x con) vars)))
           (return))))
@@ -1297,13 +1299,19 @@
                 (out-var-type *universal-type*))
             (when out
               (do-propagatable-constraints (con (out var))
-                (when (and (eq (constraint-kind con) 'typep)
-                           ;; FIXME: Handling complemented type constraints as
-                           ;; negation types here seems to cause infinite regress.
-                           (not (constraint-not-p con)))
-                  (setq out-var-type
-                        (type-approx-intersection2 out-var-type
-                                                   (constraint-y con))))))
+                ;; FIXME: Actually handle complemented type
+                ;; constraints here.
+                (unless (constraint-not-p con)
+                  (case (constraint-kind con)
+                    (typep
+                     (setq out-var-type
+                           (type-approx-intersection2 out-var-type
+                                                      (constraint-y con))))
+                    (eql
+                     (let ((y (constraint-y con)))
+                       (when (constant-p y)
+                         (setq out-var-type (leaf-type y))
+                         (return))))))))
             (setq in-var-type (type-union in-var-type out-var-type))))
         (unless (eq in-var-type *universal-type*)
           (conset-adjoin (find-or-create-constraint 'typep
