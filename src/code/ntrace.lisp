@@ -96,15 +96,20 @@
 
 ;;; When a function name is redefined, and we were tracing that name,
 ;;; then untrace the old definition and trace the new one.
-(defun trace-redefined-update (fname new-value)
-  (when (fboundp fname)
-    (let* ((fun (trace-fdefinition fname))
-           (info (gethash fun *traced-funs*)))
-      (when (and info (trace-info-named info))
-        (untrace-1 fname)
-        (trace-1 fname info new-value))
-      (retrace-local-funs fname new-value))))
-(push #'trace-redefined-update *setf-fdefinition-hook*)
+(defun maybe-retrace (name new-value)
+  (let* ((fun (trace-fdefinition name))
+         (info (gethash fun *traced-funs*)))
+    (when info
+      (untrace-1 name)
+      (trace-1 name info new-value))
+    (retrace-local-funs name new-value)))
+
+(defun maybe-retrace-function (name new-value)
+  (when (fboundp name)
+    (maybe-retrace name new-value)))
+
+(push #'maybe-retrace-function *setf-fdefinition-hook*)
+(push #'maybe-retrace-function *setf-macro-function-hook*)
 
 ;;; Annotate a FORM to evaluate with pre-converted functions. FORM is
 ;;; really a cons (EXP . FUNCTION). LOC is the code location to use

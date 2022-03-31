@@ -86,7 +86,8 @@
            (let ((sb-debug:*trace-report-default* #'collect))
              (eval `(trace ,@trace-arguments))
              (funcall fn))
-        (ignore-errors (untrace))))
+        (ignore-errors (untrace))
+        (assert (null (trace)))))
     (nreverse traces)))
 
 (defmacro collecting-traces ((&rest trace-arguments) &body body)
@@ -482,6 +483,31 @@
                    (macroexpand-1 '(macro-fact 0)))
                  '((0 (labels fact :in macro-fact) :enter 0)
                    (0 (labels fact :in macro-fact) :exit 1)))))
+
+(defun call-with-macro-fact-redefined (fn)
+  (handler-bind ((sb-kernel:redefinition-with-defmacro #'muffle-warning))
+    (eval `(defmacro macro-fact (x)
+             (declare (ignore x) (optimize (debug 3)))
+             (labels ((fact () 'redefined)) (fact))))
+    (unwind-protect
+         (funcall fn)
+      (eval `(defmacro macro-fact (x)
+               (labels ((fact (x) (if (zerop x) 1 (* x (fact (1- x))))))
+                 (fact x)))))))
+
+(with-test (:name (trace :macro :redefined))
+  (assert (equal (collecting-traces (macro-fact
+                                     (labels fact :in macro-fact))
+                   (macroexpand-1 '(macro-fact 0))
+                   (call-with-macro-fact-redefined
+                    (lambda () (macroexpand-1 '(macro-fact 0)))))
+                 '((0 macro-fact :enter (macro-fact 0) "unused argument")
+                   (1 (labels fact :in macro-fact) :enter 0)
+                   (1 (labels fact :in macro-fact) :exit 1) (0 macro-fact :exit 1)
+                   (0 macro-fact :enter (macro-fact 0) "unused argument")
+                   (1 (labels fact :in macro-fact) :enter)
+                   (1 (labels fact :in macro-fact) :exit redefined)
+                   (0 macro-fact :exit redefined)))))
 
 (defun (cas trace-cas) (old new x)
   (declare (optimize (debug 3)))

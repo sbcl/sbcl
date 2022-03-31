@@ -3009,6 +3009,7 @@ possibly temporarily, because it might be used internally.")
            "%MACROEXPAND-1"
 
            "*SETF-FDEFINITION-HOOK*"
+           "*SETF-MACRO-FUNCTION-HOOK*"
 
             ;; error-reporting facilities
 
