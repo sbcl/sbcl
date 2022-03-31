@@ -196,11 +196,15 @@ Lzero:
 	push	%rbp            # Dummy for return address
 	push	%rbp		# fp in save location S1
 	mov	%rsp,%rbp	# The current sp marks start of new frame.
+#ifndef LISP_FEATURE_DARWIN
+        # This call frame info is valid but it makes macOS print a warning
+        # that I'm tired of seeing. I can't even remember why this helps.
 	# Inform unwinder that the new frame has not been entered yet.
 	# The CFA is what it was (old RBP+16) before the preceding mov.
 	# This sequence encodes DW_CFA_def_cfa_expression
 	# DW_OP_breg6 (rbp): 0 / DW_OP_deref / DW_OP_lit16 / DW_OP_plus
 	.cfi_escape 0x0f, 5, 0x76, 0, 6, 0x40, 0x22
+#endif
 Lcall:
 	LOAD_PIC_VAR(gc_card_mark, CARD_TABLE_REG)
 	call	*CLOSURE_FUN_OFFSET(%rax)
