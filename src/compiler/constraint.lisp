@@ -1477,20 +1477,22 @@
                  (setq blocks-to-process (nconc-new block blocks-to-process))))))
       (multiple-value-bind (leading-blocks rest-of-blocks)
           (leading-component-blocks component)
-        ;; We can only start joining types once all type constraints
-        ;; are definitely correct. They may not be the first time
-        ;; around because EQL constraint propagation is optimistic,
-        ;; i.e. un-EQL variables may be considered EQL before
-        ;; constraint propagation is done, hence any inherited type
-        ;; constraints from such constraints will be wrong as well.
+        ;; Update every block once to account for changes in the
+        ;; IR1. The constraints of the lead blocks cannot be changed
+        ;; after the first pass so we might as well use them and skip
+        ;; USE-RESULT-CONSTRAINTS later.
+        (dolist (block leading-blocks)
+          (setf (block-in block) (compute-block-in block t))
+          (find-block-type-constraints block t))
+        ;; We can only start joining types on blocks in which
+        ;; constraint propagation might have to run multiple times (to
+        ;; fixpoint) once all type constraints are definitely
+        ;; correct. They may not be the first time around because EQL
+        ;; constraint propagation is optimistic, i.e. un-EQL variables
+        ;; may be considered EQL before constraint propagation is
+        ;; done, hence any inherited type constraints from such
+        ;; constraints will be wrong as well.
         (dolist (join-types-p '(nil t))
-          ;; Update every block once to account for changes in the
-          ;; IR1. The constraints of the lead blocks cannot be changed
-          ;; after the first pass so we might as well use them and skip
-          ;; USE-RESULT-CONSTRAINTS later.
-          (dolist (block leading-blocks)
-            (setf (block-in block) (compute-block-in block join-types-p))
-            (find-block-type-constraints block t))
           (setq blocks-to-process (copy-list rest-of-blocks))
           ;; The rest of the blocks.
           (dolist (block rest-of-blocks)
