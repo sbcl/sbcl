@@ -152,7 +152,7 @@
 ;;; exactly one digit.
 (define-vop (signed-byte-64-p type-predicate)
   (:translate signed-byte-64-p)
-  (:generator 45
+  (:generator 10
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
       (multiple-value-bind (yep nope)
           (if not-p
@@ -173,7 +173,7 @@
 ;;; exactly two digits and the second digit all zeros.
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
-  (:generator 45
+  (:generator 10
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args)))
       (multiple-value-bind (yep nope)

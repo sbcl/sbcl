@@ -127,7 +127,7 @@
 
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
-  (:generator 45
+  (:generator 10
    (let ((not-target (gen-label)))
      (signed-byte-32-test value temp not-p target not-target)
      (emit-label not-target))))
@@ -181,7 +181,7 @@
 
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
-  (:generator 45
+  (:generator 10
    (let ((not-target (gen-label)))
      (unsigned-byte-32-test value temp not-p target not-target)
      (emit-label not-target))))

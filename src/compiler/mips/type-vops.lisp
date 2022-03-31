@@ -120,7 +120,7 @@
 
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
-  (:generator 45
+  (:generator 10
     (signed-byte-32-test value temp not-p target not-target)
     NOT-TARGET))
 
@@ -173,7 +173,7 @@
 
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
-  (:generator 45
+  (:generator 10
     (unsigned-byte-32-test value temp not-p target not-target)
     NOT-TARGET))
 

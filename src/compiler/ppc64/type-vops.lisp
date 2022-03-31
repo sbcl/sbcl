@@ -126,7 +126,7 @@
 
 (define-vop (signed-byte-64-p type-predicate)
   (:translate signed-byte-64-p)
-  (:generator 45
+  (:generator 10
     (multiple-value-bind (yep nope)
         (if not-p
             (values not-target target)
@@ -144,7 +144,7 @@
 ;;; exactly two digits and the second digit all zeros.
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
-  (:generator 45
+  (:generator 10
     (let ((not-target (gen-label))
           (single-word (gen-label))
           (fixnum (gen-label)))
