@@ -416,6 +416,33 @@
                  '((0 (flet body :in (compiler-macro fn-with-cmac)) :enter)
                    (0 (flet body :in (compiler-macro fn-with-cmac)) :exit 42)))))
 
+(defun call-with-compiler-macro-redefined (fn)
+  (eval `(define-compiler-macro fn-with-cmac (x)
+           (declare (ignore x) (optimize (debug 3)))
+           (flet ((body () ''redefined))
+             (body))))
+  (unwind-protect
+       (funcall fn)
+    (eval `(define-compiler-macro fn-with-cmac (x)
+             (declare (ignore x) (optimize (debug 3)))
+             (flet ((body () 42))
+               (body))))))
+
+(with-test (:name (trace :compiler-macro :redefined))
+  (assert (equal (collecting-traces ((compiler-macro fn-with-cmac)
+                                     (flet body :in (compiler-macro fn-with-cmac)))
+                   (compile nil '(lambda () (fn-with-cmac 0)))
+                   (call-with-compiler-macro-redefined
+                    (lambda () (compile nil '(lambda () (fn-with-cmac 0))))))
+                 '((0 (compiler-macro fn-with-cmac) :enter (fn-with-cmac 0) "unused argument")
+                   (1 (flet body :in (compiler-macro fn-with-cmac)) :enter)
+                   (1 (flet body :in (compiler-macro fn-with-cmac)) :exit 42)
+                   (0 (compiler-macro fn-with-cmac) :exit 42)
+                   (0 (compiler-macro fn-with-cmac) :enter (fn-with-cmac 0) "unused argument")
+                   (1 (flet body :in (compiler-macro fn-with-cmac)) :enter)
+                   (1 (flet body :in (compiler-macro fn-with-cmac)) :exit 'redefined)
+                   (0 (compiler-macro fn-with-cmac) :exit 'redefined)))))
+
 (defun throw-foo ()
   (throw 'foo 42))
 

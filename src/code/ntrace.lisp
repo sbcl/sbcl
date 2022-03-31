@@ -111,6 +111,12 @@
 (push #'maybe-retrace-function *setf-fdefinition-hook*)
 (push #'maybe-retrace-function *setf-macro-function-hook*)
 
+(defun maybe-retrace-compiler-macro (name new-value)
+  (when (compiler-macro-function name)
+    (maybe-retrace `(compiler-macro ,name) new-value)))
+
+(push #'maybe-retrace-compiler-macro *setf-compiler-macro-function-hook*)
+
 ;;; Annotate a FORM to evaluate with pre-converted functions. FORM is
 ;;; really a cons (EXP . FUNCTION). LOC is the code location to use
 ;;; for the lexical environment. If LOC is NIL, evaluate in the null

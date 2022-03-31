@@ -159,6 +159,11 @@ return NIL. Can be set with SETF when ENV is NIL."
     ;; we don't do it.
     (values (info :function :compiler-macro-function name))))
 
+(defvar *setf-compiler-macro-function-hook* nil
+  "A list of functions that (SETF COMPILER-MACRO-FUNCTION) invokes before
+   storing the new value. The functions take the function name and the new
+   value.")
+
 ;;; FIXME: we don't generate redefinition warnings for these.
 (defun (setf compiler-macro-function) (function name &optional env)
   (declare (type (or symbol list) name)
@@ -168,6 +173,9 @@ return NIL. Can be set with SETF when ENV is NIL."
     (error "can't SETF COMPILER-MACRO-FUNCTION when ENV is non-NIL"))
   (when (eq (info :function :kind name) :special-form)
     (error "~S names a special form." name))
+  (when (boundp '*setf-compiler-macro-function-hook*) ; unbound during cold init
+    (dolist (f *setf-compiler-macro-function-hook*)
+      (funcall f name function)))
   (with-single-package-locked-error
       (:symbol name "setting the compiler-macro-function of ~A")
     (setf (info :function :compiler-macro-function name) function)
