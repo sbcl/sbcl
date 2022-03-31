@@ -865,14 +865,8 @@
           (inst lea result (ea tramp rip-tn))
           (inst mov result tramp)))))
 
-(define-vop (fixed-alloc)
-  (:args)
-  (:info name words type lowtag stack-allocate-p)
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) alloc-temp)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-  (:node-var node)
-  (:generator 50
+(flet ((alloc (name words type lowtag stack-allocate-p result
+                    &optional alloc-temp node)
    (let* ((instancep (typep type 'wrapper)) ; is this an instance type?
           (bytes (pad-data-block words)))
     #+bignum-assertions
@@ -903,6 +897,19 @@
       (when instancep ; store its layout, while still in pseudo-atomic
         (inst mov :dword (ea 4 result) (make-fixup type :layout)))
       (inst or :byte result lowtag)))))
+  ;; DX is strictly redundant in these 2 vops, but they're written this way
+  ;; so that backends can choose to use a single vop for both.
+  (define-vop (fixed-alloc)
+    (:info name words type lowtag dx)
+    (:results (result :scs (descriptor-reg)))
+    (:temporary (:sc unsigned-reg) alloc-temp)
+    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+    (:node-var node)
+    (:generator 50 (alloc name words type lowtag dx result alloc-temp node)))
+  (define-vop (sb-c::fixed-alloc-to-stack)
+    (:info name words type lowtag dx)
+    (:results (result :scs (descriptor-reg)))
+    (:generator 50 (alloc name words type lowtag dx result))))
 
 ;;; Allocate a non-vector variable-length object.
 ;;; Exactly 4 allocators are rendered via this vop:

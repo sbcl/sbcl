@@ -159,10 +159,12 @@
 
 (defun emit-fixed-alloc (node block name words type lowtag result lvar)
   (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
-    (when stack-allocate-p
-      (vop current-stack-pointer node block
-           (ir2-lvar-stack-pointer (lvar-info lvar))))
-    (vop fixed-alloc node block name words type lowtag stack-allocate-p result)))
+    (cond (stack-allocate-p
+           (vop current-stack-pointer node block
+                (ir2-lvar-stack-pointer (lvar-info lvar)))
+           (vop fixed-alloc-to-stack node block name words type lowtag t result))
+          (t
+           (vop fixed-alloc node block name words type lowtag nil result)))))
 
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
