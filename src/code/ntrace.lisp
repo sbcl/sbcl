@@ -600,9 +600,16 @@ functions are called. In its simplest form:
 
        (TRACE NAME-1 NAME-2 ...)
 
-The NAMEs are not evaluated. Each may be a symbol, denoting an
-individual function, or a string, denoting all functions fbound to
-symbols whose home package is the package with the given name.
+The NAMEs are not evaluated. Each may be one of the following:
+  * SYMBOL, denoting a function or macro.
+  * FNAME, a valid function name, denoting a function.
+  * (METHOD FNAME QUALIFIERS* (SPECIALIZERS*)) denoting a method.
+  * (COMPILER-MACRO SYMBOL) denoting a compiler macro.
+  * (LABELS FNAME :IN OUTER-NAME) or (FLET FNAME :IN OUTER-NAME)
+    denoting a local function where OUTER-NAME may be any of the
+    previous names for functions, macros, methods or compiler macros.
+  * STRING denoting all functions fbound to symbols whose home package
+    is the package with the given name.
 
 Options allow modification of the default behavior. Each option is a
 pair of an option keyword and a value form. Global options are
