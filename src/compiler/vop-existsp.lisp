@@ -39,8 +39,6 @@
                            (fun-info-templates it))))))))
       ;; Negatives won't be stored in the journal in optimistic mode.
       (when (and (not answer) (not optimistic))
-        (when (eq name 'sb-c::unsigned-byte-p)
-          (break))
         (pushnew (cons name query) *vop-not-existsp* :test 'equal))
       answer))
   (defun check-vop-existence-correctness ()
