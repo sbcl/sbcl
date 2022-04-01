@@ -5206,10 +5206,16 @@
         `(integer-plusp x)))
 
   (deftransform unsigned-byte-p ((x) (sb-vm:signed-word))
-    `(>= x 0))
+    `(not (< x 0)))
 
   (deftransform integer-plusp ((x) (sb-vm:signed-word))
     `(> x 0))
 
   (deftransform integer-plusp ((x) (word))
-    `(> x 0)))
+    `(> x 0))
+
+  (deftransform integer-minusp ((x) (sb-vm:signed-word))
+    `(< x 0))
+
+  (deftransform integer-not-plusp ((x) (sb-vm:signed-word))
+    `(not (> x 0))))

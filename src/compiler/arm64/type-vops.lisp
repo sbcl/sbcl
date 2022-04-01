@@ -256,9 +256,12 @@
                       plusp)
                   (inst tbnz value 0 bignum)
                   (inst cmp value 0)
-                  (inst b (if plusp
-                              :gt
-                              :ge)
+                  (inst b (case plusp
+                            (:plusp :gt)
+                            (:not :le)
+                            (:minusp :lt)
+                            (t
+                             :ge))
                         yep)
                   (inst b nope))
                  (t
@@ -275,7 +278,10 @@
          #.(assert (= (integer-length bignum-widetag) 5))
          (inst add lip value (lsr temp 5))
          (inst ldr temp (@ lip (- other-pointer-lowtag)))
-         (if not-p
+         (if (and
+              (or (not plusp)
+                  (eq plusp :plusp))
+              not-p)
              (inst tbnz* temp (1- n-word-bits) target)
              (inst tbz* temp (1- n-word-bits) target)))))
     not-target))
@@ -283,6 +289,14 @@
 (define-vop (integer-plusp unsigned-byte-p)
   (:translate sb-c::integer-plusp)
   (:variant :plusp))
+
+(define-vop (integer-not-plusp unsigned-byte-p)
+  (:translate sb-c::integer-not-plusp)
+  (:variant :not))
+
+(define-vop (integer-minusp unsigned-byte-p)
+  (:translate sb-c::integer-minusp)
+  (:variant :minusp))
 
 
 ;;; MOD type checks

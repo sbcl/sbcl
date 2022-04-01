@@ -407,13 +407,14 @@
 
  ;; this file defines the INTERVAL struct which is also used in 'srctran'
  ("src/compiler/float-tran")
- ;; This is a terrible name for a file that contains type derivers
- ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
- ("src/compiler/srctran")
  ("src/compiler/ir1final")
  ("src/compiler/generic/vm-tran")
  ("src/compiler/generic/type-vops")
  ("src/compiler/{arch}/type-vops")
+
+ ;; This is a terrible name for a file that contains type derivers
+ ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
+ ("src/compiler/srctran")
  ("src/compiler/typetran")
  ("src/compiler/generic/vm-typetran")
  ("src/code/cross-modular"  :not-target)

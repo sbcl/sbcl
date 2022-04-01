@@ -136,7 +136,9 @@
     (def-type-predicate-wrapper signed-byte-64-p))
   (sb-c::when-vop-existsp (:translate sb-c::unsigned-byte-p)
     (def-type-predicate-wrapper sb-c::unsigned-byte-p)
-    (def-type-predicate-wrapper sb-c::integer-plusp))
+    (def-type-predicate-wrapper sb-c::integer-plusp)
+    (def-type-predicate-wrapper sb-c::integer-not-plusp)
+    (def-type-predicate-wrapper sb-c::integer-minusp))
   ;; Specialized array types
   (macrolet ((saetp-defs ()
                `(progn
