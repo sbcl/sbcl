@@ -239,6 +239,51 @@
   (:translate fixnump)
   (:generator 3
     (inst adds zr-tn value value)))
+
+(define-vop (unsigned-byte-p type-predicate)
+  (:translate sb-c::unsigned-byte-p)
+  (:temporary (:scs (interior-reg)) lip)
+  (:variant-vars plusp)
+  (:generator 5
+    (let ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer))))
+     (multiple-value-bind (yep nope)
+         (if not-p
+             (values not-target target)
+             (values target not-target))
+       (assemble ()
+         (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
+           (cond ((or integer-p
+                      plusp)
+                  (inst tbnz value 0 bignum)
+                  (inst cmp value 0)
+                  (inst b (if plusp
+                              :gt
+                              :ge)
+                        yep)
+                  (inst b nope))
+                 (t
+                  (inst tst value (lognot (fixnumize most-positive-fixnum)))
+                  (inst b :eq yep))))
+         bignum
+         (unless (fixnum-or-other-pointer-tn-ref-p args)
+           (test-type value temp nope t (other-pointer-lowtag)))
+         (loadw temp value 0 other-pointer-lowtag)
+         (unless integer-p
+           (inst and tmp-tn temp widetag-mask)
+           (inst cmp tmp-tn bignum-widetag)
+           (inst b :ne nope))
+         #.(assert (= (integer-length bignum-widetag) 5))
+         (inst add lip value (lsr temp 5))
+         (inst ldr temp (@ lip (- other-pointer-lowtag)))
+         (if not-p
+             (inst tbnz* temp (1- n-word-bits) target)
+             (inst tbz* temp (1- n-word-bits) target)))))
+    not-target))
+
+(define-vop (integer-plusp unsigned-byte-p)
+  (:translate sb-c::integer-plusp)
+  (:variant :plusp))
+
 
 ;;; MOD type checks
 (defun power-of-two-limit-p (x)

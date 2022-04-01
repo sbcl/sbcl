@@ -457,7 +457,7 @@
 (defknown %allocate-bignum (bignum-length) bignum
   (flushable #-bignum-assertions always-translatable))
 
-(defknown %bignum-length (bignum) bignum-length
+(defknown %bignum-length (bignum) (and (integer 1) bignum-length)
   (foldable flushable always-translatable))
 
 ;;; Change the length of bignum to be newlen. Newlen must be the same or

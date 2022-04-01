@@ -5191,3 +5191,25 @@
            nil)
           (t
            (give-up-ir1-transform)))))
+
+(when-vop-existsp (:translate unsigned-byte-p)
+  (deftransform < ((x y) (integer (constant-arg (eql 0))))
+    (if (or (csubtypep (lvar-type x) (specifier-type 'word))
+            (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+        (give-up-ir1-transform)
+        `(not (unsigned-byte-p x))))
+
+  (deftransform > ((x y) (integer (constant-arg (eql 0))))
+    (if (or (csubtypep (lvar-type x) (specifier-type 'word))
+            (csubtypep (lvar-type x) (specifier-type 'sb-vm:signed-word)))
+        (give-up-ir1-transform)
+        `(integer-plusp x)))
+
+  (deftransform unsigned-byte-p ((x) (sb-vm:signed-word))
+    `(>= x 0))
+
+  (deftransform integer-plusp ((x) (sb-vm:signed-word))
+    `(> x 0))
+
+  (deftransform integer-plusp ((x) (word))
+    `(> x 0)))

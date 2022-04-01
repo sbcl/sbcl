@@ -122,6 +122,11 @@
 ;;; accepting any type object.
 (define-type-predicate %standard-char-p standard-char)
 (define-type-predicate non-null-symbol-p (and symbol (not null)))
+
+(when-vop-existsp (:translate unsigned-byte-p)
+  (define-type-predicate unsigned-byte-p unsigned-byte)
+  (define-type-predicate integer-plusp (integer 1)))
+
 
 (defglobal *backend-type-predicates-grouped*
     (let (plist)
@@ -187,7 +192,7 @@
           return (values (aref predicates (1+ x))
                          (set-difference types union-types)))))
 
-(sb-c::unless-vop-existsp (:translate keywordp)
+(unless-vop-existsp (:translate keywordp)
 (define-source-transform keywordp (x)
   `(let ((object ,x))
      (and (non-null-symbol-p object)

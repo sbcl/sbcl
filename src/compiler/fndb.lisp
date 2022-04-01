@@ -2215,3 +2215,7 @@
   word
   (movable foldable unsafely-flushable commutative
            always-translatable))
+
+(defknown (unsigned-byte-p integer-plusp) (t)
+  boolean
+  (movable foldable flushable))

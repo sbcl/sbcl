@@ -134,6 +134,9 @@
   (progn
     (def-type-predicate-wrapper unsigned-byte-64-p)
     (def-type-predicate-wrapper signed-byte-64-p))
+  (sb-c::when-vop-existsp (:translate sb-c::unsigned-byte-p)
+    (def-type-predicate-wrapper sb-c::unsigned-byte-p)
+    (def-type-predicate-wrapper sb-c::integer-plusp))
   ;; Specialized array types
   (macrolet ((saetp-defs ()
                `(progn
@@ -150,10 +153,10 @@
   (def-type-predicate-wrapper stringp)
   (def-type-predicate-wrapper vectorp))
 
-#+(or x86 x86-64 arm arm64)
-(defun fixnum-mod-p (x limit)
-  (and (fixnump x)
-       (<= 0 x limit)))
+(sb-c::when-vop-existsp (:translate fixnum-mod-p)
+  (defun fixnum-mod-p (x limit)
+    (and (fixnump x)
+         (<= 0 x limit))))
 
 
 ;;; Return the specifier for the type of object. This is not simply
