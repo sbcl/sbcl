@@ -1422,39 +1422,25 @@
 
 ;;; Return two lists: one of blocks that precede all loops and
 ;;; therefore require only one constraint propagation pass and the
-;;; rest. This implementation does not find all such blocks.
-;;;
-;;; A more complete implementation would be:
-;;;
-;;;     (do-blocks (block component)
-;;;       (if (every #'(lambda (pred)
-;;;                      (or (member pred leading-blocks)
-;;;                          (eq pred head)))
-;;;                  (block-pred block))
-;;;           (push block leading-blocks)
-;;;           (push block rest-of-blocks)))
+;;; rest.
 ;;;
 ;;; Trailing blocks that succeed all loops could be found and handled
 ;;; similarly. In practice though, these more complex solutions are
 ;;; slightly worse performancewise.
 (defun leading-component-blocks (component)
   (declare (type component component))
-  (flet ((loopy-p (block)
-           (let ((n (block-number block)))
-             (dolist (pred (block-pred block))
-               (unless (< n (block-number pred))
-                 (return t))))))
-    (let ((leading-blocks ())
-          (rest-of-blocks ())
-          (seen-loop-p ()))
-      (do-blocks (block component)
+  (collect ((leading-blocks) (rest-of-blocks))
+    (do-blocks (block component)
+      (let ((leading t))
+        (dolist (pred (block-pred block))
+          (unless (block-flag pred)
+            (setq leading nil)))
+        (setf (block-flag block) leading)
         (when (block-type-check block)
-          (when (and (not seen-loop-p) (loopy-p block))
-            (setq seen-loop-p t))
-          (if seen-loop-p
-              (push block rest-of-blocks)
-              (push block leading-blocks))))
-      (values (nreverse leading-blocks) (nreverse rest-of-blocks)))))
+          (if leading
+              (leading-blocks block)
+              (rest-of-blocks block)))))
+    (values (leading-blocks) (rest-of-blocks))))
 
 ;;; Append OBJ to the end of LIST as if by NCONC but only if it is not
 ;;; a member already.
@@ -1475,6 +1461,7 @@
              (dolist (block blocks)
                (when (block-type-check block)
                  (setq blocks-to-process (nconc-new block blocks-to-process))))))
+      (clear-flags component)
       (multiple-value-bind (leading-blocks rest-of-blocks)
           (leading-component-blocks component)
         ;; Update every block once to account for changes in the
