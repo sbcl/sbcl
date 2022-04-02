@@ -2912,6 +2912,7 @@ possibly temporarily, because it might be used internally.")
            "XSET-MEMBERS"
            "XSET-SUBSET-P"
            "XSET-UNION"
+           "XSET="
 
             ;; sparse set implementation backed by a lightweight hashtable
 
