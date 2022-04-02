@@ -2043,29 +2043,17 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (defoptimizer (list ir2-convert) ((&rest args) node block)
   (let* ((fun (lvar-fun-name (combination-fun node)))
-         (star (ecase fun (list* t) (list nil))))
+         (star (ecase fun (list* t) (list nil)))
+         (num-conses (- (length args) (if star 1 0))))
     ;; LIST needs at least 1 arg, LIST* demands at least 2 args
     (aver (if star (cdr args) args))
-    ;; This used to convert as a full call to LIST or LIST* when n-cons-cell exceeded a threshold
-    ;; which could confuse GC (see the :NO-CONSES-ON-LARGE-OBJECT-PAGES regression test).
-    ;; It's no longer required to special-case that situation.
-    ;; Nonetheless, beyond a certain length, it might make sense to do a full call anyway,
-    ;; because there's little to be gained by inlining all the stores - the generated code size
-    ;; grows at a rate faster than pushing more stack arguments - but because MAKE-LIST avoids
-    ;; allocating as one huge chunk (instead, doing a cons at a time), in theory it can better
-    ;; utilize free memory. But really, if you have a statically written LIST call with so many
-    ;; args that it exhausts the heap, you should probably rethink your coding style.
-    (let* ((refs (reference-tn-list
-                  (mapcar (lambda (arg)
-                            (lvar-tn node block arg))
-                          args)
-                  nil))
+    (when (> num-conses sb-vm::max-conses-per-page)
+      (return-from list-ir2-convert-optimizer (ir2-convert-full-call node block)))
+    (let* ((refs (reference-tn-list (mapcar (lambda (arg) (lvar-tn node block arg))
+                                            args)
+                                    nil))
            (lvar (node-lvar node))
-           (res (lvar-result-tns lvar (list (specifier-type 'list))))
-           (num-conses (- (length args) (if star 1 0))))
-      #+gencgc ;; technically, only required if #+use-cons-region, but OK either way
-      (when (> num-conses sb-vm::max-conses-per-page)
-        (return-from list-ir2-convert-optimizer (ir2-convert-full-call node block)))
+           (res (lvar-result-tns lvar (list (specifier-type 'list)))))
       (when (and lvar (lvar-dynamic-extent lvar))
         (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
       ;;; This COND-like expression is unfortunate, but the VOP* macro chokes if the name
