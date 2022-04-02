@@ -106,6 +106,7 @@ interface stability.")
    "VOID-SYSCALL"
    "CLOCK-THREAD-CPUTIME-ID"
    "CLOCK-PROCESS-CPUTIME-ID"
+   "CLOCK-REALTIME"
 
    ;; signals
 
