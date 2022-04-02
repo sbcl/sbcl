@@ -12,18 +12,18 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - uses: actions/cache@v1
-      id: ecl-cache
+      id: ecl-cache3
       with:
         path: /tmp/ecl
-        key: ecl-cache
+        key: ecl-cache3
 
     - name: build host ecl
-      if: steps.ecl-cache.outputs.cache-hit != 'true'
+      if: steps.ecl-cache3.outputs.cache-hit != 'true'
       run: |
         wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/ecl.tgz
         tar xf ecl.tgz
         cd ecl
-        ./configure --prefix=/usr/
+        ./configure --prefix=/usr/ --enable-threads
         make
       working-directory: /tmp
 
