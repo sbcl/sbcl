@@ -1,3 +1,5 @@
+#+interpreter (sb-ext:exit :code 104)
+
 (let ((*evaluator-mode* :compile))
   (load "../src/code/brothertree.lisp"))
 
