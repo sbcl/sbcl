@@ -244,7 +244,7 @@
   (:translate >)
   (:args (integer :scs (descriptor-reg))
          (fixnum :scs (immediate any-reg)))
-  (:arg-types integer tagged-num)
+  (:arg-types (:or integer bignum) tagged-num)
   (:temporary (:sc non-descriptor-reg) temp)
   (:conditional)
   (:info target not-p)
@@ -319,23 +319,17 @@
 
 (define-vop (<-integer-fixnum >-integer-fixnum)
   (:translate <)
-  (:args (integer :scs (descriptor-reg))
-         (fixnum :scs (immediate any-reg)))
-  (:arg-types integer tagged-num)
   (:variant :lt))
 
 (define-vop (>-fixnum-integer >-integer-fixnum)
   (:translate >)
   (:args (fixnum :scs (immediate any-reg))
          (integer :scs (descriptor-reg)))
-  (:arg-types tagged-num integer)
+  (:arg-types tagged-num (:or integer bignum))
   (:variant :lt))
 
-(define-vop (<-fixnum-integer >-integer-fixnum)
+(define-vop (<-fixnum-integer >-fixnum-integer)
   (:translate <)
-  (:args (fixnum :scs (immediate any-reg))
-         (integer :scs (descriptor-reg)))
-  (:arg-types tagged-num integer)
   (:variant :gt))
 
 
