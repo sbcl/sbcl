@@ -240,63 +240,103 @@
   (:generator 3
     (inst adds zr-tn value value)))
 
-(define-vop (unsigned-byte-p type-predicate)
-  (:translate sb-c::unsigned-byte-p)
+(define-vop (>-integer-fixnum)
+  (:translate >)
+  (:args (integer :scs (descriptor-reg))
+         (fixnum :scs (immediate any-reg)))
+  (:arg-types integer tagged-num)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:conditional)
+  (:info target not-p)
+  (:args-var args)
+  (:policy :fast-safe)
   (:temporary (:scs (interior-reg)) lip)
-  (:variant-vars plusp)
-  (:generator 5
-    (let ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer))))
-     (multiple-value-bind (yep nope)
-         (if not-p
-             (values not-target target)
-             (values target not-target))
-       (assemble ()
-         (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
-           (cond ((or integer-p
-                      plusp)
-                  (inst tbnz value 0 bignum)
-                  (inst cmp value 0)
-                  (inst b (case plusp
-                            (:plusp :gt)
-                            (:not :le)
-                            (:minusp :lt)
-                            (t
-                             :ge))
-                        yep)
-                  (inst b nope))
-                 (t
-                  (inst tst value (lognot (fixnumize most-positive-fixnum)))
-                  (inst b :eq yep))))
-         bignum
-         (unless (fixnum-or-other-pointer-tn-ref-p args)
-           (test-type value temp nope t (other-pointer-lowtag)))
-         (loadw temp value 0 other-pointer-lowtag)
-         (unless integer-p
-           (inst and tmp-tn temp widetag-mask)
-           (inst cmp tmp-tn bignum-widetag)
-           (inst b :ne nope))
-         #.(assert (= (integer-length bignum-widetag) 5))
-         (inst add lip value (lsr temp 5))
-         (inst ldr temp (@ lip (- other-pointer-lowtag)))
-         (if (and
-              (or (not plusp)
-                  (eq plusp :plusp))
-              not-p)
-             (inst tbnz* temp (1- n-word-bits) target)
-             (inst tbz* temp (1- n-word-bits) target)))))
+  (:variant-vars comparison)
+  (:variant :gt)
+  (:generator 10
+    (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
+           negative-p
+           (fixnum (if (sc-is fixnum immediate)
+                       (let ((value (fixnumize (tn-value fixnum))))
+                         (when (minusp value)
+                           (setf negative-p t))
+                         (add-sub-immediate (abs value) temp))
+                       fixnum)))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
+            (cond ((or integer-p
+                       (not (and (eql fixnum 0)
+                                 (eq comparison :ge))))
+                   (inst tbnz integer 0 bignum)
+                   (cond
+                     ((and (eql fixnum 0)
+                           (case comparison
+                             (:lt
+                              (inst tbnz* integer 63 yep)
+                              t)
+                             (:ge
+                              (inst tbz* integer 63 yep)
+                              t))))
+                     ((and (eql fixnum -1)
+                           (case comparison
+                             (:le
+                              (inst tbnz* integer 63 yep)
+                              t)
+                             (:gt
+                              (inst tbz* integer 63 yep)
+                              t))))
+                     (negative-p
+                      (inst cmn integer fixnum)
+                      (inst b comparison yep))
+                     (t
+                      (inst cmp integer fixnum)
+                      (inst b comparison yep)))
+                   (inst b nope))
+                  (t
+                   (inst tst integer (lognot (fixnumize most-positive-fixnum)))
+                   (inst b :eq yep))))
+          bignum
+          (unless (fixnum-or-other-pointer-tn-ref-p args)
+            (test-type integer temp nope t (other-pointer-lowtag)))
+          (loadw temp integer 0 other-pointer-lowtag)
+          (unless integer-p
+            (inst and tmp-tn temp widetag-mask)
+            (inst cmp tmp-tn bignum-widetag)
+            (inst b :ne nope))
+          #.(assert (= (integer-length bignum-widetag) 5))
+          (inst add lip integer (lsr temp 5))
+          (inst ldr temp (@ lip (- other-pointer-lowtag)))
+          (if (case comparison
+                ((:gt :ge) not-p)
+                (t (not not-p)))
+              (inst tbnz* temp (1- n-word-bits) target)
+              (inst tbz* temp (1- n-word-bits) target)))))
     not-target))
 
-(define-vop (integer-plusp unsigned-byte-p)
-  (:translate sb-c::integer-plusp)
-  (:variant :plusp))
+(define-vop (<-integer-fixnum >-integer-fixnum)
+  (:translate <)
+  (:args (integer :scs (descriptor-reg))
+         (fixnum :scs (immediate any-reg)))
+  (:arg-types integer tagged-num)
+  (:variant :lt))
 
-(define-vop (integer-not-plusp unsigned-byte-p)
-  (:translate sb-c::integer-not-plusp)
-  (:variant :not))
+(define-vop (>-fixnum-integer >-integer-fixnum)
+  (:translate >)
+  (:args (fixnum :scs (immediate any-reg))
+         (integer :scs (descriptor-reg)))
+  (:arg-types tagged-num integer)
+  (:variant :lt))
 
-(define-vop (integer-minusp unsigned-byte-p)
-  (:translate sb-c::integer-minusp)
-  (:variant :minusp))
+(define-vop (<-fixnum-integer >-integer-fixnum)
+  (:translate <)
+  (:args (fixnum :scs (immediate any-reg))
+         (integer :scs (descriptor-reg)))
+  (:arg-types tagged-num integer)
+  (:variant :gt))
 
 
 ;;; MOD type checks
