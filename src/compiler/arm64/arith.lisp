@@ -1428,6 +1428,8 @@
     (inst adds r low low)
     (inst b :vc done)
     (inst mov header (bignum-header-for-length 1))
+    #+bignum-assertions
+    (inst mov high 0)
     allocate
     (with-fixed-allocation
         (r pa-flag nil (+ 2 bignum-digits-offset) :lip lip)

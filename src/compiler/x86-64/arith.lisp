@@ -596,6 +596,8 @@
     (inst shl r 1)
     (inst jmp :no DONE)
     (inst mov header (bignum-header-for-length 1))
+    #+bignum-assertions
+    (zeroize rdx)
     allocate
     (pseudo-atomic ()
       (allocation nil (pad-data-block (+ 2 bignum-digits-offset)) 0
