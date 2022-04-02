@@ -949,9 +949,12 @@
          plusp)
     (when (and branch
                (or
-                (eq (vop-name next) 'sb-vm::fast-if-eq-fixnum/c)
-                (and (eq (vop-name next) 'sb-vm::fast-if->-c/fixnum)
-                     (equal (vop-codegen-info next) '(0))
+                (eq (vop-name next) #+x86-64 'sb-vm::fast-if-eq-fixnum/c
+                                    #+arm64 'sb-vm::fast-if-eq-integer/c)
+                (and (eq (vop-name next)
+                         #-arm64 'sb-vm::fast-if->-c/fixnum
+                         #+arm64 'sb-vm::fast-if->-integer/c)
+                     (eql (car (vop-codegen-info next)) 0)
                      (setf plusp t)))
                (eq (vop-name branch)
                    'branch-if))
