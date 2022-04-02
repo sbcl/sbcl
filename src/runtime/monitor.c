@@ -812,7 +812,9 @@ monitor_or_something()
     ldb_monitor();
 }
 
-#ifdef STANDALONE
+#ifdef STANDALONE_LDB
+void gc_stop_the_world() { } // do nothing
+void gc_start_the_world() { } // do nothing
 #include <errno.h>
 #include "core.h"
 #include "gencgc-private.h"
@@ -879,6 +881,7 @@ int load_gc_crashdump(char* pathname)
     printf("sprof_enabled=%d pin_dynspace_code=%d packages=%p\n",
            preamble.sprof_enabled, preamble.pin_dynspace_code,
            (void*)preamble.lisp_package_vector);
+    lisp_package_vector = preamble.lisp_package_vector;
     sb_sprof_enabled = preamble.sprof_enabled;
     if (preamble.signature != CRASH_PREAMBLE_SIGNATURE)
         lose("Can't load crashdump: bad header (have %lx, expect %lx)",

@@ -1131,7 +1131,7 @@ int release_gc_lock() { return mutex_release(&in_gc_lock); }
 /*
  * (With SB-SAFEPOINT, see the definitions in safepoint.c instead.)
  */
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if !defined LISP_FEATURE_SB_SAFEPOINT && !defined STANDALONE_LDB
 
 /* To avoid deadlocks when gc stops the world all clients of each
  * mutex must enable or disable SIG_STOP_FOR_GC for the duration of

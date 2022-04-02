@@ -118,7 +118,12 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
                     "incompatible widetag");
         }
     }
-    generation_index_t to_gen = gc_gen_of(thing, ARTIFICIALLY_HIGH_GEN);
+    generation_index_t to_gen =
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        points_to_asm_code_p((uword_t)thing)?
+        gc_gen_of(make_lispobj((void*)asm_routines_start,OTHER_POINTER_LOWTAG),0):
+#endif
+        gc_gen_of(thing, ARTIFICIALLY_HIGH_GEN);
     if (to_gen < state->min_pointee_gen) state->min_pointee_gen = to_gen;
     if (state->flags & VERIFY_QUICK) return 0;
     if (target_page_index >= 0) {
@@ -312,8 +317,13 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                     if (state->object_header) // is not a cons
                         gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
 #ifdef LISP_FEATURE_USE_CONS_REGION
-                    else if (page_table[pg].type != PAGE_TYPE_CONS)
-                        gc_assert((where[0] | where[1]) == 0); // "page-filler cons" is OK
+                    else if (page_table[pg].type != PAGE_TYPE_CONS) {
+                        if (where[0] | where[1]) // "page-filler cons" is OK
+                            // KLUDGE: allow negative bignum, but is it good/bad
+                            // to check for a bignum widetag at where[-2] ?
+                            // this SHOULD be: lose("cons @ %p on non-cons page", where);
+                            gc_assert(where[0]==(uword_t)-1 && where[1]==0);
+                    }
 #endif
                     if (widetag == CODE_HEADER_WIDETAG) {
                         if (!is_code(page_table[pg].type))
