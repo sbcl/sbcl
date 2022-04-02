@@ -118,7 +118,7 @@
   (let ((h (make-hash-table)))
     (loop
        (when (zerop count) (return (loop for k being each hash-key of h collect k)))
-       (let ((n (random (ash 1 30))))
+       (let ((n (random (min most-positive-fixnum (ash 1 30)))))
         (unless (gethash n h)
           (setf (gethash n h) t)
           (decf count))))))
