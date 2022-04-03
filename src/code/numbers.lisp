@@ -202,6 +202,7 @@
 
 (defmacro two-arg-+/- (name op big-op)
   `(defun ,name (x y)
+     (declare (explicit-check))
      (number-dispatch ((x number) (y number))
        (bignum-cross-fixnum ,op ,big-op)
        (float-contagion ,op x y)
@@ -246,6 +247,7 @@
 (two-arg-+/- two-arg-- - subtract-bignum)
 
 (defun two-arg-* (x y)
+  (declare (explicit-check))
   (flet ((integer*ratio (x y)
            (if (eql x 0) 0
                (let* ((ny (numerator y))
@@ -725,7 +727,8 @@ the first."
 
 (macrolet ((def-two-arg-</> (name op ratio-arg1 ratio-arg2 &rest cases)
              `(defun ,name (x y)
-                (declare (inline float-infinity-p))
+                (declare (inline float-infinity-p)
+                         (explicit-check))
                 (number-dispatch ((x real) (y real))
                   (basic-compare
                    ,op
@@ -762,7 +765,8 @@ the first."
      (plusp (bignum-compare x y)))))
 
 (defun two-arg-= (x y)
-  (declare (inline float-infinity-p))
+  (declare (inline float-infinity-p)
+           (explicit-check))
   (number-dispatch ((x number) (y number))
     (basic-compare =
                    ;; An infinite value is never equal to a finite value.
@@ -816,37 +820,37 @@ the first."
     (fixnum (lognot (truly-the fixnum number)))
     (bignum (bignum-logical-not number))))
 
-(macrolet ((def (name explicit-check op big-op &optional doc)
+(macrolet ((def (name op big-op &optional doc)
              `(defun ,name (integer1 integer2)
                 ,@(when doc (list doc))
-                ,@(when explicit-check `((declare (explicit-check))))
+                (declare (explicit-check))
                 (let ((x integer1)
                       (y integer2))
                   (number-dispatch ((x integer) (y integer))
                     (bignum-cross-fixnum ,op ,big-op))))))
-  (def two-arg-and nil logand bignum-logical-and)
-  (def two-arg-ior nil logior bignum-logical-ior)
-  (def two-arg-xor nil logxor bignum-logical-xor)
+  (def two-arg-and logand bignum-logical-and)
+  (def two-arg-ior logior bignum-logical-ior)
+  (def two-arg-xor logxor bignum-logical-xor)
   ;; BIGNUM-LOGICAL-{AND,IOR,XOR} need not return a bignum, so must
   ;; call the generic LOGNOT...
-  (def two-arg-eqv nil logeqv (lambda (x y) (lognot (bignum-logical-xor x y))))
-  (def lognand t lognand
+  (def two-arg-eqv logeqv (lambda (x y) (lognot (bignum-logical-xor x y))))
+  (def lognand lognand
        (lambda (x y) (lognot (bignum-logical-and x y)))
        "Complement the logical AND of INTEGER1 and INTEGER2.")
-  (def lognor t lognor
+  (def lognor lognor
        (lambda (x y) (lognot (bignum-logical-ior x y)))
        "Complement the logical OR of INTEGER1 and INTEGER2.")
   ;; ... but BIGNUM-LOGICAL-NOT on a bignum will always return a bignum
-  (def logandc1 t logandc1
+  (def logandc1 logandc1
        (lambda (x y) (bignum-logical-and (bignum-logical-not x) y))
        "Bitwise AND (LOGNOT INTEGER1) with INTEGER2.")
-  (def logandc2 t logandc2
+  (def logandc2 logandc2
        (lambda (x y) (bignum-logical-and x (bignum-logical-not y)))
        "Bitwise AND INTEGER1 with (LOGNOT INTEGER2).")
-  (def logorc1 t logorc1
+  (def logorc1 logorc1
        (lambda (x y) (bignum-logical-ior (bignum-logical-not x) y))
        "Bitwise OR (LOGNOT INTEGER1) with INTEGER2.")
-  (def logorc2 t logorc2
+  (def logorc2 logorc2
        (lambda (x y) (bignum-logical-ior x (bignum-logical-not y)))
        "Bitwise OR INTEGER1 with (LOGNOT INTEGER2)."))
 
@@ -874,6 +878,7 @@ and the number of 0 bits if INTEGER is negative."
 
 (defun logbitp (index integer)
   "Predicate returns T if bit index of integer is a 1."
+  (declare (explicit-check))
   (number-dispatch ((index integer) (integer integer))
     ((fixnum fixnum) (if (< index sb-vm:n-positive-fixnum-bits)
                          (not (zerop (logand integer (ash 1 index))))
@@ -1169,6 +1174,7 @@ and the number of 0 bits if INTEGER is negative."
           (build-ratio num den)))))
 
 (defun two-arg-/ (x y)
+  (declare (explicit-check))
   (number-dispatch ((x number) (y number))
     (float-contagion / x y (ratio integer))
 
