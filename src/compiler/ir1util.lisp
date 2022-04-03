@@ -980,26 +980,11 @@
 (defun source-path-forms (path)
   (subseq path 0 (position 'original-source-start path)))
 
-(defun tree-some (predicate tree)
-  (let ((seen (make-hash-table)))
-    (labels ((walk (tree)
-               (cond ((funcall predicate tree))
-                     ((and (consp tree)
-                           (not (gethash tree seen)))
-                      (setf (gethash tree seen) t)
-                      (or (walk (car tree))
-                          (walk (cdr tree)))))))
-      (walk tree))))
-
 ;;; Return the innermost source form for NODE.
 (defun node-source-form (node)
   (declare (type node node))
   (let* ((path (node-source-path node))
-         (forms (remove-if (lambda (x)
-                             (tree-some #'leaf-p x))
-                           (source-path-forms path))))
-    ;; another option: if first form includes a leaf, return
-    ;; find-original-source instead.
+         (forms (source-path-forms path)))
     (if forms
         (first forms)
         (values (find-original-source path)))))
