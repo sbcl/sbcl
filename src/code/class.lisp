@@ -716,11 +716,10 @@ between the ~A definition and the ~A definition"
        (values-specifier-type-cache-clear)))))
 
 (defun find-classoid-cell (name &key create)
-  (let ((real-name (uncross name)))
-    (cond ((info :type :classoid-cell real-name))
-          (create
-           (get-info-value-initializing :type :classoid-cell real-name
-                                        (make-classoid-cell real-name))))))
+  (cond ((info :type :classoid-cell name))
+        (create
+         (get-info-value-initializing :type :classoid-cell name
+                                      (make-classoid-cell name)))))
 
 ;;; Return the classoid with the specified NAME. If ERRORP is false,
 ;;; then NIL is returned when no such class exists.
