@@ -215,13 +215,11 @@
   (let ((p (cl:symbol-package symbol))
         (name (string symbol)))
     (if (and p
-             (or (eq (find-symbol name "XC-STRICT-CL") symbol)
-                 (eq (find-symbol name "SB-XC") symbol)
-                 ;; OK if the name of a symbol in the host CL package
-                 ;; is found in XC-STRICT-CL, even if the symbols
-                 ;; differ.
-                 (and (find-symbol name "XC-STRICT-CL")
-                      (eq (find-symbol name "CL") symbol))))
+             (let ((xc-strict-symbol (find-symbol name #.(find-package "XC-STRICT-CL"))))
+               (and xc-strict-symbol
+                    (or (eq xc-strict-symbol symbol)
+                        (eq symbol (find-symbol name #.(find-package "SB-XC")))
+                        (eq symbol (find-symbol name #.(find-package "COMMON-LISP")))))))
         *cl-package*
         p)))
 

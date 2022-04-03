@@ -48,7 +48,7 @@
                     ;; if for example, we altered (EQ (FLONUM-FORMAT x) 'SHORT-FLOAT)
                     ;; to compare against CL:SHORT-FLOAT.
                     (if (eq (sb-xc:symbol-package form) *cl-package*)
-                        (find-symbol (symbol-name form) "XC-STRICT-CL")
+                        (find-symbol (symbol-name form) #.(find-package "XC-STRICT-CL"))
                         form))
                    ((consp form)
                     (recons form (rcr (car form)) (rcr (cdr form))))
