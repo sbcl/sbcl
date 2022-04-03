@@ -254,13 +254,19 @@
   (:variant-vars comparison)
   (:variant :gt)
   (:generator 10
+    (unless (sc-is (tn-ref-tn args) descriptor-reg)
+      (setf args (tn-ref-across args)))
     (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
            negative-p
            (fixnum (if (sc-is fixnum immediate)
-                       (let ((value (fixnumize (tn-value fixnum))))
-                         (when (minusp value)
-                           (setf negative-p t))
-                         (add-sub-immediate (abs value) temp))
+                       (let* ((value (fixnumize (tn-value fixnum)))
+                             (abs (abs value)))
+                         (cond ((add-sub-immediate-p abs)
+                                (when (minusp value)
+                                  (setf negative-p t))
+                                abs)
+                               (t
+                                (add-sub-immediate value))))
                        fixnum)))
       (multiple-value-bind (yep nope)
           (if not-p
