@@ -1039,7 +1039,8 @@
 
 (defun pass-nargs-p (combination)
   (let ((fun-info (combination-fun-info combination)))
-    (not (and fun-info
+    (not (and (eq (combination-kind combination) :known)
+              fun-info
               (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)
               (let ((type (info :function :type (combination-fun-source-name combination))))
                 (and (not (fun-type-keyp type))

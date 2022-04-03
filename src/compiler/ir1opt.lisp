@@ -500,7 +500,15 @@
                    (= (length args) 2)
                    (constant-lvar-p (first args))
                    (not (constant-lvar-p (second args))))
-              (setf (basic-combination-args node) (nreverse args))))))))
+              (setf (basic-combination-args node) (nreverse args)))))
+      (:full
+       ;; A cut-down recognize-known-call
+       (let ((info (info :function :info (combination-fun-source-name node nil))))
+         ;; Probably, this can only come from CUT-TO-WIDTH
+         ;; otherwise normal ir1-convert would've called recognize-known-call.
+         (when info
+           (setf (basic-combination-kind node) :known
+                 (basic-combination-fun-info node) info)))))))
 
 ;;; Loop over the nodes in BLOCK, acting on (and clearing) REOPTIMIZE
 ;;; flags.
@@ -1401,9 +1409,8 @@
        (let ((info (info :function :info (leaf-source-name leaf))))
          (if info
              (values leaf
-                     (progn
-                       (setf (basic-combination-kind call) :known)
-                       (setf (basic-combination-fun-info call) info)))
+                     (setf (basic-combination-kind call) :known
+                           (basic-combination-fun-info call) info))
              (values leaf nil)))))))
 
 ;;; Check whether CALL satisfies TYPE. If so, apply the type to the
