@@ -2042,49 +2042,39 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 ;;;; n-argument functions
 
-(flet
- ((converter (star)
-    (lambda (node block &aux (args (basic-combination-args node))
-                             (num-conses (- (length args) (if star 1 0))))
+(defoptimizer (list ir2-convert) ((&rest args) node block)
+  (let* ((fun (lvar-fun-name (combination-fun node)))
+         (star (ecase fun (list* t) (list nil)))
+         (num-conses (- (length args) (if star 1 0))))
     ;; LIST needs at least 1 arg, LIST* demands at least 2 args
     (aver (if star (cdr args) args))
-    (if (> num-conses sb-vm::max-conses-per-page)
-        (ir2-convert-full-call node block)
-        (let* ((refs (reference-tn-list (mapcar (lambda (arg) (lvar-tn node block arg))
-                                                args)
-                                        nil))
-               (lvar (node-lvar node))
-               (res (lvar-result-tns lvar (list (specifier-type 'list)))))
-          (when (and lvar (lvar-dynamic-extent lvar))
-            (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
+    (when (> num-conses sb-vm::max-conses-per-page)
+      (return-from list-ir2-convert-optimizer (ir2-convert-full-call node block)))
+    (let* ((refs (reference-tn-list (mapcar (lambda (arg) (lvar-tn node block arg))
+                                            args)
+                                    nil))
+           (lvar (node-lvar node))
+           (res (lvar-result-tns lvar (list (specifier-type 'list)))))
+      (when (and lvar (lvar-dynamic-extent lvar))
+        (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
       ;;; This COND-like expression is unfortunate, but the VOP* macro chokes if the name
       ;;; doesn't exist. This was the best workaround I found, short of using #+.
-          (or (when-vop-existsp (:named cons)
-                (when (= num-conses 1)
-                  (unless star
-                    (setf (tn-ref-across refs) (reference-tn (emit-constant nil) nil)))
-                  (vop* cons node block (refs) ((first res) nil))
-                  t))
-              (when-vop-existsp (:named sb-vm::cons-2)
-                (when (= num-conses 2)
-                  (unless star
-                    (setf (tn-ref-across (tn-ref-across refs))
-                          (reference-tn (emit-constant nil) nil)))
-                  (vop* sb-vm::cons-2 node block (refs) ((first res) nil))
-                  t))
-              (vop* list node block (refs) ((first res) nil) star num-conses))
-          (move-lvar-result node block res lvar))))))
-  ;; This formerly relied on LVAR-FUN-NAME to determine whether it's LIST or LIST*,
-  ;; but NOTINLINE will, by default, suppress returning an answer.
-  ;; We can pass NOTINLINE-OK to LVAR-FUN-NAME, but it's just as well to
-  ;; create two closures over the same converter.
-  ;; The real question is: are we supposed to reach an IR2-CONVERT optimizer
-  ;; for NOTINLINEd functions? You can't portably deduce that LIST was called,
-  ;; because any such attempt would surely entail tracing and/or redefining it.
-  ;; Clearly those actions are forbidden, ergo, it's "technically" impossible
-  ;; for user code to sense the difference between inline and notinline.
-  (setf (fun-info-ir2-convert (fun-info-or-lose 'list)) (converter nil)
-        (fun-info-ir2-convert (fun-info-or-lose 'list*)) (converter t)))
+      (or (when-vop-existsp (:named cons)
+            (when (= num-conses 1)
+              (unless star
+                (setf (tn-ref-across refs) (reference-tn (emit-constant nil) nil)))
+              (vop* cons node block (refs) ((first res) nil))
+              t))
+          (when-vop-existsp (:named sb-vm::cons-2)
+            (when (= num-conses 2)
+              (unless star
+                (setf (tn-ref-across (tn-ref-across refs))
+                      (reference-tn (emit-constant nil) nil)))
+              (vop* sb-vm::cons-2 node block (refs) ((first res) nil))
+              t))
+          (vop* list node block (refs) ((first res) nil) star num-conses))
+      (move-lvar-result node block res lvar))))
+(setf (fun-info-ir2-convert (fun-info-or-lose 'list*)) #'list-ir2-convert-optimizer)
 
 
 (defoptimizer (mask-signed-field ir2-convert) ((width x) node block)

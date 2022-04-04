@@ -502,13 +502,9 @@
                    (not (constant-lvar-p (second args))))
               (setf (basic-combination-args node) (nreverse args)))))
       (:full
-       ;; A cut-down recognize-known-call
-       (let ((info (info :function :info (combination-fun-source-name node nil))))
-         ;; Probably, this can only come from CUT-TO-WIDTH
-         ;; otherwise normal ir1-convert would've called recognize-known-call.
-         (when info
-           (setf (basic-combination-kind node) :known
-                 (basic-combination-fun-info node) info)))))))
+       ;; Probably, this can only come from CUT-TO-WIDTH
+       ;; otherwise normal ir1-convert would've called recognize-known-call.
+       (recognize-known-call node nil nil nil)))))
 
 ;;; Loop over the nodes in BLOCK, acting on (and clearing) REOPTIMIZE
 ;;; flags.
@@ -1339,7 +1335,7 @@
 ;;; We return the leaf referenced (NIL if not a leaf) and the
 ;;; FUN-INFO assigned.
 (defun recognize-known-call (call ir1-converting-not-optimizing-p
-                             &optional unknown-keys)
+                             &optional unknown-keys (inline t))
   (declare (type combination call))
   (let* ((ref (lvar-uses (basic-combination-fun call)))
          (leaf (when (ref-p ref) (ref-leaf ref)))
@@ -1360,7 +1356,8 @@
       ((not (and (global-var-p leaf)
                  (eq (global-var-kind leaf) :global-function)))
        (values leaf nil))
-      ((and (ecase inlinep
+      ((and inline
+            (ecase inlinep
               (inline t)
               (no-chance nil)
               ((nil maybe-inline) (policy call (zerop space))))
