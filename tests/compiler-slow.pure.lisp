@@ -154,3 +154,20 @@
            (values-list list)))
     (('(1 2)) '(1))
     (('(1)) (condition 'type-error))))
+
+(declaim (maybe-inline inline-recursive))
+(defun inline-recursive (x)
+  (declare (muffle-conditions compiler-note
+                              style-warning))
+  (if (zerop x)
+      x
+      (inline-recursive (1- x))))
+(declaim (inline inline-recursive))
+
+(with-test (:name :reanalyze-functionals-when-inlining)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (inline-recursive x)
+      (inline-recursive x))
+    ((5) 0)))
