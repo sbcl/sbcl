@@ -1764,10 +1764,9 @@ copy_unboxed_object(lispobj object, sword_t nwords)
     return gc_copy_object(object, nwords, unboxed_region, PAGE_TYPE_UNBOXED);
 }
 
-/* a faster version for searching the dynamic space. This will work even
- * if the object is in a current allocation region. */
-lispobj *
-search_dynamic_space(void *pointer)
+/* This will NOT reliably work for objects in a currently open allocation region,
+ * because page_words_used() is not sync'ed to the free pointer until closing */
+lispobj *search_dynamic_space(void *pointer)
 {
     page_index_t page_index = find_page_index(pointer);
 
