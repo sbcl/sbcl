@@ -446,7 +446,9 @@
   (flet ((try (hasher)
            (let (hashes)
              (dotimes (i 20)
-               (let* ((a (+ sb-vm:dynamic-space-start (* i 32768)))
+               (let* ((a (+ #+64-bit sb-vm:dynamic-space-start
+                            #-64-bit #xD7C83000
+                            (* i 32768)))
                       (hash (funcall hasher a)))
                  ;; (format t "~4d ~x ~v,'0b~%" i a sb-vm:n-word-bits hash)
                  (push hash hashes)))
