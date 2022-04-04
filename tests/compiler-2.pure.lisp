@@ -3812,3 +3812,8 @@
                           (t (error ""))))
                 x))))
           '(values (not integer) &optional))))
+
+(with-test (:name :list-ir2-convert)
+  (checked-compile '(lambda ()
+                     (declare (notinline list +))
+                     (list (loop for i below 2 count t)))))
