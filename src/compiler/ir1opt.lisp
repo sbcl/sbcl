@@ -992,7 +992,7 @@
 ;;;; combination IR1 optimization
 
 (declaim (start-block ir1-optimize-combination maybe-terminate-block
-                      validate-call-type))
+                      validate-call-type recognize-known-call))
 
 (defun check-important-result (node info)
   (when (and (null (node-lvar node))
