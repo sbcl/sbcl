@@ -94,13 +94,21 @@
   (:note "AVX2 to pointer coercion")
   (:generator 13
      (alloc-other simd-pack-256-widetag simd-pack-256-size y node nil thread-tn)
-       ;; see *simd-pack-element-types*
+     (aver (tn-primitive-type x))
      (storew (fixnumize
-              (sc-case x
-                (single-avx2-reg 1)
-                (double-avx2-reg 2)
-                (int-avx2-reg 0)
-                (t 0)))
+              ;; see *simd-pack-element-types*
+              (ecase (primitive-type-name (tn-primitive-type x))
+                (simd-pack-256-single 0)
+                (simd-pack-256-double 1)
+                (simd-pack-256-ub8 2)
+                (simd-pack-256-ub16 3)
+                (simd-pack-256-ub32 4)
+                (simd-pack-256-ub64 5)
+                (simd-pack-256-any 5)
+                (simd-pack-256-sb8 6)
+                (simd-pack-256-sb16 7)
+                (simd-pack-256-sb32 8)
+                (simd-pack-256-sb64 9)))
          y simd-pack-256-tag-slot other-pointer-lowtag)
      (let ((ea (object-slot-ea
                 y simd-pack-256-p0-slot other-pointer-lowtag)))
@@ -227,7 +235,7 @@
   (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num)
   (:temporary (:sc int-avx2-reg) tmp)
   (:results (dst :scs (int-avx2-reg)))
-  (:result-types simd-pack-256-int)
+  (:result-types simd-pack-256-ub64)
   (:generator 5
     (inst vmovq dst p0)
     (inst vpinsrq dst dst p1 1)
@@ -235,44 +243,95 @@
     (inst vpinsrq tmp tmp p3 1)
     (inst vinserti128 dst dst tmp 1)))
 
-(defmacro simd-pack-256-dispatch (pack &body body)
-  (check-type pack symbol)
-  `(let ((,pack ,pack))
-     (etypecase ,pack
-       ((simd-pack-256 double-float) ,@body)
-       ((simd-pack-256 single-float) ,@body)
-       ((simd-pack-256 integer) ,@body))))
+#-sb-xc-host
+(macrolet ((unpack-unsigned (pack bits)
+             (once-only ((pack pack))
+               `(let ((a (%simd-pack-256-0 ,pack))
+                      (b (%simd-pack-256-1 ,pack))
+                      (c (%simd-pack-256-2 ,pack))
+                      (d (%simd-pack-256-3 ,pack)))
+                  (values
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-unsigned-1 ,bits ,pos a))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-unsigned-1 ,bits ,pos b))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-unsigned-1 ,bits ,pos c))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-unsigned-1 ,bits ,pos d))))))
+           (unpack-unsigned-1 (bits position ub64)
+             `(ldb (byte ,bits ,position) ,ub64)))
+  (declaim (inline %simd-pack-256-ub8s))
+  (defun %simd-pack-256-ub8s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-unsigned pack 8))
+
+  (declaim (inline %simd-pack-256-ub16s))
+  (defun %simd-pack-256-ub16s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-unsigned pack 16))
+
+  (declaim (inline %simd-pack-256-ub32s))
+  (defun %simd-pack-256-ub32s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-unsigned pack 32))
+
+  (declaim (inline %simd-pack-256-ub64s))
+  (defun %simd-pack-256-ub64s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-unsigned pack 64)))
+
+#-sb-xc-host
+(macrolet ((unpack-signed (pack bits)
+             (once-only ((pack pack))
+               `(let ((a (%simd-pack-256-0 ,pack))
+                      (b (%simd-pack-256-1 ,pack))
+                      (c (%simd-pack-256-2 ,pack))
+                      (d (%simd-pack-256-3 ,pack)))
+                  (values
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-signed-1 ,bits ,pos a))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-signed-1 ,bits ,pos b))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-signed-1 ,bits ,pos c))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-signed-1 ,bits ,pos d))))))
+           (unpack-signed-1 (bits position ub64)
+             `(- (mod (+ (ldb (byte ,bits ,position) ,ub64)
+                         ,(expt 2 (1- bits)))
+                      ,(expt 2 bits))
+                 ,(expt 2 (1- bits)))))
+  (declaim (inline %simd-pack-256-sb8s))
+  (defun %simd-pack-256-sb8s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-signed pack 8))
+
+  (declaim (inline %simd-pack-256-sb16s))
+  (defun %simd-pack-256-sb16s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-signed pack 16))
+
+  (declaim (inline %simd-pack-256-sb32s))
+  (defun %simd-pack-256-sb32s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-signed pack 32))
+
+  (declaim (inline %simd-pack-256-sb64s))
+  (defun %simd-pack-256-sb64s (pack)
+    (declare (type simd-pack-256 pack))
+    (unpack-signed pack 64)))
 
 #-sb-xc-host
 (progn
-  (declaim (inline %make-simd-pack-256-ub32))
   (defun %make-simd-pack-256-ub32 (p0 p1 p2 p3 p4 p5 p6 p7)
     (declare (type (unsigned-byte 32) p0 p1 p2 p3 p4 p5 p6 p7))
-    (%make-simd-pack-256-ub64 (logior p0 (ash p1 32))
-                              (logior p2 (ash p3 32))
-                              (logior p4 (ash p5 32))
-                              (logior p6 (ash p7 32))))
-
-  (declaim (inline %simd-pack-256-ub32s %simd-pack-256-ub64s))
-  (defun %simd-pack-256-ub32s (pack)
-    (declare (type simd-pack-256 pack))
-    (simd-pack-256-dispatch pack
-      (let ((p0 (%simd-pack-256-0 pack))
-            (p1 (%simd-pack-256-1 pack))
-            (p2 (%simd-pack-256-2 pack))
-            (p3 (%simd-pack-256-3 pack)))
-        (values (ldb (byte 32 0) p0) (ash p0 -32)
-                (ldb (byte 32 0) p1) (ash p1 -32)
-                (ldb (byte 32 0) p2) (ash p2 -32)
-                (ldb (byte 32 0) p3) (ash p3 -32)))))
-
-  (defun %simd-pack-256-ub64s (pack)
-    (declare (type simd-pack-256 pack))
-    (simd-pack-256-dispatch pack
-      (values (%simd-pack-256-0 pack)
-              (%simd-pack-256-1 pack)
-              (%simd-pack-256-2 pack)
-              (%simd-pack-256-3 pack)))))
+    (%make-simd-pack-256
+     #.(position '(unsigned-byte 32) *simd-pack-element-types* :test #'equal)
+     (logior p0 (ash p1 32))
+     (logior p2 (ash p3 32))
+     (logior p4 (ash p5 32))
+     (logior p6 (ash p7 32)))))
 
 (define-vop (%make-simd-pack-256-double)
   (:translate %make-simd-pack-256-double)
@@ -344,15 +403,14 @@
 (declaim (inline %simd-pack-256-singles))
 (defun %simd-pack-256-singles (pack)
   (declare (type simd-pack-256 pack))
-  (simd-pack-256-dispatch pack
-    (values (%simd-pack-256-single-item pack 0)
-            (%simd-pack-256-single-item pack 1)
-            (%simd-pack-256-single-item pack 2)
-            (%simd-pack-256-single-item pack 3)
-            (%simd-pack-256-single-item pack 4)
-            (%simd-pack-256-single-item pack 5)
-            (%simd-pack-256-single-item pack 6)
-            (%simd-pack-256-single-item pack 7)))))
+  (values (%simd-pack-256-single-item pack 0)
+          (%simd-pack-256-single-item pack 1)
+          (%simd-pack-256-single-item pack 2)
+          (%simd-pack-256-single-item pack 3)
+          (%simd-pack-256-single-item pack 4)
+          (%simd-pack-256-single-item pack 5)
+          (%simd-pack-256-single-item pack 6)
+          (%simd-pack-256-single-item pack 7))))
 
 (defknown %simd-pack-256-double-item
   (simd-pack-256 (integer 0 3)) double-float (flushable))
@@ -383,11 +441,10 @@
 (declaim (inline %simd-pack-256-doubles))
 (defun %simd-pack-256-doubles (pack)
   (declare (type simd-pack-256 pack))
-  (simd-pack-256-dispatch pack
-    (values (%simd-pack-256-double-item pack 0)
-            (%simd-pack-256-double-item pack 1)
-            (%simd-pack-256-double-item pack 2)
-            (%simd-pack-256-double-item pack 3))))
+  (values (%simd-pack-256-double-item pack 0)
+          (%simd-pack-256-double-item pack 1)
+          (%simd-pack-256-double-item pack 2)
+          (%simd-pack-256-double-item pack 3)))
 
 (defun %simd-pack-256-inline-constant (pack)
   (list :avx2 (logior (%simd-pack-256-0 pack)

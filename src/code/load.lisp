@@ -998,8 +998,8 @@
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (let ((tag (fast-read-s-integer 8)))
       (cond #+sb-simd-pack-256
-            ((logbitp 2 tag)
-             (%make-simd-pack-256 (logand tag #b11)
+            ((logbitp 6 tag)
+             (%make-simd-pack-256 (logand tag #b00111111)
                                   (fast-read-u-integer 8)
                                   (fast-read-u-integer 8)
                                   (fast-read-u-integer 8)

@@ -183,7 +183,17 @@
   #'equalp)
 
 #+sb-simd-pack
-(defglobal *simd-pack-element-types* '(integer single-float double-float))
+(defglobal *simd-pack-element-types*
+    '(single-float
+      double-float
+      (unsigned-byte 8)
+      (unsigned-byte 16)
+      (unsigned-byte 32)
+      (unsigned-byte 64)
+      (signed-byte 8)
+      (signed-byte 16)
+      (signed-byte 32)
+      (signed-byte 64)))
 
 (defconstant undefined-fdefn-header
   ;; This constant is constructed as follows: Take the INT opcode
