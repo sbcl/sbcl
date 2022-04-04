@@ -204,7 +204,7 @@
   ;; the gspace contents as a BIGVEC
   (data (make-bigvec) :type bigvec :read-only t)
   (page-table nil) ; for dynamic space
-  (cons-region) ; (word-index . limit)
+  (cons-region) ; (word-index . limit) - limit is the inclusive upper bound
   ;; lists of holes created by the allocator to segregate code from data.
   ;; Doesn't matter for cheneygc; does for gencgc.
   ;; Each free-range is (START . LENGTH) in words.
@@ -482,9 +482,12 @@
                     (let ((word-index (gspace-claim-n-words gspace words-per-page)))
                       (assign-page-type page-type word-index sb-vm:cons-size)
                       (let ((pte (pte (page-index word-index))))
-                        (setf (page-scan-start pte) word-index))
+                        (setf (page-scan-start pte) word-index)
+                        (setf (page-words-used pte) 2))
+                      ;; Don't use the cell that is exactly at WORD-INDEX.
+                      ;; It is reserved for the allocator.
                       (setf (gspace-cons-region gspace)
-                            (cons word-index
+                            (cons (+ word-index 2)
                                   (+ word-index (* (1- sb-vm::max-conses-per-page)
                                                    sb-vm:cons-size))))))))
              (result (car region)))
