@@ -174,7 +174,7 @@ static inline int cons_markedp(lispobj pointer) {
     unsigned int index = compute_dword_number(pointer);
 #ifdef LISP_FEATURE_USE_CONS_REGION /* all conses must be on cons pages */
     unsigned char* bits = (unsigned char*)ALIGN_DOWN(pointer, GENCGC_PAGE_BYTES)
-                          + CONS_PAGE_BITMAP_OFFSET;
+                          + CONS_PAGE_USABLE_BYTES;
 #else
     unsigned char* bits = (unsigned char*)
         hopscotch_get(&mark_bits, compute_page_key(pointer), 0);
@@ -239,7 +239,7 @@ void __mark_obj(lispobj pointer)
         unsigned int index = compute_dword_number(pointer);
 #ifdef LISP_FEATURE_USE_CONS_REGION /* all conses must be on cons pages */
         unsigned char* bits = (unsigned char*)ALIGN_DOWN(pointer, GENCGC_PAGE_BYTES)
-                              + CONS_PAGE_BITMAP_OFFSET;
+                              + CONS_PAGE_USABLE_BYTES;
 #else
         /* Only _some_ conses are on cons pages depending if they got moved there.
          * We could use a hybrid of storing mark bits on the page if possible,
@@ -666,7 +666,7 @@ void execute_full_sweep_phase()
     for (page = 0; page < next_free_page; ++page)
         if (page_table[page].type == PAGE_TYPE_CONS) {
             char* base = page_address(page);
-            char* bits = base + CONS_PAGE_BITMAP_OFFSET;
+            char* bits = base + CONS_PAGE_USABLE_BYTES;
             char* end  = base + GENCGC_PAGE_BYTES;
             memset(bits, 0, end-bits);
         }

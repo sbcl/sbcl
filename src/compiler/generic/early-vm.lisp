@@ -164,13 +164,8 @@
 
 #+gencgc
 (defconstant max-conses-per-page
-  ;; The first two words per cons page are reserved for allocator use.
-  ;; Following that are the user's cons cells. After those comes a bitmap.
-  ;; The number of user-visible conses is the page size measured in bits
-  ;; divided by the effective cons size in bits (allowing 1 extra bit per cons),
-  ;; reduced by 1 cons for the system-reserved words.
-  (1- (floor (* gencgc-page-bytes n-byte-bits)
-             (1+ (* n-word-bytes 2 n-byte-bits))))) ; 1 extra bit per cons
+  (floor (* gencgc-page-bytes n-byte-bits)
+         (1+ (* n-word-bytes 2 n-byte-bits)))) ; 1 extra bit per cons
 
 ;;; Amount to righ-shift an instance header to get the length.
 ;;; Similar consideration as above with regard to use of generation# byte.

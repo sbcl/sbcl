@@ -287,11 +287,8 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
     lispobj* where = start;
     if (state->flags & VERIFYING_GENERATIONAL && find_page_index(start)>=0) {
         page_index_t page = find_page_index(start);
-        if (page_table[page].type == PAGE_TYPE_CONS) {
-            gc_assert(where[0] == 0 && where[1] == 0); // temporary
-            // Add one cons extra for the private-use words
-            gc_assert(page_words_used(page) <=  (1+MAX_CONSES_PER_PAGE)*CONS_SIZE);
-        }
+        if (page_table[page].type == PAGE_TYPE_CONS)
+            gc_assert(page_words_used(page) <=  MAX_CONSES_PER_PAGE*CONS_SIZE);
     }
     if ((state->flags & VERIFYING_UNFORMATTED)) {
         while (where < end) {

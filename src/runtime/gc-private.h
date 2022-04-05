@@ -546,7 +546,8 @@ struct slab_header {
         if (immobile_obj_gen_bits(base_pointer(pointee)) == from_space) cell = broken; \
     }
 
-static const int CONS_PAGE_BITMAP_OFFSET =
-  (MAX_CONSES_PER_PAGE + 1) * CONS_SIZE * N_WORD_BYTES;
+#ifdef MAX_CONSES_PER_PAGE
+static const int CONS_PAGE_USABLE_BYTES = MAX_CONSES_PER_PAGE*CONS_SIZE*N_WORD_BYTES;
+#endif
 
 #endif /* _GC_PRIVATE_H_ */

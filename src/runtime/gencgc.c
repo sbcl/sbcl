@@ -929,9 +929,6 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
 
 void gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested) never_returns;
 
-// The largest valid request for one alloc_list()
-static const int CONS_PAGE_MAX_ALLOC = MAX_CONSES_PER_PAGE * CONS_SIZE * N_WORD_BYTES;
-
 /* Find a single page for conses or SMALL_MIXED objects.
  * CONS differs because:
  * - not all GENCGC_PAGE_BYTES of the page can be used.
@@ -943,13 +940,11 @@ static page_index_t find_single_page(int page_type, sword_t nbytes, generation_i
 {
     page_index_t page = alloc_start_pages[page_type];;
     // Compute the max words that could already be used while satisfying the request.
-    page_words_t usage_allowance;
-    if (page_type == PAGE_TYPE_CONS) {
-        gc_assert(nbytes <= CONS_PAGE_MAX_ALLOC);
-        // The max usage allows for the inaccessible words at word index 0 and 1
-        usage_allowance = (CONS_SIZE*(1+MAX_CONSES_PER_PAGE)) - (nbytes>>WORD_SHIFT);
-    } else {
+    page_words_t usage_allowance =
         usage_allowance = GENCGC_PAGE_BYTES/N_WORD_BYTES - (nbytes>>WORD_SHIFT);
+    if (page_type == PAGE_TYPE_CONS) {
+        gc_assert(nbytes <= CONS_PAGE_USABLE_BYTES);
+        usage_allowance = (CONS_SIZE*MAX_CONSES_PER_PAGE) - (nbytes>>WORD_SHIFT);
     }
     for ( ; page < page_table_pages ; ++page) {
         if (page_words_used(page) <= usage_allowance
@@ -965,8 +960,8 @@ static page_index_t find_single_page(int page_type, sword_t nbytes, generation_i
     }
     sword_t bytes_avail;
     if (page_type == PAGE_TYPE_CONS) {
-        bytes_avail = CONS_PAGE_MAX_ALLOC - (min_used<<WORD_SHIFT);
-        /* The sentinel value initially in 'min_used' exceeds a cons
+        bytes_avail = CONS_PAGE_USABLE_BYTES - (min_used<<WORD_SHIFT);
+        /* The sentinel value initially in 'least_words_used' exceeds a cons
          * page's capacity, so clip to 0 instead of showing a negative value
          * if no page matched on gen+type */
         if (bytes_avail < 0) bytes_avail = 0;
@@ -993,35 +988,32 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         if (page+1 > next_free_page) next_free_page = page+1;
         page_table[page].gen = gc_alloc_generation;
         page_table[page].type = OPEN_REGION_PAGE_FLAG | page_type;
-        char* page_base = page_address(page);
 #ifdef LISP_FEATURE_DARWIN_JIT
         if (!page_words_used(page))
             /* May need to be remapped from PAGE_TYPE_CODE */
             zero_dirty_pages(page, page, page_type);
+        else
+            set_page_need_to_zero(page, 1);
 #else
         if (page_type == PAGE_TYPE_CONS && page_need_to_zero(page) && !page_words_used(page)) {
-            // Zero the 2 private words and the trailing data (the cons cell mark bits)
-            ((lispobj*)page_base)[0] = ((lispobj*)page_base)[1] = 0;
-            char *trailer = page_base + CONS_PAGE_BITMAP_OFFSET;
-            memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_BITMAP_OFFSET);
+            // Zero the trailing data (the cons cell mark bits)
+            char *trailer = page_address(page) + CONS_PAGE_USABLE_BYTES;
+            memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_USABLE_BYTES);
         }
-#endif
         set_page_need_to_zero(page, 1); // would normally be set in zero_dirty_pages()
+#endif
         // Don't need to set the scan_start_offset because free pages have it 0
         // (and each of these page types starts a new contiguous block)
         gc_dcheck(page_table[page].scan_start_offset_ == 0);
         alloc_region->last_page = page;
-        alloc_region->start_addr = page_base + page_bytes_used(page);
+        alloc_region->start_addr = page_address(page) + page_bytes_used(page);
         if (page_type == PAGE_TYPE_CONS) {
-            alloc_region->end_addr = page_base + CONS_PAGE_BITMAP_OFFSET;
-            alloc_region->free_pointer = (char*)alloc_region->start_addr
-              + ((alloc_region->start_addr == page_base) ? 2*N_WORD_BYTES : 0);
+            alloc_region->end_addr = page_address(page) + CONS_PAGE_USABLE_BYTES;
         } else {
             alloc_region->end_addr =
-              (char*)ALIGN_DOWN((uword_t)alloc_region->start_addr, GENCGC_CARD_BYTES)
-              + GENCGC_CARD_BYTES;
-            alloc_region->free_pointer = alloc_region->start_addr;
-        }
+              (char*)ALIGN_DOWN((uword_t)alloc_region->start_addr, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
+          }
+        alloc_region->free_pointer = alloc_region->start_addr;
         gc_assert(find_page_index(alloc_region->start_addr) == page);
         return alloc_region->free_pointer;
     }
@@ -1172,7 +1164,6 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
  *
  * This is the internal implementation of ensure_region_closed(),
  * and not to be invoked as the interface to closing a region.
- * If called by Lisp, the free_pages_lock is assumed to be held.
  */
 void
 gc_close_region(struct alloc_region *alloc_region, int page_type)
@@ -1182,16 +1173,10 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
     char *page_base = page_address(first_page);
     char *free_pointer = alloc_region->free_pointer;
 
+    // page_bytes_used() can be done without holding a lock. Nothing else
+    // affects the usage on the first page of a region owned by this thread.
     page_bytes_t orig_first_page_bytes_used = page_bytes_used(first_page);
     gc_assert(alloc_region->start_addr == page_base + orig_first_page_bytes_used);
-
-    if ((page_table[first_page].type & PAGE_TYPE_MASK) == PAGE_TYPE_CONS) {
-        /* The free pointer can't point exactly at the first user-visible cons.
-         * That would be indicative of requesting a cons region and using none of it,
-         * which can't happen, because regions are only opened just-in-time.
-         * We never preemptively open a region and then close it wholly unused */
-        gc_assert(free_pointer > 2*N_WORD_BYTES+page_base);
-    }
 
     // Mark the region as closed on its first page.
     page_table[first_page].type &= ~(OPEN_REGION_PAGE_FLAG);
@@ -1791,7 +1776,7 @@ lispobj *search_dynamic_space(void *pointer)
     int type = page_table[page_index].type & PAGE_TYPE_MASK;
     if (type == PAGE_TYPE_CONS) {
         int wordindex = ((char*)pointer - page_address(page_index)) >> WORD_SHIFT;
-        if (wordindex > 0 && wordindex < page_words_used(page_index))
+        if (wordindex < page_words_used(page_index))
             return (lispobj*)(page_address(page_index) + ((wordindex >> 1) << (1+WORD_SHIFT)));
         else
             return NULL;
@@ -1934,10 +1919,6 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
             return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
         return 0;
     }
-
-    // The lowest addressable cell on a cons page is at word index 2
-    if (page_table[addr_page_index].type == PAGE_TYPE_CONS
-        && ((addr & (GENCGC_PAGE_BYTES - 1)) < 2*N_WORD_BYTES)) return 0;
 
     /* For pages of code:
      * - we can't enforce a particular lowtag on the pointer.
@@ -2379,20 +2360,6 @@ static void obliterate_nonpinned_words()
     }
 }
 
-static void set_smallobj_page_pinned(page_index_t page)
-{
-    /* The requirement to reserve the first two words on cons pages implies
-     * that page filler must never be deposited in those words.
-     * The easiest solution - though maybe not the best - is to pin that cell
-     * if any other cons on the page gets pinned */
-    if (!page_table[page].pinned && page_table[page].type == PAGE_TYPE_CONS) {
-        hopscotch_insert(&pinned_objects,
-                         make_lispobj(page_address(page),LIST_POINTER_LOWTAG),
-                         1);
-    }
-    page_table[page].pinned = 1;
-}
-
 /* Add 'object' to the hashtable, and if the object is a code component,
  * then also add all of the embedded simple-funs.
  * It is OK to call this function on an object which is already pinned-
@@ -2444,9 +2411,8 @@ static void pin_object(lispobj object)
     // The 'pinned' bit is a coarse-grained test of whether to bother looking in the table.
     if (hopscotch_containsp(&pinned_objects, object)) return;
 
-    set_smallobj_page_pinned(page);
     hopscotch_insert(&pinned_objects, object, 1);
-
+    page_table[page].pinned = 1;
     struct code* maybe_code = (struct code*)native_pointer(object);
     // Avoid iterating over embedded simple-funs until the debug info is set.
     // Prior to that, the unboxed payload will contain random bytes.
@@ -2519,8 +2485,8 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word)
     // It's a non-large non-code ambiguous pointer.
     if (compacting_p()) {
         if (!hopscotch_containsp(&pinned_objects, word)) {
-            set_smallobj_page_pinned(page);
             hopscotch_insert(&pinned_objects, word, 1);
+            page_table[page].pinned = 1;
         }
         return 1;
     }
@@ -5009,7 +4975,7 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nby
     gc_assert(nbytes > (sword_t)partial_request);
     // We might be even cleverer by accepting however few bytes are actually available
     // on any cons page, rather than asking for the maximum.
-    if (partial_request == 0) partial_request = CONS_PAGE_MAX_ALLOC;
+    if (partial_request == 0) partial_request = CONS_PAGE_USABLE_BYTES;
     lispobj result, *tail = &result;
     do {
         if (nbytes < partial_request) partial_request = nbytes;
@@ -5023,7 +4989,7 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nby
             ++c;
         }
         tail = &((c-1)->cdr);
-        partial_request = CONS_PAGE_MAX_ALLOC;
+        partial_request = CONS_PAGE_USABLE_BYTES;
     } while (nbytes);
     *tail = NIL;
     return result;
@@ -5038,7 +5004,7 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, swo
     struct alloc_region *region = THREAD_ALLOC_REGION(self, cons);
     int partial_request = (char*)region->end_addr - (char*)region->free_pointer;
     gc_assert(nbytes > (sword_t)partial_request);
-    if (partial_request == 0) partial_request = CONS_PAGE_MAX_ALLOC;
+    if (partial_request == 0) partial_request = CONS_PAGE_USABLE_BYTES;
     lispobj result, *tail = &result;
     do {
         if (nbytes < partial_request) partial_request = nbytes;
@@ -5064,7 +5030,7 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, swo
             c++;
         }
         tail = &((c-1)->cdr);
-        partial_request = CONS_PAGE_MAX_ALLOC;
+        partial_request = CONS_PAGE_USABLE_BYTES;
     } while (nbytes);
     *tail = NIL;
     return result;
@@ -5079,7 +5045,7 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
     struct alloc_region *region = THREAD_ALLOC_REGION(self, cons);
     int partial_request = (char*)region->end_addr - (char*)region->free_pointer;
     gc_assert(nbytes > (sword_t)partial_request);
-    if (partial_request == 0) partial_request = CONS_PAGE_MAX_ALLOC;
+    if (partial_request == 0) partial_request = CONS_PAGE_USABLE_BYTES;
     lispobj result, *tail = &result;
     do {
         if (nbytes < partial_request) partial_request = nbytes;
@@ -5105,7 +5071,7 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
             c++;
         }
         tail = &((c-1)->cdr);
-        partial_request = CONS_PAGE_MAX_ALLOC;
+        partial_request = CONS_PAGE_USABLE_BYTES;
     } while (nbytes);
     *tail = NIL;
     return result;
