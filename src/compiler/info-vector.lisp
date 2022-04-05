@@ -90,9 +90,10 @@
 ;;;;; Some stuff moved from 'globaldb.lisp':
 
 ;;; The structure constructor is never called
+;;; Can't freeze theis type because INSTANCE-LENGTH is variable,
+;;; but freezing would make it constant henceforth.
 (sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil) (:copier nil))
   cells)
-;;(declaim (freeze-type packed-info)) ; crashes?
 (defconstant info-num-mask (ldb (byte info-number-bits 0) -1)) ; #b111111
 
 ;; Using 6 bits per packed field, 5 infos can be described in a 30-bit fixnum,
