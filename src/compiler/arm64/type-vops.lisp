@@ -254,13 +254,13 @@
   (:variant-vars comparison)
   (:variant :gt)
   (:generator 10
-    (unless (sc-is (tn-ref-tn args) descriptor-reg)
+    (unless (sc-is (tn-ref-tn args) descriptor-reg control-stack)
       (setf args (tn-ref-across args)))
     (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
            negative-p
            (fixnum (if (sc-is fixnum immediate)
                        (let* ((value (fixnumize (tn-value fixnum)))
-                             (abs (abs value)))
+                              (abs (abs value)))
                          (cond ((add-sub-immediate-p abs)
                                 (when (minusp value)
                                   (setf negative-p t))
@@ -337,6 +337,20 @@
 (define-vop (<-fixnum-integer >-fixnum-integer)
   (:translate <)
   (:variant :gt))
+
+;;; For integerp+cmp
+(define-vop (<=-integer-fixnum >-integer-fixnum)
+  (:translate)
+  (:variant :le))
+(define-vop (>=-integer-fixnum <-integer-fixnum)
+  (:translate)
+  (:variant :ge))
+(define-vop (<=-fixnum-integer >-fixnum-integer)
+  (:translate)
+  (:variant :le))
+(define-vop (>=-fixnum-integer <-fixnum-integer)
+  (:translate)
+  (:variant :ge))
 
 
 ;;; MOD type checks

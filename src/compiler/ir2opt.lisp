@@ -990,6 +990,74 @@
               (delete-vop vop)
               (delete-vop next))))))))
 
+
+(when (vop-existsp :named sb-vm::<-integer-fixnum)
+  ;; The <-integer-fixnum VOPs already perform dispatch for fixnum/bignum,
+  ;; and load the header byte.
+  ;; Replace the preceding INTEGERP VOP with an appropriate
+  ;; <-integer-fixnum, which checks for INTEGER.
+  (defoptimizer (vop-optimize (bignump integerp)) (vop)
+    (when (boundp '*2block-info*)
+      (destructuring-bind (target not-p) (vop-codegen-info vop)
+        (let* ((next (ir2-block-next (vop-block vop)))
+               (target-block (gethash target *2block-info*))
+               (not-target-block (if not-p
+                                     target-block
+                                     next))
+               (target-block (if not-p
+                                 next
+                                 target-block))
+               (cmp (ir2-block-start-vop target-block)))
+          (when (and cmp
+                     (singleton-p (ir2block-predecessors target-block)))
+            (let ((integer (tn-ref-tn (vop-args vop)))
+                  (args (vop-args cmp))
+                  tns)
+              (when (case (vop-name cmp)
+                      ((sb-vm::>-integer-fixnum sb-vm::<-integer-fixnum)
+                       (when (eq (tn-ref-tn args) integer)
+                         (setf tns (list integer (tn-ref-tn (tn-ref-across args))))))
+                      ((sb-vm::>-fixnum-integer sb-vm::<-fixnum-integer)
+                       (when (eq (tn-ref-tn (tn-ref-across args)) integer)
+                         (setf tns (list (tn-ref-tn args) integer)))))
+                (destructuring-bind (cmp-target cmp-not-p) (vop-codegen-info cmp)
+                  (let* ((cmp-next (ir2-block-next (vop-block cmp)))
+                         (cmp-target-block (gethash cmp-target *2block-info*))
+                         (cmp-not-target-block (if cmp-not-p
+                                                   cmp-target-block
+                                                   cmp-next))
+                         (cmp-target-block (if cmp-not-p
+                                               cmp-next
+                                               cmp-target-block)))
+                    (when (if cmp-not-p
+                              (eq cmp-not-target-block not-target-block)
+                              (eq cmp-target-block not-target-block))
+                      (flet ((invert ()
+                               (template-or-lose
+                                (case (vop-name cmp)
+                                  (sb-vm::>-integer-fixnum 'sb-vm::<=-integer-fixnum)
+                                  (sb-vm::<-integer-fixnum 'sb-vm::>=-integer-fixnum)
+                                  (sb-vm::>-fixnum-integer 'sb-vm::<=-fixnum-integer)
+                                  (sb-vm::<-fixnum-integer 'sb-vm::>=-fixnum-integer)))))
+                        (multiple-value-bind (new-vop new-target new-not-p)
+                            (cond ((and not-p cmp-not-p)
+                                   (values (vop-info cmp) target t))
+                                  (not-p
+                                   (values (invert) target t))
+                                  (cmp-not-p
+                                   (values (invert) cmp-target nil))
+                                  (t
+                                   (values (invert) target nil)))
+                          (prog1
+                              (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                                                   new-vop
+                                                   (reference-tn-list tns nil)
+                                                   nil vop
+                                                   (list new-target new-not-p))
+                            (delete-vop vop)
+                            (delete-vop cmp)))))))))))
+        nil))))
+
 ;;; No need to reset the stack pointer just before returning.
 (defoptimizer (vop-optimize reset-stack-pointer) (vop)
   (loop for next = (next-vop vop) then (next-vop next)

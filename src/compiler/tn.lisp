@@ -356,7 +356,7 @@
 
 (defun reference-tn-refs (refs write-p)
   (when refs
-    (let* ((first (reference-tn (tn-ref-tn refs) write-p) )
+    (let* ((first (reference-tn (tn-ref-tn refs) write-p))
            (prev first))
       (loop for tn-ref = (tn-ref-across refs) then (tn-ref-across tn-ref)
             while tn-ref
