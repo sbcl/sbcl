@@ -747,7 +747,7 @@
                        t)))
                   (t
                    (ir2-convert-conditional call block template args info-args
-                                            (lvar-dest lvar) nil))))
+                                            dest nil))))
           (let* ((results (make-template-result-tns call lvar rtypes))
                  (r-refs (reference-tn-list results t)))
             (aver (= (length info-args)
