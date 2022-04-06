@@ -1130,6 +1130,18 @@
                (return-from check-proper-sequences))))
      combination info)))
 
+(defun maybe-wrap-predicate (info call)
+  (when (ir1-attributep (fun-info-attributes info) predicate)
+    (let ((lvar (node-lvar call)))
+      (when (and lvar
+                 (not (and (if-p (lvar-dest lvar))
+                           (immediately-used-p (if-test (lvar-dest lvar)) call)))
+                 (conditional-call-translated-p call))
+        (let (*instrument-if-for-code-coverage*)
+          (wrap-node call
+                     (lambda (x)
+                       `(if ,x t nil))))))))
+
 ;;; Do IR1 optimizations on a COMBINATION node.
 (defun ir1-optimize-combination (node &aux (show *show-transforms-p*))
   (declare (type combination node))
@@ -1210,6 +1222,7 @@
                         (constant-lvar-p (first args))
                         (not (constant-lvar-p (second args))))
                (setf (basic-combination-args node) (nreverse args))))
+           (maybe-wrap-predicate info node)
 
            (let ((fun-source-name (combination-fun-source-name node))
                  (optimizer (fun-info-optimizer info)))

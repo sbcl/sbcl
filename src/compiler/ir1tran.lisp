@@ -1105,9 +1105,9 @@
                       (struct-fun-transform transform form name))
                 ;; Note that "pass" means fail. Gotta love it.
                 (cond (pass
-                       (ir1-convert-maybe-predicate start next result
-                                                    (proper-list form)
-                                                    var))
+                       (ir1-convert-combination-checking-type start next result
+                                                              (proper-list form)
+                                                              var))
                       (t
                        (unless (policy *lexenv* (zerop store-xref-data))
                          (record-call name (ctran-block start) *current-path*))
@@ -1117,33 +1117,14 @@
                          (when (eq (car *current-path*) 'original-source-start)
                            (setf (ctran-source-path start) *current-path*))
                          (ir1-convert start next result transformed)))))
-              (ir1-convert-maybe-predicate start next result
-                                           (proper-list form)
-                                           var))))))
+              (ir1-convert-combination-checking-type start next result
+                                                     (proper-list form)
+                                                     var))))))
 
 
 ;;; KLUDGE: If we insert a synthetic IF for a function with the PREDICATE
 ;;; attribute, don't generate any branch coverage instrumentation for it.
 (defvar *instrument-if-for-code-coverage* t)
-
-;;; If the function has the PREDICATE attribute, and the RESULT's DEST
-;;; isn't an IF, then we convert (IF <form> T NIL), ensuring that a
-;;; predicate always appears in a conditional context.
-;;;
-;;; If the function isn't a predicate, then we call
-;;; IR1-CONVERT-COMBINATION-CHECKING-TYPE.
-(defun ir1-convert-maybe-predicate (start next result form var)
-  (declare (type ctran start next)
-           (type (or lvar null) result)
-           (list form)
-           (type global-var var))
-  (let ((info (info :function :info (leaf-source-name var))))
-    (if (and info
-             (ir1-attributep (fun-info-attributes info) predicate)
-             (not (if-p (and result (lvar-dest result)))))
-        (let ((*instrument-if-for-code-coverage* nil))
-          (ir1-convert start next result `(if ,form t nil)))
-        (ir1-convert-combination-checking-type start next result form var))))
 
 ;;; Actually really convert a global function call that we are allowed
 ;;; to early-bind.

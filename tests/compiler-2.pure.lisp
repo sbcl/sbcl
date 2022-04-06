@@ -3731,38 +3731,38 @@
 
 (with-test (:name :type-constraint-joining.</=.2)
   (assert
-   (equal (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (x)
-                (if (typep x 'rational)
-                    (cond ((= x 20))
-                          ((< x 5))
-                          ((< x 10))
-                          (t (error "")))
-                    (setf x :foo))
-                x))))
-          '(values (or
-                    (integer 20 20)
-                    (rational * (10))
-                    (member :foo))
-            &optional))))
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (x)
+                 (if (typep x 'rational)
+                     (cond ((= x 20))
+                           ((< x 5))
+                           ((< x 10))
+                           (t (error "")))
+                     (setf x :foo))
+                 x))))
+           '(values (or
+                     (integer 20 20)
+                     (rational * (10))
+                     (member :foo))
+             &optional))))
 
 (with-test (:name :type-constraint-joining.</=.3)
   (assert
-   (equal (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (x)
-                (cond ((< x 5))
-                      ((< x 10))
-                      (t (error "")))
-                x))))
-          '(values (or
-                    (double-float * (10.0d0))
-                    (single-float * (10.0))
-                    (rational * (10)))
-            &optional))))
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (x)
+                 (cond ((< x 5))
+                       ((< x 10))
+                       (t (error "")))
+                 x))))
+           '(values (or
+                     (double-float * (10.0d0))
+                     (single-float * (10.0))
+                     (rational * (10)))
+             &optional))))
 
 (with-test (:name :type-constraint-joining.>/=)
   (assert

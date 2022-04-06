@@ -79,12 +79,12 @@
   (and (subtypep x y) (subtypep y x)))
 
 (defun ctype= (left right)
-  (let ((a (sb-kernel:specifier-type left)))
+  (let ((a (sb-kernel:values-specifier-type left)))
     ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
     ;; operation if A and B are EQ.
     ;; To actually exercise the type operation, remove the memoized parse.
     (sb-int:drop-all-hash-caches)
-    (let ((b (sb-kernel:specifier-type right)))
+    (let ((b (sb-kernel:values-specifier-type right)))
       (assert (not (eq a b)))
       (sb-kernel:type= a b))))
 

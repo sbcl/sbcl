@@ -680,6 +680,37 @@
           (t
            (values nil :result-types)))))
 
+(defun conditional-call-translated-p (call)
+  (let ((templates (fun-info-templates (basic-combination-fun-info call))))
+    (labels ((template-args-ok (template )
+               (let ((mtype (template-more-args-type template)))
+                 (do ((args (basic-combination-args call) (cdr args))
+                      (types (template-arg-types template) (cdr types)))
+                     ((null types)
+                      (cond ((null args) t)
+                            ((not mtype) nil)
+                            (t
+                             (dolist (arg args t)
+                               (unless (operand-restriction-ok mtype
+                                                               (primitive-type (lvar-type arg)))
+                                 (return nil))))))
+                   (when (null args) (return nil))
+                   (let ((arg (car args))
+                         (type (car types)))
+                     (unless (operand-restriction-ok type (primitive-type (lvar-type arg))
+                                                     :lvar arg)
+                       (return nil))))))
+             (is-ok-template-use (template)
+               (let* ((guard (template-guard template)))
+                 (cond ((and guard (not (funcall guard call)))
+                        nil)
+                       (t
+                        (template-args-ok template))))))
+
+      (loop for template in templates
+            thereis
+            (is-ok-template-use template)))))
+
 ;;; Use operand type information to choose a template from the list
 ;;; TEMPLATES for a known CALL. We return three values:
 ;;; 1. The template we found.
