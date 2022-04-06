@@ -637,6 +637,43 @@
                (register-drop-thru alternative)
                (vop branch if block (block-label alternative)))))))
 
+(when-vop-existsp (:named sb-vm::move-conditional-result)
+  ;; Use a dedicated VOP instead of wrapping a conditional that needs
+  ;; to return T/NIL in (if x t nil)
+  ;; Produces slightly better code, not emitted when not needed.
+  (defun ir2-convert-conditional-result (node block template args info-args lvar)
+    (declare (type node node) (type ir2-block block)
+             (type template template) (type (or tn-ref null) args)
+             (list info-args))
+    (let* ((res (lvar-result-tns lvar
+                                 (list *universal-type*)
+                                 (list *backend-t-primitive-type*)))
+           (res-refs (reference-tn-list res t))
+           (flags (and (consp (template-result-types template))
+                       (rest (template-result-types template)))))
+      (aver (= (template-info-arg-count template)
+               (+ (length info-args)
+                  (if flags 0 2))))
+      (cond ((not flags)
+             (let ((true (gen-label)))
+               (emit-template node block template args nil
+                              (list* true nil info-args))
+               (emit-template node block (template-or-lose 'sb-vm::move-conditional-result) nil res-refs
+                              (list true))))
+            (t
+             (when (equal flags '(:after-sc-selection))
+               ;; To be fixed up by VOP-INFO-AFTER-SC-SELECTION
+               (setf flags (list :after-sc-selection))
+               (setf info-args (append info-args flags)))
+             (emit-template node block template args nil info-args)
+             (emit-template node block (template-or-lose 'sb-vm::move-if/descriptor)
+                            (reference-tn-list
+                             (list (emit-constant t)
+                                   (emit-constant nil))
+                             nil)
+                            res-refs (list flags))))
+      (move-lvar-result node block res lvar))))
+
 ;;; Convert an IF that isn't the DEST of a conditional template.
 (defun ir2-convert-if (node block)
   (declare (type ir2-block block) (type cif node))
@@ -702,8 +739,13 @@
         (reference-args call block (combination-args call) template)
       (aver (not (template-more-results-type template)))
       (if (template-conditional-p template)
-          (ir2-convert-conditional call block template args info-args
-                                   (lvar-dest lvar) nil)
+          (let ((dest (lvar-dest lvar)))
+            (if (and (vop-existsp :named sb-vm::move-conditional-result)
+                     (not (and (if-p dest)
+                               (immediately-used-p (if-test dest) call))))
+                (ir2-convert-conditional-result call block template args info-args lvar)
+                (ir2-convert-conditional call block template args info-args
+                                         (lvar-dest lvar) nil)))
           (let* ((results (make-template-result-tns call lvar rtypes))
                  (r-refs (reference-tn-list results t)))
             (aver (= (length info-args)

@@ -225,19 +225,19 @@
 
 (with-test (:name :type-constraint-joining.</=)
   (assert
-   (equal (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (x)
-                (declare (integer x))
-                (cond ((= x 20))
-                      ((< x 5))
-                      ((< x 10))
-                      (t (error ""))) x))))
-          '(values (or
-                    (integer * 9)
-                    (integer 20 20))
-            &optional))))
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (x)
+                 (declare (integer x))
+                 (cond ((= x 20))
+                       ((< x 5))
+                       ((< x 10))
+                       (t (error ""))) x))))
+           '(values (or
+                     (integer * 9)
+                     (integer 20 20))
+             &optional))))
 
 (with-test (:name :type-constraint-joining.</=.2)
   (assert
@@ -276,19 +276,19 @@
 
 (with-test (:name :type-constraint-joining.>/=)
   (assert
-   (equal (caddr
-           (sb-kernel:%simple-fun-type
-            (checked-compile
-             `(lambda (x)
-              (declare (integer x))
-                (cond ((= x 5))
-                      ((> x 20))
-                      ((> x 10))
-                      (t (error ""))) x))))
-          '(values (or
-                    (integer 11)
-                    (integer 5 5))
-            &optional))))
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (x)
+                 (declare (integer x))
+                 (cond ((= x 5))
+                       ((> x 20))
+                       ((> x 10))
+                       (t (error ""))) x))))
+           '(values (or
+                     (integer 11)
+                     (integer 5 5))
+             &optional))))
 
 (with-test (:name :type-constraint-joining.complement)
   (assert

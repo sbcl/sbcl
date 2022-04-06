@@ -552,3 +552,13 @@
 ;;; descriptor passing location.
 (define-move-vop move-arg :move-arg
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
+
+(define-vop (move-conditional-result)
+  (:results (res :scs (descriptor-reg)))
+  (:info true)
+  (:generator 1
+    (move res null-tn)
+    (inst b done)
+    (emit-label true)
+    (load-symbol res t)
+    done))
