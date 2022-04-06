@@ -504,34 +504,6 @@
         (locall-analyze-component *current-component*))))
   (values))
 
-;;; Similar to FILTER-LVAR, but wraps just one use of an LVAR
-(defun wrap-node (node function)
-  (let* ((lvar (node-lvar node))
-         (ctran (or (node-next node)
-                    (block-start (car (block-succ (node-block node))))))
-         (placeholder (make-constant 0))
-         (form (funcall function placeholder)))
-    (with-ir1-environment-from-node node
-      (ensure-block-start ctran)
-      (let* ((old-block (node-block node))
-             (new-start (make-ctran))
-             (filtered-lvar (make-lvar))
-             (new-block (ctran-starts-block new-start)))
-        (change-block-successor old-block (car (block-succ old-block)) new-block)
-
-        (%delete-lvar-use node)
-        (use-lvar node filtered-lvar)
-        (ir1-convert new-start ctran lvar form)
-
-        ;; Replace PLACEHOLDER with the LVAR.
-        (let* ((refs (leaf-refs placeholder))
-               (node (first refs))
-               (victim (node-lvar node)))
-          (aver (null (rest refs))) ; PLACEHOLDER must be referenced exactly once.
-
-          (substitute-lvar filtered-lvar victim)
-          (flush-dest victim))))))
-
 ;;; Delete NODE and VALUE. It may result in some calls becoming tail.
 (defun delete-filter (node lvar value)
   (aver (eq (lvar-dest value) node))
