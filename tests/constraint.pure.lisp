@@ -146,3 +146,162 @@
                   a)))
     ((3 1) nil)
     ((3 3) t)))
+
+(with-test (:name :type-constraint-joining)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda ()
+                (let ((x 'foo))
+                  (if (read)
+                      (setq x 3)
+                      (setq x 5))
+                  x)))))
+          '(values (or (integer 5 5) (integer 3 3)) &optional))))
+
+(with-test (:name :type-constraint-joining.2)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (etypecase x
+                  (integer (read))
+                  (float (read)))
+                x))))
+          '(values (or float integer) &optional))))
+
+(with-test (:name :type-constraint-joining.3)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (if (read)
+                    (setq x (random 10))
+                    (setq x (random 10.0)))
+                x))))
+          '(values (or (single-float 0.0 (10.0)) (mod 10)) &optional))))
+
+(with-test (:name :type-constraint-joining-terminates)
+  (checked-compile
+   sb-c::
+   `(lambda (name vop)
+      (block foo
+        (do* ((block (vop-block vop) (ir2-block-prev block))
+              (last vop (ir2-block-last-vop block)))
+             (nil)
+          (aver (eq (ir2-block-block block) (ir2-block-block (vop-block vop))))
+          (do ((current last (vop-prev current)))
+              ((null current))
+            (when (eq (vop-name current) name)
+              (return-from foo current))))))))
+
+(with-test (:name :type-constraint-joining-conflicts)
+  (assert (nth-value
+           1
+           (checked-compile
+            '(lambda (y)
+               (let ((x 'foo))
+                 (ecase y
+                   (1 (setq x (random 10)))
+                   (2 (setq x (make-array 10)))
+                   (3 (setq x (make-hash-table))))
+                 (symbol-name x)))
+            :allow-warnings t))))
+
+(with-test (:name :type-constraint-joining.eql)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (ecase x
+                  (1 (read))
+                  (2 (read)))
+                x))))
+          '(values (integer 1 2) &optional))))
+
+(with-test (:name :type-constraint-joining.</=)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (declare (integer x))
+                (cond ((= x 20))
+                      ((< x 5))
+                      ((< x 10))
+                      (t (error ""))) x))))
+          '(values (or
+                    (integer * 9)
+                    (integer 20 20))
+            &optional))))
+
+(with-test (:name :type-constraint-joining.</=.2)
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (x)
+                 (if (typep x 'rational)
+                     (cond ((= x 20))
+                           ((< x 5))
+                           ((< x 10))
+                           (t (error "")))
+                     (setf x :foo))
+                 x))))
+           '(values (or
+                     (integer 20 20)
+                     (rational * (10))
+                     (member :foo))
+             &optional))))
+
+(with-test (:name :type-constraint-joining.</=.3)
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (x)
+                 (cond ((< x 5))
+                       ((< x 10))
+                       (t (error "")))
+                 x))))
+           '(values (or
+                     (double-float * (10.0d0))
+                     (single-float * (10.0))
+                     (rational * (10)))
+             &optional))))
+
+(with-test (:name :type-constraint-joining.>/=)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+              (declare (integer x))
+                (cond ((= x 5))
+                      ((> x 20))
+                      ((> x 10))
+                      (t (error ""))) x))))
+          '(values (or
+                    (integer 11)
+                    (integer 5 5))
+            &optional))))
+
+(with-test (:name :type-constraint-joining.complement)
+  (assert
+   (equal (caddr
+           (sb-kernel:%simple-fun-type
+            (checked-compile
+             `(lambda (x)
+                (if (read)
+                    (cond ((typep x 'integer)
+                           (error ""))
+                          (t (print "")))
+                    (cond ((typep x 'float)
+                           (print ""))
+                          (t (error ""))))
+                x))))
+          '(values (not integer) &optional))))
