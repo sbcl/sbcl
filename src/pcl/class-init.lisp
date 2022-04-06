@@ -44,9 +44,8 @@
 
 
 (defun allocate-standard-instance (wrapper)
-  (let* ((instance (%make-instance (1+ sb-vm:instance-data-start)))
+  (let* ((instance (%new-instance wrapper (1+ sb-vm:instance-data-start)))
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+)))
-    (setf (%instance-wrapper instance) wrapper)
     (%instance-set instance sb-vm:instance-data-start slots)
     instance))
 

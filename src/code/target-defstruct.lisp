@@ -115,8 +115,7 @@
 ;;; when given a STRUCTURE-OBJECT.
 (defun allocate-struct (type)
   (let* ((wrapper (classoid-wrapper (the structure-classoid (find-classoid type))))
-         (structure (%make-instance (wrapper-length wrapper))))
-    (setf (%instance-wrapper structure) wrapper)
+         (structure (%new-instance wrapper (wrapper-length wrapper))))
     (dolist (dsd (dd-slots (wrapper-dd wrapper)) structure)
       (when (eq (dsd-raw-type dsd) 't)
         (%instance-set structure (dsd-index dsd) (make-unbound-marker))))))
@@ -205,10 +204,10 @@
 ;;; Because this sure as heck doesn't check anything]
 #+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
-  (let ((instance (%make-instance (dd-length dd))) ; length = sans header word
+  (let ((instance (%new-instance (dd-layout-or-lose dd)
+                                 (dd-length dd))) ; length = sans header word
         (value-index 0))
     (declare (index value-index))
-    (setf (%instance-wrapper instance) (dd-layout-or-lose dd))
     (dolist (spec slot-specs instance)
       (destructuring-bind (kind raw-type . index) spec
         (if (eq kind :unbound)
@@ -299,11 +298,9 @@
     ;; instance, with no padding. Using %INSTANCE-LENGTH allows potentially
     ;; interesting nonstandard things like variable-length structures.
     (let* ((len (%instance-length structure))
-           (res (%make-instance len)))
+           (res (%new-instance (%instance-layout structure) len)))
       (declare (type index len))
       (let ((bitmap (dd-bitmap (wrapper-dd wrapper))))
-        ;; Don't assume that %INSTANCE-REF can access the layout.
-        (%set-instance-layout res (%instance-layout structure))
         ;; On backends which don't segregate descriptor vs. non-descriptor
         ;; registers, we could speed up this code in an obvious way.
         (macrolet ((copy-loop (tagged-p &optional step)

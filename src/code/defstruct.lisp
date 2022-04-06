@@ -48,6 +48,12 @@
                             (%make-structure-instance-allocator ,dd ,slot-specs))
                       ,@slot-vars)))))
 
+(sb-xc:defmacro %new-instance (layout size)
+  `(let* ((l ,layout)
+          (i (%make-instance ,size)))
+     (setf (%instance-wrapper i) l)
+     i))
+
 (declaim (ftype (sfunction (defstruct-description list) function)
                 %make-structure-instance-allocator))
 (defun %make-structure-instance-allocator (dd slot-specs)

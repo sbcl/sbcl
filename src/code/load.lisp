@@ -783,10 +783,9 @@
 
 ;; %MAKE-INSTANCE does not exist on the host.
 (define-fop 48 :not-host (fop-struct ((:operands size) layout))
-  (let ((res (%make-instance size)) ; number of words excluding header
+  (let ((res (%new-instance layout size)) ; number of words excluding header
         ;; Discount the layout from number of user-visible words.
         (n-data-words (- size sb-vm:instance-data-start)))
-    (setf (%instance-wrapper res) layout)
     (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
       (declare (type index ptr))
       (let ((bitmap (wrapper-bitmap layout)))

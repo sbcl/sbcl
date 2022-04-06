@@ -77,8 +77,8 @@
           (error "won't make binary node from ~S ~S" left right))
   (if (or left right)
       (make-binary-node key left right)
-      (let ((instance (sb-kernel:%make-instance (1+ sb-vm:instance-data-start))))
-        (sb-kernel:%set-instance-layout instance #.(sb-kernel:find-layout 'binary-node))
+      (let ((instance (sb-kernel:%new-instance #.(sb-kernel:find-layout 'binary-node)
+                                               (1+ sb-vm:instance-data-start))))
         (sb-kernel:%instance-set instance sb-vm:instance-data-start key)
         (truly-the binary-node instance))))
 

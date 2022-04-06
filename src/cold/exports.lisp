@@ -1887,6 +1887,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MEMBER-TEST-NOT"
            "%MULTIPLY-HIGH" "%SIGNED-MULTIPLY-HIGH"
            "%NEGATE" "%POW"
+           "%NEW-INSTANCE"
            "%OTHER-POINTER-WIDETAG"
            "%PCL-INSTANCE-P"
            "%PUTHASH"

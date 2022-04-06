@@ -782,12 +782,11 @@
          (wrapper (class-wrapper class)))
     (etypecase class
       (standard-class
-        `(let ((.instance. (%make-instance (1+ sb-vm:instance-data-start)))
+        `(let ((.instance. (%new-instance ,wrapper (1+ sb-vm:instance-data-start)))
                (.slots. (make-array
                          ,(wrapper-length wrapper)
                          ,@(when early-unbound-markers-p
                                  '(:initial-element +slot-unbound+)))))
-           (setf (%instance-wrapper .instance.) ,wrapper)
            (%instance-set .instance. sb-vm:instance-data-start .slots.)
            ,body
            .instance.))
