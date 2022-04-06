@@ -740,12 +740,14 @@
       (aver (not (template-more-results-type template)))
       (if (template-conditional-p template)
           (let ((dest (lvar-dest lvar)))
-            (if (and (vop-existsp :named sb-vm::move-conditional-result)
-                     (not (and (if-p dest)
-                               (immediately-used-p (if-test dest) call))))
-                (ir2-convert-conditional-result call block template args info-args lvar)
-                (ir2-convert-conditional call block template args info-args
-                                         (lvar-dest lvar) nil)))
+            (cond ((when-vop-existsp (:named sb-vm::move-conditional-result)
+                     (unless (and (if-p dest)
+                                  (immediately-used-p (if-test dest) call))
+                       (ir2-convert-conditional-result call block template args info-args lvar)
+                       t)))
+                  (t
+                   (ir2-convert-conditional call block template args info-args
+                                            (lvar-dest lvar) nil))))
           (let* ((results (make-template-result-tns call lvar rtypes))
                  (r-refs (reference-tn-list results t)))
             (aver (= (length info-args)
