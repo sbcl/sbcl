@@ -532,13 +532,12 @@
 
 (define-vop (consp type-predicate)
   (:translate consp)
+  (:conditional :ne)
+  (:info)
   (:generator 8
-    (let* ((drop-thru (gen-label))
-           (is-not-cons-label (if not-p target drop-thru)))
-      (inst cmp value null-tn)
-      (inst b :eq is-not-cons-label)
-      (test-type value temp target not-p (list-pointer-lowtag))
-      (emit-label drop-thru))))
+    (inst and temp value lowtag-mask)
+    (inst cmp temp list-pointer-lowtag)
+    (inst ccmp value null-tn :eq 4)))
 
 (define-vop (single-float-p)
   (:args (value :scs (any-reg descriptor-reg)))
