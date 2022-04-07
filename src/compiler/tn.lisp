@@ -226,11 +226,13 @@
           (immediate-constant-sc (constant-value constant))
         ;; currently NULL-OFFSET is used only on ARM64
         (if null-offset
-            (setf (leaf-info constant)
-                  (component-live-tn
-                   (make-wired-tn (primitive-type (leaf-type constant))
-                                  immed
-                                  null-offset)))
+            (let ((tn (component-live-tn
+                       (make-wired-tn (primitive-type (leaf-type constant))
+                                      immed
+                                      null-offset
+                                      (specifier-type 'null)))))
+             (setf (tn-leaf tn) constant
+                   (leaf-info constant) tn))
             (let* ((boxed (or (not immed)
                               (boxed-immediate-sc-p immed)))
                    (component (component-info *component-being-compiled*))
