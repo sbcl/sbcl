@@ -311,27 +311,6 @@
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
 ;;; Should be run after DELETE-NO-OP-VOPS, otherwise the empty moves
 ;;; will interfere.
-
-;;; FIXME: there is one more minor glitch caused by multiway branch,
-;;; but it is not a correctness bug. Consider:
-;;;  (defun f (&optional (a (missing-arg)) (b (missing-arg))
-;;;                      (c (missing-arg)) (d (missing-arg)))
-;;;     (list a b c d ))
-;;;
-;;; Granted that this is a slightly weird idiom, but it is used frequently
-;;; in system internals as well as by FORMATTER's macroexpansion.
-;;; The main entry point dispatches on the argument count.
-;;; After elimination of redundant moves, we end up with:
-;;;   ; DF2:       42FF2498         JMP QWORD PTR [RAX+R11*4]
-;;;   ; DF6:       E981000000       JMP L3
-;;;   ; DFB:       E999000000       JMP L4
-;;;   ; E00:       E9B1000000       JMP L5
-;;;   ; E05:       E9C9000000       JMP L6
-;;; where every one of the jumps to a label is unreachable.
-;;; This is because each of the original IF's would have branched
-;;; to two MOVEs that are eliminated as the arg/results get packed
-;;; in the same physical location, and then the branch is performed,
-;;; but it is in a dead IR2 block.
 (defun ir2-optimize-jumps (component)
   (flet ((start-vop (block)
            (do ((block block (ir2-block-next block)))
@@ -353,28 +332,32 @@
                       (return label))
                      ((ir2-block-start-vop block)
                       (return nil)))))))
-    ;; This is the same information as in *2block-info*. "Too Many Cooks"
-    ;; (Well, the *2block-info* is gone at this point)
-    (let ((label-block-map (make-hash-table :test #'eq)))
-      (do-ir2-blocks (block component)
-        (setf (gethash (ir2-block-%trampoline-label block) label-block-map)
-              block)
-        (setf (gethash (ir2-block-%label block) label-block-map)
-              block))
+    (let ((*2block-info* (make-hash-table :test #'eq)))
+      (initialize-ir2-blocks-flow-info component)
       (labels ((unchain-jumps (vop)
                  ;; Handle any branching vop except a multiway branch
                  (setf (first (vop-codegen-info vop))
                        (follow-jumps (first (vop-codegen-info vop)))))
-               (follow-jumps (target-label)
+               (follow-jumps (target-label &optional (delete t))
                  (declare (type label target-label))
-                 (let* ((target-block (gethash target-label label-block-map))
+                 (let* ((target-block (gethash target-label *2block-info*))
                         (target-vop (start-vop target-block)))
-                   (if (and target-vop
-                            (eq (vop-name target-vop) 'branch)
-                            (neq (first (vop-codegen-info target-vop))
-                                 target-label))
-                       (follow-jumps (first (vop-codegen-info target-vop)))
-                       target-label)))
+                   (cond ((and target-vop
+                               (eq (vop-name target-vop) 'branch)
+                               (neq (first (vop-codegen-info target-vop))
+                                    target-label))
+                          ;; Just pop any block, *2block-info* is only
+                          ;; used here and it just needs to know the
+                          ;; number of predecessors, not their
+                          ;; identity.
+                          (when delete
+                            (pop (ir2block-predecessors target-block))
+                            (if (ir2block-predecessors target-block)
+                                (setf delete nil)
+                                (delete-vop target-vop)))
+                          (follow-jumps (first (vop-codegen-info target-vop)) delete))
+                         (t
+                          target-label))))
                (remove-jump-overs (branch-if branch)
                  ;; Turn BRANCH-IF #<L1>, BRANCH #<L2>, L1:
                  ;; into BRANCH-IF[NOT] L2
@@ -396,27 +379,28 @@
         ;; should take the label of the latter.
         (do-ir2-blocks (block component)
           (let ((last (ir2-block-last-vop block)))
-            (case (and last (vop-name last))
-              (branch
-               (unchain-jumps last)
-               ;; A block may end up having BRANCH-IF + BRANCH after converting an IF.
-               ;; Multiway can't coexist with any other branch preceding or following
-               ;; in the block, so we don't have to check for that, just a BRANCH-IF.
-               (let ((prev (vop-prev last)))
-                 (when (and prev
-                            (or (eq (vop-name prev) 'branch-if)
-                                (conditional-p prev)))
-                   (unchain-jumps prev))))
-              (branch-if
-               (unchain-jumps last))
-              (multiway-branch-if-eq
-               ;; codegen-info = (labels else-label key-type keys original-comparator)
-               (let ((info (vop-codegen-info last)))
-                 (setf (car info) (mapcar #'follow-jumps (car info))
-                       (cadr info) (follow-jumps (cadr info)))))
-              (t
-               (when (and last (conditional-p last))
-                 (unchain-jumps last))))))
+            (when last
+              (case (vop-name last)
+                (branch
+                 (unchain-jumps last)
+                 ;; A block may end up having BRANCH-IF + BRANCH after converting an IF.
+                 ;; Multiway can't coexist with any other branch preceding or following
+                 ;; in the block, so we don't have to check for that, just a BRANCH-IF.
+                 (let ((prev (vop-prev last)))
+                   (when (and prev
+                              (or (eq (vop-name prev) 'branch-if)
+                                  (conditional-p prev)))
+                     (unchain-jumps prev))))
+                (branch-if
+                 (unchain-jumps last))
+                (multiway-branch-if-eq
+                 ;; codegen-info = (labels else-label key-type keys original-comparator)
+                 (let ((info (vop-codegen-info last)))
+                   (setf (car info) (mapcar #'follow-jumps (car info))
+                         (cadr info) (follow-jumps (cadr info)))))
+                (t
+                 (when (conditional-p last)
+                   (unchain-jumps last)))))))
         ;; Pass 2
         ;; Need to unchain the jumps before handling jump-overs,
         ;; otherwise the BRANCH over which BRANCH-IF jumps may be a
