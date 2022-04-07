@@ -1060,8 +1060,24 @@
   (0 1 4)
   (nzcv 4 0))
 
+(define-instruction-format
+    (cond-compare 32
+     :default-printer '(:name :tab rn ", " rm ", " nzcv ", " cond))
+    (op :field (byte 1 30))
+    (op2 :field (byte 9 21) :value #b111010010)
+    (rm :field (byte 5 16) :type 'reg)
+    (cond :field (byte 4 12) :type 'cond)
+    (imm-p :field (byte 1 11))
+    (op3 :field (byte 1 10) :value 0)
+    (rn :field (byte 5 5) :type 'reg)
+    (op4 :field (byte 1 4) :value 0)
+    (nzcv :field (byte 4 0) :type 'unsigned-immediate))
+
 (defmacro def-cond-compare (name op)
   `(define-instruction ,name (segment rn rm-imm cond &optional (nzcv 0))
+     (:printer cond-compare ((op ,op) (imm-p 0)))
+     (:printer cond-compare ((op ,op) (imm-p 1)
+                             (rm nil :type 'unsigned-immediate)))
      (:emitter
       (emit-cond-compare segment +64-bit-size+ ,op
                          (if (integerp rm-imm)
