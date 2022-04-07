@@ -131,6 +131,12 @@
                       (inst cmp temp (ldb (byte 8 0) (logand start (cdadr remaining))))
                       (inst b (if not-p :ne :eq) target)
                       (return))
+                     ((and last
+                           (/= start bignum-widetag)
+                           (/= end complex-array-widetag))
+                      (inst sub temp temp start)
+                      (inst cmp temp (- end start))
+                      (inst b (if not-p :hi :ls) target))
                      (t
                       (unless (= start bignum-widetag)
                         (inst cmp temp start)
