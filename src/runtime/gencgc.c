@@ -435,8 +435,8 @@ write_generation_stats(FILE *file)
 
     /* Print the heap stats. */
     fprintf(file,
-            "Gen  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix  "
-            "Pin       Alloc     Waste        Trig   Dirty GCs Mem-age\n");
+            "Gen  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
+            " Waste%%       Alloc        Trig   Dirty GCs Mem-age\n");
 
     generation_index_t i, begin, end;
     // Print from the lowest gen that has any allocated pages.
@@ -446,9 +446,11 @@ write_generation_stats(FILE *file)
     for (end = SCRATCH_GENERATION; end >= 0; --end)
         if (generations[end].bytes_allocated) break;
 
+    page_index_t coltot[9];
+    memset(coltot, 0, sizeof coltot);
     for (i = begin; i <= end; i++) {
         page_index_t page;
-        page_index_t pagect[9], pinned_cnt = 0;
+        page_index_t pagect[9];
 
         memset(pagect, 0, sizeof pagect);
         for (page = 0; page < next_free_page; page++)
@@ -467,33 +469,37 @@ write_generation_stats(FILE *file)
                 default: lose("Invalid page type %#x (p%"PAGE_INDEX_FMT")", page_table[page].type, page);
                 }
                 pagect[column]++;
-                if (page_table[page].pinned) pinned_cnt++;
+                coltot[column]++;
             }
         struct generation* gen = &generations[i];
         gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
         page_index_t tot_pages, n_dirty;
         tot_pages = count_generation_pages(i, &n_dirty);
+        uword_t waste = npage_bytes(tot_pages) - generations[i].bytes_allocated;
+        double pct_waste = tot_pages > 0 ?
+          (double)waste / (double)npage_bytes(tot_pages) * 100 : 0.0;
         fprintf(file,
                 " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
-                "%7"PAGE_INDEX_FMT"%5d %11"OS_VM_SIZE_FMT
-                " %9"OS_VM_SIZE_FMT
-                " %11"OS_VM_SIZE_FMT,
+                "%7"PAGE_INDEX_FMT" %6.1f %11"OS_VM_SIZE_FMT" %11"OS_VM_SIZE_FMT,
                 i,
                 pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
                 pagect[6], pagect[7], pagect[8],
-                (int)pinned_cnt,
-                (uintptr_t)gen->bytes_allocated,
-                (uintptr_t)npage_bytes(tot_pages) - generations[i].bytes_allocated,
+                pct_waste, (uintptr_t)gen->bytes_allocated,
                 (uintptr_t)gen->gc_trigger);
         // gen0 pages are never WPed
         fprintf(file, i==0?"       -" : " %7"PAGE_INDEX_FMT, n_dirty);
         fprintf(file, " %3d %7.4f\n", gen->num_gc, generation_average_age(i));
     }
-    fprintf(file,"           Total bytes allocated    = %13"OS_VM_SIZE_FMT"\n",
-            (uintptr_t)bytes_allocated);
-    fprintf(file,"           Dynamic-space-size bytes = %13"OS_VM_SIZE_FMT"\n",
-            (uintptr_t)dynamic_space_size);
+    double frac = 100 * (double)bytes_allocated / (double)dynamic_space_size;
+    fprintf(file,
+            "-- %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
+            "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
+            "%7"PAGE_INDEX_FMT" %18"OS_VM_SIZE_FMT
+            " [%.1f%% of %"OS_VM_SIZE_FMT" max]\n",
+            coltot[0], coltot[1], coltot[2], coltot[3],   coltot[4], coltot[5], coltot[6],
+            coltot[7], coltot[8],
+            (uintptr_t)bytes_allocated, frac, (uintptr_t)dynamic_space_size);
 
 #ifdef LISP_FEATURE_X86
     fpu_restore(fpu_state);
