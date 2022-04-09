@@ -1188,7 +1188,7 @@
              (let ((loc (or target
                             (select-load-tn-location op sc))))
                (when loc
-                 (let ((res (make-tn 0 :load ptype sc)))
+                 (let ((res (make-tn 0 :load nil sc)))
                    (setf (tn-offset res) loc)
                    (return res))))
              (push sc allowed)))))))))
