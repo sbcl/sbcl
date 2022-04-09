@@ -1929,7 +1929,7 @@ variable: an unreadable object representing the error is printed instead.")
          (print-unreadable-object (pack stream)
            (etypecase pack
              ((simd-pack double-float)
-              (multiple-value-call #'format stream "~S~@{ ~,13E~}"
+              (multiple-value-call #'format stream "~S~@{ ~,13E~}" 'simd-pack
                 (%simd-pack-doubles pack)))
              ((simd-pack single-float)
               (multiple-value-call #'format stream "~S~@{ ~,7E~}" 'simd-pack
@@ -1975,7 +1975,7 @@ variable: an unreadable object representing the error is printed instead.")
          (print-unreadable-object (pack stream)
            (etypecase pack
              ((simd-pack-256 double-float)
-              (multiple-value-call #'format stream "~S~@{ ~,13E~}"
+              (multiple-value-call #'format stream "~S~@{ ~,13E~}" 'simd-pack-256
                 (%simd-pack-256-doubles pack)))
              ((simd-pack-256 single-float)
               (multiple-value-call #'format stream "~S~@{ ~,7E~}" 'simd-pack-256
