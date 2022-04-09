@@ -86,38 +86,38 @@
   (int-avx2-reg single-avx2-reg double-avx2-reg)
   (int-avx2-reg single-avx2-reg double-avx2-reg))
 
-(define-vop (move-from-avx2)
-  (:args (x :scs (single-avx2-reg double-avx2-reg int-avx2-reg)))
-  (:results (y :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-  (:node-var node)
-  (:args-var args)
-  (:note "AVX2 to pointer coercion")
-  (:generator 13
-     (alloc-other simd-pack-256-widetag simd-pack-256-size y node nil thread-tn)
-     (storew (fixnumize
-              ;; see *simd-pack-element-types*
-              (ecase (primitive-type-name (tn-primitive-type
-                                           (tn-ref-tn args)))
-                (simd-pack-256-single 0)
-                (simd-pack-256-double 1)
-                (simd-pack-256-ub8 2)
-                (simd-pack-256-ub16 3)
-                (simd-pack-256-ub32 4)
-                (simd-pack-256-ub64 5)
-                (simd-pack-256-any 5)
-                (simd-pack-256-sb8 6)
-                (simd-pack-256-sb16 7)
-                (simd-pack-256-sb32 8)
-                (simd-pack-256-sb64 9)))
-         y simd-pack-256-tag-slot other-pointer-lowtag)
-     (let ((ea (object-slot-ea
-                y simd-pack-256-p0-slot other-pointer-lowtag)))
-       (if (float-avx2-p x)
-           (inst vmovups ea x)
-           (inst vmovdqu ea x)))))
-(define-move-vop move-from-avx2 :move
-  (int-avx2-reg single-avx2-reg double-avx2-reg) (descriptor-reg))
+(macrolet ((define-move-from-avx2 (type tag &rest scs)
+             (let ((name (symbolicate "MOVE-FROM-AVX2/" type)))
+               `(progn
+                  (define-vop (,name)
+                    (:args (x :scs ,scs))
+                    (:results (y :scs (descriptor-reg)))
+                    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+                    (:node-var node)
+                    (:arg-types ,type)
+                    (:note "AVX2 to pointer coercion")
+                    (:generator 13
+                      (alloc-other simd-pack-256-widetag simd-pack-256-size y node nil thread-tn)
+                      (storew (fixnumize ,tag)
+                              y simd-pack-256-tag-slot other-pointer-lowtag)
+                      (let ((ea (object-slot-ea
+                                 y simd-pack-256-p0-slot other-pointer-lowtag)))
+                        (if (float-avx2-p x)
+                            (inst vmovups ea x)
+                            (inst vmovdqu ea x)))))
+                  (define-move-vop ,name :move
+                    ,scs (descriptor-reg))))))
+  ;; see *simd-pack-element-types*
+  (define-move-from-avx2 simd-pack-256-single 0 single-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-double 1 double-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-ub8 2 int-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-ub16 3 int-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-ub32 4 int-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-ub64 5 int-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-sb8 6 int-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-sb16 7 int-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-sb32 8 int-avx2-reg)
+  (define-move-from-avx2 simd-pack-256-sb64 9 int-avx2-reg))
 
 (define-vop (move-to-avx2)
   (:args (x :scs (descriptor-reg)))
@@ -244,10 +244,18 @@
     (inst vpinsrq tmp tmp p3 1)
     (inst vinserti128 dst dst tmp 1)))
 
+(defmacro simd-pack-256-dispatch (pack &body body)
+  (check-type pack symbol)
+  `(let ((,pack ,pack))
+     (etypecase ,pack
+       ,@(mapcar (lambda (eltype)
+                   `((simd-pack-256 ,eltype) ,@body))
+          *simd-pack-element-types*))))
+
 #-sb-xc-host
 (macrolet ((unpack-unsigned (pack bits)
-             (once-only ((pack pack))
-               `(let ((a (%simd-pack-256-0 ,pack))
+             `(simd-pack-256-dispatch ,pack
+                (let ((a (%simd-pack-256-0 ,pack))
                       (b (%simd-pack-256-1 ,pack))
                       (c (%simd-pack-256-2 ,pack))
                       (d (%simd-pack-256-3 ,pack)))
@@ -284,8 +292,8 @@
 
 #-sb-xc-host
 (macrolet ((unpack-signed (pack bits)
-             (once-only ((pack pack))
-               `(let ((a (%simd-pack-256-0 ,pack))
+             `(simd-pack-256-dispatch ,pack
+                (let ((a (%simd-pack-256-0 ,pack))
                       (b (%simd-pack-256-1 ,pack))
                       (c (%simd-pack-256-2 ,pack))
                       (d (%simd-pack-256-3 ,pack)))
@@ -404,14 +412,15 @@
 (declaim (inline %simd-pack-256-singles))
 (defun %simd-pack-256-singles (pack)
   (declare (type simd-pack-256 pack))
-  (values (%simd-pack-256-single-item pack 0)
-          (%simd-pack-256-single-item pack 1)
-          (%simd-pack-256-single-item pack 2)
-          (%simd-pack-256-single-item pack 3)
-          (%simd-pack-256-single-item pack 4)
-          (%simd-pack-256-single-item pack 5)
-          (%simd-pack-256-single-item pack 6)
-          (%simd-pack-256-single-item pack 7))))
+  (simd-pack-256-dispatch pack
+    (values (%simd-pack-256-single-item pack 0)
+            (%simd-pack-256-single-item pack 1)
+            (%simd-pack-256-single-item pack 2)
+            (%simd-pack-256-single-item pack 3)
+            (%simd-pack-256-single-item pack 4)
+            (%simd-pack-256-single-item pack 5)
+            (%simd-pack-256-single-item pack 6)
+            (%simd-pack-256-single-item pack 7)))))
 
 (defknown %simd-pack-256-double-item
   (simd-pack-256 (integer 0 3)) double-float (flushable))
@@ -442,10 +451,11 @@
 (declaim (inline %simd-pack-256-doubles))
 (defun %simd-pack-256-doubles (pack)
   (declare (type simd-pack-256 pack))
-  (values (%simd-pack-256-double-item pack 0)
-          (%simd-pack-256-double-item pack 1)
-          (%simd-pack-256-double-item pack 2)
-          (%simd-pack-256-double-item pack 3)))
+  (simd-pack-256-dispatch pack
+    (values (%simd-pack-256-double-item pack 0)
+            (%simd-pack-256-double-item pack 1)
+            (%simd-pack-256-double-item pack 2)
+            (%simd-pack-256-double-item pack 3))))
 
 (defun %simd-pack-256-inline-constant (pack)
   (list :avx2 (logior (%simd-pack-256-0 pack)

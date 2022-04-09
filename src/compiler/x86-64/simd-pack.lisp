@@ -80,37 +80,37 @@
   (int-sse-reg single-sse-reg double-sse-reg)
   (int-sse-reg single-sse-reg double-sse-reg))
 
-(define-vop (move-from-sse)
-  (:args (x :scs (single-sse-reg double-sse-reg int-sse-reg)))
-  (:results (y :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-  (:node-var node)
-  (:args-var args)
-  (:note "SSE to pointer coercion")
-  (:generator 13
-     (alloc-other simd-pack-widetag simd-pack-size y node nil thread-tn)
-     (storew (fixnumize
-              ;; see *simd-pack-element-types*
-              (ecase (primitive-type-name (tn-primitive-type
-                                           (tn-ref-tn args)))
-                (simd-pack-single 0)
-                (simd-pack-double 1)
-                (simd-pack-ub8 2)
-                (simd-pack-ub16 3)
-                (simd-pack-ub32 4)
-                (simd-pack-ub64 5)
-                (simd-pack-any 5)
-                (simd-pack-sb8 6)
-                (simd-pack-sb16 7)
-                (simd-pack-sb32 8)
-                (simd-pack-sb64 9)))
-         y simd-pack-tag-slot other-pointer-lowtag)
-     (let ((ea (object-slot-ea y simd-pack-lo-value-slot other-pointer-lowtag)))
-       (if (float-sse-p x)
-           (inst movaps ea x)
-           (inst movdqa ea x)))))
-(define-move-vop move-from-sse :move
-  (int-sse-reg single-sse-reg double-sse-reg) (descriptor-reg))
+(macrolet ((define-move-from-sse (type tag &rest scs)
+             (let ((name (symbolicate "MOVE-FROM-SSE/" type)))
+               `(progn
+                  (define-vop (,name)
+                    (:args (x :scs ,scs))
+                    (:results (y :scs (descriptor-reg)))
+                    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+                    (:node-var node)
+                    (:arg-types ,type)
+                    (:note "AVX2 to pointer coercion")
+                    (:generator 13
+                      (alloc-other simd-pack-widetag simd-pack-size y node nil thread-tn)
+                      (storew (fixnumize ,tag)
+                              y simd-pack-tag-slot other-pointer-lowtag)
+                      (let ((ea (object-slot-ea y simd-pack-lo-value-slot other-pointer-lowtag)))
+                        (if (float-sse-p x)
+                            (inst movaps ea x)
+                            (inst movdqa ea x)))))
+                  (define-move-vop ,name :move
+                    ,scs (descriptor-reg))))))
+  ;; see *simd-pack-element-types*
+  (define-move-from-sse simd-pack-single 0 single-sse-reg)
+  (define-move-from-sse simd-pack-double 1 double-sse-reg)
+  (define-move-from-sse simd-pack-ub8 2 int-sse-reg)
+  (define-move-from-sse simd-pack-ub16 3 int-sse-reg)
+  (define-move-from-sse simd-pack-ub32 4 int-sse-reg)
+  (define-move-from-sse simd-pack-ub64 5 int-sse-reg)
+  (define-move-from-sse simd-pack-sb8 6 int-sse-reg)
+  (define-move-from-sse simd-pack-sb16 7 int-sse-reg)
+  (define-move-from-sse simd-pack-sb32 8 int-sse-reg)
+  (define-move-from-sse simd-pack-sb64 9 int-sse-reg))
 
 (define-vop (move-to-sse)
   (:args (x :scs (descriptor-reg)))
@@ -218,10 +218,18 @@
     (inst movq tmp hi)
     (inst punpcklqdq dst tmp)))
 
+(defmacro simd-pack-dispatch (pack &body body)
+  (check-type pack symbol)
+  `(let ((,pack ,pack))
+     (etypecase ,pack
+       ,@(mapcar (lambda (eltype)
+                   `((simd-pack ,eltype) ,@body))
+          *simd-pack-element-types*))))
+
 #-sb-xc-host
 (macrolet ((unpack-unsigned (pack bits)
-             (once-only ((pack pack))
-               `(let ((lo (%simd-pack-low ,pack))
+             `(simd-pack-dispatch ,pack
+                (let ((lo (%simd-pack-low ,pack))
                       (hi (%simd-pack-high ,pack)))
                   (values
                    ,@(loop for pos by bits below 64 collect
@@ -252,8 +260,8 @@
 
 #-sb-xc-host
 (macrolet ((unpack-signed (pack bits)
-             (once-only ((pack pack))
-               `(let ((lo (%simd-pack-low ,pack))
+             `(simd-pack-dispatch ,pack
+                (let ((lo (%simd-pack-low ,pack))
                       (hi (%simd-pack-high ,pack)))
                   (values
                    ,@(loop for pos by bits below 64 collect
@@ -357,10 +365,11 @@
 (declaim (inline %simd-pack-singles))
 (defun %simd-pack-singles (pack)
   (declare (type simd-pack pack))
-  (values (%simd-pack-single-item pack 0)
-          (%simd-pack-single-item pack 1)
-          (%simd-pack-single-item pack 2)
-          (%simd-pack-single-item pack 3))))
+  (simd-pack-dispatch pack
+    (values (%simd-pack-single-item pack 0)
+            (%simd-pack-single-item pack 1)
+            (%simd-pack-single-item pack 2)
+            (%simd-pack-single-item pack 3)))))
 
 (defknown %simd-pack-double-item
   (simd-pack (integer 0 1)) double-float (flushable))
@@ -392,5 +401,6 @@
 (declaim (inline %simd-pack-doubles))
 (defun %simd-pack-doubles (pack)
   (declare (type simd-pack pack))
-  (values (%simd-pack-double-item pack 0)
-          (%simd-pack-double-item pack 1))))
+  (simd-pack-dispatch pack
+    (values (%simd-pack-double-item pack 0)
+            (%simd-pack-double-item pack 1)))))

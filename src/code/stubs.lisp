@@ -175,16 +175,16 @@
 #+sb-simd-pack
 (macrolet ((def (name)
              `(defun ,name (pack)
-                (declare (simd-pack pack))
-                (,name pack))))
+                (sb-vm::simd-pack-dispatch pack
+                  (,name pack)))))
   (def %simd-pack-low)
   (def %simd-pack-high))
 
 #+sb-simd-pack-256
 (macrolet ((def (name)
              `(defun ,name (pack)
-                (declare (simd-pack-256 pack))
-                (,name pack))))
+                (sb-vm::simd-pack-256-dispatch pack
+                  (,name pack)))))
   (def %simd-pack-256-0)
   (def %simd-pack-256-1)
   (def %simd-pack-256-2)

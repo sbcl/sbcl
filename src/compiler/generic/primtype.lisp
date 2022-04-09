@@ -116,8 +116,6 @@
     :type (simd-pack (signed-byte 32)))
   (!def-primitive-type simd-pack-sb64 (int-sse-reg descriptor-reg)
     :type (simd-pack (signed-byte 64)))
-  (!def-primitive-type simd-pack-any (single-sse-reg double-sse-reg int-sse-reg descriptor-reg)
-    :type simd-pack)
   (!def-primitive-type-alias simd-pack
    '(:or simd-pack-single
          simd-pack-double
@@ -128,8 +126,7 @@
          simd-pack-sb8
          simd-pack-sb16
          simd-pack-sb32
-         simd-pack-sb64
-         simd-pack-any)))
+         simd-pack-sb64)))
 #+sb-simd-pack-256
 (progn
   (!def-primitive-type simd-pack-256-single (single-avx2-reg descriptor-reg)
@@ -152,8 +149,6 @@
     :type (simd-pack-256 (signed-byte 32)))
   (!def-primitive-type simd-pack-256-sb64 (int-avx2-reg descriptor-reg)
     :type (simd-pack-256 (signed-byte 64)))
-  (!def-primitive-type simd-pack-256-any (single-avx2-reg double-avx2-reg int-avx2-reg descriptor-reg)
-    :type simd-pack-256)
   (!def-primitive-type-alias simd-pack-256
    '(:or simd-pack-256-single
          simd-pack-256-double
@@ -164,8 +159,7 @@
          simd-pack-256-sb8
          simd-pack-256-sb16
          simd-pack-256-sb32
-         simd-pack-256-sb64
-         simd-pack-256-any)))
+         simd-pack-256-sb64)))
 
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")
@@ -445,8 +439,8 @@
          (let* ((eltypes (simd-pack-type-element-type type))
                 (count (count 1 eltypes))
                 (position (position 1 eltypes)))
-           (cond ((/= count 1)
-                  (part-of simd-pack-any))
+           (if (= count 1)
+               (cond
                  ((eql position (position '(unsigned-byte 8) *simd-pack-element-types* :test #'equal))
                   (exactly simd-pack-ub8))
                  ((eql position (position '(unsigned-byte 16) *simd-pack-element-types* :test #'equal))
@@ -467,14 +461,15 @@
                   (exactly simd-pack-single))
                  ((eql position (position 'double-float *simd-pack-element-types* :test #'equal))
                   (exactly simd-pack-double))
-                 (t (any)))))
+                 (t (any)))
+               (any))))
         #+sb-simd-pack-256
         (simd-pack-256-type
          (let* ((eltypes (simd-pack-256-type-element-type type))
                 (count (count 1 eltypes))
                 (position (position 1 eltypes)))
-           (cond ((/= count 1)
-                  (part-of simd-pack-256-any))
+           (if (= count 1)
+               (cond
                  ((eql position (position '(unsigned-byte 8) *simd-pack-element-types* :test #'equal))
                   (exactly simd-pack-256-ub8))
                  ((eql position (position '(unsigned-byte 16) *simd-pack-element-types* :test #'equal))
@@ -495,7 +490,8 @@
                   (exactly simd-pack-256-single))
                  ((eql position (position 'double-float *simd-pack-element-types* :test #'equal))
                   (exactly simd-pack-256-double))
-                 (t (any)))))
+                 (t (any)))
+               (any))))
         (cons-type
          (part-of list))
         (built-in-classoid
