@@ -91,14 +91,14 @@
   (:results (y :scs (descriptor-reg)))
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:node-var node)
-  (:vop-var vop)
+  (:args-var args)
   (:note "AVX2 to pointer coercion")
   (:generator 13
      (alloc-other simd-pack-256-widetag simd-pack-256-size y node nil thread-tn)
      (storew (fixnumize
               ;; see *simd-pack-element-types*
               (ecase (primitive-type-name (tn-primitive-type
-                                           (tn-ref-tn (vop-args vop))))
+                                           (tn-ref-tn args)))
                 (simd-pack-256-single 0)
                 (simd-pack-256-double 1)
                 (simd-pack-256-ub8 2)
