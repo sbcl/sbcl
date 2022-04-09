@@ -312,28 +312,45 @@
 ;;; Should be run after DELETE-NO-OP-VOPS, otherwise the empty moves
 ;;; will interfere.
 (defun ir2-optimize-jumps (component)
-  (flet ((start-vop (block)
-           (do ((block block (ir2-block-next block)))
-               ((null block) nil)
-             (let ((vop (ir2-block-start-vop block)))
-               (when vop
-                 (if (eq (vop-name vop) 'sb-c:note-environment-start)
-                     (let ((next (vop-next vop)))
-                       (when next
-                         (return next)))
-                     (return vop))))))
-         (next-label (block)
-           (do ((block (ir2-block-next block)
-                  (ir2-block-next block)))
-               ((null block) nil)
-             (let ((label (or (ir2-block-%trampoline-label block)
-                              (ir2-block-%label block))))
-               (cond (label
-                      (return label))
-                     ((ir2-block-start-vop block)
-                      (return nil)))))))
-    (let ((*2block-info* (make-hash-table :test #'eq)))
-      (initialize-ir2-blocks-flow-info component)
+  (let ((*2block-info* (make-hash-table :test #'eq)))
+    (initialize-ir2-blocks-flow-info component)
+    (flet ((start-vop (block)
+             (do ((block block (ir2-block-next block)))
+                 ((null block) nil)
+               (let ((vop (ir2-block-start-vop block)))
+                 (when vop
+                   (if (eq (vop-name vop) 'sb-c:note-environment-start)
+                       (let ((next (vop-next vop)))
+                         (when next
+                           (return next)))
+                       (return vop))))))
+           (delete-chain (block)
+             (do ((block block (ir2-block-next block)))
+                 ((null block) nil)
+               ;; Just pop any block, *2block-info* is only used here
+               ;; and it just needs to know the number of predecessors,
+               ;; not their identity.
+               (pop (ir2block-predecessors block))
+               (if (ir2block-predecessors block)
+                   (return)
+                   (let ((vop (ir2-block-start-vop block)))
+                     (when vop
+                       (when (eq (vop-name vop) 'sb-c:note-environment-start)
+                         (setf vop (vop-next vop)))
+                       (when vop
+                         (aver (eq (vop-name vop) 'branch))
+                         (delete-vop vop)
+                         (return t)))))))
+           (next-label (block)
+             (do ((block (ir2-block-next block)
+                    (ir2-block-next block)))
+                 ((null block) nil)
+               (let ((label (or (ir2-block-%trampoline-label block)
+                                (ir2-block-%label block))))
+                 (cond (label
+                        (return label))
+                       ((ir2-block-start-vop block)
+                        (return nil)))))))
       (labels ((unchain-jumps (vop)
                  ;; Handle any branching vop except a multiway branch
                  (setf (first (vop-codegen-info vop))
@@ -346,15 +363,8 @@
                                (eq (vop-name target-vop) 'branch)
                                (neq (first (vop-codegen-info target-vop))
                                     target-label))
-                          ;; Just pop any block, *2block-info* is only
-                          ;; used here and it just needs to know the
-                          ;; number of predecessors, not their
-                          ;; identity.
                           (when delete
-                            (pop (ir2block-predecessors target-block))
-                            (if (ir2block-predecessors target-block)
-                                (setf delete nil)
-                                (delete-vop target-vop)))
+                            (setf delete (delete-chain target-block)))
                           (follow-jumps (first (vop-codegen-info target-vop)) delete))
                          (t
                           target-label))))
