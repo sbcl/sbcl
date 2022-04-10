@@ -1119,8 +1119,7 @@
                 (typecase what
                   (cons
                    (push name shadowed-funs)
-                   (let ((expression (cddr what)))
-                     (push (cons name expression) macros)))
+                   (push (cons name (cddr what)) macros))
                   ;; FIXME: Is there a good reason for this not to be
                   ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
                   ;; you're wondering how this ever worked :-)? Maybe
