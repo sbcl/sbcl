@@ -979,7 +979,7 @@
                nil
                (map 'vector
                     (lambda (cell)
-                      (let ((expander (cddr cell)))
+                      (let ((expander (caddr cell)))
                         (if (typep expander 'interpreted-function)
                             expander
                             (make-function
@@ -1129,7 +1129,7 @@
                (cons sym (make-global-var :%source-name sym
                                           :kind :special
                                           :where-from :declared))))
-           (macroize (name thing) (list* name 'sb-sys:macro thing))
+           (macroize (name thing) (list* name 'sb-sys:macro thing (function-lambda-expression thing)))
            (fname (f) (second (fun-name f))))
       (multiple-value-bind (vars funs)
           (typecase env
