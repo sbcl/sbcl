@@ -979,7 +979,7 @@
                nil
                (map 'vector
                     (lambda (cell)
-                      (let ((expander (caddr cell)))
+                      (let ((expander (cddr cell)))
                         (if (typep expander 'interpreted-function)
                             expander
                             (make-function
