@@ -617,32 +617,34 @@
 
 (define-load-time-global %%fill-bashers%% (make-array (1+ sb-vm:widetag-mask)
                                                       :initial-element 0))
-#.`(progn
-   ,@(loop for saetp across sb-vm:*specialized-array-element-type-properties*
-           for et = (sb-vm:saetp-specifier saetp)
-           if (or (null et)
-                  (sb-vm:valid-bit-bash-saetp-p saetp))
-           collect
-           (multiple-value-bind (basher value-transform)
-               (if et
-                   (sb-c::find-basher saetp)
-                   '(lambda (item vector start length)
-                     (declare (ignore item start length))
-                     (data-nil-vector-ref (truly-the (simple-array nil (*)) vector) 0)))
-             `(setf
-               (aref %%fill-bashers%% ,(sb-vm:saetp-typecode saetp))
-               (cons #',basher
-                     ,(if et
-                          `(lambda (sb-c::item)
-                             (declare (type ,et sb-c::item))
-                             ,value-transform)
-                          '#'identity))))
-           else do
-           ;; vector-fill* depends on this assertion
-           (assert (member et '(t (complex double-float)
-                                #-64-bit (complex single-float)
-                                #-64-bit double-float)
-                           :test #'equal))))
+(macrolet ((init-fill-bashers ()
+             `(progn
+                ,@(loop for saetp across sb-vm:*specialized-array-element-type-properties*
+                        for et = (sb-vm:saetp-specifier saetp)
+                        if (or (null et)
+                               (sb-vm:valid-bit-bash-saetp-p saetp))
+                          collect
+                          (multiple-value-bind (basher value-transform)
+                              (if et
+                                  (sb-c::find-basher saetp)
+                                  '(lambda (item vector start length)
+                                    (declare (ignore item start length))
+                                    (data-nil-vector-ref (truly-the (simple-array nil (*)) vector) 0)))
+                            `(setf
+                              (aref %%fill-bashers%% ,(sb-vm:saetp-typecode saetp))
+                              (cons #',basher
+                                    ,(if et
+                                         `(lambda (sb-c::item)
+                                            (declare (type ,et sb-c::item))
+                                            ,value-transform)
+                                         '#'identity))))
+                        else do
+                          ;; vector-fill* depends on this assertion
+                          (assert (member et '(t (complex double-float)
+                                               #-64-bit (complex single-float)
+                                               #-64-bit double-float)
+                                          :test #'equal))))))
+  (init-fill-bashers))
 
 (defun vector-fill* (vector item start end)
   (declare (type index start) (type (or index null) end)

@@ -45,11 +45,9 @@
       (do-mfuns *tagged-modular-class*)))
   `(progn ,@(forms)))
 
-#.`
-(defun ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits)
-                "SB-VM")
+(defun #.(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")
     (integer amount)
-  (ldb (byte ,sb-vm:n-machine-word-bits 0) (ash integer amount)))
+  (ldb (byte #.sb-vm:n-machine-word-bits 0) (ash integer amount)))
 
 #+(or x86 x86-64 arm arm64)
 (defun sb-vm::ash-left-modfx (integer amount)

@@ -129,25 +129,28 @@
 (defun (setf %instance-ref) (newval instance index)
   (%instance-set instance index newval)
   newval)
-#.`(progn
-     ,@(map 'list
-            (lambda (rsd)
-              (let* ((reader (sb-kernel::raw-slot-data-reader-name rsd))
-                     (writer (sb-kernel::raw-slot-data-writer-name rsd))
-                     (type (sb-kernel::raw-slot-data-raw-type rsd)))
-                `(progn
-                   (defun ,reader (instance index) (,reader instance index))
-                   ;; create a well-behaving SETF-compatible slot setter
-                   (defun (setf ,reader) (newval instance index)
-                     (declare (,type newval))
-                     (,writer instance index newval)
-                     newval)
-                   ;; .. and a non-SETF-compatible one
-                   (defun ,writer (instance index newval)
-                     (declare (,type newval))
-                     (,writer instance index newval)
-                     (values)))))
-            sb-kernel::*raw-slot-data*))
+
+(macrolet ((define-raw-slot-accessors ()
+             `(progn
+                ,@(map 'list
+                       (lambda (rsd)
+                         (let* ((reader (sb-kernel::raw-slot-data-reader-name rsd))
+                                (writer (sb-kernel::raw-slot-data-writer-name rsd))
+                                (type (sb-kernel::raw-slot-data-raw-type rsd)))
+                           `(progn
+                              (defun ,reader (instance index) (,reader instance index))
+                              ;; create a well-behaving SETF-compatible slot setter
+                              (defun (setf ,reader) (newval instance index)
+                                (declare (,type newval))
+                                (,writer instance index newval)
+                                newval)
+                              ;; .. and a non-SETF-compatible one
+                              (defun ,writer (instance index newval)
+                                (declare (,type newval))
+                                (,writer instance index newval)
+                                (values)))))
+                       sb-kernel::*raw-slot-data*))))
+  (define-raw-slot-accessors))
 
 (macrolet ((id-bits-sap ()
              `(sap+ (int-sap (get-lisp-obj-address layout))

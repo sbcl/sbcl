@@ -247,18 +247,20 @@
   sb-vm:signed-word ())
 (defknown %raw-instance-xchg/word (instance index sb-vm:word) sb-vm:word ())
 
-#.`(progn
-     ,@(map 'list
-            (lambda (rsd)
-              (let* ((reader (sb-kernel::raw-slot-data-reader-name rsd))
-                     (writer (sb-kernel::raw-slot-data-writer-name rsd))
-                     (type (sb-kernel::raw-slot-data-raw-type rsd)))
-                `(progn
-                   (defknown ,reader (instance index) ,type
-                     (flushable always-translatable))
-                   (defknown ,writer (instance index ,type) (values)
-                     (always-translatable)))))
-            sb-kernel::*raw-slot-data*))
+(macrolet ((define-raw-slot-defknowns ()
+             `(progn
+                ,@(map 'list
+                       (lambda (rsd)
+                         (let* ((reader (sb-kernel::raw-slot-data-reader-name rsd))
+                                (writer (sb-kernel::raw-slot-data-writer-name rsd))
+                                (type (sb-kernel::raw-slot-data-raw-type rsd)))
+                           `(progn
+                              (defknown ,reader (instance index) ,type
+                                  (flushable always-translatable))
+                              (defknown ,writer (instance index ,type) (values)
+                                  (always-translatable)))))
+                       sb-kernel::*raw-slot-data*))))
+  (define-raw-slot-defknowns))
 
 #+compare-and-swap-vops
 (defknown %raw-instance-atomic-incf/word (instance index sb-vm:word) sb-vm:word
