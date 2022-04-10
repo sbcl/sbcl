@@ -115,6 +115,7 @@
 
   ;; instances
   (def %make-instance) ; Allocate a new instance with X data slots.
+  (def %make-instance/mixed)
   (def %instance-length) ; Given an instance, return its length.
   (def %instance-layout)
   (def %instance-wrapper)

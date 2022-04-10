@@ -122,7 +122,8 @@
     ;;   depending on whether layouts are in immobile space.
     ;; - for a small number of slots, copying them is inlined
     (cond ((not dd) ; it's going to be some subtype of NAME
-           `(%copy-instance (%make-instance (%instance-length instance)) instance))
+           ;; pessimistically assume MIXED rather than choosing at runtime
+           `(%copy-instance (%make-instance/mixed (%instance-length instance)) instance))
           ((<= (dd-length dd) max-inlined-words)
            `(let ((copy (%make-structure-instance ,dd nil)))
               ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,

@@ -1874,7 +1874,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MAKE-ARRAY"
            "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE"
            "%MAKE-FUNCALLABLE-STRUCTURE-INSTANCE-ALLOCATOR"
-           "%MAKE-INSTANCE"
+           "%MAKE-INSTANCE" "%MAKE-INSTANCE/MIXED"
            "%MAKE-LISP-OBJ"
            "%MAKE-LIST"
            "%MAKE-RATIO"

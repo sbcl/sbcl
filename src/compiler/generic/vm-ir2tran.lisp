@@ -12,6 +12,8 @@
 (def-alloc '%make-structure-instance 1 :structure-alloc
            sb-vm:instance-widetag sb-vm:instance-pointer-lowtag
            nil)
+(def-alloc '%make-instance/mixed 1 :var-alloc
+           sb-vm:instance-widetag sb-vm:instance-pointer-lowtag nil)
 
 (defoptimizer (%make-structure-instance stack-allocate-result)
     ((defstruct-description &rest args) node dx)
@@ -27,6 +29,10 @@
       (not (dd-has-raw-slot-p (lvar-value defstruct-description)))))
 
 (defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
+  (declare (ignore n))
+  (eq dx 'truly-dynamic-extent))
+#+(and gencgc c-stack-is-control-stack)
+(defoptimizer (%make-instance/mixed stack-allocate-result) ((n) node dx)
   (declare (ignore n))
   (eq dx 'truly-dynamic-extent))
 (defoptimizer (%make-funcallable-instance stack-allocate-result) ((n) node dx)

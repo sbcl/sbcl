@@ -205,7 +205,7 @@
   (flushable no-verify-arg-count)
   :result-arg 0)
 
-(defknown %make-instance (index) instance
+(defknown (%make-instance %make-instance/mixed) (index) instance
   (flushable))
 (defknown %make-structure-instance (defstruct-description list &rest t) instance
   (flushable always-translatable))

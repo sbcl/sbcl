@@ -916,7 +916,7 @@
 ;;;  BIGNUM               (%ALLOCATE-BIGNUM)
 ;;;  FUNCALLABLE-INSTANCE (%MAKE-FUNCALLABLE-INSTANCE)
 ;;;  CLOSURE              (%ALLOC-CLOSURE)
-;;;  INSTANCE             (%MAKE-INSTANCE)
+;;;  INSTANCE             (%MAKE-INSTANCE,%MAKE-INSTANCE/MIXED)
 ;;; WORDS accounts for the mandatory slots *including* the header.
 ;;; EXTRA is the variable payload, also measured in words.
 (define-vop (var-alloc)

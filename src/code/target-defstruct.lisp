@@ -115,8 +115,13 @@
 ;;; when given a STRUCTURE-OBJECT.
 (defun allocate-struct (type)
   (let* ((wrapper (classoid-wrapper (the structure-classoid (find-classoid type))))
-         (structure (%new-instance wrapper (wrapper-length wrapper))))
-    (dolist (dsd (dd-slots (wrapper-dd wrapper)) structure)
+         (dd (wrapper-dd wrapper))
+         (structure (let ((len (wrapper-length wrapper)))
+                      (if (dd-has-raw-slot-p dd)
+                          (%make-instance/mixed len)
+                          (%make-instance len)))))
+    (%set-instance-layout structure wrapper)
+    (dolist (dsd (dd-slots dd) structure)
       (when (eq (dsd-raw-type dsd) 't)
         (%instance-set structure (dsd-index dsd) (make-unbound-marker))))))
 
@@ -207,10 +212,13 @@
 ;;; Because this sure as heck doesn't check anything]
 #+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
-  (let ((instance (%new-instance (dd-layout-or-lose dd)
-                                 (dd-length dd))) ; length = sans header word
+  (let ((instance (let ((len (dd-length dd))) ; # of words excluding the header
+                    (if (dd-has-raw-slot-p dd)
+                        (%make-instance/mixed len)
+                        (%make-instance len))))
         (value-index 0))
     (declare (index value-index))
+    (%set-instance-layout instance (dd-layout-or-lose dd))
     (dolist (spec slot-specs instance)
       (destructuring-bind (kind raw-type . index) spec
         (if (eq kind :unbound)
@@ -328,23 +336,33 @@
   ;; instance excluding any padding and/or stable-hash slot.
   ;; Variable-length structure types are allowed.
   (let* ((layout (%instance-layout structure))
-         (len (%instance-length structure))
-         (res (%new-instance layout len)))
+         (len (%instance-length structure)))
     ;; The finicky backends disallow loading and storing raw words
     ;; using %INSTANCE-REF. The robust backends allow it.
     ;; MIPS is probably robust, but I don't care to try it.
-    (if (or #+(or x86 x86-64) t
-            (logtest (layout-flags layout) sb-vm::+strictly-boxed-flag+))
-        (do ((i sb-vm:instance-data-start (1+ i)))
-            ((>= i len))
-          (declare (index i))
-          (%instance-set res i (%instance-ref structure i)))
-        (do-layout-bitmap (i taggedp layout len)
-          (if taggedp
-              (%instance-set res i (%instance-ref structure i))
-              (%raw-instance-set/word
-               res i (%raw-instance-ref/word structure i)))))
-    res))
+    (macrolet ((fast-loop ()
+                 `(do ((i sb-vm:instance-data-start (1+ i)))
+                      ((>= i len) res)
+                    (declare (index i))
+                    (%instance-set res i (%instance-ref structure i)))))
+      #+(or x86 x86-64) ; Two allocators, but same loop either way
+      (let ((res (if (logtest (layout-flags layout) sb-vm::+strictly-boxed-flag+)
+                     (%make-instance len)
+                     (%make-instance/mixed len))))
+        (%set-instance-layout res layout)
+        (fast-loop))
+      #-(or x86 x86-64) ; Different loops
+      (if (logtest (layout-flags layout) sb-vm::+strictly-boxed-flag+)
+          (let ((res (%new-instance layout len)))
+            (fast-loop))
+          (let ((res (%make-instance/mixed len)))
+            (%set-instance-layout res layout)
+            (do-layout-bitmap (i taggedp layout len)
+              (if taggedp
+                  (%instance-set res i (%instance-ref structure i))
+                  (%raw-instance-set/word
+                   res i (%raw-instance-ref/word structure i))))
+            res)))))
 
 ;;; Like above, but copy all slots (including the LAYOUT) as though boxed.
 ;;; If the structure might contain raw slots and the GC is precise,
