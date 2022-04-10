@@ -287,42 +287,65 @@
 
   (dd-name dd))
 
+;;; Similar to DO-INSTANCE-TAGGED-SLOT but iterating over all words.
+(defmacro do-layout-bitmap ((index-var taggedp-var layout count) &body guts)
+  `(let* ((layout ,layout)
+          ;; Start counting from the next bitmap word as we've consumed one already
+          (bitmap-word-index ,(1+ (type-dd-length sb-vm:layout)))
+          (bitmap-word-limit (%instance-length layout))
+          ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
+          ;; because it's not user-visible data.
+          (mask (ash (%raw-instance-ref/signed-word layout ,(type-dd-length sb-vm:layout))
+                     ,(- sb-vm:instance-data-start)))
+          ;; If this was the last word of the bitmap, then the high bit
+          ;; is infinitely sign-extended, and we can keep right-shifting
+          ;; the mask word indefinitely. Most bitmaps will have only 1 word.
+          (nbits (if (= bitmap-word-index bitmap-word-limit)
+                     ,sb-vm:instance-length-mask
+                     ,(- sb-vm:n-word-bits sb-vm:instance-data-start))))
+     (declare (type sb-vm:signed-word mask)
+              (type fixnum nbits))
+     (do ((,index-var sb-vm:instance-data-start (1+ ,index-var))
+          (end ,count))
+         ((>= ,index-var end))
+       (declare (type (unsigned-byte 14) ,index-var))
+       ;; If mask was fully consumed, fetch the next bitmap word
+       (when (zerop nbits)
+         (setq mask (%raw-instance-ref/signed-word layout bitmap-word-index)
+               nbits (if (= (incf (truly-the index bitmap-word-index))
+                            bitmap-word-limit)
+                         ,sb-vm:instance-length-mask
+                         ,sb-vm:n-word-bits)))
+       (let ((,taggedp-var (logbitp 0 mask))) ,@guts)
+       (setq mask (ash mask -1)
+             nbits (truly-the fixnum (1- nbits))))))
+
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)
   "Return a copy of STRUCTURE with the same (EQL) slot values."
   (declare (type structure-object structure))
-  (let ((wrapper (%instance-wrapper structure)))
-    (when (wrapper-invalid wrapper)
-      (error "attempt to copy an obsolete structure:~%  ~S" structure))
-    ;; Previously this had to used LAYOUT-LENGTH in the allocation,
-    ;; to avoid copying random bits from the stack to the heap if you had a
-    ;; padding word in a stack-allocated instance. This is no longer an issue.
-    ;; %INSTANCE-LENGTH returns the number of words that are logically in the
-    ;; instance, with no padding. Using %INSTANCE-LENGTH allows potentially
-    ;; interesting nonstandard things like variable-length structures.
-    (let* ((len (%instance-length structure))
-           (res (%new-instance (%instance-layout structure) len)))
-      (declare (type index len))
-      (let ((bitmap (dd-bitmap (wrapper-dd wrapper))))
-        ;; On backends which don't segregate descriptor vs. non-descriptor
-        ;; registers, we could speed up this code in an obvious way.
-        (macrolet ((copy-loop (tagged-p &optional step)
-                     `(do ((i sb-vm:instance-data-start (1+ i)))
-                          ((>= i len))
-                        (declare (index i))
-                        (if ,tagged-p
-                            (%instance-set res i (%instance-ref structure i))
-                            (%raw-instance-set/word res i
-                                  (%raw-instance-ref/word structure i)))
-                        ,step)))
-          (cond ((eql bitmap +layout-all-tagged+) (copy-loop t))
-                ;; The fixnum case uses fixnum operations for ODDP and ASH.
-                ((fixnump bitmap) ; shift and mask is faster than logbitp
-                 (copy-loop (oddp (truly-the fixnum bitmap))
-                            (setq bitmap (ash bitmap -1))))
-                (t ; bignum - use LOGBITP to avoid consing more bignums
-                 (copy-loop (logbitp i bitmap))))))
-      res)))
+  ;; %INSTANCE-LENGTH returns the number of words that are logically in the
+  ;; instance excluding any padding and/or stable-hash slot.
+  ;; Variable-length structure types are allowed.
+  (let* ((layout (%instance-layout structure))
+         (len (%instance-length structure))
+         (res (%new-instance layout len)))
+    ;; The finicky backends disallow loading and storing raw words
+    ;; using %INSTANCE-REF. The robust backends allow it.
+    ;; MIPS is probably robust, but I don't care to try it.
+    (if (or #+(or x86 x86-64) t
+            (logtest (layout-flags layout) sb-vm::+strictly-boxed-flag+))
+        (do ((i sb-vm:instance-data-start (1+ i)))
+            ((>= i len))
+          (declare (index i))
+          (%instance-set res i (%instance-ref structure i)))
+        (do-layout-bitmap (i taggedp layout len)
+          (if taggedp
+              (%instance-set res i (%instance-ref structure i))
+              (%raw-instance-set/word
+               res i (%raw-instance-ref/word structure i)))))
+    res))
+
 ;;; Like above, but copy all slots (including the LAYOUT) as though boxed.
 ;;; If the structure might contain raw slots and the GC is precise,
 ;;; this won't ever be called.

@@ -92,17 +92,11 @@
 ;;; The structure constructor is never called
 ;;; Can't freeze theis type because INSTANCE-LENGTH is variable,
 ;;; but freezing would make it constant henceforth.
-(sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil) (:copier nil))
+(sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil))
   cells)
 (eval-when (#-sb-xc-host :compile-toplevel)
   (sb-xc:defmacro make-packed-info (n)
-    `(%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start)))
-  ;; We can't call COPY-STRUCTURE because during bootstrapping, the DEFSTRUCT-DESCRIPTION
-  ;; is not available in cold-init by the first call to COPY-PACKED-INFO,
-  ;;    but COPY-STRUCTURE needs to know whether there are raw slos.
-  (sb-xc:defmacro copy-packed-info (info)
-    ;; not bothering with ONCE-ONLY here (doesn't matter)
-    `(%copy-instance (%make-instance (%instance-length ,info)) ,info)))
+    `(%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start))))
 
 (defconstant info-num-mask (ldb (byte info-number-bits 0) -1)) ; #b111111
 
