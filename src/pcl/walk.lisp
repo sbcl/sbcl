@@ -224,9 +224,10 @@
 
 (defun convert-macro-to-lambda (llist body env &optional (name "dummy macro"))
   (declare (ignorable llist body env name))
-  #+sb-xc-host (error "CONVERT-MACRO-TO-LAMBDA called") ; no EVAL-IN-LEXENV
-  #-sb-xc-host
   (let ((gensym (make-symbol name)))
+    #+sb-xc-host
+    (eval `(sb-xc:defmacro ,gensym ,llist ,@body))
+    #-sb-xc-host
     (eval-in-lexenv `(defmacro ,gensym ,llist ,@body)
                     (sb-c::make-restricted-lexenv env))
     (macro-function gensym)))
