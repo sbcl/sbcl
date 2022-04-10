@@ -87,10 +87,6 @@
                          sb-vm:bignum-digits-offset
                          index offset))
 
-(defun dd-contains-raw-slots-p (dd)
-  (dolist (dsd (dd-slots dd))
-    (unless (eq (dsd-raw-type dsd) t) (return t))))
-
 (deftransform copy-structure ((instance) * * :result result :node node)
   (let* ((classoid (lvar-type instance))
          (name (and (structure-classoid-p classoid) (classoid-name classoid)))
@@ -106,14 +102,14 @@
          (max-inlined-words 5))
     (unless (and result ; could be unused result (but entire call wasn't flushed?)
                  layout
-                 ;; And don't copy if raw slots are present on the precisely GCed backends.
-                 ;; To enable that, we'd want variants for {"all-raw", "all-boxed", "mixed"}
+                 ;; Fail if raw slots are present on the precisely GCed backends.
                  ;; Also note that VAR-ALLOC can not cope with dynamic-extent except where
                  ;; support has been added (x86oid so far); so requiring an exact type here
                  ;; causes VAR-ALLOC to become FIXED-ALLOC which works on more architectures.
-                 #-c-stack-is-control-stack (and dd (not (dd-contains-raw-slots-p dd)))
+                 #-c-stack-is-control-stack (and dd (not (dd-has-raw-slot-p dd)))
 
                  ;; Definitely do this if copying to stack
+                 ;; (Allocation has to be inlined, otherwise there's no way to DX it)
                  (or (lvar-dynamic-extent result)
                      ;; Or if it's a small fixed number of words
                      ;; and speed at least as important as size.

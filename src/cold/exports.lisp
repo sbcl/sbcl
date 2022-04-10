@@ -2468,7 +2468,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "NOTE-NAME-DEFINED"
            "%CODE-CODE-SIZE" "%CODE-TEXT-SIZE"
            "%CODE-SERIALNO"
-           "DD-SLOTS" "DD-INCLUDE" "SLOT-SETTER-LAMBDA-FORM"
+           "DD-SLOTS" "DD-HAS-RAW-SLOT-P" "DD-INCLUDE" "SLOT-SETTER-LAMBDA-FORM"
            "SLOT-ACCESS-TRANSFORM"
            "%IMAGPART" "%CODE-DEBUG-INFO"
            "WRAPPER-CLASSOID" "WRAPPER-INVALID"

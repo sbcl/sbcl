@@ -21,14 +21,10 @@
   ;; slots, or if we're on a target with a conservatively-scavenged
   ;; stack.  We have no reader conditional for stack conservation, but
   ;; it turns out that the only time stack conservation is in play is
-  ;; when we're on GENCGC (since CHENEYGC doesn't have conservation)
-  ;; and C-STACK-IS-CONTROL-STACK (otherwise, the C stack is the
+  ;; C-STACK-IS-CONTROL-STACK (otherwise, the C stack is the
   ;; number stack, and we precisely-scavenge the control stack).
-  #-(and :gencgc :c-stack-is-control-stack)
-  (every (lambda (x) (eq (dsd-raw-type x) t))
-         (dd-slots (lvar-value defstruct-description)))
-  #+(and :gencgc :c-stack-is-control-stack)
-  t)
+  (or #+c-stack-is-control-stack t
+      (not (dd-has-raw-slot-p (lvar-value defstruct-description)))))
 
 (defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
   (declare (ignore n))

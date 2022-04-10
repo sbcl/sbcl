@@ -191,7 +191,7 @@
 (defun dd-lisp-type (defstruct)
   (ecase (dd-type defstruct)
     (list 'list)
-    (vector `(simple-array ,(dd-element-type defstruct) (*)))))
+    (vector `(simple-array ,(dd-%element-type defstruct) (*)))))
 
 ;;;; shared machinery for inline and out-of-line slot accessor functions
 
@@ -493,7 +493,7 @@
               (new-value '(value))
               (structure '(structure))
               (slot-type `(and ,(dsd-type slot)
-                               ,(dd-element-type defstruct))))
+                               ,(dd-%element-type defstruct))))
           (let ((inherited (accessor-inherited-data name defstruct)))
             (cond
               ((not inherited)
@@ -614,10 +614,20 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
        (setf (dd-print-option dd) keyword (dd-printer-fname dd) arg))
       (:type
        (cond ((member arg '(list vector))
-              (setf (dd-type dd) arg (dd-element-type dd) t))
+              (setf (dd-type dd) arg (dd-%element-type dd) t))
              ((and (listp arg) (eq (first arg) 'vector))
+              ;; The spec is self-contradictory about this!
+              ;; It defines:
+              ;;  type-option::= (:type type)
+              ;;  type --- one of the type specifiers list, vector, or (vector size),
+              ;;  or some other type specifier defined by the implementation to be appropriate.
+              ;; However the description of the keyword makes it pretty clear that
+              ;; the option's syntax is (vector /element-type/).
+              ;; I'm not sure if it's valid to specify (VECTOR *) as the representation.
+              ;; CLISP thinks it is not, but only signals an error when the constructor
+              ;; is called. So at minimum it's unportable, if not illegal.
               (destructuring-bind (elt-type) (cdr arg)
-                (setf (dd-type dd) 'vector (dd-element-type dd) elt-type)))
+                (setf (dd-type dd) 'vector (dd-%element-type dd) elt-type)))
              (t
               (error "~S is a bad :TYPE for DEFSTRUCT." arg))))
       (:named
@@ -668,11 +678,11 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
            ;; CLHS - "The structure can be :named only if the type SYMBOL
            ;; is a subtype of the supplied element-type."
            (multiple-value-bind (winp certainp)
-               (subtypep 'symbol (dd-element-type dd))
+               (subtypep 'symbol (dd-%element-type dd))
              (when (and (not winp) certainp)
                (error ":NAMED option is incompatible with element ~
                         type ~/sb-impl:print-type-specifier/"
-                      (dd-element-type dd))))
+                      (dd-%element-type dd))))
            (when (dd-predicate-name dd)
              (error ":PREDICATE cannot be used with :TYPE ~
 unless :NAMED is also specified.")))
@@ -767,8 +777,12 @@ unless :NAMED is also specified.")))
                (nth-value 1 (parse-1-dsd proto-classoid dd slot-description))))
           (comparator-list comparator)))
       (when (dd-class-p dd)
-        (setf (dd-bitmap dd) (calculate-dd-bitmap dd)))
+        (multiple-value-bind (bitmap any-raw) (calculate-dd-bitmap dd)
+          (when any-raw (setf (dd-%element-type dd) '*))
+          (setf (dd-bitmap dd) bitmap)))
       (values inherits (comparator-list)))))
+
+(defmacro dd-has-raw-slot-p (dd) `(eq (dd-%element-type ,dd) '*))
 
 ;;;; stuff to parse slot descriptions
 
@@ -967,6 +981,19 @@ unless :NAMED is also specified.")))
 (defun typed-structure-info-or-lose (name)
   (or (info :typed-structure :info name)
       (error ":TYPE'd DEFSTRUCT ~S not found for inclusion." name)))
+
+(defmacro dd-element-type (dd)
+  `(case (dd-type ,dd)
+     (vector
+      ;; %ELEMENT-TYPE might actually be * which is weird
+      ;; but seems to mostly work. I suspect that it should not.
+      (dd-%element-type ,dd))
+     (t
+      ;; In theory we have the ability to represent that all slots
+      ;; of a classoid structure are of type SB-VM:WORD (for example),
+      ;; but in practice that is not useful.
+      ;; Just don't return * which is not a type specifier.
+      t)))
 
 ;;; Process any included slots pretty much like they were specified.
 ;;; Also inherit various other attributes.
@@ -1594,7 +1621,7 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; as a pending-deletion flag. See "src/code/target-lflist.lisp")
     (when (dd-custom-gc-method-p dd)
       (aver (eq rest :unspecific))
-      (return-from calculate-dd-bitmap minimal-bitmap))
+      (return-from calculate-dd-bitmap (values minimal-bitmap any-raw)))
 
     ;; The minimal bitmap will have the least number of bits set, and the maximal
     ;; will have the most, but it is not always a performance improvement to prefer
@@ -1614,13 +1641,14 @@ or they must be declared locally notinline at each call site.~@:>"
       ;; If the trailing slots have tagged nature, extend bitmap with
       ;; an infinite sequence of 1 bits. If :UNSPECIFIC, replicate
       ;; the most-significant-bit whether it be 0 or 1.
-      (cond ((or (eq rest :tagged)
-                 (and (eq rest :unspecific)
-                      (plusp n-bits)
-                      (logbitp (1- n-bits) bitmap)))
-             (dpb bitmap (byte n-bits 0) -1))
-            (t
-             bitmap)))))
+      (values (cond ((or (eq rest :tagged)
+                         (and (eq rest :unspecific)
+                              (plusp n-bits)
+                              (logbitp (1- n-bits) bitmap)))
+                     (dpb bitmap (byte n-bits 0) -1))
+                    (t
+                     bitmap))
+              any-raw))))
 
 ;;; This is called when we are about to define a structure class. It
 ;;; returns a (possibly new) class object and the layout which should
@@ -1774,7 +1802,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; be a (VECTOR T). If not, we fallback to MAKE-ARRAY and (SETF AREF).
 (defun typed-constructor-form (dd values)
   (multiple-value-bind (operator initial-element)
-      (cond ((and (eq (dd-type dd) 'vector) (eq (dd-element-type dd) t))
+      (cond ((and (eq (dd-type dd) 'vector) (eq (dd-%element-type dd) t))
              (values 'vector 0))
             ((eq (dd-type dd) 'list)
              (values 'list nil)))
@@ -1801,7 +1829,7 @@ or they must be declared locally notinline at each call site.~@:>"
             (cons operator vals))
           (let ((temp (make-symbol "OBJ")))
             `(let ((,temp (make-array ,length
-                                      :element-type ',(dd-element-type dd))))
+                                      :element-type ',(dd-%element-type dd))))
                ,@(mapcar (lambda (x) `(setf (aref ,temp ,(cdr x))  ',(car x)))
                          names)
                ,@(mapcan (lambda (dsd val)
@@ -1853,7 +1881,7 @@ or they must be declared locally notinline at each call site.~@:>"
                           keys))))))
       (values ,(cond ((dd-class-p dd) (dd-name dd))
                      ((eq (dd-type dd) 'list) 'list)
-                     (t `(vector ,(dd-element-type dd) ,(dd-length dd))))
+                     (t `(vector ,(dd-%element-type dd) ,(dd-length dd))))
               &optional))))
 
 ;;; Return the ftype of global function NAME.

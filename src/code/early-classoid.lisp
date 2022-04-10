@@ -59,16 +59,21 @@
   (inherited-accessor-alist () :type list)
   ;; number of data words, including the layout itself if the layout
   ;; requires an entire word (when no immobile-space)
+  ;; Technically this is redundant information: it can be derived from DD-SLOTS
+  ;; by taking the index of the final slot and adding its length in words.
+  ;; If there are no slots, then it's just INSTANCE-DATA-START.
   (length 0 :type index)
   ;; General kind of implementation.
   (type 'structure :type (member structure vector list
                                  funcallable-structure))
 
-  ;; The next three slots are for :TYPE'd structures (which aren't
+  ;; If this structure is a classoid, then T if all slots are tagged, * if not.
+  ;; If a vector, the vector element type.
+  ;; If a list, not used.
+  (%element-type t)
+  ;; The next two slots are for :TYPE'd structures (which aren't
   ;; classes, DD-CLASS-P = NIL)
   ;;
-  ;; vector element type
-  (element-type t)
   ;; T if :NAMED was explicitly specified, NIL otherwise
   (named nil :type boolean)
   ;; any INITIAL-OFFSET option on this direct type
@@ -315,8 +320,7 @@
         (when (or (logtest flags (logior +pathname-layout-flag+ +condition-layout-flag+))
                   (and (logtest flags +structure-layout-flag+)
                        dd
-                       (every (lambda (x) (eq (dsd-raw-type x) t))
-                              (dd-slots dd))))
+                       (eq (dd-%element-type dd) 't)))
           (setf flags (logior flags +strictly-boxed-flag+))))
       ;; KLUDGE: I really don't care to make defstruct-with-alternate-metaclass
       ;; any more complicated than necessary. It is unable to express that
