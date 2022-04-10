@@ -65,7 +65,7 @@
       (setf (sb-c::lexenv-funs env)
             (nconc
              (loop for (name def) in macro
-                collect (cons name (cons 'sb-sys::macro def)))
+                collect (cons name (list* 'sb-sys::macro def (function-lambda-expression def))))
              (sb-c::lexenv-funs env))))
 
     (when symbol-macro

@@ -900,7 +900,7 @@
                                        *inline-expansions*)
                                 (list* lexical-def 1 *inline-expansions*))))
                       (ir1-convert start next result
-                                   (careful-expand-macro (cdr lexical-def) form)))
+                                   (careful-expand-macro (cadr lexical-def) form)))
                     (progn
                       (compiler-warn "Recursion limit reached while expanding local macro ~
 ~/sb-ext:print-symbol-with-prefix/" op)

@@ -82,9 +82,9 @@
 ;;; variables, blocks, etc. Except for SYMBOL-MACROLET, only the
 ;;; SB-C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),
 ;;; where What is either a functional (a local function) or a list
-;;; (MACRO . <function>) (a local macro, with the specifier expander.)
-;;; Note that Name may be a (SETF <name>) function. Accessors are
-;;; defined below, eg (ENV-WALK-FUNCTION ENV).
+;;; (MACRO <function> . <form>) (a local macro, with the specifier
+;;; expander.)  Note that Name may be a (SETF <name>)
+;;; function. Accessors are defined below, eg (ENV-WALK-FUNCTION ENV).
 ;;;
 ;;; If WITH-AUGMENTED-ENVIRONMENT is called from WALKER-ENVIRONMENT-BIND
 ;;; this code hides the WALKER version of an environment
@@ -101,7 +101,7 @@
 ;;;
 ;;; Instead, we now use a special sort of "function"-type for that
 ;;; information, because the functions slot in SB-C::LEXENV is
-;;; supposed to have a list of <Name MACRO . #<function> elements.
+;;; supposed to have a list of <Name MACRO #<function> . <form> elements.
 ;;; So, now we hide our bits of interest in the walker-info slot in
 ;;; our new BOGO-FUN.
 ;;;
@@ -173,12 +173,13 @@
                                    (sb-c::make-functional :lexenv lexenv)))
                            funs)
                    (mapcar (lambda (m)
-                             (list* (car m)
-                                    'sb-sys:macro
-                                    (if (eq (car m)
-                                            *key-to-walker-environment*)
-                                        (walker-info-to-bogo-fun (cadr m))
-                                        (coerce (cadr m) 'function))))
+                             (destructuring-bind (name form) m
+                               (list* name
+                                      'sb-sys:macro
+                                      (if (eq name *key-to-walker-environment*)
+                                          (walker-info-to-bogo-fun form)
+                                          (coerce form 'function))
+                                      form)))
                            macros)))))
 
 (defun environment-function (env fn)
@@ -194,8 +195,8 @@
       (and entry
            (eq (cadr entry) 'sb-sys:macro)
            (if (eq macro *key-to-walker-environment*)
-               (values (bogo-fun-to-walker-info (cddr entry)))
-               (values (function-lambda-expression (cddr entry))))))))
+               (values (bogo-fun-to-walker-info (caddr entry)))
+               (values (cadddr entry)))))))
 
 ;;;; other environment hacking, not so SBCL-specific as the
 ;;;; environment hacking in the previous section

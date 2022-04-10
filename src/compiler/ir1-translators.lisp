@@ -324,25 +324,18 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
           (unless (listp arglist)
             (fail "The local macro argument list ~S is not a list."
                   arglist))
-          `(,name macro .
-                  ;; I guess the reason we want to compile here rather than possibly
-                  ;; using an interpreted lambda is that we generate the usual gamut
-                  ;; of style-warnings and such. One might wonder if this could somehow
-                  ;; go through the front-most part of the front-end, to deal with
-                  ;; semantics, but then generate an interpreted function or something
-                  ;; more quick to emit than machine code.
-                  ,(compile-in-lexenv
-                    (let (#-sb-xc-host
-                          (*macro-policy*
-                            ;; Make sure to save the sources if an
-                            ;; inlined functions closes over this
-                            ;; macro.
-                            (process-optimize-decl
-                             '(optimize (store-source-form 3))
-                             *macro-policy*)))
-                      (make-macro-lambda nil arglist body 'macrolet name))
-                    lexenv
-                    nil nil nil t nil))))))) ; name source-info tlf ephemeral errorp
+          (let ((lambda (make-macro-lambda nil arglist body 'macrolet name)))
+            `(,name macro
+                    ;; I guess the reason we want to compile here rather than possibly
+                    ;; using an interpreted lambda is that we generate the usual gamut
+                    ;; of style-warnings and such. One might wonder if this could somehow
+                    ;; go through the front-most part of the front-end, to deal with
+                    ;; semantics, but then generate an interpreted function or something
+                    ;; more quick to emit than machine code.
+                    ,(compile-in-lexenv lambda lexenv
+                                        ;; name source-info tlf ephemeral errorp
+                                        nil nil nil t nil)
+                    . ,lambda)))))))
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv

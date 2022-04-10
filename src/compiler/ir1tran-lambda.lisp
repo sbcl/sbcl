@@ -1119,8 +1119,7 @@
                 (typecase what
                   (cons
                    (push name shadowed-funs)
-                   (let ((expression (function-lambda-expression (cdr what))))
-                     (aver expression)
+                   (let ((expression (cddr what)))
                      (push (cons name expression) macros)))
                   ;; FIXME: Is there a good reason for this not to be
                   ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
@@ -1147,34 +1146,21 @@
                      (not (null-lexenv-p parent))))
     result))
 
-;;; Return a sexpr for LAMBDA in LEXENV such that loading it from fasl
-;;; preserves the original lexical environment for inlining.
-;;; Return NIL if the lexical environment is too complicated.
+;;; Return a lambda form that has been "closed" with respect ot
+;;; LEXENV, returning a LAMBDA-WITH-LEXENV if there are interesting
+;;; macros or declarations, so that reloading the definition from a
+;;; compiled file preserves the original lexical environment for
+;;; inlining. If there is something too complex in the lexical
+;;; environment (like a lexical variable), then we return NIL.
 (defun maybe-inline-syntactic-closure (lambda lexenv)
   (declare (type list lambda) (type lexenv-designator lexenv))
   (aver (eql (first lambda) 'lambda))
-  ;; We used to have a trivial implementation, verifying that lexenv
-  ;; was effectively null. However, this fails to take account of the
-  ;; idiom
-  ;;
-  ;; (declaim (inline foo))
-  ;; (macrolet ((def (x) `(defun ,x () ...)))
-  ;;   (def foo))
-  ;;
-  ;; which, while too complicated for the cross-compiler to handle in
-  ;; unfriendly foreign lisp environments, would be good to support in
-  ;; the target compiler. -- CSR, 2002-05-13 and 2002-11-02
   (typecase lexenv
    (lexenv
     (let ((vars (lexenv-vars lexenv))
           (funs (lexenv-funs lexenv)))
       (acond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
              ((and (null vars) (null funs)) lambda)
-             ;; If the lexenv is too hairy for cross-compilation,
-             ;; you'll find out later, when trying to perform inlining.
-             ;; This is fine, because if the inline expansion is only
-             ;; for the target, it's totally OK to cross-compile this
-             ;; defining form. The syntactic env is correctly captured.
              ((reconstruct-lexenv lexenv)
               `(lambda-with-lexenv ,it ,@(cdr lambda))))))
    #+(and sb-fasteval (not sb-xc-host))
@@ -1204,9 +1190,11 @@
                                (mapcar (lambda (binding)
                                          ;; XC compile-in-lexenv ignores its second arg
                                          #+sb-xc-host (aver (null-lexenv-p lexenv))
-                                         (list* (car binding) 'macro
-                                                (compile-in-lexenv (cdr binding) lexenv
-                                                                   nil nil nil t nil)))
+                                         (destructuring-bind (name . form) binding
+                                           (list* name 'macro
+                                                  (compile-in-lexenv form lexenv
+                                                                     nil nil nil t nil)
+                                                  form)))
                                        bindings)))
                           (recurse body
                                    (make-lexenv :default lexenv

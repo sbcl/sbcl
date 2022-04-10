@@ -40,10 +40,10 @@
                             disabled-package-locks %policy user-data
                             parent)))
   ;; an alist of (NAME . WHAT), where WHAT is either a FUNCTIONAL (a
-  ;; local function), a DEFINED-FUN, representing an
-  ;; INLINE/NOTINLINE declaration, or a list (MACRO . <function>) (a
-  ;; local macro, with the specifier expander). Note that NAME may be
-  ;; a (SETF <name>) list, not necessarily a single symbol.
+  ;; local function), a DEFINED-FUN, representing an INLINE/NOTINLINE
+  ;; declaration, or a list (MACRO <function> . <form>) (a local
+  ;; macro, with the specifier expander). Note that NAME may be a
+  ;; (SETF <name>) list, not necessarily a single symbol.
   (funs nil :type list)
   ;; an alist translating variable names to LEAF structures. A special
   ;; binding is indicated by a :SPECIAL GLOBAL-VAR leaf. Each special
