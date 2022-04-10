@@ -172,45 +172,6 @@ the file system."
   (sb-c::note-name-defined name :function)
   name)
 
-
-;;;; the ANSI interface to function names (and to other stuff too)
-;;; Note: this function gets called by the interpreter to convert its
-;;; representation of an environment to a LEXENV, and so although ANSI
-;;; says we're allowed to return NIL here freely, doing so might
-;;; prevent correct inlining of interpreted functions defined within
-;;; MACROLETs.
-(defun function-lambda-expression (fun)
-  "Return (VALUES DEFINING-LAMBDA-EXPRESSION CLOSURE-P NAME), where
-  DEFINING-LAMBDA-EXPRESSION is NIL if unknown, or a suitable argument
-  to COMPILE otherwise, CLOSURE-P is non-NIL if the function's definition
-  might have been enclosed in some non-null lexical environment, and
-  NAME is some name (for debugging only) or NIL if there is no name."
-  (declare (type function fun))
-  (etypecase fun
-    (interpreted-function
-     #+sb-eval
-     (let ((name (sb-eval:interpreted-function-name fun))
-           (lambda-list (sb-eval:interpreted-function-lambda-list fun))
-           (declarations (sb-eval:interpreted-function-declarations fun))
-           (body (sb-eval:interpreted-function-body fun)))
-       (values `(lambda ,lambda-list
-                  ,@(when declarations `((declare ,@declarations)))
-                  ,@body)
-               t name))
-     #+sb-fasteval
-     (sb-interpreter:fun-lambda-expression fun))
-    (function
-     (let ((name (%fun-name fun))
-           (fun (%fun-fun fun)))
-       (acond ((%simple-fun-lexpr fun)
-               (values it t name))
-              ((legal-fun-name-p name)
-               (let ((exp (fun-name-inline-expansion name)))
-                 ;; Isn't this (NOT EXP) wrong if it's a syntactic closure?
-                 (values exp (not exp) name)))
-              (t
-               (values nil t name)))))))
-
 (in-package "SB-C")
 
 (defun split-version-string (string)

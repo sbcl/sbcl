@@ -1129,7 +1129,7 @@
                (cons sym (make-global-var :%source-name sym
                                           :kind :special
                                           :where-from :declared))))
-           (macroize (name thing) (list* name 'sb-sys:macro thing (function-lambda-expression thing)))
+           (macroize (name thing) (list* name 'sb-sys:macro thing (fun-lambda-expression thing)))
            (symbol-macroize (name thing) (list* name 'sb-sys:macro thing))
            (fname (f) (second (fun-name f))))
       (multiple-value-bind (vars funs)
