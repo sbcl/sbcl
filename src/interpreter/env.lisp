@@ -1129,8 +1129,7 @@
                (cons sym (make-global-var :%source-name sym
                                           :kind :special
                                           :where-from :declared))))
-           (macroize (name thing) (list* name 'sb-sys:macro thing (fun-lambda-expression thing)))
-           (symbol-macroize (name thing) (list* name 'sb-sys:macro thing))
+           (macroize (name thing) (list* name 'sb-sys:macro thing))
            (fname (f) (second (fun-name f))))
       (multiple-value-bind (vars funs)
           (typecase env
@@ -1147,7 +1146,7 @@
                          ;; access interpreter's lexical vars
                          ;; Prevent SETF on the variable from getting
                          ;; "Destructive function (SETF SVREF) called on constant data"
-                         (symbol-macroize sym `(svref (load-time-value ,payload) ,i)))
+                         (macroize sym `(svref (load-time-value ,payload) ,i)))
                         (t
                          (let ((leaf (make-lambda-var
                                       :%source-name sym

@@ -82,9 +82,9 @@
 ;;; variables, blocks, etc. Except for SYMBOL-MACROLET, only the
 ;;; SB-C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),
 ;;; where What is either a functional (a local function) or a list
-;;; (MACRO <function> . <form>) (a local macro, with the specifier
-;;; expander.)  Note that Name may be a (SETF <name>)
-;;; function. Accessors are defined below, eg (ENV-WALK-FUNCTION ENV).
+;;; (MACRO . <function>) (a local macro, with the specifier expander.)
+;;; Note that Name may be a (SETF <name>) function. Accessors are
+;;; defined below, eg (ENV-WALK-FUNCTION ENV).
 ;;;
 ;;; If WITH-AUGMENTED-ENVIRONMENT is called from WALKER-ENVIRONMENT-BIND
 ;;; this code hides the WALKER version of an environment
@@ -101,7 +101,7 @@
 ;;;
 ;;; Instead, we now use a special sort of "function"-type for that
 ;;; information, because the functions slot in SB-C::LEXENV is
-;;; supposed to have a list of <Name MACRO #<function> . <form> elements.
+;;; supposed to have a list of <Name MACRO . #<function> elements.
 ;;; So, now we hide our bits of interest in the walker-info slot in
 ;;; our new BOGO-FUN.
 ;;;
@@ -173,13 +173,12 @@
                                    (sb-c::make-functional :lexenv lexenv)))
                            funs)
                    (mapcar (lambda (m)
-                             (destructuring-bind (name form) m
-                               (list* name
-                                      'sb-sys:macro
-                                      (if (eq name *key-to-walker-environment*)
-                                          (walker-info-to-bogo-fun form)
-                                          (coerce form 'function))
-                                      form)))
+                             (list* (car m)
+                                    'sb-sys:macro
+                                    (if (eq (car m)
+                                            *key-to-walker-environment*)
+                                        (walker-info-to-bogo-fun (cadr m))
+                                        (coerce (cadr m) 'function))))
                            macros)))))
 
 (defun environment-function (env fn)
@@ -195,8 +194,8 @@
       (and entry
            (eq (cadr entry) 'sb-sys:macro)
            (if (eq macro *key-to-walker-environment*)
-               (values (bogo-fun-to-walker-info (caddr entry)))
-               (values (cadddr entry)))))))
+               (values (bogo-fun-to-walker-info (cddr entry)))
+               (values (function-lambda-expression (cddr entry))))))))
 
 ;;;; other environment hacking, not so SBCL-specific as the
 ;;;; environment hacking in the previous section
@@ -471,6 +470,103 @@
 
 (defvar *walk-form-expand-macros-p* nil)
 (defvar *walk-form-preserve-source* nil)
+
+(defun macroexpand-all (form &optional environment)
+  (let ((*walk-form-expand-macros-p* t))
+    (sb-walker:walk-form
+     form environment
+     (lambda (subform context env)
+       (acond ((and (eq context :eval)
+                    (listp subform)
+                    (symbolp (car subform))
+                    (get (car subform) :partial-macroexpander))
+               ;; The partial expander must return T as its second value
+               ;; if it wants to stop the walk.
+               (funcall it subform env))
+              (t
+               subform))))))
+
+;; Given EXPR, the argument to an invocation of Quasiquote macro, macroexpand
+;; evaluable subforms of EXPR using ENV. A subform is evaluable if all
+;; preceding occurrences of #\` have been "canceled" by a comma.
+;; DEPTH counts the nesting and should not be supplied by external callers.
+(defun %quasiquoted-macroexpand-all (expr env &optional (depth 0))
+  (flet ((quasiquote-p (x)
+           (and (listp x) (eq (car x) 'quasiquote) (singleton-p (cdr x))))
+         (recurse (x)
+           (%quasiquoted-macroexpand-all x env depth)))
+    (if (atom expr)
+        (cond ((simple-vector-p expr) (map 'vector #'recurse expr))
+              ((comma-p expr)
+               (unquote (if (> depth 1)
+                            (%quasiquoted-macroexpand-all
+                             (comma-expr expr) env (1- depth))
+                            (macroexpand-all (comma-expr expr) env))
+                        (comma-kind expr)))
+              (t expr))
+        (if (quasiquote-p expr)
+            (list 'quasiquote
+                  (%quasiquoted-macroexpand-all (second expr) env (1+ depth)))
+            (let (result)
+              (loop
+               (push (recurse (pop expr)) result)
+               (when (or (atom expr) (quasiquote-p expr))
+                 (return (nreconc result (recurse expr))))))))))
+
+(setf (get 'quasiquote :partial-macroexpander)
+      (lambda (form env)
+        (destructuring-bind (arg) (cdr form) ; sanity-check the shape
+          (declare (ignore arg))
+          (values (%quasiquoted-macroexpand-all form env) t))))
+
+#|
+
+;; Another example that some people might find useful.
+
+(defun macroexpand-decls+forms (body env) ; a bit of a kludge, but it works
+  (mapcar (lambda (x)
+            (if (and (listp x) (eq (car x) 'declare))
+                x
+                (macroexpand-all x env)))
+          body))
+
+(setf (get 'dotimes :partial-macroexpander)
+      (lambda (form env)
+        (destructuring-bind ((var count &optional (result nil result-p))
+                             &body body) (cdr form)
+            (values `(dotimes (,var ,(macroexpand-all count env)
+                               ,@(if result-p
+                                     (list (macroexpand-all result env))))
+                       ,@(macroexpand-decls+forms body env))
+                    t))))
+
+(macroexpand-all '(macrolet ((hair (x) `(car ,x)))
+                   (dotimes (i (bar)) (foo i (hair baz)) l))))
+=>
+(MACROLET ((HAIR (X)
+             `(CAR ,X)))
+  (DOTIMES (I (BAR)) (FOO I (CAR BAZ)) L))
+
+instead of
+
+(MACROLET ((HAIR (X)
+             `(CAR ,X)))
+  (BLOCK NIL
+    (LET ((I 0) (#:COUNT699 (BAR)))
+      (DECLARE (TYPE UNSIGNED-BYTE I)
+               (TYPE INTEGER #:COUNT699))
+      (TAGBODY
+        (GO #:G701)
+       #:G700
+        (TAGBODY (FOO I (CAR BAZ)) L)
+        (LET* ()
+          (MULTIPLE-VALUE-BIND (#:NEW702) (1+ I) (PROGN (SETQ I #:NEW702) NIL)))
+       #:G701
+        (IF (>= I #:COUNT699)
+            NIL
+            (PROGN (GO #:G700)))
+        (RETURN-FROM NIL (PROGN NIL))))))
+|#
 
 #+sb-fasteval
 (declaim (ftype (sfunction (sb-interpreter:basic-env &optional t) sb-kernel:lexenv)

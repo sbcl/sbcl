@@ -8,6 +8,9 @@ changes relative to sbcl-2.2.3:
     or
     (LAMBDA (X) (ETYPECASE (INTEGER ...) (SYMBOL ...)) X)
     instead of forgetting all information about X after the E(TYPE)CASE.
+  * optimization: inlined functions enclosed in local macro definitions no
+    longer save their entire lexical environment, reducing unnecessary
+    memory retention.
 
 changes in sbcl-2.2.3 relative to sbcl-2.2.2:
   * minor incompatible change: SB-THREAD:MUTEX-OWNER may return :THREAD-DEAD

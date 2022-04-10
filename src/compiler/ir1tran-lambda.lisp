@@ -1049,8 +1049,8 @@
 
 (declaim (end-block))
 
-
 ;;;; defining global functions
+
 ;;; Given a lambda-list, return a FUN-TYPE object representing the signature:
 ;;; return type is *, and each individual arguments type is T -- but we get
 ;;; the argument counts and keywords.
@@ -1074,17 +1074,19 @@
 
 (declaim (start-block maybe-inline-syntactic-closure))
 
-;;; Take the lexenv surrounding an inlined function and extract things
-;;; needed for the inline expansion suitable for dumping into fasls.
-;;; Right now it's MACROLET, SYMBOL-MACROLET, SPECIAL and
-;;; INLINE/NOTINLINE declarations. Upon encountering something else return NIL.
-;;; This is later used by PROCESS-INLINE-LEXENV to reproduce the lexenv.
+;;; Expand a lambda form in LEXENV, returning the expansion and
+;;; extract the other stuff like SPECIAL and INLINE/NOTINLINE
+;;; declarations needed for reconstructing the lambda in the remaining
+;;; lexical environment. Return this other stuff as a secondary value,
+;;; but if the lexical environment still contains things that are too
+;;; hairy to handle, return NIL. This is later used by
+;;; PROCESS-INLINE-LEXENV to reproduce the lexenv.
 ;;;
 ;;; Previously it just used the functions and vars of the innermost
 ;;; lexenv, but the body of macrolet can refer to other macrolets
 ;;; defined earlier, so it needs to process all the parent lexenvs to
 ;;; recover the proper order.
-(defun reconstruct-lexenv (lexenv)
+(defun expand-in-syntactic-environment (lambda lexenv)
   (let (shadowed-funs
         shadowed-vars
         result)
@@ -1093,8 +1095,6 @@
           for vars = (lexenv-vars env)
           for funs = (lexenv-funs env)
           for declarations = nil
-          for symbol-macros = nil
-          for macros = nil
           do
           (loop for binding in vars
                 for (name . what) = binding
@@ -1103,14 +1103,14 @@
                 do (typecase what
                      (cons
                       (aver (eq (car what) 'macro))
-                      (push name shadowed-vars)
-                      (push (list name (cdr what)) symbol-macros))
+                      (push name shadowed-vars))
                      (global-var
                       (aver (eq (global-var-kind what) :special))
                       (push `(special ,name) declarations))
                      (t
                       (unless (memq name shadowed-vars)
-                        (return-from reconstruct-lexenv)))))
+                        (return-from expand-in-syntactic-environment
+                          (values nil nil))))))
           (loop for binding in funs
                 for (name . what) = binding
                 unless (and parent
@@ -1118,8 +1118,7 @@
                 do
                 (typecase what
                   (cons
-                   (push name shadowed-funs)
-                   (push (cons name (cddr what)) macros))
+                   (push name shadowed-funs))
                   ;; FIXME: Is there a good reason for this not to be
                   ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
                   ;; you're wondering how this ever worked :-)? Maybe
@@ -1128,28 +1127,28 @@
                   ;; 2002-07-08
                   (global-var
                    (unless (defined-fun-p what)
-                     (return-from reconstruct-lexenv))
+                     (return-from expand-in-syntactic-environment
+                       (values nil nil)))
                    (push `(,(car (defined-fun-inlinep what))
                            ,name)
                          declarations))
                   (t
                    (unless (memq name shadowed-funs)
-                     (return-from reconstruct-lexenv)))))
+                     (return-from expand-in-syntactic-environment
+                       (values nil nil))))))
           (when declarations
             (setf result (list* :declare declarations (and result (list result)))))
-          (when symbol-macros
-            (setf result (list* :symbol-macro symbol-macros (and result (list result)))))
-          (when macros
-            (setf result (list* :macro macros (and result (list result)))))
           while (and parent
                      (not (null-lexenv-p parent))))
-    result))
+    (values (sb-walker:macroexpand-all lambda lexenv)
+            result)))
 
-;;; Return a lambda form that has been "closed" with respect ot
+;;; Return a lambda form that has been "closed" with respect to
 ;;; LEXENV, returning a LAMBDA-WITH-LEXENV if there are interesting
-;;; macros or declarations, so that reloading the definition from a
-;;; compiled file preserves the original lexical environment for
-;;; inlining. If there is something too complex in the lexical
+;;; declarations. To handle local macros, rather than closing over
+;;; definitions in the environment, expand all macros in the body of
+;;; LAMBDA, so that nothing in the syntactic environment is needed in
+;;; the expansion. If there is something too complex in the lexical
 ;;; environment (like a lexical variable), then we return NIL.
 (defun maybe-inline-syntactic-closure (lambda lexenv)
   (declare (type list lambda) (type lexenv-designator lexenv))
@@ -1158,10 +1157,15 @@
    (lexenv
     (let ((vars (lexenv-vars lexenv))
           (funs (lexenv-funs lexenv)))
-      (acond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
-             ((and (null vars) (null funs)) lambda)
-             ((reconstruct-lexenv lexenv)
-              `(lambda-with-lexenv ,it ,@(cdr lambda))))))
+      (cond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
+            ((and (null vars) (null funs)) lambda)
+            (t
+             (multiple-value-bind (expansion remaining-lexenv)
+                 (expand-in-syntactic-environment lambda lexenv)
+               (when expansion
+                 (if remaining-lexenv
+                     `(lambda-with-lexenv ,remaining-lexenv ,@(cdr expansion))
+                     expansion)))))))
    #+(and sb-fasteval (not sb-xc-host))
    (sb-interpreter:basic-env
     (awhen (sb-interpreter::reconstruct-syntactic-closure-env lexenv)
@@ -1189,11 +1193,9 @@
                                (mapcar (lambda (binding)
                                          ;; XC compile-in-lexenv ignores its second arg
                                          #+sb-xc-host (aver (null-lexenv-p lexenv))
-                                         (destructuring-bind (name . form) binding
-                                           (list* name 'macro
-                                                  (compile-in-lexenv form lexenv
-                                                                     nil nil nil t nil)
-                                                  form)))
+                                         (list* (car binding) 'macro
+                                                (compile-in-lexenv (cdr binding) lexenv
+                                                                   nil nil nil t nil)))
                                        bindings)))
                           (recurse body
                                    (make-lexenv :default lexenv

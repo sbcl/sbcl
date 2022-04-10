@@ -2809,6 +2809,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
   (:use "CL" "SB-INT" "SB-EXT")
   (:shadow "RECONS")
   (:export "DEFINE-WALKER-TEMPLATE"
+           "MACROEXPAND-ALL"
            "WALK-FORM"
            "*WALK-FORM-EXPAND-MACROS-P*"
            "VAR-LEXICAL-P" "VAR-SPECIAL-P"

@@ -27,7 +27,7 @@ only."
      (let ((def (cdr (assoc symbol (lexenv-funs env)))))
        (when def
          (return-from macro-function
-           (when (typep def '(cons (eql macro))) (cadr def)))))))
+           (when (typep def '(cons (eql macro))) (cdr def)))))))
   (values (info :function :macro-function symbol)))
 
 (defun (setf macro-function) (function symbol &optional environment)
