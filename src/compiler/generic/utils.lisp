@@ -312,10 +312,13 @@
   (declare (type (unsigned-byte 8) rank))
   (logand (1- rank) array-rank-mask))
 
-(defun compute-object-header (nwords widetag)
-  (let ((array-header-p
-         (or (= widetag simple-array-widetag)
-             (>= widetag complex-base-string-widetag))))
+(defun compute-object-header (nwords widetag-or-metadata)
+  (let* ((widetag (if (typep widetag-or-metadata '(or wrapper defstruct-description))
+                      instance-widetag
+                      widetag-or-metadata))
+         (array-header-p
+          (or (= widetag simple-array-widetag)
+              (>= widetag complex-base-string-widetag))))
     (logior (if array-header-p
                 (let ((rank (- nwords array-dimensions-offset)))
                   (ash (encode-array-rank rank) array-rank-position))

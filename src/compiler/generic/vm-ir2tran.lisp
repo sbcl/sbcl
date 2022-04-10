@@ -201,13 +201,17 @@
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (aver (and (constant-lvar-p dd) (constant-lvar-p slot-specs) (= words 1)))
+    (aver (= type sb-vm:instance-widetag))
     (let* ((c-dd (lvar-value dd))
            (c-slot-specs (lvar-value slot-specs))
            (words (+ (dd-length c-dd) words)))
-      #+compact-instance-header
-      (progn (aver (= type sb-vm:instance-widetag))
-             (emit-constant (setq type (sb-kernel::dd-layout-or-lose c-dd))))
-      (emit-fixed-alloc node block name words type lowtag result lvar)
+      (let ((metadata #+compact-instance-header
+                      (let ((layout (sb-kernel::dd-layout-or-lose c-dd)))
+                        (emit-constant layout)
+                        layout)
+                      #-compact-instance-header
+                      c-dd))
+        (emit-fixed-alloc node block name words metadata lowtag result lvar))
       (emit-inits node block name result lowtag
                   `(#-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))

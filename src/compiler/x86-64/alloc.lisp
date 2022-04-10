@@ -865,10 +865,10 @@
           (inst lea result (ea tramp rip-tn))
           (inst mov result tramp)))))
 
-(flet ((alloc (name words type lowtag stack-allocate-p result
-                    &optional alloc-temp node)
-   (let* ((instancep (typep type 'wrapper)) ; is this an instance type?
-          (bytes (pad-data-block words)))
+(flet
+  ((alloc (name words type lowtag stack-allocate-p result
+                    &optional alloc-temp node
+                    &aux (bytes (pad-data-block words)))
     #+bignum-assertions
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
@@ -880,8 +880,7 @@
       (if stack-allocate-p
           (stack-allocation bytes (if type 0 lowtag) result)
           (allocation nil bytes (if type 0 lowtag) result node alloc-temp thread-tn))
-      (let* ((widetag (if instancep instance-widetag type))
-             (header (compute-object-header words widetag)))
+      (let ((header (compute-object-header words type)))
         (cond #+compact-instance-header
               ((and (eq name '%make-structure-instance) stack-allocate-p)
               ;; Write a :DWORD, not a :QWORD, because the high half will be
@@ -894,9 +893,9 @@
       ;; GC can make the best choice about placement if it has a layout.
       ;; Of course with conservative GC the object will be pinned anyway,
       ;; but still, always having a layout is a good thing.
-      (when instancep ; store its layout, while still in pseudo-atomic
+      (when (typep type 'wrapper) ; store its layout, while still in pseudo-atomic
         (inst mov :dword (ea 4 result) (make-fixup type :layout)))
-      (inst or :byte result lowtag)))))
+      (inst or :byte result lowtag))))
   ;; DX is strictly redundant in these 2 vops, but they're written this way
   ;; so that backends can choose to use a single vop for both.
   (define-vop (fixed-alloc)
