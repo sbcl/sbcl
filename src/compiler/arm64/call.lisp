@@ -121,8 +121,12 @@
   (:info callee)
   (:generator 2
     (move res csp-tn)
-    (inst add csp-tn csp-tn (add-sub-immediate
-                             (* (max 1 (sb-allocated-size 'control-stack)) n-word-bytes)))
+    (let ((size (add-sub-immediate (* (max 1 (sb-allocated-size 'control-stack)) n-word-bytes))))
+      (cond ((typep size '(signed-byte 9))
+             (inst str cfp-tn (@ csp-tn size :post-index)))
+            (t
+             (inst add csp-tn csp-tn size)
+             (storew cfp-tn res ocfp-save-offset))))
     (when (ir2-environment-number-stack-p callee)
       (inst sub nfp nsp-tn (add-sub-immediate
                             (bytes-needed-for-non-descriptor-stack-frame)))

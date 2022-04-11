@@ -877,8 +877,10 @@
                 (push loc passed)
                 (temps value)
                 (locs loc))))
-          (temps old-fp)
-          (locs (ir2-environment-old-fp called-env))))
+          #-arm64
+          (progn
+            (temps old-fp)
+            (locs (ir2-environment-old-fp called-env)))))
 
       (values (temps) (locs)))))
 
@@ -896,7 +898,7 @@
 
       ;; If we're about to emit a move from CURRENT-FP then we need to
       ;; initialize it.
-      (when (find current-fp temps)
+      (when (memq current-fp temps)
         (vop current-fp node block current-fp))
 
       (mapc (lambda (temp loc)
@@ -940,7 +942,8 @@
         (old-fp (make-stack-pointer-tn)))
     (multiple-value-bind (temps locs)
         (emit-psetq-moves node block fun old-fp)
-      (vop current-fp node block old-fp)
+      (when (memq old-fp temps)
+        (vop current-fp node block old-fp))
       (vop allocate-frame node block
            (environment-info (lambda-environment fun))
            fp nfp)
