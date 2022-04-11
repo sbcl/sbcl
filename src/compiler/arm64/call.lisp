@@ -208,9 +208,11 @@
       ;; value return case).
       (unless (or expecting-values-on-stack
                   (type-single-value-p type))
-        (if (values-type-may-be-single-value-p type)
-            (inst csel csp-tn ocfp-tn csp-tn :eq)
-            (inst mov csp-tn ocfp-tn)))
+        (cond ((values-type-may-be-single-value-p type)
+               (inst csel csp-tn ocfp-tn csp-tn :eq))
+              ((eq type *empty-type*))
+              (t
+               (inst mov csp-tn ocfp-tn))))
 
       ;; If we ARE expecting values on the stack, we need to
       ;; either move them to their result location or to set their

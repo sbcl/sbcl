@@ -248,13 +248,7 @@
        (note-this-location vop :single-value-return)
        (cond
          ((<= (sb-kernel:values-type-max-value-count type)
-              register-arg-count)
-          (when (and (named-type-p type)
-                     (eq nil (named-type-name type)))
-            ;; The function never returns, it may happen that the code
-            ;; ends right here leavig the :SINGLE-VALUE-RETURN note
-            ;; dangling. Let's emit a NOP.
-            (inst nop)))
+              register-arg-count))
          ((not (sb-kernel:values-type-may-be-single-value-p type))
           (inst mov rsp-tn rbx))
          (t
