@@ -1327,7 +1327,7 @@
         (note-inlining (optional-dispatch-more-entry fun))
         (mapc #'note-inlining (optional-dispatch-entry-points fun))))
     ;; substitute for any old references
-    (unless (or (eq (defined-fun-inlinep var) :notinline)
+    (unless (or (eq (defined-fun-inlinep var) 'notinline)
                 (not (block-compile *compilation*))
                 (and info
                      (or (fun-info-transforms info)
