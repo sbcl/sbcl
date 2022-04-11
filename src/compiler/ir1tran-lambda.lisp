@@ -1074,75 +1074,6 @@
 
 (declaim (start-block maybe-inline-syntactic-closure))
 
-;;; Expand a lambda form in LEXENV, returning the expansion and
-;;; extract the other stuff like SPECIAL and INLINE/NOTINLINE
-;;; declarations needed for reconstructing the lambda in the remaining
-;;; lexical environment. Return this other stuff as a secondary value,
-;;; but if the lexical environment still contains things that are too
-;;; hairy to handle, return NIL. This is later used by
-;;; PROCESS-INLINE-LEXENV to reproduce the lexenv.
-;;;
-;;; Previously it just used the functions and vars of the innermost
-;;; lexenv, but the body of macrolet can refer to other macrolets
-;;; defined earlier, so it needs to process all the parent lexenvs to
-;;; recover the proper order.
-(defun expand-in-syntactic-environment (lambda lexenv)
-  (let (shadowed-funs
-        shadowed-vars
-        result)
-    (loop for env = lexenv then parent
-          for parent = (lexenv-parent env)
-          for vars = (lexenv-vars env)
-          for funs = (lexenv-funs env)
-          for declarations = nil
-          do
-          (loop for binding in vars
-                for (name . what) = binding
-                unless (and parent
-                            (find binding (lexenv-vars parent)))
-                do (typecase what
-                     (cons
-                      (aver (eq (car what) 'macro))
-                      (push name shadowed-vars))
-                     (global-var
-                      (aver (eq (global-var-kind what) :special))
-                      (push `(special ,name) declarations))
-                     (t
-                      (unless (memq name shadowed-vars)
-                        (return-from expand-in-syntactic-environment
-                          (values nil nil))))))
-          (loop for binding in funs
-                for (name . what) = binding
-                unless (and parent
-                            (find binding (lexenv-funs parent)))
-                do
-                (typecase what
-                  (cons
-                   (push name shadowed-funs))
-                  ;; FIXME: Is there a good reason for this not to be
-                  ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
-                  ;; you're wondering how this ever worked :-)? Maybe
-                  ;; in conjunction with an AVERrance that it's not an
-                  ;; (AND GLOBAL-VAR (NOT GLOBAL-FUN))? -- CSR,
-                  ;; 2002-07-08
-                  (global-var
-                   (unless (defined-fun-p what)
-                     (return-from expand-in-syntactic-environment
-                       (values nil nil)))
-                   (push `(,(car (defined-fun-inlinep what))
-                           ,name)
-                         declarations))
-                  (t
-                   (unless (memq name shadowed-funs)
-                     (return-from expand-in-syntactic-environment
-                       (values nil nil))))))
-          (when declarations
-            (setf result (list* :declare declarations (and result (list result)))))
-          while (and parent
-                     (not (null-lexenv-p parent))))
-    (values (sb-walker:macroexpand-all lambda lexenv)
-            result)))
-
 ;;; Return a lambda form that has been "closed" with respect to
 ;;; LEXENV, returning a LAMBDA-WITH-LEXENV if there are interesting
 ;;; declarations. To handle local macros, rather than closing over
@@ -1156,16 +1087,46 @@
   (typecase lexenv
    (lexenv
     (let ((vars (lexenv-vars lexenv))
-          (funs (lexenv-funs lexenv)))
+          (funs (lexenv-funs lexenv))
+          (decls ()))
       (cond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
             ((and (null vars) (null funs)) lambda)
+            ((dolist (x vars nil)
+               (let ((name (car x))
+                     (what (cdr x)))
+                 (when (eq x (assoc name vars :test #'eq))
+                   (typecase what
+                     (cons
+                      (aver (eq (car what) 'macro)))
+                     (global-var
+                      (aver (eq (global-var-kind what) :special))
+                      (push `(special ,name) decls))
+                     (t (return t))))))
+             nil)
+            ((dolist (x funs nil)
+               (let ((name (car x))
+                     (what (cdr x)))
+                 (when (eq x (assoc name funs :test #'equal))
+                   (typecase what
+                     (cons)
+                     ;; FIXME: Is there a good reason for this not to be
+                     ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
+                     ;; you're wondering how this ever worked :-)? Maybe
+                     ;; in conjunction with an AVERrance that it's not an
+                     ;; (AND GLOBAL-VAR (NOT GLOBAL-FUN))? -- CSR,
+                     ;; 2002-07-08
+                     (global-var
+                      (when (defined-fun-p what)
+                        (push `(,(car (defined-fun-inlinep what))
+                                ,name)
+                              decls)))
+                     (t (return t))))))
+             nil)
             (t
-             (multiple-value-bind (expansion remaining-lexenv)
-                 (expand-in-syntactic-environment lambda lexenv)
-               (when expansion
-                 (if remaining-lexenv
-                     `(lambda-with-lexenv ,remaining-lexenv ,@(cdr expansion))
-                     expansion)))))))
+             (let ((expansion (sb-walker:macroexpand-all lambda lexenv)))
+               (if decls
+                   `(lambda-with-lexenv (:declare ,decls) ,@(cdr expansion))
+                   expansion))))))
    #+(and sb-fasteval (not sb-xc-host))
    (sb-interpreter:basic-env
     (awhen (sb-interpreter::reconstruct-syntactic-closure-env lexenv)
