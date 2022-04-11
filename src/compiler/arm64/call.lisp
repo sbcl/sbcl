@@ -806,24 +806,21 @@
 ;;; registers may be tied up by the more operand.  Instead, we use
 ;;; MAYBE-LOAD-STACK-TN.
 (define-vop (known-return)
-  (:args (old-fp :target old-fp-temp)
+  (:args (old-fp)
          (return-pc)
          (vals :more t))
-  (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
   (:temporary (:scs (interior-reg)) lip)
   (:move-args :known-return)
   (:info val-locs)
-  (:ignore val-locs vals)
+  (:ignore old-fp return-pc val-locs vals)
   (:vop-var vop)
   (:generator 6
-    (maybe-load-stack-tn old-fp-temp old-fp)
-    (maybe-load-stack-tn lip return-pc)
     (move csp-tn cfp-tn)
+    (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
-    (move cfp-tn old-fp-temp)
     (lisp-return lip :known)))
 
 ;;;; Full call:
