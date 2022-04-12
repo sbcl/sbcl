@@ -1681,15 +1681,18 @@
      optimize-qualities)))
 
 (defun process-muffle-decls (decls lexenv)
-  (flet ((process-it (spec)
-           (cond ((atom spec))
-                 ((member (car spec) '(muffle-conditions unmuffle-conditions))
-                  (setq lexenv
-                        (process-1-decl spec lexenv nil nil nil nil))))))
-    (dolist (decl decls)
-      (dolist (spec (rest decl))
-        (process-it spec))))
-  lexenv)
+  (let (source-form)
+   (flet ((process-it (spec)
+            (cond ((atom spec))
+                  ((member (car spec) '(muffle-conditions unmuffle-conditions))
+                   (setq lexenv
+                         (process-1-decl spec lexenv nil nil nil nil)))
+                  ((eq (car spec) 'source-form)
+                   (setf source-form (cadr spec))))))
+     (dolist (decl decls)
+       (dolist (spec (rest decl))
+         (process-it spec))))
+    (values lexenv source-form)))
 
 ;;; Use a list of DECLARE forms to annotate the lists of LAMBDA-VAR
 ;;; and FUNCTIONAL structures which are being bound. In addition to
@@ -1759,8 +1762,7 @@
                    ;; E.g. suppressing argument checking without doing
                    ;; so in all the subforms.
                    ((typep spec '(cons (eql local-optimize)))
-                    (setf local-optimize spec)
-                    (setf source-form (cadr spec)))
+                    (setf local-optimize spec))
                    (t
                     (multiple-value-bind (new-env new-qualities)
                         (process-1-decl spec lexenv vars fvars

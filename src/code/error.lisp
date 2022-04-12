@@ -172,23 +172,24 @@
                 (if (typep handler '(cons (member function quote) (cons symbol null)))
                     handler
                     (let* ((name (let ((*gensym-counter*
-                                        (length (cluster-entries))))
+                                         (length (cluster-entries))))
                                    (sb-xc:gensym "H")))
                            (lexpr
-                            (typecase handler
-                              ;; These two are merely expansion prettifiers,
-                              ;; and not strictly necessary.
-                              ((cons (eql function) (cons (cons (eql lambda)) null))
-                               (cadr handler))
-                              ((cons (eql lambda))
-                               handler)
-                              (t
-                               (complex-initforms `(,name ,handler))
-                               ;; Should be (THE (FUNCTION-DESIGNATOR (CONDITION)))
-                               ;; but the cast kills DX allocation.
-                               `(lambda (c) (funcall ,name c))))))
+                             (typecase handler
+                               ;; These two are merely expansion prettifiers,
+                               ;; and not strictly necessary.
+                               ((cons (eql function) (cons (cons (eql lambda)) null))
+                                (cadr handler))
+                               ((cons (eql lambda))
+                                handler)
+                               (t
+                                (complex-initforms `(,name ,handler))
+                                ;; Should be (THE (FUNCTION-DESIGNATOR (CONDITION)))
+                                ;; but the cast kills DX allocation.
+                                `(lambda (c) (funcall ,name c))))))
                       (local-functions
                        `(,name ,(cadr lexpr)
+                               (declare (sb-c::source-form ,binding))
                                ,@(when (typep (cadr lexpr) '(cons t null))
                                    '((declare (sb-c::local-optimize (sb-c::verify-arg-count 0)))))
                                ,@(cddr lexpr)))
@@ -251,7 +252,11 @@ specification."
                                           ll))
                                  (multiple-value-bind (body declarations)
                                      (parse-body body nil)
-                                   (push `(,fun ,ll ,@declarations (progn ,@body)) local-funs))
+                                   (push `(,fun ,ll
+                                                (declare (sb-c::source-form ,case))
+                                                ,@declarations
+                                                (progn ,@body))
+                                         local-funs))
                                  (list block type ll fun)))))
                          cases)))
           (with-unique-names (block form-fun)
