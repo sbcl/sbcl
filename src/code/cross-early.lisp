@@ -36,8 +36,6 @@
 
 (declaim (declaration explicit-check always-bound))
 
-(declaim (declaration values))
-
 (defgeneric sb-xc:make-load-form (obj &optional env))
 
 ;;; Restore normalcy of MOD and RATIONAL as type specifiers.
