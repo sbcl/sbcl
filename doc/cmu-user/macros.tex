@@ -1,0 +1,284 @@
+% macro.tex
+%
+% LaTeX macros for CMUCL User's Manual
+%
+% by Raymond Toy
+
+% use Palatino
+\renewcommand{\rmdefault}{ppl}
+\ifpdf
+\usepackage{palatino}
+\fi
+
+%% Define the indices.  We need one for Types, Variables, Functions,
+%% and a general concept index.
+\makeindex
+\newindex{types}{tdx}{tnd}{Type Index}
+\newindex{vars}{vdx}{vnd}{Variable Index}
+\newindex{funs}{fdx}{fnd}{Function Index}
+\newindex{concept}{cdx}{cnd}{Concept Index}
+
+\newcommand{\tindexed}[1]{\index[types]{#1}\code{#1}}
+\newcommand{\findexed}[1]{\index[funs]{#1}\code{#1}}
+\newcommand{\vindexed}[1]{\index[vars]{#1}\code{*#1*}}
+\newcommand{\cindex}[1]{\index[concept]{#1}}
+\newcommand{\cpsubindex}[2]{\index[concept]{#1!#2}}
+
+
+%% This code taken from the LaTeX companion.  It's meant as a
+%% replacement for the description environment.  We want one that
+%% prints description items in a fixed size box and puts the
+%% description itself on the same line or the next depending on the
+%% size of the item.
+\newcommand{\entrylabel}[1]{\mbox{#1}\hfil}
+\newenvironment{entry}{%
+  \begin{list}{}%
+    {\renewcommand{\makelabel}{\entrylabel}%
+      \setlength{\labelwidth}{45pt}%
+      \setlength{\leftmargin}{\labelwidth+\labelsep}}}%
+  {\end{list}}
+
+\newlength{\Mylen}
+\newcommand{\Lentrylabel}[1]{%
+  \settowidth{\Mylen}{#1}%
+  \ifthenelse{\lengthtest{\Mylen > \labelwidth}}%
+  {\parbox[b]{\labelwidth}%  term > labelwidth
+    {\makebox[0pt][l]{#1}\\}}%
+  {#1}%
+  \hfil\relax}
+\newenvironment{Lentry}{%
+  \renewcommand{\entrylabel}{\Lentrylabel}
+  \begin{entry}}%
+  {\end{entry}}
+
+\newcommand{\fcntype}[1]{\textit{#1}}
+\newcommand{\argtype}[1]{\textit{#1}}
+\newcommand{\fcnname}[1]{\textsf{#1}}
+
+\newlength{\formnamelen}        % length of a name of a form
+\newlength{\pboxargslen}        % length of parbox for arguments
+\newlength{\typelen}            % length of the type label for the form
+
+\newcommand{\args}[1]{#1}
+\newcommand{\keys}[1]{\code{\&key} \= #1}
+\newcommand{\morekeys}[1]{\\ \> #1}
+\newcommand{\yetmorekeys}[1]{\\ \> #1}
+
+\newcommand{\defunvspace}{\ifhmode\unskip \par\fi\addvspace{18pt plus 12pt minus 6pt}}
+
+
+%% \layout[pkg]{name}{param list}{type}
+%%
+%% This lays out a entry like so:
+%%
+%% pkg:name arg1 arg2                             [Function]
+%%
+%% where [Function] is flush right.
+%%
+\newcommand{\layout}[4][\mbox{}]{%
+  \par\noindent
+  \fcnname{#1#2\hspace{1em}}%
+  \settowidth{\formnamelen}{\fcnname{#1#2\hspace{1em}}}%
+  \settowidth{\typelen}{[\argtype{#4}]}%
+  \setlength{\pboxargslen}{\linewidth}%
+  \addtolength{\pboxargslen}{-1\formnamelen}%
+  \addtolength{\pboxargslen}{-1\typelen}%
+  \begin{minipage}[t]{\pboxargslen}
+    \begin{tabbing}
+      #3
+    \end{tabbing}
+  \end{minipage}
+  \hfill[\fcntype{#4}]%
+  \par\addvspace{2pt plus 2pt minus 2pt}}
+
+\newcommand{\vrindexbold}[1]{\index[vars]{#1|textbf}}
+\newcommand{\fnindexbold}[1]{\index[funs]{#1|textbf}}
+
+%% Define a new type
+%%
+%% \begin{deftp}{typeclass}{typename}{args}
+%%    some description
+%% \end{deftp}
+\newenvironment{deftp}[3]{%
+  \par\bigskip\index[types]{#2|textbf}%
+  \layout{#2}{\var{#3}}{#1}
+  }{}
+
+%% Define a function with name NAME and given parameters PARAM.  The
+%% function is in the package PKG.  If the optional arg SUFFIX is
+%% given, this is used as a suffix for the label.  (Useful when you
+%% have functions of the same name, such as methods, but want
+%% different labels for each version.)
+%%
+%% The defunx is for additional functions that are related to this one
+%% in some way, and we want to group them all together.
+%%  
+%% \begin{defun}[suffix]{pkg}{name}{params}
+%%   \defunx[pkg]{name}{params}
+%%   description of function
+%% \end{defun}
+\newenvironment{defun}[4][]{%
+  \par\defunvspace\fnindexbold{#3}\label{FN:#3#1}%
+  \layout[#2]{#3}{#4}{Function}
+  }{}
+\newcommand{\defunx}[3][\mbox{}]{%
+  \par\fnindexbold{#2}\label{FN:#2}%
+  \layout[#1]{#2}{#3}{Function}}
+
+%% Define a generic function.  Like defun, but for defgeneric.
+%%
+%% \begin{defgeneric}[suffix]{pkg}{name}{params}
+%%   \defgenericx[pkg]{name}{params}
+%%   description of function
+%% \end{defgeneric}
+\newenvironment{defgeneric}[4][]{%
+  \par\defunvspace\fnindexbold{#3}\label{FN:#3-generic#1}%
+  \layout[#2]{#3}{#4}{Generic Function}
+  }{}
+\newcommand{\defgenericx}[3][\mbox{}]{%
+  \par\fnindexbold{#2}\label{FN:#2}%
+  \layout[#1]{#2}{#3}{Generic Function}}
+
+%% Define a method.  Like defgeneric, but for methods.
+%%
+%% \begin{defmethod}[suffix]{pkg}{name}{params}
+%%   \defmethod[pkg]{name}{params}
+%%   description of function
+%% \end{defmethod}
+\newenvironment{defmethod}[4][]{%
+  \par\defunvspace\fnindexbold{#3}\label{FN:#3-method#1}%
+  \layout[#2]{#3}{#4}{Method}
+  }{}
+\newcommand{\defmethodx}[3][\mbox{}]{%
+  \par\fnindexbold{#2}\label{FN:#2}%
+  \layout[#1]{#2}{#3}{Method}}
+
+%% Define a macro
+%%
+%% \begin{defmac}[suffix]{pkg}{name}{params}
+%%   \defmacx[pkg]{name}{params}
+%%   description of macro
+%% \end{defmac}
+\newenvironment{defmac}[4][]{%
+  \par\defunvspace\fnindexbold{#3}\label{FN:#3#1}%
+  \layout[#2]{#3}{#4}{Macro}}{}
+\newcommand{\defmacx}[3][\mbox{}]{%
+  \par\fnindexbold{#2}\label{FN:#2}%
+  \layout[#1]{#2}{#3}{Macro}}
+
+%% Define a variable
+%%
+%% \begin{defvar}{pkg}{name}
+%%   \defvarx[pkg]{name}
+%%   description of defvar
+%% \end{defvar}
+\newenvironment{defvar}[2]{%
+  \par\defunvspace\vrindexbold{#2}\label{VR:#2}
+  \layout[#1]{*#2*}{}{Variable}}{}
+\newcommand{\defvarx}[2][\mbox{}]{%
+  \par\vrindexbold{#2}\label{VR:#2}
+  \layout[#1]{*#2*}{}{Variable}}
+
+%% Define a constant
+%%
+%% \begin{defconst}{pkg}{name}
+%%   \ddefconstx[pkg]{name}
+%%   description of defconst
+%% \end{defconst}
+\newcommand{\defconstx}[2][\mbox{}]{%
+  \layout[#1]{#2}{}{Constant}}
+\newenvironment{defconst}[2]{%
+  \defunvspace\defconstx[#1]{#2}}{}
+
+\newcommand{\credits}[1]{%
+  \begin{center}
+  \textbf{#1}
+  \end{center}}
+
+\newenvironment{example}{\begin{quote}\begin{alltt}}{\end{alltt}\end{quote}}
+\newenvironment{lisp}{\begin{example}}{\end{example}}
+
+\newcommand{\hide}[1]{}
+\newcommand{\trnumber}[1]{#1}
+\newcommand{\citationinfo}[1]{#1}
+\newcommand{\var}[1]{{\textsf{\textsl{#1}}\xspace}}
+\newcommand{\code}[1]{\textnormal{{\sffamily #1}}}
+\newcommand{\file}[1]{`\texttt{#1}'}
+\newcommand{\kwd}[1]{\code{:#1}}
+\newcommand{\F}[1]{\code{#1}}
+\newcommand{\w}[1]{\hbox{#1}}
+\newcommand{\ctrl}[1]{$\uparrow$\textsf{#1}}
+\newcommand{\result}{$\Rightarrow$}
+\newcommand{\myequiv}{$\equiv$}
+\newcommand{\back}[1]{\(\backslash\)#1}
+\newcommand{\pxlref}[1]{see section~\ref{#1}, page~\pageref{#1}}
+\newcommand{\xlref}[1]{See section~\ref{#1}, page~\pageref{#1}}
+\newcommand{\funref}[1]{\findexed{#1} (page~\pageref{FN:#1})}
+\newcommand{\specref}[1]{\findexed{#1} (page~\pageref{FN:#1})}
+\newcommand{\macref}[1]{\findexed{#1} (page~\pageref{FN:#1})}
+\newcommand{\varref}[1]{\vindexed{#1} (page~\pageref{VR:#1})}
+\newcommand{\conref}[1]{\conindexed{#1} (page~\pageref{VR:#1})}
+
+\newcommand{\false}{\code{nil}}
+\newcommand{\true}{\code{t}}
+\newcommand{\nil}{\false{}}
+%% Printed lisp character #\foo
+\newcommand{\lispchar}[1]{\code{\#\back{#1}}}
+
+\newcommand{\ampoptional}{\code{\&optional}}
+\newcommand{\amprest}{\code{\&rest}}
+\newcommand{\ampbody}{\code{\&body}}
+
+\newcommand{\mopt}[1]{{$\,\{$}\textnormal{\textsf{\textsl{#1\/}}}{$\}\,$}}
+\newcommand{\mstar}[1]{{$\,\{$}\textnormal{\textsf{\textsl{#1\/}}}{$\}^*\,$}}
+\newcommand{\mplus}[1]{{$\,\{$}\textnormal{\textsf{\textsl{#1\/}}}{$\}^+\,$}}
+\newcommand{\mgroup}[1]{{$\,\{$}\textnormal{\textsf{\textsl{#1\/}}}{$\}\,$}}
+\newcommand{\mor}{$|$}
+
+
+%% Some common abbreviations
+\newcommand{\dash}{---}
+\newcommand{\alien}{Alien}
+\newcommand{\aliens}{Aliens}
+\newcommand{\hemlock}{Hemlock}
+\newcommand{\python}{Python}
+\newcommand{\cmucl}{\textsc{cmucl}}
+\newcommand{\clisp}{Common Lisp}
+\newcommand{\llisp}{Common Lisp}
+\newcommand{\cltl}{\textit{Common Lisp: The Language}}
+\newcommand{\cltltwo}{\textit{Common Lisp: The Language II}}
+
+
+%% Set up margins
+\setlength{\oddsidemargin}{-10pt}
+\setlength{\evensidemargin}{-10pt}
+\setlength{\topmargin}{-40pt}
+\setlength{\headheight}{12pt}
+\setlength{\headsep}{25pt}
+\setlength{\footskip}{30pt}
+\setlength{\textheight}{9.25in}
+\setlength{\textwidth}{6.75in}
+\setlength{\columnsep}{0.375in}
+\setlength{\columnseprule}{0pt}
+
+
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{3}
+\def\textfraction{.1}
+\def\bottomfraction{.9}         % was .3
+\def\topfraction{.9}
+
+%% Allow TeX some stretching space to avoid overfull and underfull
+%% boxes.
+\setlength{\emergencystretch}{5pt}
+
+%% requires the sectsty package
+\allsectionsfont{\bfseries\sffamily}
+\chapterfont{\fontfamily{pag}\selectfont}
+
+%% section numbers in the left margin
+\makeatletter
+\def\@seccntformat#1{\protect\makebox[0pt][r]{\csname
+    the#1\endcsname\quad}}
+\makeatother
+

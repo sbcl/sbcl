@@ -1,0 +1,1113 @@
+\part{Compiler Retargeting}
+
+\chapter{Retargeting the Compiler}
+[\#\#\#
+
+In general, it is a danger sign if a generator references a TN that isn't an
+operand or temporary, since lifetime analysis hasn't been done for that use.
+We are doing weird stuff for the old-cont and return-pc passing locations,
+hoping that the conflicts at the called function have the desired effect.
+Other stuff?  When a function returns unknown values, we don't reference the
+values locations when a single-value return is done.  But nothing is live at a
+return point anyway.
+
+
+
+Have a way for template conversion to special-case constant arguments?  
+How about:
+    If an arg restriction is (:satisfies [$<$predicate function$>$]), and the
+    corresponding argument is constant, with the constant value satisfying the
+    predicate, then (if any other restrictions are satisfied), the template
+    will be emitted with the literal value passed as an info argument.  If the
+    predicate is omitted, then any constant will do.
+
+    We could sugar this up a bit by allowing (:member $<$object$>$*) for
+    (:satisfies (lambda (x) (member x '($<$object$>$*))))
+
+We could allow this to be translated into a Lisp type by adding a new Constant
+type specifier.  This could only appear as an argument to a function type.
+To satisfy (Constant $<$type$>$), the argument must be a compile-time constant of
+the specified type.  Just Constant means any constant (i.e. (Constant *)).
+This would be useful for the type constraints on ICR transforms.
+
+
+Constant TNs: we count on being able to indirect to the leaf, and don't try to
+wedge the information into the offset.  We set the FSC to an appropriate
+immediate SC.
+
+    Allow ``more operands'' to VOPs in define-vop.  You can't do much with the
+    more operands: define-vop just fills in the cost information according to
+    the loading costs for a SC you specify.  You can't restrict more operands,
+    and you can't make local preferences.  In the generator, the named variable
+    is bound to the TN-ref for the first extra operand.  This should be good
+    enough to handle all the variable arg VOPs (primarily function call and
+    return).  Usually more operands are used just to get TN lifetimes to work
+    out; the generator actually ignores them.
+
+    Variable-arg VOPs can't be used with the VOP macro.  You must use VOP*.
+    VOP* doesn't do anything with these extra operand except stick them on the
+    ends of the operand lists passed into the template.  VOP* is often useful
+    within the convert functions for non-VOP templates, since it can emit a VOP
+    using an already prepared TN-Ref list.
+    
+
+    It is pretty basic to the whole primitive-type idea that there is only one
+    primitive-type for a given lisp type.  This is really the same as saying
+    primitive types are disjoint.  A primitive type serves two somewhat
+    unrelated purposes:
+     -- It is an abstraction of a Lisp type used to select type specific
+        operations.  Originally kind of an efficiency hack, but it lets a
+        template's type signature be used both for selection and operand
+        representation determination.
+     -- It represents a set of possible representations for a value (SCs).  The
+        primitive type is used to determine the legal SCs for a TN, and is also
+        used to determine which type-coercion/move VOP to use.
+
+]
+
+There are basically three levels of target dependence:
+
+ -- Code in the ``front end'' (before VMR conversion) deals only with Lisp
+    semantics, and is totally target independent.
+
+ -- Code after VMR conversion and before code generation depends on the VM,
+    but should work with little modification across a wide range of
+    ``conventional'' architectures.
+
+ -- Code generation depends on the machine's instruction set and other
+    implementation details, so it will have to be redone for each
+    implementation.  Most of the work here is in defining the translation into
+    assembly code of all the supported VOPs.
+
+
+
+\chapter{Storage bases and classes}
+New interface: instead of CURRENT-FRAME-SIZE, have CURRENT-SB-SIZE \verb+<name>+ which
+returns the current element size of the named SB.
+
+How can we have primitive types that overlap, i.e. (UNSIGNED-BYTE 32),
+(SIGNED-BYTE 32), FIXNUM?
+Primitive types are used for two things:
+    Representation selection: which SCs can be used to represent this value?
+	For this purpose, it isn't necessary that primitive types be disjoint,
+	since any primitive type can choose an arbitrary set of
+	representations.  For moves between the overlapping representations,
+	the move/load operations can just be noops when the locations are the
+	same (vanilla MOVE), since any bad moves should be caught out by type
+	checking.
+    VOP selection:
+	Is this operand legal for this VOP?  When ptypes overlap in interesting
+	ways, there is a problem with allowing just a simple ptype restriction,
+	since we might want to allow multiple ptypes.  This could be handled
+	by allowing ``union primitive types'', or by allowing multiple primitive
+	types to be specified (only in the operand restriction.)  The latter
+	would be along the lines of other more flexible VOP operand restriction
+	mechanisms, (constant, etc.)
+
+
+
+Ensure that load/save-operand never need to do representation conversion.
+
+The PRIMITIVE-TYPE more/coerce info would be moved into the SC.  This could
+perhaps go along with flushing the TN-COSTS.  We would annotate the TN with
+best SC, which implies the representation (boxed or unboxed).  We would still
+need to represent the legal SCs for restricted TNs somehow, and also would have to
+come up with some other way for pack to keep track of which SCs we have already
+tried.
+
+An SC would have a list of ``alternate'' SCs and a boolean SAVE-P value that
+indicates it needs to be saved across calls in some non-SAVE-P SC.  A TN is
+initially given its ``best'' SC.  The SC is annotated with VOPs that are used for
+moving between the SC and its alternate SCs (load/save operand, save/restore
+register).  It is also annotated with the ``move'' VOPs used for moving between
+this SC and all other SCs it is possible to move between.  We flush the idea
+that there is only c-to-t and c-from-t.
+
+But how does this mesh with the idea of putting operand load/save back into the
+generator?  Maybe we should instead specify a load/save function?  The
+load/save functions would also differ from the move VOPs in that they would
+only be called when the TN is in fact in that particular alternate SC, whereas
+the move VOPs will be associated with the primary SC, and will be emitted
+before it is known whether the TN will be packed in the primary SC or an
+alternate.
+
+I guess a packed SC could also have immediate SCs as alternate SCs, and
+constant loading functions could be associated with SCs using this mechanism.
+
+So given a TN packed in SC X and an SC restriction for Y and Z, how do we know
+which load function to call?  There would be ambiguity if X was an alternate
+for both Y and Z and they specified different load functions.  This seems
+unlikely to arise in practice, though, so we could just detect the ambiguity
+and give an error at define-vop time.  If they are doing something totally
+weird, they can always inhibit loading and roll their own.
+
+Note that loading costs can be specified at the same time (same syntax) as
+association of loading functions with SCs.  It seems that maybe we will be
+rolling DEFINE-SAVE-SCS and DEFINE-MOVE-COSTS into DEFINE-STORAGE-CLASS.
+
+Fortunately, these changes will affect most VOP definitions very little.
+
+
+A Storage Base represents a physical storage resource such as a register set or
+stack frame.  Storage bases for non-global resources such as the stack are
+relativized by the environment that the TN is allocated in.  Packing conflict
+information is kept in the storage base, but non-packed storage resources such
+as closure environments also have storage bases.
+Some storage bases:
+\begin{verbatim}
+    General purpose registers
+    Floating point registers
+    Boxed (control) stack environment
+    Unboxed (number) stack environment
+    Closure environment
+\end{verbatim}
+
+A storage class is a potentially arbitrary set of the elements in a storage
+base.  Although conceptually there may be a hierarchy of storage classes such
+as ``all registers'', ``boxed registers'', ``boxed scratch registers'', this doesn't
+exist at the implementation level.  Such things can be done by specifying
+storage classes whose locations overlap.  A TN shouldn't have lots of
+overlapping SC's as legal SC's, since time would be wasted repeatedly
+attempting to pack in the same locations.
+
+There will be some SC's whose locations overlap a great deal, since we get Pack
+to do our representation analysis by having lots of SC's.  An SC is basically a
+way of looking at a storage resource.  Although we could keep a fixnum and an
+unboxed representation of the same number in the same register, they correspond
+to different SC's since they are different representation choices.
+
+TNs are annotated with the primitive type of the object that they hold:
+    T: random boxed object with only one representation.
+    Fixnum, Integer, XXX-Float: Object is always of the specified numeric type.
+    String-Char: Object is always a string-char.
+
+When a TN is packed, it is annotated with the SC it was packed into.  The code
+generator for a VOP must be able to uniquely determine the representation of
+its operands from the SC. (debugger also...)
+
+Some SCs:
+    Reg: any register (immediate objects)
+    Save-Reg: a boxed register near r15 (registers easily saved in a call)
+    Boxed-Reg: any boxed register (any boxed object)
+    Unboxed-Reg: any unboxed register (any unboxed object)
+    Float-Reg, Double-Float-Reg: float in FP register.
+    Stack: boxed object on the stack (on cstack)
+    Word: any 32bit unboxed object on nstack.
+    Double: any 64bit unboxed object on nstack.
+
+We have a number of non-packed storage classes which serve to represent access
+costs associated with values that are not allocated using conflicts
+information.  Non-packed TNs appear to already be packed in the appropriate
+storage base so that Pack doesn't get confused.  Costs for relevant non-packed
+SC's appear in the TN-Ref cost information, but need not ever be summed into
+the TN cost vectors, since TNs cannot be packed into them.
+
+There are SCs for non-immediate constants and for each significant kind of
+immediate operand in the architecture.  On the RT, 4, 8 and 20 bit integer SCs
+are probably worth having.
+
+\begin{verbatim}
+Non-packed SCs:
+    Constant
+    Immediate constant SCs:
+        Signed-Byte-<N>, Unsigned-Byte-<N>, for various architecture dependent
+	    values of <N>
+	String-Char
+	XXX-Float
+	Magic values: T, NIL, 0.
+\end{verbatim}
+
+\chapter{Type system parameterization}
+
+The main aspect of the VM that is likely to vary for good reason is the type
+system:
+
+ -- Different systems will have different ways of representing dynamic type
+    information.  The primary effect this has on the compiler is causing VMR
+    conversion of type tests and checks to be implementation dependent.
+    Rewriting this code for each implementation shouldn't be a big problem,
+    since the portable semantics of types has already been dealt with.
+
+ -- Different systems will have different specialized number and array types,
+    and different VOPs specialized for these types.  It is easy to add this kind
+    of knowledge without affecting the rest of the compiler.  All you have to
+    do is define the VOPs and translations.
+
+ -- Different systems will offer different specialized storage resources
+    such as floating-point registers, and will have additional kinds of
+    primitive-types.  The storage class mechanism handles a large part of this,
+    but there may be some problem in getting VMR conversion to realize the
+    possibly large hidden costs in implicit moves to and from these specialized
+    storage resources.  Probably the answer is to have some sort of general
+    mechanism for determining the primitive-type for a TN given the Lisp type,
+    and then to have some sort of mechanism for automatically using specialized
+    Move VOPs when the source or destination has some particular primitive-type.
+
+\#|
+How to deal with list/null(symbol)/cons in primitive-type structure?  Since
+cons and symbol aren't used for type-specific template selection, it isn't
+really all that critical.  Probably Primitive-Type should return the List
+primitive type for all of Cons, List and Null (indicating when it is exact).
+This would allow type-dispatch for simple sequence functions (such as length)
+to be done using the standard template-selection mechanism.  [Not a wired
+assumption] 
+|\#
+
+
+
+\chapter{VOP Definition}
+
+Before the operand TN-refs are passed to the emit function, the following
+stuff is done:
+ -- The refs in the operand and result lists are linked together in order using
+    the Across slot.  This list is properly NIL terminated.
+ -- The TN slot in each ref is set, and the ref is linked into that TN's refs
+    using the Next slot.
+ -- The Write-P slot is set depending on whether the ref is an argument or
+    result.
+ -- The other slots have the default values.
+
+The template emit function fills in the Vop, Costs, Cost-Function,
+SC-Restriction and Preference slots, and links together the Next-Ref chain as
+appropriate.
+
+
+\section{Lifetime model}
+
+\#|
+Note in doc that the same TN may not be used as both a more operand and as any
+other operand to the same VOP, to simplify more operand LTN number coalescing.
+|\#
+
+It seems we need a fairly elaborate model for intra-VOP conflicts in order to
+allocate temporaries without introducing spurious conflicts.  Consider the
+important case of a VOP such as a miscop that must have operands in certain
+registers.  We allocate a wired temporary, create a local preference for the
+corresponding operand, and move to (or from) the temporary.  If all temporaries
+conflict with all arguments, the result will be correct, but arguments could
+never be packed in the actual passing register.  If temporaries didn't conflict
+with any arguments, then the temporary for an earlier argument might get packed
+in the same location as the operand for a later argument; loading would then
+destroy an argument before it was read.
+
+A temporary's intra-VOP lifetime is represented by the times at which its life
+starts and ends.  There are various instants during the evaluation that start
+and end VOP lifetimes.  Two TNs conflict if the live intervals overlap.
+Lifetimes are open intervals: if one TN's lifetime begins at a point where
+another's ends, then the TNs don't conflict.
+
+The times within a VOP are the following:
+
+:Load
+    This is the beginning of the argument's lives, as far as intra-vop
+    conflicts are concerned.  If load-TNs are allocated, then this is the
+    beginning of their lives.
+
+(:Argument $<$n$>$)
+    The point at which the N'th argument is read for the last time (by this
+    VOP).  If the argument is dead after this VOP, then the argument becomes
+    dead at this time, and may be reused as a temporary or result load-TN.
+
+(:Eval $<$n$>$)
+    The N'th evaluation step.  There may be any number of evaluation steps, but
+    it is unlikely that more than two are needed.
+
+(:Result $<$n$>$) 
+    The point at which the N'th result is first written into.  This is the
+    point at which that result becomes live.
+
+:Save
+    Similar to :Load, but marks the end of time.  This is the point at which result
+    load-TNs are stored back to the actual location.
+
+In any of the list-style time specifications, the keyword by itself stands for
+the first such time, i.e.
+\begin{verbatim}
+    :argument  <==>  (:argument 0)
+\end{verbatim}
+
+Note that argument/result read/write times don't actually have to be in the
+order specified, but they must *appear* to happen in that order as far as
+conflict analysis is concerned.  For example, the arguments can be read in any
+order as long as no TN is written that has a life beginning at or after
+(:Argument $<$n$>$), where N is the number of an argument whose reading was
+postponed.
+
+[\#\#\# (???)
+
+We probably also want some syntactic sugar in Define-VOP for automatically
+moving operands to/from explicitly allocated temporaries so that this kind of
+thing is somewhat easy.  There isn't really any reason to consider the
+temporary to be a load-TN, but we want to compute costs as though it was and
+want to use the same operand loading routines.
+
+We also might consider allowing the lifetime of an argument/result to be
+extended forward/backward.  This would in many cases eliminate the need for
+temporaries when operands are read/written out of order.
+]
+
+
+\section{VOP Cost model}
+
+Note that in this model, if an operand has no restrictions, it has no cost.
+This makes sense, since the purpose of the cost is to indicate the
+relative value of packing in different SCs.  If the operand isn't required to
+be in a good SC (i.e. a register), then we might as well leave it in memory.
+The SC restriction mechanism can be used even when doing a move into the SC is
+too complex to be generated automatically (perhaps requiring temporary
+registers), since Define-VOP allows operand loading to be done explicitly.
+
+
+\section{Efficiency notes}
+
+  In addition to
+being used to tell whether a particular unsafe template might get emitted, we
+can also use it to give better efficiency notes:
+ -- We can say what is wrong with the call types, rather than just saying we
+    failed to open-code.
+ -- We can tell whether any of the ``better'' templates could possibly apply,
+    i.e. is the inapplicability of a template because of inadequate type
+    information or because the type is just plain wrong.  We don't want to
+    flame people when a template that couldn't possibly match doesn't match,
+    e.g. complaining that we can't use fixnum+ when the arguments are known to
+    be floats.
+
+
+This is how we give better efficiency notes:
+
+The Template-Note is a short noun-like string without capitalization or
+punctuation that describes what the template ``does'', i.e. we say
+``Unable to do ~A, doing ~A instead.''
+
+The Cost is moved from the Vop-Info to the Template structure, and is used to
+determine the ``goodness'' of possibly applicable templates.  [Could flush
+Template/Vop-Info distinction]  The cost is used to choose the best applicable
+template to emit, and also to determine what better templates we might have
+been able to use.
+
+A template is possibly applicable if there is an intersection between all of
+the arg/result types and the corresponding arg/result restrictions, i.e. the
+template is not clearly impossible: more declarations might allow it to be
+emitted.
+
+
+\chapter{Assembler Retargeting}
+
+
+\chapter{Writing Assembly Code}
+
+VOP writers expect:
+\begin{Lentry}
+\item[MOVE]
+      You write when you port the assembler.)
+\item[EMIT-LABEL]
+      Assembler interface like INST.  Takes a label you made and says ``stick it
+      here.''
+   \item[GEN-LABEL]
+      Returns a new label suitable for use with EMIT-LABEL exactly once and
+      for referencing as often as necessary.
+   \item[INST]
+      Recognizes and dispatches to instructions you defined for assembler.
+   \item[ALIGN]
+      This takes the number of zero bits you want in the low end of the address
+      of the next instruction.
+   \item[ASSEMBLE]
+   \item[ASSEMBLE-ELSEWHERE]
+      Get ready for assembling stuff.  Takes a VOP and arbitrary PROGN-style
+      body.  Wrap these around instruction emission code announcing the first
+      pass of our assembler.
+   \item[CURRENT-NFP-TN]
+      This returns a TN for the NFP if the caller uses the number stack, or
+      nil.
+   \item[SB-ALLOCATED-SIZE]
+      This returns the size of some storage base used by the currently
+      compiling component.
+   \item[...]
+\end{Lentry}
+;;;
+;;; VOP idioms
+;;;
+
+\begin{Lentry}
+\item[STORE-STACK-TN]
+\item[LOAD-STACK-TN]
+   These move a value from a register to the control stack, or from the
+   control stack to a register.  They take care of checking the TN types,
+   modifying offsets according to the address units per word, etc.
+\end{Lentry}
+
+\chapter{Required VOPS}
+
+
+Note: the move VOP cannot have any wired temps.  (Move-Argument also?)  This is
+so we can move stuff into wired TNs without stepping on our toes.
+
+
+We create set closure variables using the Value-Cell VOP, which takes a value
+and returns a value cell containing the value.  We can basically use this
+instead of a Move VOP when initializing the variable.  Value-Cell-Set and
+Value-Cell-Ref are used to access the value cell.  We can have a special effect
+for value cells so that value cells references can be discovered to be common
+subexpressions or loop invariants.
+
+
+
+
+Represent unknown-values continuations as (start, count).  Unknown values
+continuations are always outside of the current frame (on stack top).  Within a
+function, we always set up and receive values in the standard passing
+locations.  If we receive stack values, then we must BLT them down to the start
+of our frame, filling in any unsupplied values.  If we generate unknown values
+(i.e. PUSH-VALUES), then we set the values up in the standard locations, then
+BLT them to stack top.  When doing a tail-return of MVs, we just set them up in
+the standard locations and decrement SP: no BLT is necessary.
+
+Unknown argument call (MV-CALL) takes its arguments on stack top (is given a
+base pointer).  If not a tail call, then we just set the arg pointer to the
+base pointer and call.  If a tail call, we must BLT the arguments down to the
+beginning of the current frame.
+
+
+Implement more args by BLT'ing the more args *on top* of the current frame.
+This solves two problems:
+\begin{itemize}
+\item Any register more arguments can be made uniformly accessibly by copying
+    them into memory.  [We can't store the registers in place, since the
+    beginning of the frame gets double use for storing the old-cont, return-pc
+    and env.]
+\item It solves the deallocation problem: the arguments will be deallocated when
+    the frame is returned from or a tail full call is done out of it.  So
+    keyword args will be properly tail-recursive without any special mechanism
+    for squeezing out the more arg once the parsing is done.  Note that a tail
+    local call won't blast the more arg, since in local call the callee just
+    takes the frame it is given (in this case containing the more arg).
+\end{itemize}
+
+More args in local call???  Perhaps we should not attempt local call conversion
+in this case.  We already special-case keyword args in local call.  It seems
+that the main importance of more args is primarily related to full call: it is
+used for defining various kinds of frobs that need to take arbitrary arguments:
+\begin{itemize}
+\item Keyword arguments
+\item Interpreter stubs
+\item ``Pass through'' applications such as dispatch functions
+\end{itemize}
+Given the marginal importance of more args in local call, it seems unworth
+going to any implementation difficulty.  In fact, it seems that it would cause
+complications both at the VMR level and also in the VM definition.  This being
+the case, we should flush it.
+
+
+\section{Function Call}
+
+
+
+\subsection{Registers and frame format}
+
+These registers are used in function call and return:
+
+A0..A{\it n}
+    In full call, the first three arguments.  In unknown values return, the
+    first three return values.
+
+CFP
+    The current frame pointer.  In full call, this initially points to a
+    partial frame large enough to hold the passed stack arguments (zero-length
+    if none).
+
+CSP
+    The current control stack top pointer. 
+
+OCFP
+    In full call, the passing location for the frame to return to.
+
+    In unknown-values return of other than one value, the pointer to returned
+    stack values.  In such a return, OCFP is always initialized to point to
+    the frame returned from, even when no stack values are returned.  This
+    allows OCFP to be used to restore CSP.
+
+LRA
+    In full call, the passing location for the return PC.
+
+NARGS
+    In full call, the number of arguments passed.  In unknown-values return of
+    other than one value, the number of values returned.
+
+
+\subsection{Full call}
+
+What is our usage of CFP, OCFP and CSP?  
+
+It is an invariant that CSP always points after any useful information so that
+at any time an interrupt can come and allocate stuff in the stack.
+
+TR call is also a constraint: we can't deallocate the caller's frame before the
+call, since it holds the stack arguments for the call.  
+
+What we do is have the caller set up CFP, and have the callee set CSP to CFP
+plus the frame size.  The caller leaves CSP alone: the callee is the one who
+does any necessary stack deallocation.
+
+In a TR call, we don't do anything: CFP is left as CFP, and CSP points to the
+end of the frame, keeping the stack arguments from being trashed.
+
+In a normal call, CFP is set to CSP, causing the callee's frame to be allocated
+after the current frame.
+
+
+\subsection{Unknown values return}
+
+The unknown values return convention is always used in full call, and is used
+in local call when the compiler either can't prove that a fixed number of
+values are returned, or decides not to use the fixed values convention to allow
+tail-recursive XEP calls.
+
+The unknown-values return convention has variants: single value and variable
+values.  We make this distinction to optimize the important case of a returner
+who knows exactly one value is being returned.  Note that it is possible to
+return a single value using the variable-values convention, but it is less
+efficient.
+
+We indicate single-value return by returning at the return-pc+4; variable value
+return is indicated by returning at the return PC.
+
+Single-value return makes only the following guarantees:
+    A0 holds the value returned.
+    CSP has been reset: there is no garbage on the stack.
+
+In variable value return, more information is passed back:
+    A0..A2 hold the first three return values.  If fewer than three values are
+    returned, then the unused registers are initialized to NIL.
+
+    OCFP points to the frame returned from.  Note that because of our
+    tail-recursive implementation of call, the frame receiving the values is
+    always immediately under the frame returning the values.  This means that
+    we can use OCFP to index the values when we access them, and to restore
+    CSP when we want to discard them.
+
+    NARGS holds the number of values returned.
+
+    CSP is always (+ OCFP (* NARGS 4)), i.e. there is room on the stack
+    allocated for all returned values, even if they are all actually passed in
+    registers.
+
+
+\subsection{External Entry Points}
+
+Things that need to be done on XEP entry:
+ 1] Allocate frame
+ 2] Move more arg above the frame, saving context
+ 3] Set up env, saving closure pointer if closure
+ 4] Move arguments from closure to local home
+    Move old-cont and return-pc to the save locations
+ 5] Argument count checking and dispatching
+
+XEP VOPs:
+\begin{verbatim}
+Allocate-Frame
+Copy-More-Arg <nargs-tn> 'fixed {in a3} => <context>, <count>
+Setup-Environment
+Setup-Closure-Environment => <closure>
+Verify-Argument-Count <nargs-tn> 'count {for fixed-arg lambdas}
+Argument-Count-Error <nargs-tn> {Drop-thru on hairy arg dispatching}
+Use fast-if-=/fixnum and fast-if-</fixnum for dispatching.
+\end{verbatim}
+
+Closure vops:
+\begin{verbatim}
+make-closure <fun entry> <slot count> => <closure>
+closure-init <closure> <values> 'slot
+\end{verbatim}
+
+Things that need to be done on all function entry:
+\begin{itemize}
+\item Move arguments to the variable home (consing value cells as necessary)
+\item Move environment values to the local home
+\item Move old-cont and return-pc to the save locations
+\end{itemize}
+
+\section{Calls}
+
+Calling VOP's are a cross product of the following sets (with some members
+missing):
+   Return values
+      multiple (all values)
+      fixed (calling with unknown values conventions, wanting a certain
+             number.)
+      known (only in local call where caller/callee agree on number of
+      	     values.)
+      tail (doesn't return but does tail call)
+   What function
+      local
+      named (going through symbol, like full but stash fun name for error sys)
+      full (have a function)
+   Args
+      fixed (number of args are known at compile-time)
+      variable (MULTIPLE-VALUE-CALL and APPLY)
+
+Note on all jumps for calls and returns that we want to put some instruction
+in the jump's delay slot(s).
+
+Register usage at the time of the call:
+
+LEXENV
+   This holds the lexical environment to use during the call if it's a closure,
+   and it is undefined otherwise.
+
+CNAME
+   This holds the symbol for a named call and garbage otherwise.
+
+OCFP
+   This holds the frame pointer, which the system restores upon return.  The
+   callee saves this if necessary; this is passed as a pseudo-argument.
+
+A0 ... An
+   These holds the first n+1 arguments.
+
+NARGS
+   This holds the number of arguments, as a fixnum.
+
+LRA
+   This holds the lisp-return-address object which indicates where to return.
+   For a tail call, this retains its current value.  The callee saves this
+   if necessary; this is passed as a pseudo-argument.
+
+CODE
+   This holds the function object being called.
+
+CSP
+   The caller ignores this.  The callee sets it as necessary based on CFP.
+
+CFP
+   This holds the callee's frame pointer.  Caller sets this to the new frame
+   pointer, which it remembered when it started computing arguments; this is
+   CSP if there were no stack arguments.  For a tail call CFP retains its
+   current value.
+
+NSP
+   The system uses this within a single function.  A function using NSP must
+   allocate and deallocate before returning or making a tail call.
+
+Register usage at the time of the return for single value return, which
+goes with the unknown-values convention the caller used.
+
+A0
+   This holds the value.
+
+CODE
+   This holds the lisp-return-address at which the system continues executing.
+
+CSP
+   This holds the CFP.  That is, the stack is guaranteed to be clean, and there
+   is no code at the return site to adjust the CSP.
+
+CFP
+   This holds the OCFP.
+
+Additional register usage for multiple value return:
+
+NARGS
+   This holds the number of values returned.
+
+A0 ... An
+   These holds the first n+1 values, or NIL if there are less than n+1 values.
+
+CSP
+   Returner stores CSP to hold its CFP + NARGS * \verb+<address units per word>+
+
+OCFP
+   Returner stores this as its CFP, so the returnee has a handle on either
+   the start of the returned values on the stack.
+
+
+ALLOCATE FULL CALL FRAME.
+
+If the number of call arguments (passed to the VOP as an info argument)
+indicates that there are stack arguments, then it makes some callee frame for
+arguments:
+\begin{verbatim}
+   VOP-result <- CSP
+   CSP <- CSP + value of VOP info arg times address units per word.
+\end{verbatim}
+
+In a call sequence, move some arguments to the right places.
+
+There's a variety of MOVE-ARGUMENT VOP's.
+
+FULL CALL VOP'S
+(variations determined by whether it's named, it's a tail call, there
+is a variable arg count, etc.)
+\begin{verbatim}
+  if variable number of arguments
+    NARGS <- (CSP - value of VOP argument) shift right by address units per word.
+    A0...An <- values off of VOP argument (just fill them all)
+  else
+    NARGS <- value of VOP info argument (always a constant)
+
+  if tail call
+    OCFP <- value from VOP argument
+    LRA <- value from VOP argument
+    CFP stays the same since we reuse the frame
+    NSP <- NFP
+  else
+    OCFP <- CFP
+    LRA <- compute LRA by adding an assemble-time determined constant to
+    	   CODE.
+    CFP <- new frame pointer (remembered when starting to compute args)
+           This is CSP if no stack args.
+    when (current-nfp-tn VOP-self-pointer)
+      stack-temp <- NFP
+
+  if named
+    CNAME <- function symbol name
+    the-fun <- function object out of symbol
+
+  LEXENV <- the-fun (from previous line or VOP argument)
+  CODE <- function-entry (the first word after the-fun)
+  LIP <- calc first instruction addr (CODE + constant-offset)
+  jump and run off temp
+
+  <emit Lisp return address data-block>
+  <default and move return values OR receive return values>
+  when (current-nfp-tn VOP-self-pointer)
+    NFP <- stack-temp
+\end{verbatim}
+Callee:
+
+\begin{verbatim}
+XEP-ALLOCATE-FRAME
+  emit function header (maybe initializes offset back to component start,
+  			but other pointers are set up at load-time.  Pads
+			to dual-word boundary.)
+  CSP <- CFP + compile-time determined constant (frame size)
+  if the function uses the number stack
+    NFP <- NSP
+    NSP <- NSP + compile-time determined constant (number stack frame size)
+\end{verbatim}
+
+\begin{verbatim}
+SETUP-ENVIRONMENT
+(either use this or the next one)
+
+CODE <- CODE - assembler-time determined offset from function-entry back to
+	       the code data-block address.
+\end{verbatim}
+
+\begin{verbatim}
+SETUP-CLOSURE-ENVIRONMENT
+(either use this or the previous one)
+After this the CLOSURE-REF VOP can reference closure variables.
+
+VOP-result <- LEXENV
+CODE <- CODE - assembler-time determined offset from function-entry back to
+	       the code data-block address.
+\end{verbatim}
+
+Return VOP's
+RETURN and RETURN-MULTIPLE are for the unknown-values return convention.
+For some previous caller this is either it wants n values (and it doesn't
+know how many are coming), or it wants all the values returned (and it 
+doesn't know how many are coming).
+
+
+RETURN
+(known fixed number of values, used with the unknown-values convention
+ in the caller.)
+When compiler invokes VOP, all values are already where they should be;
+just get back to caller.
+
+\begin{verbatim}
+when (current-nfp-tn VOP-self-pointer)
+  ;; The number stack grows down in memory.
+  NSP <- NFP + number stack frame size for calls within the currently
+                  compiling component
+	       times address units per word
+CODE <- value of VOP argument with LRA
+if VOP info arg is 1 (number of values we know we're returning)
+  CSP <- CFP
+  LIP <- calc target addr
+          (CODE + skip over LRA header word + skip over address units per branch)
+	  (The branch is in the caller to skip down to the MV code.)
+else
+  NARGS <- value of VOP info arg
+  nil out unused arg regs
+  OCFP <- CFP  (This indicates the start of return values on the stack,
+  		but you leave space for those in registers for convenience.)
+  CSP <- CFP + NARGS * address-units-per-word
+  LIP <- calc target addr (CODE + skip over LRA header word)
+CFP <- value of VOP argument with OCFP
+jump and run off LIP
+\end{verbatim}
+
+RETURN-MULTIPLE
+(unknown number of values, used with the unknown-values convention in
+ the caller.)
+When compiler invokes VOP, it gets TN's representing a pointer to the
+values on the stack and how many values were computed.
+
+\begin{verbatim}
+when (current-nfp-tn VOP-self-pointer)
+  ;; The number stack grows down in memory.
+  NSP <- NFP + number stack frame size for calls within the currently
+                  compiling component
+	       times address units per word
+NARGS <- value of VOP argument
+copy the args to the beginning of the current (returner's) frame.
+   Actually some go into the argument registers.  When putting the rest at
+   the beginning of the frame, leave room for those in the argument registers.
+CSP <- CFP + NARGS * address-units-per-word
+nil out unused arg regs
+OCFP <- CFP  (This indicates the start of return values on the stack,
+	      but you leave space for those in registers for convenience.)
+CFP <- value of VOP argument with OCFP
+CODE <- value of VOP argument with LRA
+LIP <- calc target addr (CODE + skip over LRA header word)
+jump and run off LIP
+\end{verbatim}
+
+Returnee
+The call VOP's call DEFAULT-UNKNOWN-VALUES or RECEIVE-UNKNOWN-VALUES after
+spitting out transfer control to get stuff from the returner.
+
+DEFAULT-UNKNOWN-VALUES
+(We know what we want and we got something.)
+If returnee wants one value, it never does anything to deal with a shortage
+of return values.  However, if start at PC, then it has to adjust the stack
+pointer to dump extra values (move OCFP into CSP).  If it starts at PC+N,
+then it just goes along with the ``want one value, got it'' case.
+If the returnee wants multiple values, and there's a shortage of return
+values, there are two cases to handle.  One, if the returnee wants fewer
+values than there are return registers, and we start at PC+N, then it fills
+in return registers \verb|A1..A<desired values necessary>|; if we start at PC,
+then the returnee is fine since the returning conventions have filled in
+the unused return registers with nil, but the returnee must adjust the
+stack pointer to dump possible stack return values (move OCFP to CSP).
+Two, if the returnee wants more values than the number of return registers,
+and it starts at PC+N (got one value), then it sets up returnee state as if
+an unknown number of values came back:
+\begin{verbatim}
+   A0 has the one value
+   A1..An get nil
+   NARGS gets 1
+   OCFP gets CSP, so general code described below can move OCFP into CSP
+If we start at PC, then branch down to the general ``got k values, wanted n''
+code which takes care of the following issues:
+   If k < n, fill in stack return values of nil for shortage of return
+      values and move OCFP into CSP
+   If k >= n, move OCFP into CSP
+This also restores CODE from LRA by subtracting an assemble-time constant.
+\end{verbatim}
+
+RECEIVE-UKNOWN-VALUES
+(I want whatever I get.)
+We want these at the end of our frame.  When the returnee starts at
+PC, it moves the return value registers to OCFP..OCFP[An] ignoring where
+the end of the stack is and whether all the return value registers had
+values.  The returner left room on the stack before the stack return values
+for the register return values.  When the returnee starts at PC+N, bump CSP
+by 1 and copy A0 there.
+This also restores CODE from LRA by subtracting an assemble-time constant.
+
+
+Local call
+
+There are three flavors:
+   1] KNOWN-CALL-LOCAL
+      Uses known call convention where caller and callee agree where all
+      the values are, and there's a fixed number of return values.
+   2] CALL-LOCAL
+      Uses the unknown-values convention, but we expect a particular
+      number of values in return.
+   3] MULTIPLE-CALL-LOCAL
+      Uses the unknown-values convention, but we want all values returned.
+
+ALLOCATE-FRAME
+
+If the number of call arguments (passed to the VOP as an info argument)
+indicates that there are stack arguments, then it makes some callee frame for
+arguments:
+\begin{verbatim}
+   VOP-result1 <- CSP
+   CSP <- CSP + control stack frame size for calls within the currently
+   		   compiling component
+   		times address units per word.
+   when (callee-nfp-tn <VOP info arg holding callee>)
+     ;; The number stack grows down.
+     ;; May have to round to dual-word boundary if machines C calling
+     ;;    conventions demand this.
+     NSP <- NSP - number stack frame size for calls within the currently
+     		     compiling component
+		  times address units per word
+     VOP-result2 <- NSP
+\end{verbatim}
+KNOWN-CALL-LOCAL, CALL-LOCAL, MULTIPLE-CALL-LOCAL
+KNOWN-CALL-LOCAL has no need to affect CODE since CODE is the same for the
+caller/returnee and the returner.  This uses KNOWN-RETURN.
+With CALL-LOCAL and MULTIPLE-CALL-LOCAL, the caller/returnee must fixup
+CODE since the callee may do a tail full call.  This happens in the code
+emitted by DEFAULT-UNKNOWN-VALUES and RECEIVE-UNKNOWN-VALUES.  We use these
+return conventions since we don't know what kind of values the returner
+will give us.  This could happen due to a tail full call to an unknown
+function, or because the callee had different return points that returned
+various numbers of values.
+
+\begin{verbatim}
+when (current-nfp-tn VOP-self-pointer)   ;Get VOP self-pointer with
+					 ;DEFINE-VOP switch :vop-var.
+  stack-temp <- NFP
+CFP <- value of VOP arg
+when (callee-nfp-tn <VOP info arg holding callee>)
+  <where-callee-wants-NFP-tn>  <-  value of VOP arg
+<where-callee-wants-LRA-tn>  <-  compute LRA by adding an assemble-time
+				 determined constant to CODE.
+jump and run off VOP info arg holding start instruction for callee
+
+<emit Lisp return address data-block>
+<case call convention
+  known: do nothing
+  call: default and move return values
+  multiple: receive return values
+>
+when (current-nfp-tn VOP-self-pointer)   
+  NFP <- stack-temp
+\end{verbatim}
+
+KNOWN-RETURN
+\begin{verbatim}
+CSP <- CFP
+when (current-nfp-tn VOP-self-pointer)
+  ;; number stack grows down in memory.
+  NSP <- NFP + number stack frame size for calls within the currently
+                  compiling component
+	       times address units per word
+LIP <- calc target addr (value of VOP arg + skip over LRA header word)
+CFP <- value of VOP arg
+jump and run off LIP
+
+\end{verbatim}
+
+
+\chapter{Standard Primitives}
+
+
+\chapter{Customizing VMR Conversion}
+
+Another way in which different implementations differ is in the relative cost
+of operations.  On machines without an integer multiply instruction, it may be
+desirable to convert multiplication by a constant into shifts and adds, while
+this is surely a bad idea on machines with hardware support for multiplication.
+Part of the tuning process for an implementation will be adding implementation
+dependent transforms and disabling undesirable standard transforms.
+
+When practical, ICR transforms should be used instead of VMR generators, since
+transforms are more portable and less error-prone.  Note that the Lisp code
+need not be implementation independent: it may contain all sorts of
+sub-primitives and similar stuff.  Generally a function should be implemented
+using a transform instead of a VMR translator unless it cannot be implemented
+as a transform due to being totally evil or it is just as easy to implement as
+a translator because it is so simple.
+
+
+\section{Constant Operands}
+
+If the code emitted for a VOP when an argument is constant is very different
+than the non-constant case, then it may be desirable to special-case the
+operation in VMR conversion by emitting different VOPs.  An example would be if
+SVREF is only open-coded when the index is a constant, and turns into a miscop
+call otherwise.  We wouldn't want constant references to spuriously allocate
+all the miscop linkage registers on the off chance that the offset might not be
+constant.  See the :constant feature of VOP primitive type restrictions.
+
+
+\section{Supporting Multiple Hardware Configurations}
+
+
+A winning way to change emitted code depending on the hardware configuration,
+i.e. what FPA is present is to do this using primitive types.  Note that the
+Primitive-Type function is VM supplied, and can look at any appropriate
+hardware configuration switches.  Short-Float can become 6881-Short-Float,
+AFPA-Short-Float, etc.  There would be separate SBs and SCs for the registers
+of each kind of FP hardware, with each hardware-specific primitive type
+using the appropriate float register SC.  Then the hardware specific templates
+would provide AFPA-Short-Float as the argument type restriction.
+
+Primitive type changes:
+
+The primitive-type structure is given a new \%Type slot, which is the CType
+structure that is equivalent to this type.  There is also a Guard slot, which,
+if true is a function that control whether this primitive type is allowed (due
+to hardware configuration, etc.)  
+
+We add new :Type and :Guard keywords to Def-Primitive-Type.  Type is the type
+specifier that is equivalent (default to the primitive-type name), and Guard is
+an expression evaluated in the null environment that controls whether this type
+applies (default to none, i.e. constant T).
+
+The Primitive-Type-Type function returns the Lisp CType corresponding to a
+primitive type.  This is the \%Type unless there is a guard that returns false,
+in which case it is the empty type (i.e. NIL).
+
+[But this doesn't do what we want it to do, since we will compute the
+function type for a template at load-time, so they will correspond to whatever
+configuration was in effect then.  Maybe we don't want to dick with guards here
+(if at all).  I guess we can defer this issue until we actually support
+different FP configurations.  But it would seem pretty losing to separately
+flame about all the different FP configurations that could be used to open-code
++ whenever we are forced to closed-code +.
+
+If we separately report each better possibly applicable template that we
+couldn't use, then it would be reasonable to report any conditional template
+allowed by the configuration.  
+
+But it would probably also be good to give some sort of hint that perhaps it
+would be a good time to make sure you understand how to tell the compiler to
+compile for a particular configuration.  Perhaps if there is a template that
+applies *but for the guard*, then we could give a note.  This way, if someone
+thinks they are being efficient by throwing in lots of declarations, we can let
+them know that they may have to do more.
+
+I guess the guard should be associated with the template rather than the
+primitive type.  This would allow LTN and friends to easily tell whether a
+template applies in this configuration.  It is also probably more natural for
+some sorts of things: with some hardware variants, it may be that the SBs and
+representations (SCs) are really the same, but there are some different allowed
+operations.  In this case, we could easily conditionalize VOPs without the
+increased complexity due to bogus SCs.  If there are different storage
+resources, then we would conditionalize Primitive-Type as well.
+
+
+
+\section{Special-case VMR convert methods}
+
+    (defun continuation-tn (cont \&optional (check-p t))
+      ...)
+Return the TN which holds Continuation's first result value.  In general
+this may emit code to load the value into a TN.  If Check-P is true, then
+when policy indicates, code should be emitted to check that the value satisfies
+the continuation asserted type.
+
+    (defun result-tn (cont)
+      ...)
+Return the TN that Continuation's first value is delivered in.  In general,
+may emit code to default any additional values to NIL.
+
+    (defun result-tns (cont n)
+      ...)
+Similar to Result-TN, except that it returns a list of N result TNs, one
+for each of the first N values.
+
+
+Nearly all open-coded functions should be handled using standard template
+selection.  Some (all?) exceptions:
+\begin{itemize}
+\item List, List* and Vector take arbitrary numbers of arguments.  Could
+    implement Vector as a source transform.  Could even do List in a transform
+    if we explicitly represent the stack args using \%More-Args or something.
+\item \%Typep varies a lot depending on the type specifier.  We don't want to
+    transform it, since we want \%Typep as a canonical form so that we can do
+    type optimizations.
+\item Apply is weird.
+\item Funny functions emitted by the compiler: \%Listify-Rest-Args, Arg,
+    \%More-Args, \%Special-Bind, \%Catch, \%Unknown-Values (?), \%Unwind-Protect,
+    \%Unwind, \%\%Primitive.
+\end{itemize}

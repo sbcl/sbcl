@@ -1,0 +1,508 @@
+\chapter{UNIX Interface}
+\label{unix-interface}
+
+\credits{by Robert MacLachlan, Skef Wholey, Bill Chiles and William Lott}
+
+
+\cmucl{} attempts to make the full power of the underlying
+environment available to the Lisp programmer. This is done using
+combination of hand-coded interfaces and foreign function calls to C
+libraries. Although the techniques differ, the style of interface is
+similar. This chapter provides an overview of the facilities available
+and general rules for using them, as well as describing specific
+features in detail. It is assumed that the reader has a working
+familiarity with Unix and X11, as well as access to the standard
+system documentation.
+
+
+\section{Reading the Command Line}
+
+The shell parses the command line with which Lisp is invoked, and
+passes a data structure containing the parsed information to Lisp.
+This information is then extracted from that data structure and put
+into a set of Lisp data structures.
+
+\begin{defvar}{extensions:}{command-line-strings}
+  \defvarx[extensions:]{command-line-utility-name}
+  \defvarx[extensions:]{command-line-words}
+  \defvarx[extensions:]{command-line-switches}
+  
+  The value of \code{*command-line-words*} is a list of strings that
+  make up the command line, one word per string.  The first word on
+  the command line, i.e.  the name of the program invoked (usually
+  \code{lisp}) is stored in \code{*command-line-utility-name*}.  The
+  value of \code{*command-line-switches*} is a list of
+  \code{command-line-switch} structures, with a structure for each
+  word on the command line starting with a hyphen.  All the command
+  line words between the program name and the first switch are stored
+  in \code{*command-line-words*}.
+\end{defvar}
+
+The following functions may be used to examine \code{command-line-switch}
+structures.
+\begin{defun}{extensions:}{cmd-switch-name}{\args{\var{switch}}}
+  
+  Returns the name of the switch, less the preceding hyphen and
+  trailing equal sign (if any).
+\end{defun}
+\begin{defun}{extensions:}{cmd-switch-value}{\args{\var{switch}}}
+  
+  Returns the value designated using an embedded equal sign, if any.
+  If the switch has no equal sign, then this is null.
+\end{defun}
+\begin{defun}{extensions:}{cmd-switch-words}{\args{\var{switch}}}
+  
+  Returns a list of the words between this switch and the next switch
+  or the end of the command line.
+\end{defun}
+\begin{defun}{extensions:}{cmd-switch-arg}{\args{\var{switch}}}
+  
+  Returns the first non-null value from \code{cmd-switch-value}, the
+  first element in \code{cmd-switch-words}, or the first word in
+  \var{command-line-words}.
+\end{defun}
+
+\begin{defun}{extensions:}{get-command-line-switch}{\args{\var{sname}}}
+  
+  This function takes the name of a switch as a string and returns the
+  value of the switch given on the command line.  If no value was
+  specified, then any following words are returned.  If there are no
+  following words, then \true{} is returned.  If the switch was not
+  specified, then \false{} is returned.
+\end{defun}
+
+\begin{defmac}{extensions:}{defswitch}{%
+    \args{\var{name} \ampoptional{} \var{function}}}
+  
+  This macro causes \var{function} to be called when the switch
+  \var{name} appears in the command line.  Name is a simple-string
+  that does not begin with a hyphen (unless the switch name really
+  does begin with one.)
+  
+  If \var{function} is not supplied, then the switch is parsed into
+  \var{command-line-switches}, but otherwise ignored.  This suppresses
+  the undefined switch warning which would otherwise take place.  The
+  warning can also be globally suppressed by
+  \var{complain-about-illegal-switches}.
+\end{defmac}
+
+
+\section{Useful Variables}
+
+\begin{defvar}{system:}{stdin}
+  \defvarx[system:]{stdout} \defvarx[system:]{stderr}
+  
+  Streams connected to the standard input, output and error file
+  descriptors.
+\end{defvar}
+
+\begin{defvar}{system:}{tty}
+  
+  A stream connected to \file{/dev/tty}.
+\end{defvar}
+
+\begin{defvar}{extensions:}{environment-list}
+  The environment variables inherited by the current process, as a
+  keyword-indexed alist. For example, to access the DISPLAY
+  environment variable, you could use
+
+\begin{lisp}
+   (cdr (assoc :display ext:*environment-list*))
+\end{lisp}
+
+  Note that the case of the variable name is preserved when converting
+  to a keyword.  Therefore, you need to specify the keyword properly for
+  variable names containing lower-case letters,
+\end{defvar}
+
+
+\section{Lisp Equivalents for C Routines}
+
+The UNIX documentation describes the system interface in terms of C
+procedure headers.  The corresponding Lisp function will have a somewhat
+different interface, since Lisp argument passing conventions and
+datatypes are different.
+
+The main difference in the argument passing conventions is that Lisp does not
+support passing values by reference.  In Lisp, all argument and results are
+passed by value.  Interface functions take some fixed number of arguments and
+return some fixed number of values.  A given ``parameter'' in the C
+specification will appear as an argument, return value, or both, depending on
+whether it is an In parameter, Out parameter, or In/Out parameter.  The basic
+transformation one makes to come up with the Lisp equivalent of a C routine is
+to remove the Out parameters from the call, and treat them as extra return
+values.  In/Out parameters appear both as arguments and return values.  Since
+Out and In/Out parameters are only conventions in C, you must determine the
+usage from the documentation.
+
+Thus, the C routine declared as
+
+\begin{example}
+kern_return_t lookup(servport, portsname, portsid)
+        port        servport;
+        char        *portsname;
+        int        *portsid;        /* out */
+ {
+  ...
+  *portsid = <expression to compute portsid field>
+  return(KERN_SUCCESS);
+ }
+\end{example}
+
+has as its Lisp equivalent something like
+
+\begin{lisp}
+(defun lookup (ServPort PortsName)
+  ...
+  (values
+   success
+   <expression to compute portsid field>))
+\end{lisp}
+
+If there are multiple out or in-out arguments, then there are multiple
+additional returns values.
+
+Fortunately, \cmucl{} programmers rarely have to worry about the
+nuances of this translation process, since the names of the arguments and
+return values are documented in a way so that the \code{describe} function
+(and the \hemlock{} \code{Describe Function Call} command, invoked with
+\b{C-M-Shift-A}) will list this information.  Since the names of arguments
+and return values are usually descriptive, the information that
+\code{describe} prints is usually all one needs to write a
+call. Most programmers use this on-line documentation nearly
+all of the time, and thereby avoid the need to handle bulky
+manuals and perform the translation from barbarous tongues.
+
+
+\section{Type Translations}
+\cindex{aliens}
+\cpsubindex{types}{alien}
+\cpsubindex{types}{foreign language}
+
+Lisp data types have very different representations from those used by
+conventional languages such as C.  Since the system interfaces are
+designed for conventional languages, Lisp must translate objects to and
+from the Lisp representations.  Many simple objects have a direct
+translation: integers, characters, strings and floating point numbers
+are translated to the corresponding Lisp object.  A number of types,
+however, are implemented differently in Lisp for reasons of clarity and
+efficiency.
+
+Instances of enumerated types are expressed as keywords in Lisp.
+Records, arrays, and pointer types are implemented with the \alien{}
+facility (\pxlref{aliens}).  Access functions are defined
+for these types which convert fields of records, elements of arrays,
+or data referenced by pointers into Lisp objects (possibly another
+object to be referenced with another access function).
+
+One should dispose of \alien{} objects created by constructor
+functions or returned from remote procedure calls when they are no
+longer of any use, freeing the virtual memory associated with that
+object.  Since \alien{}s contain pointers to non-Lisp data, the
+garbage collector cannot do this itself.  If the memory
+was obtained from \funref{make-alien} or from a foreign function call
+to a routine that used \code{malloc}, then \funref{free-alien} should
+be used.
+
+
+\section{System Area Pointers}
+\label{system-area-pointers}
+
+\cindex{pointers}\cpsubindex{malloc}{C function}\cpsubindex{free}{C function}
+Note that in some cases an address is represented by a Lisp integer, and in
+other cases it is represented by a real pointer.  Pointers are usually used
+when an object in the current address space is being referred to.  The MACH
+virtual memory manipulation calls must use integers, since in principle the
+address could be in any process, and Lisp cannot abide random pointers.
+Because these types are represented differently in Lisp, one must explicitly
+coerce between these representations.
+
+System Area Pointers (SAPs) provide a mechanism that bypasses the
+\alien{} type system and accesses virtual memory directly.  A SAP is a
+raw byte pointer into the \code{lisp} process address space.  SAPs are
+represented with a pointer descriptor, so SAP creation can cause
+consing.  However, the compiler uses a non-descriptor representation
+for SAPs when possible, so the consing overhead is generally minimal.
+\xlref{non-descriptor}.
+
+\begin{defun}{system:}{sap-int}{\args{\var{sap}}}
+  \defunx[system:]{int-sap}{\args{\var{int}}}
+  
+  The function \code{sap-int} is used to generate an integer
+  corresponding to the system area pointer, suitable for passing to
+  the kernel interfaces (which want all addresses specified as
+  integers).  The function \code{int-sap} is used to do the opposite
+  conversion.  The integer representation of a SAP is the byte offset
+  of the SAP from the start of the address space.
+\end{defun}
+
+\begin{defun}{system:}{sap+}{\args{\var{sap} \var{offset}}}
+  
+  This function adds a byte \var{offset} to \var{sap}, returning a new
+  SAP.
+\end{defun}
+
+\begin{defun}{system:}{sap-ref-8}{\args{\var{sap} \var{offset}}}
+  \defunx[system:]{sap-ref-16}{\args{\var{sap} \var{offset}}}
+  \defunx[system:]{sap-ref-32}{\args{\var{sap} \var{offset}}}
+  
+  These functions return the 8, 16 or 32 bit unsigned integer at
+  \var{offset} from \var{sap}.  The \var{offset} is always a byte
+  offset, regardless of the number of bits accessed.  \code{setf} may
+  be used with the these functions to deposit values into virtual
+  memory.
+\end{defun}
+
+\begin{defun}{system:}{signed-sap-ref-8}{\args{\var{sap} \var{offset}}}
+  \defunx[system:]{signed-sap-ref-16}{\args{\var{sap} \var{offset}}}
+  \defunx[system:]{signed-sap-ref-32}{\args{\var{sap} \var{offset}}}
+  
+  These functions are the same as the above unsigned operations,
+  except that they sign-extend, returning a negative number if the
+  high bit is set.
+\end{defun}
+
+
+\section{Unix System Calls}
+
+You probably won't have much cause to use them, but all the Unix system
+calls are available.  The Unix system call functions are in the
+\code{Unix} package.  The name of the interface for a particular system
+call is the name of the system call prepended with \code{unix-}.  The
+system usually defines the associated constants without any prefix name.
+To find out how to use a particular system call, try using
+\code{describe} on it.  If that is unhelpful, look at the source in
+\file{unix.lisp} or consult your system maintainer.
+
+The Unix system calls indicate an error by returning \false{} as the
+first value and the Unix error number as the second value.  If the call
+succeeds, then the first value will always be non-\nil, often \code{t}.
+
+For example, to use the \code{chdir} syscall: 
+
+\begin{lisp}
+(multiple-value-bind (success errno)
+    (unix:unix-chdir "/tmp")
+  (unless success
+     (error "Can't change working directory: ~a"
+            (unix:get-unix-error-msg errno))))
+\end{lisp}
+
+\begin{defun}{Unix:}{get-unix-error-msg}{\args{\var{error}}}
+
+  This function returns a string describing the Unix error number
+  \var{error} (this is similar to the Unix function \code{perror}). 
+\end{defun}
+
+
+\section{File Descriptor Streams}
+\label{sec:fds}
+
+Many of the UNIX system calls return file descriptors.  Instead of using other
+UNIX system calls to perform I/O on them, you can create a stream around them.
+For this purpose, fd-streams exist.  See also \funref{read-n-bytes}.
+
+\begin{defun}{system:}{make-fd-stream}{%
+    \args{\var{descriptor}} \keys{\kwd{input} \kwd{output}
+      \kwd{element-type}} \morekeys{\kwd{buffering} \kwd{name}
+      \kwd{file} \kwd{original}} \yetmorekeys{\kwd{delete-original}
+      \kwd{auto-close}} \yetmorekeys{\kwd{timeout} \kwd{pathname}}}
+  
+  This function creates a file descriptor stream using
+  \var{descriptor}.  If \kwd{input} is non-\nil, input operations are
+  allowed.  If \kwd{output} is non-\nil, output operations are
+  allowed.  The default is input only.  These keywords are defined:
+  \begin{Lentry}
+  \item[\kwd{element-type}] is the type of the unit of transaction for
+    the stream, which defaults to \code{string-char}.  See the \clisp{}
+    description of \code{open} for valid values.
+  
+  \item[\kwd{buffering}] is the kind of output buffering desired for
+    the stream.  Legal values are \kwd{none} for no buffering,
+    \kwd{line} for buffering up to each newline, and \kwd{full} for
+    full buffering.
+  
+  \item[\kwd{name}] is a simple-string name to use for descriptive
+    purposes when the system prints an fd-stream.  When printing
+    fd-streams, the system prepends the streams name with \code{Stream
+      for }.  If \var{name} is unspecified, it defaults to a string
+    containing \var{file} or \var{descriptor}, in order of preference.
+  
+  \item[\kwd{file}, \kwd{original}] \var{file} specifies the defaulted
+    namestring of the associated file when creating a file stream
+    (must be a \code{simple-string}). \var{original} is the
+    \code{simple-string} name of a backup file containing the original
+    contents of \var{file} while writing \var{file}.
+  
+    When you abort the stream by passing \true{} to \code{close} as
+    the second argument, if you supplied both \var{file} and
+    \var{original}, \code{close} will rename the \var{original} name
+    to the \var{file} name.  When you \code{close} the stream
+    normally, if you supplied \var{original}, and
+    \var{delete-original} is non-\nil, \code{close} deletes
+    \var{original}.  If \var{auto-close} is true (the default), then
+    \var{descriptor} will be closed when the stream is garbage
+    collected.
+  
+  \item[\kwd{pathname}]: The original pathname passed to open and
+    returned by \code{pathname}; not defaulted or translated.
+  
+  \item[\kwd{timeout}] if non-null, then \var{timeout} is an integer
+    number of seconds after which an input wait should time out.  If a
+    read does time out, then the \code{system:io-timeout} condition is
+    signalled.
+  \end{Lentry}
+\end{defun}
+
+\begin{defun}{system:}{fd-stream-p}{\args{\var{object}}}
+  
+  This function returns \true{} if \var{object} is an fd-stream, and
+  \nil{} if not.  Obsolete: use the portable \code{(typep x
+    'file-stream)}.
+\end{defun}
+
+\begin{defun}{system:}{fd-stream-fd}{\args{\var{stream}}}
+  
+  This returns the file descriptor associated with \var{stream}.
+\end{defun}
+
+
+\section{Unix Signals}
+\cindex{unix signals} \cindex{signals}
+
+\cmucl{} allows access to all the Unix signals that can be generated
+under Unix.  It should be noted that if this capability is abused, it is
+possible to completely destroy the running Lisp.  The following macros and
+functions allow access to the Unix interrupt system.  The signal names as
+specified in section 2 of the {\em Unix Programmer's Manual} are exported
+from the Unix package.
+
+\subsection{Changing Signal Handlers}
+\label{signal-handlers}
+
+\begin{defmac}{system:}{with-enabled-interrupts}{
+    \args{\var{specs} \amprest{} \var{body}}}
+  
+  This macro should be called with a list of signal specifications,
+  \var{specs}.  Each element of \var{specs} should be a list of
+  two\hide{ or three} elements: the first should be the Unix signal
+  for which a handler should be established, the second should be a
+  function to be called when the signal is received\hide{, and the
+    third should be an optional character used to generate the signal
+    from the keyboard.  This last item is only useful for the SIGINT,
+    SIGQUIT, and SIGTSTP signals.}  One or more signal handlers can be
+  established in this way.  \code{with-enabled-interrupts} establishes
+  the correct signal handlers and then executes the forms in
+  \var{body}.  The forms are executed in an unwind-protect so that the
+  state of the signal handlers will be restored to what it was before
+  the \code{with-enabled-interrupts} was entered.  A signal handler
+  function specified as NIL will set the Unix signal handler to the
+  default which is normally either to ignore the signal or to cause a
+  core dump depending on the particular signal.
+\end{defmac}
+
+\begin{defmac}{system:}{without-interrupts}{\args{\amprest{} \var{body}}}
+  
+  It is sometimes necessary to execute a piece a code that can not be
+  interrupted.  This macro the forms in \var{body} with interrupts
+  disabled.  Note that the Unix interrupts are not actually disabled,
+  rather they are queued until after \var{body} has finished
+  executing.
+\end{defmac}
+
+\begin{defmac}{system:}{with-interrupts}{\args{\amprest{} \var{body}}}
+  
+  When executing an interrupt handler, the system disables interrupts,
+  as if the handler was wrapped in in a \code{without-interrupts}.
+  The macro \code{with-interrupts} can be used to enable interrupts
+  while the forms in \var{body} are evaluated.  This is useful if
+  \var{body} is going to enter a break loop or do some long
+  computation that might need to be interrupted.
+\end{defmac}
+
+\begin{defmac}{system:}{without-hemlock}{\args{\amprest{} \var{body}}}
+  
+  For some interrupts, such as SIGTSTP (suspend the Lisp process and
+  return to the Unix shell) it is necessary to leave Hemlock and then
+  return to it.  This macro executes the forms in \var{body} after
+  exiting Hemlock.  When \var{body} has been executed, control is
+  returned to Hemlock.
+\end{defmac}
+
+\begin{defun}{system:}{enable-interrupt}{%
+    \args{\var{signal} \var{function}\hide{ \ampoptional{}
+        \var{character}}}}
+  
+  This function establishes \var{function} as the handler for
+  \var{signal}.
+  \hide{The optional \var{character} can be specified
+    for the SIGINT, SIGQUIT, and SIGTSTP signals and causes that
+    character to generate the appropriate signal from the keyboard.}
+  Unless you want to establish a global signal handler, you should use
+  the macro \code{with-enabled-interrupts} to temporarily establish a
+  signal handler.  \hide{Without \var{character},}
+  \code{enable-interrupt} returns the old function associated with the
+  signal.  \hide{When \var{character} is specified for SIGINT,
+    SIGQUIT, or SIGTSTP, it returns the old character code.}
+\end{defun}
+
+\begin{defun}{system:}{ignore-interrupt}{\args{\var{signal}}}
+  
+  Ignore-interrupt sets the Unix signal mechanism to ignore
+  \var{signal} which means that the Lisp process will never see the
+  signal.  Ignore-interrupt returns the old function associated with
+  the signal or \false{} if none is currently defined.
+\end{defun}
+
+\begin{defun}{system:}{default-interrupt}{\args{\var{signal}}}
+  
+  Default-interrupt can be used to tell the Unix signal mechanism to
+  perform the default action for \var{signal}.  For details on what
+  the default action for a signal is, see section 2 of the {\em Unix
+    Programmer's Manual}.  In general, it is likely to ignore the
+  signal or to cause a core dump.
+\end{defun}
+
+
+\subsection{Examples of Signal Handlers}
+
+The following code is the signal handler used by the Lisp system for the
+SIGINT signal.
+
+\begin{lisp}
+(defun ih-sigint (signal code scp)
+  (declare (ignore signal code scp))
+  (without-hemlock
+   (with-interrupts
+    (break "Software Interrupt" t))))
+\end{lisp}
+
+The \code{without-hemlock} form is used to make sure that Hemlock is exited before
+a break loop is entered.  The \code{with-interrupts} form is used to enable
+interrupts because the user may want to generate an interrupt while in the
+break loop.  Finally, break is called to enter a break loop, so the user
+can look at the current state of the computation.  If the user proceeds
+from the break loop, the computation will be restarted from where it was
+interrupted.
+
+The following function is the Lisp signal handler for the SIGTSTP signal
+which suspends a process and returns to the Unix shell.
+
+\begin{lisp}
+(defun ih-sigtstp (signal code scp)
+  (declare (ignore signal code scp))
+  (without-hemlock
+   (Unix:unix-kill (Unix:unix-getpid) Unix:sigstop)))
+\end{lisp}
+
+Lisp uses this interrupt handler to catch the SIGTSTP signal because it is
+necessary to get out of Hemlock in a clean way before returning to the shell.
+
+To set up these interrupt handlers, the following is recommended:
+
+\begin{lisp}
+(with-enabled-interrupts ((Unix:SIGINT #'ih-sigint)
+                          (Unix:SIGTSTP #'ih-sigtstp))
+  <user code to execute with the above signal handlers enabled.>
+)
+\end{lisp}

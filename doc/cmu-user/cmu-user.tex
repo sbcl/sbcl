@@ -1,0 +1,146 @@
+%% cmu-user.tex --- CMUCL User's Manual
+%%
+%% 2001-04-05  Eric Marsden
+%% Modifications to work with hevea and pdflatex. 
+%%
+%% Aug 1997   Raymond Toy
+%% This is a modified version of the original CMUCL User's Manual.
+%% The key changes are modification of this file to use standard
+%% LaTeX2e.  This means latexinfo isn't going to work anymore.
+%% However, Latex2html support has been added.
+%%
+%% Jan 1998 Paul Werkowski
+%% A few of the packages below are not part of the standard LaTeX2e
+%% distribution, and must be obtained from a repository. At this time
+%% I was able to fetch from
+%% ftp.cdrom.com:pub/tex/ctan/macros/latex/contrib/supported/
+%%                     camel/index.ins
+%%                     camel/index.dtx
+%%                     calc/calc.ins
+%%                     calc/calc.dtx
+%%                     changebar/changebar.ins
+%%                     changebar/changebar.dtx
+%% One runs latex on the .ins file to produce .tex and/or .sty
+%% files that must be put in a path searched by latex.
+%%
+%% Note all of the required packages are included in the teTeX distribution,
+%% and a current version of latex2html can be obtained from:
+%% http://saftsack.fs.uni-bayreuth.de/~latex2ht/
+
+%% Delete "[a4paper]" if you don't want this formatted for A4 paper.
+\documentclass[a4paper]{report}
+\usepackage{xspace}
+\usepackage{alltt}
+\usepackage{index}
+\usepackage{ifpdf}
+\usepackage{ifthen}
+\usepackage{calc}
+\usepackage{sectsty}
+\usepackage{varioref}
+\usepackage[hyperindex=false,colorlinks=false,urlcolor=blue]{hyperref}
+%% \usepackage{html}
+\usepackage{typehtml}
+
+\input{macros}
+
+\title{CMUCL User's Manual}
+\author{Robert A. MacLachlan, \textit{Editor}}
+\newcommand{\keywords}{lisp, Common Lisp, manual, compiler, programming
+language implementation, programming environment}
+
+\date{October 2017 \\ 21c}
+
+
+\begin{document}
+
+\begin{titlepage}
+  \makeatletter
+  \vspace{60pt}
+  \begin{center}
+    \rule{\linewidth}{0.7mm}
+    \vspace{3em}
+    {\Huge \@title \par}
+    \vspace{4em}
+     {\large
+       \begin{tabular}[t]{c}
+         \@author
+       \end{tabular}\par}
+       \vspace{2em}
+     {\large \@date \par}
+     \vspace{2em}
+    \rule{\linewidth}{0.7mm}
+  \end{center}
+  \vfill
+
+  \begin{quotation}
+    \cmucl{} is a free, high-performance implementation of the Common Lisp
+    programming language, which runs on most major Unix platforms. It
+    mainly conforms to the ANSI Common Lisp Standard. \cmucl{} features a
+    sophisticated native-code compiler, a foreign function interface, a
+    graphical source-level debugger, an interface to the X11 Window
+    System, and an Emacs-like editor.
+
+    \medskip \textbf{Keywords}: \keywords
+  \end{quotation}
+
+  \vspace{5cm}
+  
+  This manual is based on CMU Technical Report CMU-CS-92-161, edited by
+  Robert A. MacLachlan, dated July 1992.
+
+  \thispagestyle{empty}
+  \makeatother
+\end{titlepage}
+
+\ifpdf
+\pdfinfo{
+/Author (Robert A. MacLachlan, ed)
+/Title (CMUCL User's Manual)
+/Keywords (\keywords)
+}
+% Add section numbers to the bookmarks, and open 2 levels by default.
+\hypersetup{bookmarksnumbered=true,
+            bookmarksopen=true,
+            bookmarksopenlevel=2}
+\fi
+
+% \maketitle
+
+\pagestyle{headings}
+\pagenumbering{roman}
+\tableofcontents
+
+\clearpage
+\pagenumbering{arabic}
+
+\input{introduction}
+\input{extensions}
+\input{debugger}
+\input{compiler}
+\input{compiler-hint}
+\input{unix}
+\input{serve-event}
+\input{aliens}
+\input{ipc}
+\input{internet}
+\input{debug-internals}
+\input{cross-referencing}
+\input{unicode}
+
+\twocolumn
+\cindex{Function Index}
+\printindex[funs]
+
+\twocolumn
+\cindex{Variable Index}
+\printindex[vars]
+
+\twocolumn
+\cindex{Type Index}
+\printindex[types]
+
+\onecolumn
+\cindex{Concept Index}
+\printindex[concept]
+
+\end{document}

@@ -1,0 +1,205 @@
+\part{System Architecture}% -*- Dictionary: int:design -*-
+
+\chapter{Package and File Structure}
+
+\section{Source Tree Structure}
+
+The \cmucl{} source tree has subdirectories for each major subsystem:
+
+\begin{description}
+\item[{\tt assembly/}] Holds the CMU CL source-file assembler, and has machine
+specific subdirectories holding assembly code for that architecture.
+
+\item[{\tt clx/}] The CLX interface to the X11 window system.
+
+\item[{\tt code/}] The Lisp code for the runtime system and standard CL
+utilities.
+
+\item[{\tt compiler/}] The Python compiler.  Has architecture-specific
+subdirectories which hold backends for different machines.  The {\tt generic}
+subdirectory holds code that is shared across most backends.
+
+\item[{\tt hemlock/}] The Hemlock editor.
+
+\item[{\tt lisp/}] The C runtime system code and low-level Lisp debugger.
+
+\item[{\tt pcl/}] \cmucl{} version of the PCL implementation of CLOS.
+
+\item[{\tt tools/}] System building command files and source management tools.
+\end{description}
+
+
+\section{Package structure}
+
+Goals: with the single exception of LISP, we want to be able to export from the
+package that the code lives in.
+
+\begin{description}
+\item[Mach, CLX...] --- These Implementation-dependent system-interface
+packages provide direct access to specific features available in the operating
+system environment, but hide details of how OS communication is done.
+
+\item[system] contains code that must know about the operating system
+environment: I/O, etc.  Hides the operating system environment.  Provides OS
+interface extensions such as {\tt print-directory}, etc.
+
+\item[kernel] hides state and types used for system integration: package
+system, error system, streams (?), reader, printer.  Also, hides the VM, in
+that we don't export anything that reveals the VM interface.  Contains code
+that needs to use the VM and SYSTEM interface, but is independent of OS and VM
+details.  This code shouldn't need to be changed in any port of CMU CL, but
+won't work when plopped into an arbitrary CL.  Uses SYSTEM, VM, EXTENSIONS.  We
+export "hidden" symbols related to implementation of CL: setf-inverses,
+possibly some global variables.
+
+The boundary between KERNEL and VM is fuzzy, but this fuzziness reflects the
+fuzziness in the definition of the VM.  We can make the VM large, and bring
+everything inside, or we can make it small.  Obviously, we want the VM to be
+as small as possible, subject to efficiency constraints.  Pretty much all of
+the code in KERNEL could be put in VM.  The issue is more what VM hides from
+KERNEL: VM knows about everything.
+
+\item[lisp]  Originally, this package had all the system code in it.  The
+current ideal is that this package should have {\it no} code in it, and only
+exist to export the standard interface.  Note that the name has been changed by
+x3j13 to common-lisp.
+
+\item[extensions] contains code that any random user could have written: list
+operations, syntactic sugar macros.  Uses only LISP, so code in EXTENSIONS is
+pure CL.  Exports everything defined within that is useful elsewhere.  This
+package doesn't hide much, so it is relatively safe for users to use
+EXTENSIONS, since they aren't getting anything they couldn't have written
+themselves.  Contrast this to KERNEL, which exports additional operations on
+CL's primitive data structures: PACKAGE-INTERNAL-SYMBOL-COUNT, etc.  Although
+some of the functionality exported from KERNEL could have been defined in CL,
+the kernel implementation is much more efficient because it knows about
+implementation internals.  Currently this package contains only extensions to
+CL, but in the ideal scheme of things, it should contain the implementations of
+all CL functions that are in KERNEL (the library.)
+
+\item[VM] hides information about the hardware and data structure
+representations.  Contains all code that knows about this sort of thing: parts
+of the compiler, GC, etc.  The bulk of the code is the compiler back-end.
+Exports useful things that are meaningful across all implementations, such as
+operations for examining compiled functions, system constants.  Uses COMPILER
+and whatever else it wants.  Actually, there are different {\it machine}{\tt
+-VM} packages for each target implementation.  VM is a nickname for whatever
+implementation we are currently targeting for.
+
+
+\item[compiler] hides the algorithms used to map Lisp semantics onto the
+operations supplied by the VM.  Exports the mechanisms used for defining the
+VM.  All the VM-independent code in the compiler, partially hiding the compiler
+intermediate representations.  Uses KERNEL.
+
+\item[eval] holds code that does direct execution of the compiler's ICR.  Uses
+KERNEL, COMPILER.  Exports debugger interface to interpreted code.
+
+\item[debug-internals] presents a reasonable, unified interface to
+manipulation of the state of both compiled and interpreted code.  (could be in
+KERNEL) Uses VM, INTERPRETER, EVAL, KERNEL.
+
+\item[debug] holds the standard debugger, and exports the debugger 
+\end{description}
+
+\chapter{System Building}
+
+It's actually rather easy to build a CMU CL core with exactly what you want in
+it.  But to do this you need two things: the source and a working CMU CL.
+
+Basically, you use the working copy of CMU CL to compile the sources,
+then run a process call ``genesis'' which builds a ``kernel'' core.
+You then load whatever you want into this kernel core, and save it.
+
+In the \verb|tools/| directory in the sources there are several files that
+compile everything, and build cores, etc.  The first step is to compile the C
+startup code.
+
+{\bf Note:} {\it the various scripts mentioned below have hard-wired paths in
+them set up for our directory layout here at CMU.  Anyone anywhere else will
+have to edit them before they will work.}
+
+\section{Compiling the C Startup Code}
+
+There is a circular dependancy between lisp/internals.h and lisp/lisp.map that
+causes bootstrapping problems.  The easiest way to get around this problem
+is to make a fake lisp.nm file that has nothing in it but a version number:
+
+\begin{verbatim}
+        % echo "Map file for lisp version 0" > lisp.nm
+\end{verbatim}
+and then run genesis with NIL for the list of files:
+\begin{verbatim}
+        * (load ".../compiler/generic/new-genesis") ; compile before loading
+        * (lisp::genesis nil ".../lisp/lisp.nm" "/dev/null"
+                ".../lisp/lisp.map" ".../lisp/lisp.h")
+\end{verbatim}
+It will generate
+a whole bunch of warnings about things being undefined, but ignore
+that, because it will also generate a correct lisp.h.  You can then
+compile lisp producing a correct lisp.map:
+\begin{verbatim}
+        % make
+\end{verbatim}
+and then use \verb|tools/do-worldbuild| and \verb|tools/mk-lisp| to build
+\verb|kernel.core| and \verb|lisp.core| (see section \ref{building-cores}.)
+
+\section{Compiling the Lisp Code}
+
+The \verb|tools| directory contains various lisp and C-shell utilities for
+building CMU CL:
+\begin{description}
+\item[compile-all*] Will compile lisp files and build a kernel core.  It has
+numerous command-line options to control what to compile and how.  Try -help to
+see a description.  It runs a separate Lisp process to compile each
+subsystem.  Error output is generated in files with ``{\tt .log}'' extension in
+the root of the build area.
+
+\item[setup.lisp] Some lisp utilities used for compiling changed files in batch
+mode and collecting the error output. Sort of a crude defsystem.  Loads into the
+``user'' package.  See {\tt with-compiler-log-file} and {\tt comf}.
+
+\item[{\it foo}com.lisp] Each system has a ``\verb|.lisp|'' file in
+\verb|tools/| which compiles that system.
+\end{description}
+
+\section{Building Core Images}
+\label{building-cores}
+Both the kernel and final core build are normally done using shell script
+drivers:
+\begin{description}
+\item[do-worldbuild*] Builds a kernel core for the current machine.  The
+version to build is indicated by an optional argument, which defaults to
+``alpha''.  The \verb|kernel.core| file is written either in the \verb|lisp/|
+directory in the build area, or in \verb|/usr/tmp/|.  The directory which
+already contains \verb|kernel.core| is chosen.  You can create a dummy version
+with e.g. ``touch'' to select the initial build location.
+
+\item[mk-lisp*] Builds a full core, with conditional loading of subsystems.
+The version is the first argument, which defaults to ``alpha''.  Any additional
+arguments are added to the \verb|*features*| list, which controls system
+loading (among other things.)  The \verb|lisp.core| file is written in the
+current working directory.
+\end{description}
+
+These scripts load Lisp command files.  When \verb|tools/worldbuild.lisp| is
+loaded, it calls genesis with the correct arguments to build a kernel core.
+Similarly, \verb|worldload.lisp|
+builds a full core.  Adding certain symbols to \verb|*features*| before
+loading worldload.lisp suppresses loading of different parts of the
+system.  These symbols are:
+\begin{description}
+\item[:no-compiler] don't load the compiler.
+\item[:no-clx] don't load CLX.
+\item[:no-clm] don't load CLM.
+\item[:no-hemlock] don't load Hemlock.
+\item[:no-pcl] don't load PCL.
+\item[:runtime] build a runtime code, implies all of the above, and then some.
+\end{description}
+
+Note: if you don't load the compiler, you can't (successfully) load the
+pretty-printer or pcl.  And if you compiled hemlock with CLX loaded, you can't
+load it without CLX also being loaded.
+
+These features are only used during the worldload process; they are
+not propagated to the generated \verb|lisp.core| file. 

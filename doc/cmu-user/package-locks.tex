@@ -1,0 +1,124 @@
+\section{Package Locks}
+\cindex{package locks}
+
+\cmucl{} provides two types of package locks, as an extension to the
+ANSI Common Lisp standard. The package-lock protects a package from
+changes in its structure (the set of exported symbols, its use list,
+etc). The package-definition-lock protects the symbols in the package
+from being redefined due to the execution of a \code{defun},
+\code{defmacro}, \code{defstruct}, \code{deftype} or \code{defclass}
+form.
+
+
+\subsection{Rationale}
+
+Package locks are an aid to program development, by helping to detect
+inadvertent name collisions and function redefinitions. They are
+consistent with the principle that a package ``belongs to'' its
+implementor, and that noone other than the package's developer should
+be making or modifying definitions on symbols in that package. Package
+locks are compatible with the ANSI Common Lisp standard, which states
+that the consequences of redefining functions in the
+\code{COMMON-LISP} package are undefined.
+
+Violation of a package lock leads to a continuable error of type
+\code{lisp::package-locked-error} being signaled. The user may choose
+to ignore the lock and proceed, or to abort the computation. Two other
+restarts are available, one which disables all locks on all packages,
+and one to disable only the package-lock or package-definition-lock
+that was tripped.
+
+The following transcript illustrates the behaviour seen when
+attempting to redefine a standard macro in the \code{COMMON-LISP}
+package, or to redefine a function in one of \cmucl{}'s
+implementation-defined packages:
+
+{\small
+\begin{verbatim}
+CL-USER> (defmacro 1+ (x) (* x 2))
+Attempt to modify the locked package COMMON-LISP, by defining macro 1+
+   [Condition of type LISP::PACKAGE-LOCKED-ERROR]
+
+Restarts:
+  0: [continue      ] Ignore the lock and continue
+  1: [unlock-package] Disable the package's definition-lock then continue
+  2: [unlock-all    ] Unlock all packages, then continue
+  3: [abort         ] Return to Top-Level.
+
+CL-USER> (defun ext:gc () t)
+Attempt to modify the locked package EXTENSIONS, by redefining function GC
+   [Condition of type LISP::PACKAGE-LOCKED-ERROR]
+
+Restarts:
+  0: [continue      ] Ignore the lock and continue
+  1: [unlock-package] Disable package's definition-lock, then continue
+  2: [unlock-all    ] Disable all package locks, then continue
+  3: [abort         ] Return to Top-Level.
+\end{verbatim}
+
+
+The following transcript illustrates the behaviour seen when an
+attempt to modify the structure of a package is made:
+
+\begin{verbatim}
+CL-USER> (unexport 'load-foreign :ext)
+Attempt to modify the locked package EXTENSIONS, by unexporting symbols LOAD-FOREIGN
+   [Condition of type lisp::package-locked-error]
+
+Restarts:
+  0: [continue      ] Ignore the lock and continue
+  1: [unlock-package] Disable package's lock then continue
+  2: [unlock-all    ] Unlock all packages, then continue
+  3: [abort         ] Return to Top-Level.
+\end{verbatim}
+}
+
+The \code{COMMON-LISP} package and the \cmucl{}-specific
+implementation packages are locked on startup. Users can lock their
+own packages by using the \code{ext:package-lock} and
+\code{ext:package-definition-lock} accessors.
+
+
+
+\subsection{Disabling package locks}
+
+A package's locks can be enabled or disabled by using the
+\code{ext:package-lock} and \code{ext:package-definition-lock}
+accessors, as follows:
+
+\begin{lisp}
+   (setf (ext:package-lock (find-package "UNIX")) nil)
+   (setf (ext:package-definition-lock (find-package "UNIX")) nil)
+\end{lisp}
+
+
+\begin{defun}{ext:}{package-lock}{\var{package}}
+  This function is an accessor for a package's structural lock, which
+  protects it against modifications to its list of exported symbols.
+\end{defun}
+
+
+\begin{defun}{ext:}{package-definition-lock}{\var{package}}
+  This function is an accessor for a package's definition-lock, which
+  protects symbols in that package from redefinition. As well as
+  protecting the symbol's fdefinition from change, attempts to change
+  the symbol's definition using \code{defstruct}, \code{defclass} or
+  \code{deftype} will be trapped.
+\end{defun}
+
+
+\begin{defmac}{ext:}{without-package-locks}{\args{\amprest{} \var{body}}}
+  This macro can be used to execute forms with all package locks (both
+  structure and definition locks) disabled. 
+\end{defmac}
+
+
+\begin{defun}{ext:}{unlock-all-packages}{}
+  This function disables both structure and definition locks on all
+  currently defined packages. Note that package locks are reset when
+  \cmucl{} is restarted, so the effect of this function is limited to
+  the current session. 
+\end{defun}
+
+
+% EOF

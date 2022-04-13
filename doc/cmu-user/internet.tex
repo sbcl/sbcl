@@ -1,0 +1,341 @@
+\chapter{Networking Support}
+\label{internet}
+
+\credits{by Mario S. Mommer}
+
+This chapter documents the IPv4 networking and local sockets support
+offered by \cmucl{}. It covers most of the basic sockets interface
+functionality in a convenient and transparent way.
+
+For reasons of space it would be impossible to include a thorough
+introduction to network programming, so we assume some basic knowledge
+of the matter.
+
+\section{Byte Order Converters}
+
+These are the functions that convert integers from host byte order to
+network byte order (big-endian).
+
+\begin{defun}{extensions:}{htonl}{%
+    \args{\var{integer}}}
+  
+  Converts a $32$ bit integer from host byte order to network byte
+  order.
+
+\end{defun}
+
+\begin{defun}{extensions:}{htons}{%
+    \args{\var{integer}}}
+  
+  Converts a $16$ bit integer from host byte order to network byte
+  order.
+
+\end{defun}
+
+\begin{defun}{extensions:}{ntohs}{%
+    \args{\var{integer}}}
+  
+  Converts a $32$ bit integer from network byte order to host
+  byte order.
+
+\end{defun}
+
+\begin{defun}{extensions:}{ntohl}{%
+    \args{\var{integer}}}
+  
+  Converts a $32$ bit integer from network byte order to host byte
+  order.
+
+\end{defun}
+
+\section{Domain Name Services (DNS)}
+
+The networking support of \cmucl{} includes the possibility of doing
+DNS lookups. The function 
+
+\begin{defun}{extensions:}{lookup-host-entry}{%
+    \args{\var{host}}}
+ 
+  returns a structure of type \var{host-entry} (explained below) for
+  the given \var{host}.  If \var{host} is an integer, it will be
+  assumed to be the IP address in host (byte-)order. If it is a string,
+  it can contain either the host name or the IP address in dotted
+  format.
+  
+  This function works by completing the structure \var{host-entry}.
+  That is, if the user provides the IP address, then the structure will
+  contain that information and also the domain names. If the user
+  provides the domain name, the structure will be complemented with
+  the IP addresses along with the any aliases the host might have.
+
+\end{defun}
+
+\newpage
+
+\begin{deftp}{structure}{host-entry}\args{\var{name} \var{aliases}
+    \var{addr-type} \var{addr-list}}
+  
+  This structure holds all information available at request time on a
+  given host. The entries are self-explanatory. Aliases is a list of
+  strings containing alternative names of the host, and addr-list a
+  list of addresses stored in host byte order. The field
+  \var{addr-type} contains the number of the address family, as
+  specified in {\tt socket.h}, to which the addresses belong. Since
+  only addresses of the IPv4 family are currently supported, this slot
+  always has the value $2$.
+
+\end{deftp}
+
+\begin{defun}{extensions:}{ip-string}{%
+    \args{\var{addr}}}
+  
+  This function takes an IP address in host order and returns a string
+  containing it in dotted format.
+
+\end{defun}
+
+\section{Binding to Interfaces}
+
+In this section, functions for creating sockets bound to an interface
+are documented.
+
+\begin{defun}{extensions:}{create-inet-listener}{%
+    \args{\var{port} \ampoptional{} \var{kind}  %
+      \keys{\kwd{reuse-address} \kwd{backlog} \kwd{host}}}}
+                     
+  Creates a socket and binds it to a port, prepared to receive
+  connections of kind \var{kind} (which defaults to \kwd{stream}),
+  queuing up to \var{backlog} of them. If \kwd{reuse-address} \var{T}
+  is used, the option SO\_REUSEADDR is used in the call to \var{bind}.
+  If no value is given for \kwd{host}, it will try to bind to the
+  default IP address of the machine where the Lisp process is running.
+
+\end{defun}
+
+\begin{defun}{extensions:}{create-unix-listener}{%
+    \args{\var{path} \ampoptional{} \var{kind} \keys{
+      \kwd{backlog}}}}
+  
+  Creates a socket and binds it to the file name given by \var{path},
+  prepared to receive connections of kind \var{kind} (which defaults
+  to \kwd{stream}), queuing up to \var{backlog} of them.
+%  If
+%  \kwd{reuse-address} \var{T} is used, then the file given by
+%  \var{path} is unlinked first.
+
+\end{defun}
+
+\section{Accepting Connections}
+
+Once a socket is bound to its interface, we have to explicitly accept
+connections. This task is performed by the functions we document here.
+
+\begin{defun}{extensions:}{accept-tcp-connection}{%
+    \args{\var{unconnected}}}
+  
+  Waits until a connection arrives on the (internet family) socket
+  \var{unconnected}. Returns the file descriptor of the connection.
+  These can be conveniently encapsulated using file descriptor
+  streams; see \ref{sec:fds}.
+
+\end{defun}
+
+\begin{defun}{extensions:}{accept-unix-connection}{%
+    \args{\var{unconnected}}}
+
+  Waits until a connection arrives on the (unix family) socket
+  \var{unconnected}. Returns the file descriptor of the connection.
+  These can be conveniently encapsulated using file descriptor
+  streams; see \ref{sec:fds}.
+
+\end{defun}
+
+\begin{defun}{extensions:}{accept-network-stream}{%
+    \args{\var{socket} \keys{\kwd{buffering} \kwd{timeout} \kwd{wait-max}}}}
+
+  Accept a connect from the specified \var{socket} and returns a stream 
+  connected to connection.  
+\end{defun}
+
+\section{Connecting}
+
+The task performed by the functions we present next is connecting to
+remote hosts.
+
+\begin{defun}{extensions:}{connect-to-inet-socket}{%
+    \args{\var{host} \var{port} \ampoptional{} \var{kind}
+          \keys{\kwd{local-host} \kwd{local-port}}}}
+  
+  Tries to open a connection to the remote host \var{host} (which may
+  be an IP address in host order, or a string with either a host name
+  or an IP address in dotted format) on port \var{port}. Returns the
+  file descriptor of the connection.  The optional parameter
+  \var{kind} can be either \kwd{stream} (the default) or \kwd{datagram}.
+
+  If \var{local-host} and \var{local-port} are specified, the socket
+  that is created is also bound to the specified \var{local-host} and
+  \var{port}.
+
+\end{defun}
+
+\begin{defun}{extensions:}{connect-to-unix-socket}{%
+    \args{\var{path} \ampoptional{} \var{kind}}}
+  
+  Opens a connection to the unix ``address'' given by \var{path}.
+  Returns the file descriptor of the connection.  The type of
+  connection is given by \var{kind}, which can be either \kwd{stream}
+  (the default) or \kwd{datagram}.
+
+\end{defun}
+
+\begin{defun}{extensions:}{open-network-stream}{%
+    \args{\var{host} \var{port} \keys{\kwd{buffering} \kwd{timeout}}}}
+  
+   Return a stream connected to the specified \var{port} on the given \var{host}.
+\end{defun}
+
+
+\section{Out-of-Band Data}
+\label{internet-oob}
+
+Out-of-band data is data transmitted with a higher priority than
+ordinary data. This is usually used by either side of the connection
+to signal exceptional conditions. Due to the fact that most TCP/IP
+implementations are broken in this respect, only single characters can
+reliably be sent this way.
+
+\begin{defun}{extensions:}{add-oob-handler}{%
+    \args{\var{fd} \var{char} \var{handler}}}
+  
+  Sets the function passed in \var{handler} as a handler for the
+  character \var{char} on the connection whose descriptor is \var{fd}.
+  In case this character arrives, the function in \var{handler} is
+  called without any argument.
+
+\end{defun}
+
+\begin{defun}{extensions:}{remove-oob-handler}{%
+    \args{\var{fd} \var{char}}}
+  
+  Removes the handler for the character \var{char} from the connection
+  with the file descriptor \var{fd}
+
+\end{defun}
+
+\begin{defun}{extensions:}{remove-all-oob-handlers}{%
+    \args{\var{fd}}}
+
+  After calling this function, the connection whose descriptor is
+  \var{fd} will ignore any out-of-band character it receives.
+
+\end{defun}
+
+\begin{defun}{extensions:}{send-character-out-of-band}{%
+    \args{\var{fd} \var{char}}}
+
+  Sends the character \var{char} through the connection \var{fd} out
+  of band.
+
+\end{defun}
+
+\section{Unbound Sockets, Socket Options, and Closing Sockets}
+
+These functions create unbound sockets. This is usually not necessary,
+since connectors and listeners create their own.
+
+\begin{defun}{extensions:}{create-unix-socket}{%
+    \args{\ampoptional{} \var{type}}}
+  
+  Creates a unix socket for the unix address family, of type
+  \var{:stream} and (on success) returns its file descriptor.
+
+\end{defun}
+
+\begin{defun}{extensions:}{create-inet-socket}{%
+    \args{\ampoptional{} \var{kind}}}
+  
+  Creates a unix socket for the internet address family, of type
+  \var{:stream} and (on success) returns its file descriptor.
+
+\end{defun}
+\bigskip
+
+Once a socket is created, it is sometimes useful to bind the socket to a 
+local address using \code{bind-inet-socket}:
+
+\begin{defun}{extensions:}{bind-inet-socket}{%
+  \args{\var{socket} \var{host} \var{port}}}
+
+  Bind the \var{socket} to a local interface address specified
+  by \var{host} and \var{port}. 
+
+\end{defun}
+\bigskip
+
+Further, it is desirable to be able to change socket options. This is
+performed by the following two functions, which are essentially
+wrappers for system calls to {\tt getsockopt} and {\tt setsockopt}.
+
+\begin{defun}{extensions:}{get-socket-option}{%
+    \args{\var{socket} \var{level} \var{optname}}}
+  
+  Gets the value of option \var{optname} from the socket \var{socket}.
+
+\end{defun}
+
+\begin{defun}{extensions:}{set-socket-option}{%
+    \args{\var{socket} \var{level} \var{optname} \var{optval}}}
+  
+  Sets the value of option \var{optname} from the socket \var{socket}
+  to the value \var{optval}.
+
+\end{defun}
+\bigskip
+
+For information on possible options and values we refer to the
+manpages of {\tt getsockopt} and {\tt setsockopt}, and to {\tt
+ socket.h}
+
+Finally, the function
+
+\begin{defun}{extensions:}{close-socket}{%
+    \args{\var{socket}}}
+
+  Closes the socket given by the file descriptor \var{socket}.
+
+\end{defun}
+
+\section{Unix Datagrams}
+
+Datagram network is supported with the following functions.
+
+\begin{defun}{extensions:}{inet-recvfrom}{%
+	\args{\var{fd} \var{buffer} \var{size}}
+	\keys{\kwd{flags}}}
+   A simple interface to the Unix \code{recvfrom} function. Returns
+   three values: bytecount, source address as integer, and source
+   port. Bytecount can of course be negative, to indicate faults.
+\end{defun}
+
+\begin{defun}{extensions:}{inet-sendto}{%
+	\args{\var{fd} \var{buffer} \var{size} \var{addr} \var{port}}
+	\keys{\kwd{flags}}}
+   A simple interface to the Unix \code{sendto} function.
+\end{defun}
+
+\begin{defun}{extensions:}{inet-shutdown}{%
+	\args{\var{fd} \var{level}}}
+
+   A simple interface to the Unix \code{shutdown} function.  For
+   \code{level}, you may use the following symbols to close one or
+   both ends of a socket: \code{shut-rd}, \code{shut-wr},
+   \code{shut-rdwr}.
+
+\end{defun}
+
+\section{Errors}
+
+Errors that occur during socket operations signal a
+\code{socket-error} condition, a subtype of the \code{error}
+condition.  Currently this condition includes just the Unix
+\code{errno} associated with the error.

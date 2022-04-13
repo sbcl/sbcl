@@ -1,0 +1,657 @@
+%  					-*- Dictionary: design; Package: C -*-
+\chapter{Debugger}
+Two classes of errors are handled by the Lisp debugger.  These are
+synchronous errors caused by something erring in program code and
+asynchronous errors caused by some external context of execution
+(clock interrupts, control-c interrupts).  Asynchronous errors can
+often be postponed if they are delivered at an inconvenient time.
+
+Synchronous errors are frequently handled by directly invoking the
+debugger.  However, there are several places where the strategy of
+jumping into the debugger is not used.  In those situations the
+compiler emits a stylized breakpoint; a breakpoint instruction
+(usually an INT3) followed by several bytes of argument data.  This
+will cause a trip through the operating system and ultimately the
+invocation of the C-level SIGTRAP handler which, in turn, interprets
+the argument bytes following the breakpoint and dispatches to the
+correct handler.  There is a switch statement in ``sigtrap\_handler''
+which gives the whole story on what types of errors rely on this
+mechanism.  The most commonly invoked handler is probably
+``interrupt\_internal\_error'' as it fields such common exceptions as
+the use of unbound symbols.  To familiarize with the context these
+traps are created in, one can disassemble just about any function and
+look at the bottom of the disassembly for blocks of error handling code.
+There will often be ``BREAK 10'' opcodes followed by several ``BYTE''
+opcodes with the meaning of the arguments in neatly decoded form off
+in the right-hand column.
+
+The other types of synchronous errors are those errors delivered by
+the operating system such as FPU traps and SIGSEGVs.  The invocation
+of those signals should be funneled through a C-level trampoline which
+makes a callback into Lisp passing all of the signal handler
+arguments.  That code is pretty straight forward and the
+``interrupt\_handle\_now'' function is pretty much where all of the
+runtime logic is localized.
+
+Handling asynchronous errors and deferred asynchronous errors is a bit more
+involved\ldots
+
+\section{Tracing and Breakpoints}
+\label{sec:trace-and-breakpoints}
+
+Here are a few notes on how tracing of compiled code works.
+
+When a function is traced, a breakpoint instruction is placed at the
+start of the function, replacing the instruction that was there.
+(This is a \verb+:function-start+ breakpoint.)  (This appears to be
+one instruction after the no-arg parsing entry point.)  The breakpoint
+instruction is, of course, architecture-specific, but it must signal a
+\verb+trap_Breakpoint+ trap.
+
+When the code is run, the breakpoint instruction is executed causing a
+trap.  The trap handler runs \verb+HANDLE-BREAKPOINT+ to process it.
+After doing the appropriate processing, we now need to continue.  Of
+course, since the real instruction has been replaced, we to run the
+original instruction.  This is done by now inserting a \emph{new}
+breakpoint after the original breakpoint.  This breakpoint must be of
+the type \verb+trap_AfterBreakpoint+.  The original instruction is
+restored and execution continues from there.  Then the
+\verb+trap_AfterBreakpoint+ instruction gets executed.  The handler
+for this puts back the original breakpoint, thereby preserving the
+breakpoint.  Then we replace the AfterBreakpoint with the original
+instruction and continue from there.
+
+That's all pretty straightforward in concept.
+
+When tracing, additional information is needed.  Breakpoints have the
+ability to run arbitrary lisp code to process the breakpoint.  Tracing
+uses this feature.
+
+When this breakpoint is reached, \verb+HANDLE-BREAKPOINT+ runs the
+breakpoint hook function.  This function figures out where this
+function would return to and creates a new return area and replaces
+the original return address with this new address.  Thus, when the
+function returns, it returns to this new location instead of the
+original.
+
+This new return address is a specially created bogus LRA object.  It
+is a code-component whose body consists of a code template copied from
+an assembly routine into the body.  The assembly routine is the code
+in \verb+function_end_breakpoint_guts+.  This bogus LRA object stores
+the real LRA for the function, and also an indication if the
+known-return convention is used for this function.
+
+The bogus LRA object contains a function-end breakpoint
+(\verb+trap_FunctionEndBreakpoint+).  When it's executed the trap
+handler handles this breakpoint.  It figures out where this trap come
+from and calls \verb+HANDLE-BREAKPOINT+ to handle it.
+\verb+HANDLE-BREAKPOINT+ returns and the trap handler arranges it so
+that this bogus LRA returns to the real LRA.  
+
+Thus, we can do something when a Lisp function returns, like printing
+out the return value for the function for tracing.
+
+There are lots of internal details left out here, but gives a short
+overview of how this works.  For more info, look at
+\verb+code/debug-int.lisp+ and \verb+lisp/breakpoint.c+, and, of
+course, the various \verb+<foo>-arch.c+ files.
+
+\chapter{Debugger Information}
+\index{debugger information}
+\label{debug-info}
+
+Although the compiler's great freedom in choice of function call conventions
+and variable representations has major efficiency advantages, it also has
+unfortunate consequences for the debugger.  The debug information that we need
+is even more elaborate than for conventional ``compiled'' languages, since we
+cannot even do a simple backtrace without some debug information.  However,
+once having gone this far, it is not that difficult to go the extra distance,
+and provide full source level debugging of compiled code.
+
+Full debug information has a substantial space penalty, so we allow different
+levels of debug information to be specified.  In the extreme case, we can
+totally omit debug information.
+
+
+\section{The Debug-Info Structure}
+\index{debug-info structure}
+
+The Debug-Info structure directly represents information about the
+source code, and points to other structures that describe the layout of
+run-time data structures.
+
+
+Make some sort of minimal debug-info format that would support at least the
+common cases of level 1 (since that is what we would release), and perhaps
+level 0.  Actually, it seems it wouldn't be hard to crunch nearly all of the
+debug-function structure and debug-info function map into a single byte-vector.
+We could have an uncrunch function that restored the current format.  This
+would be used by the debugger, and also could be used by purify to delete parts
+of the debug-info even when the compiler dumps it in crunched form.
+[Note that this isn't terribly important if purify is smart about
+debug-info...]
+
+
+
+Compiled source map representation:
+
+[\#\#\# store in debug-function PC at which env is properly initialized, i.e.
+args (and return-pc, etc.) in internal locations.  This is where a
+:function-start breakpoint would break.]
+
+[\#\#\# Note that that we can easily cache the form-number => source-path or
+form-number => form translation using a vector indexed by form numbers that we
+build during a walk.]
+
+
+
+
+Instead of using source paths in the debug-info, use ``form numbers''.  The form
+number of a form is the number of forms that we walk to reach that form when
+doing a pre-order walk of the source form.  [Might want to use a post-order
+walk, as that would more closely approximate evaluation order.]
+
+
+We probably want to continue using source-paths in the compiler, since they are
+quick to compute and to get you to a particular form.  [\#\#\# But actually, I
+guess we don't have to precompute the source paths and annotate nodes with
+them: instead we could annotate the nodes with the actual original source form.
+Then if we wanted to find the location of that form, we could walk the root
+source form, looking that original form.  But we might still need to enter all
+the forms in a hashtable so that we can tell during IR1 conversion that a given
+form appeared in the original source.]
+
+
+Note that form numbers have an interesting property: it is quite efficient to
+determine whether an arbitrary form is a subform of some other form, since the
+form number of B will be \verb+>+ than A's number and \verb+<+ A's next sibling's number iff
+B is a subform of A.  
+
+This should be quite useful for doing the \verb|source=>pc| mapping in the debugger,
+since that problem reduces to finding the subset of the known locations that
+are for subforms of the specified form.
+
+
+Assume a byte vector with a standard variable-length integer format, something
+like this:
+
+\begin{verbatim}
+    0..253 => the integer
+    254 => read next two bytes for integer
+    255 => read next four bytes for integer
+\end{verbatim}
+
+Then a compiled debug block is just a sequence of variable-length integers in a
+particular order, something like this:
+
+\begin{verbatim}
+    number of successors
+    ...offsets of each successor in the function's blocks vector...
+    first PC
+    [offset of first top-level form (in forms) (only if not component default)]
+    form number of first source form
+    first live mask (length in bytes determined by number of VARIABLES)
+    ...more <PC, top-level form offset, form-number, live-set> tuples...
+\end{verbatim}
+
+We determine the number of locations recorded in a block by finding the
+start of the next compiled debug block in the blocks vector.
+
+[\#\#\# Actually, only need 2 bits for number of successors {0,1,2}.  We might
+want to use other bits in the first byte to indicate the kind of location.]
+[\#\#\# We could support local packing by having a general concept of ``alternate
+locations'' instead of just regular and save locations.  The location would have
+a bit indicating that there are alternate locations, in which case we read the
+number of alternate locations and then that many more SC-OFFSETs.  In the
+debug-block, we would have a second bit mask with bits set for TNs that are in
+an alternate location.  We then read a number for each such TN, with the value
+being interpreted as an index into the Location's alternate locations.]
+
+
+
+It looks like using structures for the compiled-location-info is too bulky.
+Instead we need some packed binary representation.
+
+First, let's represent an SC/offset pair with an ``SC-Offset'', which is an
+integer with the SC in the low 5 bits and the offset in the remaining bits:
+\begin{verbatim}
+    ----------------------------------------------------
+    | Offset (as many bits as necessary) | SC (5 bits) |
+    ----------------------------------------------------
+\end{verbatim}
+Probably the result should be constrained to fit in a fixnum, since it will be
+more efficient and gives more than enough possible offsets.
+
+We can then represent a compiled location like this:
+\begin{verbatim}
+    single byte of boolean flags:
+	uninterned name
+	packaged name
+	environment-live
+	has distinct save location
+        has ID (name not unique in this fun)
+    name length in bytes (as var-length integer)
+    ...name bytes...
+    [if packaged, var-length integer that is package name length]
+     ...package name bytes...]
+    [If has ID, ID as var-length integer]
+    SC-Offset of primary location (as var-length integer)
+    [If has save SC, SC-Offset of save location (as var-length integer)]
+\end{verbatim}
+
+
+
+
+But for a whizzy breakpoint facility, we would need a good \verb+source=>code+ map.
+Dumping a complete \verb+code=>source map+ might be as good a way as any to represent
+this, due to the one-to-many relationship between source and code locations.
+
+We might be able to get away with just storing the source locations for the
+beginnings of blocks and maintaining a mapping from code ranges to blocks.
+This would be fine both for the profiler and for the ``where am I running now''
+indication.  Users might also be convinced that it was most interesting to
+break at block starts, but I don't really know how easily people could develop
+an understanding of basic blocks.
+
+It could also be a bit tricky to map an arbitrary user-designated source
+location to some ``closest'' source location actually in the debug info.
+This problem probably exists to some degree even with a full source map, since
+some forms will never appear as the source of any node.  It seems you might
+have to negotiate with the user.  He would mouse something, and then you would
+highlight some source form that has a common prefix (i.e. is a prefix of the
+user path, or vice-versa.)  If they aren't happy with the result, they could
+try something else.  In some cases, the designated path might be a prefix of
+several paths.  This ambiguity might be resolved by picking the shortest path
+or letting the user choose.
+
+At the primitive level, I guess what this means is that the structure of source
+locations (i.e. source paths) must be known, and the \verb+source=>code+ operation
+should return a list of \verb+<source,code>+ pairs, rather than just a list of code
+locations.  This allows the debugger to resolve the ambiguity however it wants.
+
+I guess the formal definition of which source paths we would return
+is:
+\begin{quote}
+    All source paths in the debug info that have a maximal common prefix with
+    the specified path.  i.e. if several paths have the complete specified path
+    as a prefix, we return them all.  Otherwise, all paths with an equally
+    large common prefix are returned: if the path with the most in common
+    matches only the first three elements, then we return all paths that match
+    in the first three elements.  As a degenerate case (which probably
+    shouldn't happen), if there is no path with anything in common, then we
+    return *all* of the paths.
+\end{quote}
+
+
+
+In the DEBUG-SOURCE structure we may ultimately want a vector of the start
+positions of each source form, since that would make it easier for the debugger
+to locate the source.  It could just open the file, FILE-POSITION to the form,
+do a READ, then loop down the source path.  Of course, it could read each form
+starting from the beginning, but that might be too slow.
+
+
+Do XEPs really need Debug-Functions?  The only time that we will commonly end
+up in the debugger on an XEP is when an argument type check fails.  But I
+suppose it would be nice to be able to print the arguments passed...
+
+
+Note that assembler-level code motion such as pipeline reorganization can cause
+problems with our PC maps.  The assembler needs to know that debug info markers
+are different from real labels anyway, so I suppose it could inhibit motion
+across debug markers conditional on policy.  It seems unworthwhile to remember
+the node for each individual instruction.
+
+
+For tracing block-compiled calls:
+\begin{verbatim}
+    Info about return value passing locations?
+    Info about where all the returns are?
+\end{verbatim}
+
+We definitely need the return-value passing locations for debug-return.  The
+question is what the interface should be.  We don't really want to have a
+visible debug-function-return-locations operation, since there are various
+value passing conventions, and we want to paper over the differences.
+
+
+Probably should be a compiler option to initialize stack frame to a special
+uninitialized object (some random immediate type).  This would aid debugging,
+and would also help GC problems.  For the latter reason especially, this should
+be locally-turn-onable (off of policy?  the new debug-info quality?).
+
+
+What about the interface between the evaluator and the debugger? (i.e. what
+happens on an error, etc.)  Compiler error handling should be integrated with
+run-time error handling.  Ideally the error messages should look the same.
+Practically, in some cases the run-time errors will have less information.  But
+the error should look the same to the debugger (or at least similar).
+
+
+
+\subsection{Debugger Interface}
+
+How does the debugger interface to the ``evaluator'' (where the evaluator means
+all of native code, byte-code and interpreted IR1)?  It seems that it would be
+much more straightforward to have a consistent user interface to debugging
+all code representations if there was a uniform debugger interface to the
+underlying stuff, and vice-versa.  
+
+Of course, some operations might not be supported by some representations, etc.
+For example, fine-control stepping might not be available in native code.
+In other cases, we might reduce an operation to the lowest common denominator,
+for example fetching lexical variables by string and admitting the possibility
+of ambiguous matches.  [Actually, it would probably be a good idea to store the
+package if we are going to allow variables to be closed over.]
+
+Some objects we would need:
+\begin{verbatim}
+Location:
+	The constant information about the place where a value is stored,
+        everything but which particular frame it is in.  Operations:
+        location name, type, etc.
+        location-value frame location (setf'able)
+	monitor-location location function
+            Function is called whenever location is set with the location,
+            frame and old value.  If active values aren't supported, then we
+            dummy the effect using breakpoints, in which case the change won't
+            be noticed until the end of the block (and intermediate changes
+            will be lost.)
+debug info:
+        All the debug information for a component.
+Frame:
+	frame-changed-locations frame => location*
+            Return a list of the locations in frame that were changed since the
+            last time this function was called.  Or something.  This is for
+            displaying interesting state changes at breakpoints.
+	save-frame-state frame => frame-state
+	restore-frame-state frame frame-state
+	    These operations allow the debugger to back up evaluation, modulo
+	    side-effects and non-local control transfers.  This copies and
+	    restores all variables, temporaries, etc, local to the frame, and
+	    also the current PC and dynamic environment (current catch, etc.)
+
+	    At the time of the save, the frame must be for the running function
+	    (not waiting for a call to return.)  When we restore, the frame
+	    becomes current again, effectively exiting from any frames on top.
+	    (Of course, frame must not already be exited.)
+       
+Thread:
+        Representation of which stack to use, etc.
+Block:
+        What successors the block has, what calls there are in the block.
+        (Don't need to know where calls are as long as we know called function,
+        since can breakpoint at the function.)  Whether code in this block is
+        wildly out of order due to being the result of loop-invariant
+        optimization, etc.  Operations:
+        block-successors block => code-location*
+        block-forms block => (source-location code-location)*
+            Return the corresponding source locations and code locations for
+            all forms (and form fragments) in the block.
+\end{verbatim}
+
+
+
+\subsection{Variable maps}
+
+There are about five things that the debugger might want to know about a
+variable:
+\begin{itemize}
+
+\item[Name]
+	Although a lexical variable's name is ``really'' a symbol (package and
+	all), in practice it doesn't seem worthwhile to require all the symbols
+	for local variable names to be retained.  There is much less VM and GC
+	overhead for a constant string than for a symbol.  (Also it is useful
+	to be able to access gensyms in the debugger, even though they are
+	theoretically ineffable).
+
+\item[ID]
+	Which variable with the specified name is this?  It is possible to have
+	multiple variables with the same name in a given function.  The ID is
+	something that makes Name unique, probably a small integer.  When
+	variables aren't unique, we could make this be part of the name, e.g.
+	``FOO\#1'', ``FOO\#2''.  But there are advantages to keeping this separate,
+	since in many cases lifetime information can be used to disambiguate,
+	making qualification unnecessary.
+
+\item[SC]
+	When unboxed representations are in use, we must have type information
+	to properly read and write a location.  We only need to know the
+	SC for this, which would be amenable to a space-saving
+	numeric encoding.
+
+\item[Location]
+	Simple: the offset in SC.  [Actually, we need the save location too.]
+
+\item[Lifetime]
+	In what parts of the program does this variable hold a meaningful
+	value?  It seems prohibitive to record precise lifetime information,
+	both in space and compiler effort, so we will have to settle for some
+	sort of approximation.
+
+	The finest granularity at which it is easy to determine liveness is
+	the block: we can regard the variable lifetime as the set of blocks
+	that the variable is live in.  Of course, the variable may be dead (and
+	thus contain meaningless garbage) during arbitrarily large portions of
+	the block.
+
+	Note that this subsumes the notion of which function a variable belongs
+	to.  A given block is only in one function, so the function is
+	implicit.
+\end{itemize}
+
+The variable map should represent this information space-efficiently and with
+adequate computational efficiency.
+
+The SC and ID can be represented as small integers.  Although the ID can in
+principle be arbitrarily large, it should be $<$100 in practice.  The location
+can be represented by just the offset (a moderately small integer), since the
+SB is implicit in the SC.
+
+The lifetime info can be represented either as a bit-vector indexed by block
+numbers, or by a list of block numbers.  Which is more compact depends both on
+the size of the component and on the number of blocks the variable is live in.
+In the limit of large component size, the sparse representation will be more
+compact, but it isn't clear where this crossover occurs.  Of course, it would
+be possible to use both representations, choosing the more compact one on a
+per-variable basis.  Another interesting special case is when the variable is
+live in only one block: this may be common enough to be worth picking off,
+although it is probably rarer for named variables than for TNs in general.
+
+If we dump the type, then a normal list-style type descriptor is fine: the
+space overhead is small, since the shareability is high.
+
+We could probably save some space by cleverly representing the var-info as
+parallel vectors of different types, but this would be more painful in use.
+It seems better to just use a structure, encoding the unboxed fields in a
+fixnum.  This way, we can pass around the structure in the debugger, perhaps
+even exporting it from the low-level debugger interface.
+
+[\#\#\# We need the save location too.  This probably means that we need two slots
+of bits, since we need the save offset and save SC.  Actually, we could let the
+save SC be implied by the normal SC, since at least currently, we always choose
+the same save SC for a given SC.  But even so, we probably can't fit all that
+stuff in one fixnum without squeezing a lot, so we might as well split and
+record both SCs.
+
+In a localized packing scheme, we would have to dump a different var-info
+whenever either the main location or the save location changes.  As a practical
+matter, the save location is less likely to change than the main location, and
+should never change without the main location changing.
+
+One can conceive of localized packing schemes that do saving as a special case
+of localized packing.  If we did this, then the concept of a save location
+might be eliminated, but this would require major changes in the IR2
+representation for call and/or lifetime info.  Probably we will want saving to
+continue to be somewhat magical.]
+
+
+How about:
+
+\begin{verbatim}
+(defstruct var-info
+  ;;
+  ;; This variable's name. (symbol-name of the symbol)
+  (name nil :type simple-string)
+  ;;
+  ;; The SC, ID and offset, encoded as bit-fields.
+  (bits nil :type fixnum)
+  ;;
+  ;; The set of blocks this variable is live in.  If a bit-vector, then it has
+  ;; a 1 when indexed by the number of a block that it is live in.  If an
+  ;; I-vector, then it lists the live block numbers.  If a fixnum, then that is
+  ;; the number of the sole live block.
+  (lifetime nil :type (or vector fixnum))
+  ;;
+  ;; The variable's type, represented as list-style type descriptor.
+  type)
+\end{verbatim}
+
+Then the debug-info holds a simple-vector of all the var-info structures for
+that component.  We might as well make it sorted alphabetically by name, so
+that we can binary-search to find the variable corresponding to a particular
+name.
+
+We need to be able to translate PCs to block numbers.  This can be done by an
+I-Vector in the component that contains the start location of each block.  The
+block number is the index at which we find the correct PC range.  This requires
+that we use an emit-order block numbering distinct from the IR2-Block-Number,
+but that isn't any big deal.  This seems space-expensive, but it isn't too bad,
+since it would only be a fraction of the code size if the average block length
+is a few words or more.
+
+An advantage of our per-block lifetime representation is that it directly
+supports keeping a variable in different locations when in different blocks,
+i.e. multi-location packing.  We use a different var-info for each different
+packing, since the SC and offset are potentially different.  The Name and ID
+are the same, representing the fact that it is the same variable.  It is here
+that the ID is most significant, since the debugger could otherwise make
+same-name variables unique all by itself.
+
+
+
+\subsection{Stack parsing}
+
+[\#\#\# Probably not worth trying to make the stack parseable from the bottom up.
+There are too many complications when we start having variable sized stuff on
+the stack.  It seems more profitable to work on making top-down parsing robust.
+Since we are now planning to wire the bottom-up linkage info, scanning from the
+bottom to find the top frame shouldn't be too inefficient, even when there was
+a runaway recursion.  If we somehow jump into hyperspace, then the debugger may
+get confused, but we can debug this sort of low-level system lossage using
+ADB.]
+
+
+There are currently three relevant context pointers:
+\begin{itemize}
+   \item The PC.  The current PC is wired (implicit in the machine).  A saved
+     PC (RETURN-PC) may be anywhere in the current frame.
+   \item The current stack context (CONT).  The current CONT is wired.
+     A saved CONT (OLD-CONT) may be anywhere in the current frame.
+   \item The current code object (ENV).  The current ENV is wired.
+     When saved, this is extra-difficult to locate, since it is saved
+     by the caller, and is thus at an unknown offset in OLD-CONT,
+     rather than anywhere in the current frame.
+\end{itemize}
+
+We must have all of these to parse the stack.
+
+With the proposed Debug-Function, we parse the stack (starting at the top) like
+this:
+\begin{enumerate}
+\item Use ENV to locate the current Debug-Info
+\item Use the Debug-Info and PC to determine the current Debug-Function.
+\item Use the Debug-Function to find the OLD-CONT and RETURN-PC.
+\item Find the old ENV by searching up the stack for a saved code object
+    containing the RETURN-PC.
+\item Assign old ENV to ENV, OLD-CONT to CONT, RETURN-PC to PC and goto 1.
+\end{enumerate}
+
+If we changed the function representation so that the code and environment were
+a single object, then the location of the old ENV would be simplified.  But we
+still need to represent ENV as separate from PC, since interrupts and errors
+can happen when the current PC isn't positioned at a valid return PC.
+
+It seems like it might be a good idea to save OLD-CONT, RETURN-PC and ENV at
+the beginning of the frame (before any stack arguments).  Then we wouldn't have
+to search to locate ENV, and we also have a hope of parsing the stack even if
+it is damaged.  As long as we can locate the start of some frame, we can trace
+the stack above that frame.  We can recognize a probable frame start by
+scanning the stack for a code object (presumably a saved ENV).
+
+Probably we want some fairly general
+mechanism for specifying that a TN should be considered to be live for the
+duration of a specified environment.  It would be somewhat easier to specify
+that the TN is live for all time, but this would become very space-inefficient
+in large block compilations.
+
+This mechanism could be quite useful for other debugger-related things.  For
+example, when debuggability is important, we could make the TNs holding
+arguments live for the entire environment.  This would guarantee that a
+backtrace would always get the right value (modulo setqs).  
+
+Note that in this context, ``environment'' means the Environment structure (one
+per non-let function).  At least according to current plans, even when we do
+inter-routine register allocation, the different functions will have different
+environments: we just ``equate'' the environments.  So the number of live
+per-environment TNs is bounded by the size of a ``function'', and doesn't blow up
+in block compilation.
+
+The implementation is simple: per-environment TNs are flagged by the
+:Environment kind.  :Environment TNs are treated the same as :Normal TNs by
+everyone except for lifetime/conflict analysis.  An environment's TNs are also
+stashed in a list in the IR2-Environment structure.  During the conflict
+analysis post-pass, we look at each block's environment, and make all the
+environment's TNs always-live in that block.
+
+We can implement the ``fixed save location'' concept needed for lazy frame
+creation by allocating the save TNs as wired TNs at IR2 conversion time.  We
+would use the new ``environment lifetime'' concept to specify the lifetimes of
+the save locations.  There isn't any run-time overhead if we never get around
+to using the save TNs.  [Pack would also have to notice TNs with pre-allocated
+save TNs, packing the original TN in the stack location if its FSC is the
+stack.]
+
+
+We want a standard (recognizable) format for an ``escape'' frame.  We must make
+an escape frame whenever we start running another function without the current
+function getting a chance to save its registers.  This may be due either to a
+truly asynchronous event such as a software interrupt, or due to an ``escape''
+from a miscop.  An escape frame marks a brief conversion to a callee-saves
+convention.
+
+Whenever a miscop saves registers, it should make an escape frame.  This
+ensures that the ``current'' register contents can always be located by the
+debugger.  In this case, it may be desirable to be able to indicate that only
+partial saving has been done.  For example, we don't want to have to save all
+the FP registers just so that we can use a couple extra general registers.
+
+When the debugger see an escape frame, it knows that register values are
+located in the escape frame's ``register save'' area, rather than in the normal
+save locations.
+
+It would be nice if there was a better solution to this internal error concept.
+One problem is that it seems there is a substantial space penalty for emitting
+all that error code, especially now that we don't share error code between
+errors because we want to preserve the source context in the PC.  But this
+probably isn't really all that bad when considered as a fraction of the code.
+For example, the check part of a type check is 12 bytes, whereas the error part
+is usually only 6.  In this case, we could never reduce the space overhead for
+type checks by more than 1/3, thus the total code size reduction would be
+small.  This will be made even less important when we do type check
+optimizations to reduce the number of type checks.
+
+Probably we should stick to the same general internal error mechanism, but make
+it interact with the debugger better by allocating linkage registers and
+allowing proceedable errors.  We could support shared error calls and
+non-proceedable errors when space is more important than debuggability, but
+this is probably more complexity than is worthwhile.
+
+We jump or trap to a routine that saves the context (allocating at most the
+return PC register).  We then encode the error and context in the code
+immediately following the jump/trap.  (On the MIPS, the error code can be
+encoded in the trap itself.)  The error arguments would be encoded as
+SC-offsets relative to the saved context.  This could solve both the
+arg-trashing problem and save space, since we could encode the SC-offsets more
+tersely than the corresponding move instructions.
