@@ -324,17 +324,27 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
           (unless (listp arglist)
             (fail "The local macro argument list ~S is not a list."
                   arglist))
-          `(,name macro .
-                  ;; I guess the reason we want to compile here rather than possibly
-                  ;; using an interpreted lambda is that we generate the usual gamut
-                  ;; of style-warnings and such. One might wonder if this could somehow
-                  ;; go through the front-most part of the front-end, to deal with
-                  ;; semantics, but then generate an interpreted function or something
-                  ;; more quick to emit than machine code.
-                  ,(compile-in-lexenv
-                    (make-macro-lambda nil arglist body 'macrolet name)
-                    lexenv
-                    nil nil nil t nil))))))) ; name source-info tlf ephemeral errorp
+          (let (source-info
+                tlf)
+            #-sb-xc-host
+            (when (boundp '*source-paths*)
+              (push `(declare (source-form ,definition)) body)
+              (setf source-info *source-info*
+                    tlf (let ((path (or (get-source-path definition)
+                                        (and (boundp '*current-path*)
+                                             *current-path*))))
+                          (source-path-tlf-number path))))
+            `(,name macro .
+                    ;; I guess the reason we want to compile here rather than possibly
+                    ;; using an interpreted lambda is that we generate the usual gamut
+                    ;; of style-warnings and such. One might wonder if this could somehow
+                    ;; go through the front-most part of the front-end, to deal with
+                    ;; semantics, but then generate an interpreted function or something
+                    ;; more quick to emit than machine code.
+                    ,(compile-in-lexenv
+                      (make-macro-lambda nil arglist body 'macrolet name)
+                      lexenv
+                      nil source-info tlf t nil))))))))
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
