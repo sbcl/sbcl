@@ -3641,3 +3641,18 @@
   (checked-compile '(lambda ()
                      (declare (notinline list +))
                      (list (loop for i below 2 count t)))))
+
+(with-test (:name :ir2-optimize-jumps-multiway-branch-if-eq-delete-branch)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (type (integer -345 1) a))
+         (case (ldb (byte 24 5) a)
+           ((4 47 61 17 10 39) 1)
+           ((2 7 55) A)
+           ((42 48 16 33 40 20) A)
+           ((60 54 28) 3)
+           ((15 1 44 29 57 41 52) 32771)
+           ((46 64 3 18 36 49 37) 1)
+           (t A)))
+    ((-5) -5)))

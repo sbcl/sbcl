@@ -406,8 +406,14 @@
                 (multiway-branch-if-eq
                  ;; codegen-info = (labels else-label key-type keys original-comparator)
                  (let ((info (vop-codegen-info last)))
-                   (setf (car info) (mapcar #'follow-jumps (car info))
-                         (cadr info) (follow-jumps (cadr info)))))
+                   ;; Don't delete the branches when they reach zero
+                   ;; predecessors as multiway-branch-if-eq inserts
+                   ;; extra jumps which are not in the original ir2
+                   ;; and do not correspond to any predecessors.
+                   (setf (car info) (mapcar (lambda (x)
+                                              (follow-jumps x nil))
+                                            (car info))
+                         (cadr info) (follow-jumps (cadr info) nil))))
                 (t
                  (when (conditional-p last)
                    (unchain-jumps last)))))))
