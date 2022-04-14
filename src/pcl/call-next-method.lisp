@@ -188,7 +188,7 @@
                               (optimize (speed 3) (debug 0) (safety 0)))
                      ',result)
                   nil))
-         (function (compile nil lambda))
+         (function (pcl-compile lambda))
          (specializers (append (method-specializers (first orig-methods))
                                (method-specializers (first cnm-methods))))
          (method (make-instance 'standard-method

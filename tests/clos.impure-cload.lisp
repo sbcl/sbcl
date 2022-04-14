@@ -186,10 +186,10 @@
     (call-next-method)))
 
 (defvar *compile-count* 0)
-(sb-int:encapsulate 'compile 'call-counter
-                    (lambda (f name thing)
+(sb-int:encapsulate 'sb-c:compile-in-lexenv 'call-counter
+                    (lambda (realfun &rest args)
                       (incf *compile-count*)
-                      (funcall f name thing)))
+                      (apply realfun args)))
 
 (defstruct mystruct-r/w (some-slot))
 (defstruct mystruct-r/o (allegedly-immutable-slot 3 :read-only t))

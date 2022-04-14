@@ -227,8 +227,6 @@
 ;;;; abstraction around our native structure representation doesn't
 ;;;; seem to add anything useful, and could probably go away.
 
-;;; The definition of STRUCTURE-TYPE-P was moved to early-low.lisp.
-
 (defun structure-type-slot-description-list (type)
   (let* ((dd (find-defstruct-description type))
          (include (dd-include dd))
@@ -281,7 +279,9 @@
 ;;; Damned-if-you-do / damned-if-you don't - the best thing would be to
 ;;; compile all accessors at "really" compile-time but not store the writer
 ;;; for a reaadonly slot under the #<fdefn> for #'(SETF slot-name).
-;;;
+;;; FIXME: this is highly obfuscated and we should just do exactly what the
+;;; preceding comment suggests: compile all slot-writer frobs and attach
+;;; them to the defstruct-definition in %TARGET-DEFSTRUCT.
 (defun structure-slotd-writer-function (type slotd)
   ;; TYPE is not used, because the DD is taken from runtime data.
   (declare (ignore type))
@@ -294,7 +294,7 @@
         (lambda (newval instance)
           (if (eql setter 0)
               (let* ((dd (wrapper-info (%instance-wrapper instance)))
-                     (f (compile nil (slot-setter-lambda-form dd slotd))))
+                     (f (pcl-compile (slot-setter-lambda-form dd slotd))))
                 (if (functionp f)
                     (funcall (setq setter f) newval instance)
                     (uninitialized-accessor-function :writer slotd)))
@@ -309,3 +309,19 @@
 
 (defun structure-slotd-init-form (slotd)
   (dsd-default slotd))
+
+(defun pcl-compile (expr &optional unsafe-policy)
+  (let* ((base-policy sb-c::*policy*)
+         (lexenv
+          (sb-c::make-almost-null-lexenv
+           (if unsafe-policy
+               (sb-c::process-optimize-decl
+                '((space 1) (compilation-speed 1)
+                  (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))
+                base-policy)
+               base-policy)
+           ;; I suspect that INHIBIT-WARNINGS precludes them from happening
+           (list (cons (sb-kernel:find-classoid 'style-warning) 'muffle-warning)
+                 (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))
+           nil nil nil)))
+    (sb-c:compile-in-lexenv expr lexenv nil nil nil nil nil)))

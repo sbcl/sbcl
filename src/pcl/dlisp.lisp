@@ -182,12 +182,12 @@
                    (declare (optimize (sb-c:store-source-form 0)))
                    (declare (optimize (sb-c::store-closure-debug-pointer 3)))
                    #'(lambda ,args
-                       (let ()
+                       (let () ; What is this LET doing?
                          (declare #.*optimize-speed*)
                          ,form)))))
     (values (if *precompiling-lap*
                 `#',lambda
-                (compile nil lambda))
+                (pcl-compile lambda))
             nil)))
 
 ;;; note on implementation for CMU 17 and later (including SBCL):
