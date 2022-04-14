@@ -467,3 +467,14 @@
                    (assert (>= (length (remove-duplicates field)) 8))))))))
     (try 'sxhash)
     (try 'sb-int:good-hash-word->fixnum)))
+
+;;; Ensure that all layout-clos-hash values have a 1 somewhere
+;;; such that LOGANDing any number of nonzero hashes is nonzero.
+(with-test (:name :layout-hashes-constant-1-bit)
+  (let ((combined most-positive-fixnum))
+    (maphash (lambda (classoid wrapper)
+               (declare (ignore classoid))
+               (let ((hash (sb-kernel:wrapper-clos-hash wrapper)))
+                 (setq combined (logand combined hash))))
+             (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't)))
+    (assert (/= 0 combined))))
