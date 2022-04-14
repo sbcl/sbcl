@@ -62,7 +62,7 @@
                      ((cons (eql method))
                       (values (get-def `(sb-pcl::fast-method ,@(rest outer)))
                               (simple-local-name)))
-                     ((cons (member compiler-macro cas))
+                     ((cons (member compiler-macro cas setf))
                       (values (get-def outer) (simple-local-name)))
                      (t
                       (values (get-def outer) x)))))
@@ -390,7 +390,7 @@
         (let* ((local-name (when local
                              (let ((outer (car (last local))))
                                (typecase outer
-                                 ((cons (member method compiler-macro cas))
+                                 ((cons (member method compiler-macro cas setf))
                                   (labels ((simplify (name)
                                              (if (symbolp name) name (simplify (second name)))))
                                     `(,(first local) ,(second local) :in ,(simplify outer))))

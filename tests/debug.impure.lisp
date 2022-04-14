@@ -566,6 +566,21 @@
                    (1 (flet (cas body) :in (method (cas trace-cas-gf) (t t t))) :exit 42)
                    (0 (method (cas trace-cas-gf) (t t t)) :exit 42)))))
 
+(defun (setf trace-setf) (value x)
+  (declare (optimize (debug 3)))
+  (flet (((setf body) (value)
+           (+ value x)))
+    (setf (body) value)))
+
+(with-test (:name (trace :setf))
+  (assert (equal (collecting-traces ((setf trace-setf)
+                                     (flet (setf body) :in (setf trace-setf)))
+                   (setf (trace-setf 11) 31))
+                 '((0 (setf trace-setf) :enter 31 11)
+                   (1 (flet (setf body) :in (setf trace-setf)) :enter 31)
+                   (1 (flet (setf body) :in (setf trace-setf)) :exit 42)
+                   (0 (setf trace-setf) :exit 42)))))
+
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")
