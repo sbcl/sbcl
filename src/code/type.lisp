@@ -3381,27 +3381,33 @@ used for a COMPLEX component.~:@>"
                       ((nil) class2)
                       ((integer float) class1)
                       (rational (if (eq class2 'integer)
-                                       'integer
-                                       'rational))))
+                                    'integer
+                                    'rational))))
              (format (or (numeric-type-format type1)
-                         (numeric-type-format type2))))
+                         (numeric-type-format type2)))
+             (low1 (numeric-type-low type1))
+             (high1 (numeric-type-high type1))
+             (infinity1 (and (floatp low1) (float-infinity-p low1) (eql low1 high1)))
+             (low2 (numeric-type-low type2))
+             (high2 (numeric-type-high type2))
+             (infinity2 (and (floatp low2) (float-infinity-p low2) (eql low2 high2))))
         (make-numeric-type
          :class class
          :format format
          :complexp (or (numeric-type-complexp type1)
                        (numeric-type-complexp type2))
-         :low (numeric-bound-max
-               (round-numeric-bound (numeric-type-low type1)
-                                    class format t)
-               (round-numeric-bound (numeric-type-low type2)
-                                    class format t)
-               > >= nil)
-         :high (numeric-bound-max
-                (round-numeric-bound (numeric-type-high type1)
-                                     class format nil)
-                (round-numeric-bound (numeric-type-high type2)
-                                     class format nil)
-                < <= nil)))
+         :low (cond (infinity1 low1)
+                    (infinity2 low2)
+                    (t (numeric-bound-max
+                        (round-numeric-bound low1 class format t)
+                        (round-numeric-bound low2 class format t)
+                        > >= nil)))
+         :high (cond (infinity1 high1)
+                     (infinity2 high2)
+                     (t (numeric-bound-max
+                         (round-numeric-bound high1 class format nil)
+                         (round-numeric-bound high2 class format nil)
+                         < <= nil)))))
       *empty-type*))
 
 ;;; Given two float formats, return the one with more precision. If

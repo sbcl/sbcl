@@ -305,3 +305,59 @@
                           (t (error ""))))
                 x))))
           '(values (not integer) &optional))))
+
+(with-test (:name (:type-constraint-joining :infinities 1))
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (number)
+                 (declare (type (or number null) number))
+                 (cond ((null number) nil)
+                       ((sb-ext:float-nan-p number) :nan)
+                       ((= number sb-ext:double-float-positive-infinity) :inf)
+                       ((= number sb-ext:double-float-negative-infinity) :-inf)
+                       (number))))))
+           '(values (or (member nil :nan :inf :-inf) float) &optional))))
+
+(with-test (:name (:type-constraint-joining :infinities 2))
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (number)
+                 (declare (type (or number null) number))
+                 (cond ((null number) nil)
+                       ((sb-ext:float-nan-p number) :nan)
+                       ((= number sb-ext:double-float-positive-infinity) number)
+                       ((= number sb-ext:double-float-negative-infinity) number)
+                       (t :number))))))
+           `(values (or (single-float ,sb-ext:single-float-negative-infinity
+                                      ,sb-ext:single-float-negative-infinity)
+                        (double-float ,sb-ext:double-float-negative-infinity
+                                      ,sb-ext:double-float-negative-infinity)
+                        (single-float ,sb-ext:single-float-positive-infinity
+                                      ,sb-ext:single-float-positive-infinity)
+                        (double-float ,sb-ext:double-float-positive-infinity
+                                      ,sb-ext:double-float-positive-infinity)
+                        (member nil :nan :number))
+                    &optional))))
+
+(with-test (:name (:type-constraint-joining :infinities 3))
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (number)
+                 (declare (type (or number null) number))
+                 (cond ((null number) nil)
+                       ((sb-ext:float-nan-p number) :nan)
+                       ((eql number sb-ext:double-float-positive-infinity) number)
+                       ((eql number sb-ext:double-float-negative-infinity) number)
+                       (t :number))))))
+           `(values (or (double-float ,sb-ext:double-float-negative-infinity
+                                      ,sb-ext:double-float-negative-infinity)
+                        (double-float ,sb-ext:double-float-positive-infinity
+                                      ,sb-ext:double-float-positive-infinity)
+                        (member nil :nan :number))
+                    &optional))))
