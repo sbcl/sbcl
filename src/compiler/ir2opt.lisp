@@ -994,7 +994,6 @@
               (delete-vop vop)
               (delete-vop next))))))))
 
-
 (when (vop-existsp :named sb-vm::<-integer-fixnum)
   ;; The <-integer-fixnum VOPs already perform dispatch for fixnum/bignum,
   ;; and load the header byte.
@@ -1005,8 +1004,11 @@
       (destructuring-bind (target not-p) (vop-codegen-info vop)
         (let ((target-block (gethash target *2block-info*)))
           (when target-block
-            (let* ((next (ir2-block-next (vop-block vop)))
-
+            (let* ((next (if (eq vop (ir2-block-last-vop (vop-block vop)))
+                             (ir2-block-next (vop-block vop))
+                             (let ((next (next-vop vop)))
+                               (and (eq (vop-name next) 'branch)
+                                    (gethash (car (vop-codegen-info next)) *2block-info*)))))
                    (not-target-block (if not-p
                                          target-block
                                          next))
@@ -1027,41 +1029,46 @@
                            (when (eq (tn-ref-tn (tn-ref-across args)) integer)
                              (setf tns (list (tn-ref-tn args) integer)))))
                     (destructuring-bind (cmp-target cmp-not-p) (vop-codegen-info cmp)
-                      (let* ((cmp-next (ir2-block-next (vop-block cmp)))
-                             (cmp-target-block (gethash cmp-target *2block-info*))
-                             (cmp-not-target-block (if cmp-not-p
-                                                       cmp-target-block
-                                                       cmp-next))
-                             (cmp-target-block (if cmp-not-p
-                                                   cmp-next
-                                                   cmp-target-block)))
-                        (when (if cmp-not-p
-                                  (eq cmp-not-target-block not-target-block)
-                                  (eq cmp-target-block not-target-block))
-                          (flet ((invert ()
-                                   (template-or-lose
-                                    (case (vop-name cmp)
-                                      (sb-vm::>-integer-fixnum 'sb-vm::<=-integer-fixnum)
-                                      (sb-vm::<-integer-fixnum 'sb-vm::>=-integer-fixnum)
-                                      (sb-vm::>-fixnum-integer 'sb-vm::<=-fixnum-integer)
-                                      (sb-vm::<-fixnum-integer 'sb-vm::>=-fixnum-integer)))))
-                            (multiple-value-bind (new-vop new-target new-not-p)
-                                (cond ((and not-p cmp-not-p)
-                                       (values (vop-info cmp) target t))
-                                      (not-p
-                                       (values (invert) target t))
-                                      (cmp-not-p
-                                       (values (invert) cmp-target nil))
-                                      (t
-                                       (values (invert) target nil)))
-                              (prog1
-                                  (emit-and-insert-vop (vop-node vop) (vop-block vop)
-                                                       new-vop
-                                                       (reference-tn-list tns nil)
-                                                       nil vop
-                                                       (list new-target new-not-p))
-                                (delete-vop vop)
-                                (delete-vop cmp)))))))))))))
+                      (let* ((cmp-next-block (ir2-block-next (vop-block cmp)))
+                             (cmp-target-block (gethash cmp-target *2block-info*)))
+                        (flet ((invert ()
+                                 (template-or-lose
+                                  (case (vop-name cmp)
+                                    (sb-vm::>-integer-fixnum 'sb-vm::<=-integer-fixnum)
+                                    (sb-vm::<-integer-fixnum 'sb-vm::>=-integer-fixnum)
+                                    (sb-vm::>-fixnum-integer 'sb-vm::<=-fixnum-integer)
+                                    (sb-vm::<-fixnum-integer 'sb-vm::>=-fixnum-integer)))))
+                          (multiple-value-bind (new-vop new-target new-not-p)
+                              (cond ((and not-p
+                                          (eq not-target-block cmp-next-block))
+                                     (if cmp-not-p
+                                         (values (invert) cmp-target nil)
+                                         (values (vop-info cmp) cmp-target nil)))
+                                    ((and not-p
+                                          (eq not-target-block cmp-target-block))
+                                     (if cmp-not-p
+                                         (values (vop-info cmp) cmp-target t)
+                                         (values (invert) cmp-target t)))
+                                    ((and (not not-p)
+                                          (eq not-target-block cmp-target-block))
+                                     (if cmp-not-p
+                                         (values (vop-info cmp) (ir2-block-%label target-block) nil)
+                                         (values (invert) (ir2-block-%label target-block) nil)))
+                                    ((and (not not-p)
+                                          (eq not-target-block cmp-next-block))
+                                     (if cmp-not-p
+                                         (values (invert) cmp-target nil)
+                                         (values (vop-info cmp) cmp-target nil)))
+                                    (t
+                                     (return-from vop-optimize-bignump-optimizer)))
+                            (prog1
+                                (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                                                     new-vop
+                                                     (reference-tn-list tns nil)
+                                                     nil vop
+                                                     (list new-target new-not-p))
+                              (delete-vop vop)
+                              (delete-vop cmp))))))))))))
         nil))))
 
 ;;; No need to reset the stack pointer just before returning.
