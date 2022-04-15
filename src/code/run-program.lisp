@@ -1188,16 +1188,16 @@ Users Manual for details about the PROCESS structure.
                     (push write-fd *close-on-error*)
                     (let ((stream (make-fd-stream write-fd :output t
                                                          :element-type :default
-                                                         :external-format
-                                                         external-format)))
+                                                         :external-format external-format
+                                                         :auto-close t)))
                       (values read-fd stream)))
                  (:output
                     (push read-fd *close-on-error*)
                     (push write-fd *close-in-parent*)
                     (let ((stream (make-fd-stream read-fd :input t
                                                          :element-type :default
-                                                         :external-format
-                                                         external-format)))
+                                                         :external-format external-format
+                                                         :auto-close t)))
                       (values write-fd stream)))
                  (t
                     (sb-unix:unix-close read-fd)
