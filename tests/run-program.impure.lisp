@@ -18,7 +18,9 @@
     (sb-ext:run-program "/usr/bin/pwd" nil :input :stream :output :stream :wait nil)
     (length initially-open-fds)))
 
-(with-test (:name (run-program :autoclose-streams) :skipped-on (:not :linux))
+(with-test (:name (run-program :autoclose-streams)
+            :skipped-on (:or :sbcl ;; not reliable enough
+                             (:not :linux)))
   (let ((n-initially-open-fds (bin-pwd-ignoring-result)))
     (gc)
     (sb-sys:scrub-control-stack) ; Make sure we're not referencing the #<process>
