@@ -1222,7 +1222,10 @@ between the ~A definition and the ~A definition"
           :predicate slot-object-p
           :hierarchical-p nil
           :state :read-only
-          :prototype-form (make-defstruct-description t 'arbitrary))
+          ;; Why is this its prototype-form? It sure looks like SLOT-OBJECT's
+          ;; metaobject has a valid prototype object that is the canonical
+          ;; CLOS object (the usual 2-word thing of layout + slot vector)
+          :prototype-form (make-defstruct-description 'arbitrary 0))
 
          ;; KLUDGE: the length must match the subsequent defstruct.
          (pathname :depth 1

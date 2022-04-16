@@ -124,23 +124,25 @@
     (cond ((not dd) ; it's going to be some subtype of NAME
            ;; pessimistically assume MIXED rather than choosing at runtime
            `(%copy-instance (%make-instance/mixed (%instance-length instance)) instance))
-          ((<= (dd-length dd) max-inlined-words)
-           `(let ((copy (%make-structure-instance ,dd nil)))
-              ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,
-              ;; or the GC will treat random bit patterns as conservative pointers
-              ;; (i.e. not alter them if %INSTANCE-REF is not the correct accessor)
-              ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
-                      collect `(%instance-set copy ,i (%instance-ref instance ,i)))
-              copy))
-          (t
-           `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)))))
+          ((not (logtest (dd-flags dd) +dd-varylen+)) ; fixed length
+           ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,
+           ;; or the GC will treat random bit patterns as conservative pointers
+           ;; (i.e. not alter them if %INSTANCE-REF is not the correct accessor)
+           (if (> (dd-length dd) max-inlined-words)
+               `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)
+               `(let ((copy (%make-structure-instance ,dd nil)))
+                  ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
+                       collect `(%instance-set copy ,i (%instance-ref instance ,i)))
+                  copy)))
+          (t ; variable-length
+           `(let ((copy (,(if (dd-has-raw-slot-p dd) '%make-instance/mixed '%make-instance)
+                          (%instance-length instance))))
+              (%set-instance-layout copy (%instance-layout instance))
+              (%copy-instance-slots copy instance))))))
 
 (defun varying-length-struct-p (classoid)
-  ;; This is a nice feature to have in general, but at present it is only possible
-  ;; to make varying length instances of SB-VM:LAYOUT (or WRAPPER if that is the same type),
-  ;; and nothing else.
-  (eq classoid (load-time-value (find-classoid #+metaspace 'sb-vm:layout
-                                               #-metaspace 'wrapper))))
+  (let ((dd (find-defstruct-description (classoid-name classoid))))
+    (logtest (dd-flags dd) +dd-varylen+)))
 
 (deftransform %instance-length ((instance))
   (let ((classoid (lvar-type instance)))

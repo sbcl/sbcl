@@ -94,6 +94,11 @@
 ;;; but freezing would make it constant henceforth.
 (sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil))
   cells)
+(declaim (freeze-type packed-info))
+#-sb-xc-host
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (let ((dd (find-defstruct-description 'packed-info)))
+    (setf (dd-flags dd) (logior (dd-flags dd) +dd-varylen+))))
 (eval-when (#-sb-xc-host :compile-toplevel)
   (sb-xc:defmacro make-packed-info (n)
     `(%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start))))

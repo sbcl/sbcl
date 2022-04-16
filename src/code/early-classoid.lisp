@@ -15,6 +15,13 @@
 
 ;;;; DEFSTRUCT-DESCRIPTION
 
+(defconstant +dd-named+      #b000001) ; :NAMED was specified
+(defconstant +dd-printfun+   #b000010) ; :PRINT-FUNCTION was specified
+(defconstant +dd-printobj+   #b000100) ; :PRINT-OBJECT was specified
+(defconstant +dd-pure+       #b001000) ; :PURE T was specified
+(defconstant +dd-varylen+    #b010000)
+(defconstant +dd-nullenv+    #b100000)
+
 ;;; The DEFSTRUCT-DESCRIPTION structure holds compile-time information
 ;;; about a structure type.
 ;;; It is defined prior to WRAPPER because WRAPPER-INFO
@@ -23,9 +30,10 @@
              (:conc-name dd-)
              (:copier nil)
              (:pure t)
-             (:constructor make-defstruct-description (null-lexenv-p name)))
+             (:constructor make-defstruct-description (name flags)))
   ;; name of the structure
   (name (missing-arg) :type symbol :read-only t)
+  (flags 0 :type fixnum) ; see the constants above
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
@@ -33,8 +41,6 @@
   ;; All the :CONSTRUCTOR specs and posssibly an implied constructor,
   ;; keyword constructors first, then BOA constructors. NIL if none.
   (constructors () :type list)
-  ;; True if the DEFSTRUCT appeared in a null lexical environment.
-  (null-lexenv-p nil :type boolean :read-only t) ; the safe default is NIL
   ;; name of copying function
   (copier-name nil :type symbol)
   ;; name of type predicate
@@ -71,27 +77,12 @@
   ;; If a vector, the vector element type.
   ;; If a list, not used.
   (%element-type t)
-  ;; The next two slots are for :TYPE'd structures (which aren't
-  ;; classes, DD-CLASS-P = NIL)
-  ;;
-  ;; T if :NAMED was explicitly specified, NIL otherwise
-  (named nil :type boolean)
   ;; any INITIAL-OFFSET option on this direct type
   (offset nil :type (or index null))
 
-  ;; which :PRINT-mumble option was given, if either was.
-  (print-option nil :type (member nil :print-function :print-object))
   ;; the argument to the PRINT-FUNCTION or PRINT-OBJECT option.
   ;; NIL if the option was given with no argument.
-  (printer-fname nil :type (or cons symbol))
-
-  ;; the value of the :PURE option, used by cheneygc when purifying.
-  ;; This is true if objects of this class are never modified to
-  ;; contain dynamic pointers in their slots or constant-like
-  ;; substructure (and hence can be copied into read-only space by
-  ;; PURIFY).
-  ;; This is only meaningful if DD-CLASS-P = T.
-  (pure nil :type (member t nil)))
+  (printer-fname nil :type (or cons symbol)))
 (declaim (freeze-type defstruct-description))
 (!set-load-form-method defstruct-description (:host :xc :target))
 

@@ -32,9 +32,6 @@
   ;; unary should not have unary child but it seems like the deletion algorithm
   ;; temporarily does that and then eliminates it.
   (child nil :type t))
-;; Can't freeze BINARY-NODE because freezing implies constant %INSTANCE-LENGTH,
-;; but we use variable-length instances.
-(declaim (freeze-type unary-node))
 ;;; L2 is a temporary node that gets eliminated by the insertion algorithm.
 ;;; My guess is that the "2" is supposed to be reminiscent of "binary",
 ;;; but it's a leaf, a/k/a "external node".
@@ -44,6 +41,11 @@
 (defstruct (ternary-node (:copier nil)
                          (:constructor N3 (left key1 middle key2 right)))
   left key1 middle key2 right)
+
+(declaim (freeze-type unary-node binary-node ternary-node))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (let ((dd (sb-kernel:find-defstruct-description 'binary-node)))
+    (setf (sb-kernel:dd-flags dd) (logior (sb-kernel:dd-flags dd) sb-kernel:+dd-varylen+))))
 
 ;;; Roughly half the binary nodes in a tree are at the fringe, so the left and right
 ;;; children are both NIL. We have to use binary nodes because only binary nodes

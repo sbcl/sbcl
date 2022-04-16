@@ -83,6 +83,12 @@
 ;;; Does DD describe a structure with a class?
 (defun dd-class-p (dd)
   (if (member (dd-type dd) '(structure funcallable-structure)) t nil))
+(defmacro dd-named (dd) `(logtest (dd-flags ,dd) +dd-named+))
+(defmacro dd-pure (dd) `(logtest (dd-flags ,dd) +dd-pure+))
+(defmacro dd-null-lexenv-p (dd) `(logtest (dd-flags ,dd) +dd-nullenv+))
+(defun dd-print-option (dd)
+  (cond ((logtest (dd-flags dd) +dd-printfun+) :print-function)
+        ((logtest (dd-flags dd) +dd-printobj+) :print-object)))
 
 (defun dd-layout-or-lose (dd)
   (compiler-layout-or-lose (dd-name dd)))
@@ -272,7 +278,9 @@
                   ;; Rather than hit MAKE-DEFSTRUCT-DESCRIPTION's type-check
                   ;; on the NAME slot, we can be a little more clear.
                   (error "DEFSTRUCT: ~S is not a symbol." name)))
-         (dd (make-defstruct-description null-env-p name))
+         (flagbits (logior #+sb-xc-host (if (member name '(wrapper layout)) +dd-varylen+ 0)
+                           (if null-env-p +dd-nullenv+ 0)))
+         (dd (make-defstruct-description name flagbits))
          (*dsd-source-form* nil)
          ((inherits comparators) (parse-defstruct dd options slot-descriptions))
          (constructor-definitions
@@ -297,7 +305,7 @@
                     ((not (symbolp fname))
                      ;; Don't dump the source form into the DD constant;
                      ;; just indicate that there was an expression there.
-                     (setf (dd-printer-fname dd) t)))
+                     (setf (dd-printer-fname dd) 'lambda)))
               `((defmethod print-object ((,x ,name) ,s)
                   (funcall #',fname ,x ,s
                            ,@(if depthp `(*current-level-in-print*)))))))))
@@ -611,7 +619,9 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
        (when (dd-print-option dd)
          (error "~S and ~S may not both be specified"
                 (dd-print-option dd) keyword))
-       (setf (dd-print-option dd) keyword (dd-printer-fname dd) arg))
+       (setf (dd-flags dd) (logior (if (eq keyword :print-object) +dd-printobj+ +dd-printfun+)
+                                   (dd-flags dd))
+             (dd-printer-fname dd) arg))
       (:type
        (cond ((member arg '(list vector))
               (setf (dd-type dd) arg (dd-%element-type dd) t))
@@ -635,7 +645,8 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
       (:initial-offset
        (setf (dd-offset dd) arg)) ; FIXME: disallow (:INITIAL-OFFSET NIL)
       (:pure
-       (setf (dd-pure dd) arg))
+       (setf (dd-flags dd) (logior (logandc2 (dd-flags dd) +dd-pure+)
+                                   (if arg +dd-pure+ 0))))
       (t
        (error "unknown DEFSTRUCT option:~%  ~S" option)))
     seen-options))
@@ -647,7 +658,8 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
     (declare (type (unsigned-byte #.(length +dd-option-names+)) seen-options))
     (dolist (option options)
       (if (eq option :named)
-          (setf named-p t (dd-named dd) t)
+          (setf named-p t
+                (dd-flags dd) (logior (dd-flags dd) +dd-named+))
           (setq seen-options
                 (parse-1-dd-option
                  (cond ((consp option) option)
@@ -1042,8 +1054,9 @@ unless :NAMED is also specified.")))
         ;; FIXME: This POSITION call should be foldable without read-time eval
         ;; since literals are immutable, and +DD-OPTION-NAMES+ was initialized
         ;; from a literal.
-        (unless (logbitp #.(position :pure +dd-option-names+) option-bits)
-          (setf (dd-pure dd) (dd-pure included-structure))))
+        (when (and (dd-pure included-structure)
+                   (not (logbitp #.(position :pure +dd-option-names+) option-bits)))
+          (setf (dd-flags dd) (logior (dd-flags dd) +dd-pure+))))
 
       (setf (dd-inherited-accessor-alist dd)
             (dd-inherited-accessor-alist included-structure))
@@ -2092,7 +2105,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                               (dd-type (missing-arg))
                                               metaclass-constructor
                                               slot-names)
-  (let* ((dd (make-defstruct-description t class-name))
+  (let* ((dd (make-defstruct-description class-name +dd-nullenv+))
          (conc-name (string (gensymify* class-name "-")))
          (slot-index 0))
     ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
@@ -2186,7 +2199,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; special enough (and simple enough) that we just build it by hand
 ;;; instead of trying to generalize the ordinary DEFSTRUCT code.
 (defun !set-up-structure-object-class ()
-  (let ((dd (make-defstruct-description t 'structure-object)))
+  (let ((dd (make-defstruct-description 'structure-object +dd-nullenv+)))
     (setf (dd-length dd) sb-vm:instance-data-start)
     (%compiler-set-up-layout dd (vector (find-layout 't)))))
 #+sb-xc-host(!set-up-structure-object-class)
