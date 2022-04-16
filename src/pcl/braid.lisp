@@ -132,14 +132,14 @@
                                      :direct-superclasses supers
                                      :direct-slots slots)))
        (slot-initargs-from-structure-slotd (slotd)
-         (let ((accessor (structure-slotd-accessor-symbol slotd)))
-           `(:name ,(structure-slotd-name slotd)
+         (let ((accessor (dsd-accessor-name slotd)))
+           `(:name ,(dsd-name slotd)
              :defstruct-accessor-symbol ,accessor
              :internal-reader-function ,(structure-slotd-reader-function slotd)
              :internal-writer-function ,(structure-slotd-writer-function name slotd)
-             :type ,(or (structure-slotd-type slotd) t)
-             :initform ,(structure-slotd-init-form slotd)
-             :initfunction ,(eval-form (structure-slotd-init-form slotd)))))
+             :type ,(dsd-type slotd)
+             :initform ,(dsd-default slotd)
+             :initfunction ,(eval-form (dsd-default slotd)))))
        (slot-initargs-from-condition-slot (slot)
          `(:name ,(condition-slot-name slot)
            :initargs ,(condition-slot-initargs slot)
@@ -152,9 +152,29 @@
            :allocation ,(condition-slot-allocation slot)
            :documentation ,(condition-slot-documentation slot))))
     (cond ((structure-type-p name)
-           (ensure 'structure-class
-                   (mapcar #'slot-initargs-from-structure-slotd
-                           (structure-type-slot-description-list name))))
+           ;; This seems like a somewhat unclear way to do what it's doing, which is
+           ;; collect slots of TYPE that are not in its direct ancestor, *or*
+           ;; which have an altered definition relative to the inherited one.
+           (flet ((structure-type-slot-description-list (type)
+                    (let* ((dd (find-defstruct-description type))
+                           (include (dd-include dd))
+                           (all-slots (dd-slots dd)))
+                      (multiple-value-bind (super slot-overrides)
+                          (if (consp include)
+                              (values (car include) (mapcar #'car (cdr include)))
+                              (values include nil))
+                        (let ((included-slots
+                               (when super
+                                 (dd-slots (find-defstruct-description super)))))
+                          (loop for slot = (pop all-slots)
+                             for included-slot = (pop included-slots)
+                             while slot
+                             when (or (not included-slot)
+                                      (member (dsd-name included-slot) slot-overrides :test #'eq))
+                             collect slot))))))
+             (ensure 'structure-class
+                     (mapcar #'slot-initargs-from-structure-slotd
+                             (structure-type-slot-description-list name)))))
           ((condition-type-p name)
            (ensure 'condition-class
                    (mapcar #'slot-initargs-from-condition-slot

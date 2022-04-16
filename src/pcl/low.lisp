@@ -227,35 +227,13 @@
 ;;;; abstraction around our native structure representation doesn't
 ;;;; seem to add anything useful, and could probably go away.
 
-(defun structure-type-slot-description-list (type)
-  (let* ((dd (find-defstruct-description type))
-         (include (dd-include dd))
-         (all-slots (dd-slots dd)))
-    (multiple-value-bind (super slot-overrides)
-        (if (consp include)
-            (values (car include) (mapcar #'car (cdr include)))
-            (values include nil))
-      (let ((included-slots
-             (when super
-               (dd-slots (find-defstruct-description super)))))
-        (loop for slot = (pop all-slots)
-              for included-slot = (pop included-slots)
-              while slot
-              when (or (not included-slot)
-                       (member (dsd-name included-slot) slot-overrides :test #'eq))
-              collect slot)))))
+
 
 (defun uninitialized-accessor-function (type slotd)
   (lambda (&rest args)
     (declare (ignore args))
     (error "~:(~A~) function~@[ for ~S ~] not yet initialized."
            type slotd)))
-
-(defun structure-slotd-name (slotd)
-  (dsd-name slotd))
-
-(defun structure-slotd-accessor-symbol (slotd)
-  (dsd-accessor-name slotd))
 
 (defun structure-slotd-reader-function (slotd)
   (let ((name (dsd-accessor-name slotd)))
@@ -303,12 +281,6 @@
         (if (fboundp name)
             (fdefinition name)
             (uninitialized-accessor-function :writer slotd)))))
-
-(defun structure-slotd-type (slotd)
-  (dsd-type slotd))
-
-(defun structure-slotd-init-form (slotd)
-  (dsd-default slotd))
 
 (defun pcl-compile (expr &optional unsafe-policy)
   (let* ((base-policy sb-c::*policy*)
