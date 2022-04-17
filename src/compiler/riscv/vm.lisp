@@ -229,13 +229,17 @@
      zero-sc-number)
     (null
      (values descriptor-reg-sc-number null-offset))
-    ((or (integer #.most-negative-fixnum #.most-positive-fixnum)
-         character)
-     immediate-sc-number)
     (symbol
      (if (static-symbol-p value)
          immediate-sc-number
-         nil))))
+         nil))
+    ((integer #.most-negative-fixnum #.most-positive-fixnum)
+     immediate-sc-number)
+    #-(or sb-xc-host 64-bit) ; There is no such object type in the host
+    (system-area-pointer
+     immediate-sc-number)
+    (character
+     immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
   (or (eql sc zero-sc-number)
