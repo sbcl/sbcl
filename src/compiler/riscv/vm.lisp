@@ -234,8 +234,16 @@
          immediate-sc-number
          nil))
     ((integer #.most-negative-fixnum #.most-positive-fixnum)
-     immediate-sc-number)
-    #-(or sb-xc-host 64-bit) ; There is no such object type in the host
+     ;; KLUDGE: This is a subset on 64-bit because we currently
+     ;; produce untagged intermediates in %LI.
+     (typecase (fixnumize value)
+       #-64-bit
+       ((signed-byte 32)
+        immediate-sc-number)
+       #+64-bit
+       ((integer #x-80000800 #x7ffff7ff)
+        immediate-sc-number)))
+    #-sb-xc-host ; There is no such object type in the host
     (system-area-pointer
      immediate-sc-number)
     (character

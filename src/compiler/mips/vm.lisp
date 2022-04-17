@@ -293,7 +293,7 @@
      (if (static-symbol-p value)
          immediate-sc-number
          nil))
-    ((integer #.most-negative-fixnum #.most-positive-fixnum)
+    ((signed-byte 30)
      immediate-sc-number)
     #-sb-xc-host ; There is no such object type in the host
     (system-area-pointer
