@@ -566,7 +566,7 @@
                                  type))
            (y (plausible-signed-imm32-operand-p y))
            (error (generate-error-code+ (lambda ()
-                                          (inst mov r y))
+                                          (inst mov r (fixnumize y)))
                                         vop
                                         'sb-kernel::mul-overflow-error x
                                         r)))
