@@ -65,14 +65,22 @@
     (lambda-var
      (unless (lambda-var-indirect leaf)
        (find-in-environment leaf env)))
-    (constant (make-constant-tn leaf))
+    (constant (constant-tn leaf))
     (t nil)))
+
+;;; If LEAF already has a constant TN, return that, otherwise make a
+;;; TN for it.
+(defun constant-tn (leaf)
+  (declare (type constant leaf))
+  (or (leaf-info leaf)
+      (setf (leaf-info leaf)
+            (make-constant-tn leaf))))
 
 ;;; This is used to conveniently get a handle on a constant TN during
 ;;; IR2 conversion. It returns a constant TN representing the Lisp
 ;;; object VALUE.
 (defun emit-constant (value)
-  (make-constant-tn (find-constant value)))
+  (constant-tn (find-constant value)))
 
 ;;; Convert a REF node. The reference must not be delayed.
 (defun ir2-convert-ref (node block)
@@ -99,7 +107,7 @@
                   (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
            (t (emit-move node block tn res)))))
       (constant
-       (move-lvar-result node block (list (make-constant-tn leaf)) lvar)
+       (move-lvar-result node block (list (constant-tn leaf)) lvar)
        (return-from ir2-convert-ref))
       (functional
        (ir2-convert-closure node block leaf res))

@@ -221,49 +221,40 @@
 ;;; EMIT-MOVES-AND-COERCIONS. That's wasteful.
 (defun make-constant-tn (constant &optional force-boxed)
   (declare (type constant constant))
-  (or (leaf-info constant)
-      (multiple-value-bind (immed null-offset)
-          (immediate-constant-sc (constant-value constant))
-        ;; currently NULL-OFFSET is used only on ARM64
-        (if null-offset
-            (let ((tn (component-live-tn
-                       (make-wired-tn (primitive-type (leaf-type constant))
-                                      immed
-                                      null-offset
-                                      (specifier-type 'null)))))
-             (setf (tn-leaf tn) constant
-                   (leaf-info constant) tn))
-            (let* ((boxed (or (not immed)
-                              (boxed-immediate-sc-p immed)))
-                   (component (component-info *component-being-compiled*))
-                   ;; If a constant has either an immediate or boxed
-                   ;; representation (e.g. double-float) postpone the SC
-                   ;; choice until SELECT-REPRESENTATIONS.
-                   (sc (cond (boxed
-                              (if immed
-                                  (svref *backend-sc-numbers* immed)
-                                  (sc-or-lose 'constant)))
-                             (force-boxed
-                              (setf immed nil)
-                              (sc-or-lose 'constant))))
-                   (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
-              ;; Objects of type SYMBOL can be immediate but they still go in the constants
-              ;; because liveness depends on pointer tracing without looking at code-fixups.
-              (when (and sc
-                         (or (not immed)
-                             #+immobile-space
-                             (let ((val (constant-value constant)))
-                               (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
-                                   (typep val 'wrapper)))))
-                (let ((constants (ir2-component-constants component)))
-                  (setf (tn-offset res)
-                        (vector-push-extend constant constants))))
-              (when sc
-                (setf (leaf-info constant) res))
-              (push-in tn-next res (ir2-component-constant-tns component))
-              (setf (tn-type res) (leaf-type constant))
-              (setf (tn-leaf res) constant)
-              res)))))
+  (multiple-value-bind (immed null-offset)
+      (immediate-constant-sc (constant-value constant))
+    ;; currently NULL-OFFSET is used only on ARM64
+    (if null-offset
+        (let ((tn (component-live-tn
+                   (make-wired-tn (primitive-type (leaf-type constant))
+                                  immed
+                                  null-offset
+                                  (specifier-type 'null)))))
+          (setf (tn-leaf tn) constant
+                (leaf-info constant) tn))
+        (let* ((component (component-info *component-being-compiled*))
+               ;; If a constant has either an immediate or boxed
+               ;; representation (e.g. double-float) postpone the SC
+               ;; choice until SELECT-REPRESENTATIONS.
+               (sc (cond ((or force-boxed (not immed))
+                          (sc-or-lose 'constant))
+                         ((boxed-immediate-sc-p immed)
+                          (svref *backend-sc-numbers* immed))))
+               (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
+          ;; Objects of type SYMBOL can be immediate but they still go in the constants
+          ;; because liveness depends on pointer tracing without looking at code-fixups.
+          (when (or (not immed) force-boxed
+                    #+immobile-space
+                    (let ((val (constant-value constant)))
+                      (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
+                          (typep val 'wrapper))))
+            (let ((constants (ir2-component-constants component)))
+              (setf (tn-offset res)
+                    (vector-push-extend constant constants))))
+          (push-in tn-next res (ir2-component-constant-tns component))
+          (setf (tn-type res) (leaf-type constant))
+          (setf (tn-leaf res) constant)
+          res))))
 
 ;;; Extracted from above
 (defun constant-sc (constant)
@@ -273,14 +264,12 @@
           (immediate-constant-sc (constant-value constant))
         (if null-offset
             immed
-            (let ((boxed (or (not immed)
-                             (boxed-immediate-sc-p immed))))
-              (cond (boxed
-                     (if immed
-                         (svref *backend-sc-numbers* immed)
-                         (sc-or-lose 'constant)))
-                    (t
-                     (sc-or-lose 'constant))))))))
+            (cond ((not immed)
+                   (sc-or-lose 'constant))
+                  ((boxed-immediate-sc-p immed)
+                   (svref *backend-sc-numbers* immed))
+                  (t
+                   (sc-or-lose 'constant)))))))
 
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))
