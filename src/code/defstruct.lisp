@@ -181,15 +181,23 @@
 (defmethod print-object ((x defstruct-slot-description) stream)
   (print-unreadable-object (x stream :type t)
     (prin1 (dsd-name x) stream)))
+
 (defun dsd-raw-slot-data (dsd)
   (let ((rsd-index (dsd-rsd-index dsd)))
     (and rsd-index
          (svref *raw-slot-data* rsd-index))))
+
 (defun dsd-raw-type (dsd)
   (acond ((dsd-raw-slot-data dsd) (raw-slot-data-raw-type it))
          (t)))
-(defun dsd-primitive-accessor (dsd &aux (rsd (dsd-raw-slot-data dsd)))
-  (if rsd (raw-slot-data-reader-name rsd) '%instance-ref))
+
+(defun dsd-reader (dsd funinstancep)
+  (acond ((dsd-raw-slot-data dsd)
+          (values (raw-slot-data-reader-name it) (raw-slot-data-writer-name it)))
+         (funinstancep
+          (values '%funcallable-instance-info '%set-funcallable-instance-info))
+         (t
+          (values '%instance-ref '%instance-set))))
 
 ;;;; typed (non-class) structures
 
@@ -368,9 +376,8 @@
   ;; that compare more than one word at a time.
   (collect ((group1) (group2) (group3))
     (mapc (lambda (dsd comparator)
-            (let* ((slot-key (cons dd dsd))
-                   (x (slot-access-transform :read '(a) slot-key))
-                   (y (slot-access-transform :read '(b) slot-key)))
+            (let ((x `(truly-the ,(dsd-type dsd) (,(dsd-reader dsd nil) a ,(dsd-index dsd))))
+                  (y `(truly-the ,(dsd-type dsd) (,(dsd-reader dsd nil) b ,(dsd-index dsd)))))
               (cond ((member comparator '(= char-equal))
                      (group1 `(,comparator ,x ,y))) ; bounded amount of testing
                     ((member comparator '(bit-vector-=))
@@ -1168,17 +1175,9 @@ unless :NAMED is also specified.")))
 (defun slot-access-transform (operation args slot-key &optional (fun-or-macro :macro))
   (binding* ((dd (car slot-key))
              (dsd (cdr slot-key))
+             ((reader writer) (dsd-reader dsd (neq (dd-type dd) 'structure)))
              (type-spec (dsd-type dsd))
-             (index (dsd-index dsd))
-             ((writer reader)
-              (acond ((dsd-raw-slot-data dsd)
-                      (values (raw-slot-data-writer-name it) (raw-slot-data-reader-name it)))
-                     (t
-                      (ecase (dd-type dd)
-                        (funcallable-structure
-                         (values '%set-funcallable-instance-info '%funcallable-instance-info))
-                        (structure
-                         (values '%instance-set '%instance-ref)))))))
+             (index (dsd-index dsd)))
     (ecase operation
       (:read
        (when (singleton-p args)
@@ -2256,7 +2255,7 @@ or they must be declared locally notinline at each call site.~@:>"
             (let ((slot-name (dsd-name dsd)))
               (when (or (memq slot-name slot-names)
                         (not slot-names-p))
-                (let* ((accessor (dsd-primitive-accessor dsd))
+                (let* ((accessor (dsd-reader dsd nil))
                        (index (dsd-index dsd))
                        (value (funcall accessor object index)))
                   (inits `(setf (,accessor ,object ,index) ',value))))))
