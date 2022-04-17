@@ -3755,8 +3755,16 @@ conservative_stack_scan(struct thread* th,
     // there's no need to call preserve_pointer on them since
     // they definitely don't point to the heap.
     // See the picture at create_thread_struct() as a reminder.
+#ifdef LISP_FEATURE_UNIX
     lispobj exclude_from = (lispobj)th->control_stack_start;
     lispobj exclude_to = (lispobj)th + dynamic_values_bytes;
+#define potential_heap_pointer(word) !(exclude_from <= word && word < exclude_to)
+#else
+    // We can't use the heuristic of excluding words that appear to point into
+    // 'struct thread' on win32 because ... I don't know why.
+    // See https://groups.google.com/g/sbcl-devel/c/8s7mrapq56s/m/UaAjYPqKBAAJ
+#define potential_heap_pointer(word) 1
+#endif
 
     lispobj* ptr;
     for (ptr = esp; ptr < th->control_stack_end; ptr++) {
@@ -3764,8 +3772,7 @@ conservative_stack_scan(struct thread* th,
         // Also note that we can eliminate small fixnums from consideration
         // since there is no memory on the 0th page.
         // (most OSes don't let users map memory there, though they used to).
-        if (word >= BACKEND_PAGE_BYTES &&
-            !(exclude_from <= word && word < exclude_to)) {
+        if (word >= BACKEND_PAGE_BYTES && potential_heap_pointer(word)) {
             preserve_pointer(word);
         }
     }
