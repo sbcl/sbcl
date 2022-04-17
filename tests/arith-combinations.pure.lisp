@@ -65,8 +65,10 @@
                                                                         c
                                                                         x))))))
                                                   (:no-error (x)
-                                                    (unless (eql x result)
-                                                      (error "~a = ~a /= ~a" (list* lambda args) x result))))))))))))))
+                                                    (if (typep result result-type)
+                                                        (unless (eql x result)
+                                                          (error "~a = ~a /= ~a" (list* lambda args) x result))
+                                                        (error "~a => ~a /= type error" (list* lambda args) x))))))))))))))
 
 (with-test (:name :overflow-arith)
   (test-ops '(+ - *)
