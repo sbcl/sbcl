@@ -286,9 +286,3 @@
 (defun node-value (node) (cdr (data node)))
 (sb-rbtree::define-search-methods < (= <= >=))
 (export '(find= find>= find<=))
-
-(eval-when (:compile-toplevel)
-  (do-all-symbols (s)
-    (let ((dd (sb-kernel:find-defstruct-description s nil)))
-      (when (and dd (not (sb-kernel::dd-null-lexenv-p dd)))
-        (format t "~&Jeez ~s~%" (sb-kernel:dd-name dd))))))
