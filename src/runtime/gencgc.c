@@ -4034,7 +4034,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (conservative_stack) {
         struct thread *th;
         for_each_thread(th) {
-#if defined(LISP_FEATURE_MIPS) || !defined(reg_CODE) // interrupt contexts already pinned everything they see
+#if !defined(LISP_FEATURE_MIPS) && defined(reg_CODE) // interrupt contexts already pinned everything they see
             scavenge_interrupt_contexts(th);
 #endif
             scavenge_control_stack(th);
