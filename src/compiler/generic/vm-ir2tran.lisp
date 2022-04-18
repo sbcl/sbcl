@@ -216,6 +216,9 @@
                   `(#-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))
 
+;;; FIXME: this causes emission of GC store barriers, but it should not.
+;;; The vector is freshly consed, so anything being stored into it
+;;; is at least as old.
 (defoptimizer (initialize-vector ir2-convert)
     ((vector &rest initial-contents) node block)
   (let* ((vector-ctype (lvar-type vector))
@@ -224,13 +227,14 @@
                         (bug "Unknown vector type in IR2 conversion for ~S."
                              'initialize-vector)))
          (bit-vector-p (type= elt-ctype (specifier-type 'bit)))
+         (simple-vector-p (type= elt-ctype (specifier-type 't)))
          (saetp (find-saetp-by-ctype elt-ctype))
          (lvar (node-lvar node))
          (locs (lvar-result-tns lvar (list vector-ctype)))
          (result (first locs))
          (elt-ptype (primitive-type elt-ctype))
          (tmp (make-normal-tn elt-ptype)))
-    (declare (ignorable bit-vector-p))
+    (declare (ignorable bit-vector-p simple-vector-p))
     (emit-move node block (lvar-tn node block vector) result)
     (flet ((compute-setter ()
              ;; Such cringe. I had no idea why all the "-C" vops were mandatory.
@@ -293,9 +297,14 @@
               ;; Nonetheless it's far better than it was. In all other scenarios, don't pass
               ;; a constant TN, because we don't know that generated code is better.
               (cond #+x86-64 ; still moar cringe
-                    ((and bit-vector-p (constant-lvar-p value))
+                    ((and (or bit-vector-p simple-vector-p) (constant-lvar-p value))
                      (funcall setter (tnify i) (emit-constant (lvar-value value))))
                     (t
+                     ;; FIXME: for simple-vector, fixnums should get stored via an ANY-REG
+                     ;; so that data-vector-set doesn't emit a store barrier.
+                     ;; (TMP is a descriptor-reg because ELT-CTYPE is T)
+                     ;; Or just fix this optimizer - as commented above - to somehow elide
+                     ;; the barrier for all elements.
                      (emit-move node block (lvar-tn node block value) tmp)
                      (funcall setter (tnify i) tmp))))))))
     (move-lvar-result node block locs lvar)))
