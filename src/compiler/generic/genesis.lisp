@@ -1723,10 +1723,10 @@ core and return a descriptor to it."
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
 (defun make-nil-descriptor ()
-  ;; 8 words prior to NIL is an array of two 'struct alloc_region'.
+  ;; 10 words prior to NIL is an array of three 'struct alloc_region'.
   ;; The lisp objects begin at STATIC_SPACE_OBJECTS_START.
   ;; See also (DEFCONSTANT NIL-VALUE) in early-objdef.
-  #+(and gencgc (not sb-thread)) (gspace-claim-n-words *static* 8)
+  #+(and gencgc (not sb-thread)) (gspace-claim-n-words *static* 10)
   #+64-bit (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
   (let* ((des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)

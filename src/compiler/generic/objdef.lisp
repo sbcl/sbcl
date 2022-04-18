@@ -495,17 +495,7 @@ during backtrace.
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
 
-  ;; Technically this slot violates our requirement that the size of the thread
-  ;; primitive object be computable by assuming one word per slot. POSIX says
-  ;; "IEEE Std 1003.1-2001/Cor 2-2004, item XBD/TC2/D6/26 is applied,
-  ;;  adding pthread_t to the list of types that are not required to be arithmetic
-  ;;  types, thus allowing pthread_t to be defined as a structure."
-  ;;
-  ;; Furthermore, it is technically possibly for a pthread_t to be smaller than a word
-  ;; (a 4-byte identifier, not a pointer, on 64-bit) but that seems not to be true
-  ;; for any system that we care about.
-  (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj" ; actually is HANDLE
-                     #-(or win32 (not sb-thread)) "pthread_t")
+  (stepping)
 
   ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
   ;; near the beginning of the structure so that x86[-64] assembly code
@@ -526,12 +516,12 @@ during backtrace.
                       :c-type "pa_bits_t")
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
-  (stepping)
   ;; Deterministic consing profile recording area.
   (profile-data :c-type "uword_t *" :pointer t)
   ;; Thread-local allocation buffers
-  #+gencgc (mixed-tlab :c-type "struct alloc_region" :length 4)
-  #+gencgc (cons-tlab :c-type "struct alloc_region" :length 4)
+  (boxed-tlab :c-type "struct alloc_region" :length 3)
+  (cons-tlab :c-type "struct alloc_region" :length 3)
+  (mixed-tlab :c-type "struct alloc_region" :length 3)
   ;; END of slots to keep near the beginning.
 
   ;; This is the original address at which the memory was allocated,
@@ -539,6 +529,17 @@ during backtrace.
   ;; Kept here so that when the thread dies we can release the whole
   ;; memory we reserved.
   (os-address :c-type "void *" :pointer t)
+  ;; Technically this slot violates our requirement that the size of the thread
+  ;; primitive object be computable by assuming one word per slot. POSIX says
+  ;; "IEEE Std 1003.1-2001/Cor 2-2004, item XBD/TC2/D6/26 is applied,
+  ;;  adding pthread_t to the list of types that are not required to be arithmetic
+  ;;  types, thus allowing pthread_t to be defined as a structure."
+  ;;
+  ;; Furthermore, it is technically possibly for a pthread_t to be smaller than a word
+  ;; (a 4-byte identifier, not a pointer, on 64-bit) but that seems not to be true
+  ;; for any system that we care about.
+  (os-thread :c-type #+(or win32 (not sb-thread)) "lispobj" ; actually is HANDLE
+                     #-(or win32 (not sb-thread)) "pthread_t")
   (os-kernel-tid) ; the kernel's thread identifier, 32 bits on linux
 
   ;; These aren't accessed (much) from Lisp, so don't really care
@@ -647,10 +648,11 @@ during backtrace.
 (defconstant nil-value
     (+ static-space-start
        ;; mixed_region precedes NIL
-       ;; 8 is the number of words to reserve at the beginning of static space
+       ;; 10 is the number of words to reserve at the beginning of static space
        ;; prior to the words of NIL.
-       ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
-       #+(and gencgc (not sb-thread) (not 64-bit)) (ash 8 word-shift)
+       ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis,
+       ;; and zero_all_free_ranges() in gencgc.
+       #+(and gencgc (not sb-thread) (not 64-bit)) (ash 10 word-shift)
        ;; This offset of #x100 has to do with some edge cases where a vop
        ;; might treat UNBOUND-MARKER as a pointer. So it has an address
        ;; that is somewhere near NIL which makes it sort of "work"
@@ -661,9 +663,12 @@ during backtrace.
        list-pointer-lowtag))
 
 ;;; MIXED-REGION is at the beginning of static space
+;;; Be sure to update "#define main_thread_mixed_region" etc
+;;; if these get changed.
 #-sb-thread
 (progn (defconstant mixed-region static-space-start)
-       (defconstant cons-region (+ mixed-region (* 4 n-word-bytes))))
+       (defconstant cons-region (+ mixed-region (* 3 n-word-bytes)))
+       (defconstant boxed-region (+ cons-region (* 3 n-word-bytes))))
 
 ;;; Start of static objects:
 ;;;

@@ -1011,7 +1011,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         // Don't need to set the scan_start_offset because free pages have it 0
         // (and each of these page types starts a new contiguous block)
         gc_dcheck(page_table[page].scan_start_offset_ == 0);
-        alloc_region->last_page = page;
         alloc_region->start_addr = page_address(page) + page_bytes_used(page);
         if (page_type == PAGE_TYPE_CONS) {
             alloc_region->end_addr = page_address(page) + CONS_PAGE_USABLE_BYTES;
@@ -1034,7 +1033,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
     et_find_freeish_page);
 
     /* Set up the alloc_region. */
-    alloc_region->last_page = last_page;
     alloc_region->start_addr = page_address(first_page) + page_bytes_used(first_page);
     alloc_region->free_pointer = alloc_region->start_addr;
     alloc_region->end_addr = page_address(last_page+1);
@@ -1252,7 +1250,8 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
     }
 
     /* Unallocate any unused pages. */
-    while (next_page <= alloc_region->last_page) {
+    page_index_t region_last_page = find_page_index((char*)alloc_region->end_addr-1);
+    while (next_page <= region_last_page) {
         gc_assert(page_words_used(next_page) == 0);
         reset_page_flags(next_page);
         next_page++;
@@ -1275,9 +1274,8 @@ gc_alloc_large(sword_t nbytes, int page_type, struct alloc_region *alloc_region,
     // not enough information. At best we can skip some work in only the case where
     // the supplied region was the one most recently created. To do this right
     // would entail a malloc-like allocator at the page granularity.
-    if (first_page <= alloc_region->last_page) {
-        first_page = alloc_region->last_page+1;
-    }
+    page_index_t min = find_page_index(alloc_region->end_addr);
+    if (first_page < min) first_page = min;
 
     INSTRUMENTING(
     last_page = gc_find_freeish_pages(&first_page, nbytes,
@@ -1560,8 +1558,10 @@ void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int 
             return new_obj;
         }
     }
-    __attribute__((unused)) page_index_t page = region->last_page;
-    gc_assert(page_table[page].type & OPEN_REGION_PAGE_FLAG);
+    __attribute__((unused)) page_index_t fpi = find_page_index(region->start_addr);
+    __attribute__((unused)) page_index_t lpi = find_page_index((char*)region->end_addr-1);
+    gc_assert(fpi == lpi);
+    gc_assert(page_table[fpi].type & OPEN_REGION_PAGE_FLAG);
     // Region is open, but card at free_pointer lacks sufficient space.
     // See if there's another card on the same page.
     char* page_base = PTR_ALIGN_DOWN(region->start_addr, GENCGC_PAGE_BYTES);
@@ -4392,6 +4392,7 @@ extern int finalizer_thread_runflag;
 # define THREAD_ALLOC_REGION(threadvar,slot) main_thread_ ##slot ##_region
 #define main_thread_mixed_region (struct alloc_region*)STATIC_SPACE_START
 #define main_thread_cons_region (1+main_thread_mixed_region)
+#define main_thread_boxed_region (2+main_thread_mixed_region)
 #endif
 
 /* GC all generations newer than last_gen, raising the objects in each
@@ -5232,12 +5233,10 @@ int gencgc_handle_wp_violation(void* fault_addr)
             lisp_backtrace(10);
             fprintf(stderr,
                     "Fault @ %p, page %"PAGE_INDEX_FMT" (~WP) mark=%#x\n"
-                    "  mixed_region.first_page: %"PAGE_INDEX_FMT","
-                    "  .last_page %"PAGE_INDEX_FMT"\n"
+                    "  mixed_region=%p:%p\n"
                     "  page.scan_start: %p .words_used: %u .type: %d .gen: %d\n",
                     fault_addr, page_index, mark,
-                    find_page_index(mixed_region->start_addr),
-                    mixed_region->last_page,
+                    mixed_region->start_addr, mixed_region->end_addr,
                     page_scan_start(page_index),
                     page_words_used(page_index),
                     page_table[page_index].type,
@@ -5266,6 +5265,14 @@ zero_all_free_ranges() /* called only by gc_and_save() */
         start += page_bytes_used(i);
         memset(start, 0, page_end-start);
     }
+#ifndef LISP_FEATURE_SB_THREAD
+    // zero the allocation regions at the start of static-space
+    // This gets a spurious warning:
+    //   warning: 'memset' offset [0, 71] is out of the bounds [0, 0] [-Warray-bounds]
+    // which 'volatile' works around.
+    char * volatile region = (char*)STATIC_SPACE_START;
+    bzero((char*)region, 3*sizeof (struct alloc_region));
+#endif
 }
 
 /* Things to do before doing a final GC before saving a core (without
@@ -5425,10 +5432,6 @@ gc_and_save(char *filename, boolean prepend_runtime,
     prepare_for_final_gc();
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
-#ifndef LISP_FEATURE_SB_THREAD // reset the first 8 words of static-space
-    gc_init_region(main_thread_mixed_region);
-    gc_init_region(main_thread_cons_region);
-#endif
     /* All global allocation regions should be empty */
     ASSERT_REGIONS_CLOSED();
     // Enforce (rather, warn for lack of) self-containedness of the heap
