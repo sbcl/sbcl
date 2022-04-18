@@ -3650,12 +3650,14 @@ static void semiconservative_pin_stack(struct thread* th,
 
 #if GENCGC_IS_PRECISE && !defined(reg_CODE)
 
+static int boxed_registers[] = BOXED_REGISTERS;
+
 /* Pin all (condemned) code objects pointed to by the chain of in-flight calls
  * based on scanning from the innermost frame pointer. This relies on an exact backtrace,
  * which some of our architectures have trouble obtaining. But it's theoretically
  * more efficient to do it this way versus looking at all stack words to see
  * whether each points to a code object. */
-static void pin_call_chain(struct thread* th) {
+static void pin_call_chain_and_boxed_registers(struct thread* th) {
     lispobj *cfp = access_control_frame_pointer(th);
 
     if (cfp) {
@@ -3672,6 +3674,10 @@ static void pin_call_chain(struct thread* th) {
     for (i = i - 1; i >= 0; --i) {
         os_context_t* context = nth_interrupt_context(i, th);
         maybe_pin_code((lispobj)*os_context_register_addr(context, reg_LR));
+
+        for (unsigned i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
+            pin_exact_root(*os_context_register_addr(context, boxed_registers[i]));
+        }
     }
 
 }
@@ -3945,7 +3951,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #elif defined REG_RA
             conservative_pin_code_from_return_addresses(th);
 #elif !defined(reg_CODE)
-            pin_call_chain(th);
+            pin_call_chain_and_boxed_registers(th);
 #endif
         }
     }
@@ -4028,7 +4034,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     if (conservative_stack) {
         struct thread *th;
         for_each_thread(th) {
-#ifndef LISP_FEATURE_MIPS // interrupt contexts already pinned everything they see
+#if defined(LISP_FEATURE_MIPS) || !defined(reg_CODE) // interrupt contexts already pinned everything they see
             scavenge_interrupt_contexts(th);
 #endif
             scavenge_control_stack(th);

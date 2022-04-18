@@ -2377,6 +2377,7 @@ scavenge_control_stack(struct thread *th)
     }
 }
 
+#ifndef REG_CODE
 /* Scavenging Interrupt Contexts */
 
 static int boxed_registers[] = BOXED_REGISTERS;
@@ -2555,17 +2556,6 @@ scavenge_interrupt_context(os_context_t * context)
 #endif
 
 #ifdef ARCH_HAS_LINK_REGISTER
-#ifndef reg_CODE
-    /* If LR points inside a code object, and there's no reg_CODE,
-       don't pair it with anything, as there is nothing valid to pair
-       LR with. On-stack code is pinned, so there is no need to fix up
-       LR */
-    int code_in_lr = 0;
-
-    if (dynamic_space_code_from_pc((char *)*os_context_register_addr(context, reg_LR))) {
-        code_in_lr = 1;
-    }
-#endif
     {
       PAIR_INTERIOR_POINTER(lr);
     }
@@ -2616,9 +2606,6 @@ scavenge_interrupt_context(os_context_t * context)
 #endif
 #ifdef ARCH_HAS_LINK_REGISTER
 
-#ifndef reg_CODE
-    if(!code_in_lr)
-#endif
     {
         FIXUP_INTERIOR_POINTER(lr);
     }
@@ -2648,6 +2635,7 @@ scavenge_interrupt_contexts(struct thread *th)
         scavenge_interrupt_context(context);
     }
 }
+#endif /* !REG_CODE */
 #endif /* x86oid targets */
 
 /* Our own implementation of heapsort, because some C libraries have a qsort()
