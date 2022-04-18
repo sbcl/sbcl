@@ -2377,7 +2377,7 @@ scavenge_control_stack(struct thread *th)
     }
 }
 
-#ifndef reg_CODE
+#ifdef reg_CODE
 /* Scavenging Interrupt Contexts */
 
 static int boxed_registers[] = BOXED_REGISTERS;
