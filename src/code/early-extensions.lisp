@@ -929,7 +929,121 @@ NOTE: This interface is experimental and subject to change."
             (unless sub-value (return (values nil t)))
             (setf certain? nil))))))
 
+;;;; DEFPRINTER
 
+;;; These functions are called by the expansion of the DEFPRINTER
+;;; macro to do the actual printing.
+(declaim (ftype (function (symbol t stream) (values))
+                defprinter-prin1 defprinter-princ))
+(defun defprinter-prin1 (name value stream)
+  (defprinter-prinx #'prin1 name value stream))
+(defun defprinter-princ (name value stream)
+  (defprinter-prinx #'princ name value stream))
+(defun defprinter-prinx (prinx name value stream)
+  (declare (type function prinx))
+  (when *print-pretty*
+    (pprint-newline :linear stream))
+  (format stream ":~A " name)
+  (funcall prinx value stream)
+  (values))
+(defun defprinter-print-space (stream)
+  (write-char #\space stream))
+
+(defvar *print-ir-nodes-pretty* nil)
+
+;;; Define some kind of reasonable PRINT-OBJECT method for a
+;;; STRUCTURE-OBJECT class.
+;;;
+;;; NAME is the name of the structure class, and CONC-NAME is the same
+;;; as in DEFSTRUCT.
+;;;
+;;; The SLOT-DESCS describe how each slot should be printed. Each
+;;; SLOT-DESC can be a slot name, indicating that the slot should
+;;; simply be printed. A SLOT-DESC may also be a list of a slot name
+;;; and other stuff. The other stuff is composed of keywords followed
+;;; by expressions. The expressions are evaluated with the variable
+;;; which is the slot name bound to the value of the slot. These
+;;; keywords are defined:
+;;;
+;;; :PRIN1    Print the value of the expression instead of the slot value.
+;;; :PRINC    Like :PRIN1, only PRINC the value
+;;; :TEST     Only print something if the test is true.
+;;;
+;;; If no printing thing is specified then the slot value is printed
+;;; as if by PRIN1.
+;;;
+;;; The structure being printed is bound to STRUCTURE and the stream
+;;; is bound to STREAM.
+;;;
+;;; If PRETTY-IR-PRINTER is supplied, the form is invoked when
+;;; *PRINT-IR-NODES-PRETTY* is true.
+(defmacro defprinter ((name
+                       &key
+                       (conc-name (concatenate 'simple-string
+                                               (symbol-name name)
+                                               "-"))
+                       identity
+                       pretty-ir-printer)
+                      &rest slot-descs)
+  (let ((first? t)
+        maybe-print-space
+        (reversed-prints nil))
+    (flet ((sref (slot-name)
+             `(,(symbolicate conc-name slot-name) structure)))
+      (dolist (slot-desc slot-descs)
+        (if first?
+            (setf maybe-print-space nil
+                  first? nil)
+            (setf maybe-print-space `(defprinter-print-space stream)))
+        (cond ((atom slot-desc)
+               (push maybe-print-space reversed-prints)
+               (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) stream)
+                     reversed-prints))
+              (t
+               (let ((sname (first slot-desc))
+                     (test t))
+                 (collect ((stuff))
+                   (do ((option (rest slot-desc) (cddr option)))
+                       ((null option)
+                        (push `(let ((,sname ,(sref sname)))
+                                 (when ,test
+                                   ,maybe-print-space
+                                   ,@(or (stuff)
+                                         `((defprinter-prin1
+                                             ',sname ,sname stream)))))
+                              reversed-prints))
+                     (case (first option)
+                       (:prin1
+                        (stuff `(defprinter-prin1
+                                  ',sname ,(second option) stream)))
+                       (:princ
+                        (stuff `(defprinter-princ
+                                  ',sname ,(second option) stream)))
+                       (:test (setq test (second option)))
+                       (t
+                        (error "bad option: ~S" (first option)))))))))))
+    (let ((normal-printer `(pprint-logical-block (stream nil)
+                             (print-unreadable-object (structure
+                                                       stream
+                                                       :type t
+                                                       :identity ,identity)
+                               ,@(nreverse reversed-prints))) ))
+      `(defmethod print-object ((structure ,name) stream)
+         ,(cond (pretty-ir-printer
+                 `(if *print-ir-nodes-pretty*
+                      ,pretty-ir-printer
+                      ,normal-printer))
+                (t
+                 normal-printer))))))
+
+;;; When cross-compiling, there is nothing out of the ordinary
+;;; about compilling a DEFUN wrapped in PRESERVING-HOST-FUNCTION,
+;;; so just remove the decoration.
+#-sb-xc-host
+(eval-when (:compile-toplevel)
+  (sb-xc:defmacro sb-cold:preserving-host-function (form) form))
+
+(sb-cold:preserving-host-function
 (defun print-symbol-with-prefix (stream symbol &optional colon at)
   "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from
   the current package."
@@ -938,9 +1052,10 @@ NOTE: This interface is experimental and subject to change."
   ;; keywords are always printed with colons, so this guarantees that the
   ;; symbol will not be printed without a prefix.
   (let ((*package* *keyword-package*))
-    (write symbol :stream stream :escape t)))
+    (write symbol :stream stream :escape t))))
 
 (declaim (special sb-pretty:*pprint-quote-with-syntactic-sugar*))
+(sb-cold:preserving-host-function
 (defun print-type-specifier (stream type-specifier &optional colon at)
   (declare (ignore colon at))
   ;; Binding *PPRINT-QUOTE-WITH-SYNTACTIC-SUGAR* prevents certain
@@ -956,10 +1071,11 @@ NOTE: This interface is experimental and subject to change."
   ;; specifiers.
   (let ((sb-pretty:*pprint-quote-with-syntactic-sugar* nil)
         (*package* *cl-package*))
-    (prin1 type-specifier stream)))
+    (prin1 type-specifier stream))))
 
+(sb-cold:preserving-host-function
 (defun print-type (stream type &optional colon at)
-  (print-type-specifier stream (type-specifier type) colon at))
+  (print-type-specifier stream (type-specifier type) colon at)))
 
 (defun print-lambda-list (stream lambda-list &optional colon at)
   (declare (ignore colon at))

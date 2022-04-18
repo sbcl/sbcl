@@ -95,6 +95,41 @@
 (compile 'hide-host-packages)
 (compile 'unhide-host-format-funs)
 
+;;; Macro invoked from 'src/code/early-extensions' to avoid clobbering
+;;; host functions that are potentially called from format strings.
+(export 'preserving-host-function)
+(defmacro preserving-host-function (defun)
+  (let ((name (second defun)))
+    `(progn
+       ;; Assume that this function got a definition from set-up-cold-packages
+       ;; and prevent a possible redefinition warning.
+       (fmakunbound ',name)
+       ,defun
+       (restore-host-function ',(string name)))))
+
+(defun restore-host-function (name)
+  (declare (ignorable name))
+  #+sbcl
+  (let ((host-fun (second (assoc name *host-format-functions* :test #'string=))))
+    (when host-fun
+      (if (string= name "PRINT-TYPE")
+          (let* ((our-fun (fdefinition (intern name "SB-IMPL")))
+                 (combined
+                  (lambda (stream object &rest rest)
+                    (let ((ours (typep object (find-symbol "CTYPE" "SB-KERNEL"))))
+                      (apply (if ours our-fun host-fun) stream object rest)))))
+            (dolist (entry *host-format-functions*)
+              (when (string= (car entry) 'print-type)
+                (let ((symbol (intern name (cddr entry))))
+                  ;; The parallelized build performs this twice: once from
+                  ;; interpreted load, again from compilation.
+                  ;; So don't wrap more than once.
+                  (unless (sb-impl::closurep (fdefinition symbol))
+                    (setf (fdefinition symbol) combined))))))
+          (dolist (entry *host-format-functions*)
+            (when (string= (car entry) name)
+              (setf (fdefinition (intern name (cddr entry))) host-fun)))))))
+
 ;;; an entry in the table which describes the non-standard part (i.e. not
 ;;; CL/CL-USER/KEYWORD) of the package structure of the SBCL system
 ;;;
