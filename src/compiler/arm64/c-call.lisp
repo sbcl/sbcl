@@ -200,7 +200,7 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
@@ -212,7 +212,7 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
@@ -282,13 +282,15 @@
   (:args (function :scs (sap-reg sap-stack))
          (args :more t))
   (:results (results :more t))
-  (:ignore args results)
+  (:ignore args results lr)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:temporary (:sc any-reg :offset r9-offset
                :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg :offset #+darwin r8-offset #-darwin r10-offset) temp)
   (:temporary (:sc any-reg :offset lexenv-offset) temp2)
-  (:temporary (:scs (interior-reg)) lip)
+
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:vop-var vop)
   (:generator 0
     (emit-c-call vop nfp-save temp temp2 lip cfunc function))
@@ -300,7 +302,7 @@
 (define-vop (call-out-named call-out)
   (:args (args :more t))
   (:info function variadic)
-  (:ignore args results variadic))
+  (:ignore args results variadic lr))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

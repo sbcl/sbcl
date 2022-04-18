@@ -274,7 +274,7 @@
   (:temporary (:sc descriptor-reg :offset r9-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset r0-offset) block)
   (:temporary (:sc descriptor-reg :offset lexenv-offset) lexenv)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
   (:temporary (:sc descriptor-reg :offset nargs-offset) nargs)
   (:vop-var vop)
   (:generator 22

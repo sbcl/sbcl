@@ -64,7 +64,7 @@
   (:results (y))
   (:note "float to pointer coercion")
   (:temporary (:sc non-descriptor-reg) flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:results (y :scs (descriptor-reg)))
   (:generator 13
    (with-fixed-allocation (y flag
@@ -167,7 +167,7 @@
   (:args (x :scs (complex-single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:note "complex single float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y pa-flag complex-single-float-widetag
@@ -182,7 +182,7 @@
   (:args (x :scs (complex-double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:note "complex double float to pointer coercion")
   (:generator 13
      (with-fixed-allocation (y pa-flag complex-double-float-widetag

@@ -37,7 +37,7 @@
          (new :scs (descriptor-reg any-reg)))
   (:info name offset lowtag)
   (:ignore name)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:results (result :scs (descriptor-reg any-reg) :from :load))
   (:generator 5
     (inst add-sub lip object (- (* offset n-word-bytes) lowtag))
@@ -241,7 +241,7 @@
   (:results (result :scs (descriptor-reg any-reg) :from :load))
   #+sb-thread
   (:temporary (:sc any-reg) tls-index)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
@@ -283,7 +283,7 @@
   (:results (result :scs (descriptor-reg any-reg) :from :load))
   #+sb-thread
   (:temporary (:sc any-reg) tls-index)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:policy :fast-safe)
   (:vop-var vop)
   (:guard (member :arm-v8.1 *backend-subfeatures*))
@@ -334,7 +334,7 @@
   (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg) :target result)
          (fdefn :scs (descriptor-reg)))
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
@@ -354,7 +354,7 @@
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
     (load-inline-constant temp '(:fixup undefined-tramp :assembly-routine) lip)
@@ -378,7 +378,7 @@
     (:temporary (:sc descriptor-reg :offset r8-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
     (:temporary (:sc non-descriptor-reg :offset nl1-offset) free-tls-index)
-    (:temporary (:sc interior-reg) lip)
+    (:temporary (:sc non-descriptor-reg :offset lr-offset) lip)
     (:ignore free-tls-index)
     (:temporary (:scs (any-reg)) bsp)
      (:generator 5
@@ -581,7 +581,7 @@
          (value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num *)
   (:temporary (:scs (non-descriptor-reg)) temp card)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 10
     (load-inline-constant temp `(:fixup "gc_card_table_mask" :foreign-dataref) lip)
@@ -668,7 +668,7 @@
          (diff :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
   (:temporary (:sc non-descriptor-reg) sum)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:generator 4
@@ -692,7 +692,7 @@
          (index :scs (any-reg))
          (diff :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:guard (member :arm-v8.1 *backend-subfeatures*))

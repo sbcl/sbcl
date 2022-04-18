@@ -30,7 +30,7 @@
 (define-vop (move-from-sap)
   (:args (sap :scs (sap-reg) :to :save))
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:results (res :scs (descriptor-reg)))
   (:note "SAP to pointer coercion")
   (:generator 20

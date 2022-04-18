@@ -17,7 +17,7 @@
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
   (:info star cons-cells)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
@@ -83,7 +83,7 @@
 (define-vop (make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:temporary (:sc non-descriptor-reg) pa-flag temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
   (:results (result :scs (descriptor-reg) :from :argument))
   (:policy :fast-safe)
   (:translate make-fdefn)
@@ -97,7 +97,7 @@
 (define-vop (make-closure)
   (:info label length stack-allocate-p)
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (let* ((size (+ length closure-info-offset))
@@ -117,7 +117,7 @@
 (define-vop (make-value-cell)
   (:args (value :to :save :scs (descriptor-reg any-reg)))
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
   (:info stack-allocate-p)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
@@ -137,7 +137,7 @@
 
 (define-vop (make-funcallable-instance-tramp)
   (:args)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg)) lip)
   (:results (result :scs (any-reg)))
   (:generator 1
     (load-inline-constant result '(:fixup funcallable-instance-tramp :assembly-routine) lip)))
@@ -148,7 +148,7 @@
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
   (:generator 4
     (with-fixed-allocation (result pa-flag type words
                             :lowtag lowtag
@@ -163,7 +163,7 @@
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (any-reg) :from :argument) bytes)
   (:temporary (:sc non-descriptor-reg) pa-flag header)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
   (:generator 6
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header

@@ -12,7 +12,6 @@
 
 (in-package "SB-VM")
 
-
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg) :target nl0))
   (:results (result :scs (descriptor-reg)))
@@ -20,7 +19,7 @@
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) nl0)
   (:temporary (:sc any-reg :offset r9-offset) cfunc)
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lip)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:vop-var vop)
   (:generator 100

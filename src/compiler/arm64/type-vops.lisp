@@ -256,7 +256,6 @@
   (:info target not-p)
   (:args-var args)
   (:policy :fast-safe)
-  (:temporary (:scs (interior-reg)) lip)
   (:variant-vars comparison)
   (:variant :gt)
   (:generator 10
@@ -321,8 +320,8 @@
             (inst cmp tmp-tn bignum-widetag)
             (inst b :ne nope))
           #.(assert (= (integer-length bignum-widetag) 5))
-          (inst add lip integer (lsr temp 5))
-          (inst ldr temp (@ lip (- other-pointer-lowtag)))
+          (inst add temp integer (lsr temp 5))
+          (inst ldr temp (@ temp (- other-pointer-lowtag)))
           (if (case comparison
                 ((:gt :ge) not-p)
                 (t (not not-p)))

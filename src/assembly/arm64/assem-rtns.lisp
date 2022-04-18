@@ -11,7 +11,7 @@
     ((:temp nvals any-reg nargs-offset)
      (:temp vals any-reg nl1-offset)
      (:temp old-fp any-reg nl2-offset)
-     (:temp lra interior-reg lr-offset)
+     (:temp lra non-descriptor-reg lr-offset)
 
      ;; These are just needed to facilitate the transfer
      (:temp count any-reg nl3-offset)
@@ -127,7 +127,7 @@
      (:temp dest any-reg nl2-offset) ;; Not live concurrent with ARGS.
      (:temp count any-reg nl3-offset)
      (:temp temp descriptor-reg r9-offset)
-     (:temp lip interior-reg lr-offset)
+     (:temp lr non-descriptor-reg lr-offset)
 
      ;; These are needed so we can get at the register args.
      (:temp r0 descriptor-reg r0-offset)
@@ -136,8 +136,8 @@
      (:temp r3 descriptor-reg r3-offset))
 
   (prepare-for-tail-call-variable nargs args count dest temp r0 r1 r2 r3)
-  (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump lip))
+  (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump lr))
 
 #+sb-assembling
 (define-assembly-routine
@@ -155,7 +155,7 @@
      (:temp dest any-reg nl2-offset) ;; Not live concurrent with ARGS.
      (:temp count any-reg nl3-offset)
      (:temp temp descriptor-reg r9-offset)
-     (:temp lip interior-reg lr-offset)
+     (:temp lr non-descriptor-reg lr-offset)
 
      ;; These are needed so we can get at the register args.
      (:temp r0 descriptor-reg r0-offset)
@@ -169,8 +169,8 @@
   (inst b :eq call)
   (inst b (entry-point-label 'tail-call-symbol))
   call
-  (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
-  (lisp-jump lip))
+  (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
+  (lisp-jump lr))
 
 #+sb-assembling
 (define-assembly-routine (call-symbol
@@ -251,7 +251,7 @@
      (:arg count (any-reg descriptor-reg) nargs-offset)
      (:temp ocfp any-reg ocfp-offset)
      (:temp cur-uwp any-reg nl2-offset)
-     (:temp lip interior-reg lr-offset)
+     (:temp lr non-descriptor-reg lr-offset)
      (:temp next-uwp any-reg nl3-offset)
      ;; for unbind-to-here
      (:temp where any-reg r1-offset)
@@ -282,13 +282,13 @@
   (loadw next-uwp cur-uwp unwind-block-uwp-slot)
   (store-tl-symbol-value next-uwp *current-unwind-protect-block*)
 
-  (loadw-pair cfp-tn unwind-block-cfp-slot lip unwind-block-entry-pc-slot cur-uwp)
+  (loadw-pair cfp-tn unwind-block-cfp-slot lr unwind-block-entry-pc-slot cur-uwp)
   (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
   (loadw-pair (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset)
               unwind-block-nfp-slot next-uwp unwind-block-nsp-slot cur-uwp)
   (inst mov-sp nsp-tn next-uwp)
-  (inst br lip)
+  (inst br lr)
   RET
   (inst ldr count (@ csp-tn -8 :pre-index))
   (inst ldp block start (@ csp-tn -16 :pre-index))
@@ -297,14 +297,14 @@
   DO-EXIT
   (loadw where block unwind-block-bsp-slot)
   (unbind-to-here where symbol value tmp-tn)
-  (loadw-pair cfp-tn unwind-block-cfp-slot lip unwind-block-entry-pc-slot block)
+  (loadw-pair cfp-tn unwind-block-cfp-slot lr unwind-block-entry-pc-slot block)
   (loadw next-uwp block unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
   (loadw-pair (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset)
               unwind-block-nfp-slot next-uwp unwind-block-nsp-slot block)
   (inst mov-sp nsp-tn next-uwp)
 
-  (inst br lip))
+  (inst br lr))
 
 (define-vop ()
   (:translate %continue-unwind)

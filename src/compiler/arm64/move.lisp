@@ -446,7 +446,7 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lip)
   (:note "signed word to integer coercion")
   (:generator 20
     (move x arg)
@@ -489,7 +489,7 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lip)
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move x arg)

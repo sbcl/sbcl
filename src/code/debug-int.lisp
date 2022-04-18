@@ -2463,7 +2463,7 @@ register."
       #-(or x86 x86-64)
       (#.sb-vm:non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
-      #-(or x86 x86-64)
+      #-(or x86 x86-64 arm64)
       (#.sb-vm:interior-reg-sc-number
        (error "Local interior register access?"))
       #+sb-simd-pack
@@ -2701,7 +2701,7 @@ register."
       #-(or x86 x86-64)
       (#.sb-vm:non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
-      #-(or x86 x86-64)
+      #-(or x86 x86-64 arm64)
       (#.sb-vm:interior-reg-sc-number
        (error "Local interior register access?"))
       #+sb-simd-pack

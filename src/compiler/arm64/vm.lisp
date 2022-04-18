@@ -186,10 +186,6 @@
   (non-descriptor-reg registers
                       :locations #.non-descriptor-regs)
 
-  ;; Pointers to the interior of objects.  Used only as a temporary.
-  (interior-reg registers
-                :locations (#.lr-offset))
-
   ;; **** Things that can go in the floating point registers.
 
   ;; Non-Descriptor single-floats.
@@ -242,9 +238,9 @@
   (defregtn zr any-reg)
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
-  (defregtn lr interior-reg)
+  (defregtn lr any-reg)
   #+sb-thread
-  (defregtn thread interior-reg))
+  (defregtn thread any-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.

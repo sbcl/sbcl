@@ -90,22 +90,20 @@
                          #+big-endian `(+ ,n-offset (1- n-word-bytes))))
       `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
 
-(defmacro lisp-jump (lip)
-  `(let ((lip ,lip))
-     (aver (sc-is lip interior-reg))
-     (inst add lip lip 4)
-     (inst br lip)))
+(defmacro lisp-jump (lr)
+  `(progn
+     (inst add ,lr ,lr 4)
+     (inst br ,lr)))
 
-(defmacro lisp-return (lip return-style)
+(defmacro lisp-return (lr return-style)
   "Return to RETURN-PC."
-  `(let* ((lip ,lip))
-     (aver (sc-is lip interior-reg))
+  `(progn
      ;; Indicate a single-valued return by clearing the Z flag
      ,@(ecase return-style
          (:single-value '((inst cmp null-tn 0)))
          (:multiple-values '((inst cmp zr-tn zr-tn)))
          (:known))
-     (inst ret lip)))
+     (inst ret ,lr)))
 
 ;;;; Stack TN's
 
@@ -136,7 +134,7 @@
   (once-only ((n-reg reg)
               (n-stack reg-or-stack))
     `(sc-case ,n-reg
-       ((any-reg descriptor-reg interior-reg)
+       ((any-reg descriptor-reg non-descriptor-reg)
         (sc-case ,n-stack
           ((any-reg descriptor-reg)
            (move ,n-reg ,n-stack))
@@ -352,7 +350,7 @@
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate)))
      (:arg-types ,type tagged-num)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
@@ -375,7 +373,7 @@
             (index :scs (any-reg immediate))
             (value :scs (,@scs zero)))
      (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 2
        (sc-case index
          (immediate
@@ -397,7 +395,7 @@
      (:arg-types ,type tagged-num)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 5
        ,@(multiple-value-bind (op shift)
              (ecase size
@@ -440,7 +438,7 @@
                    :load-if (not (and (sc-is value immediate)
                                       (eql (tn-value value) 0)))))
      (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 5
        (when (sc-is value immediate)
          (setf value zr-tn))
