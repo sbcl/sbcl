@@ -263,6 +263,7 @@
     (unless (sc-is (tn-ref-tn args) descriptor-reg control-stack)
       (setf args (tn-ref-across args)))
     (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
+           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args))
            negative-p
            (fixnum (if (sc-is fixnum immediate)
                        (let* ((value (fixnumize (tn-value fixnum)))
@@ -280,7 +281,7 @@
               (values target not-target))
         (assemble ()
           (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
-            (cond ((or integer-p
+            (cond ((or other-pointer-p
                        (not (and (eql fixnum 0)
                                  (eq comparison :ge))))
                    (inst tbnz integer 0 bignum)
@@ -312,7 +313,7 @@
                    (inst tst integer (lognot (fixnumize most-positive-fixnum)))
                    (inst b :eq yep))))
           bignum
-          (unless (fixnum-or-other-pointer-tn-ref-p args)
+          (unless other-pointer-p
             (test-type integer temp nope t (other-pointer-lowtag)))
           (loadw temp integer 0 other-pointer-lowtag)
           (unless integer-p
