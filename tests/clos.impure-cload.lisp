@@ -207,6 +207,6 @@
         ;; hide the slot name from the compiler so it doesn't optimize
         (slot-name (eval ''allegedly-immutable-slot)))
     (setf (slot-value myobj slot-name) :newval1)
-    (assert (= *compile-count* (1+ old-count)))
+    (assert (= *compile-count* old-count)) ; no compilation
     (setf (slot-value myobj slot-name) :newval2)
-    (assert (= *compile-count* (1+ old-count))))) ; same as before
+    (assert (= *compile-count* old-count)))) ; no compilation

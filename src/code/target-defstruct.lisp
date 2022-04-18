@@ -251,12 +251,27 @@
 (defun assign-equalp-impl (type-name function)
   (set-wrapper-equalp-impl (find-layout type-name) function))
 
-(defun %target-defstruct (dd equalp)
+;;; This variable is just a somewhat hokey way to pass additional
+;;; arguments to the defstruct hook (which renders the structure definition
+;;; into a CLOS class) without having to figure out some means of stashing
+;;; functions in the DD or DD for the structure.
+(defvar *struct-accesss-fragments* nil)
+(define-load-time-global *struct-accesss-fragments-delayed* nil)
+
+(defun !bootstrap-defstruct-hook (classoid)
+  ;; I hate this, but do whatever it takes...
+  ;; A better approach might be to write the correct data
+  ;; into the LAYOUT-SLOT-TABLE now.
+  ;; (I think that's where the code fragments end up)
+  (unless (member (classoid-name classoid) '(pathname condition)) ; KLUDGE
+    (push (cons (classoid-name classoid) *struct-accesss-fragments*)
+          *struct-accesss-fragments-delayed*)))
+
+(defun %target-defstruct (dd equalp &rest accessors)
   (declare (type defstruct-description dd))
 
   (when (dd-doc dd)
-    (setf (documentation (dd-name dd) 'structure)
-          (dd-doc dd)))
+    (setf (documentation (dd-name dd) 'structure) (dd-doc dd)))
 
   (let ((classoid (find-classoid (dd-name dd))))
     (let ((layout (classoid-wrapper classoid)))
@@ -289,11 +304,18 @@
                     (lambda (a b)
                       (sb-impl::instance-equalp* comparators a b)))))))
 
-    (when *type-system-initialized*
+    (let ((*struct-accesss-fragments* accessors))
       (dolist (fun *defstruct-hooks*)
         (funcall fun classoid))))
 
   (dd-name dd))
+(defun !target-defstruct-altmetaclass (dd &rest accessors)
+  (declare (type defstruct-description dd))
+  (let ((classoid (find-classoid (dd-name dd)))
+        (*struct-accesss-fragments* accessors))
+    (dolist (fun *defstruct-hooks*)
+      (funcall fun classoid)))
+  t)
 
 ;;; Similar to DO-INSTANCE-TAGGED-SLOT but iterating over all words.
 (defmacro do-layout-bitmap ((index-var taggedp-var layout count) &body guts)

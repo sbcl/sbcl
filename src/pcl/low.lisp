@@ -221,67 +221,6 @@
   (cond ((std-instance-p instance) (std-instance-slots instance))
         ((fsc-instance-p instance) (fsc-instance-slots instance))))
 
-;;;; structure-instance stuff
-;;;;
-;;;; FIXME: Now that the code is SBCL-only, this extra layer of
-;;;; abstraction around our native structure representation doesn't
-;;;; seem to add anything useful, and could probably go away.
-
-
-
-(defun uninitialized-accessor-function (type slotd)
-  (lambda (&rest args)
-    (declare (ignore args))
-    (error "~:(~A~) function~@[ for ~S ~] not yet initialized."
-           type slotd)))
-
-(defun structure-slotd-reader-function (slotd)
-  (let ((name (dsd-accessor-name slotd)))
-    (if (fboundp name)
-        (fdefinition name)
-        (uninitialized-accessor-function :reader slotd))))
-
-;;; Return a function to write the slot identified by SLOTD.
-;;; This is easy for read/write slots - we just return the accessor
-;;; that was already set up - but it requires work for read-only slots.
-;;; Basically we get the slotter-setter-lambda-form and compile it.
-;;; Using (COERCE lambda-form 'FUNCTION) as used to be done might produce
-;;; an interpreted function. I'm not sure whether that's right or wrong,
-;;; because if the DEFSTRUCT itself were evaluated, then the ordinary
-;;; accessors would indeed be interpreted. However if the DEFSTRUCT were
-;;; compiled, and the fasl loaded in a Lisp with *EVALUATOR-MODE* = :INTERPRET,
-;;; arguably this is against the expectation that all things got compiled.
-;;; But can people really expect that manipulating read-only slots
-;;; via (SETF SLOT-VALUE) should be fast?
-;;;
-;;; Damned-if-you-do / damned-if-you don't - the best thing would be to
-;;; compile all accessors at "really" compile-time but not store the writer
-;;; for a reaadonly slot under the #<fdefn> for #'(SETF slot-name).
-;;; FIXME: this is highly obfuscated and we should just do exactly what the
-;;; preceding comment suggests: compile all slot-writer frobs and attach
-;;; them to the defstruct-definition in %TARGET-DEFSTRUCT.
-(defun structure-slotd-writer-function (type slotd)
-  ;; TYPE is not used, because the DD is taken from runtime data.
-  (declare (ignore type))
-  (if (dsd-read-only slotd)
-      ;; We'd like to compile the writer just-in-time and store it
-      ;; back into the STRUCTURE-DIRECT-SLOT-DEFINITION and also
-      ;; the LAYOUT for the class, but we don't have a handle on
-      ;; any of the containing objects. So this has to be a closure.
-      (let ((setter 0))
-        (lambda (newval instance)
-          (if (eql setter 0)
-              (let* ((dd (wrapper-info (%instance-wrapper instance)))
-                     (f (pcl-compile (slot-setter-lambda-form dd slotd))))
-                (if (functionp f)
-                    (funcall (setq setter f) newval instance)
-                    (uninitialized-accessor-function :writer slotd)))
-              (funcall (truly-the function setter) newval instance))))
-      (let ((name `(setf ,(dsd-accessor-name slotd))))
-        (if (fboundp name)
-            (fdefinition name)
-            (uninitialized-accessor-function :writer slotd)))))
-
 (defun pcl-compile (expr &optional unsafe-policy)
   (let* ((base-policy sb-c::*policy*)
          (lexenv

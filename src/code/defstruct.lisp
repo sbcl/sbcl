@@ -241,6 +241,51 @@
 ;;; the source form to them directly.
 (defvar *dsd-source-form*)
 
+(defun accessor-definitions (dd defuns)
+  (if defuns
+      ;; Return the ordinary toplevel (usually, anyway) defuns
+      (loop for dsd in (dd-slots dd)
+            for accessor-name = (dsd-accessor-name dsd)
+            unless (accessor-inherited-data accessor-name dd)
+            nconc (dx-let ((key (cons dd dsd)))
+                    (let ((source-form (and (boundp '*dsd-source-form*)
+                                            (cdr (assq dsd *dsd-source-form*)))))
+                      `(,@(unless (dsd-read-only dsd)
+                            `((sb-c:xdefun (setf ,accessor-name) :accessor ,source-form (value instance)
+                                ,(slot-access-transform :setf '(instance value) key))))
+                        (sb-c:xdefun ,accessor-name :accessor ,source-form (instance)
+                                     ,(slot-access-transform :read '(instance) key))))))
+      ;; Return fragements of code that CLOS can use.
+      ;; We don't return the toplevel DEFUNs because those generally
+      ;; perform an unneeded type-check unless in safety 0.
+      ;; These lambdas don't need to check the instance
+      ;; because it was already subject to type-based dispatch.
+      ;; FIXME: it seems like all these fragments should be packed into a single codebob
+      ;; which will have less overhead than separate blobs.
+      ;; Afaict, the only way to do that is to return one lambda that returns all the lambdas.
+      (collect ((result))
+        (dolist (dsd (dd-slots dd) (result))
+          (binding* ((key (cons dd dsd))
+                     (name (string (dsd-name dsd))) ; anonymize by stringification
+                     ((reader writer) (dsd-reader dsd (neq (dd-type dd) 'structure))))
+            (declare (dynamic-extent key))
+            (result `(named-lambda (setf ,name) (#1=#:v #2=#:x)
+                       ,@(if (eql (dsd-type dsd) 't)
+                             ;; no typecheck
+                             `((,writer (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd) #1#) #1#)
+                             `(,(slot-access-transform :setf `(#1# (truly-the ,(dd-name dd) #2#))
+                                                       key :function))))
+                    `(named-lambda ,name (#2#)
+                       ,(if (and (dsd-always-boundp dsd) (dsd-safe-p dsd))
+                            ;; Most slots are always-boundp (don't have a BOA constructor
+                            ;; that omits slots) and safe-p (type-safe for reading),
+                            ;; so we can be concise rather than use SLOT-ACCESS-TRANSFORM
+                            ;; plus a rebinding of X with TRULY-THE.
+                            `(,reader (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd))
+                            ;; Don't check X, but do check the the fetched value.
+                            (slot-access-transform :read `((truly-the ,(dd-name dd) #2#))
+                                                   key)))))))))
+
 ;;; shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
 ;;; This monster has exactly one inline use in the final image,
@@ -340,7 +385,7 @@
                             ,@(awhen (dd-predicate-name dd)
                                 `((sb-c:xdefun ,(dd-predicate-name dd) :predicate nil (object)
                                     (typep object ',(dd-name dd)))))
-                            ,@(accessor-definitions dd))))
+                            ,@(accessor-definitions dd t))))
                      (if (and delayp (not (compiler-layout-ready-p name)))
                          `((sb-impl::%simple-eval ',(cons 'progn defuns)
                                                   (make-null-lexenv)))
@@ -352,7 +397,8 @@
                  ;; %TARGET-DEFSTRUCT returns NAME
                  (%target-defstruct ',dd
                                     ,(if optimize-speed
-                                         (gen-custom-equalp dd comparators))))))
+                                         (gen-custom-equalp dd comparators))
+                                    ,@(accessor-definitions dd nil)))))
          ;; Not DD-CLASS-P
          ;; FIXME: missing package lock checks
          `((eval-when (:compile-toplevel :load-toplevel :execute)
@@ -2053,19 +2099,6 @@ or they must be declared locally notinline at each call site.~@:>"
                          ;; because the container itself will check.
                          (if (eq type t) initform `(the ,type ,initform)))))
                  (dd-slots dd))))))))))
-
-(defun accessor-definitions (dd)
-  (loop for dsd in (dd-slots dd)
-        for accessor-name = (dsd-accessor-name dsd)
-        unless (accessor-inherited-data accessor-name dd)
-        nconc (dx-let ((key (cons dd dsd)))
-                (let ((source-form (and (boundp '*dsd-source-form*)
-                                        (cdr (assq dsd *dsd-source-form*)))))
-                  `(,@(unless (dsd-read-only dsd)
-                        `((sb-c:xdefun (setf ,accessor-name) :accessor ,source-form (value instance)
-                            ,(slot-access-transform :setf '(instance value) key))))
-                    (sb-c:xdefun ,accessor-name :accessor ,source-form (instance)
-                      ,(slot-access-transform :read '(instance) key)))))))
 
 ;;;; instances with ALTERNATE-METACLASS
 ;;;;
@@ -2169,11 +2202,14 @@ or they must be declared locally notinline at each call site.~@:>"
              (setf (info :type :kind ',class-name) :instance))
            ,@(when (eq metaclass-name 'static-classoid)
                `((declaim (freeze-type ,class-name)))))
-       ,@(accessor-definitions dd)
+       ,@(accessor-definitions dd t)
        ,@(when constructor
            (multiple-value-bind (allocate set-layout)
                (ecase dd-type
                  (structure
+                  ;; I think the only nonfuncallable alternate-metaclass structure
+                  ;; is CONDITION, which has its own fancy constructor.
+                  ;; Maybe this should be (bug "Can't happen") ?
                   (values `(%make-structure-instance-macro ,dd nil) nil))
                  (funcallable-structure
                   (values `(truly-the ,class-name
@@ -2186,7 +2222,11 @@ or they must be declared locally notinline at each call site.~@:>"
                  ,@(mapcar (lambda (dsd)
                              `(setf (,(dsd-accessor-name dsd) object) ,(dsd-name dsd)))
                            (dd-slots dd))
-                 object)))))))
+                 object))))
+       (!target-defstruct-altmetaclass ',dd ,@(accessor-definitions dd nil)))))
+#+sb-xc-host
+(defun !target-defstruct-altmetaclass (&rest args)
+  (declare (ignore args)))
 
 ;;;; finalizing bootstrapping
 

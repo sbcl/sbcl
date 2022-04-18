@@ -461,6 +461,11 @@
    (info
     :accessor slot-definition-info)))
 
+(defun uninitialized-accessor-function (type slotd)
+  (lambda (&rest args)
+    (declare (ignore args))
+    (error "~:(~A~) function~@[ for ~S ~] not yet initialized."
+           type slotd)))
 ;;; We use a structure here, because fast slot-accesses to this information
 ;;; are critical to making SLOT-VALUE-USING-CLASS &co fast: places that need
 ;;; these functions can access the SLOT-INFO directly, avoiding the overhead
