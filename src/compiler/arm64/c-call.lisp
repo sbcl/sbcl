@@ -242,7 +242,7 @@
 
         (loop for reg in (list r0-offset r1-offset r2-offset r3-offset
                                r4-offset r5-offset r6-offset r7-offset
-                               #-darwin r10-offset)
+                               #-darwin r8-offset)
               do
               (inst mov
                     (make-random-tn
@@ -266,7 +266,7 @@
                       nl4-offset nl5-offset nl6-offset nl7-offset nl8-offset nl9-offset
                       r0-offset r1-offset r2-offset r3-offset
                       r4-offset r5-offset r6-offset r7-offset
-                      #-darwin r10-offset
+                      #-darwin r8-offset
                       #-sb-thread r11-offset))
           (vars))
       (append
@@ -286,7 +286,7 @@
   (:temporary (:sc any-reg :offset r9-offset
                :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:sc any-reg :offset r8-offset) temp)
+  (:temporary (:sc any-reg :offset #+darwin r8-offset #-darwin r10-offset) temp)
   (:temporary (:sc any-reg :offset lexenv-offset) temp2)
   (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
