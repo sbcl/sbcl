@@ -36,6 +36,8 @@
 
 (defun !system-class-p (x) (typep x 'sb-pcl::system-class))
 
+(let ((c (find-class 't)))
+  (assert (not (slot-boundp c 'sb-pcl::prototype))))
 (let ((class (find-class 'sequence)))
   ;; Give the prototype a concrete prototype. It's an extra step because
   ;; SEQUENCE was removed from *built-in-classes*
