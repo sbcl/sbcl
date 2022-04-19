@@ -159,12 +159,12 @@
 ;;; P-A FLAG-TN is also acceptable here.
 
 #+gencgc
-(defun allocation-tramp (type alloc-tn size back-label lip)
+(defun allocation-tramp (type alloc-tn size back-label)
   (if (integerp size)
       (load-immediate-word tmp-tn size)
       (inst mov tmp-tn size))
   (let ((asm-routine (if (eq type 'list) 'list-alloc-tramp 'alloc-tramp)))
-    (load-inline-constant alloc-tn `(:fixup ,asm-routine :assembly-routine) lip))
+    (load-inline-constant alloc-tn `(:fixup ,asm-routine :assembly-routine)))
   (inst blr alloc-tn)
   (inst b back-label))
 
@@ -173,9 +173,8 @@
 (defun allocation (type size lowtag result-tn
                    &key flag-tn
                         stack-allocate-p
-                        (lip (if stack-allocate-p nil (missing-arg)))
                         overflow)
-  (declare (ignorable type lip))
+  (declare (ignorable type))
   ;; Normal allocation to the heap.
   (if stack-allocate-p
       (assemble ()
@@ -210,13 +209,11 @@
               (allocation-tramp type
                                 result-tn
                                 size
-                                BACK-FROM-ALLOC
-                                lip))))))
+                                BACK-FROM-ALLOC))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
                                                  stack-allocate-p
-                                                 (lip (missing-arg))
                                                  (store-type-code t))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
@@ -226,14 +223,12 @@
   initializes the object."
   (once-only ((result-tn result-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag)
-              (stack-allocate-p stack-allocate-p)
-              (lip lip))
+              (stack-allocate-p stack-allocate-p))
     `(pseudo-atomic (,flag-tn :sync ,type-code
                      :elide-if ,stack-allocate-p)
        (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
-                   :stack-allocate-p ,stack-allocate-p
-                   :lip ,lip)
+                   :stack-allocate-p ,stack-allocate-p)
        (when ,type-code
          (load-immediate-word ,flag-tn (compute-object-header ,size ,type-code))
          ,@(and store-type-code
@@ -470,11 +465,11 @@
                     (inst ,op
                           ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))))))))
 
-(defun load-inline-constant (dst value &optional lip)
+(defun load-inline-constant (dst value)
   (destructuring-bind (size . label) (register-inline-constant value)
     (ecase size
       (:qword
-       (inst load-from-label dst label lip)))))
+       (inst load-from-label dst label)))))
 
 ;;;
 

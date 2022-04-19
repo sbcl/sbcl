@@ -574,7 +574,7 @@
   (:temporary (:scs (descriptor-reg) :from :eval) temp)
   (:temporary (:scs (any-reg) :from :eval) dst)
   (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:sc non-descriptor-reg :offset lr-offset) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:results (result :scs (descriptor-reg)))
   (:policy :safe)
   (:node-var node)
@@ -601,12 +601,10 @@
                       (lambda ()
                         ;; The size will be computed by subtracting from CSP
                         (inst mov tmp-tn context)
-                        (load-inline-constant dst `(:fixup listify-&rest :assembly-routine)
-                                              lip)
-                        (inst blr dst)
+                        (load-inline-constant lr `(:fixup listify-&rest :assembly-routine))
+                        (inst blr lr)
                         (inst mov result tmp-tn)
-                        (inst b leave-pa))
-                      :lip lip))
+                        (inst b leave-pa))))
         (move result dst)
 
         (inst b ENTER)
@@ -1090,7 +1088,6 @@
   (:info fun-type)
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :from (:argument 1)) lexenv)
-  (:temporary (:scs (non-descriptor-reg)) lip)
   (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
   (:generator 75
@@ -1105,8 +1102,7 @@
     (load-inline-constant tmp-tn
                           (if (eq fun-type :function)
                               '(:fixup tail-call-variable :assembly-routine)
-                              '(:fixup tail-call-callable-variable :assembly-routine))
-                          lip)
+                              '(:fixup tail-call-callable-variable :assembly-routine)))
     (inst br tmp-tn)))
 
 ;;; Invoke the function-designator FUN.
@@ -1266,7 +1262,7 @@
     (move old-fp old-fp-arg)
     (move vals vals-arg)
     (move nvals nvals-arg)
-    (load-inline-constant tmp-tn '(:fixup return-multiple :assembly-routine) lr)
+    (load-inline-constant tmp-tn '(:fixup return-multiple :assembly-routine))
     (inst br tmp-tn)))
 
 ;;; Single-stepping

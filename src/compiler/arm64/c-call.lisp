@@ -200,11 +200,10 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:sc non-descriptor-reg) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (load-inline-constant res `(:fixup ,foreign-symbol :foreign) lip)))
+    (load-inline-constant res `(:fixup ,foreign-symbol :foreign))))
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
@@ -212,19 +211,18 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:scs (non-descriptor-reg)) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref) lip)
+    (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref))
     (inst ldr res (@ res))))
 
-(defun emit-c-call (vop nfp-save temp temp2 lip cfunc function)
+(defun emit-c-call (vop nfp-save temp temp2 cfunc function)
   (let ((cur-nfp (current-nfp-tn vop)))
     (when cur-nfp
       (store-stack-tn nfp-save cur-nfp))
     (if (stringp function)
-        (load-inline-constant cfunc `(:fixup ,function :foreign) lip)
+        (load-inline-constant cfunc `(:fixup ,function :foreign))
         (sc-case function
           (sap-reg (move cfunc function))
           (sap-stack
@@ -255,7 +253,7 @@
       #-sb-thread
       (progn
         temp2
-        (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
+        (load-inline-constant temp '(:fixup "call_into_c" :foreign))
         (inst blr temp))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
@@ -289,11 +287,9 @@
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg :offset #+darwin r8-offset #-darwin r10-offset) temp)
   (:temporary (:sc any-reg :offset lexenv-offset) temp2)
-
-  (:temporary (:scs (non-descriptor-reg)) lip)
   (:vop-var vop)
   (:generator 0
-    (emit-c-call vop nfp-save temp temp2 lip cfunc function))
+    (emit-c-call vop nfp-save temp temp2 cfunc function))
   .
   #. (destroyed-c-registers))
 

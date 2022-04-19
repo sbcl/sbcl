@@ -343,7 +343,7 @@
     (load-type type function (- fun-pointer-lowtag))
     (inst cmp type simple-fun-widetag)
     (inst b :eq SIMPLE-FUN)
-    (load-inline-constant lip '(:fixup closure-tramp :assembly-routine) lip)
+    (load-inline-constant lip '(:fixup closure-tramp :assembly-routine))
     SIMPLE-FUN
     (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -354,10 +354,9 @@
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:scs (non-descriptor-reg)) lip)
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (load-inline-constant temp '(:fixup undefined-tramp :assembly-routine) lip)
+    (load-inline-constant temp '(:fixup undefined-tramp :assembly-routine))
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)))
 
 
@@ -378,7 +377,7 @@
     (:temporary (:sc descriptor-reg :offset r8-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
     (:temporary (:sc non-descriptor-reg :offset nl1-offset) free-tls-index)
-    (:temporary (:sc non-descriptor-reg :offset lr-offset) lip)
+    (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
     (:ignore free-tls-index)
     (:temporary (:scs (any-reg)) bsp)
      (:generator 5
@@ -398,8 +397,8 @@
                  (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
                  (inst cbnz (32-bit-reg tls-index) TLS-INDEX-VALID)
                  (move alloc-tls-symbol symbol)
-                 (load-inline-constant value-temp '(:fixup alloc-tls-index :assembly-routine) lip)
-                 (inst blr value-temp)))
+                 (load-inline-constant lr '(:fixup alloc-tls-index :assembly-routine))
+                 (inst blr lr)))
           TLS-INDEX-VALID
           (inst ldr value-temp (@ thread-tn tls-index))
           (inst stp value-temp tls-index-reg
@@ -581,10 +580,9 @@
          (value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num *)
   (:temporary (:scs (non-descriptor-reg)) temp card)
-  (:temporary (:scs (non-descriptor-reg)) lip)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 10
-    (load-inline-constant temp `(:fixup "gc_card_table_mask" :foreign-dataref) lip)
+    (load-inline-constant temp `(:fixup "gc_card_table_mask" :foreign-dataref))
     (inst ldr temp (@ temp))
     (inst ldr (32-bit-reg temp) (@ temp)) ; 4-byte int
     (pseudo-atomic (pa-flag)
@@ -592,7 +590,7 @@
       (inst lsr card object gencgc-card-shift)
       (inst and card card temp)
       ;; Load mark table base
-      (load-inline-constant temp `(:fixup "gc_card_mark" :foreign-dataref) lip)
+      (load-inline-constant temp `(:fixup "gc_card_mark" :foreign-dataref))
       (inst ldr temp (@ temp))
       (inst ldr temp (@ temp))
       ;; Touch the card mark byte.

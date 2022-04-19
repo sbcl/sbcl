@@ -274,7 +274,7 @@
   (:temporary (:sc descriptor-reg :offset r9-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset r0-offset) block)
   (:temporary (:sc descriptor-reg :offset lexenv-offset) lexenv)
-  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:temporary (:sc descriptor-reg :offset nargs-offset) nargs)
   (:vop-var vop)
   (:generator 22
@@ -303,7 +303,7 @@
       (storew temp block catch-block-entry-pc-slot)
 
       ;; Run any required UWPs.
-      (load-inline-constant tmp-tn '(:fixup unwind :assembly-routine) lip)
+      (load-inline-constant tmp-tn '(:fixup unwind :assembly-routine))
       (inst br tmp-tn)
 
       (emit-label ENTRY-LABEL)
@@ -311,6 +311,6 @@
 
       (move lexenv saved-function)
 
-      (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
-      (lisp-jump lip))))
+      (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
+      (lisp-jump lr))))
 

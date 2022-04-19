@@ -22,7 +22,8 @@
   (:arg-types tagged-num tagged-num)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
   (:temporary (:sc non-descriptor-reg) pa-flag ndescr)
-  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
+  (:ignore lr)
   (:results (result :scs (descriptor-reg)))
   (:generator 5
     ;; Compute the allocation size.
@@ -31,7 +32,7 @@
                                lowtag-mask))
     (inst and ndescr ndescr (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation nil ndescr other-pointer-lowtag header :flag-tn pa-flag :lip lip)
+      (allocation nil ndescr other-pointer-lowtag header :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header
       ;; value.
       ;; See ENCODE-ARRAY-RANK.

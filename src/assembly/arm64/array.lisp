@@ -32,7 +32,7 @@
     (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
     (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
     (allocation nil ndescr other-pointer-lowtag result
-                :flag-tn pa-flag :lip nil) ;; keep LR intact as per above
+                :flag-tn pa-flag)
 
     (move lr lra-save)
     (inst lsr ndescr type n-fixnum-tag-bits)
