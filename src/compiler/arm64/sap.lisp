@@ -29,15 +29,13 @@
 ;;; Move an untagged SAP to a tagged representation.
 (define-vop (move-from-sap)
   (:args (sap :scs (sap-reg) :to :save))
-  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:ignore lr)
   (:results (res :scs (descriptor-reg)))
   (:note "SAP to pointer coercion")
   (:generator 20
-    (with-fixed-allocation (res pa-flag sap-widetag sap-size
+    (with-fixed-allocation (res lr sap-widetag sap-size
                             :store-type-code nil)
-      (storew-pair pa-flag 0 sap sap-pointer-slot tmp-tn))))
+      (storew-pair lr 0 sap sap-pointer-slot tmp-tn))))
 
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))

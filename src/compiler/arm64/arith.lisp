@@ -1406,9 +1406,8 @@
          (y :scs (signed-reg immediate)))
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg) high low)
-  (:temporary (:sc signed-reg :from (:argument 2)) header pa-flag)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:ignore lr)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -1433,7 +1432,7 @@
     (inst mov high 0)
     allocate
     (with-fixed-allocation
-        (r pa-flag nil (+ 2 bignum-digits-offset))
+        (r lr nil (+ 2 bignum-digits-offset))
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
@@ -1444,9 +1443,8 @@
          (y :scs (unsigned-reg immediate)))
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg) high low)
-  (:temporary (:sc unsigned-reg :from (:argument 2)) header pa-flag)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:ignore lr)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -1475,7 +1473,7 @@
     (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
-        (r pa-flag nil (+ 2 bignum-digits-offset))
+        (r lr nil (+ 2 bignum-digits-offset))
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
@@ -1486,9 +1484,8 @@
          (y :scs (signed-reg immediate)))
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg) high low)
-  (:temporary (:sc signed-reg :from (:argument 2)) header pa-flag)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:ignore lr)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -1507,7 +1504,7 @@
     (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
-        (r pa-flag nil (+ 2 bignum-digits-offset))
+        (r lr nil (+ 2 bignum-digits-offset))
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
@@ -1518,9 +1515,8 @@
          (y :scs (signed-reg immediate)))
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg) high low)
-  (:temporary (:sc signed-reg :from (:argument 2)) header pa-flag)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:ignore lr)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -1539,7 +1535,7 @@
     (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
-        (r pa-flag nil (+ 2 bignum-digits-offset))
+        (r lr nil (+ 2 bignum-digits-offset))
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
@@ -1550,9 +1546,8 @@
          (y :scs (unsigned-reg immediate)))
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg) high low)
-  (:temporary (:sc unsigned-reg :from (:argument 2)) header pa-flag)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:ignore lr)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -1569,7 +1564,7 @@
     (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
-        (r pa-flag nil (+ 2 bignum-digits-offset))
+        (r lr nil (+ 2 bignum-digits-offset))
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))
@@ -1580,9 +1575,8 @@
          (y :scs (unsigned-reg immediate)))
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg) high low)
-  (:temporary (:sc unsigned-reg :from (:argument 2)) header pa-flag)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
-  (:ignore lr)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -1603,7 +1597,7 @@
     (inst mov header (bignum-header-for-length 1))
     allocate
     (with-fixed-allocation
-        (r pa-flag nil (+ 2 bignum-digits-offset))
+        (r lr nil (+ 2 bignum-digits-offset))
       (storew-pair header 0 low bignum-digits-offset tmp-tn)
       (storew high tmp-tn 2))
     DONE))

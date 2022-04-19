@@ -227,11 +227,9 @@
   (:translate symbol-name)
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 5
-    (pseudo-atomic (pa-flag :sync nil)
-      (loadw result symbol symbol-name-slot other-pointer-lowtag)
-      (inst and result result (1- (ash 1 sb-impl::symbol-name-bits))))))
+    (loadw tmp-tn symbol symbol-name-slot other-pointer-lowtag)
+    (inst and result tmp-tn (1- (ash 1 sb-impl::symbol-name-bits)))))
 
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
