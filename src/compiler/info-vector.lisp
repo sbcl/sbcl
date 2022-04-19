@@ -90,8 +90,6 @@
 ;;;;; Some stuff moved from 'globaldb.lisp':
 
 ;;; The structure constructor is never called
-;;; Can't freeze theis type because INSTANCE-LENGTH is variable,
-;;; but freezing would make it constant henceforth.
 (sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil))
   cells)
 (declaim (freeze-type packed-info))
