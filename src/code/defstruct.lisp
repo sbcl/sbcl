@@ -1679,7 +1679,9 @@ or they must be declared locally notinline at each call site.~@:>"
     ;; as a pending-deletion flag. See "src/code/target-lflist.lisp")
     (when (dd-custom-gc-method-p dd)
       (aver (eq rest :unspecific))
-      (return-from calculate-dd-bitmap (values minimal-bitmap any-raw)))
+      ;; Pretend there are raw slots so that the layout
+      ;; does not get the STRICTLY-BOXED flag set.
+      (return-from calculate-dd-bitmap (values minimal-bitmap t)))
 
     ;; The minimal bitmap will have the least number of bits set, and the maximal
     ;; will have the most, but it is not always a performance improvement to prefer

@@ -32,6 +32,12 @@ PAGE_TYPE_EDEN_BOXED:
   - closure, value-cell, weak-pointer
   - simple-array, simple-vector-nil, simple-vector
   - complex-{base-string,character-string,bit-vector,vector,array}
+* Lockfree list nodes should be allowed on eden boxed pages,
+  but we need more flag bits: one bit which says whether it can
+  be initially allocated to BOXED (it won't contain random bits)
+  and one which says whether it may be transported to BOXED.
+  Generations > 1 do not use scavenge methods on BOXED pages,
+  so it would not be allowed to have a list node there.
 * Differs from BOXED in that ordinary BOXED may not contain
   any object that demands a type-specific scavenge method.
 

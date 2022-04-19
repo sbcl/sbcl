@@ -1,9 +1,13 @@
 (in-package "SB-LOCKLESS")
 
-#-gencgc (sb-ext:exit :code 104)
+(test-util:with-test (:name :layout-bits)
+  (dolist (type '(list-node keyed-node))
+    (assert (eq (sb-kernel::dd-%element-type
+                 (sb-kernel:find-defstruct-description type))
+                '*))
+    (assert (not (logtest (sb-kernel:wrapper-flags (find-layout type))
+                          sb-kernel::+strictly-boxed-flag+)))))
 
-(assert (not (logtest (sb-kernel:wrapper-flags (find-layout 'keyed-node))
-                      sb-kernel::+strictly-boxed-flag+)))
 
 ;;; Make sure no promotions occur so that objects will be movable
 ;;; throughout these tests.
