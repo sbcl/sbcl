@@ -270,15 +270,14 @@ static inline struct bitmap get_layout_bitmap(struct layout* layout)
     struct bitmap bitmap;
     const int layout_id_vector_fixed_capacity = 7;
 #ifdef LISP_FEATURE_64_BIT
-    sword_t depthoid = layout->flags;
+    sword_t depthoid = layout->sw_flags;
     // Depthoid is stored in the upper 4 bytes of 'flags', as a fixnum.
     depthoid >>= (32 + N_FIXNUM_TAG_BITS);
     int extra_id_words =
       (depthoid > layout_id_vector_fixed_capacity) ?
       ALIGN_UP(depthoid - layout_id_vector_fixed_capacity, 2) / 2 : 0;
 #else
-    sword_t depthoid = layout->depthoid;
-    depthoid >>= N_FIXNUM_TAG_BITS;
+    sword_t depthoid = fixnum_value(layout->depthoid);
     int extra_id_words = (depthoid > layout_id_vector_fixed_capacity) ?
       depthoid - layout_id_vector_fixed_capacity : 0;
 #endif
@@ -484,7 +483,7 @@ static inline int instanceoid_length(lispobj header) {
 #endif
 
 static inline int layout_depth2_id(struct layout* layout) {
-    int32_t* vector = (int32_t*)&layout->id_word0;
+    int32_t* vector = (int32_t*)&layout->uw_id_word0;
     return vector[0];
 }
 // Keep in sync with hardwired IDs in src/compiler/generic/genesis.lisp

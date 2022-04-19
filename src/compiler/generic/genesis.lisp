@@ -3363,9 +3363,12 @@ lispobj symbol_package(struct symbol*);~%")
       (dolist (slot (dd-slots dd))
         (let ((cell (aref names (- (dsd-index slot) sb-vm:instance-data-start)))
               (name (cstring (dsd-name slot))))
-          (if (member (dsd-raw-type slot) '(t sb-vm:word sb-vm:signed-word))
-              (rplaca cell name)
-              (rplacd cell name))))
+          (case (dsd-raw-type slot)
+            ((t) (rplaca cell name))
+            ;; remind C programmers which slots are untagged
+            (sb-vm:signed-word (rplaca cell (format nil "sw_~a" name)))
+            (sb-vm:word (rplaca cell (format nil "uw_~a" name)))
+            (t (rplacd cell name)))))
       (loop for slot across names
             do (format t "    lispobj ~A;~@[ // ~A~]~%"
                        ;; reserved word

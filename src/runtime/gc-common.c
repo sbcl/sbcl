@@ -403,6 +403,12 @@ trans_code(struct code *code)
     return new_code;
 }
 
+#ifdef LISP_FEATURE_64_BIT
+# define layout_flags(x) x->sw_flags
+#else
+# define layout_flags(x) x->uw_flags
+#endif
+
 static sword_t
 scav_fun_pointer(lispobj *where, lispobj object)
 {
@@ -425,7 +431,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
              * except for the trampoline, which points to an asm routine.
              * This is not true for self-contained trampoline GFs though. */
             struct layout* layout = (void*)native_pointer(funinstance_layout(FUNCTION(object)));
-            if (layout && (layout->flags & STRICTLY_BOXED_FLAG)) // 'flags' is a raw slot
+            if (layout && (layout_flags(layout) & STRICTLY_BOXED_FLAG))
                 page_type = PAGE_TYPE_BOXED, region = boxed_region;
         } else {
             /* Closures can always go on strictly boxed pages even though the
@@ -544,7 +550,7 @@ static inline lispobj copy_instance(lispobj object)
             && bitmap.nwords == 1)
             page_type = PAGE_TYPE_UNBOXED, region = unboxed_region;
         else if (original_length < words_per_card &&
-                 (layout->flags & STRICTLY_BOXED_FLAG)) // 'flags' is a raw slot
+                 (layout_flags(layout) & STRICTLY_BOXED_FLAG))
             page_type = PAGE_TYPE_BOXED, region = boxed_region;
     }
 #endif
@@ -831,15 +837,15 @@ scav_instance(lispobj *where, lispobj header)
     // writing it back if and only if it changed.
     lispobj layoutptr = instance_layout(where);
     if (!layoutptr) return total_nwords; // instance can't point to any data yet
-    struct layout *layout = LAYOUT(layoutptr);
 #ifdef LISP_FEATURE_METASPACE
+    struct layout *layout = LAYOUT(layoutptr); // layouts never move in metaspace
     scav1(&layout->friend, layout->friend);
 #else
     lispobj old = layoutptr;
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) instance_layout(where) = layoutptr;
+    struct layout *layout = LAYOUT(layoutptr);
 #endif
-    layout = LAYOUT(layoutptr); // in case it was adjusted in !METASPACE
     struct bitmap bitmap = get_layout_bitmap(layout);
     sword_t mask = bitmap.bits[0]; // there's always at least 1 bitmap word
 
@@ -2119,7 +2125,7 @@ static boolean can_invoke_post_gc(__attribute__((unused)) struct thread* th,
     /* If the SB-THREAD:THREAD has a 0 for its 'struct thread', give up.
      * This is the same as the THREAD-ALIVE-P test.  Maybe a thread that is
      * in the process of un-setting that slot performed this GC. */
-    if (!lispthread->primitive_thread) return 0;
+    if (!lispthread->uw_primitive_thread) return 0;
 
     /* I don't know why we aren't in general willing to run post-GC with some or all
      * deferrable signals blocked. "Obviously" the idea is to run post-GC code only in
