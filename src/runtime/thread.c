@@ -1109,7 +1109,7 @@ uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
                      CREATE_SUSPENDED, &tid);
     boolean success = th->os_thread != 0;
     if (success) {
-        instance->primitive_thread = (lispobj)th;
+        instance->uw_primitive_thread = (lispobj)th;
         th->os_kernel_tid = tid;
         ResumeThread((HANDLE)th->os_thread);
     } else {
@@ -1298,7 +1298,7 @@ void wake_thread(struct thread_instance* lispthread)
          * that leave_region safepoint will acknowledge the signal, so
          * there is no need to take locks, roll thread to safepoint
          * etc. */
-        struct thread* thread = (void*)lispthread->primitive_thread;
+        struct thread* thread = (void*)lispthread->uw_primitive_thread;
         if (thread == get_sb_vm_thread()) {
             sb_pthr_kill(thread, 1); // can't fail
             check_pending_thruptions(NULL);
@@ -1318,7 +1318,7 @@ void wake_thread(struct thread_instance* lispthread)
 #elif defined LISP_FEATURE_SB_SAFEPOINT
     wake_thread_impl(lispthread);
 #else
-    pthread_kill(lispthread->os_thread, SIGURG);
+    pthread_kill(lispthread->uw_os_thread, SIGURG);
 #endif
 }
 #endif
