@@ -50,7 +50,7 @@
          (nwords (+ fixed-words extra-id-words bitmap-words))
          (layout
           (truly-the sb-vm:layout
-                     #-(or metaspace immobile-space) (%make-instance nwords)
+                     #-(or metaspace immobile-space) (%make-instance/mixed nwords)
                      #+metaspace (sb-vm::allocate-metaspace-chunk (1+ nwords))
                      #+(and immobile-space (not metaspace))
                      (sb-vm::alloc-immobile-fixedobj

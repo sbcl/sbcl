@@ -438,7 +438,7 @@ write_generation_stats(FILE *file)
             "Gen  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
             " Waste%%       Alloc        Trig   Dirty GCs Mem-age\n");
 
-    generation_index_t i, begin, end;
+    generation_index_t gen_num, begin, end;
     // Print from the lowest gen that has any allocated pages.
     for (begin = 0; begin <= PSEUDO_STATIC_GENERATION; ++begin)
         if (generations[begin].bytes_allocated) break;
@@ -448,13 +448,13 @@ write_generation_stats(FILE *file)
 
     page_index_t coltot[9];
     memset(coltot, 0, sizeof coltot);
-    for (i = begin; i <= end; i++) {
+    for (gen_num = begin; gen_num <= end; gen_num++) {
         page_index_t page;
         page_index_t pagect[9];
 
         memset(pagect, 0, sizeof pagect);
         for (page = 0; page < next_free_page; page++)
-            if (!page_free_p(page) && page_table[page].gen == i) {
+            if (!page_free_p(page) && page_table[page].gen == gen_num) {
                 int column;
                 switch (page_table[page].type & (SINGLE_OBJECT_FLAG|PAGE_TYPE_MASK)) {
                 case PAGE_TYPE_BOXED:   column = 0; break;
@@ -471,25 +471,25 @@ write_generation_stats(FILE *file)
                 pagect[column]++;
                 coltot[column]++;
             }
-        struct generation* gen = &generations[i];
-        gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
+        struct generation* gen = &generations[gen_num];
+        gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(gen_num));
         page_index_t tot_pages, n_dirty;
-        tot_pages = count_generation_pages(i, &n_dirty);
-        uword_t waste = npage_bytes(tot_pages) - generations[i].bytes_allocated;
+        tot_pages = count_generation_pages(gen_num, &n_dirty);
+        uword_t waste = npage_bytes(tot_pages) - generations[gen_num].bytes_allocated;
         double pct_waste = tot_pages > 0 ?
           (double)waste / (double)npage_bytes(tot_pages) * 100 : 0.0;
         fprintf(file,
                 " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT" %6.1f %11"OS_VM_SIZE_FMT" %11"OS_VM_SIZE_FMT,
-                i,
+                gen_num,
                 pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
                 pagect[6], pagect[7], pagect[8],
                 pct_waste, (uintptr_t)gen->bytes_allocated,
                 (uintptr_t)gen->gc_trigger);
         // gen0 pages are never WPed
-        fprintf(file, i==0?"       -" : " %7"PAGE_INDEX_FMT, n_dirty);
-        fprintf(file, " %3d %7.4f\n", gen->num_gc, generation_average_age(i));
+        fprintf(file, gen_num==0?"       -" : " %7"PAGE_INDEX_FMT, n_dirty);
+        fprintf(file, " %3d %7.4f\n", gen->num_gc, generation_average_age(gen_num));
     }
     double frac = 100 * (double)bytes_allocated / (double)dynamic_space_size;
     fprintf(file,
@@ -684,7 +684,7 @@ static inline void zero_pages(page_index_t start, page_index_t end) {
 #ifdef LISP_FEATURE_DARWIN_JIT
         zero_range_with_mmap(page_address(start), npage_bytes(1+end-start));
 #else
-    fast_bzero(page_address(start), npage_bytes(1+end-start));
+        fast_bzero(page_address(start), npage_bytes(1+end-start));
 #endif
 }
 /* Zero the address range from START up to but not including END */
@@ -693,22 +693,9 @@ static inline void zero_range(char* start, char* end) {
         fast_bzero(start, end-start);
 }
 
-// A robustness testing flag: when true, pages claimed for purpose of the current
-// GC cycle are prefilled with garbage bytes instead of zeroes.
-// This is fine for GC because it always uses memcpy() from the old data.
-// Lisp never directly requests unboxed pages, so this is always acceptable
-// on unboxed pages. Lisp does directly request pages of code, but the code allocator
-// is compatible with the non-prezeroing convention.
-// The last case is boxed pages- we can only do this on boxed pages that will be
-// consumed by GC and only by GC (i.e. not pages that were either directly
-// allocated by lisp, or whose tail could be picked up by lisp)
-// This could be made to work for those pages as well if we remember which pages
-// haven't been fully used prior to returning to lisp, and then zero-filling
-// any unused bytes just in case lisp picks up the remaining part of the page.
-char gc_allocate_dirty = 0;
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
-static const char * const page_type_description[8] =
+__attribute__((unused)) static const char * const page_type_description[8] =
   {0, "unboxed", "boxed", "mixed", "sm_mix", "cons", "?", "code"};
 
 /* Zero the pages from START to END (inclusive), except for those
@@ -740,29 +727,7 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
         (page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0;
 #endif
 
-    if (gc_allocate_dirty) { // For testing only
-#ifdef LISP_FEATURE_64_BIT
-        lispobj word = 0x100 | 5;
-#else
-        lispobj word = 0x100 | 2;
-#endif
-        if (must_zero)
-            for (i = start; i <= end; i++)
-                zero_pages(i, i);
-        else
-            for (i = start; i <= end; i++) {
-                // Write every word with a widetag which if scavenged inavertentiy would call scav_lose().
-                // This is purely for testing that the lisp side can deal with unzeroed code pages.
-                // Non-code unboxed pages won't been seen by lisp allocation routines.
-                lispobj *where = (lispobj*)page_address(i);
-                lispobj *limit = (lispobj*)((char*)where + GENCGC_PAGE_BYTES);
-                if (gc_allocate_dirty > 1)
-                    fprintf(stderr, "dirtying g%d %s %d (%p..%p) [%d->%d]\n",
-                            gc_alloc_generation, page_type_description[page_type],
-                            (int)i, where, limit, from_space, new_space);
-                while (where < limit) *where++ = word;
-            }
-    } else if (must_zero) {
+    if (must_zero) {
         // look for contiguous ranges. This is probably without merit, since bzero
         // does not go significantly faster for 2 pages than for 1 page and 1 page.
         for (i = start; i <= end; i++) {
