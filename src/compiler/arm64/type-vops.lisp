@@ -174,6 +174,15 @@
           (inst b (if not-p :ne :eq) target))))
     not-target))
 
+(define-vop (signed-byte-64-p/unsigned)
+  (:args (value :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:conditional :eq)
+  (:policy :fast-safe)
+  (:translate signed-byte-64-p)
+  (:generator 5
+    (inst tst value (ash 1 (1- n-word-bits)))))
+
 ;;; An (UNSIGNED-BYTE 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
@@ -195,7 +204,7 @@
                 (fixnum-p
                  (move temp value)))
           (when fixnum-p
-           (%test-fixnum temp nil fixnum nil))
+            (%test-fixnum temp nil fixnum nil))
           (unless other-pointer-p
             (inst cmp (32-bit-reg temp) other-pointer-lowtag)
             (inst b :ne nope))
@@ -225,7 +234,7 @@
       (values))
     NOT-TARGET))
 
-(define-vop (fixnump/unsigned-byte-64)
+(define-vop (fixnump/unsigned)
   (:policy :fast-safe)
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
@@ -236,7 +245,7 @@
                                    n-positive-fixnum-bits)))
                      n-positive-fixnum-bits))))
 
-(define-vop (fixnump/signed-byte-64)
+(define-vop (fixnump/signed)
   (:args (value :scs (signed-reg)))
   (:policy :fast-safe)
   (:conditional :vc)
