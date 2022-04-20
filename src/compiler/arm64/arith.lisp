@@ -980,6 +980,52 @@
 (define-conditional-vop > :gt :hi)
 (define-conditional-vop eql :eq :eq)
 
+(define-vop (<-unsigned-signed)
+  (:translate <)
+  (:args (unsigned :scs (unsigned-reg))
+         (signed :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num)
+  (:conditional :lo)
+  (:policy :fast-safe)
+  (:generator 7
+    (inst cmp signed 0)
+    (inst ccmp unsigned signed :ge #b0010)))
+
+(define-vop (>-unsigned-signed <-unsigned-signed)
+  (:translate >)
+  (:conditional :hi))
+
+(define-vop (<-signed-unsigned)
+  (:translate <)
+  (:args (signed :scs (signed-reg))
+         (unsigned :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:conditional :lo)
+  (:policy :fast-safe)
+  (:generator 7
+    (inst cmp signed 0)
+    (inst ccmp signed unsigned :ge #b0000)))
+
+(define-vop (>-signed-unsigned <-signed-unsigned)
+  (:translate >)
+  (:conditional :hi))
+
+(define-vop (eql-unsigned-signed)
+  (:translate eql)
+  (:args (unsigned :scs (unsigned-reg))
+         (signed :scs (signed-reg)))
+  (:arg-types unsigned-num signed-num)
+  (:conditional :eq)
+  (:policy :fast-safe)
+  (:generator 7
+    (inst cmp signed 0)
+    (inst ccmp unsigned signed :ge #b0000)))
+
+(define-vop (eql-signed-unsigned eql-unsigned-signed)
+  (:args (signed :scs (signed-reg))
+         (unsigned :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num))
+
 (define-vop (generic-eql/fixnum fast-if-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg))
          (y :scs (any-reg)))
