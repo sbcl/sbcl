@@ -129,7 +129,7 @@
   (:conditional :eq)
   (:policy :fast-safe)
   (:translate eq)
-  (:generator 6
+  (:generator 7
     (let ((value (sc-case y
                    (immediate
                     (let ((value (tn-value y)))

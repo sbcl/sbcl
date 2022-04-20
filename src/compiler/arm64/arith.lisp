@@ -1026,6 +1026,14 @@
          (unsigned :scs (unsigned-reg)))
   (:arg-types signed-num unsigned-num))
 
+(define-vop (eq-unsigned-signed eql-unsigned-signed)
+  (:variant-cost 6)
+  (:translate eq))
+
+(define-vop (eq-signed-unsigned eql-signed-unsigned)
+  (:variant-cost 6)
+  (:translate eq))
+
 (define-vop (generic-eql/fixnum fast-if-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg))
          (y :scs (any-reg)))
