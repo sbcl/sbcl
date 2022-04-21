@@ -1208,6 +1208,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
   (:use "CL" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM" "SB-C"
         "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS")
   (:import-from "SB-VM" "+FIXUP-KINDS+")
+  (:import-from "SB-IMPL" "MAKE-DEFERRED-PACKAGE" "WITH-DEFERRED-PACKAGE-NAMES")
   (:export "*ASSEMBLER-ROUTINES*"
            "GET-ASM-ROUTINE"
            "+BACKEND-FASL-FILE-IMPLEMENTATION+"

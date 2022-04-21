@@ -1072,13 +1072,6 @@ necessary, since type inference may take arbitrarily long to converge.")
           (if (eq (block-compile *compilation*) t)
               (push tll (toplevel-lambdas *compilation*))
               (compile-toplevel (list tll) nil))
-          (when (consp form)
-            (case (car form)
-              ;; Block compilation can cause packages to be defined after
-              ;; they are referenced at load time, so we have to delimit the
-              ;; current block compilation.
-              ((sb-impl::%defpackage)
-               (delimit-block-compilation))))
           nil))))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
@@ -1702,13 +1695,6 @@ necessary, since type inference may take arbitrarily long to converge.")
         (setf (toplevel-lambdas compilation) nil))
       (setf (block-compile compilation) :specified)
       (setf (entry-points compilation) nil))))
-
-(defun delimit-block-compilation ()
-  (let ((compilation *compilation*))
-    (when (block-compile compilation)
-      (when (toplevel-lambdas compilation)
-        (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil)
-        (setf (toplevel-lambdas compilation) nil)))))
 
 (declaim (ftype function handle-condition-p))
 (flet ((get-handled-conditions ()

@@ -746,12 +746,13 @@
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
   (let ((fasl-input (make-fasl-input stream print)))
-    (unwind-protect
-         (loop while (load-fasl-group fasl-input))
-      ;; Nuke the table and stack to avoid keeping garbage on
-      ;; conservatively collected platforms.
-      (nuke-fop-vector (%fasl-input-table fasl-input))
-      (nuke-fop-vector (%fasl-input-stack fasl-input))))
+    (with-deferred-package-names
+      (unwind-protect
+           (loop while (load-fasl-group fasl-input))
+        ;; Nuke the table and stack to avoid keeping garbage on
+        ;; conservatively collected platforms.
+        (nuke-fop-vector (%fasl-input-table fasl-input))
+        (nuke-fop-vector (%fasl-input-stack fasl-input)))))
   t)
 
 
@@ -840,10 +841,6 @@
 
 ;;;; fops for loading symbols
 
-(defstruct (undefined-package (:copier nil))
-  (error nil :read-only t))
-(declaim (freeze-type undefined-package))
-
 ;;; Cold load has its own implementation of all symbol fops,
 ;;; but we have to execute define-fop now to assign their numbers.
 ;;;
@@ -871,14 +868,8 @@
          (aux-fop-intern (length+flag package fasl-input)
            (multiple-value-bind (name length elt-type)
                (read-symbol-name length+flag fasl-input)
-             (if (undefined-package-p package)
-                 (error 'simple-package-error
-                        :format-control "Error finding package for symbol ~s:~% ~a"
-                        :format-arguments
-                        (list (subseq name 0 length)
-                              (undefined-package-error package)))
-                 (push-fop-table (%intern name length package elt-type t)
-                                 fasl-input))))
+             (push-fop-table (%intern name length package elt-type t)
+                             fasl-input)))
          (ensure-hashed (symbol)
            ;; ENSURE-SYMBOL-HASH when vop-translated is flushable since it is
            ;; conceptually just a slot reader, however its actual effect is to fill in
@@ -915,8 +906,9 @@
     (read-char-string-as-varints (fasl-input-stream) package-name)
     (push-fop-table
      (handler-case (find-undeleted-package-or-lose package-name)
-       (simple-package-error (c)
-         (make-undefined-package :error (princ-to-string c))))
+       (simple-package-error (condition)
+         (declare (ignore condition))
+         (make-deferred-package package-name)))
      (fasl-input))))
 
 ;;;; fops for loading numbers
