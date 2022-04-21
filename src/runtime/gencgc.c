@@ -2030,7 +2030,7 @@ static void refine_ambiguous_roots()
         workspace = (lispobj*)os_allocate(pins_alloc_size);
         gc_assert(workspace);
     }
-    gc_filtered_pins = workspace; // needed for wipe_nonpinned_words
+    gc_filtered_pins = workspace; // needed for obliterate_nonpinned_words
     lispobj key;
     int count = 0, index;
     for_each_hopscotch_key(index, key, pinned_objects) {
@@ -3725,7 +3725,7 @@ conservative_stack_scan(struct thread* th,
     // frame pointers or alien or DX object pointers. In any case
     // there's no need to call preserve_pointer on them since
     // they definitely don't point to the heap.
-    // See the picture at create_thread_struct() as a reminder.
+    // See the picture at alloc_thread_struct() as a reminder.
 #ifdef LISP_FEATURE_UNIX
     lispobj exclude_from = (lispobj)th->control_stack_start;
     lispobj exclude_to = (lispobj)th + dynamic_values_bytes;
@@ -4174,7 +4174,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
     cull_weak_hash_tables(weak_ht_alivep_funs);
 
     obliterate_nonpinned_words();
-    // Do this last, because until wipe_nonpinned_words() happens,
+    // Do this last, because until obliterate_nonpinned_words() happens,
     // not all page table entries have the 'gen' value updated,
     // which we need to correctly find all old->young pointers.
     sweep_immobile_space(raise);

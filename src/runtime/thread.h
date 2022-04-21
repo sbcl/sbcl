@@ -268,7 +268,7 @@ extern pthread_key_t specials;
 /* sigaltstack() - "Signal stacks are automatically adjusted
  * for the direction of stack growth and alignment requirements." */
 static inline void* calc_altstack_base(struct thread* thread) {
-    // Refer to the picture in the comment above create_thread_struct().
+    // Refer to the picture in the comment above alloc_thread_struct().
     // Always return the lower limit as the base even if stack grows down.
     return ((char*) thread) + dynamic_values_bytes
         + ALIGN_UP(sizeof (struct extra_thread_data), N_WORD_BYTES);

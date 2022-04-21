@@ -11,7 +11,7 @@
 
 (in-package "SB-IMPL")
 
-;;;; these are initialized by create_thread_struct()
+;;;; these are initialized by alloc_thread_struct()
 
 (defvar *in-without-gcing*)
 (defvar *gc-inhibit*)
