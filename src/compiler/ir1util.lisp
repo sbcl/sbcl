@@ -413,6 +413,49 @@
         (when new-lvar
           (propagate-lvar-dx new-lvar old-lvar)
           t)))))
+
+(defun node-dominates-p (node1 node2)
+  (let ((block1 (node-block node1))
+        (block2 (node-block node2)))
+    (if (eq block1 block2)
+        (do-nodes (node nil block1)
+          (cond ((eq node node1)
+                 (setf node1 0))
+                ((eq node node2)
+                 (return (eq node1 0)))))
+        (let ((component (block-component block1)))
+          (unless (component-dominators-computed component)
+            (find-dominators component))
+          (dominates-p block1 block2)))))
+
+(defun set-slot-old-p (node)
+  (let ((args (combination-args node)))
+    (multiple-value-bind (object-lvar value-lvar)
+        (if (lvar-fun-is (combination-fun node) '(%%primitive))
+            (values (car (last args 2))
+                    (car (last args)))
+            (values (first args) (second args)))
+      (let ((allocator (principal-lvar-ref-use object-lvar))
+            (value-ref (principal-lvar-ref value-lvar))
+            (uses (lvar-uses value-lvar)))
+        (when (and (combination-p allocator)
+                   (lvar-fun-is (combination-fun allocator) '(list* list
+                                                              %make-instance
+                                                              %make-funcallable-instance)))
+
+          (when value-ref
+            (let ((var (ref-leaf value-ref)))
+              (when (and (lambda-var-p (ref-leaf value-ref))
+                         (not (lambda-var-sets (ref-leaf value-ref))))
+                (when (member (functional-kind (lambda-var-home var))
+                              '(:external :optional))
+                  (return-from set-slot-old-p t))
+                (setf uses (principal-lvar-ref-use value-lvar)))))
+          (when uses
+            (if (consp uses)
+                (loop for use in uses
+                      always (node-dominates-p use allocator))
+                (node-dominates-p uses allocator))))))))
 
 ;;;; block starting/creation
 

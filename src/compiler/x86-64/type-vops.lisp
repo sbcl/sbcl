@@ -535,8 +535,10 @@
           (value :scs (any-reg descriptor-reg)))
    (:vop-var vop)
    (:temporary (:sc unsigned-reg) temp)
+   (:node-var node)
    (:generator 1
-     (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)
+     (unless (sb-c::set-slot-old-p node)
+       (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value))
      (inst mov :dword (ea (- 4 instance-pointer-lowtag) object) value)))
  (define-vop (%fun-layout %instance-layout)
    (:translate %fun-layout)
@@ -544,7 +546,8 @@
  (define-vop (%set-fun-layout %set-instance-layout)
    (:translate %set-fun-layout)
    (:generator 1
-     (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)
+     (unless (sb-c::set-slot-old-p node)
+       (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value))
      (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value)))
  (define-vop ()
   (:translate sb-c::layout-eq)

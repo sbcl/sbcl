@@ -637,7 +637,9 @@
   ;; The default LOOP in the component.
   (outer-loop (missing-arg) :type cloop)
   ;; The current sset index
-  (sset-number 0 :type fixnum))
+  (sset-number 0 :type fixnum)
+  (dominators-computed nil))
+
 (defprinter (component :identity t)
   name
   (reanalyze :test reanalyze))

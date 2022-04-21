@@ -591,6 +591,11 @@ necessary, since type inference may take arbitrarily long to converge.")
 
     (maybe-mumble "IR2Tran ")
     (entry-analyze component)
+
+    ;; For on-demand recalculation of dominators, the previously
+    ;; computed results may be stale.
+    (clear-dominators component)
+
     (ir2-convert component)
 
     (when (policy *lexenv* (>= speed compilation-speed))

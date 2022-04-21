@@ -77,7 +77,7 @@
          res)
     (move-lvar-result node block locs lvar)))
 
-(defun emit-inits (node block name object lowtag inits args)
+(defun emit-inits (node block object lowtag inits args)
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil)
         (dx-p (node-stack-allocate-p node)))
@@ -102,7 +102,7 @@
                          `(ecase raw-type
                             ((t)
                              (vop set-slot node block object arg-tn
-                                  name (+ sb-vm:instance-slots-offset slot) lowtag))
+                                  :allocator (+ sb-vm:instance-slots-offset slot) lowtag))
                             ,@(map 'list
                                (lambda (rsd)
                                  `(,(sb-kernel::raw-slot-data-raw-type rsd)
@@ -116,7 +116,7 @@
            (:dd
             (vop set-slot node block object
                  (emit-constant (sb-kernel::dd-layout-or-lose slot))
-                 name sb-vm:instance-slots-offset lowtag))
+                 :allocator sb-vm:instance-slots-offset lowtag))
            (otherwise
             (if (and (eq kind :arg)
                      (zero-init-p (car args)))
@@ -148,7 +148,7 @@
                                              nil sb-vm:any-reg-sc-number)))
                                     (vop make-funcallable-instance-tramp node block tn)
                                     tn)))))
-                     name slot lowtag))))))))
+                     :allocator slot lowtag))))))))
   (unless (null args)
     (bug "Leftover args: ~S" args)))
 
@@ -174,7 +174,7 @@
          (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result lvar)
-    (emit-inits node block name result lowtag inits args)
+    (emit-inits node block result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-variable-allocation
@@ -191,7 +191,7 @@
                  (ir2-lvar-stack-pointer (lvar-info lvar))))
           (vop var-alloc node block (lvar-tn node block extra) name words
                type lowtag stack-allocate-p result)))
-    (emit-inits node block name result lowtag inits args)
+    (emit-inits node block result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 
 (defoptimizer ir2-convert-structure-allocation
@@ -212,7 +212,7 @@
                       #-compact-instance-header
                       c-dd))
         (emit-fixed-alloc node block name words metadata lowtag result lvar))
-      (emit-inits node block name result lowtag
+      (emit-inits node block result lowtag
                   `(#-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))
 

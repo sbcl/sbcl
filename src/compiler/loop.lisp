@@ -41,11 +41,13 @@
                    (setq dom (copy-sset pdom) changed t)))))
          (setf (block-dominators block) dom)
          (when dom (sset-adjoin block dom))))
-     (unless changed (return)))))
+     (unless changed (return)))
+    (setf (component-dominators-computed component) t)))
 
 (defun clear-dominators (component)
   (do-blocks (block component)
-    (setf (block-dominators block) nil)))
+    (setf (block-dominators block) nil))
+  (setf (component-dominators-computed component) nil))
 
 ;;; DOMINATES-P  --  Internal
 ;;;
