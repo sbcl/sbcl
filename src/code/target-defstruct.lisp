@@ -368,10 +368,7 @@
                     (declare (index i))
                     (%instance-set res i (%instance-ref structure i)))))
       #+(or x86 x86-64) ; Two allocators, but same loop either way
-      (let ((res (if (logtest (layout-flags layout) sb-vm::+strictly-boxed-flag+)
-                     (%make-instance len)
-                     (%make-instance/mixed len))))
-        (%set-instance-layout res layout)
+      (let ((res (%new-instance* layout len)))
         (fast-loop))
       #-(or x86 x86-64) ; Different loops
       (if (logtest (layout-flags layout) sb-vm::+strictly-boxed-flag+)

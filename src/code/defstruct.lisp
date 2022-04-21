@@ -53,6 +53,12 @@
           (i (%make-instance ,size)))
      (%set-instance-layout i l)
      i))
+(sb-xc:defmacro %new-instance* (layout len)
+  `(let ((i (if (logtest (layout-flags ,layout) sb-vm::+strictly-boxed-flag+)
+                (%make-instance ,len)
+                (%make-instance/mixed ,len))))
+     (%set-instance-layout i ,layout)
+     i))
 
 (declaim (ftype (sfunction (defstruct-description list) function)
                 %make-structure-instance-allocator))
