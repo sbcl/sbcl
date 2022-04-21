@@ -106,7 +106,6 @@
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
 
 ;;; With SYMBOL-VALUE, we check that the value isn't the trap object.
-;;; So SYMBOL-VALUE of NIL is NIL.
 (define-vop (symbol-global-value checked-cell-ref)
   (:translate sym-global-val)
   (:generator 9
@@ -138,8 +137,7 @@
       (storew value symbol symbol-value-slot other-pointer-lowtag)
       DONE))
 
-  ;; With Symbol-Value, we check that the value isn't the trap object. So
-  ;; Symbol-Value of NIL is NIL.
+  ;; With Symbol-Value, we check that the value isn't the trap object.
   (define-vop (symbol-value)
     (:translate symeval)
     (:policy :fast-safe)

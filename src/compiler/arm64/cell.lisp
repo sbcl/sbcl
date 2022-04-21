@@ -68,8 +68,7 @@
   (:vop-var vop)
   (:save-p :compute-only))
 
-;;; With Symbol-Value, we check that the value isn't the trap object.  So
-;;; Symbol-Value of NIL is NIL.
+;;; With Symbol-Value, we check that the value isn't the trap object.
 #+sb-thread
 (progn
   (define-vop (set)
