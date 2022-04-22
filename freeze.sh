@@ -23,6 +23,7 @@ usage: $0 VERSION
   SBCL_RELEASE_DIR: Absolute path to directory containing all the build
     artifacts. If not defined, a new build directory is created in \$PWD.
   CCL: Path to Clozure Common Lisp, suitable as an argument to make.sh
+  CLISP: Path to CLISP, suitable as an argument to make.sh
 EOF
     exit 1
 }
@@ -40,9 +41,9 @@ then
     usage "Extra command-line arguments: $@"
 fi
 
-if [ -z "$CCL" ]
+if [ -z "$CLISP" ]
 then
-    usage "CCL environment variable not set"
+    usage "CLISP environment variable not set"
 fi
 
 SBCL_RELEASE_DIR=${SBCL_RELEASE_DIR:-$(mktemp -d $PWD/sbcl-release-dir-$(date +%Y%m%d)-XXXXXXXXX)}
@@ -131,18 +132,29 @@ fi
 
 # check build from ccl
 
-if [ ! -d $SBCL_RELEASE_DIR/obj_from-xc_ccl ]; then
-   cd $SBCL_DIR
-   sh clean.sh
-   nice -20 ./make.sh "$CCL" >> $LOGFILE 2>&1
-   cd $SBCL_RELEASE_DIR
+if [ -n "$CCL" ]; then
+    if [ ! -d $SBCL_RELEASE_DIR/obj_from-xc_ccl ]; then
+        cd $SBCL_DIR
+        sh clean.sh
+        nice -20 ./make.sh "$CCL" >> $LOGFILE 2>&1
+        cd $SBCL_RELEASE_DIR
 
-   mv $SBCL_DIR/obj/from-xc obj_from-xc_ccl
+        mv $SBCL_DIR/obj/from-xc obj_from-xc_ccl
+    fi
 fi
 
-# TODO: check binary-equality between ccl, sbcl objs
+if [ ! -d $SBCL_RELEASE_DIR/obj_from-xc_clisp ]; then
+   cd $SBCL_DIR
+   sh clean.sh
+   nice -20 ./make.sh "$CLISP" >> $LOGFILE 2>&1
+   cd $SBCL_RELEASE_DIR
 
-# TODO: check build from clisp, abcl
+   mv $SBCL_DIR/obj/from-xc obj_from-xc_clisp
+fi
+
+# TODO: check binary-equality between ccl, clisp, sbcl objs
+
+# TODO: check build from abcl, ecl
 
 # upload rc build
 
