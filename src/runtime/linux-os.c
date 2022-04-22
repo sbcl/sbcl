@@ -49,6 +49,7 @@
 #include "thread.h"
 #include "gc-internal.h"
 #include <fcntl.h>
+#include <sys/prctl.h>
 
 #ifdef LISP_FEATURE_X86
 /* Prototype for personality(2). Done inline here since the header file
@@ -263,6 +264,9 @@ void os_init()
 {
 #ifdef LISP_FEATURE_SB_FUTEX
     futex_init();
+#endif
+#ifdef LISP_FEATURE_SB_DEVEL
+    prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY);
 #endif
 }
 
