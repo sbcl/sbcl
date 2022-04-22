@@ -5185,7 +5185,10 @@
                   (and succ
                        (block-start succ)
                        (neq (node-enclosing-cleanup node)
-                            (block-start-cleanup succ)))))
+                            (block-start-cleanup succ))))
+                (do-nested-cleanups (cleanup (node-lexenv node) t)
+                  (when (eq (cleanup-kind cleanup) :dynamic-extent)
+                    (return))))
            (setf (lexenv-cleanup (node-lexenv node)) nil)
            (flush-combination prev)
            nil)

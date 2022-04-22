@@ -1683,3 +1683,14 @@
                 (lambda (j &rest points)
                   (apply continuation  j (mapcar identity points)))))))
     (() '(1 #()) :test #'equalp)))
+
+(with-test (:name :special-bind-removal)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (multiple-value-prog1 (eval a)
+           (let ((* (let ((x (list 1)))
+                      (setf (car x) 1)
+                      x)))
+             (declare (dynamic-extent *)))))
+    ((1) 1)))
