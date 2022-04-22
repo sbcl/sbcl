@@ -4840,29 +4840,27 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
         new_obj = gc_alloc_large(nbytes, page_type, region, 1);
     else {
         ensure_region_closed(region, page_type);
+        // hold the lock after alloc_new_region if a cons page
+        int release = page_type != PAGE_TYPE_CONS;
+        new_obj = gc_alloc_new_region(nbytes, page_type, region, release);
+        region->free_pointer = (char*)new_obj + nbytes;
+        // addr_diff asserts that 'end' >= 'free_pointer'
+        int remaining = addr_diff(region->end_addr, region->free_pointer);
+        // Try to avoid the next Lisp -> C -> Lisp round-trip by possibly
+        // requesting yet another region.
         if (page_type == PAGE_TYPE_CONS) {
-            new_obj = gc_alloc_new_region(nbytes, PAGE_TYPE_CONS, region, 0); // don't release free_pages_lock
-            region->free_pointer = (char*)new_obj + nbytes;
-            gc_assert(region->free_pointer <= region->end_addr);
-            // Refill now if there is only 1 cons remaining on the page.
-            // This can often avoid the next Lisp -> C -> Lisp round-trip.
-            if (addr_diff(region->end_addr, region->free_pointer) <= 2 * N_WORD_BYTES) {
+            if (remaining <= CONS_SIZE * N_WORD_BYTES) { // Refill now if <= 1 more cons to go
                 gc_close_region(region, page_type);
                 // Request > 2 words, forcing a new page to be claimed.
                 gc_alloc_new_region(4 * N_WORD_BYTES, page_type, region, 0); // don't release
             }
             ret = mutex_release(&free_pages_lock);
             gc_assert(ret);
-        } else {
-            new_obj = gc_alloc_new_region(nbytes, page_type, region, 1); // do release free_pages_lock
-            region->free_pointer = (char*)new_obj + nbytes;
-            gc_assert(region->free_pointer <= region->end_addr);
-            if (addr_diff(region->end_addr, region->free_pointer) <= 4 * N_WORD_BYTES
-                && TryEnterCriticalSection(&free_pages_lock)) {
-                gc_close_region(region, page_type);
-                // Request > 4 words, forcing a new page to be claimed.
-                gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region, 1); // do release
-            }
+        } else if (remaining <= 4 * N_WORD_BYTES
+                   && TryEnterCriticalSection(&free_pages_lock)) {
+            gc_close_region(region, page_type);
+            // Request > 4 words, forcing a new page to be claimed.
+            gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region, 1); // do release
         }
     }
 
