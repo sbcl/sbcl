@@ -353,7 +353,7 @@ os_vm_size_t gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
 
 /* Count the number of pages in the given generation.
  * Additionally, if 'n_write_protected' is non-NULL, then assign
- * into *n_write_protected the count of marked cards.
+ * into *n_write_protected the count of marked pages.
  */
 static page_index_t
 count_generation_pages(generation_index_t generation, page_index_t* n_dirty)
@@ -368,7 +368,8 @@ count_generation_pages(generation_index_t generation, page_index_t* n_dirty)
             for (j=0; j<CARDS_PER_PAGE; ++j, ++card)
                 if (card_dirtyp(card)) ++dirty;
         }
-    if (n_dirty) *n_dirty = dirty;
+    // divide by cards per page rounding up
+    if (n_dirty) *n_dirty = (dirty + (CARDS_PER_PAGE-1)) / CARDS_PER_PAGE;
     return total;
 }
 
@@ -491,15 +492,19 @@ write_generation_stats(FILE *file)
         fprintf(file, gen_num==0?"       -" : " %7"PAGE_INDEX_FMT, n_dirty);
         fprintf(file, " %3d %7.4f\n", gen->num_gc, generation_average_age(gen_num));
     }
-    double frac = 100 * (double)bytes_allocated / (double)dynamic_space_size;
+    page_index_t tot_pages = coltot[0] + coltot[1] + coltot[2] + coltot[3] + coltot[4] +
+                             coltot[5] + coltot[6] + coltot[7] + coltot[8];
+    uword_t waste = npage_bytes(tot_pages) - bytes_allocated;
+    double pct_waste = (double)waste / (double)npage_bytes(tot_pages) * 100;
+    double heap_use_frac = 100 * (double)bytes_allocated / (double)dynamic_space_size;
     fprintf(file,
             "-- %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
             "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
-            "%7"PAGE_INDEX_FMT" %18"OS_VM_SIZE_FMT
+            "%7"PAGE_INDEX_FMT" %6.1f%12"OS_VM_SIZE_FMT
             " [%.1f%% of %"OS_VM_SIZE_FMT" max]\n",
-            coltot[0], coltot[1], coltot[2], coltot[3],   coltot[4], coltot[5], coltot[6],
-            coltot[7], coltot[8],
-            (uintptr_t)bytes_allocated, frac, (uintptr_t)dynamic_space_size);
+            coltot[0], coltot[1], coltot[2], coltot[3], coltot[4], coltot[5], coltot[6],
+            coltot[7], coltot[8], pct_waste,
+            (uintptr_t)bytes_allocated, heap_use_frac, (uintptr_t)dynamic_space_size);
 
 #ifdef LISP_FEATURE_X86
     fpu_restore(fpu_state);
