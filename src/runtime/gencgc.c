@@ -2967,29 +2967,21 @@ static page_index_t scan_mixed_root_cards(page_index_t page, generation_index_t 
 }
 #endif
 
-/* Scavenge all generations from FROM to TO, inclusive, except for
- * new_space which needs special handling, as new objects may be
- * added which are not checked here - use scavenge_newspace generation.
+/* Scavenge all generations greater than or equal to FROM.
  *
- * Write-protected pages should not have any pointers to the
- * from_space so do need scavenging; thus write-protected pages are
- * not always scavenged. There is some code to check that these pages
- * are not written; but to check fully the write-protected pages need
- * to be scavenged by disabling the code to skip them.
+ * Under the current scheme when a generation is GCed, the generations
+ * younger than it are empty. So, when a generation is being GCed it
+ * is only necessary to examine generations older than it for pointers.
  *
- * Under the current scheme when a generation is GCed the younger
- * generations will be empty. So, when a generation is being GCed it
- * is only necessary to scavenge the older generations for pointers
- * not the younger. So a page that does not have pointers to younger
- * generations does not need to be scavenged.
+ * Logical or physical write-protection is used to note pages that don't
+ * contain old->young pointers. But pages can be written without having
+ * such pointers. After the pages are scavenged here, they are examined
+ * for old->young pointer, are marked clean (unprotected) if there are none.
  *
- * The write-protection can be used to note pages that don't have
- * pointers to younger pages. But pages can be written without having
- * pointers to younger generations. After the pages are scavenged here
- * they can be scanned for pointers to younger generations and if
- * there are none the page can be write-protected.
+ * Write-protected pages will not have any pointers to the
+ * from_space so do not need scavenging, but might be visited
+ * as part of a contiguous range containing a relevant page.
  *
- * One complication is when the newspace is the top temp. generation.
  */
 static void
 scavenge_root_gens(generation_index_t from)
@@ -3000,15 +2992,10 @@ scavenge_root_gens(generation_index_t from)
 
     while (i < limit) {
         generation_index_t generation = page_table[i].gen;
-        if (!page_boxed_p(i)
+        if (generation < from || generation == SCRATCH_GENERATION
             /* Not sure why word_used is checked. Probably because reset_page_flags()
              * does not change the page's gen to an unused number. Perhaps it should */
-            || !page_words_used(i)
-            || (generation < from)
-            /* Yet another reason it's bad that SCRATCH_GENERATION is numerically
-             * higher than PSEUDO_STATIC: we wouldn't need this '<=' test if SCRATCH
-             * were numerically lowest */
-            || (generation > PSEUDO_STATIC_GENERATION)) {
+            || !page_boxed_p(i) || !page_words_used(i)) {
             ++i;
             continue;
         }
