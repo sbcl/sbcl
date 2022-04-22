@@ -17,6 +17,8 @@ changes relative to sbcl-2.2.3:
        available.
   * bug fix: block compilation now interacts more correctly with the creation
     of new packages.
+  * bug fix: internal compiler error in array reference
+    optimizer. (lp#1966624)
 
 changes in sbcl-2.2.3 relative to sbcl-2.2.2:
   * minor incompatible change: SB-THREAD:MUTEX-OWNER may return :THREAD-DEAD
