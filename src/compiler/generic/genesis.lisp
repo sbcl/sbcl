@@ -1992,9 +1992,7 @@ core and return a descriptor to it."
          ;; Embed the constant in an unboxed array. This shouldn't be necessary,
          ;; because the start of the scanned space is STATIC_SPACE_OBJECTS_START,
          ;; but not all uses strictly follow that rule. (They should though)
-         ;; This does not conflict with the 2 alloc regions at the start of the space,
-         ;; because the constant is in word index 10, and the array header is in
-         ;; word index 8, and the two regions are in indices 0 through 7.
+         ;; This must not conflict with the alloc regions at the start of the space.
          (make-random-descriptor (logior (- sb-vm::non-negative-fixnum-mask-constant-wired-address
                                             (* 2 sb-vm:n-word-bytes))
                                          sb-vm:other-pointer-lowtag))))

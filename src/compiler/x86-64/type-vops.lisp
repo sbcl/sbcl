@@ -308,7 +308,12 @@
 (defconstant non-negative-fixnum-mask-constant
   #x8000000000000001)
 (defconstant non-negative-fixnum-mask-constant-wired-address
-  (+ static-space-start (* 10 n-word-bytes)))
+  (+ static-space-start (* 12 n-word-bytes)))
+;; the preceding constant is embedded in an array,
+;; the header of which must not overlap the static alloc regions
+#-sb-thread
+(aver (>= (- non-negative-fixnum-mask-constant-wired-address (* 2 n-word-bytes))
+          (+ (max boxed-region cons-region mixed-region) (* 3 n-word-bytes))))
 
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
