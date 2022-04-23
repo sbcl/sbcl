@@ -904,12 +904,8 @@
 (define-fop 83 :not-host (fop-named-package-save ((:operands length)) nil)
   (let ((package-name (make-string length)))
     (read-char-string-as-varints (fasl-input-stream) package-name)
-    (push-fop-table
-     (handler-case (find-undeleted-package-or-lose package-name)
-       (simple-package-error (condition)
-         (declare (ignore condition))
-         (make-deferred-package package-name)))
-     (fasl-input))))
+    (push-fop-table (find-or-maybe-make-deferred-package package-name)
+                    (fasl-input))))
 
 ;;;; fops for loading numbers
 

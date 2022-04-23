@@ -2130,16 +2130,19 @@ PACKAGE."
 ;;; the package is actually created, we preserve package environment
 ;;; semantics at runtime, and give a reasonable error if the package
 ;;; has not been created by the end of the load.
-(defun make-deferred-package (name)
-  (let ((package (%make-package (make-package-hashtable 0)
-                                (make-package-hashtable 0))))
-    (unless *deferred-package-names* ; bind on demand
-      (setq *deferred-package-names*
-            (make-info-hashtable :comparator #'pkg-name=
-                                 :hash-function #'sxhash)))
-    (setf (info-gethash name *deferred-package-names*) package)
-    (setf (package-%name package) name)
-    package))
+(defun find-or-maybe-make-deferred-package (name)
+  (or (find-package name)
+      (progn
+        (unless *deferred-package-names* ; bind on demand
+          (setq *deferred-package-names*
+                (make-info-hashtable :comparator #'pkg-name=
+                                     :hash-function #'sxhash)))
+        (or (%get-package name *deferred-package-names*)
+            (let ((package (%make-package (make-package-hashtable 0)
+                                          (make-package-hashtable 0))))
+              (%register-package *deferred-package-names* name package)
+              (setf (package-%name package) name)
+              package)))))
 
 ;;; Return the deferred package object for NAME if it exists,
 ;;; otherwise return NIL.
@@ -2156,9 +2159,11 @@ PACKAGE."
 ;;; deferred package table still has any unresolved entries after
 ;;; FUNCTION is called.
 (defun call-with-deferred-package-names (function)
-  (let ((*deferred-package-names* nil)) ; bind on demand
+  (let* ((boundp (boundp '*deferred-package-names*))
+         ;; bind on demand
+         (*deferred-package-names* (if boundp *deferred-package-names* nil)))
     (funcall function)
-    (when *deferred-package-names*
+    (when (and (not boundp) *deferred-package-names*)
       (info-maphash
        (lambda (name package)
          (unless (eq package :deleted)
