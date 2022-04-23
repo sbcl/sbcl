@@ -1036,6 +1036,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;;; processing of top level forms
 
+(defvar *fopcompile* nil)
+
 ;;; This is called by top level form processing when we are ready to
 ;;; actually compile something. If (BLOCK-COMPILE *COMPILATION*) is T,
 ;;; then we still convert the form, but delay compilation, pushing the result
@@ -1051,7 +1053,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (return-from convert-and-maybe-compile))
   ;; Don't bother to compile simple objects that just sit there.
   (when (and form (or (symbolp form) (consp form)))
-    (if (and (policy *policy*
+    (if (and *fopcompile*
+             (policy *policy*
                  ;; FOP-compiled code is harder to debug.
                  (or (< debug 2)
                      (> space debug)))
@@ -1062,6 +1065,9 @@ necessary, since type inference may take arbitrarily long to converge.")
              #+sb-xc-host nil
              #-sb-xc-host (fopcompilable-p form t))
         (let ((*fopcompile-label-counter* 0))
+          ;; Force any pending lambdas to avoid bad ordering
+          ;; interaction with fop compilation.
+          (compile-toplevel-lambdas () t)
           #+sb-xc-host (error "unreachable")
           #-sb-xc-host (fopcompile form path nil t))
         (let* ((*lexenv* (make-lexenv
@@ -1433,9 +1439,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Compile FORM and arrange for it to be called at load-time. Return
 ;;; the dumper handle and our best guess at the type of the object.
-;;; Potential optimizations: We could test the form for constantness
-;;; (including FIND-PACKAGE forms) and dump it as a literal directly
-;;; instead. We could also fopcompile more complex non-constant forms.
+;;; TODO: We could use an IR2 bytecode compiler here to produce
+;;; smaller code. Same goes for top level code.
 (defun compile-load-time-value (form &optional no-skip)
   (let ((lambda (compile-load-time-stuff form t)))
     (values (fasl-dump-load-time-value-lambda lambda *compile-object*
@@ -1454,6 +1459,11 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Do the actual work of COMPILE-LOAD-TIME-VALUE or
 ;;; COMPILE-MAKE-LOAD-FORM-INIT-FORMS.
 (defun compile-load-time-stuff (form for-value)
+  ;; We want to force top level lambdas before any recursive IR1
+  ;; namespacing happens. Therefore, we need to force here as well as
+  ;; in EMIT-MAKE-LOAD-FORMS, since we could enter recursive IR1
+  ;; namespacing through either function.
+  (compile-toplevel-lambdas () t)
   (with-ir1-namespace
    (let* ((*lexenv* (make-null-lexenv))
           (lambda (ir1-toplevel form *current-path* for-value nil)))
@@ -1540,6 +1550,13 @@ necessary, since type inference may take arbitrarily long to converge.")
         (handler-case (make-load-form constant (make-null-lexenv))
           (error (condition) (sb-c:compiler-error condition)))
       (cond
+        ;; Used mainly as an optimization to avoid dumping internal
+        ;; compiler data structures (see :IGNORE-IT), and to avoid
+        ;; unnecessary top level lambda forcing.
+        ((and (null creation-form) (null init-form))
+         (sb-fasl::dump-fop 'sb-fasl::fop-empty-list fasl)
+         (fasl-note-handle-for-constant constant (sb-fasl::dump-pop fasl) fasl)
+         nil)
         ((and
           ;; MAKE-LOAD-FORM-SAVING-SLOTS on the cross-compiler needs
           ;; the type to be defined for the target.
@@ -1566,6 +1583,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (fasl-note-instance-saves-slots constant (slot-names) fasl))
                t)))))
         (t
+         (compile-toplevel-lambdas () t)
+         (when (fasl-constant-already-dumped-p constant fasl)
+           (return-from emit-make-load-form nil))
          ;; Allow dumping objects that can't be printed
          ;; Non-invocation of PRINT-OBJECT is tested by 'mlf.impure-cload.lisp'.
          (let* ((name #+sb-xc-host 'blobby ; the name means nothing
@@ -1604,6 +1624,10 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;;; COMPILE-FILE
 
+;;; The maximum number of top-level lambdas we put in a single top-level
+;;; component.
+(defparameter top-level-lambda-max 20)
+
 (defun object-call-toplevel-lambda (tll)
   (declare (type functional tll))
   (let ((object *compile-object*))
@@ -1612,21 +1636,31 @@ necessary, since type inference may take arbitrarily long to converge.")
       (core-object (core-call-toplevel-lambda      tll object))
       (null))))
 
-;;; Smash LAMBDAS into a single component, compile it, and arrange for
-;;; the resulting function to be called.
-(defun sub-compile-toplevel-lambdas (lambdas)
+;;; Add LAMBDAS to the pending lambdas.  If this leaves more than
+;;; TOP-LEVEL-LAMBDA-MAX lambdas in the list, or if FORCE-P is true,
+;;; then smash the lambdas into a single component, compile it, and
+;;; arrange for the resulting function to be called.
+(defun sub-compile-toplevel-lambdas (lambdas force-p)
   (declare (list lambdas))
-  (when lambdas
-    (multiple-value-bind (component tll) (merge-toplevel-lambdas lambdas)
-      (compile-component component)
-      (clear-ir1-info component)
-      (object-call-toplevel-lambda tll)))
+  (let ((compilation *compilation*))
+    (setf (pending-toplevel-lambdas compilation)
+          (append (pending-toplevel-lambdas compilation) lambdas))
+    (let ((pending (pending-toplevel-lambdas compilation)))
+      (when (and pending
+                 (or (> (length pending) top-level-lambda-max)
+                     force-p))
+        (multiple-value-bind (component tll)
+            (merge-toplevel-lambdas pending)
+          (setf (pending-toplevel-lambdas compilation) ())
+          (compile-component component)
+          (clear-ir1-info component)
+          (object-call-toplevel-lambda tll)))))
   (values))
 
 ;;; Compile top level code and call the top level lambdas. We pick off
 ;;; top level lambdas in non-top-level components here, calling
 ;;; SUB-c-t-l-l on each subsequence of normal top level lambdas.
-(defun compile-toplevel-lambdas (lambdas)
+(defun compile-toplevel-lambdas (lambdas force-p)
   (declare (list lambdas))
   (let ((len (length lambdas)))
     (flet ((loser (start)
@@ -1643,17 +1677,19 @@ necessary, since type inference may take arbitrarily long to converge.")
                  len)))
       (do* ((start 0 (1+ loser))
             (loser (loser start) (loser start)))
-           ((>= start len))
-        (sub-compile-toplevel-lambdas (subseq lambdas start loser))
+           ((>= start len)
+            (when force-p
+              (sub-compile-toplevel-lambdas nil t)))
+        (sub-compile-toplevel-lambdas (subseq lambdas start loser)
+                                      (or force-p (/= loser len)))
         (unless (= loser len)
           (object-call-toplevel-lambda (elt lambdas loser))))))
   (values))
 
 ;;; Compile LAMBDAS (a list of CLAMBDAs for top level forms) into the
-;;; object file.
-;;;
-;;; LOAD-TIME-VALUE-P seems to control whether it's MAKE-LOAD-FORM and
-;;; COMPILE-LOAD-TIME-VALUE stuff. -- WHN 20000201
+;;; object file. We loop doing local call analysis until it converges,
+;;; since a single pass might miss something due to components being
+;;; joined by let conversion.
 (defun compile-toplevel (lambdas load-time-value-p)
   (declare (list lambdas))
 
@@ -1667,17 +1703,19 @@ necessary, since type inference may take arbitrarily long to converge.")
       (maybe-mumble "[Check]~%")
       (check-ir1-consistency (append components top-components)))
 
-    (dolist (component components)
-      (compile-component component)
-      (replace-toplevel-xeps component))
+    (let ((top-level-closure nil))
+      (dolist (component components)
+        (compile-component component)
+        (when (replace-toplevel-xeps component)
+          (setq top-level-closure t)))
 
-    (when *check-consistency*
-      (maybe-mumble "[Check]~%")
-      (check-ir1-consistency (append components top-components)))
+      (when *check-consistency*
+        (maybe-mumble "[Check]~%")
+        (check-ir1-consistency (append components top-components)))
 
-    (if load-time-value-p
-        (compile-load-time-value-lambda lambdas)
-        (compile-toplevel-lambdas lambdas))
+      (if load-time-value-p
+          (compile-load-time-value-lambda lambdas)
+          (compile-toplevel-lambdas lambdas top-level-closure)))
 
     (mapc #'clear-ir1-info components))
   (values))
@@ -1688,10 +1726,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((compilation *compilation*))
     (when (block-compile compilation)
       (when (toplevel-lambdas compilation)
-        ;; FIXME: Use the source information from the initial
-        ;; conversion. CMUCL does this right.
-        (with-source-paths
-            (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil))
+        (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil)
         (setf (toplevel-lambdas compilation) nil))
       (setf (block-compile compilation) :specified)
       (setf (entry-points compilation) nil))))
@@ -1800,7 +1835,11 @@ necessary, since type inference may take arbitrarily long to converge.")
                         (process-toplevel-form
                          form `(original-source-start 0 ,current-index) nil))))
                   (let ((*source-info* info))
-                    (finish-block-compilation)))
+                    ;; FIXME: Use the source information from the initial
+                    ;; conversion. CMUCL does this right.
+                    (with-source-paths
+                      (finish-block-compilation)
+                      (compile-toplevel-lambdas () t))))
                 (let ((code-coverage-records
                        (code-coverage-records (coverage-metadata *compilation*))))
                   (unless (zerop (hash-table-count code-coverage-records))

@@ -264,6 +264,9 @@ the stack without triggering overflow protection.")
   ;; level lambdas resulting from compiling subforms. (In reverse
   ;; order.)
   (toplevel-lambdas nil :type list)
+  ;; We build a list of top-level lambdas, and then periodically smash them
+  ;; together into a single component and compile it.
+  (pending-toplevel-lambdas nil :type list)
 
   ;; Bidrectional map between IR1/IR2/assembler abstractions and a corresponding
   ;; small integer or string identifier. One direction could be done by adding

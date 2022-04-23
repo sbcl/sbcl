@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.2.4:
+  * optimization: fasl files are now usually smaller (up to 10% on default
+    policy) and may load faster, especially on high debug.
+
 changes in sbcl-2.2.4 relative to sbcl-2.2.3:
   * enhancement: better constraint propagation in the compiler. Specifically,
     the compiler can now derive the type of X in control flow join situations

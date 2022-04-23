@@ -1039,7 +1039,7 @@ of specialized arrays is supported."
 
 (defun array-element-ctype (array)
   ;; same as (SPECIFIER-TYPE (ARRAY-ELEMENT-TYPE ARRAY)) but more efficient
-  (svref (load-time-value *saetp-widetag-ctype*)
+  (svref *saetp-widetag-ctype*
          (- (ash (array-underlying-widetag array) -2) 32)))
 
 (defun array-element-type (array)
