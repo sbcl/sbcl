@@ -2490,13 +2490,12 @@
 
 (test-util:with-test (:name :bug-308941)
   (multiple-value-bind (warn fail)
-      (let ((*check-consistency* t))
-        (ctu:file-compile
-         "(eval-when (:compile-toplevel :load-toplevel :execute)
+      (ctu:file-compile
+       "(eval-when (:compile-toplevel :load-toplevel :execute)
             (defstruct foo3))
           (defstruct bar
             (foo #.(make-foo3)))"
-         :load nil))
+       :load nil)
     ;; ...but the compiler should not break.
     (assert (and warn fail))))
 
