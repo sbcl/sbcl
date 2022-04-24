@@ -130,7 +130,6 @@
   (stack (make-fop-vector 100) :type simple-vector)
   (name-buffer (vector (make-string  1 :element-type 'character)
                        (make-string 31 :element-type 'base-char)))
-  (deprecated-stuff nil :type list)
   ;; Sometimes we want to skip over any FOPs with side-effects (like
   ;; function calls) while executing other FOPs. SKIP-UNTIL will
   ;; either contain the position where the skipping will stop, or
@@ -713,33 +712,7 @@
                    byte
                    n-operands arg1 arg2 arg3)
            (when (functionp function)
-             (format *trace-output* " ~35t~(~a~)" (%fun-name function))))
-         (let ((stack (%fasl-input-stack fasl-input)))
-           (declare (ignorable stack)) ; not used in xc-host
-           (when (and (eq byte #.(get 'fop-funcall-for-effect 'opcode))
-                      (fop-stack-empty-p stack)) ; (presumed) end of TLF
-             (awhen (%fasl-input-deprecated-stuff fasl-input)
-               ;; Delaying this message rather than printing it
-               ;; in fop-fdefn makes it more informative (usually).
-               (setf (%fasl-input-deprecated-stuff fasl-input) nil)
-               (loader-deprecation-warn
-                it
-                (and (eq (svref stack 1) 'sb-impl::%defun) (svref stack 2)))))))))))
-
-;; This is the moral equivalent of a warning from /usr/bin/ld that
-;; "gets() is dangerous." You're informed by both the compiler and linker.
-(defun loader-deprecation-warn (stuff whence)
-  ;; Stuff is a list: ((<state> name . category) ...)
-  ;; For now we only deal with category = :FUNCTION so we ignore it.
-  (let ((warning-class
-         ;; We're only going to warn once (per toplevel form),
-         ;; so pick the most stern warning applicable.
-         (if (every (lambda (x) (eq (car x) :early)) stuff)
-             'simple-style-warning 'simple-warning)))
-    (warn warning-class
-          :format-control "Reference to deprecated function~P ~S~@[ from ~S~]"
-          :format-arguments
-          (list (length stuff) (mapcar #'second stuff) whence))))
+             (format *trace-output* " ~35t~(~a~)" (%fun-name function)))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))
@@ -1183,9 +1156,11 @@
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.
 (define-fop 18 :not-host (fop-fdefn (name))
-  (awhen (deprecated-thing-p 'function name) ; returns the stage of deprecation
-    (pushnew (list* it name :function)
-             (%fasl-input-deprecated-stuff (fasl-input)) :test 'equal))
+  (when (deprecated-thing-p 'function name)
+    ;; This is the moral equivalent of a warning from /usr/bin/ld
+    ;; that "gets() is dangerous." You're informed by both the
+    ;; compiler and linker.
+    (check-deprecated-thing 'function name))
   (find-or-create-fdefn name))
 
 (define-fop 19 :not-host (fop-known-fun (name))

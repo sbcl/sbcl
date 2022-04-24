@@ -352,9 +352,8 @@
       (write-string "(defun b () (please-dont-use-this 1) (really-dont-do-it 2))" f)
       (write-string "(defun c () (you-cant-use-this 3))" f))
     ;; We expect four deprecation warnings from compiling the source
-    ;; (four uses of deprecated things) and three from loading it
-    ;; (loading three functions that contain uses of deprecated
-    ;; things).
+    ;; and four from loading it, as there are four uses of deprecated
+    ;; things)
     (unwind-protect
          (progn (setq fasl
                       (assert-signal
@@ -363,6 +362,6 @@
                            late-deprecation-warning
                            final-deprecation-warning)
                        4))
-                (assert-signal (load fasl) warning 3))
+                (assert-signal (load fasl) warning 4))
       (delete-file fasl)
       (delete-file source))))
