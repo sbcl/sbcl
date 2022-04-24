@@ -1321,12 +1321,15 @@
 
 (with-test (:name (load-time-value :errors))
   (multiple-value-bind (warn fail)
-      (ctu:file-compile
-       `((defvar *load-time-value-error-value* 10)
-         (declaim (fixnum *load-time-value-error-value*))
-         (defun load-time-value-error-test-1 ()
-           (the list (load-time-value *load-time-value-error-value*))))
-       :load t)
+      (progn
+        (ctu:file-compile
+         `((defvar *load-time-value-error-value* 10)
+           (declaim (fixnum *load-time-value-error-value*)))
+         :load t)
+        (ctu:file-compile
+         `((defun load-time-value-error-test-1 ()
+              (the list (load-time-value *load-time-value-error-value*))))
+         :load t))
     (assert warn)
     (assert fail))
   (handler-case (load-time-value-error-test-1)

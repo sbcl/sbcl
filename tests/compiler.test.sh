@@ -593,8 +593,7 @@ EOF
 expect_warned_compile $tmpfilename
 
 cat > $tmpfilename <<EOF
-(defun foo () 128)
-(let ((a (load-time-value (foo))))
+(let ((a (load-time-value (funcall (lambda () 128)))))
   (declare (fixnum a))
   (print a)
   (terpri))
