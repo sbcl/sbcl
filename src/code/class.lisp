@@ -230,35 +230,43 @@ between the ~A definition and the ~A definition"
                 name old-context context)
           t))))
 
+;;; Used by the loader to forward-reference layouts for classes whose
+;;; definitions may not have been loaded yet. This allows type tests
+;;; to be loaded when the type definition hasn't been loaded yet.
+;;;
+;;; If we can't find any existing layout, then we create a new one
+;;; with the supplied information, storing it in
+;;; *FORWARD-REFERENCED-LAYOUTS*. If we can find the layout, then
+;;; return it, after checking for compatibility. If incompatible, we
+;;; allow the layout to be replaced, altered or left alone.
 (defun load-layout (name depthoid inherits length bitmap flags)
-  (let* ((layout
-          (or (binding* ((classoid (find-classoid name nil) :exit-if-null))
-                (classoid-wrapper classoid))
-              (let ((table *forward-referenced-wrappers*))
-                (with-world-lock ()
+  (let* ((table *forward-referenced-wrappers*)
+         (classoid (find-classoid name nil))  ; thread safety
+         (new-layout (make-layout (hash-layout-name name)
+                                  (or classoid (make-undefined-classoid name))
+                                  :depthoid depthoid :inherits inherits
+                                  :length length :bitmap bitmap :flags flags))
+         (existing-layout
+           (or (and classoid (classoid-wrapper classoid))
+               (with-world-lock ()
                  (let ((classoid (find-classoid name nil)))
+                   (when classoid
+                     (setf (wrapper-classoid new-layout) classoid))
                    (or (and classoid (classoid-wrapper classoid))
-                       (ensure-gethash
-                        name table
-                        (make-layout
-                         (hash-layout-name name)
-                         (or classoid (make-undefined-classoid name))
-                         :depthoid depthoid :inherits inherits
-                         :length length :bitmap bitmap :flags flags))))))))
+                       (ensure-gethash name table new-layout))))))
          (classoid
-          (or (find-classoid name nil) (wrapper-classoid layout))))
-    (if (or (eq (wrapper-invalid layout) :uninitialized)
-            (not *type-system-initialized*))
-        (setf (wrapper-classoid layout) classoid)
-        ;; There was an old layout already initialized with old
-        ;; information, and we'll now check that old information
-        ;; which was known with certainty is consistent with current
-        ;; information which is known with certainty.
-        (when (warn-if-altered-layout "current" layout "compile time"
-                                    length inherits depthoid bitmap)
-          (error "The loaded code expects an incompatible layout for class ~S."
-                 (wrapper-proper-name layout))))
-    layout))
+           (or (find-classoid name nil) (wrapper-classoid existing-layout))))
+    (cond ((or (eq (wrapper-invalid existing-layout) :uninitialized)
+               (not *type-system-initialized*))
+           (setf (wrapper-classoid existing-layout) classoid))
+          ;; There was an old layout already initialized with old
+          ;; information, and we'll now check that old information
+          ;; which was known with certainty is consistent with current
+          ;; information which is known with certainty.
+          ((warn-if-altered-layout "current" existing-layout "compile time"
+                                   length inherits depthoid bitmap)
+           (%redefine-defstruct classoid existing-layout new-layout)))
+    existing-layout))
 
 (defun classoid-lock (classoid)
   #+sb-xc-host (declare (ignore classoid))
