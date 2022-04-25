@@ -112,6 +112,7 @@
   (def %caller-pc ())
   (def sb-vm::%code-fixups)
   #+x86-64 (def pointerp)
+  (def sb-bignum:%bignum-length)
 
   ;; instances
   (def %make-instance) ; Allocate a new instance with X data slots.
