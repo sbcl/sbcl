@@ -237,6 +237,18 @@
         ;; affect the policy in an interpreter environment.
         (%eval form interpreter-env))))
 
+;;; Return a handler that returns a constant.
+;;; The %SEXPR constructor elides a handler for constants,
+;;; but there are cases where NIL sneaks through and demands a callable handler.
+;;; We avoid generating N copies of such handler. Same goes for 0 and T.
+;;; Moved here as LOAD-TIME-VALUE has to happen after the file
+;;; containing %HANDLER has been loaded.
+(defun return-constant (object)
+  (cond ((null object) (load-time-value (handler #'%const nil)))
+        ((eq object t) (load-time-value (handler #'%const t)))
+        ((eql object 0) (load-time-value (handler #'%const 0)))
+        (t (handler #'%const object))))
+
 (push
   (let ((this-pkg (find-package "SB-INTERPRETER")))
     `("SB-INTERPRETER"

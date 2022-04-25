@@ -132,22 +132,12 @@
   (declare (ignore env sexpr) #.+handler-optimize+)
   x)
 
-;;; Return a handler that returns a constant.
-;;; The %SEXPR constructor elides a handler for constants,
-;;; but there are cases where NIL sneaks through and demands a callable handler.
-;;; We avoid generating N copies of such handler. Same goes for 0 and T.
-(defun return-constant (object)
-  (cond ((null object) (load-time-value (handler #'%const nil)))
-        ((eq object t) (load-time-value (handler #'%const t)))
-        ((eql object 0) (load-time-value (handler #'%const 0)))
-        (t (handler #'%const object))))
-
 (defun return-constant-values (values env sexpr)
   (declare (ignore env sexpr) #.+handler-optimize+)
   (values-list values))
 
 ;; Forward defs
-(declaim (ftype function digest-form %eval eval-setq))
+(declaim (ftype function digest-form %eval eval-setq reutrn-constant))
 
 ;;; Return a SEXPR object that will, when dispatched, evaluate FORM.
 ;;; Unlike optimizations on SEXPRS whereby they install the most-specific
