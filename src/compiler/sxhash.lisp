@@ -153,15 +153,16 @@
 ;;; Treat double-float essentially the same as a fixnum if words are 64 bits.
 #+64-bit
 (defglobal +sxhash-double-float-expr+
-  ;; logical negation of magic constant ensures that 0.0d0 hashes to something
-  ;; other than what the fixnum 0 hashes to (as tested in hash.impure.lisp)
-  (let ((c (logandc1 1193941380939624010 most-positive-fixnum)))
-    `(let ((x (double-float-bits x)))
-       ;; ensure we mix the sign bit into the hash
-       (logand (logxor (ash x 4)
-                       (ash x (- (1+ sb-vm:n-fixnum-tag-bits)))
-                       ,c)
-               most-positive-fixnum))))
+  `(let ((x (double-float-bits x)))
+     ;; ensure we mix the sign bit into the hash
+     (logand (logxor (ash x 4)
+                     (ash x (- (1+ sb-vm:n-fixnum-tag-bits)))
+                     ;; logical negation of magic constant ensures
+                     ;; that 0.0d0 hashes to something other than what
+                     ;; the fixnum 0 hashes to (as tested in
+                     ;; hash.impure.lisp)
+                     #.(logandc1 1193941380939624010 most-positive-fixnum))
+             most-positive-fixnum)))
 
 (deftransform sxhash ((x) (double-float)) '#.+sxhash-double-float-expr+)
 
