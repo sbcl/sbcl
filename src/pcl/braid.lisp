@@ -268,6 +268,12 @@
   ;; but this approach avoids changing how PCL uses MAKE-LAYOUT.
   ;; The big comment above MAKE-IMMOBILE-FUNINSTANCE in src/code/x86-64-vm
   ;; explains why we differentiate between SGF and everything else.
+  ;; FIXME: we should assert that this is not a STRUCTURE-OBJECT,
+  ;; because there must not be additional ID words preceding the bitmap.
+  ;; STANDARD-OBJECT can't generally use a fixed number of ID slots
+  ;; because of arbitrary changes to inheritance being permissible.
+  ;; On the other hand, we do create a new layout for each change
+  ;; to superclasses, so maybe it's possible.
   (dovector (ancestor inherits)
     (when (eq ancestor #.(find-layout 'function))
       (%raw-instance-set/signed-word layout (sb-kernel::type-dd-length sb-vm:layout)
