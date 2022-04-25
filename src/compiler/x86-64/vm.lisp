@@ -197,7 +197,6 @@
   ;; non-immediate constants in the constant pool
   (constant constant)
 
-  ;; some FP constants can be generated in the i387 silicon
   (fp-single-zero immediate-constant)
   (fp-double-zero immediate-constant)
   (fp-complex-single-zero immediate-constant)
