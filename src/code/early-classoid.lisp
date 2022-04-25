@@ -376,17 +376,21 @@
 
 #-sb-xc-host
 (progn
-(declaim (inline bitmap-nwords bitmap-all-taggedp))
+(declaim (inline bitmap-start bitmap-nwords bitmap-all-taggedp))
+(defun bitmap-start (layout)
+  (+ (type-dd-length sb-vm:layout)
+     (calculate-extra-id-words (layout-depthoid layout))))
 (defun bitmap-nwords (layout)
   (declare (sb-vm:layout layout))
-  (- (%instance-length layout) (type-dd-length sb-vm:layout)))
-
+  (- (%instance-length layout)
+     (calculate-extra-id-words (layout-depthoid layout))
+     (type-dd-length sb-vm:layout)))
 (defun bitmap-all-taggedp (layout)
   ;; All bitmaps have at least 1 word; read that first.
-  (and (= (%raw-instance-ref/signed-word layout (type-dd-length sb-vm:layout))
+  (and (= (%raw-instance-ref/signed-word layout (bitmap-start layout))
           +layout-all-tagged+)
        ;; Then check that there are no additional words.
-       (= (%instance-length layout) (1+ (type-dd-length sb-vm:layout)))))
+       (= (bitmap-nwords layout) 1)))
 
 #+metaspace ; If metaspace, then WRAPPER has no flags; they're in the LAYOUT.
 (defmacro wrapper-flags (x) `(layout-flags (wrapper-friend ,x)))

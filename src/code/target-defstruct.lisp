@@ -320,12 +320,12 @@
 ;;; Similar to DO-INSTANCE-TAGGED-SLOT but iterating over all words.
 (defmacro do-layout-bitmap ((index-var taggedp-var layout count) &body guts)
   `(let* ((layout ,layout)
-          ;; Start counting from the next bitmap word as we've consumed one already
-          (bitmap-word-index ,(1+ (type-dd-length sb-vm:layout)))
+          (bitmap-word-index (bitmap-start layout))
           (bitmap-word-limit (%instance-length layout))
           ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
           ;; because it's not user-visible data.
-          (mask (ash (%raw-instance-ref/signed-word layout ,(type-dd-length sb-vm:layout))
+          (mask (ash (%raw-instance-ref/signed-word
+                      layout (prog1 bitmap-word-index (incf bitmap-word-index)))
                      ,(- sb-vm:instance-data-start)))
           ;; If this was the last word of the bitmap, then the high bit
           ;; is infinitely sign-extended, and we can keep right-shifting
@@ -338,7 +338,7 @@
      (do ((,index-var sb-vm:instance-data-start (1+ ,index-var))
           (end ,count))
          ((>= ,index-var end))
-       (declare (type (unsigned-byte 14) ,index-var))
+       (declare (type (unsigned-byte 14) ,index-var end))
        ;; If mask was fully consumed, fetch the next bitmap word
        (when (zerop nbits)
          (setq mask (%raw-instance-ref/signed-word layout bitmap-word-index)
@@ -376,6 +376,8 @@
             (fast-loop))
           (let ((res (%make-instance/mixed len)))
             (%set-instance-layout res layout)
+            ;; DO-LAYOUT-BITMAP does not visit the LAYOUT itself
+            ;; (if that occupies a whole slot vs. being in the header)
             (do-layout-bitmap (i taggedp layout len)
               (if taggedp
                   (%instance-set res i (%instance-ref structure i))

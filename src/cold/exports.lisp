@@ -2038,6 +2038,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "DIVISION-BY-ZERO-ERROR"
            "DO-REST-ARG"
            "DO-INSTANCE-TAGGED-SLOT"
+           "DO-LAYOUT-BITMAP"
            "DOUBLE-FLOAT-EXPONENT"
            "DOUBLE-FLOAT-BITS"
            "DOUBLE-FLOAT-HIGH-BITS" "DOUBLE-FLOAT-INT-EXPONENT"
