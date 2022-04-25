@@ -999,7 +999,7 @@
   ;; and load the header byte.
   ;; Replace the preceding INTEGERP VOP with an appropriate
   ;; <-integer-fixnum, which checks for INTEGER.
-  (defoptimizer (vop-optimize (bignump integerp)) (vop)
+  (defoptimizer (vop-optimize integerp) (vop)
     (when (boundp '*2block-info*)
       (destructuring-bind (target not-p) (vop-codegen-info vop)
         (let ((target-block (gethash target *2block-info*)))
@@ -1060,7 +1060,7 @@
                                          (values (invert) cmp-target nil)
                                          (values (vop-info cmp) cmp-target nil)))
                                     (t
-                                     (return-from vop-optimize-bignump-optimizer)))
+                                     (return-from vop-optimize-integerp-optimizer)))
                             (prog1
                                 (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                                      new-vop

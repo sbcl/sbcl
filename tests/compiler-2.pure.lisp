@@ -3656,3 +3656,14 @@
            ((46 64 3 18 36 49 37) 1)
            (t A)))
     ((-5) -5)))
+
+(with-test (:name :bignump-integer-<)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type integer a))
+      (if (and (typep a 'bignum) (< a 0))
+          t
+          nil))
+   ((-1) nil)
+   (((- (expt 2 300))) t)))
