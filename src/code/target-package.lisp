@@ -1247,17 +1247,17 @@ implementation it is ~S." *!default-package-use-list*)
 ;;; The fasloader always supplies NAME as a (SIMPLE-ARRAY <ELT-TYPE> 1),
 ;;; but the reader uses a buffer of CHARACTER, which, based on a flag,
 ;;; can be demoted to an array of BASE-CHAR.
-(defun %intern (name length package elt-type ignore-lock)
+(defun %intern (name length package elt-type ignore-lock &optional (allow-inherited t))
   ;; No type declarations, %find-symbol will perform the checks
   (multiple-value-bind (symbol where) (%find-symbol name length package)
-    (if where
+    (if (and where (or allow-inherited (neq where :inherited)))
         (values symbol where)
         ;; Double-checked lock pattern: the common case has the symbol already interned,
         ;; but in case another thread is interning in parallel we need to check after
         ;; grabbing the lock.
         (with-package-graph ()
           (setf (values symbol where) (%find-symbol name length package))
-          (if where
+          (if (and where (or allow-inherited (neq where :inherited)))
               (values symbol where)
               (let* ((symbol-name
                        (logically-readonlyize

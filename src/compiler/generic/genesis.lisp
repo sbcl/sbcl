@@ -2488,6 +2488,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (cold-load-symbol length+flag (ref-fop-table (fasl-input) pkg-index)
                     (fasl-input)))
 
+(define-cold-fop (fop-symbol-in-package-internal-save (length+flag pkg-index))
+  (cold-load-symbol length+flag (ref-fop-table (fasl-input) pkg-index)
+                    (fasl-input)))
+
 (define-cold-fop (fop-lisp-symbol-save (length+flag))
   (cold-load-symbol length+flag *cl-package* (fasl-input)))
 

@@ -1000,8 +1000,9 @@
            (dump-fop 'fop-keyword-symbol-save file length+flag))
           (t
            (let ((pkg-index (dump-package pkg file)))
-             (dump-fop 'fop-symbol-in-package-save file
-                       length+flag pkg-index))))
+             (if (eq (find-symbol pname pkg) :inherited)
+                 (dump-fop 'fop-symbol-in-package-save file length+flag pkg-index)
+                 (dump-fop 'fop-symbol-in-package-internal-save file length+flag pkg-index)))))
 
     (unless dumped-as-copy
       (dump-chars pname file base-string-p)

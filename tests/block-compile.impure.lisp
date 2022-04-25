@@ -46,6 +46,23 @@
   (assert (eq *x* nil))
   (assert *y*))
 
+(with-test (:name :block-defpackage-symbol-inheritance-load-fasl)
+  (defpackage block-defpackage2 (:use :cl))
+  (ctu:file-compile
+   `((in-package :block-defpackage2)
+
+     (eval-when (:compile-toplevel :load-toplevel :execute)
+       (shadow "+"))
+
+     (defun + (x) (print x)))
+   :block-compile t
+   :before-load (lambda ()
+                  (delete-package :block-defpackage2)
+                  (defpackage block-defpackage2 (:use :cl)))
+   :load t)
+  (assert (not (eq (fdefinition (find-symbol "+" "BLOCK-DEFPACKAGE2"))
+                   #'cl:+))))
+
 (with-test (:name :block-defconstant-then-load-fasl)
   (ctu:file-compile
    ;; test a non-EQL-comparable constant.
