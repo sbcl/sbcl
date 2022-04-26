@@ -51,11 +51,11 @@ os_context_register_addr(os_context_t *context, int offset)
     if (offset == 0) {
         static int zero;
         zero = 0;
-        return &zero;
+        return (os_context_register_t*)&zero;
     } else if (offset < 16) {
         return &context->si_regs.u_regs[offset];
     } else if (offset < 32) {
-        int *sp = (int*) context->si_regs.u_regs[14]; /* Stack Pointer */
+        unsigned int *sp = (unsigned int*) context->si_regs.u_regs[14]; /* Stack Pointer */
         return &(sp[offset-16]);
     } else
         return 0;
@@ -70,7 +70,7 @@ os_context_npc_addr(os_context_t *context)
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {
-    return &(context->si_mask);
+    return (sigset_t*)&(context->si_mask);
 }
 
 void
@@ -91,5 +91,6 @@ void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
     /* This is the same for linux and solaris, so see sparc-assem.S */
+    extern void sparc_flush_icache(os_vm_address_t,os_vm_size_t);
     sparc_flush_icache(address,length);
 }
