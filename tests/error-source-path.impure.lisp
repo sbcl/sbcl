@@ -137,17 +137,17 @@
    (locally (declare (optimize (safety 0)))
     (defstruct f
       (x (print t) :type fixnum)))
-   (1 2 2) (2))
+   (1 2 2))
   (assert-condition-source-paths
    (locally (declare (optimize (safety 0)))
      (defstruct f
        (x 33 :type cons)))
-   (2 2) (2))
+   (2 2))
   (assert-condition-source-paths
    (locally (declare (optimize (safety 0)))
      (defstruct f
        (x mm)))
-   (2) (2 2)))
+   (2 2)))
 
 (with-test (:name (:source-path defgeneric :lambda-list))
   (assert-condition-source-paths

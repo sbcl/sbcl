@@ -273,24 +273,31 @@
         (dolist (dsd (dd-slots dd) (result))
           (binding* ((key (cons dd dsd))
                      (name (string (dsd-name dsd))) ; anonymize by stringification
-                     ((reader writer) (dsd-reader dsd (neq (dd-type dd) 'structure))))
+                     ;; reader and writer are the primitive operations
+                     ((reader writer) (dsd-reader dsd (neq (dd-type dd) 'structure)))
+                     ;; accessor is the global defun
+                     (accessor (dsd-accessor-name dsd)))
             (declare (dynamic-extent key))
-            (result `(named-lambda (setf ,name) (#1=#:v #2=#:x)
-                       ,@(if (eql (dsd-type dsd) 't)
-                             ;; no typecheck
-                             `((,writer (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd) #1#) #1#)
-                             `(,(slot-access-transform :setf `(#1# (truly-the ,(dd-name dd) #2#))
-                                                       key :function))))
-                    `(named-lambda ,name (#2#)
-                       ,(if (and (dsd-always-boundp dsd) (dsd-safe-p dsd))
-                            ;; Most slots are always-boundp (don't have a BOA constructor
-                            ;; that omits slots) and safe-p (type-safe for reading),
-                            ;; so we can be concise rather than use SLOT-ACCESS-TRANSFORM
-                            ;; plus a rebinding of X with TRULY-THE.
-                            `(,reader (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd))
-                            ;; Don't check X, but do check the the fetched value.
-                            (slot-access-transform :read `((truly-the ,(dd-name dd) #2#))
-                                                   key)))))))))
+            (result (if (dsd-read-only dsd)
+                        `(named-lambda (setf ,name) (#1=#:v #2=#:x)
+                           ,@(if (eql (dsd-type dsd) 't)
+                                 ;; no typecheck
+                                 `((,writer (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd) #1#) #1#)
+                                 `(,(slot-access-transform :setf `(#1# (truly-the ,(dd-name dd) #2#))
+                                                           key :function))))
+                        `'(setf ,accessor))
+                    (if nil ; TODO: policy-based selection perhaps?
+                        `(named-lambda ,name (#2#)
+                           ,(if (and (dsd-always-boundp dsd) (dsd-safe-p dsd))
+                                ;; Most slots are always-boundp (don't have a BOA constructor
+                                ;; that omits slots) and safe-p (type-safe for reading),
+                                ;; so we can be concise rather than use SLOT-ACCESS-TRANSFORM
+                                ;; plus a rebinding of X with TRULY-THE.
+                                `(,reader (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd))
+                                ;; Don't check X, but do check the the fetched value.
+                                (slot-access-transform :read `((truly-the ,(dd-name dd) #2#))
+                                                       key)))
+                        `',accessor)))))))
 
 ;;; shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT

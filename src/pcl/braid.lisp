@@ -132,15 +132,16 @@
                                      :direct-superclasses supers
                                      :direct-slots slots)))
        (slot-initargs-from-structure-slotd (slotd writer-fn reader-fn)
+         (flet ((name->fun (f) (if (functionp f) f (fdefinition f))))
            `(:name ,(dsd-name slotd)
              :defstruct-accessor-symbol ,(dsd-accessor-name slotd)
-             :internal-reader-function ,reader-fn
-             :internal-writer-function ,writer-fn
+             :internal-reader-function ,(name->fun reader-fn)
+             :internal-writer-function ,(name->fun writer-fn)
              :type ,(dsd-type slotd)
              :initform ,(dsd-default slotd)
              ;; This is nuts! any DEFAULT might need its lexical environment,
              ;; yet we EVAL in the null environment.
-             :initfunction ,(eval-form (dsd-default slotd))))
+             :initfunction ,(eval-form (dsd-default slotd)))))
        (accessor-closures (dsd)
          (multiple-value-bind (reader-fn writer-fn) (sb-kernel::dsd-reader dsd nil)
            ;; This is for a structure class that exists only in its compile-time representation.
