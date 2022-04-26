@@ -9,7 +9,7 @@
 ;;; A CLAMBDA is deemed to be "externally referenced" if:
 ;;;   - It is of KIND :TOPLEVEL (a toplevel CLAMBDA).
 ;;;   - It is LAMBDA-HAS-EXTERNAL-REFERENCES-P true (from COMPILE
-;;;     or from the fopcompiler, possibly other causes).
+;;;     or possibly other causes).
 ;;;   - It has a REF which has a NODE-COMPONENT other than the
 ;;;     LAMBDA-COMPONENT of the CLAMBDA.
 ;;;

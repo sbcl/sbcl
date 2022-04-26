@@ -229,6 +229,14 @@
 
 )) ; end EVAL-WHEN
 
+(defun load-form-is-default-mlfss-p (object)
+  (multiple-value-bind (creation-form init-form)
+      (make-load-form object)
+    (multiple-value-bind (ss-creation-form ss-init-form)
+        (make-load-form-saving-slots object)
+      (and (equal creation-form ss-creation-form)
+           (equal init-form ss-init-form)))))
+
 ;; Redefine the MAKE-LOAD-FORM method on FOO.
 (remove-method #'make-load-form (find-method #'make-load-form nil (list 'foo)))
 (defvar *foo-save-slots* nil)
@@ -241,13 +249,13 @@
   (let ((foo (make-foo :x 'x :y 'y)))
     (flet ((assert-canonical (slots)
              (let ((*foo-save-slots* slots))
-               (assert (sb-fasl:load-form-is-default-mlfss-p foo)))))
+               (assert (load-form-is-default-mlfss-p foo)))))
       (assert-canonical :all)
       (assert-canonical '(x y)) ; specifying all slots explicitly is still canonical
       (assert-canonical '(y x)))
     ;; specifying only one slot is not canonical
     (let ((*foo-save-slots* '(x)))
-      (assert (not (sb-fasl:load-form-is-default-mlfss-p foo))))))
+      (assert (not (load-form-is-default-mlfss-p foo))))))
 
 ;; A huge constant vector. This took 9 seconds to compile (on a MacBook Pro)
 ;; prior to the optimization for using fops to dump.

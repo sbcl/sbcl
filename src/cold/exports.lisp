@@ -1226,7 +1226,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "FASL-OUTPUT-ENTRY-TABLE" "FASL-OUTPUT-STREAM"
            "FASL-VALIDATE-STRUCTURE"
            "FASL-NOTE-INSTANCE-SAVES-SLOTS"
-           "LOAD-FORM-IS-DEFAULT-MLFSS-P"
            "*!LOAD-TIME-VALUES*"
            "OPEN-FASL-OUTPUT"
            "*!COLD-TOPLEVELS*"

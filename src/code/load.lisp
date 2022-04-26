@@ -130,11 +130,6 @@
   (stack (make-fop-vector 100) :type simple-vector)
   (name-buffer (vector (make-string  1 :element-type 'character)
                        (make-string 31 :element-type 'base-char)))
-  ;; Sometimes we want to skip over any FOPs with side-effects (like
-  ;; function calls) while executing other FOPs. SKIP-UNTIL will
-  ;; either contain the position where the skipping will stop, or
-  ;; NIL if we're executing normally.
-  (skip-until nil :type (or null fixnum))
   (print nil :type boolean))
 (declaim (freeze-type fasl-input))
 
@@ -421,8 +416,7 @@
                `((macrolet
                    ((fasl-input () '(truly-the fasl-input .fasl-input.))
                     (fasl-input-stream () '(%fasl-input-stream (fasl-input)))
-                    (operand-stack () '(%fasl-input-stack (fasl-input)))
-                    (skip-until () '(%fasl-input-skip-until (fasl-input))))
+                    (operand-stack () '(%fasl-input-stack (fasl-input))))
                   ,@(if (null stack-args)
                         forms
                         (with-unique-names (stack ptr)
@@ -1035,24 +1029,19 @@
     (read-n-bytes (fasl-input-stream) vector 0 bytes)
     vector))
 
-(defun fop-funcall* (argc stack skipping)
+(defun fop-funcall* (argc stack)
   (with-fop-stack ((stack) ptr (1+ argc))
-    (unless skipping
-      (do ((i (+ ptr argc))
-           (args))
-          ((= i ptr) (apply (fop-stack-ref i) args))
-        (declare (type index i))
-        (push (fop-stack-ref i) args)
-        (decf i)))))
+    (do ((i (+ ptr argc))
+         (args))
+        ((= i ptr) (apply (fop-stack-ref i) args))
+      (declare (type index i))
+      (push (fop-stack-ref i) args)
+      (decf i))))
 
 (define-fop 55 (fop-funcall ((:operands n)))
-  (fop-funcall* n (operand-stack) (skip-until)))
+  (fop-funcall* n (operand-stack)))
 (define-fop 56 (fop-funcall-for-effect ((:operands n)) nil)
-  (fop-funcall* n (operand-stack) (skip-until)))
-
-;;; For LOAD-TIME-VALUE which is used for MAKE-LOAD-FORM
-(define-fop 57 (fop-funcall-no-skip ((:operands n)))
-  (fop-funcall* n (operand-stack) nil))
+  (fop-funcall* n (operand-stack)))
 
 ;;;; fops for fixing up circularities
 
@@ -1217,44 +1206,6 @@
 
 (define-fop 22 (fop-assembler-code)
   (error "cannot load assembler code except at cold load"))
-
-;;; FOPs needed for implementing an IF operator in a FASL
-
-;;; Skip until a FOP-MAYBE-STOP-SKIPPING with the same POSITION is
-;;; executed. While skipping, we execute most FOPs normally, except
-;;; for ones that a) funcall/eval b) start skipping. This needs to
-;;; be done to ensure that the fop table gets populated correctly
-;;; regardless of the execution path.
-(define-fop 6 (fop-skip ((:operands position)) nil)
-  (unless (skip-until)
-    (setf (skip-until) position))
-  (values))
-
-;;; As before, but only start skipping if the top of the FOP stack is NIL.
-(define-fop 7 (fop-skip-if-false ((:operands position) condition) nil)
-  (unless (or condition (skip-until))
-    (setf (skip-until) position))
-  (values))
-
-;;; If skipping, pop the top of the stack and discard it. Needed for
-;;; ensuring that the stack stays balanced when skipping.
-(define-fop 8 (fop-drop-if-skipping () nil)
-  (when (skip-until)
-    (fop-stack-pop-n (operand-stack) 1))
-  (values))
-
-;;; If skipping, push a dummy value on the stack. Needed for
-;;; ensuring that the stack stays balanced when skipping.
-(define-fop 9 (fop-push-nil-if-skipping () nil)
-  (when (skip-until)
-    (push-fop-stack nil (fasl-input)))
-  (values))
-
-;;; Stop skipping if the top of the stack matches SKIP-UNTIL
-(define-fop 10 (fop-maybe-stop-skipping ((:operands label)) nil)
-  (when (eql (skip-until) label)
-    (setf (skip-until) nil))
-  (values))
 
 ;;;; fops for code coverage
 

@@ -2611,11 +2611,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (push (pop-stack) *!cold-toplevels*)
       (error "Can't FOP-FUNCALL-FOR-EFFECT random stuff in cold load")))
 
-;;; Needed for certain L-T-V lambdas that use the -NO-SKIP variant of funcall.
-#-c-headers-only
-(setf (svref **fop-funs** (get 'fop-funcall-no-skip 'opcode))
-      (svref **fop-funs** (get 'fop-funcall 'opcode)))
-
 (define-cold-fop (fop-named-constant-set (index))
   (push (cold-list (cold-intern :named-constant)
                    (pop-stack)

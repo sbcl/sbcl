@@ -68,8 +68,6 @@
 
 (defvar *emit-cfasl* nil)
 
-(defvar *fopcompile-label-counter*)
-
 (declaim (inline code-coverage-records code-coverage-blocks))
 ;; Used during compilation to map code paths to the matching
 ;; instrumentation conses.
@@ -1036,8 +1034,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;;; processing of top level forms
 
-(defvar *fopcompile* nil)
-
 ;;; This is called by top level form processing when we are ready to
 ;;; actually compile something. If (BLOCK-COMPILE *COMPILATION*) is T,
 ;;; then we still convert the form, but delay compilation, pushing the result
@@ -1053,32 +1049,15 @@ necessary, since type inference may take arbitrarily long to converge.")
     (return-from convert-and-maybe-compile))
   ;; Don't bother to compile simple objects that just sit there.
   (when (and form (or (symbolp form) (consp form)))
-    (if (and *fopcompile*
-             (policy *policy*
-                 ;; FOP-compiled code is harder to debug.
-                 (or (< debug 2)
-                     (> space debug)))
-             ;; The fopcompiler doesn't play nice with coverage data,
-             ;; as then top level forms don't get instrumented.
-             (policy *lexenv* (= store-coverage-data 0))
-             (not (eq (block-compile *compilation*) t))
-             #+sb-xc-host nil
-             #-sb-xc-host (fopcompilable-p form t))
-        (let ((*fopcompile-label-counter* 0))
-          ;; Force any pending lambdas to avoid bad ordering
-          ;; interaction with fop compilation.
-          (compile-toplevel-lambdas () t)
-          #+sb-xc-host (error "unreachable")
-          #-sb-xc-host (fopcompile form path nil t))
-        (let* ((*lexenv* (make-lexenv
-                          :policy *policy*
-                          :handled-conditions *handled-conditions*
-                          :disabled-package-locks *disabled-package-locks*))
-               (tll (ir1-toplevel form path nil)))
-          (if (eq (block-compile *compilation*) t)
-              (push tll (toplevel-lambdas *compilation*))
-              (compile-toplevel (list tll) nil))
-          nil))))
+    (let* ((*lexenv* (make-lexenv
+                      :policy *policy*
+                      :handled-conditions *handled-conditions*
+                      :disabled-package-locks *disabled-package-locks*))
+           (tll (ir1-toplevel form path nil)))
+      (if (eq (block-compile *compilation*) t)
+          (push tll (toplevel-lambdas *compilation*))
+          (compile-toplevel (list tll) nil))
+      nil)))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
 ;;; We only expand one level, so that we retain all the intervening
@@ -1439,12 +1418,11 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 ;;; Compile FORM and arrange for it to be called at load-time. Return
 ;;; the dumper handle and our best guess at the type of the object.
-;;; TODO: We could use an IR2 bytecode compiler here to produce
-;;; smaller code. Same goes for top level code.
-(defun compile-load-time-value (form &optional no-skip)
+;;; TODO: We could use a bytecode compiler here to produce smaller
+;;; code. Same goes for top level code.
+(defun compile-load-time-value (form)
   (let ((lambda (compile-load-time-stuff form t)))
-    (values (fasl-dump-load-time-value-lambda lambda *compile-object*
-                                              no-skip)
+    (values (fasl-dump-load-time-value-lambda lambda *compile-object*)
             (let ((type (leaf-type lambda)))
               (if (fun-type-p type)
                   (single-value-type (fun-type-returns type))
@@ -1603,7 +1581,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (catch constant
                    (fasl-note-handle-for-constant
                     constant
-                    (compile-load-time-value creation-form t)
+                    (compile-load-time-value creation-form)
                     fasl)
                    nil)
                (compiler-error "circular references in creation form for ~S"

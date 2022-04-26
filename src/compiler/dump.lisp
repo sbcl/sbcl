@@ -602,16 +602,13 @@
 
 ;;; Emit a funcall of the function and return the handle for the
 ;;; result.
-(defun fasl-dump-load-time-value-lambda (fun file no-skip)
+(defun fasl-dump-load-time-value-lambda (fun file)
   (declare (type sb-c::clambda fun) (type fasl-output file))
   (let ((handle (gethash (sb-c::leaf-info fun)
                          (fasl-output-entry-table file))))
     (aver handle)
     (dump-push handle file)
-    ;; Can't skip MAKE-LOAD-FORM due to later references
-    (if no-skip
-        (dump-fop 'fop-funcall-no-skip file 0)
-        (dump-fop 'fop-funcall file 0)))
+    (dump-fop 'fop-funcall file 0))
   (dump-pop file))
 
 ;;; Return T iff CONSTANT has already been dumped. It's been dumped if
@@ -1326,45 +1323,11 @@
 
 ;;;; dumping structures
 
-;;; Even as late as calling DUMP-STRUCTURE we might have to deduce that a
-;;; user's "custom" MAKE-LOAD-FORM amounts to MAKE-LOAD-FORM-SAVING-SLOTS
-;;; with the default of all slots. Why: suppose you have some structure
-;;;   (DEFSTRUCT MYSTRUCT A)
-;;; and a macro that returns literal instances of the structure:
-;;;   (DEFMACRO FUNNYMAC (N) (MAKE-MYSTRUCT :A N))
-;;; and a DEFVAR that uses the structure:
-;;;   (DEFVAR *A* (FUNNYMAC 1))
-;;;
-;;; Now, because the fopcompiler expands macros more than once - at least once
-;;; in FOPCOMPILABLE-P and then again in FOPCOMPILE - we see _different_
-;;; instances of MYSTRUCT each of those times. We don't memoize the expansion.
-;;; The two structures are similar but not EQ, and only the instance produced
-;;; during FOPCOMPILABLE-P was entered in the FASL-OUTPUT-VALID-STRUCTURES table.
-;;; The other structure instance isn't there, but we need it to be legal to dump.
-;;;
-;;; This problem is not just theoretical.  We ourselves do just that, e.g.:
-;;;   (defvar *cpus* (... (sb-alien:alien-funcall ...)))
-;;; and the expansion of alien-funcall involves an ALIEN-TYPE literal
-;;; which gets multiply expanded exactly as described above.
-(defun load-form-is-default-mlfss-p (struct)
-  ;; FIXME? this is called while writing a fasl and so might need
-  ;; to invoke MAKE-LOAD-FORM, long after IR1 conversion has happened.
-  ;; Surely this is not the best design.
-  (and (typep struct 'structure-object)
-       (multiple-value-bind (creation-form init-form)
-           (handler-case (make-load-form struct (make-null-lexenv))
-             (error (condition) (sb-c:compiler-error condition)))
-         (multiple-value-bind (ss-creation-form ss-init-form)
-             (make-load-form-saving-slots struct)
-           (and (equal creation-form ss-creation-form)
-                (equal init-form ss-init-form))))))
-
 (defun dump-structure (struct file)
   (unless (or (gethash struct (fasl-output-valid-structures file))
               (typep struct
                      '(or sb-c::debug-info sb-c::debug-fun sb-c::debug-source
-                          sb-c:definition-source-location sb-c::debug-name-marker))
-              (load-form-is-default-mlfss-p struct))
+                          sb-c:definition-source-location sb-c::debug-name-marker)))
     (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"
            struct))
   (note-potential-circularity struct file)

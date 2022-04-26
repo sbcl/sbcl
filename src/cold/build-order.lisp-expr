@@ -470,7 +470,6 @@
 
  #+sb-dyncount ("src/compiler/dyncount")
  #+sb-dyncount ("src/code/dyncount")
- ("src/compiler/fopcompile" :not-host)
 
  ("src/code/format-time" :not-host)
 
