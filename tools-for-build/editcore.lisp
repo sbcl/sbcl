@@ -1539,8 +1539,9 @@
            (case widetag
              (#.instance-widetag
               (let ((type (translate (%instance-layout obj) spaces)))
-                (do-instance-tagged-slot (i obj t type)
-                  (scanptr vaddr obj (1+ i))))
+                (do-layout-bitmap (i taggedp type (%instance-length obj))
+                  (when taggedp
+                    (scanptr vaddr obj (1+ i)))))
               (return-from scan-obj))
              (#.simple-vector-widetag
               (let ((len (length (the simple-vector obj))))
