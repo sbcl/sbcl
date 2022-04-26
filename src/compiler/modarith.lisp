@@ -242,7 +242,7 @@
                        (cond ((= constant-value new-value)
                               (values t nil)) ; we knew what to do and did nothing
                              (t
-                              (change-ref-leaf node (make-constant new-value)
+                              (change-ref-leaf node (find-constant new-value)
                                                :recklessly t)
                               (let ((lvar (node-lvar node)))
                                 (setf (lvar-%derived-type lvar)
