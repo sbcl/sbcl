@@ -2273,7 +2273,8 @@ not stack-allocated LVAR ~S." source-lvar)))))
                              (policy first-node (/= insert-safepoints 0)))
                     (vop sb-vm::insert-safepoint first-node 2block))))
             (ir2-convert-block block)
-            (incf num))))))
+            (incf num))))
+      (setf (component-max-block-number component) num)))
   (values))
 
 ;;; If necessary, emit a terminal unconditional branch to go to the
