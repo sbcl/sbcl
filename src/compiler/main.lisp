@@ -1,6 +1,4 @@
-;;;; the top level interfaces to the compiler, plus some other
-;;;; compiler-related stuff (e.g. CL:CALL-ARGUMENTS-LIMIT) which
-;;;; doesn't obviously belong anywhere else
+;;;; the top level interfaces to the compiler
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
