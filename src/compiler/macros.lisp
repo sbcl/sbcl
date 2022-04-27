@@ -603,17 +603,14 @@
 (defvar *source-paths*)
 
 (defmacro with-source-paths (&body forms)
-  (with-unique-names (source-paths)
-    `(let* ((,source-paths (make-hash-table :test 'eq))
-            (*source-paths* ,source-paths))
-      (unwind-protect
-           (progn ,@forms)
-        (clrhash ,source-paths)))))
+  `(let ((*source-paths* (make-hash-table :test 'eq)))
+     ,@forms))
 
 ;;; Bind the hashtables used for keeping track of global variables,
 ;;; functions, etc.
 (defmacro with-ir1-namespace (&body forms)
-  `(let ((*ir1-namespace* (make-ir1-namespace))) ,@forms))
+  `(let ((*ir1-namespace* (make-ir1-namespace)))
+     ,@forms))
 
 ;;; Look up NAME in the lexical environment namespace designated by
 ;;; SLOT, returning the <value, T>, or <NIL, NIL> if no entry. The

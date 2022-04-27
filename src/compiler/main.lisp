@@ -1016,11 +1016,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                                &optional (on-error ''input-error-in-load))
                               &body body)
   (aver (symbolp form))
-  (once-only ((info info))
-    `(let ((*source-info* ,info))
-       (%do-forms-from-info (lambda (,form &key ,@keys &allow-other-keys)
-                              ,@body)
-                            ,info ,on-error))))
+  `(%do-forms-from-info (lambda (,form &key ,@keys &allow-other-keys)
+                          ,@body)
+                        ,info ,on-error))
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
@@ -1766,6 +1764,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         (*compile-file-truename* nil) ; "
         (*policy* *policy*)
         (*macro-policy* *macro-policy*)
+        (*source-info* info)
 
         (*compilation*
          (make-compilation
@@ -1798,26 +1797,23 @@ necessary, since type inference may take arbitrarily long to converge.")
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values
             (with-compilation-unit ()
-                (setf (sb-fasl::fasl-output-source-info *compile-object*)
-                      (debug-source-for-info info))
-                (with-ir1-namespace
+              (setf (sb-fasl::fasl-output-source-info *compile-object*)
+                    (debug-source-for-info info))
+              (with-ir1-namespace
+                (with-source-paths
                   (do-forms-from-info ((form current-index) info
                                        'input-error-in-compile-file)
-                    (with-source-paths
-                      (find-source-paths form current-index)
-                      (let ((*gensym-counter* 0))
-                        (when *compile-print*
-                          (note-top-level-form form))
-                        (process-toplevel-form
-                         form `(original-source-start 0 ,current-index) nil))))
-                  (let ((*source-info* info))
-                    ;; FIXME: Use the source information from the initial
-                    ;; conversion. CMUCL does this right.
-                    (with-source-paths
-                      (finish-block-compilation)
-                      (compile-toplevel-lambdas () t))))
-                (let ((code-coverage-records
-                       (code-coverage-records (coverage-metadata *compilation*))))
+                    (clrhash *source-paths*)
+                    (find-source-paths form current-index)
+                    (let ((*gensym-counter* 0))
+                      (when *compile-print*
+                        (note-top-level-form form))
+                      (process-toplevel-form
+                       form `(original-source-start 0 ,current-index) nil)))
+                  (finish-block-compilation)
+                  (compile-toplevel-lambdas () t)))
+              (let ((code-coverage-records
+                      (code-coverage-records (coverage-metadata *compilation*))))
                   (unless (zerop (hash-table-count code-coverage-records))
                     ;; Dump the code coverage records into the fasl.
                     (sb-fasl::dump-code-coverage-records
