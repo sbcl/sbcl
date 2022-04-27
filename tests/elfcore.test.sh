@@ -58,7 +58,7 @@ $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-us
  :all)
 ;; This just needs any function that when ELFinated has its packed fixups rewritten.
 ;; If the packed value is a bignum, it goes into a C data section.
-(let* ((code (sb-kernel:fun-code-header #'sb-c::%compile-files))
+(let* ((code (sb-kernel:fun-code-header #'compile-file))
        (fixups (sb-vm::%code-fixups code)))
   (assert (typep fixups 'bignum))
   (assert (not (heap-allocated-p fixups))))

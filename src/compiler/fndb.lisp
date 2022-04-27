@@ -1715,17 +1715,6 @@
    (:entry-points list)
    (:emit-cfasl t))
   (values (or pathname null) boolean boolean))
-(defknown sb-c::compile-files
-    (cons &key (:output-file pathname-designator)
-               (:verbose t)
-               (:print t)
-               (:external-format external-format-designator)
-               (:progress t)
-               (:trace-file t)
-               (:block-compile t)
-               (:entry-points list)
-               (:emit-cfasl t))
-  (values (or pathname null) boolean boolean))
 
 (defknown (compile-file-pathname)
   (pathname-designator &key (:output-file (or pathname-designator
