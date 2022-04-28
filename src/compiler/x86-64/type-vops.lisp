@@ -304,6 +304,15 @@
       (inst cmp :qword ea (bignum-header-for-length 1)))
     OUT))
 
+(define-vop (signed-byte-64-p/unsigned)
+  (:args (value :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:conditional :ns)
+  (:policy :fast-safe)
+  (:translate signed-byte-64-p)
+  (:generator 5
+    (inst test value value)))
+
 ;;; Sign bit and fixnum tag bit.
 (defconstant non-negative-fixnum-mask-constant
   #x8000000000000001)
