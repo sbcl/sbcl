@@ -16,17 +16,9 @@
 
 (/show "beginning tests/vm.before-xc.lisp")
 
-(flet ((yes (x)
-         (assert
-          (eql immediate-sc-number
-               (immediate-constant-sc x))))
-       (no (x)
+(flet ((no (x)
          (assert
           (not (immediate-constant-sc x)))))
-  ;; target fixnums can be dealt with as immediates; target bignums
-  ;; can not.
-  (yes #.most-positive-fixnum)
-  (yes #.most-negative-fixnum)
   (no #.(1+ most-positive-fixnum))
   (no #.(1- most-negative-fixnum)))
 

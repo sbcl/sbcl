@@ -219,8 +219,7 @@
             (,bitmap-limit (%instance-length ,layout))
             ;; If this was the last word of the bitmap, then the high bit
             ;; is infinitely sign-extended, and we can keep right-shifting
-            ;; the mask word indefinitely. Most bitmaps will have only 1 word,
-            ;; so this is almost always MOST-POSITIVE-FIXNUM.
+            ;; the mask word indefinitely. Most bitmaps will have only 1 word.
             (,nbits (if (= ,bitmap-index ,bitmap-limit)
                         sb-vm:instance-length-mask
                         (- sb-vm:n-word-bits sb-vm:instance-data-start))))
@@ -236,9 +235,39 @@
          ;; If mask was fully consumed, fetch the next bitmap word
          (when (zerop ,nbits)
            (setq ,mask (%raw-instance-ref/signed-word ,layout ,bitmap-index)
-                 ,nbits (if (= (incf ,bitmap-index) ,bitmap-limit)
+                 ,nbits (if (= (incf (truly-the index ,bitmap-index)) ,bitmap-limit)
                             sb-vm:instance-length-mask
                             sb-vm:n-word-bits)))
          (when (logbitp 0 ,mask) ,@body)
          (setq ,mask (ash ,mask -1)
                ,nbits (truly-the fixnum (1- ,nbits)))))))
+
+;;; FIXME: at the earliest opportunity, either express DO-INSTANCE-TAGGED-SLOT
+;;; in terms of DO-LAYOUT-BITMAP or apply this diff:
+#|
+--- a/src/code/early-raw-slots.lisp
++++ b/src/code/early-raw-slots.lisp
+@@ -194,6 +194,7 @@
+ ;;; I have a love/hate relationship with this macro.
+ ;;; It's more efficient than iterating over DSD-SLOTS, and editcore would
+ ;;; have a harder time using DSD-SLOTS. But it's too complicated.
+ #-sb-xc-host
+ (defmacro do-instance-tagged-slot ((index-var thing &optional (pad t) layout-expr)
+                                    &body body)
+@@ -210,12 +211,12 @@
+                                     (%instance-ref ,instance 0)))
+                              (truly-the sb-vm:layout
+                                         (if (eql l 0) #.(find-layout 't) l)))))
++            (,bitmap-index (bitmap-start ,layout))
+             ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
+             ;; because it's not user-visible data.
+-            (,mask (ash (%raw-instance-ref/signed-word ,layout (type-dd-length sb-vm:layout))
++            (,mask (ash (%raw-instance-ref/signed-word
++                         ,layout (prog1 ,bitmap-index (incf ,bitmap-index)))
+                         (- sb-vm:instance-data-start)))
+-            ;; Start counting from the next bitmap word as we've consumed one already
+-            (,bitmap-index (1+ (type-dd-length sb-vm:layout)))
+             (,bitmap-limit (%instance-length ,layout))
+             ;; If this was the last word of the bitmap, then the high bit
+             ;; is infinitely sign-extended, and we can keep right-shifting
+|#

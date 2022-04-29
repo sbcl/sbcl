@@ -90,9 +90,17 @@
 ;;;;; Some stuff moved from 'globaldb.lisp':
 
 ;;; The structure constructor is never called
-(sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil) (:copier nil))
+(sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil))
   cells)
-;;(declaim (freeze-type packed-info)) ; crashes?
+(declaim (freeze-type packed-info))
+#-sb-xc-host
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (let ((dd (find-defstruct-description 'packed-info)))
+    (setf (dd-flags dd) (logior (dd-flags dd) +dd-varylen+))))
+(eval-when (#-sb-xc-host :compile-toplevel)
+  (sb-xc:defmacro make-packed-info (n)
+    `(%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start))))
+
 (defconstant info-num-mask (ldb (byte info-number-bits 0) -1)) ; #b111111
 
 ;; Using 6 bits per packed field, 5 infos can be described in a 30-bit fixnum,
@@ -246,8 +254,8 @@
 ;; Iterate over PACKED-INFO, binding DATA-INDEX to the index of each aux-key in turn.
 ;; TOTAL-N-FIELDS is deliberately exposed to invoking code.
 ;;
-(defmacro do-packed-info-aux-key ((packed-info &optional (data-index (gensym)))
-                                          step-form &optional result-form)
+(defmacro do-packed-info-aux-key ((packed-info &optional (data-index (sb-xc:gensym)))
+                                  step-form &optional result-form)
   (with-unique-names (descriptor-idx field-idx info)
      `(let* ((,info ,packed-info)
              (,data-index (packed-info-len ,info))
@@ -569,9 +577,9 @@
             (t (packify-infos new end)))))) ; otherwise repack
 
 ;; We need a few magic constants to be shared between the next two functions.
-(defconstant-eqx !+pcl-reader-name+ '#.(make-symbol "READER") (constantly t))
-(defconstant-eqx !+pcl-writer-name+ '#.(make-symbol "WRITER") (constantly t))
-(defconstant-eqx !+pcl-boundp-name+ '#.(make-symbol "BOUNDP") (constantly t))
+(defconstant-eqx !+pcl-reader-name+ (make-symbol "READER") (constantly t))
+(defconstant-eqx !+pcl-writer-name+ (make-symbol "WRITER") (constantly t))
+(defconstant-eqx !+pcl-boundp-name+ (make-symbol "BOUNDP") (constantly t))
 
 ;; PCL names are physically 4-lists (see "pcl/slot-name")
 ;; that get treated as 2-component names for globaldb's purposes.

@@ -52,7 +52,7 @@ node [shape=record];~%")
     (let (tree (prev-op :delete))
       (setf (fill-pointer keys) 0)
       (loop
-       repeat n-ops for event from 0 do
+       for event from 0 repeat n-ops do
        (assert (= (avl-count tree) (length keys)))
        (let ((op
               (if (< (random 10) 5)

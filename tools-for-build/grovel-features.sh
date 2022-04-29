@@ -42,6 +42,8 @@ featurep os-provides-getprotoby-r
 
 featurep os-provides-poll
 
+featurep os-provides-close-range-wrapper
+
 if [ "$sbcl_arch" = arm ] ; then
    featurep arm-softfp
 fi

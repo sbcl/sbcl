@@ -894,58 +894,61 @@
     (bug "Both SYSTEM-LAMBDA and MAYBE-ADD-DEBUG-CATCH specified"))
   (unless (or debug-name (neq '.anonymous. source-name))
     (setf debug-name (name-lambdalike form)))
-  (multiple-value-bind (forms decls doc) (parse-body (cddr form) t)
-    (let ((*lexenv* (process-muffle-decls decls *lexenv*)))
-      (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
-          (make-lambda-vars (cadr form))
-        (binding* (((*lexenv* result-type post-binding-lexenv
-                              lambda-list explicit-check source-form
-                              local-policy)
-                    (process-decls decls (append aux-vars vars) nil
-                                   :binding-form-p t :allow-lambda-list t))
-                   (debug-catch-p (and maybe-add-debug-catch
-                                       *allow-instrumenting*
-                                       (policy *lexenv*
-                                           (>= insert-debug-catch 2))))
-                   (forms (if debug-catch-p
-                              (wrap-forms-in-debug-catch forms)
-                              forms))
-                   (forms (if (eq result-type *wild-type*)
-                              forms
-                              `((the ,(type-specifier result-type) (progn ,@forms)))))
-                   (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*))
-                   (res (cond ((or (find-if #'lambda-var-arg-info vars) keyp)
-                               (ir1-convert-hairy-lambda forms vars keyp
-                                                         allow-other-keys
-                                                         aux-vars aux-vals
-                                                         :post-binding-lexenv post-binding-lexenv
-                                                         :source-name source-name
-                                                         :debug-name debug-name
-                                                         :system-lambda system-lambda))
-                              (t
-                               (ir1-convert-lambda-body forms vars
-                                                        :aux-vars aux-vars
-                                                        :aux-vals aux-vals
-                                                        :post-binding-lexenv post-binding-lexenv
-                                                        :source-name source-name
-                                                        :debug-name debug-name
-                                                        :system-lambda system-lambda
-                                                        :local-policy local-policy)))))
-          (when explicit-check
-            (setf (getf (functional-plist res) 'explicit-check) explicit-check))
-          (setf (functional-inline-expansion res) (or source-form form))
-          (setf (functional-arg-documentation res)
-                (if (eq lambda-list :unspecified)
-                    (strip-lambda-list (cadr form) :arglist)
-                    lambda-list))
-          (setf (functional-documentation res) doc)
-          (when (boundp '*lambda-conversions*)
-            ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but
-            ;; keeps things less confusing to users of TIME, where this
-            ;; count gets used.
-            (unless (and (consp debug-name) (eq 'tl-xep (car debug-name)))
-              (incf *lambda-conversions*)))
-          res)))))
+  (binding* (((forms decls doc) (parse-body (cddr form) t))
+             ((*lexenv* source-form) (process-muffle-decls decls *lexenv*))
+             (*current-path* (or (and source-form
+                                      (get-source-path source-form))
+                                 *current-path*))
+             ((vars keyp allow-other-keys aux-vars aux-vals)
+              (make-lambda-vars (cadr form)))
+             ((*lexenv* result-type post-binding-lexenv
+                        lambda-list explicit-check source-form
+                        local-policy)
+              (process-decls decls (append aux-vars vars) nil
+                             :binding-form-p t :allow-lambda-list t))
+             (debug-catch-p (and maybe-add-debug-catch
+                                 *allow-instrumenting*
+                                 (policy *lexenv*
+                                     (>= insert-debug-catch 2))))
+             (forms (if debug-catch-p
+                        (wrap-forms-in-debug-catch forms)
+                        forms))
+             (forms (if (eq result-type *wild-type*)
+                        forms
+                        `((the ,(type-specifier result-type) (progn ,@forms)))))
+             (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*))
+             (res (cond ((or (find-if #'lambda-var-arg-info vars) keyp)
+                         (ir1-convert-hairy-lambda forms vars keyp
+                                                   allow-other-keys
+                                                   aux-vars aux-vals
+                                                   :post-binding-lexenv post-binding-lexenv
+                                                   :source-name source-name
+                                                   :debug-name debug-name
+                                                   :system-lambda system-lambda))
+                        (t
+                         (ir1-convert-lambda-body forms vars
+                                                  :aux-vars aux-vars
+                                                  :aux-vals aux-vals
+                                                  :post-binding-lexenv post-binding-lexenv
+                                                  :source-name source-name
+                                                  :debug-name debug-name
+                                                  :system-lambda system-lambda
+                                                  :local-policy local-policy)))))
+    (when explicit-check
+      (setf (getf (functional-plist res) 'explicit-check) explicit-check))
+    (setf (functional-inline-expansion res) (or source-form form))
+    (setf (functional-arg-documentation res)
+          (if (eq lambda-list :unspecified)
+              (strip-lambda-list (cadr form) :arglist)
+              lambda-list))
+    (setf (functional-documentation res) doc)
+    (when (boundp '*lambda-conversions*)
+      ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but
+      ;; keeps things less confusing to users of TIME, where this
+      ;; count gets used.
+      (unless (and (consp debug-name) (eq 'tl-xep (car debug-name)))
+        (incf *lambda-conversions*)))
+    res))
 
 (defun wrap-forms-in-debug-catch (forms)
   #+unwind-to-frame-and-call-vop
@@ -1049,8 +1052,8 @@
 
 (declaim (end-block))
 
-
 ;;;; defining global functions
+
 ;;; Given a lambda-list, return a FUN-TYPE object representing the signature:
 ;;; return type is *, and each individual arguments type is T -- but we get
 ;;; the argument counts and keywords.
@@ -1074,109 +1077,59 @@
 
 (declaim (start-block maybe-inline-syntactic-closure))
 
-;;; Take the lexenv surrounding an inlined function and extract things
-;;; needed for the inline expansion suitable for dumping into fasls.
-;;; Right now it's MACROLET, SYMBOL-MACROLET, SPECIAL and
-;;; INLINE/NOTINLINE declarations. Upon encountering something else return NIL.
-;;; This is later used by PROCESS-INLINE-LEXENV to reproduce the lexenv.
-;;;
-;;; Previously it just used the functions and vars of the innermost
-;;; lexenv, but the body of macrolet can refer to other macrolets
-;;; defined earlier, so it needs to process all the parent lexenvs to
-;;; recover the proper order.
-(defun reconstruct-lexenv (lexenv)
-  (let (shadowed-funs
-        shadowed-vars
-        result)
-    (loop for env = lexenv then parent
-          for parent = (lexenv-parent env)
-          for vars = (lexenv-vars env)
-          for funs = (lexenv-funs env)
-          for declarations = nil
-          for symbol-macros = nil
-          for macros = nil
-          do
-          (loop for binding in vars
-                for (name . what) = binding
-                unless (and parent
-                            (find binding (lexenv-vars parent)))
-                do (typecase what
-                     (cons
-                      (aver (eq (car what) 'macro))
-                      (push name shadowed-vars)
-                      (push (list name (cdr what)) symbol-macros))
-                     (global-var
-                      (aver (eq (global-var-kind what) :special))
-                      (push `(special ,name) declarations))
-                     (t
-                      (unless (memq name shadowed-vars)
-                        (return-from reconstruct-lexenv)))))
-          (loop for binding in funs
-                for (name . what) = binding
-                unless (and parent
-                            (find binding (lexenv-funs parent)))
-                do
-                (typecase what
-                  (cons
-                   (push name shadowed-funs)
-                   (let ((expression (function-lambda-expression (cdr what))))
-                     (aver expression)
-                     (push (cons name expression) macros)))
-                  ;; FIXME: Is there a good reason for this not to be
-                  ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
-                  ;; you're wondering how this ever worked :-)? Maybe
-                  ;; in conjunction with an AVERrance that it's not an
-                  ;; (AND GLOBAL-VAR (NOT GLOBAL-FUN))? -- CSR,
-                  ;; 2002-07-08
-                  (global-var
-                   (unless (defined-fun-p what)
-                     (return-from reconstruct-lexenv))
-                   (push `(,(car (defined-fun-inlinep what))
-                           ,name)
-                         declarations))
-                  (t
-                   (unless (memq name shadowed-funs)
-                     (return-from reconstruct-lexenv)))))
-          (when declarations
-            (setf result (list* :declare declarations (and result (list result)))))
-          (when symbol-macros
-            (setf result (list* :symbol-macro symbol-macros (and result (list result)))))
-          (when macros
-            (setf result (list* :macro macros (and result (list result)))))
-          while (and parent
-                     (not (null-lexenv-p parent))))
-    result))
-
-;;; Return a sexpr for LAMBDA in LEXENV such that loading it from fasl
-;;; preserves the original lexical environment for inlining.
-;;; Return NIL if the lexical environment is too complicated.
+;;; Return a lambda form that has been "closed" with respect to
+;;; LEXENV, returning a LAMBDA-WITH-LEXENV if there are interesting
+;;; declarations. To handle local macros, rather than closing over
+;;; definitions in the environment, expand all macros in the body of
+;;; LAMBDA, so that nothing in the syntactic environment is needed in
+;;; the expansion. If there is something too complex in the lexical
+;;; environment (like a lexical variable), then we return NIL.
 (defun maybe-inline-syntactic-closure (lambda lexenv)
   (declare (type list lambda) (type lexenv-designator lexenv))
   (aver (eql (first lambda) 'lambda))
-  ;; We used to have a trivial implementation, verifying that lexenv
-  ;; was effectively null. However, this fails to take account of the
-  ;; idiom
-  ;;
-  ;; (declaim (inline foo))
-  ;; (macrolet ((def (x) `(defun ,x () ...)))
-  ;;   (def foo))
-  ;;
-  ;; which, while too complicated for the cross-compiler to handle in
-  ;; unfriendly foreign lisp environments, would be good to support in
-  ;; the target compiler. -- CSR, 2002-05-13 and 2002-11-02
   (typecase lexenv
    (lexenv
     (let ((vars (lexenv-vars lexenv))
-          (funs (lexenv-funs lexenv)))
-      (acond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
-             ((and (null vars) (null funs)) lambda)
-             ;; If the lexenv is too hairy for cross-compilation,
-             ;; you'll find out later, when trying to perform inlining.
-             ;; This is fine, because if the inline expansion is only
-             ;; for the target, it's totally OK to cross-compile this
-             ;; defining form. The syntactic env is correctly captured.
-             ((reconstruct-lexenv lexenv)
-              `(lambda-with-lexenv ,it ,@(cdr lambda))))))
+          (funs (lexenv-funs lexenv))
+          (decls ()))
+      (cond ((or (lexenv-blocks lexenv) (lexenv-tags lexenv)) nil)
+            ((and (null vars) (null funs)) lambda)
+            ((dolist (x vars nil)
+               (let ((name (car x))
+                     (what (cdr x)))
+                 (when (eq x (assoc name vars :test #'eq))
+                   (typecase what
+                     (cons
+                      (aver (eq (car what) 'macro)))
+                     (global-var
+                      (aver (eq (global-var-kind what) :special))
+                      (push `(special ,name) decls))
+                     (t (return t))))))
+             nil)
+            ((dolist (x funs nil)
+               (let ((name (car x))
+                     (what (cdr x)))
+                 (when (eq x (assoc name funs :test #'equal))
+                   (typecase what
+                     (cons)
+                     ;; FIXME: Is there a good reason for this not to be
+                     ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
+                     ;; you're wondering how this ever worked :-)? Maybe
+                     ;; in conjunction with an AVERrance that it's not an
+                     ;; (AND GLOBAL-VAR (NOT GLOBAL-FUN))? -- CSR,
+                     ;; 2002-07-08
+                     (global-var
+                      (when (defined-fun-p what)
+                        (push `(,(car (defined-fun-inlinep what))
+                                ,name)
+                              decls)))
+                     (t (return t))))))
+             nil)
+            (t
+             (let ((expansion (sb-walker:macroexpand-all lambda lexenv)))
+               (if decls
+                   `(lambda-with-lexenv (:declare ,decls) ,@(cdr expansion))
+                   expansion))))))
    #+(and sb-fasteval (not sb-xc-host))
    (sb-interpreter:basic-env
     (awhen (sb-interpreter::reconstruct-syntactic-closure-env lexenv)
@@ -1374,7 +1327,7 @@
         (note-inlining (optional-dispatch-more-entry fun))
         (mapc #'note-inlining (optional-dispatch-entry-points fun))))
     ;; substitute for any old references
-    (unless (or (eq (defined-fun-inlinep var) :notinline)
+    (unless (or (eq (defined-fun-inlinep var) 'notinline)
                 (not (block-compile *compilation*))
                 (and info
                      (or (fun-info-transforms info)

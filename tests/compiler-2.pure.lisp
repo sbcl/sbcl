@@ -3050,23 +3050,6 @@
                  :allow-failure t))))
 
 
-(declaim (maybe-inline inline-recursive))
-(defun inline-recursive (x)
-  (declare (muffle-conditions compiler-note
-                              style-warning))
-  (if (zerop x)
-      x
-      (inline-recursive (1- x))))
-(declaim (inline inline-recursive))
-
-(with-test (:name :reanalyze-functionals-when-inlining)
-  (checked-compile-and-assert
-   ()
-   `(lambda (x)
-      (inline-recursive x)
-      (inline-recursive x))
-    ((5) 0)))
-
 (with-test (:name :split-let-unused-vars)
   (checked-compile-and-assert
       ()
@@ -3348,6 +3331,13 @@
       `(lambda (x y)
          (1+ (position x (the list y))))
     ((1 '(1)) 1)))
+
+(with-test (:name :lvar-annotation-inline-type-mismatch)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (sb-kernel:the* (float :use-annotations t) (inline-deletion-note x y)))
+    ((1.0 nil) 1.0)))
 
 (with-test (:name :cast-type-preservation)
   (assert
@@ -3636,3 +3626,44 @@
       (x #.#'list))))~%"))
     (with-scratch-file (fasl "fasl")
       (compile-file lisp :output-file fasl))))
+
+(with-test (:name :substitute-single-use-lvar-mv-cast)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((r (random 10))
+               (x (list 1)))
+           (declare (special x)
+                    (dynamic-extent x))
+           (throw 'c (the (integer 0 10) r))))))
+
+(with-test (:name :list-ir2-convert)
+  (checked-compile '(lambda ()
+                     (declare (notinline list +))
+                     (list (loop for i below 2 count t)))))
+
+(with-test (:name :ir2-optimize-jumps-multiway-branch-if-eq-delete-branch)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare (type (integer -345 1) a))
+         (case (ldb (byte 24 5) a)
+           ((4 47 61 17 10 39) 1)
+           ((2 7 55) A)
+           ((42 48 16 33 40 20) A)
+           ((60 54 28) 3)
+           ((15 1 44 29 57 41 52) 32771)
+           ((46 64 3 18 36 49 37) 1)
+           (t A)))
+    ((-5) -5)))
+
+(with-test (:name :bignump-integer-<)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type integer a))
+      (if (and (typep a 'bignum) (< a 0))
+          t
+          nil))
+   ((-1) nil)
+   (((- (expt 2 300))) t)))

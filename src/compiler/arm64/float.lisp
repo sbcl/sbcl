@@ -63,15 +63,13 @@
   (:args (x :scs (double-reg) :to :save))
   (:results (y))
   (:note "float to pointer coercion")
-  (:temporary (:sc non-descriptor-reg) flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:results (y :scs (descriptor-reg)))
   (:generator 13
-   (with-fixed-allocation (y flag
-                           double-float-widetag
-                           double-float-value-slot
-                           :lip lip)
-     (storew x y double-float-value-slot other-pointer-lowtag))))
+    (with-fixed-allocation (y lr
+                            double-float-widetag
+                            double-float-value-slot)
+      (storew x y double-float-value-slot other-pointer-lowtag))))
 
 (define-move-vop move-from-double :move (double-reg) (descriptor-reg))
 
@@ -166,30 +164,28 @@
 (define-vop (move-from-complex-single)
   (:args (x :scs (complex-single-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:note "complex single float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y pa-flag complex-single-float-widetag
-                             complex-single-float-size :lip lip)
-       (inst str x (@ y (- (* complex-single-float-data-slot
-                              n-word-bytes)
-                           other-pointer-lowtag))))))
+    (with-fixed-allocation (y lr complex-single-float-widetag
+                            complex-single-float-size)
+      (inst str x (@ y (- (* complex-single-float-data-slot
+                             n-word-bytes)
+                          other-pointer-lowtag))))))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
 (define-vop (move-from-complex-double)
   (:args (x :scs (complex-double-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:note "complex double float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y pa-flag complex-double-float-widetag
-                             complex-double-float-size :lip lip)
-       (inst str x (@ y (- (* complex-double-float-real-slot
-                              n-word-bytes)
-                           other-pointer-lowtag))))))
+    (with-fixed-allocation (y lr complex-double-float-widetag
+                            complex-double-float-size)
+      (inst str x (@ y (- (* complex-double-float-real-slot
+                             n-word-bytes)
+                          other-pointer-lowtag))))))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 

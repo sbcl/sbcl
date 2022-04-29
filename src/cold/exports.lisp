@@ -106,6 +106,7 @@ interface stability.")
    "VOID-SYSCALL"
    "CLOCK-THREAD-CPUTIME-ID"
    "CLOCK-PROCESS-CPUTIME-ID"
+   "CLOCK-REALTIME"
 
    ;; signals
 
@@ -1111,8 +1112,14 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
    "%MAKE-SIMD-PACK-UB64"
    "%MAKE-SIMD-PACK-DOUBLE"
    "%MAKE-SIMD-PACK-SINGLE"
+   "%SIMD-PACK-UB8S"
+   "%SIMD-PACK-UB16S"
    "%SIMD-PACK-UB32S"
    "%SIMD-PACK-UB64S"
+   "%SIMD-PACK-SB8S"
+   "%SIMD-PACK-SB16S"
+   "%SIMD-PACK-SB32S"
+   "%SIMD-PACK-SB64S"
    "%SIMD-PACK-DOUBLES"
    "%SIMD-PACK-SINGLES")
   #+sb-simd-pack-256
@@ -1123,8 +1130,14 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
    "%MAKE-SIMD-PACK-256-UB64"
    "%MAKE-SIMD-PACK-256-DOUBLE"
    "%MAKE-SIMD-PACK-256-SINGLE"
+   "%SIMD-PACK-256-UB8S"
+   "%SIMD-PACK-256-UB16S"
    "%SIMD-PACK-256-UB32S"
    "%SIMD-PACK-256-UB64S"
+   "%SIMD-PACK-256-SB8S"
+   "%SIMD-PACK-256-SB16S"
+   "%SIMD-PACK-256-SB32S"
+   "%SIMD-PACK-256-SB64S"
    "%SIMD-PACK-256-DOUBLES"
    "%SIMD-PACK-256-SINGLES"))
 
@@ -1195,6 +1208,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
   (:use "CL" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM" "SB-C"
         "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS")
   (:import-from "SB-VM" "+FIXUP-KINDS+")
+  (:import-from "SB-IMPL" "MAKE-DEFERRED-PACKAGE" "WITH-DEFERRED-PACKAGE-NAMES")
   (:export "*ASSEMBLER-ROUTINES*"
            "GET-ASM-ROUTINE"
            "+BACKEND-FASL-FILE-IMPLEMENTATION+"
@@ -1861,7 +1875,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MAKE-ARRAY"
            "%MAKE-COMPLEX" "%MAKE-FUNCALLABLE-INSTANCE"
            "%MAKE-FUNCALLABLE-STRUCTURE-INSTANCE-ALLOCATOR"
-           "%MAKE-INSTANCE"
+           "%MAKE-INSTANCE" "%MAKE-INSTANCE/MIXED"
            "%MAKE-LISP-OBJ"
            "%MAKE-LIST"
            "%MAKE-RATIO"
@@ -1886,6 +1900,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MEMBER-TEST-NOT"
            "%MULTIPLY-HIGH" "%SIGNED-MULTIPLY-HIGH"
            "%NEGATE" "%POW"
+           "%NEW-INSTANCE"
            "%OTHER-POINTER-WIDETAG"
            "%PCL-INSTANCE-P"
            "%PUTHASH"
@@ -2023,6 +2038,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "DIVISION-BY-ZERO-ERROR"
            "DO-REST-ARG"
            "DO-INSTANCE-TAGGED-SLOT"
+           "DO-LAYOUT-BITMAP"
            "DOUBLE-FLOAT-EXPONENT"
            "DOUBLE-FLOAT-BITS"
            "DOUBLE-FLOAT-HIGH-BITS" "DOUBLE-FLOAT-INT-EXPONENT"
@@ -2449,12 +2465,13 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "DEFSTRUCT-DESCRIPTION" "UNDECLARE-STRUCTURE"
            "UNDEFINE-FUN-NAME" "DD-TYPE" "CLASSOID-STATE" "INSTANCE"
            "*TYPE-SYSTEM-INITIALIZED*" "FIND-LAYOUT"
-           "%TYPEP" "%%TYPEP" "DD-NAME" "CLASSOID-SUBCLASSES"
+           "%TYPEP" "%%TYPEP" "DD-FLAGS" "DD-NAME" "CLASSOID-SUBCLASSES"
+           "+DD-VARYLEN+"
            "CLASSOID-LAYOUT" "CLASSOID-NAME" "CLASSOID-P" "CLASSOID-WRAPPER"
            "NOTE-NAME-DEFINED"
            "%CODE-CODE-SIZE" "%CODE-TEXT-SIZE"
            "%CODE-SERIALNO"
-           "DD-SLOTS" "DD-INCLUDE" "SLOT-SETTER-LAMBDA-FORM"
+           "DD-SLOTS" "DD-HAS-RAW-SLOT-P" "DD-INCLUDE" "SLOT-SETTER-LAMBDA-FORM"
            "SLOT-ACCESS-TRANSFORM"
            "%IMAGPART" "%CODE-DEBUG-INFO"
            "WRAPPER-CLASSOID" "WRAPPER-INVALID"
@@ -2795,6 +2812,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
   (:use "CL" "SB-INT" "SB-EXT")
   (:shadow "RECONS")
   (:export "DEFINE-WALKER-TEMPLATE"
+           "MACROEXPAND-ALL"
            "WALK-FORM"
            "*WALK-FORM-EXPAND-MACROS-P*"
            "VAR-LEXICAL-P" "VAR-SPECIAL-P"
@@ -2911,6 +2929,7 @@ possibly temporarily, because it might be used internally.")
            "XSET-MEMBERS"
            "XSET-SUBSET-P"
            "XSET-UNION"
+           "XSET="
 
             ;; sparse set implementation backed by a lightweight hashtable
 
@@ -2981,6 +3000,7 @@ possibly temporarily, because it might be used internally.")
             ;; hash mixing operations
 
            "MIX" "MIXF" "WORD-MIX"
+           "GOOD-HASH-WORD->FIXNUM"
 
             ;; Macroexpansion that doesn't touch special forms
 
@@ -3513,9 +3533,17 @@ package is deprecated in favour of SB-MOP.")
 
 (defpackage* "SB-RBTREE"
   (:documentation "internal: red/black tree")
-  (:use "CL" "SB-INT" "SB-EXT")
+  (:use "CL" "SB-INT" "SB-EXT"))
+(defpackage* "SB-RBTREE.WORD"
+  (:documentation nil)
+  (:use "CL")
   (:shadow "DELETE")
-  (:export "INSERT" "DELETE" "FIND=" "FIND<="))
+  (:export "INSERT" "DELETE"))
+(defpackage* "SB-RBTREE.MAP"
+  (:documentation nil)
+  (:use "CL")
+  (:shadow "DELETE")
+  (:export "INSERT" "DELETE"))
 
 (defpackage* "SB-LOCKLESS"
   (:documentation "internal: lockfree lists")

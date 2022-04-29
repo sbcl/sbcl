@@ -395,6 +395,22 @@ static void brief_list(lispobj obj)
     }
 }
 
+void print_list_car_ptrs(lispobj obj, FILE* f)
+{
+    char sep = '(';
+    int len = 0;
+    if (obj == NIL) { fprintf(f, "NIL"); return; }
+    do {
+        if (++len > 20) { fprintf(f, "...)"); return; }
+        fprintf(f, "%c%p", sep, (void*)CONS(obj)->car);
+        obj = CONS(obj)->cdr;
+        sep = ' ';
+    } while (listp(obj) && obj != NIL);
+    if (obj != NIL) fprintf(f, " . %p", (void*)obj);
+    putc(')', f);
+}
+
+
 static void print_list(lispobj obj)
 {
     if (obj == NIL) {

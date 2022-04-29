@@ -97,7 +97,9 @@
      (:temp src any-reg nl1-offset)
      (:temp dst any-reg nl2-offset)
      (:temp count any-reg nl3-offset)
-     (:temp temp descriptor-reg l0-offset))
+     (:temp temp descriptor-reg l0-offset)
+
+     (:temp function descriptor-reg l0-offset))
 
 
   ;; Calculate NARGS (as a fixnum)
@@ -127,8 +129,8 @@
   DONE
   ;; We are done.  Do the jump.
   (with-word-index-as-fixnum (nargs nargs))
-  (loadw count lexenv closure-fun-slot fun-pointer-lowtag)
-  (inst jalr zero-tn count
+  (loadw function lexenv closure-fun-slot fun-pointer-lowtag)
+  (inst jalr zero-tn function
         (- (ash simple-fun-insts-offset word-shift)
            fun-pointer-lowtag)))
 
@@ -260,6 +262,7 @@
      (:temp a0 descriptor-reg a0-offset)
 
      (:temp value (descriptor-reg any-reg) ca0-offset)
+     (:temp fun (descriptor-reg) l0-offset)
 
      ;; Don't want these to overlap with C args.
      (:temp pa-temp non-descriptor-reg nl6-offset)
@@ -283,10 +286,10 @@
         do (loadw arg cfp-tn index))
 
   ;; Indirect closure.
-  (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
+  (loadw fun lexenv-tn closure-fun-slot fun-pointer-lowtag)
   ;; Call into Lisp!
-  (inst jalr ra code-tn (- (* simple-fun-insts-offset n-word-bytes)
-                           fun-pointer-lowtag))
+  (inst jalr ra fun (- (* simple-fun-insts-offset n-word-bytes)
+                       fun-pointer-lowtag))
 
   (inst blt nargs-tn zero-tn single-value-return)
   (move csp-tn ocfp-tn)
@@ -320,11 +323,10 @@
   (move cfp-tn csp-tn)
   (inst addi csp-tn cfp-tn 32)
 
-  (storew ocfp-tn cfp-tn)
-  (storew ra-tn cfp-tn 1)
-  (storew code-tn cfp-tn 2)
-
   (pseudo-atomic (pa-temp)
+    (storew ocfp-tn cfp-tn)
+    (storew ra-tn cfp-tn 1)
+    (storew code-tn cfp-tn 2)
     (save-lisp-context csp-tn cfp-tn temp))
 
   ;; Call into C.

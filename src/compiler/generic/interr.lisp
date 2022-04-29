@@ -73,16 +73,20 @@
         ;; Error number must be of type (unsigned-byte 8).
         (assert (<= (length list) 256))
         `(defconstant-eqx sb-c:+backend-internal-errors+
-               ,(map 'vector
-                     (lambda (x)
+             ,(map 'vector
+                   (lambda (x)
+                     (flet ((normalize-type (type)
+                              (if (stringp type)
+                                  type
+                                  (type-specifier (specifier-type type)))))
                        (if (symbolp x)
-                           (list* x (symbolicate "OBJECT-NOT-" x "-ERROR") 1)
-                           (list* (car x) (symbolicate (second x) "-ERROR")
+                           (list* (normalize-type x) (symbolicate "OBJECT-NOT-" x "-ERROR") 1)
+                           (list* (normalize-type (car x)) (symbolicate (second x) "-ERROR")
                                   (if (stringp (car x))
                                       (third x)
-                                      1))))
-                     list)
-               #'equalp))))
+                                      1)))))
+                   list)
+           #'equalp))))
  (compute-it
   ;; Keep the following two subsets of internal errors in this order:
   ;;
@@ -118,8 +122,10 @@
    ("Thread local storage exhausted." tls-exhausted 0)
    ("Unreachable code reached" unreachable 0)
    ("Failed aver" failed-aver 1)
-   ("Fixnum multiplication overflow" mul-overflow 2))
-
+   ("Multiplication overflow" mul-overflow 2)
+   ("Addition overflow" add-sub-overflow 1)
+   #+x86-64
+   ("Subtraction overflow" sub-overflow 1))
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
   function

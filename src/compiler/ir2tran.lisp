@@ -79,7 +79,7 @@
   (declare (type ref node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
          (leaf (ref-leaf node))
-         (locs (lvar-result-tns lvar (list (leaf-type leaf))))
+         (locs (lvar-result-tns lvar (list (single-value-type (node-derived-type node)))))
          (res (first locs)))
     (etypecase leaf
       (lambda-var
@@ -637,6 +637,43 @@
                (register-drop-thru alternative)
                (vop branch if block (block-label alternative)))))))
 
+(when-vop-existsp (:named sb-vm::move-conditional-result)
+  ;; Use a dedicated VOP instead of wrapping a conditional that needs
+  ;; to return T/NIL in (if x t nil)
+  ;; Produces slightly better code, not emitted when not needed.
+  (defun ir2-convert-conditional-result (node block template args info-args lvar)
+    (declare (type node node) (type ir2-block block)
+             (type template template) (type (or tn-ref null) args)
+             (list info-args))
+    (let* ((res (lvar-result-tns lvar
+                                 (list *universal-type*)
+                                 (list *backend-t-primitive-type*)))
+           (res-refs (reference-tn-list res t))
+           (flags (and (consp (template-result-types template))
+                       (rest (template-result-types template)))))
+      (aver (= (template-info-arg-count template)
+               (+ (length info-args)
+                  (if flags 0 2))))
+      (cond ((not flags)
+             (let ((true (gen-label)))
+               (emit-template node block template args nil
+                              (list* true nil info-args))
+               (emit-template node block (template-or-lose 'sb-vm::move-conditional-result) nil res-refs
+                              (list true))))
+            (t
+             (when (equal flags '(:after-sc-selection))
+               ;; To be fixed up by VOP-INFO-AFTER-SC-SELECTION
+               (setf flags (list :after-sc-selection))
+               (setf info-args (append info-args flags)))
+             (emit-template node block template args nil info-args)
+             (emit-template node block (template-or-lose 'sb-vm::move-if/descriptor)
+                            (reference-tn-list
+                             (list (emit-constant t)
+                                   (emit-constant nil))
+                             nil)
+                            res-refs (list flags))))
+      (move-lvar-result node block res lvar))))
+
 ;;; Convert an IF that isn't the DEST of a conditional template.
 (defun ir2-convert-if (node block)
   (declare (type ir2-block block) (type cif node))
@@ -702,8 +739,15 @@
         (reference-args call block (combination-args call) template)
       (aver (not (template-more-results-type template)))
       (if (template-conditional-p template)
-          (ir2-convert-conditional call block template args info-args
-                                   (lvar-dest lvar) nil)
+          (let ((dest (lvar-dest lvar)))
+            (cond ((when-vop-existsp (:named sb-vm::move-conditional-result)
+                     (unless (and (if-p dest)
+                                  (immediately-used-p (if-test dest) call))
+                       (ir2-convert-conditional-result call block template args info-args lvar)
+                       t)))
+                  (t
+                   (ir2-convert-conditional call block template args info-args
+                                            dest nil))))
           (let* ((results (make-template-result-tns call lvar rtypes))
                  (r-refs (reference-tn-list results t)))
             (aver (= (length info-args)
@@ -833,8 +877,10 @@
                 (push loc passed)
                 (temps value)
                 (locs loc))))
-          (temps old-fp)
-          (locs (ir2-environment-old-fp called-env))))
+          #-arm64
+          (progn
+            (temps old-fp)
+            (locs (ir2-environment-old-fp called-env)))))
 
       (values (temps) (locs)))))
 
@@ -852,7 +898,7 @@
 
       ;; If we're about to emit a move from CURRENT-FP then we need to
       ;; initialize it.
-      (when (find current-fp temps)
+      (when (memq current-fp temps)
         (vop current-fp node block current-fp))
 
       (mapc (lambda (temp loc)
@@ -896,7 +942,8 @@
         (old-fp (make-stack-pointer-tn)))
     (multiple-value-bind (temps locs)
         (emit-psetq-moves node block fun old-fp)
-      (vop current-fp node block old-fp)
+      (when (memq old-fp temps)
+        (vop current-fp node block old-fp))
       (vop allocate-frame node block
            (environment-info (lambda-environment fun))
            fp nfp)
@@ -1039,7 +1086,8 @@
 
 (defun pass-nargs-p (combination)
   (let ((fun-info (combination-fun-info combination)))
-    (not (and fun-info
+    (not (and (eq (combination-kind combination) :known)
+              fun-info
               (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)
               (let ((type (info :function :type (combination-fun-source-name combination))))
                 (and (not (fun-type-keyp type))
@@ -2043,29 +2091,17 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (defoptimizer (list ir2-convert) ((&rest args) node block)
   (let* ((fun (lvar-fun-name (combination-fun node)))
-         (star (ecase fun (list* t) (list nil))))
+         (star (ecase fun (list* t) (list nil)))
+         (num-conses (- (length args) (if star 1 0))))
     ;; LIST needs at least 1 arg, LIST* demands at least 2 args
     (aver (if star (cdr args) args))
-    ;; This used to convert as a full call to LIST or LIST* when n-cons-cell exceeded a threshold
-    ;; which could confuse GC (see the :NO-CONSES-ON-LARGE-OBJECT-PAGES regression test).
-    ;; It's no longer required to special-case that situation.
-    ;; Nonetheless, beyond a certain length, it might make sense to do a full call anyway,
-    ;; because there's little to be gained by inlining all the stores - the generated code size
-    ;; grows at a rate faster than pushing more stack arguments - but because MAKE-LIST avoids
-    ;; allocating as one huge chunk (instead, doing a cons at a time), in theory it can better
-    ;; utilize free memory. But really, if you have a statically written LIST call with so many
-    ;; args that it exhausts the heap, you should probably rethink your coding style.
-    (let* ((refs (reference-tn-list
-                  (mapcar (lambda (arg)
-                            (lvar-tn node block arg))
-                          args)
-                  nil))
+    (when (> num-conses sb-vm::max-conses-per-page)
+      (return-from list-ir2-convert-optimizer (ir2-convert-full-call node block)))
+    (let* ((refs (reference-tn-list (mapcar (lambda (arg) (lvar-tn node block arg))
+                                            args)
+                                    nil))
            (lvar (node-lvar node))
-           (res (lvar-result-tns lvar (list (specifier-type 'list))))
-           (num-conses (- (length args) (if star 1 0))))
-      #+gencgc ;; technically, only required if #+use-cons-region, but OK either way
-      (when (> num-conses sb-vm::max-conses-per-page)
-        (return-from list-ir2-convert-optimizer (ir2-convert-full-call node block)))
+           (res (lvar-result-tns lvar (list (specifier-type 'list)))))
       (when (and lvar (lvar-dynamic-extent lvar))
         (vop current-stack-pointer node block (ir2-lvar-stack-pointer (lvar-info lvar))))
       ;;; This COND-like expression is unfortunate, but the VOP* macro chokes if the name
@@ -2237,7 +2273,8 @@ not stack-allocated LVAR ~S." source-lvar)))))
                              (policy first-node (/= insert-safepoints 0)))
                     (vop sb-vm::insert-safepoint first-node 2block))))
             (ir2-convert-block block)
-            (incf num))))))
+            (incf num))))
+      (setf (component-max-block-number component) num)))
   (values))
 
 ;;; If necessary, emit a terminal unconditional branch to go to the

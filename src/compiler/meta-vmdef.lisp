@@ -1153,11 +1153,11 @@
     (values costs load-scs)))
 
 (defconstant-eqx +no-costs+
-    #.(make-array sb-vm:sc-number-limit :initial-element 0)
+  (make-array sb-vm:sc-number-limit :initial-element 0)
   #'equalp)
 
 (defconstant-eqx +no-loads+
-    #.(make-array sb-vm:sc-number-limit :initial-element t)
+  (make-array sb-vm:sc-number-limit :initial-element t)
   #'equalp)
 
 ;;; Pick off the case of operands with no restrictions.

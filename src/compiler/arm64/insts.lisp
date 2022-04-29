@@ -48,10 +48,10 @@
   #'equal)
 
 (defconstant-eqx +condition-name-vec+
-  #.(let ((vec (make-array 16 :initial-element nil)))
-      (dolist (cond +conditions+ vec)
-        (when (null (aref vec (cdr cond)))
-          (setf (aref vec (cdr cond)) (car cond)))))
+  (let ((vec (make-array 16 :initial-element nil)))
+    (dolist (cond +conditions+ vec)
+      (when (null (aref vec (cdr cond)))
+        (setf (aref vec (cdr cond)) (car cond)))))
   #'equalp)
 
 (defun conditional-opcode (condition)
@@ -115,6 +115,7 @@
   (define-arg-type sys-reg :printer #'print-sys-reg)
 
   (define-arg-type cond :printer #'print-cond)
+  (define-arg-type negated-cond :printer #'print-negated-cond)
 
   (define-arg-type ldr-str-annotation :printer #'annotate-ldr-str-imm)
   (define-arg-type ldr-str-pair-annotation :printer #'annotate-ldr-str-pair)
@@ -1031,10 +1032,12 @@
 
 (def-cond-select csel 0 0)
 (def-cond-select csinc 0 1
-  (:printer cond-select ((op 0) (op2 1) (rn 31) (rm 31))
+  (:printer cond-select ((op 0) (op2 1) (rn 31) (rm 31)
+                         (cond nil :type 'negated-cond))
             '('cset :tab rd  ", " cond)))
 (def-cond-select csinv 1 0
-  (:printer cond-select ((op 1) (op2 0) (rn 31) (rm 31))
+  (:printer cond-select ((op 1) (op2 0) (rn 31) (rm 31)
+                         (cond nil :type 'negated-cond))
             '('csetm :tab rd  ", " cond)))
 (def-cond-select csneg 1 1)
 
@@ -1057,8 +1060,24 @@
   (0 1 4)
   (nzcv 4 0))
 
+(define-instruction-format
+    (cond-compare 32
+     :default-printer '(:name :tab rn ", " rm ", " nzcv ", " cond))
+    (op :field (byte 1 30))
+    (op2 :field (byte 9 21) :value #b111010010)
+    (rm :field (byte 5 16) :type 'reg)
+    (cond :field (byte 4 12) :type 'cond)
+    (imm-p :field (byte 1 11))
+    (op3 :field (byte 1 10) :value 0)
+    (rn :field (byte 5 5) :type 'reg)
+    (op4 :field (byte 1 4) :value 0)
+    (nzcv :field (byte 4 0) :type 'unsigned-immediate))
+
 (defmacro def-cond-compare (name op)
   `(define-instruction ,name (segment rn rm-imm cond &optional (nzcv 0))
+     (:printer cond-compare ((op ,op) (imm-p 0)))
+     (:printer cond-compare ((op ,op) (imm-p 1)
+                             (rm nil :type 'unsigned-immediate)))
      (:emitter
       (emit-cond-compare segment +64-bit-size+ ,op
                          (if (integerp rm-imm)

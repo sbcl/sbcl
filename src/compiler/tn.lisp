@@ -226,11 +226,13 @@
           (immediate-constant-sc (constant-value constant))
         ;; currently NULL-OFFSET is used only on ARM64
         (if null-offset
-            (setf (leaf-info constant)
-                  (component-live-tn
-                   (make-wired-tn (primitive-type (leaf-type constant))
-                                  immed
-                                  null-offset)))
+            (let ((tn (component-live-tn
+                       (make-wired-tn (primitive-type (leaf-type constant))
+                                      immed
+                                      null-offset
+                                      (specifier-type 'null)))))
+             (setf (tn-leaf tn) constant
+                   (leaf-info constant) tn))
             (let* ((boxed (or (not immed)
                               (boxed-immediate-sc-p immed)))
                    (component (component-info *component-being-compiled*))
@@ -356,7 +358,7 @@
 
 (defun reference-tn-refs (refs write-p)
   (when refs
-    (let* ((first (reference-tn (tn-ref-tn refs) write-p) )
+    (let* ((first (reference-tn (tn-ref-tn refs) write-p))
            (prev first))
       (loop for tn-ref = (tn-ref-across refs) then (tn-ref-across tn-ref)
             while tn-ref

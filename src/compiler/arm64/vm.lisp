@@ -81,7 +81,7 @@
       r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #-darwin r10 #-sb-thread r11 lexenv)
 
   (defregset non-descriptor-regs
-      nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
+      nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp lr)
 
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
@@ -186,10 +186,6 @@
   (non-descriptor-reg registers
                       :locations #.non-descriptor-regs)
 
-  ;; Pointers to the interior of objects.  Used only as a temporary.
-  (interior-reg registers
-                :locations (#.lr-offset))
-
   ;; **** Things that can go in the floating point registers.
 
   ;; Non-Descriptor single-floats.
@@ -242,9 +238,9 @@
   (defregtn zr any-reg)
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
-  (defregtn lr interior-reg)
+  (defregtn lr any-reg)
   #+sb-thread
-  (defregtn thread interior-reg))
+  (defregtn thread any-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.

@@ -28,7 +28,7 @@
                 cl:*gensym-counter*
                 cl:*load-pathname*
                 cl:*load-print*
-                cl:*load-truename*
+                #+ansi-compliant-load-truename cl:*load-truename*
                 cl:*load-verbose*
                 cl:*macroexpand-hook*
                 cl:*modules*
@@ -77,6 +77,27 @@
          (dolist (symbol ',list)
            (declare (notinline (setf sb-int:info))) ; skirt failure-to-inline warning
            (setf (sb-int:info :variable :wired-tls symbol) t)))))
+
+#-ansi-compliant-load-truename
+(progn
+;; this could almost go in target-load.lisp were it not for the use in ir1-translators
+(defvar sb-fasl::%load-truename nil)
+;; "The consequences are unspecified if an attempt is made to assign or bind [...]"
+;;  http://www.lispworks.com/documentation/HyperSpec/Body/v_ld_pns.htm#STload-truenameST
+;;
+;; But the rationale provided in http://www.lispworks.com/documentation/HyperSpec/Issues/iss218_w.htm
+;; for the existence of the -TRUENAME* variables is dubious:
+;;  "Note that it is not adequate to just have the -PATHNAME* variables
+;;   since TRUENAME on these pathnames might not yield the value of the
+;;   -TRUENAME* variables if the file has been deleted or protected
+;;   since the open occurred (in some implementations)."
+;; because in our ANSI-compliant logic, there is a delay between opening a file
+;; and determining its truename, which means that it might be impossible to determine
+;; the truename even if done ASAP.  Supposing that somebody really were to delete
+;; the very file being acted on, it's not LOAD's job to deal with race conditions.
+(define-symbol-macro *load-truename*
+    (sb-ext:truly-the (values (or pathname null) &optional)
+      (sb-fasl::resolve-load-truename 'sb-fasl::%load-truename *load-pathname*))))
 
 (declaim (type t cl:+ cl:++ cl:+++ cl:- cl:* cl:** cl:***))
 

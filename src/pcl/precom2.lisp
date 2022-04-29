@@ -34,13 +34,15 @@
 
 (push '("SB-PCL" *pcl-package* *built-in-classes*) *!removable-symbols*)
 
+(defun !system-class-p (x) (typep x 'sb-pcl::system-class))
+
+(let ((c (find-class 't)))
+  (assert (not (slot-boundp c 'sb-pcl::prototype))))
 (let ((class (find-class 'sequence)))
   ;; Give the prototype a concrete prototype. It's an extra step because
   ;; SEQUENCE was removed from *built-in-classes*
   (setf (slot-value class 'prototype) #()))
-(dolist (c (sb-vm:list-allocated-objects
-            :all
-            :test (compile nil '(lambda (x) (typep x 'sb-pcl::system-class)))))
+(dolist (c (sb-vm:list-allocated-objects :all :test #'!system-class-p))
   (when (slot-boundp c 'sb-pcl::prototype)
     (let ((val (slot-value c 'sb-pcl::prototype)))
       (assert (typep val c)))))

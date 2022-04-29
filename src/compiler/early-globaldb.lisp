@@ -70,23 +70,6 @@
     (format stream "[~{~W~^ ~}]"
             (loop for i below (%instance-length obj)
                collect (%instance-ref obj i))))
-  (eval-when (:compile-toplevel)
-    (sb-xc:defmacro make-packed-info (n)
-      ;; this file is earlier than early-vm, so we have to take
-      ;; INSTANCE-DATA-START from the value set in make-host-1.
-      `(let ((new (%make-instance (+ ,n #.sb-vm:instance-data-start))))
-         (setf (%instance-wrapper new) #.(find-layout 'packed-info))
-         new))
-    ;; We can't merely call COPY-STRUCTURE due to two issues:
-    ;; 1. bootstrapping- the DEFSTRUCT-DESCRIPTION is not available
-    ;;    in cold-init by the first call to COPY-PACKED-INFO,
-    ;;    but COPY-STRUCTURE needs it, because of raw slots.
-    ;; 2. the transform for COPY-STRUCTURE would think that
-    ;;    it needs to copy exactly 1 slot. Well, it would think that,
-    ;;    if the FREEZE-TYPE wasn't commented out.
-    (sb-xc:defmacro copy-packed-info (info)
-      ;; not bothering with ONCE-ONLY here (doesn't matter)
-      `(%copy-instance (%make-instance (%instance-length ,info)) ,info)))
   (defmacro packed-info-len (info)
       `(- (%instance-length ,info) #.sb-vm:instance-data-start))
   (defmacro %info-ref (v i)

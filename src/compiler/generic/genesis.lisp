@@ -1723,10 +1723,10 @@ core and return a descriptor to it."
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
 (defun make-nil-descriptor ()
-  ;; 8 words prior to NIL is an array of two 'struct alloc_region'.
+  ;; 10 words prior to NIL is an array of three 'struct alloc_region'.
   ;; The lisp objects begin at STATIC_SPACE_OBJECTS_START.
   ;; See also (DEFCONSTANT NIL-VALUE) in early-objdef.
-  #+(and gencgc (not sb-thread)) (gspace-claim-n-words *static* 8)
+  #+(and gencgc (not sb-thread)) (gspace-claim-n-words *static* 10)
   #+64-bit (setf (gspace-free-word-index *static*) (/ 256 sb-vm:n-word-bytes))
   (let* ((des (allocate-otherptr *static* (1+ sb-vm:symbol-size) 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
@@ -1992,9 +1992,7 @@ core and return a descriptor to it."
          ;; Embed the constant in an unboxed array. This shouldn't be necessary,
          ;; because the start of the scanned space is STATIC_SPACE_OBJECTS_START,
          ;; but not all uses strictly follow that rule. (They should though)
-         ;; This does not conflict with the 2 alloc regions at the start of the space,
-         ;; because the constant is in word index 10, and the array header is in
-         ;; word index 8, and the two regions are in indices 0 through 7.
+         ;; This must not conflict with the alloc regions at the start of the space.
          (make-random-descriptor (logior (- sb-vm::non-negative-fixnum-mask-constant-wired-address
                                             (* 2 sb-vm:n-word-bytes))
                                          sb-vm:other-pointer-lowtag))))
@@ -3363,9 +3361,12 @@ lispobj symbol_package(struct symbol*);~%")
       (dolist (slot (dd-slots dd))
         (let ((cell (aref names (- (dsd-index slot) sb-vm:instance-data-start)))
               (name (cstring (dsd-name slot))))
-          (if (member (dsd-raw-type slot) '(t sb-vm:word sb-vm:signed-word))
-              (rplaca cell name)
-              (rplacd cell name))))
+          (case (dsd-raw-type slot)
+            ((t) (rplaca cell name))
+            ;; remind C programmers which slots are untagged
+            (sb-vm:signed-word (rplaca cell (format nil "sw_~a" name)))
+            (sb-vm:word (rplaca cell (format nil "uw_~a" name)))
+            (t (rplacd cell name)))))
       (loop for slot across names
             do (format t "    lispobj ~A;~@[ // ~A~]~%"
                        ;; reserved word
@@ -4019,6 +4020,7 @@ III. initially undefined function references (alphabetically):
           (cond ((and (= sb-vm:n-word-bytes 8) (= ncards 32)) 4)
                 ((and (= sb-vm:n-word-bytes 8) (= ncards 16)) 2)
                 ((and (= sb-vm:n-word-bytes 8) (= ncards 8)) 1)
+                ((and (= sb-vm:n-word-bytes 4) (= ncards 8)) 2)
                 (t (error "bad cards-per-page"))))
          (indices (loop for i below n-markwords collect i)))
     (format stream "static inline int cardseq_all_marked_nonsticky(long card) {

@@ -25,14 +25,14 @@
      (:temp ndescr non-descriptor-reg nl2-offset)
      (:temp pa-flag non-descriptor-reg nl3-offset)
      (:temp lra-save non-descriptor-reg nl5-offset)
-     (:temp lr interior-reg lr-offset))
+     (:temp lr non-descriptor-reg lr-offset))
   (pseudo-atomic (pa-flag)
     (inst lsl ndescr words (- word-shift n-fixnum-tag-bits))
     (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
     (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
     (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
     (allocation nil ndescr other-pointer-lowtag result
-                :flag-tn pa-flag :lip nil) ;; keep LR intact as per above
+                :flag-tn pa-flag)
 
     (move lr lra-save)
     (inst lsr ndescr type n-fixnum-tag-bits)
@@ -55,20 +55,18 @@
      (:res result descriptor-reg r0-offset)
 
      (:temp temp non-descriptor-reg nl0-offset))
-  (pseudo-atomic (temp)
-    (inst lsr temp type n-fixnum-tag-bits)
-    (inst lsl words words (- word-shift n-fixnum-tag-bits))
-    (inst add words words (* (1+ vector-data-offset) n-word-bytes))
-    (inst and words words (bic-mask lowtag-mask)) ; double-word align
-    (allocation nil words other-pointer-lowtag result :stack-allocate-p t)
+  (inst lsr temp type n-fixnum-tag-bits)
+  (inst lsl words words (- word-shift n-fixnum-tag-bits))
+  (inst add words words (* (1+ vector-data-offset) n-word-bytes))
+  (inst and words words (bic-mask lowtag-mask)) ; double-word align
+  (allocation nil words other-pointer-lowtag result :stack-allocate-p t)
 
-    (inst stp temp length (@ tmp-tn))
-    ;; Zero fill
-    (assemble ()
-      ;; The header word has already been set, skip it.
-      (inst add temp tmp-tn (* n-word-bytes 2))
-      (inst add words tmp-tn words)
-      LOOP
-      (inst stp zr-tn zr-tn (@ temp (* n-word-bytes 2) :post-index))
-      (inst cmp temp words)
-      (inst b :lt LOOP))))
+  (inst stp temp length (@ tmp-tn))
+  ;; Zero fill
+  ;; The header word has already been set, skip it.
+  (inst add temp tmp-tn (* n-word-bytes 2))
+  (inst add words tmp-tn words)
+  LOOP
+  (inst stp zr-tn zr-tn (@ temp (* n-word-bytes 2) :post-index))
+  (inst cmp temp words)
+  (inst b :lt LOOP))

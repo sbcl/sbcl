@@ -124,7 +124,7 @@
              ((nil) 'unsigned-byte)
              ((t) 'signed-byte))
           ,width)
-         (foldable flushable movable)
+         (foldable flushable movable always-translatable)
        :derive-type (make-modular-fun-type-deriver ',prototype ,width ',signedp))))
 
 (defun %define-good-modular-fun (name kind signedp)

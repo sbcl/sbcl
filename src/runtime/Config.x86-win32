@@ -60,7 +60,3 @@ CC = gcc
 ifeq ($(shell $(LD) --disable-dynamicbase 2>&1 | grep disable-dynamicbase),)
 LINKFLAGS += -Wl,--disable-dynamicbase,--disable-nxcompat
 endif
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:

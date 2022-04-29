@@ -311,70 +311,63 @@
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
 ;;; Should be run after DELETE-NO-OP-VOPS, otherwise the empty moves
 ;;; will interfere.
-
-;;; FIXME: there is one more minor glitch caused by multiway branch,
-;;; but it is not a correctness bug. Consider:
-;;;  (defun f (&optional (a (missing-arg)) (b (missing-arg))
-;;;                      (c (missing-arg)) (d (missing-arg)))
-;;;     (list a b c d ))
-;;;
-;;; Granted that this is a slightly weird idiom, but it is used frequently
-;;; in system internals as well as by FORMATTER's macroexpansion.
-;;; The main entry point dispatches on the argument count.
-;;; After elimination of redundant moves, we end up with:
-;;;   ; DF2:       42FF2498         JMP QWORD PTR [RAX+R11*4]
-;;;   ; DF6:       E981000000       JMP L3
-;;;   ; DFB:       E999000000       JMP L4
-;;;   ; E00:       E9B1000000       JMP L5
-;;;   ; E05:       E9C9000000       JMP L6
-;;; where every one of the jumps to a label is unreachable.
-;;; This is because each of the original IF's would have branched
-;;; to two MOVEs that are eliminated as the arg/results get packed
-;;; in the same physical location, and then the branch is performed,
-;;; but it is in a dead IR2 block.
 (defun ir2-optimize-jumps (component)
-  (flet ((start-vop (block)
-           (do ((block block (ir2-block-next block)))
-               ((null block) nil)
-             (let ((vop (ir2-block-start-vop block)))
-               (when vop
-                 (if (eq (vop-name vop) 'sb-c:note-environment-start)
-                     (let ((next (vop-next vop)))
-                       (when next
-                         (return next)))
-                     (return vop))))))
-         (next-label (block)
-           (do ((block (ir2-block-next block)
-                  (ir2-block-next block)))
-               ((null block) nil)
-             (let ((label (or (ir2-block-%trampoline-label block)
-                              (ir2-block-%label block))))
-               (cond (label
-                      (return label))
-                     ((ir2-block-start-vop block)
-                      (return nil)))))))
-    ;; This is the same information as in *2block-info*. "Too Many Cooks"
-    ;; (Well, the *2block-info* is gone at this point)
-    (let ((label-block-map (make-hash-table :test #'eq)))
-      (do-ir2-blocks (block component)
-        (setf (gethash (ir2-block-%trampoline-label block) label-block-map)
-              block)
-        (setf (gethash (ir2-block-%label block) label-block-map)
-              block))
+  (let ((*2block-info* (make-hash-table :test #'eq)))
+    (initialize-ir2-blocks-flow-info component)
+    (flet ((start-vop (block)
+             (do ((block block (ir2-block-next block)))
+                 ((null block) nil)
+               (let ((vop (ir2-block-start-vop block)))
+                 (when vop
+                   (if (eq (vop-name vop) 'sb-c:note-environment-start)
+                       (let ((next (vop-next vop)))
+                         (when next
+                           (return next)))
+                       (return vop))))))
+           (delete-chain (block)
+             (do ((block block (ir2-block-next block)))
+                 ((null block) nil)
+               ;; Just pop any block, *2block-info* is only used here
+               ;; and it just needs to know the number of predecessors,
+               ;; not their identity.
+               (pop (ir2block-predecessors block))
+               (if (ir2block-predecessors block)
+                   (return)
+                   (let ((vop (ir2-block-start-vop block)))
+                     (when vop
+                       (when (eq (vop-name vop) 'sb-c:note-environment-start)
+                         (setf vop (vop-next vop)))
+                       (when vop
+                         (aver (eq (vop-name vop) 'branch))
+                         (delete-vop vop)
+                         (return t)))))))
+           (next-label (block)
+             (do ((block (ir2-block-next block)
+                    (ir2-block-next block)))
+                 ((null block) nil)
+               (let ((label (or (ir2-block-%trampoline-label block)
+                                (ir2-block-%label block))))
+                 (cond (label
+                        (return label))
+                       ((ir2-block-start-vop block)
+                        (return nil)))))))
       (labels ((unchain-jumps (vop)
                  ;; Handle any branching vop except a multiway branch
                  (setf (first (vop-codegen-info vop))
                        (follow-jumps (first (vop-codegen-info vop)))))
-               (follow-jumps (target-label)
+               (follow-jumps (target-label &optional (delete t))
                  (declare (type label target-label))
-                 (let* ((target-block (gethash target-label label-block-map))
+                 (let* ((target-block (gethash target-label *2block-info*))
                         (target-vop (start-vop target-block)))
-                   (if (and target-vop
-                            (eq (vop-name target-vop) 'branch)
-                            (neq (first (vop-codegen-info target-vop))
-                                 target-label))
-                       (follow-jumps (first (vop-codegen-info target-vop)))
-                       target-label)))
+                   (cond ((and target-vop
+                               (eq (vop-name target-vop) 'branch)
+                               (neq (first (vop-codegen-info target-vop))
+                                    target-label))
+                          (when delete
+                            (setf delete (delete-chain target-block)))
+                          (follow-jumps (first (vop-codegen-info target-vop)) delete))
+                         (t
+                          target-label))))
                (remove-jump-overs (branch-if branch)
                  ;; Turn BRANCH-IF #<L1>, BRANCH #<L2>, L1:
                  ;; into BRANCH-IF[NOT] L2
@@ -396,27 +389,34 @@
         ;; should take the label of the latter.
         (do-ir2-blocks (block component)
           (let ((last (ir2-block-last-vop block)))
-            (case (and last (vop-name last))
-              (branch
-               (unchain-jumps last)
-               ;; A block may end up having BRANCH-IF + BRANCH after converting an IF.
-               ;; Multiway can't coexist with any other branch preceding or following
-               ;; in the block, so we don't have to check for that, just a BRANCH-IF.
-               (let ((prev (vop-prev last)))
-                 (when (and prev
-                            (or (eq (vop-name prev) 'branch-if)
-                                (conditional-p prev)))
-                   (unchain-jumps prev))))
-              (branch-if
-               (unchain-jumps last))
-              (multiway-branch-if-eq
-               ;; codegen-info = (labels else-label key-type keys original-comparator)
-               (let ((info (vop-codegen-info last)))
-                 (setf (car info) (mapcar #'follow-jumps (car info))
-                       (cadr info) (follow-jumps (cadr info)))))
-              (t
-               (when (and last (conditional-p last))
-                 (unchain-jumps last))))))
+            (when last
+              (case (vop-name last)
+                (branch
+                 (unchain-jumps last)
+                 ;; A block may end up having BRANCH-IF + BRANCH after converting an IF.
+                 ;; Multiway can't coexist with any other branch preceding or following
+                 ;; in the block, so we don't have to check for that, just a BRANCH-IF.
+                 (let ((prev (vop-prev last)))
+                   (when (and prev
+                              (or (eq (vop-name prev) 'branch-if)
+                                  (conditional-p prev)))
+                     (unchain-jumps prev))))
+                (branch-if
+                 (unchain-jumps last))
+                (multiway-branch-if-eq
+                 ;; codegen-info = (labels else-label key-type keys original-comparator)
+                 (let ((info (vop-codegen-info last)))
+                   ;; Don't delete the branches when they reach zero
+                   ;; predecessors as multiway-branch-if-eq inserts
+                   ;; extra jumps which are not in the original ir2
+                   ;; and do not correspond to any predecessors.
+                   (setf (car info) (mapcar (lambda (x)
+                                              (follow-jumps x nil))
+                                            (car info))
+                         (cadr info) (follow-jumps (cadr info) nil))))
+                (t
+                 (when (conditional-p last)
+                   (unchain-jumps last)))))))
         ;; Pass 2
         ;; Need to unchain the jumps before handling jump-overs,
         ;; otherwise the BRANCH over which BRANCH-IF jumps may be a
@@ -639,16 +639,20 @@
         (let* ((args (vop-args if-eq))
                (x (tn-ref-tn args))
                (y (tn-ref-tn (tn-ref-across args))))
-          (when (constant-tn-p y)
-            (let ((move (branch-destination branch-if)))
-              (when (and move
-                         (eq (vop-name move) 'move))
-                (let* ((args (vop-args move))
-                       (from (tn-ref-tn args)))
-                  (when (and (constant-tn-p from)
-                             (eq (tn-leaf y)
-                                 (tn-leaf from)))
-                    (change-tn-ref-tn args x))))))
+          (flet ((constant-p (x)
+                   (or (constant-tn-p x)
+                       (type= (tn-type x)
+                              (specifier-type 'null)))))
+           (when (constant-p y)
+             (let ((move (branch-destination branch-if)))
+               (when (and move
+                          (eq (vop-name move) 'move))
+                 (let* ((args (vop-args move))
+                        (from (tn-ref-tn args)))
+                   (when (and (constant-p from)
+                              (eq (tn-leaf y)
+                                  (tn-leaf from)))
+                     (change-tn-ref-tn args x)))))))
           nil)))))
 
 ;;; If 2BLOCK ends in an IF-EQ (or similar) + BRANCH-IF where the second operand
@@ -949,9 +953,12 @@
          plusp)
     (when (and branch
                (or
-                (eq (vop-name next) 'sb-vm::fast-if-eq-fixnum/c)
-                (and (eq (vop-name next) 'sb-vm::fast-if->-c/fixnum)
-                     (equal (vop-codegen-info next) '(0))
+                (eq (vop-name next) #+x86-64 'sb-vm::fast-if-eq-fixnum/c
+                                    #+arm64 'sb-vm::fast-if-eq-integer/c)
+                (and (eq (vop-name next)
+                         #-arm64 'sb-vm::fast-if->-c/fixnum
+                         #+arm64 'sb-vm::fast-if->-integer/c)
+                     (eql (car (vop-codegen-info next)) 0)
                      (setf plusp t)))
                (eq (vop-name branch)
                    'branch-if))
@@ -986,6 +993,83 @@
                       (not (second (vop-codegen-info branch)))))
               (delete-vop vop)
               (delete-vop next))))))))
+
+(when (vop-existsp :named sb-vm::<-integer-fixnum)
+  ;; The <-integer-fixnum VOPs already perform dispatch for fixnum/bignum,
+  ;; and load the header byte.
+  ;; Replace the preceding INTEGERP VOP with an appropriate
+  ;; <-integer-fixnum, which checks for INTEGER.
+  (defoptimizer (vop-optimize integerp) (vop)
+    (when (boundp '*2block-info*)
+      (destructuring-bind (target not-p) (vop-codegen-info vop)
+        (let ((target-block (gethash target *2block-info*)))
+          (when target-block
+            (let* ((next (if (eq vop (ir2-block-last-vop (vop-block vop)))
+                             (ir2-block-next (vop-block vop))
+                             (let ((next (next-vop vop)))
+                               (and (eq (vop-name next) 'branch)
+                                    (gethash (car (vop-codegen-info next)) *2block-info*)))))
+                   (not-target-block (if not-p
+                                         target-block
+                                         next))
+                   (target-block (if not-p
+                                     next
+                                     target-block))
+                   (cmp (ir2-block-start-vop target-block)))
+              (when (and cmp
+                         (singleton-p (ir2block-predecessors target-block)))
+                (let ((integer (tn-ref-tn (vop-args vop)))
+                      (args (vop-args cmp))
+                      tns)
+                  (when (case (vop-name cmp)
+                          ((sb-vm::>-integer-fixnum sb-vm::<-integer-fixnum)
+                           (when (eq (tn-ref-tn args) integer)
+                             (setf tns (list integer (tn-ref-tn (tn-ref-across args))))))
+                          ((sb-vm::>-fixnum-integer sb-vm::<-fixnum-integer)
+                           (when (eq (tn-ref-tn (tn-ref-across args)) integer)
+                             (setf tns (list (tn-ref-tn args) integer)))))
+                    (destructuring-bind (cmp-target cmp-not-p) (vop-codegen-info cmp)
+                      (let* ((cmp-next-block (ir2-block-next (vop-block cmp)))
+                             (cmp-target-block (gethash cmp-target *2block-info*)))
+                        (flet ((invert ()
+                                 (template-or-lose
+                                  (case (vop-name cmp)
+                                    (sb-vm::>-integer-fixnum 'sb-vm::<=-integer-fixnum)
+                                    (sb-vm::<-integer-fixnum 'sb-vm::>=-integer-fixnum)
+                                    (sb-vm::>-fixnum-integer 'sb-vm::<=-fixnum-integer)
+                                    (sb-vm::<-fixnum-integer 'sb-vm::>=-fixnum-integer)))))
+                          (multiple-value-bind (new-vop new-target new-not-p)
+                              (cond ((and not-p
+                                          (eq not-target-block cmp-next-block))
+                                     (if cmp-not-p
+                                         (values (invert) cmp-target nil)
+                                         (values (vop-info cmp) cmp-target nil)))
+                                    ((and not-p
+                                          (eq not-target-block cmp-target-block))
+                                     (if cmp-not-p
+                                         (values (vop-info cmp) cmp-target t)
+                                         (values (invert) cmp-target t)))
+                                    ((and (not not-p)
+                                          (eq not-target-block cmp-target-block))
+                                     (if cmp-not-p
+                                         (values (vop-info cmp) (ir2-block-%label target-block) nil)
+                                         (values (invert) (ir2-block-%label target-block) nil)))
+                                    ((and (not not-p)
+                                          (eq not-target-block cmp-next-block))
+                                     (if cmp-not-p
+                                         (values (invert) cmp-target nil)
+                                         (values (vop-info cmp) cmp-target nil)))
+                                    (t
+                                     (return-from vop-optimize-integerp-optimizer)))
+                            (prog1
+                                (emit-and-insert-vop (vop-node vop) (vop-block vop)
+                                                     new-vop
+                                                     (reference-tn-list tns nil)
+                                                     nil vop
+                                                     (list new-target new-not-p))
+                              (delete-vop vop)
+                              (delete-vop cmp))))))))))))
+        nil))))
 
 ;;; No need to reset the stack pointer just before returning.
 (defoptimizer (vop-optimize reset-stack-pointer) (vop)

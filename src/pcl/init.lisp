@@ -91,8 +91,7 @@
        ;; The normal, good case: compile an efficient typecheck function.
        (let ((*typecheck-stack* (cons cookie *typecheck-stack*)))
          (handler-bind (((or style-warning compiler-note) #'muffle-warning))
-           (let ((fun (compile
-                       nil
+           (let ((fun (pcl-compile
                        `(named-lambda (slot-typecheck ,type) (value)
                           (declare (optimize (sb-c:store-coverage-data 0)
                                              (sb-c::type-check 3)

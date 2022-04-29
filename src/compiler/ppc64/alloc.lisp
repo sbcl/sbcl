@@ -10,6 +10,95 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
+
+;;;; Storage allocation:
+
+;;; This is the main mechanism for allocating memory in the lisp heap.
+;;;
+;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
+;;; applied.  The amount of space to be allocated is SIZE bytes (which
+;;; must be a multiple of the lisp object size).
+;;;
+;;; On other platforms (Non-PPC), if STACK-P is given, then allocation
+;;; occurs on the control stack (for dynamic-extent).  In this case,
+;;; you MUST also specify NODE, so that the appropriate compiler
+;;; policy can be used, and TEMP-TN, which is needed for work-space.
+;;; TEMP-TN MUST be a non-descriptor reg. FIXME: This is not yet
+;;; implemented on PPC. We should implement this and replace the
+;;; inline stack-based allocation that presently occurs in the
+;;; VOPs. The stack-p argument is ignored on PPC.
+;;;
+;;; Using trap instructions for not-very-exceptional situations, such as
+;;; allocating, is clever but not very convenient when using gdb to debug.
+;;; Set the :sigill-traps feature to use SIGILL instead of SIGTRAP.
+;;;
+(defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
+  (declare (ignore stack-p node))
+  (binding* ((imm-size (typep size '(unsigned-byte 15)))
+             ((region-base-tn field-offset)
+              (values thread-base-tn
+                      (if (or #+use-cons-region (eq type 'list))
+                          (ash thread-cons-tlab-slot word-shift)
+                          (ash thread-mixed-tlab-slot word-shift)))))
+
+    (unless imm-size ; Make temp-tn be the size
+      (if (numberp size)
+          (inst lr temp-tn size)
+          (move temp-tn size)))
+
+    (inst ld result-tn region-base-tn field-offset)
+    (inst ld flag-tn region-base-tn (+ field-offset n-word-bytes)) ; region->end_addr
+
+    ;; CAUTION: The C code depends on the exact order of
+    ;; instructions here.  In particular, immediately before the
+    ;; TW instruction must be an ADD or ADDI instruction, so it
+    ;; can figure out the size of the desired allocation and
+    ;; storing the new base pointer back to the allocation region
+    ;; must take one instruction.
+    (without-scheduling ()
+      ;; Now make result-tn point at the end of the object, to
+      ;; figure out if we overflowed the current region.
+      (if imm-size
+          (inst addi result-tn result-tn size)
+          (inst add result-tn result-tn temp-tn))
+
+     ;; result-tn points to the new end of the region.  Did we go past
+     ;; the actual end of the region?  If so, we need a full alloc.
+     ;; The C code depends on this exact form of instruction.  If
+     ;; either changes, you have to change the other appropriately!
+      (let ((ok (gen-label)))
+        (declare (ignorable ok))
+        #+sigill-traps
+        (progn (inst cmpld result-tn flag-tn)
+               (inst ble ok)
+               (inst mfmq temp-reg-tn) ; an illegal instructions
+               ;; KLUDGE: emit another ADD so that the sigtrap handler
+               ;; can behave just as if the trap happened at the TD.
+               (if imm-size
+                   (inst addi result-tn result-tn size)
+                   (inst add result-tn result-tn temp-tn)))
+        (if (eq type 'list)
+            (inst td :llt flag-tn result-tn)  ; trap if region.end < new_freeptr
+            (inst td :lgt result-tn flag-tn)) ; trap if new_freeptr > region.end
+        #+sigill-traps (emit-label ok))
+      ;; The C code depends on exactly 1 instruction here.
+      (inst std result-tn region-base-tn field-offset))
+
+    ;; Execution resumes here if the trap fires.
+    ;; At this point, result-tn points at the end of the object.
+    ;; Adjust to point to the beginning.
+    (cond (imm-size
+           (inst addi result-tn result-tn (+ (- size) lowtag)))
+          (t
+           (inst sub result-tn result-tn temp-tn)
+           ;; Set the lowtag appropriately
+           (inst ori result-tn result-tn lowtag)))))
+
+(defun align-csp (temp)
+  ;; is used for stack allocation of dynamic-extent objects
+  (storew null-tn csp-tn 0 0) ; store a known-good value (don't want wild pointers below CSP)
+  (inst addi temp csp-tn lowtag-mask)
+  (inst clrrdi csp-tn temp n-lowtag-bits))
 
 ;;;; LIST and LIST*
 (define-vop (list)
@@ -35,7 +124,7 @@
                         temp)))))
       (let ((dx-p (node-stack-allocate-p node))
             (alloc (* (pad-data-block cons-size) cons-cells)))
-        (pseudo-atomic (pa-flag :sync nil)
+        (pseudo-atomic (pa-flag :sync nil :elide-if dx-p)
                  (if dx-p
                      (progn
                        (align-csp res)
@@ -87,7 +176,7 @@
   (:generator 10
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
-      (pseudo-atomic (pa-flag)
+      (pseudo-atomic (pa-flag :elide-if stack-allocate-p)
         (if stack-allocate-p
             (progn
               (align-csp result)

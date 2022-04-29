@@ -106,8 +106,8 @@
          (n-names (sap-ref-32 export-data 24))
          (functions-sap (sap+ image-base (sap-ref-32 export-data 28)))
          (names-sap (sap+ image-base (sap-ref-32 export-data 32))))
-    (loop repeat (min n-functions n-names)
-          for offset from 0 by #.sb-vm::n-word-bytes
+    (loop for offset from 0 by #.sb-vm::n-word-bytes
+          repeat (min n-functions n-names)
           collect
        (cons
          (sap-int (sap+ image-base (sap-ref-32 functions-sap offset)))

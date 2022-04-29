@@ -256,8 +256,9 @@
                  ;;  the variable var." - so we can read it here with impunity.
                  `(unwind-protect (progn ,@forms) (close ,var))
                  `(progn ,@forms)))) ; don't bother closing
-      `(,bind ((,dummy (%make-instance ,(dd-length (find-defstruct-description
-                                                    'string-input-stream)))))
+      `(,bind ((,dummy (%make-structure-instance
+                        ,(find-defstruct-description 'string-input-stream)
+                        nil)))
               ,(multiple-value-bind (forms decls) (parse-body forms-decls nil)
                  (if index
                      `(multiple-value-bind (,var ,offset) ,ctor
@@ -307,7 +308,7 @@
 (declaim (freeze-type string-output-stream))
 
 (defmacro %allocate-string-ostream ()
-  `(%make-instance ,(dd-length (find-defstruct-description 'string-output-stream))))
+  `(%make-structure-instance ,(find-defstruct-description 'string-output-stream) nil))
 
 (defmacro with-output-to-string
     ((var &optional string &key (element-type ''character)) &body body)
@@ -316,8 +317,9 @@
         ;; "If string is supplied, element-type is ignored".
         ;; Why do implementors take this to mean "evaluated and ignored?"
         ;; I would have figured it meant expansion-time ignored.
-        `(dx-let ((,dummy (%make-instance ,(dd-length (find-defstruct-description
-                                                       'fill-pointer-output-stream)))))
+        `(dx-let ((,dummy (%make-structure-instance
+                           ,(find-defstruct-description 'fill-pointer-output-stream)
+                           nil)))
            (let ((,var (truly-the fill-pointer-output-stream
                                   (%init-fill-pointer-output-stream
                                    ,dummy ,string ,element-type))))

@@ -14,8 +14,11 @@
 (in-package :cl-user)
 
 ;;; callbacks only on a few platforms
-#-alien-callbacks
-(exit :code 104)
+;;; (actually, all platforms claim to support them now,
+;;; and :alien-callbacks is almost everywhere defined.
+;;; However mips doesn't seem to correctly implement them,
+;;; making the feature indicator somewhat useless)
+#+(or (not alien-callbacks) mips) (exit :code 104)
 
 ;;; simple callback for a function
 

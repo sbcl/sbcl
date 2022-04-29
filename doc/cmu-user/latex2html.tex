@@ -1,0 +1,56 @@
+%% Replacement commands when we run latex2html.  This should be last
+%% so that latex2html uses these commands instead of the LaTeX
+%% commands above.
+\usepackage{makeidx}
+
+\newcommand{\var}[1]{\textnormal{\textit{#1}}}
+\newcommand{\code}[1]{\textnormal{\texttt{#1}}}
+%%\newcommand{\printindex}[1][\mbox{}]{}
+
+%% We need the quote environment because the alltt is broken.  The
+%% quote environment helps us in postprocessing to result to get
+%% what we want.
+\newenvironment{example}{\begin{quote}\begin{alltt}}{\end{alltt}\end{quote}}
+\newenvironment{display}{\begin{quote}\begin{alltt}}{\end{alltt}\end{quote}}
+
+\newcommand{\textnormal}[1]{\rm #1}
+\newcommand{\hbox}[1]{\mbox{#1}}
+\newcommand{\xspace}{}
+\newcommand{newindex}[4]{}
+
+\newcommand{\pxlref}[1]{see section~\ref{#1}}
+\newcommand{\xlref}[1]{See section~\ref{#1}}
+
+\newcommand{\tindexed}[1]{\index{#1}\texttt{#1}}
+\newcommand{\findexed}[1]{\index{#1}\texttt{#1}}
+\newcommand{\vindexed}[1]{\index{#1}\texttt{*#1*}}
+\newcommand{\cindex}[1]{\index{#1}}
+\newcommand{\cpsubindex}[2]{\index{#1!#2}}
+
+\newcommand{\keys}[1]{\texttt{\&key} #1}
+\newcommand{\morekeys}[1]{#1}
+\newcommand{\yetmorekeys}[1]{#1}
+
+\newenvironment{defun}[3]{%
+  \textbf{[Function]}\\
+  \texttt{#1#2} \emph{#3}\\}{}
+\newcommand{\defunx}[3][\mbox{}]{%
+  \texttt{#1#2} {\em #3}\\}
+\newenvironment{defmac}[3]{%
+  \textbf{[Macro]}\\
+  \texttt{#1#2} \emph{#3}\\}{}
+\newcommand{\defmacx}[3][\mbox{}]{%
+  \texttt{#1#2} {\em #3}\\}
+\newenvironment{defvar}[2]{%
+  \textbf{[Variable]}\\
+  \texttt{#1*#2*}\\ \\}{}
+\newcommand{\defvarx}[2][\mbox{}]{%
+  \texttt{#1*#2*}\\}
+\newenvironment{defconst}[2]{%
+  \textbf{[Constant]}\\
+  \texttt{#1#2}\\}{}
+\newcommand{\defconstx}[2][\mbox{}]{\texttt{#1#2}\\}
+\newenvironment{deftp}[3]{%
+  \textbf{[#1]}\\
+  \texttt{#2} \textit{#3}\\}{}
+\newenvironment{Lentry}{\begin{description}}{\end{description}}

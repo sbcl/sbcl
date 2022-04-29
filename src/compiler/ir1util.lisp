@@ -413,6 +413,49 @@
         (when new-lvar
           (propagate-lvar-dx new-lvar old-lvar)
           t)))))
+
+(defun node-dominates-p (node1 node2)
+  (let ((block1 (node-block node1))
+        (block2 (node-block node2)))
+    (if (eq block1 block2)
+        (do-nodes (node nil block1)
+          (cond ((eq node node1)
+                 (setf node1 0))
+                ((eq node node2)
+                 (return (eq node1 0)))))
+        (let ((component (block-component block1)))
+          (unless (component-dominators-computed component)
+            (find-dominators component))
+          (dominates-p block1 block2)))))
+
+(defun set-slot-old-p (node)
+  (let ((args (combination-args node)))
+    (multiple-value-bind (object-lvar value-lvar)
+        (if (lvar-fun-is (combination-fun node) '(%%primitive))
+            (values (car (last args 2))
+                    (car (last args)))
+            (values (first args) (second args)))
+      (let ((allocator (principal-lvar-ref-use object-lvar))
+            (value-ref (principal-lvar-ref value-lvar))
+            (uses (lvar-uses value-lvar)))
+        (when (and (combination-p allocator)
+                   (lvar-fun-is (combination-fun allocator) '(list* list
+                                                              %make-instance
+                                                              %make-funcallable-instance)))
+
+          (when value-ref
+            (let ((var (ref-leaf value-ref)))
+              (when (and (lambda-var-p (ref-leaf value-ref))
+                         (not (lambda-var-sets (ref-leaf value-ref))))
+                (when (member (functional-kind (lambda-var-home var))
+                              '(:external :optional))
+                  (return-from set-slot-old-p t))
+                (setf uses (principal-lvar-ref-use value-lvar)))))
+          (when uses
+            (if (consp uses)
+                (loop for use in uses
+                      always (node-dominates-p use allocator))
+                (node-dominates-p uses allocator))))))))
 
 ;;;; block starting/creation
 
@@ -980,26 +1023,11 @@
 (defun source-path-forms (path)
   (subseq path 0 (position 'original-source-start path)))
 
-(defun tree-some (predicate tree)
-  (let ((seen (make-hash-table)))
-    (labels ((walk (tree)
-               (cond ((funcall predicate tree))
-                     ((and (consp tree)
-                           (not (gethash tree seen)))
-                      (setf (gethash tree seen) t)
-                      (or (walk (car tree))
-                          (walk (cdr tree)))))))
-      (walk tree))))
-
 ;;; Return the innermost source form for NODE.
 (defun node-source-form (node)
   (declare (type node node))
   (let* ((path (node-source-path node))
-         (forms (remove-if (lambda (x)
-                             (tree-some #'leaf-p x))
-                           (source-path-forms path))))
-    ;; another option: if first form includes a leaf, return
-    ;; find-original-source instead.
+         (forms (source-path-forms path)))
     (if forms
         (first forms)
         (values (find-original-source path)))))
@@ -1739,14 +1767,6 @@
       (flush-node use))
     (setf (lvar-uses lvar) nil))
   (values))
-
-(defun delete-dest (lvar)
-  (when lvar
-    (let* ((dest (lvar-dest lvar))
-           (prev (node-prev dest)))
-      (let ((block (ctran-block prev)))
-        (unless (block-delete-p block)
-          (mark-for-deletion block))))))
 
 ;;; Queue the block for deletion
 (defun delete-block-lazily (block)
@@ -3168,8 +3188,9 @@ is :ANY, the function name is not checked."
                            'slot-initform-type-style-warning
                            (return-from process-lvar-type-annotation)))
                       (t
-                       'sb-int:type-warning)))
-         (type (lvar-type-annotation-type annotation)))
+                       'type-warning)))
+         (type (lvar-type-annotation-type annotation))
+         (dest (lvar-dest lvar)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
            (%compile-time-type-error-warn annotation (type-specifier type)
                                           (type-specifier (lvar-type lvar))
@@ -3180,14 +3201,18 @@ is :ANY, the function name is not checked."
                                                  (car path))))
                                           :condition condition))
           ((consp uses)
-           (loop for use in uses
-                 for dtype = (node-derived-type use)
-                 unless (values-types-equal-or-intersect dtype type)
-                 do (%compile-time-type-error-warn annotation
-                                                   (type-specifier type)
-                                                   (type-specifier dtype)
-                                                   (list (node-source-form use))
-                                                   :condition condition))))))
+           (let ((condition (case condition
+                              (type-warning 'type-style-warning)
+                              (t condition))))
+             (loop for use in uses
+                   for dtype = (node-derived-type use)
+                   unless (or (cast-mismatch-from-inlined-p dest use)
+                              (values-types-equal-or-intersect dtype type))
+                   do (%compile-time-type-error-warn use
+                                                     (type-specifier type)
+                                                     (type-specifier dtype)
+                                                     (list (node-source-form use))
+                                                     :condition condition)))))))
 
 (defun process-annotations (lvar)
   (unless (and (combination-p (lvar-dest lvar))

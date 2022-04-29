@@ -1,0 +1,550 @@
+\chapter{Compiler Overview} % -*- Dictionary: design -*-
+
+The structure of the compiler may be broadly characterized by describing the
+compilation phases and the data structures that they manipulate.  The steps in
+the compilation are called phases rather than passes since they don't
+necessarily involve a full pass over the code.  The data structure used to
+represent the code at some point is called an {\it intermediate
+representation.}
+
+Two major intermediate representations are used in the compiler:
+\begin{itemize}
+
+\item The Implicit Continuation Representation (ICR) represents the lisp-level
+semantics of the source code during the initial phases.  Partial evaluation and
+semantic analysis are done on this representation.  ICR is roughly equivalent
+to a subset of Common Lisp, but is represented as a flow-graph rather than a
+syntax tree.  Phases which only manipulate ICR comprise the ``front end''.  It
+would be possible to use a different back end such as one that directly
+generated code for a stack machine.
+
+\item The Virtual Machine Representation (VMR) represents the implementation of
+the source code on a virtual machine.  The virtual machine may vary depending
+on the the target hardware, but VMR is sufficiently stylized that most of the
+phases which manipulate it are portable.
+\end{itemize}
+
+Each phase is briefly described here.  The phases from ``local call analysis''
+to ``constraint propagation'' all interact; for maximum optimization, they
+are generally repeated until nothing new is discovered.  The source files which
+primarily contain each phase are listed after ``Files: ''.
+\begin{description}
+
+\item[ICR conversion]
+Convert the source into ICR, doing macroexpansion and simple source-to-source
+transformation.  All names are resolved at this time, so we don't have to worry
+about name conflicts later on.  Files: {\tt ir1tran, srctran, typetran}
+
+\item[Local call analysis] Find calls to local functions and convert them to
+local calls to the correct entry point, doing keyword parsing, etc.  Recognize
+once-called functions as lets.  Create {\it external entry points} for
+entry-point functions.  Files: {\tt locall}
+
+\item[Find components]
+Find flow graph components and compute depth-first ordering.  Separate
+top-level code from run-time code, and determine which components are top-level
+components.  Files: {\tt dfo}
+
+\item[ICR optimize] A grab-bag of all the non-flow ICR optimizations.  Fold
+constant functions, propagate types and eliminate code that computes unused
+values.  Special-case calls to some known global functions by replacing them
+with a computed function.  Merge blocks and eliminate IF-IFs.  Substitute let
+variables.  Files: {\tt ir1opt, ir1tran, typetran, seqtran, vm/vm-tran}
+
+\item[Type constraint propagation]
+Use global flow analysis to propagate information about lexical variable
+types.   Eliminate unnecessary type checks and tests.  Files: {\tt constraint}
+
+\item[Type check generation]
+Emit explicit ICR code for any necessary type checks that are too complex to be
+easily generated on the fly by the back end.  Files: {\tt checkgen}
+
+\item[Event driven operations]
+Various parts of ICR are incrementally recomputed, either eagerly on
+modification of the ICR, or lazily, when the relevant information is needed.
+\begin{itemize}
+\item Check that type assertions are satisfied, marking places where type
+checks need to be done.
+
+\item Locate let calls.
+
+\item Delete functions and variables with no references
+\end{itemize}
+Files: {\tt ir1util}, {\tt ir1opt}
+
+\item[ICR finalize]
+This phase is run after all components have been compiled.  It scans the
+global variable references, looking for references to undefined variables
+and incompatible function redefinitions.  Files: {\tt ir1final}, {\tt main}.
+
+\item[Environment analysis]
+Determine which distinct environments need to be allocated, and what
+context needed to be closed over by each environment.  We detect non-local
+exits and set closure variables.  We also emit cleanup code as funny
+function calls.  This is the last pure ICR pass.  Files: {\tt envanal}
+
+\item[Global TN allocation (GTN)]
+Iterate over all defined functions, determining calling conventions
+and assigning TNs to local variables.  Files: {\tt gtn}
+
+\item[Local TN allocation (LTN)]
+Use type and policy information to determine which VMR translation to use
+for known functions, and then create TNs for expression evaluation
+temporaries.  We also accumulate some random information needed by VMR
+conversion.  Files: {\tt ltn}
+
+\item[Control analysis]
+Linearize the flow graph in a way that minimizes the number of branches.  The
+block-level structure of the flow graph is basically frozen at this point.
+Files: {\tt control}
+
+\item[Stack analysis]
+Maintain stack discipline for unknown-values continuation in the presence
+of local exits.  Files: {\tt stack}
+
+\item[Entry analysis]
+Collect some back-end information for each externally callable function.
+
+\item[VMR conversion] Convert ICR into VMR by translating nodes into VOPs.
+Emit type checks.  Files: {\tt ir2tran, vmdef}
+
+\item[Copy propagation] Use flow analysis to eliminate unnecessary copying of
+TN values.  Files: {\tt copyprop}
+
+\item[Representation selection]
+Look at all references to each TN to determine which representation has the
+lowest cost.  Emit appropriate move and coerce VOPS for that representation.
+
+\item[Lifetime analysis]
+Do flow analysis to find the set of TNs whose lifetimes 
+overlap with the lifetimes of each TN being packed.  Annotate call VOPs with
+the TNs that need to be saved.  Files: {\tt life}
+
+\item[Pack]
+Find a legal register allocation, attempting to minimize unnecessary moves.
+Files: {\tt pack}
+
+\item[Code generation]
+Call the VOP generators to emit assembly code.  Files: {\tt codegen}
+
+\item[Pipeline reorganization] On some machines, move memory references
+backward in the code so that they can overlap with computation.  On machines
+with delayed branch instructions, locate instructions that can be moved into
+delay slots.  Files: {\tt assem-opt}
+
+\item[Assembly]
+Resolve branches and convert into object code and fixup information.
+Files: {\tt assembler}
+
+\item[Dumping] Convert the compiled code into an object file or in-core
+function.  Files: {\tt debug-dump}, {\tt dump}, {\tt vm/core}
+
+\end{description}
+
+\chapter{The Implicit Continuation Representation}
+
+The set of special forms recognized is exactly that specified in the Common
+Lisp manual.  Everything that is described as a macro in CLTL is a macro.
+
+Large amounts of syntactic information are thrown away by the conversion to an
+anonymous flow graph representation.  The elimination of names eliminates the
+need to represent most environment manipulation special forms.  The explicit
+representation of control eliminates the need to represent BLOCK and GO, and
+makes flow analysis easy.  The full Common Lisp LAMBDA is implemented with a
+simple fixed-arg lambda, which greatly simplifies later code.
+      
+The elimination of syntactic information eliminates the need for most of the
+``beta transformation'' optimizations in Rabbit.  There are no progns, no
+tagbodys and no returns.  There are no ``close parens'' which get in the way of
+determining which node receives a given value.
+
+In ICR, computation is represented by Nodes.  These are the node types:
+\begin{description}
+\item[if]  Represents all conditionals.
+
+\item[set] Represents a {\tt setq}.
+
+\item[ref] Represents a constant or variable reference.
+
+\item[combination] Represents a normal function call.
+
+\item[MV-combination] Represents a {\tt multiple-value-call}.  This is used to
+implement all multiple value receiving forms except for {\tt
+multiple-value-prog1}, which is implicit.
+
+\item[bind]
+This represents the allocation and initialization of the variables in
+a lambda.
+
+\item[return]
+This collects the return value from a lambda and represents the
+control transfer on return.
+
+\item[entry] Marks the start of a dynamic extent that can have non-local exits
+to it.  Dynamic state can be saved at this point for restoration on re-entry.
+
+\item[exit] Marks a potentially non-local exit.  This node is interposed
+between the non-local uses of a continuation and the {\tt dest} so that code to
+do a non-local exit can be inserted if necessary.
+\end{description}
+
+Some slots are shared between all node types (via defstruct inheritance.)  This
+information held in common between all nodes often makes it possible to avoid
+special-casing nodes on the basis of type.  This shared information is
+primarily concerned with the order of evaluation and destinations and
+properties of results.  This control and value flow is indicated in the node
+primarily by pointing to continuations.
+
+The {\tt continuation} structure represents information sufficiently related
+to the normal notion of a continuation that naming it so seems sensible.
+Basically, a continuation represents a place in the code, or alternatively the
+destination of an expression result and a transfer of control.  These two
+notions are bound together for the same reasons that they are related in the
+standard functional continuation interpretation.
+
+A continuation may be deprived of either or both of its value or control
+significance.  If the value of a continuation is unused due to evaluation for
+effect, then the continuation will have a null {\tt dest}.  If the {\tt next}
+node for a continuation is deleted by some optimization, then {\tt next} will
+be {\tt :none}.
+
+  [\#\#\# Continuation kinds...]
+
+The {\tt block} structure represents a basic block, in the the normal sense.
+Control transfers other than simple sequencing are represented by information
+in the block structure.  The continuation for the last node in a block
+represents only the destination for the result.
+
+It is very difficult to reconstruct anything resembling the original source
+from ICR, so we record the original source form in each node.  The location of
+the source form within the input is also recorded, allowing for interfaces such
+as ``Edit Compiler Warnings''.  See section \ref{source-paths}.
+
+Forms such as special-bind and catch need to have cleanup code executed at all
+exit points from the form.  We represent this constraint in ICR by annotating
+the code syntactically within the form with a Cleanup structure describing what
+needs to be cleaned up.  Environment analysis determines the cleanup locations
+by watching for a change in the cleanup between two continuations.  We can't
+emit cleanup code during ICR conversion, since we don't know which exits will
+be local until after ICR optimizations are done.
+
+Special binding is represented by a call to the funny function \%Special-Bind.
+The first argument is the Global-Var structure for the variable bound and the
+second argument is the value to bind it to.
+
+Some subprimitives are implemented using a macro-like mechanism for translating
+\%PRIMITIVE forms into arbitrary lisp code.  Subprimitives special-cased by VMR
+conversion are represented by a call to the funny function \%\%Primitive.  The
+corresponding Template structure is passed as the first argument.
+
+We check global function calls for syntactic legality with respect to any
+defined function type function.  If the call is illegal or we are unable to
+tell if it is legal due to non-constant keywords, then we give a warning and
+mark the function reference as :notinline to force a full call and cause
+subsequent phases to ignore the call.  If the call is legal and is to a known
+function, then we annotate the Combination node with the Function-Info
+structure that contains the compiler information for the function.
+
+
+\section{Tail sets}
+\#|
+Probably want to have a GTN-like function result equivalence class mechanism
+for ICR type inference.  This would be like the return value propagation being
+done by Propagate-From-Calls, but more powerful, less hackish, and known to
+terminate.  The ICR equivalence classes could probably be used by GTN, as well.
+
+What we do is have local call analysis eagerly maintain the equivalence classes
+of functions that return the same way by annotating functions with a Tail-Info
+structure shared between all functions whose value could be the value of this
+function.  We don't require that the calls actually be tail-recursive, only
+that the call deliver its value to the result continuation.  [\#\#\# Actually
+now done by ICR-OPTIMIZE-RETURN, which is currently making ICR optimize
+mandatory.]
+
+We can then use the Tail-Set during ICR type inference.  It would have a type
+that is the union across all equivalent functions of the types of all the uses
+other than in local calls.  This type would be recomputed during optimization
+of return nodes.  When the type changes, we would propagate it to all calls to
+any of the equivalent functions.  How do we know when and how to recompute the
+type for a tail-set?  Recomputation is driven by type propagation on the result
+continuation.
+
+This is really special-casing of RETURN nodes.  The return node has the type
+which is the union of all the non-call uses of the result.  The tail-set is
+found though the lambda.  We can then recompute the overall union by taking the
+union of the type per return node, rather than per-use.
+
+
+How do result type assertions work?  We can't intersect the assertions across
+all functions in the equivalence class, since some of the call combinations may
+not happen (or even be possible).  We can intersect the assertion of the result
+with the derived types for non-call uses.
+
+When we do a tail call, we obviously can't check that the returned value
+matches our assertion.  Although in principle, we would like to be able to
+check all assertions, to preserve system integrity, we only need to check
+assertions that we depend on.  We can afford to lose some assertion information
+as long as we entirely lose it, ignoring it for type inference as well as for
+type checking.
+
+Things will work out, since the caller will see the tail-info type as the
+derived type for the call, and will emit a type check if it needs a stronger
+result.
+
+A remaining question is whether we should intersect the assertion with
+per-RETURN derived types from the very beginning (i.e. before the type check
+pass).  I think the answer is yes.  We delay the type check pass so that we can
+get our best guess for the derived type before we decide whether a check is
+necessary.  But with the function return type, we aren't committing to doing
+any type check when we intersect with the type assertion; the need to type
+check is still determined in the type check pass by examination of the result
+continuation.
+
+What is the relationship between the per-RETURN types and the types in the
+result continuation?  The assertion is exactly the Continuation-Asserted-Type
+(note that the asserted type of result continuations will never change after
+ICR conversion).  The per-RETURN derived type is different than the
+Continuation-Derived-Type, since it is intersected with the asserted type even
+before Type Check runs.  Ignoring the Continuation-Derived-Type probably makes
+life simpler anyway, since this breaks the potential circularity of the
+Tail-Info-Type will affecting the Continuation-Derived-Type, which affects...
+
+When a given return has no non-call uses, we represent this by using
+*empty-type*.  This is consistent with the interpretation that a return type of
+NIL means the function can't return.
+
+
+\section{Hairy function representation}
+
+Non-fixed-arg functions are represented using Optional-Dispatch.  An
+Optional-Dispatch has an entry-point function for each legal number of
+optionals, and one for when extra args are present.  Each entry point function
+is a simple lambda.  The entry point function for an optional is passed the
+arguments which were actually supplied; the entry point function is expected to
+default any remaining parameters and evaluate the actual function body.
+
+If no supplied-p arg is present, then we can do this fairly easily by having
+each entry point supply its default and call the next entry point, with the
+last entry point containing the body.  If there are supplied-p args, then entry
+point function is replaced with a function that calls the original entry
+function with T's inserted at the position of all the supplied args with
+supplied-p parameters.
+
+We want to be a bit clever about how we handle arguments declared special when
+doing optional defaulting, or we will emit really gross code for special
+optionals.  If we bound the arg specially over the entire entry-point function,
+then the entry point function would be caused to be non-tail-recursive.  What
+we can do is only bind the variable specially around the evaluation of the
+default, and then read the special and store the final value of the special
+into a lexical variable which we then pass as the argument.  In the common case
+where the default is a constant, we don't have to special-bind at all, since
+the computation of the default is not affected by and cannot affect any special
+bindings.
+
+Keyword and rest args are both implemented using a LEXPR-like ``more
+args'' convention.  The More-Entry takes two arguments in addition to
+the fixed and optional arguments: the argument context and count.
+\verb+(ARG <context> <n>)+ accesses the N'th additional argument.  Keyword
+args are implemented directly using this mechanism.  Rest args are
+created by calling \%Listify-Rest-Args with the context and count.
+
+The More-Entry parses the keyword arguments and passes the values to the main
+function as positional arguments.  If a keyword default is not constant, then
+we pass a supplied-p parameter into the main entry and let it worry about
+defaulting the argument.  Since the main entry accepts keywords in parsed form,
+we can parse keywords at compile time for calls to known functions.  We keep
+around the original parsed lambda-list and related information so that people
+can figure out how to call the main entry.
+
+
+\section{ICR representation of non-local exits}
+
+All exits are initially represented by EXIT nodes:
+How about an Exit node:
+\begin{verbatim}
+    (defstruct (exit (:include node))
+      value)
+\end{verbatim}
+The Exit node uses the continuation that is to receive the thrown Value.
+During optimization, if we discover that the Cont's home-lambda is the same as
+the exit node's, then we can delete the Exit node, substituting the Cont for
+all of the Value's uses.
+
+The successor block of an EXIT is the entry block in the entered environment.
+So we use the Exit node to mark the place where exit code is inserted.  During
+environment analysis, we need only insert a single block containing the entry
+point stub.
+
+We ensure that all Exits that aren't for a NLX don't have any Value, so that
+local exits never require any value massaging.
+
+The Entry node marks the beginning of a block or tagbody:
+\begin{verbatim} 
+    (defstruct (entry (:include node))
+      (continuations nil :type list)) 
+\end{verbatim}
+It contains a list of all the continuations that the body could exit to.  The
+Entry node is used as a marker for the place to snapshot state, including
+the control stack pointer.  Each lambda has a list of its Entries so
+that environment analysis can figure out which continuations are really being
+closed over.  There is no reason for optimization to delete Entry nodes,
+since they are harmless in the degenerate case: we just emit no code (like a
+no-var let).
+
+
+We represent CATCH using the lexical exit mechanism.  We do a transformation
+like this:
+\begin{verbatim}
+   (catch 'foo xxx)  ==>
+   (block #:foo
+     (%catch #'(lambda () (return-from #:foo (%unknown-values))) 'foo)
+     (%within-cleanup :catch
+       xxx))
+\end{verbatim}
+
+\%CATCH just sets up the catch frame which points to the exit function.  \%Catch
+is an ordinary function as far as ICR is concerned.  The fact that the catcher
+needs to be cleaned up is expressed by the Cleanup slots in the continuations
+in the body.  \%UNKNOWN-VALUES is a dummy function call which represents the
+fact that we don't know what values will be thrown.  
+
+\%WITHIN-CLEANUP is a special special form that instantiates its first argument
+as the current cleanup when converting the body.  In reality, the lambda is
+also created by the special special form \%ESCAPE-FUNCTION, which gives the
+lambda a special :ESCAPE kind so that the back end knows not to generate any
+code for it.
+
+
+We use a similar hack in Unwind-Protect to represent the fact that the cleanup
+forms can be invoked at arbitrarily random times.
+
+\begin{verbatim}
+    (unwind-protect p c)  ==>
+    (flet ((#:cleanup () c))
+      (block #:return
+	(multiple-value-bind
+	    (#:next #:start #:count)
+	    (block #:unwind
+              (%unwind-protect #'(lambda (x) (return-from #:unwind x)))
+              (%within-cleanup :unwind-protect
+		(return-from #:return p)))
+	  (#:cleanup)
+          (%continue-unwind #:next #:start #:count))))
+\end{verbatim}
+
+We use the block \#:unwind to represent the entry to cleanup code in the case
+where we are non-locally unwound.  Calling of the cleanup function in the
+drop-through case (or any local exit) is handled by cleanup generation.  We
+make the cleanup a function so that cleanup generation can add calls at local
+exits from the protected form.  \#:next, \#:start and \#:count are state used in
+the case where we are unwound.  They indicate where to go after doing the
+cleanup and what values are being thrown.  The cleanup encloses only the
+protected form.  As in CATCH, the escape function is specially tagged as
+:ESCAPE.  The cleanup function is tagged as :CLEANUP to inhibit let conversion
+(since references are added in environment analysis.)
+
+Notice that implementing these forms using closures over continuations
+eliminates any need to special-case ICR flow analysis.  Obviously we don't
+really want to make heap-closures here.  In reality these functions are
+special-cased by the back-end according to their KIND.
+
+
+\section{Block compilation}
+
+One of the properties of ICR is that it supports ``block compilation'' by allowing
+arbitrarily large amounts of code to be converted at once, with actual
+compilation of the code being done at will.
+
+
+In order to preserve the normal semantics we must recognize that proclamations
+(possibly implicit) are scoped.  A proclamation is in effect only from the time
+of appearance of the proclamation to the time it is contradicted.  The current
+global environment at the end of a block is not necessarily the correct global
+environment for compilation of all the code within the block.  We solve this
+problem by closing over the relevant information in the ICR at the time it is
+converted.  For example, each functional variable reference is marked as
+inline, notinline or don't care.  Similarly, each node contains a structure
+known as a Cookie which contains the appropriate settings of the compiler
+policy switches.
+
+We actually convert each form in the file separately, creating a separate
+``initial component'' for each one.  Later on, these components are merged as
+needed.  The main reason for doing this is to cause EVAL-WHEN processing to be
+interleaved with reading. 
+
+
+\section{Entry points}
+
+\#|
+
+Since we need to evaluate potentially arbitrary code in the XEP argument forms
+(for type checking), we can't leave the arguments in the wired passing
+locations.  Instead, it seems better to give the XEP max-args fixed arguments,
+with the passing locations being the true passing locations.  Instead of using
+\%XEP-ARG, we reference the appropriate variable.
+
+Also, it might be a good idea to do argument count checking and dispatching
+with explicit conditional code in the XEP.  This would simplify both the code
+that creates the XEP and the VMR conversion of XEPs.  Also, argument count
+dispatching would automatically benefit from any cleverness in compilation of
+case-like forms (jump tables, etc).  On the downside, this would push some
+assumptions about how arg dispatching is done into ICR.  But then we are
+currently violating abstraction at least as badly in VMR conversion, which is
+also supposed to be implementation independent.
+|\#
+
+As a side-effect of finding which references to known functions can be
+converted to local calls, we find any references that cannot be converted.
+References that cannot be converted to a local call must evaluate to a
+``function object'' (or function-entry) that can be called using the full call
+convention.  A function that can be called from outside the component is called
+an ``entry-point''.
+
+Lots of stuff that happens at compile-time with local function calls must be
+done at run-time when an entry-point is called.
+
+It is desirable for optimization and other purposes if all the calls to every
+function were directly present in ICR as local calls.  We cannot directly do
+this with entry-point functions, since we don't know where and how the
+entry-point will be called until run-time.
+
+What we do is represent all the calls possible from outside the component by
+local calls within the component.  For each entry-point function, we create a
+corresponding lambda called the external entry point or XEP.  This is a
+function which takes the number of arguments passed as the first argument,
+followed by arguments corresponding to each required or optional argument.
+
+If an optional argument is unsupplied, the value passed into the XEP is
+undefined.  The XEP is responsible for doing argument count checking and
+dispatching.  
+
+In the case of a fixed-arg lambda, we emit a call to the \%VERIFY-ARGUMENT-COUNT
+funny function (conditional on policy), then call the real function on the
+passed arguments.  Even in this simple case, we benefit several ways from
+having a separate XEP:
+\begin{itemize}
+\item The argument count checking is factored out, and only needs to
+  be done in full calls.
+\item Argument type checking happens automatically as a consequence of
+  passing the XEP arguments in a local call to the real function.
+  This type checking is also only done in full calls.
+\item The real function may use a non-standard calling convention for
+  the benefit of recursive or block-compiled calls.  The XEP converts
+  arguments/return values to/from the standard convention.  This also
+  requires little special-casing of XEPs.
+\end{itemize}
+
+If the function has variable argument count (represented by an
+OPTIONAL-DISPATCH), then the XEP contains a COND which dispatches off of the
+argument count, calling the appropriate entry-point function (which then does
+defaulting).  If there is a more entry (for keyword or rest args), then the XEP
+obtains the more arg context and count by calling the \%MORE-ARG-CONTEXT funny
+function.
+
+All non-local-call references to functions are replaced with references to the
+corresponding XEP.  ICR optimization may discover a local call that was
+previously a non-local reference.  When we delete the reference to the XEP, we
+may find that it has no references.  In this case, we can delete the XEP,
+causing the function to no longer be an entry-point.
+
+

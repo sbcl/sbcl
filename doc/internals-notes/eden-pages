@@ -1,0 +1,73 @@
+Design for new page types in support of asynchronous
+determination of ambiguous roots.
+
+Background: concurrency is only a problem pertinent
+to generation 0 with open per-thread allocation regions.
+Generations 1 and up are manipulated by the GC and will not have
+open regions when threads are initially stopped.
+If only generation 0 is to be collected, then each
+thread can stack its own stack.
+If generation 1 or higher is to be collected,
+the GC'ing thread will have to scan all stacks.
+
+PAGE_TYPE_EDEN_CONS:
+* Pages are initially filled with 0xff.
+* All objects are conses.
+* Examining an arbitrary word will, with 100% certainty,
+  determine that the word starts an object or does not.
+  (Any <-1,-1> wordpair can not possibly be a cons)
+* Differs from CONS in that ordinary CONS is not prezeroed.
+
+PAGE_TYPE_EDEN_BOXED:
+* Pages are initially zero-filled.
+* All objects are headered.
+* No object contains a raw slot.
+* Examining an arbitrary word will, with 100% certainty,
+  determine that the word starts an object or does not.
+  (Any word containing 0 can not possibly start an object.)
+* Acceptable primitive types:
+  - instance with no raw slots
+  - funinstance without embedded trampoline
+  - ratio, (complex rational)
+  - closure, value-cell, weak-pointer
+  - simple-array, simple-vector-nil, simple-vector
+  - complex-{base-string,character-string,bit-vector,vector,array}
+* Lockfree list nodes should be allowed on eden boxed pages,
+  but we need more flag bits: one bit which says whether it can
+  be initially allocated to BOXED (it won't contain random bits)
+  and one which says whether it may be transported to BOXED.
+  Generations > 1 do not use scavenge methods on BOXED pages,
+  so it would not be allowed to have a list node there.
+* Differs from BOXED in that ordinary BOXED may not contain
+  any object that demands a type-specific scavenge method.
+
+PAGE_TYPE_EDEN_MIXED:
+* Pages need not be zero-filled (in theory).
+* All objects are headered.
+* Objects potentially contain one or more raw slots.
+* A bitmap of object start addresses is maintained by the allocator.
+* Acceptable primitive types:
+  - bignum, double-float, (complex float)
+  - symbol, mixed instance and/or instances made by %MAKE-INSTANCE
+  - funinstance with embedded trampoline
+  - sap, fdefn, simd-pack{-256}
+  - simple-unboxed-vector
+* Differs from MIXED in that normal MIXED has no bitmap and will
+  usually not contain instances that lack raw slots.
+
+Similarities:
+* Type-specific scavenge methods are required for EDEN pages
+  except for CONS.
+  In the case of BOXED, this is due to presence of weak pointers,
+  weak vectors, and address-based and/or weak KV storage vectors.
+  For MIXED, this is required to avoid seeing raw bits.
+* Pinned objects can promote beyond gen0, but the page type remains
+  as EDEN_type because it would take more computation to decide whether
+  to turn a page into something different.
+  Additionally it might not be possible to change because:
+  - EDEN_BOXED can hold the union of ordinary BOXED and MIXED
+  - EDEN_MIXED can hold the union of ordinary MIXED and UNBOXED
+
+Caution: this writeup only applies to x86-64.
+Ensuring visibility of writes for relaxed-memory-order machines
+is an issue. Something can possibly be done involving sys_membarrier.

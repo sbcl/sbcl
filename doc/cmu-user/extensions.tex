@@ -1,0 +1,3077 @@
+\chapter{Design Choices and Extensions}
+
+Several design choices in \clisp{} are left to the individual
+implementation, and some essential parts of the programming environment
+are left undefined.  This chapter discusses the most important design
+choices and extensions.
+
+\section{Data Types}
+
+\subsection{Integers}
+
+The \tindexed{fixnum} type is equivalent to \code{(signed-byte 30)}.
+Integers outside this range are represented as a \tindexed{bignum} or
+a word integer (\pxlref{word-integers}.)  Almost all integers that
+appear in programs can be represented as a \code{fixnum}, so integer
+number consing is rare.
+
+
+\subsection{Floats}
+\label{ieee-float}
+
+\cmucl{} supports three floating point formats:
+\tindexed{single-float}, \tindexed{double-float} and
+\tindexed{double-double-float}.  The first two are implemented with
+IEEE single and double float arithmetic, respectively.  The last is an
+extension; \pxlref{extended-float} for more information.
+\code{short-float} is a synonym for \code{single-float}, and
+\code{long-float} is a synonym for \code{double-float}.  The initial
+value of \vindexed{read-default-float-format} is \code{single-float}.
+
+Both \code{single-float} and \code{double-float} are represented with
+a pointer descriptor, so float operations can cause number consing.
+Number consing is greatly reduced if programs are written to allow the
+use of non-descriptor representations (\pxlref{numeric-types}.)
+
+
+\subsubsection{IEEE Special Values}
+
+\cmucl{} supports the IEEE infinity and NaN special values.  These
+non-numeric values will only be generated when trapping is disabled
+for some floating point exception (\pxlref{float-traps}), so users of
+the default configuration need not concern themselves with special
+values.
+
+\begin{defconst}{extensions:}{short-float-positive-infinity}
+  \defconstx[extensions:]{short-float-negative-infinity}
+  \defconstx[extensions:]{single-float-positive-infinity}
+  \defconstx[extensions:]{single-float-negative-infinity}
+  \defconstx[extensions:]{double-float-positive-infinity}
+  \defconstx[extensions:]{double-float-negative-infinity}
+  \defconstx[extensions:]{long-float-positive-infinity}
+  \defconstx[extensions:]{long-float-negative-infinity}
+  
+  The values of these constants are the IEEE positive and negative
+  infinity objects for each float format.
+\end{defconst}
+
+\begin{defun}{extensions:}{float-infinity-p}{\args{\var{x}}}
+  
+  This function returns true if \var{x} is an IEEE float infinity (of
+  either sign.)  \var{x} must be a float.
+\end{defun}
+
+\begin{defun}{extensions:}{float-nan-p}{\args{\var{x}}}
+  \defunx[extensions:]{float-signaling-nan-p}{\args{\var{x}}}
+  \defunx[extensions:]{float-trapping-nan-p}{\args{\var{x}}}
+  
+  \code{float-nan-p} returns true if \var{x} is an IEEE NaN (Not A
+  Number) object.  \code{float-signaling-nan-p} returns true only if
+  \var{x} is a trapping NaN.  With either function, \var{x} must be a
+  float. \code{float-trapping-nan-p} is the former name of
+  \code{float-signaling-nan-p} and is deprecated.
+\end{defun}
+
+\subsubsection{Negative Zero}
+
+The IEEE float format provides for distinct positive and negative
+zeros.  To test the sign on zero (or any other float), use the
+\clisp{} \findexed{float-sign} function.  Negative zero prints as
+\code{-0.0f0} or \code{-0.0d0}.
+
+\subsubsection{Denormalized Floats}
+
+\cmucl{} supports IEEE denormalized floats.  Denormalized floats
+provide a mechanism for gradual underflow.  The \clisp{}
+\findexed{float-precision} function returns the actual precision of a
+denormalized float, which will be less than \findexed{float-digits}.
+Note that in order to generate (or even print) denormalized floats,
+trapping must be disabled for the underflow exception
+(\pxlref{float-traps}.)  The \clisp{}
+\w{\code{least-positive-}\var{format}-\code{float}} constants are
+denormalized.
+
+\begin{defun}{extensions:}{float-denormalized-p}{\args{\var{x}}}
+  
+  This function returns true if \var{x} is a denormalized float.
+  \var{x} must be a float.
+\end{defun}
+
+
+\subsubsection{Floating Point Exceptions}
+\label{float-traps}
+
+The IEEE floating point standard defines several exceptions that occur
+when the result of a floating point operation is unclear or
+undesirable.  Exceptions can be ignored, in which case some default
+action is taken, such as returning a special value.  When trapping is
+enabled for an exception, a error is signalled whenever that exception
+occurs.  These are the possible floating point exceptions:
+\begin{Lentry}
+  
+\item[\kwd{underflow}] This exception occurs when the result of an
+  operation is too small to be represented as a normalized float in
+  its format.  If trapping is enabled, the
+  \tindexed{floating-point-underflow} condition is signalled.
+  Otherwise, the operation results in a denormalized float or zero.
+  
+\item[\kwd{overflow}] This exception occurs when the result of an
+  operation is too large to be represented as a float in its format.
+  If trapping is enabled, the \tindexed{floating-point-overflow}
+  exception is signalled.  Otherwise, the operation results in the
+  appropriate infinity.
+  
+\item[\kwd{inexact}] This exception occurs when the result of a
+  floating point operation is not exact, i.e. the result was rounded.
+  If trapping is enabled, the \code{extensions:floating-point-inexact}
+  condition is signalled.  Otherwise, the rounded result is returned.
+  
+\item[\kwd{invalid}] This exception occurs when the result of an
+  operation is ill-defined, such as \code{\w{(/ 0.0 0.0)}}.  If
+  trapping is enabled, the \code{extensions:floating-point-invalid}
+  condition is signalled.  Otherwise, a quiet NaN is returned.
+  
+\item[\kwd{divide-by-zero}] This exception occurs when a float is
+  divided by zero.  If trapping is enabled, the
+  \tindexed{divide-by-zero} condition is signalled.  Otherwise, the
+  appropriate infinity is returned.
+\end{Lentry}
+
+\subsubsection{Floating Point Rounding Mode}
+\label{float-rounding-modes}
+
+IEEE floating point specifies four possible rounding modes:
+\begin{Lentry}
+  
+\item[\kwd{nearest}] In this mode, the inexact results are rounded to
+  the nearer of the two possible result values.  If the neither
+  possibility is nearer, then the even alternative is chosen.  This
+  form of rounding is also called ``round to even'', and is the form
+  of rounding specified for the \clisp{} \findexed{round} function.
+  
+\item[\kwd{positive-infinity}] This mode rounds inexact results to the
+  possible value closer to positive infinity.  This is analogous to
+  the \clisp{} \findexed{ceiling} function.
+  
+\item[\kwd{negative-infinity}] This mode rounds inexact results to the
+  possible value closer to negative infinity.  This is analogous to
+  the \clisp{} \findexed{floor} function.
+  
+\item[\kwd{zero}] This mode rounds inexact results to the possible
+  value closer to zero.  This is analogous to the \clisp{}
+  \findexed{truncate} function.
+\end{Lentry}
+
+Warning: Although the rounding mode can be changed with
+\code{set-floating-point-modes}, use of any value other than the
+default (\kwd{nearest}) can cause unusual behavior, since it will
+affect rounding done by \llisp{} system code as well as rounding in
+user code.  In particular, the unary \code{round} function will stop
+doing round-to-nearest on floats, and instead do the selected form of
+rounding.
+
+%% \subsubsection{Precision Control}
+%% \label{precision-control}
+%% 
+%% The floating-point unit for the Intel IA-32 architecture supports a
+%% precision control mechanism.  The floating-point unit consists of an
+%% IEEE extended double-float unit and all operations are always done
+%% using his format, and this includes rounding.  However, by setting the
+%% precision control mode, the user can control how rounding is done for
+%% each basic arithmetic operation like addition, subtraction,
+%% multiplication, and division.  The extra instructions for
+%% trigonometric, exponential, and logarithmic operations are not
+%% affected.  We refer the reader to Intel documentation for more
+%% information. 
+%% 
+%% The possible modes are:
+%% \begin{Lentry}
+%%   
+%% \item[\kwd{24-bit}] In this mode, all basic arithmetic operations like
+%%   addition, subtraction, multiplication, and division, are rounded
+%%   after each operation as if both the operands were IEEE single
+%%   precision numbers.  
+%%   
+%% \item[\kwd{53-bit}] In this mode, rounding is performed as if the
+%%   operands and results were IEEE double precision numbers.
+%%   
+%% \item[\kwd{64-bit}] In this mode, the default, rounding is performed
+%%   on the full IEEE extended double precision format.
+%%   
+%% \end{Lentry}
+%% 
+%% \subsubsection{Warning:}
+%% 
+%% Although the precision mode can be changed with
+%% \code{set-floating-point-modes}, use of anything other than
+%% \kwd{64-bit} or \kwd{53-bit} can cause unexpected results, especially
+%% if external functions or libraries are called.  A setting of
+%% \kwd{64-bit} also causes \code{(= 1d0 (+ 1d0 double-float-epsilon))}
+%% to return \true{} instead of \false.
+%% 
+%% 
+\subsubsection{Accessing the Floating Point Modes}
+
+These functions can be used to modify or read the floating point modes:
+
+\begin{defun}{extensions:}{set-floating-point-modes}{%
+    \keys{\kwd{traps} \kwd{rounding-mode}}
+    \morekeys{\kwd{fast-mode} \kwd{accrued-exceptions}}
+    \yetmorekeys{\kwd{current-exceptions}}}
+  \defunx[extensions:]{get-floating-point-modes}{}
+  
+  The keyword arguments to \code{set-floating-point-modes} set various
+  modes controlling how floating point arithmetic is done:
+  \begin{Lentry}
+  
+  \item[\kwd{traps}] A list of the exception conditions that should
+    cause traps.  Possible exceptions are \kwd{underflow},
+    \kwd{overflow}, \kwd{inexact}, \kwd{invalid} and
+    \kwd{divide-by-zero}.  Initially all traps except \kwd{inexact}
+    are enabled.  \xlref{float-traps}.
+    
+  \item[\kwd{rounding-mode}] The rounding mode to use when the result
+    is not exact. Possible values are \kwd{nearest},
+    \kwd{positive-infinity}, \kwd{negative-infinity} and \kwd{zero}.
+    Initially, the rounding mode is \kwd{nearest}. See the warning in
+    section \ref{float-rounding-modes} about use of other rounding
+    modes.
+  
+  \item[\kwd{current-exceptions}, \kwd{accrued-exceptions}] Lists of
+    exception keywords used to set the exception flags.  The
+    \var{current-exceptions} are the exceptions for the previous
+    operation, so setting it is not very useful.  The
+    \var{accrued-exceptions} are a cumulative record of the exceptions
+    that occurred since the last time these flags were cleared.
+    Specifying \code{()} will clear any accrued exceptions.
+  
+  \item[\kwd{fast-mode}] Set the hardware's ``fast mode'' flag, if
+    any.  When set, IEEE conformance or debuggability may be impaired.
+    Some machines may not have this feature, in which case the value
+    is always \false.  Sparc platforms support a fast mode where
+    denormal numbers are silently truncated to zero.
+  \end{Lentry}
+  If a keyword argument is not supplied, then the associated state is
+  not changed.
+  
+  \code{get-floating-point-modes} returns a list representing the
+  state of the floating point modes.  The list is in the same format
+  as the keyword arguments to \code{set-floating-point-modes}, so
+  \code{apply} could be used with \code{set-floating-point-modes} to
+  restore the modes in effect at the time of the call to
+  \code{get-floating-point-modes}.
+\end{defun}
+
+To make handling control of floating-point exceptions, the following
+macro is useful.
+
+\begin{defmac}{ext:}{with-float-traps-masked}{\var{traps} \ampbody\ \var{body}}
+  \code{body} is executed with the selected floating-point exceptions
+  given by \code{traps} masked out (disabled).  \code{traps} should be
+  a list of possible floating-point exceptions that should be ignored.
+  Possible values are \kwd{underflow}, \kwd{overflow}, \kwd{inexact},
+  \kwd{invalid} and \kwd{divide-by-zero}.
+  
+  This is equivalent to saving the current traps from
+  \code{get-floating-point-modes}, setting the floating-point modes to
+  the desired exceptions, running the \code{body}, and restoring the
+  saved floating-point modes.  The advantage of this macro is that it
+  causes less consing to occur.
+
+  Some points about the with-float-traps-masked:
+
+  \begin{itemize}
+  \item Two approaches are available for detecting FP exceptions:
+    \begin{enumerate}
+    \item enabling the traps and handling the exceptions
+    \item disabling the traps and either handling the return values or
+      checking the accrued exceptions.
+    \end{enumerate}
+    Of these the latter is the most portable because on the alpha port
+    it is not possible to enable some traps at run-time.
+    
+  \item To assist the checking of the exceptions within the body any
+    accrued exceptions matching the given traps are cleared at the
+    start of the body when the traps are masked.
+    
+  \item To allow the macros to be nested these accrued exceptions are
+    restored at the end of the body to their values at the start of
+    the body. Thus any exceptions that occurred within the body will
+    not affect the accrued exceptions outside the macro.
+    
+  \item Note that only the given exceptions are restored at the end of
+    the body so other exception will be visible in the accrued
+    exceptions outside the body.
+    
+  \item On the x86, setting the accrued exceptions of an unmasked
+    exception would cause a FP trap. The macro behaviour of restoring
+    the accrued exceptions ensures than if an accrued exception is
+    initially not flagged and occurs within the body it will be
+    restored/cleared at the exit of the body and thus not cause a
+    trap.
+    
+  \item On the x86, and, perhaps, the hppa, the FP exceptions may be
+    delivered at the next FP instruction which requires a FP
+    \code{wait} instruction (\code{x86::float-wait}) if using the lisp
+    conditions to catch trap within a \code{handler-bind}.  The
+    \code{handler-bind} macro does the right thing and inserts a
+    float-wait (at the end of its body on the x86).  The masking and
+    noting of exceptions is also safe here.
+    
+  \item The setting of the FP flags uses the
+    \code{(floating-point-modes)} and the \code{(set
+      (floating-point-modes)\ldots)} VOPs. These VOPs blindly update
+    the flags which may include other state.  We assume this state
+    hasn't changed in between getting and setting the state. For
+    example, if you used the FP unit between the above calls, the
+    state may be incorrectly restored! The
+    \code{with-float-traps-masked} macro keeps the intervening code to
+    a minimum and uses only integer operations.
+    %% Safe byte-compiled?
+    %% Perhaps the VOPs (x86) should be smarter and only update some of
+    %% the flags, the trap masks and exceptions?
+  \end{itemize}
+
+\end{defmac}
+
+\subsection{Extended Floats}
+\label{extended-float}
+
+\cmucl{} also has an extension to support \code{double-double-float}
+type.  This float format provides extended precision of about 31
+decimal digits, with the same exponent range as \code{double-float}.
+It is completely integrated into \cmucl{}, and can be used just like
+any other floating-point object, including arrays, complex
+\code{double-double-float}'s, and special functions.  With appropriate
+declarations, no boxing is needed, just like \code{single-float} and
+\code{double-float}. 
+
+The exponent marker for a double-double float number is ``W'', so
+``1.234w0'' is a double-double float number.
+
+
+Note that there are a few shortcomings with
+\code{double-double-float}'s:
+\begin{itemize}
+ \item There are no equivalents to \code{most-positive-double-float},
+   \code{double-float-positive-infinity}, \textit{etc}.  This is because
+   these are not really well defined for \code{double-double-float}'s.
+ \item Underflow and overflow may be prematurely signaled.  This is
+   due to how \code{double-double-float}'s are implemented.
+ \item Basic arithmetic operations are inlined, so the code size is
+   fairly large.
+ \item \code{double-double-float} arithmetic is quite a bit slower
+   than \code{double-float} since there is no hardware support for
+   this type.
+ \item The constant \code{pi} is still a \code{double-float} instead
+   of a \code{double-double-float}.  Use \code{ext:dd-pi} if you
+   want a \code{double-double-float} value for $\pi$.
+\end{itemize}
+
+\begin{deftp}{float}{extensions:double-double-float}{}
+  The \code{double-double-float} type.  It is in the \code{EXTENSIONS}
+  package.
+\end{deftp}
+
+\begin{defconst}{extensions:}{dd-pi}
+  A \code{double-double-float} approximation to $\pi$.
+\end{defconst}
+
+\subsection{Characters}
+
+\cmucl{} implements characters according to \cltltwo{}. The
+main difference from the first version is that character bits and font
+have been eliminated, and the names of the types have been changed.
+\tindexed{base-character} is the new equivalent of the old
+\tindexed{string-char}. In this implementation, all characters are
+base characters (there are no extended characters.) Character codes
+range between \code{0} and \code{255}, using the ASCII encoding.
+Table~\ref{tbl:chars}~\vpageref{tbl:chars} shows characters recognized
+by \cmucl.
+
+\begin{table}[tbhp]
+  \begin{center}
+    \begin{tabular}{|c|c|l|l|l|l|}
+      \hline
+      \multicolumn{2}{|c|}{ASCII} & \multicolumn{1}{|c}{Lisp} &
+      \multicolumn{3}{|c|}{} \\
+      \cline{1-2}
+      Name & Code & \multicolumn{1}{|c|}{Name} & \multicolumn{3}{|c|}{\raisebox{1.5ex}{Alternatives}}\\
+      \hline
+      \hline
+      \code{nul} & 0 & \code{\#\back{NULL}} & \code{\#\back{NUL}} & &\\
+      \code{bel} & 7 & \code{\#\back{BELL}} & & &\\
+      \code{bs} &  8 & \code{\#\back{BACKSPACE}} & \code{\#\back{BS}} & &\\
+      \code{tab} & 9 & \code{\#\back{TAB}} & & &\\
+      \code{lf} & 10 & \code{\#\back{NEWLINE}} & \code{\#\back{NL}} & \code{\#\back{LINEFEED}} & \code{\#\back{LF}}\\
+      \code{ff} & 11 & \code{\#\back{VT}} & \code{\#\back{PAGE}} & \code{\#\back{FORM}} &\\
+      \code{cr} & 13 & \code{\#\back{RETURN}} & \code{\#\back{CR}} & &\\
+      \code{esc} & 27 & \code{\#\back{ESCAPE}} & \code{\#\back{ESC}} & \code{\#\back{ALTMODE}} & \code{\#\back{ALT}}\\
+      \code{sp} & 32 & \code{\#\back{SPACE}} & \code{\#\back{SP}} & &\\
+      \code{del} & 127 & \code{\#\back{DELETE}} & \code{\#\back{RUBOUT}} & &\\
+      \hline
+    \end{tabular}
+    \caption{Characters recognized by \cmucl}
+    \label{tbl:chars}
+  \end{center}
+\end{table}
+
+
+\subsection{Array Initialization}
+
+If no \kwd{initial-value} is specified, arrays are initialized to zero.
+
+
+\subsection{Hash tables}
+
+The \tindexed{hash-tables} defined by \clisp{} have limited utility because they
+are limited to testing their keys using the equality predicates
+provided by (pre-CLOS) \clisp{}.  \cmucl{} overcomes this limitation
+by allowing its users to specify new hash table tests and hashing
+methods.  The hashing method must also be specified, since the
+compiler is unable to determine a good hashing function for an
+arbitrary equality (equivalence) predicate.
+
+\begin{defun}{extensions:}{define-hash-table-test}%
+  {\args{\var{hash-table-test-name} \var{test-function} \var{hash-function}}}
+      
+      The \var{hash-table-test-name} must be a symbol.
+      % I just assumed the above. [2002/10/10:rpg]
+      The \var{test-function} takes two objects and returns true
+      iff they are the same.  The \var{hash-function} takes one object and
+      returns two values: the (positive fixnum) hash value and true if
+      the hashing depends on pointer values and will have to be redone
+      if the object moves.
+      
+      To create a hash-table using this new ``test'' (really, a
+      test/hash-function pair), use
+      \code{(\index[funs]{make-hash-table}make-hash-table :test
+        \var{hash-table-test-name} \ldots)}.
+
+      Note that it is the \var{hash-table-test-name} that will be
+      returned by the function \findexed{hash-table-test}, when applied to
+      a hash-table created using this function.
+
+      This function updates \vindexed{hash-table-tests}, which is now
+      internal.  
+\end{defun}
+
+\cmucl{} also supports a number of weak hash tables.  These weak
+tables are created using the \kwd{weak-p} argument to
+\code{make-hash-table}.  Normally, a reference to an object as either
+the key or value of the hash-table will prevent that object from being
+garbage-collected.  However, in a weak table, if the only reference is
+the hash-table, the object can be collected.
+
+The possible values for \kwd{weak-p} are listed below.  An entry in
+the table remains if the condition holds
+\begin{Lentry}
+\item[\kwd{key}] The key is referenced elsewhere
+\item[\kwd{value}] The value is referenced elsewhere
+\item[\kwd{key-and-value}] Both the key and value are referenced elsewhere
+\item[\kwd{key-or-value}] Either the key or value are referenced elsewhere
+\item[T] For backward compatibility, this means the same as \kwd{key}.
+\end{Lentry}
+If the condition does not hold, the object can be removed from the
+hash table.  
+
+Weak hash tables can only be created if the test is \code{eq} or
+\code{eql}.  An error is signaled if this is not the case.
+
+\begin{defun}{}{make-hash-table}%
+  {\args{\keys{\kwd{test} \kwd{size} \kwd{rehash-size} \kwd{rehash-threshold} \kwd{weak-p}}}}
+  Creates a hash-table with the specified properties.
+\end{defun}
+\section{Default Interrupts for Lisp}
+
+\cmucl{} has several interrupt handlers defined when it starts up,
+as follows:
+\begin{Lentry}
+  
+\item[\code{SIGINT} (\ctrl{c})] causes Lisp to enter a break loop.
+  This puts you into the debugger which allows you to look at the
+  current state of the computation.  If you proceed from the break
+  loop, the computation will proceed from where it was interrupted.
+  
+\item[\code{SIGQUIT} (\ctrl{L})] causes Lisp to do a throw to the
+  top-level.  This causes the current computation to be aborted, and
+  control returned to the top-level read-eval-print loop.
+  
+\item[\code{SIGTSTP} (\ctrl{z})] causes Lisp to suspend execution and
+  return to the Unix shell.  If control is returned to Lisp, the
+  computation will proceed from where it was interrupted.
+  
+\item[\code{SIGILL}, \code{SIGBUS}, \code{SIGSEGV}, and \code{SIGFPE}]
+  cause Lisp to signal an error.
+\end{Lentry}
+For keyboard interrupt signals, the standard interrupt character is in
+parentheses.  Your \file{.login} may set up different interrupt
+characters.  When a signal is generated, there may be some delay before
+it is processed since Lisp cannot be interrupted safely in an arbitrary
+place.  The computation will continue until a safe point is reached and
+then the interrupt will be processed.  \xlref{signal-handlers} to define
+your own signal handlers.
+
+
+\section{Implementation-Specific Packages}
+
+When \cmucl{} is first started up, the default package is the
+\code{common-lisp-user} package. The \code{common-lisp-user} package
+uses the \code{common-lisp} and \code{extensions} packages. The
+symbols exported from these three packages can be referenced without
+package qualifiers. This section describes packages which have
+exported interfaces that may concern users. The numerous internal
+packages which implement parts of the system are not described here.
+Package nicknames are in parenthesis after the full name.
+
+\begin{Lentry}
+\item[\code{alien}, \code{c-call}] Export the features of the Alien
+  foreign data structure facility (\pxlref{aliens}.)
+  
+\item[\code{pcl}] This package contains PCL (Portable CommonLoops),
+  which is a portable implementation of CLOS (the Common Lisp Object
+  System.)  This implements most (but not all) of the features in the
+  CLOS chapter of \cltltwo{}.
+
+\item[\code{clos-mop (mop)}] This package contains an implementation
+  of the CLOS Metaobject Protocol, as per the book \textit{The Art of
+  the Metaobject Protocol}.
+  
+\item[\code{debug}] The \code{debug} package contains the command-line
+  oriented debugger.  It exports utility various functions and
+  switches.
+  
+\item[\code{debug-internals}] The \code{debug-internals} package
+  exports the primitives used to write debuggers.
+  \xlref{debug-internals}.
+  
+\item[\code{extensions (ext)}] The \code{extensions} packages exports
+  local extensions to \clisp{} that are documented in this manual.
+  Examples include the \code{save-lisp} function and time parsing.
+  
+\item[\code{hemlock (ed)}] The \code{hemlock} package contains all the
+  code to implement Hemlock commands.  The \code{hemlock} package
+  currently exports no symbols.
+  
+\item[\code{hemlock-internals (hi)}] The \code{hemlock-internals}
+  package contains code that implements low level primitives and
+  exports those symbols used to write Hemlock commands.
+  
+\item[\code{keyword}] The \code{keyword} package contains keywords
+  (e.g., \kwd{start}).  All symbols in the \code{keyword} package are
+  exported and evaluate to themselves (i.e., the value of the symbol
+  is the symbol itself).
+  
+\item[\code{profile}] The \code{profile} package exports a simple
+  run-time profiling facility (\pxlref{profiling}).
+  
+\item[\code{common-lisp (cl)}] The \code{common-lisp} package
+  exports all the symbols defined by \cltl{} and only those symbols.
+  Strictly portable Lisp code will depend only on the symbols exported
+  from the \code{common-lisp} package.
+  
+\item[\code{unix}] This package exports system call
+  interfaces to Unix (\pxlref{unix-interface}).
+  
+\item[\code{system (sys)}] The \code{system} package contains
+  functions and information necessary for system interfacing.  This
+  package is used by the \code{lisp} package and exports several
+  symbols that are necessary to interface to system code.
+  
+\item[\code{xlib}] The \code{xlib} package contains the Common Lisp X
+  interface (CLX) to the X11 protocol.  This is mostly Lisp code with
+  a couple of functions that are defined in C to connect to the
+  server.
+  
+\item[\code{wire}] The \code{wire} package exports a remote procedure
+  call facility (\pxlref{remote}).
+
+\item[\code{stream}] The \code{stream} package exports the public
+  interface to the simple-streams implementation (\pxlref{simple-streams}).
+
+\item[\code{xref}] The \code{xref} package exports the public
+  interface to the cross-referencing utility (\pxlref{xref}).
+
+\end{Lentry}
+
+
+\input{hierarchical-packages}
+
+\input{package-locks}
+
+
+
+\section{The Editor}
+
+The \code{ed} function invokes the Hemlock editor which is described
+in {\it Hemlock User's Manual} and {\it Hemlock Command Implementor's
+Manual}. Most users at CMU prefer to use Hemlock's slave \llisp{}
+mechanism which provides an interactive buffer for the
+\code{read-eval-print} loop and editor commands for evaluating and
+compiling text from a buffer into the slave \llisp.  Since the editor
+runs in the \llisp, using slaves keeps users from trashing their
+editor by developing in the same \llisp{} with \hemlock{}.
+
+
+\section{Garbage Collection}
+
+\cmucl{} uses either a stop-and-copy garbage collector or a
+generational, mostly copying garbage collector.  Which collector is
+available depends on the platform and the features of the platform.
+The stop-and-copy GC is available on all RISC platforms.  The x86
+platform supports a conservative stop-and-copy collector, which is now
+rarely used, and a generational conservative collector.  On the Sparc
+platform, both the stop-and-copy GC and the generational GC are
+available, but the stop-and-copy GC is deprecated in favor of the
+generational GC.  
+
+The generational GC is available if \var{*features*} contains
+\code{:gencgc}.
+
+%% The stop-and-copy GC compacts the items in dynamic space every time it
+%% runs. Most users cause the system to garbage collect (GC) frequently,
+%% long before space is exhausted. With 16 or 24 megabytes of memory,
+%% causing GC's more frequently on less garbage allows the system to GC
+%% without much (if any) paging.
+
+The following functions invoke the garbage collector or control whether
+automatic garbage collection is in effect:
+
+\begin{defun}[-cheney]{extensions:}{gc}{\args{\ampoptional{} \var{verbose-p}}}
+  
+  This function runs the garbage collector.  If
+  \code{ext:*gc-verbose*} is non-\nil, then it invokes
+  \code{ext:*gc-notify-before*} before GC'ing and
+  \code{ext:*gc-notify-after*} afterwards.
+  
+  \code{verbose-p} indicates whether GC statistics are printed or
+  not. 
+
+\end{defun}
+
+\begin{defun}{extensions:}{gc-off}{}
+  
+  This function inhibits automatic garbage collection.  After calling
+  it, the system will not GC unless you call \code{ext:gc} or
+  \code{ext:gc-on}.
+\end{defun}
+
+\begin{defun}{extensions:}{gc-on}{}
+  
+  This function reinstates automatic garbage collection.  If the
+  system would have GC'ed while automatic GC was inhibited, then this
+  will call \code{ext:gc}.
+\end{defun}
+
+\subsection{GC Parameters}
+
+The following variables control the behavior of the garbage collector:
+
+\begin{defvar}{extensions:}{bytes-consed-between-gcs}
+  
+  \cmucl{} automatically GC's whenever the amount of memory
+  allocated to dynamic objects exceeds the value of an internal
+  variable.  After each GC, the system sets this internal variable to
+  the amount of dynamic space in use at that point plus the value of
+  the variable \code{ext:*bytes-consed-between-gcs*}.  The default
+  value is 2000000.
+\end{defvar}
+
+\begin{defvar}{extensions:}{gc-verbose}
+  
+  This variable controls whether \code{ext:gc} invokes the functions
+  in \code{ext:*gc-notify-before*} and
+  \code{ext:*gc-notify-after*}.  If \code{*gc-verbose*} is \nil,
+  \code{ext:gc} foregoes printing any messages.  The default value is
+  \code{T}.
+\end{defvar}
+
+\begin{defvar}{extensions:}{gc-notify-before}
+  
+  This variable's value is a function that should notify the user that
+  the system is about to GC.  It takes one argument, the amount of
+  dynamic space in use before the GC measured in bytes.  The default
+  value of this variable is a function that prints a message similar
+  to the following:
+\begin{verbatim}
+   [GC threshold exceeded with 2,107,124 bytes in use.  Commencing GC.]
+\end{verbatim}
+\end{defvar}
+
+\begin{defvar}{extensions:}{gc-notify-after}
+  
+  This variable's value is a function that should notify the user when
+  a GC finishes.  The function must take three arguments, the amount
+  of dynamic spaced retained by the GC, the amount of dynamic space
+  freed, and the new threshold which is the minimum amount of space in
+  use before the next GC will occur.  All values are byte quantities.
+  The default value of this variable is a function that prints a
+  message similar to the following:
+  \begin{verbatim}
+    [GC completed with 25,680 bytes retained and 2,096,808 bytes freed.]
+    [GC will next occur when at least 2,025,680 bytes are in use.]
+  \end{verbatim}
+\end{defvar}
+
+Note that a garbage collection will not happen at exactly the new
+threshold printed by the default \code{ext:*gc-notify-after*}
+function.  The system periodically checks whether this threshold has
+been exceeded, and only then does a garbage collection.
+
+\begin{defvar}{extensions:}{gc-inhibit-hook}
+  
+  This variable's value is either a function of one argument or \nil.
+  When the system has triggered an automatic GC, if this variable is a
+  function, then the system calls the function with the amount of
+  dynamic space currently in use (measured in bytes).  If the function
+  returns \nil, then the GC occurs; otherwise, the system inhibits
+  automatic GC as if you had called \code{ext:gc-off}.  The writer of
+  this hook is responsible for knowing when automatic GC has been
+  turned off and for calling or providing a way to call
+  \code{ext:gc-on}.  The default value of this variable is \nil.
+\end{defvar}
+
+\begin{defvar}{extensions:}{before-gc-hooks}
+  \defvarx[extensions:]{after-gc-hooks}
+  
+  These variables' values are lists of functions to call before or
+  after any GC occurs.  The system provides these purely for
+  side-effect, and the functions take no arguments.
+\end{defvar}
+
+\subsection{Generational GC}
+Generational GC also supports some additional functions and variables
+to control it.
+
+\begin{defun}[-gencgc]{extensions:}{gc}{\args{\keys{\kwd{verbose} \kwd{gen} \kwd{full}}}}
+  
+  This function runs the garbage collector.  If
+  \code{ext:*gc-verbose*} is non-\nil, then it invokes
+  \code{ext:*gc-notify-before*} before GC'ing and
+  \code{ext:*gc-notify-after*} afterwards.
+
+  \begin{Lentry}
+  \item[\code{verbose}] Print GC statistics if non-\code{NIL}.
+  \item[\code{gen}] The number of generations to be collected.
+  \item[\code{full}] If non-\code{NIL}, a full collection of all
+    generations is performed.
+  \end{Lentry}
+\end{defun}
+
+\begin{defun}{lisp::}{gencgc-stats}{\args{\var{generation}}}
+  Returns statistics about the generation, as multiple values:
+  \begin{enumerate}
+  \item Bytes allocated in this generation
+  \item The GC trigger for this generation.  When this many bytes have
+    been allocated, a GC is started automatically.
+  \item The number of bytes consed between GCs.
+  \item The number of GCs that have been done on this generation.
+    This is reset to zero when the generation is raised.
+  \item The trigger age, which is the maximum number of GCs to perform
+    before this generation is raised.
+  \item The total number of bytes allocated to this generation.
+  \item Average age of the objects in this generations.  The average
+    age is the cumulative bytes allocated divided by current number of
+    bytes allocated.
+  \end{enumerate}
+\end{defun}
+
+\begin{defun}{lisp::}{set-gc-trigger}{\args{\var{gen} \var{trigger}}}
+  Sets the GC trigger value for the specified generation.
+\end{defun}
+
+\begin{defun}{lisp::}{set-trigger-age}{\args{\var{gen} \var{trigger-age}}}
+  Sets the GC trigger age for the specified generation.
+\end{defun}
+
+\begin{defun}{lisp::}{set-min-mem-age}{\args{\var{gen} \var{min-mem-age}}}
+  Sets the minimum average memory age for the specified generation.
+  If the computed memory age is below this, GC is not performed, which
+  helps prevent a GC when a large number of new live objects have been
+  added in which case a GC would usually be a waste of time.
+\end{defun}
+
+\subsection{Weak Pointers}
+
+A weak pointer provides a way to maintain a reference to an object
+without preventing an object from being garbage collected.  If the
+garbage collector discovers that the only pointers to an object are
+weak pointers, then it breaks the weak pointers and deallocates the
+object.
+
+\begin{defun}{extensions:}{make-weak-pointer}{\args{\var{object}}}
+  \defunx[extensions:]{weak-pointer-value}{\args{\var{weak-pointer}}}
+  
+  \code{make-weak-pointer} returns a weak pointer to an object.
+  \code{weak-pointer-value} follows a weak pointer, returning the two
+  values: the object pointed to (or \false{} if broken) and a boolean
+  value which is \false{} if the pointer has been broken, and true
+  otherwise.
+\end{defun}
+
+
+\subsection{Finalization}
+
+Finalization provides a ``hook'' that is triggered when the garbage
+collector reclaims an object.  It is usually used to recover non-Lisp
+resources that were allocated to implement the finalized Lisp object.
+For example, when a unix file-descriptor stream is collected,
+finalization is used to close the underlying file descriptor.
+
+\begin{defun}{extensions:}{finalize}{\args{\var{object} \var{function}}}
+  
+  This function registers \var{object} for finalization.
+  \var{function} is called with no arguments when \var{object} is
+  reclaimed.  Normally \var{function} will be a closure over the
+  underlying state that needs to be freed, e.g. the unix file
+  descriptor in the fd-stream case.  Note that \var{function} must not
+  close over \var{object} itself, as this prevents the object from
+  ever becoming garbage.
+\end{defun}
+
+\begin{defun}{extensions:}{cancel-finalization}{\args{\var{object}}}
+  
+  This function cancel any finalization request for \var{object}.
+\end{defun}
+
+
+\section{Describe}
+
+\begin{defun}{}{describe}{ \args{\var{object} \ampoptional{} \var{stream}}}
+  
+  The \code{describe} function prints useful information about
+  \var{object} on \var{stream}, which defaults to
+  \code{*standard-output*}.  For any object, \code{describe} will
+  print out the type.  Then it prints other information based on the
+  type of \var{object}.  The types which are presently handled are:
+
+  \begin{Lentry}
+  
+  \item[\tindexed{hash-table}] \code{describe} prints the number of
+    entries currently in the hash table and the number of buckets
+    currently allocated.
+  
+  \item[\tindexed{function}] \code{describe} prints a list of the
+    function's name (if any) and its formal parameters.  If the name
+    has function documentation, then it will be printed.  If the
+    function is compiled, then the file where it is defined will be
+    printed as well.
+  
+  \item[\tindexed{fixnum}] \code{describe} prints whether the integer
+    is prime or not.
+  
+  \item[\tindexed{symbol}] The symbol's value, properties, and
+    documentation are printed.  If the symbol has a function
+    definition, then the function is described.
+  \end{Lentry}
+  If there is anything interesting to be said about some component of
+  the object, describe will invoke itself recursively to describe that
+  object.  The level of recursion is indicated by indenting output.
+\end{defun}
+
+A number of switches can be used to control \code{describe}'s behavior.
+
+\begin{defvar}{extensions:}{describe-level}
+
+  The maximum level of recursive description allowed.  Initially two.
+\end{defvar}
+
+\begin{defvar}{extensions:}{describe-indentation}
+
+The number of spaces to indent for each level of recursive
+description, initially three.
+\end{defvar}
+
+\begin{defvar}{extensions:}{describe-print-level}
+  \defvarx[extensions:]{describe-print-length}
+  
+  The values of \code{*print-level*} and \code{*print-length*} during
+  description.  Initially two and five.
+\end{defvar}
+
+
+\section{The Inspector}
+
+\cmucl{} has both a graphical inspector that uses the X Window System,
+and a simple terminal-based inspector.
+
+\begin{defun}{}{inspect}{ \args{\ampoptional{} \var{object}}}
+  
+  \code{inspect} calls the inspector on the optional argument
+  \var{object}.  If \var{object} is unsupplied, \code{inspect}
+  immediately returns \false.  Otherwise, the behavior of inspect
+  depends on whether Lisp is running under X.  When \code{inspect} is
+  eventually exited, it returns some selected Lisp object.
+\end{defun}
+
+
+\subsection{The Graphical Interface}
+\label{motif-interface}
+
+\cmucl{} has an interface to Motif which is functionally similar to
+CLM, but works better in \cmucl{}.  This interface is documented in
+separate manuals \textit{CMUCL Motif Toolkit} and \textit{Design Notes
+on the Motif Toolkit}, which are distributed with \cmucl{}.
+
+This motif interface has been used to write the inspector and graphical
+debugger.  There is also a Lisp control panel with a simple file management
+facility, apropos and inspector dialogs, and controls for setting global
+options.  See the \code{interface} and \code{toolkit} packages.
+
+\begin{defun}{interface:}{lisp-control-panel}{}
+  
+  This function creates a control panel for the Lisp process.
+\end{defun}
+
+\begin{defvar}{interface:}{interface-style}
+  
+  When the graphical interface is loaded, this variable controls
+  whether it is used by \code{inspect} and the error system.  If the
+  value is \kwd{graphics} (the default) and the \code{DISPLAY}
+  environment variable is defined, the graphical inspector and
+  debugger will be invoked by \findexed{inspect} or when an error is
+  signalled.  Possible values are \kwd{graphics} and {tty}.  If the
+  value is \kwd{graphics}, but there is no X display, then we quietly
+  use the TTY interface.
+\end{defvar}
+
+
+\subsection{The TTY Inspector}
+
+If X is unavailable, a terminal inspector is invoked.  The TTY inspector
+is a crude interface to \code{describe} which allows objects to be
+traversed and maintains a history.  This inspector prints information
+about and object and a numbered list of the components of the object.
+The command-line based interface is a normal
+\code{read}--\code{eval}--\code{print} loop, but an integer \var{n}
+descends into the \var{n}'th component of the current object, and
+symbols with these special names are interpreted as commands:
+
+\begin{Lentry}
+\item[U] Move back to the enclosing object.  As you descend into the
+components of an object, a stack of all the objects previously seen is
+kept.  This command pops you up one level of this stack.
+
+\item[Q, E] Return the current object from \code{inspect}.
+
+\item[R] Recompute object display, and print again.  Useful if the
+object may have changed.
+
+\item[D] Display again without recomputing.
+
+\item[H, ?] Show help message.
+\end{Lentry}
+
+
+\section{Load}
+
+\begin{defun}{}{load}{%
+    \args{\var{filename}
+      \keys{\kwd{verbose} \kwd{print} \kwd{if-does-not-exist}}
+      \morekeys{\kwd{if-source-newer} \kwd{contents}}}}
+  
+  As in standard \clisp{}, this function loads a file containing
+  source or object code into the running Lisp.  Several CMU extensions
+  have been made to \code{load} to conveniently support a variety of
+  program file organizations.  \var{filename} may be a wildcard
+  pathname such as \file{*.lisp}, in which case all matching files are
+  loaded.
+  
+  If \var{filename} has a \code{pathname-type} (or extension), then
+  that exact file is loaded.  If the file has no extension, then this
+  tells \code{load} to use a heuristic to load the ``right'' file.
+  The \code{*load-source-types*} and \code{*load-object-types*}
+  variables below are used to determine the default source and object
+  file types.  If only the source or the object file exists (but not
+  both), then that file is quietly loaded.  Similarly, if both the
+  source and object file exist, and the object file is newer than the
+  source file, then the object file is loaded.  The value of the
+  \var{if-source-newer} argument is used to determine what action to
+  take when both the source and object files exist, but the object
+  file is out of date:
+  \begin{Lentry}
+  \item[\kwd{load-object}] The object file is loaded even though the
+    source file is newer.
+    
+  \item[\kwd{load-source}] The source file is loaded instead of the
+    older object file.
+    
+  \item[\kwd{compile}] The source file is compiled and then the new
+    object file is loaded.
+    
+  \item[\kwd{query}] The user is asked a yes or no question to
+    determine whether the source or object file is loaded.
+  \end{Lentry}
+  This argument defaults to the value of
+  \code{ext:*load-if-source-newer*} (initially \kwd{load-object}.)
+  
+  The \var{contents} argument can be used to override the heuristic
+  (based on the file extension) that normally determines whether to
+  load the file as a source file or an object file.  If non-null, this
+  argument must be either \kwd{source} or \kwd{binary}, which forces
+  loading in source and binary mode, respectively. You really
+  shouldn't ever need to use this argument.
+\end{defun}
+
+\begin{defvar}{extensions:}{load-source-types}
+  \defvarx[extensions:]{load-object-types}
+  
+  These variables are lists of possible \code{pathname-type} values
+  for source and object files to be passed to \code{load}.  These
+  variables are only used when the file passed to \code{load} has no
+  type; in this case, the possible source and object types are used to
+  default the type in order to determine the names of the source and
+  object files.
+\end{defvar}
+
+\begin{defvar}{extensions:}{load-if-source-newer}
+  
+  This variable determines the default value of the
+  \var{if-source-newer} argument to \code{load}.  Its initial value is
+  \kwd{load-object}.
+\end{defvar}
+
+
+\section{The Reader}
+
+\subsection{Reader Extensions}
+\cmucl{} supports an ANSI-compatible extension to enable reading of
+specialized arrays.  Thus
+\begin{example}
+  * (setf *print-readably* nil)
+  NIL
+  * (make-array '(2 2) :element-type '(signed-byte 8))
+  #2A((0 0) (0 0))
+  * (setf *print-readably* t)
+  T
+  * (make-array '(2 2) :element-type '(signed-byte 8))
+  #A((SIGNED-BYTE 8) (2 2) ((0 0) (0 0)))
+  * (type-of (read-from-string "#A((SIGNED-BYTE 8) (2 2) ((0 0) (0 0)))"))
+  (SIMPLE-ARRAY (SIGNED-BYTE 8) (2 2))
+  * (setf *print-readably* nil)
+  NIL
+  * (type-of (read-from-string "#A((SIGNED-BYTE 8) (2 2) ((0 0) (0 0)))"))
+  (SIMPLE-ARRAY (SIGNED-BYTE 8) (2 2))
+\end{example}
+
+\subsection{Reader Parameters}
+\begin{defvar}{extensions:}{ignore-extra-close-parentheses}
+  
+  If this variable is \true{} (the default), then the reader merely
+  prints a warning when an extra close parenthesis is detected
+  (instead of signalling an error.)
+\end{defvar}
+
+\section{Stream Extensions}
+\begin{defun}{sys:}{read-n-bytes}{%
+    \args{\var{stream buffer start numbytes} 
+      \ampoptional{} \var{eof-error-p}}}
+  
+  On streams that support it, this function reads multiple bytes of
+  data into a buffer.  The buffer must be a \code{simple-string} or
+  \code{(simple-array (unsigned-byte 8) (*))}.  The argument
+  \var{nbytes} specifies the desired number of bytes, and the return
+  value is the number of bytes actually read.
+  \begin{itemize}
+  \item If \var{eof-error-p} is true, an \tindexed{end-of-file}
+    condition is signalled if end-of-file is encountered before
+    \var{count} bytes have been read.
+    
+  \item If \var{eof-error-p} is false, \code{read-n-bytes reads} as
+    much data is currently available (up to count bytes.)  On pipes or
+    similar devices, this function returns as soon as any data is
+    available, even if the amount read is less than \var{count} and
+    eof has not been hit.  See also \funref{make-fd-stream}.
+  \end{itemize}
+\end{defun}
+
+\input{simple-streams}
+
+\section{Running Programs from Lisp}
+
+It is possible to run programs from Lisp by using the following function.
+
+\begin{defun}{extensions:}{run-program}{%
+    \args{\var{program} \var{args}
+      \keys{\kwd{env} \kwd{wait} \kwd{pty} \kwd{input}}
+      \morekeys{\kwd{if-input-does-not-exist}}
+      \yetmorekeys{\kwd{output} \kwd{if-output-exists}}
+      \yetmorekeys{\kwd{error} \kwd{if-error-exists}}
+      \yetmorekeys{\kwd{status-hook} \kwd{external-format}}
+      \yetmorekeys{\kwd{element-type}}}}
+     
+  \code{run-program} runs \var{program} in a child process.
+  \var{Program} should be a pathname or string naming the program.
+  \var{Args} should be a list of strings which this passes to
+  \var{program} as normal Unix parameters.  For no arguments, specify
+  \var{args} as \nil.  The value returned is either a process
+  structure or \nil.  The process interface follows the description of
+  \code{run-program}.  If \code{run-program} fails to fork the child
+  process, it returns \nil.
+  
+  Except for sharing file descriptors as explained in keyword argument
+  descriptions, \code{run-program} closes all file descriptors in the
+  child process before running the program.  When you are done using a
+  process, call \code{process-close} to reclaim system resources.  You
+  only need to do this when you supply \kwd{stream} for one of
+  \kwd{input}, \kwd{output}, or \kwd{error}, or you supply \kwd{pty}
+  non-\nil.  You can call \code{process-close} regardless of whether
+  you must to reclaim resources without penalty if you feel safer.
+
+  \code{run-program} accepts the following keyword arguments:
+
+  \begin{Lentry}   
+  \item[\kwd{env}] This is an a-list mapping keywords and
+    simple-strings.  The default is \code{ext:*environment-list*}.  If
+    \kwd{env} is specified, \code{run-program} uses the value given
+    and does not combine the environment passed to Lisp with the one
+    specified.
+    
+  \item[\kwd{wait}] If non-\nil{} (the default), wait until the child
+    process terminates.  If \nil, continue running Lisp while the
+    child process runs.
+    
+  \item[\kwd{pty}] This should be one of \true, \nil, or a stream.  If
+    specified non-\nil, the subprocess executes under a Unix PTY.
+    If specified as a stream, the system collects all output to this
+    pty and writes it to this stream.  If specified as \true, the
+    \code{process-pty} slot contains a stream from which you can read
+    the program's output and to which you can write input for the
+    program.  The default is \nil.
+    
+  \item[\kwd{input}] This specifies how the program gets its input.
+    If specified as a string, it is the name of a file that contains
+    input for the child process.  \code{run-program} opens the file as
+    standard input.  If specified as \nil{} (the default), then
+    standard input is the file \file{/dev/null}.  If specified as
+    \true, the program uses the current standard input.  This may
+    cause some confusion if \kwd{wait} is \nil{} since two processes
+    may use the terminal at the same time.  If specified as
+    \kwd{stream}, then the \code{process-input} slot contains an
+    output stream.  Anything written to this stream goes to the
+    program as input.  \kwd{input} may also be an input stream that
+    already contains all the input for the process.  In this case
+    \code{run-program} reads all the input from this stream before
+    returning, so this cannot be used to interact with the process.
+    If \kwd{input} is a string stream, it is up to the caller to call
+    \code{string-encode} or other function to convert the string to
+    the appropriate encoding.  In either case, the least significant 8
+    bits of the \code{char-code} of each \code{character} is
+    sent to the program.
+    
+  \item[\kwd{if-input-does-not-exist}] This specifies what to do if
+    the input file does not exist.  The following values are valid:
+    \nil{} (the default) causes \code{run-program} to return \nil{}
+    without doing anything; \kwd{create} creates the named file; and
+    \kwd{error} signals an error.
+    
+  \item[\kwd{output}] This specifies what happens with the program's
+    output.  If specified as a pathname, it is the name of a file that
+    contains output the program writes to its standard output.  If
+    specified as \nil{} (the default), all output goes to
+    \file{/dev/null}.  If specified as \true, the program writes to
+    the Lisp process's standard output.  This may cause confusion if
+    \kwd{wait} is \nil{} since two processes may write to the terminal
+    at the same time.  If specified as \kwd{stream}, then the
+    \code{process-output} slot contains an input stream from which you
+    can read the program's output.  \kwd{output} can also be a stream
+    in which case all output from the process is written to this
+    stream.  If \kwd{output} is a string-stream, each octet read from
+    the program is converted to a character using \code{code-char}.
+    It is up to the caller to convert this using the appropriate
+    external format to create the desired encoded string.
+    
+  \item[\kwd{if-output-exists}] This specifies what to do if the
+    output file already exists.  The following values are valid:
+    \nil{} causes \code{run-program} to return \nil{} without doing
+    anything; \kwd{error} (the default) signals an error;
+    \kwd{supersede} overwrites the current file; and \kwd{append}
+    appends all output to the file.
+    
+  \item[\kwd{error}] This is similar to \kwd{output}, except the file
+    becomes the program's standard error.  Additionally, \kwd{error}
+    can be \kwd{output} in which case the program's error output is
+    routed to the same place specified for \kwd{output}.  If specified
+    as \kwd{stream}, the \code{process-error} contains a stream
+    similar to the \code{process-output} slot when specifying the
+    \kwd{output} argument.
+    
+  \item[\kwd{if-error-exists}] This specifies what to do if the error
+    output file already exists.  It accepts the same values as
+    \kwd{if-output-exists}.
+    
+  \item[\kwd{status-hook}] This specifies a function to call whenever
+    the process changes status.  This is especially useful when
+    specifying \kwd{wait} as \nil.  The function takes the process as
+    a required argument.
+
+  \item[\kwd{external-format}] This specifies the external format to
+    use for streams created for \code{run-program}.  This does not
+    apply to string streams passed in as \kwd{input} or \kwd{output}
+    parameters.
+
+  \item[\kwd{element-type}] If streams are created \code{run-program},
+    use this as the \kwd{element-type} for the stream.  Defaults to
+    \code{BASE-CHAR}. 
+    
+%   \item[\kwd{before-execve}] This specifies a function to run in the
+%     child process before it becomes the program to run.  This is
+%     useful for actions such as authenticating the child process
+%     without modifying the parent Lisp process.
+  \end{Lentry}
+\end{defun}
+
+
+\subsection{Process Accessors}
+
+The following functions interface the process returned by \code{run-program}:
+
+\begin{defun}{extensions:}{process-p}{\args{\var{thing}}}
+  
+  This function returns \true{} if \var{thing} is a process.
+  Otherwise it returns \nil{}
+\end{defun}
+
+\begin{defun}{extensions:}{process-pid}{\args{\var{process}}}
+  
+  This function returns the process ID, an integer, for the
+  \var{process}.
+\end{defun}
+
+\begin{defun}{extensions:}{process-status}{\args{\var{process}}}
+  
+  This function returns the current status of \var{process}, which is
+  one of \kwd{running}, \kwd{stopped}, \kwd{exited}, or
+  \kwd{signaled}.
+\end{defun}
+
+\begin{defun}{extensions:}{process-exit-code}{\args{\var{process}}}
+  
+  This function returns either the exit code for \var{process}, if it
+  is \kwd{exited}, or the termination signal \var{process} if it is
+  \kwd{signaled}.  The result is undefined for processes that are
+  still alive.
+\end{defun}
+
+\begin{defun}{extensions:}{process-core-dumped}{\args{\var{process}}}
+  
+  This function returns \true{} if someone used a Unix signal to
+  terminate the \var{process} and caused it to dump a Unix core image.
+\end{defun}
+
+\begin{defun}{extensions:}{process-pty}{\args{\var{process}}}
+  
+  This function returns either the two-way stream connected to
+  \var{process}'s Unix PTY connection or \nil{} if there is none.
+\end{defun}
+
+\begin{defun}{extensions:}{process-input}{\args{\var{process}}}
+  \defunx[extensions:]{process-output}{\args{\var{process}}}
+  \defunx[extensions:]{process-error}{\args{\var{process}}}
+  
+  If the corresponding stream was created, these functions return the
+  input, output or error fd-stream.  \nil{} is returned if there
+  is no stream.
+\end{defun}
+
+\begin{defun}{extensions:}{process-status-hook}{\args{\var{process}}}
+  
+  This function returns the current function to call whenever
+  \var{process}'s status changes.  This function takes the
+  \var{process} as a required argument.  \code{process-status-hook} is
+  \code{setf}'able.
+\end{defun}
+
+\begin{defun}{extensions:}{process-plist}{\args{\var{process}}}
+  
+  This function returns annotations supplied by users, and it is
+  \code{setf}'able.  This is available solely for users to associate
+  information with \var{process} without having to build a-lists or
+  hash tables of process structures.
+\end{defun}
+
+\begin{defun}{extensions:}{process-wait}{
+    \args{\var{process} \ampoptional{} \var{check-for-stopped}}}
+  
+  This function waits for \var{process} to finish.  If
+  \var{check-for-stopped} is non-\nil, this also returns when
+  \var{process} stops.
+\end{defun}
+
+\begin{defun}{extensions:}{process-kill}{%
+    \args{\var{process} \var{signal} \ampoptional{} \var{whom}}}
+  
+  This function sends the Unix \var{signal} to \var{process}.
+  \var{Signal} should be the number of the signal or a keyword with
+  the Unix name (for example, \kwd{sigsegv}).  \var{Whom} should be
+  one of the following:
+  \begin{Lentry}
+    
+  \item[\kwd{pid}] This is the default, and it indicates sending the
+    signal to \var{process} only.
+    
+  \item[\kwd{process-group}] This indicates sending the signal to
+    \var{process}'s group.
+    
+  \item[\kwd{pty-process-group}] This indicates sending the signal to
+    the process group currently in the foreground on the Unix PTY
+    connected to \var{process}.  This last option is useful if the
+    running program is a shell, and you wish to signal the program
+    running under the shell, not the shell itself.  If
+    \code{process-pty} of \var{process} is \nil, using this option is
+    an error.
+  \end{Lentry}
+\end{defun}
+
+\begin{defun}{extensions:}{process-alive-p}{\args{\var{process}}}
+  
+  This function returns \true{} if \var{process}'s status is either
+  \kwd{running} or \kwd{stopped}.
+\end{defun}
+
+\begin{defun}{extensions:}{process-close}{\args{\var{process}}}
+  
+  This function closes all the streams associated with \var{process}.
+  When you are done using a process, call this to reclaim system
+  resources.
+\end{defun}
+
+
+\section{Saving a Core Image}
+
+A mechanism has been provided to save a running Lisp core image and to
+later restore it.  This is convenient if you don't want to load several files
+into a Lisp when you first start it up.  The main problem is the large
+size of each saved Lisp image, typically at least 20 megabytes.
+
+\begin{defun}{extensions:}{save-lisp}{%
+    \args{\var{file}
+      \keys{\kwd{purify} \kwd{root-structures} \kwd{init-function}}
+      \morekeys{\kwd{load-init-file} \kwd{print-herald} \kwd{site-init}}
+      \yetmorekeys{\kwd{process-command-line} \kwd{batch-mode} \kwd{executable}}}}
+  
+  The \code{save-lisp} function saves the state of the currently
+  running Lisp core image in \var{file}.  The keyword arguments have
+  the following meaning:
+  \begin{Lentry}
+    
+  \item[\kwd{purify}] If non-\nil{} (the default), the core image is
+    purified before it is saved (see \funref{purify}.)  This reduces
+    the amount of work the garbage collector must do when the
+    resulting core image is being run.  Also, if more than one Lisp is
+    running on the same machine, this maximizes the amount of memory
+    that can be shared between the two processes.
+    
+  \item[\kwd{root-structures}]
+      This should be a list of the main entry points in any newly
+      loaded systems.  This need not be supplied, but locality and/or
+      GC performance will be better if they are.  Meaningless if
+      \kwd{purify} is \nil.  See \funref{purify}.
+
+  \item[\kwd{init-function}] This is the function that starts running
+    when the created core file is resumed.  The default function
+    simply invokes the top level read-eval-print loop.  If the
+    function returns the lisp will exit.
+    
+  \item[\kwd{load-init-file}] If non-NIL, then load an init file;
+    either the one specified on the command line or
+    ``\w{\file{init.}\var{fasl-type}}'', or, if
+    ``\w{\file{init.}\var{fasl-type}}'' does not exist,
+    \code{init.lisp} from the user's home directory.  If the init file
+    is found, it is loaded into the resumed core file before the
+    read-eval-print loop is entered.
+    
+  \item[\kwd{site-init}] If non-NIL, the name of the site init file to
+    quietly load.  The default is \file{library:site-init}.  No error
+    is signalled if the file does not exist.
+    
+  \item[\kwd{print-herald}] If non-NIL (the default), then print out
+    the standard Lisp herald when starting.
+    
+  \item[\kwd{process-command-line}] If non-NIL (the default),
+    processes the command line switches and performs the appropriate
+    actions.
+
+  \item[\kwd{batch-mode}] If NIL (the default), then the presence of
+    the -batch command-line switch will invoke batch-mode processing
+    upon resuming the saved core.  If non-NIL, the produced core will
+    always be in batch-mode, regardless of any command-line switches.
+
+  \item[\kwd{executable}] If non-NIL, an executable image is created.
+    Normally, \cmucl{} consists of the C runtime along with a core
+    file image.  When \kwd{executable} is non-NIL, the core file is
+    incorporated into the C runtime, so one (large) executable is
+    created instead of a new separate core file.
+
+    This feature is only available on some platforms, as indicated by
+    having the feature \kwd{executable}.  Currently only x86 ports and
+    the solaris/sparc port have this feature.
+  \end{Lentry}
+\end{defun}
+
+To resume a saved file, type:
+\begin{example}
+lisp -core file
+\end{example}
+However, if the \kwd{executable} option was specified, you can just
+use
+\begin{example}
+  file
+\end{example}
+since the executable contains the core file within the executable.
+
+\begin{defun}{extensions:}{purify}{
+    \args{\var{file}
+      \keys{\kwd{root-structures} \kwd{environment-name}}}}
+  
+  This function optimizes garbage collection by moving all currently
+  live objects into non-collected storage.  Once statically allocated,
+  the objects can never be reclaimed, even if all pointers to them are
+  dropped.  This function should generally be called after a large
+  system has been loaded and initialized.
+
+  \begin{Lentry}
+  \item[\kwd{root-structures}] is an optional list of objects which
+    should be copied first to maximize locality.  This should be a
+    list of the main entry points for the resulting core image.  The
+    purification process tries to localize symbols, functions, etc.,
+    in the core image so that paging performance is improved.  The
+    default value is NIL which means that Lisp objects will still be
+    localized but probably not as optimally as they could be.
+  
+    \var{defstruct} structures defined with the \code{(:pure t)}
+    option are moved into read-only storage, further reducing GC cost.
+    List and vector slots of pure structures are also moved into
+    read-only storage.
+  
+  \item[\kwd{environment-name}] is gratuitous documentation for the
+    compacted version of the current global environment (as seen in
+    \code{c::*info-environment*}.)  If \false{} is supplied, then
+    environment compaction is inhibited.
+  \end{Lentry}
+\end{defun}
+
+
+\section{Pathnames}
+
+In \clisp{} quite a few aspects of \tindexed{pathname} semantics are left to
+the implementation.  
+
+
+\subsection{Unix Pathnames}
+\cpsubindex{unix}{pathnames}
+
+Unix pathnames are always parsed with a \code{unix-host} object as the host and
+\code{nil} as the device.  The last two dots (\code{.}) in the namestring mark
+the type and version, however if the first character is a dot, it is considered
+part of the name.  If the last character is a dot, then the pathname has the
+empty-string as its type.  The type defaults to \code{nil} and the version
+defaults to \kwd{newest}.
+
+\begin{example}
+(defun parse (x)
+  (values (pathname-name x) (pathname-type x) (pathname-version x)))
+
+(parse "foo") \result "foo", NIL, NIL
+(parse "foo.bar") \result "foo", "bar", NIL
+(parse ".foo") \result ".foo", NIL, NIL
+(parse ".foo.bar") \result ".foo", "bar", NIL
+(parse "..") \result NIL, NIL, NIL
+(parse "foo.") \result "foo", "", NIL
+(parse "foo.bar.~1~") \result "foo", "bar", 1
+(parse "foo.bar.baz") \result "foo.bar", "baz", NIL
+\end{example}
+
+The directory of pathnames beginning with a slash (or a search-list,
+\pxlref{search-lists}) is starts \kwd{absolute}, others start with
+\kwd{relative}.  The \code{..} directory is parsed as \kwd{up}; there is no
+namestring for \kwd{back}:
+
+\begin{example}
+(pathname-directory "/usr/foo/bar.baz") \result (:ABSOLUTE "usr" "foo")
+(pathname-directory "../foo/bar.baz") \result (:RELATIVE :UP "foo")
+\end{example}
+
+
+\subsection{Wildcard Pathnames}
+
+Wildcards are supported in Unix pathnames.  If `\code{*}' is specified for a
+part of a pathname, that is parsed as \kwd{wild}.  `\code{**}' can be used as a
+directory name to indicate \kwd{wild-inferiors}.  Filesystem operations
+treat \kwd{wild-inferiors} the same as\ \kwd{wild}, but pathname pattern
+matching (e.g. for logical pathname translation, \pxlref{logical-pathnames})
+matches any number of directory parts with `\code{**}' (see
+\pxlref{wildcard-matching}.)
+
+`\code{*}' embedded in a pathname part matches any number of characters.
+Similarly, `\code{?}' matches exactly one character, and `\code{[a,b]}'
+matches the characters `\code{a}' or `\code{b}'.  These pathname parts are
+parsed as \code{pattern} objects.
+
+Backslash can be used as an escape character in namestring
+parsing to prevent the next character from being treated as a wildcard.  Note
+that if typed in a string constant, the backslash must be doubled, since the
+string reader also uses backslash as a quote:
+
+\begin{example}
+(pathname-name "foo\(\backslash\backslash\)*bar") => "foo*bar"
+\end{example}
+
+
+\subsection{Logical Pathnames}
+\cindex{logical pathnames}
+\label{logical-pathnames}
+
+If a namestring begins with the name of a defined logical pathname
+host followed by a colon, then it will be parsed as a logical
+pathname.  Both `\code{*}' and `\code{**}' wildcards are implemented.
+\findexed{load-logical-pathname-translations} on \var{name} looks for a
+logical host definition file in
+\w{\file{library:\var{name}.translations}}. Note that \file{library:}
+designates the search list (\pxlref{search-lists}) initialized to the
+\cmucl{} \file{lib/} directory, not a logical pathname.  The format of
+the file is a single list of two-lists of the from and to patterns:
+
+\begin{example}
+(("foo;*.text" "/usr/ram/foo/*.txt")
+ ("foo;*.lisp" "/usr/ram/foo/*.l"))
+\end{example}
+
+
+\subsection{Search Lists}
+\cindex{search lists}
+\label{search-lists}
+
+Search lists are an extension to \clisp{} pathnames.  They serve a function
+somewhat similar to \clisp{} logical pathnames, but work more like Unix PATH
+variables.  Search lists are used for two purposes:
+\begin{itemize}
+\item They provide a convenient shorthand for commonly used directory names,
+and
+
+\item They allow the abstract (directory structure independent) specification
+of file locations in program pathname constants (similar to logical pathnames.)
+\end{itemize}
+Each search list has an associated list of directories (represented as
+pathnames with no name or type component.)  The namestring for any relative
+pathname may be prefixed with ``\var{slist}\code{:}'', indicating that the
+pathname is relative to the search list \var{slist} (instead of to the current
+working directory.)  Once qualified with a search list, the pathname is no
+longer considered to be relative.
+
+When a search list qualified pathname is passed to a file-system operation such
+as \code{open}, \code{load} or \code{truename}, each directory in the search
+list is successively used as the root of the pathname until the file is
+located.  When a file is written to a search list directory, the file is always
+written to the first directory in the list.
+
+
+\subsection{Predefined Search-Lists}
+
+These search-lists are initialized from the Unix environment or when Lisp was
+built:
+\begin{Lentry}
+\item[\code{default:}] The current directory at startup.
+
+\item[\code{home:}] The user's home directory.
+
+\item[\code{library:}] The \cmucl{} \file{lib/} directory (\code{CMUCLLIB} environment
+variable).
+
+\item[\code{path:}] The Unix command path (\code{PATH} environment variable).
+\item[\code{ld-library-path:}] The Unix \code{LD\_LIBRARY\_PATH}
+  environment variable.
+\item[\code{target:}] The root of the tree where \cmucl{} was compiled.
+\item[\code{modules:}] The list of directories where \cmucl{}'s
+  modules can be found.
+\item[\code{ext-formats:}] The list of directories where \cmucl{} can
+  find the implementation of external formats.  
+\end{Lentry}
+It can be useful to redefine these search-lists, for example, \file{library:}
+can be augmented to allow logical pathname translations to be located, and
+\file{target:} can be redefined to point to where \cmucl{} system sources are
+locally installed. 
+
+
+\subsection{Search-List Operations}
+
+These operations define and access search-list definitions.  A search-list name
+may be parsed into a pathname before the search-list is actually defined, but
+the search-list must be defined before it can actually be used in a filesystem
+operation.
+
+\begin{defun}{extensions:}{search-list}{\var{name}}
+  
+  This function returns the list of directories associated with the
+  search list \var{name}.  If \var{name} is not a defined search list,
+  then an error is signaled.  When set with \code{setf}, the list of
+  directories is changed to the new value.  If the new value is just a
+  namestring or pathname, then it is interpreted as a one-element
+  list.  Note that (unlike Unix pathnames), search list names are
+  case-insensitive.
+\end{defun}
+
+\begin{defun}{extensions:}{search-list-defined-p}{\var{name}}
+  \defunx[extensions:]{clear-search-list}{\var{name}}
+  
+  \code{search-list-defined-p} returns \true{} if \var{name} is a
+  defined search list name, \false{} otherwise.
+  \code{clear-search-list} make the search list \var{name} undefined.
+\end{defun}
+
+\begin{defmac}{extensions:}{enumerate-search-list}{%
+    \args{(\var{var} \var{pathname} \mopt{result}) \mstar{form}}}
+  
+  This macro provides an interface to search list resolution.  The
+  body \var{forms} are executed with \var{var} bound to each
+  successive possible expansion for \var{name}.  If \var{name} does
+  not contain a search-list, then the body is executed exactly once.
+  Everything is wrapped in a block named \nil, so \code{return} can be
+  used to terminate early.  The \var{result} form (default \nil) is
+  evaluated to determine the result of the iteration.
+\end{defmac}
+
+
+\subsection{Search List Example}
+
+The search list \code{code:} can be defined as follows:
+\begin{example}
+(setf (ext:search-list "code:") '("/usr/lisp/code/"))
+\end{example}
+It is now possible to use \code{code:} as an abbreviation for the directory
+\file{/usr/lisp/code/} in all file operations.  For example, you can now specify
+\code{code:eval.lisp} to refer to the file \file{/usr/lisp/code/eval.lisp}.
+
+To obtain the value of a search-list name, use the function search-list
+as follows:
+\begin{example}
+(ext:search-list \var{name})
+\end{example}
+Where \var{name} is the name of a search list as described above.  For example,
+calling \code{ext:search-list} on \code{code:} as follows:
+\begin{example}
+(ext:search-list "code:")
+\end{example}
+returns the list \code{("/usr/lisp/code/")}.
+
+
+\section{Filesystem Operations}
+
+\cmucl{} provides a number of extensions and optional features beyond those
+required by the \clisp{} specification.
+
+
+\subsection{Wildcard Matching}
+\label{wildcard-matching}
+
+Unix filesystem operations such as \code{open} will accept wildcard pathnames
+that match a single file (of course, \code{directory} allows any number of
+matches.)  Filesystem operations treat \kwd{wild-inferiors} the same as\
+\kwd{wild}.
+
+\begin{defun}{}{directory}{\var{wildname} \keys{\kwd{all} \kwd{check-for-subdirs}}
+    \kwd{truenamep} \morekeys{\kwd{follow-links}}}
+  
+  The keyword arguments to this \clisp{} function are a \cmucl{} extension.
+  The arguments (all default to \code{t}) have the following
+  functions:
+  \begin{Lentry}
+  \item[\kwd{all}] Include files beginning with dot such as
+    \file{.login}, similar to ``\code{ls -a}''.
+    
+  \item[\kwd{check-for-subdirs}] Test whether files are directories,
+    similar to ``\code{ls -F}''.
+    
+  \item[\kwd{truenamep}] Call \code{truename} on each file, which
+    expands out all symbolic links.  Note that this option can easily
+    result in pathnames being returned which have a different
+    directory from the one in the \var{wildname} argument.
+
+  \item[\kwd{follow-links}] Follow symbolic links when searching for
+    matching directories.
+  \end{Lentry}
+\end{defun}
+
+\begin{defun}{extensions:}{print-directory}{%
+    \args{\var{wildname}
+      \ampoptional{} \var{stream}
+      \keys{\kwd{all} \kwd{verbose}}
+      \morekeys{\kwd{return-list}}}}
+  
+  Print a directory of \var{wildname} listing to \var{stream} (default
+  \code{*standard-output*}.)  \kwd{all} and \kwd{verbose} both default
+  to \false{} and correspond to the ``\code{-a}'' and ``\code{-l}''
+  options of \file{ls}.  Normally this function returns \false{}, but
+  if \kwd{return-list} is true, a list of the matched pathnames are
+  returned.
+\end{defun}
+
+
+\subsection{File Name Completion}
+
+\begin{defun}{extensions:}{complete-file}{%
+    \args{\var{pathname}
+      \keys{\kwd{defaults} \kwd{ignore-types}}}}
+  
+  Attempt to complete a file name to the longest unambiguous prefix.
+  If supplied, directory from \kwd{defaults} is used as the ``working
+  directory'' when doing completion.  \kwd{ignore-types} is a list of
+  strings of the pathname types (a.k.a. extensions) that should be
+  disregarded as possible matches (binary file names, etc.)
+\end{defun}
+
+\begin{defun}{extensions:}{ambiguous-files}{%
+    \args{\var{pathname}
+      \ampoptional{} \var{defaults}}}
+  
+  Return a list of pathnames for all the possible completions of
+  \var{pathname} with respect to \var{defaults}.
+\end{defun}
+
+
+\subsection{Miscellaneous Filesystem Operations}
+
+\begin{defun}{extensions:}{default-directory}{}
+  
+  Return the current working directory as a pathname.  If set with
+  \code{setf}, set the working directory.
+\end{defun}
+
+\begin{defun}{extensions:}{file-writable}{\var{name}}
+  
+  This function accepts a pathname and returns \true{} if the current
+  process can write it, and \false{} otherwise.
+\end{defun}
+
+\begin{defun}{extensions:}{unix-namestring}{%
+    \args{\var{pathname}
+      \ampoptional{} \var{for-input}}}
+  
+  This function converts \var{pathname} into a string that can be used
+  with UNIX system calls.  Search-lists and wildcards are expanded.
+  \var{for-input} controls the treatment of search-lists: when true
+  (the default) and the file exists anywhere on the search-list, then
+  that absolute pathname is returned; otherwise the first element of
+  the search-list is used as the directory.
+\end{defun}
+
+
+\section{Time Parsing and Formatting}
+
+\cindex{time parsing} \cindex{time formatting}
+Functions are provided to allow parsing strings containing time information
+and printing time in various formats are available.
+
+\begin{defun}{extensions:}{parse-time}{%
+    \args{\var{time-string}
+      \keys{\kwd{error-on-mismatch} \kwd{default-seconds}}
+      \morekeys{\kwd{default-minutes} \kwd{default-hours}}
+      \yetmorekeys{\kwd{default-day} \kwd{default-month}}
+      \yetmorekeys{\kwd{default-year} \kwd{default-zone}}
+      \yetmorekeys{\kwd{default-weekday}}}}
+  
+  \code{parse-time} accepts a string containing a time (e.g.,
+  \w{"\code{Jan 12, 1952}"}) and returns the universal time if it is
+  successful.  If it is unsuccessful and the keyword argument
+  \kwd{error-on-mismatch} is non-\nil{}, it signals an error.
+  Otherwise it returns \nil{}.  The other keyword arguments have the
+  following meaning:
+
+  \begin{Lentry}
+  \item[\kwd{default-seconds}] specifies the default value for the
+    seconds value if one is not provided by \var{time-string}.  The
+    default value is 0.
+    
+  \item[\kwd{default-minutes}] specifies the default value for the
+    minutes value if one is not provided by \var{time-string}.  The
+    default value is 0.
+    
+  \item[\kwd{default-hours}] specifies the default value for the hours
+    value if one is not provided by \var{time-string}.  The default
+    value is 0.
+    
+  \item[\kwd{default-day}] specifies the default value for the day
+    value if one is not provided by \var{time-string}.  The default
+    value is the current day.
+    
+  \item[\kwd{default-month}] specifies the default value for the month
+    value if one is not provided by \var{time-string}.  The default
+    value is the current month.
+    
+  \item[\kwd{default-year}] specifies the default value for the year
+    value if one is not provided by \var{time-string}.  The default
+    value is the current year.
+    
+  \item[\kwd{default-zone}] specifies the default value for the time
+    zone value if one is not provided by \var{time-string}.  The
+    default value is the current time zone.
+    
+  \item[\kwd{default-weekday}] specifies the default value for the day
+    of the week if one is not provided by \var{time-string}.  The
+    default value is the current day of the week.
+  \end{Lentry}
+  Any of the above keywords can be given the value \kwd{current} which
+  means to use the current value as determined by a call to the
+  operating system.
+\end{defun}
+
+\begin{defun}{extensions:}{format-universal-time}{
+    \args{\var{dest} \var{universal-time}
+       \\
+       \keys{\kwd{timezone}}
+       \morekeys{\kwd{style} \kwd{date-first}}
+       \yetmorekeys{\kwd{print-seconds} \kwd{print-meridian}}
+       \yetmorekeys{\kwd{print-timezone} \kwd{print-weekday}}}}
+   \defunx[extensions:]{format-decoded-time}{
+     \args{\var{dest} \var{seconds} \var{minutes} \var{hours} \var{day} \var{month} \var{year}
+       \\
+       \keys{\kwd{timezone}}
+       \morekeys{\kwd{style} \kwd{date-first}}
+       \yetmorekeys{\kwd{print-seconds} \kwd{print-meridian}}
+       \yetmorekeys{\kwd{print-timezone} \kwd{print-weekday}}}}
+   
+   \code{format-universal-time} formats the time specified by
+   \var{universal-time}.  \code{format-decoded-time} formats the time
+   specified by \var{seconds}, \var{minutes}, \var{hours}, \var{day},
+   \var{month}, and \var{year}.  \var{Dest} is any destination
+   accepted by the \code{format} function.  The keyword arguments have
+   the following meaning:
+   \begin{Lentry}
+     
+   \item[\kwd{timezone}] is an integer specifying the hours west of
+     Greenwich.  \kwd{timezone} defaults to the current time zone.
+     
+   \item[\kwd{style}] specifies the style to use in formatting the
+     time.  The legal values are:
+     \begin{Lentry}
+  
+     \item[\kwd{short}] specifies to use a numeric date.
+  
+     \item[\kwd{long}] specifies to format months and weekdays as
+       words instead of numbers.
+  
+     \item[\kwd{abbreviated}] is similar to long except the words are
+       abbreviated.
+  
+     \item[\kwd{government}] is similar to abbreviated, except the
+       date is of the form ``day month year'' instead of ``month day,
+       year''.
+     \end{Lentry}
+     
+   \item[\kwd{date-first}] if non-\false{} (default) will place the
+     date first.  Otherwise, the time is placed first.
+  
+   \item[\kwd{print-seconds}] if non-\false{} (default) will format
+     the seconds as part of the time.  Otherwise, the seconds will be
+     omitted.
+  
+   \item[\kwd{print-meridian}] if non-\false{} (default) will format
+     ``AM'' or ``PM'' as part of the time.  Otherwise, the ``AM'' or
+     ``PM'' will be omitted.
+  
+   \item[\kwd{print-timezone}] if non-\false{} (default) will format
+     the time zone as part of the time.  Otherwise, the time zone will
+     be omitted.
+
+     %%\item[\kwd{print-seconds}]
+     %%if non-\false{} (default) will format the seconds as part of
+     %%the time.  Otherwise, the seconds will be omitted.
+  
+   \item[\kwd{print-weekday}] if non-\false{} (default) will format
+     the weekday as part of date.  Otherwise, the weekday will be
+     omitted.
+   \end{Lentry}
+\end{defun}
+
+
+\section{Random Number Generation}
+\cindex{random number generation}
+
+\clisp{} includes a random number generator as a standard part of the
+language; however, the implementation of the generator is not
+specified.
+
+\subsection{MT-19937 Generator}
+\cpsubindex{random number generation}{MT-19937 generator}
+On all platforms, the random number is \code{MT-19937} generator as indicated by
+\kwd{rand-mt19937} being in \code{*features*}.  This is a Lisp
+implementation of the MT-19937 generator of Makoto Matsumoto and
+T. Nishimura.  We refer the reader to their paper\footnote{``Mersenne
+  Twister: A 623-Dimensionally Equidistributed Uniform Pseudorandom
+  Number Generator,'' ACM Trans. on Modeling and Computer Simulation,
+  Vol. 8, No. 1, January 1998, pp.3--30} or to
+their
+\ifpdf
+\href{http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html}{website}.
+\else
+website at
+\href{http://www.math.keio.ac.jp/~matumoto/emt.html}{\texttt{http://www.math.keio.ac.jp/~matsumoto/emt.html}}.
+\fi
+
+When \cmucl{} starts up, \code{*random-state*} is initialized by
+reading 627 words from \code{/dev/urandom}, when available.  If
+\code{/dev/urandom} is not available, the universal time is used to
+initialize \code{*random-state*}.  The initialization is done as given
+in Matsumoto's paper.
+
+\section{Lisp Threads}
+\cindex{lisp threads}
+
+\cmucl{} supports Lisp threads for the x86 platform.
+
+\section{Lisp Library}
+\label{lisp-lib}
+
+The \cmucl{} project maintains a collection of useful or interesting
+programs written by users of our system.  The library is in
+\file{lib/contrib/}.  Two files there that users should read are:
+\begin{Lentry}
+
+\item[CATALOG.TXT]
+This file contains a page for each entry in the library.  It
+contains information such as the author, portability or dependency issues, how
+to load the entry, etc.
+
+\item[READ-ME.TXT]
+This file describes the library's organization and all the
+possible pieces of information an entry's catalog description could contain.
+\end{Lentry}
+
+Hemlock has a command \F{Library Entry} that displays a list of the current
+library entries in an editor buffer.  There are mode specific commands that
+display catalog descriptions and load entries.  This is a simple and convenient
+way to browse the library.
+
+
+\section{Generalized Function Names}
+
+\begin{defmac}{ext:}{define-function-name-syntax}{%
+    \var{name} (\var{var}) \ampbody\ \var{body}}
+  Define lists starting with the symbol \code{name} as a new extended
+  function name syntax.
+  
+  \code{body} is executed with \code{var} bound to an actual function
+  name of that form, and should return two values:
+
+  \begin{itemize}
+  \item A generalized boolean that is true if \code{var} is a valid
+    function name.
+  \item A symbol that can be used as a \code{block} name in functions
+    whose name is \code{var}.  (For some sorts of function names it
+    might make sense to return \code{nil} for the block name, or just
+    return one value.)
+  \end{itemize}
+  
+  Users should not define function names starting with a symbol that
+  \cmucl{} might be using internally.  It is therefore advisable to
+  only define new function names starting with a symbol from a
+  user-defined package.
+\end{defmac}
+
+\begin{defun}{ext:}{valid-function-name-p}{\var{name}}
+  Returns two values:
+
+  \begin{itemize}
+  \item True if \code{name} is a valid function name.
+  \item A symbol that can be used as a \code{block} name in
+    functions whose name is \code{name}.  This can be \code{nil}
+    for some function names.
+  \end{itemize}
+\end{defun}
+
+
+
+\section{CLOS}
+
+\subsection{Primary Method Errors}
+\cindex{primary method}
+
+The standard requires that an error is signaled when a generic
+function is called and
+
+\begin{itemize}
+\item no primary method is applicable to the generic function's actual
+  arguments, and
+\item the generic function's method combination is either the standard
+  method combination or a method combination defined with the short
+  form of \code{define-method-combination}.  The latter includes the
+  standardized method combinations like \code{progn}, \code{and}, etc.
+\end{itemize}
+
+\begin{defgeneric}[-generic]{pcl:}{no-primary-method}{\var{gf} \amprest{} \var{args}}
+  In \cmucl, this generic function is called in the above erroneous
+  cases.  The parameter \code{gf} is the generic function being
+  called, and \code{args} is a list of actual arguments in the generic
+  function call.
+\end{defgeneric}
+
+\begin{defmethod}[-standard]{pcl:}{no-primary-method}{%
+    (\var{gf} \argtype{standard-generic-function}) \amprest{} \var{args}}
+  This method signals a continuable error of type
+  \code{pcl:no-primary-method-error}.
+\end{defmethod}
+
+
+\subsection{Slot Type Checking}
+\cindex{slot type checking}
+
+Declared slot types are used when 
+
+\begin{itemize}
+\item reading slot values with \code{slot-value} in methods, or
+
+\item setting slots with \code{(setf slot-value)} in methods, or 
+  
+\item creating instances with \code{make-instance}, when slots are
+  initialized from initforms.  This currently depends on PCL being
+  able to use its internal \code{make-instance} optimization, which it
+  usually can.
+\end{itemize}
+
+Example:
+
+\begin{example}
+(defclass foo ()
+  ((a :type fixnum)))
+
+(defmethod bar ((object foo) value)
+  (with-slots (a) object
+    (setf a value)))
+
+(defmethod baz ((object foo))
+  (< (slot-value object 'a) 10))
+\end{example}
+
+In method \code{bar}, and with a suitable safety setting, a type error
+will occur if \code{value} is not a \code{fixnum}.  In method
+\code{baz}, a \code{fixnum} comparison can be used by the compiler.
+  
+\begin{defvar}{pcl::}{use-slot-types-p}
+  Slot type checking can be turned off by setting this variable to
+  \false, which can be useful for compiling code containing incorrect
+  slot type declarations.
+\end{defvar}
+
+
+\subsection{Slot Access Optimization}
+\cindex{slot access optimization}
+\cindex{slot declarations}
+
+The declaration \code{ext:slots} is used for optimizing slot access in
+methods.
+
+\begin{example}
+declare (ext:slots specifier*)
+
+specifier   ::= (quality class-entry*)
+quality     ::= SLOT-BOUNDP | INLINE
+class-entry ::= class | (class slot-name*)
+class       ::= the name of a class
+slot-name   ::= the name of a slot
+\end{example}
+
+The \code{slot-boundp} quality specifies that all or some slots of a
+class are always bound.
+
+The \code{inline} quality specifies that access to all or some slots
+of a class should be inlined, using compile-time knowledge of class
+layouts.
+
+
+
+\subsubsection{\code{slot-boundp} Declaration}
+\cpsubindex{slot declaration}{slot-boundp}
+
+Example:
+
+\begin{example}
+(defclass foo ()
+  (a b))
+
+(defmethod bar ((x foo))
+  (declare (ext:slots (slot-boundp foo)))
+  (list (slot-value x 'a) (slot-value x 'b)))
+\end{example}
+
+The \code{slot-boundp} declaration in method \code{bar} specifies that
+the slots \code{a} and \code{b} accessed through parameter \code{x} in
+the scope of the declaration are always bound, because parameter
+\code{x} is specialized on class \code{foo} to which the
+\code{slot-boundp} declaration applies.  The PCL-generated code for
+the \code{slot-value} forms will thus not contain tests for the slots
+being bound or not.  The consequences are undefined should one of the
+accessed slots not be bound.
+
+
+
+\subsubsection{\code{inline} Declaration}
+\cpsubindex{slot declaration}{inline}
+
+Example:
+
+\begin{example}
+(defclass foo ()
+  (a b))
+
+(defmethod bar ((x foo))
+  (declare (ext:slots (inline (foo a))))
+  (list (slot-value x 'a) (slot-value x 'b)))
+\end{example}
+
+The \code{inline} declaration in method \code{bar} tells PCL to use
+compile-time knowledge of slot locations for accessing slot \code{a}
+of class \code{foo}, in the scope of the declaration.
+
+Class \code{foo} must be known at compile time for this optimization
+to be possible.  PCL prints a warning and uses normal slot access If
+the class is not defined at compile time.
+
+If a class is \code{proclaim}ed to use inline slot access before it is
+defined, the class is defined at compile time.  Example:
+
+\begin{example}
+(declaim (ext:slots (inline (foo slot-a))))
+(defclass foo () ...)
+(defclass bar (foo) ...)
+\end{example}
+  
+Class \code{foo} will be defined at compile time because it is
+declared to use inline slot access; methods accessing slot
+\code{slot-a} of \code{foo} will use inline slot access if otherwise
+possible.  Class \code{bar} will be defined at compile time because
+its superclass \code{foo} is declared to use inline slot access.  PCL
+uses compile-time information from subclasses to warn about situations
+where using inline slot access is not possible.
+
+Normal slot access will be used if PCL finds, at method compilation
+time, that
+
+\begin{itemize}
+\item class \code{foo} has a subclass in which slot \code{a} is at a
+  different location, or
+
+\item there exists a \code{slot-value-using-class} method for
+  \code{foo} or a subclass of \code{foo}.
+\end{itemize}
+  
+When the declaration is used to optimize calls to slot accessor
+generic functions in methods, as opposed to \code{slot-value} or
+\code{(setf slot-value)}, the optimization is additionally not used if
+
+\begin{itemize}
+\item there exist, at compile time, applicable methods on the
+  reader/writer generic function that are not standard accessor
+  methods (for instance, there exist around-methods), or
+  
+\item applicable reader/writer methods access different slots in a
+  class accessed inline, and one of its subclasses.
+\end{itemize}
+
+The consequences are undefined if the compile-time environment is not
+the same as the run-time environment in these respects, or if the
+definition of class \code{foo} or any subclass of \code{foo} is
+changed in an incompatible way, that is, if slot locations change.
+
+The effect of the \code{inline} optimization combined with the
+\code{slot-boundp} optimization is that CLOS slot access becomes as
+fast as structure slot access, which is an order of magnitude faster
+than normal CLOS slot access.
+
+\begin{defvar}{pcl::}{optimize-inline-slot-access-p}
+  This variable controls if inline slot access optimizations are
+  performed.  It is true by default.
+\end{defvar}
+
+
+
+\subsubsection{Automatic Method Recompilation}
+\cindex{methods}
+\cpsubindex{methods}{auto-compilation}
+\cpsubindex{slot declaration}{method recompilation}
+  
+Methods using inline slot access can be automatically recompiled after
+class changes.  Two declarations control which methods are
+automatically recompiled.
+
+\begin{example}
+declaim (ext:auto-compile specifier*)
+declaim (ext:not-auto-compile specifier*)
+
+specifier   ::= gf-name | (gf-name qualifier* (specializer*))
+gf-name     ::= the name of a generic function
+qualifier   ::= a method qualifier
+specializer ::= a method specializer
+\end{example}
+
+If no specifier is given, auto-compilation is by default done/not done
+for all methods of all generic functions using inline slot access;
+current default is that it is not done.  This global policy can be
+overridden on a generic function and method basis.  If
+\code{specifier} is a generic function name, it applies to all methods
+of that generic function.
+
+Examples:
+
+\begin{example}
+(declaim (ext:auto-compile foo))
+(defmethod foo :around ((x bar)) ...)
+\end{example}
+
+The around-method \code{foo} will be automatically recompiled because
+the declamation applies to all methods with name \code{foo}.
+
+\begin{example}
+(declaim (ext:auto-compile (foo (bar))))
+(defmethod foo :around ((x bar)) ...)
+(defmethod foo ((x bar)) ...)
+\end{example}
+
+The around-method will not be automatically recompiled, but the
+primary method will.
+
+\begin{example}
+(declaim (ext:auto-compile foo))
+(declaim (ext:not-auto-compile (foo :around (bar)))  
+(defmethod foo :around ((x bar)) ...)
+(defmethod foo ((x bar)) ...)
+\end{example}
+
+The around-method will not be automatically recompiled, because it
+is explicitly declaimed not to be.  The primary method will be
+automatically recompiled because the first declamation applies to
+it.
+
+Auto-recompilation works by recording method bodies using inline slot
+access.  When PCL determines that a recompilation is necessary, a
+\code{defmethod} form is constructed and evaluated.
+
+Auto-compilation can only be done for methods defined in a null
+lexical environment.  PCL prints a warning and doesn't record the
+method body if a method using inline slot access is defined in a
+non-null lexical environment.  Instead of doing a recompilation on
+itself, PCL will then print a warning that the method must be
+recompiled manually when classes are changed.
+
+
+
+\subsection{Inlining Methods in Effective Methods}
+\cindex{effective method}
+\cpsubindex{methods}{inlining in effective methods}
+\cpsubindex{effective method}{inlining of methods}
+\cindex{inline}
+
+When a generic function is called, an effective method is constructed
+from applicable methods.  The effective method is called with the
+original arguments, and itself calls applicable methods according to
+the generic function's method combination.  Some of the function call
+overhead in effective methods can be removed by inlining methods in
+effective methods, at the expense of increased code size.
+
+Inlining of methods is controlled by the usual \code{inline}
+declaration.  In the following example, both \code{foo} methods shown
+will be inlined in effective methods:
+
+\begin{example}
+(declaim (inline (method foo (foo))
+                 (method foo :before (foo))))
+(defmethod foo ((x foo)) ...)
+(defmethod foo :before ((x foo)) ...)
+\end{example}
+
+Please note that this form of inlining has no noticeable effect for
+effective methods that consist of a primary method only, which doesn't
+have keyword arguments.  In such cases, PCL uses the primary method
+directly for the effective method.
+
+When the definition of an inlined method is changed, effective methods
+are \textbf{not} automatically updated to reflect the change.  This is
+just as it is when inlining normal functions.  Different from the
+normal case is that users do not have direct access to effective
+methods, as it would be the case when a function is inlined somewhere
+else.  Because of this, the function \code{pcl:flush-emf-cache} is
+provided for forcing such an update of effective methods.
+
+\begin{defun}{pcl:}{flush-emf-cache}{\ampoptional{} \var{gf}}
+  Flush cached effective method functions.  If \code{gf} is supplied,
+  it should be a generic function metaobject or the name of a generic
+  function, and this function flushes all cached effective methods for
+  the given generic function.  If \code{gf} is not supplied, all
+  cached effective methods are flushed.
+\end{defun}
+
+\begin{defvar}{pcl::}{inline-methods-in-emfs}
+  If true, the default, perform method inlining as described above.
+  If false, don't.
+\end{defvar}
+
+
+
+\subsection{Effective Method Precomputation}
+\cpsubindex{effective method}{precomputation}
+\cpsubindex{methods}{load time}
+\cpsubindex{methods}{emf precomputation}
+
+When a generic function is called, the generic function's
+discriminating function computes the set of methods applicable to
+actual arguments and constructs an effective method function from
+applicable methods, using the generic function's method combination.
+
+Effective methods can be precomputed at method load time instead of
+when the generic function is called depending on the value of
+\code{pcl:*max-emf-precomputation-methods*}.
+
+\begin{defvar}{pcl:}{*max-emf-precomputation-methods*}
+  If nonzero, the default value is 100, precompute effective methods
+  when methods are loaded, and the method's generic function has less
+  than the specified number of methods.
+  
+  If zero, compute effective methods only when the generic function is
+  called.
+\end{defvar}
+
+
+
+\subsection{Sealing}
+\cindex{sealing}
+\cpsubindex{sealing}{subclasses}
+\cpsubindex{sealing}{methods}
+\cpsubindex{methods}{sealing}
+
+Support for sealing classes and generic functions have been
+implemented.  Please note that this interface is subject to change.
+
+\begin{defmac}{pcl:}{seal}{\var{name} (\var{var}) \amprest{} \var{specifiers}}
+  Seal \code{name} with respect to the given specifiers; \code{name}
+  can be the name of a class or generic-function.
+
+  Supported specifiers are \kwd{subclasses} for classes,
+  which prevents changing subclasses of a class, and \kwd{methods}
+  which prevents changing the methods of a generic function.
+  
+  Sealing violations signal an error of type \code{pcl:sealed-error}.
+\end{defmac}
+
+\begin{defun}{pcl:}{unseal}{\var{name-or-object}}
+  Remove seals from \code{name-or-object}.
+\end{defun}
+
+
+
+\subsection{Method Tracing and Profiling}
+\label{sec:method-tracing}
+\cindex{tracing}
+\cpsubindex{tracing}{methods}
+\cindex{profiling}
+\cpsubindex{profiling}{methods}
+\cpsubindex{methods}{tracing}
+\cpsubindex{methods}{profiling}
+
+Methods can be traced with \code{trace}, using function names of the
+form \code{(method <name> <qualifiers> <specializers>)}.  Example:
+
+\begin{example}
+(defmethod foo ((x integer)) x)
+(defmethod foo :before ((x integer)) x)
+
+(trace (method foo (integer)))
+(trace (method foo :before (integer)))
+(untrace (method foo :before (integer)))
+\end{example}
+  
+\code{trace} and \code{untrace} also allow a name specifier
+\code{:methods gf-form} for tracing all methods of a generic function:
+
+\begin{example}
+(trace :methods 'foo)
+(untrace :methods 'foo)
+\end{example}
+
+Methods can also be specified for the \kwd{wherein} option to
+\code{trace}.  Because this option is a name or a list of names,
+methods must be specified as a list.  Thus, to trace all calls of
+\code{foo} from the method \code{bar} specialized on integer argument,
+use
+\begin{example}
+  (trace foo :wherein ((method bar (integer))))
+\end{example}
+Before and after methods are supported as well:
+\begin{example}
+  (trace foo :wherein ((method bar :before (integer))))
+\end{example}
+
+Method profiling is done analogously to \code{trace}:
+
+\begin{example}
+(defmethod foo ((x integer)) x)
+(defmethod foo :before ((x integer)) x)
+
+(profile:profile (method foo (integer)))
+(profile:profile (method foo :before (integer)))
+(profile:unprofile (method foo :before (integer)))
+
+(profile:profile :methods 'foo)
+(profile:unprofile :methods 'foo)
+
+(profile:profile-all :methods t)
+\end{example}
+
+
+
+\subsection{Misc}
+\cpsubindex{methods}{interpreted}
+
+\begin{defvar}{pcl::}{compile-interpreted-methods-p}
+  This variable controls compilation of interpreted method functions,
+  e.g. for methods defined interactively at the REPL.  Default is
+  true, that is, method functions are compiled.
+\end{defvar}
+
+
+
+
+
+\section{Differences from ANSI Common Lisp}
+This section describes some of the known differences between \cmucl{}
+and ANSI \clisp{}.  Some may be non-compliance issues; same may be
+extensions.
+
+\subsection{Extensions}
+
+\begin{defun}{}{constantly}{%
+    \var{value} \ampoptional{} \var{val1} \var{val2} \amprest{} \var{more-values}}
+  As an extension, \cmucl{} allows \code{constantly} to accept more
+  than one value which are returned as multiple values.
+\end{defun}
+
+
+
+
+\section{Function Wrappers}
+\cindex{function wrappers}
+\cindex{fwrappers}
+
+Function wrappers, fwrappers for short, are a facility for efficiently
+encapsulating functions\footnote{This feature was independently
+developed, but the interface is modelled after a similar feature in
+Allegro.  Some names, however, have been changed.}.
+
+Functions in \cmucl{} are represented by \code{kernel:fdefn}
+objects.  Each \code{fdefn} object contains a reference to its
+function's actual code, which we call the function's primary function.
+
+A function wrapper replaces the primary function in the \code{fdefn}
+object with a function of its own, and records the original function
+in an fwrapper object, a funcallable instance.  Thus, when the
+function is called, the fwrapper gets called, which in turn might call
+the primary function, or a previously installed fwrapper that was
+found in the \code{fdefn} object when the second fwrapper was
+installed.
+
+Example:
+
+\begin{lisp}
+(use-package :fwrappers)
+
+(define-fwrapper foo (x y)
+  (format t "x = ~s, y = ~s, user-data = ~s~%"
+          x y (fwrapper-user-data fwrapper))
+  (let ((value (call-next-function)))
+    (format t "value = ~s~%" value)
+    value))
+
+(defun bar (x y)
+  (+ x y))
+
+(fwrap 'bar #'foo :type 'foo :user-data 42)
+
+(bar 1 2)
+ =>
+ x = 1, y = 2, user-data = 42
+ value = 3
+ 3   
+\end{lisp}
+
+Fwrappers are used in the implementation of \code{trace} and
+\code{profile}.
+
+Please note that \code{fdefinition} always returns the primary
+definition of a function; if a function is fwrapped,
+\code{fdefinition} returns the primary function stored in the
+innermost fwrapper object.  Likewise, if a function is fwrapped,
+\code{(setf fdefinition)} will set the primary function in the
+innermost fwrapper.
+
+\begin{defmac}{fwrappers:}{define-fwrapper}{\var{name} \var{lambda-list} \ampbody{} \var{body}}
+  This macro is like \code{defun}, but defines a function named
+  \var{name} that can be used as an fwrapper definition.
+  
+  In \var{body}, the symbol \code{fwrapper} is bound to the current
+  fwrapper object.
+  
+  The macro \code{call-next-function} can be used to invoke the next
+  fwrapper, or the primary function that is being fwrapped.  When
+  called with no arguments, \code{call-next-function} invokes the next
+  function with the original arguments passed to the fwrapper, unless
+  you modify one of the parameters.  When called with arguments,
+  \code{call-next-function} invokes the next function with the given
+  arguments.
+\end{defmac}
+
+\begin{defun}{fwrappers:}{fwrap}{\var{function-name} \var{fwrapper} %
+    \keys{\kwd{type} \kwd{user-data}}}
+  This function wraps function \code{function-name} in an fwrapper
+  \var{fwrapper} which was defined with \code{define-fwrapper}.
+
+  The value of \var{type}, if supplied, is used as an identifying
+  tag that can be used in various other operations.
+  
+  The value of \var{user-data} is stored as user-supplied data in the
+  fwrapper object that is created for the function encapsulation.
+  User-data is accessible in the body of fwrappers defined with
+  \code{define-fwrapper} as \code{(fwrapper-user-data fwrapper)}.
+
+  Value is the fwrapper object created.
+\end{defun}
+
+\begin{defun}{fwrappers:}{funwrap}{\var{function-name} \keys{\kwd{type} \kwd{test}}}
+  Remove fwrappers from the function named \var{function-name}.  If
+  \var{type} is supplied, remove fwrappers whose type is \code{equal}
+  to \var{type}.  If \var{test} is supplied, remove fwrappers
+  satisfying \var{test}.
+\end{defun}
+
+\begin{defun}{fwrappers:}{find-fwrapper}{\var{function-name} \keys{\kwd{type} \kwd{test}}}
+  Find an fwrapper of \var{function-name}.  If \var{type} is supplied,
+  find an fwrapper whose type is \code{equal} to \var{type}.  If
+  \var{test} is supplied, find an fwrapper satisfying \var{test}.
+\end{defun}
+
+\begin{defun}{fwrappers:}{update-fwrapper}{\var{fwrapper}}
+  Update the funcallable instance function of the fwrapper object
+  \var{fwrapper} from the definition of its function that was 
+  defined with \code{define-fwrapper}.  This can be used to update
+  fwrappers after changing a \code{define-fwrapper}.
+\end{defun}
+
+\begin{defun}{fwrappers:}{update-fwrappers}{\var{function-name} \keys{\kwd{type} \kwd{test}}}
+  Update fwrappers of \var{function-name}; see \code{update-fwrapper}.
+  If \var{type} is supplied, update fwrappers whose type is
+  \code{equal} to \var{type}.  If \var{test} is supplied, update fwrappers
+  satisfying \var{test}.
+\end{defun}
+
+\begin{defun}{fwrappers:}{set-fwrappers}{\var{function-name} \var{fwrappers}}
+  Set \var{function-names}'s fwrappers to elements of the list
+  \var{fwrappers}, which is assumed to be ordered from outermost to
+  innermost.  \var{fwrappers} null means remove all fwrappers.
+\end{defun}
+
+\begin{defun}{fwrappers:}{list-fwrappers}{\var{function-name}}
+  Return a list of all fwrappers of \var{function-name}, ordered
+  from outermost to innermost.
+\end{defun}
+
+\begin{defun}{fwrappers:}{push-fwrapper}{\var{fwrapper} \var{function-name}}
+  Prepend fwrapper \var{fwrapper} to the definition of
+  \var{function-name}.  Signal an error if \var{function-name} is an
+  undefined function.
+\end{defun}
+
+\begin{defun}{fwrappers:}{delete-fwrapper}{\var{fwrapper} \var{function-name}}
+  Remove fwrapper \var{fwrapper} from the definition of
+  \var{function-name}.  Signal an error if \var{function-name} is an
+  undefined function.
+\end{defun}
+
+\begin{defmac}{fwrappers:}{do-fwrappers}{(\var{var} \var{fdefn} \ampoptional{}
+  \var{result}) \ampbody{} \var{body}}
+  Evaluate \var{body} with \var{var} bound to consecutive fwrappers of
+  \var{fdefn}.  Return \var{result} at the end.  Note that \var{fdefn}
+  must be an \code{fdefn} object.  You can use
+  \code{kernel:fdefn-or-lose}, for instance, to get the \code{fdefn}
+  object from a function name.
+\end{defmac}
+
+\section{Dynamic-Extent Declarations}
+\cindex{dynamic-extent}
+
+\emph{Note:  As of the 19a release, \code{dynamic-extent} is
+  unfortunately disabled by default.  It is known to cause some issues
+  with CLX and Hemlock.  The cause is not known, but causes random
+  errors and brokeness.  Enable at your own risk.  However, it is safe
+  enough to build all of CMUCL without problems.}
+
+On x86 and sparc, \cmucl{} can exploit \code{dynamic-extent}
+declarations by allocating objects on the stack instead of the heap.
+
+You can tell \cmucl{} to trust or not trust \code{dynamic-extent}
+declarations by setting the variable
+\var{*trust-dynamic-extent-declarations*}.
+
+\begin{defvar}{ext:}{trust-dynamic-extent-declarations}
+  If the value of \var{*trust-dynamic-extent-declarations*} is 
+  \code{NIL}, \code{dynamic-extent} declarations are effectively
+  ignored.
+
+  If the value of this variable is a function, the function is called
+  with four arguments to determine if a \code{dynamic-extent} 
+  declaration should be trusted.  The arguments are the safety,
+  space, speed, and debug settings at the point where the 
+  \code{dynamic-extent} declaration is used.  If the function
+  returns true, the declaration is trusted, otherwise it is not
+  trusted.
+
+  In all other cases, \code{dynamic-extent} declarations are
+  trusted.
+\end{defvar}
+
+Please note that stack-allocation is inherently unsafe.  If you make a
+mistake, and a stack-allocated object or part of it escapes, \cmucl{}
+is likely to crash, or format your hard disk.
+
+\subsection{\code{\&rest} argument lists}
+\cpsubindex{dynamic-extent}{rest lists}
+
+Rest argument lists can be allocated on the stack by declaring the
+rest argument variable \code{dynamic-extent}.  Examples:
+
+\begin{lisp}
+(defun foo (x &rest rest)
+  (declare (dynamic-extent rest))
+  ...)
+
+(defun bar ()
+  (lambda (&rest rest)
+    (declare (dynamic-extent rest))
+    ...))
+\end{lisp}
+
+\subsection{Closures}
+\cpsubindex{dynamic-extent}{closures}
+
+Closures for local functions can be allocated on the stack if the
+local function is declared \code{dynamic-extent}, and the closure
+appears as an argument in the call of a named function.  In the
+example:
+
+\begin{lisp}
+(defun foo (x)
+  (flet ((bar () x))
+    (declare (dynamic-extent #'bar))
+    (baz #'bar)))
+\end{lisp}
+
+the closure passed to function \code{baz} is allocated on the stack.
+Likewise in the example:
+
+\begin{lisp}
+(defun foo (x)
+  (flet ((bar () x))
+    (baz #'bar)
+    (locally (declare (dynamic-extent #'bar))
+      (baz #'bar))))
+\end{lisp}
+
+\cpsubindex{dynamic-extent}{known CL functions}
+
+Stack-allocation of closures can also automatically take place when
+calling certain known CL functions taking function arguments, for
+example \code{some} or \code{find-if}.
+
+\subsection{\code{list}, \code{list*}, and \code{cons}}
+\cpsubindex{dynamic-extent}{list, list*, cons}
+
+New conses allocated by \code{list}, \code{list*}, or \code{cons}
+which are used to initialize variables can be allocated from the stack
+if the variables are declared \code{dynamic-extent}.  In the case of
+\code{cons}, only the outermost cons cell is allocated from the stack;
+this is an arbitrary restriction.
+
+\begin{lisp}
+(let ((x (list 1 2))
+      (y (list* 1 2 x))
+      (z (cons 1 (cons 2 nil))))
+  (declare (dynamic-extent x y z))
+  ...
+  (setq x (list 2 3))
+  ...)
+\end{lisp}
+
+Please note that the \code{setq} of \code{x} in the example program
+assigns to \code{x} a list that is allocated from the heap.  This is
+another arbitrary restriction that exists because other Lisps behave
+that way.
+
+\section{Modular Arithmetic}
+\cindex{modular-arith}
+
+This section is mostly taken, with permission,  from the documentation
+for SBCL.
+
+Some numeric functions have a property: \code{N} lower bits of
+the result depend only on \code{N} lower bits of (all or some)
+arguments. If the compiler sees an expression of form \code{(logand
+exp mask)}, where \code{exp} is a tree of such ``good'' functions
+and \code{mask} is known to be of type \code{(unsigned-byte
+w)}, where \code{w} is a "good" width, all intermediate results
+will be cut to \code{w} bits (but it is not done for variables
+and constants!). This often results in an ability to use simple
+machine instructions for the functions.
+
+Consider an example.
+\begin{lisp}
+(defun i (x y)
+  (declare (type (unsigned-byte 32) x y))
+  (ldb (byte 32 0) (logxor x (lognot y))))
+\end{lisp}
+The result of \code{(lognot y)} will be negative and of
+type \code{(signed-byte 33)}, so a naive implementation on a 32-bit
+platform is unable to use 32-bit arithmetic here. But modular
+arithmetic optimizer is able to do it: because the result is cut down
+to 32 bits, the compiler will replace \code{logxor}
+and \code{lognot} with versions cutting results to 32 bits, and
+because terminals (here---expressions \code{x} and \code{y})
+are also of type \code{(unsigned-byte 32)}, 32-bit machine
+arithmetic can be used.
+
+
+Currently ``good'' functions
+are \code{+}, \code{-}, \code{*}; \code{logand}, \code{logior},
+\code{logxor}, \code{lognot} and their combinations;
+and \code{ash} with the positive second argument. ``Good'' widths
+are 32 on HPPA, MIPS, PPC, Sparc and X86 and 64 on Alpha. While it is
+possible to support smaller widths as well, currently it is not
+implemented.
+
+A more extensive description of modular arithmetic can be found in the
+paper ``Efficient Hardware Arithmetic in Common Lisp'' by Alexey
+Dejneka, and Christophe Rhodes, to be published.
+
+\section{Extension to REQUIRE}
+\cindex{require}
+
+The behavior of \code{require} when called with only one argument is
+implementation-defined.  In \cmucl, functions from the list
+\var{*module-provider-functions*} are called in order with the
+stringified module name as the argument.  The first function to return
+non-\var{NIL} is assumed to have loaded the module.
+
+By default the functions \code{module-provide-cmucl-defmodule} and
+\code{module-provide- cmucl-library} are on this list of functions, in
+that order.
+
+\begin{defvar}{ext:}{module-provider-functions}
+  This is a list of functions taking a single argument.
+  \code{require} calls each function in turn with the stringified
+  module name.  The first function to return non-\var{NIL} indicates
+  that the module has been loaded.  The remaining functions, if any,
+  are not called.
+
+  To add new providers, push the new provider function onto the
+  beginning of this list.
+\end{defvar}
+
+\begin{defmac}{ext:}{defmodule}{\var{name} \amprest{} \var{files}}
+  Defines a module by registering the files that need to be loaded
+  when the module is required.  If \var{name} is a symbol, its print
+  name is used after downcasing it.
+\end{defmac}
+
+\begin{defun}{ext:}{module-provide-cmucl-defmodule}{\var{module-name}}
+  This function is the module-provider for modules registered by a
+  \code{ext:defmodule} form.  
+\end{defun}
+
+\begin{defun}{ext:}{module-provide-cmucl-library}{\var{module-name}}
+  This function is the module-provider for \cmucl's libraries,
+  including Gray streams, simple streams, CLX, CLM, Hemlock,
+  \emph{etc}.
+  
+  This function causes a file to be loaded whose name is formed by
+  merging the search-list ``modules:'' and the concatenation of
+  module-name with the suffix ``-LIBRARY''.  Note that both the
+  module-name and the suffix are each, separately, converted from
+  :case :common to :case :local.  This merged name will be probed with
+  both a .lisp and .fasl extensions, calling \code{LOAD} if it exists.
+\end{defun}
+
+
+\section{Localization}
+\label{sec:localization}
+
+\cmucl{} support localization where messages can be presented in the
+native language.  This is done in the style of \code{gettext} which
+marks strings that are to be translated and provides the lookup to
+convert the string to the specified language.
+
+All messages from \cmucl{} can be translated but as of this writing,
+the only complete translation is a Pig Latin translation done by
+machine.  There are a few messages translated to Korean.
+
+In general, translatable strings are marked as such by using the
+functions \code{intl:gettext} and \code{intl:ngettext} or by using the
+reader macros \verb+_+ or \verb+_N+.  When loading or compiling, such
+strings are recorded for translation.  At runtime, such strings are
+looked in and the translation is returned.  Doc strings do not need to
+be noted in any way; the are automatically noted for translation.
+
+By default, recording of translatable strings is disabled.  To enable
+recording of strings, call \code{intl:translation-enable}.
+
+\subsection{Dictionary}
+\label{sec:localization-dictionary}
+
+\begin{defun}{intl:}{translation-enable}{}
+  Enable recording of translatable strings.
+\end{defun}
+
+\begin{defun}{intl:}{translation-disable}{}
+  Disablle recording of translatable strings.
+\end{defun}
+
+\begin{defun}{intl:}{setlocale}{\ampoptional{} \var{locale}}
+  Sets the locale to the locale specified by \var{locale}.  If
+  \var{locale} is not give or is \nil, the locale is determined by
+  look at the environment variables \code{LANGUAGE}, \code{LC\_ALL},
+  \code{LC\_MESSAGES}, or \code{LANG}.  If none of these are set, the
+  locale is unchanged.
+
+  The default locale is ``C''.
+\end{defun}
+
+\begin{defun}{intl:}{textdomain}{\var{domain}}
+  Set the default domain to the domain specified by \var{domain}.
+  Typically,  this only needs to be done at the top of each source
+  file.  This is used to \code{gettext} and \code{ngettext} to set the
+  domain for the message string.
+\end{defun}
+
+\begin{defmac}{intl:}{gettext}{\var{string}}
+  Look up the specified string, \var{string}, in the current message
+  domain and return its translation.
+\end{defmac}
+
+\begin{defun}{intl:}{dgettext}{\var{domain} \var{string}}
+  Look up the specified string, \var{string}, in the message domain,
+  \var{domain}.  The translation is returned.
+
+  When compiled, this also function also records the string so that an
+  appropriate message template file can be created.  (See
+  \code{intl::dump-pot-files}.) 
+\end{defun}
+
+\begin{defmac}{intl:}{ngettext}{\var{singular} \var{plural} \var{n}}
+  Look up the singular or plural form of a message in the default
+  domain.  The singular form is \var{singular}; the plural is
+  \var{plural}.  The number of items is specified by \var{n} in case
+  the correct translation depends on the actual number of items.
+\end{defmac}
+
+\begin{defun}{intl:}{dngettext}{\var{domain} \var{singular} \var{plural} \var{n}}
+  Look up the singular or plural form of a message in the specified
+  domain, \var{domain}.  The singular form is \var{singular}; the
+  plural is \var{plural}.  The number of items is specified by \var{n}
+  in case the correct translation depends on the actual number of
+  items.
+
+  When compiled, this also function also records the singular and
+  plural forms so that an appropriate message template file can be
+  created.  (See \code{intl::dump-pot-files}.)
+\end{defun}
+
+\begin{defun}{intl::}{dump-pot-files}{\keys{\kwd{copyright} \kwd{output-directory}}}
+  Dumps the translatable strings recorded by \code{dgettext} and
+  \code{dngettext}.  The message template file (pot file) is written
+  to a file in the directory specified by \var{output-directory}, and
+  the name of the file is the domain of the string.
+
+  If \var{copyright} is specified, this is placed in the output file
+  as the copyright message.
+\end{defun}
+
+\begin{defvar}{intl:}{locale-directories}
+  This is a list of directory pathnames where the translations can be found.
+\end{defvar}  
+
+\begin{defun}{intl:}{install}{\ampoptional{} (\var{rt} \var{*readtable*})}
+  Installs reader macros and comment reader into the specified
+  readtable as explained below.  The readtable defaults to
+  \var{*readtable*}.
+\end{defun}
+
+Two reader macros are also provided: \code{\_''} and \code{\_N''}.  The
+first is equivalent to wrapping \code{dgettext} around the string.
+The second returns the string, but also records the string.  This is
+needed when we want to record a docstring for translation or any other
+string in a place where a macro or function call would be incorrect.
+
+Also, the standard comment reader is extended to allow translator
+comments to be saved and written to the messages template file so that
+the translator may not need to look at the original source to
+understand the string.  Any comment line that begins with exactly
+\verb|"TRANSLATORS: "| is saved.  This means each translator comment
+must be preceded by this string to be saved; the translator comment
+ends at the end of each line.
+
+
+\subsection{Example Usage}
+\label{sec:localization-usage}
+
+Here is a simple example of how to localize your code.  Let the file
+\code{intl-ex.lisp} contain:
+
+\begin{example}
+
+(intl:textdomain "example")  
+
+(defun foo (x y)
+  "Cool function foo of x and y"
+  (let ((result (bar x y)))
+    ;; TRANSLATORS:  One line comment about bar.
+    (format t _"bar of ~A and ~A = ~A~%" x y result)
+    #| TRANSLATORS:  Multiline comment about
+    how many Xs there are
+    |#
+    (format t (intl:ngettext "There is one X"
+                             "There are many Xs"
+                             x))
+    result))
+\end{example}
+
+The call to \code{textdomain} sets the default domain for all
+translatable strings following the call.
+
+Here is a sample session for creating a template file:
+
+\begin{example}
+* (intl:install)
+
+T
+* (intl:translation-enable)
+
+T
+* (compile-file "intl-ex")
+
+#P"/Volumes/share/cmucl/cvs/intl-ex.sse2f"
+NIL
+NIL
+* (intl::dump-pot-files :output-directory "./")
+
+Dumping 3 messages for domain "example"
+NIL
+*
+\end{example}
+
+When this file is compiled, all of the translatable strings are
+recorded.  This includes the docstring for \code{foo}, the string for
+the first \code{format}, and the string marked by the call to
+\code{intl:ngettext}.
+
+A file named ``example.pot'' in the directory ``./'' is created.
+The contents of this file are:
+\begin{example}
+#@ example
+
+# SOME DESCRIPTIVE TITLE
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION"
+"Report-Msgid-Bugs-To: "
+"PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>"
+"Language-Team: LANGUAGE <LL@li.org>"
+"MIME-Version: 1.0"
+"Content-Type: text/plain; charset=UTF-8"
+"Content-Transfer-Encoding: 8bit"
+
+#.  One line comment about bar.
+#: intl-ex.lisp
+msgid "bar of ~A and ~A = ~A~%"
+msgstr ""
+
+#.  Multiline comment about
+    how many Xs there are
+#: intl-ex.lisp
+msgid "Cool function foo of x and y"
+msgstr ""
+
+#: intl-ex.lisp
+msgid "There is one X"
+msgid_plural "There are many Xs"
+msgstr[0] ""
+
+\end{example}
+
+To finish the translation, a corresponding ``example.po'' file needs
+to be created with the appropriate translations for the given
+strings.  This file must be placed in some directory that is included
+in \code{intl:*locale-directories*}.
+
+Suppose the translation is done for Korean.  Then the user can set the
+environment variables appropriately or call \code{(intl:setlocale
+  "ko")}.  Note that the external format for the standard streams
+needs to be set up appropriately too.  It is up to the user to set
+this correctly.  Once this is all done, the output from the function
+\code{foo} will now be in Korean instead of English as in the original
+source file.
+
+For further information, we refer the reader to documentation on
+\ifpdf
+\href{http://www.gnu.org/software/gettext/manual/gettext.html}{gettext}.
+\else
+gettext at
+\href{http://www.gnu.org/software/gettext/manual/gettext.html}{\texttt{http://www.gnu.org/software/gettext/manual/gettext.html}}.
+\fi
+
+\section{Static Arrays}
+\label{sec:static-arrays}
+
+\cmucl{} supports static arrays which are arrays that are not moved by
+the garbage collector.  To create such an array, use the
+\kwd{allocation} option to \code{make-array} with a value of
+\kwd{malloc}.  These arrays appear as normal Lisp arrays, but are
+actually allocated from the \code{C} heap (hence the \kwd{malloc}).
+Thus, the number and size of such arrays are limited by the available
+\code{C} heap.
+
+Also, only certain types of arrays can be allocated.  The static array
+cannot be adjustable and cannot be displaced to.  The array must also
+be a \code{simple-array} of one dimension.  The element type is also
+constrained to be one of the types in
+Table~\ref{tbl:static-array-types}.
+
+\begin{table}[tbhp]
+  \begin{center}
+    \begin{tabular}{|c|}
+      \hline
+      \code{(unsigned-byte 8)} \\
+      \hline
+      \code{(unsigned-byte 16)} \\
+      \hline
+      \code{(unsigned-byte 32)} \\
+      \hline
+      \code{(signed-byte 8)} \\
+      \hline
+      \code{(signed-byte 16)} \\
+      \hline
+      \code{(signed-byte 32)} \\
+      \hline
+      \code{single-float} \\
+      \hline
+      \code{double-float} \\
+      \hline
+      \code{(complex single-float)} \\
+      \hline
+      \code{(complex double-float)} \\
+      \hline
+    \end{tabular}
+    \caption{Allowed element types for static arrays}
+    \label{tbl:static-array-types}
+  \end{center}
+\end{table}
+
+The arrays are properly handled by GC.  GC will not move the arrays,
+but they will be properly removed up if they become garbage.

@@ -3877,8 +3877,8 @@
              (let* ((start (get-internal-run-time))
                     (iterations 0)
                     (fun (if times
-                             (loop repeat times
-                                   for result = (checked-compile lambda)
+                             (loop for result = (checked-compile lambda)
+                                   repeat times
                                    finally (return result))
                              (loop for result = (checked-compile lambda)
                                    do (incf iterations)

@@ -495,7 +495,7 @@
 ;;; MOD and REM. Test that the transform is indeed triggered and test
 ;;; several cases for correct results.
 (with-test (:name (:integer-division-using-multiplication :used)
-                  :skipped-on (not (or :x86-64 :x86)))
+            :skipped-on (not (or :x86-64 :x86 :arm64)))
   (dolist (fun '(truncate floor ceiling mod rem))
     (let* ((foo (checked-compile
                  `(lambda (x)
@@ -1004,3 +1004,31 @@
                   (multiple-value-setq (a) -10000)
                   a))))
    ((0) 0)))
+
+(with-test (:name :fixnum*-lifetimes)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare ((integer -8394154896 -1950772105) b))
+      a
+      (round (+ b 4611686018427387903)
+             (let ((divisor (expt b 2)))
+               divisor)))
+   ((0 -5000000000) (values 0 4611686013427387903))))
+
+(with-test (:name :ash-*-cycle)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (truly-the fixnum (* (the fixnum x) -4)))
+   ((4) -16)))
+
+(with-test (:name :-unsigned=>signed)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare ((integer #.(- (expt 2 sb-vm:n-word-bits) 10)
+                         #.(- (expt 2 sb-vm:n-word-bits) 1))
+                a b))
+      (- a b))
+   (((- (expt 2 sb-vm:n-word-bits) 10) (- (expt 2 sb-vm:n-word-bits) 9)) -1)))

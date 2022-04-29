@@ -1,0 +1,120 @@
+Todo:
+fasl.tex
+In good shape.
+
+object.tex
+Fairly good, but should probably be integrated with description of primitives
+in vm.tex.
+
+front.tex
+Needs updating cleanup scan.  Not too bad.
+
+middle.tex
+Need VMR overview.  New names for GTN/LTN?  Needs general cleanup, but not too
+bad.  NLX and stack are the worst. 
+
+back.tex
+Pack and assembler need more info.  General cleanup.
+
+
+compiler-overview.tex
+Adapt introductory material from /../fred/usr/ram/comp.mss, pap:talk.mss
+Division between ICR overview and ICR convert needs work.
+
+debugger.tex
+Needs much work.  Merge much info from debug-info and debug-int.  Duplicating a
+fair amount of stuff in the source may make sense where, since this is a part
+of the system that is generally interesting.  And also, a part that people
+building on CMU CL might want to understand.
+
+glossary.tex
+Finish, integrate w/ main text?
+
+interpreter.tex
+Very sketchy and tentative.  Needs to be fleshed out from the code.
+
+retargeting.tex
+Very rough.  Needs to be merged with parts of vm.tex (call vops).  Needs some
+additional text.  Documentation of assembler, and all other exported
+interfaces.  (Generate defined VOP descriptions from the core, keyed to files?)
+
+vm.tex
+This file should probably cease to exist, going into object, retargeting and
+introductory material.  [Also other scrap in stuff/]
+
+
+[VMR and ICR overview also needed...]
+
+architecture.tex
+Missing sections on startup code, compiling, building.
+
+environment.tex
+Needs to be written: type system and info database interfaces.
+
+interface.tex
+Needs to be written: source paths and error message utilities.
+
+lowlev.tex
+Needs to be written.  All manner of low-level stuff: memory layout and
+management, core file format, C interface, low-level debugging (and ldb.)
+
+
+Several different audiences:
+ -- Curious compiler implementors (not a big priority.  Downplay academic
+    aspects, i.e. comparisons to other techniques, analysis of limitations,
+    future work...)  Compiler part can be more academic, and include some
+    justifications of other design decisions.
+ -- System maintainers.
+ -- People retargeting the compiler.
+ -- People bringing up the system in a new environment.
+
+Sys arch part:
+    Package + file structure [system.txt]
+    system building [compiling.txt]
+        bootstrapping & cross compiling
+
+Compiler design:
+    Overview (mirror structure of rest of the part)
+    ICR data structure
+    Front end [front.tex]
+    Basic VMR data structures (no back-end stuff)
+    Middle end [middle.tex]
+    Back end + data structures [back.tex]
+
+    Error system interface
+    Source tracking
+
+Compiler retargeting:
+    VM definition concepts [porting.txt, mail.txt, retargeting.tex]
+        SCs, SBs, primitive-types
+    Defining VOPS
+        time specification
+    defining 
+    and using the assembler
+    Required VOPs [internal.txt, lowlev.txt, vm.mss]
+    Standard primitives [vm.mss] (broken down by type, parallels object format
+    section structure.)
+    Customizing VMR conversion
+        multiple hardware
+        constant operands
+        VM specific transforms
+        special-case IR2 convert methods
+
+Run-time system:
+    type system
+    info database
+    Data format [object.tex]
+    Debugger:
+	Info format [debug.txt]
+	Stack parsing [debug.txt]
+	Breakpoints
+	Internal errors
+	Signals
+    Memory management: [William]
+        heap Layout
+        stacks
+        GC
+    misc implementation stuff: foreign call, assembly routines [lowlev.txt]
+    LDB and low-level debugging
+    core file format  [William]
+    fasl format [fasl.tex]

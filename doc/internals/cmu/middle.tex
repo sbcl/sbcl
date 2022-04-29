@@ -1,0 +1,667 @@
+% -*- Dictionary: design -*-
+
+
+\chapter{Virtual Machine Representation Introduction}
+
+
+\chapter{Global TN assignment}
+
+% Rename this phase so as not to be confused with the local/global TN
+% representation.
+
+The basic mechanism for closing over values is to pass the values as additional
+implicit arguments in the function call.  This technique is only applicable
+when:
+
+\begin{itemize}
+\item the calling function knows which values the called function wants to close
+    over, and
+\item the values to be closed over are available in the calling
+  environment.
+\end{itemize}
+
+The first condition is always true of local function calls.  Environment
+analysis can guarantee that the second condition holds by closing over any
+needed values in the calling environment.
+
+If the function that closes over values may be called in an environment where
+the closed over values are not available, then we must store the values in a
+``closure'' so that they are always accessible.  Closures are called using the
+``full call'' convention.  When a closure is called, control is transferred to
+the ``external entry point'', which fetches the values out of the closure and
+then does a local call to the real function, passing the closure values as
+implicit arguments.
+
+In this scheme there is no such thing as a ``heap closure variable'' in code,
+since the closure values are moved into TNs by the external entry point.  There
+is some potential for pessimization here, since we may end up moving the values
+from the closure into a stack memory location, but the advantages are also
+substantial.  Simplicity is gained by always representing closure values the
+same way, and functions with closure references may still be called locally
+without allocating a closure.  All the TN based VMR optimizations will apply
+to closure variables, since closure variables are represented in the same way
+as all other variables in VMR.  Closure values will be allocated in registers
+where appropriate.
+
+Closures are created at the point where the function is referenced, eliminating
+the need to be able to close over closures.  This lazy creation of closures has
+the additional advantage that when a closure reference is conditionally not
+done, then the closure consing will never be done at all.  The corresponding
+disadvantage is that a closure over the same values may be created multiple
+times if there are multiple references.  Note however, that VMR loop and common
+subexpression optimizations can eliminate redundant closure consing.  In any
+case, multiple closures over the same variables doesn't seem to be that common.
+
+\#|
+Having the Tail-Info would also make return convention determination trivial.
+We could just look at the type, checking to see if it represents a fixed number
+of values.  To determine if the standard return convention is necessary to
+preserve tail-recursion, we just iterate over the equivalent functions, looking
+for XEPs and uses in full calls.
+|\#
+
+The Global TN Assignment pass (GTN) can be considered a post-pass to
+environment analysis.  This phase assigns the TNs used to hold local lexical
+variables and pass arguments and return values and determines the value-passing
+strategy used in local calls.
+
+To assign return locations, we look at the function's tail-set.
+
+If the result continuation for an entry point is used as the continuation for a
+full call, then we may need to constrain the continuation's values passing
+convention to the standard one.  This is not necessary when the call is known
+not to be part of a tail-recursive loop (due to being a known function).
+
+Once we have figured out where we must use the standard value passing strategy,
+we can use a more flexible strategy to determine the return locations for local
+functions.  We determine the possible numbers of return values from each
+function by examining the uses of all the result continuations in the
+equivalence class of the result continuation.
+
+If the tail-set type is for a fixed number of
+values, then we return that fixed number of values from all the functions whose
+result continuations are equated.  If the number of values is not fixed, then
+we must use the unknown-values convention, although we are not forced to use
+the standard locations.  We assign the result TNs at this time.
+
+We also use the tail-sets to see what convention we want to use.  What we do is
+use the full convention for any function that has a XEP its tail-set, even if
+we aren't required to do so by a tail-recursive full call, as long as there are
+no non-tail-recursive local calls in the set.  This prevents us from
+gratuitously using a non-standard convention when there is no reason to.
+
+
+\chapter{Local TN assignment}
+
+[Want a different name for this so as not to be confused with the different
+local/global TN representations.  The really interesting stuff in this phase is
+operation selection, values representation selection, return strategy, etc.
+Maybe this phase should be conceptually lumped with GTN as ``implementation
+selection'', since GTN determines call strategies and locations.]
+
+\#|
+
+[\#\#\# I guess I believe that it is OK for VMR conversion to dick the ICR flow
+graph.  An alternative would be to give VMR its very own flow graph, but that
+seems like overkill.
+
+In particular, it would be very nice if a TR local call looked exactly like a
+jump in VMR.  This would allow loop optimizations to be done on loops written
+as recursions.  In addition to making the call block transfer to the head of
+the function rather than to the return, we would also have to do something
+about skipping the part of the function prolog that moves arguments from the
+passing locations, since in a TR call they are already in the right frame.
+
+
+In addition to directly indicating whether a call should be coded with a TR
+variant, the Tail-P annotation flags non-call nodes that can directly return
+the value (an ``advanced return''), rather than moving the value to the result
+continuation and jumping to the return code.  Then (according to policy), we
+can decide to advance all possible returns.  If all uses of the result are
+Tail-P, then LTN can annotate the result continuation as :Unused, inhibiting
+emission of the default return code.
+
+[\#\#\# But not really.  Now there is a single list of templates, and a given
+template has only one policy.]
+
+In LTN, we use the :Safe template as a last resort even when the policy is
+unsafe.  Note that we don't try :Fast-Safe; if this is also a good unsafe
+template, then it should have the unsafe policies explicitly specified.
+
+With a :Fast-Safe template, the result type must be proven to satisfy the
+output type assertion.  This means that a fast-safe template with a fixnum
+output type doesn't need to do fixnum overflow checking.  [\#\#\# Not right to
+just check against the Node-Derived-Type, since type-check intersects with
+this.]
+
+It seems that it would be useful to have a kind of template where the args must
+be checked to be fixnum, but the template checks for overflow and signals an
+error.  In the case where an output assertion is present, this would generate
+better code than conditionally branching off to make a bignum, and then doing a
+type check on the result.
+
+    How do we deal with deciding whether to do a fixnum overflow check?  This
+    is perhaps a more general problem with the interpretation of result type
+    restrictions in templates.  It would be useful to be able to discriminate
+    between the case where the result has been proven to be a fixnum and where
+    it has simply been asserted to be so.
+
+    The semantics of result type restriction is that the result must be proven
+    to be of that type *except* for safe generators, which are assumed to
+    verify the assertion.  That way ``is-fixnum'' case can be a fast-safe
+    generator and the ``should-be-fixnum'' case is a safe generator.  We could
+    choose not to have a safe ``should-be-fixnum'' generator, and let the
+    unrestricted safe generator handle it.  We would then have to do an
+    explicit type check on the result.
+
+    In other words, for all template except Safe, a type restriction on either
+    an argument or result means ``this must be true; if it is not the system may
+    break.''  In contrast, in a Safe template, the restriction means ``If this is
+    not true, I will signal an error.''
+
+    Since the node-derived-type only takes into consideration stuff that can be
+    proved from the arguments, we can use the node-derived-type to select
+    fast-safe templates.  With unsafe policies, we don't care, since the code
+    is supposed to be unsafe.
+
+|\#
+
+Local TN assignment (LTN) assigns all the TNs needed to represent the values of
+continuations.  This pass scans over the code for the component, examining each
+continuation and its destination.  A number of somewhat unrelated things are
+also done at the same time so that multiple passes aren't necessary.
+ -- Determine the Primitive-Type for each continuation value and assigns TNs
+    to hold the values.
+ -- Use policy information to determine the implementation strategy for each
+    call to a known function.
+ -- Clear the type-check flags in continuations whose destinations have safe
+    implementations.
+ -- Determine the value-passing strategy for each continuation: known or
+    unknown.
+ -- Note usage of unknown-values continuations so that stack analysis can tell
+    when stack values must be discarded.
+ 
+If safety is more important than speed and space, then we consider generating
+type checks on the values of nodes whose CONT has the Type-Check flag set.  If
+the destination for the continuation value is safe, then we don't need to do
+a check.  We assume that all full calls are safe, and use the template
+information to determine whether inline operations are safe.
+
+This phase is where compiler policy switches have most of their effect.  The
+speed/space/safety tradeoff can determine which of a number of coding
+strategies are used.  It is important to make the policy choice in VMR
+conversion rather than in code generation because the cost and storage
+requirement information which drives TNBIND will depend strongly on what actual
+VOP is chosen.  In the case of +/FIXNUM, there might be three or more
+implementations, some optimized for speed, some for space, etc.  Some of these
+VOPS might be open-coded and some not.
+
+We represent the implementation strategy for a call by either marking it as a
+full call or annotating it with a ``template'' representing the open-coding
+strategy.  Templates are selected using a two-way dispatch off of operand
+primitive-types and policy.  The general case of LTN is handled by the
+LTN-Annotate function in the function-info, but most functions are handled by a
+table-driven mechanism.  There are four different translation policies that a
+template may have:
+\begin{description}
+\item[Safe]
+        The safest implementation; must do argument type checking.
+
+\item[Small]
+        The (unsafe) smallest implementation.
+
+\item[Fast]
+        The (unsafe) fastest implementation.
+
+\item[Fast-Safe]
+        An implementation optimized for speed, but which does any necessary
+        checks exclusive of argument type checking.  Examples are array bounds
+        checks and fixnum overflow checks.
+\end{description}
+
+Usually a function will have only one or two distinct templates.  Either or
+both of the safe and fast-safe templates may be omitted; if both are specified,
+then they should be distinct.  If there is no safe template and our policy is
+safe, then we do a full call.
+
+We use four different coding strategies, depending on the policy:
+\begin{description}
+\item[Safe:]  safety $>$ space $>$ speed, or
+we want to use the fast-safe template, but there isn't one.
+
+\item[Small:] space $>$ (max speed safety)
+
+\item[Fast:] speed $>$ (max space safety)
+
+\item[Fast-Safe (and type check):] safety $>$ speed $>$ space, or we want to use
+the safe template, but there isn't one.
+\end{description}
+
+``Space'' above is actually the maximum of space and cspeed, under the theory
+that less code will take less time to generate and assemble.  [\#\#\# This could
+lose if the smallest case is out-of-line, and must allocate many linkage
+registers.]
+
+
+\chapter{Control optimization}
+
+In this phase we annotate blocks with drop-throughs.  This controls how code
+generation linearizes code so that drop-throughs are used most effectively.  We
+totally linearize the code here, allowing code generation to scan the blocks
+in the emit order.
+
+There are basically two aspects to this optimization:
+
+\begin{enumerate}
+\item
+Dynamically reducing the number of branches taken v.s. branches not
+taken under the assumption that branches not taken are cheaper.
+\item
+Statically minimizing the number of unconditional branches, saving
+space and presumably time.
+\end{enumerate}
+
+These two goals can conflict, but if they do it seems pretty clear that the
+dynamic optimization should get preference.  The main dynamic optimization is
+changing the sense of a conditional test so that the more commonly taken branch
+is the fall-through case.  The problem is determining which branch is more
+commonly taken.
+
+The most clear-cut case is where one branch leads out of a loop and the other
+is within.  In this case, clearly the branch within the loop should be
+preferred.  The only added complication is that at some point in the loop there
+has to be a backward branch, and it is preferable for this branch to be
+conditional, since an unconditional branch is just a waste of time.
+
+In the absence of such good information, we can attempt to guess which branch
+is more popular on the basis of difference in the cost between the two cases.
+Min-max strategy suggests that we should choose the cheaper alternative, since
+the percentagewise improvement is greater when the branch overhead is
+significant with respect to the cost of the code branched to.  A tractable
+approximation of this is to compare only the costs of the two blocks
+immediately branched to, since this would avoid having to do any hairy graph
+walking to find all the code for the consequent and the alternative.  It might
+be worthwhile discriminating against ultra-expensive functions such as ERROR.
+
+For this to work, we have to detect when one of the options is empty.  In this
+case, the next for one branch is a successor of the other branch, making the
+comparison meaningless.  We use dominator information to detect this situation.
+When a branch is empty, one of the predecessors of the first block in the empty
+branch will be dominated by the first block in the other branch.  In such a
+case we favor the empty branch, since that's about as cheap as you can get.
+
+Statically minimizing branches is really a much more tractable problem, but
+what literature there is makes it look hard.  Clearly the thing to do is to use
+a non-optimal heuristic algorithm.
+
+A good possibility is to use an algorithm based on the depth first ordering.
+We can modify the basic DFO algorithm so that it chooses an ordering which
+favors any drop-thrus that we may choose for dynamic reasons.  When we are
+walking the graph, we walk the desired drop-thru arc last, which will place it
+immediately after us in the DFO unless the arc is a retreating arc.
+
+We scan through the DFO and whenever we find a block that hasn't been done yet,
+we build a straight-line segment by setting the drop-thru to the unreached
+successor block which has the lowest DFN greater than that for the block.  We
+move to the drop-thru block and repeat the process until there is no such
+block.  We then go back to our original scan through the DFO, looking for the
+head of another straight-line segment.
+
+This process will automagically implement all of the dynamic optimizations
+described above as long as we favor the appropriate IF branch when creating the
+DFO.  Using the DFO will prevent us from making the back branch in a loop the
+drop-thru, but we need to be clever about favoring IF branches within loops
+while computing the DFO.  The IF join will be favored without any special
+effort, since we follow through the most favored path until we reach the end.
+
+This needs some knowledge about the target machine, since on most machines
+non-tail-recursive calls will use some sort of call instruction.  In this case,
+the call actually wants to drop through to the return point, rather than
+dropping through to the beginning of the called function.
+
+
+\chapter{VMR conversion}
+
+\#|
+Single-use let var continuation substitution not really correct, since it can
+cause a spurious type error.  Maybe we do want stuff to prove that an NLX can't
+happen after all.  Or go back to the idea of moving a combination arg to the
+ref location, and having that use the ref cont (with its output assertion.)
+This lossage doesn't seem very likely to actually happen, though.
+[\#\#\# must-reach stuff wouldn't work quite as well as combination substitute in
+psetq, etc., since it would fail when one of the new values is random code
+(might unwind.)]
+
+Is this really a general problem with eager type checking?  It seems you could
+argue that there was no type error in this code:
+
+\begin{verbatim}
+      (+ :foo (throw 'up nil))
+\end{verbatim}
+
+But we would signal an error.
+
+
+Emit explicit you-lose operation when we do a move between two non-T ptypes,
+even when type checking isn't on.  Can this really happen?  Seems we should
+treat continuations like this as though type-check was true.  Maybe LTN should
+leave type-check true in this case, even when the policy is unsafe.  (Do a type
+check against NIL?)
+
+At continuation use time, we may in general have to do both a coerce-to-t and a
+type check, allocating two temporary TNs to hold the intermediate results.
+
+
+\section{VMR Control representation}
+
+We represent all control transfer explicitly.  In particular, :Conditional VOPs
+take a single Target continuation and a Not-P flag indicating whether the sense
+of the test is negated.  Then an unconditional Branch VOP will be emitted
+afterward if the other path isn't a drop-through.
+
+So we linearize the code before VMR-conversion.  This isn't a problem,
+since there isn't much change in control flow after VMR conversion (none until
+loop optimization requires introduction of header blocks.)  It does make
+cost-based branch prediction a bit ucky, though, since we don't have any cost
+information in ICR.  Actually, I guess we do have pretty good cost information
+after LTN even before VMR conversion, since the most important thing to know is
+which functions are open-coded.
+
+|\#
+
+VMR preserves the block structure of ICR, but replaces the nodes with a target
+dependent virtual machine (VM) representation.  Different implementations may
+use different VMs without making major changes in the back end.  The two main
+components of VMR are Temporary Names (TNs) and Virtual OPerations (VOPs).  TNs
+represent the locations that hold values, and VOPs represent the operations
+performed on the values.
+
+A ``primitive type'' is a type meaningful at the VM level.  Examples are Fixnum,
+String-Char, Short-Float.  During VMR conversion we use the primitive type of
+an expression to determine both where we can store the result of the expression
+and which type-specific implementations of an operation can be applied to the
+value.  [Ptype is a set of SCs == representation choices and representation
+specific operations]
+
+The VM specific definitions provide functions that do stuff like find the
+primitive type corresponding to a type and test for primitive type subtypep.
+Usually primitive types will be disjoint except for T, which represents all
+types.
+
+The primitive type T is special-cased.  Not only does it overlap with all the
+other types, but it implies a descriptor (``boxed'' or ``pointer'') representation.
+For efficiency reasons, we sometimes want to use
+alternate representations for some objects such as numbers.  The majority of
+operations cannot exploit alternate representations, and would only be
+complicated if they had to be able to convert alternate representations into
+descriptors.  A template can require an operand to be a descriptor by
+constraining the operand to be of type T.
+
+A TN can only represent a single value, so we bare the implementation of MVs at
+this point.  When we know the number of multiple values being handled, we use
+multiple TNs to hold them.  When the number of values is actually unknown, we
+use a convention that is compatible with full function call.
+
+Everything that is done is done by a VOP in VMR.  Calls to simple primitive
+functions such as + and CAR are translated to VOP equivalents by a table-driven
+mechanism.  This translation is specified by the particular VM definition; VMR
+conversion makes no assumptions about which operations are primitive or what
+operand types are worth special-casing.  The default calling mechanisms and
+other miscellaneous builtin features are implemented using standard VOPs that
+must be implemented by each VM.
+
+Type information can be forgotten after VMR conversion, since all type-specific
+operation selections have been made.
+
+Simple type checking is explicitly done using CHECK-xxx VOPs.  They act like
+innocuous effectless/unaffected VOPs which return the checked thing as a
+result.  This allows loop-invariant optimization and common subexpression
+elimination to remove redundant checks.  All type checking is done at the time
+the continuation is used.
+
+Note that we need only check asserted types, since if type inference works, the
+derived types will also be satisfied.  We can check whichever is more
+convenient, since both should be true.
+
+Constants are turned into special Constant TNs, which are wired down in a SC
+that is determined by their type.  The VM definition provides a function that
+returns a constant TN to represent a Constant Leaf. 
+
+Each component has a constant pool.  There is a register dedicated to holding
+the constant pool for the current component.  The back end allocates
+non-immediate constants in the constant pool when it discovers them during
+translation from ICR.
+
+[\#\#\# Check that we are describing what is actually implemented.  But this
+really isn't very good in the presence of interesting unboxed
+representations...] 
+Since LTN only deals with values from the viewpoint of the receiver, we must be
+prepared during the translation pass to do stuff to the continuation at the
+time it is used.
+ -- If a VOP yields more values than are desired, then we must create TNs to
+    hold the discarded results.  An important special-case is continuations
+    whose value is discarded.  These continuations won't be annotated at all.
+    In the case of a Ref, we can simply skip evaluation of the reference when
+    the continuation hasn't been annotated.  Although this will eliminate
+    bogus references that for some reason weren't optimized away, the real
+    purpose is to handle deferred references.
+ -- If a VOP yields fewer values than desired, then we must default the extra
+    values to NIL.
+ -- If a continuation has its type-check flag set, then we must check the type
+    of the value before moving it into the result location.  In general, this
+    requires computing the result in a temporary, and having the type-check
+    operation deliver it in the actual result location.
+ -- If the template's result type is T, then we must generate a boxed
+    temporary to compute the result in when the continuation's type isn't T.
+
+
+We may also need to do stuff to the arguments when we generate code for a
+template.  If an argument continuation isn't annotated, then it must be a
+deferred reference.  We use the leaf's TN instead.  We may have to do any of
+the above use-time actions also.  Alternatively, we could avoid hair by not
+deferring references that must be type-checked or may need to be boxed.
+
+
+\section{Stack analysis}
+
+Think of this as a lifetime problem: a values generator is a write and a values
+receiver is a read.  We want to annotate each VMR-Block with the unknown-values
+continuations that are live at that point.  If we do a control transfer to a
+place where fewer continuations are live, then we must deallocate the newly
+dead continuations.
+
+We want to convince ourselves that values deallocation based on lifetime
+analysis actually works.  In particular, we need to be sure that it doesn't
+violate the required stack discipline.  It is clear that it is impossible to
+deallocate the values before they become dead, since later code may decide to
+use them.  So the only thing we need to ensure is that the ``right'' time isn't
+later than the time that the continuation becomes dead.
+
+The only reason why we couldn't deallocate continuation A as soon as it becomes
+dead would be that there is another continuation B on top of it that isn't dead
+(since we can only deallocate the topmost continuation).
+
+The key to understanding why this can't happen is that each continuation has
+only one read (receiver).  If B is on top of A, then it must be the case that A
+is live at the receiver for B.  This means that it is impossible for B to be
+live without A being live.
+
+
+The reason that we don't solve this problem using a normal iterative flow
+analysis is that we also need to know the ordering of the continuations on the
+stack so that we can do deallocation.  When it comes time to discard values, we
+want to know which discarded continuation is on the bottom so that we can reset
+SP to its start.  
+
+[I suppose we could also decrement SP by the aggregate size of the discarded
+continuations.]  Another advantage of knowing the order in which we expect
+continuations to be on the stack is that it allows us to do some consistency
+checking.  Also doing a localized graph walk around the values-receiver is
+likely to be much more efficient than doing an iterative flow analysis problem
+over all the code in the component (not that big a consideration.)
+
+
+
+\#|
+Actually, what we do is a backward graph walk from each unknown-values
+receiver.   As we go, we mark each walked block with the ordered list of
+continuations we believe are on the stack.  Starting with an empty stack, we:
+ -- When we encounter another unknown-values receiver, we push that
+    continuation on our simulated stack.
+ -- When we encounter a receiver (which had better be for the topmost
+    continuation), we pop that continuation.
+ -- When we pop all continuations, we terminate our walk.
+
+[\#\#\# not quite right...  It seems we may run into ``dead values'' during the
+graph walk too.  It seems that we have to check if the pushed continuation is
+on stack top, and if not, add it to the ending stack so that the post-pass will
+discard it.]
+
+
+
+[\#\#\# Also, we can't terminate our walk just because we hit a block previously
+walked.  We have to compare the End-Stack with the values received along
+the current path: if we have more values on our current walk than on the walk
+that last touched the block, then we need to re-walk the subgraph reachable
+from that block, using our larger set of continuations.  It seems that our
+actual termination condition is reaching a block whose End-Stack is already EQ
+to our current stack.]
+
+
+
+
+
+If at the start, the block containing the values receiver has already been
+walked, we skip the walk for that continuation, since it has already been
+handled by an enclosing values receiver.  Once a walk has started, we
+ignore any signs of a previous walk, clobbering the old result with our own,
+since we enclose that continuation, and the previous walk doesn't take into
+consideration the fact that our values block underlies its own.
+
+When we are done, we have annotated each block with the stack current both at
+the beginning and at the end of that block.  Blocks that aren't walked don't
+have anything on the stack either place (although they may hack MVs
+internally).  
+
+We then scan all the blocks in the component, looking for blocks that have
+predecessors with a different ending stack than that block's starting stack.
+(The starting stack had better be a tail of the predecessor's ending stack.)
+We insert a block intervening between all of these predecessors that sets SP to
+the end of the values for the continuation that should be on stack top.  Of
+course, this pass needn't be done if there aren't any global unknown MVs.
+
+Also, if we find any block that wasn't reached during the walk, but that USEs
+an outside unknown-values continuation, then we know that the DEST can't be
+reached from this point, so the values are unused.  We either insert code to
+pop the values, or somehow mark the code to prevent the values from ever being
+pushed.  (We could cause the popping to be done by the normal pass if we
+iterated over the pushes beforehand, assigning a correct END-STACK.)
+
+[\#\#\# But I think that we have to be a bit clever within blocks, given the
+possibility of blocks being joined.  We could collect some unknown MVs in a
+block, then do a control transfer out of the receiver, and this control
+transfer could be squeezed out by merging blocks.  How about:
+
+\begin{verbatim}
+    (tagbody
+      (return
+       (multiple-value-prog1 (foo)
+	 (when bar
+	   (go UNWIND))))
+
+     UNWIND
+      (return
+       (multiple-value-prog1 (baz)
+	 bletch)))
+\end{verbatim}
+
+But the problem doesn't happen here (can't happen in general?) since a node
+buried within a block can't use a continuation outside of the block.  In fact,
+no block can have more then one PUSH continuation, and this must always be the
+last continuation.  So it is trivially (structurally) true that all pops come
+before any push.
+
+[\#\#\# But not really: the DEST of an embedded continuation may be outside the
+block.  There can be multiple pushes, and we must find them by iterating over
+the uses of MV receivers in LTN.  But it would be hard to get the order right
+this way.  We could easily get the order right if we added the generators as we
+saw the uses, except that we can't guarantee that the continuations will be
+annotated at that point.  (Actually, I think we only need the order for
+consistency checks, but that is probably worthwhile).  I guess the thing to do
+is when we process the receiver, add the generator blocks to the
+Values-Generators, then do a post-pass that re-scans the blocks adding the
+pushes.]
+
+I believe that above concern with a dead use getting mashed inside a block
+can't happen, since the use inside the block must be the only use, and if the
+use isn't reachable from the push, then the use is totally unreachable, and
+should have been deleted, which would prevent it from ever being
+annotated.
+]
+]
+|\#
+
+We find the partial ordering of the values globs for unknown values
+continuations in each environment.  We don't have to scan the code looking for
+unknown values continuations since LTN annotates each block with the
+continuations that were popped and not pushed or pushed and not popped.  This
+is all we need to do the inter-block analysis.
+
+After we have found out what stuff is on the stack at each block boundary, we
+look for blocks with predecessors that have junk on the stack.  For each such
+block, we introduce a new block containing code to restore the stack pointer.
+Since unknown-values continuations are represented as \verb+<start, count>+, we can
+easily pop a continuation using the Start TN.
+
+Note that there is only doubt about how much stuff is on the control stack,
+since only it is used for unknown values.  Any special stacks such as number
+stacks will always have a fixed allocation.
+
+
+\section{Non-local exit}
+
+
+If the starting and ending continuations are not in the same environment, then
+the control transfer is a non-local exit.  In this case just call Unwind with
+the appropriate stack pointer, and let the code at the re-entry point worry
+about fixing things up.
+
+It seems like maybe a good way to organize VMR conversion of NLX would be to
+have environment analysis insert funny functions in new interposed cleanup
+blocks.  The thing is that we need some way for VMR conversion to:
+ 1] Get its hands on the returned values.
+ 2] Do weird control shit.
+ 3] Deliver the values to the original continuation destination.
+I.e. we need some way to interpose arbitrary code in the path of value
+delivery.
+
+What we do is replace the NLX uses of the continuation with another
+continuation that is received by a MV-Call to \%NLX-VALUES in a cleanup block
+that is interposed between the NLX uses and the old continuation's block.  The
+MV-Call uses the original continuation to deliver its values to.  
+
+[Actually, it's not really important that this be an MV-Call, since it has to
+be special-cased by LTN anyway.  Or maybe we would want it to be an MV call.
+If we did normal LTN analysis of an MV call, it would force the returned values
+into the unknown values convention, which is probably pretty convenient for use
+in NLX.
+
+Then the entry code would have to use some special VOPs to receive the unknown
+values.  But we probably need special VOPs for NLX entry anyway, and the code
+can share with the call VOPs.  Also we probably need the technology anyway,
+since THROW will use truly unknown values.]
+
+
+On entry to a dynamic extent that has non-local-exists into it (always at an
+ENTRY node), we take a complete snapshot of the dynamic state:
+
+\begin{itemize}
+\item the top pointers for all stacks
+\item current Catch and Unwind-Protect
+\item current special binding (binding stack pointer in shallow binding)
+\end{itemize}
+
+We insert code at the re-entry point which restores the saved dynamic state.
+All TNs live at an NLX EP are forced onto the stack, so we don't have to restore
+them, and we don't have to worry about getting them saved.
+

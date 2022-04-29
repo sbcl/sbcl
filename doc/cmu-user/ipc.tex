@@ -1,0 +1,414 @@
+\chapter{Interprocess Communication under LISP}
+\label{remote}
+
+\credits{by William Lott and Bill Chiles}
+
+
+\cmucl{} offers a facility for interprocess communication (IPC)
+on top of using Unix system calls and the complications of that level
+of IPC.  There is a simple remote-procedure-call (RPC) package build
+on top of TCP/IP sockets.
+
+
+\section{The REMOTE Package}
+
+The \code{remote} package provides simple RPC facility including
+interfaces for creating servers, connecting to already existing
+servers, and calling functions in other Lisp processes.  The routines
+for establishing a connection between two processes,
+\code{create-request-server} and \code{connect-to-remote-server},
+return \var{wire} structures.  A wire maintains the current state of
+a connection, and all the RPC forms require a wire to indicate where
+to send requests.
+
+
+\subsection{Connecting Servers and Clients}
+
+Before a client can connect to a server, it must know the network address on
+which the server accepts connections.  Network addresses consist of a host
+address or name, and a port number.  Host addresses are either a string of the
+form \code{VANCOUVER.SLISP.CS.CMU.EDU} or a 32 bit unsigned integer.  Port
+numbers are 16 bit unsigned integers.  Note: \var{port} in this context has
+nothing to do with Mach ports and message passing.
+
+When a process wants to receive connection requests (that is, become a
+server), it first picks an integer to use as the port.  Only one server
+(Lisp or otherwise) can use a given port number on a given machine at
+any particular time.  This can be an iterative process to find a free
+port: picking an integer and calling \code{create-request-server}.  This
+function signals an error if the chosen port is unusable.  You will
+probably want to write a loop using \code{handler-case}, catching
+conditions of type error, since this function does not signal more
+specific conditions.
+
+\begin{defun}{wire:}{create-request-server}{%
+    \args{\var{port} \ampoptional{} \var{on-connect}}}
+
+  \code{create-request-server} sets up the current Lisp to accept
+  connections on the given port.  If port is unavailable for any
+  reason, this signals an error.  When a client connects to this port,
+  the acceptance mechanism makes a wire structure and invokes the
+  \var{on-connect} function.  Invoking this function has a couple of
+  purposes, and \var{on-connect} may be \nil{} in which case the
+  system foregoes invoking any function at connect time.
+  
+  The \var{on-connect} function is both a hook that allows you access
+  to the wire created by the acceptance mechanism, and it confirms the
+  connection.  This function takes two arguments, the wire and the
+  host address of the connecting process.  See the section on host
+  addresses below.  When \var{on-connect} is \nil, the request server
+  allows all connections.  When it is non-\nil, the function returns
+  two values, whether to accept the connection and a function the
+  system should call when the connection terminates.  Either value may
+  be \nil, but when the first value is \nil, the acceptance mechanism
+  destroys the wire.
+  
+  \code{create-request-server} returns an object that
+  \code{destroy-request-server} uses to terminate a connection.
+\end{defun}
+
+\begin{defun}{wire:}{destroy-request-server}{\args{\var{server}}}
+  
+  \code{destroy-request-server} takes the result of
+  \code{create-request-server} and terminates that server.  Any
+  existing connections remain intact, but all additional connection
+  attempts will fail.
+\end{defun}
+
+\begin{defun}{wire:}{connect-to-remote-server}{%
+    \args{\var{host} \var{port} \ampoptional{} \var{on-death}}}
+  
+  \code{connect-to-remote-server} attempts to connect to a remote
+  server at the given \var{port} on \var{host} and returns a wire
+  structure if it is successful.  If \var{on-death} is non-\nil, it is
+  a function the system invokes when this connection terminates.
+\end{defun}
+
+
+\subsection{Remote Evaluations}
+
+After the server and client have connected, they each have a wire
+allowing function evaluation in the other process.  This RPC mechanism
+has three flavors: for side-effect only, for a single value, and for
+multiple values.
+
+Only a limited number of data types can be sent across wires as
+arguments for remote function calls and as return values: integers
+inclusively less than 32 bits in length, symbols, lists, and
+\var{remote-objects} (\pxlref{remote-objs}).  The system sends symbols
+as two strings, the package name and the symbol name, and if the
+package doesn't exist remotely, the remote process signals an error.
+The system ignores other slots of symbols.  Lists may be any tree of
+the above valid data types.  To send other data types you must
+represent them in terms of these supported types.  For example, you
+could use \code{prin1-to-string} locally, send the string, and use
+\code{read-from-string} remotely.
+
+\begin{defmac}{wire:}{remote}{%
+    \args{\var{wire} \mstar{call-specs}}}
+  
+  The \code{remote} macro arranges for the process at the other end of
+  \var{wire} to invoke each of the functions in the \var{call-specs}.
+  To make sure the system sends the remote evaluation requests over
+  the wire, you must call \code{wire-force-output}.
+  
+  Each of \var{call-specs} looks like a function call textually, but
+  it has some odd constraints and semantics.  The function position of
+  the form must be the symbolic name of a function.  \code{remote}
+  evaluates each of the argument subforms for each of the
+  \var{call-specs} locally in the current context, sending these
+  values as the arguments for the functions.
+  
+  Consider the following example:
+
+\begin{verbatim}
+(defun write-remote-string (str)
+  (declare (simple-string str))
+  (wire:remote wire
+    (write-string str)))
+\end{verbatim}
+
+  The value of \code{str} in the local process is passed over the wire
+  with a request to invoke \code{write-string} on the value.  The
+  system does not expect to remotely evaluate \code{str} for a value
+  in the remote process.
+\end{defmac}
+
+\begin{defun}{wire:}{wire-force-output}{\args{\var{wire}}}
+  
+  \code{wire-force-output} flushes all internal buffers associated
+  with \var{wire}, sending the remote requests.  This is necessary
+  after a call to \code{remote}.
+\end{defun}
+
+\begin{defmac}{wire:}{remote-value}{\args{\var{wire} \var{call-spec}}}
+  
+  The \code{remote-value} macro is similar to the \code{remote} macro.
+  \code{remote-value} only takes one \var{call-spec}, and it returns
+  the value returned by the function call in the remote process.  The
+  value must be a valid type the system can send over a wire, and
+  there is no need to call \code{wire-force-output} in conjunction
+  with this interface.
+  
+  If client unwinds past the call to \code{remote-value}, the server
+  continues running, but the system ignores the value the server sends
+  back.
+  
+  If the server unwinds past the remotely requested call, instead of
+  returning normally, \code{remote-value} returns two values, \nil{}
+  and \true.  Otherwise this returns the result of the remote
+  evaluation and \nil.
+\end{defmac}
+
+\begin{defmac}{wire:}{remote-value-bind}{%
+    \args{\var{wire} (\mstar{variable}) \var{remote-form}
+      \mstar{local-forms}}}
+  
+  \code{remote-value-bind} is similar to \code{multiple-value-bind}
+  except the values bound come from \var{remote-form}'s evaluation in
+  the remote process.  The \var{local-forms} execute in an implicit
+  \code{progn}.
+  
+  If the client unwinds past the call to \code{remote-value-bind}, the
+  server continues running, but the system ignores the values the
+  server sends back.
+  
+  If the server unwinds past the remotely requested call, instead of
+  returning normally, the \var{local-forms} never execute, and
+  \code{remote-value-bind} returns \nil.
+\end{defmac}
+
+
+\subsection{Remote Objects}
+\label{remote-objs}
+
+The wire mechanism only directly supports a limited number of data
+types for transmission as arguments for remote function calls and as
+return values: integers inclusively less than 32 bits in length,
+symbols, lists.  Sometimes it is useful to allow remote processes to
+refer to local data structures without allowing the remote process
+to operate on the data.  We have \var{remote-objects} to support
+this without the need to represent the data structure in terms of
+the above data types, to send the representation to the remote
+process, to decode the representation, to later encode it again, and
+to send it back along the wire.
+
+You can convert any Lisp object into a remote-object.  When you send
+a remote-object along a wire, the system simply sends a unique token
+for it.  In the remote process, the system looks up the token and
+returns a remote-object for the token.  When the remote process
+needs to refer to the original Lisp object as an argument to a
+remote call back or as a return value, it uses the remote-object it
+has which the system converts to the unique token, sending that
+along the wire to the originating process.  Upon receipt in the
+first process, the system converts the token back to the same
+(\code{eq}) remote-object.
+
+\begin{defun}{wire:}{make-remote-object}{\args{\var{object}}}
+  
+  \code{make-remote-object} returns a remote-object that has
+  \var{object} as its value.  The remote-object can be passed across
+  wires just like the directly supported wire data types.
+\end{defun}
+
+\begin{defun}{wire:}{remote-object-p}{\args{\var{object}}}
+  
+  The function \code{remote-object-p} returns \true{} if \var{object}
+  is a remote object and \nil{} otherwise.
+\end{defun}
+
+\begin{defun}{wire:}{remote-object-local-p}{\args{\var{remote}}}
+  
+  The function \code{remote-object-local-p} returns \true{} if
+  \var{remote} refers to an object in the local process.  This is can
+  only occur if the local process created \var{remote} with
+  \code{make-remote-object}.
+\end{defun}
+
+\begin{defun}{wire:}{remote-object-eq}{\args{\var{obj1} \var{obj2}}}
+  
+  The function \code{remote-object-eq} returns \true{} if \var{obj1} and
+  \var{obj2} refer to the same (\code{eq}) lisp object, regardless of
+  which process created the remote-objects.
+\end{defun}
+
+\begin{defun}{wire:}{remote-object-value}{\args{\var{remote}}}
+  
+  This function returns the original object used to create the given
+  remote object.  It is an error if some other process originally
+  created the remote-object.
+\end{defun}
+
+\begin{defun}{wire:}{forget-remote-translation}{\args{\var{object}}}
+  
+  This function removes the information and storage necessary to
+  translate remote-objects back into \var{object}, so the next
+  \code{gc} can reclaim the memory.  You should use this when you no
+  longer expect to receive references to \var{object}.  If some remote
+  process does send a reference to \var{object},
+  \code{remote-object-value} signals an error.
+\end{defun}
+
+
+% This stuff has been moved to internet.tex.  *** Remove me someday ***
+% \subsection{Host Addresses}
+
+% The operating system maintains a database of all the valid host
+% addresses.  You can use this database to convert between host names
+% and addresses and vice-versa.
+
+% \begin{defun}{ext:}{lookup-host-entry}{\args{\var{host}}}
+  
+%   \code{lookup-host-entry} searches the database for the given
+%   \var{host} and returns a host-entry structure for it.  If it fails
+%   to find \var{host} in the database, it returns \nil.  \var{Host} is
+%   either the address (as an integer) or the name (as a string) of the
+%   desired host.
+% \end{defun}
+
+% \begin{defun}{ext:}{host-entry-name}{\args{\var{host-entry}}}
+%   \defunx[ext:]{host-entry-aliases}{\args{\var{host-entry}}}
+%   \defunx[ext:]{host-entry-addr-list}{\args{\var{host-entry}}}
+%   \defunx[ext:]{host-entry-addr}{\args{\var{host-entry}}}
+
+%   \code{host-entry-name}, \code{host-entry-aliases}, and
+%   \code{host-entry-addr-list} each return the indicated slot from the
+%   host-entry structure.  \code{host-entry-addr} returns the primary
+%   (first) address from the list returned by
+%   \code{host-entry-addr-list}.
+% \end{defun}
+
+
+\section{The WIRE Package}
+
+The \code{wire} package provides for sending data along wires.  The
+\code{remote} package sits on top of this package.  All data sent
+with a given output routine must be read in the remote process with
+the complementary fetching routine.  For example, if you send so a
+string with \code{wire-output-string}, the remote process must know
+to use \code{wire-get-string}.  To avoid rigid data transfers and
+complicated code, the interface supports sending
+\var{tagged} data.  With tagged data, the system sends a tag
+announcing the type of the next data, and the remote system takes
+care of fetching the appropriate type.
+
+When using interfaces at the wire level instead of the RPC level,
+the remote process must read everything sent by these routines.  If
+the remote process leaves any input on the wire, it will later
+mistake the data for an RPC request causing unknown lossage.
+
+
+\subsection{Untagged Data}
+
+When using these routines both ends of the wire know exactly what types are
+coming and going and in what order. This data is restricted to the following
+types:
+
+\begin{itemize}
+\item
+8 bit unsigned bytes.
+
+\item
+32 bit unsigned bytes.
+
+\item
+32 bit integers.
+
+\item
+simple-strings less than 65535 in length.
+\end{itemize}
+
+\begin{defun}{wire:}{wire-output-byte}{\args{\var{wire} \var{byte}}}
+  \defunx[wire:]{wire-get-byte}{\args{\var{wire}}}
+  \defunx[wire:]{wire-output-number}{\args{\var{wire} \var{number}}}
+  \defunx[wire:]{wire-get-number}{\args{\var{wire} \ampoptional{}
+      \var{signed}}}
+  \defunx[wire:]{wire-output-string}{\args{\var{wire} \var{string}}}
+  \defunx[wire:]{wire-get-string}{\args{\var{wire}}}
+  
+  These functions either output or input an object of the specified
+  data type.  When you use any of these output routines to send data
+  across the wire, you must use the corresponding input routine
+  interpret the data.
+\end{defun}
+
+
+\subsection{Tagged Data}
+
+When using these routines, the system automatically transmits and interprets
+the tags for you, so both ends can figure out what kind of data transfers
+occur.  Sending tagged data allows a greater variety of data types: integers
+inclusively less than 32 bits in length, symbols, lists, and \var{remote-objects}
+(\pxlref{remote-objs}).  The system sends symbols as two strings, the
+package name and the symbol name, and if the package doesn't exist remotely,
+the remote process signals an error.  The system ignores other slots of
+symbols.  Lists may be any tree of the above valid data types.  To send other
+data types you must represent them in terms of these supported types.  For
+example, you could use \code{prin1-to-string} locally, send the string, and use
+\code{read-from-string} remotely.
+
+\begin{defun}{wire:}{wire-output-object}{%
+    \args{\var{wire} \var{object} \ampoptional{} \var{cache-it}}}
+  \defunx[wire:]{wire-get-object}{\args{\var{wire}}}
+  
+  The function \code{wire-output-object} sends \var{object} over
+  \var{wire} preceded by a tag indicating its type.
+  
+  If \var{cache-it} is non-\nil, this function only sends \var{object}
+  the first time it gets \var{object}.  Each end of the wire
+  associates a token with \var{object}, similar to remote-objects,
+  allowing you to send the object more efficiently on successive
+  transmissions.  \var{cache-it} defaults to \true{} for symbols and
+  \nil{} for other types.  Since the RPC level requires function
+  names, a high-level protocol based on a set of function calls saves
+  time in sending the functions' names repeatedly.
+  
+  The function \code{wire-get-object} reads the results of
+  \code{wire-output-object} and returns that object.
+\end{defun}
+
+
+\subsection{Making Your Own Wires}
+
+You can create wires manually in addition to the \code{remote}
+package's interface creating them for you. To create a wire, you need
+a Unix {\em file descriptor}. If you are unfamiliar with Unix file
+descriptors, see section 2 of the Unix manual pages.
+
+\begin{defun}{wire:}{make-wire}{\args{\var{descriptor}}}
+
+  The function \code{make-wire} creates a new wire when supplied with
+  the file descriptor to use for the underlying I/O operations.
+\end{defun}
+
+\begin{defun}{wire:}{wire-p}{\args{\var{object}}}
+  
+  This function returns \true{} if \var{object} is indeed a wire,
+  \nil{} otherwise.
+\end{defun}
+
+\begin{defun}{wire:}{wire-fd}{\args{\var{wire}}}
+  
+  This function returns the file descriptor used by the \var{wire}.
+\end{defun}
+
+
+\section{Out-Of-Band Data}
+
+The TCP/IP protocol allows users to send data asynchronously, otherwise
+known as \var{out-of-band} data.  When using this feature, the operating
+system interrupts the receiving process if this process has chosen to be
+notified about out-of-band data.  The receiver can grab this input
+without affecting any information currently queued on the socket.
+Therefore, you can use this without interfering with any current
+activity due to other wire and remote interfaces.
+
+Unfortunately, most implementations of TCP/IP are broken, so use of
+out-of-band data is limited for safety reasons.  You can only reliably
+send one character at a time.
+
+The Wire package is built on top of \cmucl{}s networking support. In
+view of this, it is possible to use the routines described in section
+\ref{internet-oob} for handling and sending out-of-band data. These
+all take a Unix file descriptor instead of a wire, but you can fetch a
+wire's file descriptor with \code{wire-fd}.

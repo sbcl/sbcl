@@ -38,6 +38,7 @@
   (:info name offset lowtag)
   (:results)
   (:vop-var vop)
+  (:node-var node)
   (:temporary (:sc unsigned-reg) val-temp)
   (:generator 1
     (cond #+ubsan
@@ -50,8 +51,8 @@
                  (or (encode-value-if-immediate value) value)))
           (t
            ;; gencgc does not need to emit the barrier for constructors
-           (unless (member name '(%make-structure-instance make-weak-pointer
-                                  %make-ratio %make-complex))
+           (unless (or (eq name :allocator)
+                       (sb-c::set-slot-old-p node))
              (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value))
            (gen-cell-set (object-slot-ea object offset lowtag) value val-temp)))))
 
@@ -299,8 +300,7 @@
                                 symbol-reg))))
             RETRY))))
 
-  ;; With Symbol-Value, we check that the value isn't the trap object. So
-  ;; Symbol-Value of NIL is NIL.
+  ;; With Symbol-Value, we check that the value isn't the trap object.
     (define-vop (symbol-value)
       (:translate symeval)
       (:policy :fast-safe)

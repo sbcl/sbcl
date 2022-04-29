@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-LINKFLAGS += -O2 -Wl,--export-dynamic
+LINKFLAGS += -Wl,--export-dynamic
 
 ASSEM_SRC = mips-assem.S
 ARCH_SRC = mips-arch.c
@@ -29,7 +29,3 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 endif
 
 GC_SRC = gencgc.c fullcgc.c traceroot.c
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:

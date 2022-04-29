@@ -343,22 +343,18 @@ between the ~A definition and the ~A definition"
                table))
   nil)
 
-;;; Record LAYOUT as the layout for its class, adding it as a subtype
+;;; Record WRAPPER as the layout for its class, adding it as a subtype
 ;;; of all superclasses. This is the operation that "installs" a
 ;;; layout for a class in the type system, clobbering any old layout.
 ;;; However, this does not modify the class namespace; that is a
 ;;; separate operation (think anonymous classes.)
 ;;; -- If INVALIDATE, then all the layouts for any old definition
 ;;;    and subclasses are invalidated, and the SUBCLASSES slot is cleared.
-;;; -- If DESTRUCT-LAYOUT, then this is some old layout, and is to be
-;;;    destructively modified to hold the same type information.
+;;; -- If MODIFY is given, then it is some old layout, and is to be
+;;;    destructively altered to hold the same data as WRAPPER.
 (macrolet ((set-bitmap-from-layout (to-layout from-layout)
-             `(let ((to-index
-                     (+ (type-dd-length sb-vm:layout)
-                        (calculate-extra-id-words (layout-depthoid ,to-layout))))
-                    (from-index
-                     (+ (type-dd-length sb-vm:layout)
-                        (calculate-extra-id-words (layout-depthoid ,from-layout)))))
+             `(let ((to-index (bitmap-start ,to-layout))
+                    (from-index (bitmap-start ,from-layout)))
                 (dotimes (i (bitmap-nwords ,from-layout))
                   (%raw-instance-set/word ,to-layout (+ to-index i)
                         (%raw-instance-ref/word ,from-layout (+ from-index i)))))))
@@ -716,11 +712,10 @@ between the ~A definition and the ~A definition"
        (values-specifier-type-cache-clear)))))
 
 (defun find-classoid-cell (name &key create)
-  (let ((real-name (uncross name)))
-    (cond ((info :type :classoid-cell real-name))
-          (create
-           (get-info-value-initializing :type :classoid-cell real-name
-                                        (make-classoid-cell real-name))))))
+  (cond ((info :type :classoid-cell name))
+        (create
+         (get-info-value-initializing :type :classoid-cell name
+                                      (make-classoid-cell name)))))
 
 ;;; Return the classoid with the specified NAME. If ERRORP is false,
 ;;; then NIL is returned when no such class exists.
@@ -1223,7 +1218,10 @@ between the ~A definition and the ~A definition"
           :predicate slot-object-p
           :hierarchical-p nil
           :state :read-only
-          :prototype-form (make-defstruct-description t 'arbitrary))
+          ;; Why is this its prototype-form? It sure looks like SLOT-OBJECT's
+          ;; metaobject has a valid prototype object that is the canonical
+          ;; CLOS object (the usual 2-word thing of layout + slot vector)
+          :prototype-form (make-defstruct-description 'arbitrary 0))
 
          ;; KLUDGE: the length must match the subsequent defstruct.
          (pathname :depth 1

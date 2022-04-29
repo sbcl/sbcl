@@ -136,6 +136,8 @@
 
   (/show0 "entering !COLD-INIT")
   #+sb-show (setq */show* t)
+  (setq sb-kernel::*defstruct-hooks* '(sb-kernel::!bootstrap-defstruct-hook)
+        sb-kernel::*struct-accesss-fragments-delayed* nil)
   (let ((stream (!make-cold-stderr-stream)))
     (setq *error-output* stream
           *standard-output* stream

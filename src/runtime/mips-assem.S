@@ -179,6 +179,7 @@ symbol:
 
 	/* Mark us as in Lisp land. */
 	sw	zero, foreign_function_call_active
+	lw	reg_CARDBASE, gc_card_mark
 
 	/* Jump into lisp land. */
 	jr	reg_LIP
@@ -318,6 +319,7 @@ lra:	.word	RETURN_PC_WIDETAG
 
 	/* Mark us as in Lisp land. */
 	sw	zero, foreign_function_call_active
+	lw	reg_CARDBASE, gc_card_mark
 
 	/* Return to LISP. */
 	jr	reg_LIP

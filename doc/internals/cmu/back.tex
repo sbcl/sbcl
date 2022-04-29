@@ -1,0 +1,728 @@
+% -*- Dictionary: design -*-
+
+\chapter{Copy propagation}
+
+File: {\tt copyprop}
+
+This phase is optional, but should be done whenever speed or space is more
+important than compile speed.  We use global flow analysis to find the reaching
+definitions for each TN.  This information is used here to eliminate
+unnecessary TNs, and is also used later on by loop invariant optimization.
+
+In some cases, VMR conversion will unnecessarily copy the value of a TN into
+another TN, since it may not be able to tell that the initial TN has the same
+value at the time the second TN is referenced.  This can happen when ICR
+optimize is unable to eliminate a trivial variable binding, or when the user
+does a setq, or may also result from creation of expression evaluation
+temporaries during VMR conversion.  Whatever the cause, we would like to avoid
+the unnecessary creation and assignment of these TNs.
+
+What we do is replace TN references whose only reaching definition is a Move
+VOP with a reference to the TN moved from, and then delete the Move VOP if the
+copy TN has no remaining references.  There are several restrictions on copy
+propagation:
+\begin{itemize}
+\item The TNs must be ``ordinary'' TNs, not restricted or otherwise
+unusual.  Extending the life of restricted (or wired) TNs can make register
+allocation impossible.  Some other TN kinds have hidden references.
+
+\item We don't want to defeat source-level debugging by replacing named
+variables with anonymous temporaries.
+
+\item We can't delete moves that representation selected might want to change
+into a representation conversion, since we need the primitive types of both TNs
+to select a conversion.
+\end{itemize}
+
+Some cleverness reduces the cost of flow analysis.  As for lifetime analysis,
+we only need to do flow analysis on global packed TNs.  We can't do the real
+local TN assignment pass before this, since we allocate TNs afterward, so we do
+a pre-pass that marks the TNs that are local for our purposes.  We don't care
+if block splitting eventually causes some of them to be considered global.
+
+Note also that we are really only interested in knowing if there is a
+unique reaching definition, which we can mash into our flow analysis rules by
+doing an intersection.  Then a definition only appears in the set when it is
+unique.  We then propagate only definitions of TNs with only one write, which
+allows the TN to stand for the definition.
+
+
+\chapter{Representation selection}
+
+File: {\tt represent}
+
+Some types of object (such as {\tt single-float}) have multiple possible
+representations.  Multiple representations are useful mainly when there is a
+particularly efficient non-descriptor representation.  In this case, there is
+the normal descriptor representation, and an alternate non-descriptor
+representation.
+
+This possibility brings up two major issues:
+\begin{itemize}
+\item The compiler must decide which representation will be most efficient for
+any given value, and
+
+\item Representation conversion code must be inserted where the representation
+of a value is changed.
+\end{itemize}
+First, the representations for TNs are selected by examining all the TN
+references and attempting to minimize reference costs.  Then representation
+conversion code is introduced.
+
+This phase is in effect a pre-pass to register allocation.  The main reason for
+its existence is that representation conversions may be farily complex (e.g.
+involving memory allocation), and thus must be discovered before register
+allocation.
+
+
+VMR conversion leaves stubs for representation specific move operations.
+Representation selection recognizes {\tt move} by name.  Argument and return
+value passing for call VOPs is controlled by the {\tt :move-arguments} option
+to {\tt define-vop}.
+
+Representation selection is also responsible for determining what functions use
+the number stack.  If any representation is chosen which could involve packing
+into the {\tt non-descriptor-stack} SB, then we allocate the NFP register
+throughout the component.  As an optimization, permit the decision of whether a
+number stack frame needs to be allocated to be made on a per-function basis.
+If a function doesn't use the number stack, and isn't in the same tail-set as
+any function that uses the number stack, then it doesn't need a number stack
+frame, even if other functions in the component do.
+
+
+\chapter{Lifetime analysis}
+
+File: {\tt life}
+
+This phase is a preliminary to Pack.  It involves three passes:
+ -- A pre-pass that computes the DEF and USE sets for live TN analysis, while
+    also assigning local TN numbers, splitting blocks if necessary.  \#\#\# But
+not really...
+ -- A flow analysis pass that does backward flow analysis on the
+    component to find the live TNs at each block boundary.
+ -- A post-pass that finds the conflict set for each TN.
+
+\#|
+Exploit the fact that a single VOP can only exhaust LTN numbers when there are
+large more operands.  Since more operand reference cannot be interleaved with
+temporary reference, the references all effectively occur at the same time.
+This means that we can assign all the more args and all the more results the
+same LTN number and the same lifetime info.
+|\#
+
+
+\section{Flow analysis}
+
+It seems we could use the global-conflicts structures during compute the
+inter-block lifetime information.  The pre-pass creates all the
+global-conflicts for blocks that global TNs are referenced in.  The flow
+analysis pass just adds always-live global-conflicts for the other blocks the
+TNs are live in.  In addition to possibly being more efficient than SSets, this
+would directly result in the desired global-conflicts information, rather than
+having to create it from another representation.
+
+The DFO sorted per-TN global-conflicts thread suggests some kind of algorithm
+based on the manipulation of the sets of blocks each TN is live in (which is
+what we really want), rather than the set of TNs live in each block.
+
+If we sorted the per-TN global-conflicts in reverse DFO (which is just as good
+for determining conflicts between TNs), then it seems we could scan though the
+conflicts simultaneously with our flow-analysis scan through the blocks.
+
+The flow analysis step is the following:
+    If a TN is always-live or read-before-written in a successor block, then we
+    make it always-live in the current block unless there are already
+    global-conflicts recorded for that TN in this block.
+
+The iteration terminates when we don't add any new global-conflicts during a
+pass.
+
+We may also want to promote TNs only read within a block to always-live when
+the TN is live in a successor.  This should be easy enough as long as the
+global-conflicts structure contains this kind of info.
+
+The critical operation here is determining whether a given global TN has global
+conflicts in a given block.  Note that since we scan the blocks in DFO, and the
+global-conflicts are sorted in DFO, if we give each global TN a pointer to the
+global-conflicts for the last block we checked the TN was in, then we can
+guarantee that the global-conflicts we are looking for are always at or after
+that pointer.  If we need to insert a new structure, then the pointer will help
+us rapidly find the place to do the insertion.]
+
+
+\section{Conflict detection}
+
+[\#\#\# Environment, :more TNs.]
+
+This phase makes use of the results of lifetime analysis to find the set of TNs
+that have lifetimes overlapping with those of each TN.  We also annotate call
+VOPs with information about the live TNs so that code generation knows which
+registers need to be saved.
+
+The basic action is a backward scan of each block, looking at each TN-Ref and
+maintaining a set of the currently live TNs.  When we see a read, we check if
+the TN is in the live set.  If not, we:
+ -- Add the TN to the conflict set for every currently live TN,
+ -- Union the set of currently live TNs with the conflict set for the TN, and
+ -- Add the TN to the set of live TNs.
+
+When we see a write for a live TN, we just remove it from the live set.  If we
+see a write to a dead TN, then we update the conflicts sets as for a read, but
+don't add the TN to the live set.  We have to do this so that the bogus write
+doesn't clobber anything.
+
+[We don't consider always-live TNs at all in this process, since the conflict
+of always-live TNs with other TNs in the block is implicit in the
+global-conflicts structures.
+
+Before we do the scan on a block, we go through the global-conflicts structures
+of TNs that change liveness in the block, assigning the recorded LTN number to
+the TN's LTN number for the duration of processing of that block.]
+ 
+
+Efficiently computing and representing this information calls for some
+cleverness.  It would be prohibitively expensive to represent the full conflict
+set for every TN with sparse sets, as is done at the block-level.  Although it
+wouldn't cause non-linear behavior, it would require a complex linked structure
+containing tens of elements to be created for every TN.  Fortunately we can
+improve on this if we take into account the fact that most TNs are ``local'' TNs:
+TNs which have all their uses in one block.
+
+First, many global TNs will be either live or dead for the entire duration of a
+given block.  We can represent the conflict between global TNs live throughout
+the block and TNs local to the block by storing the set of always-live global
+TNs in the block.  This reduces the number of global TNs that must be
+represented in the conflicts for local TNs.
+
+Second, we can represent conflicts within a block using bit-vectors.  Each TN
+that changes liveness within a block is assigned a local TN number.  Local
+conflicts are represented using a fixed-size bit-vector of 64 elements or so
+which has a 1 for the local TN number of every TN live at that time.  The block
+has a simple-vector which maps from local TN numbers to TNs.  Fixed-size
+vectors reduce the hassle of doing allocations and allow operations to be
+open-coded in a maximally tense fashion.
+
+We can represent the conflicts for a local TN by a single bit-vector indexed by
+the local TN numbers for that block, but in the global TN case, we need to be
+able to represent conflicts with arbitrary TNs.  We could use a list-like
+sparse set representation, but then we would have to either special-case global
+TNs by using the sparse representation within the block, or convert the local
+conflicts bit-vector to the sparse representation at the block end.  Instead,
+we give each global TN a list of the local conflicts bit-vectors for each block
+that the TN is live in.  If the TN is always-live in a block, then we record
+that fact instead.  This gives us a major reduction in the amount of work we
+have to do in lifetime analysis at the cost of some increase in the time to
+iterate over the set during Pack.
+
+Since we build the lists of local conflict vectors a block at a time, the
+blocks in the lists for each TN will be sorted by the block number.  The
+structure also contains the local TN number for the TN in that block.  These
+features allow pack to efficiently determine whether two arbitrary TNs
+conflict.  You just scan the lists in order, skipping blocks that are in only
+one list by using the block numbers.  When we find a block that both TNs are
+live in, we just check the local TN number of one TN in the local conflicts
+vector of the other.
+
+In order to do these optimizations, we must do a pre-pass that finds the
+always-live TNs and breaks blocks up into small enough pieces so that we don't
+run out of local TN numbers.  If we can make a block arbitrarily small, then we
+can guarantee that an arbitrarily small number of TNs change liveness within
+the block.  We must be prepared to make the arguments to unbounded arg count
+VOPs (such as function call) always-live even when they really aren't.  This is
+enabled by a panic mode in the block splitter: if we discover that the block
+only contains one VOP and there are still too many TNs that aren't always-live,
+then we promote the arguments (which we'd better be able to do...).
+
+This is done during the pre-scan in lifetime analysis.  We can do this because
+all TNs that change liveness within a block can be found by examining that
+block: the flow analysis only adds always-live TNs.
+
+
+When we are doing the conflict detection pass, we set the LTN number of global
+TNs.  We can easily detect global TNs that have not been locally mapped because
+this slot is initially null for global TNs and we null it out after processing
+each block.  We assign all Always-Live TNs to the same local number so that we
+don't need to treat references to them specially when making the scan.
+
+We also annotate call VOPs that do register saving with the TNs that are live
+during the call, and thus would need to be saved if they are packed in
+registers.
+
+We adjust the costs for TNs that need to be saved so that TNs costing more to
+save and restore than to reference get packed on the stack.  We would also like
+more often saved TNs to get higher costs so that they are packed in more
+savable locations.
+
+
+\chapter{Packing}
+
+File: {\tt pack}
+
+\#|
+
+Add lifetime/pack support for pre-packed save TNs.
+
+Fix GTN/VMR conversion to use pre-packed save TNs for old-cont and return-PC.
+(Will prevent preference from passing location to save location from ever being
+honored?)
+
+We will need to make packing of passing locations smarter before we will be
+able to target the passing location on the stack in a tail call (when that is
+where the callee wants it.)  Currently, we will almost always pack the passing
+location in a register without considering whether that is really a good idea.
+Maybe we should consider schemes that explicitly understand the parallel
+assignment semantics, and try to do the assignment with a minimum number of
+temporaries.  We only need assignment temps for TNs that appear both as an
+actual argument value and as a formal parameter of the called function.  This
+only happens in self-recursive functions.
+
+Could be a problem with lifetime analysis, though.  The write by a move-arg VOP
+would look like a write in the current env, when it really isn't.  If this is a
+problem, then we might want to make the result TN be an info arg rather than a
+real operand.  But this would only be a problem in recursive calls, anyway.
+[This would prevent targeting, but targeting across passing locations rarely
+seems to work anyway.]  [\#\#\# But the :ENVIRONMENT TN mechanism would get
+confused.  Maybe put env explicitly in TN, and have it only always-live in that
+env, and normal in other envs (or blocks it is written in.)  This would allow
+targeting into environment TNs.  
+
+I guess we would also want the env/PC save TNs normal in the return block so
+that we can target them.  We could do this by considering env TNs normal in
+read blocks with no successors.  
+
+ENV TNs would be treated totally normally in non-env blocks, so we don't have
+to worry about lifetime analysis getting confused by variable initializations.
+Do some kind of TN costing to determine when it is more trouble than it is
+worth to allocate TNs in registers.
+
+Change pack ordering to be less pessimal.  Pack TNs as they are seen in the LTN
+map in DFO, which at least in non-block compilations has an effect something
+like packing main trace TNs first, since control analysis tries to put the good
+code first.  This could also reduce spilling, since it makes it less likely we
+will clog all registers with global TNs.
+
+If we pack a TN with a specified save location on the stack, pack in the
+specified location.
+
+Allow old-cont and return-pc to be kept in registers by adding a new ``keep
+around'' kind of TN.  These are kind of like environment live, but are only
+always-live in blocks that they weren't referenced in.  Lifetime analysis does
+a post-pass adding always-live conflicts for each ``keep around'' TN to those
+blocks with no conflict for that TN.  The distinction between always-live and
+keep-around allows us to successfully target old-cont and return-pc to passing
+locations.  MAKE-KEEP-AROUND-TN (ptype), PRE-PACK-SAVE-TN (tn scn offset).
+Environment needs a KEEP-AROUND-TNS slot so that conflict analysis can find
+them (no special casing is needed after then, they can be made with :NORMAL
+kind).  VMR-component needs PRE-PACKED-SAVE-TNS so that conflict analysis or
+somebody can copy conflict info from the saved TN.
+
+
+
+Note that having block granularity in the conflict information doesn't mean
+that a localized packing scheme would have to do all moves at block boundaries
+(which would clash with the desire to have saving done as part of this
+mechanism.)  All that it means is that if we want to do a move within the
+block, we would need to allocate both locations throughout that block (or
+something).
+
+
+
+
+
+Load TN pack:
+
+A location is out for load TN packing if: 
+
+The location has TN live in it after the VOP for a result, or before the VOP
+for an argument, or
+
+The location is used earlier in the TN-ref list (after) the saved results ref
+or later in the TN-Ref list (before) the loaded argument's ref.
+
+To pack load TNs, we advance the live-tns to the interesting VOP, then
+repeatedly scan the vop-refs to find vop-local conflicts for each needed load
+TN.  We insert move VOPs and change over the TN-Ref-TNs as we go so the TN-Refs
+will reflect conflicts with already packed load-TNs.
+
+If we fail to pack a load-TN in the desired SC, then we scan the Live-TNs for
+the SB, looking for a TN that can be packed in an unbounded SB.  This TN must
+then be repacked in the unbounded SB.  It is important the load-TNs are never
+packed in unbounded SBs, since that would invalidate the conflicts info,
+preventing us from repacking TNs in unbounded SBs.  We can't repack in a finite
+SB, since there might have been load TNs packed in that SB which aren't
+represented in the original conflict structures.
+
+Is it permissible to ``restrict'' an operand to an unbounded SC?  Not impossible
+to satisfy as long as a finite SC is also allowed.  But in practice, no
+restriction would probably be as good.
+
+We assume all locations can be used when an sc is based on an unbounded sb.
+
+]
+
+
+TN-Refs are convenient structures to build the target graph out of.  If we
+allocated space in every TN-Ref, then there would certainly be enough to
+represent arbitrary target graphs.  Would it be enough to allocate a single
+Target slot?  If there is a target path through a given VOP, then the Target of
+the write ref would be the read, and vice-versa.  To find all the TNs that
+target us, we look at the TN for the target of all our write refs.
+
+We separately chain together the read refs and the write refs for a TN,
+allowing easy determination of things such as whether a TN has only a single
+definition or has no reads.  It would also allow easier traversal of the target
+graph.
+ 
+Represent per-location conflicts as vectors indexed by block number of
+per-block conflict info.  To test whether a TN conflicts on a location, we
+would then have to iterate over the TNs global-conflicts, using the block
+number and LTN number to check for a conflict in that block.  But since most
+TNs are local, this test actually isn't much more expensive than indexing into
+a bit-vector by GTN numbers.
+
+The big win of this scheme is that it is much cheaper to add conflicts into the
+conflict set for a location, since we never need to actually compute the
+conflict set in a list-like representation (which requires iterating over the
+LTN conflicts vectors and unioning in the always-live TNs).  Instead, we just
+iterate over the global-conflicts for the TN, using BIT-IOR to combine the
+conflict set with the bit-vector for that block in that location, or marking
+that block/location combination as being always-live if the conflict is
+always-live.
+
+Generating the conflict set is inherently more costly, since although we
+believe the conflict set size to be roughly constant, it can easily contain
+tens of elements.  We would have to generate these moderately large lists for
+all TNs, including local TNs.  In contrast, the proposed scheme does work
+proportional to the number of blocks the TN is live in, which is small on
+average (1 for local TNs).  This win exists independently from the win of not
+having to iterate over LTN conflict vectors.
+
+
+[\#\#\# Note that since we never do bitwise iteration over the LTN conflict
+vectors, part of the motivation for keeping these a small fixed size has been
+removed.  But it would still be useful to keep the size fixed so that we can
+easily recycle the bit-vectors, and so that we could potentially have maximally
+tense special primitives for doing clear and bit-ior on these vectors.]
+
+This scheme is somewhat more space-intensive than having a per-location
+bit-vector.  Each vector entry would be something like 150 bits rather than one
+bit, but this is mitigated by the number of blocks being 5-10x smaller than the
+number of TNs.  This seems like an acceptable overhead, a small fraction of the
+total VMR representation.
+
+The space overhead could also be reduced by using something equivalent to a
+two-dimensional bit array, indexed first by LTN numbers, and then block numbers
+(instead of using a simple-vector of separate bit-vectors.)  This would
+eliminate space wastage due to bit-vector overheads, which might be 50% or
+more, and would also make efficient zeroing of the vectors more
+straightforward.  We would then want efficient operations for OR'ing LTN
+conflict vectors with rows in the array.
+
+This representation also opens a whole new range of allocation algorithms: ones
+that store allocate TNs in different locations within different portions of the
+program.  This is because we can now represent a location being used to hold a
+certain TN within an arbitrary subset of the blocks the TN is referenced in.
+
+
+
+
+
+
+
+
+
+Pack goals:
+
+Pack should:
+
+Subject to resource constraints:
+ -- Minimize use costs
+     -- ``Register allocation''
+         Allocate as many values as possible in scarce ``good'' locations,
+         attempting to minimize the aggregate use cost for the entire program.
+     -- ``Save optimization''
+         Don't allocate values in registers when the save/restore costs exceed
+         the expected gain for keeping the value in a register.  (Similar to
+         ``opening costs'' in RAOC.)  [Really just a case of representation
+         selection.]
+
+ -- Minimize preference costs
+    Eliminate as many moves as possible.
+
+
+``Register allocation'' is basically an attempt to eliminate moves between
+registers and memory.  ``Save optimization'' counterbalances ``register
+allocation'' to prevent it from becoming a pessimization, since saves can
+introduce register/memory moves.
+
+Preference optimization reduces the number of moves within an SC.  Doing a good
+job of honoring preferences is important to the success of the compiler, since
+we have assumed in many places that moves will usually be optimized away.
+
+The scarcity-oriented aspect of ``register allocation'' is handled by a greedy
+algorithm in pack.  We try to pack the ``most important'' TNs first, under the
+theory that earlier packing is more likely to succeed due to fewer constraints.
+
+The drawback of greedy algorithms is their inability to look ahead.  Packing a
+TN may mess up later ``register allocation'' by precluding packing of TNs that
+are individually ``less important,'' but more important in aggregate.  Packing a
+TN may also prevent preferences from being honored.
+
+
+
+Initial packing:
+
+
+Pack all TNs restricted to a finite SC first, before packing any other TNs.
+
+One might suppose that Pack would have to treat TNs in different environments
+differently, but this is not the case.  Pack simply assigns TNs to locations so
+that no two conflicting TNs are in the same location.  In the process of
+implementing call semantics in conflict analysis, we cause TNs in different
+environments not to conflict.  In the case of passing TNs, cross environment
+conflicts do exist, but this reflects reality, since the passing TNs are
+live in both the caller and the callee.  Environment semantics has already been
+implemented at this point.
+
+This means that Pack can pack all TNs simultaneously, using one data structure
+to represent the conflicts for each location.  So we have only one conflict set
+per SB location, rather than separating this information by environment.
+
+
+Load TN packing:
+
+We create load TNs as needed in a post-pass to the initial packing.  After TNs
+are packed, it may be that some references to a TN will require it to be in a
+SC other than the one it was packed in.  We create load-TNs and pack them on
+the fly during this post-pass.  
+
+What we do is have an optional SC restriction associated with TN-refs.  If we
+pack the TN in an SC which is different from the required SC for the reference,
+then we create a TN for each such reference, and pack it into the required SC.
+
+In many cases we will be able to pack the load TN with no hassle, but in
+general we may need to spill a TN that has already been packed.  We choose a
+TN that isn't in use by the offending VOP, and then spill that TN onto the
+stack for the duration of that VOP.  If the VOP is a conditional, then we must
+insert a new block interposed before the branch target so that the TN
+value is restored regardless of which branch is taken.
+
+Instead of remembering lifetime information from conflict analysis, we rederive
+it.  We scan each block backward while keeping track of which locations have
+live TNs in them.  When we find a reference that needs a load TN packed, we try
+to pack it in an unused location.  If we can't, we unpack the currently live TN
+with the lowest cost and force it into an unbounded SC.
+
+The per-location and per-TN conflict information used by pack doesn't
+need to be updated when we pack a load TN, since we are done using those data
+structures.
+
+We also don't need to create any TN-Refs for load TNs.  [??? How do we keep
+track of load-tn lifetimes?  It isn't really that hard, I guess.  We just
+remember which load TNs we created at each VOP, killing them when we pass the
+loading (or saving) step.  This suggests we could flush the Refs thread if we
+were willing to sacrifice some flexibility in explicit temporary lifetimes.
+Flushing the Refs would make creating the VMR representation easier.]
+
+The lifetime analysis done during load-TN packing doubles as a consistency
+check.  If we see a read of a TN packed in a location which has a different TN
+currently live, then there is a packing bug.  If any of the TNs recorded as
+being live at the block beginning are packed in a scarce SB, but aren't current
+in that location, then we also have a problem.
+
+The conflict structure for load TNs is fairly simple, the load TNs for
+arguments and results all conflict with each other, and don't conflict with
+much else.  We just try packing in targeted locations before trying at random.
+
+
+
+\chapter{Code generation}
+
+This is fairly straightforward.  We translate VOPs into instruction sequences
+on a per-block basis.
+
+After code generation, the VMR representation is gone.  Everything is
+represented by the assembler data structures.
+
+
+\chapter{Assembly}
+
+In effect, we do much of the work of assembly when the compiler is compiled.
+
+The assembler makes one pass fixing up branch offsets, then squeezes out the
+space left by branch shortening and dumps out the code along with the load-time
+fixup information.  The assembler also deals with dumping unboxed non-immediate
+constants and symbols.  Boxed constants are created by explicit constructor
+code in the top-level form, while immediate constants are generated using
+inline code.
+
+[\#\#\# The basic output of the assembler is:
+    A code vector
+    A representation of the fixups along with indices into the code vector for
+      the fixup locations
+    A PC map translating PCs into source paths
+
+This information can then be used to build an output file or an in-core
+function object.
+]
+
+The assembler is table-driven and supports arbitrary instruction formats.  As
+far as the assembler is concerned, an instruction is a bit sequence that is
+broken down into subsequences.  Some of the subsequences are constant in value,
+while others can be determined at assemble or load time.
+
+\begin{verbatim}
+Assemble Node Form*
+    Allow instructions to be emitted during the evaluation of the Forms by
+    defining Inst as a local macro.  This macro caches various global
+    information in local variables.  Node tells the assembler what node
+    ultimately caused this code to be generated.  This is used to create the
+    pc=>source map for the debugger.
+
+Assemble-Elsewhere Node Form*
+    Similar to Assemble, but the current assembler location is changed to
+    somewhere else.  This is useful for generating error code and similar
+    things.  Assemble-Elsewhere may not be nested.
+
+Inst Name Arg*
+    Emit the instruction Name with the specified arguments.
+
+Gen-Label
+Emit-Label (Label)
+    Gen-Label returns a Label object, which describes a place in the code.
+    Emit-Label marks the current position as being the location of Label.
+\end{verbatim}
+
+
+
+\chapter{Dumping}
+
+So far as input to the dumper/loader, how about having a list of Entry-Info
+structures in the VMR-Component?  These structures contain all information
+needed to dump the associated function objects, and are only implicitly
+associated with the functional/XEP data structures.  Load-time constants that
+reference these function objects should specify the Entry-Info, rather than the
+functional (or something).  We would then need to maintain some sort of
+association so VMR conversion can find the appropriate Entry-Info.
+Alternatively, we could initially reference the functional, and then later
+clobber the reference to the Entry-Info.
+
+We have some kind of post-pass that runs after assembly, going through the
+functions and constants, annotating the VMR-Component for the benefit of the
+dumper:
+    Resolve :Label load-time constants.
+    Make the debug info.
+    Make the entry-info structures.
+
+Fasl dumper and in-core loader are implementation (but not instruction set)
+dependent, so we want to give them a clear interface.
+
+\begin{verbatim}
+open-fasl-file name => fasl-file
+    Returns a ``fasl-file'' object representing all state needed by the dumper.
+    We objectify the state, since the fasdumper should be reentrant.  (but
+    could fail to be at first.)
+
+close-fasl-file fasl-file abort-p
+    Close the specified fasl-file.
+
+fasl-dump-component component code-vector length fixups fasl-file
+    Dump the code, constants, etc. for component.  Code-Vector is a vector
+    holding the assembled code.  Length is the number of elements of Vector
+    that are actually in use.  Fixups is a list of conses (offset . fixup)
+    describing the locations and things that need to be fixed up at load time.
+    If the component is a top-level component, then the top-level lambda will
+    be called after the component is loaded.
+
+load-component component code-vector length fixups
+    Like Fasl-Dump-Component, but directly installs the code in core, running
+    any top-level code immediately.  (???) but we need some way to glue
+    together the componenents, since we don't have a fasl table.
+\end{verbatim}
+
+
+
+Dumping:
+
+Dump code for each component after compiling that component, but defer dumping
+of other stuff.  We do the fixups on the code vectors, and accumulate them in
+the table.
+
+We have to grovel the constants for each component after compiling that
+component so that we can fix up load-time constants.  Load-time constants are
+values needed by the code that are computed after code generation/assembly
+time.  Since the code is fixed at this point, load-time constants are always
+represented as non-immediate constants in the constant pool.  A load-time
+constant is distinguished by being a cons (Kind . What), instead of a Constant
+leaf.  Kind is a keyword indicating how the constant is computed, and What is
+some context.
+
+Some interesting load-time constants:
+\begin{verbatim}
+    (:label . <label>)
+        Is replaced with the byte offset of the label within the code-vector.
+
+    (:code-vector . <component>)
+        Is replaced by the component's code-vector.
+
+    (:entry . <function>)
+    (:closure-entry . <function>)
+	Is replaced by the function-entry structure for the specified function.
+	:Entry is how the top-level component gets a handle on the function
+	definitions so that it can set them up.
+\end{verbatim}
+We also need to remember the starting offset for each entry, although these
+don't in general appear as explicit constants.
+
+We then dump out all the :Entry and :Closure-Entry objects, leaving any
+constant-pool pointers uninitialized.  After dumping each :Entry, we dump some
+stuff to let genesis know that this is a function definition.  Then we dump all
+the constant pools, fixing up any constant-pool pointers in the already-dumped
+function entry structures.
+
+The debug-info *is* a constant: the first constant in every constant pool.  But
+the creation of this constant must be deferred until after the component is
+compiled, so we leave a (:debug-info) placeholder.  [Or maybe this is
+implicitly added in by the dumper, being supplied in a VMR-component slot.]
+
+
+    Work out details of the interface between the back-end and the
+    assembler/dumper.
+
+    Support for multiple assemblers concurrently loaded?  (for byte code)
+    
+    We need various mechanisms for getting information out of the assembler.
+
+    We can get entry PCs and similar things into function objects by making a
+    Constant leaf, specifying that it goes in the closure, and then
+    setting the value after assembly.
+
+    We have an operation Label-Value which can be used to get the value of a
+    label after assembly and before the assembler data structures are
+    deallocated.
+
+    The function map can be constructed without any special help from the
+    assembler.  Codegen just has to note the current label when the function
+    changes from one block to the next, and then use the final value of these
+    labels to make the function map.
+
+    Probably we want to do the source map this way too.  Although this will
+    make zillions of spurious labels, we would have to effectively do that
+    anyway.
+
+    With both the function map and the source map, getting the locations right
+    for uses of Elsewhere will be a bit tricky.  Users of Elsewhere will need
+    to know about how these maps are being built, since they must record the
+    labels and corresponding information for the elsewhere range.  It would be
+    nice to have some cooperation from Elsewhere so that this isn't necessary,
+    otherwise some VOP writer will break the rules, resulting in code that is
+    nowhere.
+
+    The Debug-Info and related structures are dumped by consing up the
+    structure and making it be the value of a constant.
+
+    Getting the code vector and fixups dumped may be a bit more interesting.  I
+    guess we want a Dump-Code-Vector function which dumps the code and fixups
+    accumulated by the current assembly, returning a magic object that will
+    become the code vector when it is dumped as a constant.
+]

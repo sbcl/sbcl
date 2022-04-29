@@ -417,6 +417,19 @@
 ;;; equality or emptiness testing.  There's also union, but that's only an
 ;;; optimisation to avoid useless copies in ADD-TEST-CONSTRAINTS and
 ;;; FIND-BLOCK-TYPE-CONSTRAINTS.
+(defmacro do-conset-elements ((constraint conset &optional result) &body body)
+  (let ((index (gensym "INDEX"))
+        (conset-vector (gensym "CONSET-VECTOR"))
+        (universe (gensym "UNIVERSE")))
+    `(let ((,conset-vector (conset-vector ,conset))
+           (,universe *constraint-universe*))
+       (declare (optimize speed))
+       (loop for ,index from (conset-min ,conset) below (conset-max ,conset)
+             do (when (plusp (sbit ,conset-vector ,index))
+                  (let ((,constraint (aref ,universe ,index)))
+                    ,@body))
+             finally (return ,result)))))
+
 (defmacro do-conset-constraints-intersection ((symbol (conset constraints) &optional result)
                                               &body body)
   (let ((min (gensym "MIN"))
@@ -426,18 +439,17 @@
       `(flet ((body (,symbol)
                 (declare (type constraint ,symbol))
                 ,@body))
+         (declare (optimize speed)
+                  (inline body))
          (when ,constraints
            (let ((,min (conset-min ,conset))
                  (,max (conset-max ,conset)))
-             (declare (optimize speed))
-             (map nil (lambda (constraint)
-                        (declare (type constraint constraint))
-                        (let ((number (constraint-number constraint)))
-                          (when (and (<= ,min number)
-                                     (< number ,max)
-                                     (conset-member constraint ,conset))
-                            (body constraint))))
-                  ,constraints)))
+             (loop for constraint across ,constraints
+                   do (let ((number (constraint-number (the constraint constraint))))
+                        (when (and (<= ,min number)
+                                   (< number ,max)
+                                   (conset-member constraint ,conset))
+                          (body constraint))))))
          ,result))))
 
 (defmacro do-eql-vars ((symbol (var constraints) &optional result) &body body)
@@ -932,6 +944,94 @@
         ((xset-member-p 0 xset)
          (make-numeric-type :class 'integer :low 0 :high 0))))
 
+;;; Compute the tightest type possible for a variable given a set of
+;;; CONSTRAINTS.
+(defun type-from-constraints (variable constraints initial-type)
+  ;; FIXME: Try to share some of this logic with CONSTRAIN-REF. It was
+  ;; copied out of that.
+  (let ((type        initial-type)
+        ;; FIXME: see the comment in CONSTRAIN-REF-TYPES. This makes
+        ;; LINE-BREAK-ANNOTATE compile a lot slower in self
+        ;; build. Reconsider whether we want this policy dependent and
+        ;; have that function add LINE-BREAK-ANNOTATE once we merge
+        ;; the functions.
+        (constrain-symbols nil)
+        (not-type    *empty-type*)
+        (not-set     nil)
+        (not-numeric nil)
+        (not-fpz     '()))
+    (flet ((note-not (x)
+             (if (fp-zero-p x)
+                 (push x not-fpz)
+                 (when (or constrain-symbols (null x) (not (symbolp x)))
+                   (when (null not-set)
+                     (setf not-set (alloc-xset)))
+                   (add-to-xset x not-set))))
+           (intersect-result (other-type)
+             (setf type (type-approx-intersection2 type other-type))))
+      (declare (inline intersect-result))
+      (do-propagatable-constraints (con (constraints variable))
+        (let* ((kind (constraint-kind con))
+               (x (constraint-x con))
+               (y (constraint-y con))
+               (not-p (constraint-not-p con))
+               (other (if (eq x variable) y x)))
+          (case kind
+            (typep
+             (cond ((not not-p)
+                    (intersect-result other))
+                   ((member-type-p other)
+                    (mapc-member-type-members #'note-not other))
+                   (t
+                    (setq not-type (type-union not-type other)))))
+            (eql
+             (let ((other-type (leaf-type other)))
+               (cond ((not not-p)
+                      (intersect-result other-type))
+                     ((constant-p other)
+                      (cond ((member-type-p other-type)
+                             (note-not (constant-value other)))
+                            ;; Numeric types will produce interesting
+                            ;; negations, other than just "not equal"
+                            ;; which can be handled by the equality
+                            ;; constraints.
+                            ((numeric-type-p other-type)
+                             (when (null not-numeric)
+                               (setf not-numeric (alloc-xset)))
+                             (add-to-xset (constant-value other) not-numeric)))))))
+            ((< >)
+             (let* ((greater (eq kind '>))
+                    (greater (if not-p (not greater) greater)))
+               (cond ((and (integer-type-p type) (integer-type-p y))
+                      (setf type (constrain-integer-type type y greater not-p)))
+                     ((and (float-type-p type) (float-type-p y))
+                      (setf type (constrain-float-type type y greater not-p)))
+                     ((integer-type-p y)
+                      (let ((real-type (constrain-real-to-integer y greater not-p)))
+                        (when real-type (intersect-result real-type)))))))
+            (=
+             (when (and (numeric-type-p y)
+                        (not not-p))
+               (let* ((low (numeric-type-low y))
+                      (high (numeric-type-high y))
+                      (real (make-numeric-type :low low :high high))
+                      (complex (make-numeric-type :complexp :complex :low low :high high)))
+                 (intersect-result (type-union real complex)))))))))
+    (let* ((negated not-type)
+           (negated (if (and (null not-set) (null not-fpz))
+                        negated
+                        (let ((excluded (make-member-type
+                                         (or not-set (alloc-xset)) not-fpz)))
+                          (type-union negated excluded))))
+           (numeric (when not-numeric
+                      (contiguous-numeric-set-type not-numeric)))
+           (negated (if numeric
+                        (type-union negated numeric)
+                        negated)))
+      (if (eq negated *empty-type*)
+          type
+          (type-difference type negated)))))
+
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly.
@@ -1047,8 +1147,8 @@
                                 (make-member-type not-set not-fpz)))
                   (numeric (contiguous-numeric-set-type not-numeric))
                   (type (type-difference res
-                                         (if  numeric
-                                              (type-union union numeric)
+                                         (if numeric
+                                             (type-union union numeric)
                                              union))))
              ;; CHANGE-CLASS can change the type, lower down to standard-object,
              ;; type propagation for classes is not as important anyway.
@@ -1265,7 +1365,41 @@
                  (if-alternative-constraints last))))
         (block-out pred))))
 
-(defun compute-block-in (block)
+;;; Join the constraints coming from the predecessors of BLOCK on
+;;; every constrained variable into the constraint set IN.
+(defun join-type-constraints (in block)
+  (let ((vars '()))
+    ;; Find some set of constrained variables in the predecessors.
+    (dolist (pred (block-pred block))
+      (let ((out (block-out-for-successor pred block)))
+        (when out
+          (do-conset-elements (con out)
+            (let ((kind  (constraint-kind con))
+                  (y     (constraint-y con))
+                  (not-p (constraint-not-p con)))
+              (when (or (member kind '(typep < >))
+                        (and (eq kind 'eql) (or (not not-p)
+                                                (constant-p y)))
+                        (and (eq kind '=) (and (numeric-type-p y)
+                                               (not not-p))))
+                (pushnew (constraint-x con) vars))))
+          (return))))
+    (dolist (var vars)
+      (let ((in-var-type *empty-type*))
+        (dolist (pred (block-pred block))
+          (let ((out (block-out-for-successor pred block)))
+            (when out
+              (setq in-var-type
+                    (type-union in-var-type
+                                (type-from-constraints var out *universal-type*))))))
+        (unless (eq in-var-type *universal-type*)
+          (conset-adjoin (find-or-create-constraint 'typep
+                                                    var
+                                                    in-var-type
+                                                    nil)
+                         in))))))
+
+(defun compute-block-in (block join-types-p)
   (let ((in nil))
     (dolist (pred (block-pred block))
       ;; If OUT has not been calculated, assume it to be the universal
@@ -1275,10 +1409,12 @@
           (if in
               (conset-intersection in out)
               (setq in (copy-conset out))))))
+    (when join-types-p
+      (join-type-constraints in block))
     (or in (make-conset))))
 
-(defun update-block-in (block)
-  (let ((in (compute-block-in block)))
+(defun update-block-in (block join-types-p)
+  (let ((in (compute-block-in block join-types-p)))
     (cond ((and (block-in block) (conset= in (block-in block)))
            nil)
           (t
@@ -1286,39 +1422,25 @@
 
 ;;; Return two lists: one of blocks that precede all loops and
 ;;; therefore require only one constraint propagation pass and the
-;;; rest. This implementation does not find all such blocks.
-;;;
-;;; A more complete implementation would be:
-;;;
-;;;     (do-blocks (block component)
-;;;       (if (every #'(lambda (pred)
-;;;                      (or (member pred leading-blocks)
-;;;                          (eq pred head)))
-;;;                  (block-pred block))
-;;;           (push block leading-blocks)
-;;;           (push block rest-of-blocks)))
+;;; rest.
 ;;;
 ;;; Trailing blocks that succeed all loops could be found and handled
 ;;; similarly. In practice though, these more complex solutions are
 ;;; slightly worse performancewise.
 (defun leading-component-blocks (component)
   (declare (type component component))
-  (flet ((loopy-p (block)
-           (let ((n (block-number block)))
-             (dolist (pred (block-pred block))
-               (unless (< n (block-number pred))
-                 (return t))))))
-    (let ((leading-blocks ())
-          (rest-of-blocks ())
-          (seen-loop-p ()))
-      (do-blocks (block component)
+  (collect ((leading-blocks) (rest-of-blocks))
+    (do-blocks (block component)
+      (let ((leading t))
+        (dolist (pred (block-pred block))
+          (unless (block-flag pred)
+            (setq leading nil)))
+        (setf (block-flag block) leading)
         (when (block-type-check block)
-          (when (and (not seen-loop-p) (loopy-p block))
-            (setq seen-loop-p t))
-          (if seen-loop-p
-              (push block rest-of-blocks)
-              (push block leading-blocks))))
-      (values (nreverse leading-blocks) (nreverse rest-of-blocks)))))
+          (if leading
+              (leading-blocks block)
+              (rest-of-blocks block)))))
+    (values (leading-blocks) (rest-of-blocks))))
 
 ;;; Append OBJ to the end of LIST as if by NCONC but only if it is not
 ;;; a member already.
@@ -1339,6 +1461,7 @@
              (dolist (block blocks)
                (when (block-type-check block)
                  (setq blocks-to-process (nconc-new block blocks-to-process))))))
+      (clear-flags component)
       (multiple-value-bind (leading-blocks rest-of-blocks)
           (leading-component-blocks component)
         ;; Update every block once to account for changes in the
@@ -1346,20 +1469,30 @@
         ;; after the first pass so we might as well use them and skip
         ;; USE-RESULT-CONSTRAINTS later.
         (dolist (block leading-blocks)
-          (setf (block-in block) (compute-block-in block))
+          (setf (block-in block) (compute-block-in block t))
           (find-block-type-constraints block t))
-        (setq blocks-to-process (copy-list rest-of-blocks))
-        ;; The rest of the blocks.
-        (dolist (block rest-of-blocks)
-          (aver (eq block (pop blocks-to-process)))
-          (setf (block-in block) (compute-block-in block))
-          (enqueue (find-block-type-constraints block nil)))
-        ;; Propagate constraints
-        (loop for block = (pop blocks-to-process)
-              while block do
-              (unless (eq block (component-tail component))
-                (when (update-block-in block)
-                  (enqueue (find-block-type-constraints block nil)))))
+        ;; We can only start joining types on blocks in which
+        ;; constraint propagation might have to run multiple times (to
+        ;; fixpoint) once all type constraints are definitely
+        ;; correct. They may not be the first time around because EQL
+        ;; constraint propagation is optimistic, i.e. un-EQL variables
+        ;; may be considered EQL before constraint propagation is
+        ;; done, hence any inherited type constraints from such
+        ;; constraints will be wrong as well.
+        (dolist (join-types-p '(nil t))
+          (setq blocks-to-process (copy-list rest-of-blocks))
+          ;; The rest of the blocks.
+          (dolist (block rest-of-blocks)
+            (aver (eq block (pop blocks-to-process)))
+            (setf (block-in block) (compute-block-in block join-types-p))
+            (enqueue (find-block-type-constraints block nil)))
+          ;; Propagate constraints
+          (loop for block = (pop blocks-to-process)
+                while block do
+                  (unless (eq block (component-tail component))
+                    (when (update-block-in block join-types-p)
+                      (enqueue (find-block-type-constraints block nil))))))
+
         rest-of-blocks))))
 
 (defun constraint-propagate (component)

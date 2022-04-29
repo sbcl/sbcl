@@ -1,0 +1,21 @@
+\section{Simple Streams}
+\cindex{simple-streams}
+\label{simple-streams}
+
+\cmucl{} includes a partial implementation of \emph{Simple Streams}, a
+protocol that allows user-extensible streams\footnote{This
+implementation was donated by Paul Foley}. The protocol was proposed
+by Franz, Inc. and is intended to replace the \emph{Gray Streams}
+method of extending streams. Simple streams are distributed as a
+\cmucl{} subsystem, that can be loaded into the image by saying
+
+\begin{lisp}
+   (require :simple-streams)
+\end{lisp}
+
+Note that CMUCL's implementation of simple streams is incomplete, and
+in particular is currently missing support for the functions
+\code{read-sequence} and \code{write-sequence}. Please consult the
+\textit{Allegro Common Lisp} documentation for more information on
+simple streams.
+

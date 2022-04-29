@@ -180,7 +180,6 @@
 ;;; Does the TN definitely hold *any* of the 4 pointer types
 (defun pointer-tn-ref-p (tn-ref)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
-       (tn-ref-type tn-ref)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
              (specifier-type '(or fixnum
@@ -196,7 +195,6 @@
 ;;; Does the TN definitely hold an OTHER pointer
 (defun other-pointer-tn-ref-p (tn-ref)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
-       (tn-ref-type tn-ref)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
              (specifier-type '(or fixnum
@@ -206,10 +204,19 @@
                                instance
                                character))))))
 
+(defun fixnum-or-other-pointer-tn-ref-p (tn-ref)
+  (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
+       (not (types-equal-or-intersect
+             (tn-ref-type tn-ref)
+             (specifier-type '(or #+64-bit single-float
+                               function
+                               list
+                               instance
+                               character))))))
+
 (defun not-nil-tn-ref-p (tn-ref)
-  (and (tn-ref-type tn-ref)
-       (not (types-equal-or-intersect (tn-ref-type tn-ref)
-                                      (specifier-type '(eql nil))))))
+  (not (types-equal-or-intersect (tn-ref-type tn-ref)
+                                 (specifier-type '(eql nil)))))
 
 (defun stack-consed-p (object)
   (let ((write (sb-c::tn-writes object))) ; list of write refs
@@ -305,10 +312,13 @@
   (declare (type (unsigned-byte 8) rank))
   (logand (1- rank) array-rank-mask))
 
-(defun compute-object-header (nwords widetag)
-  (let ((array-header-p
-         (or (= widetag simple-array-widetag)
-             (>= widetag complex-base-string-widetag))))
+(defun compute-object-header (nwords widetag-or-metadata)
+  (let* ((widetag (if (typep widetag-or-metadata '(or wrapper defstruct-description))
+                      instance-widetag
+                      widetag-or-metadata))
+         (array-header-p
+          (or (= widetag simple-array-widetag)
+              (>= widetag complex-base-string-widetag))))
     (logior (if array-header-p
                 (let ((rank (- nwords array-dimensions-offset)))
                   (ash (encode-array-rank rank) array-rank-position))
@@ -316,6 +326,10 @@
                   (#.fdefn-widetag 0)
                   (t (ash (1- nwords) (length-field-shift widetag)))))
             widetag)))
+
+;;; Convert # of "big digits" (= words, sometimes called "limbs") to a header value.
+(defmacro bignum-header-for-length (n)
+  (logior (ash n n-widetag-bits) bignum-widetag))
 
 (defmacro id-bits-offset ()
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))

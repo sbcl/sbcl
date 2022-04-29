@@ -119,8 +119,8 @@ the file system."
            (close *dribble-stream*)
            (apply #'install-streams (pop *previous-dribble-streams*)))))
   (values))
-
-;;; DEFmumble helpers
+
+;;;; DEFmumble helpers
 
 (defun %defglobal (name value source-location &optional (doc nil docp))
   (%compiler-defglobal name :always-bound

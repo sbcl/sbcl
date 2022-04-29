@@ -138,5 +138,3 @@
 ;;; The number of bits per element in the assemblers code vector.
 ;;;
 (defparameter *assembly-unit-length* 8)
-
-(defvar *allocation-pointer*)

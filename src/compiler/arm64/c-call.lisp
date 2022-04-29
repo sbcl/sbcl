@@ -200,11 +200,10 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:scs (interior-reg)) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (load-inline-constant res `(:fixup ,foreign-symbol :foreign) lip)))
+    (load-inline-constant res `(:fixup ,foreign-symbol :foreign))))
 
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
@@ -212,19 +211,18 @@
   (:args)
   (:arg-types (:constant simple-string))
   (:info foreign-symbol)
-  (:temporary (:scs (interior-reg)) lip)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-    (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref) lip)
+    (load-inline-constant res `(:fixup ,foreign-symbol :foreign-dataref))
     (inst ldr res (@ res))))
 
-(defun emit-c-call (vop nfp-save temp temp2 lip cfunc function)
+(defun emit-c-call (vop nfp-save temp temp2 cfunc function)
   (let ((cur-nfp (current-nfp-tn vop)))
     (when cur-nfp
       (store-stack-tn nfp-save cur-nfp))
     (if (stringp function)
-        (load-inline-constant cfunc `(:fixup ,function :foreign) lip)
+        (load-inline-constant cfunc `(:fixup ,function :foreign))
         (sc-case function
           (sap-reg (move cfunc function))
           (sap-stack
@@ -242,7 +240,7 @@
 
         (loop for reg in (list r0-offset r1-offset r2-offset r3-offset
                                r4-offset r5-offset r6-offset r7-offset
-                               #-darwin r10-offset)
+                               #-darwin r8-offset)
               do
               (inst mov
                     (make-random-tn
@@ -255,7 +253,7 @@
       #-sb-thread
       (progn
         temp2
-        (load-inline-constant temp '(:fixup "call_into_c" :foreign) lip)
+        (load-inline-constant temp '(:fixup "call_into_c" :foreign))
         (inst blr temp))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
@@ -266,7 +264,7 @@
                       nl4-offset nl5-offset nl6-offset nl7-offset nl8-offset nl9-offset
                       r0-offset r1-offset r2-offset r3-offset
                       r4-offset r5-offset r6-offset r7-offset
-                      #-darwin r10-offset
+                      #-darwin r8-offset
                       #-sb-thread r11-offset))
           (vars))
       (append
@@ -282,16 +280,16 @@
   (:args (function :scs (sap-reg sap-stack))
          (args :more t))
   (:results (results :more t))
-  (:ignore args results)
+  (:ignore args results lr)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:temporary (:sc any-reg :offset r9-offset
                :from (:argument 0) :to (:result 0)) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-  (:temporary (:sc any-reg :offset r8-offset) temp)
+  (:temporary (:sc any-reg :offset #+darwin r8-offset #-darwin r10-offset) temp)
   (:temporary (:sc any-reg :offset lexenv-offset) temp2)
-  (:temporary (:scs (interior-reg)) lip)
   (:vop-var vop)
   (:generator 0
-    (emit-c-call vop nfp-save temp temp2 lip cfunc function))
+    (emit-c-call vop nfp-save temp temp2 cfunc function))
   .
   #. (destroyed-c-registers))
 
@@ -300,7 +298,7 @@
 (define-vop (call-out-named call-out)
   (:args (args :more t))
   (:info function variadic)
-  (:ignore args results variadic))
+  (:ignore args results variadic lr))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

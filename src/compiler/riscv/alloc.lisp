@@ -35,20 +35,23 @@
                       :flag-tn pa-flag
                       :stack-allocate-p (node-stack-allocate-p node)
                       :temp-tn temp)
-          (move ptr res)
-          (dotimes (i (1- cons-cells))
-            (storew (maybe-load (tn-ref-tn things)) ptr
-                    cons-car-slot list-pointer-lowtag)
-            (setf things (tn-ref-across things))
-            (inst addi ptr ptr (pad-data-block cons-size))
-            (storew ptr ptr (- cons-cdr-slot cons-size)
-                    list-pointer-lowtag))
-          (storew (maybe-load (tn-ref-tn things)) ptr
+          (let ((ptr (if (= cons-cells 1)
+                         res
+                         ptr)))
+            (move ptr res)
+            (dotimes (i (1- cons-cells))
+              (storew (maybe-load (tn-ref-tn things)) ptr
                   cons-car-slot list-pointer-lowtag)
-          (storew (if star
-                      (maybe-load (tn-ref-tn (tn-ref-across things)))
-                      null-tn)
-                  ptr cons-cdr-slot list-pointer-lowtag))
+              (setf things (tn-ref-across things))
+              (inst addi ptr ptr (pad-data-block cons-size))
+              (storew ptr ptr (- cons-cdr-slot cons-size)
+                  list-pointer-lowtag))
+            (storew (maybe-load (tn-ref-tn things)) ptr
+                cons-car-slot list-pointer-lowtag)
+            (storew (if star
+                        (maybe-load (tn-ref-tn (tn-ref-across things)))
+                        null-tn)
+                ptr cons-cdr-slot list-pointer-lowtag)))
         (move result res)))))
 
 ;;;; Special purpose inline allocators.

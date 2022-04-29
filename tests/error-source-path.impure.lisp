@@ -137,7 +137,7 @@
    (locally (declare (optimize (safety 0)))
     (defstruct f
       (x (print t) :type fixnum)))
-   (2 2))
+   (1 2 2))
   (assert-condition-source-paths
    (locally (declare (optimize (safety 0)))
      (defstruct f

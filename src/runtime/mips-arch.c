@@ -500,3 +500,16 @@ arch_write_linkage_table_entry(int index, void *target_addr, int datap)
         (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
     *(unsigned int *)reloc_addr = (unsigned int)target_addr;
 }
+
+void gcbarrier_patch_code(void* where, int nbits)
+{
+    // Replicate FIXUP-CODE-OBJECT for fixup kind :SLL-SA.
+    unsigned* pc = where;
+    unsigned inst = pc[0];
+    unsigned next = pc[1];
+    int left_shift = 32 - (GENCGC_CARD_SHIFT + nbits);
+    int right_shift = left_shift + GENCGC_CARD_SHIFT;
+    unsigned preserve_bits = ~(0x1f << 6);
+    pc[0] = (inst & preserve_bits) | (left_shift << 6);
+    pc[1] = (next & preserve_bits) | (right_shift << 6);
+}

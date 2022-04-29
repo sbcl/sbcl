@@ -1,12 +1,40 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.2.2:
-  * platform support: Threads now enabled by default on RISC-V.
+changes relative to sbcl-2.2.3:
+  * enhancement: better constraint propagation in the compiler. Specifically,
+    the compiler can now derive the type of X in control flow join situations
+    such as
+    (LAMBDA (X) (ECASE (1 ...) (2 ...)) X)
+    or
+    (LAMBDA (X) (ETYPECASE (INTEGER ...) (SYMBOL ...)) X)
+    instead of forgetting all information about X after the E(TYPE)CASE.
+  * optimization: inlined functions enclosed in local macro definitions no
+    longer save their entire lexical environment, reducing unnecessary
+    memory retention.
+  * optimization: faster (< integer fixnum) comparisons (ARM64 and x86-64).
+  * platform support:
+    ** RUN-PROGRAM is faster on Linux and FreeBSD if close_range(2) is
+       available.
+  * bug fix: block compilation now interacts more correctly with the creation
+    of new packages.
+  * bug fix: internal compiler error in array reference
+    optimizer. (lp#1966624)
+
+changes in sbcl-2.2.3 relative to sbcl-2.2.2:
   * minor incompatible change: SB-THREAD:MUTEX-OWNER may return :THREAD-DEAD
     if the apparent owner either exited nearly instantly after releasing the
     mutex (and is not now the owner), or died and never released it.
+  * minor incompatible change: building the system with the simple semi-space
+    copying collector is no longer supported.
+  * minor incompatible change: support for PPC/Darwin has been removed.
+  * platform support:
+    ** fix regressions in threads on RISC-V.  (lp#1962598)
+    ** threads are now enabled by default on RISC-V.
+    ** The generational garbage collector is now supported on MIPS.
   * optimization: fasls containing standard object literals are now smaller
     and load more efficiently.
+  * optimization: faster arithmetic (*-+) on word-sized integers when the
+    result is not known to fit into a word (ARM64 and x86-64).
   * bug fix: EQness of constants is now always preserved when block compiling.
 
 changes in sbcl-2.2.2 relative to sbcl-2.2.1:

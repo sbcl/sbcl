@@ -103,8 +103,7 @@
                      :dynamic-space-start
                      #+linux   #x4f000000
                      #+netbsd  #x4f000000
-                     #+openbsd #x4f000000
-                     #+darwin  #x10000000)
+                     #+openbsd #x4f000000)
 
 (defconstant linkage-table-growth-direction :up)
 (defconstant linkage-table-entry-size 16)
@@ -136,13 +135,6 @@
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x5cfff000)))
-
-#+darwin
-(progn
-  #-gencgc
-  (progn
-    (defparameter dynamic-0-space-start #x10000000)
-    (defparameter dynamic-0-space-end   #x3ffff000)))
 
 (defenum (:start 8)
   halt-trap

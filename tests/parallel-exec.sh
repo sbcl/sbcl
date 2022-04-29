@@ -105,7 +105,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   ;; starting them in the batches that filtering places them in.
   (let ((subprocess-count 0)
         (subprocess-list nil)
-        (aggregate-vop-usage (make-hash-table))
+        (aggregate-vop-usage (make-hash-table :test #'equal))
         ;; Start timing only after all the DIRECTORY calls are done (above)
         (start-time (get-internal-real-time))
         (missing-usage)
@@ -194,7 +194,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        ;; table such that integers don't print normally (and can't be parsed).
                        (let ((*print-pretty* nil))
                          (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
-                           (format output "~7d ~s~%" count name)))))
+                           (format output "~7d \"~s\"~%" count name)))))
                    (sb-sprof:stop-profiling)
                    #+test-aprof (progn (sb-aprof::aprof-stop) (sb-aprof:aprof-show))
                    (when (member :allocator-metrics sb-impl:+internal-features+)
@@ -212,7 +212,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
           (let (list)
             (sb-int:dohash ((name vop) sb-c::*backend-template-names*)
               (declare (ignore vop))
-              (push (cons (gethash name aggregate-vop-usage 0) name) list))
+              (push (cons (gethash (prin1-to-string name) aggregate-vop-usage 0) name) list))
             (with-open-file (output (format nil "$logdir/~a" result)
                                             :direction :output
                                             :if-exists :supersede)

@@ -15,6 +15,13 @@
 
 ;;;; DEFSTRUCT-DESCRIPTION
 
+(defconstant +dd-named+      #b000001) ; :NAMED was specified
+(defconstant +dd-printfun+   #b000010) ; :PRINT-FUNCTION was specified
+(defconstant +dd-printobj+   #b000100) ; :PRINT-OBJECT was specified
+(defconstant +dd-pure+       #b001000) ; :PURE T was specified
+(defconstant +dd-varylen+    #b010000)
+(defconstant +dd-nullenv+    #b100000)
+
 ;;; The DEFSTRUCT-DESCRIPTION structure holds compile-time information
 ;;; about a structure type.
 ;;; It is defined prior to WRAPPER because WRAPPER-INFO
@@ -23,9 +30,10 @@
              (:conc-name dd-)
              (:copier nil)
              (:pure t)
-             (:constructor make-defstruct-description (null-lexenv-p name)))
+             (:constructor make-defstruct-description (name flags)))
   ;; name of the structure
   (name (missing-arg) :type symbol :read-only t)
+  (flags 0 :type fixnum) ; see the constants above
   ;; documentation on the structure
   (doc nil :type (or string null))
   ;; prefix for slot names. If NIL, none.
@@ -33,8 +41,6 @@
   ;; All the :CONSTRUCTOR specs and posssibly an implied constructor,
   ;; keyword constructors first, then BOA constructors. NIL if none.
   (constructors () :type list)
-  ;; True if the DEFSTRUCT appeared in a null lexical environment.
-  (null-lexenv-p nil :type boolean :read-only t) ; the safe default is NIL
   ;; name of copying function
   (copier-name nil :type symbol)
   ;; name of type predicate
@@ -59,34 +65,24 @@
   (inherited-accessor-alist () :type list)
   ;; number of data words, including the layout itself if the layout
   ;; requires an entire word (when no immobile-space)
+  ;; Technically this is redundant information: it can be derived from DD-SLOTS
+  ;; by taking the index of the final slot and adding its length in words.
+  ;; If there are no slots, then it's just INSTANCE-DATA-START.
   (length 0 :type index)
   ;; General kind of implementation.
   (type 'structure :type (member structure vector list
                                  funcallable-structure))
 
-  ;; The next three slots are for :TYPE'd structures (which aren't
-  ;; classes, DD-CLASS-P = NIL)
-  ;;
-  ;; vector element type
-  (element-type t)
-  ;; T if :NAMED was explicitly specified, NIL otherwise
-  (named nil :type boolean)
+  ;; If this structure is a classoid, then T if all slots are tagged, * if not.
+  ;; If a vector, the vector element type.
+  ;; If a list, not used.
+  (%element-type t)
   ;; any INITIAL-OFFSET option on this direct type
   (offset nil :type (or index null))
 
-  ;; which :PRINT-mumble option was given, if either was.
-  (print-option nil :type (member nil :print-function :print-object))
   ;; the argument to the PRINT-FUNCTION or PRINT-OBJECT option.
   ;; NIL if the option was given with no argument.
-  (printer-fname nil :type (or cons symbol))
-
-  ;; the value of the :PURE option, used by cheneygc when purifying.
-  ;; This is true if objects of this class are never modified to
-  ;; contain dynamic pointers in their slots or constant-like
-  ;; substructure (and hence can be copied into read-only space by
-  ;; PURIFY).
-  ;; This is only meaningful if DD-CLASS-P = T.
-  (pure nil :type (member t nil)))
+  (printer-fname nil :type (or cons symbol)))
 (declaim (freeze-type defstruct-description))
 (!set-load-form-method defstruct-description (:host :xc :target))
 
@@ -315,8 +311,7 @@
         (when (or (logtest flags (logior +pathname-layout-flag+ +condition-layout-flag+))
                   (and (logtest flags +structure-layout-flag+)
                        dd
-                       (every (lambda (x) (eq (dsd-raw-type x) t))
-                              (dd-slots dd))))
+                       (eq (dd-%element-type dd) 't)))
           (setf flags (logior flags +strictly-boxed-flag+))))
       ;; KLUDGE: I really don't care to make defstruct-with-alternate-metaclass
       ;; any more complicated than necessary. It is unable to express that
@@ -381,17 +376,21 @@
 
 #-sb-xc-host
 (progn
-(declaim (inline bitmap-nwords bitmap-all-taggedp))
+(declaim (inline bitmap-start bitmap-nwords bitmap-all-taggedp))
+(defun bitmap-start (layout)
+  (+ (type-dd-length sb-vm:layout)
+     (calculate-extra-id-words (layout-depthoid layout))))
 (defun bitmap-nwords (layout)
   (declare (sb-vm:layout layout))
-  (- (%instance-length layout) (type-dd-length sb-vm:layout)))
-
+  (- (%instance-length layout)
+     (calculate-extra-id-words (layout-depthoid layout))
+     (type-dd-length sb-vm:layout)))
 (defun bitmap-all-taggedp (layout)
   ;; All bitmaps have at least 1 word; read that first.
-  (and (= (%raw-instance-ref/signed-word layout (type-dd-length sb-vm:layout))
+  (and (= (%raw-instance-ref/signed-word layout (bitmap-start layout))
           +layout-all-tagged+)
        ;; Then check that there are no additional words.
-       (= (%instance-length layout) (1+ (type-dd-length sb-vm:layout)))))
+       (= (bitmap-nwords layout) 1)))
 
 #+metaspace ; If metaspace, then WRAPPER has no flags; they're in the LAYOUT.
 (defmacro wrapper-flags (x) `(layout-flags (wrapper-friend ,x)))

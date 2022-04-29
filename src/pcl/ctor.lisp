@@ -552,12 +552,9 @@
       (multiple-value-bind (form locations names optimizedp)
           (constructor-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
-              (apply
-               (let ((*compiling-optimized-constructor* t))
-                 (handler-bind ((compiler-note #'muffle-warning))
-                   (compile nil `(lambda ,names (declare #.*optimize-speed*)
-                                   ,form))))
-               locations)
+              (apply (let ((*compiling-optimized-constructor* t))
+                       (pcl-compile `(lambda ,names ,form) t))
+                     locations)
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 
 (defun install-optimized-allocator (ctor)
@@ -580,9 +577,7 @@
       (multiple-value-bind (form optimizedp)
           (allocator-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
-              (let ((*compiling-optimized-constructor* t))
-                (handler-bind ((compiler-note #'muffle-warning))
-                  (compile nil form)))
+              (let ((*compiling-optimized-constructor* t)) (pcl-compile form t))
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 
 (defun allocator-function-form (ctor)
@@ -782,12 +777,11 @@
          (wrapper (class-wrapper class)))
     (etypecase class
       (standard-class
-        `(let ((.instance. (%make-instance (1+ sb-vm:instance-data-start)))
+        `(let ((.instance. (%new-instance ,wrapper (1+ sb-vm:instance-data-start)))
                (.slots. (make-array
                          ,(wrapper-length wrapper)
                          ,@(when early-unbound-markers-p
                                  '(:initial-element +slot-unbound+)))))
-           (setf (%instance-wrapper .instance.) ,wrapper)
            (%instance-set .instance. sb-vm:instance-data-start .slots.)
            ,body
            .instance.))

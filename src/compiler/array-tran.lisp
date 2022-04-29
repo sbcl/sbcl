@@ -292,36 +292,35 @@
                       (unsupplied-or-nil displaced-to)
                       (unsupplied-or-nil fill-pointer)))
          (spec
-           (or `(,(if simple 'simple-array 'array)
-                 ;; element-type is usually an LVAR or nil,
-                 ;; but MAKE-WEAK-VECTOR derive-type passes in 'T.
-                 ,(cond ((or (not element-type) (eq element-type 't))
-                         t)
-                        ((ctype-p element-type)
-                         (type-specifier element-type))
-                        ((constant-lvar-p element-type)
-                         (let ((ctype (careful-specifier-type
-                                       (lvar-value element-type))))
-                           (cond
-                             ((or (null ctype) (contains-unknown-type-p ctype)) '*)
-                             (t (upgraded-array-element-type
-                                 (lvar-value element-type))))))
-                        (t
-                         '*))
-                 ,(cond ((constant-lvar-p dims)
-                         (let* ((val (lvar-value dims))
-                                (cdims (ensure-list val)))
-                           (unless (check-array-dimensions val node)
-                             (return-from derive-make-array-type))
-                           (if simple
-                               cdims
-                               (length cdims))))
-                        ((csubtypep (lvar-type dims)
-                                    (specifier-type 'integer))
-                         '(*))
-                        (t
-                         '*)))
-               'array)))
+           `(,(if simple 'simple-array 'array)
+             ;; element-type is usually an LVAR or nil,
+             ;; but MAKE-WEAK-VECTOR derive-type passes in 'T.
+             ,(cond ((or (not element-type) (eq element-type 't))
+                     t)
+                    ((ctype-p element-type)
+                     (type-specifier element-type))
+                    ((constant-lvar-p element-type)
+                     (let ((ctype (careful-specifier-type
+                                   (lvar-value element-type))))
+                       (cond
+                         ((or (null ctype) (contains-unknown-type-p ctype)) '*)
+                         (t (upgraded-array-element-type
+                             (lvar-value element-type))))))
+                    (t
+                     '*))
+             ,(cond ((constant-lvar-p dims)
+                     (let* ((val (lvar-value dims))
+                            (cdims (ensure-list val)))
+                       (unless (check-array-dimensions val node)
+                         (return-from derive-make-array-type))
+                       (if simple
+                           cdims
+                           (length cdims))))
+                    ((csubtypep (lvar-type dims)
+                                (specifier-type 'integer))
+                     '(*))
+                    (t
+                     '*)))))
     (if (and (not simple)
              (or (supplied-and-true adjustable)
                  (supplied-and-true displaced-to)

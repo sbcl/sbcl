@@ -62,10 +62,10 @@ variable: an unreadable object representing the error is printed instead.")
 ;; duplicate defglobal because this file is compiled before "reader"
 (define-load-time-global *standard-readtable* nil)
 
+(define-load-time-global sb-pretty::*standard-pprint-dispatch-table* nil)
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
   (declare (dynamic-extent function))
-  (declare (special sb-pretty::*standard-pprint-dispatch-table*))
   (let ((*package* #.(find-package "COMMON-LISP-USER"))
         (*print-array* t)
         (*print-base* 10)
@@ -1918,92 +1918,109 @@ variable: an unreadable object representing the error is printed instead.")
 #+sb-simd-pack
 (defmethod print-object ((pack simd-pack) stream)
   (cond ((and *print-readably* *read-eval*)
-         (multiple-value-bind (format maker extractor)
-             (etypecase pack
-               ((simd-pack double-float)
-                (values "#.(~S ~S ~S)"
-                        '%make-simd-pack-double #'%simd-pack-doubles))
-               ((simd-pack single-float)
-                (values "#.(~S ~S ~S ~S ~S)"
-                        '%make-simd-pack-single #'%simd-pack-singles))
-               (t
-                (values "#.(~S #X~16,'0X #X~16,'0X)"
-                        '%make-simd-pack-ub64 #'%simd-pack-ub64s)))
-           (multiple-value-call
-               #'format stream format maker (funcall extractor pack))))
+         (format stream "#.(~S #b~3,'0b #x~16,'0X #x~16,'0X)"
+                 '%make-simd-pack
+                 (%simd-pack-tag pack)
+                 (%simd-pack-low pack)
+                 (%simd-pack-high pack)))
         (*print-readably*
          (print-not-readable-error pack stream))
         (t
          (print-unreadable-object (pack stream)
-           (flet ((all-ones-p (value start end &aux (mask (- (ash 1 end) (ash 1 start))))
-                    (= (logand value mask) mask))
-                  (split-num (value start)
-                    (loop
-                       for i from 0 to 3
-                       and v = (ash value (- start)) then (ash v -8)
-                       collect (logand v #xFF))))
-             (multiple-value-bind (low high)
-                 (%simd-pack-ub64s pack)
-               (etypecase pack
-                 ((simd-pack double-float)
-                  (multiple-value-bind (v0 v1) (%simd-pack-doubles pack)
-                    (format stream "~S~@{ ~:[~,13E~;~*TRUE~]~}"
-                            'simd-pack
-                            (all-ones-p low 0 64) v0
-                            (all-ones-p high 0 64) v1)))
-                 ((simd-pack single-float)
-                  (multiple-value-bind (v0 v1 v2 v3) (%simd-pack-singles pack)
-                    (format stream "~S~@{ ~:[~,7E~;~*TRUE~]~}"
-                            'simd-pack
-                            (all-ones-p low 0 32) v0
-                            (all-ones-p low 32 64) v1
-                            (all-ones-p high 0 32) v2
-                            (all-ones-p high 32 64) v3)))
-                 (t
-                  (format stream "~S~@{ ~{ ~2,'0X~}~}"
-                          'simd-pack
-                          (split-num low 0) (split-num low 32)
-                          (split-num high 0) (split-num high 32))))))))))
+           (etypecase pack
+             ((simd-pack double-float)
+              (multiple-value-call #'format stream "~S~@{ ~,13E~}" 'simd-pack
+                (%simd-pack-doubles pack)))
+             ((simd-pack single-float)
+              (multiple-value-call #'format stream "~S~@{ ~,7E~}" 'simd-pack
+                (%simd-pack-singles pack)))
+             ((simd-pack (unsigned-byte 8))
+              (multiple-value-call #'format stream "~S~@{ ~3D~}" 'simd-pack
+                (%simd-pack-ub8s pack)))
+             ((simd-pack (unsigned-byte 16))
+              (multiple-value-call #'format stream "~S~@{ ~5D~}" 'simd-pack
+                (%simd-pack-ub16s pack)))
+             ((simd-pack (unsigned-byte 32))
+              (multiple-value-call #'format stream "~S~@{ ~10D~}" 'simd-pack
+                (%simd-pack-ub32s pack)))
+             ((simd-pack (unsigned-byte 64))
+              (multiple-value-call #'format stream "~S~@{ ~20D~}" 'simd-pack
+                (%simd-pack-ub64s pack)))
+             ((simd-pack (signed-byte 8))
+              (multiple-value-call #'format stream "~S~@{ ~4,@D~}" 'simd-pack
+                (%simd-pack-sb8s pack)))
+             ((simd-pack (signed-byte 16))
+              (multiple-value-call #'format stream "~S~@{ ~6,@D~}" 'simd-pack
+                (%simd-pack-sb16s pack)))
+             ((simd-pack (signed-byte 32))
+              (multiple-value-call #'format stream "~S~@{ ~11@D~}" 'simd-pack
+                (%simd-pack-sb32s pack)))
+             ((simd-pack (signed-byte 64))
+              (multiple-value-call #'format stream "~S~@{ ~20@D~}" 'simd-pack
+                (%simd-pack-sb64s pack))))))))
 
 #+sb-simd-pack-256
 (defmethod print-object ((pack simd-pack-256) stream)
   (cond ((and *print-readably* *read-eval*)
-         (multiple-value-bind (format maker extractor)
-             (etypecase pack
-               ((simd-pack-256 double-float)
-                (values "#.(~@{~S~^ ~})"
-                        '%make-simd-pack-256-double #'%simd-pack-256-doubles))
-               ((simd-pack-256 single-float)
-                (values "#.(~@{~S~^ ~})"
-                        '%make-simd-pack-256-single #'%simd-pack-256-singles))
-               (t
-                (values "#.(~S~@{ #X~16,'0X~})"
-                        '%make-simd-pack-256-ub64 #'%simd-pack-256-ub64s)))
-           (multiple-value-call
-               #'format stream format maker (funcall extractor pack))))
+         (format stream "#.(~S #b~3,'0B #x~16,'0D #x~16,'0D #x~16,'0D #x~16,'0D)"
+                 '%make-simd-pack-256
+                 (%simd-pack-256-tag pack)
+                 (%simd-pack-256-0 pack)
+                 (%simd-pack-256-1 pack)
+                 (%simd-pack-256-2 pack)
+                 (%simd-pack-256-3 pack)))
         (*print-readably*
          (print-not-readable-error pack stream))
         (t
          (print-unreadable-object (pack stream)
            (etypecase pack
              ((simd-pack-256 double-float)
-              (multiple-value-call #'format stream "~S~@{ ~,13E~}"
-                'simd-pack-256
+              (multiple-value-call #'format stream "~S~@{ ~,13E~}" 'simd-pack-256
                 (%simd-pack-256-doubles pack)))
              ((simd-pack-256 single-float)
-              (multiple-value-call #'format stream "~S~@{ ~,7E~}"
-                'simd-pack-256
+              (multiple-value-call #'format stream "~S~@{ ~,7E~}" 'simd-pack-256
                 (%simd-pack-256-singles pack)))
-             (t
-              (multiple-value-bind (p0 p1 p2 p3)
-                  (%simd-pack-256-ub64s pack)
-                (format stream "~S~@{ ~16,'0X~}"
-                        'simd-pack-256
-                        p0 p1 p2 p3))))))))
+             ((simd-pack-256 (unsigned-byte 8))
+              (multiple-value-call #'format stream "~S~@{ ~3D~}" 'simd-pack-256
+                (%simd-pack-256-ub8s pack)))
+             ((simd-pack-256 (unsigned-byte 16))
+              (multiple-value-call #'format stream "~S~@{ ~5D~}" 'simd-pack-256
+                (%simd-pack-256-ub16s pack)))
+             ((simd-pack-256 (unsigned-byte 32))
+              (multiple-value-call #'format stream "~S~@{ ~10D~}" 'simd-pack-256
+                (%simd-pack-256-ub32s pack)))
+             ((simd-pack-256 (unsigned-byte 64))
+              (multiple-value-call #'format stream "~S~@{ ~20D~}" 'simd-pack-256
+                (%simd-pack-256-ub64s pack)))
+             ((simd-pack-256 (signed-byte 8))
+              (multiple-value-call #'format stream "~S~@{ ~4@D~}" 'simd-pack-256
+                (%simd-pack-256-sb8s pack)))
+             ((simd-pack-256 (signed-byte 16))
+              (multiple-value-call #'format stream "~S~@{ ~6@D~}" 'simd-pack-256
+                (%simd-pack-256-sb16s pack)))
+             ((simd-pack-256 (signed-byte 32))
+              (multiple-value-call #'format stream "~S~@{ ~11@D~}" 'simd-pack-256
+                (%simd-pack-256-sb32s pack)))
+             ((simd-pack-256 (signed-byte 64))
+              (multiple-value-call #'format stream "~S~@{ ~20@D~}" 'simd-pack-256
+                (%simd-pack-256-sb64s pack))))))))
 
 ;;;; functions
 
 (defmethod print-object ((object function) stream)
+  (macrolet ((unprintable-instance-p (x)
+               ;; Guard against calling %FUN-FUN if it would return 0.
+               ;; %FUNCALLABLE-INSTANCE-FUN is known to return FUNCTION so determining
+               ;; whether it is actually assigned requires a low-level trick.
+               (let ((s (sb-vm::primitive-object-slot
+                         (sb-vm:primitive-object 'funcallable-instance)
+                         'function)))
+                 `(and (funcallable-instance-p ,x)
+                       (eql 0 (%primitive sb-alien:slot ,x 'function ,(sb-vm:slot-offset s)
+                                          ,sb-vm:fun-pointer-lowtag))))))
+    (when (unprintable-instance-p object)
+      (return-from print-object
+        (print-unreadable-object (object stream :type t :identity t)))))
   (let* ((name (%fun-name object))
          (proper-name-p (and (legal-fun-name-p name) (fboundp name)
                              (eq (fdefinition name) object))))

@@ -339,10 +339,10 @@
     (:nle . 15) (:g . 15))
   #'equal)
 (defconstant-eqx +condition-name-vec+
-  #.(let ((vec (make-array 16 :initial-element nil)))
-      (dolist (cond +conditions+ vec)
-        (when (null (aref vec (cdr cond)))
-          (setf (aref vec (cdr cond)) (car cond)))))
+  (let ((vec (make-array 16 :initial-element nil)))
+    (dolist (cond +conditions+ vec)
+      (when (null (aref vec (cdr cond)))
+        (setf (aref vec (cdr cond)) (car cond)))))
   #'equalp)
 
 ;;; SSE shuffle patterns. The names end in the number of bits of the
@@ -3289,7 +3289,12 @@
 
 (defun sort-inline-constants (constants)
   ;; Each constant is ((size . bits) . label)
-  (stable-sort constants #'> :key (lambda (x) (align-of (car x)))))
+  ;; Jump tables must precede everything else.
+  (let ((jump-tables (remove :jump-table constants :test #'neq :key #'caar))
+        (rest (remove :jump-table constants :key #'caar)))
+    (concatenate 'vector
+                 jump-tables
+                 (stable-sort rest #'> :key (lambda (x) (align-of (car x)))))))
 
 (defun emit-inline-constant (section constant label)
   ;; See comment at CANONICALIZE-INLINE-CONSTANT about how we are

@@ -1,0 +1,4138 @@
+\chapter{Advanced Compiler Use and Efficiency Hints}
+\label{advanced-compiler}
+
+\credits{by Robert MacLachlan}
+
+
+\section{Advanced Compiler Introduction}
+
+In \cmucl{}, as with any language on any computer, the path to efficient
+code starts with good algorithms and sensible programming techniques,
+but to avoid inefficiency pitfalls, you need to know some of this
+implementation's quirks and features.  This chapter is mostly a fairly
+long and detailed overview of what optimizations \python{} does.
+Although there are the usual negative suggestions of inefficient
+features to avoid, the main emphasis is on describing the things that
+programmers can count on being efficient.
+
+The optimizations described here can have the effect of speeding up
+existing programs written in conventional styles, but the potential
+for new programming styles that are clearer and less error-prone is at
+least as significant.  For this reason, several sections end with a
+discussion of the implications of these optimizations for programming
+style.
+
+
+
+\subsection{Types}
+
+\python{}'s support for types is unusual in three major ways:
+\begin{itemize}
+  
+\item Precise type checking encourages the specific use of type
+  declarations as a form of run-time consistency checking.  This
+  speeds development by localizing type errors and giving more
+  meaningful error messages.  \xlref{precise-type-checks}.  \python{}
+  produces completely safe code; optimized type checking maintains
+  reasonable efficiency on conventional hardware
+  (\pxlref{type-check-optimization}.)
+  
+\item Comprehensive support for the \clisp{} type system makes complex
+  type specifiers useful.  Using type specifiers such as \code{or} and
+  \code{member} has both efficiency and robustness advantages.
+  \xlref{advanced-type-stuff}.
+  
+\item Type inference eliminates the need for some declarations, and
+  also aids compile-time detection of type errors.  Given detailed
+  type declarations, type inference can often eliminate type checks
+  and enable more efficient object representations and code sequences.
+  Checking all types results in fewer type checks.  See sections
+  \ref{type-inference} and \ref{non-descriptor}.
+\end{itemize}
+
+
+\subsection{Optimization}
+
+The main barrier to efficient Lisp programs is not that there is no
+efficient way to code the program in Lisp, but that it is difficult to
+arrive at that efficient coding.  \clisp{} is a highly complex
+language, and usually has many semantically equivalent ``reasonable''
+ways to code a given problem.  It is desirable to make all of these
+equivalent solutions have comparable efficiency so that programmers
+don't have to waste time discovering the most efficient solution.
+
+Source level optimization increases the number of efficient ways to
+solve a problem.  This effect is much larger than the increase in the
+efficiency of the ``best'' solution.  Source level optimization
+transforms the original program into a more efficient (but equivalent)
+program.  Although the optimizer isn't doing anything the programmer
+couldn't have done, this high-level optimization is important because:
+
+\begin{itemize} 
+\item The programmer can code simply and directly, rather than
+  obfuscating code to please the compiler.
+  
+\item When presented with a choice of similar coding alternatives, the
+  programmer can chose whichever happens to be most convenient,
+  instead of worrying about which is most efficient.
+\end{itemize}
+
+Source level optimization eliminates the need for macros to optimize
+their expansion, and also increases the effectiveness of inline
+expansion.  See sections \ref{source-optimization} and
+\ref{inline-expansion}.
+
+Efficient support for a safer programming style is the biggest
+advantage of source level optimization.  Existing tuned programs
+typically won't benefit much from source optimization, since their
+source has already been optimized by hand.  However, even tuned
+programs tend to run faster under \python{} because:
+
+\begin{itemize} 
+\item Low level optimization and register allocation provides modest
+  speedups in any program.
+  
+\item Block compilation and inline expansion can reduce function call
+  overhead, but may require some program restructuring.  See sections
+  \ref{inline-expansion}, \ref{local-call} and
+  \ref{block-compilation}.
+  
+\item Efficiency notes will point out important type declarations that
+  are often missed even in highly tuned programs.
+  \xlref{efficiency-notes}.
+  
+\item Existing programs can be compiled safely without prohibitive
+  speed penalty, although they would be faster and safer with added
+  declarations.  \xlref{type-check-optimization}.
+  
+\item The context declaration mechanism allows both space and runtime
+  of large systems to be reduced without sacrificing robustness by
+  semi-automatically varying compilation policy without addition any
+  \code{optimize} declarations to the source.
+  \xlref{context-declarations}.
+  
+\item Byte compilation can be used to dramatically reduce the size of
+  code that is not speed-critical. \xlref{byte-compile}
+\end{itemize}
+
+
+\subsection{Function Call}
+
+The sort of symbolic programs generally written in \llisp{} often
+favor recursion over iteration, or have inner loops so complex that
+they involve multiple function calls.  Such programs spend a larger
+fraction of their time doing function calls than is the norm in other
+languages; for this reason \llisp{} implementations strive to make the
+general (or full) function call as inexpensive as possible.  \python{}
+goes beyond this by providing two good alternatives to full call:
+
+\begin{itemize} 
+\item Local call resolves function references at compile time,
+  allowing better calling sequences and optimization across function
+  calls.  \xlref{local-call}.
+  
+\item Inline expansion totally eliminates call overhead and allows
+  many context dependent optimizations.  This provides a safe and
+  efficient implementation of operations with function semantics,
+  eliminating the need for error-prone macro definitions or manual
+  case analysis.  Although most \clisp{} implementations support
+  inline expansion, it becomes a more powerful tool with \python{}'s
+  source level optimization.  See sections \ref{source-optimization}
+  and \ref{inline-expansion}.
+\end{itemize}
+
+
+Generally, \python{} provides simple implementations for simple uses
+of function call, rather than having only a single calling convention.
+These features allow a more natural programming style:
+
+\begin{itemize} 
+\item Proper tail recursion.  \xlref{tail-recursion}
+  
+\item Relatively efficient closures.
+  
+\item A \code{funcall} that is as efficient as normal named call.
+  
+\item Calls to local functions such as from \code{labels} are
+  optimized:
+\begin{itemize}
+  
+\item Control transfer is a direct jump.
+  
+\item The closure environment is passed in registers rather than heap
+  allocated.
+  
+\item Keyword arguments and multiple values are implemented more
+  efficiently.
+\end{itemize}
+
+\xlref{local-call}.
+\end{itemize}
+
+
+\subsection{Representation of Objects}
+
+Sometimes traditional \llisp{} implementation techniques compare so
+poorly to the techniques used in other languages that \llisp{} can
+become an impractical language choice.  Terrible inefficiencies appear
+in number-crunching programs, since \llisp{} numeric operations often
+involve number-consing and generic arithmetic.  \python{} supports
+efficient natural representations for numbers (and some other types),
+and allows these efficient representations to be used in more
+contexts.  \python{} also provides good efficiency notes that warn
+when a crucial declaration is missing.
+
+See section \ref{non-descriptor} for more about object representations and
+numeric types.  Also \pxlref{efficiency-notes} about efficiency notes.
+
+
+\subsection{Writing Efficient Code}
+\label{efficiency-overview}
+
+Writing efficient code that works is a complex and prolonged process.
+It is important not to get so involved in the pursuit of efficiency
+that you lose sight of what the original problem demands.  Remember
+that:
+\begin{itemize}
+  
+\item The program should be correct\dash{}it doesn't matter how
+  quickly you get the wrong answer.
+  
+\item Both the programmer and the user will make errors, so the
+  program must be robust\dash{}it must detect errors in a way that
+  allows easy correction.
+  
+\item A small portion of the program will consume most of the
+  resources, with the bulk of the code being virtually irrelevant to
+  efficiency considerations.  Even experienced programmers familiar
+  with the problem area cannot reliably predict where these ``hot
+  spots'' will be.
+\end{itemize}
+
+
+
+The best way to get efficient code that is still worth using, is to separate
+coding from tuning.  During coding, you should:
+\begin{itemize}
+  
+\item Use a coding style that aids correctness and robustness without
+  being incompatible with efficiency.
+  
+\item Choose appropriate data structures that allow efficient
+  algorithms and object representations
+  (\pxlref{object-representation}).  Try to make interfaces abstract
+  enough so that you can change to a different representation if
+  profiling reveals a need.
+  
+\item Whenever you make an assumption about a function argument or
+  global data structure, add consistency assertions, either with type
+  declarations or explicit uses of \code{assert}, \code{ecase}, etc.
+\end{itemize}
+
+During tuning, you should:
+\begin{itemize}
+  
+\item Identify the hot spots in the program through profiling (section
+  \ref{profiling}.)
+  
+\item Identify inefficient constructs in the hot spot with efficiency
+  notes, more profiling, or manual inspection of the source.  See
+  sections \ref{general-efficiency} and \ref{efficiency-notes}.
+  
+\item Add declarations and consider the application of optimizations.
+  See sections \ref{local-call}, \ref{inline-expansion} and
+  \ref{non-descriptor}.
+  
+\item If all else fails, consider algorithm or data structure changes.
+  If you did a good job coding, changes will be easy to introduce.
+\end{itemize}
+
+
+\section{More About Types in Python}
+\label{advanced-type-stuff}
+\cpsubindex{types}{in python}
+
+This section goes into more detail describing what types and declarations are
+recognized by \python.  The area where \python{} differs most radically from
+previous \llisp{} compilers is in its support for types:
+\begin{itemize}
+  
+\item Precise type checking helps to find bugs at run time.
+  
+\item Compile-time type checking helps to find bugs at compile time.
+  
+\item Type inference minimizes the need for generic operations, and
+  also increases the efficiency of run time type checking and the
+  effectiveness of compile time type checking.
+  
+\item Support for detailed types provides a wealth of opportunity for
+  operation-specific type inference and optimization.
+\end{itemize}
+
+
+
+\subsection{More Types Meaningful}
+
+\clisp{} has a very powerful type system, but conventional \llisp{}
+implementations typically only recognize the small set of types
+special in that implementation.  In these systems, there is an
+unfortunate paradox: a declaration for a relatively general type like
+\code{fixnum} will be recognized by the compiler, but a highly
+specific declaration such as \code{\w{(integer 3 17)}} is totally
+ignored.
+
+This is obviously a problem, since the user has to know how to specify
+the type of an object in the way the compiler wants it.  A very
+minimal (but rarely satisfied) criterion for type system support is
+that it be no worse to make a specific declaration than to make a
+general one.  \python{} goes beyond this by exploiting a number of
+advantages obtained from detailed type information.
+
+Using more restrictive types in declarations allows the compiler to do
+better type inference and more compile-time type checking.  Also, when
+type declarations are considered to be consistency assertions that
+should be verified (conditional on policy), then complex types are
+useful for making more detailed assertions.
+
+\python{} ``understands'' the list-style \code{or}, \code{member},
+\code{function}, array and number type specifiers.  Understanding
+means that:
+\begin{itemize}
+  
+\item If the type contains more information than is used in a
+  particular context, then the extra information is simply ignored,
+  rather than derailing type inference.
+  
+\item In many contexts, the extra information from these type
+  specifier is used to good effect.  In particular, type checking in
+  \python{} is \var{precise}, so these complex types can be used
+  in declarations to make interesting assertions about functions and
+  data structures (\pxlref{precise-type-checks}.)  More specific
+  declarations also aid type inference and reduce the cost for type
+  checking.
+\end{itemize}
+
+For related information, \pxlref{numeric-types} for numeric types, and
+section \ref{array-types} for array types.
+
+
+\subsection{Canonicalization}
+\cpsubindex{types}{equivalence}
+\cindex{canonicalization of types}
+\cindex{equivalence of types}
+
+When given a type specifier, \python{} will often rewrite it into a
+different (but equivalent) type.  This is the mechanism that \python{}
+uses for detecting type equivalence.  For example, in \python{}'s
+canonical representation, these types are equivalent:
+\begin{example}
+(or list (member :end)) \myequiv (or cons (member nil :end))
+\end{example}
+This has two implications for the user:
+\begin{itemize}
+  
+\item The standard symbol type specifiers for \code{atom},
+  \code{null}, \code{fixnum}, etc., are in no way magical.  The
+  \tindexed{null} type is actually defined to be \code{\w{(member
+      nil)}}, \tindexed{list} is \code{\w{(or cons null)}}, and
+  \tindexed{fixnum} is \code{\w{(signed-byte 30)}}.
+  
+\item When the compiler prints out a type, it may not look like the
+  type specifier that originally appeared in the program.  This is
+  generally not a problem, but it must be taken into consideration
+  when reading compiler error messages.
+\end{itemize}
+
+
+\subsection{Member Types}
+\cindex{member types}
+
+The \tindexed{member} type specifier can be used to represent
+``symbolic'' values, analogous to the enumerated types of Pascal.  For
+example, the second value of \code{find-symbol} has this type:
+\begin{lisp}
+(member :internal :external :inherited nil)
+\end{lisp}
+Member types are very useful for expressing consistency constraints on data
+structures, for example:
+\begin{lisp}
+(defstruct ice-cream
+  (flavor :vanilla :type (member :vanilla :chocolate :strawberry)))
+\end{lisp}
+Member types are also useful in type inference, as the number of members can
+sometimes be pared down to one, in which case the value is a known constant.
+
+
+\subsection{Union Types}
+\cindex{union (\code{or}) types}
+\cindex{or (union) types}
+
+The \tindexed{or} (union) type specifier is understood, and is
+meaningfully applied in many contexts.  The use of \code{or} allows
+assertions to be made about types in dynamically typed programs.  For
+example:
+
+\begin{lisp}
+(defstruct box
+  (next nil :type (or box null))
+  (top :removed :type (or box-top (member :removed))))
+\end{lisp}
+
+The type assertion on the \code{top} slot ensures that an error will be signaled
+when there is an attempt to store an illegal value (such as \kwd{rmoved}.)
+Although somewhat weak, these union type assertions provide a useful input into
+type inference, allowing the cost of type checking to be reduced.  For example,
+this loop is safely compiled with no type checks:
+
+\begin{lisp}
+(defun find-box-with-top (box)
+  (declare (type (or box null) box))
+  (do ((current box (box-next current)))
+      ((null current))
+    (unless (eq (box-top current) :removed)
+      (return current))))
+\end{lisp}
+
+Union types are also useful in type inference for representing types that are
+partially constrained.  For example, the result of this expression:
+\begin{lisp}
+(if foo
+    (logior x y)
+    (list x y))
+\end{lisp}
+can be expressed as \code{\w{(or integer cons)}}.
+
+
+\subsection{The Empty Type}
+\label{empty-type}
+\cindex{NIL type}
+\cpsubindex{empty type}{the}
+\cpsubindex{errors}{result type of}
+
+The type \false{} is also called the empty type, since no object is of
+type \false{}.  The union of no types, \code{(or)}, is also empty.
+\python{}'s interpretation of an expression whose type is \false{} is
+that the expression never yields any value, but rather fails to
+terminate, or is thrown out of.  For example, the type of a call to
+\code{error} or a use of \code{return} is \false{}.  When the type of
+an expression is empty, compile-time type warnings about its value are
+suppressed; presumably somebody else is signaling an error.  If a
+function is declared to have return type \false{}, but does in fact
+return, then (in safe compilation policies) a ``\code{NIL Function
+  returned}'' error will be signaled.  See also the function
+\funref{required-argument}.
+
+
+\subsection{Function Types}
+\label{function-types}
+\cpsubindex{function}{types}
+\cpsubindex{types}{function}
+
+\findexed{function} types are understood in the restrictive sense, specifying:
+\begin{itemize}
+  
+\item The argument syntax that the function must be called with.  This
+  is information about what argument counts are acceptable, and which
+  keyword arguments are recognized.  In \python, warnings about
+  argument syntax are a consequence of function type checking.
+  
+\item The types of the argument values that the caller must pass.  If
+  the compiler can prove that some argument to a call is of a type
+  disallowed by the called function's type, then it will give a
+  compile-time type warning.  In addition to being used for
+  compile-time type checking, these type assertions are also used as
+  output type assertions in code generation.  For example, if
+  \code{foo} is declared to have a \code{fixnum} argument, then the
+  \code{1+} in \w{\code{(foo (1+ x))}} is compiled with knowledge that
+  the result must be a fixnum.
+  
+\item The types the values that will be bound to argument variables in
+  the function's definition.  Declaring a function's type with
+  \code{ftype} implicitly declares the types of the arguments in the
+  definition.  \python{} checks for consistency between the definition
+  and the \code{ftype} declaration.  Because of precise type checking,
+  an error will be signaled when a function is called with an
+  argument of the wrong type.
+  
+\item The type of return value(s) that the caller can expect.  This
+  information is a useful input to type inference.  For example, if a
+  function is declared to return a \code{fixnum}, then when a call to
+  that function appears in an expression, the expression will be
+  compiled with knowledge that the call will return a \code{fixnum}.
+  
+\item The type of return value(s) that the definition must return.
+  The result type in an \code{ftype} declaration is treated like an
+  implicit \code{the} wrapped around the body of the definition.  If
+  the definition returns a value of the wrong type, an error will be
+  signaled.  If the compiler can prove that the function returns the
+  wrong type, then it will give a compile-time warning.
+\end{itemize}
+
+This is consistent with the new interpretation of function types and
+the \code{ftype} declaration in the proposed X3J13
+``function-type-argument-type-semantics'' cleanup.  Note also, that if
+you don't explicitly declare the type of a function using a global
+\code{ftype} declaration, then \python{} will compute a function type
+from the definition, providing a degree of inter-routine type
+inference, \pxlref{function-type-inference}.
+
+
+\subsection{The Values Declaration}
+\cindex{values declaration}
+
+\cmucl{} supports the \code{values} declaration as an extension to
+\clisp.  The syntax of the declaration is 
+{\code{(values \var{type1} \var{type2}$\ldots$\var{typen})}}.  This
+declaration is semantically equivalent to a \code{the} form wrapped
+around the body of the special form in which the \code{values}
+declaration appears. The advantage of \code{values} over
+\findexed{the} is purely syntactic\dash{}it doesn't introduce more
+indentation.  For example:
+
+\begin{example}
+(defun foo (x)
+  (declare (values single-float))
+  (ecase x
+    (:this ...)
+    (:that ...)
+    (:the-other ...)))
+\end{example}
+
+is equivalent to:
+
+\begin{example}
+(defun foo (x)
+  (the single-float
+       (ecase x
+         (:this ...)
+         (:that ...)
+         (:the-other ...))))
+\end{example}
+
+and
+
+\begin{example}
+(defun floor (number &optional (divisor 1))
+  (declare (values integer real))
+  ...)
+\end{example}
+
+is equivalent to:
+
+\begin{example}
+(defun floor (number &optional (divisor 1))
+  (the (values integer real)
+       ...))
+\end{example}
+
+In addition to being recognized by \code{lambda} (and hence by
+\code{defun}), the \code{values} declaration is recognized by all the
+other special forms with bodies and declarations: \code{let},
+\code{let*}, \code{labels} and \code{flet}.  Macros with declarations
+usually splice the declarations into one of the above forms, so they
+will accept this declaration too, but the exact effect of a
+\code{values} declaration will depend on the macro.
+
+If you declare the types of all arguments to a function, and also
+declare the return value types with \code{values}, you have described
+the type of the function.  \python{} will use this argument and result
+type information to derive a function type that will then be applied
+to calls of the function (\pxlref{function-types}.)  This provides a
+way to declare the types of functions that is much less syntactically
+awkward than using the \code{ftype} declaration with a \code{function}
+type specifier.
+
+Although the \code{values} declaration is non-standard, it is
+relatively harmless to use it in otherwise portable code, since any
+warning in non-CMU implementations can be suppressed with the standard
+\code{declaration} proclamation.
+
+
+\subsection{Structure Types}
+\label{structure-types}
+\cindex{structure types}
+\cindex{defstruct types}
+\cpsubindex{types}{structure}
+
+Because of precise type checking, structure types are much better
+supported by \python{} than by conventional compilers:
+
+\begin{itemize}  
+\item The structure argument to structure accessors is precisely
+  checked\dash{}if you call \code{foo-a} on a \code{bar}, an error
+  will be signaled.
+  
+\item The types of slot values are precisely checked\dash{}if you pass
+  the wrong type argument to a constructor or a slot setter, then an
+  error will be signaled.
+\end{itemize}
+
+This error checking is tremendously useful for detecting bugs in
+programs that manipulate complex data structures.
+
+An additional advantage of checking structure types and enforcing slot
+types is that the compiler can safely believe slot type declarations.
+\python{} effectively moves the type checking from the slot access to
+the slot setter or constructor call.  This is more efficient since
+caller of the setter or constructor often knows the type of the value,
+entirely eliminating the need to check the value's type.  Consider
+this example:
+
+\begin{lisp}
+(defstruct coordinate
+  (x nil :type single-float)
+  (y nil :type single-float))
+
+(defun make-it ()
+  (make-coordinate :x 1.0 :y 1.0))
+
+(defun use-it (it)
+  (declare (type coordinate it))
+  (sqrt (expt (coordinate-x it) 2) (expt (coordinate-y it) 2)))
+\end{lisp}
+
+\code{make-it} and \code{use-it} are compiled with no checking on the
+types of the float slots, yet \code{use-it} can use
+\code{single-float} arithmetic with perfect safety.  Note that
+\code{make-coordinate} must still check the values of \code{x} and
+\code{y} unless the call is block compiled or inline expanded
+(\pxlref{local-call}.)  But even without this advantage, it is almost
+always more efficient to check slot values on structure
+initialization, since slots are usually written once and read many
+times.
+
+
+\subsection{The Freeze-Type Declaration}
+\cindex{freeze-type declaration}
+\label{freeze-type}
+
+The \code{extensions:freeze-type} declaration is a \cmucl{} extension that
+enables more efficient compilation of user-defined types by asserting
+that the definition is not going to change.  This declaration may only
+be used globally (with \code{declaim} or \code{proclaim}).  Currently
+\code{freeze-type} only affects structure type testing done by
+\code{typep}, \code{typecase}, etc.  Here is an example:
+
+\begin{lisp}
+(declaim (freeze-type foo bar))
+\end{lisp}
+
+This asserts that the types \code{foo} and \code{bar} and their
+subtypes are not going to change.  This allows more efficient type
+testing, since the compiler can open-code a test for all possible
+subtypes, rather than having to examine the type hierarchy at
+run-time.
+
+
+\subsection{Type Restrictions}
+\cpsubindex{types}{restrictions on}
+
+Avoid use of the \code{and}, \code{not} and \code{satisfies} types in
+declarations, since type inference has problems with them.  When these
+types do appear in a declaration, they are still checked precisely,
+but the type information is of limited use to the compiler.
+\code{and} types are effective as long as the intersection can be
+canonicalized to a type that doesn't use \code{and}.  For example:
+
+\begin{example}
+(and fixnum unsigned-byte)
+\end{example}
+
+is fine, since it is the same as:
+
+\begin{example}
+(integer 0 \var{most-positive-fixnum})
+\end{example}
+
+but this type:
+
+\begin{example}
+(and symbol (not (member :end)))
+\end{example}
+
+will not be fully understood by type interference since the \code{and}
+can't be removed by canonicalization.
+
+Using any of these type specifiers in a type test with \code{typep} or
+\code{typecase} is fine, since as tests, these types can be translated
+into the \code{and} macro, the \code{not} function or a call to the
+satisfies predicate.
+
+
+\subsection{Type Style Recommendations}
+\cindex{style recommendations}
+
+\python{} provides good support for some currently unconventional ways of
+using the \clisp{} type system.  With \python{}, it is desirable to make
+declarations as precise as possible, but type inference also makes
+some declarations unnecessary.  Here are some general guidelines for
+maximum robustness and efficiency:
+\begin{itemize}
+  
+\item Declare the types of all function arguments and structure slots
+  as precisely as possible (while avoiding \code{not}, \code{and} and
+  \code{satisfies}).  Put these declarations in during initial coding
+  so that type assertions can find bugs for you during debugging.
+  
+\item Use the \tindexed{member} type specifier where there are a small
+  number of possible symbol values, for example: \w{\code{(member :red
+      :blue :green)}}.
+  
+\item Use the \tindexed{or} type specifier in situations where the
+  type is not certain, but there are only a few possibilities, for
+  example: \w{\code{(or list vector)}}.
+  
+\item Declare integer types with the tightest bounds that you can,
+  such as \code{\w{(integer 3 7)}}.
+  
+\item Define \findexed{deftype} or \findexed{defstruct} types before
+  they are used.  Definition after use is legal (producing no
+  ``undefined type'' warnings), but type tests and structure
+  operations will be compiled much less efficiently.
+  
+\item Use the \code{extensions:freeze-type} declaration to speed up
+  type testing for structure types which won't have new subtypes added
+  later. \xlref{freeze-type}
+  
+\item In addition to declaring the array element type and simpleness,
+  also declare the dimensions if they are fixed, for example:
+  \begin{example}
+    (simple-array single-float (1024 1024))
+  \end{example}
+  This bounds information allows array indexing for multi-dimensional
+  arrays to be compiled much more efficiently, and may also allow
+  array bounds checking to be done at compile time.
+  \xlref{array-types}.
+
+\item Avoid use of the \findexed{the} declaration within expressions.
+  Not only does it clutter the code, but it is also almost worthless
+  under safe policies.  If the need for an output type assertion is
+  revealed by efficiency notes during tuning, then you can consider
+  \code{the}, but it is preferable to constrain the argument types
+  more, allowing the compiler to prove the desired result type.
+  
+\item Don't bother declaring the type of \findexed{let} or other
+  non-argument variables unless the type is non-obvious.  If you
+  declare function return types and structure slot types, then the
+  type of a variable is often obvious both to the programmer and to
+  the compiler.  An important case where the type isn't obvious, and a
+  declaration is appropriate, is when the value for a variable is
+  pulled out of untyped structure (e.g., the result of \code{car}), or
+  comes from some weakly typed function, such as \code{read}.
+  
+\item Declarations are sometimes necessary for integer loop variables,
+  since the compiler can't always prove that the value is of a good
+  integer type.  These declarations are best added during tuning, when
+  an efficiency note indicates the need.
+\end{itemize}
+
+
+\section{Type Inference}
+\label{type-inference}
+\cindex{type inference}
+\cindex{inference of types}
+\cindex{derivation of types}
+
+Type inference is the process by which the compiler tries to figure
+out the types of expressions and variables, given an inevitable lack
+of complete type information.  Although \python{} does much more type
+inference than most \llisp{} compilers, remember that the more precise
+and comprehensive type declarations are, the more type inference will
+be able to do.
+
+
+\subsection{Variable Type Inference}
+\label{variable-type-inference}
+
+The type of a variable is the union of the types of all the
+definitions.  In the degenerate case of a let, the type of the
+variable is the type of the initial value.  This inferred type is
+intersected with any declared type, and is then propagated to all the
+variable's references.  The types of \findexed{multiple-value-bind}
+variables are similarly inferred from the types of the individual
+values of the values form.
+
+If multiple type declarations apply to a single variable, then all the
+declarations must be correct; it is as though all the types were intersected
+producing a single \tindexed{and} type specifier.  In this example:
+\begin{example}
+(defmacro my-dotimes ((var count) &body body)
+  `(do ((,var 0 (1+ ,var)))
+       ((>= ,var ,count))
+     (declare (type (integer 0 *) ,var))
+     ,@body))
+
+(my-dotimes (i ...)
+  (declare (fixnum i))
+  ...)
+\end{example}
+the two declarations for \code{i} are intersected, so \code{i} is
+known to be a non-negative fixnum.
+
+In practice, this type inference is limited to lets and local
+functions, since the compiler can't analyze all the calls to a global
+function.  But type inference works well enough on local variables so
+that it is often unnecessary to declare the type of local variables.
+This is especially likely when function result types and structure
+slot types are declared.  The main areas where type inference breaks
+down are:
+\begin{itemize}
+  
+\item When the initial value of a variable is a untyped expression,
+  such as \code{\w{(car x)}}, and
+  
+\item When the type of one of the variable's definitions is a function
+  of the variable's current value, as in: \code{(setq x (1+ x))}
+\end{itemize}
+
+
+\subsection{Local Function Type Inference}
+\cpsubindex{local call}{type inference}
+
+The types of arguments to local functions are inferred in the same was
+as any other local variable; the type is the union of the argument
+types across all the calls to the function, intersected with the
+declared type.  If there are any assignments to the argument
+variables, the type of the assigned value is unioned in as well.
+
+The result type of a local function is computed in a special way that
+takes tail recursion (\pxlref{tail-recursion}) into consideration.
+The result type is the union of all possible return values that aren't
+tail-recursive calls.  For example, \python{} will infer that the
+result type of this function is \code{integer}:
+
+\begin{lisp}
+(defun ! (n res)
+  (declare (integer n res))
+  (if (zerop n)
+      res
+      (! (1- n) (* n res))))
+\end{lisp}
+
+Although this is a rather obvious result, it becomes somewhat less
+trivial in the presence of mutual tail recursion of multiple
+functions.  Local function result type inference interacts with the
+mechanisms for ensuring proper tail recursion mentioned in section
+\ref{local-call-return}.
+
+
+\subsection{Global Function Type Inference}
+\label{function-type-inference}
+\cpsubindex{function}{type inference}
+
+As described in section \ref{function-types}, a global function type
+(\tindexed{ftype}) declaration places implicit type assertions on the
+call arguments, and also guarantees the type of the return value.  So
+wherever a call to a declared function appears, there is no doubt as
+to the types of the arguments and return value.  Furthermore,
+\python{} will infer a function type from the function's definition if
+there is no \code{ftype} declaration.  Any type declarations on the
+argument variables are used as the argument types in the derived
+function type, and the compiler's best guess for the result type of
+the function is used as the result type in the derived function type.
+
+This method of deriving function types from the definition implicitly assumes
+that functions won't be redefined at run-time.  Consider this example:
+\begin{lisp}
+(defun foo-p (x)
+  (let ((res (and (consp x) (eq (car x) 'foo))))
+    (format t "It is ~:[not ~;~]foo." res)))
+
+(defun frob (it)
+  (if (foo-p it)
+      (setf (cadr it) 'yow!)
+      (1+ it)))
+\end{lisp}
+
+Presumably, the programmer really meant to return \code{res} from
+\code{foo-p}, but he seems to have forgotten.  When he tries to call
+do \code{\w{(frob (list 'foo nil))}}, \code{frob} will flame out when
+it tries to add to a \code{cons}.  Realizing his error, he fixes
+\code{foo-p} and recompiles it.  But when he retries his test case, he
+is baffled because the error is still there.  What happened in this
+example is that \python{} proved that the result of \code{foo-p} is
+\code{null}, and then proceeded to optimize away the \code{setf} in
+\code{frob}.
+
+Fortunately, in this example, the error is detected at compile time
+due to notes about unreachable code (\pxlref{dead-code-notes}.)
+Still, some users may not want to worry about this sort of problem
+during incremental development, so there is a variable to control
+deriving function types.
+
+\begin{defvar}{extensions:}{derive-function-types}
+  
+  If true (the default), argument and result type information derived
+  from compilation of \code{defun}s is used when compiling calls to
+  that function.  If false, only information from \code{ftype}
+  proclamations will be used.
+\end{defvar}
+
+
+\subsection{Operation Specific Type Inference}
+\label{operation-type-inference}
+\cindex{operation specific type inference}
+\cindex{arithmetic type inference}
+\cpsubindex{numeric}{type inference}
+
+Many of the standard \clisp{} functions have special type inference
+procedures that determine the result type as a function of the
+argument types.  For example, the result type of \code{aref} is the
+array element type.  Here are some other examples of type inferences:
+\begin{lisp}
+(logand x #xFF) \result{} (unsigned-byte 8)
+
+(+ (the (integer 0 12) x) (the (integer 0 1) y)) \result{} (integer 0 13)
+
+(ash (the (unsigned-byte 16) x) -8) \result{} (unsigned-byte 8)
+\end{lisp}
+
+
+\subsection{Dynamic Type Inference}
+\label{constraint-propagation}
+\cindex{dynamic type inference}
+\cindex{conditional type inference}
+\cpsubindex{type inference}{dynamic}
+
+\python{} uses flow analysis to infer types in dynamically typed
+programs.  For example:
+
+\begin{example}
+(ecase x
+  (list (length x))
+  ...)
+\end{example}
+
+Here, the compiler knows the argument to \code{length} is a list,
+because the call to \code{length} is only done when \code{x} is a
+list.  The most significant efficiency effect of inference from
+assertions is usually in type check optimization.
+
+Dynamic type inference has two inputs: explicit conditionals and
+implicit or explicit type assertions.  Flow analysis propagates these
+constraints on variable type to any code that can be executed only
+after passing though the constraint.  Explicit type constraints come
+from \findexed{if}s where the test is either a lexical variable or a
+function of lexical variables and constants, where the function is
+either a type predicate, a numeric comparison or \code{eq}.
+
+If there is an \code{eq} (or \code{eql}) test, then the compiler will
+actually substitute one argument for the other in the true branch.
+For example:
+\begin{lisp}
+(when (eq x :yow!) (return x))
+\end{lisp}
+becomes:
+\begin{lisp}
+(when (eq x :yow!) (return :yow!))
+\end{lisp}
+This substitution is done when one argument is a constant, or one
+argument has better type information than the other.  This
+transformation reveals opportunities for constant folding or
+type-specific optimizations.  If the test is against a constant, then
+the compiler can prove that the variable is not that constant value in
+the false branch, or \w{\code{(not (member :yow!))}}  in the example
+above.  This can eliminate redundant tests, for example:
+\begin{example}
+(if (eq x nil)
+    ...
+    (if x a b))
+\end{example}
+is transformed to this:
+\begin{example}
+(if (eq x nil)
+    ...
+    a)
+\end{example}
+Variables appearing as \code{if} tests are interpreted as
+\code{\w{(not (eq \var{var} nil))}} tests.  The compiler also converts
+\code{=} into \code{eql} where possible.  It is difficult to do
+inference directly on \code{=} since it does implicit coercions.
+
+When there is an explicit \code{\textless} or \code{\textgreater} test on numeric
+variables, the compiler makes inferences about the ranges the
+variables can assume in the true and false branches. This is mainly
+useful when it proves that the values are small enough in magnitude to
+allow open-coding of arithmetic operations. For example, in many uses
+of \code{dotimes} with a \code{fixnum} repeat count, the compiler
+proves that fixnum arithmetic can be used.
+
+Implicit type assertions are quite common, especially if you declare
+function argument types.  Dynamic inference from implicit type
+assertions sometimes helps to disambiguate programs to a useful
+degree, but is most noticeable when it detects a dynamic type error.
+For example:
+
+\begin{lisp}
+(defun foo (x)
+  (+ (car x) x))
+\end{lisp} 
+
+results in this warning:
+
+\begin{example}
+In: DEFUN FOO
+  (+ (CAR X) X)
+==>
+  X
+Warning: Result is a LIST, not a NUMBER.
+\end{example}
+
+Note that \llisp{}'s dynamic type checking semantics make dynamic type
+inference useful even in programs that aren't really dynamically
+typed, for example:
+
+\begin{lisp}
+(+ (car x) (length x))
+\end{lisp}
+
+Here, \code{x} presumably always holds a list, but in the absence of a
+declaration the compiler cannot assume \code{x} is a list simply
+because list-specific operations are sometimes done on it.  The
+compiler must consider the program to be dynamically typed until it
+proves otherwise.  Dynamic type inference proves that the argument to
+\code{length} is always a list because the call to \code{length} is
+only done after the list-specific \code{car} operation.
+
+
+\subsection{Type Check Optimization}
+\label{type-check-optimization}
+\cpsubindex{type checking}{optimization}
+\cpsubindex{optimization}{type check}
+
+\python{} backs up its support for precise type checking by minimizing
+the cost of run-time type checking.  This is done both through type
+inference and though optimizations of type checking itself.
+
+Type inference often allows the compiler to prove that a value is of
+the correct type, and thus no type check is necessary.  For example:
+\begin{lisp}
+(defstruct foo a b c)
+(defstruct link
+  (foo (required-argument) :type foo)
+  (next nil :type (or link null)))
+
+(foo-a (link-foo x))
+\end{lisp}
+
+Here, there is no need to check that the result of \code{link-foo} is
+a \code{foo}, since it always is.  Even when some type checks are
+necessary, type inference can often reduce the number:
+\begin{example}
+(defun test (x)
+  (let ((a (foo-a x))
+        (b (foo-b x))
+        (c (foo-c x)))
+    ...))
+\end{example}
+In this example, only one \w{\code{(foo-p x)}} check is needed.  This
+applies to a lesser degree in list operations, such as:
+\begin{lisp}
+(if (eql (car x) 3) (cdr x) y)
+\end{lisp}
+Here, we only have to check that \code{x} is a list once.
+
+Since \python{} recognizes explicit type tests, code that explicitly
+protects itself against type errors has little introduced overhead due
+to implicit type checking.  For example, this loop compiles with no
+implicit checks checks for \code{car} and \code{cdr}:
+\begin{lisp}
+(defun memq (e l)
+  (do ((current l (cdr current)))
+      ((atom current) nil)
+    (when (eq (car current) e) (return current))))
+\end{lisp}
+
+\cindex{complemented type checks}
+\python{} reduces the cost of checks that must be done through an
+optimization called \var{complementing}.  A complemented check for
+\var{type} is simply a check that the value is not of the type
+\w{\code{(not \var{type})}}.  This is only interesting when something
+is known about the actual type, in which case we can test for the
+complement of \w{\code{(and \var{known-type} (not \var{type}))}}, or
+the difference between the known type and the assertion.  An example:
+\begin{lisp}
+(link-foo (link-next x))
+\end{lisp}
+Here, we change the type check for \code{link-foo} from a test for
+\code{foo} to a test for:
+\begin{lisp}
+(not (and (or foo null) (not foo)))
+\end{lisp}
+or more simply \w{\code{(not null)}}.  This is probably the most
+important use of complementing, since the situation is fairly common,
+and a \code{null} test is much cheaper than a structure type test.
+
+Here is a more complicated example that illustrates the combination of
+complementing with dynamic type inference:
+\begin{lisp}
+(defun find-a (a x)
+  (declare (type (or link null) x))
+  (do ((current x (link-next current)))
+      ((null current) nil)
+    (let ((foo (link-foo current)))
+      (when (eq (foo-a foo) a) (return foo)))))
+\end{lisp}
+This loop can be compiled with no type checks.  The \code{link} test
+for \code{link-foo} and \code{link-next} is complemented to
+\w{\code{(not null)}}, and then deleted because of the explicit
+\code{null} test.  As before, no check is necessary for \code{foo-a},
+since the \code{link-foo} is always a \code{foo}.  This sort of
+situation shows how precise type checking combined with precise
+declarations can actually result in reduced type checking.
+
+
+\section{Source Optimization}
+\label{source-optimization}
+\cindex{optimization}
+
+This section describes source-level transformations that \python{} does on
+programs in an attempt to make them more efficient.  Although source-level
+optimizations can make existing programs more efficient, the biggest advantage
+of this sort of optimization is that it makes it easier to write efficient
+programs.  If a clean, straightforward implementation is can be transformed
+into an efficient one, then there is no need for tricky and dangerous hand
+optimization. 
+
+
+\subsection{Let Optimization}
+\label{let-optimization}
+
+\cindex{let optimization} \cpsubindex{optimization}{let}
+
+The primary optimization of let variables is to delete them when they
+are unnecessary.  Whenever the value of a let variable is a constant,
+a constant variable or a constant (local or non-notinline) function,
+the variable is deleted, and references to the variable are replaced
+with references to the constant expression.  This is useful primarily
+in the expansion of macros or inline functions, where argument values
+are often constant in any given call, but are in general non-constant
+expressions that must be bound to preserve order of evaluation.  Let
+variable optimization eliminates the need for macros to carefully
+avoid spurious bindings, and also makes inline functions just as
+efficient as macros.
+
+A particularly interesting class of constant is a local function.
+Substituting for lexical variables that are bound to a function can
+substantially improve the efficiency of functional programming styles,
+for example:
+\begin{lisp}
+(let ((a #'(lambda (x) (zow x))))
+  (funcall a 3))
+\end{lisp}
+effectively transforms to:
+\begin{lisp}
+(zow 3)
+\end{lisp}
+This transformation is done even when the function is a closure, as in:
+\begin{lisp}
+(let ((a (let ((y (zug)))
+           #'(lambda (x) (zow x y)))))
+  (funcall a 3))
+\end{lisp}
+becoming:
+\begin{lisp}
+(zow 3 (zug))
+\end{lisp}
+
+A constant variable is a lexical variable that is never assigned to,
+always keeping its initial value.  Whenever possible, avoid setting
+lexical variables\dash{}instead bind a new variable to the new value.
+Except for loop variables, it is almost always possible to avoid
+setting lexical variables.  This form:
+\begin{example}
+(let ((x (f x)))
+  ...)
+\end{example}
+is \var{more} efficient than this form:
+\begin{example}
+(setq x (f x))
+...
+\end{example}
+Setting variables makes the program more difficult to understand, both
+to the compiler and to the programmer.  \python{} compiles assignments
+at least as efficiently as any other \llisp{} compiler, but most let
+optimizations are only done on constant variables.
+
+Constant variables with only a single use are also optimized away,
+even when the initial value is not constant.\footnote{The source
+  transformation in this example doesn't represent the preservation of
+  evaluation order implicit in the compiler's internal representation.
+  Where necessary, the back end will reintroduce temporaries to
+  preserve the semantics.}  For example, this expansion of
+\code{incf}:
+\begin{lisp}
+(let ((#:g3 (+ x 1)))
+  (setq x #:G3))
+\end{lisp}
+becomes:
+\begin{lisp}
+(setq x (+ x 1))
+\end{lisp}
+The type semantics of this transformation are more important than the
+elimination of the variable itself.  Consider what happens when
+\code{x} is declared to be a \code{fixnum}; after the transformation,
+the compiler can compile the addition knowing that the result is a
+\code{fixnum}, whereas before the transformation the addition would
+have to allow for fixnum overflow.
+
+Another variable optimization deletes any variable that is never read.
+This causes the initial value and any assigned values to be unused,
+allowing those expressions to be deleted if they have no side-effects.
+
+Note that a let is actually a degenerate case of local call
+(\pxlref{let-calls}), and that let optimization can be done on calls
+that weren't created by a let.  Also, local call allows an applicative
+style of iteration that is totally assignment free.
+
+
+\subsection{Constant Folding}
+\cindex{constant folding}
+\cpsubindex{folding}{constant}
+
+Constant folding is an optimization that replaces a call of constant
+arguments with the constant result of that call.  Constant folding is
+done on all standard functions for which it is legal.  Inline
+expansion allows folding of any constant parts of the definition, and
+can be done even on functions that have side-effects.
+
+It is convenient to rely on constant folding when programming, as in this
+example:
+\begin{example}
+(defconstant limit 42)
+
+(defun foo ()
+  (... (1- limit) ...))
+\end{example}
+Constant folding is also helpful when writing macros or inline
+functions, since it usually eliminates the need to write a macro that
+special-cases constant arguments.
+
+\cindex{constant-function declaration} Constant folding of a user
+defined function is enabled by the \code{extensions:constant-function}
+proclamation.  In this example:
+\begin{example}
+(declaim (ext:constant-function myfun))
+(defun myexp (x y)
+  (declare (single-float x y))
+  (exp (* (log x) y)))
+
+ ... (myexp 3.0 1.3) ...
+\end{example}
+The call to \code{myexp} is constant-folded to \code{4.1711674}.
+
+
+\subsection{Unused Expression Elimination}
+\cindex{unused expression elimination}
+\cindex{dead code elimination}
+
+If the value of any expression is not used, and the expression has no
+side-effects, then it is deleted.  As with constant folding, this
+optimization applies most often when cleaning up after inline
+expansion and other optimizations.  Any function declared an
+\code{extensions:constant-function} is also subject to unused
+expression elimination.
+
+Note that \python{} will eliminate parts of unused expressions known
+to be side-effect free, even if there are other unknown parts.  For
+example:
+\begin{lisp}
+(let ((a (list (foo) (bar))))
+  (if t
+      (zow)
+      (raz a)))
+\end{lisp}
+becomes:
+\begin{lisp}
+(progn (foo) (bar))
+(zow)
+\end{lisp}
+
+
+\subsection{Control Optimization}
+\cindex{control optimization}
+\cpsubindex{optimization}{control}
+
+The most important optimization of control is recognizing when an
+\findexed{if} test is known at compile time, then deleting the
+\code{if}, the test expression, and the unreachable branch of the
+\code{if}.  This can be considered a special case of constant folding,
+although the test doesn't have to be truly constant as long as it is
+definitely not \false.  Note also, that type inference propagates the
+result of an \code{if} test to the true and false branches,
+\pxlref{constraint-propagation}.
+
+A related \code{if} optimization is this transformation:\footnote{Note
+  that the code for \code{x} and \code{y} isn't actually replicated.}
+\begin{lisp}
+(if (if a b c) x y)
+\end{lisp}
+into:
+\begin{lisp}
+(if a
+    (if b x y)
+    (if c x y))
+\end{lisp}
+The opportunity for this sort of optimization usually results from a
+conditional macro.  For example:
+\begin{lisp}
+(if (not a) x y)
+\end{lisp}
+is actually implemented as this:
+\begin{lisp}
+(if (if a nil t) x y)
+\end{lisp}
+which is transformed to this:
+\begin{lisp}
+(if a
+    (if nil x y)
+    (if t x y))
+\end{lisp}
+which is then optimized to this:
+\begin{lisp}
+(if a y x)
+\end{lisp}
+Note that due to \python{}'s internal representations, the
+\code{if}\dash{}\code{if} situation will be recognized even if other
+forms are wrapped around the inner \code{if}, like:
+\begin{example}
+(if (let ((g ...))
+      (loop
+        ...
+        (return (not g))
+        ...))
+    x y)
+\end{example}
+
+In \python, all the \clisp{} macros really are macros, written in
+terms of \code{if}, \code{block} and \code{tagbody}, so user-defined
+control macros can be just as efficient as the standard ones.
+\python{} emits basic blocks using a heuristic that minimizes the
+number of unconditional branches.  The code in a \code{tagbody} will
+not be emitted in the order it appeared in the source, so there is no
+point in arranging the code to make control drop through to the
+target.
+
+
+\subsection{Unreachable Code Deletion}
+\label{dead-code-notes}
+\cindex{unreachable code deletion}
+\cindex{dead code elimination}
+
+\python{} will delete code whenever it can prove that the code can never be
+executed.  Code becomes unreachable when:
+
+\begin{itemize}
+\item
+An \code{if} is optimized away, or
+
+\item
+There is an explicit unconditional control transfer such as \code{go} or
+\code{return-from}, or
+
+\item
+The last reference to a local function is deleted (or there never was any
+reference.)
+\end{itemize}
+
+When code that appeared in the original source is deleted, the compiler prints
+a note to indicate a possible problem (or at least unnecessary code.)  For
+example:
+\begin{lisp}
+(defun foo ()
+  (if t
+      (write-line "True.")
+      (write-line "False.")))
+\end{lisp}
+will result in this note:
+\begin{example}
+In: DEFUN FOO
+  (WRITE-LINE "False.")
+Note: Deleting unreachable code.
+\end{example}
+
+It is important to pay attention to unreachable code notes, since they often
+indicate a subtle type error.  For example:
+\begin{example}
+(defstruct foo a b)
+
+(defun lose (x)
+  (let ((a (foo-a x))
+        (b (if x (foo-b x) :none)))
+    ...))
+\end{example}
+results in this note:
+\begin{example}
+In: DEFUN LOSE
+  (IF X (FOO-B X) :NONE)
+==>
+  :NONE
+Note: Deleting unreachable code.
+\end{example}
+The \kwd{none} is unreachable, because type inference knows that the argument
+to \code{foo-a} must be a \code{foo}, and thus can't be \false.  Presumably the
+programmer forgot that \code{x} could be \false{} when he wrote the binding for
+\code{a}.
+
+Here is an example with an incorrect declaration:
+\begin{lisp}
+(defun count-a (string)
+  (do ((pos 0 (position #\back{a} string :start (1+ pos)))
+       (count 0 (1+ count)))
+      ((null pos) count)
+    (declare (fixnum pos))))
+\end{lisp}
+This time our note is:
+\begin{example}
+In: DEFUN COUNT-A
+  (DO ((POS 0 #) (COUNT 0 #))
+      ((NULL POS) COUNT)
+    (DECLARE (FIXNUM POS)))
+--> BLOCK LET TAGBODY RETURN-FROM PROGN 
+==>
+  COUNT
+Note: Deleting unreachable code.
+\end{example}
+
+The problem here is that \code{pos} can never be null since it is declared a
+\code{fixnum}.
+
+It takes some experience with unreachable code notes to be able to
+tell what they are trying to say.  In non-obvious cases, the best
+thing to do is to call the function in a way that should cause the
+unreachable code to be executed.  Either you will get a type error, or
+you will find that there truly is no way for the code to be executed.
+
+Not all unreachable code results in a note:
+
+\begin{itemize} 
+\item A note is only given when the unreachable code textually appears
+  in the original source.  This prevents spurious notes due to the
+  optimization of macros and inline functions, but sometimes also
+  foregoes a note that would have been useful.
+  
+\item Since accurate source information is not available for non-list
+  forms, there is an element of heuristic in determining whether or
+  not to give a note about an atom.  Spurious notes may be given when
+  a macro or inline function defines a variable that is also present
+  in the calling function.  Notes about \false{} and \true{} are never
+  given, since it is too easy to confuse these constants in expanded
+  code with ones in the original source.
+  
+\item Notes are only given about code unreachable due to control flow.
+  There is no note when an expression is deleted because its value is
+  unused, since this is a common consequence of other optimizations.
+\end{itemize}
+
+
+Somewhat spurious unreachable code notes can also result when a macro
+inserts multiple copies of its arguments in different contexts, for
+example:
+\begin{lisp}
+(defmacro t-and-f (var form)
+  `(if ,var ,form ,form))
+
+(defun foo (x)
+  (t-and-f x (if x "True." "False.")))
+\end{lisp}
+results in these notes:
+\begin{example}
+In: DEFUN FOO
+  (IF X "True." "False.")
+==>
+  "False."
+Note: Deleting unreachable code.
+
+==>
+  "True."
+Note: Deleting unreachable code.
+\end{example}
+
+It seems like it has deleted both branches of the \code{if}, but it has really
+deleted one branch in one copy, and the other branch in the other copy.  Note
+that these messages are only spurious in not satisfying the intent of the rule
+that notes are only given when the deleted code appears in the original source;
+there is always \var{some} code being deleted when a unreachable code note is
+printed.
+
+
+\subsection{Multiple Values Optimization}
+\cindex{multiple value optimization}
+\cpsubindex{optimization}{multiple value}
+
+Within a function, \python{} implements uses of multiple values
+particularly efficiently.  Multiple values can be kept in arbitrary
+registers, so using multiple values doesn't imply stack manipulation
+and representation conversion.  For example, this code:
+\begin{example}
+(let ((a (if x (foo x) u))
+      (b (if x (bar x) v)))
+  ...)
+\end{example}
+is actually more efficient written this way:
+\begin{example}
+(multiple-value-bind
+    (a b)
+    (if x
+        (values (foo x) (bar x))
+        (values u v))
+  ...)
+\end{example}
+
+Also, \pxlref{local-call-return} for information on how local call
+provides efficient support for multiple function return values.
+
+
+\subsection{Source to Source Transformation}
+\cindex{source-to-source transformation}
+\cpsubindex{transformation}{source-to-source}
+
+The compiler implements a number of operation-specific optimizations as
+source-to-source transformations.  You will often see unfamiliar code in error
+messages, for example:
+
+\begin{lisp}
+(defun my-zerop () (zerop x))
+\end{lisp}
+
+gives this warning:
+
+\begin{example}
+In: DEFUN MY-ZEROP
+  (ZEROP X)
+==>
+  (= X 0)
+Warning: Undefined variable: X
+\end{example}
+
+The original \code{zerop} has been transformed into a call to
+\code{=}.  This transformation is indicated with the same \code{==$>$}
+used to mark macro and function inline expansion.  Although it can be
+confusing, display of the transformed source is important, since
+warnings are given with respect to the transformed source.  This a
+more obscure example:
+
+\begin{lisp}
+(defun foo (x) (logand 1 x))
+\end{lisp}
+
+gives this efficiency note:
+
+\begin{example}
+In: DEFUN FOO
+  (LOGAND 1 X)
+==>
+  (LOGAND C::Y C::X)
+Note: Forced to do static-function Two-arg-and (cost 53).
+      Unable to do inline fixnum arithmetic (cost 1) because:
+      The first argument is a INTEGER, not a FIXNUM.
+      etc.
+\end{example}
+
+Here, the compiler commuted the call to \code{logand}, introducing
+temporaries.  The note complains that the \var{first} argument is not
+a \code{fixnum}, when in the original call, it was the second
+argument.  To make things more confusing, the compiler introduced
+temporaries called \code{c::x} and \code{c::y} that are bound to
+\code{y} and \code{1}, respectively.
+
+You will also notice source-to-source optimizations when efficiency
+notes are enabled (\pxlref{efficiency-notes}.)  When the compiler is
+unable to do a transformation that might be possible if there was more
+information, then an efficiency note is printed.  For example,
+\code{my-zerop} above will also give this efficiency note:
+\begin{example}
+In: DEFUN FOO
+  (ZEROP X)
+==>
+  (= X 0)
+Note: Unable to optimize because:
+      Operands might not be the same type, so can't open code.
+\end{example}
+
+
+\subsection{Style Recommendations}
+\cindex{style recommendations}
+
+Source level optimization makes possible a clearer and more relaxed programming
+style:
+\begin{itemize}
+  
+\item Don't use macros purely to avoid function call.  If you want an
+  inline function, write it as a function and declare it inline.  It's
+  clearer, less error-prone, and works just as well.
+  
+\item Don't write macros that try to ``optimize'' their expansion in
+  trivial ways such as avoiding binding variables for simple
+  expressions.  The compiler does these optimizations too, and is less
+  likely to make a mistake.
+  
+\item Make use of local functions (i.e., \code{labels} or \code{flet})
+  and tail-recursion in places where it is clearer.  Local function
+  call is faster than full call.
+  
+\item Avoid setting local variables when possible.  Binding a new
+  \code{let} variable is at least as efficient as setting an existing
+  variable, and is easier to understand, both for the compiler and the
+  programmer.
+  
+\item Instead of writing similar code over and over again so that it
+  can be hand customized for each use, define a macro or inline
+  function, and let the compiler do the work.
+\end{itemize}
+
+
+\section{Tail Recursion}
+\label{tail-recursion}
+\cindex{tail recursion}
+\cindex{recursion}
+
+A call is tail-recursive if nothing has to be done after the the call
+returns, i.e. when the call returns, the returned value is immediately
+returned from the calling function.  In this example, the recursive
+call to \code{myfun} is tail-recursive:
+\begin{lisp}
+(defun myfun (x)
+  (if (oddp (random x))
+      (isqrt x)
+      (myfun (1- x))))
+\end{lisp}
+
+Tail recursion is interesting because it is form of recursion that can be
+implemented much more efficiently than general recursion.  In general, a
+recursive call requires the compiler to allocate storage on the stack at
+run-time for every call that has not yet returned.  This memory consumption
+makes recursion unacceptably inefficient for representing repetitive algorithms
+having large or unbounded size.  Tail recursion is the special case of
+recursion that is semantically equivalent to the iteration constructs normally
+used to represent repetition in programs.  Because tail recursion is equivalent
+to iteration, tail-recursive programs can be compiled as efficiently as
+iterative programs.
+
+So why would you want to write a program recursively when you can write it
+using a loop?  Well, the main answer is that recursion is a more general
+mechanism, so it can express some solutions simply that are awkward to write as
+a loop.  Some programmers also feel that recursion is a stylistically
+preferable way to write loops because it avoids assigning variables.
+For example, instead of writing:
+
+\begin{lisp}
+(defun fun1 (x)
+  something-that-uses-x)
+
+(defun fun2 (y)
+  something-that-uses-y)
+
+(do ((x something (fun2 (fun1 x))))
+    (nil))
+\end{lisp}
+
+You can write:
+
+\begin{lisp}
+(defun fun1 (x)
+  (fun2 something-that-uses-x))
+
+(defun fun2 (y)
+  (fun1 something-that-uses-y))
+
+(fun1 something)
+\end{lisp}
+
+The tail-recursive definition is actually more efficient, in addition to being
+(arguably) clearer.  As the number of functions and the complexity of their
+call graph increases, the simplicity of using recursion becomes compelling.
+Consider the advantages of writing a large finite-state machine with separate
+tail-recursive functions instead of using a single huge \code{prog}.
+
+It helps to understand how to use tail recursion if you think of a
+tail-recursive call as a \code{psetq} that assigns the argument values to the
+called function's variables, followed by a \code{go} to the start of the called
+function.  This makes clear an inherent efficiency advantage of tail-recursive
+call: in addition to not having to allocate a stack frame, there is no need to
+prepare for the call to return (e.g., by computing a return PC.)
+
+Is there any disadvantage to tail recursion?  Other than an increase
+in efficiency, the only way you can tell that a call has been compiled
+tail-recursively is if you use the debugger.  Since a tail-recursive
+call has no stack frame, there is no way the debugger can print out
+the stack frame representing the call.  The effect is that backtrace
+will not show some calls that would have been displayed in a
+non-tail-recursive implementation.  In practice, this is not as bad as
+it sounds\dash{}in fact it isn't really clearly worse, just different.
+\xlref{debug-tail-recursion} for information about the debugger
+implications of tail recursion, and how to turn it off for the sake of
+more conservative backtrace information.
+
+In order to ensure that tail-recursion is preserved in arbitrarily
+complex calling patterns across separately compiled functions, the
+compiler must compile any call in a tail-recursive position as a
+tail-recursive call.  This is done regardless of whether the program
+actually exhibits any sort of recursive calling pattern.  In this
+example, the call to \code{fun2} will always be compiled as a
+tail-recursive call:
+
+\begin{lisp}
+(defun fun1 (x)
+  (fun2 x))
+\end{lisp}
+
+So tail recursion doesn't necessarily have anything to do with recursion
+as it is normally thought of.  \xlref{local-tail-recursion} for more
+discussion of using tail recursion to implement loops.
+
+
+\subsection{Tail Recursion Exceptions}
+
+Although \python{} is claimed to be ``properly'' tail-recursive, some
+might dispute this, since there are situations where tail recursion is
+inhibited:
+\begin{itemize}
+  
+\item When the call is enclosed by a special binding, or
+  
+\item When the call is enclosed by a \code{catch} or
+  \code{unwind-protect}, or
+  
+\item When the call is enclosed by a \code{block} or \code{tagbody}
+  and the block name or \code{go} tag has been closed over.
+\end{itemize}
+These dynamic extent binding forms inhibit tail recursion because they
+allocate stack space to represent the binding.  Shallow-binding
+implementations of dynamic scoping also require cleanup code to be
+evaluated when the scope is exited.
+
+In addition, optimization of tail-recursive calls is inhibited when
+the \code{debug} optimization quality is greater than \code{2}
+(\pxlref{debugger-policy}.)
+
+
+\section{Local Call}
+\label{local-call}
+\cindex{local call}
+\cpsubindex{call}{local}
+\cpsubindex{function call}{local}
+
+\python{} supports two kinds of function call: full call and local call.
+Full call is the standard calling convention; its late binding and
+generality make \llisp{} what it is, but create unavoidable overheads.
+When the compiler can compile the calling function and the called
+function simultaneously, it can use local call to avoid some of the
+overhead of full call.  Local call is really a collection of
+compilation strategies.  If some aspect of call overhead is not needed
+in a particular local call, then it can be omitted.  In some cases,
+local call can be totally free.  Local call provides two main
+advantages to the user:
+\begin{itemize}
+  
+\item Local call makes the use of the lexical function binding forms
+  \findexed{flet} and \findexed{labels} much more efficient.  A local
+  call is always faster than a full call, and in many cases is much
+  faster.
+  
+\item Local call is a natural approach to \textit{block compilation}, a
+  compilation technique that resolves function references at compile
+  time.  Block compilation speeds function call, but increases
+  compilation times and prevents function redefinition.
+\end{itemize}
+
+
+
+\subsection{Self-Recursive Calls}
+\cpsubindex{recursion}{self}
+
+Local call is used when a function defined by \code{defun} calls itself.  For
+example:
+\begin{lisp}
+(defun fact (n)
+  (if (zerop n)
+      1
+      (* n (fact (1- n)))))
+\end{lisp}
+
+This use of local call speeds recursion, but can also complicate
+debugging, since \findexed{trace} will only show the first call to
+\code{fact}, and not the recursive calls.  This is because the
+recursive calls directly jump to the start of the function, and don't
+indirect through the \code{symbol-function}.  Self-recursive local
+call is inhibited when the \kwd{block-compile} argument to
+\code{compile-file} is \false{} (\pxlref{compile-file-block}.)
+
+
+\subsection{Let Calls}
+\label{let-calls}
+Because local call avoids unnecessary call overheads, the compiler
+internally uses local call to implement some macros and special forms
+that are not normally thought of as involving a function call.  For
+example, this \code{let}:
+
+\begin{example}
+(let ((a (foo))
+      (b (bar)))
+  ...)
+\end{example}
+
+is internally represented as though it was macroexpanded into:
+
+\begin{example}
+(funcall #'(lambda (a b)
+             ...)
+         (foo)
+         (bar))
+\end{example}
+
+This implementation is acceptable because the simple cases of local
+call (equivalent to a \code{let}) result in good code.  This doesn't
+make \code{let} any more efficient, but does make local calls that are
+semantically the same as \code{let} much more efficient than full
+calls.  For example, these definitions are all the same as far as the
+compiler is concerned:
+
+\begin{example}
+(defun foo ()
+  ...some other stuff...
+  (let ((a something))
+    ...some stuff...))
+
+(defun foo ()
+  (flet ((localfun (a)
+           ...some stuff...))
+    ...some other stuff...
+    (localfun something)))
+
+(defun foo ()
+  (let ((funvar #'(lambda (a)
+                    ...some stuff...)))
+    ...some other stuff...
+    (funcall funvar something)))
+\end{example}
+
+Although local call is most efficient when the function is called only
+once, a call doesn't have to be equivalent to a \code{let} to be more
+efficient than full call.  All local calls avoid the overhead of
+argument count checking and keyword argument parsing, and there are a
+number of other advantages that apply in many common situations.
+\xlref{let-optimization} for a discussion of the optimizations done on
+let calls.
+
+
+\subsection{Closures}
+\cindex{closures}
+
+Local call allows for much more efficient use of closures, since the
+closure environment doesn't need to be allocated on the heap, or even
+stored in memory at all.  In this example, there is no penalty for
+\code{localfun} referencing \code{a} and \code{b}:
+\begin{lisp}
+(defun foo (a b)
+  (flet ((localfun (x)
+           (1+ (* a b x))))
+    (if (= a b)
+        (localfun (- x))
+        (localfun x))))
+\end{lisp}
+In local call, the compiler effectively passes closed-over values as
+extra arguments, so there is no need for you to ``optimize'' local
+function use by explicitly passing in lexically visible values.
+Closures may also be subject to let optimization
+(\pxlref{let-optimization}.)
+
+Note: indirect value cells are currently always allocated on the heap
+when a variable is both assigned to (with \code{setq} or \code{setf})
+and closed over, regardless of whether the closure is a local function
+or not.  This is another reason to avoid setting variables when you
+don't have to.
+
+
+\subsection{Local Tail Recursion}
+\label{local-tail-recursion}
+\cindex{tail recursion}
+\cpsubindex{recursion}{tail}
+
+Tail-recursive local calls are particularly efficient, since they are
+in effect an assignment plus a control transfer.  Scheme programmers
+write loops with tail-recursive local calls, instead of using the
+imperative \code{go} and \code{setq}.  This has not caught on in the
+\clisp{} community, since conventional \llisp{} compilers don't
+implement local call.  In \python, users can choose to write loops
+such as:
+\begin{lisp}
+(defun ! (n)
+  (labels ((loop (n total)
+             (if (zerop n)
+                 total
+                 (loop (1- n) (* n total)))))
+    (loop n 1)))
+\end{lisp}
+
+\begin{defmac}{extensions:}{iterate}{%
+    \args{\var{name} (\mstar{(\var{var} \var{initial-value})})
+      \mstar{\var{declaration}} \mstar{\var{form}}}}
+  
+  This macro provides syntactic sugar for using \findexed{labels} to
+  do iteration.  It creates a local function \var{name} with the
+  specified \var{var}s as its arguments and the \var{declaration}s and
+  \var{form}s as its body.  This function is then called with the
+  \var{initial-values}, and the result of the call is return from the
+  macro.
+
+  Here is our factorial example rewritten using \code{iterate}:
+
+  \begin{lisp}
+    (defun ! (n)
+      (iterate loop
+               ((n n)
+               (total 1))
+        (if (zerop n)
+          total
+          (loop (1- n) (* n total)))))
+  \end{lisp}
+      
+  The main advantage of using \code{iterate} over \code{do} is that
+  \code{iterate} naturally allows stepping to be done differently
+  depending on conditionals in the body of the loop.  \code{iterate}
+  can also be used to implement algorithms that aren't really
+  iterative by simply doing a non-tail call.  For example, the
+  standard recursive definition of factorial can be written like this:
+\begin{lisp}
+(iterate fact
+         ((n n))
+  (if (zerop n)
+      1
+      (* n (fact (1- n)))))
+\end{lisp}
+\end{defmac}
+
+
+\subsection{Return Values}
+\label{local-call-return}
+\cpsubindex{return values}{local call}
+\cpsubindex{local call}{return values}
+
+One of the more subtle costs of full call comes from allowing
+arbitrary numbers of return values.  This overhead can be avoided in
+local calls to functions that always return the same number of values.
+For efficiency reasons (as well as stylistic ones), you should write
+functions so that they always return the same number of values.  This
+may require passing extra \false{} arguments to \code{values} in some
+cases, but the result is more efficient, not less so.
+
+When efficiency notes are enabled (\pxlref{efficiency-notes}), and the
+compiler wants to use known values return, but can't prove that the
+function always returns the same number of values, then it will print
+a note like this:
+\begin{example}
+In: DEFUN GRUE
+  (DEFUN GRUE (X) (DECLARE (FIXNUM X)) (COND (# #) (# NIL) (T #)))
+Note: Return type not fixed values, so can't use known return convention:
+  (VALUES (OR (INTEGER -536870912 -1) NULL) &REST T)
+\end{example}
+
+In order to implement proper tail recursion in the presence of known
+values return (\pxlref{tail-recursion}), the compiler sometimes must
+prove that multiple functions all return the same number of values.
+When this can't be proven, the compiler will print a note like this:
+\begin{example}
+In: DEFUN BLUE
+  (DEFUN BLUE (X) (DECLARE (FIXNUM X)) (COND (# #) (# #) (# #) (T #)))
+Note: Return value count mismatch prevents known return from
+      these functions:
+  BLUE
+  SNOO
+\end{example}
+\xlref{number-local-call} for the interaction between local call
+and the representation of numeric types.
+
+
+\section{Block Compilation}
+\label{block-compilation}
+\cindex{block compilation}
+\cpsubindex{compilation}{block}
+
+Block compilation allows calls to global functions defined by
+\findexed{defun} to be compiled as local calls.  The function call
+can be in a different top-level form than the \code{defun}, or even in a
+different file.
+
+In addition, block compilation allows the declaration of the \textit{entry points}
+to the block compiled portion.  An entry point is any function that may be
+called from outside of the block compilation.  If a function is not an entry
+point, then it can be compiled more efficiently, since all calls are known at
+compile time.  In particular, if a function is only called in one place, then
+it will be let converted.  This effectively inline expands the function, but
+without the code duplication that results from defining the function normally
+and then declaring it inline.
+
+The main advantage of block compilation is that it it preserves efficiency in
+programs even when (for readability and syntactic convenience) they are broken
+up into many small functions.  There is absolutely no overhead for calling a
+non-entry point function that is defined purely for modularity (i.e. called
+only in one place.)
+
+Block compilation also allows the use of non-descriptor arguments and return
+values in non-trivial programs (\pxlref{number-local-call}).
+
+
+\subsection{Block Compilation Semantics}
+
+The effect of block compilation can be envisioned as the compiler turning all
+the \code{defun}s in the block compilation into a single \code{labels} form:
+\begin{example}
+(declaim (start-block fun1 fun3))
+
+(defun fun1 ()
+  ...)
+
+(defun fun2 ()
+  ...
+  (fun1)
+  ...)
+
+(defun fun3 (x)
+  (if x
+      (fun1)
+      (fun2)))
+
+(declaim (end-block))
+\end{example}
+becomes:
+\begin{example}
+(labels ((fun1 ()
+           ...)
+         (fun2 ()
+           ...
+           (fun1)
+           ...)
+         (fun3 (x)
+           (if x
+               (fun1)
+               (fun2))))
+  (setf (fdefinition 'fun1) #'fun1)
+  (setf (fdefinition 'fun3) #'fun3))
+\end{example}
+Calls between the block compiled functions are local calls, so changing the
+global definition of \code{fun1} will have no effect on what \code{fun2} does;
+\code{fun2} will keep calling the old \code{fun1}.
+
+The entry points \code{fun1} and \code{fun3} are still installed in
+the \code{symbol-function} as the global definitions of the functions,
+so a full call to an entry point works just as before.  However,
+\code{fun2} is not an entry point, so it is not globally defined.  In
+addition, \code{fun2} is only called in one place, so it will be let
+converted.
+
+
+\subsection{Block Compilation Declarations}
+\cpsubindex{declarations}{block compilation}
+\cindex{start-block declaration}
+\cindex{end-block declaration}
+
+The \code{extensions:start-block} and \code{extensions:end-block}
+declarations allow fine-grained control of block compilation.  These
+declarations are only legal as a global declarations (\code{declaim}
+or \code{proclaim}).
+
+\noindent
+\vspace{1 em}
+The \code{start-block} declaration has this syntax:
+\begin{example}
+(start-block \mstar{\var{entry-point-name}})
+\end{example}
+When processed by the compiler, this declaration marks the start of
+block compilation, and specifies the entry points to that block.  If
+no entry points are specified, then \var{all} functions are made into
+entry points.  If already block compiling, then the compiler ends the
+current block and starts a new one.
+
+\noindent
+\vspace{1 em}
+The \code{end-block} declaration has no arguments:
+\begin{lisp}
+(end-block)
+\end{lisp}
+The \code{end-block} declaration ends a block compilation unit without
+starting a new one.  This is useful mainly when only a portion of a file
+is worth block compiling.
+
+
+\subsection{Compiler Arguments}
+\label{compile-file-block}
+\cpsubindex{compile-file}{block compilation arguments}
+
+The \kwd{block-compile} and \kwd{entry-points} arguments to
+\code{extensions:compile-from-stream} and \funref{compile-file} provide overall
+control of block compilation, and allow block compilation without requiring
+modification of the program source.
+
+There are three possible values of the \kwd{block-compile} argument:
+\begin{Lentry}
+  
+\item[\false{}] Do no compile-time resolution of global function
+  names, not even for self-recursive calls.  This inhibits any
+  \code{start-block} declarations appearing in the file, allowing all
+  functions to be incrementally redefined.
+  
+\item[\true{}] Start compiling in block compilation mode.  This is
+  mainly useful for block compiling small files that contain no
+  \code{start-block} declarations.  See also the \kwd{entry-points}
+  argument.
+  
+\item[\kwd{specified}] Start compiling in form-at-a-time mode, but
+  exploit any \code{start-block} declarations and compile
+  self-recursive calls as local calls.  Normally \kwd{specified} is
+  the default for this argument (see \varref{block-compile-default}.)
+\end{Lentry}
+
+The \kwd{entry-points} argument can be used in conjunction with
+\w{\kwd{block-compile} \true{}} to specify the entry-points to a
+block-compiled file.  If not specified or \nil, all global functions
+will be compiled as entry points.  When \kwd{block-compile} is not
+\true, this argument is ignored.
+
+\begin{defvar}{}{block-compile-default}
+  
+  This variable determines the default value for the
+  \kwd{block-compile} argument to \code{compile-file} and
+  \code{compile-from-stream}.  The initial value of this variable is
+  \kwd{specified}, but \false{} is sometimes useful for totally
+  inhibiting block compilation.
+\end{defvar}
+
+
+\subsection{Practical Difficulties}
+
+The main problem with block compilation is that the compiler uses
+large amounts of memory when it is block compiling.  This places an
+upper limit on the amount of code that can be block compiled as a
+unit.  To make best use of block compilation, it is necessary to
+locate the parts of the program containing many internal calls, and
+then add the appropriate \code{start-block} declarations.  When writing
+new code, it is a good idea to put in block compilation declarations
+from the very beginning, since writing block declarations correctly
+requires accurate knowledge of the program's function call structure.
+If you want to initially develop code with full incremental
+redefinition, you can compile with \varref{block-compile-default} set to
+\false.
+
+Note if a \code{defun} appears in a non-null lexical environment, then
+calls to it cannot be block compiled.
+
+Unless files are very small, it is probably impractical to block compile
+multiple files as a unit by specifying a list of files to \code{compile-file}.
+Semi-inline expansion (\pxlref{semi-inline}) provides another way to
+extend block compilation across file boundaries.
+
+
+\subsection{Context Declarations}
+\label{context-declarations}
+\cindex{context sensitive declarations}
+\cpsubindex{declarations}{context-sensitive}
+
+\cmucl{} has a context-sensitive declaration mechanism which is useful
+because it allows flexible control of the compilation policy in large
+systems without requiring changes to the source files.  The primary
+use of this feature is to allow the exported interfaces of a system to
+be compiled more safely than the system internals.  The context used
+is the name being defined and the kind of definition (function, macro,
+etc.)
+
+The \kwd{context-declarations} option to \macref{with-compilation-unit} has
+dynamic scope, affecting all compilation done during the evaluation of the
+body.  The argument to this option should evaluate to a list of lists of the
+form:
+\begin{example}
+(\var{context-spec} \mplus{\var{declare-form}})
+\end{example}
+In the indicated context, the specified declare forms are inserted at
+the head of each definition.  The declare forms for all contexts that
+match are appended together, with earlier declarations getting
+precedence over later ones.  A simple example:
+\begin{example}
+    :context-declarations
+    '((:external (declare (optimize (safety 2)))))
+\end{example}
+This will cause all functions that are named by external symbols to be
+compiled with \code{safety 2}.
+
+The full syntax of context specs is:
+\begin{Lentry}
+  
+\item[\kwd{internal}, \kwd{external}] True if the symbol is internal
+  (external) in its home package.
+  
+\item[\kwd{uninterned}] True if the symbol has no home package.
+  
+\item[\code{\w{(:package \mstar{\var{package-name}})}}] True if the
+  symbol's home package is in any of the named packages (false if
+  uninterned.)
+  
+\item[\kwd{anonymous}] True if the function doesn't have any
+  interesting name (not \code{defmacro}, \code{defun}, \code{labels}
+  or \code{flet}).
+  
+\item[\kwd{macro}, \kwd{function}] \kwd{macro} is a global
+  (\code{defmacro}) macro.  \kwd{function} is anything else.
+  
+\item[\kwd{local}, \kwd{global}] \kwd{local} is a \code{labels} or
+  \code{flet}.  \kwd{global} is anything else.
+  
+\item[\code{\w{(:or \mstar{\var{context-spec}})}}] True when any
+  supplied \var{context-spec} is true.
+  
+\item[\code{\w{(:and \mstar{\var{context-spec}})}}] True only when all
+  supplied \var{context-spec}s are true.
+  
+\item[\code{\w{(:not \mstar{\var{context-spec}})}}] True when
+  \var{context-spec} is false.
+  
+\item[\code{\w{(:member \mstar{\var{name}})}}] True when the defined
+  name is one of these names (\code{equal} test.)
+  
+\item[\code{\w{(:match \mstar{\var{pattern}})}}] True when any of the
+  patterns is a substring of the name.  The name is wrapped with
+  \code{\$}'s, so ``\code{\$FOO}'' matches names beginning with
+  ``\code{FOO}'', etc.
+\end{Lentry}
+
+
+\subsection{Context Declaration Example}
+
+Here is a more complex example of \code{with-compilation-unit} options:
+\begin{example}
+:optimize '(optimize (speed 2) (space 2) (inhibit-warnings 2)
+                     (debug 1) (safety 0))
+:optimize-interface '(optimize-interface (safety 1) (debug 1))
+:context-declarations
+'(((:or :external (:and (:match "\%") (:match "SET")))
+   (declare (optimize-interface (safety 2))))
+  ((:or (:and :external :macro)
+        (:match "\$PARSE-"))
+   (declare (optimize (safety 2)))))
+\end{example}
+The \code{optimize} and \code{extensions:optimize-interface}
+declarations (\pxlref{optimize-declaration}) set up the global
+compilation policy.  The bodies of functions are to be compiled
+completely unsafe (\code{safety 0}), but argument count and weakened
+argument type checking is to be done when a function is called
+(\code{speed 2 safety 1}).
+
+The first declaration specifies that all functions that are external
+or whose names contain both ``\code{\%}'' and ``\code{SET}'' are to be
+compiled compiled with completely safe interfaces (\code{safety 2}).
+The reason for this particular \kwd{match} rule is that \code{setf}
+inverse functions in this system tend to have both strings in their
+name somewhere.  We want \code{setf} inverses to be safe because they
+are implicitly called by users even though their name is not exported.
+
+The second declaration makes external macros or functions whose names
+start with ``\code{PARSE-}'' have safe bodies (as well as interfaces).
+This is desirable because a syntax error in a macro may cause a type
+error inside the body.  The \kwd{match} rule is used because macros
+often have auxiliary functions whose names begin with this string.
+
+This particular example is used to build part of the standard \cmucl{}
+system.  Note however, that context declarations must be set up
+according to the needs and coding conventions of a particular system;
+different parts of \cmucl{} are compiled with different context
+declarations, and your system will probably need its own declarations.
+In particular, any use of the \kwd{match} option depends on naming
+conventions used in coding.
+
+
+\section{Inline Expansion}
+\label{inline-expansion}
+\cindex{inline expansion}
+\cpsubindex{expansion}{inline}
+\cpsubindex{call}{inline}
+\cpsubindex{function call}{inline}
+\cpsubindex{optimization}{function call}
+
+\python{} can expand almost any function inline, including functions
+with keyword arguments.  The only restrictions are that keyword
+argument keywords in the call must be constant, and that global
+function definitions (\code{defun}) must be done in a null lexical
+environment (not nested in a \code{let} or other binding form.)  Local
+functions (\code{flet}) can be inline expanded in any environment.
+Combined with \python{}'s source-level optimization, inline expansion
+can be used for things that formerly required macros for efficient
+implementation.  In \python, macros don't have any efficiency
+advantage, so they need only be used where a macro's syntactic
+flexibility is required.
+
+Inline expansion is a compiler optimization technique that reduces
+the overhead of a function call by simply not doing the call:
+instead, the compiler effectively rewrites the program to appear as
+though the definition of the called function was inserted at each
+call site.  In \llisp, this is straightforwardly expressed by
+inserting the \code{lambda} corresponding to the original definition:
+\begin{lisp}
+(proclaim '(inline my-1+))
+(defun my-1+ (x) (+ x 1))
+
+(my-1+ someval) \result{} ((lambda (x) (+ x 1)) someval)
+\end{lisp}
+
+When the function expanded inline is large, the program after inline
+expansion may be substantially larger than the original program.  If
+the program becomes too large, inline expansion hurts speed rather
+than helping it, since hardware resources such as physical memory and
+cache will be exhausted.  Inline expansion is called for:
+\begin{itemize}
+  
+\item When profiling has shown that a relatively simple function is
+  called so often that a large amount of time is being wasted in the
+  calling of that function (as opposed to running in that function.)
+  If a function is complex, it will take a long time to run relative
+  the time spent in call, so the speed advantage of inline expansion
+  is diminished at the same time the space cost of inline expansion is
+  increased.  Of course, if a function is rarely called, then the
+  overhead of calling it is also insignificant.
+  
+\item With functions so simple that they take less space to inline
+  expand than would be taken to call the function (such as
+  \code{my-1+} above.)  It would require intimate knowledge of the
+  compiler to be certain when inline expansion would reduce space, but
+  it is generally safe to inline expand functions whose definition is
+  a single function call, or a few calls to simple \clisp{} functions.
+\end{itemize}
+
+
+In addition to this speed/space tradeoff from inline expansion's
+avoidance of the call, inline expansion can also reveal opportunities
+for optimization.  \python{}'s extensive source-level optimization can
+make use of context information from the caller to tremendously
+simplify the code resulting from the inline expansion of a function.
+
+The main form of caller context is local information about the actual
+argument values: what the argument types are and whether the arguments
+are constant.  Knowledge about argument types can eliminate run-time
+type tests (e.g., for generic arithmetic.)  Constant arguments in a
+call provide opportunities for constant folding optimization after
+inline expansion.
+
+A hidden way that constant arguments are often supplied to functions
+is through the defaulting of unsupplied optional or keyword arguments.
+There can be a huge efficiency advantage to inline expanding functions
+that have complex keyword-based interfaces, such as this definition of
+the \code{member} function:
+\begin{lisp}
+(proclaim '(inline member))
+(defun member (item list &key
+                    (key #'identity)
+                    (test #'eql testp)
+                    (test-not nil notp))
+  (do ((list list (cdr list)))
+      ((null list) nil)
+    (let ((car (car list)))
+      (if (cond (testp
+                 (funcall test item (funcall key car)))
+                (notp
+                 (not (funcall test-not item (funcall key car))))
+                (t
+                 (funcall test item (funcall key car))))
+          (return list)))))
+
+\end{lisp}
+After inline expansion, this call is simplified to the obvious code:
+\begin{lisp}
+(member a l :key #'foo-a :test #'char=) \result{}
+
+(do ((list list (cdr list)))
+    ((null list) nil)
+  (let ((car (car list)))
+    (if (char= item (foo-a car))
+        (return list))))
+\end{lisp}
+In this example, there could easily be more than an order of magnitude
+improvement in speed.  In addition to eliminating the original call to
+\code{member}, inline expansion also allows the calls to \code{char=}
+and \code{foo-a} to be open-coded.  We go from a loop with three tests
+and two calls to a loop with one test and no calls.
+
+\xlref{source-optimization} for more discussion of source level
+optimization.
+
+
+\subsection{Inline Expansion Recording}
+\cindex{recording of inline expansions}
+
+Inline expansion requires that the source for the inline expanded function to
+be available when calls to the function are compiled.  The compiler doesn't
+remember the inline expansion for every function, since that would take an
+excessive about of space.  Instead, the programmer must tell the compiler to
+record the inline expansion before the definition of the inline expanded
+function is compiled.  This is done by globally declaring the function inline
+before the function is defined, by using the \code{inline} and
+\code{extensions:maybe-inline} (\pxlref{maybe-inline-declaration})
+declarations.
+
+In addition to recording the inline expansion of inline functions at the time
+the function is compiled, \code{compile-file} also puts the inline expansion in
+the output file.  When the output file is loaded, the inline expansion is made
+available for subsequent compilations; there is no need to compile the
+definition again to record the inline expansion.
+
+If a function is declared inline, but no expansion is recorded, then the
+compiler will give an efficiency note like:
+
+\begin{example}
+Note: MYFUN is declared inline, but has no expansion.
+\end{example}
+
+When you get this note, check that the \code{inline} declaration and the
+definition appear before the calls that are to be inline expanded.  This note
+will also be given if the inline expansion for a \code{defun} could not be
+recorded because the \code{defun} was in a non-null lexical environment.
+
+
+\subsection{Semi-Inline Expansion}
+\label{semi-inline}
+
+\python{} supports \var{semi-inline} functions.  Semi-inline expansion
+shares a single copy of a function across all the calls in a component
+by converting the inline expansion into a local function
+(\pxlref{local-call}.)  This takes up less space when there are
+multiple calls, but also provides less opportunity for context
+dependent optimization.  When there is only one call, the result is
+identical to normal inline expansion.  Semi-inline expansion is done
+when the \code{space} optimization quality is \code{0}, and the
+function has been declared \code{extensions:maybe-inline}.
+
+This mechanism of inline expansion combined with local call also
+allows recursive functions to be inline expanded.  If a recursive
+function is declared \code{inline}, calls will actually be compiled
+semi-inline.  Although recursive functions are often so complex that
+there is little advantage to semi-inline expansion, it can still be
+useful in the same sort of cases where normal inline expansion is
+especially advantageous, i.e. functions where the calling context can
+help a lot.
+
+
+\subsection{The Maybe-Inline Declaration}
+\label{maybe-inline-declaration}
+\cindex{maybe-inline declaration}
+
+The \code{extensions:maybe-inline} declaration is a \cmucl{}
+extension.  It is similar to \code{inline}, but indicates that inline
+expansion may sometimes be desirable, rather than saying that inline
+expansion should almost always be done.  When used in a global
+declaration, \code{extensions:maybe-inline} causes the expansion for
+the named functions to be recorded, but the functions aren't actually
+inline expanded unless \code{space} is \code{0} or the function is
+eventually (perhaps locally) declared \code{inline}.
+
+Use of the \code{extensions:maybe-inline} declaration followed by the
+\code{defun} is preferable to the standard idiom of:
+\begin{lisp}
+(proclaim '(inline myfun))
+(defun myfun () ...)
+(proclaim '(notinline myfun))
+
+;;; \textit{Any calls to \code{myfun} here are not inline expanded.}
+
+(defun somefun ()
+  (declare (inline myfun))
+  ;;
+  ;; \textit{Calls to \code{myfun} here are inline expanded.}
+  ...)
+\end{lisp}
+The problem with using \code{notinline} in this way is that in
+\clisp{} it does more than just suppress inline expansion, it also
+forbids the compiler to use any knowledge of \code{myfun} until a
+later \code{inline} declaration overrides the \code{notinline}.  This
+prevents compiler warnings about incorrect calls to the function, and
+also prevents block compilation.
+
+The \code{extensions:maybe-inline} declaration is used like this:
+\begin{lisp}
+(proclaim '(extensions:maybe-inline myfun))
+(defun myfun () ...)
+
+;;; \textit{Any calls to \code{myfun} here are not inline expanded.}
+
+(defun somefun ()
+  (declare (inline myfun))
+  ;;
+  ;; \textit{Calls to \code{myfun} here are inline expanded.}
+  ...)
+
+(defun someotherfun ()
+  (declare (optimize (space 0)))
+  ;;
+  ;; \textit{Calls to \code{myfun} here are expanded semi-inline.}
+  ...)
+\end{lisp}
+In this example, the use of \code{extensions:maybe-inline} causes the
+expansion to be recorded when the \code{defun} for \code{somefun} is
+compiled, and doesn't waste space through doing inline expansion by
+default.  Unlike \code{notinline}, this declaration still allows the
+compiler to assume that the known definition really is the one that
+will be called when giving compiler warnings, and also allows the
+compiler to do semi-inline expansion when the policy is appropriate.
+
+When the goal is merely to control whether inline expansion is done by
+default, it is preferable to use \code{extensions:maybe-inline} rather
+than \code{notinline}.  The \code{notinline} declaration should be
+reserved for those special occasions when a function may be redefined
+at run-time, so the compiler must be told that the obvious definition
+of a function is not necessarily the one that will be in effect at the
+time of the call.
+
+
+\section{Byte Coded Compilation}
+\label{byte-compile}
+\cindex{byte coded compilation}
+\cindex{space optimization}
+
+\python{} supports byte compilation to reduce the size of Lisp
+programs by allowing functions to be compiled more compactly.  Byte
+compilation provides an extreme speed/space tradeoff: byte code is
+typically six times more compact than native code, but runs fifty
+times (or more) slower.  This is about ten times faster than the
+standard interpreter, which is itself considered fast in comparison to
+other \clisp{} interpreters.
+
+Large Lisp systems (such as \cmucl{} itself) often have large amounts
+of user-interface code, compile-time (macro) code, debugging code, or
+rarely executed special-case code.  This code is a good target for
+byte compilation: very little time is spent running in it, but it can
+take up quite a bit of space.  Straight-line code with many function
+calls is much more suitable than inner loops.
+
+When byte-compiling, the compiler compiles about twice as fast, and
+can produce a hardware independent object file (\file{.bytef} type.)
+This file can be loaded like a normal fasl file on any implementation
+of \cmucl{} with the same byte-ordering.
+
+The decision to byte compile or native compile can be done on a
+per-file or per-code-object basis.  The \kwd{byte-compile} argument to
+\funref{compile-file} has these possible values:
+
+\begin{Lentry}
+\item[\false{}] Don't byte compile anything in this file.
+  
+\item[\true{}] Byte compile everything in this file and produce a
+  processor-independent \file{.bytef} file.
+  
+\item[\kwd{maybe}] Produce a normal fasl file, but byte compile any
+  functions for which the \code{speed} optimization quality is
+  \code{0} and the \code{debug} quality is not greater than \code{1}.
+\end{Lentry}
+
+\begin{defvar}{extensions:}{byte-compile-top-level}
+  
+  If this variable is true (the default) and the \kwd{byte-compile}
+  argument to \code{compile-file} is \kwd{maybe}, then byte compile
+  top-level code (code outside of any \code{defun}, \code{defmethod},
+  etc.)
+\end{defvar}
+
+\begin{defvar}{extensions:}{byte-compile-default}
+  
+  This variable determines the default value for the
+  \kwd{byte-compile} argument to \code{compile-file}, initially
+  \kwd{maybe}.
+\end{defvar}
+
+
+\section{Object Representation}
+\label{object-representation}
+\cindex{object representation}
+\cpsubindex{representation}{object}
+\cpsubindex{efficiency}{of objects}
+
+A somewhat subtle aspect of writing efficient \clisp{} programs is
+choosing the correct data structures so that the underlying objects
+can be implemented efficiently.  This is partly because of the need
+for multiple representations for a given value
+(\pxlref{non-descriptor}), but is also due to the sheer number of
+object types that \clisp{} has built in.  The number of possible
+representations complicates the choice of a good representation
+because semantically similar objects may vary in their efficiency
+depending on how the program operates on them.
+
+
+\subsection{Think Before You Use a List}
+\cpsubindex{lists}{efficiency of}
+
+Although Lisp's creator seemed to think that it was for LISt
+Processing, the astute observer may have noticed that the chapter on
+list manipulation makes up less that three percent of \cltltwo{}. The
+language has grown since Lisp 1.5\dash{}new data types supersede lists
+for many purposes.
+
+
+\subsection{Structure Representation}
+\cpsubindex{structure types}{efficiency of} One of the best ways of
+building complex data structures is to define appropriate structure
+types using \findexed{defstruct}.  In \python, access of structure
+slots is always at least as fast as list or vector access, and is
+usually faster.  In comparison to a list representation of a tuple,
+structures also have a space advantage.
+
+Even if structures weren't more efficient than other representations, structure
+use would still be attractive because programs that use structures in
+appropriate ways are much more maintainable and robust than programs written
+using only lists.  For example:
+\begin{lisp}
+(rplaca (caddr (cadddr x)) (caddr y))
+\end{lisp}
+could have been written using structures in this way:
+\begin{lisp}
+(setf (beverage-flavor (astronaut-beverage x)) (beverage-flavor y))
+\end{lisp}
+The second version is more maintainable because it is easier to
+understand what it is doing.  It is more robust because structures
+accesses are type checked.  An \code{astronaut} will never be confused
+with a \code{beverage}, and the result of \code{beverage-flavor} is
+always a flavor.  See sections \ref{structure-types} and
+\ref{freeze-type} for more information about structure types.
+\xlref{type-inference} for a number of examples that make clear the
+advantages of structure typing.
+
+Note that the structure definition should be compiled before any uses
+of its accessors or type predicate so that these function calls can be
+efficiently open-coded.
+
+
+\subsection{Arrays}
+\label{array-types}
+\cpsubindex{arrays}{efficiency of}
+
+Arrays are often the most efficient representation for collections of objects
+because:
+\begin{itemize}
+  
+\item Array representations are often the most compact.  An array is
+  always more compact than a list containing the same number of
+  elements.
+  
+\item Arrays allow fast constant-time access.
+  
+\item Arrays are easily destructively modified, which can reduce
+  consing.
+  
+\item Array element types can be specialized, which reduces both
+  overall size and consing (\pxlref{specialized-array-types}.)
+\end{itemize}
+
+
+Access of arrays that are not of type \code{simple-array} is less
+efficient, so declarations are appropriate when an array is of a
+simple type like \code{simple-string} or \code{simple-bit-vector}.
+Arrays are almost always simple, but the compiler may not be able to
+prove simpleness at every use.  The only way to get a non-simple array
+is to use the \kwd{displaced-to}, \kwd{fill-pointer} or
+\code{adjustable} arguments to \code{make-array}.  If you don't use
+these hairy options, then arrays can always be declared to be simple.
+
+Because of the many specialized array types and the possibility of
+non-simple arrays, array access is much like generic arithmetic
+(\pxlref{generic-arithmetic}).  In order for array accesses to be
+efficiently compiled, the element type and simpleness of the array
+must be known at compile time.  If there is inadequate information,
+the compiler is forced to call a generic array access routine.  You
+can detect inefficient array accesses by enabling efficiency notes,
+\pxlref{efficiency-notes}.
+
+
+\subsection{Vectors}
+\cpsubindex{vectors}{efficiency of}
+
+Vectors (one dimensional arrays) are particularly useful, since in
+addition to their obvious array-like applications, they are also well
+suited to representing sequences.  In comparison to a list
+representation, vectors are faster to access and take up between two
+and sixty-four times less space (depending on the element type.)  As
+with arbitrary arrays, the compiler needs to know that vectors are not
+complex, so you should use \code{simple-string} in preference to
+\code{string}, etc.
+
+The only advantage that lists have over vectors for representing
+sequences is that it is easy to change the length of a list, add to it
+and remove items from it.  Likely signs of archaic, slow lisp code are
+\code{nth} and \code{nthcdr}.  If you are using these functions you
+should probably be using a vector.
+
+
+\subsection{Bit-Vectors}
+\cpsubindex{bit-vectors}{efficiency of}
+
+Another thing that lists have been used for is set manipulation.  In
+applications where there is a known, reasonably small universe of
+items bit-vectors can be used to improve performance.  This is much
+less convenient than using lists, because instead of symbols, each
+element in the universe must be assigned a numeric index into the bit
+vector.  Using a bit-vector will nearly always be faster, and can be
+tremendously faster if the number of elements in the set is not small.
+The logical operations on \code{simple-bit-vector}s are efficient,
+since they operate on a word at a time.
+
+
+\subsection{Hashtables}
+\cpsubindex{hash-tables}{efficiency of}
+
+Hashtables are an efficient and general mechanism for maintaining associations
+such as the association between an object and its name.  Although hashtables
+are usually the best way to maintain associations, efficiency and style
+considerations sometimes favor the use of an association list (a-list).
+
+\code{assoc} is fairly fast when the \var{test} argument is \code{eq}
+or \code{eql} and there are only a few elements, but the time goes up
+in proportion with the number of elements.  In contrast, the
+hash-table lookup has a somewhat higher overhead, but the speed is
+largely unaffected by the number of entries in the table.  For an
+\code{equal} hash-table or alist, hash-tables have an even greater
+advantage, since the test is more expensive.  Whatever you do, be sure
+to use the most restrictive test function possible.
+
+The style argument observes that although hash-tables and alists
+overlap in function, they do not do all things equally well.
+\begin{itemize}
+  
+\item Alists are good for maintaining scoped environments.  They were
+  originally invented to implement scoping in the Lisp interpreter,
+  and are still used for this in \python.  With an alist one can
+  non-destructively change an association simply by consing a new
+  element on the front.  This is something that cannot be done with
+  hash-tables.
+  
+\item Hashtables are good for maintaining a global association.  The
+  value associated with an entry can easily be changed with
+  \code{setf}.  With an alist, one has to go through contortions,
+  either \code{rplacd}'ing the cons if the entry exists, or pushing a
+  new one if it doesn't.  The side-effecting nature of hash-table
+  operations is an advantage here.
+\end{itemize}
+
+
+Historically, symbol property lists were often used for global name
+associations.  Property lists provide an awkward and error-prone
+combination of name association and record structure.  If you must use
+the property list, please store all the related values in a single
+structure under a single property, rather than using many properties.
+This makes access more efficient, and also adds a modicum of typing
+and abstraction.  \xlref{advanced-type-stuff} for information on types
+in \cmucl.
+
+
+\section{Numbers}
+\label{numeric-types}
+\cpsubindex{numeric}{types}
+\cpsubindex{types}{numeric}
+
+Numbers are interesting because numbers are one of the few \llisp{} data types
+that have direct support in conventional hardware.  If a number can be
+represented in the way that the hardware expects it, then there is a big
+efficiency advantage.
+
+Using hardware representations is problematical in \llisp{} due to
+dynamic typing (where the type of a value may be unknown at compile
+time.)  It is possible to compile code for statically typed portions
+of a \llisp{} program with efficiency comparable to that obtained in
+statically typed languages such as C, but not all \llisp{}
+implementations succeed.  There are two main barriers to efficient
+numerical code in \llisp{}:
+\begin{itemize}
+  
+\item The compiler must prove that the numerical expression is in fact
+  statically typed, and
+  
+\item The compiler must be able to somehow reconcile the conflicting
+  demands of the hardware mandated number representation with the
+  \llisp{} requirements of dynamic typing and garbage-collecting
+  dynamic storage allocation.
+\end{itemize}
+
+Because of its type inference (\pxlref{type-inference}) and efficiency
+notes (\pxlref{efficiency-notes}), \python{} is better than
+conventional \llisp{} compilers at ensuring that numerical expressions
+are statically typed.  \python{} also goes somewhat farther than existing
+compilers in the area of allowing native machine number
+representations in the presence of garbage collection.
+
+
+\subsection{Descriptors}
+\cpsubindex{descriptors}{object}
+\cindex{object representation}
+\cpsubindex{representation}{object}
+\cpsubindex{consing}{overhead of}
+
+\llisp{}'s dynamic typing requires that it be possible to represent
+any value with a fixed length object, known as a \var{descriptor}.
+This fixed-length requirement is implicit in features such as:
+\begin{itemize}
+  
+\item Data types (like \code{simple-vector}) that can contain any type
+  of object, and that can be destructively modified to contain
+  different objects (of possibly different types.)
+  
+\item Functions that can be called with any type of argument, and that
+  can be redefined at run time.
+\end{itemize}
+
+In order to save space, a descriptor is invariably represented as a
+single word.  Objects that can be directly represented in the
+descriptor itself are said to be \var{immediate}.  Descriptors for
+objects larger than one word are in reality pointers to the memory
+actually containing the object.
+
+Representing objects using pointers has two major disadvantages:
+\begin{itemize}
+  
+\item The memory pointed to must be allocated on the heap, so it must
+  eventually be freed by the garbage collector.  Excessive heap
+  allocation of objects (or ``consing'') is inefficient in several
+  ways.  \xlref{consing}.
+  
+\item Representing an object in memory requires the compiler to emit
+  additional instructions to read the actual value in from memory, and
+  then to write the value back after operating on it.
+\end{itemize}
+
+The introduction of garbage collection makes things even worse, since
+the garbage collector must be able to determine whether a descriptor
+is an immediate object or a pointer.  This requires that a few bits in
+each descriptor be dedicated to the garbage collector.  The loss of a
+few bits doesn't seem like much, but it has a major efficiency
+implication\dash{}objects whose natural machine representation is a
+full word (integers and single-floats) cannot have an immediate
+representation.  So the compiler is forced to use an unnatural
+immediate representation (such as \code{fixnum}) or a natural pointer
+representation (with the attendant consing overhead.)
+
+
+\subsection{Non-Descriptor Representations}
+\label{non-descriptor}
+\cindex{non-descriptor representations}
+\cindex{stack numbers}
+
+From the discussion above, we can see that the standard descriptor
+representation has many problems, the worst being number consing.
+\llisp{} compilers try to avoid these descriptor efficiency problems by using
+\var{non-descriptor} representations.  A compiler that uses non-descriptor
+representations can compile this function so that it does no number consing:
+\begin{lisp}
+(defun multby (vec n)
+  (declare (type (simple-array single-float (*)) vec)
+           (single-float n))
+  (dotimes (i (length vec))
+    (setf (aref vec i)
+          (* n (aref vec i)))))
+\end{lisp}
+If a descriptor representation were used, each iteration of the loop might
+cons two floats and do three times as many memory references.
+
+As its negative definition suggests, the range of possible non-descriptor
+representations is large.  The performance improvement from non-descriptor
+representation depends upon both the number of types that have non-descriptor
+representations and the number of contexts in which the compiler is forced to
+use a descriptor representation.
+
+Many \llisp{} compilers support non-descriptor representations for
+float types such as \code{single-float} and \code{double-float}
+(section \ref{float-efficiency}.)  \python{} adds support for full
+word integers (\pxlref{word-integers}), characters
+(\pxlref{characters}) and system-area pointers (unconstrained
+pointers, \pxlref{system-area-pointers}.)  Many \llisp{} compilers
+support non-descriptor representations for variables (section
+\ref{ND-variables}) and array elements (section
+\ref{specialized-array-types}.)  \python{} adds support for
+non-descriptor arguments and return values in local call
+(\pxlref{number-local-call}) and structure slots (\pxlref{raw-slots}).
+
+
+\subsection{Variables}
+\label{ND-variables}
+\cpsubindex{variables}{non-descriptor}
+\cpsubindex{type declarations}{variable}
+\cpsubindex{efficiency}{of numeric variables}
+
+In order to use a non-descriptor representation for a variable or
+expression intermediate value, the compiler must be able to prove that
+the value is always of a particular type having a non-descriptor
+representation.  Type inference (\pxlref{type-inference}) often needs
+some help from user-supplied declarations.  The best kind of type
+declaration is a variable type declaration placed at the binding
+point:
+\begin{lisp}
+(let ((x (car l)))
+  (declare (single-float x))
+  ...)
+\end{lisp}
+Use of \code{the}, or of variable declarations not at the binding form
+is insufficient to allow non-descriptor representation of the
+variable\dash{}with these declarations it is not certain that all
+values of the variable are of the right type.  It is sometimes useful
+to introduce a gratuitous binding that allows the compiler to change
+to a non-descriptor representation, like:
+\begin{lisp}
+(etypecase x
+  ((signed-byte 32)
+   (let ((x x))
+     (declare (type (signed-byte 32) x)) 
+     ...))
+  ...)
+\end{lisp}
+The declaration on the inner \code{x} is necessary here due to a phase
+ordering problem.  Although the compiler will eventually prove that
+the outer \code{x} is a \w{\code{(signed-byte 32)}} within that
+\code{etypecase} branch, the inner \code{x} would have been optimized
+away by that time.  Declaring the type makes let optimization more
+cautious.
+
+Note that storing a value into a global (or \code{special}) variable
+always forces a descriptor representation.  Wherever possible, you
+should operate only on local variables, binding any referenced globals
+to local variables at the beginning of the function, and doing any
+global assignments at the end.
+
+Efficiency notes signal use of inefficient representations, so
+programmer's needn't continuously worry about the details of
+representation selection (\pxlref{representation-eff-note}.)
+
+
+\subsection{Generic Arithmetic}
+\label{generic-arithmetic}
+\cindex{generic arithmetic}
+\cpsubindex{arithmetic}{generic}
+\cpsubindex{numeric}{operation efficiency}
+
+In \clisp, arithmetic operations are \var{generic}.\footnote{As Steele
+  notes in CLTL II, this is a generic conception of generic, and is
+  not to be confused with the CLOS concept of a generic function.}
+The \code{+} function can be passed \code{fixnum}s, \code{bignum}s,
+\code{ratio}s, and various kinds of \code{float}s and
+\code{complex}es, in any combination.  In addition to the inherent
+complexity of \code{bignum} and \code{ratio} operations, there is also
+a lot of overhead in just figuring out which operation to do and what
+contagion and canonicalization rules apply.  The complexity of generic
+arithmetic is so great that it is inconceivable to open code it.
+Instead, the compiler does a function call to a generic arithmetic
+routine, consuming many instructions before the actual computation
+even starts.
+
+This is ridiculous, since even \llisp{} programs do a lot of
+arithmetic, and the hardware is capable of doing operations on small
+integers and floats with a single instruction.  To get acceptable
+efficiency, the compiler special-cases uses of generic arithmetic that
+are directly implemented in the hardware.  In order to open code
+arithmetic, several constraints must be met:
+\begin{itemize}
+  
+\item All the arguments must be known to be a good type of number.
+  
+\item The result must be known to be a good type of number.
+  
+\item Any intermediate values such as the result of \w{\code{(+ a b)}}
+  in the call \w{\code{(+ a b c)}} must be known to be a good type of
+  number.
+  
+\item All the above numbers with good types must be of the \var{same}
+  good type.  Don't try to mix integers and floats or different float
+  formats.
+\end{itemize}
+
+The ``good types'' are \w{\code{(signed-byte 32)}},
+\w{\code{(unsigned-byte 32)}}, \code{single-float},
+\code{double-float}, \code{(complex single-float)}, and \code{(complex
+  double-float)}.  See sections \ref{fixnums}, \ref{word-integers}
+and \ref{float-efficiency} for more discussion of good numeric types.
+
+\code{float} is not a good type, since it might mean either
+\code{single-float} or \code{double-float}.  \code{integer} is not a
+good type, since it might mean \code{bignum}.  \code{rational} is not
+a good type, since it might mean \code{ratio}.  Note however that
+these types are still useful in declarations, since type inference may
+be able to strengthen a weak declaration into a good one, when it
+would be at a loss if there was no declaration at all
+(\pxlref{type-inference}).  The \code{integer} and
+\code{unsigned-byte} (or non-negative integer) types are especially
+useful in this regard, since they can often be strengthened to a good
+integer type.
+
+% Arithmetic with \code{complex} numbers is inefficient in comparison to
+% float and integer arithmetic.  Complex numbers are always represented
+% with a pointer descriptor (causing consing overhead), and complex
+% arithmetic is always closed coded using the general generic arithmetic
+As noted above, \cmucl{} has support for \code{(complex single-float)}
+and \code{(complex double-float)}.  These can be unboxed and, thus,
+are quite efficient.  However, arithmetic with complex types such as:
+\begin{lisp}
+(complex float)
+(complex fixnum)
+\end{lisp}
+will be significantly slower than the good complex types but is still
+faster than \code{bignum} or \code{ratio} arithmetic, since the
+implementation is much simpler.
+
+Note: don't use \code{/} to divide integers unless you want the
+overhead of rational arithmetic.  Use \code{truncate} even when you
+know that the arguments divide evenly.
+
+You don't need to remember all the rules for how to get open-coded
+arithmetic, since efficiency notes will tell you when and where there
+is a problem\dash{}\pxlref{efficiency-notes}.
+
+
+\subsection{Fixnums}
+\label{fixnums}
+\cindex{fixnums}
+\cindex{bignums}
+
+A fixnum is a ``FIXed precision NUMber''.  In modern \llisp{}
+implementations, fixnums can be represented with an immediate
+descriptor, so operating on fixnums requires no consing or memory
+references.  Clever choice of representations also allows some
+arithmetic operations to be done on fixnums using hardware supported
+word-integer instructions, somewhat reducing the speed penalty for
+using an unnatural integer representation.
+
+It is useful to distinguish the \code{fixnum} type from the fixnum
+representation of integers.  In \python, there is absolutely nothing
+magical about the \code{fixnum} type in comparison to other finite
+integer types.  \code{fixnum} is equivalent to (is defined with
+\code{deftype} to be) \w{\code{(signed-byte 30)}}.  \code{fixnum} is
+simply the largest subset of integers that {\em can be represented}
+using an immediate fixnum descriptor.
+
+Unlike in other \clisp{} compilers, it is in no way desirable to use
+the \code{fixnum} type in declarations in preference to more
+restrictive integer types such as \code{bit}, \w{\code{(integer -43
+    7)}} and \w{\code{(unsigned-byte 8)}}.  Since \python{} does
+understand these integer types, it is preferable to use the more
+restrictive type, as it allows better type inference
+(\pxlref{operation-type-inference}.)
+
+The small, efficient fixnum is contrasted with bignum, or ``BIG
+NUMber''.  This is another descriptor representation for integers, but
+this time a pointer representation that allows for arbitrarily large
+integers.  Bignum operations are less efficient than fixnum
+operations, both because of the consing and memory reference overheads
+of a pointer descriptor, and also because of the inherent complexity
+of extended precision arithmetic.  While fixnum operations can often
+be done with a single instruction, bignum operations are so complex
+that they are always done using generic arithmetic.
+
+A crucial point is that the compiler will use generic arithmetic if it
+can't \var{prove} that all the arguments, intermediate values, and
+results are fixnums.  With bounded integer types such as
+\code{fixnum}, the result type proves to be especially problematical,
+since these types are not closed under common arithmetic operations
+such as \code{+}, \code{-}, \code{*} and \code{/}.  For example,
+\w{\code{(1+ (the fixnum x))}} does not necessarily evaluate to a
+\code{fixnum}.  Bignums were added to \llisp{} to get around this
+problem, but they really just transform the correctness problem ``if
+this add overflows, you will get the wrong answer'' to the efficiency
+problem ``if this add \var{might} overflow then your program will run
+slowly (because of generic arithmetic.)''
+
+There is just no getting around the fact that the hardware only
+directly supports short integers.  To get the most efficient open
+coding, the compiler must be able to prove that the result is a good
+integer type.  This is an argument in favor of using more restrictive
+integer types: \w{\code{(1+ (the fixnum x))}} may not always be a
+\code{fixnum}, but \w{\code{(1+ (the (unsigned-byte 8) x))}} always
+is.  Of course, you can also assert the result type by putting in lots
+of \code{the} declarations and then compiling with \code{safety}
+\code{0}.
+
+
+\subsection{Word Integers}
+\label{word-integers}
+\cindex{word integers}
+
+\python{} is unique in its efficient implementation of arithmetic
+on full-word integers through non-descriptor representations and open coding.
+Arithmetic on any subtype of these types:
+
+\begin{lisp}
+(signed-byte 32)
+(unsigned-byte 32)
+\end{lisp}
+
+is reasonably efficient, although subtypes of \code{fixnum} remain
+somewhat more efficient.
+
+If a word integer must be represented as a descriptor, then the
+\code{bignum} representation is used, with its associated consing
+overhead.  The support for word integers in no way changes the
+language semantics, it just makes arithmetic on small bignums vastly
+more efficient.  It is fine to do arithmetic operations with mixed
+\code{fixnum} and word integer operands; just declare the most
+specific integer type you can, and let the compiler decide what
+representation to use.
+
+In fact, to most users, the greatest advantage of word integer
+arithmetic is that it effectively provides a few guard bits on the
+fixnum representation.  If there are missing assertions on
+intermediate values in a fixnum expression, the intermediate results
+can usually be proved to fit in a word.  After the whole expression is
+evaluated, there will often be a fixnum assertion on the final result,
+allowing creation of a fixnum result without even checking for
+overflow.
+
+The remarks in section \ref{fixnums} about fixnum result type also
+apply to word integers; you must be careful to give the compiler
+enough information to prove that the result is still a word integer.
+This time, though, when we blow out of word integers we land in into
+generic bignum arithmetic, which is much worse than sleazing from
+\code{fixnum}s to word integers.  Note that mixing
+\w{\code{(unsigned-byte 32)}} arguments with arguments of any signed
+type (such as \code{fixnum}) is a no-no, since the result might not be
+unsigned.
+
+
+\subsection{Floating Point Efficiency}
+\label{float-efficiency}
+\cindex{floating point efficiency}
+
+Arithmetic on objects of type \code{single-float} and \code{double-float} is
+efficiently implemented using non-descriptor representations and open coding.
+As for integer arithmetic, the arguments must be known to be of the same float
+type.  Unlike for integer arithmetic, the results and intermediate values
+usually take care of themselves due to the rules of float contagion, i.e.
+\w{\code{(1+ (the single-float x))}} is always a \code{single-float}.
+
+Although they are not specially implemented, \code{short-float} and
+\code{long-float} are also acceptable in declarations, since they are
+synonyms for the \code{single-float} and \code{double-float} types,
+respectively.
+
+In \cmucl{}, list-style float type specifiers such as
+\w{\code{(single-float 0.0 1.0)}} will be used to good effect.
+
+For example, in this function,
+
+\begin{example}
+  (defun square (x)
+    (declare (type (single-float 0f0 10f0)))
+    (* x x))
+\end{example}
+
+\python{} can deduce that the
+return type of the function \code{square} is \w{\code{(single-float
+    0f0 100f0)}}.
+
+Many union types are also supported so that
+
+\begin{example}
+  (+ (the (or (integer 1 1) (integer 5 5)) x)
+     (the (or (integer 10 10) (integer 20 20)) y))
+\end{example}
+
+has the inferred type \code{(or (integer 11 11) (integer 15 15)
+  (integer 21 21) (integer 25 25))}.  This also works for
+floating-point numbers.  Member types are also supported.
+  
+\cmucl{} can also infer types for many mathematical functions
+including square root, exponential and logarithmic functions,
+trignometric functions and their inverses, and hyperbolic functions
+and their inverses.  For numeric code, this can greatly enhance
+efficiency by allowing the compiler to use specialized versions of
+the functions instead of the generic versions.  The greatest benefit 
+of this type inference is determining that the result of the
+function is real-valued number instead of possibly being
+a complex-valued number.
+
+For example, consider the function
+\begin{example}
+  (defun fun (x)
+    (declare (type (single-float (0f0) 100f0) x))
+    (values (sqrt x) (log x)))
+\end{example}
+With this declaration, the compiler can determine that the argument
+to \code{sqrt} and \code{log} are always non-negative so that the result 
+is always a \code{single-float}.  In fact, the return type for this
+function is derived to be \code{(values (single-float 0f0 10f0)
+    (single-float * 2f0))}.
+
+If the declaration were reduced to just \w{\code{(declare
+    (single-float x))}}, the argument to \code{sqrt} and \code{log}
+could be negative.  This forces the use of the generic versions of
+these functions because the result could be a complex number.
+
+We note, however, that proper interval arithmetic is not fully
+implemented in the compiler so the inferred types may be slightly in
+error due to round-off errors.  This round-off error could
+accumulate to cause the compiler to erroneously deduce the result
+type and cause code to be removed as being
+unreachable.\footnote{This, however, has not actually happened, but
+  it is a possibility.}%
+Thus, the declarations should only be precise enough for the
+compiler to deduce that a real-valued argument to a function would
+produce a real-valued result.  The efficiency notes
+(\pxlref{representation-eff-note}) from the compiler will guide you
+on what declarations might be useful.
+
+When a float must be represented as a descriptor, a pointer representation is
+used, creating consing overhead.  For this reason, you should try to avoid
+situations (such as full call and non-specialized data structures) that force a
+descriptor representation.  See sections \ref{specialized-array-types},
+\ref{raw-slots} and \ref{number-local-call}.
+
+\xlref{ieee-float} for information on the extensions to support IEEE
+floating point.
+
+\subsubsection{Signed Zeroes and Special Functions}
+
+\cmucl{} supports IEEE signed zeroes.  In typical usage, the signed
+zeroes are not a problem and can be treated as an unsigned zero.
+However, some of the special functions have branch points at zero, so
+care must be taken.
+
+For example, suppose we have the function
+\begin{example}
+  (defun fun (x)
+    (declare (type (single-float 0f0) x))
+    (log x))
+\end{example}
+The derived result of the function is \code{(OR SINGLE-FLOAT
+(COMPLEX SINGLE-FLOAT))} because the declared values for
+\code{x} includes both $-0.0$ and $0.0$ and \code{(log -0.0)} is
+actually a complex number.  Because of this, the generic complex log
+routine is used.
+
+If the declaration for \code{x} were \code{(single-float (0f0))} so $+0.0$
+is not included or \code{(or (single-float (0f0)) (member 0f0))} so
+  $+0.0$ is include but not $-0.0$, the derived type would be
+  \code{single-float} for both cases.  By declaring \code{x} this way,
+  the log can be implemented using a fast real-valued log routine
+  instead of the generic log routine.
+
+\cmucl{} implements the branch cuts and values given by
+Kahan\footnote{Kahan, W., ``Branch Cuts for Complex Elementary
+Functions, or Much Ado About Nothing's Sign Bit''
+in Iserles and Powell (eds.) \textit{The State of the Art
+in Numerical Analysis}, pp. 165-211, Clarendon
+Press, 1987}.
+  
+
+
+\subsection{Specialized Arrays}
+\label{specialized-array-types}
+\cindex{specialized array types}
+\cpsubindex{array types}{specialized}
+\cpsubindex{types}{specialized array}
+
+\clisp{} supports specialized array element types through the
+\kwd{element-type} argument to \code{make-array}.  When an array has a
+specialized element type, only elements of that type can be stored in
+the array.  From this restriction comes two major efficiency
+advantages:
+\begin{itemize}
+  
+\item A specialized array can save space by packing multiple elements
+  into a single word.  For example, a \code{base-char} array can have
+  4 elements per word, and a \code{bit} array can have 32.  This
+  space-efficient representation is possible because it is not
+  necessary to separately indicate the type of each element.
+  
+\item The elements in a specialized array can be given the same
+  non-descriptor representation as the one used in registers and on
+  the stack, eliminating the need for representation conversions when
+  reading and writing array elements.  For objects with pointer
+  descriptor representations (such as floats and word integers) there
+  is also a substantial consing reduction because it is not necessary
+  to allocate a new object every time an array element is modified.
+\end{itemize}
+
+
+These are the specialized element types currently supported:
+\begin{lisp}
+bit
+(unsigned-byte 2)
+(unsigned-byte 4)
+(unsigned-byte 8)
+(unsigned-byte 16)
+(unsigned-byte 32)
+(signed-byte 8)
+(signed-byte 16)
+(signed-byte 30)
+(signed-byte 32)
+base-character
+single-float
+double-float
+ext:double-double-float
+(complex single-float)
+(complex double-float)
+(complex ext:double-double-float)
+\end{lisp}
+
+Although a \code{simple-vector} can hold any type of object, \true{}
+should still be considered a specialized array type, since arrays with
+element type \true{} are specialized to hold descriptors.
+
+
+
+When using non-descriptor representations, it is particularly
+important to make sure that array accesses are open-coded, since in
+addition to the generic operation overhead, efficiency is lost when
+the array element is converted to a descriptor so that it can be
+passed to (or from) the generic access routine.  You can detect
+inefficient array accesses by enabling efficiency notes,
+\pxlref{efficiency-notes}.  \xlref{array-types}.
+
+
+\subsection{Specialized Structure Slots}
+\label{raw-slots}
+\cpsubindex{structure types}{numeric slots}
+\cindex{specialized structure slots}
+
+Structure slots declared by the \kwd{type} \code{defstruct} slot option
+to have certain known numeric types are also given non-descriptor
+representations.  These types (and subtypes of these types) are supported:
+\begin{lisp}
+(unsigned-byte 32)
+single-float
+double-float
+(complex single-float)
+(complex double-float)
+\end{lisp}
+
+The primary advantage of specialized slot representations is a large
+reduction spurious memory allocation and access overhead of programs
+that intensively use these types.
+
+
+\subsection{Interactions With Local Call}
+\label{number-local-call}
+\cpsubindex{local call}{numeric operands}
+\cpsubindex{call}{numeric operands}
+\cindex{numbers in local call}
+
+Local call has many advantages (\pxlref{local-call}); one relevant to
+our discussion here is that local call extends the usefulness of
+non-descriptor representations.  If the compiler knows from the
+argument type that an argument has a non-descriptor representation,
+then the argument will be passed in that representation.  The easiest
+way to ensure that the argument type is known at compile time is to
+always declare the argument type in the called function, like:
+\begin{lisp}
+(defun 2+f (x)
+  (declare (single-float x))
+  (+ x 2.0))
+\end{lisp}
+The advantages of passing arguments and return values in a non-descriptor
+representation are the same as for non-descriptor representations in general:
+reduced consing and memory access (\pxlref{non-descriptor}.)  This
+extends the applicative programming styles discussed in section
+\ref{local-call} to numeric code.  Also, if source files are kept reasonably
+small, block compilation can be used to reduce number consing to a minimum.
+
+Note that non-descriptor return values can only be used with the known return
+convention (section \ref{local-call-return}.)  If the compiler can't prove that
+a function always returns the same number of values, then it must use the
+unknown values return convention, which requires a descriptor representation.
+Pay attention to the known return efficiency notes to avoid number consing.
+ 
+
+\subsection{Representation of Characters}
+\label{characters}
+\cindex{characters}
+\cindex{strings}
+
+\python{} also uses a non-descriptor representation for characters when
+convenient.  This improves the efficiency of string manipulation, but is
+otherwise pretty invisible; characters have an immediate descriptor
+representation, so there is not a great penalty for converting a character to a
+descriptor.  Nonetheless, it may sometimes be helpful to declare
+character-valued variables as \code{base-character}.
+
+
+\section{General Efficiency Hints}
+\label{general-efficiency}
+\cpsubindex{efficiency}{general hints}
+
+This section is a summary of various implementation costs and ways to get
+around them.  These hints are relatively unrelated to the use of the \python{}
+compiler, and probably also apply to most other \llisp{} implementations.  In
+each section, there are references to related in-depth discussion.
+
+
+\subsection{Compile Your Code}
+\cpsubindex{compilation}{why to}
+
+At this point, the advantages of compiling code relative to running it
+interpreted probably need not be emphasized too much, but remember that
+in \cmucl, compiled code typically runs hundreds of times faster than
+interpreted code.  Also, compiled (\code{fasl}) files load significantly faster
+than source files, so it is worthwhile compiling files which are loaded many
+times, even if the speed of the functions in the file is unimportant.
+
+Even disregarding the efficiency advantages, compiled code is as good or better
+than interpreted code.  Compiled code can be debugged at the source level (see
+chapter \ref{debugger}), and compiled code does more error checking.  For these
+reasons, the interpreter should be regarded mainly as an interactive command
+interpreter, rather than as a programming language implementation.
+
+\b{Do not} be concerned about the performance of your program until you
+see its speed compiled.  Some techniques that make compiled code run
+faster make interpreted code run slower.
+
+
+\subsection{Avoid Unnecessary Consing}
+\label{consing}
+\cindex{consing}
+\cindex{garbage collection}
+\cindex{memory allocation}
+\cpsubindex{efficiency}{of memory use}
+
+
+Consing is another name for allocation of storage, as done by the
+\code{cons} function (hence its name.)  \code{cons} is by no means the
+only function which conses\dash{}so does \code{make-array} and many
+other functions.  Arithmetic and function call can also have hidden
+consing overheads.  Consing hurts performance in the following ways:
+\begin{itemize}
+  
+\item Consing reduces memory access locality, increasing paging
+  activity.
+  
+\item Consing takes time just like anything else.
+  
+\item Any space allocated eventually needs to be reclaimed, either by
+  garbage collection or by starting a new \code{lisp} process.
+\end{itemize}
+
+
+Consing is not undiluted evil, since programs do things other than
+consing, and appropriate consing can speed up the real work.  It would
+certainly save time to allocate a vector of intermediate results that
+are reused hundreds of times.  Also, if it is necessary to copy a
+large data structure many times, it may be more efficient to update
+the data structure non-destructively; this somewhat increases update
+overhead, but makes copying trivial.
+
+Note that the remarks in section \ref{efficiency-overview} about the
+importance of separating tuning from coding also apply to consing
+overhead.  The majority of consing will be done by a small portion of
+the program.  The consing hot spots are even less predictable than the
+CPU hot spots, so don't waste time and create bugs by doing
+unnecessary consing optimization.  During initial coding, avoid
+unnecessary side-effects and cons where it is convenient.  If
+profiling reveals a consing problem, \var{then} go back and fix the
+hot spots.
+
+\xlref{non-descriptor} for a discussion of how to avoid number consing
+in \python.
+
+
+\subsection{Complex Argument Syntax}
+\cpsubindex{argument syntax}{efficiency}
+\cpsubindex{efficiency}{of argument syntax}
+\cindex{keyword argument efficiency}
+\cindex{rest argument efficiency}
+
+\clisp{} has very powerful argument passing mechanisms.  Unfortunately, two
+of the most powerful mechanisms, rest arguments and keyword arguments, have a
+significant performance penalty:
+
+\begin{itemize}
+\item
+With keyword arguments, the called function has to parse the supplied keywords
+by iterating over them and checking them against the desired keywords.
+
+\item
+With rest arguments, the function must cons a list to hold the arguments.  If a
+function is called many times or with many arguments, large amounts of memory
+will be allocated.
+\end{itemize}
+
+Although rest argument consing is worse than keyword parsing, neither problem
+is serious unless thousands of calls are made to such a function.  The use of
+keyword arguments is strongly encouraged in functions with many arguments or
+with interfaces that are likely to be extended, and rest arguments are often
+natural in user interface functions.
+
+Optional arguments have some efficiency advantage over keyword
+arguments, but their syntactic clumsiness and lack of extensibility
+has caused many \clisp{} programmers to abandon use of optionals
+except in functions that have obviously simple and immutable
+interfaces (such as \code{subseq}), or in functions that are only
+called in a few places.  When defining an interface function to be
+used by other programmers or users, use of only required and keyword
+arguments is recommended.
+
+Parsing of \code{defmacro} keyword and rest arguments is done at
+compile time, so a macro can be used to provide a convenient syntax
+with an efficient implementation.  If the macro-expanded form contains
+no keyword or rest arguments, then it is perfectly acceptable in inner
+loops.
+
+Keyword argument parsing overhead can also be avoided by use of inline
+expansion (\pxlref{inline-expansion}) and block compilation (section
+\ref{block-compilation}.)
+
+Note: the compiler open-codes most heavily used system functions which have
+keyword or rest arguments, so that no run-time overhead is involved.
+
+
+\subsection{Mapping and Iteration}
+\cpsubindex{mapping}{efficiency of}
+
+One of the traditional \llisp{} programming styles is a highly applicative one,
+involving the use of mapping functions and many lists to store intermediate
+results.  To compute the sum of the square-roots of a list of numbers, one
+might say:
+
+\begin{lisp}
+(apply #'+ (mapcar #'sqrt list-of-numbers))
+\end{lisp}
+
+This programming style is clear and elegant, but unfortunately results
+in slow code.  There are two reasons why:
+
+\begin{itemize} 
+\item The creation of lists of intermediate results causes much
+  consing (see \ref{consing}).
+  
+\item Each level of application requires another scan down the list.
+  Thus, disregarding other effects, the above code would probably take
+  twice as long as a straightforward iterative version.
+\end{itemize}
+
+
+An example of an iterative version of the same code:
+\begin{lisp}
+(do ((num list-of-numbers (cdr num))
+     (sum 0 (+ (sqrt (car num)) sum)))
+    ((null num) sum))
+\end{lisp}
+
+See sections \ref{variable-type-inference} and \ref{let-optimization}
+for a discussion of the interactions of iteration constructs with type
+inference and variable optimization.  Also, section
+\ref{local-tail-recursion} discusses an applicative style of
+iteration.
+
+
+\subsection{Trace Files and Disassembly}
+\label{trace-files}
+\cindex{trace files}
+\cindex{assembly listing}
+\cpsubindex{listing files}{trace}
+\cindex{Virtual Machine (VM, or IR2) representation}
+\cindex{implicit continuation representation (IR1)}
+\cpsubindex{continuations}{implicit representation}
+
+In order to write efficient code, you need to know the relative costs
+of different operations.  The main reason why writing efficient
+\llisp{} code is difficult is that there are so many operations, and
+the costs of these operations vary in obscure context-dependent ways.
+Although efficiency notes point out some problem areas, the only way
+to ensure generation of the best code is to look at the assembly code
+output.
+
+The \code{disassemble} function is a convenient way to get the assembly code for a
+function, but it can be very difficult to interpret, since the correspondence
+with the original source code is weak.  A better (but more awkward) option is
+to use the \kwd{trace-file} argument to \code{compile-file} to generate a trace
+file.
+
+A trace file is a dump of the compiler's internal representations,
+including annotated assembly code.  Each component in the program gets
+four pages in the trace file (separated by ``\code{$\hat{ }L$}''):
+\begin{itemize}
+  
+\item The implicit-continuation (or IR1) representation of the
+  optimized source.  This is a dump of the flow graph representation
+  used for ``source level'' optimizations.  As you will quickly
+  notice, it is not really very close to the source.  This
+  representation is not very useful to even sophisticated users.
+  
+\item The Virtual Machine (VM, or IR2) representation of the program.
+  This dump represents the generated code as sequences of ``Virtual
+  OPerations'' (VOPs.)  This representation is intermediate between
+  the source and the assembly code\dash{}each VOP corresponds fairly
+  directly to some primitive function or construct, but a given VOP
+  also has a fairly predictable instruction sequence.  An operation
+  (such as \code{+}) may have multiple implementations with different
+  cost and applicability.  The choice of a particular VOP such as
+  \code{+/fixnum} or \code{+/single-float} represents this choice of
+  implementation.  Once you are familiar with it, the VM
+  representation is probably the most useful for determining what
+  implementation has been used.
+  
+\item An assembly listing, annotated with the VOP responsible for
+  generating the instructions.  This listing is useful for figuring
+  out what a VOP does and how it is implemented in a particular
+  context, but its large size makes it more difficult to read.
+  
+\item A disassembly of the generated code, which has all
+  pseudo-operations expanded out, but is not annotated with VOPs.
+\end{itemize}
+
+
+Note that trace file generation takes much space and time, since the trace file
+is tens of times larger than the source file.  To avoid huge confusing trace
+files and much wasted time, it is best to separate the critical program portion
+into its own file and then generate the trace file from this small file.
+
+
+\section{Efficiency Notes}
+\label{efficiency-notes}
+\cindex{efficiency notes}
+\cpsubindex{notes}{efficiency}
+\cindex{tuning}
+
+Efficiency notes are messages that warn the user that the compiler has
+chosen a relatively inefficient implementation for some operation.
+Usually an efficiency note reflects the compiler's desire for more
+type information.  If the type of the values concerned is known to the
+programmer, then additional declarations can be used to get a more
+efficient implementation.
+
+Efficiency notes are controlled by the
+\code{extensions:inhibit-warnings} (\pxlref{optimize-declaration})
+optimization quality. When \code{speed} is greater than
+\code{extensions:inhibit-warnings}, efficiency notes are enabled.
+Note that this implicitly enables efficiency notes whenever
+\code{speed} is increased from its default of \code{1}.
+
+Consider this program with an obscure missing declaration:
+
+\begin{lisp}
+(defun eff-note (x y z)
+  (declare (fixnum x y z))
+  (the fixnum (+ x y z)))
+\end{lisp}
+
+If compiled with \code{\w{(speed 3) (safety 0)}}, this note is given:
+
+\begin{example}
+In: DEFUN EFF-NOTE
+  (+ X Y Z)
+==>
+  (+ (+ X Y) Z)
+Note: Forced to do inline (signed-byte 32) arithmetic (cost 3).
+      Unable to do inline fixnum arithmetic (cost 2) because:
+      The first argument is a (INTEGER -1073741824 1073741822),
+      not a FIXNUM.
+\end{example}
+
+This efficiency note tells us that the result of the intermediate
+computation \code{\w{(+ x y)}} is not known to be a \code{fixnum}, so
+the addition of the intermediate sum to \code{z} must be done less
+efficiently.  This can be fixed by changing the definition of
+\code{eff-note}:
+
+\begin{lisp}
+(defun eff-note (x y z)
+  (declare (fixnum x y z))
+  (the fixnum (+ (the fixnum (+ x y)) z)))
+\end{lisp}
+
+
+\subsection{Type Uncertainty}
+\cpsubindex{types}{uncertainty}
+\cindex{uncertainty of types}
+
+The main cause of inefficiency is the compiler's lack of adequate
+information about the types of function argument and result values.
+Many important operations (such as arithmetic) have an inefficient
+general (generic) case, but have efficient implementations that can
+usually be used if there is sufficient argument type information.
+
+Type efficiency notes are given when a value's type is uncertain.
+There is an important distinction between values that are {\em not
+known} to be of a good type (uncertain) and values that are {\em known
+not} to be of a good type. Efficiency notes are given mainly for the
+first case (uncertain types.) If it is clear to the compiler that that
+there is not an efficient implementation for a particular function
+call, then an efficiency note will only be given if the
+\code{extensions:inhibit-warnings} optimization quality is \code{0}
+(\pxlref{optimize-declaration}.)
+
+In other words, the default efficiency notes only suggest that you add
+declarations, not that you change the semantics of your program so
+that an efficient implementation will apply.  For example, compilation
+of this form will not give an efficiency note:
+\begin{lisp}
+(elt (the list l) i)
+\end{lisp}
+even though a vector access is more efficient than indexing a list.
+
+
+\subsection{Efficiency Notes and Type Checking}
+\cpsubindex{type checking}{efficiency of}
+\cpsubindex{efficiency}{of type checking}
+\cpsubindex{optimization}{type check}
+
+It is important that the \code{eff-note} example above used
+\w{\code{(safety 0)}}.  When type checking is enabled, you may get apparently
+spurious efficiency notes.  With \w{\code{(safety 1)}}, the note has this extra
+line on the end:
+
+\begin{example}
+The result is a (INTEGER -1610612736 1610612733), not a FIXNUM.
+\end{example}
+
+This seems strange, since there is a \code{the} declaration on the result of that
+second addition.
+
+In fact, the inefficiency is real, and is a consequence of \python{}'s
+treating declarations as assertions to be verified.  The compiler
+can't assume that the result type declaration is true\dash{}it must
+generate the result and then test whether it is of the appropriate
+type.
+
+In practice, this means that when you are tuning a program to run
+without type checks, you should work from the efficiency notes
+generated by unsafe compilation.  If you want code to run efficiently
+with type checking, then you should pay attention to all the
+efficiency notes that you get during safe compilation.  Since user
+supplied output type assertions (e.g., from \code{the}) are
+disregarded when selecting operation implementations for safe code,
+you must somehow give the compiler information that allows it to prove
+that the result truly must be of a good type.  In our example, it
+could be done by constraining the argument types more:
+
+\begin{lisp}
+(defun eff-note (x y z)
+  (declare (type (unsigned-byte 18) x y z))
+  (+ x y z))
+\end{lisp}
+
+Of course, this declaration is acceptable only if the arguments to \code{eff-note}
+always \var{are} \w{\code{(unsigned-byte 18)}} integers.
+
+
+\subsection{Representation Efficiency Notes}
+\label{representation-eff-note}
+\cindex{representation efficiency notes}
+\cpsubindex{efficiency notes}{for representation}
+\cindex{object representation efficiency notes}
+\cindex{stack numbers}
+\cindex{non-descriptor representations}
+\cpsubindex{descriptor representations}{forcing of}
+
+When operating on values that have non-descriptor representations
+(\pxlref{non-descriptor}), there can be a substantial time and consing
+penalty for converting to and from descriptor representations.  For
+this reason, the compiler gives an efficiency note whenever it is
+forced to do a representation coercion more expensive than
+\varref{efficiency-note-cost-threshold}.
+
+Inefficient representation coercions may be due to type uncertainty,
+as in this example:
+
+\begin{lisp}
+(defun set-flo (x)
+  (declare (single-float x))
+  (prog ((var 0.0))
+    (setq var (gorp))
+    (setq var x)
+    (return var)))
+\end{lisp}
+
+which produces this efficiency note:
+
+\begin{example}
+In: DEFUN SET-FLO
+  (SETQ VAR X)
+Note: Doing float to pointer coercion (cost 13) from X to VAR.
+\end{example}
+
+The variable \code{var} is not known to always hold values of type
+\code{single-float}, so a descriptor representation must be used for its value.
+In this sort of situation, adding a declaration will eliminate the inefficiency.
+
+Often inefficient representation conversions are not due to type
+uncertainty\dash{}instead, they result from evaluating a
+non-descriptor expression in a context that requires a descriptor
+result:
+
+\begin{itemize} 
+\item Assignment to or initialization of any data structure other than
+  a specialized array (\pxlref{specialized-array-types}), or
+  
+\item Assignment to a \code{special} variable, or
+  
+\item Passing as an argument or returning as a value in any function
+  call that is not a local call (\pxlref{number-local-call}.)
+\end{itemize}
+
+If such inefficient coercions appear in a ``hot spot'' in the program, data
+structures redesign or program reorganization may be necessary to improve
+efficiency.  See sections \ref{block-compilation}, \ref{numeric-types} and
+\ref{profiling}.
+
+Because representation selection is done rather late in compilation,
+the source context in these efficiency notes is somewhat vague, making
+interpretation more difficult.  This is a fairly straightforward
+example:
+
+\begin{lisp}
+(defun cf+ (x y)
+  (declare (single-float x y))
+  (cons (+ x y) t))
+\end{lisp}
+
+which gives this efficiency note:
+
+\begin{example}
+In: DEFUN CF+
+  (CONS (+ X Y) T)
+Note: Doing float to pointer coercion (cost 13), for:
+      The first argument of CONS.
+\end{example}
+
+The source context form is almost always the form that receives the value being
+coerced (as it is in the preceding example), but can also be the source form
+which generates the coerced value.  Compiling this example:
+
+\begin{lisp}
+(defun if-cf+ (x y)
+  (declare (single-float x y))
+  (cons (if (grue) (+ x y) (snoc)) t))
+\end{lisp}
+
+produces this note:
+
+\begin{example}
+In: DEFUN IF-CF+
+  (+ X Y)
+Note: Doing float to pointer coercion (cost 13).
+\end{example}
+
+In either case, the note's text explanation attempts to include
+additional information about what locations are the source and
+destination of the coercion.  Here are some example notes:
+\begin{example}
+  (IF (GRUE) X (SNOC))
+Note: Doing float to pointer coercion (cost 13) from X.
+
+  (SETQ VAR X)
+Note: Doing float to pointer coercion (cost 13) from X to VAR.
+\end{example}
+Note that the return value of a function is also a place to which coercions may
+have to be done:
+\begin{example}
+  (DEFUN F+ (X Y) (DECLARE (SINGLE-FLOAT X Y)) (+ X Y))
+Note: Doing float to pointer coercion (cost 13) to "<return value>".
+\end{example}
+Sometimes the compiler is unable to determine a name for the source or
+destination, in which case the source context is the only clue.
+
+
+\subsection{Verbosity Control}
+\cpsubindex{verbosity}{of efficiency notes}
+\cpsubindex{efficiency notes}{verbosity}
+
+These variables control the verbosity of efficiency notes:
+
+\begin{defvar}{}{efficiency-note-cost-threshold}
+  
+  Before printing some efficiency notes, the compiler compares the
+  value of this variable to the difference in cost between the chosen
+  implementation and the best potential implementation.  If the
+  difference is not greater than this limit, then no note is printed.
+  The units are implementation dependent; the initial value suppresses
+  notes about ``trivial'' inefficiencies.  A value of \code{1} will
+  note any inefficiency.
+\end{defvar}
+
+\begin{defvar}{}{efficiency-note-limit}
+  
+  When printing some efficiency notes, the compiler reports possible
+  efficient implementations.  The initial value of \code{2} prevents
+  excessively long efficiency notes in the common case where there is
+  no type information, so all implementations are possible.
+\end{defvar}
+
+
+\section{Profiling}
+\cindex{profiling}
+\cindex{timing}
+\cindex{consing}
+\cindex{tuning}
+\label{profiling}
+
+The first step in improving a program's performance is to profile the
+activity of the program to find where it spends its time.  The best
+way to do this is to use the profiling utility found in the
+\code{profile} package.  This package provides a macro \code{profile}
+that encapsulates functions with statistics gathering code.
+
+
+\subsection{Profile Interface}
+
+\begin{defvar}{profile:}{timed-functions}
+  
+  This variable holds a list of all functions that are currently being
+  profiled.
+\end{defvar}
+
+\begin{defmac}{profile:}{profile}{%
+    \args{\mstar{\var{name} \mor \kwd{callers} \code{t}}}}
+  
+  This macro wraps profiling code around the named functions.  As in
+  \code{trace}, the \var{name}s are not evaluated.  If a function is
+  already profiled, then the function is unprofiled and reprofiled
+  (useful to notice function redefinition.)  A warning is printed for
+  each name that is not a defined function.
+  
+  If \kwd{callers \var{t}} is specified, then each function that calls
+  this function is recorded along with the number of calls made.
+\end{defmac}
+
+\begin{defmac}{profile:}{unprofile}{%
+    \args{\mstar{\var{name}}}}
+  
+  This macro removes profiling code from the named functions.  If no
+  \var{name}s are supplied, all currently profiled functions are
+  unprofiled.
+\end{defmac}
+
+\begin{defmac}{profile:}{profile-all}{%
+    \args{\keys{\kwd{package} \kwd{callers-p}}}}
+  
+  This macro in effect calls \code{profile:profile} for each
+  function in the specified package which defaults to
+  \code{*package*}.  \kwd{callers-p} has the same meaning as in
+  \code{profile:profile}.
+\end{defmac}
+
+\begin{defmac}{profile:}{report-time}{\args{\mstar{\var{name}}}}
+  
+  This macro prints a report for each \var{name}d function of the
+  following information:
+  \begin{itemize}
+  \item The total CPU time used in that function for all calls,
+  
+  \item the total number of bytes consed in that function for all
+    calls,
+  
+  \item the total number of calls,
+  
+  \item the average amount of CPU time per call.
+  \end{itemize}
+  Summary totals of the CPU time, consing and calls columns are
+  printed.  An estimate of the profiling overhead is also printed (see
+  below).  If no \var{name}s are supplied, then the times for all
+  currently profiled functions are printed.
+\end{defmac}
+
+\begin{defmac}{}{reset-time}{\args{\mstar{\var{name}}}}
+  
+  This macro resets the profiling counters associated with the
+  \var{name}d functions.  If no \var{name}s are supplied, then all
+  currently profiled functions are reset.
+\end{defmac}
+
+
+\subsection{Profiling Techniques}
+
+Start by profiling big pieces of a program, then carefully choose which
+functions close to, but not in, the inner loop are to be profiled next.
+Avoid profiling functions that are called by other profiled functions, since
+this opens the possibility of profiling overhead being included in the reported
+times.
+
+If the per-call time reported is less than 1/10 second, then consider the clock
+resolution and profiling overhead before you believe the time.  It may be that
+you will need to run your program many times in order to average out to a
+higher resolution.
+
+
+\subsection{Nested or Recursive Calls}
+
+The profiler attempts to compensate for nested or recursive calls.  Time and
+consing overhead will be charged to the dynamically innermost (most recent)
+call to a profiled function.  So profiling a subfunction of a profiled function
+will cause the reported time for the outer function to decrease.  However if an
+inner function has a large number of calls, some of the profiling overhead may
+``leak'' into the reported time for the outer function.  In general, be wary of
+profiling short functions that are called many times.
+
+
+\subsection{Clock resolution}
+
+Unless you are very lucky, the length of your machine's clock ``tick'' is
+probably much longer than the time it takes simple function to run.  For
+example, on the IBM RT, the clock resolution is 1/50 second.  This means that
+if a function is only called a few times, then only the first couple decimal
+places are really meaningful.  
+
+Note however, that if a function is called many times, then the statistical
+averaging across all calls should result in increased resolution.  For example,
+on the IBM RT, if a function is called a thousand times, then a resolution of
+tens of microseconds can be expected.
+
+\subsection{Profiling overhead}
+
+The added profiling code takes time to run every time that the profiled
+function is called, which can disrupt the attempt to collect timing
+information.  In order to avoid serious inflation of the times for functions
+that take little time to run, an estimate of the overhead due to profiling is
+subtracted from the times reported for each function.
+
+Although this correction works fairly well, it is not totally accurate,
+resulting in times that become increasingly meaningless for functions with
+short runtimes.  This is only a concern when the estimated profiling overhead
+is many times larger than reported total CPU time.
+
+The estimated profiling overhead is not represented in the reported total CPU
+time.  The sum of total CPU time and the estimated profiling overhead should be
+close to the total CPU time for the entire profiling run (as determined by the
+\code{time} macro.)  Time unaccounted for is probably being used by functions that
+you forgot to profile.
+
+\subsection{Additional Timing Utilities}
+
+\begin{defmac}{}{time}{ \args{\var{form}}}
+
+  This macro evaluates \var{form}, prints some timing and memory
+  allocation information to \code{*trace-output*}, and returns any
+  values that \var{form} returns.  The timing information includes
+  real time, user run time, and system run time.  This macro executes
+  a form and reports the time and consing overhead.  If the
+  \code{time} form is not compiled (e.g. it was typed at top-level),
+  then \code{compile} will be called on the form to give more accurate
+  timing information.  If you really want to time interpreted speed,
+  you can say:
+\begin{lisp}
+(time (eval '\var{form}))
+\end{lisp}
+Things that execute fairly quickly should be timed more than once,
+since there may be more paging overhead in the first timing.  To
+increase the accuracy of very short times, you can time multiple
+evaluations:
+\begin{lisp}
+(time (dotimes (i 100) \var{form}))
+\end{lisp}
+\end{defmac}
+
+\begin{defun}{extensions:}{get-bytes-consed}{}
+  
+  This function returns the number of bytes allocated since the first
+  time you called it.  The first time it is called it returns zero.
+  The above profiling routines use this to report consing information.
+\end{defun}
+
+\begin{defvar}{extensions:}{gc-run-time}
+  
+  This variable accumulates the run-time consumed by garbage
+  collection, in the units returned by
+  \findexed{get-internal-run-time}.
+\end{defvar}
+
+\begin{defconst}{}{internal-time-units-per-second}
+The value of internal-time-units-per-second is 100.
+\end{defconst}
+
+\subsection{A Note on Timing}
+\cpsubindex{CPU time}{interpretation of}
+\cpsubindex{run time}{interpretation of}
+\cindex{interpretation of run time}
+
+There are two general kinds of timing information provided by the
+\code{time} macro and other profiling utilities: real time and run
+time.  Real time is elapsed, wall clock time.  It will be affected in
+a fairly obvious way by any other activity on the machine.  The more
+other processes contending for CPU and memory, the more real time will
+increase.  This means that real time measurements are difficult to
+replicate, though this is less true on a dedicated workstation.  The
+advantage of real time is that it is real.  It tells you really how
+long the program took to run under the benchmarking conditions.  The
+problem is that you don't know exactly what those conditions were.
+
+Run time is the amount of time that the processor supposedly spent
+running the program, as opposed to waiting for I/O or running other
+processes.  ``User run time'' and ``system run time'' are numbers
+reported by the Unix kernel.  They are supposed to be a measure of how
+much time the processor spent running your ``user'' program (which
+will include GC overhead, etc.), and the amount of time that the
+kernel spent running ``on your behalf.''
+
+Ideally, user time should be totally unaffected by benchmarking
+conditions; in reality user time does depend on other system activity,
+though in rather non-obvious ways.
+
+System time will clearly depend on benchmarking conditions.  In Lisp
+benchmarking, paging activity increases system run time (but not by as much
+as it increases real time, since the kernel spends some time waiting for
+the disk, and this is not run time, kernel or otherwise.)
+
+In my experience, the biggest trap in interpreting kernel/user run time is
+to look only at user time.  In reality, it seems that the \var{sum} of kernel
+and user time is more reproducible.  The problem is that as system activity
+increases, there is a spurious \var{decrease} in user run time.  In effect, as
+paging, etc., increases, user time leaks into system time.
+
+So, in practice, the only way to get truly reproducible results is to run
+with the same competing activity on the system.  Try to run on a machine
+with nobody else logged in, and check with ``ps aux'' to see if there are any
+system processes munching large amounts of CPU or memory.  If the ratio
+between real time and the sum of user and system time varies much between
+runs, then you have a problem.
+
+
+\subsection{Benchmarking Techniques}
+\cindex{benchmarking techniques}
+
+Given these imperfect timing tools, how do should you do benchmarking?  The
+answer depends on whether you are trying to measure improvements in the
+performance of a single program on the same hardware, or if you are trying to
+compare the performance of different programs and/or different hardware.
+
+For the first use (measuring the effect of program modifications with
+constant hardware), you should look at \var{both} system+user and real time to
+understand what effect the change had on CPU use, and on I/O (including
+paging.)  If you are working on a CPU intensive program, the change in
+system+user time will give you a moderately reproducible measure of
+performance across a fairly wide range of system conditions.  For a CPU
+intensive program, you can think of system+user as ``how long it would have
+taken to run if I had my own machine.''  So in the case of comparing CPU
+intensive programs, system+user time is relatively real, and reasonable to
+use.
+
+For programs that spend a substantial amount of their time paging, you
+really can't predict elapsed time under a given operating condition without
+benchmarking in that condition.  User or system+user time may be fairly
+reproducible, but it is also relatively meaningless, since in a paging or
+I/O intensive program, the program is spending its time waiting, not
+running, and system time and user time are both measures of run time.
+A change that reduces run time might increase real time by increasing
+paging.
+
+Another common use for benchmarking is comparing the performance of
+the same program on different hardware.  You want to know which
+machine to run your program on.  For comparing different machines
+(operating systems, etc.), the only way to compare that makes sense is
+to set up the machines in \var{exactly} the way that they will
+\var{normally} be run, and then measure \var{real} time.  If the
+program will normally be run along with X, then run X.  If the program
+will normally be run on a dedicated workstation, then be sure nobody
+else is on the benchmarking machine.  If the program will normally be
+run on a machine with three other Lisp jobs, then run three other Lisp
+jobs.  If the program will normally be run on a machine with 64MB of
+memory, then run with 64MB.  Here, ``normal'' means ``normal for that
+machine''.  
+
+If you have a program you believe to be CPU intensive, then you might be
+tempted to compare ``run'' times across systems, hoping to get a meaningful
+result even if the benchmarking isn't done under the expected running
+condition.  Don't to this, for two reasons:
+
+\begin{itemize}  
+\item The operating systems might not compute run time in the same
+  way.
+  
+\item Under the real running condition, the program might not be CPU
+  intensive after all.
+\end{itemize}
+
+
+In the end, only real time means anything\dash{}it is the amount of time you
+have to wait for the result.  The only valid uses for run time are:
+
+\begin{itemize}
+\item To develop insight into the program.  For example, if run time
+  is much less than elapsed time, then you are probably spending lots
+  of time paging.
+  
+\item To evaluate the relative performance of CPU intensive programs
+  in the same environment.
+\end{itemize}

@@ -46,7 +46,6 @@
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
 
 ;;; With Symbol-Value, we check that the value isn't the trap object.
-;;; So Symbol-Value of NIL is NIL.
 (define-vop (symbol-value checked-cell-ref)
   (:translate symeval)
   (:generator 9

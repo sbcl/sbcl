@@ -257,7 +257,7 @@ static inline void gc_set_region_empty(struct alloc_region *region)
 
 static inline void gc_init_region(struct alloc_region *region)
 {
-    region->last_page = 0; // must always be a valid page index
+    // A distinction without a difference (it used to do one more assignment)
     gc_set_region_empty(region);
 }
 

@@ -1,5 +1,3 @@
-#+gencgc (setf (extern-alien "gc_allocate_dirty" char) 1)
-
 (setq *compile-print* nil)
 sb-ext::(declaim (muffle-conditions compiler-note))
 (require :asdf)

@@ -215,8 +215,8 @@
                           ;; receivers (or only senders) are shot
                           ;; dead, there's still one that survives to
                           ;; properly end the test.
-                          (loop repeat 99
-                                for victim = (nth (random n) threads)
+                          (loop for victim = (nth (random n) threads)
+                                repeat 99
                                 do (kill-thread victim)
                                    (sleep (random 0.0001)))))
       (values

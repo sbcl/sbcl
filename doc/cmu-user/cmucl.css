@@ -1,0 +1,85 @@
+html {
+  color: black;
+  background-color: white;
+  margin-left: 4%;
+  margin-right: 2%;
+}
+
+h1 {
+   text-align: center;
+   font-family: Helvetica, Arial, sans-serif
+}
+
+h2 {
+   color: #515e4b;
+   font-family: Helvetica, Arial, sans-serif
+}
+
+h3 {
+   font-family: Helvetica, Arial, sans-serif;
+}
+
+.lisp {
+   background: #aaaaaa;
+   border:solid #aaaaaa 0.1px;
+   white-space:pre;
+   font-family: sans-serif;
+}
+
+.example {
+   background: #cccccc;
+   border:solid #cccccc 0.1px;
+   white-space:pre;
+}
+
+.code {
+   background: #faf0e6;
+   border:solid #faf0e6 1px;
+   white-space:pre-line;
+}
+
+.technical {
+   background: #dddddd;
+   border: solid black 1px;
+   padding-left: 1em;
+   padding-right: 1em;
+   padding-top: 1ex;
+   padding-bottom: 1ex;
+   font-size: smaller;
+   font-stretch: semi-condensed;
+   margin-left: 10%;
+}
+
+.credits {
+   background: #eeeeee;
+   font-stretch: condensed;
+   font-size: 0.8em;
+   font-family: Helvetica, Arial, sans-serif;
+   text-align: right;
+}
+
+.function-name {
+   color: rgb(25%,0%,0%);
+} 
+
+.variable {
+   color: rgb(0%,25%,0%);
+}
+
+
+A:link
+{
+    text-decoration: none
+}
+A:active
+{
+    text-decoration: none
+}
+A:visited
+{
+    text-decoration: none
+}
+A:hover
+{
+    text-decoration: underline
+}

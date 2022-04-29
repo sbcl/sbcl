@@ -150,17 +150,24 @@
                           (:translate %negate)
                           (:save-p t))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
-                          (:res res (descriptor-reg any-reg) rdx-offset)
-                          (:temp rcx unsigned-reg rcx-offset))
+                          (:res res (descriptor-reg any-reg) rdx-offset))
   (inst test :byte x fixnum-tag-mask)
   (inst jmp :nz GENERIC)
   (move res x)
   (inst neg res)                        ; (- most-negative-fixnum) is BIGNUM
-  (inst jmp :o BIGNUM)
-  (inst clc) (inst ret)
-  BIGNUM
-  (inst shr res n-fixnum-tag-bits)      ; sign bit is data - remove type bits
-  (return-single-word-bignum res rcx res)
+  (inst jmp :no FIXNUM)
+  ;; "inline constants" are quite wonky in terms of how we express the desired
+  ;; alignment and how we compute a pointer to the value
+  ;; (each backend being different in the implementation thereof is no help).
+  ;; The easiest thing to do is make this bignum an :OWORD and OR in a lowtag.
+  ;; Unfortunately this constant is not a valid argument to MAKE-LISP-OBJ.
+  ;; I don't think asm routines are allowed to reference boxed constants
+  ;; in dynamic space, are they? We could put it in static space maybe.
+  (let ((bignum (register-inline-constant
+                 :oword (logior (ash (- most-negative-fixnum) 64)
+                                (bignum-header-for-length 1)))))
+    (inst lea res (rip-relative-ea (ea-disp bignum) other-pointer-lowtag)))
+  FIXNUM
   (inst clc) (inst ret)
   GENERIC
   (tail-call-static-fun '%negate 1))

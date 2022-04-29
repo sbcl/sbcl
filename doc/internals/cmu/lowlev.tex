@@ -1,0 +1,85 @@
+\chapter{Memory Management}
+
+\section{Stacks and Globals}
+
+\section{Heap Layout}
+
+\section{Garbage Collection}
+
+\chapter{Interface to C and Assembler}
+
+
+\section{Linkage Table}
+
+The linkage table feature is based on how dynamic libraries dispatch.
+A table of functions is used which is filled in with the appropriate
+code to jump to the correct address.
+
+For \cmucl{}, this table is stored at
+\code{target-foreign-linkage-space-start}. Each entry is
+\code{target-foreign-linkage-entry-size} bytes long.
+
+At startup, the table is initialized with default values in
+\code{os\_foreign\_linkage\_init}. On x86 platforms, the first entry is
+code to call the routine \code{resolve\_linkage\_tramp}. All other
+entries jump to the first entry. The function
+\code{resolve\_linkage\_tramp} looks at where it was called from to
+figure out which entry in the table was used. It calls
+\code{lazy\_resolve\_linkage} with the address of the linkage entry.
+This routine then fills in the appropriate linkage entry with code to
+jump to where the real routine is located, and returns the address of
+the entry. On return, \code{resolve\_linkage\_tramp} then just jumps to
+the returned address to call the desired function. On all subsequent
+calls, the entry no longer points to \code{resolve\_linkage\_tramp} but
+to the real function.
+
+This describes how function calls are made. For foreign data,
+\code{lazy\_resolve\_linkage} stuffs the address of the actual foreign
+data into the linkage table. The lisp code then just loads the address
+from there to get the actual address of the foreign data.
+
+For sparc, the linkage table is slightly different. The first entry is
+the entry for \code{call\_into\_c} so we never have to look this up. All
+other entries are for \code{resolve\_linkage\_tramp}. This has the
+advantage that \code{resolve\_linkage\_tramp} can be much simpler since
+all calls to foreign code go through \code{call\_into\_c} anyway, and
+that means all live Lisp registers have already been saved. Also, to
+make life simpler, we lie about \code{closure\_tramp} and
+\code{undefined\_tramp} in the Lisp code. These are really functions,
+but we treat them as foreign data since these two routines are only
+used as addresses in the Lisp code to stuff into a lisp function
+header.
+
+On the Lisp side, there are two supporting data structures for the
+linkage table: \code{*linkage-table-data*} and
+\code{*foreign-linkage-symbols*}. The latter is a hash table whose key
+is the foreign symbol (a string) and whose value is an index into
+\code{*linkage-table-data*}.
+
+\code{*linkage-table-data*} is a vector with an unlispy layout. Each
+entry has 3 parts:
+
+\begin{itemize}
+\item symbol name
+\item type, a fixnum, 1 = code, 2 = data
+\item library list - the library list at the time the symbol is registered.
+\end{itemize}
+
+Whenever a new foreign symbol is defined, a new
+\code{*linkage-table-data*} entry is created.
+\code{*foreign-linkage-symbols*} is updated with the symbol and the
+entry number into \code{*linkage-table-data*}.
+
+The \code{*linkage-table-data*} is accessed from C (hence the unlispy
+layout), to figure out the symbol name and the type so that the
+address of the symbol can be determined.  The type tells the C code
+how to fill in the entry in the linkage-table itself.
+
+% (Should say something about genesis too, but I don't know how that
+% works other than the initial table is setup with the appropriate first
+% entry.)
+
+
+\chapter{Low-level debugging}
+
+\chapter{Core File Format}

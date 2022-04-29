@@ -348,8 +348,21 @@ describe_internal_error(os_context_t *context)
 
 #ifdef LISP_FEATURE_ARM64
     unsigned char first_arg = trap_instruction >> 13 & 0xFF;
+    unsigned char first_offset = first_arg & 0x1F;
+    unsigned char first_sc = first_arg >> 5;
     if (first_arg != 31) {
-        describe_error_arg(context, 0, first_arg);
+        char sc = 0;
+        switch (first_sc) {
+        case 1:
+            sc = sc_UnsignedReg;
+            break;
+        case 2:
+            sc = sc_SignedReg;
+            break;
+        default:
+            sc = sc_DescriptorReg;
+        }
+        describe_error_arg(context, sc, first_offset);
         count--;
     }
 #endif

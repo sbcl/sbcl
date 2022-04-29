@@ -230,8 +230,7 @@
                 (if p
                     (canon (concatenate 'string (subseq s 0 p) (subseq s (1+ p))))
                     s))))
-    (loop repeat 1000
-          for length = (random 32)
+    (loop for length = (random 32)
           for native-namestring = (coerce
                                    (loop repeat length
                                          collect
@@ -240,11 +239,11 @@
                                    'simple-base-string)
           for pathname = (native-pathname native-namestring)
           for nnn = (native-namestring pathname)
+          repeat 1000
           do (setf native-namestring (canon native-namestring))
              (unless (string= nnn native-namestring)
                (error "1: wanted ~S, got ~S" native-namestring nnn)))
-    (loop repeat 1000
-          for native-namestring = (with-output-to-string (s)
+    (loop for native-namestring = (with-output-to-string (s)
                                     (write-string "mu" s)
                                     (loop
                                       (let ((r (random 1.0)))
@@ -262,6 +261,7 @@
                                               s))))))
           for pathname = (native-pathname native-namestring)
           for tricky-nnn = (native-namestring pathname)
+          repeat 1000
           do (setf native-namestring (canon native-namestring))
              (unless (string= tricky-nnn native-namestring)
                (error "2: wanted ~S, got ~S" native-namestring tricky-nnn))))))

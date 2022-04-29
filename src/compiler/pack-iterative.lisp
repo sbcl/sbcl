@@ -65,7 +65,7 @@
   ;; vertex, taking into account reserve locations and preallocated
   ;; TNs.
   (initial-domain 0 :type sc-locations)
-  (initial-domain-size 0 :type #.`(integer 0 ,sb-vm:finite-sc-offset-limit))
+  (initial-domain-size 0 :type (integer 0 #.sb-vm:finite-sc-offset-limit))
   ;; TN this is a vertex for.
   (tn           nil :type tn :read-only t)
   (element-size nil :type (integer 1 8) :read-only t)

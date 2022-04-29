@@ -286,6 +286,13 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
   ;; can create a POLICY that indicates absence of primary qualities.
   ;; This does not affect RESTRICT-COMPILER-POLICY because a lower bound of 0
   ;; can be assumed for everything. SET-MACRO-POLICY might care though.
+  ;;
+  ;; FIXME: it is wrong IMHO that the min/max are applied lazily, every time
+  ;; they are fetched from a policy. This makes it impossible to create
+  ;; a policy that represents _exactly_ what you want in the internals of the
+  ;; CLOS implementation. Applying the min/max when a policy is created would
+  ;; provide an escape mechanism. Alternatively we could indicate in the policy
+  ;; whether each quality should be treated as absolute.
   (define-getter %policy-quality
     (let ((min *policy-min*)
           (max *policy-max*))

@@ -27,9 +27,12 @@
          (value :scs (descriptor-reg any-reg null zero)))
   (:info name offset lowtag)
   (:ignore name)
-  (:results)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:vop-var vop)
   (:generator 1
-    (storew value object offset lowtag)))
+    (without-scheduling ()
+      (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)
+      (storew value object offset lowtag))))
 
 ;;;; Symbol hacking VOPs:
 
@@ -49,8 +52,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp))
 
-;;; With Symbol-Value, we check that the value isn't the trap object.  So
-;;; Symbol-Value of NIL is NIL.
+;;; With Symbol-Value, we check that the value isn't the trap object.
 ;;;
 (define-vop (symbol-value checked-cell-ref)
   (:translate symeval)
@@ -73,7 +75,6 @@
   (:generator 9
     (inst lb temp object (+ (- (ash symbol-value-slot word-shift) other-pointer-lowtag)
                             #+big-endian 3))
-    (inst nop)
     (inst xor temp temp unbound-marker-widetag)
     (if not-p
         (inst beq temp target)
@@ -137,8 +138,9 @@
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
+      (without-scheduling ()
+        (emit-gc-store-barrier fdefn nil type)) ; type = temp
       (load-type type function (- fun-pointer-lowtag))
-      (inst nop)
       (inst xor type simple-fun-widetag)
       (inst beq type normal-fn)
       (inst addu lip function
@@ -181,20 +183,25 @@
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (non-descriptor-reg)) temp2)
   (:generator 5
     (loadw temp symbol symbol-value-slot other-pointer-lowtag)
     (inst addu bsp-tn bsp-tn (* 2 n-word-bytes))
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
-    (storew val symbol symbol-value-slot other-pointer-lowtag)))
-
+    (without-scheduling ()
+      (emit-gc-store-barrier symbol nil temp2)
+      (storew val symbol symbol-value-slot other-pointer-lowtag))))
 
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) symbol value)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 0
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
-    (storew value symbol symbol-value-slot other-pointer-lowtag)
+    (without-scheduling ()
+      (emit-gc-store-barrier symbol nil temp)
+      (storew value symbol symbol-value-slot other-pointer-lowtag))
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst addu bsp-tn bsp-tn (* -2 n-word-bytes))))
@@ -204,6 +211,7 @@
   (:args (arg :scs (descriptor-reg any-reg) :target where))
   (:temporary (:scs (any-reg) :from (:argument 0)) where)
   (:temporary (:scs (descriptor-reg)) symbol value)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 0
     (let ((loop (gen-label))
           (skip (gen-label))
@@ -216,7 +224,9 @@
       (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
       (inst beq symbol skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
-      (storew value symbol symbol-value-slot other-pointer-lowtag)
+      (without-scheduling ()
+        (emit-gc-store-barrier symbol nil temp)
+        (storew value symbol symbol-value-slot other-pointer-lowtag))
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
       (emit-label skip)

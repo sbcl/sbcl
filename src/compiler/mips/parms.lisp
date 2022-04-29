@@ -18,7 +18,8 @@
   ;; The o32 ABI specifies 4k-64k as page size. We have to pick the
   ;; maximum since mprotect() works only with page granularity.
 (defconstant +backend-page-bytes+ 65536)
-(defconstant gencgc-page-bytes +backend-page-bytes+)
+(defconstant gencgc-page-bytes 8192)
+(defconstant cards-per-page 8)
 (defconstant gencgc-alloc-granularity 0)
 (defconstant gencgc-release-granularity +backend-page-bytes+)
 

@@ -1,0 +1,968 @@
+\chapter{ICR conversion} % -*- Dictionary: design -*-
+
+
+\section{Canonical forms}
+
+\#|
+
+Would be useful to have a Freeze-Type proclamation.  Its primary use would be
+to say that the indicated type won't acquire any new subtypes in the future.
+This allows better open-coding of structure type predicates, since the possible
+types that would satisfy the predicate will be constant at compile time, and
+thus can be compiled as a skip-chain of EQ tests.  
+
+Of course, this is only a big win when the subtypes are few: the most important
+case is when there are none.  If the closure of the subtypes is much larger
+than the average number of supertypes of an inferior, then it is better to grab
+the list of superiors out of the object's type, and test for membership in that
+list.
+
+Should type-specific numeric equality be done by EQL rather than =?  i.e.
+should = on two fixnums become EQL and then convert to EQL/FIXNUM?
+Currently we transform EQL into =, which is complicated, since we have to prove
+the operands are the class of numeric type before we do it.  Also, when EQL
+sees one operand is a FIXNUM, it transforms to EQ, but the generator for EQ
+isn't expecting numbers, so it doesn't use an immediate compare.
+
+
+\subsection{Array hackery}
+
+Array type tests are transformed to \verb|%array-typep|, separation of the
+implementation-dependent array-type handling.  This way we can transform
+STRINGP to:
+
+\begin{verbatim}
+     (or (simple-string-p x)
+	 (and (complex-array-p x)
+	      (= (array-rank x) 1)
+	      (simple-string-p (%array-data x))))  
+\end{verbatim}
+
+In addition to the similar bit-vector-p, we also handle vectorp and any type
+tests on which the a dimension isn't wild.
+[Note that we will want to expand into frobs compatible with those that
+array references expand into so that the same optimizations will work on both.]
+
+These changes combine to convert hairy type checks into hairy typep's, and then
+convert hairyp typeps into simple typeps.
+
+
+Do we really need non-VOP templates? It seems that we could get the
+desired effect through implementation-dependent ICR transforms. The
+main risk would be of obscuring the type semantics of the code. We
+could fairly easily retain all the type information present at the
+time the tranform is run, but if we discover new type information,
+then it won't be propagated unless the VM also supplies type inference
+methods for its internal frobs (precluding the use of
+\verb|%PRIMITIVE|, since primitives don't have derive-type methods.)
+
+I guess one possibility would be to have the call still considered ``known'' even
+though it has been transformed.  But this doesn't work, since we start doing
+LET optimizations that trash the arglist once the call has been transformed
+(and indeed we want to.)
+
+Actually, I guess the overhead for providing type inference methods for the
+internal frobs isn't that great, since we can usually borrow the inference
+method for a Common Lisp function.  For example, in our AREF case:
+
+\begin{verbatim}
+    (aref x y)
+==>
+    (let ((#:len (array-dimension x 0)))
+      (%unchecked-aref x (%check-in-bounds y #:len)))  
+\end{verbatim}
+
+Now in this case, if we made \verb|%UNCHECKED-AREF| have the same
+derive-type method as AREF, then if we discovered something new about
+X's element type, we could derive a new type for the entire
+expression.
+
+Actually, it seems that baring this detail at the ICR level is
+beneficial, since it admits the possibility of optimizing away the bounds
+check using type information. If we discover X's dimensions, then
+\verb|#:LEN| becomes a constant that can be substituted. Then
+\verb|%CHECK-IN-BOUNDS| can notice that the bound is constant and
+check it against the type for Y. If Y is known to be in range, then we
+can optimize away the bounds check.
+
+Actually in this particular case, the best thing to do would be if we
+discovered the bound is constant, then replace the bounds check with an
+implicit type check.  This way all the type check optimization mechanisms would
+be brought into the act.
+
+So we actually want to do the bounds-check expansion as soon as possible,
+rather than later than possible: it should be a source-transform, enabled by
+the fast-safe policy.
+
+With multi-dimensional arrays we probably want to explicitly do the index
+computation: this way portions of the index computation can become loop
+invariants.  In a scan in row-major order, the inner loop wouldn't have to do
+any multiplication: it would only do an addition.  We would use normal
+fixnum arithmetic, counting on * to cleverly handle multiplication by a
+constant, and appropriate inline expansion.
+
+Note that in a source transform, we can't make any assumptions the type of the
+array.  If it turns out to be a complex array without declared dimensions, then
+the calls to ARRAY-DIMENSION will have to turn into a VOP that can be affected.
+But if it is simple, then the VOP is unaffected, and if we know the bounds, it
+is constant.  Similarly, we would have %ARRAY-DATA and %ARRAY-DISPLACEMENT
+operations.  %ARRAY-DISPLACEMENT would optimize to 0 if we discover the array
+is simple.  [This is somewhat inefficient when the array isn't eventually
+discovered to be simple, since finding the data and finding the displacement
+duplicate each other.  We could make %ARRAY-DATA return both as MVs, and then
+optimize to (VALUES (%SIMPLE-ARRAY-DATA x) 0), but this would require
+optimization of trivial VALUES uses.]
+
+Also need (THE (ARRAY * * * ...) x) to assert correct rank.
+
+|\#
+
+A bunch of functions have source transforms that convert them into the
+canonical form that later parts of the compiler want to see.  It is not legal
+to rely on the canonical form since source transforms can be inhibited by a
+Notinline declaration.  This shouldn't be a problem, since everyone should keep
+their hands off of Notinline calls.
+
+Some transformations:
+\begin{verbatim}
+Endp  ==>  (NULL (THE LIST ...))
+(NOT xxx) or (NULL xxx) => (IF xxx NIL T)
+
+(typep x '<simple type>) => (<simple predicate> x)
+(typep x '<complex type>) => ...composition of simpler operations...
+\end{verbatim}
+
+TYPEP of AND, OR and NOT types turned into conditionals over multiple TYPEP
+calls.  This makes hairy TYPEP calls more digestible to type constraint
+propagation, and also means that the TYPEP code generators don't have to deal
+with these cases.  [\#\#\# In the case of union types we may want to do something
+to preserve information for type constraint propagation.]
+
+
+\begin{verbatim}
+    (apply \#'foo a b c)
+==>
+    (multiple-value-call \#'foo (values a) (values b) (values-list c))
+\end{verbatim}
+
+This way only MV-CALL needs to know how to do calls with unknown numbers of
+arguments.  It should be nearly as efficient as a special-case VMR-Convert
+method could be.
+
+
+\begin{verbatim}
+Make-String => Make-Array
+N-arg predicates associated into two-arg versions.
+Associate N-arg arithmetic ops.
+Expand CxxxR and FIRST...nTH
+Zerop, Plusp, Minusp, 1+, 1-, Min, Max, Rem, Mod
+(Values x), (Identity x) => (Prog1 x)
+
+All specialized aref functions => (aref (the xxx) ...)
+\end{verbatim}
+
+Convert (ldb (byte ...) ...) into internal frob that takes size and position as
+separate args.  Other byte functions also...
+
+Change for-value primitive predicates into \verb+(if <pred> t nil)+.  This isn't
+particularly useful during ICR phases, but makes life easy for VMR conversion.
+
+
+This last can't be a source transformation, since a source transform can't tell
+where the form appears.  Instead, ICR conversion special-cases calls to known
+functions with the Predicate attribute by doing the conversion when the
+destination of the result isn't an IF.  It isn't critical that this never be
+done for predicates that we ultimately discover to deliver their value to an
+IF, since IF optimizations will flush unnecessary IFs in a predicate.
+
+
+\section{Inline functions}
+
+[\#\#\# Inline expansion is especially powerful in the presence of good lisp-level
+optimization (``partial evaluation'').  Many ``optimizations'' usually done in Lisp
+compilers by special-case source-to-source transforms can be had simply by
+making the source of the general case function available for inline expansion.
+This is especially helpful in Common Lisp, which has many commonly used
+functions with simple special cases but bad general cases (list and sequence
+functions, for example.)
+
+Inline expansion of recursive functions is allowed, and is not as silly as it
+sounds.  When expanded in a specific context, much of the overhead of the
+recursive calls may be eliminated (especially if there are many keyword
+arguments, etc.)
+
+[Also have MAYBE-INLINE]
+]
+
+We only record a function's inline expansion in the global environment when the
+function is in the null lexical environment, since the expansion must be
+represented as source.
+
+We do inline expansion of functions locally defined by FLET or LABELS even when
+the environment is not null.  Since the appearances of the local function must
+be nested within the desired environment, it is possible to expand local
+functions inline even when they use the environment.  We just stash the source
+form and environments in the Functional for the local function.  When we
+convert a call to it, we just reconvert the source in the saved environment.
+
+An interesting alternative to the inline/full-call dichotomy is ``semi-inline''
+coding.  Whenever we have an inline expansion for a function, we can expand it
+only once per block compilation, and then use local call to call this copied
+version.  This should get most of the speed advantage of real inline coding
+with much less code bloat.  This is especially attractive for simple system
+functions such as Read-Char.
+
+The main place where true inline expansion would still be worth doing is where
+large amounts of the function could be optimized away by constant folding or
+other optimizations that depend on the exact arguments to the call.
+
+
+
+\section{Compilation policy}
+
+We want more sophisticated control of compilation safety than is offered in CL,
+so that we can emit only those type checks that are likely to discover
+something (i.e. external interfaces.)
+
+
+
+\section{Notes}
+
+Generalized back-end notion provides dynamic retargeting?  (for byte code)
+
+The current node type annotations seem to be somewhat unsatisfactory, since we
+lose information when we do a THE on a continuation that already has uses, or
+when we convert a let where the actual result continuation has other uses.  
+
+But the case with THE isn't really all that bad, since the test of whether
+there are any uses happens before conversion of the argument, thus THE loses
+information only when there are uses outside of the declared form.  The LET
+case may not be a big deal either.
+
+Note also that losing user assertions isn't really all that bad, since it won't
+damage system integrity.  At worst, it will cause a bug to go undetected.  More
+likely, it will just cause the error to be signaled in a different place (and
+possibly in a less informative way).  Of course, there is an efficiency hit for
+losing type information, but if it only happens in strange cases, then this
+isn't a big deal.
+
+
+\chapter{Local call analysis}
+
+All calls to local functions (known named functions and LETs) are resolved to
+the exact LAMBDA node which is to be called.  If the call is syntactically
+illegal, then we emit a warning and mark the reference as :notinline, forcing
+the call to be a full call.  We don't even think about converting APPLY calls;
+APPLY is not special-cased at all in ICR.  We also take care not to convert
+calls in the top-level component, which would join it to normal code.  Calls to
+functions with rest args and calls with non-constant keywords are also not
+converted.
+
+We also convert MV-Calls that look like MULTIPLE-VALUE-BIND to local calls,
+since we know that they can be open-coded.  We replace the optional dispatch
+with a call to the last optional entry point, letting MV-Call magically default
+the unsupplied values to NIL.
+
+When ICR optimizations discover a possible new local call, they explicitly
+invoke local call analysis on the code that needs to be reanalyzed. 
+
+[\#\#\# Let conversion.  What it means to be a let.  Argument type checking done
+by caller.  Significance of local call is that all callers are known, so
+special call conventions may be used.]
+A lambda called in only one place is called a ``let'' call, since a Let would
+turn into one.
+
+In addition to enabling various ICR optimizations, the let/non-let distinction
+has important environment significance.  We treat the code in function and all
+of the lets called by that function as being in the same environment.  This
+allows exits from lets to be treated as local exits, and makes life easy for
+environment analysis.  
+
+Since we will let-convert any function with only one call, we must be careful
+about cleanups.  It is possible that a lexical exit from the let function may
+have to clean up dynamic bindings not lexically apparent at the exit point.  We
+handle this by annotating lets with any cleanup in effect at the call site.
+The cleanup for continuations with no immediately enclosing cleanup is the
+lambda that the continuation is in.  In this case, we look at the lambda to see
+if any cleanups need to be done.
+
+Let conversion is disabled for entry-point functions, since otherwise we might
+convert the call from the XEP to the entry point into a let.  Then later on, we
+might want to convert a non-local reference into a local call, and not be able
+to, since once a function has been converted to a let, we can't convert it
+back.
+
+
+A function's return node may also be deleted if it is unreachable, which can
+happen if the function never returns normally.  Such functions are not lets.
+
+
+\chapter{Find components}
+
+This is a post-pass to ICR conversion that massages the flow graph into the
+shape subsequent phases expect.  Things done:
+  Compute the depth-first ordering for the flow graph.
+  Find the components (disconnected parts) of the flow graph.
+
+This pass need only be redone when newly converted code has been added to the
+flow graph.  The reanalyze flag in the component structure should be set by
+people who mess things up.
+
+We create the initial DFO using a variant of the basic algorithm.  The initial
+DFO computation breaks the ICR up into components, which are parts that can be
+compiled independently.  This is done to increase the efficiency of large block
+compilations.  In addition to improving locality of reference and reducing the
+size of flow analysis problems, this allows back-end data structures to be
+reclaimed after the compilation of each component.
+
+ICR optimization can change the connectivity of the flow graph by discovering
+new calls or eliminating dead code.  Initial DFO determination splits up the
+flow graph into separate components, but does so conservatively, ensuring that
+parts that might become joined (due to local call conversion) are joined from
+the start.  Initial DFO computation also guarantees that all code which shares
+a lexical environment is in the same component so that environment analysis
+needs to operate only on a single component at a time.
+
+[This can get a bit hairy, since code seemingly reachable from the
+environment entry may be reachable from a NLX into that environment.  Also,
+function references must be considered as links joining components even though
+the flow graph doesn't represent these.]
+
+After initial DFO determination, components are neither split nor joined.  The
+standard DFO computation doesn't attempt to split components that have been
+disconnected.
+
+
+\chapter{ICR optimize}
+
+{\bf Somewhere describe basic ICR utilities: continuation-type,
+constant-continuation-p, etc.  Perhaps group by type in ICR description?}
+
+We are conservative about doing variable-for-variable substitution in ICR
+optimization, since if we substitute a variable with a less restrictive type,
+then we may prevent use of a ``good'' representation within the scope of the
+inner binding.
+
+Note that variable-variable substitutions aren't really crucial in ICR, since
+they don't create opportunities for new optimizations (unlike substitution of
+constants and functions).  A spurious variable-variable binding will show up as
+a Move operation in VMR.  This can be optimized away by reaching-definitions
+and also by targeting.  [\#\#\# But actually, some optimizers do see if operands
+are the same variable.]
+
+\#|
+
+The IF-IF optimization can be modeled as a value driven optimization, since
+adding a use definitely is cause for marking the continuation for
+reoptimization.  [When do we add uses?  Let conversion is the only obvious
+time.]  I guess IF-IF conversion could also be triggered by a non-immediate use
+of the test continuation becoming immediate, but to allow this to happen would
+require Delete-Block (or somebody) to mark block-starts as needing to be
+reoptimized when a predecessor changes.  It's not clear how important it is
+that IF-IF conversion happen under all possible circumstances, as long as it
+happens to the obvious cases.
+
+[\#\#\# It isn't totally true that code flushing never enables other worthwhile
+optimizations.  Deleting a functional reference can cause a function to cease
+being an XEP, or even trigger let conversion.  It seems we still want to flush
+code during ICR optimize, but maybe we want to interleave it more intimately
+with the optimization pass.  
+
+Ref-flushing works just as well forward as backward, so it could be done in the
+forward pass.  Call flushing doesn't work so well, but we could scan the block
+backward looking for any new flushable stuff if we flushed a call on the
+forward pass.
+
+When we delete a variable due to lack of references, we leave the variable
+in the lambda-list so that positional references still work.  The initial value
+continuation is flushed, though (replaced with NIL) allowing the initial value
+for to be deleted (modulo side-effects.)
+
+Note that we can delete vars with no refs even when they have sets.  I guess
+when there are no refs, we should also flush all sets, allowing the value
+expressions to be flushed as well.
+
+Squeeze out single-reference unset let variables by changing the dest of the
+initial value continuation to be the node that receives the ref.  This can be
+done regardless of what the initial value form is, since we aren't actually
+moving the evaluation.  Instead, we are in effect using the continuation's
+locations in place of the temporary variable.  
+
+Doing this is of course, a wild violation of stack discipline, since the ref
+might be inside a loop, etc.  But with the VMR back-end, we only need to
+preserve stack discipline for unknown-value continuations; this ICR
+transformation must be already inhibited when the DEST of the REF is a
+multiple-values receiver (EXIT, RETURN or MV-COMBINATION), since we must
+preserve the single-value semantics of the let-binding in this case.
+
+The REF and variable must be deleted as part of this operation, since the ICR
+would otherwise be left in an inconsistent state; we can't wait for the REF to
+be deleted due to being unused, since we have grabbed the arg continuation and
+substituted it into the old DEST.
+
+The big reason for doing this transformation is that in macros such as INCF and
+PSETQ, temporaries are squeezed out, and the new value expression is evaluated
+directly to the setter, allowing any result type assertion to be applied to the
+expression evaluation.  Unlike in the case of substitution, there is no point
+in inhibiting this transformation when the initial value type is weaker than
+the variable type.  Instead, we intersect the asserted type for the old REF's
+CONT with the type assertion on the initial value continuation.  Note that the
+variable's type has already been asserted on the initial-value continuation.
+
+Of course, this transformation also simplifies the ICR even when it doesn't
+discover interesting type assertions, so it makes sense to do it whenever
+possible.  This reduces the demands placed on register allocation, etc.
+
+
+There are three dead-code flushing rules:
+
+\begin{enumerate}
+\item Refs with no DEST may be flushed.
+
+\item Known calls with no dest that are flushable may be flushed.  We null the
+DEST in all the args.
+
+\item If a lambda-var has no refs, then it may be deleted. The flushed
+    argument continuations have their DEST nulled.
+\end{enumerate}
+
+These optimizations all enable one another.  We scan blocks backward, looking
+for nodes whose CONT has no DEST, then type-dispatching off of the node.  If we
+delete a ref, then we check to see if it is a lambda-var with no refs.  When we
+flush an argument, we mark the blocks for all uses of the CONT as needing to be
+reoptimized.
+
+
+\section{Goals for ICR optimizations}
+
+\#|
+
+When an optimization is disabled, code should still be correct and not
+ridiculously inefficient.  Phases shouldn't be made mandatory when they have
+lots of non-required stuff jammed into them.
+
+|\#
+
+This pass is optional, but is desirable if anything is more important than
+compilation speed.
+
+This phase is a grab-bag of optimizations that concern themselves with the flow
+of values through the code representation.  The main things done are type
+inference, constant folding and dead expression elimination.  This phase can be
+understood as a walk of the expression tree that propagates assertions down the
+tree and propagates derived information up the tree.  The main complication is
+that there isn't any expression tree, since ICR is flow-graph based.
+
+We repeat this pass until we don't discover anything new.  This is a bit of
+feat, since we dispatch to arbitrary functions which may do arbitrary things,
+making it hard to tell if anything really happened.  Even if we solve this
+problem by requiring people to flag when they changed or by checking to see if
+they changed something, there are serious efficiency problems due to massive
+redundant computation, since in many cases the only way to tell if anything
+changed is to recompute the value and see if it is different from the old one.
+
+We solve this problem by requiring that optimizations for a node only depend on
+the properties of the CONT and the continuations that have the node as their
+DEST.  If the continuations haven't changed since the last pass, then we don't
+attempt to re-optimize the node, since we know nothing interesting will happen.
+
+We keep track of which continuations have changed by a REOPTIMIZE flag that is
+set whenever something about the continuation's value changes.
+
+When doing the bottom up pass, we dispatch to type specific code that knows how
+to tell when a node needs to be reoptimized and does the optimization.  These
+node types are special-cased: COMBINATION, IF, RETURN, EXIT, SET.
+
+The REOPTIMIZE flag in the COMBINATION-FUN is used to detect when the function
+information might have changed, so that we know when there are new assertions
+that could be propagated from the function type to the arguments.
+
+When we discover something about a leaf, or substitute for leaf, we reoptimize
+the CONT for all the REF and SET nodes. 
+
+We have flags in each block that indicate when any nodes or continuations in
+the block need to be re-optimized, so we don't have to scan blocks where there
+is no chance of anything happening.
+
+It is important for efficiency purposes that optimizers never say that they did
+something when they didn't, but this by itself doesn't guarantee timely
+termination.  I believe that with the type system implemented, type inference
+will converge in finite time, but as a practical matter, it can take far too
+long to discover not much.  For this reason, ICR optimization is terminated
+after three consecutive passes that don't add or delete code.  This premature
+termination only happens 2\% of the time.
+
+
+\section{Flow graph simplification}
+
+Things done:
+
+\begin{itemize}
+\item Delete blocks with no predecessors.
+\item Merge blocks that can be merged.
+\item Convert local calls to Let calls.
+\item Eliminate degenerate IFs.
+\end{itemize}
+
+We take care not to merge blocks that are in different functions or have
+different cleanups.  This guarantees that non-local exits are always at block
+ends and that cleanup code never needs to be inserted within a block.
+
+We eliminate IFs with identical consequent and alternative.  This would most
+likely happen if both the consequent and alternative were optimized away.
+
+[Could also be done if the consequent and alternative were different blocks,
+but computed the same value.  This could be done by a sort of cross-jumping
+optimization that looked at the predecessors for a block and merged code shared
+between predecessors.  IFs with identical branches would eventually be left
+with nothing in their branches.]
+
+We eliminate IF-IF constructs:
+
+\begin{verbatim}
+    (IF (IF A B C) D E) ==>
+    (IF A (IF B D E) (IF C D E))
+\end{verbatim}
+
+In reality, what we do is replicate blocks containing only an IF node where the
+predicate continuation is the block start.  We make one copy of the IF node for
+each use, leaving the consequent and alternative the same.  If you look at the
+flow graph representation, you will see that this is really the same thing as
+the above source to source transformation.
+
+
+\section{Forward ICR optimizations}
+
+In the forward pass, we scan the code in forward depth-first order.  We
+examine each call to a known function, and:
+
+\begin{itemize}
+\item Eliminate any bindings for unused variables.
+
+\item Do top-down type assertion propagation.  In local calls, we propagate
+asserted and derived types between the call and the called lambda.
+
+\item
+    Replace calls of foldable functions with constant arguments with the
+    result.  We don't have to actually delete the call node, since Top-Down
+    optimize will delete it now that its value is unused.
+ 
+\item
+   Run any Optimizer for the current function.  The optimizer does arbitrary
+    transformations by hacking directly on the IR.  This is useful primarily
+    for arithmetic simplification and similar things that may need to examine
+    and modify calls other than the current call.  The optimizer is responsible
+    for recording any changes that it makes.  An optimizer can inhibit further
+    optimization of the node during the current pass by returning true.  This
+    is useful when deleting the node.
+
+\item
+   Do ICR transformations, replacing a global function call with equivalent
+    inline lisp code.
+
+\item
+    Do bottom-up type propagation/inferencing.  For some functions such as
+    Coerce we will dispatch to a function to find the result type.  The
+    Derive-Type function just returns a type structure, and we check if it is
+    different from the old type in order to see if there was a change.
+
+\item
+    Eliminate IFs with predicates known to be true or false.
+
+\item
+    Substitute the value for unset let variables that are bound to constants,
+    unset lambda variables or functionals.
+
+\item
+    Propagate types from local call args to var refs.
+\end{itemize}
+
+We use type info from the function continuation to find result types for
+functions that don't have a derive-type method.
+
+
+\subsection{ICR transformation}
+
+ICR transformation does ``source to source'' transformations on known global
+functions, taking advantage of semantic information such as argument types and
+constant arguments.  Transformation is optional, but should be done if speed or
+space is more important than compilation speed.  Transformations which increase
+space should pass when space is more important than speed.
+
+A transform is actually an inline function call where the function is computed
+at compile time.  The transform gets to peek at the continuations for the
+arguments, and computes a function using the information gained.  Transforms
+should be cautious about directly using the values of constant continuations,
+since the compiler must preserve eqlness of named constants, and it will have a
+hard time if transforms go around randomly copying constants.
+
+The lambda that the transform computes replaces the original function variable
+reference as the function for the call.  This lets the compiler worry about
+evaluating each argument once in the right order.  We want to be careful to
+preserve type information when we do a transform, since it may be less than
+obvious what the transformed code does.
+
+There can be any number of transforms for a function.  Each transform is
+associated with a function type that the call must be compatible with.  A
+transform is only invoked if the call has the right type.  This provides a way
+to deal with the common case of a transform that only applies when the
+arguments are of certain types and some arguments are not specified.  We always
+use the derived type when determining whether a transform is applicable.  Type
+check is responsible for setting the derived type to the intersection of the
+asserted and derived types.
+
+If the code in the expansion has insufficient explicit or implicit argument
+type checking, then it should cause checks to be generated by making
+declarations.
+
+A transformation may decide to pass if it doesn't like what it sees when it
+looks at the args.  The Give-Up function unwinds out of the transform and deals
+with complaining about inefficiency if speed is more important than brevity.
+The format args for the message are arguments to Give-Up.  If a transform can't
+be done, we just record the message where ICR finalize can find it.  note.  We
+can't complain immediately, since it might get transformed later on.
+
+
+\section{Backward ICR optimizations}
+
+In the backward pass, we scan each block in reverse order, and
+eliminate any effectless nodes with unused values.  In ICR this is the
+only way that code is deleted other than the elimination of unreachable blocks.
+
+
+\chapter{Type checking}
+
+%  Somehow split this section up into three parts:
+%  -- Conceptual: how we know a check is necessary, and who is responsible for
+%     doing checks.
+%  -- Incremental: intersection of derived and asserted types, checking for
+%     non-subtype relationship.
+%  -- Check generation phase.
+
+We need to do a pretty good job of guessing when a type check will ultimately
+need to be done.  Generic arithmetic, for example: In the absence of
+declarations, we will use the safe variant, but if we don't know this, we
+will generate a check for NUMBER anyway.  We need to look at the fast-safe
+templates and guess if any of them could apply.
+
+We compute a function type from the VOP arguments
+and assertions on those arguments.  This can be used with Valid-Function-Use
+to see which templates do or might apply to a particular call.  If we guess
+that a safe implementation will be used, then we mark the continuation so as to
+force a safe implementation to be chosen.  [This will happen if ICR optimize
+doesn't run to completion, so the ICR optimization after type check generation
+can discover new type information.  Since we won't redo type check at that
+point, there could be a call that has applicable unsafe templates, but isn't
+type checkable.]
+
+[\#\#\# A better and more general optimization of structure type checks: in type
+check conversion, we look at the *original derived* type of the continuation:
+if the difference between the proven type and the asserted type is a simple
+type check, then check for the negation of the difference.  e.g. if we want a
+FOO and we know we've got (OR FOO NULL), then test for (NOT NULL).  This is a
+very important optimization for linked lists of structures, but can also apply
+in other situations.]
+
+If after ICR phases, we have a continuation with check-type set in a context
+where it seems likely a check will be emitted, and the type is too 
+hairy to be easily checked (i.e. no CHECK-xxx VOP), then we do a transformation
+on the ICR equivalent to:
+
+\begin{verbatim}
+  (... (the hair <foo>) ...)
+==>
+  (... (funcall \#'(lambda (\#:val)
+		    (if (typep \#:val 'hair)
+			\#:val
+			(%type-check-error \#:val 'hair)))
+		<foo>)
+       ...)
+\end{verbatim}
+This way, we guarantee that VMR conversion never has to emit type checks for
+hairy types.
+
+[Actually, we need to do a MV-bind and several type checks when there is a MV
+continuation.  And some values types are just too hairy to check.  We really
+can't check any assertion for a non-fixed number of values, since there isn't
+any efficient way to bind arbitrary numbers of values.  (could be done with
+MV-call of a more-arg function, I guess...)
+]
+
+[Perhaps only use CHECK-xxx VOPs for types equivalent to a ptype?  Exceptions
+for CONS and SYMBOL?  Anyway, no point in going to trouble to implement and
+emit rarely used CHECK-xxx vops.]
+
+One potential lose in converting a type check to explicit conditionals rather
+than to a CHECK-xxx VOP is that VMR code motion optimizations won't be able to
+do anything.  This shouldn't be much of an issue, though, since type constraint
+propagation has already done global optimization of type checks.
+
+
+This phase is optional, but should be done if anything is more important than
+compile speed.  
+
+Type check is responsible for reconciling the continuation asserted and derived
+types, emitting type checks if appropriate.  If the derived type is a subtype
+of the asserted type, then we don't need to do anything.
+
+If there is no intersection between the asserted and derived types, then there
+is a manifest type error.  We print a warning message, indicating that
+something is almost surely wrong.  This will inhibit any transforms or
+generators that care about their argument types, yet also inhibits further
+error messages, since NIL is a subtype of every type.
+
+If the intersection is not null, then we set the derived type to the
+intersection of the asserted and derived types and set the Type-Check flag in
+the continuation.  We always set the flag when we can't prove that the type
+assertion is satisfied, regardless of whether we will ultimately actually emit
+a type check or not.  This is so other phases such as type constraint
+propagation can use the Type-Check flag to detect an interesting type
+assertion, instead of having to duplicate much of the work in this phase.  
+[\#\#\# 7 extremely random values for CONTINUATION-TYPE-CHECK.]
+
+Type checks are generated on the fly during VMR conversion.  When VMR
+conversion generates the check, it prints an efficiency note if speed is
+important.  We don't flame now since type constraint progpagation may decide
+that the check is unnecessary.  [\#\#\# Not done now, maybe never.]
+
+In local function call, it is the caller that is in effect responsible for
+checking argument types.  This happens in the same way as any other type check,
+since ICR optimize propagates the declared argument types to the type
+assertions for the argument continuations in all the calls.
+
+Since the types of arguments to entry points are unknown at compile time, we
+want to do runtime checks to ensure that the incoming arguments are of the
+correct type.  This happens without any special effort on the part of type
+check, since the XEP is represented as a local call with unknown type
+arguments.  These arguments will be marked as needing to be checked.
+
+
+\chapter{Constraint propagation}
+
+New lambda-var-slot:
+
+constraints: a list of all the constraints on this var for either X or Y.
+
+How to maintain consistency?  Does it really matter if there are constraints
+with deleted vars lying around?  Note that whatever mechanism we use for
+getting the constraints in the first place should tend to keep them up to date.
+Probably we would define optimizers for the interesting relations that look at
+their CONT's dest and annotate it if it is an IF.
+
+But maybe it is more trouble then it is worth trying to build up the set of
+constraints during ICR optimize (maintaining consistency in the process).
+Since ICR optimize iterates a bunch of times before it converges, we would be
+wasting time recomputing the constraints, when nobody uses them till constraint
+propagation runs.  
+
+It seems that the only possible win is if we re-ran constraint propagation
+(which we might want to do.)  In that case, we wouldn't have to recompute all
+the constraints from scratch.  But it seems that we could do this just as well
+by having ICR optimize invalidate the affected parts of the constraint
+annotation, rather than trying to keep them up to date.  This also fits better
+with the optional nature of constraint propagation, since we don't want ICR
+optimize to commit to doing a lot of the work of constraint propagation.  
+
+For example, we might have a per-block flag indicating that something happened
+in that block since the last time constraint propagation ran.  We might have
+different flags to represent the distinction between discovering a new type
+assertion inside the block and discovering something new about an if
+predicate, since the latter would be cheaper to update and probably is more
+common.
+
+It's fairly easy to see how we can build these sets of restrictions and
+propagate them using flow analysis, but actually using this information seems
+a bit more ad-hoc.  
+
+Probably the biggest thing we do is look at all the refs.  If we have proven that
+the value is EQ (EQL for a number) to some other leaf (constant or lambda-var),
+then we can substitute for that reference.  In some cases, we will want to do
+special stuff depending on the DEST.  If the dest is an IF and we proved (not
+null), then we can substitute T.  And if the dest is some relation on the same
+two lambda-vars, then we want to see if we can show that relation is definitely
+true or false.
+
+Otherwise, we can do our best to invert the set of restrictions into a type.
+Since types hold only constant info, we have to ignore any constraints between
+two vars.  We can make some use of negated type restrictions by using
+TYPE-DIFFERENCE to remove the type from the ref types.  If our inferred type is
+as good as the type assertion, then the continuation's type-check flag will be
+cleared.
+
+It really isn't much of a problem that we don't infer union types on joins,
+since union types are relatively easy to derive without using flow information.
+The normal bottom-up type inference done by ICR optimize does this for us: it
+annotates everything with the union of all of the things it might possibly be.
+Then constraint propagation subtracts out those types that can't be in effect
+because of predicates or checks.
+
+
+
+This phase is optional, but is desirable if anything is more important than
+compilation speed.  We use an algorithm similar to available expressions to
+propagate variable type information that has been discovered by implicit or
+explicit type tests, or by type inference.
+
+We must do a pre-pass which locates set closure variables, since we cannot do
+flow analysis on such variables.  We set a flag in each set closure variable so
+that we can quickly tell that it is losing when we see it again.  Although this
+may seem to be wastefully redundant with environment analysis, the overlap
+isn't really that great, and the cost should be small compared to that of the
+flow analysis that we are preparing to do.  [Or we could punt on set
+variables...]
+
+A type constraint is a structure that includes sset-element and has
+the type and variable. [Also a not-p flag indicating whether the sense
+is negated.]
+
+Each variable has a list of its type constraints. We create a type
+constraint when we see a type test or check. If there is already a
+constraint for the same variable and type, then we just re-use it. If
+there is already a weaker constraint, then we generate both the weak
+constraints and the strong constraint so that the weak constraints
+won't be lost even if the strong one is unavailable.
+
+We find all the distinct type constraints for each variable during the pre-pass
+over the lambda nesting.  Each constraint has a list of the weaker constraints
+so that we can easily generate them.
+
+Every block generates all the type constraints in it, but a constraint is
+available in a successor only if it is available in all predecessors.  We
+determine the actual type constraint for a variable at a block by intersecting
+all the available type constraints for that variable.
+
+This isn't maximally tense when there are constraints that are not
+hierarchically related, e.g. (or a b) (or b c).  If these constraints were
+available from two predecessors, then we could infer that we have an (or a b c)
+constraint, but the above algorithm would come up with none.  This probably
+isn't a big problem.
+
+[\#\#\# Do we want to deal with \verb+(if (eq <var> '<foo>) ...)+ indicating singleton
+member type?]
+
+We detect explicit type tests by looking at type test annotation in the IF
+node.  If there is a type check, the OUT sets are stored in the node, with
+different sets for the consequent and alternative.  Implicit type checks are
+located by finding Ref nodes whose Cont has the Type-Check flag set.  We don't
+actually represent the GEN sets, we just initialize OUT to it, and then form
+the union in place.
+
+When we do the post-pass, we clear the Type-Check flags in the continuations
+for Refs when we discover that the available constraints satisfy the asserted
+type.  Any explicit uses of typep should be cleaned up by the ICR optimizer for
+typep.  We can also set the derived type for Refs to the intersection of the
+available type assertions.  If we discover anything, we should consider redoing
+ICR optimization, since better type information might enable more
+optimizations.
+
+
+\chapter{ICR finalize} % -*- Dictionary: design -*-
+
+This pass looks for interesting things in the ICR so that we can forget about
+them.  Used and not defined things are flamed about.
+
+We postpone these checks until now because the ICR optimizations may discover
+errors that are not initially obvious.  We also emit efficiency notes about
+optimizations that we were unable to do.  We can't emit the notes immediately,
+since we don't know for sure whether a repeated attempt at optimization will
+succeed.
+
+We examine all references to unknown global function variables and update the
+approximate type accordingly.  We also record the names of the unknown
+functions so that they can be flamed about if they are never defined.  Unknown
+normal variables are flamed about on the fly during ICR conversion, so we
+ignore them here.
+
+We check each newly defined global function for compatibility with previously
+recorded type information.  If there is no :defined or :declared type, then we
+check for compatibility with any approximate function type inferred from
+previous uses.
+
+
+
+\chapter{Environment analysis}
+
+A related change would be to annotate ICR with information about tail-recursion
+relations.  What we would do is add a slot to the node structure that points to
+the corresponding Tail-Info when a node is in a TR position.  This annotation
+would be made in a final ICR pass that runs after cleanup code is generated
+(part of environment analysis).  When true, the node is in a true TR position
+(modulo return-convention incompatibility).  When we determine return
+conventions, we null out the tail-p slots in XEP calls or known calls where we
+decided not to preserve tail-recursion. 
+
+
+In this phase, we also check for changes in the dynamic binding environment
+that require cleanup code to be generated.  We just check for changes in the
+Continuation-Cleanup on local control transfers.  If it changes from
+an inner dynamic context to an outer one that is in the same environment, then
+we emit code to clean up the dynamic bindings between the old and new
+continuation.  We represent the result of cleanup detection to the back end by
+interposing a new block containing a call to a funny function.  Local exits
+from CATCH or UNWIND-PROTECT are detected in the same way.
+
+
+|\#
+
+The primary activity in environment analysis is the annotation of ICR with
+environment structures describing where variables are allocated and what values
+the environment closes over.
+
+Each lambda points to the environment where its variables are allocated, and
+the environments point back.  We always allocate the environment at the Bind
+node for the sole non-let lambda in the environment, so there is a close
+relationship between environments and functions.  Each ``real function'' (i.e.
+not a LET) has a corresponding environment.
+
+We attempt to share the same environment among as many lambdas as possible so
+that unnecessary environment manipulation is not done.  During environment
+analysis the only optimization of this sort is realizing that a Let (a lambda
+with no Return node) cannot need its own environment, since there is no way
+that it can return and discover that its old values have been clobbered.
+
+When the function is called, values from other environments may need to be made
+available in the function's environment.  These values are said to be ``closed
+over''.
+
+Even if a value is not referenced in a given environment, it may need to be
+closed over in that environment so that it can be passed to a called function
+that does reference the value.  When we discover that a value must be closed
+over by a function, we must close over the value in all the environments where
+that function is referenced.  This applies to all references, not just local
+calls, since at other references we must have the values on hand so that we can
+build a closure.  This propagation must be applied recursively, since the value
+must also be available in *those* functions' callers.
+
+If a closure reference is known to be ``safe'' (not an upward funarg), then the
+closure structure may be allocated on the stack.
+
+Closure analysis deals only with closures over values, while Common Lisp
+requires closures over variables.  The difference only becomes significant when
+variables are set.  If a variable is not set, then we can freely make copies of
+it without keeping track of where they are.  When a variable is set, we must
+maintain a single value cell, or at least the illusion thereof.  We achieve
+this by creating a heap-allocated ``value cell'' structure for each set variable
+that is closed over.  The pointer to this value cell is passed around as the
+``value'' corresponding to that variable.  References to the variable must
+explicitly indirect through the value cell.
+
+When we are scanning over the lambdas in the component, we also check for bound
+but not referenced variables.
+
+Environment analysis emits cleanup code for local exits and markers for
+non-local exits.
+
+A non-local exit is a control transfer from one environment to another.  In a
+non-local exit, we must close over the continuation that we transfer to so that
+the exiting function can find its way back.  We indicate the need to close a
+continuation by placing the continuation structure in the closure and also
+pushing it on a list in the environment structure for the target of the exit.
+[\#\#\# To be safe, we would treat the continuation as a set closure variable so
+that we could invalidate it when we leave the dynamic extent of the exit point.
+Transferring control to a meaningless stack pointer would be apt to cause
+horrible death.]
+
+Each local control transfer may require dynamic state such as special bindings
+to be undone.  We represent cleanup actions by funny function calls in a new
+block linked in as an implicit MV-PROG1.
+

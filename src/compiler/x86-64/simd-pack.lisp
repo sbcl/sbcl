@@ -80,28 +80,37 @@
   (int-sse-reg single-sse-reg double-sse-reg)
   (int-sse-reg single-sse-reg double-sse-reg))
 
-(define-vop (move-from-sse)
-  (:args (x :scs (single-sse-reg double-sse-reg int-sse-reg)))
-  (:results (y :scs (descriptor-reg)))
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-  (:node-var node)
-  (:note "SSE to pointer coercion")
-  (:generator 13
-     (alloc-other simd-pack-widetag simd-pack-size y node nil thread-tn)
-       ;; see *simd-pack-element-types*
-     (storew (fixnumize
-              (sc-case x
-                (single-sse-reg 1)
-                (double-sse-reg 2)
-                (int-sse-reg 0)
-                (t 0)))
-         y simd-pack-tag-slot other-pointer-lowtag)
-     (let ((ea (object-slot-ea y simd-pack-lo-value-slot other-pointer-lowtag)))
-       (if (float-sse-p x)
-           (inst movaps ea x)
-           (inst movdqa ea x)))))
-(define-move-vop move-from-sse :move
-  (int-sse-reg single-sse-reg double-sse-reg) (descriptor-reg))
+(macrolet ((define-move-from-sse (type tag &rest scs)
+             (let ((name (symbolicate "MOVE-FROM-SSE/" type)))
+               `(progn
+                  (define-vop (,name)
+                    (:args (x :scs ,scs))
+                    (:results (y :scs (descriptor-reg)))
+                    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+                    (:node-var node)
+                    (:arg-types ,type)
+                    (:note "AVX2 to pointer coercion")
+                    (:generator 13
+                      (alloc-other simd-pack-widetag simd-pack-size y node nil thread-tn)
+                      (storew (fixnumize ,tag)
+                              y simd-pack-tag-slot other-pointer-lowtag)
+                      (let ((ea (object-slot-ea y simd-pack-lo-value-slot other-pointer-lowtag)))
+                        (if (float-sse-p x)
+                            (inst movaps ea x)
+                            (inst movdqa ea x)))))
+                  (define-move-vop ,name :move
+                    ,scs (descriptor-reg))))))
+  ;; see *simd-pack-element-types*
+  (define-move-from-sse simd-pack-single 0 single-sse-reg)
+  (define-move-from-sse simd-pack-double 1 double-sse-reg)
+  (define-move-from-sse simd-pack-ub8 2 int-sse-reg)
+  (define-move-from-sse simd-pack-ub16 3 int-sse-reg)
+  (define-move-from-sse simd-pack-ub32 4 int-sse-reg)
+  (define-move-from-sse simd-pack-ub64 5 int-sse-reg)
+  (define-move-from-sse simd-pack-sb8 6 int-sse-reg)
+  (define-move-from-sse simd-pack-sb16 7 int-sse-reg)
+  (define-move-from-sse simd-pack-sb32 8 int-sse-reg)
+  (define-move-from-sse simd-pack-sb64 9 int-sse-reg))
 
 (define-vop (move-to-sse)
   (:args (x :scs (descriptor-reg)))
@@ -203,7 +212,7 @@
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc int-sse-reg) tmp)
   (:results (dst :scs (int-sse-reg)))
-  (:result-types simd-pack-int)
+  (:result-types simd-pack-ub64)
   (:generator 5
     (inst movq dst lo)
     (inst movq tmp hi)
@@ -213,34 +222,86 @@
   (check-type pack symbol)
   `(let ((,pack ,pack))
      (etypecase ,pack
-       ((simd-pack double-float) ,@body)
-       ((simd-pack single-float) ,@body)
-       ((simd-pack integer) ,@body))))
+       ,@(mapcar (lambda (eltype)
+                   `((simd-pack ,eltype) ,@body))
+          *simd-pack-element-types*))))
+
+#-sb-xc-host
+(macrolet ((unpack-unsigned (pack bits)
+             `(simd-pack-dispatch ,pack
+                (let ((lo (%simd-pack-low ,pack))
+                      (hi (%simd-pack-high ,pack)))
+                  (values
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-unsigned-1 ,bits ,pos lo))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-unsigned-1 ,bits ,pos hi))))))
+           (unpack-unsigned-1 (bits position ub64)
+             `(ldb (byte ,bits ,position) ,ub64)))
+  (declaim (inline %simd-pack-ub8s))
+  (defun %simd-pack-ub8s (pack)
+    (declare (type simd-pack pack))
+    (unpack-unsigned pack 8))
+
+  (declaim (inline %simd-pack-ub16s))
+  (defun %simd-pack-ub16s (pack)
+    (declare (type simd-pack pack))
+    (unpack-unsigned pack 16))
+
+  (declaim (inline %simd-pack-ub32s))
+  (defun %simd-pack-ub32s (pack)
+    (declare (type simd-pack pack))
+    (unpack-unsigned pack 32))
+
+  (declaim (inline %simd-pack-ub64s))
+  (defun %simd-pack-ub64s (pack)
+    (declare (type simd-pack pack))
+    (unpack-unsigned pack 64)))
+
+#-sb-xc-host
+(macrolet ((unpack-signed (pack bits)
+             `(simd-pack-dispatch ,pack
+                (let ((lo (%simd-pack-low ,pack))
+                      (hi (%simd-pack-high ,pack)))
+                  (values
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-signed-1 ,bits ,pos lo))
+                   ,@(loop for pos by bits below 64 collect
+                           `(unpack-signed-1 ,bits ,pos hi))))))
+           (unpack-signed-1 (bits position ub64)
+             `(- (mod (+ (ldb (byte ,bits ,position) ,ub64)
+                         ,(expt 2 (1- bits)))
+                      ,(expt 2 bits))
+                 ,(expt 2 (1- bits)))))
+  (declaim (inline %simd-pack-sb8s))
+  (defun %simd-pack-sb8s (pack)
+    (declare (type simd-pack pack))
+    (unpack-signed pack 8))
+
+  (declaim (inline %simd-pack-sb16s))
+  (defun %simd-pack-sb16s (pack)
+    (declare (type simd-pack pack))
+    (unpack-signed pack 16))
+
+  (declaim (inline %simd-pack-sb32s))
+  (defun %simd-pack-sb32s (pack)
+    (declare (type simd-pack pack))
+    (unpack-signed pack 32))
+
+  (declaim (inline %simd-pack-sb64s))
+  (defun %simd-pack-sb64s (pack)
+    (declare (type simd-pack pack))
+    (unpack-signed pack 64)))
 
 #-sb-xc-host
 (progn
   (declaim (inline %make-simd-pack-ub32))
   (defun %make-simd-pack-ub32 (w x y z)
     (declare (type (unsigned-byte 32) w x y z))
-    (%make-simd-pack-ub64 (logior w (ash x 32))
-                          (logior y (ash z 32))))
-
-  (declaim (inline %simd-pack-ub32s %simd-pack-ub64s))
-  (defun %simd-pack-ub32s (pack)
-    (declare (type simd-pack pack))
-    (simd-pack-dispatch pack
-      (let ((lo (%simd-pack-low pack))
-            (hi (%simd-pack-high pack)))
-        (values (ldb (byte 32 0) lo)
-                (ash lo -32)
-                (ldb (byte 32 0) hi)
-                (ash hi -32)))))
-
-  (defun %simd-pack-ub64s (pack)
-    (declare (type simd-pack pack))
-    (simd-pack-dispatch pack
-      (values (%simd-pack-low pack)
-              (%simd-pack-high pack)))))
+    (%make-simd-pack
+     #.(position '(unsigned-byte 32) *simd-pack-element-types* :test #'equal)
+     (logior w (ash x 32))
+     (logior y (ash z 32)))))
 
 (define-vop (%make-simd-pack-double)
   (:translate %make-simd-pack-double)

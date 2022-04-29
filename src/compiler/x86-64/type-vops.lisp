@@ -275,9 +275,6 @@
 ;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
 
-(defmacro bignum-header-for-length (n)
-  (logior (ash n n-widetag-bits) bignum-widetag))
-
 (define-vop (pointerp)
   (:args (value :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
@@ -294,12 +291,10 @@
   (:conditional :z)
   (:args-var arg-ref)
   (:generator 6
-    (inst test :byte value fixnum-tag-mask)
-    (inst jmp :z out) ; good
-    ;; No lowtag test is needed if it's definitely an OTHER-POINTER.
-    ;; Even more cleverness could be imparted here based on arg-ref's type,
-    ;; but SINGLE-FLOAT always has to be ruled out somehow.
-    (let ((ea (cond ((csubtypep (tn-ref-type arg-ref) (specifier-type 'rational))
+    (when (types-equal-or-intersect (tn-ref-type arg-ref) (specifier-type 'fixnum))
+      (inst test :byte value fixnum-tag-mask)
+      (inst jmp :z out)) ; good
+    (let ((ea (cond ((fixnum-or-other-pointer-tn-ref-p arg-ref)
                      (ea (- other-pointer-lowtag) value))
                     (t
                      (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
@@ -313,27 +308,38 @@
 (defconstant non-negative-fixnum-mask-constant
   #x8000000000000001)
 (defconstant non-negative-fixnum-mask-constant-wired-address
-  (+ static-space-start (* 10 n-word-bytes)))
+  (+ static-space-start (* 12 n-word-bytes)))
+;; the preceding constant is embedded in an array,
+;; the header of which must not overlap the static alloc regions
+#-sb-thread
+(aver (>= (- non-negative-fixnum-mask-constant-wired-address (* 2 n-word-bytes))
+          (+ (max boxed-region cons-region mixed-region) (* 3 n-word-bytes))))
 
 ;;; An (unsigned-byte 64) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
-  (:generator 45
+  (:generator 10
     (let ((not-target (gen-label))
-          (single-word (gen-label)))
+          (single-word (gen-label))
+          (fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
               (values target not-target))
-        ;; Is it a fixnum with the sign bit clear?
-        (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
-        (inst jmp :z yep)
-        ;; If not, is it an other pointer?
-        (%lea-for-lowtag-test temp value other-pointer-lowtag)
-        (inst test :byte temp lowtag-mask)
-        (inst jmp :ne nope)
+        (when fixnum-p
+          ;; Is it a fixnum with the sign bit clear?
+          (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
+          (inst jmp :z yep))
+        (cond ((fixnum-or-other-pointer-tn-ref-p args)
+               (when fixnum-p
+                 (inst test :byte value fixnum-tag-mask)
+                 (inst jmp :z nope)))
+              (t
+               (%lea-for-lowtag-test temp value other-pointer-lowtag)
+               (inst test :byte temp lowtag-mask)
+               (inst jmp :ne nope)))
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
@@ -534,8 +540,10 @@
           (value :scs (any-reg descriptor-reg)))
    (:vop-var vop)
    (:temporary (:sc unsigned-reg) temp)
+   (:node-var node)
    (:generator 1
-     (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)
+     (unless (sb-c::set-slot-old-p node)
+       (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value))
      (inst mov :dword (ea (- 4 instance-pointer-lowtag) object) value)))
  (define-vop (%fun-layout %instance-layout)
    (:translate %fun-layout)
@@ -543,7 +551,8 @@
  (define-vop (%set-fun-layout %set-instance-layout)
    (:translate %set-fun-layout)
    (:generator 1
-     (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)
+     (unless (sb-c::set-slot-old-p node)
+       (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value))
      (inst mov :dword (ea (- 4 fun-pointer-lowtag) object) value)))
  (define-vop ()
   (:translate sb-c::layout-eq)
@@ -652,3 +661,85 @@
               (sb-c::delete-vop prev)
               (sb-c::delete-vop vop)
               new)))))))
+
+(define-vop (>-integer-fixnum)
+  (:translate >)
+  (:args (integer :scs (descriptor-reg))
+         (fixnum :scs (immediate any-reg)))
+  (:arg-types (:or integer bignum) tagged-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:conditional)
+  (:info target not-p)
+  (:args-var args)
+  (:policy :fast-safe)
+  (:variant-vars comparison)
+  (:variant :g)
+  (:generator 8
+    (unless (sc-is (tn-ref-tn args) descriptor-reg control-stack)
+      (setf args (tn-ref-across args)))
+    (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
+           (fixnum (if (sc-is fixnum immediate)
+                       (let* ((value (fixnumize (tn-value fixnum))))
+                         (cond ((plausible-signed-imm32-operand-p value)
+                                value)
+                               (t
+                                (inst mov temp value)
+                                temp)))
+                       fixnum)))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum))
+            (generate-fixnum-test integer)
+            (inst jmp :nz BIGNUM)
+            (if (eql fixnum 0)
+                (inst test integer integer)
+                (inst cmp integer fixnum))
+            (inst jmp comparison yep)
+            (inst jmp nope))
+          bignum
+          (unless (fixnum-or-other-pointer-tn-ref-p args)
+            (test-type integer temp nope t (other-pointer-lowtag)))
+          (loadw temp integer 0 other-pointer-lowtag)
+          (unless integer-p
+            (inst cmp :byte temp bignum-widetag)
+            (inst jmp :ne nope))
+          #.(assert (= (integer-length bignum-widetag) 5))
+          (inst shr temp 5)
+          (inst cmp :qword (ea (- other-pointer-lowtag) integer temp) 0)
+          (inst jmp (case comparison
+                      ((:l :le) (if not-p :ge :l))
+                      (t (if not-p :l :ge)))
+                target))))
+    not-target))
+
+(define-vop (<-integer-fixnum >-integer-fixnum)
+  (:translate <)
+  (:variant :l))
+
+(define-vop (>-fixnum-integer >-integer-fixnum)
+  (:translate >)
+  (:args (fixnum :scs (immediate any-reg))
+         (integer :scs (descriptor-reg)))
+  (:arg-types tagged-num (:or integer bignum))
+  (:variant :l))
+
+(define-vop (<-fixnum-integer >-fixnum-integer)
+  (:translate <)
+  (:variant :g))
+
+;;; For integerp+cmp
+(define-vop (<=-integer-fixnum >-integer-fixnum)
+  (:translate)
+  (:variant :le))
+(define-vop (>=-integer-fixnum <-integer-fixnum)
+  (:translate)
+  (:variant :ge))
+(define-vop (<=-fixnum-integer >-fixnum-integer)
+  (:translate)
+  (:variant :le))
+(define-vop (>=-fixnum-integer <-fixnum-integer)
+  (:translate)
+  (:variant :ge))

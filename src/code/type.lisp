@@ -2604,24 +2604,86 @@ expansion happened."
 ;;; exclusive bounds.
 (defun coerce-numeric-bound (bound type)
   (flet ((c (thing)
+           #+sb-xc-host (declare (ignore thing))
            (case type
-             (rational (rational thing))
+             (rational
+              #+sb-xc-host (return-from coerce-numeric-bound)
+              #-sb-xc-host (if (and (floatp thing) (float-infinity-p thing))
+                               (return-from coerce-numeric-bound nil)
+                               (rational thing)))
              ((float single-float)
               (cond #-sb-xc-host
                     ((<= most-negative-single-float thing most-positive-single-float)
                      (coerce thing 'single-float))
                     (t
-                     (return-from coerce-numeric-bound))))
+                     (return-from coerce-numeric-bound nil))))
              (double-float
               (cond #-sb-xc-host
                     ((<= most-negative-double-float thing most-positive-double-float)
                      (coerce thing 'double-float))
                     (t
-                     (return-from coerce-numeric-bound)))))))
+                     (return-from coerce-numeric-bound nil)))))))
     (when bound
       (if (consp bound)
           (list (c (car bound)))
           (c bound)))))
+
+(defun %make-union-numeric-type (class format complexp low high enumerable)
+  (declare (type (member integer rational float nil) class))
+  (macrolet ((unionize (&rest specs)
+               `(type-union
+                 ,@(loop for (class format coerce simple-coerce) in specs
+                         collect `(make-numeric-type
+                                   :class ',class
+                                   :format ',format
+                                   :complexp complexp
+                                   :low ,(if simple-coerce
+                                             `(coerce low ',coerce)
+                                             `(coerce-numeric-bound low ',coerce))
+                                   :high ,(if simple-coerce
+                                              `(coerce high ',coerce)
+                                              `(coerce-numeric-bound high ',coerce))
+                                   :enumerable enumerable)))))
+    (cond ((and (null class) (member complexp '(:real :complex)))
+           (cond ((not (bounds-unbounded-p low high))
+                  (cond ((and (floatp low) (float-infinity-p low)
+                              (eql low high))
+                         ;; low and high are some float
+                         ;; infinity. not representable as a
+                         ;; rational.
+                         (let ((complexp :real)) ; TODO what if complexp was :complex?
+                           (unionize (float single-float single-float t)
+                                     (float double-float double-float t))))
+                        (t
+                         (unionize (rational nil          rational)
+                                   (float    single-float single-float)
+                                   (float    double-float double-float)))))
+                 ((eq complexp :complex)
+                  (specifier-type 'complex))
+                 (t
+                  (specifier-type 'real))))
+          ((and (eq class 'float) (member complexp '(:real :complex))
+                (eq format nil))
+           (cond ((not (bounds-unbounded-p low high))
+                  (if (and (floatp low) (float-infinity-p low)
+                           (eql low high))
+                      (let ((complexp :real))
+                        (unionize (float single-float single-float t)
+                                  (float double-float double-float t)
+                                  #+long-float((error "long-float"))))
+                      (unionize (float single-float single-float)
+                                (float double-float double-float)
+                                #+long-float((error "long-float")))))
+                 ((eq complexp :complex)
+                  (specifier-type '(complex float)))
+                 (t
+                  (specifier-type 'float))))
+          ((and (null complexp)
+                (or class format low high))
+           (type-union (make-numeric-type :class class :format format :complexp :complex
+                                          :low low :high high :enumerable enumerable)
+                       (make-numeric-type :class class :format format :complexp :real
+                                          :low low :high high :enumerable enumerable))))))
 
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
 ;;; cases, despite the name, we return *EMPTY-TYPE* or a UNION-TYPE instead of a
@@ -2640,50 +2702,9 @@ expansion happened."
 (defun make-numeric-type (&key class format (complexp :real) low high
                                enumerable)
   (declare (type (member integer rational float nil) class))
-  (macrolet ((unionize (types classes formats)
-               `(let (types)
-                  (loop for thing in ',types
-                        for class in ',classes
-                        for format in ',formats
-                        do
-                        (let ((low (coerce-numeric-bound low thing))
-                              (high (coerce-numeric-bound high thing)))
-                          (push (make-numeric-type
-                                 :format format
-                                 :class class
-                                 :complexp complexp
-                                 :low low
-                                 :high high
-                                 :enumerable enumerable)
-                                types)))
-                  (apply #'type-union types))))
-    (when (and (null class) (member complexp '(:real :complex)))
-      (return-from make-numeric-type
-        (if (bounds-unbounded-p low high)
-            (if (eq complexp :complex)
-                (specifier-type 'complex)
-                (specifier-type 'real))
-            (unionize (rational single-float double-float)
-                      (rational float float)
-                      (nil single-float double-float)))))
-    (when (and (eql class 'float) (member complexp '(:complex :real)) (eql format nil))
-      (return-from make-numeric-type
-        (if (bounds-unbounded-p low high)
-            (if (eq complexp :complex)
-                (specifier-type '(complex float))
-                (specifier-type 'float))
-            (unionize (single-float double-float #+long-float (error "long-float"))
-                      (float float)
-                      (single-float double-float)))))
-    (when (and (null complexp)
-               (or class format low high))
-      (return-from make-numeric-type
-        (type-union (make-numeric-type :class class :format format
-                                       :low low :high high :enumerable enumerable
-                                       :complexp :complex)
-                    (make-numeric-type :class class :format format
-                                       :low low :high high :enumerable enumerable
-                                       :complexp :real)))))
+  (let ((union-type (%make-union-numeric-type
+                     class format complexp low high enumerable)))
+    (when union-type (return-from make-numeric-type union-type)))
   (multiple-value-bind (low high)
       (case class
         (integer
@@ -2707,12 +2728,12 @@ expansion happened."
     (or (case class
           (float
            (macrolet ((float-type (fmt complexp
-                                       &aux (spec (if (eq complexp :complex)
-                                                      `(complex ,fmt) fmt)))
+                                   &aux (spec (if (eq complexp :complex)
+                                                  `(complex ,fmt) fmt)))
                         `(literal-ctype (interned-numeric-type ',spec
                                                                :class 'float :complexp ,complexp
                                                                :format ',fmt :enumerable nil)
-                                        ,spec)))
+                             ,spec)))
              (when (bounds-unbounded-p low high)
                (ecase format
                  (single-float
@@ -2726,10 +2747,10 @@ expansion happened."
           (integer
            (macrolet ((int-type (low high)
                         `(literal-ctype
-                          (interned-numeric-type nil
-                                                 :class 'integer :low ,low :high ,high
-                                                 :enumerable (if (and ,low ,high) t nil))
-                          (integer ,(or low '*) ,(or high '*)))))
+                             (interned-numeric-type nil
+                                                    :class 'integer :low ,low :high ,high
+                                                    :enumerable (if (and ,low ,high) t nil))
+                             (integer ,(or low '*) ,(or high '*)))))
              (cond ((neq complexp :real) nil)
                    ((and (eql low 0) (eql high (1- array-dimension-limit)))
                     (int-type 0 #.(1- array-dimension-limit))) ; INDEX type
@@ -2903,8 +2924,7 @@ expansion happened."
                  ;; Calling (EQL (- X) Y) might cons. Using = would be almost the same
                  ;; but not cons, however I prefer not to assume that the caller has
                  ;; already checked for matching float formats. EQL enforces that.
-                 ;; Change to use SB-XC:- here if anything requires it.
-                 (and (fp-zero-p x) (fp-zero-p y) (eql (- x) y)))))
+                 (and (fp-zero-p x) (fp-zero-p y) (eql (sb-xc:- x) y)))))
       (cond ((not (and low-bound high-bound)) nil)
             ((and (consp low-bound) (consp high-bound)) nil)
             ((consp low-bound) (float-zeros-eqlish (car low-bound) high-bound))
@@ -3361,27 +3381,33 @@ used for a COMPLEX component.~:@>"
                       ((nil) class2)
                       ((integer float) class1)
                       (rational (if (eq class2 'integer)
-                                       'integer
-                                       'rational))))
+                                    'integer
+                                    'rational))))
              (format (or (numeric-type-format type1)
-                         (numeric-type-format type2))))
+                         (numeric-type-format type2)))
+             (low1 (numeric-type-low type1))
+             (high1 (numeric-type-high type1))
+             (infinity1 (and (floatp low1) (float-infinity-p low1) (eql low1 high1)))
+             (low2 (numeric-type-low type2))
+             (high2 (numeric-type-high type2))
+             (infinity2 (and (floatp low2) (float-infinity-p low2) (eql low2 high2))))
         (make-numeric-type
          :class class
          :format format
          :complexp (or (numeric-type-complexp type1)
                        (numeric-type-complexp type2))
-         :low (numeric-bound-max
-               (round-numeric-bound (numeric-type-low type1)
-                                    class format t)
-               (round-numeric-bound (numeric-type-low type2)
-                                    class format t)
-               > >= nil)
-         :high (numeric-bound-max
-                (round-numeric-bound (numeric-type-high type1)
-                                     class format nil)
-                (round-numeric-bound (numeric-type-high type2)
-                                     class format nil)
-                < <= nil)))
+         :low (cond (infinity1 low1)
+                    (infinity2 low2)
+                    (t (numeric-bound-max
+                        (round-numeric-bound low1 class format t)
+                        (round-numeric-bound low2 class format t)
+                        > >= nil)))
+         :high (cond (infinity1 high1)
+                     (infinity2 high2)
+                     (t (numeric-bound-max
+                         (round-numeric-bound high1 class format nil)
+                         (round-numeric-bound high2 class format nil)
+                         < <= nil)))))
       *empty-type*))
 
 ;;; Given two float formats, return the one with more precision. If
@@ -4098,7 +4124,7 @@ used for a COMPLEX component.~:@>"
 
 (define-type-method (member :simple-subtypep) (type1 type2)
    (values (and (xset-subset-p (member-type-xset type1)
-                                 (member-type-xset type2))
+                               (member-type-xset type2))
                 (subsetp (member-type-fp-zeroes type1)
                          (member-type-fp-zeroes type2)))
            t))
@@ -4158,13 +4184,10 @@ used for a COMPLEX component.~:@>"
                            (member-type-fp-zeroes type2))))
 
 (define-type-method (member :simple-=) (type1 type2)
-  (let ((xset1 (member-type-xset type1))
-        (xset2 (member-type-xset type2))
-        (l1 (member-type-fp-zeroes type1))
+  (let ((l1 (member-type-fp-zeroes type1))
         (l2 (member-type-fp-zeroes type2)))
-    (values (and (eql (xset-count xset1) (xset-count xset2))
-                 (xset-subset-p xset1 xset2)
-                 (xset-subset-p xset2 xset1)
+    (values (and (xset= (member-type-xset type1)
+                        (member-type-xset type2))
                  (subsetp l1 l2)
                  (subsetp l2 l1))
             t)))
@@ -5234,7 +5257,7 @@ used for a COMPLEX component.~:@>"
     (declare (type simd-pack-type type1 type2))
     (let ((intersection (bit-and (simd-pack-type-element-type type1)
                                  (simd-pack-type-element-type type2))))
-      (if intersection
+      (if (find 1 intersection)
           (%make-simd-pack-type intersection)
           *empty-type*)))
 
@@ -5299,7 +5322,7 @@ used for a COMPLEX component.~:@>"
     (declare (type simd-pack-256-type type1 type2))
     (let ((intersection (bit-and (simd-pack-256-type-element-type type1)
                                  (simd-pack-256-type-element-type type2))))
-      (if intersection
+      (if (find 1 intersection)
           (%make-simd-pack-256-type intersection)
           *empty-type*)))
 

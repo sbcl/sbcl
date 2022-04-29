@@ -1142,3 +1142,31 @@ sb-vm::(define-vop (cl-user::test)
 (defun zook ()
   (sb-sys:%primitive trythis)
   nil)
+
+;;; Previously INITIALIZE-VECTOR would move every element into
+;;; a register, causing each to require a store barrier
+;;; and then a register-to-memory move like so:
+;;;     BB02000000       MOV EBX, 2
+;;;     488D4601         LEA RAX, [RSI+1]
+;;;     48C1E80A         SHR RAX, 10
+;;;     25FFFF0F00       AND EAX, 1048575
+;;;     41C6040400       MOV BYTE PTR [R12+RAX], 0
+;;;     48895E01         MOV [RSI+1], RBX
+;;; The improved code emits 4 consecutive MOV instructions,
+;;; one per item. It is still suboptimal in that it can not discern
+;;; between initializing and updating, so it always uses a :QWORD move
+;;; despite the prezeroed pages.
+(with-test (:name :init-vector-mov-to-mem)
+  (let* ((lines (disassembly-lines
+                 '(lambda () (vector #\x 1 2 3))))
+         (magic-value
+          (write-to-string
+           (logior (ash (char-code #\x) 8) sb-vm:character-widetag)))
+         (start
+          (position-if
+           (lambda (line) (search magic-value line))
+           lines)))
+    (assert start)
+    (assert (search ", 2" (nth (+ start 1) lines)))
+    (assert (search ", 4" (nth (+ start 2) lines)))
+    (assert (search ", 6" (nth (+ start 3) lines)))))

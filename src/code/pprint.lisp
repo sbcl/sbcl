@@ -727,7 +727,6 @@ line break."
 
 ;;;; pprint-dispatch tables
 
-(define-load-time-global *standard-pprint-dispatch-table* nil)
 (define-load-time-global *initial-pprint-dispatch-table* nil)
 
 (defstruct (pprint-dispatch-entry

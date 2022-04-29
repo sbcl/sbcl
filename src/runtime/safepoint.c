@@ -625,7 +625,7 @@ static boolean can_invoke_post_gc(struct thread* th)
     lispobj obj = th->lisp_thread;
     if (!obj) return 0;
     struct thread_instance* lispthread = (void*)(obj - INSTANCE_POINTER_LOWTAG);
-    if (!lispthread->primitive_thread) return 0;
+    if (!lispthread->uw_primitive_thread) return 0;
     return 1;
 }
 
@@ -910,7 +910,7 @@ wake_thread_io(struct thread * thread)
 
 void wake_thread_impl(struct thread_instance *lispthread)
 {
-    struct thread* thread = (void*)lispthread->primitive_thread;
+    struct thread* thread = (void*)lispthread->uw_primitive_thread;
     wake_thread_io(thread);
 
     if (read_TLS(THRUPTION_PENDING,thread)==T)
@@ -939,7 +939,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
 # else
 void wake_thread_impl(struct thread_instance *lispthread)
 {
-    struct thread *thread = (void*)lispthread->primitive_thread;
+    struct thread *thread = (void*)lispthread->uw_primitive_thread;
     struct thread *self = get_sb_vm_thread();
 
     /* Must not and need not attempt to signal ourselves while we're the
@@ -979,7 +979,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
                                 odxprint(safepoints, "wake_thread_posix: kill");
                                 /* ... and in foreign code.  Push it into a safety
                                  * transition. */
-                                int status = pthread_kill((pthread_t)lispthread->os_thread, SIGURG);
+                                int status = pthread_kill((pthread_t)lispthread->uw_os_thread, SIGURG);
                                 if (status)
                                     lose("wake_thread_posix: pthread_kill failed with %d",
                                          status);

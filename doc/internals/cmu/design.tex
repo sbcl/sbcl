@@ -1,0 +1,92 @@
+%%\documentstyle[cmu-titlepage]{report} % -*- Dictionary: design -*-
+%\documentstyle{report} % -*- Dictionary: design -*-
+
+\documentclass{report}
+\usepackage{ifpdf}
+\usepackage{ifthen}
+\usepackage{calc}
+\usepackage{palatino}
+\usepackage[hyperindex=false,colorlinks=false,urlcolor=blue]{hyperref}
+
+\title{Design of CMU Common Lisp}
+\date{January 15, 2003}
+\author{Robert A. MacLachlan (ed)}
+
+\ifpdf
+\pdfinfo{
+/Author (Robert A. MacLachlan, ed)
+/Title (Design of CMU Common Lisp)
+}
+% Add section numbers to the bookmarks, and open 2 levels by default.
+\hypersetup{bookmarksnumbered=true,
+            bookmarksopen=true,
+            bookmarksopenlevel=2}
+\fi
+%%\trnumber{CMU-CS-91-???}
+
+%% This code taken from the LaTeX companion.  It's meant as a
+%% replacement for the description environment.  We want one that
+%% prints description items in a fixed size box and puts the
+%% description itself on the same line or the next depending on the
+%% size of the item.
+\newcommand{\entrylabel}[1]{\mbox{#1}\hfil}
+\newenvironment{entry}{%
+  \begin{list}{}%
+    {\renewcommand{\makelabel}{\entrylabel}%
+      \setlength{\labelwidth}{45pt}%
+      \setlength{\leftmargin}{\labelwidth+\labelsep}}}%
+  {\end{list}}
+
+\newlength{\Mylen}
+\newcommand{\Lentrylabel}[1]{%
+  \settowidth{\Mylen}{#1}%
+  \ifthenelse{\lengthtest{\Mylen > \labelwidth}}%
+  {\parbox[b]{\labelwidth}%  term > labelwidth
+    {\makebox[0pt][l]{#1}\\}}%
+  {#1}%
+  \hfil\relax}
+\newenvironment{Lentry}{%
+  \renewcommand{\entrylabel}{\Lentrylabel}
+  \begin{entry}}%
+  {\end{entry}}
+
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{3}
+\def\textfraction{.1}
+\def\bottomfraction{.9}         % was .3
+\def\topfraction{.9}
+
+\newcommand{\code}[1]{\textnormal{{\sffamily #1}}}
+%% Some common abbreviations
+\newcommand{\cmucl}{\textsc{cmucl}}
+
+%% Set up margins
+\setlength{\oddsidemargin}{-10pt}
+\setlength{\evensidemargin}{-10pt}
+\setlength{\topmargin}{-40pt}
+\setlength{\headheight}{12pt}
+\setlength{\headsep}{25pt}
+\setlength{\footskip}{30pt}
+\setlength{\textheight}{9.25in}
+\setlength{\textwidth}{6.75in}
+\setlength{\columnsep}{0.375in}
+\setlength{\columnseprule}{0pt}
+
+
+\begin{document}
+\maketitle
+\abstract{This report documents internal details of the CMU Common Lisp
+compiler and run-time system.  CMU Common Lisp is a public domain
+implementation of Common Lisp that runs on various Unix workstations.
+This document is a work in progress: neither the contents nor the
+presentation are completed. Nevertheless, it provides some useful
+background information, in particular regarding the \cmucl{} compiler.}
+
+\tableofcontents
+\include{architecture}
+\include{compiler}
+\include{retargeting}
+\include{run-time}
+\appendix
+\include{glossary}
+\end{document}

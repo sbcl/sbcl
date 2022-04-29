@@ -137,6 +137,21 @@
        xset1))
     t))
 
+(defun xset= (xset1 xset2)
+  (declare (inline subsetp))
+  (when (= (xset-count xset1) (xset-count xset2))
+    (let ((data1 (xset-data xset1))
+          (data2 (xset-data xset2)))
+      (if (listp data1)
+          (return-from xset= (subsetp data1 data2))
+          (maphash
+           (lambda (k v)
+             (declare (ignore v))
+             (unless (gethash k data2)
+               (return-from xset= nil)))
+           data1)))
+    t))
+
 (declaim (inline xset-empty-p))
 (defun xset-empty-p (xset)
   (not (xset-data xset)))

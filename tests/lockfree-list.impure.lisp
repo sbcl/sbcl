@@ -1,9 +1,13 @@
 (in-package "SB-LOCKLESS")
 
-#-gencgc (sb-ext:exit :code 104)
+(test-util:with-test (:name :layout-bits)
+  (dolist (type '(list-node keyed-node))
+    (assert (eq (sb-kernel::dd-%element-type
+                 (sb-kernel:find-defstruct-description type))
+                '*))
+    (assert (not (logtest (sb-kernel:wrapper-flags (find-layout type))
+                          sb-kernel::+strictly-boxed-flag+)))))
 
-(assert (not (logtest (sb-kernel:wrapper-flags (find-layout 'keyed-node))
-                      sb-kernel::+strictly-boxed-flag+)))
 
 ;;; Make sure no promotions occur so that objects will be movable
 ;;; throughout these tests.
@@ -245,7 +249,7 @@
 (defparameter *l* nil)
 (defun construct (n)
   (setq *l* (make-ordered-list :key-type 'fixnum))
-  (loop repeat n for key from 10 by 10 do (lfl-insert *l* key (make-foo :a key))))
+  (loop for key from 10 by 10 repeat n do (lfl-insert *l* key (make-foo :a key))))
 
 (defun scan-lfl-gens (deletep &aux page-indices)
   (do ((node (get-next (list-head *l*)) ; can't delete the dummy node (list head)

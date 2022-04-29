@@ -39,6 +39,8 @@
   (:generator 0
      (emit-label the-label)))
 
+#-x86-64 (define-vop (fixed-alloc-to-stack fixed-alloc))
+
 ;;; SPLAT is always a no-op for architectures other than x86-64
 ;;; because:
 ;;; - the heap is zero-filled, and only value that can be

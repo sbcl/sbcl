@@ -1,0 +1,1163 @@
+\chapter{Alien Objects}
+\label{aliens}
+
+\credits{by Robert MacLachlan and William Lott}
+
+
+\section{Introduction to Aliens}
+
+Because of Lisp's emphasis on dynamic memory allocation and garbage
+collection, Lisp implementations use unconventional memory representations
+for objects.  This representation mismatch creates problems when a Lisp
+program must share objects with programs written in another language.  There
+are three different approaches to establishing communication:
+
+\begin{itemize}
+\item The burden can be placed on the foreign program (and programmer) by
+requiring the use of Lisp object representations.  The main difficulty with
+this approach is that either the foreign program must be written with Lisp
+interaction in mind, or a substantial amount of foreign ``glue'' code must be
+written to perform the translation.
+
+\item The Lisp system can automatically convert objects back and forth
+between the Lisp and foreign representations.  This is convenient, but
+translation becomes prohibitively slow when large or complex data structures
+must be shared.
+
+\item The Lisp program can directly manipulate foreign objects through the
+use of extensions to the Lisp language.  Most Lisp systems make use of
+this approach, but the language for describing types and expressing
+accesses is often not powerful enough for complex objects to be easily
+manipulated.
+\end{itemize}
+
+\cmucl{} relies primarily on the automatic conversion and direct manipulation
+approaches: Aliens of simple scalar types are automatically converted,
+while complex types are directly manipulated in their foreign
+representation.  Any foreign objects that can't automatically be
+converted into Lisp values are represented by objects of type
+\code{alien-value}.  Since Lisp is a dynamically typed language, even
+foreign objects must have a run-time type; this type information is
+provided by encapsulating the raw pointer to the foreign data within an
+\code{alien-value} object.
+
+The Alien type language and operations are most similar to those of the
+C language, but Aliens can also be used when communicating with most
+other languages that can be linked with C.
+
+
+\section{Alien Types}
+
+Alien types have a description language based on nested list structure.  For
+example:
+
+\begin{example}
+struct foo \{
+    int a;
+    struct foo *b[100];
+\};
+\end{example}
+
+has the corresponding Alien type:
+
+\begin{lisp}
+(struct foo
+  (a int)
+  (b (array (* (struct foo)) 100)))
+\end{lisp}
+
+
+\subsection{Defining Alien Types}
+
+Types may be either named or anonymous.  With structure and union
+types, the name is part of the type specifier, allowing recursively
+defined types such as:
+
+\begin{lisp}
+(struct foo (a (* (struct foo))))
+\end{lisp}
+
+An anonymous structure or union type is specified by using the name
+\nil{}.  The \funref{with-alien} macro defines a local scope which
+``captures'' any named type definitions.  Other types are not
+inherently named, but can be given named abbreviations using
+\code{def-alien-type}.
+
+\begin{defmac}{alien:}{def-alien-type}{name type}  
+  This macro globally defines \var{name} as a shorthand for the Alien
+  type \var{type}.  When introducing global structure and union type
+  definitions, \var{name} may be \nil, in which case the name to
+  define is taken from the type's name.
+\end{defmac}
+
+
+\subsection{Alien Types and Lisp Types}
+
+The Alien types form a subsystem of the \cmucl{} type system.  An
+\code{alien} type specifier provides a way to use any Alien type as a
+Lisp type specifier.  For example
+
+\begin{lisp}
+(typep foo '(alien (* int)))
+\end{lisp}
+
+can be used to determine whether \code{foo} is a pointer to an
+\code{int}.  \code{alien} type specifiers can be used in the same ways
+as ordinary type specifiers (like \code{string}.)  Alien type
+declarations are subject to the same precise type checking as any
+other declaration (\pxlref{precise-type-checks}.)
+
+Note that the Alien type system overlaps with normal Lisp type
+specifiers in some cases.  For example, the type specifier
+\code{(alien single-float)} is identical to \code{single-float}, since
+Alien floats are automatically converted to Lisp floats.  When
+\code{type-of} is called on an Alien value that is not automatically
+converted to a Lisp value, then it will return an \code{alien} type
+specifier.
+
+
+\subsection{Alien Type Specifiers}
+
+Some Alien type names are \clisp{} symbols, but the names are
+still exported from the \code{alien} package, so it is legal to say
+\code{alien:single-float}.  These are the basic Alien type specifiers: 
+
+\begin{deftp}{Alien type}{*}{%
+    \args{\var{type}}}
+  
+  A pointer to an object of the specified \var{type}.  If \var{type}
+  is \true, then it means a pointer to anything, similar to
+  ``\code{void *}'' in ANSI C.  Currently, the only way to detect a
+  null pointer is:
+\begin{lisp}
+  (zerop (sap-int (alien-sap \var{ptr})))
+\end{lisp}
+\xlref{system-area-pointers}
+\end{deftp}
+
+\begin{deftp}{Alien type}{array}{\var{type} \mstar{\var{dimension}}} 
+
+  An array of the specified \var{dimensions}, holding elements of type
+  \var{type}.  Note that \code{(* int)} and \code{(array int)} are
+  considered to be different types when type checking is done; pointer
+  and array types must be explicitly coerced using \code{cast}.
+  
+  Arrays are accessed using \code{deref}, passing the indices as
+  additional arguments.  Elements are stored in column-major order (as
+  in C), so the first dimension determines only the size of the memory
+  block, and not the layout of the higher dimensions.  An array whose
+  first dimension is variable may be specified by using \nil{} as the
+  first dimension.  Fixed-size arrays can be allocated as array
+  elements, structure slots or \code{with-alien} variables.  Dynamic
+  arrays can only be allocated using \funref{make-alien}.
+\end{deftp}
+
+\begin{deftp}{Alien type}{struct}{\var{name} 
+    \mstar{(\var{field} \var{type} \mopt{\var{bits}})}}
+  
+  A structure type with the specified \var{name} and \var{fields}.
+  Fields are allocated at the same positions used by the
+  implementation's C compiler.  \var{bits} is intended for C-like bit
+  field support, but is currently unused.  If \var{name} is \false,
+  then the type is anonymous.
+  
+  If a named Alien \code{struct} specifier is passed to
+  \funref{def-alien-type} or \funref{with-alien}, then this defines,
+  respectively, a new global or local Alien structure type.  If no
+  \var{fields} are specified, then the fields are taken from the
+  current (local or global) Alien structure type definition of
+  \var{name}.
+\end{deftp}
+
+\begin{deftp}{Alien type}{union}{\var{name} 
+    \mstar{(\var{field} \var{type} \mopt{\var{bits}})}}
+  
+  Similar to \code{struct}, but defines a union type.  All fields are
+  allocated at the same offset, and the size of the union is the size
+  of the largest field.  The programmer must determine which field is
+  active from context.
+\end{deftp}
+
+\begin{deftp}{Alien type}{enum}{\var{name} \mstar{\var{spec}}}
+  
+  An enumeration type that maps between integer values and keywords.
+  If \var{name} is \false, then the type is anonymous.  Each
+  \var{spec} is either a keyword, or a list \code{(\var{keyword}
+    \var{value})}.  If \var{integer} is not supplied, then it defaults
+  to one greater than the value for the preceding spec (or to zero if
+  it is the first spec.)
+\end{deftp}
+
+\begin{deftp}{Alien type}{signed}{\mopt{\var{bits}}}  
+  A signed integer with the specified number of bits precision.  The
+  upper limit on integer precision is determined by the machine's word
+  size.  If no size is specified, the maximum size will be used.
+\end{deftp}
+
+\begin{deftp}{Alien type}{integer}{\mopt{\var{bits}}}  
+  Identical to \code{signed}---the distinction between \code{signed}
+  and \code{integer} is purely stylistic.
+\end{deftp}
+
+\begin{deftp}{Alien type}{unsigned}{\mopt{\var{bits}}}
+  Like \code{signed}, but specifies an unsigned integer.
+\end{deftp}
+
+\begin{deftp}{Alien type}{boolean}{\mopt{\var{bits}}}
+  Similar to an enumeration type that maps \code{0} to \false{} and
+  all other values to \true.  \var{bits} determines the amount of
+  storage allocated to hold the truth value.
+\end{deftp}
+
+\begin{deftp}{Alien type}{single-float}{}
+  A floating-point number in IEEE single format.
+\end{deftp}
+
+\begin{deftp}{Alien type}{double-float}{}
+  A floating-point number in IEEE double format.
+\end{deftp}
+
+\begin{deftp}{Alien type}{function}{\var{result-type} \mstar{\var{arg-type}}}
+  \label{alien-function-types}
+  A Alien function that takes arguments of the specified
+  \var{arg-types} and returns a result of type \var{result-type}.
+  Note that the only context where a \code{function} type is directly
+  specified is in the argument to \code{alien-funcall} (see section
+  \funref{alien-funcall}.)  In all other contexts, functions are
+  represented by function pointer types: \code{(* (function ...))}.
+\end{deftp}
+
+\begin{deftp}{Alien type}{system-area-pointer}{}
+  A pointer which is represented in Lisp as a
+  \code{system-area-pointer} object (\pxlref{system-area-pointers}.)
+\end{deftp}
+
+
+\subsection{The C-Call Package}
+
+The \code{c-call} package exports these type-equivalents to the C type
+of the same name: \code{char}, \code{short}, \code{int}, \code{long},
+\code{unsigned-char}, \code{unsigned-short}, \code{unsigned-int},
+\code{unsigned-long}, \code{float}, \code{double}.  \code{c-call} also
+exports these types:
+
+\begin{deftp}{Alien type}{void}{}
+  This type is used in function types to declare that no useful value
+  is returned.  Evaluation of an \code{alien-funcall} form will return
+  zero values.
+\end{deftp}
+
+\begin{deftp}{Alien type}{c-string}{}
+  This type is similar to \code{(* char)}, but is interpreted as a
+  null-terminated string, and is automatically converted into a Lisp
+  string when accessed.  If the pointer is C \code{NULL} (or 0), then
+  accessing gives Lisp \false.
+  
+  With Unicode, a Lisp string is not the same as a C string since a
+  Lisp string uses two bytes for each character.  In this case, a
+  C string is converted to a Lisp string by taking each byte of the
+  C-string and applying \code{code-char} to create each character of
+  the Lisp string.
+
+  Similarly, a Lisp string is converted to a C string by taking the
+  low 8 bits of the \code{char-code} of each character and assigning
+  that to each byte of the C string.
+
+  In either case, \code{string-encode} and \code{string-decode} may be
+  useful to convert Unicode Lisp strings to or from C strings.
+
+  Assigning a Lisp string to a \code{c-string} structure field or
+  variable stores the contents of the string to the memory already
+  pointed to by that variable.  When an Alien of type \code{(* char)}
+  is assigned to a \code{c-string}, then the \code{c-string} pointer
+  is assigned to.  This allows \code{c-string} pointers to be
+  initialized.  For example:
+
+\begin{lisp}
+  (def-alien-type nil (struct foo (str c-string)))
+  
+  (defun make-foo (str)
+    (let ((my-foo (make-alien (struct foo))))
+      (setf (slot my-foo 'str) (make-alien char (length str)))
+      (setf (slot my-foo 'str) str)
+      my-foo))
+\end{lisp}
+
+Storing Lisp \false{} writes C \code{NULL} to the \code{c-string}
+pointer.
+\end{deftp}
+
+
+
+\section{Alien Operations}
+
+This section describes the basic operations on Alien values.
+
+\subsection{Alien Access Operations}
+
+\begin{defun}{alien:}{deref}{\args{\var{pointer-or-array} \amprest{} \var{indices}}}
+  
+  This function returns the value pointed to by an Alien pointer or
+  the value of an Alien array element.  If a pointer, an optional
+  single index can be specified to give the equivalent of C pointer
+  arithmetic; this index is scaled by the size of the type pointed to.
+  If an array, the number of indices must be the same as the number of
+  dimensions in the array type.  \code{deref} can be set with
+  \code{setf} to assign a new value.
+\end{defun}
+ 
+\begin{defun}{alien:}{slot}{\args{\var{struct-or-union} \var{slot-name}}}
+  
+  This function extracts the value of slot \var{slot-name} from the an
+  Alien \code{struct} or \code{union}.  If \var{struct-or-union} is a
+  pointer to a structure or union, then it is automatically
+  dereferenced.  This can be set with \code{setf} to assign a new
+  value.  Note that \var{slot-name} is evaluated, and need not be a
+  compile-time constant (but only constant slot accesses are
+  efficiently compiled.)
+\end{defun}
+
+
+\subsection{Alien Coercion Operations}
+
+\begin{defmac}{alien:}{addr}{\var{alien-expr}}
+  
+  This macro returns a pointer to the location specified by
+  \var{alien-expr}, which must be either an Alien variable, a use of
+  \code{deref}, a use of \code{slot}, or a use of
+  \funref{extern-alien}.
+\end{defmac}
+
+\begin{defmac}{alien:}{cast}{\var{alien} \var{new-type}}
+  
+  This macro converts \var{alien} to a new Alien with the specified
+  \var{new-type}.  Both types must be an Alien pointer, array or
+  function type.  Note that the result is not \code{eq} to the
+  argument, but does refer to the same data bits.
+\end{defmac}
+
+\begin{defmac}{alien:}{sap-alien}{\var{sap} \var{type}}
+  \defunx[alien:]{alien-sap}{\var{alien-value}}
+  
+  \code{sap-alien} converts \var{sap} (a system area pointer
+  \pxlref{system-area-pointers}) to an Alien value with the specified
+  \var{type}.  \var{type} is not evaluated.
+
+\code{alien-sap} returns the SAP which points to \var{alien-value}'s
+data.
+
+The \var{type} to \code{sap-alien} and the type of the \var{alien-value} to
+\code{alien-sap} must some Alien pointer, array or record type.
+\end{defmac}
+
+
+\subsection{Alien Dynamic Allocation}
+
+Dynamic Aliens are allocated using the \code{malloc} library, so foreign code
+can call \code{free} on the result of \code{make-alien}, and Lisp code can
+call \code{free-alien} on objects allocated by foreign code.
+
+\begin{defmac}{alien:}{make-alien}{\var{type} \mopt{\var{size}}}
+  
+  This macro returns a dynamically allocated Alien of the specified
+  \var{type} (which is not evaluated.)  The allocated memory is not
+  initialized, and may contain arbitrary junk.  If supplied,
+  \var{size} is an expression to evaluate to compute the size of the
+  allocated object.  There are two major cases:
+  \begin{itemize}
+  \item When \var{type} is an array type, an array of that type is
+    allocated and a \var{pointer} to it is returned.  Note that you
+    must use \code{deref} to change the result to an array before you
+    can use \code{deref} to read or write elements:
+
+\begin{lisp}
+(defvar *foo* (make-alien (array char 10)))
+
+(type-of *foo*) \result{} (alien (* (array (signed 8) 10)))
+
+(setf (deref (deref foo) 0) 10) \result{} 10
+\end{lisp}
+
+    If supplied, \var{size} is used as the first dimension for the
+    array.
+    
+  \item When \var{type} is any other type, then then an object for
+    that type is allocated, and a \var{pointer} to it is returned.  So
+    \code{(make-alien int)} returns a \code{(* int)}.  If \var{size}
+    is specified, then a block of that many objects is allocated, with
+    the result pointing to the first one.
+  \end{itemize}
+\end{defmac}
+ 
+\begin{defun}{alien:}{free-alien}{\var{alien}}
+
+  This function frees the storage for \var{alien} (which must have
+  been allocated with \code{make-alien} or \code{malloc}.)
+\end{defun}
+
+See also \funref{with-alien}, which stack-allocates Aliens.
+
+
+\section{Alien Variables}
+
+Both local (stack allocated) and external (C global) Alien variables are
+supported.
+
+
+\subsection{Local Alien Variables}
+
+\begin{defmac}{alien:}{with-alien}{\mstar{(\var{name} \var{type} 
+      \mopt{\var{initial-value}})} \mstar{form}}
+  
+  This macro establishes local alien variables with the specified
+  Alien types and names for dynamic extent of the body.  The variable
+  \var{names} are established as symbol-macros; the bindings have
+  lexical scope, and may be assigned with \code{setq} or \code{setf}.
+  This form is analogous to defining a local variable in C: additional
+  storage is allocated, and the initial value is copied.
+  
+  \code{with-alien} also establishes a new scope for named structures
+  and unions.  Any \var{type} specified for a variable may contain
+  name structure or union types with the slots specified.  Within the
+  lexical scope of the binding specifiers and body, a locally defined
+  structure type \var{foo} can be referenced by its name using:
+\begin{lisp}
+  (struct foo)
+\end{lisp}
+\end{defmac}
+
+
+\subsection{External Alien Variables} 
+\label{external-aliens}
+
+External Alien names are strings, and Lisp names are symbols.  When an
+external Alien is represented using a Lisp variable, there must be a
+way to convert from one name syntax into the other.  The macros
+\code{extern-alien}, \code{def-alien-variable} and
+\funref{def-alien-routine} use this conversion heuristic:
+\begin{itemize}
+\item Alien names are converted to Lisp names by uppercasing and
+  replacing underscores with hyphens.
+  
+\item Conversely, Lisp names are converted to Alien names by
+  lowercasing and replacing hyphens with underscores.
+  
+\item Both the Lisp symbol and Alien string names may be separately
+  specified by using a list of the form:
+\begin{lisp}
+  (\var{alien-string} \var{lisp-symbol})
+\end{lisp}
+\end{itemize}
+
+\begin{defmac}{alien:}{def-alien-variable}{\var{name} \var{type}}
+  
+  This macro defines \var{name} as an external Alien variable of the
+  specified Alien \var{type}.  \var{name} and \var{type} are not
+  evaluated.  The Lisp name of the variable (see above) becomes a
+  global Alien variable in the Lisp namespace.  Global Alien variables
+  are effectively ``global symbol macros''; a reference to the
+  variable fetches the contents of the external variable.  Similarly,
+  setting the variable stores new contents---the new contents must be
+  of the declared \var{type}.
+  
+  For example, it is often necessary to read the global C variable
+  \code{errno} to determine why a particular function call failed.  It
+  is possible to define errno and make it accessible from Lisp by the
+  following:
+\begin{lisp}
+(def-alien-variable "errno" int)
+
+;; Now it is possible to get the value of the C variable errno simply by
+;; referencing that Lisp variable:
+;;
+(print errno)
+\end{lisp}
+\end{defmac}
+
+\begin{defmac}{alien:}{extern-alien}{\var{name} \var{type}}
+  
+  This macro returns an Alien with the specified \var{type} which
+  points to an externally defined value.  \var{name} is not evaluated,
+  and may be specified either as a string or a symbol.  \var{type} is
+  an unevaluated Alien type specifier.
+\end{defmac}
+
+
+\section{Alien Data Structure Example}
+
+Now that we have Alien types, operations and variables, we can manipulate
+foreign data structures.  This C declaration can be translated into the
+following Alien type:
+
+\begin{lisp}
+struct foo \{
+    int a;
+    struct foo *b[100];
+\};
+
+ \myequiv
+
+(def-alien-type nil
+  (struct foo
+    (a int)
+    (b (array (* (struct foo)) 100))))
+\end{lisp}
+
+With this definition, the following C expression can be translated in this way:
+
+\begin{example}
+struct foo f;
+f.b[7].a
+
+ \myequiv
+
+(with-alien ((f (struct foo)))
+  (slot (deref (slot f 'b) 7) 'a)
+  ;;
+  ;; Do something with f...
+  )
+\end{example}
+
+
+Or consider this example of an external C variable and some accesses:
+
+\begin{example}
+struct c_struct \{
+        short x, y;
+        char a, b;
+        int z;
+        c_struct *n;
+\};
+
+extern struct c_struct *my_struct;
+
+my_struct->x++;
+my_struct->a = 5;
+my_struct = my_struct->n;
+\end{example}
+
+which can be made be manipulated in Lisp like this:
+
+\begin{lisp}
+(def-alien-type nil
+  (struct c-struct
+          (x short)
+          (y short)
+          (a char)
+          (b char)
+          (z int)
+          (n (* c-struct))))
+
+(def-alien-variable "my_struct" (* c-struct))
+
+(incf (slot my-struct 'x))
+(setf (slot my-struct 'a) 5)
+(setq my-struct (slot my-struct 'n))
+\end{lisp}
+
+
+\section{Loading Unix Object Files}
+
+\cmucl{} is able to load foreign object files at runtime, using the
+function \code{load-foreign}. This function is able to load shared
+libraries (that are typically named \verb|.so|) via the dlopen
+mechanism. It can also load \verb|.a| or \verb|.o| object files by
+calling the linker on the files and libraries to create a loadable
+object file. Once loaded, the external symbols that define routines
+and variables are made available for future external references (e.g.
+by \code{extern-alien}.) \code{load-foreign} must be run before any of
+the defined symbols are referenced.
+
+Note that if a Lisp core image is saved (using \funref{save-lisp}), all
+loaded foreign code is lost when the image is restarted. 
+
+
+\begin{defun}{ext:}{load-foreign}{%
+    \args{\var{files} \keys{\kwd{libraries} \kwd{base-file} \kwd{env}}}}
+  
+  \var{files} is a \code{simple-string} or list of
+  \code{simple-string}s specifying the names of the object files. If
+  \var{files} is a simple-string, the file that it designates is
+  loaded using the platform's dlopen mechanism. If it is a list of
+  strings, the platform linker \code{ld} is invoked to transform the
+  object files into a loadable object file. \var{libraries} is a list
+  of \code{simple-string}s specifying libraries in a format that the
+  platform linker expects. The default value for \var{libraries} is
+  \code{("-lc")} (i.e., the standard C library). \var{base-file} is
+  the file to use for the initial symbol table information. The
+  default is the Lisp start up code: \file{path:lisp}. \var{env}
+  should be a list of simple strings in the format of Unix environment
+  variables (i.e., \code{\var{A}=\var{B}}, where \var{A} is an
+  environment variable and \var{B} is its value). The default value
+  for \var{env} is the environment information available at the time
+  Lisp was invoked. Unless you are certain that you want to change
+  this, you should just use the default.
+\end{defun}
+
+
+\section{Alien Function Calls}
+
+The foreign function call interface allows a Lisp program to call functions
+written in other languages.  The current implementation of the foreign
+function call interface assumes a C calling convention and thus routines
+written in any language that adheres to this convention may be called from
+Lisp.
+
+Lisp sets up various interrupt handling routines and other environment
+information when it first starts up, and expects these to be in place at all
+times.  The C functions called by Lisp should either not change the
+environment, especially the interrupt entry points, or should make sure
+that these entry points are restored when the C function returns to Lisp.
+If a C function makes changes without restoring things to the way they were
+when the C function was entered, there is no telling what will happen.
+
+
+\subsection{The alien-funcall Primitive}
+
+\begin{defun}{alien:}{alien-funcall}{%
+    \args{\var{alien-function} \amprest{} \var{arguments}}}
+  
+  This function is the foreign function call primitive:
+  \var{alien-function} is called with the supplied \var{arguments} and
+  its value is returned.  The \var{alien-function} is an arbitrary
+  run-time expression; to call a constant function, use
+  \funref{extern-alien} or \code{def-alien-routine}.
+  
+  The type of \var{alien-function} must be \code{(alien (function
+    ...))} or \code{(alien (* (function ...)))},
+  \xlref{alien-function-types}.  The function type is used to
+  determine how to call the function (as though it was declared with
+  a prototype.)  The type need not be known at compile time, but only
+  known-type calls are efficiently compiled.  Limitations:
+  \begin{itemize}
+  \item Structure type return values are not implemented.
+  \item Passing of structures by value is not implemented.
+  \end{itemize}
+\end{defun}
+
+Here is an example which allocates a \code{(struct foo)}, calls a foreign
+function to initialize it, then returns a Lisp vector of all the
+\code{(* (struct foo))} objects filled in by the foreign call:
+
+\begin{lisp}
+;; Allocate a foo on the stack.
+(with-alien ((f (struct foo)))
+  ;;
+  ;; Call some C function to fill in foo fields.
+  (alien-funcall (extern-alien "mangle_foo" (function void (* foo)))
+                 (addr f))
+  ;;
+  ;; Find how many foos to use by getting the A field.
+  (let* ((num (slot f 'a))
+         (result (make-array num)))
+    ;;
+    ;; Get a pointer to the array so that we don't have to keep
+    ;; extracting it:
+    (with-alien ((a (* (array (* (struct foo)) 100)) (addr (slot f 'b))))
+      ;;
+      ;; Loop over the first N elements and stash them in the
+      ;; result vector.
+      (dotimes (i num)
+        (setf (svref result i) (deref (deref a) i)))
+      result)))
+\end{lisp}
+
+
+\subsection{The def-alien-routine Macro}
+
+\begin{defmac}{alien:}{def-alien-routine}{\var{name} \var{result-type}
+    \mstar{(\var{aname} \var{atype} \mopt{style})}}
+  
+  This macro is a convenience for automatically generating Lisp
+  interfaces to simple foreign functions.  The primary feature is the
+  parameter style specification, which translates the C
+  pass-by-reference idiom into additional return values.
+  
+  \var{name} is usually a string external symbol, but may also be a
+  symbol Lisp name or a list of the foreign name and the Lisp name.
+  If only one name is specified, the other is automatically derived,
+  (\pxlref{external-aliens}.)
+  
+  \var{result-type} is the Alien type of the return value.  Each
+  remaining subform specifies an argument to the foreign function.
+  \var{aname} is the symbol name of the argument to the constructed
+  function (for documentation) and \var{atype} is the Alien type of
+  corresponding foreign argument.  The semantics of the actual call
+  are the same as for \funref{alien-funcall}.  \var{style} should be
+  one of the following:
+  \begin{Lentry}
+  \item[\kwd{in}] specifies that the argument is passed by value.
+    This is the default.  \kwd{in} arguments have no corresponding
+    return value from the Lisp function.
+  
+  \item[\kwd{out}] specifies a pass-by-reference output value.  The
+    type of the argument must be a pointer to a fixed sized object
+    (such as an integer or pointer).  \kwd{out} and \kwd{in-out}
+    cannot be used with pointers to arrays, records or functions.  An
+    object of the correct size is allocated, and its address is passed
+    to the foreign function.  When the function returns, the contents
+    of this location are returned as one of the values of the Lisp
+    function.
+  
+  \item[\kwd{copy}] is similar to \kwd{in}, but the argument is copied
+    to a pre-allocated object and a pointer to this object is passed
+    to the foreign routine.
+  
+  \item[\kwd{in-out}] is a combination of \kwd{copy} and \kwd{out}.
+    The argument is copied to a pre-allocated object and a pointer to
+    this object is passed to the foreign routine.  On return, the
+    contents of this location is returned as an additional value.
+  \end{Lentry}
+  Any efficiency-critical foreign interface function should be inline
+  expanded by preceding \code{def-alien-routine} with:
+
+\begin{lisp}
+(declaim (inline \var{lisp-name}))
+\end{lisp}
+
+  In addition to avoiding the Lisp call overhead, this allows
+  pointers, word-integers and floats to be passed using non-descriptor
+  representations, avoiding consing (\pxlref{non-descriptor}.)
+\end{defmac}
+
+
+\subsection{def-alien-routine Example}
+
+Consider the C function \code{cfoo} with the following calling convention:
+
+\begin{example}
+/* a for update
+ * i out
+ */
+void cfoo (char *str, char *a, int *i);
+\end{example}
+
+which can be described by the following call to \code{def-alien-routine}:
+
+\begin{lisp}
+(def-alien-routine "cfoo" void
+  (str c-string)
+  (a char :in-out)
+  (i int :out))
+\end{lisp}
+
+The Lisp function \code{cfoo} will have two arguments (\var{str} and \var{a})
+and two return values (\var{a} and \var{i}).
+
+
+\subsection{Calling Lisp from C}
+
+% Calling Lisp functions from C is sometimes possible, but is rather hackish.
+% See \code{funcall0} ... \code{funcall3} in the \file{lisp/arch.h}.  The
+% arguments must be valid \cmucl{} object descriptors (e.g.  fixnums must be
+% left-shifted by 2.)  See \file{compiler/generic/objdef.lisp} or the derived
+% file \file{lisp/internals.h} for details of the object representation.
+% \file{lisp/internals.h} is mechanically generated, and is not part of the
+% source distribution.  It is distributed in the \file{docs/} directory of the
+% binary distribution.
+
+% Note that the garbage collector moves objects, and won't be able to fix up any
+% references in C variables, so either turn GC off or don't keep Lisp pointers
+% in C data unless they are to statically allocated objects.  You can use
+% \funref{purify} to place live data structures in static space so that they
+% won't move during GC.
+
+\cmucl{} supports calling Lisp from C via the \funref{def-callback}
+macro:
+
+\begin{defmac}{alien:}{def-callback}{\var{name} (\var{return-type}
+    \mstar{(arg-name arg-type)}) \ampbody{} \var{body}}
+  This macro defines a Lisp function that can be called from C and a
+  Lisp variable.  The arguments to the function must be alien types,
+  and the return type must also be an alien type.  This Lisp function
+  can be accessed via the \funref{callback} macro.
+
+  \var{name} is the name of the Lisp function.  It is also the name of
+  a variable to be used by the \code{callback} macro.
+
+  \var{return-type} is the return type of the function.  This must be
+  a recognized alien type.
+
+  \var{arg-name} specifies the name of the argument to the function,
+  and the argument has type \var{arg-type}, which must be an alien type.
+\end{defmac}
+
+\begin{defmac}{alien:}{callback}{\var{callback-symbol}}
+  This macro extracts the appropriate information for the function
+  named \var{callback-symbol} so that it can be called by a C
+  function.  \var{callback-symbol} must be a symbol created by the
+  \code{def-callback} macro.
+\end{defmac}
+
+\begin{defmac}{alien:}{callback-funcall}{\var{callback-name} \amprest{}
+    \var{args}}
+  This macro does the necessary stuff to call the callback named
+  \var{callback-name} with the given arguments.
+\end{defmac}
+
+\subsection{Callback Example}
+
+Here is a simple example of using callbacks.
+\begin{lisp}
+(use-package :alien)
+(use-package :c-call)
+
+(def-callback foo (int (arg1 int) (arg2 int))
+  (format t "~&foo: ~S, ~S~%" arg1 arg2)
+  (+ arg1 arg2))
+
+(defun test-foo ()
+  (callback-funcall foo 555 444444))
+\end{lisp}
+
+In this example, the callback function \code{foo} is defined which
+takes two C \code{int} parameters and returns a \code{int}.  As this
+shows, we can use arbitrary Lisp inside the function.
+
+The function \code{test-foo} shows how we can call this callback
+function from Lisp.  The macro \code{callback} extracts the necessary
+information for the callback function \code{foo} which can be
+converted into a pointer which we can call via \code{alien-funcall}.
+
+The following code is a more complete example where a foreign routine
+calls our Lisp routine.
+\begin{lisp}
+(use-package :alien)
+(use-package :c-call)
+
+(def-alien-routine qsort void
+  (base (* t))
+  (nmemb int)
+  (size int)
+  (compar (* (function int (* t) (* t)))))
+
+(def-callback my< (int (arg1 (* double))
+                       (arg2 (* double)))
+  (let ((a1 (deref arg1))
+        (a2 (deref arg2)))
+    (cond ((= a1 a2)  0)
+          ((< a1 a2) -1)
+          (t         +1))))
+
+(defun test-qsort ()
+  (let ((a (make-array 10 :element-type 'double-float
+                       :initial-contents '(0.1d0 0.5d0 0.2d0 1.2d0 1.5d0
+                                           2.5d0 0.0d0 0.1d0 0.2d0 0.3d0))))
+    (print a)
+    (qsort (sys:vector-sap a)
+           (length a)
+           (alien-size double :bytes)
+           (alien:callback my<))
+    (print a)))
+\end{lisp}
+
+We define the alien routine, \code{qsort}, and a callback, \code{my<},
+to determine whether two \code{double}'s are less than, greater than
+or equal to each other.
+
+The test function \code{test-qsort} shows how we can call the alien
+sort routine with our Lisp comparison routine to produce a sorted
+array.
+
+\subsection{Accessing Lisp Arrays}
+
+Due to the way \cmucl{} manages memory, the amount of memory that can
+be dynamically allocated by \code{malloc} or \funref{make-alien} is
+limited\footnote{\cmucl{} mmaps a large piece of memory for its own
+use and this memory is typically about 256~MB above the start of the C
+heap. Thus, only about 256~MB of memory can be dynamically allocated.
+In earlier versions, this limit was closer to 8~MB.}.
+
+To overcome this limitation, it is possible to access the content of
+Lisp arrays which are limited only by the amount of physical memory
+and swap space available.  However, this technique is only useful if
+the foreign function takes pointers to memory instead of allocating
+memory for itself.  In latter case, you will have to modify the
+foreign functions.
+
+This technique takes advantage of the fact that \cmucl{} has
+specialized array types (\pxlref{specialized-array-types}) that match
+a typical C array.  For example, a \code{(simple-array double-float
+  (100))} is stored in memory in essentially the same way as the C
+array \code{double x[100]} would be.  The following function allows us
+to get the physical address of such a Lisp array:
+
+\begin{example}
+(defun array-data-address (array)
+  "Return the physical address of where the actual data of an array is
+stored.
+
+ARRAY must be a specialized array type in \cmucl{}.  This means ARRAY
+must be an array of one of the following types:
+
+                  double-float
+                  single-float
+                  (unsigned-byte 32)
+                  (unsigned-byte 16)
+                  (unsigned-byte  8)
+                  (signed-byte 32)
+                  (signed-byte 16)
+                  (signed-byte  8)
+"
+  (declare (type (or (simple-array (signed-byte 8))
+                     (simple-array (signed-byte 16))
+                     (simple-array (signed-byte 32))
+                     (simple-array (unsigned-byte 8))
+                     (simple-array (unsigned-byte 16))
+                     (simple-array (unsigned-byte 32))
+                     (simple-array single-float)
+                     (simple-array double-float)
+                     (simple-array (complex single-float))
+                     (simple-array (complex double-float)))
+                 array)
+           (optimize (speed 3) (safety 0))
+           (ext:optimize-interface (safety 3)))
+  ;; with-array-data will get us to the actual data.  However, because
+  ;; the array could have been displaced, we need to know where the
+  ;; data starts.
+  (lisp::with-array-data ((data array)
+                          (start)
+                          (end))
+    (declare (ignore end))
+    ;; DATA is a specialized simple-array.  Memory is laid out like this:
+    ;;
+    ;;   byte offset    Value
+    ;;        0         type code (should be 70 for double-float vector)
+    ;;        4         4 * number of elements in vector
+    ;;        8         1st element of vector
+    ;;      ...         ...
+    ;;
+    (let ((addr (+ 8 (logandc1 7 (kernel:get-lisp-obj-address data))))
+          (type-size
+           (let ((type (array-element-type data)))
+             (cond ((or (equal type '(signed-byte 8))
+                        (equal type '(unsigned-byte 8)))
+                    1)
+                   ((or (equal type '(signed-byte 16))
+                        (equal type '(unsigned-byte 16)))
+                    2)
+                   ((or (equal type '(signed-byte 32))
+                        (equal type '(unsigned-byte 32)))
+                    4)
+                   ((equal type 'single-float)
+                    4)
+                   ((equal type 'double-float)
+                    8)
+                   (t
+                    (error "Unknown specialized array element type"))))))
+      (declare (type (unsigned-byte 32) addr)
+               (optimize (speed 3) (safety 0) (ext:inhibit-warnings 3)))
+      (system:int-sap (the (unsigned-byte 32)
+                        (+ addr (* type-size start)))))))
+\end{example}
+
+We note, however, that the system function
+\findexed{system:vector-sap} will do the same thing as above does.
+
+Assume we have the C function below that we wish to use:
+
+\begin{example}
+  double dotprod(double* x, double* y, int n)
+  \{
+    int k;
+    double sum = 0;
+
+    for (k = 0; k < n; ++k) \{
+      sum += x[k] * y[k];
+    \}
+    return sum;
+  \}
+\end{example}
+
+The following example generates two large arrays in Lisp, and calls the C
+function to do the desired computation.  This would not have been
+possible using \code{malloc} or \code{make-alien} since we need about
+16 MB of memory to hold the two arrays.
+
+\begin{example}
+  (alien:def-alien-routine "dotprod" c-call:double
+    (x (* double-float) :in)
+    (y (* double-float) :in)
+    (n c-call:int :in))
+    
+  (defun test-dotprod ()
+    (let ((x (make-array 10000 :element-type 'double-float 
+                         :initial-element 2d0))
+          (y (make-array 10000 :element-type 'double-float
+                         :initial-element 10d0)))
+        (sys:without-gcing
+          (let ((x-addr (sys:vector-sap x))
+                (y-addr (sys:vector-sap y)))
+            (dotprod x-addr y-addr 10000)))))
+\end{example}
+
+In this example, we have used \code{sys:vector-sap} instead of
+\code{array-data-address}, but we could have used \code{(sys:int-sap
+  (array-data-address x))} as well.
+
+Also, we have wrapped the inner \code{let} expression in a
+\code{sys:without-gcing} that disables garbage collection for the
+duration of the body.  This will prevent garbage collection from
+moving \code{x} and \code{y} arrays after we have obtained the (now
+erroneous) addresses but before the call to \code{dotprod} is made.
+
+
+\section{Step-by-Step Alien Example}
+
+This section presents a complete example of an interface to a somewhat
+complicated C function.  This example should give a fairly good idea
+of how to get the effect you want for almost any kind of C function.
+Suppose you have the following C function which you want to be able to
+call from Lisp in the file \file{test.c}:
+
+\begin{verbatim}                
+struct c_struct
+{
+  int x;
+  char *s;
+};
+ 
+struct c_struct *c_function (i, s, r, a)
+    int i;
+    char *s;
+    struct c_struct *r;
+    int a[10];
+{
+  int j;
+  struct c_struct *r2;
+ 
+  printf("i = %d\n", i);
+  printf("s = %s\n", s);
+  printf("r->x = %d\n", r->x);
+  printf("r->s = %s\n", r->s);
+  for (j = 0; j < 10; j++) printf("a[%d] = %d.\n", j, a[j]);
+  r2 = (struct c_struct *) malloc (sizeof(struct c_struct));
+  r2->x = i + 5;
+  r2->s = "A C string";
+  return(r2);
+};
+\end{verbatim}
+
+It is possible to call this function from Lisp using the file \file{test.lisp}
+whose contents is:
+
+\begin{lisp}
+;;; -*- Package: test-c-call -*-
+(in-package "TEST-C-CALL")
+(use-package "ALIEN")
+(use-package "C-CALL")
+
+;;; Define the record c-struct in Lisp.
+(def-alien-type nil
+    (struct c-struct
+            (x int)
+            (s c-string)))
+
+;;; Define the Lisp function interface to the C routine.  It returns a
+;;; pointer to a record of type c-struct.  It accepts four parameters:
+;;; i, an int; s, a pointer to a string; r, a pointer to a c-struct
+;;; record; and a, a pointer to the array of 10 ints.
+;;;
+;;; The INLINE declaration eliminates some efficiency notes about heap
+;;; allocation of Alien values.
+(declaim (inline c-function))
+(def-alien-routine c-function
+    (* (struct c-struct))
+  (i int)
+  (s c-string)
+  (r (* (struct c-struct)))
+  (a (array int 10)))
+
+;;; A function which sets up the parameters to the C function and
+;;; actually calls it.
+(defun call-cfun ()
+  (with-alien ((ar (array int 10))
+               (c-struct (struct c-struct)))
+    (dotimes (i 10)                     ; Fill array.
+      (setf (deref ar i) i))
+    (setf (slot c-struct 'x) 20)
+    (setf (slot c-struct 's) "A Lisp String")
+
+    (with-alien ((res (* (struct c-struct))
+                 (c-function 5 "Another Lisp String" (addr c-struct) ar)))
+      (format t "Returned from C function.~%")
+      (multiple-value-prog1
+          (values (slot res 'x)
+                  (slot res 's))
+        ;;              
+        ;; Deallocate result {\em after} we are done using it.
+        (free-alien res)))))
+\end{lisp}
+
+To execute the above example, it is necessary to compile the C routine as
+follows:
+
+\begin{example}
+cc -c test.c
+\end{example}
+
+In order to enable incremental loading with some linkers, you may need to say:
+
+\begin{example}
+cc -G 0 -c test.c
+\end{example}
+
+Once the C code has been compiled, you can start up Lisp and load it in:
+
+\begin{example}
+% lisp
+;;; Lisp should start up with its normal prompt.
+
+;;; Compile the Lisp file.  This step can be done separately.  You don't have
+;;; to recompile every time.
+* (compile-file "test.lisp")
+
+;;; Load the foreign object file to define the necessary symbols.  This must
+;;; be done before loading any code that refers to these symbols.  next block
+;;; of comments are actually the output of LOAD-FOREIGN.  Different linkers
+;;; will give different warnings, but some warning about redefining the code
+;;; size is typical.
+* (load-foreign "test.o")
+
+;;; Running library:load-foreign.csh...
+;;; Loading object file...
+;;; Parsing symbol table...
+Warning:  "_gp" moved from #x00C082C0 to #x00C08460.
+Warning:  "end" moved from #x00C00340 to #x00C004E0.
+
+;;; o.k. now load the compiled Lisp object file.
+* (load "test")
+
+;;; Now we can call the routine that sets up the parameters and calls the C
+;;; function.
+* (test-c-call::call-cfun)
+
+;;; The C routine prints the following information to standard output.
+i = 5
+s = Another Lisp string
+r->x = 20
+r->s = A Lisp string
+a[0] = 0.
+a[1] = 1.
+a[2] = 2.
+a[3] = 3.
+a[4] = 4.
+a[5] = 5.
+a[6] = 6.
+a[7] = 7.
+a[8] = 8.
+a[9] = 9.
+;;; Lisp prints out the following information.
+Returned from C function.
+;;; Return values from the call to test-c-call::call-cfun.
+10
+"A C string"
+*
+\end{example}
+
+If any of the foreign functions do output, they should not be called
+from within \hemlock{}. Depending on the situation, various strange
+behavior occurs. Under X, the output goes to the window in which Lisp
+was started; on a terminal, the output will overwrite the \hemlock{}
+screen image; in a \hemlock{} slave, standard output is
+\file{/dev/null} by default, so any output is discarded.

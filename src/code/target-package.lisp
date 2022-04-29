@@ -842,9 +842,7 @@ Experimental: interface subject to change."
                (floor (info-storage-capacity (info-env-storage table)) 4))
         ;; Otherwise, when >1/4th of the table consists of tombstones,
         ;; then rebuild the table.
-        (%rebuild-package-names table)
-        (when (eq oldval :deleted)
-          (setq oldval nil))))
+        (%rebuild-package-names table)))
     (setf (info-gethash name table) object)
     (when (eq oldval :deleted)
       (decf (info-env-tombstones table)))))
@@ -1001,8 +999,10 @@ The default value of USE is implementation-dependent, and in this
 implementation it is ~S." *!default-package-use-list*)
   (prog ((name (stringify-string-designator name))
          (nicks (stringify-string-designators nicknames))
-         (package (%make-package (make-package-hashtable internal-symbols)
-                                 (make-package-hashtable external-symbols)))
+         (package
+          (or (resolve-deferred-package name)
+              (%make-package (make-package-hashtable internal-symbols)
+                             (make-package-hashtable external-symbols))))
          clobber)
    :restart
      (when (find-package name)
@@ -1012,12 +1012,6 @@ implementation it is ~S." *!default-package-use-list*)
         "Clobber existing package."
         "A package named ~S already exists" name)
        (setf clobber t))
-     (when (and sb-c::*compile-time-eval*
-                (eq (sb-c::block-compile sb-c::*compilation*) t))
-       (style-warn "Package creation forms limit block compilation and ~
-       may cause failure with the use of specified entry ~
-       points. Consider moving the package creation form outside the ~
-       scope of a block compilation."))
      (with-package-graph ()
          ;; Check for race, signal the error outside the lock.
          (when (and (not clobber) (find-package name))
@@ -2119,6 +2113,65 @@ PACKAGE."
               ;; other than NIL without invalidating the cache line by incrementing the
               ;; cookie. i.e. a cached NIL is correct until the next cache invalidation.
               (or (null pkg) (and (packagep pkg) (package-%name pkg)))))
+
+
+;;;; deferred package handling
+
+(defvar *deferred-package-names*)
+
+;;; A deferred package is a package which is not added to the normal
+;;; package database until some later point in time. The current
+;;; purpose for deferred packages is so that the loader symbol fasl
+;;; ops can intern symbols into packages, without the packages
+;;; necessarily being created yet. This is important for deferred
+;;; top-level form loading, as to not cause loading symbols (which may
+;;; appear as literal code constants) to fail early. Since the
+;;; deferred package is not added to the normal package database until
+;;; the package is actually created, we preserve package environment
+;;; semantics at runtime, and give a reasonable error if the package
+;;; has not been created by the end of the load.
+(defun make-deferred-package (name)
+  (let ((package (%make-package (make-package-hashtable 0)
+                                (make-package-hashtable 0))))
+    (unless *deferred-package-names* ; bind on demand
+      (setq *deferred-package-names*
+            (make-info-hashtable :comparator #'pkg-name=
+                                 :hash-function #'sxhash)))
+    (setf (info-gethash name *deferred-package-names*) package)
+    (setf (package-%name package) name)
+    package))
+
+;;; Return the deferred package object for NAME if it exists,
+;;; otherwise return NIL.
+(defun resolve-deferred-package (name)
+  (and (boundp '*deferred-package-names*)
+       *deferred-package-names*
+       (let ((package (%get-package name *deferred-package-names*)))
+         (when package
+           ;; To simulate remhash.
+           (setf (info-gethash name *deferred-package-names*) :deleted))
+         package)))
+
+;;; Bind the deferred package name table and test to see if the
+;;; deferred package table still has any unresolved entries after
+;;; FUNCTION is called.
+(defun call-with-deferred-package-names (function)
+  (let ((*deferred-package-names* nil)) ; bind on demand
+    (funcall function)
+    (when *deferred-package-names*
+      (info-maphash
+       (lambda (name package)
+         (unless (eq package :deleted)
+           (dovector (sym (package-hashtable-cells
+                           (package-internal-symbols package)))
+             (when (symbolp sym)
+               (error 'simple-package-error
+                      :format-control
+                      "The loader tried loading the symbol named ~a ~
+                       into the package named ~a, but the package did ~
+                       not get defined, and does not exist."
+                      :format-arguments (list (symbol-name sym) name))))))
+       *deferred-package-names*))))
 
 ;;; We don't benefit from these transforms because any time we have a constant
 ;;; package in our code, we refer to it via #.(FIND-PACKAGE).

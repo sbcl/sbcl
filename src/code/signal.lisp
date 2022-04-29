@@ -48,7 +48,7 @@
 ;;;    (foo))
 ;;; provided that the first branch is true "often enough".
 
-;;; These 4 symbols are initialized by create_thread_struct()
+;;; These 4 symbols are initialized by alloc_thread_struct()
 (defvar *interrupts-enabled*)
 (defvar *interrupt-pending*)
 #+sb-safepoint (defvar *thruption-pending*)

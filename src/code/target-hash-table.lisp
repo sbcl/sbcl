@@ -67,17 +67,9 @@
           (sb-vm:is-lisp-pointer (get-lisp-obj-address key))))
 
 (declaim (inline eql-hash eql-hash-no-memoize))
-#.`(progn ; our usual whacky incantation because of macrolet + inline
-    ,@(loop
-        for (name symbol-hash-fun)
-        in '((eql-hash sxhash) ; via transform
-             ;; For GETHASH we never compute a symbol-hash. If PUTHASH
-             ;; (or other) hasn't done it, the lookup will fail anyway.
-             ;; Also, the backend can at its discretion avoid clearing
-             ;; the low bits of the hash which is a known fixnum.
-             (eql-hash-no-memoize symbol-hash))
-        collect
-        `(defun ,name (key)
+(macrolet
+    ((define-eql-hash (name symbol-hash-fun)
+       `(defun ,name (key)
           (declare (values fixnum (member t nil)))
           (if (%other-pointer-subtype-p
                key
@@ -104,6 +96,12 @@
                       nil)
               ;; Consider picking off %INSTANCEP too before using EQ-HASH ?
               (eq-hash key)))))
+  (define-eql-hash eql-hash sxhash) ; via transform
+  ;; For GETHASH we should never compute a symbol-hash. If it hasn't been
+  ;; computed, KEY won't be found, and it doesn't matter what the hash is.
+  ;; This could theoretically avoid clearing the fixnum tag since the symbol
+  ;; is not n.
+  (define-eql-hash eql-hash-no-memoize symbol-hash))
 
 (declaim (inline equal-hash))
 (defun equal-hash (key)

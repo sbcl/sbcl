@@ -124,13 +124,6 @@
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x5cfff000)))
-
-#+darwin
-(progn
-  #-gencgc
-  (progn
-    (defparameter dynamic-0-space-start #x10000000)
-    (defparameter dynamic-0-space-end   #x3ffff000)))
 
 (defenum (:start 8)
   halt-trap

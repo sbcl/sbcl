@@ -1,0 +1,899 @@
+%%
+%% This is file `typehtml.sty',
+%% generated with the docstrip utility.
+%%
+%% The original source files were:
+%%
+%% typehtml.dtx  (with options: `package')
+%% 
+%% IMPORTANT NOTICE:
+%% 
+%% For the copyright see the source file.
+%% 
+%% Any modified versions of this file must be renamed
+%% with new filenames distinct from typehtml.sty.
+%% 
+%% For distribution of the original source see the terms
+%% for copying and modification in the file typehtml.dtx.
+%% 
+%% This generated file may be distributed as long as the
+%% original source files, as listed above, are part of the
+%% same distribution. (The sources need not necessarily be
+%% in the same archive or directory.)
+%%
+%% Source File `typehtml.dtx'.
+%% Copyright (C) 1996 1997 David Carlisle
+%% This file may be distributed under the terms of the LPPL.
+%% See 00readme.txt for details.
+%%
+\NeedsTeXFormat{LaTeX2e}[1995/06/01]
+\ProvidesPackage{typehtml}
+          [1997/11/19 v0.12 HTML printer (DPC)]
+\DeclareOption{html2}{\let\HTML@two@stop\endinput}
+\DeclareOption{netscape}
+      {\def\HTML@not#1{\SGML@w{<#1> is not valid HTML}}}
+\DeclareOption{html3}{\let\HTML@two@stop\relax}
+\DeclareOption{nohyperref}{%
+  \let\HTML@doname\@secondoftwo
+  \def\HTML@dosrc#1#2{\emph{#2}}}
+\DeclareOption{ftnhyperref}{%
+  \let\HTML@doname\@secondoftwo
+  \def\HTML@dosrc#1#2{\emph{#2}\footnote{HREF: \texttt{#1}}}}
+\DeclareOption{hyperref}{%
+  \AtBeginDocument{%
+    \providecommand\href[2]{\special{html:<A href="#1">}%
+                            #2\special{html:</A>}}%
+    \providecommand\hypertarget[2]{\special{html:<A name="#1">}%
+                            #2\special{html:</A>}}%
+    \let\HTML@doname\hypertarget
+    \let\HTML@dosrc\href}}
+\DeclareOption{dviwindo}{%
+   \def\HTML@dosrc#1#2{{%
+      \leavevmode\sbox\z@{#2}\count@\ht\z@\@tempcnta\wd\z@
+      \if\string##\@car#1\@nil
+        \special{button: \the\@tempcnta\space\the\count@\space
+                 "\@gobble#1"}%
+      \else
+         \special{button: \the\@tempcnta\space\the\count@\space
+              launch: typehtml "#1"}
+      \fi
+      \special{color push}\special{color rgb 0 1 0}%
+      \unhbox\z@
+      \special{color pop}}}%
+   \def\HTML@doname#1#2{\leavevmode\special{mark: "#1"}#2}}%
+\DeclareOption{imgalt}{}
+\DeclareOption{imggif}{\SGML@w{img gif support not done yet}}
+\DeclareOption{imgps}{\SGML@w{img ps support not done yet}}
+\DeclareOption{smartquotedbl}{%
+  \def\SGMLquotedbla{%
+    \textquotedblleft\global\let\SGMLquotedbl\SGMLquotedblb}
+  \def\SGMLquotedblb{%
+    \textquotedblright\global\let\SGMLquotedbl\SGMLquotedbla}
+  \let\SGMLquotedbl\SGMLquotedbla
+  \let\SGML@savedeverypar\everypar
+  \newtoks\everypar
+  \SGML@savedeverypar{%
+    \global\let\SGMLquotedbl\SGMLquotedbla\the\everypar}}
+\DeclareOption{straightquotedbl}{%
+  \DeclareTextCommandDefault{\textquotedbl}{{\ttfamily\char`\"}}%
+  \let\SGMLquotedbl\textquotedbl}
+\DeclareOption{chapter}{%
+  \def\HTML@headings{%
+    \chapter\section\subsection%
+    \subsubsection\paragraph\subparagraph}}
+\DeclareOption{chapter*}{%
+  \def\HTML@headings{%
+    {\chapter*}{\section*}{\subsection*}%
+    {\subsubsection*}{\paragraph*}{\subparagraph*}}}
+\DeclareOption{section}{%
+  \def\HTML@headings{%
+    \section\subsection%
+    \subsubsection\paragraph\subparagraph\endgraf}}
+\DeclareOption{section*}{%
+  \def\HTML@headings{%
+    {\section*}{\subsection*}%
+    {\subsubsection*}{\paragraph*}{\subparagraph*}\endgraf}}
+\DeclareOption{subsection}{%
+  \def\HTML@headings{%
+    \subsection%
+    \subsubsection\paragraph\subparagraph\endgraf\endgraf}}
+\DeclareOption{subsection*}{%
+  \def\HTML@headings{%
+    {\subsection*}%
+    {\subsubsection*}{\paragraph*}{\subparagraph*}\endgraf\endgraf}}
+\DeclareOption{bigint}{%
+  \let\HTML@int\int
+  \AtEndOfPackage{\RequirePackage{exscale}}}
+\ExecuteOptions{section*,imgalt,html2,nohyperref,straightquotedbl}
+\ProcessOptions
+\begingroup
+\catcode`\<=\active
+\catcode`\>=\active
+\catcode`\&=\active
+\catcode`\$=\active
+\catcode`\"=\active
+\catcode`\^=\active
+\catcode`\_=\active
+\catcode`\;=\active
+\catcode`\A=\active
+\catcode`\B=\active
+\catcode`\C=\active
+\catcode`\D=\active
+\uccode`\A=`\{%
+\uccode`\B=`\}%
+\uccode`\C=`\|%
+\uccode`\D=`\\%
+\uppercase{\endgroup
+\def\SGMLent@@#1;{\csname SGML@E@#1\endcsname}
+\def\SGML@def@active#1>{%
+  \expandafter\def\csname SGML@#1\endcsname}
+\def\dohtml{%
+ \begingroup
+ \ifx;\@undefined\expandafter\let\expandafter;\string;\fi
+ \ifx>\@undefined\expandafter\let\expandafter>\string>\fi
+ \catcode`\<=\active
+ \catcode`\>=\active
+ \catcode`\&=\active
+ \catcode`\{=\active
+ \catcode`\}=\active
+ \catcode`\$=\active
+ \catcode`\"=\active
+ \catcode`\^=\active
+ \catcode`\_=\active
+ \catcode`\\=\active
+ \catcode`\|=\active
+ \catcode\endlinechar=10
+ \catcode`\%=12
+ \catcode`\#=12
+ \catcode`\;=\active
+ \def\verbatim@nolig@list{\do\`\do\,\do\'\do\-}
+ \def<{\SGMLopen}%
+ \def&{\SGMLent}%
+ \let^\textasciicircum
+ \let~\textasciitilde
+ \def_{\_}%
+ \let$\$%
+ \def"{\SGMLquotedbl}%
+ \def A{\{}%
+ \def B{\}}%
+ \def C{\texttt{|}}%
+ \def D{\texttt{\char`\\}}%
+  \def\addcontentsline##1##2##3{%
+    {\def<{\string<}\def&{\string&}%
+      \addtocontents{##1}{\protect\dotochtml<html>}%
+      \addtocontents{##1}{\protect\contentsline{##2}{##3}{\thepage}}%
+      \addtocontents{##1}{\protect</html>}}}}
+\def\dotochtml{%
+ \dohtml
+ \catcode`\\\z@
+ \catcode`\{\@ne
+  \catcode`\}\tw@}
+\def\SGMLshortend{/}
+\def\SGMLgrab@#1<#2>{%
+  \edef\@tempd{\lowercase{\def\noexpand\@tempd{\gobblespc#2 \relax}}}%
+  \@tempd
+  \ifx\@tempd\SGMLshortend\let\@tempd\@tempc\fi
+  \ifx\@tempb\@tempd
+   \advance\@tempcnta\@ne
+  \else
+    \ifx\@tempc\@tempd
+      \advance\@tempcnta\m@ne
+    \fi
+  \fi
+  \ifnum\@tempcnta=\z@
+    \expandafter\@tempa\expandafter{\the\@temptokena#1}%
+  \else
+    \addto@hook\@temptokena{#1<#2>}%
+    \expandafter\SGMLgrab@
+  \fi}
+\def\SGMLopen#1>{%
+  \SGMLopen@#1 \@nil}
+}
+\def\htmlinput#1{\dohtml\let\@endhtml\relax\input{#1}\endgroup}
+\def\gobblespc#1 #2\relax{#1}
+\def\SGMLgrabber#1#2{%
+  \def\@tempa{#2}%
+  \@tempcnta\@ne
+  \@temptokena{}%
+  \lowercase{\def\@tempb{#1}\def\@tempc{/#1}}%
+  \SGMLgrab@}
+\begingroup
+\catcode`\"=\active
+\uppercase{\endgroup
+\def\SGMLopen@#1 #2\@nil{%
+  \toks@{}%
+  \edef\@tempa{\lowercase{\def\noexpand\SGMLelement{#1}}}\@tempa
+  \if!\@car#1\relax\@nil
+    \toks@{#1 #2}%
+    \SGML@w{Declaration ignored\MessageBreak<\the\toks@>\MessageBreak}%
+  \else
+    \if$#2$\else
+      \replacequotes#2"\@nil"%
+      \SGMLafterfi
+      \expandafter\toks@\expandafter{\expandafter}%
+      \expandafter\SGMLgetattrib\the\toks@ \@nil
+    \fi
+    \expandafter\ifx\csname SGML@\SGMLelement
+                          \expandafter\endcsname\relax
+      \SGML@w{<\SGMLelement> undefined}%
+    \else
+      \csname SGML@\SGMLelement
+        \expandafter\expandafter\expandafter\endcsname
+    \fi
+  \fi}
+\def\replacequotes#1"#2"{%
+  \def\@tempb{#2}%
+  \ifx\@tempb\@nnil
+    \addto@hook\toks@{#1}%
+  \else
+    \addto@hook\toks@{#1{#2}}%
+  \expandafter\replacequotes
+  \fi}}
+\def\SGMLafterfi#1\fi{\fi#1}
+\def\SGMLgobbletofi#1\fi{\fi}
+\def\SGMLgetattrib#1 #2{%
+  \ifx\box#1\box\else
+    \SGMLgetval#1=$=\@nil
+      \def\@tempa{#2}%
+    \ifx\@tempa\@nnil
+      \expandafter\SGMLgobbletofi
+    \else
+      \expandafter\SGMLafterfi
+    \fi
+    \SGMLgetattrib#2%
+  \fi}
+\def\SGMLgetval#1=#2=#3\@nil{%
+  \ifcat$#2%
+    \lowercase{\SGML@addattrib\doimplied{#1}}%
+  \else
+    \lowercase{\SGML@addattrib{\do{#1}}}{#2}%
+  \fi}
+\def\SGML@addattrib#1#2{\addto@hook\toks@{#1{#2}}}
+\def\SGML@w{\PackageWarning{typehtml}}
+\def\SGMLdef#1{%
+  \ifcat\noexpand#1\noexpand~%
+    \expandafter\SGML@def@active
+  \else
+    \expandafter\SGML@def
+  \fi}
+\edef\@tempa{\def\noexpand\SGML@def##1\string>}\@tempa{%
+  \expandafter\def\csname SGML@#1\endcsname}
+\expandafter\def\expandafter\SGMLent\expandafter{%
+  \expandafter\protect\csname& \endcsname}
+\expandafter\def\csname& \endcsname{%
+  \futurelet\@let@token\SGMLent@}
+\def\SGMLent@{%
+ \ifx\@let@token\@sptoken
+    \&%
+ \else
+    \expandafter\SGMLent@@
+ \fi}
+\def\SGMLentity#1{%
+  \expandafter\def\csname SGML@E@#1\endcsname}
+\SGMLdef<html>{}
+\SGMLdef</html>{\@endhtml}
+\let\@endhtml\endgroup
+\SGMLdef<title>{\typeout{***TITLE***}\SGMLgrabber{title}\typeout}
+\long\def\@tempa#1#2#3#4#5#6{%
+  \SGMLdef<h1>{\SGMLgrabber{h1}{\HTMLsection{#1}}}%
+  \SGMLdef<h2>{\SGMLgrabber{h2}{\HTMLsection{#2}}}%
+  \SGMLdef<h3>{\SGMLgrabber{h3}{\HTMLsection{#3}}}%
+  \SGMLdef<h4>{\SGMLgrabber{h4}{\HTMLsection{#4}}}%
+  \SGMLdef<h5>{\SGMLgrabber{h5}{\HTMLsection{#5}}}%
+  \SGMLdef<h6>{\SGMLgrabber{h6}{\HTMLsection{#6}}}}
+\expandafter\@tempa\HTML@headings
+\def\HTMLsection#1#2{#1{\ignorespaces#2\unskip}}
+\SGMLdef<head>{}
+\SGMLdef</head>{}
+\SGMLdef<body>{}
+\SGMLdef</body>{}
+\SGMLdef<bodytext>{}
+\SGMLdef</bodytext>{}
+\SGMLdef<p>{\par}
+\SGMLdef</p>{\par}
+\SGMLdef<blockquote>{\begin{quote}}
+\SGMLdef</blockquote>{\end{quote}}
+\SGMLdef<address>{\begin{quote}}
+\SGMLdef</address>{\end{quote}}
+\SGMLdef<ul>{\begin{itemize}}
+\SGMLdef</ul>{\end{itemize}}
+\SGMLdef<ol>{\begin{enumerate}}
+\SGMLdef</ol>{\end{enumerate}}
+\SGMLdef<li>{\item}
+\SGMLdef</li>{}
+\SGMLdef<dl>{%
+  \let\do\dldo
+  \let\doimplied\dlimplied
+  \begin{description}\the\toks@}
+\SGMLdef</dl>{\end{description}}
+\def\dldo#1#2{%
+  \def\@tempa{compact}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb
+    \itemsep\z@
+    \advance\@totalleftmargin-\leftmargin
+    \advance\linewidth\leftmargin
+    \itemindent-\labelsep
+    \leftmargin\z@
+    \parshape \@ne \@totalleftmargin \linewidth
+  \fi}
+\def\dlimplied#1{\dldo{#1}\relax}
+\def\itx#1{\item[#1]}
+\SGMLdef<dt>{\begin{lrbox}\z@\bfseries\let\maybeenddt\enddt}
+\SGMLdef</dt>{\maybeenddt}
+\SGMLdef<dd>{\maybeenddt}
+\SGMLdef</dd>{}
+\def\enddt{\end{lrbox}\item[\unhbox\z@]}
+\let\maybeenddt\relax
+\SGMLdef<a>{\SGMLgrabber{a}\HTML@anchor}
+\def\HTML@anchor#1{{%
+  \let\@tempa\@gobble
+  \def\_{\string_}%
+  \let\do\ado
+  \the\toks@
+  \@tempa{#1}}}
+\def\ado#1#2{%
+  \def\@tempb{name}\def\@tempc{#1}%
+  \ifx\@tempb\@tempc
+    \let\@tempa\@firstofone
+    \def\@tempa{\HTML@doname{#2}}%
+  \else
+    \def\@tempa{\HTML@dosrc{#2}}%
+  \fi}
+\SGMLdef<pre>{%
+  \par
+  \begingroup
+  \parindent\z@
+  \obeylines\verbatim@font\@noligs
+  \frenchspacing\@vobeyspaces}
+\SGMLdef</pre>{\endgroup}
+\SGMLdef<tt>{\SGMLgrabber{tt}\texttt}
+\SGMLdef<b>{\SGMLgrabber{b}\textbf}
+\SGMLdef<i>{\SGMLgrabber{i}\textit}
+\SGMLdef<em>{\SGMLgrabber{em}\emph}
+\SGMLdef<strong>{\SGMLgrabber{strong}\textbf}
+\SGMLdef<code>{\SGMLgrabber{code}\texttt}
+\SGMLdef<samp>{\SGMLgrabber{samp}\textsf}
+\SGMLdef<kbd>{\SGMLgrabber{kbd}\texttt}
+\SGMLdef<var>{\SGMLgrabber{var}\textit}
+\SGMLdef<cite>{\SGMLgrabber{cite}\textit}
+\SGMLdef<form>{\par\medskip}
+\SGMLdef</form>{\par\medskip}
+\SGMLdef<select>{%
+  \let\do\selectdo
+  \the\toks@\par
+  \begin{tabular}{|l|}%
+  \hline\@tempc\\\hline
+  \let\tabularnewline\relax
+  \ignorespaces}
+\def\selectdo#1#2{%
+  \def\@tempa{name}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb\def\@tempc{#2}\fi}
+\SGMLdef</select>{\\\hline\end{tabular}}
+\SGMLdef<option>{%
+  \gdef\optionbul{\phantom{$\bullet$}}%
+  \let\do\optiondo
+  \let\doimplied\optionimplied
+  \the\toks@
+  \tabularnewline
+  \let\tabularnewline\\%
+  \optionbul\space\ignorespaces}
+\SGMLdef</option>{}
+\def\optiondo#1#2{%
+  \def\@tempa{selected}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb\gdef\optionbul{$\bullet$}\fi}
+\def\optionimplied#1{%
+  \def\@tempa{selected}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb\gdef\optionbul{$\bullet$}\fi}
+\SGMLdef<input>{}
+\SGMLdef<img>{{%
+  \let\do\imgdo
+  \def\@tempa{\doimage}%
+  \the\toks@
+  \@tempa}}
+\def\doimage{\textsf{[image]}}
+\def\imgdo#1{\csname img=#1\endcsname}
+\expandafter\def\csname img=align\endcsname#1{%
+  \SGML@w{align=#1 ignored}}
+\expandafter\def\csname img=src\endcsname#1{%
+  \SGML@w{src=#1 ignored}}
+\expandafter\def\csname img=height\endcsname#1{%
+  \SGML@w{height=#1 ignored}}
+\expandafter\def\csname img=alt\endcsname#1{%
+  \def\doimage{#1}}
+\SGMLdef<hr>{\par\smallskip\hrule\smallskip}
+\SGMLdef<br>{\leavevmode\\}
+\SGMLdef<xmp>{%
+  \SGML@pre
+  \def\@tempb{/xmp}%
+  \let\SGMLopen\HTML@xmptest}
+\SGMLdef<listing>{%
+  \SGML@xmp
+  \def\@tempb{/listing}}
+\SGMLdef<plaintext>{%
+  \SGML@xmp
+  \def\@tempb{/plaintext}}%
+\def\HTML@xmptest#1>{%
+  \lowercase{\def\@tempa{#1}}%
+  \ifx\@tempa\@tempb
+    \endgroup
+  \else
+    \SGMLafterfi
+    <#1>%
+  \fi}
+\SGMLentity{amp}{\&}
+\SGMLentity{lt}{\ensuremath{<}}
+\SGMLentity{gt}{\ensuremath{>}}
+\SGMLentity{aacute}{\'a}
+\SGMLentity{Aacute}\'A{}
+\SGMLentity{acirc}{\^a}
+\SGMLentity{Acirc}{\^A}
+\SGMLentity{agrave}{\`a}
+\SGMLentity{Agrave}{\`A}
+\SGMLentity{aring}{\r a}
+\SGMLentity{Aring}{\r A}
+\SGMLentity{atilde}{\~a}
+\SGMLentity{Atilde}{\~A}
+\SGMLentity{auml}{\"a}
+\SGMLentity{Auml}{\"A}
+\SGMLentity{aelig}{\ae}
+\SGMLentity{AElig}{\AE}
+\SGMLentity{ccedil}{\c c}
+\SGMLentity{Ccedil}{\c C}
+\SGMLentity{eth}{\dh}
+\SGMLentity{ETH}{\DH}
+\SGMLentity{eacute}{\'e}
+\SGMLentity{Eacute}{\`E}
+\SGMLentity{ecirc}{\^e}
+\SGMLentity{Ecirc}{\^E}
+\SGMLentity{egrave}{\`e}
+\SGMLentity{Egrave}{\`E}
+\SGMLentity{euml}{\"e}
+\SGMLentity{Euml}{\"E}
+\SGMLentity{iacute}{\'\i}
+\SGMLentity{Iacute}{\'I}
+\SGMLentity{icirc}{\^\i}
+\SGMLentity{Icirc}{\^I}
+\SGMLentity{igrave}{\`\i}
+\SGMLentity{Igrave}{\`I}
+\SGMLentity{iuml}{\"\i}
+\SGMLentity{Iuml}{\"I}
+\SGMLentity{ntilde}{\~n}
+\SGMLentity{Ntilde}{\~N}
+\SGMLentity{oacute}{\'o}
+\SGMLentity{Oacute}{\'O}
+\SGMLentity{ocirc}{\^o}
+\SGMLentity{Ocirc}{\^O}
+\SGMLentity{ograve}{\`o}
+\SGMLentity{Ograve}{\`O}
+\SGMLentity{oslash}{\oe}
+\SGMLentity{Oslash}{\OE}
+\SGMLentity{otilde}{\~o}
+\SGMLentity{Otilde}{\~O}
+\SGMLentity{ouml}{\"o}
+\SGMLentity{Ouml}{\"O}
+\SGMLentity{szlig}{\ss}
+\SGMLentity{thorn}{\th}
+\SGMLentity{THORN}{\TH}
+\SGMLentity{uacute}{\'u}
+\SGMLentity{Uacute}{\'U}
+\SGMLentity{ucirc}{\^u}
+\SGMLentity{Ucirc}{\^U}
+\SGMLentity{ugrave}{\`u}
+\SGMLentity{Ugrave}{\`U}
+\SGMLentity{uuml}{\"u}
+\SGMLentity{Uuml}{\"U}
+\SGMLentity{yacute}{\'y}
+\SGMLentity{Yacute}{\'Y}
+\SGMLentity{yuml}{\"y}
+\ifx\HTML@not\@undefined\else
+\SGMLdef<center>{\HTML@not{center}\begin{center}}
+\SGMLdef</center>{\end{center}}
+\SGMLdef<blink>{\SGMLgrabber{blink}\textbf}
+\SGMLdef<font>{\HTML@not{font}\begingroup
+  \let\do\fontdo\the\toks@}
+\SGMLdef</font>{\endgroup}
+\def\fontdo#1#2{%
+  \def\@tempa{size}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb
+    \font@switch#2\relax\@nil
+  \fi}
+\toks@\expandafter{\set@fontsize{#1}{#2}{#3}}
+\edef\@tempa{%
+  \def\noexpand\set@fontsize##1##2##3{\the\toks@\noexpand\set@fontnum}}
+\@tempa
+\def\set@fontnum{\dimen@\f@size\p@
+  \dimen@\mul@ptsize\dimen@
+  \count@\dimen@ \divide\count@\p@
+  \advance\count@ -5\relax
+  \edef\@fontnum{\number\count@}}
+\def\mul@ptsize{}%
+\def\@fontnum{5}
+\ifcase 0\@ptsize\relax
+  \global\let\mul@ptsize\@empty% case 0, ptsize = 10
+  \or\gdef\mul@ptsize{.9091}%    case 1, ptsize = 11
+  \else\gdef\mul@ptsize{.8333}%  case 2, ptsize = 12
+\fi
+\def\font@switch#1#2\@nil{\count@\@fontnum\relax
+  \ifx +#1\advance\else\ifx -#1\advance\fi\fi
+  \count@#1#2\relax
+  \ifcase\count@ \tiny\or \tiny\or \scriptsize
+  \or\footnotesize \or\small \or\normalsize \or\large
+  \or\Large \or\LARGE \or\huge \else\Huge \fi}
+\fi
+\HTML@two@stop
+\SGML@w{HTML3 support not finished yet}
+\SGMLdef<math>{\SGMLgrabber{math}\domath}
+\SGMLdef<sup>{^\bgroup\HTMLscriptmap}
+\SGMLdef</sup>{\egroup}
+\SGMLdef<sub>{_\bgroup\HTMLscriptmap}
+\SGMLdef</sub>{\egroup}
+\SGMLdef<box>{\SGMLgrabber{box}\dobox}
+\begingroup
+\catcode`\<=\active
+\catcode`\>=\active
+\catcode`\&=\active
+\catcode`\_=\active
+\catcode`\^=\active
+\catcode`\"=\active
+\gdef\domath#1{%
+  {{\def&{\expandafter\expandafter\expandafter\noexpand\SGMLent@@}%
+   \let<\relax\let>\relax\let_\relax\let^\relax\let"\relax
+   \def\{{<box>}\def\}{</box>}%
+   \xdef\@gtempa{#1}}%
+  \let\do\mathdo
+  \let\doimplied\mathimplied
+  \the\toks@
+  \[%
+  \m@th\nulldelimiterspace\z@
+  \def^{<sup>}%
+  \def_{<sub>}%
+  \@gtempa\]}}
+\gdef\HTMLscriptmap{%
+  \def^{</sup>}%
+  \def_{</sub>}}
+\gdef\dobox#1{%
+  {\let\do\boxdo
+   \let\bigstrut\relax
+   \the\toks@
+   \def^{<sup>}%
+   \def_{<sub>}%
+   \lookleft@#1<left>\@nil}}
+\gdef\lookleft@#1<left>#2\@nil{%
+  \if$#2$%
+    {\left.\bgroup#1\mayberight}%
+  \else
+     \lookbox@#1<box>\@nil#2\@nil
+  \fi}
+\gdef\lookbox@#1<box>#2\@nil#3<left>\@nil{%
+  \if$#2$%
+     {\maybeleft#1\@nil#3\mayberight}
+  \else
+     {#1 \boxtofront#2 <left> #3}%
+  \fi}
+\gdef\boxtofront#1<box>{<box>#1}
+\endgroup
+\def\mathdo#1#2{%
+  \def\@tempa{class-chem}\def\@tempb{#1-#2}%
+  \ifx\@tempa\@tempb
+     \everymath{\fam\z@}\everydisplay{\fam\z@}%
+  \fi}
+\def\mathimplied#1{%
+  \def\@tempa{box}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb
+     \def\[{\center\setbox\z@\hbox\bgroup$\displaystyle}%
+     \def\]{$\egroup\fbox{\box\z@}\endcenter}%
+  \fi}
+\def\boxdo#1#2{%
+  \def\@tempa{size}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb
+     \def\@tempb{#2}
+     \def\@tempa{normal}\ifx\@tempa\@tempb\def\@tempc{1}\fi
+     \def\@tempa{medium}\ifx\@tempa\@tempb\def\@tempc{2}\fi
+     \def\@tempa{large}\ifx\@tempa\@tempb\def\@tempc{3}\fi
+     \def\@tempa{huge}\ifx\@tempa\@tempb\def\@tempc{4}\fi
+     \edef\bigstrut{\vrule\@height\@tempc\ht\strutbox\@width\z@}
+  \fi}
+\SGMLdef<left>{\left.\bgroup}
+\def\mayberight{\egroup\bigstrut\right.}
+\def\maybeleft#1#2\@nil{%
+   \in@{#1}{()[]\SGML@E@rbrace\SGML@E@lbrace}%
+   \ifin@
+     \left#1\bgroup#2%
+   \else
+      \let\SGML@E@int\HTML@bigint
+      #1#2\left.\bgroup\let\SGML@E@int\int
+   \fi}
+\def\righttest#1{%
+   \in@{#1}{()[]\SGML@E@rbrace\SGML@E@lbrace}%
+   \ifin@
+     \right#1\let\mayberight\relax
+   \else
+      \right.\let\mayberight\relax\expandafter#1%
+   \fi}
+\ifx\HTML@int\@undefined
+\let\HTML@bigint\int
+\else
+\def\HTML@int{\int^{\box\tw@}_{\box4}}
+\def\HTML@bigint#1\left.\bgroup{%
+  \def\@tempa{#1}%
+  \setbox\z@\hbox\bgroup
+      \aftergroup\HTMLafterbigint$\displaystyle\bgroup
+      \aftergroup$\aftergroup\egroup}
+\def\HTMLafterbigint{%
+   \dimen@.5\ht\z@
+   \advance\dimen@.5\dp\z@
+   {\SGMLdef<sup>{\setbox\tw@\hbox\bgroup\HTMLscriptmap$\scriptstyle}%
+    \SGMLdef<sub>{\setbox4\hbox\bgroup\HTMLscriptmap$\scriptstyle}%
+    \SGMLdef</sup>{$\egroup}%
+    \SGMLdef</sub>{$\egroup}%
+    \setbox\tw@\box\voidb@x
+    \setbox4\box\voidb@x
+    \@tempa
+    \ifdim\dimen@>\f@size\p@
+       \mathop{\hbox{\DeclareFixedFont\@tempa{OMX}{cmex}{m}{n}\dimen@
+           $\displaystyle\textfont\thr@@\@tempa\HTML@int$}}%
+    \else
+        \HTML@int
+    \fi
+    }\left.\box\z@}
+\fi
+\SGMLdef<over>{\over}
+\SGMLdef<atop>{\atop}
+\SGMLdef<choose>{\choose}
+\SGMLdef<right>{\egroup\bigstrut\righttest}
+\SGMLdef<above>{\SGMLgrabber{above}%
+    {\let\@tempc\overlineop
+    \let\do\abovedo
+    \the\toks@
+    \@tempc}}
+\SGMLdef<below>{\SGMLgrabber{below}%
+    {\let\@tempc\underlineop
+    \let\do\abovedo
+    \the\toks@
+    \@tempc}}
+\def\overlineop#1{\mathop{\overline{#1}}}
+\def\underlineop#1{\mathop{\underline{#1}}}
+\def\abovedo#1#2{%
+  \def\@tempa{sym}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb\def\@tempc{\csname#2\endcsname}\fi}
+\SGMLdef<vec>{\SGMLgrabber{vec}\vec}
+\SGMLdef<bar>{\SGMLgrabber{bar}\bar}
+\SGMLdef<dot>{\SGMLgrabber{dot}\dot}
+\SGMLdef<ddot>{\SGMLgrabber{ddot}\ddot}
+\SGMLdef<hat>{\SGMLgrabber{hat}\hat}
+\SGMLdef<tilde>{\SGMLgrabber{tilde}\tilde}
+\SGMLdef<t>{\SGMLgrabber{t}\mathrm}
+\SGMLdef<bt>{\SGMLgrabber{bt}\mathbf}
+\SGMLdef<text>{\SGMLgrabber{text}\textnormal}%%%%% not in the dtd????
+\SGMLdef<root>{\rootfudge}
+\def\rootfudge#1{%
+  \setbox\rootbox\hbox\bgroup$\m@th\scriptscriptstyle\bgroup#1}
+\SGMLdef<of>{\egroup$\egroup\SGMLgrabber{root}\offudge}
+\SGMLdef</of>{}
+\def\offudge#1{\mathpalette\r@@t{#1}}
+\SGMLdef<sqrt>{\SGMLgrabber{sqrt}\sqrt}
+\newcount\HTMLrow
+\newcount\HTMLcol
+\newcount\HTMLrowspan
+\newcount\HTMLcolspan
+\SGMLdef<array>{{\ifnum`}=0\fi
+  \let\do\arraydo
+  \let\doimplied\arrayimplied
+  \let\HTMLal.%
+  \let\HTMLar.%
+  \global\HTMLrow\z@
+  \let\HTMLabox\vcenter
+  \the\toks@
+  \setbox\z@\vbox\bgroup\halign\bgroup
+     \strut\span\HTMLacolspec\cr\nocr}
+\def\HTMLacolspec{##&&##}
+
+\def\HTMLamakepream#1{%
+  \let\HTMLacolspec\@empty
+  \let\@sharp\relax
+  \lowercase{\@tfor\@tempc:=#1}\do{%
+     \if\@tempc l%
+       \edef\HTMLacolspec{\HTMLacolspec\@sharp\hfill&}%
+     \else
+       \if\@tempc c%
+         \edef\HTMLacolspec{\HTMLacolspec\hfill\@sharp\hfill&}%
+       \else
+         \if\@tempc r%
+           \edef\HTMLacolspec{\HTMLacolspec\hfill\@sharp&}%
+         \else
+           \if\@tempc +%
+             \edef\HTMLacolspec{\HTMLacolspec$+$}%
+           \else
+             \if\@tempc -%
+               \edef\HTMLacolspec{\HTMLacolspec$-$}%
+             \else
+               \if\@tempc =%
+                 \edef\HTMLacolspec{\HTMLacolspec$=$}%
+               \fi
+             \fi
+           \fi
+         \fi
+       \fi
+     \fi}%
+  \def\@sharp{########}%
+  \edef\HTMLacolspec{\HTMLacolspec&\@sharp}}
+\SGMLdef</array>{\HTMLendarray}
+\let\HTMLcr\cr
+\def\HTMLendarray{%
+  \endi\crcr\egroup\egroup
+  \ifx\HTMLabox\vtop
+    \setbox\z@\vtop{\unvbox\z@}%
+  \else
+     \ifx\HTMLabox\vcenter
+        \dimen@\ht\z@
+         \advance\dimen@\dp\z@
+         \divide\dimen@\tw@
+         \advance\dimen@-\ht\z@
+        \setbox\z@\hbox{\raise\dimen@\box\z@}%
+    \fi
+  \fi
+  \dimen@=\ht\z@
+  \setbox\z@
+\hbox{$\left\HTMLal\kern-1em\vcenter{\box\z@}\kern-1em\right\HTMLar$}%
+  \advance\dimen@-\ht\z@
+  \raise\dimen@\box\z@
+  \ifnum`{=0\fi}}
+\def\HTMLendarraylabels{%
+  \endi\crcr\strut\cr\egroup\egroup
+  \setbox2=\vsplit\z@ to \baselineskip
+  \setbox\z@\vbox{\unvbox\z@\global\setbox\@ne\lastbox}%
+  \setbox4\hbox{\unhbox\@ne\unskip\global\setbox\@ne\lastbox}%
+  \vcenter{%
+  \box2
+  \hbox{$\kern\wd\@ne
+    \left\HTMLal\kern-\wd\@ne
+       \vcenter{\box\z@}%
+    \right\HTMLar$}}%
+  \ifnum`{=0\fi}}
+\def\nocr{\relax\iffalse{\fi\let\HTMLcr\relax\iffalse}\fi}
+\SGMLdef<row>{%
+  \endi\HTMLcr
+  \global\advance\HTMLrow\@ne
+  \global\HTMLcol\z@}
+\SGMLdef</row>{}
+\SGMLdef<item>{%
+  \let\do\itemdo
+  \gdef\@gtempa{\global\advance\HTMLcol\@ne}%
+  \gdef\@gtempb{}%
+  \gdef\@gtempc{}%
+  \global\HTMLcolspan\@ne
+  \the\toks@
+  \endi%
+  \@gtempc
+  \@gtempa
+  \spanifneeded
+  \@gtempb
+  \setbox\z@\hbox\bgroup$%
+  \def\endi{\unskip$\egroup%
+     \quad\HTMLaleft\box\z@\HTMLaright\quad&}%
+   \ignorespaces}
+\def\spanifneeded{%
+  \edef\@tempa{\noexpand\in@{,\the\HTMLrow/\the\HTMLcol,}{\spanitems}}%
+  \@tempa
+  \ifin@
+     \@firstofone{&}\global\advance\HTMLcol\@ne
+   \expandafter\spanifneeded
+  \fi}
+\SGMLdef</item>{}
+\let\HTMLaleft\hfil
+\let\HTMLaright\hfil
+\let\endi\relax
+\def\arraydo#1#2{%
+  \def\@tempa{#1}\def\@tempb{#2}%
+  \def\@tempc{align}%
+  \ifx\@tempa\@tempc
+    \def\@tempc{top}%
+    \ifx\@tempb\@tempc
+      \let\HTMLabox\vtop
+     \else
+      \def\@tempc{bottom}%
+      \ifx\@tempb\@tempc
+        \let\HTMLabox\vbox
+      \fi
+    \fi
+  \else
+    \def\@tempc{ldelim}%
+    \ifx\@tempa\@tempc
+      \let\HTMLal\@tempb
+    \else
+      \def\@tempc{rdelim}%
+      \ifx\@tempa\@tempc
+        \let\HTMLar\@tempb
+      \else
+        \def\@tempc{labels}%
+        \ifx\@tempa\@tempc
+          \let\HTMLendarray\HTMLendarraylabels
+        \else
+          \def\@tempc{colspec}%
+          \ifx\@tempa\@tempc
+            \HTMLamakepream{#2}%
+          \fi
+        \fi
+      \fi
+    \fi
+  \fi}
+\def\arrayimplied#1{%
+  \def\@tempa{labels}\def\@tempb{#1}%
+  \ifx\@tempa\@tempb
+    \let\HTMLendarray\HTMLendarraylabels
+  \fi}
+\def\itemdo#1#2{%
+  \def\@tempa{#1}\def\@tempb{#2}%
+  \def\@tempc{colspan}%
+  \ifx\@tempa\@tempc
+    \global\HTMLcolspan#2\relax
+    \gdef\@gtempa{\@multispan#2\relax\global\advance\HTMLcol#2\relax}%
+  \else
+    \def\@tempc{align}%
+    \ifx\@tempa\@tempc
+      \def\@tempc{left}%
+      \ifx\@tempb\@tempc
+        \gdef\@gtempb{\let\HTMLaleft\relax}%
+      \else
+        \def\@tempc{right}%
+        \ifx\@tempb\@tempc
+          \gdef\@gtempb{\let\HTMLaright\relax}%
+        \fi
+      \fi
+    \else
+      \def\@tempc{rowspan}%
+      \ifx\@tempa\@tempc
+        \global\HTMLrowspan#2\relax
+        \gdef\@gtempc{%
+          \@tempcnta=\HTMLrow
+          \advance\@tempcnta\HTMLrowspan
+          \loop
+            \@tempcntb=\HTMLcol
+            \advance\@tempcntb\HTMLcolspan
+            \advance\@tempcnta\m@ne
+            \ifnum\@tempcnta>\HTMLrow
+            {\loop
+               \xdef\spanitems{%
+                  \spanitems\the\@tempcnta/\the\@tempcntb,}%
+               \advance\@tempcntb\m@ne
+             \ifnum\@tempcntb>\HTMLcol
+             \repeat}%
+          \repeat}%
+      \fi
+    \fi
+  \fi}
+\def\spanitems{,}
+\SGMLentity{thinsp}{\,}
+\SGMLentity{emsp}{\quad}
+\SGMLentity{alpha}{\alpha}
+\SGMLentity{beta}{\beta}
+\SGMLentity{gamma}{\gamma}
+\SGMLentity{Gamma}{\Gamma}
+\SGMLentity{int}{\int}
+\SGMLentity{sum}{\sum}
+\SGMLentity{lbrace}{\lbrace}
+\SGMLentity{rbrace}{\rbrace}
+\SGMLentity{times}{\times}
+\SGMLentity{cup}{\cup}
+\SGMLentity{cap}{\cap}
+\SGMLentity{vee}{\vee}
+\SGMLentity{wedge}{\wedge}
+\SGMLentity{infty}{\infty}
+\SGMLentity{oplus}{\oplus}
+\SGMLentity{ominus}{\ominus}
+\SGMLentity{otimes}{\otimes}
+\SGMLentity{sin}{\sin}
+\SGMLentity{cos}{\cos}
+\SGMLentity{tan}{\tan}
+\SGMLdef<table>{\begin{table}[htp]\centering\begin{tabular}{*{10}c}}
+\SGMLdef</table>{\end{tabular}\end{table}}
+\SGMLdef<tr>{\ifhmode\expandafter\\\fi\relax}
+\SGMLdef</tr>{\\\relax}
+\SGMLdef<td>{\ifvmode\else\expandafter\hiddenamp\fi}
+\def\hiddenamp{&}
+\SGMLdef</td>{}
+\SGMLdef<caption>{\end{tabular}\begingroup\bfseries}
+\SGMLdef</caption>{\endgroup\par\smallskip\begin{tabular}{*{10}{c}}}
+\endinput
+%%
+%% End of file `typehtml.sty'.

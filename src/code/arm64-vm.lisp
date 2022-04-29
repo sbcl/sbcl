@@ -68,7 +68,9 @@
                          (t
                           (prog1 (sap-ref-8 pc 4)
                             (setf pc (sap+ pc 1))))))
-         (first-arg (ldb (byte 8 13) instruction)))
+         (first-arg (ldb (byte 8 13) instruction))
+         (first-offset (ldb (byte 5 0) first-arg))
+         (first-sc (ldb (byte 2 5) first-arg)))
     (declare (type system-area-pointer pc))
     (if (= trap-number invalid-arg-count-trap)
         (values #.(error-number-or-lose 'invalid-arg-count-error)
@@ -80,13 +82,17 @@
                       (zerop length))
             (decf length))
           (setf pc (sap+ pc 4))
-          (let ((args (loop repeat length
-                            with index = 0
+          (let ((args (loop with index = 0
+                            repeat length
                             collect (sb-c:sap-read-var-integerf pc index))))
             (values error-number
-                    (if (= first-arg zr-offset)
+                    (if (= first-offset zr-offset)
                         args
-                        (cons (make-sc+offset sb-vm:descriptor-reg-sc-number first-arg)
+                        (cons (make-sc+offset (case first-sc
+                                                (1 sb-vm:unsigned-reg-sc-number)
+                                                (2 sb-vm:signed-reg-sc-number)
+                                                (t sb-vm:descriptor-reg-sc-number))
+                                              first-offset)
                               args))
                     trap-number))))))
 
@@ -163,3 +169,13 @@
                       (get-lisp-obj-address value)
                       index))
     value))
+
+(defconstant n-bit 31)
+(defconstant z-bit 30)
+(defconstant c-bit 29)
+(defconstant v-bit 28)
+
+(defun context-overflow-carry-flags (context)
+  (let ((flags (context-flags context)))
+    (values (logbitp v-bit flags)
+            (logbitp c-bit flags))))

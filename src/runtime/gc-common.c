@@ -403,6 +403,12 @@ trans_code(struct code *code)
     return new_code;
 }
 
+#ifdef LISP_FEATURE_64_BIT
+# define layout_flags(x) x->sw_flags
+#else
+# define layout_flags(x) x->uw_flags
+#endif
+
 static sword_t
 scav_fun_pointer(lispobj *where, lispobj object)
 {
@@ -425,7 +431,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
              * except for the trampoline, which points to an asm routine.
              * This is not true for self-contained trampoline GFs though. */
             struct layout* layout = (void*)native_pointer(funinstance_layout(FUNCTION(object)));
-            if (layout && (layout->flags & STRICTLY_BOXED_FLAG)) // 'flags' is a raw slot
+            if (layout && (layout_flags(layout) & STRICTLY_BOXED_FLAG))
                 page_type = PAGE_TYPE_BOXED, region = boxed_region;
         } else {
             /* Closures can always go on strictly boxed pages even though the
@@ -544,7 +550,7 @@ static inline lispobj copy_instance(lispobj object)
             && bitmap.nwords == 1)
             page_type = PAGE_TYPE_UNBOXED, region = unboxed_region;
         else if (original_length < words_per_card &&
-                 (layout->flags & STRICTLY_BOXED_FLAG)) // 'flags' is a raw slot
+                 (layout_flags(layout) & STRICTLY_BOXED_FLAG))
             page_type = PAGE_TYPE_BOXED, region = boxed_region;
     }
 #endif
@@ -831,15 +837,15 @@ scav_instance(lispobj *where, lispobj header)
     // writing it back if and only if it changed.
     lispobj layoutptr = instance_layout(where);
     if (!layoutptr) return total_nwords; // instance can't point to any data yet
-    struct layout *layout = LAYOUT(layoutptr);
 #ifdef LISP_FEATURE_METASPACE
+    struct layout *layout = LAYOUT(layoutptr); // layouts never move in metaspace
     scav1(&layout->friend, layout->friend);
 #else
     lispobj old = layoutptr;
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) instance_layout(where) = layoutptr;
+    struct layout *layout = LAYOUT(layoutptr);
 #endif
-    layout = LAYOUT(layoutptr); // in case it was adjusted in !METASPACE
     struct bitmap bitmap = get_layout_bitmap(layout);
     sword_t mask = bitmap.bits[0]; // there's always at least 1 bitmap word
 
@@ -2119,7 +2125,7 @@ static boolean can_invoke_post_gc(__attribute__((unused)) struct thread* th,
     /* If the SB-THREAD:THREAD has a 0 for its 'struct thread', give up.
      * This is the same as the THREAD-ALIVE-P test.  Maybe a thread that is
      * in the process of un-setting that slot performed this GC. */
-    if (!lispthread->primitive_thread) return 0;
+    if (!lispthread->uw_primitive_thread) return 0;
 
     /* I don't know why we aren't in general willing to run post-GC with some or all
      * deferrable signals blocked. "Obviously" the idea is to run post-GC code only in
@@ -2377,6 +2383,7 @@ scavenge_control_stack(struct thread *th)
     }
 }
 
+#ifdef reg_CODE
 /* Scavenging Interrupt Contexts */
 
 static int boxed_registers[] = BOXED_REGISTERS;
@@ -2525,7 +2532,7 @@ scavenge_interrupt_context(os_context_t * context)
      * compile out for the registers that don't exist on a given
      * platform? */
 
-#ifdef reg_CODE
+#ifdef reg_LRA
     INTERIOR_POINTER_VARS(pc);
 #endif
 
@@ -2542,7 +2549,11 @@ scavenge_interrupt_context(os_context_t * context)
     INTERIOR_POINTER_VARS(ctr);
 #endif
 
-#ifdef reg_CODE
+    /* Platforms without LRA pin on-stack code. Furthermore, the PC
+       must not be paired, as even on platforms with $CODE, there is
+       nothing valid to pair PC with immediately upon function
+       return. */
+#ifdef reg_LRA
     PAIR_INTERIOR_POINTER(pc);
 #endif
 
@@ -2551,15 +2562,6 @@ scavenge_interrupt_context(os_context_t * context)
 #endif
 
 #ifdef ARCH_HAS_LINK_REGISTER
-#ifndef reg_CODE
-    /* If LR has code in it don't pair it with anything else, since
-       there's reg_CODE and it may match something bogus. It will be pinned by pin_stack. */
-    int code_in_lr = 0;
-
-    if (dynamic_space_code_from_pc((char *)*os_context_register_addr(context, reg_LR))) {
-        code_in_lr = 1;
-    }
-#endif
     {
       PAIR_INTERIOR_POINTER(lr);
     }
@@ -2601,7 +2603,7 @@ scavenge_interrupt_context(os_context_t * context)
 
     /* Now that the scavenging is done, repair the various interior
      * pointers. */
-#ifdef reg_CODE
+#ifdef reg_LRA
     FIXUP_INTERIOR_POINTER(pc);
 #endif
 
@@ -2610,9 +2612,6 @@ scavenge_interrupt_context(os_context_t * context)
 #endif
 #ifdef ARCH_HAS_LINK_REGISTER
 
-#ifndef reg_CODE
-    if(!code_in_lr)
-#endif
     {
         FIXUP_INTERIOR_POINTER(lr);
     }
@@ -2642,6 +2641,7 @@ scavenge_interrupt_contexts(struct thread *th)
         scavenge_interrupt_context(context);
     }
 }
+#endif /* !REG_CODE */
 #endif /* x86oid targets */
 
 /* Our own implementation of heapsort, because some C libraries have a qsort()

@@ -196,7 +196,7 @@
   #'equal)
 
 (defconstant-eqx +common-static-symbols+
-  '#.`(t
+  `(t
     ;; These symbols are accessed from C only through TLS,
     ;; never the symbol-value slot
     #-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))

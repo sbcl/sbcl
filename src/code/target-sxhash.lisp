@@ -590,6 +590,18 @@
                              (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))
 
+;;; These "good" hashers act on sb-vm:word, returning a fixnum, do not cons,
+;;; and have better avalanche behavior then SXHASH - changing any one input bit
+;;; should affect each bit of output with equal chance.
+#+64-bit
+(defun good-hash-word->fixnum (x)
+  (declare (inline murmur3-fmix64))
+  (logand (murmur3-fmix64 (truly-the sb-vm:word x)) most-positive-fixnum))
+#-64-bit
+(defun good-hash-word->fixnum (x)
+  (declare (inline murmur3-fmix32))
+  (logand (murmur3-fmix32 (truly-the sb-vm:word x)) most-positive-fixnum))
+
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)
 

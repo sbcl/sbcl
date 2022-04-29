@@ -434,14 +434,53 @@
   (bug "Unreachable code reached"))
 
 (deferr mul-overflow-error (low high)
-  (let ((type (or (sb-di:error-context)
-                  'fixnum)))
-   (object-not-type-error (ash (logior
-                                (ash high sb-vm:n-word-bits)
-                                (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
-                               (- sb-vm:n-fixnum-tag-bits))
-                          type
-                          nil)))
+  (destructuring-bind (raw-low raw-high) *current-internal-error-args*
+    (declare (ignorable raw-low raw-high))
+    (let ((type (or (sb-di:error-context)
+                    'fixnum)))
+      (object-not-type-error #+x86-64
+                             (* low high)
+                             #-x86-64
+                             (if (memq (sb-c:sc+offset-scn raw-low) `(,sb-vm:any-reg-sc-number
+                                                                      ,sb-vm:descriptor-reg-sc-number))
+                                 (ash (logior
+                                       (ash high sb-vm:n-word-bits)
+                                       (ldb (byte sb-vm:n-word-bits 0) (ash low sb-vm:n-fixnum-tag-bits)))
+                                      (- sb-vm:n-fixnum-tag-bits))
+                                 (logior
+                                  (ash high sb-vm:n-word-bits)
+                                  (ldb (byte sb-vm:n-word-bits 0) low)))
+                             type
+                             nil))))
+
+(sb-c::when-vop-existsp (:translate sb-c::unsigned+)
+  (flet ((err (x of cf)
+           (let* ((raw-x (car *current-internal-error-args*))
+                  (signed (= (sb-c:sc+offset-scn raw-x) sb-vm:signed-reg-sc-number)))
+             (let ((type (or (sb-di:error-context)
+                             'fixnum))
+                   (x (if signed
+                          (cond ((and of cf)
+                                 (dpb x (byte sb-vm:n-word-bits 0) -1))
+                                (of
+                                 (ldb (byte sb-vm:n-word-bits 0) x))
+                                (t
+                                 (bug "flags")))
+                          (cond (cf
+                                 (dpb 1 (byte 1 sb-vm:n-word-bits) x))
+                                (of
+                                 (sb-c::mask-signed-field sb-vm:n-word-bits x))
+                                (t
+                                 (dpb x (byte sb-vm:n-word-bits 0) -1))))))
+               (object-not-type-error x type nil)))))
+    (deferr add-sub-overflow-error (x)
+      (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
+        (err x of cf)))
+
+   #+x86-64
+    (deferr sub-overflow-error (x)
+      (multiple-value-bind (of cf) (sb-vm::context-overflow-carry-flags *current-internal-error-context*)
+        (err x of (not cf))))))
 
 ;;;; INTERNAL-ERROR signal handler
 

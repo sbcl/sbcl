@@ -113,7 +113,9 @@
 (defun %space-bounds (space)
   (macrolet ((bounds (a b) `(values (%make-lisp-obj ,a) (%make-lisp-obj ,b))))
     (ecase space
-      (:static
+      (:static ;; These bounds are appropriate for computing the space usage
+               ;; but NOT for computing iteration bounds, because there are
+               ;; "unformatted" words preceding the lowest addressable object.
        (bounds static-space-start
                (sap-int *static-space-free-pointer*)))
       (:read-only
@@ -325,15 +327,10 @@ We could try a few things to mitigate this:
             (:static
              ;; Static space starts with NIL, which requires special
              ;; handling, as the header and alignment are slightly off.
-             (multiple-value-bind (start end) (%space-bounds space)
-               (declare (ignore start))
-               (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
-               (let ((start (+ (logandc2 nil-value lowtag-mask)
-                               (ash (- sizeof-nil-in-words 2) word-shift))))
-                 (map-objects-in-range fun
-                                       (ash start (- n-fixnum-tag-bits))
-                                       end))))
-
+             (funcall fun nil symbol-widetag (* sizeof-nil-in-words n-word-bytes))
+             (let ((start (%make-lisp-obj static-space-objects-start))
+                   (end (%make-lisp-obj (sap-int *static-space-free-pointer*))))
+               (map-objects-in-range fun start end)))
             ((:read-only #-gencgc :dynamic)
              ;; Read-only space (and dynamic space on cheneygc) is a block
              ;; of contiguous allocations.
@@ -722,6 +719,8 @@ We could try a few things to mitigate this:
            (type stream stream) (type spaces space)
            (type (or index null) type larger smaller count))
   (multiple-value-bind (start end) (%space-bounds space)
+    (when (eq space :static)
+      (setq start (%make-lisp-obj static-space-objects-start)))
     (let* ((space-start (ash start n-fixnum-tag-bits))
            (space-end (ash end n-fixnum-tag-bits))
            (space-size (- space-end space-start))

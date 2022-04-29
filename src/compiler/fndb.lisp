@@ -89,7 +89,7 @@
 
 #+(or x86 x86-64 arm arm64)
 (defknown fixnum-mod-p (t fixnum) boolean
-  (movable foldable flushable always-translatable))
+  (movable flushable always-translatable))
 
 
 ;;;; classes
@@ -2192,6 +2192,22 @@
   (defknown round-single (single-float #1#) single-float
       (foldable flushable movable always-translatable)))
 
-(defknown fixnum* (fixnum fixnum t) fixnum
-  (movable foldable unsafely-flushable commutative
-           always-translatable))
+(defknown fixnum*
+  (fixnum fixnum t)
+  fixnum
+  (movable foldable always-translatable))
+
+(defknown (signed* signed+ signed-)
+  (sb-vm:signed-word sb-vm:signed-word t)
+  sb-vm:signed-word
+  (movable foldable commutative always-translatable))
+
+(defknown (unsigned* unsigned+ unsigned-)
+  (word word t)
+  word
+  (movable foldable commutative always-translatable))
+
+(defknown (unsigned+signed unsigned-signed)
+  (word sb-vm:signed-word t)
+  word
+  (movable foldable commutative always-translatable))

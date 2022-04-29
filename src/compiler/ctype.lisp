@@ -69,6 +69,17 @@
   (values))
 
 
+(defun node-asserted-type (node)
+  (let ((dtype (node-derived-type node)))
+    (or
+     (binding* ((lvar (node-lvar node) :exit-if-null)
+                (dest (lvar-dest lvar)))
+       (when (and (cast-p dest)
+                  (eq (cast-type-to-check dest) *wild-type*))
+         (values-type-intersection
+          dtype (cast-asserted-type dest))))
+     dtype)))
+
 ;;;; stuff for checking a call against a function type
 
 ;;; Determine whether a use of a function is consistent with its type.
@@ -130,16 +141,7 @@
                (setf unknown-keys t))))
 
           (when result-test
-            (let* ((dtype (node-derived-type call))
-                   (out-type (or
-                              (binding* ((lvar (node-lvar call) :exit-if-null)
-                                         (dest (lvar-dest lvar)))
-                                (when (and (cast-p dest)
-                                           (eq (cast-type-to-check dest) *wild-type*)
-                                           (immediately-used-p lvar call))
-                                  (values-type-intersection
-                                   dtype (cast-asserted-type dest))))
-                              dtype))
+            (let* ((out-type (node-asserted-type call))
                    (return-type (fun-type-returns type)))
               (multiple-value-bind (int win) (funcall result-test out-type return-type)
                 (cond ((not win)
@@ -269,8 +271,8 @@ and no value was provided for it." name))))))))))
 ;;; Check that each of the type of each supplied argument intersects
 ;;; with the type specified for that argument. If we can't tell, then
 ;;; we can complain about the absence of manifest winnage.
-(declaim (ftype (function (list list (or ctype null)) (values)) check-fixed-and-rest))
 (defun check-fixed-and-rest (args types rest)
+  (declare (list args types) (type (or ctype null) rest))
   (do ((arg args (cdr arg))
        (type types (cdr type))
        (n 1 (1+ n)))
@@ -287,8 +289,8 @@ and no value was provided for it." name))))))))))
 ;;; be known and the corresponding argument should be of the correct
 ;;; type. If the key isn't a constant, then we can't tell, so we can
 ;;; complain about absence of manifest winnage.
-(declaim (ftype (function (t list fixnum fun-type) boolean) check-key-args))
 (defun check-key-args (name args pre-key type)
+  (declare (list args) (fixnum pre-key) (fun-type type))
   (declare (ignorable name))
   (let (lossages allow-other-keys
         unknown-keys)
@@ -345,8 +347,9 @@ and no value was provided for it." name))))))))))
 ;;;
 ;;; Due to the lack of a (LIST X) type specifier, we can't reconstruct
 ;;; the &REST type.
-(declaim (ftype (sfunction (functional) fun-type) definition-type))
 (defun definition-type (functional)
+  (declare (type functional functional)
+           #-sb-xc-host (values fun-type))
   (if (lambda-p functional)
       (make-fun-type
        :required (mapcar #'leaf-type (lambda-vars functional))
@@ -431,11 +434,11 @@ and no value was provided for it." name))))))))))
 ;;; Return an APPROXIMATE-FUN-TYPE representing the context of
 ;;; CALL. If TYPE is supplied and not null, then we merge the
 ;;; information into the information already accumulated in TYPE.
-(declaim (ftype (function (combination
-                           &optional (or approximate-fun-type null))
-                          approximate-fun-type)
-                note-fun-use))
 (defun note-fun-use (call &optional type)
+  (declare (type combination call)
+           (type (or approximate-fun-type null) type)
+           #-sb-xc-host
+           (values approximate-fun-type))
   (let* ((type (or type (make-approximate-fun-type)))
          (types (approximate-fun-type-types type))
          (args (combination-args call))
@@ -496,16 +499,17 @@ and no value was provided for it." name))))))))))
 
 ;;; This is similar to VALID-FUN-USE, but checks an
 ;;; APPROXIMATE-FUN-TYPE against a real function type.
-(declaim (ftype (function (approximate-fun-type fun-type
-                           &optional function function function)
-                          (values boolean boolean))
-                valid-approximate-type))
 (defun valid-approximate-type (call-type type &optional
                                          (*ctype-test-fun*
                                           #'types-equal-or-intersect)
                                          (*lossage-fun*
                                           #'compiler-style-warn)
                                          (*unwinnage-fun* #'compiler-notify))
+  (declare (type approximate-fun-type call-type)
+           (type fun-type type)
+           (function *ctype-test-fun* *lossage-fun* *unwinnage-fun*)
+           #-sb-xc-host
+           (values boolean boolean))
   (let* ((*lossage-detected* nil)
          (*unwinnage-detected* nil)
          (required (fun-type-required type))
@@ -549,10 +553,10 @@ and no value was provided for it." name))))))))))
 
 ;;; Check that each of the types used at each arg position is
 ;;; compatible with the actual type.
-(declaim (ftype (function (approximate-fun-type list (or ctype null))
-                          (values))
-                check-approximate-fixed-and-rest))
 (defun check-approximate-fixed-and-rest (call-type fixed rest)
+  (declare (type approximate-fun-type call-type)
+           (list fixed)
+           (type (or ctype null) rest))
   (do ((types (approximate-fun-type-types call-type) (cdr types))
        (n 1 (1+ n))
        (arg fixed (cdr arg)))
@@ -564,9 +568,8 @@ and no value was provided for it." name))))))))))
 
 ;;; Check that each of the call-types is compatible with DECL-TYPE,
 ;;; complaining if not or if we can't tell.
-(declaim (ftype (function (list ctype string &rest t) (values))
-                check-approximate-arg-type))
 (defun check-approximate-arg-type (call-types decl-type context &rest args)
+  (declare (list call-types) (type ctype decl-type) (string context))
   (when *ctype-test-fun*
     (let ((losers *empty-type*))
       (dolist (ctype call-types)

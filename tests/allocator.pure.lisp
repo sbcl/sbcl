@@ -50,8 +50,7 @@
 ;;; The 32-bit architectures that use GENCGC-PAGE-BYTES = 65536 are unaffected
 ;;; by the change that took the size test out of the allocator fast path.
 
-#+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
-(with-test (:name :pseudostatic-large-objects :fails-on :x86)
+(with-test (:name :pseudostatic-large-objects :fails-on (or :mips :x86))
   (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
@@ -79,9 +78,23 @@
   (let ((fun (checked-compile '(lambda (&rest params) params))))
     (assert (not (large-object-p (apply fun (make-list large-n-conses)))))))
 
-#+gencgc ; can't read-time-eval #.large-n-conses
+;;; MIPS either: (1) runs for 10 minutes just in COMPILE and then croaks in the assembler
+;;; due to an overly large displacement in an instruction, (2) crashes with heap exhaustion.
+;;; I don't really care enough to fix it.  A flat profile shows the following top hot spots:
+;;;
+;;;            Self        Total        Cumul
+;;;   Nr  Count     %  Count     %  Count     %    Calls  Function
+;;; ------------------------------------------------------------------------
+;;;    1    813 677.5    813 677.5    813 677.5        -  SB-REGALLOC::CONFLICTS-IN-SC
+;;;    2    208 173.3    208 173.3   1021 850.8        -  SB-C::COALESCE-MORE-LTN-NUMBERS
+;;;    3    118  98.3    118  98.3   1139 949.2        -  NTH
+;;;    4     63  52.5    878 731.7   1202 1001.7        -  (LABELS SB-REGALLOC::ATTEMPT-LOCATION :IN SB-REGALLOC::SELECT-LOCATION)
+;;;
+;;; (And I don't know much about math, but I don't think that's how percentages work)
+;;;
+;;; I don't remember what the problem is with PPC.
 (with-test (:name :no-list-on-large-object-pages
-                  :skipped-on (:or (:not :gencgc) :ppc :ppc64))
+                  :skipped-on (:or :mips :ppc :ppc64))
   (let* ((fun (checked-compile
                '(lambda ()
                  (macrolet ((expand (n) `(list ,@(loop for i from 1 to n collect i))))

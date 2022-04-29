@@ -6,6 +6,8 @@
   "src/code/shaketree.lisp")
  ("avltree.pure.lisp" "tests/bbtree-test-util.lisp")
  ("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
+ ("brothertree.impure.lisp"
+  "src/code/brothertree.lisp")
  ("case.pure.lisp" "tests/case-test.lisp")
  ("chill.test.sh"
   "src/cold/chill.lisp"

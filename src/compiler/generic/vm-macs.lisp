@@ -50,7 +50,7 @@
 (defun primitive-object (name)
   (find name *primitive-objects* :key #'primitive-object-name))
 (defun primitive-object-slot (obj name)
-  (find name (primitive-object-slots obj):key #'slot-name))
+  (find name (primitive-object-slots obj) :key #'slot-name))
 
 (defun !%define-primitive-object (primobj)
   (let ((name (primitive-object-name primobj)))

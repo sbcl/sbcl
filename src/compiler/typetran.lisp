@@ -854,6 +854,19 @@
 ;;; object's layout can ever be EQ to that of the ancestor.
 ;;; e.g. a fixnum as representative of class REAL.
 ;;; So in actual practice, you can't make something that is a pure STREAM, etc.
+
+;;; TODOs:
+;;; 1. There is an additional tweak that can potentially return false in one fewer
+;;;    conditional branch if the layout being tested has depthoid 8 (or 9 if #+64-bit).
+;;;    In that scenario, if the ID word of the candidate structure's layout does not
+;;;    exist, then it's the 0th bitmap word and safe to read always. Therefore
+;;;    STRUCTURE-IS-A and depthoid can be tested in that order. If there is no ID match,
+;;;    there's no depthoid test. If there is an ID match, it's the same as before.
+;;; 2. Since all backends implement STRUCTURE-IS-A, is there any reason that the
+;;;    depthoid test is in the transform's expansion and not baked into that vop?
+;;;    Putting it in the vop could be better for some backends,
+;;;    and would eliminate the ad-hoc LAYOUT-DEPTHOID-GE vop.
+
 #-(or x86 x86-64) ; vop-translated for these 2
 (defmacro layout-depthoid-ge (layout depthoid)
   `(>= (wrapper-depthoid ,layout) ,depthoid))
@@ -1378,7 +1391,7 @@
         tval)))))
 
 (deftransform #+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p
-  ((value) (fixnum) * :important nil)
+  ((value) (sb-vm:signed-word) * :important nil)
   `(>= value 0))
 
 (deftransform %other-pointer-p ((object))

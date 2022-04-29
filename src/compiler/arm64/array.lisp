@@ -21,8 +21,8 @@
          (rank :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
-  (:temporary (:sc non-descriptor-reg) pa-flag ndescr)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg) ndescr)
+  (:temporary (:scs (non-descriptor-reg) :offset lr-offset) lr)
   (:results (result :scs (descriptor-reg)))
   (:generator 5
     ;; Compute the allocation size.
@@ -30,8 +30,8 @@
     (inst add ndescr ndescr (+ (* array-dimensions-offset n-word-bytes)
                                lowtag-mask))
     (inst and ndescr ndescr (bic-mask lowtag-mask))
-    (pseudo-atomic (pa-flag)
-      (allocation nil ndescr other-pointer-lowtag header :flag-tn pa-flag :lip lip)
+    (pseudo-atomic (lr)
+      (allocation nil ndescr other-pointer-lowtag header :flag-tn lr)
       ;; Now that we have the space allocated, compute the header
       ;; value.
       ;; See ENCODE-ARRAY-RANK.
@@ -265,14 +265,13 @@
          (:arg-types ,type positive-fixnum)
          (:results (result :scs (unsigned-reg)))
          (:result-types positive-fixnum)
-         (:temporary (:scs (interior-reg)) lip)
          (:temporary (:scs (non-descriptor-reg)) temp)
          (:generator 20
            ;; Compute the offset for the word we're interested in.
            (inst lsr temp index ,bit-shift)
            ;; Load the word in question.
-           (inst add lip object (lsl temp word-shift))
-           (inst ldr result (@ lip
+           (inst add temp object (lsl temp word-shift))
+           (inst ldr result (@ temp
                                (- (* vector-data-offset n-word-bytes)
                                   other-pointer-lowtag)))
            ;; Compute the position of the bitfield we need.
@@ -344,7 +343,7 @@
                            '(:target shift)))
                 (value :scs (unsigned-reg immediate)))
          (:arg-types ,type positive-fixnum positive-fixnum)
-         (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:scs (non-descriptor-reg)) lip)
          (:temporary (:scs (non-descriptor-reg)) temp old)
          ,@(unless (= bits 1)
              '((:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)))
@@ -395,12 +394,11 @@
   (:args (object :scs (descriptor-reg)) (index :scs (unsigned-reg)))
   (:arg-types simple-bit-vector positive-fixnum)
   (:conditional :eq)
-  (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (non-descriptor-reg)) temp x)
   (:generator 20
     (inst lsr temp index 6)
-    (inst add lip object (lsl temp word-shift))
-    (inst ldr x (@ lip (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
+    (inst add temp object (lsl temp word-shift))
+    (inst ldr x (@ temp (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
     (inst lsr x x index)
     (inst tst x 1)))
 
@@ -572,7 +570,7 @@
   (:result-types unsigned-num)
   (:temporary (:sc unsigned-reg) offset)
   (:temporary (:sc non-descriptor-reg) sum)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:generator 4
     (inst lsl offset index (- word-shift n-fixnum-tag-bits))
     (inst add offset offset (- (* vector-data-offset n-word-bytes)
@@ -597,7 +595,7 @@
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:temporary (:sc unsigned-reg) offset)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:guard (member :arm-v8.1 *backend-subfeatures*))
   (:generator 3
     (inst lsl offset index (- word-shift n-fixnum-tag-bits))

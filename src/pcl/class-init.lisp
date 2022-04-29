@@ -44,9 +44,8 @@
 
 
 (defun allocate-standard-instance (wrapper)
-  (let* ((instance (%make-instance (1+ sb-vm:instance-data-start)))
+  (let* ((instance (%new-instance wrapper (1+ sb-vm:instance-data-start)))
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+)))
-    (setf (%instance-wrapper instance) wrapper)
     (%instance-set instance sb-vm:instance-data-start slots)
     instance))
 
@@ -231,9 +230,12 @@
               (when (layout-for-pcl-obj-p wrapper)
                 (setf (wrapper-slot-list wrapper) slots))
 
-              (setq proto (if (eq meta 'funcallable-standard-class)
-                              (allocate-standard-funcallable-instance wrapper name)
-                              (allocate-standard-instance wrapper)))
+              (setq proto
+                    (cond ((eq name t) nil)
+                          ((eq meta 'funcallable-standard-class)
+                           (allocate-standard-funcallable-instance wrapper name))
+                          (t
+                           (allocate-standard-instance wrapper))))
 
               (setq direct-slots
                     (!bootstrap-make-slot-definitions
@@ -438,6 +440,7 @@
 
     (case metaclass-name
       (structure-class
+       (aver (not proto-p))
        (let ((constructor-sym '|STRUCTURE-OBJECT class constructor|))
          (set-slot 'defstruct-form
                    `(defstruct (structure-object (:constructor
@@ -448,10 +451,11 @@
          (set-slot 'plist nil)
          (set-slot 'prototype (funcall constructor-sym))))
       (condition-class
+       (aver (not proto-p))
        (set-slot 'prototype (make-condition name)))
       (t
-       (set-slot 'prototype
-                 (if proto-p proto (allocate-standard-instance wrapper)))))
+       (aver proto-p)
+       (unless (eq name 't) (set-slot 'prototype proto))))
     class))
 
 (defun !bootstrap-make-slot-definitions (name class slots wrapper effective-p)

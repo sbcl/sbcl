@@ -21,7 +21,6 @@
 #include "interrupt.h"
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs)
-
 #ifdef LISP_FEATURE_X86_64
     __attribute__((sysv_abi))
 #endif

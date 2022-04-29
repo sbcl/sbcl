@@ -71,6 +71,7 @@
   (fmakunbound gf-name)
   (ensure-accessor gf-name))
 
+(setq sb-kernel::*defstruct-hooks* '(ensure-defstruct-class))
 (compute-standard-slot-locations)
 (dolist (s '(condition function structure-object))
   (sb-kernel::do-subclassoids ((k v) (find-classoid s))

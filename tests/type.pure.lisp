@@ -670,9 +670,41 @@
             (assert (eq (sb-int:info :type :kind s) :primitive))
             (assert (eq (sb-int:info :type :kind s) :instance)))))))
 
-(with-test (:name :make-numeric-type)
+(with-test (:name (make-numeric-type :smoke))
   (assert (eq (make-numeric-type :class 'integer :low '(4) :high '(5))
               *empty-type*)))
+
+(with-test (:name (make-numeric-type :union))
+  (assert (equal (type-specifier (make-numeric-type :low '(-79106810381456307)))
+                 `(or (rational (-79106810381456307))
+                      (single-float (-7.910681e16))
+                      (double-float (-7.91068103814563d16))))))
+
+(with-test (:name (make-numeric-type :infinities))
+  ;; Without class
+  (assert (equal (type-specifier
+                  (make-numeric-type :low sb-ext:single-float-negative-infinity
+                                     :high sb-ext:single-float-negative-infinity))
+                 `(or (single-float ,sb-ext:single-float-negative-infinity
+                                    ,sb-ext:single-float-negative-infinity)
+                      (double-float ,sb-ext:double-float-negative-infinity
+                                    ,sb-ext:double-float-negative-infinity))))
+  (assert (equal (type-specifier
+                  (make-numeric-type :low sb-ext:single-float-negative-infinity))
+                 'real))
+  ;; With FLOAT class
+  (assert (equal (type-specifier
+                  (make-numeric-type :class 'float
+                                     :low sb-ext:single-float-negative-infinity
+                                     :high sb-ext:single-float-negative-infinity))
+                 `(or (single-float ,sb-ext:single-float-negative-infinity
+                                    ,sb-ext:single-float-negative-infinity)
+                      (double-float ,sb-ext:double-float-negative-infinity
+                                    ,sb-ext:double-float-negative-infinity))))
+  (assert (equal (type-specifier
+                  (make-numeric-type :class 'float
+                                     :low sb-ext:single-float-negative-infinity))
+                 `float)))
 
 (with-test (:name :prettier-union-types :skipped-on (not :sb-unicode))
   ;; (OR STRING BIGNUM) used to unparse as
@@ -734,16 +766,10 @@
   (assert (eq (type-of (eval '(sb-kernel:%make-instance 12)))
               'sb-kernel:instance)))
 
-(with-test (:name :make-numeric-type-union)
-  (assert (equal (sb-kernel:type-specifier
-                  (sb-kernel:make-numeric-type :low '(-79106810381456307)))
-                 '(or (double-float (-7.91068103814563d16)) (single-float (-7.910681e16))
-                   (rational (-79106810381456307))))))
-
 (with-test (:name (:cons-union :lp1912863))
   (let ((c (cons 2 4)))
     (assert (not (typep c '(or (cons (integer 0 8) (integer 5 15))
-                               (cons (integer 3 15) (integer 4 14))))))))
+                            (cons (integer 3 15) (integer 4 14))))))))
 
 (with-test (:name (:rational-union :equivalent-to-t))
   (let ((type '(or (integer * -1) (rational -1/2 1/2) (integer 1) (not integer))))

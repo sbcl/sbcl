@@ -8,7 +8,6 @@
     #+sb-building-contrib #p"SYS:CONTRIB;SB-CLTL2;"
     :components ((:file "defpackage")
                  (:file "compiler-let" :depends-on ("defpackage"))
-                 (:file "macroexpand" :depends-on ("defpackage"))
                  (:file "env" :depends-on ("defpackage")))
     :perform (load-op :after (o c) (provide 'sb-cltl2))
     :in-order-to ((test-op (test-op "sb-cltl2/tests"))))

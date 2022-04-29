@@ -92,8 +92,8 @@
     (store-stack-offset value frame-pointer variable-home-tn)))
 
 (define-vop (xep-allocate-frame)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:info start-lab)
-  (:temporary (:scs (interior-reg)) lip)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
     ;; function header.
@@ -102,7 +102,7 @@
     ;; Allocate function header.
     (inst simple-fun-header-word)
     (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
-    (inst str lip (@ cfp-tn (* lra-save-offset n-word-bytes)))))
+    (inst str lr (@ cfp-tn (* lra-save-offset n-word-bytes)))))
 
 (define-vop (xep-setup-sp)
   (:vop-var vop)
@@ -121,8 +121,12 @@
   (:info callee)
   (:generator 2
     (move res csp-tn)
-    (inst add csp-tn csp-tn (add-sub-immediate
-                             (* (max 1 (sb-allocated-size 'control-stack)) n-word-bytes)))
+    (let ((size (add-sub-immediate (* (max 1 (sb-allocated-size 'control-stack)) n-word-bytes))))
+      (cond ((typep size '(signed-byte 9))
+             (inst str cfp-tn (@ csp-tn size :post-index)))
+            (t
+             (inst add csp-tn csp-tn size)
+             (storew cfp-tn res ocfp-save-offset))))
     (when (ir2-environment-number-stack-p callee)
       (inst sub nfp nsp-tn (add-sub-immediate
                             (bytes-needed-for-non-descriptor-stack-frame)))
@@ -204,9 +208,11 @@
       ;; value return case).
       (unless (or expecting-values-on-stack
                   (type-single-value-p type))
-        (if (values-type-may-be-single-value-p type)
-            (inst csel csp-tn ocfp-tn csp-tn :eq)
-            (inst mov csp-tn ocfp-tn)))
+        (cond ((values-type-may-be-single-value-p type)
+               (inst csel csp-tn ocfp-tn csp-tn :eq))
+              ((eq type *empty-type*))
+              (t
+               (inst mov csp-tn ocfp-tn))))
 
       ;; If we ARE expecting values on the stack, we need to
       ;; either move them to their result location or to set their
@@ -310,30 +316,38 @@
 ;;;    Args and Nargs are TNs wired to the named locations.  We must
 ;;; explicitly allocate these TNs, since their lifetimes overlap with the
 ;;; results Start and Count (also, it's nice to be able to target them).
-(defun receive-unknown-values (args nargs start count)
+(defun receive-unknown-values (node args nargs start count)
   (declare (type tn args nargs start count))
   (let ((unused-count-p (eq (tn-kind count) :unused))
-        (unused-start-p (eq (tn-kind start) :unused)))
-    (assemble ()
-      (inst b :eq MULTIPLE)
-      (unless unused-start-p
-        (move start csp-tn))
-      (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
-      (unless unused-count-p
-        (inst mov count (fixnumize 1)))
-      (inst b DONE)
-      MULTIPLE
-      #.(assert (evenp register-arg-count))
-      (do ((arg *register-arg-tns* (cddr arg))
-           (i 0 (+ i 2)))
-          ((null arg))
-        (inst stp (first arg) (second arg)
-              (@ args (* i n-word-bytes))))
-      (unless unused-start-p
-        (move start args))
-      (unless unused-count-p
-        (move count nargs))
-      DONE)))
+        (unused-start-p (eq (tn-kind start) :unused))
+        (type (sb-c::node-derived-type node)))
+    (if (type-single-value-p type)
+        (assemble ()
+          (unless unused-start-p
+            (move start csp-tn))
+          (unless unused-count-p
+            (inst mov count (fixnumize 1)))
+          (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index)))
+        (assemble ()
+          (inst b :eq MULTIPLE)
+          (unless unused-start-p
+            (move start csp-tn))
+          (inst str (first *register-arg-tns*) (@ csp-tn n-word-bytes :post-index))
+          (unless unused-count-p
+            (inst mov count (fixnumize 1)))
+          (inst b DONE)
+          MULTIPLE
+          #.(assert (evenp register-arg-count))
+          (do ((arg *register-arg-tns* (cddr arg))
+               (i 0 (+ i 2)))
+              ((null arg))
+            (inst stp (first arg) (second arg)
+                  (@ args (* i n-word-bytes))))
+          (unless unused-start-p
+            (move start args))
+          (unless unused-count-p
+            (move count nargs))
+          DONE))))
 
 ;;; VOP that can be inherited by unknown values receivers.  The main
 ;;; thing this handles is allocation of the result temporaries.
@@ -559,8 +573,7 @@
   (:temporary (:scs (any-reg) :from (:argument 1)) count)
   (:temporary (:scs (descriptor-reg) :from :eval) temp)
   (:temporary (:scs (any-reg) :from :eval) dst)
-  (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:results (result :scs (descriptor-reg)))
   (:policy :safe)
   (:node-var node)
@@ -573,7 +586,7 @@
 
     (let ((dx-p (node-stack-allocate-p node))
           (leave-pa (gen-label)))
-      (pseudo-atomic (pa-flag :sync nil :elide-if dx-p)
+      (pseudo-atomic (lr :sync nil :elide-if dx-p)
         ;; Allocate a cons (2 words) for each item.
         (let ((size (cond (dx-p
                            (lsl count (1+ (- word-shift n-fixnum-tag-bits))))
@@ -581,18 +594,16 @@
                            (inst lsl temp count (1+ (- word-shift n-fixnum-tag-bits)))
                            temp))))
           (allocation 'list size list-pointer-lowtag dst
-                      :flag-tn pa-flag
+                      :flag-tn lr
                       :stack-allocate-p dx-p
                       :overflow
                       (lambda ()
                         ;; The size will be computed by subtracting from CSP
                         (inst mov tmp-tn context)
-                        (load-inline-constant dst `(:fixup listify-&rest :assembly-routine)
-                                              lip)
-                        (inst blr dst)
+                        (load-inline-constant lr `(:fixup listify-&rest :assembly-routine))
+                        (inst blr lr)
                         (inst mov result tmp-tn)
-                        (inst b leave-pa))
-                      :lip lip))
+                        (inst b leave-pa))))
         (move result dst)
 
         (inst b ENTER)
@@ -735,6 +746,7 @@
   (:info save callee target)
   (:ignore args save r0-temp)
   (:vop-var vop)
+  (:node-var node)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:generator 20
     (let ((cur-nfp (current-nfp-tn vop)))
@@ -748,7 +760,7 @@
       (note-this-location vop :call-site)
       (inst bl target)
       (note-this-location vop :unknown-return)
-      (receive-unknown-values values-start nvals start count)
+      (receive-unknown-values node values-start nvals start count)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
@@ -793,25 +805,22 @@
 ;;; registers may be tied up by the more operand.  Instead, we use
 ;;; MAYBE-LOAD-STACK-TN.
 (define-vop (known-return)
-  (:args (old-fp :target old-fp-temp)
+  (:args (old-fp)
          (return-pc)
          (vals :more t))
-  (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:move-args :known-return)
   (:info val-locs)
-  (:ignore val-locs vals)
+  (:ignore old-fp return-pc val-locs vals)
   (:vop-var vop)
   (:generator 6
-    (maybe-load-stack-tn old-fp-temp old-fp)
-    (maybe-load-stack-tn lip return-pc)
     (move csp-tn cfp-tn)
+    (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
-    (move cfp-tn old-fp-temp)
-    (lisp-return lip :known)))
+    (lisp-return lr :known)))
 
 ;;;; Full call:
 ;;;
@@ -852,7 +861,6 @@
 ;;; In tail call with fixed arguments, the passing locations are passed as a
 ;;; more arg, but there is no new-FP, since the arguments have been set up in
 ;;; the current frame.
-;(defvar fun-type :function)
 (defmacro define-full-call (name named return variable)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
@@ -899,7 +907,7 @@
       ,@(ecase return
           (:fixed '(ocfp-temp))
           (:tail '(old-fp return-pc node))
-          (:unknown '(r0-temp node))))
+          (:unknown '(r0-temp))))
 
      ,@(unless (eq named :direct)
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
@@ -927,7 +935,7 @@
      ,@(unless (eq return :tail)
          '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
 
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
 
      (:generator ,(+ (if named 5 0)
                      (if variable 19 1)
@@ -1025,23 +1033,23 @@
                           (return)))
                      ,@(case named
                          ((t)
-                          `((loadw lip name-pass fdefn-raw-addr-slot other-pointer-lowtag)
+                          `((loadw lr name-pass fdefn-raw-addr-slot other-pointer-lowtag)
                             ,(if (eq return :tail)
-                                 `(inst add lip lip 4))))
+                                 `(inst add lr lr 4))))
                          (:direct
-                          `((inst ldr lip (@ null-tn (load-store-offset (static-fun-offset fun))))
+                          `((inst ldr lr (@ null-tn (load-store-offset (static-fun-offset fun))))
                             ,(if (eq return :tail)
-                                 `(inst add lip lip 4)))))
+                                 `(inst add lr lr 4)))))
 
                      (note-this-location vop :call-site)
 
                      ,(if named
                           (if (eq return :tail)
-                              `(inst br lip)
-                              `(inst blr lip))
+                              `(inst br lr)
+                              `(inst blr lr))
                           (if (eq return :tail)
-                              `(tail-call-unnamed lexenv lip fun-type)
-                              `(call-unnamed lexenv lip fun-type))))
+                              `(tail-call-unnamed lexenv lr fun-type)
+                              `(call-unnamed lexenv lr fun-type))))
 
                    ,@(ecase return
                        (:fixed
@@ -1050,7 +1058,7 @@
                             (load-stack-tn cur-nfp nfp-save))))
                        (:unknown
                         '((note-this-location vop :unknown-return)
-                          (receive-unknown-values values-start nvals start count)
+                          (receive-unknown-values node values-start nvals start count)
                           (when cur-nfp
                             (load-stack-tn cur-nfp nfp-save))))
                        (:tail))))))
@@ -1079,7 +1087,6 @@
   (:info fun-type)
   (:temporary (:sc any-reg :offset nl2-offset :from (:argument 0)) args)
   (:temporary (:sc descriptor-reg :offset lexenv-offset :from (:argument 1)) lexenv)
-  (:temporary (:scs (interior-reg)) lip)
   (:ignore old-fp-arg lra-arg)
   (:vop-var vop)
   (:generator 75
@@ -1094,12 +1101,11 @@
     (load-inline-constant tmp-tn
                           (if (eq fun-type :function)
                               '(:fixup tail-call-variable :assembly-routine)
-                              '(:fixup tail-call-callable-variable :assembly-routine))
-                          lip)
+                              '(:fixup tail-call-callable-variable :assembly-routine)))
     (inst br tmp-tn)))
 
 ;;; Invoke the function-designator FUN.
-(defun tail-call-unnamed (lexenv lip type)
+(defun tail-call-unnamed (lexenv lr type)
   (case type
     (:symbol
      (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
@@ -1113,11 +1119,11 @@
          (load-inline-constant tmp-tn '(:fixup tail-call-symbol :assembly-routine))
          (inst br tmp-tn))
        call
-       (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
-       (inst add lip lip 4)
-       (inst br lip)))))
+       (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
+       (inst add lr lr 4)
+       (inst br lr)))))
 
-(defun call-unnamed (lexenv lip type)
+(defun call-unnamed (lexenv lr type)
   (case type
     (:symbol
      (load-inline-constant tmp-tn '(:fixup call-symbol :assembly-routine))
@@ -1132,8 +1138,8 @@
          (inst blr tmp-tn)
          (inst b ret))
        call
-       (loadw lip lexenv closure-fun-slot fun-pointer-lowtag)
-       (inst blr lip)
+       (loadw lr lexenv closure-fun-slot fun-pointer-lowtag)
+       (inst blr lr)
        ret))))
 
 ;;;; Unknown values return:
@@ -1143,7 +1149,7 @@
   (:args (old-fp)
          (return-pc)
          (value))
-  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:ignore value old-fp return-pc)
   (:vop-var vop)
   (:generator 6
@@ -1155,11 +1161,11 @@
     ;; Interrupts leave two words of space for the new frame, so it's safe
     ;; to deallocate the frame before accessing OCFP/LR.
     (move csp-tn cfp-tn)
-    (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
+    (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
     ;; Clear the control stack, and restore the frame pointer.
 
     ;; Out of here.
-    (lisp-return lip :single-value)))
+    (lisp-return lr :single-value)))
 
 ;;; Do unknown-values return of a fixed number of values.  The Values are
 ;;; required to be set up in the standard passing locations.  Nvals is the
@@ -1184,7 +1190,7 @@
   (:temporary (:sc descriptor-reg :offset r1-offset :from (:eval 0)) r1)
   (:temporary (:sc descriptor-reg :offset r2-offset :from (:eval 0)) r2)
   (:temporary (:sc descriptor-reg :offset r3-offset :from (:eval 0)) r3)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
   (:vop-var vop)
@@ -1197,15 +1203,15 @@
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
            (move csp-tn cfp-tn)
-           (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
+           (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
            ;; Out of here.
-           (lisp-return lip :single-value))
+           (lisp-return lr :single-value))
           (t
            ;; Establish the values pointer.
            (move val-ptr cfp-tn)
            ;; restore the frame pointer and clear as much of the control
            ;; stack as possible.
-           (loadw-pair cfp-tn ocfp-save-offset lip lra-save-offset cfp-tn)
+           (loadw-pair cfp-tn ocfp-save-offset lr lra-save-offset cfp-tn)
            (inst add csp-tn val-ptr (add-sub-immediate (* nvals n-word-bytes)))
            ;; Establish the values count.
            (load-immediate-word nargs (fixnumize nvals))
@@ -1214,7 +1220,7 @@
              (dolist (reg (subseq (list r0 r1 r2 r3) nvals))
                (move reg null-tn)))
            ;; And away we go.
-           (lisp-return lip :multiple-values)))))
+           (lisp-return lr :multiple-values)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
 ;;; on the stack.)  We check for the common case of a single return
@@ -1231,10 +1237,10 @@
   (:temporary (:sc any-reg :offset nl1-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset r0-offset) r0)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg :offset lr-offset) lr)
   (:vop-var vop)
   (:generator 13
-    (maybe-load-stack-tn lip lra-arg)
+    (maybe-load-stack-tn lr lra-arg)
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
@@ -1249,13 +1255,13 @@
     (inst ldr r0 (@ vals-arg))
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp-arg)
-    (lisp-return lip :single-value)
+    (lisp-return lr :single-value)
 
     NOT-SINGLE
     (move old-fp old-fp-arg)
     (move vals vals-arg)
     (move nvals nvals-arg)
-    (load-inline-constant tmp-tn '(:fixup return-multiple :assembly-routine) lip)
+    (load-inline-constant tmp-tn '(:fixup return-multiple :assembly-routine))
     (inst br tmp-tn)))
 
 ;;; Single-stepping

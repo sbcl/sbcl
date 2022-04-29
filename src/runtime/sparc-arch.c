@@ -162,7 +162,7 @@ void
 arch_handle_after_breakpoint(os_context_t *context)
 {
     *skipped_break_addr = trap_Breakpoint;
-    os_flush_icache(skipped_break_addr, sizeof(unsigned int));
+    os_flush_icache((os_vm_address_t)skipped_break_addr, sizeof(unsigned int));
     skipped_break_addr = NULL;
     *(unsigned long *)OS_CONTEXT_PC(context) = displaced_after_inst;
     /* context->sigmask = orig_sigmask; */

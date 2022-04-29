@@ -1,0 +1,575 @@
+\chapter{Event Dispatching with SERVE-EVENT}
+\label{serve-event}
+
+\credits{by Bill Chiles and Robert MacLachlan}
+
+
+It is common to have multiple activities simultaneously operating in the same
+Lisp process.  Furthermore, Lisp programmers tend to expect a flexible
+development environment.  It must be possible to load and modify application
+programs without requiring modifications to other running programs.  \cmucl{}
+achieves this by having a central scheduling mechanism based on an
+event-driven, object-oriented paradigm.
+
+An \var{event} is some interesting happening that should cause the Lisp process
+to wake up and do something.  These events include X events and activity on
+Unix file descriptors.  The object-oriented mechanism is only available with
+the first two, and it is optional with X events as described later in this
+chapter.  In an X event, the window ID is the object capability and the X event
+type is the operation code.  The Unix file descriptor input mechanism simply
+consists of an association list of a handler to call when input shows up on a
+particular file descriptor.
+
+
+\section{Object Sets}
+\label{object-sets}
+\cindex{object sets}
+
+An {\em object set} is a collection of objects that have the same implementation
+for each operation.  Externally the object is represented by the object
+capability and the operation is represented by the operation code.  Within
+Lisp, the object is represented by an arbitrary Lisp object, and the
+implementation for the operation is represented by an arbitrary Lisp function.
+The object set mechanism maintains this translation from the external to the
+internal representation.
+
+\begin{defun}{system:}{make-object-set}{%
+    \args{\var{name} \ampoptional{} \var{default-handler}}}
+  
+  This function makes a new object set.  \var{Name} is a string used
+  only for purposes of identifying the object set when it is printed.
+  \var{Default-handler} is the function used as a handler when an
+  undefined operation occurs on an object in the set.  You can define
+  operations with the \code{serve-}\var{operation} functions exported
+  the \code{extensions} package for X events
+  (\pxlref{x-serve-mumbles}).  Objects are added with
+  \code{system:add-xwindow-object}.  Initially the object set has no
+  objects and no defined operations.
+\end{defun}
+
+\begin{defun}{system:}{object-set-operation}{%
+    \args{\var{object-set} \var{operation-code}}}
+  
+  This function returns the handler function that is the
+  implementation of the operation corresponding to
+  \var{operation-code} in \var{object-set}.  When set with
+  \code{setf}, the setter function establishes the new handler.  The
+  \code{serve-}\var{operation} functions exported from the
+  \code{extensions} package for X events (\pxlref{x-serve-mumbles})
+  call this on behalf of the user when announcing a new operation for
+  an object set.
+\end{defun}
+
+\begin{defun}{system:}{add-xwindow-object}{%
+    \args{\var{window} \var{object} \var{object-set}}}
+  
+  These functions add \var{port} or \var{window} to \var{object-set}.
+  \var{Object} is an arbitrary Lisp object that is associated with the
+  \var{port} or \var{window} capability.  \var{Window} is a CLX
+  window.  When an event occurs, \code{system:serve-event} passes
+  \var{object} as an argument to the handler function.
+\end{defun}
+
+
+\section{The SERVE-EVENT Function}
+
+The \code{system:serve-event} function is the standard way for an application
+to wait for something to happen.  For example, the Lisp system calls
+\code{system:serve-event} when it wants input from X or a terminal stream.
+The idea behind \code{system:serve-event} is that it knows the appropriate
+action to take when any interesting event happens.  If an application calls
+\code{system:serve-event} when it is idle, then any other applications with
+pending events can run.  This allows several applications to run ``at the
+same time'' without interference, even though there is only one thread of
+control.  Note that if an application is waiting for input of any kind,
+then other applications will get events.
+
+\begin{defun}{system:}{serve-event}{\args{\ampoptional{} \var{timeout}}}
+  
+  This function waits for an event to happen and then dispatches to
+  the correct handler function.  If specified, \var{timeout} is the
+  number of seconds to wait before timing out.  A time out of zero
+  seconds is legal and causes \code{system:serve-event} to poll for
+  any events immediately available for processing.
+  \code{system:serve-event} returns \true{} if it serviced at least
+  one event, and \nil{} otherwise.  Depending on the application, when
+  \code{system:serve-event} returns \true, you might want to call it
+  repeatedly with a timeout of zero until it returns \nil.
+  
+  If input is available on any designated file descriptor, then this
+  calls the appropriate handler function supplied by
+  \code{system:add-fd-handler}.
+  
+  Since events for many different applications may arrive
+  simultaneously, an application waiting for a specific event must
+  loop on \code{system:serve-event} until the desired event happens.
+  Since programs such as \hemlock{} call \code{system:serve-event} for
+  input, applications usually do not need to call
+  \code{system:serve-event} at all; \hemlock{} allows other
+  application's handlers to run when it goes into an input wait.
+\end{defun}
+
+\begin{defun}{system:}{serve-all-events}{\args{\ampoptional{} \var{timeout}}}
+  
+  This function is similar to \code{system:serve-event}, except it
+  serves all the pending events rather than just one.  It returns
+  \true{} if it serviced at least one event, and \nil{} otherwise.
+\end{defun}
+
+
+\section{Using SERVE-EVENT with Unix File Descriptors}
+
+Object sets are not available for use with file descriptors, as there are
+only two operations possible on file descriptors: input and output.
+Instead, a handler for either input or output can be registered with
+\code{system:serve-event} for a specific file descriptor.  Whenever any input
+shows up, or output is possible on this file descriptor, the function
+associated with the handler for that descriptor is funcalled with the
+descriptor as it's single argument.
+
+\begin{defun}{system:}{add-fd-handler}{%
+    \args{\var{fd} \var{direction} \var{function}}}
+  
+  This function installs and returns a new handler for the file
+  descriptor \var{fd}.  \var{direction} can be either \kwd{input} if
+  the system should invoke the handler when input is available or
+  \kwd{output} if the system should invoke the handler when output is
+  possible.  This returns a unique object representing the handler,
+  and this is a suitable argument for \code{system:remove-fd-handler}
+  \var{function} must take one argument, the file descriptor.
+\end{defun}
+
+\begin{defun}{system:}{remove-fd-handler}{\args{\var{handler}}}
+
+  This function removes \var{handler}, that \code{add-fd-handler} must
+  have previously returned.
+\end{defun}
+
+\begin{defmac}{system:}{with-fd-handler}{%
+    \args{(\var{fd} \var{direction} \var{function})
+      \mstar{\var{form}}}}
+      
+  This macro executes the supplied forms with a handler installed
+  using \var{fd}, \var{direction}, and \var{function}.  See
+  \code{system:add-fd-handler}.  The given forms are wrapped in an
+  \code{unwind-protect};  the handler is removed (see
+  \code{system:remove-fd-handler}) when done.
+\end{defmac}
+
+\begin{defun}{system:}{wait-until-fd-usable}{%
+    \args{\var{fd} \var{direction} \ampoptional{} \var{timeout}}}
+      
+  This function waits for up to \var{timeout} seconds for \var{fd} to
+  become usable for \var{direction} (either \kwd{input} or
+  \kwd{output}).  If \var{timeout} is \nil{} or unspecified, this
+  waits forever.
+\end{defun}
+
+\begin{defun}{system:}{invalidate-descriptor}{\args{\var{fd}}}
+  
+  This function removes all handlers associated with \var{fd}.  This
+  should only be used in drastic cases (such as I/O errors, but not
+  necessarily EOF).  Normally, you should use \code{remove-fd-handler}
+  to remove the specific handler.
+\end{defun}
+
+
+
+
+\section{Using SERVE-EVENT with the CLX Interface to X}
+\label{x-serve-mumbles}
+
+Remember from section \ref{object-sets}, an object set is a collection of
+objects, CLX windows in this case, with some set of operations, event keywords,
+with corresponding implementations, the same handler functions.  Since X allows
+multiple display connections from a given process, you can avoid using object
+sets if every window in an application or display connection behaves the same.
+If a particular X application on a single display connection has windows that
+want to handle certain events differently, then using object sets is a
+convenient way to organize this since you need some way to map the window/event
+combination to the appropriate functionality.
+
+The following is a discussion of functions exported from the \code{extensions}
+package that facilitate handling CLX events through \code{system:serve-event}.
+The first two routines are useful regardless of whether you use
+\code{system:serve-event}:
+\begin{defun}{ext:}{open-clx-display}{%
+    \args{\ampoptional{} \var{string}}}
+  
+  This function parses \var{string} for an X display specification
+  including display and screen numbers.  \var{String} defaults to the
+  following:
+  \begin{example}
+    (cdr (assoc :display ext:*environment-list* :test #'eq))
+  \end{example}
+  If any field in the display specification is missing, this signals
+  an error.  \code{ext:open-clx-display} returns the CLX display and
+  screen.
+\end{defun}
+
+\begin{defun}{ext:}{flush-display-events}{\args{\var{display}}}
+  
+  This function flushes all the events in \var{display}'s event queue
+  including the current event, in case the user calls this from within
+  an event handler.
+\end{defun}
+
+
+
+\subsection{Without Object Sets}
+
+Since most applications that use CLX, can avoid the complexity of object sets,
+these routines are described in a separate section.  The routines described in
+the next section that use the object set mechanism are based on these
+interfaces.
+
+\begin{defun}{ext:}{enable-clx-event-handling}{%
+    \args{\var{display} \var{handler}}} 
+  
+  This function causes \code{system:serve-event} to notice when there
+  is input on \var{display}'s connection to the X11 server.  When this
+  happens, \code{system:serve-event} invokes \var{handler} on
+  \var{display} in a dynamic context with an error handler bound that
+  flushes all events from \var{display} and returns.  By returning,
+  the error handler declines to handle the error, but it will have
+  cleared all events; thus, entering the debugger will not result in
+  infinite errors due to streams that wait via
+  \code{system:serve-event} for input.  Calling this repeatedly on the
+  same \var{display} establishes \var{handler} as a new handler,
+  replacing any previous one for \var{display}.
+\end{defun}
+
+\begin{defun}{ext:}{disable-clx-event-handling}{\args{\var{display}}}
+
+  This function undoes the effect of
+  \code{ext:enable-clx-event-handling}.
+\end{defun}
+
+\begin{defmac}{ext:}{with-clx-event-handling}{%
+    \args{(\var{display} \var{handler}) \mstar{form}}}
+  
+  This macro evaluates each \var{form} in a context where
+  \code{system:serve-event} invokes \var{handler} on \var{display}
+  whenever there is input on \var{display}'s connection to the X
+  server.  This destroys any previously established handler for
+  \var{display}.
+\end{defmac}
+
+
+\subsection{With Object Sets}
+
+This section discusses the use of object sets and
+\code{system:serve-event} to handle CLX events.  This is necessary
+when a single X application has distinct windows that want to handle
+the same events in different ways.  Basically, you need some way of
+asking for a given window which way you want to handle some event
+because this event is handled differently depending on the window.
+Object sets provide this feature.
+
+For each CLX event-key symbol-name \i{XXX} (for example,
+\var{key-press}), there is a function \code{serve-}\i{XXX} of two
+arguments, an object set and a function.  The \code{serve-}\i{XXX}
+function establishes the function as the handler for the \kwd{XXX}
+event in the object set.  Recall from section \ref{object-sets},
+\code{system:add-xwindow-object} associates some Lisp object with a
+CLX window in an object set.  When \code{system:serve-event} notices
+activity on a window, it calls the function given to
+\code{ext:enable-clx-event-handling}.  If this function is
+\code{ext:object-set-event-handler}, it calls the function given to
+\code{serve-}\i{XXX}, passing the object given to
+\code{system:add-xwindow-object} and the event's slots as well as a
+couple other arguments described below.
+
+To use object sets in this way:
+
+\begin{itemize} 
+\item Create an object set.
+  
+\item Define some operations on it using the \code{serve-}\i{XXX}
+  functions.
+  
+\item Add an object for every window on which you receive requests.
+  This can be the CLX window itself or some structure more meaningful
+  to your application.
+  
+\item Call \code{system:serve-event} to service an X event.
+\end{itemize}
+
+
+\begin{defun}{ext:}{object-set-event-handler}{%
+    \args{\var{display}}}
+  
+  This function is a suitable argument to
+  \code{ext:enable-clx-event-handling}.  The actual event handlers
+  defined for particular events within a given object set must take an
+  argument for every slot in the appropriate event.  In addition to
+  the event slots, \code{ext:object-set-event-handler} passes the
+  following arguments:
+  \begin{itemize}
+  \item The object, as established by
+    \code{system:add-xwindow-object}, on which the event occurred.
+  \item event-key, see \code{xlib:event-case}.
+  \item send-event-p, see \code{xlib:event-case}.
+  \end{itemize}
+  
+  Describing any \code{ext:serve-}\var{event-key-name} function, where
+  \var{event-key-name} is an event-key symbol-name (for example,
+  \code{ext:serve-key-press}), indicates exactly what all the
+  arguments are in their correct order.
+
+%%  \begin{comment}
+%%    \code{ext:object-set-event-handler} ignores \kwd{no-exposure}
+%%    events on pixmaps, issuing a warning if one occurs.  It is only
+%%    prepared to dispatch events for windows.
+%%  \end{comment}
+  
+  When creating an object set for use with
+  \code{ext:object-set-event-handler}, specify
+  \code{ext:default-clx-event-handler} as the default handler for
+  events in that object set.  If no default handler is specified, and
+  the system invokes the default default handler, it will cause an
+  error since this function takes arguments suitable for handling port
+  messages.
+\end{defun}
+
+
+\section{A SERVE-EVENT Example}
+
+This section contains two examples using \code{system:serve-event}.  The first
+one does not use object sets, and the second, slightly more complicated one
+does.
+
+\subsection{Without Object Sets Example}
+
+This example defines an input handler for a CLX display connection.  It only
+recognizes \kwd{key-press} events.  The body of the example loops over
+\code{system:serve-event} to get input.
+
+\begin{lisp}
+(in-package "SERVER-EXAMPLE")
+
+(defun my-input-handler (display)
+  (xlib:event-case (display :timeout 0)
+    (:key-press (event-window code state)
+     (format t "KEY-PRESSED (Window = ~D) = ~S.~%"
+                  (xlib:window-id event-window)
+             ;; See Hemlock Command Implementor's Manual for convenient
+             ;; input mapping function.
+             (ext:translate-character display code state))
+      ;; Make XLIB:EVENT-CASE discard the event.
+      t)))
+\end{lisp}
+
+\begin{lisp}
+(defun server-example ()
+  "An example of using the SYSTEM:SERVE-EVENT function and object sets to
+   handle CLX events."
+  (let* ((display (ext:open-clx-display))
+         (screen (display-default-screen display))
+         (black (screen-black-pixel screen))
+         (white (screen-white-pixel screen))
+         (window (create-window :parent (screen-root screen)
+                                :x 0 :y 0 :width 200 :height 200
+                                :background white :border black
+                                :border-width 2
+                                :event-mask
+                                (xlib:make-event-mask :key-press))))
+    ;; Wrap code in UNWIND-PROTECT, so we clean up after ourselves.
+    (unwind-protect
+        (progn
+          ;; Enable event handling on the display.
+          (ext:enable-clx-event-handling display #'my-input-handler)
+          ;; Map the windows to the screen.
+          (map-window window)
+          ;; Make sure we send all our requests.
+          (display-force-output display)
+          ;; Call serve-event for 100,000 events or immediate timeouts.
+          (dotimes (i 100000) (system:serve-event)))
+      ;; Disable event handling on this display.
+      (ext:disable-clx-event-handling display)
+      ;; Get rid of the window.
+      (destroy-window window)
+      ;; Pick off any events the X server has already queued for our
+      ;; windows, so we don't choke since SYSTEM:SERVE-EVENT is no longer
+      ;; prepared to handle events for us.
+      (loop
+       (unless (deleting-window-drop-event *display* window)
+        (return)))
+      ;; Close the display.
+      (xlib:close-display display))))
+
+(defun deleting-window-drop-event (display win)
+  "Check for any events on win.  If there is one, remove it from the
+   event queue and return t; otherwise, return nil."
+  (xlib:display-finish-output display)
+  (let ((result nil))
+    (xlib:process-event
+     display :timeout 0
+     :handler #'(lambda (&key event-window &allow-other-keys)
+                  (if (eq event-window win)
+                      (setf result t)
+                      nil)))
+    result))
+\end{lisp}
+
+
+\subsection{With Object Sets Example}
+
+This example involves more work, but you get a little more for your effort.  It
+defines two objects, \code{input-box} and \code{slider}, and establishes a
+\kwd{key-press} handler for each object, \code{key-pressed} and
+\code{slider-pressed}.  We have two object sets because we handle events on the
+windows manifesting these objects differently, but the events come over the
+same display connection.
+
+\begin{lisp}
+(in-package "SERVER-EXAMPLE")
+
+(defstruct (input-box (:print-function print-input-box)
+                      (:constructor make-input-box (display window)))
+  "Our program knows about input-boxes, and it doesn't care how they
+   are implemented."
+  display        ; The CLX display on which my input-box is displayed.
+  window)        ; The CLX window in which the user types.
+;;;
+(defun print-input-box (object stream n)
+  (declare (ignore n))
+  (format stream "#<Input-Box ~S>" (input-box-display object)))
+
+(defvar *input-box-windows*
+        (system:make-object-set "Input Box Windows"
+                                #'ext:default-clx-event-handler))
+
+(defun key-pressed (input-box event-key event-window root child
+                    same-screen-p x y root-x root-y modifiers time
+                    key-code send-event-p)
+  "This is our :key-press event handler."
+  (declare (ignore event-key root child same-screen-p x y
+                   root-x root-y time send-event-p))
+  (format t "KEY-PRESSED (Window = ~D) = ~S.~%"
+          (xlib:window-id event-window)
+          ;; See Hemlock Command Implementor's Manual for convenient
+          ;; input mapping function.
+          (ext:translate-character (input-box-display input-box)
+                                     key-code modifiers)))
+;;;
+(ext:serve-key-press *input-box-windows* #'key-pressed)
+\end{lisp}
+
+\begin{lisp}
+(defstruct (slider (:print-function print-slider)
+                   (:include input-box)
+                   (:constructor %make-slider
+                                    (display window window-width max)))
+  "Our program knows about sliders too, and these provide input values
+   zero to max."
+  bits-per-value  ; bits per discrete value up to max.
+  max)            ; End value for slider.
+;;;
+(defun print-slider (object stream n)
+  (declare (ignore n))
+  (format stream "#<Slider ~S  0..~D>"
+          (input-box-display object)
+          (1- (slider-max object))))
+;;;
+(defun make-slider (display window max)
+  (%make-slider display window
+                  (truncate (xlib:drawable-width window) max)
+                max))
+
+(defvar *slider-windows*
+        (system:make-object-set "Slider Windows"
+                                #'ext:default-clx-event-handler))
+
+(defun slider-pressed (slider event-key event-window root child
+                       same-screen-p x y root-x root-y modifiers time
+                       key-code send-event-p)
+  "This is our :key-press event handler for sliders.  Probably this is
+   a mouse thing, but for simplicity here we take a character typed."
+  (declare (ignore event-key root child same-screen-p x y
+                   root-x root-y time send-event-p))
+  (format t "KEY-PRESSED (Window = ~D) = ~S  -->  ~D.~%"
+          (xlib:window-id event-window)
+          ;; See Hemlock Command Implementor's Manual for convenient
+          ;; input mapping function.
+          (ext:translate-character (input-box-display slider)
+                                     key-code modifiers)
+          (truncate x (slider-bits-per-value slider))))
+;;;
+(ext:serve-key-press *slider-windows* #'slider-pressed)
+\end{lisp}
+
+\begin{lisp}
+(defun server-example ()
+  "An example of using the SYSTEM:SERVE-EVENT function and object sets to
+   handle CLX events."
+  (let* ((display (ext:open-clx-display))
+         (screen (display-default-screen display))
+         (black (screen-black-pixel screen))
+         (white (screen-white-pixel screen))
+         (iwindow (create-window :parent (screen-root screen)
+                                 :x 0 :y 0 :width 200 :height 200
+                                 :background white :border black
+                                 :border-width 2
+                                 :event-mask
+                                 (xlib:make-event-mask :key-press)))
+         (swindow (create-window :parent (screen-root screen)
+                                 :x 0 :y 300 :width 200 :height 50
+                                 :background white :border black
+                                 :border-width 2
+                                 :event-mask
+                                 (xlib:make-event-mask :key-press)))
+         (input-box (make-input-box display iwindow))
+         (slider (make-slider display swindow 15)))
+    ;; Wrap code in UNWIND-PROTECT, so we clean up after ourselves.
+    (unwind-protect
+        (progn
+          ;; Enable event handling on the display.
+          (ext:enable-clx-event-handling display
+                                         #'ext:object-set-event-handler)
+          ;; Add the windows to the appropriate object sets.
+          (system:add-xwindow-object iwindow input-box
+                                       *input-box-windows*)
+          (system:add-xwindow-object swindow slider
+                                       *slider-windows*)
+          ;; Map the windows to the screen.
+          (map-window iwindow)
+          (map-window swindow)
+          ;; Make sure we send all our requests.
+          (display-force-output display)
+          ;; Call server for 100,000 events or immediate timeouts.
+          (dotimes (i 100000) (system:serve-event)))
+      ;; Disable event handling on this display.
+      (ext:disable-clx-event-handling display)
+      (delete-window iwindow display)
+      (delete-window swindow display)
+      ;; Close the display.
+      (xlib:close-display display))))
+\end{lisp}
+
+\begin{lisp}
+(defun delete-window (window display)
+  ;; Remove the windows from the object sets before destroying them.
+  (system:remove-xwindow-object window)
+  ;; Destroy the window.
+  (destroy-window window)
+  ;; Pick off any events the X server has already queued for our
+  ;; windows, so we don't choke since SYSTEM:SERVE-EVENT is no longer
+  ;; prepared to handle events for us.
+  (loop
+   (unless (deleting-window-drop-event display window)
+     (return))))
+
+(defun deleting-window-drop-event (display win)
+  "Check for any events on win.  If there is one, remove it from the
+   event queue and return t; otherwise, return nil."
+  (xlib:display-finish-output display)
+  (let ((result nil))
+    (xlib:process-event
+     display :timeout 0
+     :handler #'(lambda (&key event-window &allow-other-keys)
+                  (if (eq event-window win)
+                      (setf result t)
+                      nil)))
+    result))
+\end{lisp}

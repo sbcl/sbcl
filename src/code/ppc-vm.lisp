@@ -46,8 +46,7 @@
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
 ;;;
-;;; FIXME: surely this must be accessible somewhere under Darwin?  Or
-;;; under NetBSD?
+;;; FIXME: surely this must be accessible somewhere under *BSD?
 #+linux
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (unsigned 32)

@@ -42,8 +42,7 @@
             (error "can't use :TYPE option in DEF!STRUCT"))
           (values name options slots)))
     ;; Attempting to define a type named by a CL symbol is an error.
-    ;; Therefore NAME is wrong if it uncrosses to something other than itself.
-    (assert (eq (uncross name) name))
+    (assert (not (eq (sb-xc:symbol-package name) *cl-package*)))
     (assert (equal (uncross options) options))
     `(progn
        (sb-xc:defstruct ,@args)

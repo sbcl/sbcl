@@ -20,13 +20,7 @@
         class)))
 
 ;;;; the ANSI interface to function names (and to other stuff too)
-;;; Note: this function gets called by the compiler (as of 1.0.17.x,
-;;; in MAYBE-INLINE-SYNTACTIC-CLOSURE), and so although ANSI says
-;;; we're allowed to return NIL here freely, it seems plausible that
-;;; small changes to the circumstances under which this function
-;;; returns non-NIL might have subtle consequences on the compiler.
-;;; So it might be desirable to have the compiler not rely on this
-;;; function, eventually.
+
 (defun function-lambda-expression (fun)
   "Return (VALUES DEFINING-LAMBDA-EXPRESSION CLOSURE-P NAME), where
   DEFINING-LAMBDA-EXPRESSION is NIL if unknown, or a suitable argument

@@ -865,16 +865,10 @@
           (inst lea result (ea tramp rip-tn))
           (inst mov result tramp)))))
 
-(define-vop (fixed-alloc)
-  (:args)
-  (:info name words type lowtag stack-allocate-p)
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg) alloc-temp)
-  #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
-  (:node-var node)
-  (:generator 50
-   (let* ((instancep (typep type 'wrapper)) ; is this an instance type?
-          (bytes (pad-data-block words)))
+(flet
+  ((alloc (name words type lowtag stack-allocate-p result
+                    &optional alloc-temp node
+                    &aux (bytes (pad-data-block words)))
     #+bignum-assertions
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
@@ -886,8 +880,7 @@
       (if stack-allocate-p
           (stack-allocation bytes (if type 0 lowtag) result)
           (allocation nil bytes (if type 0 lowtag) result node alloc-temp thread-tn))
-      (let* ((widetag (if instancep instance-widetag type))
-             (header (compute-object-header words widetag)))
+      (let ((header (compute-object-header words type)))
         (cond #+compact-instance-header
               ((and (eq name '%make-structure-instance) stack-allocate-p)
               ;; Write a :DWORD, not a :QWORD, because the high half will be
@@ -900,16 +893,29 @@
       ;; GC can make the best choice about placement if it has a layout.
       ;; Of course with conservative GC the object will be pinned anyway,
       ;; but still, always having a layout is a good thing.
-      (when instancep ; store its layout, while still in pseudo-atomic
+      (when (typep type 'wrapper) ; store its layout, while still in pseudo-atomic
         (inst mov :dword (ea 4 result) (make-fixup type :layout)))
-      (inst or :byte result lowtag)))))
+      (inst or :byte result lowtag))))
+  ;; DX is strictly redundant in these 2 vops, but they're written this way
+  ;; so that backends can choose to use a single vop for both.
+  (define-vop (fixed-alloc)
+    (:info name words type lowtag dx)
+    (:results (result :scs (descriptor-reg)))
+    (:temporary (:sc unsigned-reg) alloc-temp)
+    #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+    (:node-var node)
+    (:generator 50 (alloc name words type lowtag dx result alloc-temp node)))
+  (define-vop (sb-c::fixed-alloc-to-stack)
+    (:info name words type lowtag dx)
+    (:results (result :scs (descriptor-reg)))
+    (:generator 50 (alloc name words type lowtag dx result))))
 
 ;;; Allocate a non-vector variable-length object.
 ;;; Exactly 4 allocators are rendered via this vop:
 ;;;  BIGNUM               (%ALLOCATE-BIGNUM)
 ;;;  FUNCALLABLE-INSTANCE (%MAKE-FUNCALLABLE-INSTANCE)
 ;;;  CLOSURE              (%ALLOC-CLOSURE)
-;;;  INSTANCE             (%MAKE-INSTANCE)
+;;;  INSTANCE             (%MAKE-INSTANCE,%MAKE-INSTANCE/MIXED)
 ;;; WORDS accounts for the mandatory slots *including* the header.
 ;;; EXTRA is the variable payload, also measured in words.
 (define-vop (var-alloc)

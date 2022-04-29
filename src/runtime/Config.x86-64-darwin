@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -g -Wall -O2 -fdollars-in-identifiers
+CFLAGS += -g -Wall -fdollars-in-identifiers
 
 ifdef SBCL_MACOSX_VERSION_MIN
   CFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)
@@ -49,7 +49,3 @@ ifdef LISP_FEATURE_IMMOBILE_SPACE
 else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:

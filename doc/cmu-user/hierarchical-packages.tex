@@ -1,0 +1,213 @@
+\section{Hierarchical Packages}
+\cindex{hierarchical packages}
+
+
+% this section is heavily based on the Franz Inc. documentation for
+% the hierarchical packages feature, as per
+% <URL:http://www.franz.com/support/tech_corner/hierpackuser.lhtml>
+% accessed on 2002-03-18. It is used by permission from Kevin Layer,
+% obtained in email to Eric Marsden, in response to spr25795. 
+%
+% Allegro-specific references in the document have been removed.
+
+
+\subsection{Introduction}
+
+The \clisp{} package system, designed and standardized several years
+ago, is not hierarchical. Since \clisp{} was standardized, other
+languages, including Java and Perl, have evolved namespaces which are
+hierarchical. This document describes a hierarchical package naming
+scheme for \clisp{}. The scheme was proposed by Franz Inc and
+implemented in their \textit{Allegro Common Lisp} product; a
+compatible implementation of the naming scheme is implemented in
+\cmucl{}. This documentation is based on the Franz Inc. documentation,
+and is included with permission.
+
+The goals of hierarchical packages in \clisp{} are:
+
+\begin{itemize}
+\item
+Reduce collisions with user-defined packages: it is a well-known
+problem that package names used by the Lisp implementation and those
+defined by users can easily conflict. The intent of hierarchical
+packages is to reduce such conflicts to a minimum.
+
+\item
+Improve modularity: the current organization of packages in various
+implementations has grown over the years and appears somewhat random.
+Organizing future packages into a hierarchy will help make the
+intention of the implementation more clear.
+
+\item 
+Foster growth in \clisp{} programs, or modules, available to the CL
+community: the Perl and Java communities are able to contribute code
+to repositories, with minimal fear of collision, because of the
+hierarchical nature of the name spaces used by the contributed code.
+We want the Lisp community to benefit from shared modules in the same
+way.
+\end{itemize}
+
+In a nutshell, a dot (\verb|.|) is used to separate levels in package
+names, and a leading dot signifies a relative package name. The choice
+of dot follows Java. Perl, another language with hierarchical
+packages, uses a colon (\verb|:|) as a delimiter, but the colon is
+already reserved in \clisp{}. Absolute package names require no
+modifications to the underlying \clisp{} implementation. Relative
+package names require only small and simple modifications.
+
+
+\subsection{Relative Package Names}
+
+Relative package names are needed for the same reason as relative
+pathnames, for brevity and to reduce the brittleness of absolute
+names. A relative package name is one that begins with one or more
+dots. A single dot means the current package, two dots mean the parent
+of the current package, and so on.
+
+Table~\ref{tbl:hierarchical-packages} presents a number of examples,
+assuming that the packages named \verb|foo|, \verb|foo.bar|,
+\verb|mypack|, \verb|mypack.foo|, \verb|mypack.foo.bar|,
+\verb|mypack.foo.baz|, \verb|mypack.bar|, and \verb|mypack.bar.baz|,
+have all been created.
+
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+relative name   &  current package & absolute name of referenced package \\
+\hline
+foo &               any  &                      foo \\
+foo.bar &           any &                       foo.bar \\
+.foo &              mypack &                    mypack.foo \\
+ .foo.bar &         mypack &                    mypack.foo.bar \\
+ ..foo &            mypack.bar &                mypack.foo \\
+ ..foo.baz &        mypack.bar &                mypack.foo.baz \\
+ ...foo &           mypack.bar.baz &            mypack.foo \\
+ . &                mypack.bar.baz &            mypack.bar.baz \\
+ .. &               mypack.bar.baz &            mypack.bar \\
+ ... &              mypack.bar.baz &            mypack \\
+\hline
+\end{tabular}
+\end{center}
+\caption{Examples of hierarchical packages}
+\label{tbl:hierarchical-packages}
+\end{table}
+
+Additional notes:
+
+\begin{enumerate}
+\item
+All packages in the hierarchy must exist.
+
+\item
+\textbf{Warning about nicknames}: Unless you provide nicknames for
+your hierarchical packages (and we recommend against doing so because
+the number gets quite large), you can only use the names supplied. You
+cannot mix in nicknames or alternate names. \code{cl-user}
+is nickname of the \code{common-lisp-user} package.
+Consider the following:
+
+\begin{verbatim}
+   (defpackage :cl-user.foo)
+\end{verbatim}
+  
+When the current package (the value of the variable \code{*package*})
+is \code{common-lisp-user}, you might expect \verb|.foo| to refer to
+\verb|cl-user.foo|, but it does not. It actually refers to the non-existent
+package \verb|common-lisp-user.foo|. Note that the purpose of
+nicknames is to provide shorter names in place of the longer names
+that are designed to be fully descriptive. The hope is that
+hierarchical packages makes longer names unnecessary and thus makes
+nicknames unnecessary.
+
+\item
+Multiple dots can only appear at the beginning of a package name. For
+example, \verb|foo.bar..baz| does not mean \verb|foo.baz| -- it is
+invalid. (Of course, it is perfectly legal to name a package
+\verb|foo.bar..baz|, but \code{cl:find-package} will not process such
+a name to find \verb|foo.baz| in the package hierarchy.)
+\end{enumerate}
+
+
+\subsection{Compatibility with ANSI \clisp{}}
+
+The implementation of hierarchical packages modifies the
+\code{cl:find-package} function, and provides certain auxiliary
+functions, \code{package-parent}, \code{package-children}, and
+\code{relative-package-name-to-package}, as described in this section.
+The function \code{defpackage} itself requires no modification.
+
+While the changes to \code{cl:find-package} are small and described
+below, it is an important consideration for authors who would like
+their programs to run on a variety of implementations that using
+hierarchical packages will work in an implementation without the
+modifications discussed in this document. We show why after
+describing the changes to \code{cl:find-package}.
+
+Absolute hierarchical package names require no changes in the
+underlying \clisp{} implementation.
+
+
+\subsubsection{Changes to \code{cl:find-package}}
+
+Using relative hierarchical package names requires a simple
+modification of \code{cl:find-package}.
+
+In ANSI \clisp{}, \code{cl:find-package}, if passed a package object,
+returns it; if passed a string, \code{cl:find-package} looks for a
+package with that string as its name or nickname, and returns the
+package if it finds one, or returns nil if it does not; if passed a
+symbol, the symbol name (a string) is extracted and
+\code{cl:find-package} proceeds as it does with a string.
+
+For implementing hierarchical packages, the behavior when the argument
+is a package object (return it) does not change. But when the argument
+is a string starting with one or more dots not directly naming a
+package, \code{cl:find-package} will, instead of returning nil, check
+whether the string can be resolved as naming a relative package, and
+if so, return the associated absolute package object. (If the argument
+is a symbol, the symbol name is extracted and \code{cl:find-package}
+proceeds as it does with a string argument.)
+
+Note that you should not use leading dots in package names when using
+hierarchical packages.
+
+\subsubsection{Using Hierarchical Packages without Modifying cl:find-package}
+
+Even without the modifications to \code{cl:find-package}, authors need
+not avoid using relative package names, but the ability to reuse
+relative package names is restricted. Consider for example a module
+\textit{foo} which is composed of the \verb|my.foo.bar| and
+\verb|my.foo.baz| packages. In the code for each of the these packages
+there are relative package references, \verb|..bar| and \verb|..baz|.
+
+Implementations that have the new \code{cl:find-package} would have
+\verb|:relative-package-names| on their \code{*features*}
+list (this is the case of \cmucl{} releases starting from 18d). Then,
+in the \textit{foo} module, there would be definitions of the
+\verb|my.foo.bar| and \verb|my.foo.baz| packages like so:
+
+\begin{verbatim}
+   (defpackage :my.foo.bar
+     #-relative-package-names (:nicknames #:..bar)
+     ...)
+
+   (defpackage :my.foo.baz
+     #-relative-package-names (:nicknames #:..baz)
+     ...)
+\end{verbatim}
+
+Then, in a \verb|#-relative-package-names| implementation, the symbol
+\verb|my.foo.bar:blam| would be visible from \verb|my.foo.baz| as
+\verb|..bar:blam|, just as it would from a
+\verb|#+relative-package-names| implementation.
+
+So, even without the implementation of the augmented
+\code{cl:find-package}, one can still write \clisp{} code that will
+work in both types of implementations, but \verb|..bar| and
+\verb|..baz| are now used, so you cannot also have
+\verb|otherpack.foo.bar| and \verb|otherpack.foo.baz| and use
+\verb|..bar| and \verb|..baz| as relative names. (The point of
+hierarchical packages, of course, is to allow reusing relative package
+names.)
+

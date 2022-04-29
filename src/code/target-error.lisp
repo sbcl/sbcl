@@ -26,7 +26,8 @@
     (let ((length (error-length error-number)))
       (declare (type (unsigned-byte 8) length))
       (values error-number
-              (loop repeat length with index = 0
+              (loop with index = 0
+                    repeat length
                     collect (sb-c:sap-read-var-integerf sap index))
               trap-number))))
 
@@ -425,7 +426,8 @@ with that condition (or with no condition) will be returned."
                     thereis (stackp (fast-&rest-nth arg-index initargs))))
              (layout (classoid-wrapper classoid))
              (extra (if (and any-dx (type-err-p layout)) 2 0)) ; space for secret initarg
-             (instance (%make-instance (+ sb-vm:instance-data-start
+             (instance (%new-instance layout
+                                        (+ sb-vm:instance-data-start
                                           1 ; ASSIGNED-SLOTS
                                           (length initargs)
                                           extra)))
@@ -433,8 +435,7 @@ with that condition (or with no condition) will be returned."
              (arg-index 0)
              (have-type-error-datum)
              (type-error-datum))
-        (setf (%instance-wrapper instance) layout
-              (condition-assigned-slots instance) nil)
+        (setf (condition-assigned-slots instance) nil)
         (macrolet ((store-pair (key val)
                      `(progn (%instance-set instance data-index ,key)
                              (%instance-set instance (1+ data-index) ,val))))

@@ -639,7 +639,6 @@ and
                                                    stack-allocate-p
                                                    temp-tn)
   (declare (ignorable type))
-  #-gencgc (declare (ignore temp-tn))
   (cond (stack-allocate-p
          ;; Stack allocation
          ;;
@@ -659,20 +658,6 @@ and
            (tn
             (inst add csp-tn csp-tn size))))
         ;; Normal allocation to the heap.
-        #-gencgc
-        (t
-         (load-symbol-value flag-tn *allocation-pointer*)
-         (inst ori result-tn flag-tn lowtag)
-         (etypecase size
-           (short-immediate
-            (inst addi flag-tn flag-tn size))
-           (u+i-immediate
-            (inst li flag-tn (- size lowtag))
-            (inst add flag-tn flag-tn result-tn))
-           (tn
-            (inst add flag-tn flag-tn size)))
-         (store-symbol-value flag-tn *allocation-pointer*))
-        #+gencgc
         (t
          (let ((alloc (gen-label))
                (back-from-alloc (gen-label)))

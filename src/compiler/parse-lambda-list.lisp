@@ -555,7 +555,9 @@
                  (if (ll-kwds-keyp llks) (cons '&key keys)) ; KEYS can be nil
                  (if (ll-kwds-allowp llks) '(&allow-other-keys))
                  ;; Should &AUX be inserted even if empty? Probably not.
-                 (if aux (cons '&aux aux)))))))
+                 (if aux (cons '&aux aux))
+                 ;; fresh lambda list spine everywhere
+                 nil)))))
 
 ;;; Produce a destructuring lambda list from its internalized representation,
 ;;; excluding any parts that don't constrain the shape of the expected input.
@@ -1157,10 +1159,15 @@
              ;; Drop &WHOLE and &ENVIRONMENT
              (new-ll (make-lambda-list llks nil req opt rest keys aux))
              #-sb-xc-host
-             (*lexenv* (process-muffle-decls decls
-                                             (if (boundp '*lexenv*)
-                                                 *lexenv*
-                                                 (make-null-lexenv))))
+             ((*lexenv* source-form) (process-muffle-decls decls
+                                                           (if (boundp '*lexenv*)
+                                                               *lexenv*
+                                                               (make-null-lexenv))))
+             #-sb-xc-host
+             (*current-path* (or (and source-form
+                                      (get-source-path source-form))
+                                 (and (boundp '*current-path*)
+                                      *current-path*)))
              (parse (parse-ds-lambda-list new-ll))
              ((declared-lambda-list decls)
               (let ((ll
@@ -1206,6 +1213,9 @@
                 (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
               ,@(when (and docstring (eq doc-string-allowed :internal))
                   (prog1 (list docstring) (setq docstring nil)))
+              #-sb-xc-host
+              ,@(and source-form
+                     `((declare (source-form ,source-form))))
               ;; MACROLET doesn't produce an object capable of reflection,
               ;; so don't bother inserting a different lambda-list.
               ,@(unless (eq kind 'macrolet)

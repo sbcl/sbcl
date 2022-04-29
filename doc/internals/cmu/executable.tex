@@ -1,0 +1,100 @@
+\chapter{Saving Executable Lisp Images}
+
+The :executable flag to SAVE-LISP allows saving the Lisp core sections into an ELF binary that
+is executable.  To do this, the ELF format is adapted to emulate the old core format.
+
+\section{Saving}
+The first part of the save process is almost the same as saving a core-file image except that
+instead of a single core image, three ELF object files are created.  These are temporary files
+called CORRO.o, CORSTA.o and CORDYN.o containing the read-only, static and dynamic spaces.
+
+After that, a script called linker.sh is invoked to use the system linker to create the
+executable file.  The linker links a file called lisp.a with the three object files.  When
+SAVE-LISP calls linker.sh, it passes the address of the initial function to be run when lisp is
+restarted.
+
+The linker.sh script does several things.
+
+\begin{enumerate}
+\item It locates the directory where the C runtime object files are kept.
+\item It passes the name of the linker directive script to the linker.
+\item It uses the linker to define two symbols: builtin_image_flag and initial_function_addr.
+  The first symbol has to be the address of some location in memory with non-zero contents
+  because it is used to tell the system that it is an executable rather than the traditional
+  runtime loader with core file.  This is definitely a kludge but something like this is needed
+  because it gets around a bootstrapping issue.  The second symbol is the startup function;
+  ordinarily this would be saved in the core file header.  It would be possible to save this
+  information in the ELF file but since we have to use the linker to define builtin_image_flag
+  anyway, it is simpler to just define initial_function_addr the same way.
+\item Finally, the linker script links the executable with the correct set of libraries and
+  object files.  One of these files is lisp.a, containing the object code of the runtime
+  loader program, which is no longer a separate file.
+\end{enumerate}
+
+\section{Running}
+The startup procedure for an executable image attempts to emulate the startup procedure for a
+core image file by using information saved in the ELF section headers.
+
+When an executable image starts up, it sees the builtin_image_flag that tells it that it is an
+executable image.  It reads the ELF header of the executable file.  It finds the string section
+of the file.  It then reads ELF section headers, looking for sections with the names CORRO,
+CORSTA or CORDYN (it uses the string section to look up the names).  Once it finds them, it
+mmaps them into the memory space indicated by the parameters in the ELF section header.
+Finally it sets variables indicating the starts of the three spaces.  It also sets a variable
+to indicate how big the dynamic space is.
+
+\section{Porting the Linker Directive Script}
+The following describes how to create a linker directive script.  It assumes that the system is
+based on GCC and the GCC compiler toolchain (in particular, GNU ld).
+
+The linker directive script is used to set up the memory layout for the system.  It is a
+modified version of the normal linker directive script used by the system.
+
+To obtain a copy of this script (for porting to another operating system), the command ``ld
+--verbose'' must be run.  This will dump the linker script to standard output.  Save this to a
+file and edit it as follows.
+
+First, add a ``PHDRS'' part after the SEARCH_DIR part and before the SECTIONS part.  The PHDRS
+part should look like this:
+
+PHDRS
+{
+	headers PT_PHDR PHDRS ;
+	interp PT_INTERP ;
+	text PT_LOAD FILEHDR PHDRS ;
+
+	data PT_LOAD ;
+	dynamic PT_DYNAMIC ;
+        note PT_NOTE ;
+
+	/* Add core sections for Lisp. */
+	CORRO	PT_NOTE ;
+	CORSTA	PT_NOTE ;
+        CORDYN	PT_NOTE ;
+}
+
+
+Note the three CORXXX sections.  They are given type PT_NOTE so the system will not try to
+process them.  An attempt was made to use the PT_LOAD type (and thereby taking advantage of the
+ELF loader automatically mmapping the sections into place) but this caused systems to get
+confused about the memory layout so that any use of malloc would fail.
+
+Right after the place where the file has something like this:
+
+  _end = .;
+  PROVIDE (end = .);
+  . = DATA_SEGMENT_END (.);
+
+  add the following lines (modified for your system):
+
+  /* Lisp core sections. */
+  CORRO  0x10000000 : { CORRO.o  (CORRO)  } :CORRO
+  CORSTA 0x28f00000 : { CORSTA.o (CORSTA) } :CORSTA
+  CORDYN 0x48000000 : { CORDYN.o (CORDYN) } :CORDYN
+
+Note that the addresses (the second field) must correspond to the addresses of the read-only,
+static and dynamic sections given in src/lisp/xxx-validate.h.
+
+This linker directive script will reside in the library: directory along with the linker.sh
+script and the lisp.a file created by rebuild-lisp.sh.  It should be given a descriptive name
+that indicates the system it is used for.

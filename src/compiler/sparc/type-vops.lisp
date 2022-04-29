@@ -132,22 +132,22 @@
 
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
-  (:generator 45
-              (let ((not-target (gen-label)))
-                (multiple-value-bind
-                      (yep nope)
-                    (if not-p
-                        (values not-target target)
-                        (values target not-target))
-                  (inst andcc zero-tn value fixnum-tag-mask)
-                  (inst b :eq yep)
-                  (test-type value temp nope t (other-pointer-lowtag))
-                  (loadw temp value 0 other-pointer-lowtag)
-                  (inst cmp temp (+ (ash 1 n-widetag-bits)
-                                    bignum-widetag))
-                  (inst b (if not-p :ne :eq) target)
-                  (inst nop)
-                  (emit-label not-target)))))
+  (:generator 10
+    (let ((not-target (gen-label)))
+      (multiple-value-bind
+            (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (inst andcc zero-tn value fixnum-tag-mask)
+        (inst b :eq yep)
+        (test-type value temp nope t (other-pointer-lowtag))
+        (loadw temp value 0 other-pointer-lowtag)
+        (inst cmp temp (+ (ash 1 n-widetag-bits)
+                          bignum-widetag))
+        (inst b (if not-p :ne :eq) target)
+        (inst nop)
+        (emit-label not-target)))))
 
 
 
@@ -159,52 +159,52 @@
 
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
-  (:generator 45
-              (let ((not-target (gen-label))
-                    (single-word (gen-label))
-                    (fixnum (gen-label)))
-                (multiple-value-bind
-                      (yep nope)
-                    (if not-p
-                        (values not-target target)
-                        (values target not-target))
-                  ;; Is it a fixnum?
-                  (inst andcc temp value fixnum-tag-mask)
-                  (inst b :eq fixnum)
-                  (inst cmp value)
+  (:generator 10
+    (let ((not-target (gen-label))
+          (single-word (gen-label))
+          (fixnum (gen-label)))
+      (multiple-value-bind
+            (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        ;; Is it a fixnum?
+        (inst andcc temp value fixnum-tag-mask)
+        (inst b :eq fixnum)
+        (inst cmp value)
 
-                  ;; If not, is it an other pointer?
-                  (test-type value temp nope t (other-pointer-lowtag))
-                  ;; Get the header.
-                  (loadw temp value 0 other-pointer-lowtag)
-                  ;; Is it one?
-                  (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-                  (inst b :eq single-word)
-                  ;; If it's other than two, we can't be an
-                  ;; (unsigned-byte 32)
-                  (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
-                  (inst b :ne nope)
-                  ;; Get the second digit.
-                  (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-                  ;; All zeros, its an (unsigned-byte 32).
-                  (inst cmp temp)
-                  (inst b :eq yep)
-                  (inst nop)
-                  ;; Otherwise, it isn't.
-                  (inst b nope)
-                  (inst nop)
+        ;; If not, is it an other pointer?
+        (test-type value temp nope t (other-pointer-lowtag))
+        ;; Get the header.
+        (loadw temp value 0 other-pointer-lowtag)
+        ;; Is it one?
+        (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (inst b :eq single-word)
+        ;; If it's other than two, we can't be an
+        ;; (unsigned-byte 32)
+        (inst cmp temp (+ (ash 2 n-widetag-bits) bignum-widetag))
+        (inst b :ne nope)
+        ;; Get the second digit.
+        (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+        ;; All zeros, its an (unsigned-byte 32).
+        (inst cmp temp)
+        (inst b :eq yep)
+        (inst nop)
+        ;; Otherwise, it isn't.
+        (inst b nope)
+        (inst nop)
 
-                  (emit-label single-word)
-                  ;; Get the single digit.
-                  (loadw temp value bignum-digits-offset other-pointer-lowtag)
-                  (inst cmp temp)
+        (emit-label single-word)
+        ;; Get the single digit.
+        (loadw temp value bignum-digits-offset other-pointer-lowtag)
+        (inst cmp temp)
 
-                  ;; positive implies (unsigned-byte 32).
-                  (emit-label fixnum)
-                  (inst b (if not-p :lt :ge) target)
-                  (inst nop)
+        ;; positive implies (unsigned-byte 32).
+        (emit-label fixnum)
+        (inst b (if not-p :lt :ge) target)
+        (inst nop)
 
-                  (emit-label not-target)))))
+        (emit-label not-target)))))
 
 ;;;; List/symbol types:
 

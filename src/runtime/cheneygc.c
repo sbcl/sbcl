@@ -91,15 +91,6 @@ lispobj  copy_possibly_large_object(lispobj object, sword_t nwords,
     return gc_copy_object(object, nwords, 0, 0);
 }
 
-/*
- * This flag is needed for compatibility with gencgc.
- * In theory, it says to splat a nonzero byte pattern over newly allocated
- * memory before giving the block to Lisp, to verify that Lisp is able to deal
- * with non-pre-zeroed memory.
- * In practice, that's not how cheneygc works.
- */
-char gc_allocate_dirty = 0;
-
 #if 0
 static void verify_range(int purified, lispobj *base, lispobj *end);
 void show_spaces()

@@ -8,7 +8,8 @@
                 (sb-thread:join-thread t2))
   #-sb-thread '(doit -8 8))
 
-(with-test (:name (logand :complicated-identity))
+(with-test (:name (logand :complicated-identity)
+                  :skipped-on :mips) ; too slow
   (flet ((doit (k-lo k-hi)
   (loop for k from k-lo upto k-hi do
     (loop for min from -16 upto 16 do
@@ -20,7 +21,8 @@
             (assert (eql (logand x k) (funcall f x))))))))))
     (test-guts)))
 
-(with-test (:name (logior :complicated-identity))
+(with-test (:name (logior :complicated-identity)
+                  :skipped-on :mips) ; too slow
   (flet ((doit (k-lo k-hi)
   (loop for k from k-lo upto k-hi do
     (loop for min from -16 upto 16 do

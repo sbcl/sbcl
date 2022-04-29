@@ -92,9 +92,9 @@ LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
 targets: $(TARGET) $(OBJTARGET) sbcl.mk
 
-LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o,$(OBJS))
+LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o thread.o,$(OBJS))
 ldb: $(LIBSBCL)
-	$(CC) -DSTANDALONE -I. -o ldb monitor.c $(LDB_OBJS) $(LIBS)
+	$(CC) -DSTANDALONE_LDB -I. -o ldb monitor.c thread.c $(LDB_OBJS) $(LIBS)
 
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)

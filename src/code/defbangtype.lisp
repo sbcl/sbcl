@@ -25,8 +25,7 @@
 
 (defmacro def!type (name &rest rest)
   ;; Attempting to define a type named by a CL symbol is an error.
-  ;; Therefore NAME is wrong if it uncrosses to something other than itself.
-  (assert (eq (uncross name) name))
+  (assert (not (eq (sb-xc:symbol-package name) *cl-package*)))
   `(progn
      (deftype ,name ,@rest)
      #+sb-xc-host

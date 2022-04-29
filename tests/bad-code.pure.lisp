@@ -270,8 +270,8 @@
                          (macrolet ((macro ()
                                       `((lambda (x)
                                           (declare (number x))
-                                          ',@ (loop repeat 10000
-                                                    for cons = (list 1) then (list cons)
+                                          ',@ (loop for cons = (list 1) then (list cons)
+                                                    repeat 10000
                                                     finally (return cons)))
                                         t)))
                            (macro)))

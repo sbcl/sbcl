@@ -2,7 +2,7 @@
 #define _SPARC_LINUX_OS_H
 
 typedef struct sigcontext os_context_t;
-typedef unsigned long os_context_register_t;
+typedef unsigned int os_context_register_t;
 
 static inline os_context_t *arch_os_get_context(void **void_context)
 {

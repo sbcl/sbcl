@@ -10,9 +10,8 @@
 # files for more information.
 
 CC = gcc
-CFLAGS += -g -Wall -O2
+CFLAGS += -g -Wall
 LINKFLAGS += -export-dynamic
-NM = nm -t x -p
 
 ASSEM_SRC = sparc-assem.S
 ARCH_SRC = sparc-arch.c
@@ -24,7 +23,3 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 endif
 
 GC_SRC = fullcgc.c gencgc.c traceroot.c
-
-# Nothing to do for after-grovel-headers.
-.PHONY: after-grovel-headers
-after-grovel-headers:

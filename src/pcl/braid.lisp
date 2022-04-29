@@ -123,23 +123,63 @@
 (defun eval-form (form)
   (lambda () (eval form)))
 
-(defun ensure-non-standard-class (name classoid &optional existing-class)
-  (flet
+(defun ensure-non-standard-class (name classoid &optional existing-class extra-data)
+  (labels
       ((ensure (metaclass slots)
          (let ((supers (mapcar #'classoid-name (classoid-direct-superclasses classoid))))
            (ensure-class-using-class existing-class name
                                      :metaclass metaclass :name name
                                      :direct-superclasses supers
                                      :direct-slots slots)))
-       (slot-initargs-from-structure-slotd (slotd)
-         (let ((accessor (structure-slotd-accessor-symbol slotd)))
-           `(:name ,(structure-slotd-name slotd)
-             :defstruct-accessor-symbol ,accessor
-             :internal-reader-function ,(structure-slotd-reader-function slotd)
-             :internal-writer-function ,(structure-slotd-writer-function name slotd)
-             :type ,(or (structure-slotd-type slotd) t)
-             :initform ,(structure-slotd-init-form slotd)
-             :initfunction ,(eval-form (structure-slotd-init-form slotd)))))
+       (slot-initargs-from-structure-slotd (slotd writer-fn reader-fn)
+         (flet ((name->fun (f) (if (functionp f) f (fdefinition f))))
+           `(:name ,(dsd-name slotd)
+             :defstruct-accessor-symbol ,(dsd-accessor-name slotd)
+             :internal-reader-function ,(name->fun reader-fn)
+             :internal-writer-function ,(name->fun writer-fn)
+             :type ,(dsd-type slotd)
+             :initform ,(dsd-default slotd)
+             ;; This is nuts! any DEFAULT might need its lexical environment,
+             ;; yet we EVAL in the null environment.
+             :initfunction ,(eval-form (dsd-default slotd)))))
+       (accessor-closures (dsd)
+         (multiple-value-bind (reader-fn writer-fn) (sb-kernel::dsd-reader dsd nil)
+           ;; This is for a structure class that exists only in its compile-time representation.
+           ;; I don't see how these would get called, since you can't make an instance
+           ;; of the structure.
+           (list (lambda (newval object) (funcall writer-fn newval object) newval)
+                 (lambda (object) (funcall reader-fn object)))))
+       (structure-type-slot-description-list (type)
+         (let* ((dd (find-defstruct-description type))
+                (include (dd-include dd))
+                (all-slots (dd-slots dd)))
+           (unless extra-data
+             (acond ((assoc (dd-name dd) sb-kernel::*struct-accesss-fragments-delayed*)
+                     (let ((fragments (cdr it)))
+                       (dolist (dsd (dd-slots dd))
+                         (push (list dsd (pop fragments) (pop fragments)) extra-data)))
+                     (setq sb-kernel::*struct-accesss-fragments-delayed*
+                           (delete it sb-kernel::*struct-accesss-fragments-delayed*)))
+                    (t
+                     (dolist (dsd (dd-slots dd))
+                       (push (cons dsd (accessor-closures dsd)) extra-data)))))
+           (multiple-value-bind (super slot-overrides)
+               (if (consp include)
+                   (values (car include) (mapcar #'car (cdr include)))
+                   (values include nil))
+             (let ((included-slots
+                    (when super
+                      (dd-slots (find-defstruct-description super)))))
+               ;; This seems like a very unclear way to do what it's doing, which is
+               ;; collect slots of TYPE that are not in its direct ancestor, *or*
+               ;; which have an altered definition relative to the inherited one.
+               (loop for slot = (pop all-slots)
+                  for included-slot = (pop included-slots)
+                  while slot
+                  when (or (not included-slot)
+                           (member (dsd-name included-slot) slot-overrides :test #'eq))
+                  collect (apply #'slot-initargs-from-structure-slotd
+                                 (assoc slot extra-data)))))))
        (slot-initargs-from-condition-slot (slot)
          `(:name ,(condition-slot-name slot)
            :initargs ,(condition-slot-initargs slot)
@@ -152,9 +192,7 @@
            :allocation ,(condition-slot-allocation slot)
            :documentation ,(condition-slot-documentation slot))))
     (cond ((structure-type-p name)
-           (ensure 'structure-class
-                   (mapcar #'slot-initargs-from-structure-slotd
-                           (structure-type-slot-description-list name))))
+           (ensure 'structure-class (structure-type-slot-description-list name)))
           ((condition-type-p name)
            (ensure 'condition-class
                    (mapcar #'slot-initargs-from-condition-slot
@@ -162,14 +200,30 @@
           (t
            (error "~@<~S is not the name of a class.~@:>" name)))))
 
-(defun ensure-deffoo-class (classoid)
+(defun ensure-deffoo-class (classoid &optional accessors)
   (let ((class (classoid-pcl-class classoid)))
     (cond (class
-           (ensure-non-standard-class (class-name class) classoid class))
+           (ensure-non-standard-class (class-name class) classoid class accessors))
           ((eq 'complete **boot-state**)
-           (ensure-non-standard-class (classoid-name classoid) classoid)))))
+           (ensure-non-standard-class (classoid-name classoid) classoid nil accessors)))))
 
-(pushnew 'ensure-deffoo-class sb-kernel::*defstruct-hooks*)
+(defun ensure-defstruct-class (classoid)
+  ;; Create an association from the DSD to the reader and writer functions.
+  (let* ((name (classoid-name classoid))
+         (dd (find-defstruct-description name))
+         (fragments sb-kernel::*struct-accesss-fragments*))
+    (collect ((accessors))
+      (dolist (dsd (dd-slots dd))
+        (accessors (list dsd (pop fragments) (pop fragments))))
+      (ensure-deffoo-class classoid (accessors)))))
+
+;;; Prior to the normal (steady-state) defstruct hook getting installed,
+;;; we just accumulate an alist of slot accessor functions keyed by
+;;; the type name. After switching it over, we start calling
+;;; ENSURE-CLASS-USING-CLASS. But that means if PCL isn't ready to
+;;; actually create classes, we can't switch over.  So we refrain
+;;; from installing the DEFSTRUCT-HOOK until there are no more
+;;; defstruct forms to execute within PCL itself.
 (pushnew 'ensure-deffoo-class sb-kernel::*define-condition-hooks*)
 
 (defun !make-class-predicate (class name source-location)
@@ -215,6 +269,12 @@
   ;; but this approach avoids changing how PCL uses MAKE-LAYOUT.
   ;; The big comment above MAKE-IMMOBILE-FUNINSTANCE in src/code/x86-64-vm
   ;; explains why we differentiate between SGF and everything else.
+  ;; FIXME: we should assert that this is not a STRUCTURE-OBJECT,
+  ;; because there must not be additional ID words preceding the bitmap.
+  ;; STANDARD-OBJECT can't generally use a fixed number of ID slots
+  ;; because of arbitrary changes to inheritance being permissible.
+  ;; On the other hand, we do create a new layout for each change
+  ;; to superclasses, so maybe it's possible.
   (dovector (ancestor inherits)
     (when (eq ancestor #.(find-layout 'function))
       (%raw-instance-set/signed-word layout (sb-kernel::type-dd-length sb-vm:layout)

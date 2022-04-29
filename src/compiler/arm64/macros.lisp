@@ -90,22 +90,20 @@
                          #+big-endian `(+ ,n-offset (1- n-word-bytes))))
       `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
 
-(defmacro lisp-jump (lip)
-  `(let ((lip ,lip))
-     (aver (sc-is lip interior-reg))
-     (inst add lip lip 4)
-     (inst br lip)))
+(defmacro lisp-jump (lr)
+  `(progn
+     (inst add ,lr ,lr 4)
+     (inst br ,lr)))
 
-(defmacro lisp-return (lip return-style)
+(defmacro lisp-return (lr return-style)
   "Return to RETURN-PC."
-  `(let* ((lip ,lip))
-     (aver (sc-is lip interior-reg))
+  `(progn
      ;; Indicate a single-valued return by clearing the Z flag
      ,@(ecase return-style
          (:single-value '((inst cmp null-tn 0)))
          (:multiple-values '((inst cmp zr-tn zr-tn)))
          (:known))
-     (inst ret lip)))
+     (inst ret ,lr)))
 
 ;;;; Stack TN's
 
@@ -136,7 +134,7 @@
   (once-only ((n-reg reg)
               (n-stack reg-or-stack))
     `(sc-case ,n-reg
-       ((any-reg descriptor-reg interior-reg)
+       ((any-reg descriptor-reg non-descriptor-reg)
         (sc-case ,n-stack
           ((any-reg descriptor-reg)
            (move ,n-reg ,n-stack))
@@ -161,12 +159,12 @@
 ;;; P-A FLAG-TN is also acceptable here.
 
 #+gencgc
-(defun allocation-tramp (type alloc-tn size back-label lip)
+(defun allocation-tramp (type alloc-tn size back-label)
   (if (integerp size)
       (load-immediate-word tmp-tn size)
       (inst mov tmp-tn size))
   (let ((asm-routine (if (eq type 'list) 'list-alloc-tramp 'alloc-tramp)))
-    (load-inline-constant alloc-tn `(:fixup ,asm-routine :assembly-routine) lip))
+    (load-inline-constant alloc-tn `(:fixup ,asm-routine :assembly-routine)))
   (inst blr alloc-tn)
   (inst b back-label))
 
@@ -175,9 +173,8 @@
 (defun allocation (type size lowtag result-tn
                    &key flag-tn
                         stack-allocate-p
-                        (lip (if stack-allocate-p nil (missing-arg)))
                         overflow)
-  (declare (ignorable type lip))
+  (declare (ignorable type))
   ;; Normal allocation to the heap.
   (if stack-allocate-p
       (assemble ()
@@ -185,13 +182,6 @@
         (inst and tmp-tn tmp-tn (lognot lowtag-mask))
         (inst add csp-tn tmp-tn (add-sub-immediate size result-tn))
         (inst add result-tn tmp-tn lowtag))
-      #-gencgc
-      (progn
-        (load-symbol-value flag-tn *allocation-pointer*)
-        (inst add result-tn flag-tn lowtag)
-        (inst add flag-tn flag-tn (add-sub-immediate size))
-        (store-symbol-value flag-tn *allocation-pointer*))
-      #+gencgc
       (let ((alloc (gen-label))
             #+sb-thread (tlab (if (eq type 'list) thread-cons-tlab-slot thread-mixed-tlab-slot))
             #-sb-thread (region (if (eq type 'list) cons-region mixed-region))
@@ -219,13 +209,11 @@
               (allocation-tramp type
                                 result-tn
                                 size
-                                BACK-FROM-ALLOC
-                                lip))))))
+                                BACK-FROM-ALLOC))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
                                                  stack-allocate-p
-                                                 (lip (missing-arg))
                                                  (store-type-code t))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
@@ -235,17 +223,16 @@
   initializes the object."
   (once-only ((result-tn result-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag)
-              (stack-allocate-p stack-allocate-p)
-              (lip lip))
+              (stack-allocate-p stack-allocate-p))
     `(pseudo-atomic (,flag-tn :sync ,type-code
                      :elide-if ,stack-allocate-p)
        (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
-                   :stack-allocate-p ,stack-allocate-p
-                   :lip ,lip)
-       (load-immediate-word ,flag-tn (compute-object-header ,size ,type-code))
-       ,@(and store-type-code
-              `((storew ,flag-tn ,result-tn 0 ,lowtag)))
+                   :stack-allocate-p ,stack-allocate-p)
+       (when ,type-code
+         (load-immediate-word ,flag-tn (compute-object-header ,size ,type-code))
+         ,@(and store-type-code
+                `((storew ,flag-tn ,result-tn 0 ,lowtag))))
        ,@body)))
 
 ;;;; Error Code
@@ -269,9 +256,14 @@
           (t
            (let ((first-value (car values)))
              (inst brk (dpb (cond ((and (tn-p first-value)
-                                        (sc-is first-value descriptor-reg any-reg))
+                                        (sc-is first-value descriptor-reg any-reg unsigned-reg signed-reg))
                                    (pop values)
-                                   (tn-offset first-value))
+                                   (dpb (sc-case first-value
+                                          (unsigned-reg 1)
+                                          (signed-reg 2)
+                                          (t 0))
+                                        (byte 2 5)
+                                        (tn-offset first-value)))
                                   (t
                                    zr-offset))
                             (byte 8 8)
@@ -353,7 +345,7 @@
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate)))
      (:arg-types ,type tagged-num)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
@@ -376,7 +368,7 @@
             (index :scs (any-reg immediate))
             (value :scs (,@scs zero)))
      (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 2
        (sc-case index
          (immediate
@@ -398,7 +390,7 @@
      (:arg-types ,type tagged-num)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 5
        ,@(multiple-value-bind (op shift)
              (ecase size
@@ -441,7 +433,7 @@
                    :load-if (not (and (sc-is value immediate)
                                       (eql (tn-value value) 0)))))
      (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)) lip)
      (:generator 5
        (when (sc-is value immediate)
          (setf value zr-tn))
@@ -473,11 +465,11 @@
                     (inst ,op
                           ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))))))))
 
-(defun load-inline-constant (dst value &optional lip)
+(defun load-inline-constant (dst value)
   (destructuring-bind (size . label) (register-inline-constant value)
     (ecase size
       (:qword
-       (inst load-from-label dst label lip)))))
+       (inst load-from-label dst label)))))
 
 ;;;
 

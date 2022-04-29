@@ -135,9 +135,9 @@ about function addresses and register values.")
                         (operand regname dstate))))))
 
 (defparameter float-reg-symbols
-  #.(coerce
-     (loop for n from 0 to 63 collect (make-symbol (format nil "%F~d" n)))
-     'vector))
+  (coerce
+   (loop for n from 0 to 63 collect (make-symbol (format nil "%F~d" n)))
+   'vector))
 
 (define-arg-type fp-reg
   :printer (lambda (value stream dstate)
@@ -245,7 +245,7 @@ about function addresses and register values.")
   #'equalp)
 
 (defconstant-eqx integer-cond-reg-name-vec
-  #.(coerce integer-condition-registers 'vector)
+  (coerce integer-condition-registers 'vector)
   #'equalp)
 
 (deftype integer-condition-register ()
@@ -308,7 +308,7 @@ about function addresses and register values.")
   #'equalp)
 
 (defconstant-eqx fp-cond-reg-name-vec
-  #.(coerce fp-condition-registers 'vector)
+  (coerce fp-condition-registers 'vector)
   #'equalp)
 
 (defparameter fp-condition-reg-symbols
@@ -485,7 +485,7 @@ about function addresses and register values.")
   #'equalp)
 
 (defconstant-eqx cond-move-cond-reg-name-vec
-  #.(coerce cond-move-condition-registers 'vector)
+  (coerce cond-move-condition-registers 'vector)
   #'equalp)
 
 (deftype cond-move-condition-register ()
@@ -561,14 +561,8 @@ about function addresses and register values.")
   '(:reserved :z :lez :lz :reserved :nz :gz :gez)
   #'equalp)
 
-;;; Why "#.(coerce)" instead of just coerce: as a consequence of revision
-;;; c7791afe76, cross-compiled DEFCONSTANT-EQX requires that the assigned
-;;; value be "constant per se" - only an expression for which CONSTANTP
-;;; returns T. Uses of the constant symbol in cold-load will read its value
-;;; from the cold symbol, therefore a literal value must be dumped for it.
-;;; A lambda computing the value is no good - it would be target machine code.
 (defconstant-eqx cond-move-integer-condition-vec
-  #.(coerce cond-move-integer-conditions 'vector)
+  (coerce cond-move-integer-conditions 'vector)
   #'equalp)
 
 (deftype cond-move-integer-condition ()
@@ -758,11 +752,11 @@ about function addresses and register values.")
      ,printer))
 
 (defconstant-eqx load-printer
-  '#.(with-ref-format `(:NAME :TAB ,ref-format ", " rd))
+  (with-ref-format `(:NAME :TAB ,ref-format ", " rd))
   #'equalp)
 
 (defconstant-eqx store-printer
-  '#.(with-ref-format `(:NAME :TAB rd ", " ,ref-format))
+  (with-ref-format `(:NAME :TAB rd ", " ,ref-format))
   #'equalp)
 
 (macrolet ((define-f3-inst (name op op3 &key fixup load-store (dest-kind 'reg)

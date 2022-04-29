@@ -13,6 +13,11 @@
  * files for more information.
  */
 
+#ifdef __linux__
+/* glibc won't give us close_range without this */
+#define _GNU_SOURCE
+#endif
+
 #include "sbcl.h"
 #include <stdlib.h>
 #include <sys/file.h>
@@ -27,6 +32,7 @@
 #include <termios.h>
 #include <errno.h>
 #include <dirent.h>
+#include <sys/syscall.h>
 #include "interr.h" // for lose()
 
 #ifdef LISP_FEATURE_OPENBSD
@@ -96,20 +102,6 @@ set_pty(char *pty_name)
 
 #endif /* !LISP_FEATURE_OPENBSD */
 
-void closefrom_fallback(int lowfd)
-{
-    int fd, maxfd;
-
-#ifdef SVR4
-    maxfd = sysconf(_SC_OPEN_MAX)-1;
-#else
-    maxfd = getdtablesize()-1;
-#endif
-
-    for (fd = maxfd; fd >= lowfd; fd--)
-        close(fd);
-}
-
 int closefrom_fddir(char *dir, int lowfd)
 {
     DIR *d;
@@ -133,6 +125,38 @@ int closefrom_fddir(char *dir, int lowfd)
     return 0;
 }
 
+void closefds_range(unsigned int first, unsigned int last)
+{
+    int fds_closed = 0;
+    // Try using close_range syscall first.
+#if defined(LISP_FEATURE_OS_PROVIDES_CLOSE_RANGE_WRAPPER)
+    // Prefer the libc wrapper, if it exists at build time.
+    fds_closed = !close_range(first, last, 0);
+#elif defined(LISP_FEATURE_LINUX) && defined(__NR_close_range)
+    // Use syscall(2) if we could detect the syscall number at build time.
+    fds_closed = !syscall(__NR_close_range, first, last, 0);
+#endif
+    // Otherwise (if the syscall information isn't availble at build time or if
+    // the run time kernel doesn't support the syscall), fall back to close()
+    // in a for loop.
+    if (!fds_closed)
+    {
+        unsigned int close_fd;
+        if (last == ~0U)
+        {
+#ifdef SVR4
+            last = sysconf(_SC_OPEN_MAX)-1;
+#else
+            last = getdtablesize()-1;
+#endif
+        }
+        for (close_fd = first; close_fd <= last; close_fd++)
+        {
+            close(close_fd);
+        }
+    }
+}
+
 void closefds_from(int lowfd, int* dont_close)
 {
     if (dont_close) {
@@ -142,13 +166,7 @@ void closefds_from(int lowfd, int* dont_close)
         for (i = 0; i < length; i++)
         {
             int fd = dont_close[i];
-            int close_fd;
-
-            /* Close the gaps between the fds */
-            for (close_fd = lowfd; close_fd < fd; close_fd++)
-            {
-                close(close_fd);
-            }
+            closefds_range(lowfd, fd - 1);
             lowfd = fd+1;
         }
     }
@@ -172,7 +190,7 @@ void closefds_from(int lowfd, int* dont_close)
 */
 
     if (!fds_closed)
-        closefrom_fallback(lowfd);
+        closefds_range(lowfd, ~0U);
 #endif
 }
 

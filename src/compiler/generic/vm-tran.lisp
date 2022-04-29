@@ -87,10 +87,6 @@
                          sb-vm:bignum-digits-offset
                          index offset))
 
-(defun dd-contains-raw-slots-p (dd)
-  (dolist (dsd (dd-slots dd))
-    (unless (eq (dsd-raw-type dsd) t) (return t))))
-
 (deftransform copy-structure ((instance) * * :result result :node node)
   (let* ((classoid (lvar-type instance))
          (name (and (structure-classoid-p classoid) (classoid-name classoid)))
@@ -106,14 +102,14 @@
          (max-inlined-words 5))
     (unless (and result ; could be unused result (but entire call wasn't flushed?)
                  layout
-                 ;; And don't copy if raw slots are present on the precisely GCed backends.
-                 ;; To enable that, we'd want variants for {"all-raw", "all-boxed", "mixed"}
+                 ;; Fail if raw slots are present on the precisely GCed backends.
                  ;; Also note that VAR-ALLOC can not cope with dynamic-extent except where
                  ;; support has been added (x86oid so far); so requiring an exact type here
                  ;; causes VAR-ALLOC to become FIXED-ALLOC which works on more architectures.
-                 #-c-stack-is-control-stack (and dd (not (dd-contains-raw-slots-p dd)))
+                 #-c-stack-is-control-stack (and dd (not (dd-has-raw-slot-p dd)))
 
                  ;; Definitely do this if copying to stack
+                 ;; (Allocation has to be inlined, otherwise there's no way to DX it)
                  (or (lvar-dynamic-extent result)
                      ;; Or if it's a small fixed number of words
                      ;; and speed at least as important as size.
@@ -126,24 +122,27 @@
     ;;   depending on whether layouts are in immobile space.
     ;; - for a small number of slots, copying them is inlined
     (cond ((not dd) ; it's going to be some subtype of NAME
-           `(%copy-instance (%make-instance (%instance-length instance)) instance))
-          ((<= (dd-length dd) max-inlined-words)
-           `(let ((copy (%make-structure-instance ,dd nil)))
-              ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,
-              ;; or the GC will treat random bit patterns as conservative pointers
-              ;; (i.e. not alter them if %INSTANCE-REF is not the correct accessor)
-              ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
-                      collect `(%instance-set copy ,i (%instance-ref instance ,i)))
-              copy))
-          (t
-           `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)))))
+           ;; pessimistically assume MIXED rather than choosing at runtime
+           `(%copy-instance (%make-instance/mixed (%instance-length instance)) instance))
+          ((not (logtest (dd-flags dd) +dd-varylen+)) ; fixed length
+           ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,
+           ;; or the GC will treat random bit patterns as conservative pointers
+           ;; (i.e. not alter them if %INSTANCE-REF is not the correct accessor)
+           (if (> (dd-length dd) max-inlined-words)
+               `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)
+               `(let ((copy (%make-structure-instance ,dd nil)))
+                  ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
+                       collect `(%instance-set copy ,i (%instance-ref instance ,i)))
+                  copy)))
+          (t ; variable-length
+           `(let ((copy (,(if (dd-has-raw-slot-p dd) '%make-instance/mixed '%make-instance)
+                          (%instance-length instance))))
+              (%set-instance-layout copy (%instance-layout instance))
+              (%copy-instance-slots copy instance))))))
 
 (defun varying-length-struct-p (classoid)
-  ;; This is a nice feature to have in general, but at present it is only possible
-  ;; to make varying length instances of SB-VM:LAYOUT (or WRAPPER if that is the same type),
-  ;; and nothing else.
-  (eq classoid (load-time-value (find-classoid #+metaspace 'sb-vm:layout
-                                               #-metaspace 'wrapper))))
+  (let ((dd (find-defstruct-description (classoid-name classoid))))
+    (logtest (dd-flags dd) +dd-varylen+)))
 
 (deftransform %instance-length ((instance))
   (let ((classoid (lvar-type instance)))
@@ -541,7 +540,8 @@
 (deftransform fill ((sequence item) (simple-base-string t) *
                                     :policy (>= speed space))
   (let ((multiplier (logand #x0101010101010101 most-positive-word)))
-    `(let* ((value ,(if (and (constant-lvar-p item) (typep item 'base-char))
+    `(let* ((value ,(if (and (constant-lvar-p item)
+                             (typep (lvar-value item) 'base-char))
                         (* multiplier (char-code (lvar-value item)))
                         ;; Use multiplication if it's known to be cheap
                         #+(or x86 x86-64)

@@ -25,7 +25,11 @@
 (defvar *load-print* nil
   "the default for the :PRINT argument to LOAD")
 
+#+ansi-compliant-load-truename
 (defvar *load-truename* nil
+  "the TRUENAME of the file that LOAD is currently loading")
+#-ansi-compliant-load-truename
+(setf (documentation '*load-truename* 'variable)
   "the TRUENAME of the file that LOAD is currently loading")
 
 (defvar *load-pathname* nil
@@ -132,16 +136,22 @@
                             (error () nil)))
          ;; FIXME: this ANSI-specified nonsense should have been an accessor call
          ;; because eager binding might force dozens of syscalls to occur.
-         ;; And you wonder why I/O is slow.  What a joke. Making this a symbol-macro
-         ;; that calls a function would be technically incompatible, but we could
-         ;; make it an unbound symbol and trap the access, stuffing in a value
-         ;; just-in-time. But BOUNDP would also need to hacked to return T.
+         ;; The non-ansi-compliant code resolves *LOAD-TRUENAME* only if referenced.
+         #-ansi-compliant-load-truename (%load-truename (make-unbound-marker))
+         #+ansi-compliant-load-truename
          (*load-truename* (when *load-pathname*
                             (handler-case (truename stream)
                               (file-error () nil))))
          ;; Bindings used internally.
          (*load-depth* (1+ *load-depth*)))
     (funcall function stream arg)))
+
+(defun resolve-load-truename (symbol untruename)
+  (if (boundp symbol)
+      (symbol-value symbol)
+      (set symbol (when untruename
+                    (handler-case (truename untruename)
+                      (file-error () nil))))))
 
 ;;; Returns T if the stream is a binary input stream with a FASL header.
 (defun fasl-header-p (stream &key errorp)
@@ -270,6 +280,23 @@
                                  "~@<Couldn't load ~S: file does not exist.~@:>"
                                  :format-arguments (list filespec))
                           (return-from load nil))))
+        ;; This is the understandable logic.
+        #-ansi-compliant-load-truename
+        (if (string-equal (pathname-type pathname) *fasl-file-type*)
+            (load-stream stream t)
+            (with-open-file (stream pathname :external-format external-format
+                                             :class 'form-tracking-stream)
+              (load-stream stream nil)))
+        ;; I have no idea what "don't allow empty .fasls" was supposed to mean.
+        ;; The more natural interpretation to me would be that if a file is empty,
+        ;; we don't treat the file as fasl, but instead treat it as source (and do nothing)
+        ;; regardless of the name. But the actual effect seems to be to force an error.
+        ;; So I would have commented that as "force an error on empty fasls", especially
+        ;; as there is ambiguity in "don't X and Y" - does it mean "don't X" and "don't Y"?
+        ;; Because surely that would be illogical - "don't assume empty files are source".
+        ;; Anyway, reasonable users should never test the edge cases of this,
+        ;; and so all it effectively achieves is slowing down the loading of files.
+        #+ansi-compliant-load-truename
         (let* ((real (probe-file stream))
                (should-be-fasl-p
                  (and real (string-equal (pathname-type real) *fasl-file-type*))))

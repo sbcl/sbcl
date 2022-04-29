@@ -38,7 +38,7 @@
          (old-value :scs (any-reg descriptor-reg))
          (new-value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num * *)
-  (:temporary (:sc interior-reg) lip)
+  (:temporary (:sc non-descriptor-reg) lip)
   (:results (result :scs (any-reg descriptor-reg) :from :load))
   (:result-types *)
   (:variant-vars offset lowtag)

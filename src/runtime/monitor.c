@@ -213,33 +213,56 @@ static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
 static cmd grab_sigs_cmd;
 static cmd kill_cmd;
+static cmd threads_cmd;
 
-static int save_cmd(char **ptr) {
-#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
-    extern void gc_stop_the_world(), gc_start_the_world();
-    char *name  = parse_token(ptr);
-    if (!name) {
-        fprintf(stderr, "Need filename\n");
-        return 1;
-    }
+extern void gc_stop_the_world(), gc_start_the_world();
+static void suspend_other_threads() {
+#ifdef LISP_FEATURE_SB_THREAD
     gc_stop_the_world();
+#endif
     // It might make sense for each thread's stop-for-gc handler to close its region
     // versus doing this loop
     struct thread *th;
     for_each_thread(th) { gc_close_thread_regions(th); }
     gc_close_collector_regions();
-    save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
+}
+static void unsuspend_other_threads() {
+#ifdef LISP_FEATURE_SB_THREAD
     gc_start_the_world();
+#endif
+}
+
+static int save_cmd(char **ptr) {
+#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
+    char *name  = parse_token(ptr);
+    if (!name) {
+        fprintf(stderr, "Need filename\n");
+        return 1;
+    }
+    suspend_other_threads();
+    save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
+    unsuspend_other_threads();
 #else
     fprintf(stderr, "Unimplemented\n");
 #endif
     return 0;
 }
 
-#ifdef STANDALONE
-static int verify_cmd(char **ptr) {
+static int threads_cmd(char __attribute__((unused)) **ptr) {
+    struct thread* th;
+    fprintf(stderr, "(thread*,pthread,sb-vm:thread)\n");
+    void* pthread;
+    for_each_thread(th) {
+        memcpy(&pthread, &th->os_thread, N_WORD_BYTES);
+        fprintf(stderr, "%p %p %p\n", th, pthread, (void*)th->lisp_thread);
+    }
+    return 0;
+}
+static int verify_cmd(char __attribute__((unused)) **ptr) {
     gencgc_verbose = 1;
+    suspend_other_threads();
     verify_heap(0);
+    unsuspend_other_threads();
     return 0;
 }
 static int gc_cmd(char **ptr) {
@@ -250,10 +273,11 @@ static int gc_cmd(char **ptr) {
     gencgc_verbose = 2;
     pre_verify_gen_0 = 1;
     verify_gens = 0;
+    suspend_other_threads();
     collect_garbage(last_gen);
+    unsuspend_other_threads();
     return 0;
 }
-#endif
 
 static struct cmd {
     char *cmd, *help;
@@ -283,10 +307,9 @@ static struct cmd {
     {"regs", "Display current Lisp registers.", regs_cmd},
     {"search", "Search heap for object.", search_cmd},
     {"save", "Produce crashdump", save_cmd},
-#ifdef STANDALONE
+    {"threads", "List threads", threads_cmd},
     {"verify", "Check heap invariants", verify_cmd},
     {"gc", "Collect garbage", gc_cmd},
-#endif
     {NULL, NULL, NULL}
 };
 
@@ -315,14 +338,14 @@ dump_cmd(char **ptr)
     int force = 0, decode = 0;
 
     if (more_p(ptr)) {
-        // you can't both "force" and "decode" - only one or the other,
-        // or neither
-        if (!strncmp(*ptr, "-f ", 3)) {
-          force = 1;
-          *ptr += 3;
-        } else if (!strncmp(*ptr, "-d ", 3)) {
-          decode = 1;
-          *ptr += 3;
+        while (1) {
+            if (!strncmp(*ptr, "-f ", 3)) {
+              force = 1;
+              *ptr += 3;
+            } else if (!strncmp(*ptr, "-d ", 3)) {
+              decode = 1;
+              *ptr += 3;
+            } else break;
         }
         if (!parse_addr(ptr, !force, &addr)) return 0;
 
@@ -597,10 +620,6 @@ print_context(os_context_t *context)
         brief_print((lispobj)(*os_context_register_addr(context,i)));
 
     }
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_PPC)
-    printf("DAR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 41)));
-    printf("DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
-#endif
 #ifndef REG_PC
     printf("PC:\t\t  0x%08lx\n", (unsigned long)os_context_pc(context));
 #endif
@@ -793,7 +812,9 @@ monitor_or_something()
     ldb_monitor();
 }
 
-#ifdef STANDALONE
+#ifdef STANDALONE_LDB
+void gc_stop_the_world() { } // do nothing
+void gc_start_the_world() { } // do nothing
 #include <errno.h>
 #include "core.h"
 #include "gencgc-private.h"
@@ -860,6 +881,7 @@ int load_gc_crashdump(char* pathname)
     printf("sprof_enabled=%d pin_dynspace_code=%d packages=%p\n",
            preamble.sprof_enabled, preamble.pin_dynspace_code,
            (void*)preamble.lisp_package_vector);
+    lisp_package_vector = preamble.lisp_package_vector;
     sb_sprof_enabled = preamble.sprof_enabled;
     if (preamble.signature != CRASH_PREAMBLE_SIGNATURE)
         lose("Can't load crashdump: bad header (have %lx, expect %lx)",

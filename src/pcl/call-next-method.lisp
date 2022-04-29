@@ -127,9 +127,9 @@
     (declare (dynamic-extent args))
     ;; Construct the concatenation of the required arguments in
     ;; ORIG-ARGS and CNM-ARGS in ARGS.
-    (loop repeat nreq
-          for rest1 on args
+    (loop for rest1 on args
           for arg in orig-args
+          repeat nreq
           do (setf (car rest1) arg)
           finally (loop for rest2 on (rest rest1)
                         for arg in cnm-args
@@ -188,7 +188,7 @@
                               (optimize (speed 3) (debug 0) (safety 0)))
                      ',result)
                   nil))
-         (function (compile nil lambda))
+         (function (pcl-compile lambda))
          (specializers (append (method-specializers (first orig-methods))
                                (method-specializers (first cnm-methods))))
          (method (make-instance 'standard-method

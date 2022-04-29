@@ -32,7 +32,7 @@
 (defun c-strings->string-list (c-strings)
   (declare (type (alien (* c-string)) c-strings))
   (let ((reversed-result nil))
-    (dotimes (i most-positive-fixnum (error "argh! can't happen"))
+    (dotimes (i most-positive-fixnum)
       (declare (type index i))
       (let ((c-string (deref c-strings i)))
         (if c-string

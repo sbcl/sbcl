@@ -1,0 +1,640 @@
+\chapter{Fasload File Format}% -*- Dictionary: design -*-
+\section{General}
+
+The purpose of Fasload files is to allow concise storage and rapid
+loading of Lisp data, particularly function definitions.  The intent
+is that loading a Fasload file has the same effect as loading the
+source file from which the Fasload file was compiled, but accomplishes
+the tasks more efficiently.  One noticeable difference, of course, is
+that function definitions may be in compiled form rather than
+S-expression form.  Another is that Fasload files may specify in what
+parts of memory the Lisp data should be allocated.  For example,
+constant lists used by compiled code may be regarded as read-only.
+
+In some Lisp implementations, Fasload file formats are designed to
+allow sharing of code parts of the file, possibly by direct mapping
+of pages of the file into the address space of a process.  This
+technique produces great performance improvements in a paged
+time-sharing system.  Since the Mach project is to produce a
+distributed personal-computer network system rather than a
+time-sharing system, efficiencies of this type are explicitly {\it not}
+a goal for the CMU Common Lisp Fasload file format.
+
+On the other hand, CMU Common Lisp is intended to be portable, as it will
+eventually run on a variety of machines.  Therefore an explicit goal
+is that Fasload files shall be transportable among various
+implementations, to permit efficient distribution of programs in
+compiled form.  The representations of data objects in Fasload files
+shall be relatively independent of such considerations as word
+length, number of type bits, and so on.  If two implementations
+interpret the same macrocode (compiled code format), then Fasload
+files should be completely compatible.  If they do not, then files
+not containing compiled code (so-called ``Fasdump'' data files) should
+still be compatible.  While this may lead to a format which is not
+maximally efficient for a particular implementation, the sacrifice of
+a small amount of performance is deemed a worthwhile price to pay to
+achieve portability.
+
+The primary assumption about data format compatibility is that all
+implementations can support I/O on finite streams of eight-bit bytes.
+By ``finite'' we mean that a definite end-of-file point can be detected
+irrespective of the content of the data stream.  A Fasload file will
+be regarded as such a byte stream.
+
+\section{Strategy}
+
+A Fasload file may be regarded as a human-readable prefix followed by
+code in a funny little language.  When interpreted, this code will
+cause the construction of the encoded data structures.  The virtual
+machine which interprets this code has a {\it stack} and a {\it table},
+both initially empty.  The table may be thought of as an expandable
+register file; it is used to remember quantities which are needed
+more than once.  The elements of both the stack and the table are
+Lisp data objects.  Operators of the funny language may take as
+operands following bytes of the data stream, or items popped from the
+stack.  Results may be pushed back onto the stack or pushed onto the
+table.  The table is an indexable stack that is never popped; it is
+indexed relative to the base, not the top, so that an item once
+pushed always has the same index.
+
+More precisely, a Fasload file has the following macroscopic
+organization.  It is a sequence of zero or more groups concatenated
+together.  End-of-file must occur at the end of the last group.  Each
+group begins with a series of seven-bit ASCII characters terminated
+by one or more bytes of all ones \verb|#xFF|; this is called the
+{\it header}.  Following the bytes which terminate the header is the
+{\it body}, a stream of bytes in the funny binary language.  The body
+of necessity begins with a byte other than \verb|#xFF|.  The body is
+terminated by the operation {\tt FOP-END-GROUP}.
+
+The first nine characters of the header must be \verb|FASL FILE| in
+upper-case letters.  The rest may be any ASCII text, but by
+convention it is formatted in a certain way.  The header is divided
+into lines, which are grouped into paragraphs.  A paragraph begins
+with a line which does {\it not} begin with a space or tab character,
+and contains all lines up to, but not including, the next such line.
+The first word of a paragraph, defined to be all characters up to but
+not including the first space, tab, or end-of-line character, is the
+{\it name} of the paragraph.  A Fasload file header might look something like
+this:
+\begin{verbatim}
+FASL FILE >SteelesPerq>User>Guy>IoHacks>Pretty-Print.Slisp
+Package Pretty-Print
+Compiled 31-Mar-1988 09:01:32 by some random luser
+Compiler Version 1.6, Lisp Version 3.0.
+Functions: INITIALIZE DRIVER HACK HACK1 MUNGE MUNGE1 GAZORCH
+	   MINGLE MUDDLE PERTURB OVERDRIVE GOBBLE-KEYBOARD
+	   FRY-USER DROP-DEAD HELP CLEAR-MICROCODE
+	    %AOS-TRIANGLE %HARASS-READTABLE-MAYBE
+Macros:    PUSH POP FROB TWIDDLE
+\end{verbatim}
+{\it one or more bytes of \verb|#xFF|}
+
+The particular paragraph names and contents shown here are only intended as
+suggestions.
+
+\section{Fasload Language}
+
+Each operation in the binary Fasload language is an eight-bit
+(one-byte) opcode.  Each has a name beginning with ``{\tt FOP-}''.  In	
+the following descriptions, the name is followed by operand
+descriptors.  Each descriptor denotes operands that follow the opcode
+in the input stream.  A quantity in parentheses indicates the number
+of bytes of data from the stream making up the operand.  Operands
+which implicitly come from the stack are noted in the text.  The
+notation ``$\Rightarrow$ stack'' means that the result is pushed onto the
+stack; ``$\Rightarrow$ table'' similarly means that the result is added to the
+table.  A construction like ``{\it n}(1) {\it value}({\it n})'' means that
+first a single byte {\it n} is read from the input stream, and this
+byte specifies how many bytes to read as the operand named {\it value}.
+All numeric values are unsigned binary integers unless otherwise
+specified.  Values described as ``signed'' are in two's-complement form
+unless otherwise specified.  When an integer read from the stream
+occupies more than one byte, the first byte read is the least
+significant byte, and the last byte read is the most significant (and
+contains the sign bit as its high-order bit if the entire integer is
+signed).
+
+Some of the operations are not necessary, but are rather special
+cases of or combinations of others.  These are included to reduce the
+size of the file or to speed up important cases.  As an example,
+nearly all strings are less than 256 bytes long, and so a special
+form of string operation might take a one-byte length rather than a
+four-byte length.  As another example, some implementations may
+choose to store bits in an array in a left-to-right format within
+each word, rather than right-to-left.  The Fasload file format may
+support both formats, with one being significantly more efficient
+than the other for a given implementation.  The compiler for any
+implementation may generate the more efficient form for that
+implementation, and yet compatibility can be maintained by requiring
+all implementations to support both formats in Fasload files.
+
+Measurements are to be made to determine which operation codes are
+worthwhile; little-used operations may be discarded and new ones
+added.  After a point the definition will be ``frozen'', meaning that
+existing operations may not be deleted (though new ones may be added;
+some operations codes will be reserved for that purpose).
+
+\begin{description}
+\item[0:] \hspace{2em} {\tt FOP-NOP} \\
+No operation.  (This is included because it is recognized
+that some implementations may benefit from alignment of operands to some
+operations, for example to 32-bit boundaries.  This operation can be used
+to pad the instruction stream to a desired boundary.)
+
+\item[1:] \hspace{2em} {\tt FOP-POP} \hspace{2em} $\Rightarrow$ \hspace{2em} table \\
+One item is popped from the stack and added to the table.
+
+\item[2:] \hspace{2em} {\tt FOP-PUSH} \hspace{2em} {\it index}(4) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Item number {\it index} of the table is pushed onto the stack.
+The first element of the table is item number zero.
+
+\item[3:] \hspace{2em} {\tt FOP-BYTE-PUSH} \hspace{2em} {\it index}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Item number {\it index} of the table is pushed onto the stack.
+The first element of the table is item number zero.
+
+\item[4:] \hspace{2em} {\tt FOP-EMPTY-LIST} \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The empty list ({\tt ()}) is pushed onto the stack.
+
+\item[5:] \hspace{2em} {\tt FOP-TRUTH} \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The standard truth value ({\tt T}) is pushed onto the stack.
+
+\item[6:] \hspace{2em} {\tt FOP-SYMBOL-SAVE} \hspace{2em} {\it n}(4) \hspace{2em} {\it name}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \& table\\
+The four-byte operand {\it n} specifies the length of the print name
+of a symbol.  The name follows, one character per byte,
+with the first byte of the print name being the first read.
+The name is interned in the default package,
+and the resulting symbol is both pushed onto the stack and added to the table.
+
+\item[7:] \hspace{2em} {\tt FOP-SMALL-SYMBOL-SAVE} \hspace{2em} {\it n}(1) \hspace{2em} {\it name}({\it n}) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \& table\\
+The one-byte operand {\it n} specifies the length of the print name
+of a symbol.  The name follows, one character per byte,
+with the first byte of the print name being the first read.
+The name is interned in the default package,
+and the resulting symbol is both pushed onto the stack and added to the table.
+
+\item[8:] \hspace{2em} {\tt FOP-SYMBOL-IN-PACKAGE-SAVE} \hspace{2em} {\it index}(4)
+\hspace{2em} {\it n}(4) \hspace{2em} {\it name}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \& table\\
+The four-byte {\it index} specifies a package stored in the table.
+The four-byte operand {\it n} specifies the length of the print name
+of a symbol.  The name follows, one character per byte,
+with the first byte of the print name being the first read.
+The name is interned in the specified package,
+and the resulting symbol is both pushed onto the stack and added to the table.
+
+\item[9:] \hspace{2em} {\tt FOP-SMALL-SYMBOL-IN-PACKAGE-SAVE}  \hspace{2em} {\it index}(4)
+\hspace{2em} {\it n}(1) \hspace{2em} {\it name}({\it n}) \hspace{2em}
+$\Rightarrow$ \hspace{2em} stack \& table\\
+The four-byte {\it index} specifies a package stored in the table.
+The one-byte operand {\it n} specifies the length of the print name
+of a symbol.  The name follows, one character per byte,
+with the first byte of the print name being the first read.
+The name is interned in the specified package,
+and the resulting symbol is both pushed onto the stack and added to the table.
+
+\item[10:] \hspace{2em} {\tt FOP-SYMBOL-IN-BYTE-PACKAGE-SAVE} \hspace{2em} {\it index}(1)
+\hspace{2em} {\it n}(4) \hspace{2em} {\it name}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \& table\\
+The one-byte {\it index} specifies a package stored in the table.
+The four-byte operand {\it n} specifies the length of the print name
+of a symbol.  The name follows, one character per byte,
+with the first byte of the print name being the first read.
+The name is interned in the specified package,
+and the resulting symbol is both pushed onto the stack and added to the table.
+
+\item[11:]\hspace{2em} {\tt FOP-SMALL-SYMBOL-IN-BYTE-PACKAGE-SAVE} \hspace{2em} {\it index}(1)
+\hspace{2em} {\it n}(1) \hspace{2em} {\it name}({\it n}) \hspace{2em}
+$\Rightarrow$ \hspace{2em} stack \& table\\
+The one-byte {\it index} specifies a package stored in the table.
+The one-byte operand {\it n} specifies the length of the print name
+of a symbol.  The name follows, one character per byte,
+with the first byte of the print name being the first read.
+The name is interned in the specified package,
+and the resulting symbol is both pushed onto the stack and added to the table.
+
+\item[12:] \hspace{2em} {\tt FOP-UNINTERNED-SYMBOL-SAVE} \hspace{2em} {\it n}(4) \hspace{2em} {\it name}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \& table\\
+Like {\tt FOP-SYMBOL-SAVE}, except that it creates an uninterned symbol.
+
+\item[13:] \hspace{2em} {\tt FOP-UNINTERNED-SMALL-SYMBOL-SAVE} \hspace{2em} {\it n}(1)
+\hspace{2em} {\it name}({\it n}) \hspace{2em} $\Rightarrow$ \hspace{2em} stack
+\& table\\
+Like {\tt FOP-SMALL-SYMBOL-SAVE}, except that it creates an uninterned symbol.
+
+\item[14:] \hspace{2em} {\tt FOP-PACKAGE} \hspace{2em} $\Rightarrow$ \hspace{2em} table \\
+An item is popped from the stack; it must be a symbol.	The package of
+that name is located and pushed onto the table.
+
+\item[15:] \hspace{2em} {\tt FOP-LIST} \hspace{2em} {\it length}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The unsigned operand {\it length} specifies a number of
+operands to be popped from the stack.  These are made into a list
+of that length, and the list is pushed onto the stack.
+The first item popped from the stack becomes the last element of
+the list, and so on.  Hence an iterative loop can start with
+the empty list and perform ``pop an item and cons it onto the list''
+{\it length} times.
+(Lists of length greater than 255 can be made by using {\tt FOP-LIST*}
+repeatedly.)
+
+\item[16:] \hspace{2em} {\tt FOP-LIST*} \hspace{2em} {\it length}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+This is like {\tt FOP-LIST} except that the constructed list is terminated
+not by {\tt ()} (the empty list), but by an item popped from the stack
+before any others are.	Therefore {\it length}+1 items are popped in all.
+Hence an iterative loop can start with
+a popped item and perform ``pop an item and cons it onto the list''
+{\it length}+1 times.
+
+\item[17-24:] \hspace{2em} {\tt FOP-LIST-1}, {\tt FOP-LIST-2}, ..., {\tt FOP-LIST-8} \\
+{\tt FOP-LIST-{\it k}} is like {\tt FOP-LIST} with a byte containing {\it k}
+following it.  These exist purely to reduce the size of Fasload files.
+Measurements need to be made to determine the useful values of {\it k}.
+
+\item[25-32:] \hspace{2em} {\tt FOP-LIST*-1}, {\tt FOP-LIST*-2}, ..., {\tt FOP-LIST*-8} \\
+{\tt FOP-LIST*-{\it k}} is like {\tt FOP-LIST*} with a byte containing {\it k}
+following it.  These exist purely to reduce the size of Fasload files.
+Measurements need to be made to determine the useful values of {\it k}.
+
+\item[33:] \hspace{2em} {\tt FOP-INTEGER} \hspace{2em} {\it n}(4) \hspace{2em} {\it value}({\it n}) \hspace{2em}
+$\Rightarrow$ \hspace{2em} stack \\
+A four-byte unsigned operand specifies the number of following
+bytes.	These bytes define the value of a signed integer in two's-complement
+form.  The first byte of the value is the least significant byte.
+
+\item[34:] \hspace{2em} {\tt FOP-SMALL-INTEGER} \hspace{2em} {\it n}(1) \hspace{2em} {\it value}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+A one-byte unsigned operand specifies the number of following
+bytes.	These bytes define the value of a signed integer in two's-complement
+form.  The first byte of the value is the least significant byte.
+
+\item[35:] \hspace{2em} {\tt FOP-WORD-INTEGER} \hspace{2em} {\it value}(4) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+A four-byte signed integer (in the range $-2^{31}$ to $2^{31}-1$) follows the
+operation code.  A LISP integer (fixnum or bignum) with that value
+is constructed and pushed onto the stack.
+
+\item[36:] \hspace{2em} {\tt FOP-BYTE-INTEGER} \hspace{2em} {\it value}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+A one-byte signed integer (in the range -128 to 127) follows the
+operation code.  A LISP integer (fixnum or bignum) with that value
+is constructed and pushed onto the stack.
+
+\item[37:] \hspace{2em} {\tt FOP-STRING} \hspace{2em} {\it n}(4) \hspace{2em} {\it name}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The four-byte operand {\it n} specifies the length of a string to
+construct.  The characters of the string follow, one per byte.
+The constructed string is pushed onto the stack.
+
+\item[38:] \hspace{2em} {\tt FOP-SMALL-STRING} \hspace{2em} {\it n}(1) \hspace{2em} {\it name}({\it n}) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The one-byte operand {\it n} specifies the length of a string to
+construct.  The characters of the string follow, one per byte.
+The constructed string is pushed onto the stack.
+
+\item[39:] \hspace{2em} {\tt FOP-VECTOR} \hspace{2em} {\it n}(4) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The four-byte operand {\it n} specifies the length of a vector of LISP objects
+to construct.  The elements of the vector are popped off the stack;
+the first one popped becomes the last element of the vector.
+The constructed vector is pushed onto the stack.
+
+\item[40:] \hspace{2em} {\tt FOP-SMALL-VECTOR} \hspace{2em} {\it n}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The one-byte operand {\it n} specifies the length of a vector of LISP objects
+to construct.  The elements of the vector are popped off the stack;
+the first one popped becomes the last element of the vector.
+The constructed vector is pushed onto the stack.
+
+\item[41:] \hspace{2em} {\tt FOP-UNIFORM-VECTOR} \hspace{2em} {\it n}(4) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The four-byte operand {\it n} specifies the length of a vector of LISP objects
+to construct.  A single item is popped from the stack and used to initialize
+all elements of the vector.  The constructed vector is pushed onto the stack.
+
+\item[42:] \hspace{2em} {\tt FOP-SMALL-UNIFORM-VECTOR} \hspace{2em} {\it n}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The one-byte operand {\it n} specifies the length of a vector of LISP objects
+to construct.  A single item is popped from the stack and used to initialize
+all elements of the vector.  The constructed vector is pushed onto the stack.
+
+\item[43:] \hspace{2em} {\tt FOP-INT-VECTOR} \hspace{2em} {\it len}(4) \hspace{2em}
+{\it size}(1) \hspace{2em} {\it data}($\left\lceil len*count/8\right\rceil$)
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The four-byte operand {\it n} specifies the length of a vector of
+unsigned integers to be constructed.   Each integer is {\it size}
+bits long, and is packed according to the machine's native byte ordering.
+{\it size} must be a directly supported i-vector element size.  Currently
+supported values are 1,2,4,8,16 and 32.
+
+\item[44:] \hspace{2em} {\tt FOP-UNIFORM-INT-VECTOR} \hspace{2em} {\it n}(4) \hspace{2em} {\it size}(1) \hspace{2em}
+{\it value}(@ceiling$<${\it size}/8$>$) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The four-byte operand {\it n} specifies the length of a vector of unsigned
+integers to construct.
+Each integer is {\it size} bits big, and is initialized to the value
+of the operand {\it value}.
+The constructed vector is pushed onto the stack.
+
+\item[45:] \hspace{2em} {\tt FOP-LAYOUT} \hspace{2em} \\
+Pops the stack four times to get the name, length, inheritance and depth for a layout object. 
+
+\item[46:] \hspace{2em} {\tt FOP-SINGLE-FLOAT} \hspace{2em} {\it data}(4) \hspace{2em}
+$\Rightarrow$ \hspace{2em} stack \\
+The {\it data} bytes are read as an integer, then turned into an IEEE single
+float (as though by {\tt make-single-float}).
+
+\item[47:] \hspace{2em} {\tt FOP-DOUBLE-FLOAT} \hspace{2em} {\it data}(8) \hspace{2em}
+$\Rightarrow$ \hspace{2em} stack \\
+The {\it data} bytes are read as an integer, then turned into an IEEE double
+float (as though by {\tt make-double-float}).
+
+\item[48:] \hspace{2em} {\tt FOP-STRUCT} \hspace{2em} {\it n}(4) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The four-byte operand {\it n} specifies the length structure to construct.  The
+elements of the vector are popped off the stack; the first one popped becomes
+the last element of the structure.  The constructed vector is pushed onto the
+stack.
+
+\item[49:] \hspace{2em} {\tt FOP-SMALL-STRUCT} \hspace{2em} {\it n}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The one-byte operand {\it n} specifies the length structure to construct.  The
+elements of the vector are popped off the stack; the first one popped becomes
+the last element of the structure.  The constructed vector is pushed onto the
+stack.
+
+\item[50-52:] Unused
+
+\item[53:] \hspace{2em} {\tt FOP-EVAL} \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Pop an item from the stack and evaluate it (give it to {\tt EVAL}).
+Push the result back onto the stack.
+
+\item[54:] \hspace{2em} {\tt FOP-EVAL-FOR-EFFECT} \\
+Pop an item from the stack and evaluate it (give it to {\tt EVAL}).
+The result is ignored.
+
+\item[55:] \hspace{2em} {\tt FOP-FUNCALL} \hspace{2em} {\it nargs}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Pop {\it nargs}+1 items from the stack and apply the last one popped
+as a function to
+all the rest as arguments (the first one popped being the last argument).
+Push the result back onto the stack.
+
+\item[56:] \hspace{2em} {\tt FOP-FUNCALL-FOR-EFFECT} \hspace{2em} {\it nargs}(1) \\
+Pop {\it nargs}+1 items from the stack and apply the last one popped
+as a function to
+all the rest as arguments (the first one popped being the last argument).
+The result is ignored.
+
+\item[57:] \hspace{2em} {\tt FOP-CODE-FORMAT} \hspace{2em} {\it implementation}(1)
+\hspace{2em} {\it version}(1) \\
+This FOP specifiers the code format for following code objects.  The operations
+{\tt FOP-CODE} and its relatives may not occur in a group until after {\tt
+FOP-CODE-FORMAT} has appeared; there is no default format.  The {\it
+implementation} is an integer indicating the target hardware and environment.
+See {\tt compiler/generic/vm-macs.lisp} for the currently defined
+implementations.  {\it version} for an implementation is increased whenever
+there is a change that renders old fasl files unusable.
+
+\item[58:] \hspace{2em} {\tt FOP-CODE} \hspace{2em} {\it nitems}(4) \hspace{2em} {\it size}(4) \hspace{2em}
+{\it code}({\it size}) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+A compiled function is constructed and pushed onto the stack.
+This object is in the format specified by the most recent
+occurrence of {\tt FOP-CODE-FORMAT}.
+The operand {\it nitems} specifies a number of items to pop off
+the stack to use in the ``boxed storage'' section.  The operand {\it code}
+is a string of bytes constituting the compiled executable code.
+
+\item[59:] \hspace{2em} {\tt FOP-SMALL-CODE} \hspace{2em} {\it nitems}(1) \hspace{2em} {\it size}(2) \hspace{2em}
+{\it code}({\it size}) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+A compiled function is constructed and pushed onto the stack.
+This object is in the format specified by the most recent
+occurrence of {\tt FOP-CODE-FORMAT}.
+The operand {\it nitems} specifies a number of items to pop off
+the stack to use in the ``boxed storage'' section.  The operand {\it code}
+is a string of bytes constituting the compiled executable code.
+
+\item[60] \hspace{2em} {\tt FOP-FDEFINITION} \hspace{2em} \\
+Pops the stack to get an fdefinition.
+
+\item[61] \hspace{2em} {\tt FOP-SANCTIFY-FOR-EXECUTION} \hspace{2em} \\
+A code component is popped from the stack, and the necessary magic is applied 
+to the code so that it can be executed.
+
+\item[62:] \hspace{2em} {\tt FOP-VERIFY-TABLE-SIZE} \hspace{2em} {\it size}(4) \\
+If the current size of the table is not equal to {\it size},
+then an inconsistency has been detected.  This operation
+is inserted into a Fasload file purely for error-checking purposes.
+It is good practice for a compiler to output this at least at the
+end of every group, if not more often.
+
+\item[63:] \hspace{2em} {\tt FOP-VERIFY-EMPTY-STACK} \\
+If the stack is not currently empty,
+then an inconsistency has been detected.  This operation
+is inserted into a Fasload file purely for error-checking purposes.
+It is good practice for a compiler to output this at least at the
+end of every group, if not more often.
+
+\item[64:] \hspace{2em} {\tt FOP-END-GROUP} \\
+This is the last operation of a group.	If this is not the
+last byte of the file, then a new group follows; the next
+nine bytes must be ``{\tt FASL FILE}''.
+
+\item[65:] \hspace{2em} {\tt FOP-POP-FOR-EFFECT} \hspace{2em} stack \hspace{2em} $\Rightarrow$ \hspace{2em} \\
+One item is popped from the stack.
+
+\item[66:] \hspace{2em} {\tt FOP-MISC-TRAP} \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+A trap object is pushed onto the stack.
+
+\item[67:] \hspace{2em} {\tt FOP-DOUBLE-DOUBLE-FLOAT} \hspace{2em} {\it double-double-float}(8) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The next 8 bytes are read, and a double-double-float number is constructed.
+
+\item[68:] \hspace{2em} {\tt FOP-CHARACTER} \hspace{2em} {\it character}(3) \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+The three bytes are read as an integer then converted to a character.  This FOP
+is currently rather useless, as extended characters are not supported.
+
+\item[69:] \hspace{2em} {\tt FOP-SHORT-CHARACTER} \hspace{2em} {\it character}(1) \hspace{2em}
+$\Rightarrow$ \hspace{2em} stack \\
+The one byte specifies the code of a Common Lisp character object.  A character
+is constructed and pushed onto the stack.
+
+\item[70:] \hspace{2em} {\tt FOP-RATIO} \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Creates a ratio from two integers popped from the stack.
+The denominator is popped first, the numerator second.
+
+\item[71:] \hspace{2em} {\tt FOP-COMPLEX} \hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Creates a complex number from two numbers popped from the stack.
+The imaginary part is popped first, the real part second.
+
+\item[72] \hspace{2em} {\tt FOP-COMPLEX-SINGLE-FLOAT} {\it real(4)} {\it imag(4)}\hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Creates a complex single-float number from the following 8 bytes.
+
+\item[73] \hspace{2em} {\tt FOP-COMPLEX-DOUBLE-FLOAT} {\it real(8)} {\it imag(8)}\hspace{2em} $\Rightarrow$ \hspace{2em} stack \\
+Creates a complex double-float number from the following 16 bytes.
+
+
+\item[74:] \hspace{2em} {\tt FOP-FSET} \hspace{2em} \\
+Except in the cold loader (Genesis), this is a no-op with two stack arguments.
+In the initial core this is used to make DEFUN functions defined at cold-load
+time so that global functions can be called before top-level forms are run
+(which normally installs definitions.)  Genesis pops the top two things off of
+the stack and effectively does (SETF SYMBOL-FUNCTION).
+
+\item[75:] \hspace{2em} {\tt FOP-LISP-SYMBOL-SAVE} \hspace{2em} {\it n}(4) \hspace{2em} {\it name}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \& table\\
+Like {\tt FOP-SYMBOL-SAVE}, except that it creates a symbol in the LISP
+package.
+
+\item[76:] \hspace{2em} {\tt FOP-LISP-SMALL-SYMBOL-SAVE} \hspace{2em} {\it n}(1)
+\hspace{2em} {\it name}({\it n}) \hspace{2em} $\Rightarrow$ \hspace{2em} stack
+\& table\\
+Like {\tt FOP-SMALL-SYMBOL-SAVE}, except that it creates a symbol in the LISP
+package.
+
+\item[77:] \hspace{2em} {\tt FOP-KEYWORD-SYMBOL-SAVE} \hspace{2em} {\it n}(4) \hspace{2em} {\it name}({\it n})
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack \& table\\
+Like {\tt FOP-SYMBOL-SAVE}, except that it creates a symbol in the
+KEYWORD package.
+
+\item[78:] \hspace{2em} {\tt FOP-KEYWORD-SMALL-SYMBOL-SAVE} \hspace{2em} {\it n}(1)
+\hspace{2em} {\it name}({\it n}) \hspace{2em} $\Rightarrow$ \hspace{2em} stack
+\& table\\
+Like {\tt FOP-SMALL-SYMBOL-SAVE}, except that it creates a symbol in the
+KEYWORD package.
+
+\item[79-80:] Unused
+
+\item[81:] \hspace{2em} {\tt FOP-NORMAL-LOAD}\\
+This FOP is used in conjunction with the cold loader (Genesis) to read
+top-level package manipulation forms.  These forms are to be read as though by
+the normal loaded, so that they can be evaluated at cold load time, instead of
+being dumped into the initial core image.  A no-op in normal loading.
+
+\item[82:] \hspace{2em} {\tt FOP-MAYBE-COLD-LOAD}\\
+Undoes the effect of {\tt FOP-NORMAL-LOAD}. 
+
+\item[83:] \hspace{2em} {\tt FOP-ARRAY} \hspace{2em} {\it rank}(4)
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+This operation creates a simple array header (used for simple-arrays with rank
+/= 1).  The data vector is popped off of the stack, and then {\it rank}
+dimensions are popped off of the stack (the highest dimensions is on top.)
+
+\item[84:] \hspace{2em} {\tt FOP-SINGLE-FLOAT-VECTOR} \hspace{2em} {\it length}(4) {\it data}(n)
+ \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Creates a {\it (simple-array single-float (*))} object.  The number of single-floats is {\it length}.
+
+\item[85:] \hspace{2em} {\tt FOP-DOUBLE-FLOAT-VECTOR} \hspace{2em} {\it length}(4) {\it data}(n)
+ \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Creates a {\it (simple-array double-float (*))} object.  The number of double-floats is {\it length}.
+
+\item[86:] \hspace{2em} {\tt FOP-COMPLEX-SINGLE-FLOAT-VECTOR} \hspace{2em} {\it length}(4) {\it data}(n)
+ \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Creates a {\it (simple-array (complex single-float) (*))} object.  The number of complex single-floats is {\it length}.
+
+\item[87:] \hspace{2em} {\tt FOP-COMPLEX-DOUBLE-FLOAT-VECTOR} \hspace{2em} {\it length}(4) {\it data}(n)
+ \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Creates a {\it (simple-array (complex double-float) (*))} object.  The number of complex double-floats is {\it length}.
+
+\item[88:] \hspace{2em} {\tt FOP-DOUBLE-DOUBLE-FLOAT-VECTOR} \hspace{2em} {\it length}(4) {\it data}(n)
+ \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Creates a {\it (simple-array double-double-float (*))} object.  The number of double-double-floats is {\it length}.
+
+\item[89:] \hspace{2em} {\tt FOP-COMPLEX-DOUBLE-DOUBLE-FLOAT} \hspace{2em} {\it data}(32)
+ \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Creates a {\it (complex double-double-float)} object from the following 32 bytes of data.
+
+\item[90:] \hspace{2em} {\tt FOP-COMPLEX-DOUBLE-DOUBLE-FLOAT-VECTOR} \hspace{2em} {\it length}(4) {\it data}(n)
+ \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Creates a {\it (simple-arra (complex double-double-float) (*))} object.  The number of complex double-double-floats is {\it length}.
+
+\item[91-139:] Unused
+
+\item[140:] \hspace{2em} {\tt FOP-ALTER-CODE} \hspace{2em} {\it index}(4)\\
+This operation modifies the constants part of a code object (necessary for
+creating certain circular function references.)  It pops the new value and code
+object are off of the stack, storing the new value at the specified index.
+
+\item[141:] \hspace{2em} {\tt FOP-BYTE-ALTER-CODE} \hspace{2em} {\it index}(1)\\
+Like {\tt FOP-ALTER-CODE}, but has only a one byte offset.
+
+\item[142:] \hspace{2em} {\tt FOP-FUNCTION-ENTRY} \hspace{2em} {\it index}(4)
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Initializes a function-entry header inside of a pre-existing code object, and
+returns the corresponding function descriptor.  {\it index} is the byte offset
+inside of the code object where the header should be plunked down.  The stack
+arguments to this operation are the code object, function name, function debug
+arglist and function type.
+
+\item[143:] \hspace{2em} {\tt FOP-MAKE-BYTE-COMPILED-FUNCTION} \hspace{2em} {\it size}(1) \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Create a byte-compiled function.  {\it FIXME:} describe what's on the stack.
+
+\item[144:] \hspace{2em} {\tt FOP-ASSEMBLER-CODE} \hspace{2em} {\it length}(4)
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+This operation creates a code object holding assembly routines.  {\it length}
+bytes of code are read and placed in the code object, and the code object
+descriptor is pushed on the stack.  This FOP is only recognized by the cold
+loader (Genesis.)
+
+\item[145:] \hspace{2em} {\tt FOP-ASSEMBLER-ROUTINE} \hspace{2em} {\it offset}(4)
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+This operation records an entry point into an assembler code object (for use
+with {\tt FOP-ASSEMBLER-FIXUP}).  The routine name (a symbol) is on stack top.
+The code object is underneath.  The entry point is defined at {\it offset}
+bytes inside the code area of the code object, and the code object is left on
+stack top (allowing multiple uses of this FOP to be chained.)  This FOP is only
+recognized by the cold loader (Genesis.)
+
+\item[146:] Unused
+
+\item[147:] \hspace{2em} {\tt FOP-FOREIGN-FIXUP} \hspace{2em} {\it len}(1)
+\hspace{2em} {\it name}({\it len})
+\hspace{2em} {\it offset}(4) \hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+This operation resolves a reference to a foreign (C) symbol.  {\it len} bytes
+are read and interpreted as the symbol {\it name}.  First the {\it kind} and the
+code-object to patch are popped from the stack.  The kind is a target-dependent
+symbol indicating the instruction format of the patch target (at {\it offset}
+bytes from the start of the code area.)  The code object is left on
+stack top (allowing multiple uses of this FOP to be chained.)
+
+\item[148:] \hspace{2em} {\tt FOP-ASSEMBLER-FIXUP} \hspace{2em} {\it offset}(4)
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+This operation resolves a reference to an assembler routine.  The stack args
+are ({\it routine-name}, {\it kind} and {\it code-object}).  The kind is a
+target-dependent symbol indicating the instruction format of the patch target
+(at {\it offset} bytes from the start of the code area.)  The code object is
+left on stack top (allowing multiple uses of this FOP to be chained.)
+
+\item[149:] \hspace{2em} {\tt FOP-CODE-OBJECT-FIXUP} 
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+{\it FIXME:} Describe what this does!
+
+\item[150:] \hspace{2em} {\tt FOP-FOREIGN-DATA-FIXUP} 
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+{\it FIXME:} Describe what this does!
+
+\item[151-156:] Unused
+
+\item[157:] \hspace{2em} {\tt FOP-LONG-CODE-FORMAT} \hspace{2em} {\it implementation}(1)
+\hspace{2em} {\it version}(4) \\
+Like FOP-CODE-FORMAT, except that the version is 32 bits long.
+
+\item[158-199:] Unused
+
+\item[200:] \hspace{2em} {\tt FOP-RPLACA} \hspace{2em} {\it table-idx}(4)
+\hspace{2em} {\it cdr-offset}(4)\\
+
+\item[201:] \hspace{2em} {\tt FOP-RPLACD} \hspace{2em} {\it table-idx}(4)
+\hspace{2em} {\it cdr-offset}(4)\\
+These operations destructively modify a list entered in the table.  {\it
+table-idx} is the table entry holding the list, and {\it cdr-offset} designates
+the cons in the list to modify (like the argument to {\tt nthcdr}.)  The new
+value is popped off of the stack, and stored in the {\tt car} or {\tt cdr},
+respectively.
+
+\item[202:] \hspace{2em} {\tt FOP-SVSET} \hspace{2em} {\it table-idx}(4)
+\hspace{2em} {\it vector-idx}(4)\\
+Destructively modifies a {\tt simple-vector} entered in the table.  Pops the
+new value off of the stack, and stores it in the {\it vector-idx} element of
+the contents of the table entry {\it table-idx.}
+
+\item[203:] \hspace{2em} {\tt FOP-NTHCDR} \hspace{2em} {\it cdr-offset}(4)
+\hspace{2em} $\Rightarrow$ \hspace{2em} stack\\
+Does {\tt nthcdr} on the top-of stack, leaving the result there.
+
+\item[204:] \hspace{2em} {\tt FOP-STRUCTSET} \hspace{2em} {\it table-idx}(4)
+\hspace{2em} {\it vector-idx}(4)\\
+Like {\tt FOP-SVSET}, except it alters structure slots.
+
+\item[205-254:] Unused
+\item[255:] \hspace{2em} {\tt FOP-END-HEADER} \\ Indicates the end of a group header,
+as described above.
+\end{description}

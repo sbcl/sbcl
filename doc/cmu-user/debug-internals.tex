@@ -1,0 +1,765 @@
+\chapter{Debugger Programmer's Interface}
+\label{debug-internals}
+
+The debugger programmers interface is exported from from the
+\code{DEBUG-INTERNALS} or \code{DI} package.  This is a CMU
+extension that allows debugging tools to be written without detailed
+knowledge of the compiler or run-time system.
+
+Some of the interface routines take a code-location as an argument.  As
+described in the section on code-locations, some code-locations are
+unknown.  When a function calls for a \var{basic-code-location}, it
+takes either type, but when it specifically names the argument
+\var{code-location}, the routine will signal an error if you give it an
+unknown code-location.
+
+
+\section{DI Exceptional Conditions}
+
+Some of these operations fail depending on the availability debugging
+information.  In the most severe case, when someone saved a Lisp image
+stripping all debugging data structures, no operations are valid.  In
+this case, even backtracing and finding frames is impossible.  Some
+interfaces can simply return values indicating the lack of information,
+or their return values are naturally meaningful in light missing data.
+Other routines, as documented below, will signal
+\code{serious-condition}s when they discover awkward situations.  This
+interface does not provide for programs to detect these situations other
+than by calling a routine that detects them and signals a condition.
+These are serious-conditions because the program using the interface
+must handle them before it can correctly continue execution.  These
+debugging conditions are not errors since it is no fault of the
+programmers that the conditions occur.
+
+\subsection{Debug-conditions}
+
+The debug internals interface signals conditions when it can't adhere
+to its contract.  These are serious-conditions because the program
+using the interface must handle them before it can correctly continue
+execution.  These debugging conditions are not errors since it is no
+fault of the programmers that the conditions occur.  The interface
+does not provide for programs to detect these situations other than
+calling a routine that detects them and signals a condition.
+
+
+\begin{deftp}{Condition}{debug-condition}{}
+
+This condition inherits from serious-condition, and all debug-conditions
+inherit from this.  These must be handled, but they are not programmer errors.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{no-debug-info}{}
+
+This condition indicates there is absolutely no debugging information
+available.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{no-debug-function-returns}{}
+
+This condition indicates the system cannot return values from a frame since
+its debug-function lacks debug information details about returning values.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{no-debug-blocks}{}
+This condition indicates that a function was not compiled with debug-block
+information, but this information is necessary necessary for some requested
+operation.
+\end{deftp}
+
+\begin{deftp}{Condition}{no-debug-variables}{}
+Similar to \code{no-debug-blocks}, except that variable information was
+requested.
+\end{deftp}
+
+\begin{deftp}{Condition}{lambda-list-unavailable}{}
+Similar to \code{no-debug-blocks}, except that lambda list information was
+requested.
+\end{deftp}
+
+\begin{deftp}{Condition}{invalid-value}{}
+
+This condition indicates a debug-variable has \kwd{invalid} or \kwd{unknown}
+value in a particular frame.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{ambiguous-variable-name}{}
+
+This condition indicates a user supplied debug-variable name identifies more
+than one valid variable in a particular frame.
+\end{deftp}
+
+
+\subsection{Debug-errors}
+
+These are programmer errors resulting from misuse of the debugging tools'
+programmers' interface.  You could have avoided an occurrence of one of these
+by using some routine to check the use of the routine generating the error.
+
+
+\begin{deftp}{Condition}{debug-error}{}
+This condition inherits from error, and all user programming errors inherit
+from this condition.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{unhandled-condition}{}
+This error results from a signalled \code{debug-condition} occurring
+without anyone handling it.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{unknown-code-location}{}
+This error indicates the invalid use of an unknown-code-location.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{unknown-debug-variable}{}
+
+This error indicates an attempt to use a debug-variable in conjunction with an
+inappropriate debug-function; for example, checking the variable's validity
+using a code-location in the wrong debug-function will signal this error.
+\end{deftp}
+
+
+\begin{deftp}{Condition}{frame-function-mismatch}{}
+
+This error indicates you called a function returned by
+\code{preprocess-for-eval}
+on a frame other than the one for which the function had been prepared.
+\end{deftp}
+
+
+\section{Debug-variables}
+
+Debug-variables represent the constant information about where the system
+stores argument and local variable values.  The system uniquely identifies with
+an integer every instance of a variable with a particular name and package.  To
+access a value, you must supply the frame along with the debug-variable since
+these are particular to a function, not every instance of a variable on the
+stack.
+
+\begin{defun}{}{debug-variable-name}{\args{\var{debug-variable}}}
+  
+  This function returns the name of the \var{debug-variable}.  The
+  name is the name of the symbol used as an identifier when writing
+  the code.
+\end{defun}
+
+
+\begin{defun}{}{debug-variable-package}{\args{\var{debug-variable}}}
+  
+  This function returns the package name of the \var{debug-variable}.
+  This is the package name of the symbol used as an identifier when
+  writing the code.
+\end{defun}
+
+
+\begin{defun}{}{debug-variable-symbol}{\args{\var{debug-variable}}}
+  
+  This function returns the symbol from interning
+  \code{debug-variable-name} in the package named by
+  \code{debug-variable-package}.
+\end{defun}
+
+
+\begin{defun}{}{debug-variable-id}{\args{\var{debug-variable}}}
+  
+  This function returns the integer that makes \var{debug-variable}'s
+  name and package name unique with respect to other
+  \var{debug-variable}'s in the same function.
+\end{defun}
+
+
+\begin{defun}{}{debug-variable-validity}{%
+    \args{\var{debug-variable} \var{basic-code-location}}}
+  
+  This function returns three values reflecting the validity of
+  \var{debug-variable}'s value at \var{basic-code-location}:
+  \begin{Lentry}
+  \item[\kwd{valid}] The value is known to be available.
+  \item[\kwd{invalid}] The value is known to be unavailable.
+  \item[\kwd{unknown}] The value's availability is unknown.
+  \end{Lentry}
+\end{defun}
+
+
+\begin{defun}{}{debug-variable-value}{\args{\var{debug-variable}
+      \var{frame}}}
+  
+  This function returns the value stored for \var{debug-variable} in
+  \var{frame}.  The value may be invalid.  This is \code{SETF}'able.
+\end{defun}
+
+
+\begin{defun}{}{debug-variable-valid-value}{%
+    \args{\var{debug-variable} \var{frame}}}
+  
+  This function returns the value stored for \var{debug-variable} in
+  \var{frame}.  If the value is not \kwd{valid}, then this signals an
+  \code{invalid-value} error.
+\end{defun}
+
+
+\section{Frames}
+
+Frames describe a particular call on the stack for a particular thread.  This
+is the environment for name resolution, getting arguments and locals, and
+returning values.  The stack conceptually grows up, so the top of the stack is
+the most recently called function.
+
+\code{top-frame}, \code{frame-down}, \code{frame-up}, and
+\code{frame-debug-function} can only fail when there is absolutely no
+debug information available.  This can only happen when someone saved a
+Lisp image specifying that the system dump all debugging data.
+
+
+\begin{defun}{}{top-frame}{}
+  
+  This function never returns the frame for itself, always the frame
+  before calling \code{top-frame}.
+\end{defun}
+
+
+\begin{defun}{}{frame-down}{\args{\var{frame}}}
+  
+  This returns the frame immediately below \var{frame} on the stack.
+  When \var{frame} is the bottom of the stack, this returns \nil.
+\end{defun}
+
+
+\begin{defun}{}{frame-up}{\args{\var{frame}}}
+  
+  This returns the frame immediately above \var{frame} on the stack.
+  When \var{frame} is the top of the stack, this returns \nil.
+\end{defun}
+
+
+\begin{defun}{}{frame-debug-function}{\args{\var{frame}}}
+  
+  This function returns the debug-function for the function whose call
+  \var{frame} represents.
+\end{defun}
+
+
+\begin{defun}{}{frame-code-location}{\args{\var{frame}}}
+  
+  This function returns the code-location where \var{frame}'s
+  debug-function will continue running when program execution returns
+  to \var{frame}.  If someone interrupted this frame, the result could
+  be an unknown code-location.
+\end{defun}
+
+
+\begin{defun}{}{frame-catches}{\args{\var{frame}}}
+  
+  This function returns an a-list for all active catches in
+  \var{frame} mapping catch tags to the code-locations at which the
+  catch re-enters.
+\end{defun}
+
+
+\begin{defun}{}{eval-in-frame}{\args{\var{frame} \var{form}}}
+  
+  This evaluates \var{form} in \var{frame}'s environment.  This can
+  signal several different debug-conditions since its success relies
+  on a variety of inexact debug information: \code{invalid-value},
+  \code{ambiguous-variable-name}, \code{frame-function-mismatch}.  See
+  also \funref{preprocess-for-eval}.
+\end{defun}
+
+%   \begin{defun}{}{return-from-frame}{\args{\var{frame} \var{values}}}
+%     
+%     This returns the elements in the list \var{values} as multiple
+%     values from \var{frame} as if the function \var{frame} represents
+%     returned these values.  This signals a
+%     \code{no-debug-function-returns} condition when \var{frame}'s
+%     debug-function lacks information on returning values.
+%     
+%     \i{Not Yet Implemented}
+%   \end{defun}
+
+
+\section {Debug-functions}
+
+Debug-functions represent the static information about a function determined at
+compile time---argument and variable storage, their lifetime information,
+etc.  The debug-function also contains all the debug-blocks representing
+basic-blocks of code, and these contains information about specific
+code-locations in a debug-function.
+
+\begin{defmac}{}{do-debug-function-blocks}{%
+    \args{(\var{block-var} \var{debug-function} \mopt{result-form})
+      \mstar{form}}}
+  
+  This executes the forms in a context with \var{block-var} bound to
+  each debug-block in \var{debug-function} successively.
+  \var{Result-form} is an optional form to execute for a return value,
+  and \code{do-debug-function-blocks} returns \nil if there is no
+  \var{result-form}.  This signals a \code{no-debug-blocks} condition
+  when the \var{debug-function} lacks debug-block information.
+\end{defmac}
+
+
+\begin{defun}{}{debug-function-lambda-list}{\args{\var{debug-function}}}
+  
+  This function returns a list representing the lambda-list for
+  \var{debug-function}.  The list has the following structure:
+  \begin{example}
+    (required-var1 required-var2
+    ...
+    (:optional var3 suppliedp-var4)
+    (:optional var5)
+    ...
+    (:rest var6) (:rest var7)
+    ...
+    (:keyword keyword-symbol var8 suppliedp-var9)
+    (:keyword keyword-symbol var10)
+    ...
+    )
+  \end{example}
+  Each \code{var}\var{n} is a debug-variable; however, the symbol
+  \kwd{deleted} appears instead whenever the argument remains
+  unreferenced throughout \var{debug-function}.
+  
+  If there is no lambda-list information, this signals a
+  \code{lambda-list-unavailable} condition.
+\end{defun}
+
+
+\begin{defmac}{}{do-debug-function-variables}{%
+    \args{(\var{var} \var{debug-function} \mopt{result})
+      \mstar{form}}}
+  
+  This macro executes each \var{form} in a context with \var{var}
+  bound to each debug-variable in \var{debug-function}.  This returns
+  the value of executing \var{result} (defaults to \nil).  This may
+  iterate over only some of \var{debug-function}'s variables or none
+  depending on debug policy; for example, possibly the compilation
+  only preserved argument information.
+\end{defmac}
+
+
+\begin{defun}{}{debug-variable-info-available}{\args{\var{debug-function}}}
+  
+  This function returns whether there is any variable information for
+  \var{debug-function}.  This is useful for distinguishing whether
+  there were no locals in a function or whether there was no variable
+  information.  For example, if \code{do-debug-function-variables}
+  executes its forms zero times, then you can use this function to
+  determine the reason.
+\end{defun}
+
+
+\begin{defun}{}{debug-function-symbol-variables}{%
+    \args{\var{debug-function} \var{symbol}}}
+  
+  This function returns a list of debug-variables in
+  \var{debug-function} having the same name and package as
+  \var{symbol}.  If \var{symbol} is uninterned, then this returns a
+  list of debug-variables without package names and with the same name
+  as \var{symbol}.  The result of this function is limited to the
+  availability of variable information in \var{debug-function}; for
+  example, possibly \var{debug-function} only knows about its
+  arguments.
+\end{defun}
+
+
+\begin{defun}{}{ambiguous-debug-variables}{%
+    \args{\var{debug-function} \var{name-prefix-string}}}
+  
+  This function returns a list of debug-variables in
+  \var{debug-function} whose names contain \var{name-prefix-string} as
+  an initial substring.  The result of this function is limited to the
+  availability of variable information in \var{debug-function}; for
+  example, possibly \var{debug-function} only knows about its
+  arguments.
+\end{defun}
+
+
+\begin{defun}{}{preprocess-for-eval}{%
+    \args{\var{form} \var{basic-code-location}}}
+  
+  This function returns a function of one argument that evaluates
+  \var{form} in the lexical context of \var{basic-code-location}.
+  This allows efficient repeated evaluation of \var{form} at a certain
+  place in a function which could be useful for conditional breaking.
+  This signals a \code{no-debug-variables} condition when the
+  code-location's debug-function has no debug-variable information
+  available.  The returned function takes a frame as an argument.  See
+  also \funref{eval-in-frame}.
+\end{defun}
+
+
+\begin{defun}{}{function-debug-function}{\args{\var{function}}}
+  
+  This function returns a debug-function that represents debug
+  information for \var{function}.
+\end{defun}
+
+
+\begin{defun}{}{debug-function-kind}{\args{\var{debug-function}}}
+  
+  This function returns the kind of function \var{debug-function}
+  represents.  The value is one of the following:
+  \begin{Lentry}
+  \item[\kwd{optional}] This kind of function is an entry point to an
+    ordinary function.  It handles optional defaulting, parsing
+    keywords, etc.
+  \item[\kwd{external}] This kind of function is an entry point to an
+    ordinary function.  It checks argument values and count and calls
+    the defined function.
+  \item[\kwd{top-level}] This kind of function executes one or more
+    random top-level forms from a file.
+  \item[\kwd{cleanup}] This kind of function represents the cleanup
+    forms in an \code{unwind-protect}.
+  \item[\nil] This kind of function is not one of the above; that is,
+    it is not specially marked in any way.
+  \end{Lentry}
+\end{defun}
+
+
+\begin{defun}{}{debug-function-function}{\args{\var{debug-function}}}
+  
+  This function returns the Common Lisp function associated with the
+  \var{debug-function}.  This returns \nil{} if the function is
+  unavailable or is non-existent as a user callable function object.
+\end{defun}
+
+
+\begin{defun}{}{debug-function-name}{\args{\var{debug-function}}}
+  
+  This function returns the name of the function represented by
+  \var{debug-function}.  This may be a string or a cons; do not assume
+  it is a symbol.
+\end{defun}
+
+
+\section{Debug-blocks}
+
+Debug-blocks contain information pertinent to a specific range of code in a
+debug-function.
+
+\begin{defmac}{}{do-debug-block-locations}{%
+    \args{(\var{code-var} \var{debug-block} \mopt{result})
+      \mstar{form}}}
+  
+  This macro executes each \var{form} in a context with \var{code-var}
+  bound to each code-location in \var{debug-block}.  This returns the
+  value of executing \var{result} (defaults to \nil).
+\end{defmac}
+
+
+\begin{defun}{}{debug-block-successors}{\args{\var{debug-block}}}
+  
+  This function returns the list of possible code-locations where
+  execution may continue when the basic-block represented by
+  \var{debug-block} completes its execution.
+\end{defun}
+
+
+\begin{defun}{}{debug-block-elsewhere-p}{\args{\var{debug-block}}}
+  
+  This function returns whether \var{debug-block} represents elsewhere
+  code.  This is code the compiler has moved out of a function's code
+  sequence for optimization reasons.  Code-locations in these blocks
+  are unsuitable for stepping tools, and the first code-location has
+  nothing to do with a normal starting location for the block.
+\end{defun}
+
+
+\section{Breakpoints}
+
+A breakpoint represents a function the system calls with the current frame when
+execution passes a certain code-location.  A break point is active or inactive
+independent of its existence.  They also have an extra slot for users to tag
+the breakpoint with information.
+
+\begin{defun}{}{make-breakpoint}{%
+    \args{\var{hook-function} \var{what} \keys{\kwd{kind} \kwd{info}
+        \kwd{function-end-cookie}}}}
+  
+  This function creates and returns a breakpoint.  When program
+  execution encounters the breakpoint, the system calls
+  \var{hook-function}.  \var{hook-function} takes the current frame
+  for the function in which the program is running and the breakpoint
+  object.
+  
+  \var{what} and \var{kind} determine where in a function the system
+  invokes \var{hook-function}.  \var{what} is either a code-location
+  or a debug-function.  \var{kind} is one of \kwd{code-location},
+  \kwd{function-start}, or \kwd{function-end}.  Since the starts and
+  ends of functions may not have code-locations representing them,
+  designate these places by supplying \var{what} as a debug-function
+  and \var{kind} indicating the \kwd{function-start} or
+  \kwd{function-end}.  When \var{what} is a debug-function and
+  \var{kind} is \kwd{function-end}, then hook-function must take two
+  additional arguments, a list of values returned by the function and
+  a function-end-cookie.
+  
+  \var{info} is information supplied by and used by the user.
+  
+  \var{function-end-cookie} is a function.  To implement function-end
+  breakpoints, the system uses starter breakpoints to establish the
+  function-end breakpoint for each invocation of the function.  Upon
+  each entry, the system creates a unique cookie to identify the
+  invocation, and when the user supplies a function for this argument,
+  the system invokes it on the cookie.  The system later invokes the
+  function-end breakpoint hook on the same cookie.  The user may save
+  the cookie when passed to the function-end-cookie function for later
+  comparison in the hook function.
+  
+  This signals an error if \var{what} is an unknown code-location.
+  
+  {\em Note: Breakpoints in interpreted code or byte-compiled code are
+    not implemented.  Function-end breakpoints are not implemented for
+    compiled functions that use the known local return convention
+    (e.g. for block-compiled or self-recursive functions.)}
+
+\end{defun}
+
+
+\begin{defun}{}{activate-breakpoint}{\args{\var{breakpoint}}}
+  
+  This function causes the system to invoke the \var{breakpoint}'s
+  hook-function until the next call to \code{deactivate-breakpoint} or
+  \code{delete-breakpoint}.  The system invokes breakpoint hook
+  functions in the opposite order that you activate them.
+\end{defun}
+
+
+\begin{defun}{}{deactivate-breakpoint}{\args{\var{breakpoint}}}
+  
+  This function stops the system from invoking the \var{breakpoint}'s
+  hook-function.
+\end{defun}
+
+
+\begin{defun}{}{breakpoint-active-p}{\args{\var{breakpoint}}}
+  
+  This returns whether \var{breakpoint} is currently active.
+\end{defun}
+
+
+\begin{defun}{}{breakpoint-hook-function}{\args{\var{breakpoint}}}
+  
+  This function returns the \var{breakpoint}'s function the system
+  calls when execution encounters \var{breakpoint}, and it is active.
+  This is \code{SETF}'able.
+\end{defun}
+
+
+\begin{defun}{}{breakpoint-info}{\args{\var{breakpoint}}}
+  
+  This function returns \var{breakpoint}'s information supplied by the
+  user.  This is \code{SETF}'able.
+\end{defun}
+
+
+\begin{defun}{}{breakpoint-kind}{\args{\var{breakpoint}}}
+
+  This function returns the \var{breakpoint}'s kind specification.
+\end{defun}
+
+
+\begin{defun}{}{breakpoint-what}{\args{\var{breakpoint}}}
+  
+  This function returns the \var{breakpoint}'s what specification.
+\end{defun}
+
+
+\begin{defun}{}{delete-breakpoint}{\args{\var{breakpoint}}}
+  
+  This function frees system storage and removes computational
+  overhead associated with \var{breakpoint}.  After calling this,
+  \var{breakpoint} is useless and can never become active again.
+\end{defun}
+
+
+\section{Code-locations}
+
+Code-locations represent places in functions where the system has correct
+information about the function's environment and where interesting operations
+can occur---asking for a local variable's value, setting breakpoints,
+evaluating forms within the function's environment, etc.
+
+Sometimes the interface returns unknown code-locations.  These
+represent places in functions, but there is no debug information
+associated with them.  Some operations accept these since they may
+succeed even with missing debug data.  These operations' argument is
+named \var{basic-code-location} indicating they take known and unknown
+code-locations.  If an operation names its argument
+\var{code-location}, and you supply an unknown one, it will signal an
+error.  For example, \code{frame-code-location} may return an unknown
+code-location if someone interrupted Lisp in the given frame.  The
+system knows where execution will continue, but this place in the code
+may not be a place for which the compiler dumped debug information.
+
+\begin{defun}{}{code-location-debug-function}{\args{\var{basic-code-location}}}
+  
+  This function returns the debug-function representing information
+  about the function corresponding to the code-location.
+\end{defun}
+
+
+\begin{defun}{}{code-location-debug-block}{\args{\var{basic-code-location}}}
+  
+  This function returns the debug-block containing code-location if it
+  is available.  Some debug policies inhibit debug-block information,
+  and if none is available, then this signals a \code{no-debug-blocks}
+  condition.
+\end{defun}
+
+
+\begin{defun}{}{code-location-top-level-form-offset}{%
+    \args{\var{code-location}}}
+  
+  This function returns the number of top-level forms before the one
+  containing \var{code-location} as seen by the compiler in some
+  compilation unit.  A compilation unit is not necessarily a single
+  file, see the section on debug-sources.
+\end{defun}
+
+
+\begin{defun}{}{code-location-form-number}{\args{\var{code-location}}}
+  
+  This function returns the number of the form corresponding to
+  \var{code-location}.  The form number is derived by walking the
+  subforms of a top-level form in depth-first order.  While walking
+  the top-level form, count one in depth-first order for each subform
+  that is a cons.  See \funref{form-number-translations}.
+\end{defun}
+
+
+\begin{defun}{}{code-location-debug-source}{\args{\var{code-location}}}
+  
+  This function returns \var{code-location}'s debug-source.
+\end{defun}
+
+
+\begin{defun}{}{code-location-unknown-p}{\args{\var{basic-code-location}}}
+  
+  This function returns whether \var{basic-code-location} is unknown.
+  It returns \nil{} when the code-location is known.
+\end{defun}
+
+
+\begin{defun}{}{code-location=}{\args{\var{code-location1}
+      \var{code-location2}}}
+  
+  This function returns whether the two code-locations are the same.
+\end{defun}
+
+
+\section{Debug-sources}
+
+Debug-sources represent how to get back the source for some code.  The
+source is either a file (\code{compile-file} or \code{load}), a
+lambda-expression (\code{compile}, \code{defun}, \code{defmacro}), or
+a stream (something particular to \cmucl{}, \code{compile-from-stream}).
+
+When compiling a source, the compiler counts each top-level form it
+processes, but when the compiler handles multiple files as one block
+compilation, the top-level form count continues past file boundaries.
+Therefore \code{code-location-top-level-form-offset} returns an offset
+that does not always start at zero for the code-location's
+debug-source.  The offset into a particular source is
+\code{code-location-top-level-form-offset} minus
+\code{debug-source-root-number}.
+
+Inside a top-level form, a code-location's form number indicates the
+subform corresponding to the code-location.
+
+\begin{defun}{}{debug-source-from}{\args{\var{debug-source}}}
+  
+  This function returns an indication of the type of source.  The
+  following are the possible values:
+  \begin{Lentry}
+  \item[\kwd{file}] from a file (obtained by \code{compile-file} if
+    compiled).
+  \item[\kwd{lisp}] from Lisp (obtained by \code{compile} if
+    compiled).
+  \item[\kwd{stream}] from a non-file stream (\cmucl{} supports
+    \code{compile-from-stream}).
+  \end{Lentry}
+\end{defun}
+
+
+\begin{defun}{}{debug-source-name}{\args{\var{debug-source}}}
+  
+  This function returns the actual source in some sense represented by
+  debug-source, which is related to \code{debug-source-from}:
+  \begin{Lentry}
+  \item[\kwd{file}] the pathname of the file.
+  \item[\kwd{lisp}] a lambda-expression.
+  \item[\kwd{stream}] some descriptive string that's otherwise
+    useless.
+\end{Lentry}
+\end{defun}
+
+
+\begin{defun}{}{debug-source-created}{\args{\var{debug-source}}}
+  
+  This function returns the universal time someone created the source.
+  This may be \nil{} if it is unavailable.
+\end{defun}
+
+
+\begin{defun}{}{debug-source-compiled}{\args{\var{debug-source}}}
+  
+  This function returns the time someone compiled the source.  This is
+  \nil{} if the source is uncompiled.
+\end{defun}
+
+
+\begin{defun}{}{debug-source-root-number}{\args{\var{debug-source}}}
+  
+  This returns the number of top-level forms processed by the compiler
+  before compiling this source.  If this source is uncompiled, this is
+  zero.  This may be zero even if the source is compiled since the
+  first form in the first file compiled in one compilation, for
+  example, must have a root number of zero---the compiler saw no other
+  top-level forms before it.
+\end{defun}
+
+
+\section{Source Translation Utilities}
+
+These two functions provide a mechanism for converting the rather
+obscure (but highly compact) representation of source locations into an
+actual source form:
+
+\begin{defun}{}{debug-source-start-positions}{\args{\var{debug-source}}}
+  
+  This function returns the file position of each top-level form as a
+  vector if \var{debug-source} is from a \kwd{file}.  If
+  \code{debug-source-from} is \kwd{lisp} or \kwd{stream}, or the file
+  is byte-compiled, then the result is \false{}.
+\end{defun}
+
+
+\begin{defun}{}{form-number-translations}{\args{\var{form}
+      \var{tlf-number}}}
+  
+  This function returns a table mapping form numbers (see
+  \code{code-location-form-number}) to source-paths.  A source-path
+  indicates a descent into the top-level-form \var{form}, going
+  directly to the subform corresponding to a form number.
+  \var{tlf-number} is the top-level-form number of \var{form}.
+\end{defun}
+
+
+\begin{defun}{}{source-path-context}{%
+    \args{\var{form} \var{path} \var{context}}}
+  
+  This function returns the subform of \var{form} indicated by the
+  source-path.  \var{Form} is a top-level form, and \var{path} is a
+  source-path into it.  \var{Context} is the number of enclosing forms
+  to return instead of directly returning the source-path form.  When
+  \var{context} is non-zero, the form returned contains a marker,
+  \code{\#:****HERE****}, immediately before the form indicated by
+  \var{path}.
+\end{defun}

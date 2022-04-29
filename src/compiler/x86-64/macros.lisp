@@ -107,6 +107,7 @@
 ;;; assert that alloc-region->free_pointer and ->end_addr can be accessed
 ;;; using a single byte displacement from thread-tn
 (eval-when (:compile-toplevel)
+  (aver (<= (1+ thread-boxed-tlab-slot) 15))
   (aver (<= (1+ thread-mixed-tlab-slot) 15))
   (aver (<= (1+ thread-cons-tlab-slot) 15)))
 
@@ -206,7 +207,7 @@
 ;;; This macro is purposely unhygienic with respect to THREAD-TN,
 ;;; which is either a global symbol macro, or a LET-bound variable,
 ;;; depending on #+gs-seg.
-(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if) &rest forms)
+(defmacro pseudo-atomic ((&key ((:thread-tn thread)) elide-if) &body forms)
   (declare (ignorable thread))
   #+sb-safepoint
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))

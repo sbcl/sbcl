@@ -237,13 +237,10 @@
 
 #-(or (and darwin x86) win32)
 (deftest stat.2
-  (let* ((stat (sb-posix:stat "/"))
-         (mode (sb-posix::stat-mode stat)))
-    ;; it's logically possible for / to be writeable by others... but
-    ;; if it is, either someone is playing with strange security
-    ;; modules or they want to know about it anyway.
-    (logand mode sb-posix::s-iwoth))
-  0)
+  (eql
+   (sb-posix::stat-mode (sb-posix:stat "/"))
+   (sb-posix::stat-mode (sb-posix:stat (make-pathname :directory '(:absolute :up)))))
+  t)
 
 (deftest stat.3
   (let* ((now (get-universal-time))
@@ -255,16 +252,6 @@
     #+nil (< (- atime unix-now) 10)
     (< (- atime unix-now) 10))
   t)
-
-#-(or (and darwin x86) win32)
-(deftest stat.4
-  (let* ((stat (sb-posix:stat (make-pathname :directory '(:absolute :up))))
-         (mode (sb-posix::stat-mode stat)))
-    ;; it's logically possible for / to be writeable by others... but
-    ;; if it is, either someone is playing with strange security
-    ;; modules or they want to know about it anyway.
-    (logand mode sb-posix::s-iwoth))
-  0)
 
 ;; Test that stat can take a second argument.
 #-win32

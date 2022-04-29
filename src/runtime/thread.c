@@ -88,11 +88,7 @@ static pthread_mutex_t in_gc_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs)
-# ifdef LISP_FEATURE_X86_64
-    __attribute__((sysv_abi))
-# endif
-    ;
+extern lispobj call_into_lisp_first_time(lispobj fun, lispobj *args, int nargs);
 #endif
 
 static void
@@ -283,7 +279,7 @@ void* read_current_thread() {
 extern pthread_key_t foreign_thread_ever_lispified;
 #endif
 
-#if !defined COLLECT_GC_STATS && \
+#if !defined COLLECT_GC_STATS && !defined STANDALONE_LDB && \
   defined LISP_FEATURE_LINUX && defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_64_BIT
 #define COLLECT_GC_STATS
 #endif
@@ -1113,7 +1109,7 @@ uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
                      CREATE_SUSPENDED, &tid);
     boolean success = th->os_thread != 0;
     if (success) {
-        instance->primitive_thread = (lispobj)th;
+        instance->uw_primitive_thread = (lispobj)th;
         th->os_kernel_tid = tid;
         ResumeThread((HANDLE)th->os_thread);
     } else {
@@ -1135,7 +1131,7 @@ int release_gc_lock() { return mutex_release(&in_gc_lock); }
 /*
  * (With SB-SAFEPOINT, see the definitions in safepoint.c instead.)
  */
-#ifndef LISP_FEATURE_SB_SAFEPOINT
+#if !defined LISP_FEATURE_SB_SAFEPOINT && !defined STANDALONE_LDB
 
 /* To avoid deadlocks when gc stops the world all clients of each
  * mutex must enable or disable SIG_STOP_FOR_GC for the duration of
@@ -1302,7 +1298,7 @@ void wake_thread(struct thread_instance* lispthread)
          * that leave_region safepoint will acknowledge the signal, so
          * there is no need to take locks, roll thread to safepoint
          * etc. */
-        struct thread* thread = (void*)lispthread->primitive_thread;
+        struct thread* thread = (void*)lispthread->uw_primitive_thread;
         if (thread == get_sb_vm_thread()) {
             sb_pthr_kill(thread, 1); // can't fail
             check_pending_thruptions(NULL);
@@ -1322,7 +1318,7 @@ void wake_thread(struct thread_instance* lispthread)
 #elif defined LISP_FEATURE_SB_SAFEPOINT
     wake_thread_impl(lispthread);
 #else
-    pthread_kill(lispthread->os_thread, SIGURG);
+    pthread_kill(lispthread->uw_os_thread, SIGURG);
 #endif
 }
 #endif

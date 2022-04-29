@@ -134,7 +134,7 @@
 
 (define-vop (#-64-bit signed-byte-32-p #+64-bit signed-byte-64-p type-predicate)
   (:translate #-64-bit signed-byte-32-p #+64-bit signed-byte-64-p)
-  (:generator 45
+  (:generator 10
    (let ((not-target (gen-label)))
      (signed-byte-n-word-bits-test value temp not-p target not-target)
      (emit-label not-target))))
@@ -145,7 +145,7 @@
 (define-vop (#-64-bit unsigned-byte-32-p #+64-bit unsigned-byte-64-p type-predicate)
   (:translate #-64-bit unsigned-byte-32-p #+64-bit unsigned-byte-64-p)
   (:temporary (:scs (non-descriptor-reg)) temp1)
-  (:generator 45
+  (:generator 10
     (let ((not-target (gen-label)))
       (multiple-value-bind (yep nope)
           (if not-p

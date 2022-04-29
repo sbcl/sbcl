@@ -95,6 +95,11 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
         = (os_vm_address_t)(((uintptr_t) address) + length);
     __clear_cache(address, end_address);
 }
+os_context_register_t *
+os_context_flags_addr(os_context_t *context)
+{
+    return (os_context_register_t*)(&context->sc_spsr);
+}
 
 #elif defined(LISP_FEATURE_NETBSD)
 os_context_register_t   *
@@ -120,6 +125,12 @@ os_context_float_register_addr(os_context_t *context, int offset)
 {
     return (os_context_register_t*)
         &context->uc_mcontext.__fregs.__qregs[offset];
+}
+
+os_context_register_t *
+os_context_flags_addr(os_context_t *context)
+{
+    return (os_context_register_t *)&(context->uc_mcontext.__gregs[_REG_SPSR]);
 }
 
 void
@@ -150,10 +161,16 @@ os_restore_fp_control(os_context_t *context)
     /* FIXME: Implement. */
 }
 
-os_context_register_t   *
+os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
     return (os_context_register_t*) &context->uc_mcontext.mc_fpregs.fp_q[offset];
+}
+
+os_context_register_t *
+os_context_flags_addr(os_context_t *context)
+{
+    return (os_context_register_t*)(&context->uc_mcontext.mc_gpregs.gp_spsr);
 }
 
 void
@@ -162,7 +179,7 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
     __builtin___clear_cache(address, address + length);
 }
 #elif defined (LISP_FEATURE_DARWIN)
-os_context_register_t   *
+os_context_register_t *
 os_context_register_addr(os_context_t *context, int regno)
 {
     switch (regno) {
@@ -172,7 +189,7 @@ os_context_register_addr(os_context_t *context, int regno)
     }
 }
 
-os_context_register_t   *
+os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
     return (os_context_register_t*)(&context->uc_mcontext->__ns.__v[offset]);
@@ -187,5 +204,11 @@ os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
     return os_context_register_addr(context, reg_LR);
+}
+
+os_context_register_t *
+os_context_flags_addr(os_context_t *context)
+{
+    return (os_context_register_t*)(&context->uc_mcontext->__ss.__cpsr);
 }
 #endif

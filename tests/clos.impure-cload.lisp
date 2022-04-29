@@ -186,10 +186,10 @@
     (call-next-method)))
 
 (defvar *compile-count* 0)
-(sb-int:encapsulate 'compile 'call-counter
-                    (lambda (f name thing)
+(sb-int:encapsulate 'sb-c:compile-in-lexenv 'call-counter
+                    (lambda (realfun &rest args)
                       (incf *compile-count*)
-                      (funcall f name thing)))
+                      (apply realfun args)))
 
 (defstruct mystruct-r/w (some-slot))
 (defstruct mystruct-r/o (allegedly-immutable-slot 3 :read-only t))
@@ -207,6 +207,6 @@
         ;; hide the slot name from the compiler so it doesn't optimize
         (slot-name (eval ''allegedly-immutable-slot)))
     (setf (slot-value myobj slot-name) :newval1)
-    (assert (= *compile-count* (1+ old-count)))
+    (assert (= *compile-count* old-count)) ; no compilation
     (setf (slot-value myobj slot-name) :newval2)
-    (assert (= *compile-count* (1+ old-count))))) ; same as before
+    (assert (= *compile-count* old-count)))) ; no compilation

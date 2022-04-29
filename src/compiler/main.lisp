@@ -591,6 +591,11 @@ necessary, since type inference may take arbitrarily long to converge.")
 
     (maybe-mumble "IR2Tran ")
     (entry-analyze component)
+
+    ;; For on-demand recalculation of dominators, the previously
+    ;; computed results may be stale.
+    (clear-dominators component)
+
     (ir2-convert component)
 
     (when (policy *lexenv* (>= speed compilation-speed))
@@ -858,18 +863,17 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format &optional form-tracking-p)
   (make-source-info
-   :file-info (make-file-info :pathname ; becomes *C-F-PATHNAME*
-                              (if *merge-pathnames* (merge-pathnames file) file)
-                              :external-format external-format
-                              :subforms
-                              (if form-tracking-p
-                                  (make-array 100 :fill-pointer 0 :adjustable t))
-                              :write-date (file-write-date file))))
+   :file-info (make-file-info
+               ;; becomes *COMPILE-FILE-PATHNAME*
+               :pathname (if *merge-pathnames* (merge-pathnames file) file)
+               :external-format external-format
+               :subforms (if form-tracking-p (make-array 100 :fill-pointer 0 :adjustable t))
+               :write-date (file-write-date file))))
 
 ;; LOAD-AS-SOURCE uses this.
 (defun make-file-stream-source-info (file-stream)
   (make-source-info
-   :file-info (make-file-info :truename (truename file-stream)
+   :file-info (make-file-info :truename (truename file-stream) ; FIXME: WHY USE TRUENAME???
                               ;; This T-L-P has been around since at least 2011.
                               ;; It's unclear why an LPN isn't good enough.
                               :pathname (translate-logical-pathname file-stream)
@@ -1068,13 +1072,6 @@ necessary, since type inference may take arbitrarily long to converge.")
           (if (eq (block-compile *compilation*) t)
               (push tll (toplevel-lambdas *compilation*))
               (compile-toplevel (list tll) nil))
-          (when (consp form)
-            (case (car form)
-              ;; Block compilation can cause packages to be defined after
-              ;; they are referenced at load time, so we have to delimit the
-              ;; current block compilation.
-              ((sb-impl::%defpackage)
-               (delimit-block-compilation))))
           nil))))
 
 ;;; Macroexpand FORM in the current environment with an error handler.
@@ -1698,13 +1695,6 @@ necessary, since type inference may take arbitrarily long to converge.")
         (setf (toplevel-lambdas compilation) nil))
       (setf (block-compile compilation) :specified)
       (setf (entry-points compilation) nil))))
-
-(defun delimit-block-compilation ()
-  (let ((compilation *compilation*))
-    (when (block-compile compilation)
-      (when (toplevel-lambdas compilation)
-        (compile-toplevel (nreverse (toplevel-lambdas compilation)) nil)
-        (setf (toplevel-lambdas compilation) nil)))))
 
 (declaim (ftype function handle-condition-p))
 (flet ((get-handled-conditions ()

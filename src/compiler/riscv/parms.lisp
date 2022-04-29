@@ -116,13 +116,13 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
- #.`#(,@+common-static-symbols+
-      #-sb-thread
-      ,@'(*binding-stack-pointer*
-          ;; interrupt handling
-          *pseudo-atomic-atomic*
-          *pseudo-atomic-interrupted*)
-      ,@*runtime-asm-routines*)
+ `#(,@+common-static-symbols+
+    #-sb-thread
+    ,@'(*binding-stack-pointer*
+        ;; interrupt handling
+        *pseudo-atomic-atomic*
+        *pseudo-atomic-interrupted*)
+    ,@*runtime-asm-routines*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
