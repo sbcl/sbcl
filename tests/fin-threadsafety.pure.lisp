@@ -37,12 +37,18 @@
   (let ((fun (sb-kernel:%make-funcallable-instance 0))
         (stop nil)
         (condition nil))
-    ;; It doesn't matter what this layout is, but it has to be something.
-    ;; GC checks for a layout before fixing up any other slots. That's required
-    ;; because immobile funcallable-instances contain raw bytes comprising the
-    ;; self-contained trampoline. For some reason FUNCALLABLE-INSTANCE claims
-    ;; to have a 0 bitmap which implies 0 tagged slots. I don't like that.
-    (sb-kernel:%set-fun-layout fun (sb-kernel:find-layout 'function))
+    ;; If the %FUN-LLAYOUT were unset or its bitmap were 0, then the
+    ;; %FUNCALLABLE-INSTANCE-FUN slot would not be visited in GC because
+    ;; it assumes the instance is wholly empty in that case.
+    ;; It doesn't matter too much what the layout is, but it has to be something
+    ;; whose bitmap satisfies the assertion in "verify_headered_object()"
+    ;; concerning the potentially valid bitmaps for a funcallable instance.
+    ;; FUNCALLABLE-INSTANCE itself has a 0 bitmap which implies 0 tagged slots
+    ;; (which seems dubious to be sure), and FUNCTION has a bitmap indicating
+    ;; 1 raw slot and all the rest tagged. Neither of those is right.
+    ;; GENERIC-FUNCTION is ok even though this is not an instance of it.
+    ;; I _think_ this makes the test reliable with pre_verify_gen_0 enabled.
+    (sb-kernel:%set-fun-layout fun (sb-kernel:find-layout 'generic-function))
     (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-one)
     (flet ((changer ()
              (loop (sb-thread:barrier (:read))
