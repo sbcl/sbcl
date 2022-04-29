@@ -317,39 +317,6 @@
       (funcall fun classoid)))
   t)
 
-;;; Similar to DO-INSTANCE-TAGGED-SLOT but iterating over all words.
-(defmacro do-layout-bitmap ((index-var taggedp-var layout count) &body guts)
-  `(let* ((layout ,layout)
-          (bitmap-word-index (bitmap-start layout))
-          (bitmap-word-limit (%instance-length layout))
-          ;; Shift out 1 bit if skipping bit 0 of the 0th mask word
-          ;; because it's not user-visible data.
-          (mask (ash (%raw-instance-ref/signed-word
-                      layout (prog1 bitmap-word-index (incf bitmap-word-index)))
-                     ,(- sb-vm:instance-data-start)))
-          ;; If this was the last word of the bitmap, then the high bit
-          ;; is infinitely sign-extended, and we can keep right-shifting
-          ;; the mask word indefinitely. Most bitmaps will have only 1 word.
-          (nbits (if (= bitmap-word-index bitmap-word-limit)
-                     ,sb-vm:instance-length-mask
-                     ,(- sb-vm:n-word-bits sb-vm:instance-data-start))))
-     (declare (type sb-vm:signed-word mask)
-              (type fixnum nbits))
-     (do ((,index-var sb-vm:instance-data-start (1+ ,index-var))
-          (end ,count))
-         ((>= ,index-var end))
-       (declare (type (unsigned-byte 14) ,index-var end))
-       ;; If mask was fully consumed, fetch the next bitmap word
-       (when (zerop nbits)
-         (setq mask (%raw-instance-ref/signed-word layout bitmap-word-index)
-               nbits (if (= (incf (truly-the index bitmap-word-index))
-                            bitmap-word-limit)
-                         ,sb-vm:instance-length-mask
-                         ,sb-vm:n-word-bits)))
-       (let ((,taggedp-var (logbitp 0 mask))) ,@guts)
-       (setq mask (ash mask -1)
-             nbits (truly-the fixnum (1- nbits))))))
-
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)
   "Return a copy of STRUCTURE with the same (EQL) slot values."

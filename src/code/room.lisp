@@ -913,9 +913,13 @@ We could try a few things to mitigate this:
          ;; These two are in fact generally the most frequently occurring type.
          ,.(make-case 'cons `(car ,obj) `(cdr ,obj))
          ,.(make-case* 'instance
-            `(progn
+            ;; %INSTANCE-LAYOUT is defknown'ed to return a LAYOUT,
+            ;; but heap walking might encounter an instance with no layout,
+            ;; hence the need to access the slot opaquely.
+            `(unless (eql 0 #+compact-instance-header (%primitive %instance-layout ,obj)
+                            #-compact-instance-header (%instance-ref ,obj 0))
                (,functoid (%instance-layout ,obj) ,@more)
-               (do-instance-tagged-slot (.i. ,obj nil)
+               (do-instance-tagged-slot (.i. ,obj)
                  (,functoid (%instance-ref ,obj .i.) ,@more))))
          (function
           (typecase ,obj

@@ -118,8 +118,8 @@
     (sb-kernel:do-instance-tagged-slot (i *afoo*)
       (push `(,i ,(sb-kernel:%instance-ref *afoo* i)) l))
     (assert (equalp (nreverse l)
-                    #-64-bit `((3 aaay) (9 bee) (13 cee) (14 #xdead))
-                    #+64-bit `((2 aaay) (6 bee) (9 cee) (10 #xdead))))))
+                    #-64-bit `((3 aaay) (9 bee) (13 cee))
+                    #+64-bit `((2 aaay) (6 bee) (9 cee))))))
 
 (defvar *anotherfoo* (make-foo1))
 
