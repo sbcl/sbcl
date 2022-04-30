@@ -69,7 +69,7 @@ static void perform_gc(lispobj* stackptr)
     extern void garbage_collect_generation(generation_index_t, int, void*);
 
     gc_active_p = 1;
-    gc_close_collector_regions();
+    gc_close_collector_regions(0); // TODO: should be THREAD_PAGE_FLAG
     close_current_thread_tlab();
     update_immobile_nursery_bits();
     verify_heap(VERIFY_PRE_GC);

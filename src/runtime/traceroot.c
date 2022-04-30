@@ -988,7 +988,13 @@ static int trace_paths(void (*context_scanner)(),
         }
         ++i;
     } while (weak_pointers != NIL);
-    gc_close_collector_regions();
+    // gc_close_collector_regions() won't suffice here.
+    // Depending on whether this is called from prove_liveness() or
+    // gc_prove_liveness() via collect_garbage(), there may be an open
+    // region that has the THREAD_PAGE_FLAG in its PTE. But that's not
+    // correct for the allocations made for traceroot's answers.
+    ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
+    ensure_region_closed(cons_region, PAGE_TYPE_CONS);
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
 #if TRACEROOT_USE_ABSL_HASHMAP
     absl_hashmap_destroy(inverted_heap);

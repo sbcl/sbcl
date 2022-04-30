@@ -224,7 +224,7 @@ static void suspend_other_threads() {
     // versus doing this loop
     struct thread *th;
     for_each_thread(th) { gc_close_thread_regions(th); }
-    gc_close_collector_regions();
+    gc_close_collector_regions(0);
 }
 static void unsuspend_other_threads() {
 #ifdef LISP_FEATURE_SB_THREAD
@@ -753,7 +753,8 @@ ldb_monitor(void)
     int ambig;
 
     printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
-    if (gc_active_p) printf("(GC in progress)\n");
+    if (gc_active_p) printf("(GC in progress, oldspace=%d, newspace=%d)\n",
+                            from_space, new_space);
     if (gc_activitylog_file) fflush(gc_activitylog_file);
     if (!ldb_in) {
 #ifndef LISP_FEATURE_WIN32

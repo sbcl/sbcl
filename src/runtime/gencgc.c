@@ -3147,9 +3147,9 @@ static void newspace_full_scavenge(generation_index_t generation)
     record_new_regions_below = 1 + page_table_pages;
 }
 
-void gc_close_collector_regions()
+void gc_close_collector_regions(int flag)
 {
-    ensure_region_closed(code_region, PAGE_TYPE_CODE);
+    ensure_region_closed(code_region, flag|PAGE_TYPE_CODE);
     ensure_region_closed(boxed_region, PAGE_TYPE_BOXED);
     ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
     ensure_region_closed(mixed_region, PAGE_TYPE_MIXED);
@@ -3162,7 +3162,7 @@ static void
 scavenge_newspace(generation_index_t generation)
 {
     /* Flush the current regions updating the page table. */
-    gc_close_collector_regions();
+    gc_close_collector_regions(0);
 
     /* Turn on the recording of new areas. */
     gc_assert(new_areas_index == 0);
@@ -3173,7 +3173,7 @@ scavenge_newspace(generation_index_t generation)
     newspace_full_scavenge(generation);
 
     /* Flush the current regions updating the page table. */
-    gc_close_collector_regions();
+    gc_close_collector_regions(0);
 
     while (1) {
         if (GC_LOGGING) fprintf(gc_activitylog(), "newspace loop\n");
@@ -3184,7 +3184,7 @@ scavenge_newspace(generation_index_t generation)
             // actually entails new work - it only knows which triggers were removed
             // from the pending list. So check again if allocations occurred,
             // which is only if not all triggers referenced already-live objects.
-            gc_close_collector_regions(); // update new_areas from regions
+            gc_close_collector_regions(0); // update new_areas from regions
             if (!new_areas_index && !immobile_scav_queue_count)
                 break; // still no work to do
         }
@@ -3229,7 +3229,7 @@ scavenge_newspace(generation_index_t generation)
 
         }
         /* Flush the current regions updating the page table. */
-        gc_close_collector_regions();
+        gc_close_collector_regions(0);
     }
 
     /* Turn off recording of allocation regions. */
@@ -4450,7 +4450,7 @@ collect_garbage(generation_index_t last_gen)
         ensure_region_closed(THREAD_ALLOC_REGION(th,mixed), PAGE_TYPE_MIXED);
         ensure_region_closed(THREAD_ALLOC_REGION(th,cons), PAGE_TYPE_CONS);
     }
-    gc_close_collector_regions();
+    ensure_region_closed(code_region, PAGE_TYPE_CODE);
     if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_gcs, last_gen);
 
     /* Immobile space generation bits are lazily updated for gen0
