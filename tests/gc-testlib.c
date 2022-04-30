@@ -37,6 +37,15 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
     // Fill to the end of the card
     int filler_nwords = (GENCGC_CARD_BYTES >> WORD_SHIFT) - 2;
     *where = ((filler_nwords - 1) << N_WIDETAG_BITS) | FILLER_WIDETAG;
+
+    // Assert that no tagged pointer can point to the filler
+    // fprintf(stderr, "Filler @ %p: %"OBJ_FMTX"\n", where, *where);
+    int lowtag;
+    for (lowtag=1; lowtag<=LOWTAG_MASK; ++lowtag) {
+        lispobj addr = make_lispobj(where, lowtag);
+        gc_assert(!plausible_tag_p(addr));
+    }
+
     where += filler_nwords;
 
     // Create the funcallable instance, total length 6 words

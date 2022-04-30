@@ -549,4 +549,19 @@ struct slab_header {
 static const int CONS_PAGE_USABLE_BYTES = MAX_CONSES_PER_PAGE*CONS_SIZE*N_WORD_BYTES;
 #endif
 
+#include "genesis/cons.h"
+/* Return true if 'addr' has a lowtag and widetag that correspond,
+ * given that the words at 'addr' are within range for an allocated page.
+ * 'addr' could be a pointer to random data, and this check is merely
+ * a heuristic. False positives are possible. */
+static inline boolean plausible_tag_p(lispobj addr)
+{
+    if (listp(addr))
+        return is_cons_half(CONS(addr)->car)
+            && is_cons_half(CONS(addr)->cdr);
+    unsigned char widetag = widetag_of(native_pointer(addr));
+    return other_immediate_lowtag_p(widetag)
+        && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);
+}
+
 #endif /* _GC_PRIVATE_H_ */

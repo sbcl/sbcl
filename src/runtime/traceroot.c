@@ -785,6 +785,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                 }
             }
             break;
+        case FILLER_WIDETAG: continue;
         default:
             if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag)))
               lose("Unknown widetag %x", widetag);

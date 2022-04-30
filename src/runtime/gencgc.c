@@ -1822,20 +1822,6 @@ lispobj *search_dynamic_space(void *pointer)
     return gc_search_space(start, pointer);
 }
 
-/* Return true if 'addr' has a lowtag and widetag that correspond,
- * given that the words at 'addr' are within range for an allocated page.
- * 'addr' could be a pointer to random data, and this check is merely
- * a heuristic. False positives are possible. */
-static inline boolean plausible_tag_p(lispobj addr)
-{
-    if (listp(addr))
-        return is_cons_half(CONS(addr)->car)
-            && is_cons_half(CONS(addr)->cdr);
-    unsigned char widetag = widetag_of(native_pointer(addr));
-    return other_immediate_lowtag_p(widetag)
-        && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);
-}
-
 /* Return true if and only if everything on the specified page is NOT subject
  * to evacuation, i.e. either the page is not in 'from_space', or is entirely
  * pinned.  "Entirely pinned" is predicated on being marked as pinned,

@@ -183,6 +183,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                 (+ #x80 (case widetag
                           (#.instance-widetag instance-pointer-lowtag)
                           (#.+function-widetags+ fun-pointer-lowtag)
+                          (#.filler-widetag 0)
                           (t other-pointer-lowtag)))))))
     (format stream "unsigned char widetag_lowtag[256] = {")
     (dotimes (line 16)

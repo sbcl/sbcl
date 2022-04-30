@@ -302,6 +302,9 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
     }
     while (where < end) {
         int widetag = is_header(*where) ? header_widetag(*where) : LIST_POINTER_LOWTAG;
+        /* Technically we should wait until after performing the widetag validity
+         * tests before calling the sizer.  Otherwise the lossage message would
+         * not be as good as it could be. I guess that failure doesn't happen much */
         long nwords = OBJECT_SIZE(*where,where);
         state->object_addr = where;
         state->object_header = is_cons_half(*where) ? 0 : *where;
@@ -338,6 +341,7 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
         if (!state->object_header) {
             if (verify_pointer(where[0], where+0, state) ||
                 verify_pointer(where[1], where+1, state)) break;
+        } else if (widetag == FILLER_WIDETAG) { // do nothing
         } else if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag))) {
             lose("Unhandled widetag %"OBJ_FMTX" @ %p", *where, where);
         } else if (leaf_obj_widetag_p(widetag)) {

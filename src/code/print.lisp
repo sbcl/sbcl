@@ -2055,6 +2055,7 @@ variable: an unreadable object representing the error is printed instead.")
              (#.sb-vm:value-cell-widetag
               (write-string "value cell " stream)
               (output-object (value-cell-ref object) stream))
+             #+nil
              (#.sb-vm:filler-widetag
               (write-string "pad " stream)
               (write (1+ (get-header-data object)) :stream stream)

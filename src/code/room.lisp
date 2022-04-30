@@ -45,9 +45,6 @@
                           complex-array-widetag))
         (setf (svref infos code) info)))
 
-    ;; FIXME: do we still need this ?
-    (setf (svref infos filler-widetag) (make-room-info 'filler))
-
     (dotimes (i (length *specialized-array-element-type-properties*))
       (let ((saetp (aref *specialized-array-element-type-properties* i)))
         (setf (svref infos (saetp-typecode saetp)) saetp)))
@@ -1051,7 +1048,6 @@ We could try a few things to mitigate this:
           (case (widetag-of this)
             (#.value-cell-widetag
              (test (value-cell-ref this)))
-            (#.filler-widetag)
             (t
              (bug "Unknown object type #x~x addr=~x"
                   (widetag-of this)
