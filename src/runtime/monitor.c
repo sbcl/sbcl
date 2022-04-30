@@ -158,16 +158,23 @@ void save_gc_crashdump(char *pathname,
         int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
         os_context_t* threadcontext = nth_interrupt_context(0, th);
         uword_t sp;
-        if (ici)
+        if (ici) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
             sp = *os_context_register_addr(threadcontext, reg_SP);
 #else
             sp = *os_context_register_addr(threadcontext, reg_CSP);
 #endif
-        else {
+        } else if (th->state_word.state == STATE_DEAD) {
+            gc_assert(th->binding_stack_pointer == th->binding_stack_start);
+            // FIXME: assumes stack grows down
+            sp = (uword_t)th->control_stack_end;
+        } else {
             if (th != get_sb_vm_thread()) {
-              char msg[] = "No stackptr for crash dump\n";
-              write(2, msg, sizeof msg-1);
+              char msg[80];
+              int n = snprintf(msg, sizeof msg,
+                               "thread %p state %d - No stackptr for crash dump\n",
+                               th, th->state_word.state);
+              write(2, msg, n);
               _exit(1);
             }
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
