@@ -486,6 +486,20 @@ Examples:
        test test-fun hash-fun
        size rehash-size rehash-threshold))))
 
+(defmacro make-index-vector (n)
+  `(let ((a (make-array ,n :element-type 'hash-table-index
+                           :initial-element 0)))
+     a))
+
+(defun validate-index-vector (tbl reason)
+  (let* ((iv (hash-table-index-vector tbl))
+         (pairs (hash-table-pairs tbl))
+         (npairs (length pairs)))
+    (dovector (indexval iv)
+      (when (> (* 2 indexval) npairs)
+        (bug "~a: Busted index vector on ~S, pairlen=~d 2*index=~d"
+             reason tbl npairs (* 2 indexval))))))
+
 (defun %make-hash-table (flags test test-fun hash-fun size rehash-size rehash-threshold)
   (binding* (
            ;; KLUDGE: The most natural way of expressing the below is
@@ -511,8 +525,7 @@ Examples:
             (if defaultp
                 #.(sb-xc:make-array 2 :element-type '(unsigned-byte 32)
                                     :initial-element 0)
-                (make-array bucket-count :element-type 'hash-table-index
-                            :initial-element 0)))
+                (make-index-vector bucket-count)))
            (kv-vector (if defaultp #(0 0 nil) (%alloc-kv-pairs size)))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indices at 2i and 2i+1 -
@@ -672,9 +685,7 @@ multiple threads accessing the same hash-table without locking."
             pow2ceil))
          ;; These vector lengths are exactly analogous to those in MAKE-HASH-TABLE,
          ;; prompting the question of whether we can share some code.
-         (new-index-vector (make-array new-n-buckets
-                                       :element-type 'hash-table-index
-                                       :initial-element 0))
+         (new-index-vector (make-index-vector new-n-buckets))
          (new-kv-vector (%alloc-kv-pairs new-size))
          (new-next-vector (make-array (1+ new-size) :element-type 'hash-table-index
                                       ;; for robustness testing, as explained in %MAKE-HASH-TABLE
@@ -894,8 +905,7 @@ multiple threads accessing the same hash-table without locking."
     (let* ((size (shiftf (hash-table-cache table) 0))
            (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table))))
            (bucket-count (power-of-two-ceiling (max scaled-size +min-hash-table-size+)))
-           (index-vector (make-array bucket-count :element-type 'hash-table-index
-                                     :initial-element 0))
+           (index-vector (make-index-vector bucket-count))
            (kv-vector (%alloc-kv-pairs size))
            (next-vector (make-array (1+ size) :element-type 'hash-table-index
                                     #+sb-devel :initial-element #+sb-devel bad-next-value))
