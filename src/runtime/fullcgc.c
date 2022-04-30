@@ -571,46 +571,29 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
 {
     long *zeroed = (long*)arg; // one count per generation
     sword_t nwords;
+    extern void deposit_filler(uword_t addr, sword_t nbytes);
 
-    // TODO: consecutive dead objects on same page should be merged.
     for ( ; where < end ; where += nwords ) {
         lispobj word = *where;
+        int livep = 0;
         if (is_header(word)) {
             nwords = sizetab[header_widetag(word)](where);
             lispobj markbit = general_widetag_to_markbit(header_widetag(word));
-            if (word & markbit)
-                *where = word ^ markbit;
-            else {
-                // Turn the object into either a (0 . 0) cons
-                // or an unboxed filler depending on size.
-                if (nwords <= 2) // could be SAP, SIMPLE-ARRAY-NIL, 1-word bignum, etc
-                    goto cons;
-                struct code* code  = (struct code*)where;
-                // Keep in sync with the definition of filler_obj_p()
-                if (!filler_obj_p((lispobj*)code)) {
-                    page_index_t page = find_page_index(where);
-                    int gen = page >= 0 ? page_table[page].gen
-                      : immobile_obj_gen_bits(where);
-                    NOTE_GARBAGE(gen, where, nwords, zeroed, {
-                        code->boxed_size = 0;
-                        code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
-                                     | CODE_HEADER_WIDETAG;
-                        /* This memset() is needed for strictly boxed pages,
-                         * but probably not for other page types. No big deal.
-                         * fullcgc isn't really used much */
-                        memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
-                    })
-                }
-            }
+            if (word & markbit) livep = 1, *where = word ^ markbit;
         } else {
             nwords = 2;
-            if (!cons_markedp((lispobj)where)) {
-                if (where[0] | where[1]) {
-               cons:
-                    gc_dcheck(!immobile_space_p((lispobj)where));
-                    NOTE_GARBAGE(page_table[find_page_index(where)].gen,
-                                 where, 2, zeroed,
-                                 where[0] = where[1] = 0);
+            livep = cons_markedp((lispobj)where);
+        }
+        if (!livep) {
+            if (find_page_index(where)>=0) // dynamic space
+                deposit_filler((uword_t)where, nwords<<WORD_SHIFT);
+            else { // immobile space
+                struct code* code  = (struct code*)where;
+                if (!filler_obj_p((lispobj*)code)) {
+                    code->boxed_size = 0;
+                    code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
+                                   | CODE_HEADER_WIDETAG;
+                    memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
                 }
             }
         }

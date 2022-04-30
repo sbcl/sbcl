@@ -2205,7 +2205,7 @@ void visit_freed_objects(char __attribute__((unused)) *start,
 #endif
 }
 
-static void deposit_filler(uword_t addr, sword_t nbytes) {
+void deposit_filler(uword_t addr, sword_t nbytes) {
     if (!nbytes) return;
     gc_assert(nbytes > 0);
     sword_t nwords = nbytes >> WORD_SHIFT;
