@@ -794,11 +794,9 @@
           (cond ((not component-tlf-num)
                  (setf component-tlf-num tlf-num))
                 ((= component-tlf-num tlf-num))
-                ((block-compile *compilation*)
-                 (setf component-tlf-num :multiple)
-                 (return))
                 (t
-                 (bug "tlf-num mismatch"))))))
+                 (setf component-tlf-num :multiple)
+                 (return))))))
     (dolist (lambda (component-lambdas component))
       (unless (empty-fun-p lambda)
         (clrhash var-locs)
