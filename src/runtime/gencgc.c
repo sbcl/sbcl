@@ -423,8 +423,8 @@ extern void fpu_restore(void *);
 
 #define PAGE_INDEX_FMT PRIdPTR
 
-extern void
-write_generation_stats(FILE *file)
+// You can call this with 0 and NULL to perform its assertions silently
+void gc_gen_report_to_file(int filedes, FILE *file)
 {
 #ifdef LISP_FEATURE_X86
     int fpu_state[27];
@@ -434,10 +434,14 @@ write_generation_stats(FILE *file)
     fpu_save(fpu_state);
 #endif
 
+#define OUTPUT(str, len) \
+    {if (file) fwrite(str, 1, len, file); if (filedes>=0) write(filedes, str, len);}
+
     /* Print the heap stats. */
-    fprintf(file,
-            "Gen  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
-            " Waste%%       Alloc        Trig   Dirty GCs Mem-age\n");
+    char header[] =
+            " Gen  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
+            " Waste%       Alloc        Trig   Dirty GCs Mem-age\n";
+    OUTPUT(header, sizeof header-1);
 
     generation_index_t gen_num, begin, end;
     // Print from the lowest gen that has any allocated pages.
@@ -447,15 +451,51 @@ write_generation_stats(FILE *file)
     for (end = SCRATCH_GENERATION; end >= 0; --end)
         if (generations[end].bytes_allocated) break;
 
+    char linebuf[144];
     page_index_t coltot[9];
+    uword_t eden_words_allocated = 0;
+    page_index_t eden_pages = 0;
     memset(coltot, 0, sizeof coltot);
     for (gen_num = begin; gen_num <= end; gen_num++) {
         page_index_t page;
         page_index_t pagect[9];
 
         memset(pagect, 0, sizeof pagect);
+        if (gen_num == 0) { // Count the eden pages
+            for (page = 0; page < next_free_page; page++)
+                if (page_table[page].gen == 0 && page_table[page].type & THREAD_PAGE_FLAG) {
+                    int column;
+                    switch (page_table[page].type & ~THREAD_PAGE_FLAG) {
+                    case PAGE_TYPE_BOXED:   column = 0; break;
+                    case PAGE_TYPE_CONS:    column = 1; break;
+                    case PAGE_TYPE_CODE:    column = 3; break;
+                    case PAGE_TYPE_MIXED:   column = 5; break;
+                    default: lose("Bad eden page subtype: %x\n", page_table[page].type);
+                    }
+                    pagect[column]++;
+                    coltot[column]++;
+                    ++eden_pages;
+                    eden_words_allocated += page_words_used(page);
+                }
+            uword_t waste = npage_bytes(eden_pages) - (eden_words_allocated<<WORD_SHIFT);
+            double pct_waste = eden_pages > 0 ?
+                               (double)waste / (double)npage_bytes(eden_pages) * 100 : 0.0;
+            if (eden_pages) {
+                int linelen = snprintf(linebuf, sizeof linebuf,
+                        "  E %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%14"PAGE_INDEX_FMT
+                        "%14"PAGE_INDEX_FMT
+                        "%28.1f %11"OS_VM_SIZE_FMT"\n",
+                        pagect[0], pagect[1], pagect[3], pagect[5],
+                        pct_waste, eden_words_allocated<<WORD_SHIFT);
+                OUTPUT(linebuf, linelen);
+            }
+            memset(pagect, 0, sizeof pagect);
+        }
+        uword_t words_allocated = 0;
+        page_index_t tot_pages = 0;
         for (page = 0; page < next_free_page; page++)
-            if (!page_free_p(page) && page_table[page].gen == gen_num) {
+            if (!page_free_p(page) && page_table[page].gen == gen_num
+                && !(page_table[page].type & THREAD_PAGE_FLAG)) {
                 int column;
                 switch (page_table[page].type & (SINGLE_OBJECT_FLAG|PAGE_TYPE_MASK)) {
                 case PAGE_TYPE_BOXED:   column = 0; break;
@@ -471,45 +511,60 @@ write_generation_stats(FILE *file)
                 }
                 pagect[column]++;
                 coltot[column]++;
+                ++tot_pages;
+                words_allocated += page_words_used(page);
             }
         struct generation* gen = &generations[gen_num];
-        gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(gen_num));
-        page_index_t tot_pages, n_dirty;
-        tot_pages = count_generation_pages(gen_num, &n_dirty);
-        uword_t waste = npage_bytes(tot_pages) - generations[gen_num].bytes_allocated;
+        if (gen_num == 0)
+            gc_assert(gen->bytes_allocated ==
+                      (words_allocated+eden_words_allocated) << WORD_SHIFT);
+        else {
+            gc_assert(gen->bytes_allocated == words_allocated << WORD_SHIFT);
+        }
+        page_index_t n_dirty;
+        count_generation_pages(gen_num, &n_dirty);
+        uword_t waste = npage_bytes(tot_pages) - (words_allocated<<WORD_SHIFT);
         double pct_waste = tot_pages > 0 ?
           (double)waste / (double)npage_bytes(tot_pages) * 100 : 0.0;
-        fprintf(file,
-                " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
+        int linelen =
+            snprintf(linebuf, sizeof linebuf,
+                "  %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT" %6.1f %11"OS_VM_SIZE_FMT" %11"OS_VM_SIZE_FMT,
                 gen_num,
                 pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
                 pagect[6], pagect[7], pagect[8],
-                pct_waste, (uintptr_t)gen->bytes_allocated,
+                pct_waste, words_allocated<<WORD_SHIFT,
                 (uintptr_t)gen->gc_trigger);
         // gen0 pages are never WPed
-        fprintf(file, gen_num==0?"       -" : " %7"PAGE_INDEX_FMT, n_dirty);
-        fprintf(file, " %3d %7.4f\n", gen->num_gc, generation_average_age(gen_num));
+        linelen += snprintf(linebuf+linelen, sizeof linebuf-linelen,
+                            gen_num==0?"       -" : " %7"PAGE_INDEX_FMT, n_dirty);
+        linelen += snprintf(linebuf+linelen, sizeof linebuf-linelen,
+                            " %3d %7.4f\n", gen->num_gc, generation_average_age(gen_num));
+        OUTPUT(linebuf, linelen);
     }
     page_index_t tot_pages = coltot[0] + coltot[1] + coltot[2] + coltot[3] + coltot[4] +
                              coltot[5] + coltot[6] + coltot[7] + coltot[8];
     uword_t waste = npage_bytes(tot_pages) - bytes_allocated;
     double pct_waste = (double)waste / (double)npage_bytes(tot_pages) * 100;
     double heap_use_frac = 100 * (double)bytes_allocated / (double)dynamic_space_size;
-    fprintf(file,
-            "-- %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
+    int linelen =
+        snprintf(linebuf, sizeof linebuf,
+            "Tot %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
             "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
             "%7"PAGE_INDEX_FMT" %6.1f%12"OS_VM_SIZE_FMT
             " [%.1f%% of %"OS_VM_SIZE_FMT" max]\n",
             coltot[0], coltot[1], coltot[2], coltot[3], coltot[4], coltot[5], coltot[6],
             coltot[7], coltot[8], pct_waste,
             (uintptr_t)bytes_allocated, heap_use_frac, (uintptr_t)dynamic_space_size);
+    OUTPUT(linebuf, linelen);
+#undef OUTPUT
 
 #ifdef LISP_FEATURE_X86
     fpu_restore(fpu_state);
 #endif
 }
+void write_generation_stats(FILE *file) { gc_gen_report_to_file(-1, file); }
 
 extern void
 write_heap_exhaustion_report(FILE *file, long available, long requested,

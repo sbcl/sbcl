@@ -80,6 +80,7 @@ int gencgc_handle_wp_violation(void *);
 #define PAGE_TYPE_SMALL_MIXED  4 // #b100
 #define PAGE_TYPE_CONS         5 // #b101
 #define PAGE_TYPE_CODE         7 // #b111
+#define THREAD_PAGE_FLAG       8
 #define SINGLE_OBJECT_FLAG    16
 #define OPEN_REGION_PAGE_FLAG 32
 #define FREE_PAGE_FLAG        0

@@ -567,9 +567,9 @@ static void sweep_fixedobj_pages(long *zeroed)
 }
 #endif
 
-static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
+static uword_t sweep(lispobj* where, lispobj* end,
+                     __attribute__((unused)) uword_t arg)
 {
-    long *zeroed = (long*)arg; // one count per generation
     sword_t nwords;
     extern void deposit_filler(uword_t addr, sword_t nbytes);
 
