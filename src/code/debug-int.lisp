@@ -296,6 +296,9 @@
   ;; the DEBUG-BLOCK containing CODE-LOCATION. XXX Possibly toss this
   ;; out and just find it in the blocks cache in DEBUG-FUN.
   (%debug-block :unparsed :type (or debug-block (member :unparsed)))
+  ;; This is the number of forms processed by the compiler or loader
+  ;; before the top level form containing this code-location.
+  (%tlf-offset :unparsed :type (or index (member :unparsed)))
   ;; This is the depth-first number of the node that begins
   ;; code-location within its top level form.
   (%form-number :unparsed :type (or index (member :unparsed))))
@@ -463,13 +466,13 @@
   #+gencgc
   (let ((memo-cell
          (let* ((info (sb-vm::%%code-debug-info component))
-                (val (sb-c::compiled-debug-info-tlf-num+offset info)))
-           (if (consp val)
-               val
-               (let* ((list (list val))
-                      (old (cas (sb-c::compiled-debug-info-tlf-num+offset info) val list)))
-                 (if (eq old val) list old))))))
-    ;; The CDR of TLF-NUM+OFFSET slot is an alist from compiler -> debugger structure.
+                (val (sb-c::compiled-debug-info-memo-cell info)))
+           (if (null val)
+               (let* ((list (cons val nil))
+                      (old (cas (sb-c::compiled-debug-info-memo-cell info) val list)))
+                 (if (eq old val) list old))
+               val))))
+    ;; The CDR of MEMO-CELL slot is an alist from compiler -> debugger structure.
     (let ((new-df nil) (new-pair nil) (new-alist nil) (alist (cdr memo-cell)))
       (loop
         ;; This list generally contains 5 items or less. At least, in our tests it does
@@ -494,12 +497,12 @@
            str)))
 
 (defstruct (compiled-code-location
-             (:include code-location)
-             (:constructor make-known-code-location
-                           (pc debug-fun %debug-block %form-number
-                               %live-set kind step-info context &aux (%unknown-p nil)))
-             (:constructor make-compiled-code-location (pc debug-fun))
-             (:copier nil))
+            (:include code-location)
+            (:constructor make-known-code-location
+                (pc debug-fun %debug-block %tlf-offset %form-number
+                 %live-set kind step-info context &aux (%unknown-p nil)))
+            (:constructor make-compiled-code-location (pc debug-fun))
+            (:copier nil))
   ;; an index into DEBUG-FUN's component slot
   (pc nil :type index :read-only t)
   ;; a bit-vector indexed by a variable's position in
@@ -1803,6 +1806,7 @@ register."
            ;; element size of the packed binary representation of the
            ;; blocks data.
            (live-set-len (ceiling var-count 8))
+           (tlf-number (sb-c::compiled-debug-fun-tlf-number compiler-debug-fun))
            (elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc compiler-debug-fun))
            elsewhere-p
            (len (length blocks))
@@ -1831,6 +1835,8 @@ register."
                              (ldb (byte 3 0) flags)))
                 (pc (+ last-pc
                        (sb-c:read-var-integerf blocks i)))
+                (tlf-offset (or tlf-number
+                                (sb-c::read-var-integerf blocks i)))
                 (equal-live (logtest sb-c::compiled-code-location-equal-live flags))
                 (form-number
                   (cond ((logtest sb-c::compiled-code-location-zero-form-number flags)
@@ -1864,7 +1870,7 @@ register."
                           (setf elsewhere-p t)))
              (new-block))
            (push (make-known-code-location
-                  pc debug-fun block
+                  pc debug-fun block tlf-offset
                   form-number live-set kind
                   step-info context)
                  locations)
@@ -2051,26 +2057,27 @@ register."
         (debug-signal 'no-debug-blocks :debug-fun
                       (code-location-debug-fun code-location)))))
 
-(defun debug-fun-tlf-and-offset (debug-info debug-fun)
-  (if (typep (sb-c::compiled-debug-info-tlf-num+offset debug-info)
-             '(or (eql :multiple) (cons (eql :multiple))))
-      (let* ((encoded-locs (sb-c::compiled-debug-fun-encoded-locs debug-fun))
-             (tlf-num+offset (and (consp encoded-locs)
-                                  (car encoded-locs))))
-        (if tlf-num+offset
-            (sb-c::unpack-tlf-num+offset tlf-num+offset)))
-      (values (sb-c::compiled-debug-info-tlf-number debug-info)
-              (sb-c::compiled-debug-info-char-offset debug-info))))
-
 ;;; Returns the number of top level forms before the one containing
 ;;; CODE-LOCATION as seen by the compiler in some compilation unit. (A
 ;;; compilation unit is not necessarily a single file, see the section
 ;;; on debug-sources.)
 (defun code-location-toplevel-form-offset (code-location)
-  (let ((df (code-location-debug-fun code-location)))
-    (values
-     (debug-fun-tlf-and-offset (compiled-debug-fun-debug-info df)
-                               (compiled-debug-fun-compiler-debug-fun df)))))
+  (when (code-location-unknown-p code-location)
+    (error 'unknown-code-location :code-location code-location))
+  (let ((tlf-offset (code-location-%tlf-offset code-location)))
+    (cond ((eq tlf-offset :unparsed)
+           (etypecase code-location
+             (compiled-code-location
+              (unless (fill-in-code-location code-location)
+                ;; This check should be unnecessary. We're missing
+                ;; debug info the compiler should have dumped.
+                (bug "unknown code location"))
+              (code-location-%tlf-offset code-location))
+             ;; (There used to be more cases back before sbcl-0.7.0,,
+             ;; when we did special tricks to debug the IR1
+             ;; interpreter.)
+             ))
+          (t tlf-offset))))
 
 ;;; Return the number of the form corresponding to CODE-LOCATION. The
 ;;; form number is derived by a walking the subforms of a top level
@@ -2210,6 +2217,8 @@ register."
     (when found
       (setf (code-location-%debug-block code-location)
             (code-location-%debug-block found))
+      (setf (code-location-%tlf-offset code-location)
+            (code-location-%tlf-offset found))
       (setf (code-location-%form-number code-location)
             (code-location-%form-number found))
       (setf (compiled-code-location-%live-set code-location)
@@ -3045,38 +3054,39 @@ register."
     rt))
 
 ;;; Locate the source file (if it still exists) and grab the top level
-;;; form. If the file is modified, we use the top level form offset
-;;; instead of the recorded character offset.
+;;; form. If the file is modified, or if we are in the middle of
+;;; loading the file (so that the start positions map is not available
+;;; yet), we use the top level form offset instead of the recorded
+;;; character offset.
 (defun get-file-toplevel-form (location)
   (let* ((d-source (code-location-debug-source location))
-         (di (compiled-debug-fun-debug-info
-              (code-location-debug-fun location)))
+         (tlf-offset (code-location-toplevel-form-offset location))
+         (start-positions (sb-di:debug-source-start-positions d-source))
          (namestring (debug-source-namestring d-source))
          (sbcl-source-p (eql (search "SYS:" namestring) 0)))
-    (multiple-value-bind (tlf-offset char-offset)
-        (debug-fun-tlf-and-offset di
-                                  (compiled-debug-fun-compiler-debug-fun
-                                   (code-location-debug-fun location)))
-      ;; FIXME: External format?
-      (with-open-file (f namestring :if-does-not-exist nil)
-        (when f
-          (let ((*readtable* (safe-readtable)))
-            (cond ((eql (debug-source-created d-source) (file-write-date f))
-                   (file-position f char-offset))
-                  (t
+    ;; FIXME: External format?
+    (with-open-file (f namestring :if-does-not-exist nil)
+      (when f
+        (let ((*readtable* (safe-readtable)))
+          (cond ((and (eql (debug-source-created d-source) (file-write-date f))
+                      start-positions)
+                 (file-position f (aref start-positions tlf-offset)))
+                (t
+                 (when start-positions
                    (format *debug-io*
-                           "~%; File has been modified since compilation:~%;   ~A~@
-                          ; Using form offset instead of character position.~%"
-                           namestring)
-                   (let ((*read-suppress* t)
-                         (*features* (if sbcl-source-p
-                                         (append *features*
-                                                 '(:sb-xc)
-                                                 (symbol-value 'sb-impl::+internal-features+))
-                                         *features*)))
-                     (loop repeat tlf-offset
-                           do (read f)))))
-            (read f)))))))
+                           "~%; File has been modified since compilation:~%;   ~A"
+                           namestring))
+                 (format *debug-io*
+                         "~%; Using form offset instead of character position.~%")
+                 (let ((*read-suppress* t)
+                       (*features* (if sbcl-source-p
+                                       (append *features*
+                                               '(:sb-xc)
+                                               (symbol-value 'sb-impl::+internal-features+))
+                                       *features*)))
+                   (loop repeat tlf-offset
+                         do (read f)))))
+          (read f))))))
 
 ;;;; PREPROCESS-FOR-EVAL
 

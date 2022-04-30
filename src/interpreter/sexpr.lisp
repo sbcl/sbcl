@@ -1170,11 +1170,6 @@ Test case.
             (setf (debug-source-namestring source)
                   (sb-kernel::function-file-namestring f)
                   (debug-source-created source) nil) ; = unknown
-            ;; Clobber the TLF-NUM + OFFSET. We should do better that that,
-            ;; but interpreted functions do not track their file offset,
-            ;; so the conservative thing is to plug in NILs, not bogus values
-            ;; from whatever file (if any) is currently being loaded.
-            (setf (sb-c::compiled-debug-info-tlf-num+offset cdi) 0)
             ;; Skirt a package lock by avoiding (SETF SYMBOL-FUNCTION)
             ;; *technically* this should be a compare-and-swap to ensure that the
             ;; original lambda expression is as expected. To do that, we need

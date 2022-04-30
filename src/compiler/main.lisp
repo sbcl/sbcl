@@ -1799,8 +1799,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values
             (with-compilation-unit ()
-              (setf (sb-fasl::fasl-output-source-info *compile-object*)
-                    (debug-source-for-info info))
+              (fasl-dump-partial-source-info info *compile-object*)
               (with-ir1-namespace
                 (with-source-paths
                   (do-forms-from-info ((form current-index) info
@@ -1813,7 +1812,13 @@ necessary, since type inference may take arbitrarily long to converge.")
                       (process-toplevel-form
                        form `(original-source-start 0 ,current-index) nil)))
                   (finish-block-compilation)
-                  (compile-toplevel-lambdas () t)))
+                  (compile-toplevel-lambdas () t)
+                  (let ((object *compile-object*))
+                    (etypecase object
+                      (fasl-output (fasl-dump-source-info info object))
+                      #-sb-xc-host
+                      (core-object (fix-core-source-info info object))
+                      (null)))))
               (let ((code-coverage-records
                       (code-coverage-records (coverage-metadata *compilation*))))
                   (unless (zerop (hash-table-count code-coverage-records))

@@ -2854,6 +2854,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
                                (lookup-assembler-reference (car item)))))
     (apply-fixups (%fasl-input-stack (fasl-input)) asm-code n-fixups)))
 
+;; The partial source info is not needed during the cold load, since
+;; it can't be interrupted.
+(define-cold-fop (fop-note-partial-source-info)
+  (pop-stack)
+  (pop-stack)
+  (pop-stack)
+  (values))
+
 ;;; Target variant of this is defined in 'target-load'
 (defun apply-fixups (fop-stack code-obj n-fixups)
   (let ((alloc-points (pop-fop-stack fop-stack)))

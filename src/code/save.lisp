@@ -500,12 +500,6 @@ sb-c::
          (declare (ignore size))
          (case widetag
           (#.sb-vm:code-header-widetag
-           (let ((di (sb-vm::%%code-debug-info obj)))
-             ;; Discard memoized debugger's debug info
-             (when (typep di 'sb-c::compiled-debug-info)
-               (let ((thing (sb-c::compiled-debug-info-tlf-num+offset di)))
-                 (when (consp thing)
-                   (setf (sb-c::compiled-debug-info-tlf-num+offset di) (car thing))))))
            (dotimes (i (sb-kernel:code-n-entries obj))
              (let* ((fun (sb-kernel:%code-entry-point obj i))
                     (arglist (%simple-fun-arglist fun))

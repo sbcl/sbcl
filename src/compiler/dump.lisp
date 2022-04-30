@@ -76,6 +76,10 @@
   ;; is the offset in the table of the code object needing to be
   ;; patched, and <offset> is the offset that must be patched.
   (patch-table (make-hash-table :test 'eq) :type hash-table)
+  ;; a list of the table handles for all of the DEBUG-INFO structures
+  ;; dumped in this file. These structures must be back-patched with
+  ;; source location information when the compilation is complete.
+  (debug-info () :type list)
   ;; This is used to keep track of objects that we are in the process
   ;; of dumping so that circularities can be preserved. The key is the
   ;; object that we have previously seen, and the value is the object
@@ -89,9 +93,7 @@
   ;; try to dump a structure that isn't in this hash table, we lose.
   (valid-structures (make-hash-table :test 'eq) :type hash-table)
   ;; a hash table of slots to be saved when dumping an instance.
-  (saved-slot-names (make-hash-table :test 'eq) :type hash-table)
-  ;; DEBUG-SOURCE written at the very beginning
-  (source-info nil :type (or null sb-c::debug-source)))
+  (saved-slot-names (make-hash-table :test 'eq) :type hash-table))
 (declaim (freeze-type fasl-output))
 
 ;;; Similarity hash table logic.
@@ -1170,9 +1172,9 @@
 
       ;; Dump the debug info.
       (let ((info (sb-c::debug-info-for-component component)))
-        (setf (sb-c::debug-info-source info)
-              (fasl-output-source-info fasl-output))
-        (dump-object info fasl-output))
+        (dump-object info fasl-output)
+        (push (dump-to-table fasl-output)
+              (fasl-output-debug-info fasl-output)))
 
       (dump-fop 'fop-load-code fasl-output
                 (logior (ash header-length 1)
@@ -1319,6 +1321,38 @@
   (declare (type sb-c::clambda fun))
   (dump-push-previously-dumped-fun fun fasl-output)
   (dump-fop 'fop-funcall-for-effect fasl-output 0)
+  (values))
+
+;;; Dump some information to allow partial reconstruction of the
+;;; DEBUG-SOURCE structure.
+(defun fasl-dump-partial-source-info (info file)
+  (declare (type sb-c::source-info info) (type fasl-output file))
+  (let ((partial (sb-c::debug-source-for-info info)))
+    (dump-object (sb-c::debug-source-namestring partial) file)
+    (dump-object (sb-c::debug-source-created partial) file)
+    (dump-object (sb-c::debug-source-plist partial) file)
+    (dump-fop 'fop-note-partial-source-info file)))
+
+;;; Compute the correct list of DEBUG-SOURCE structures and backpatch
+;;; all of the dumped DEBUG-INFO structures. We clear the
+;;; FASL-OUTPUT-DEBUG-INFO, so that subsequent components with
+;;; different source info may be dumped.
+(defun fasl-dump-source-info (info file)
+  (declare (type sb-c::source-info info) (type fasl-output file))
+  (let ((res (sb-c::debug-source-for-info info)))
+    (fasl-validate-structure res file)
+    (dump-object res file)
+    (let ((res-handle (dump-pop file)))
+      (dolist (info-handle (fasl-output-debug-info file))
+        (dump-push res-handle file)
+        (symbol-macrolet
+            ((debug-info-source-index
+               (let ((dd (find-defstruct-description 'sb-c::debug-info)))
+                 (dsd-index (find 'source (dd-slots dd)
+                                  :key #'dsd-name :test 'string=)))))
+          (dump-fop 'fop-structset file info-handle debug-info-source-index)))))
+
+  (setf (fasl-output-debug-info file) nil)
   (values))
 
 ;;;; dumping structures

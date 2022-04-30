@@ -2824,10 +2824,11 @@ bootstrapping.
                             (function-header (sb-kernel:fun-code-header function-object))
                             (debug-info (sb-kernel:%code-debug-info function-header))
                             (debug-source (sb-c::debug-info-source debug-info))
-                            (debug-fun (debug-info-debug-function function debug-info)))
+                            (debug-fun (debug-info-debug-function function debug-info))
+                            (tlf (and debug-fun (sb-c::compiled-debug-fun-tlf-number debug-fun))))
                        (sb-c::%make-definition-source-location
                         (sb-c::debug-source-namestring debug-source)
-                        (sb-c::compiled-debug-info-tlf-number debug-info)
+                        tlf
                         (sb-c::compiled-debug-fun-form-number debug-fun))))
                    (debug-info-debug-function (function debug-info)
 

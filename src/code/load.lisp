@@ -130,7 +130,10 @@
   (stack (make-fop-vector 100) :type simple-vector)
   (name-buffer (vector (make-string  1 :element-type 'character)
                        (make-string 31 :element-type 'base-char)))
-  (print nil :type boolean))
+  (print nil :type boolean)
+  ;; We keep track of partial source info for the input in case
+  ;; loading gets interrupted.
+  (partial-source-info nil :type (or null sb-c::debug-source)))
 (declaim (freeze-type fasl-input))
 
 ;;; Output the current number of semicolons after a fresh-line.
@@ -1115,6 +1118,8 @@
           ;; Assign debug-info last. A code object that has no debug-info will never
           ;; have its fun table accessed in conservative_root_p() or pin_object().
           (setf (%code-debug-info code) (svref stack (+ ptr n-constants)))
+          (setf (sb-c::debug-info-source (%code-debug-info code))
+                (%fasl-input-partial-source-info (fasl-input)))
           ;; Boxed constants can be assigned only after figuring out where the range
           ;; of implicitly tagged words is, which requires knowing how many functions
           ;; are in the code component, which requires reading the code trailer.
@@ -1208,6 +1213,15 @@
 
 (define-fop 22 (fop-assembler-code)
   (error "cannot load assembler code except at cold load"))
+
+;;;; fops for debug info
+
+(define-fop 124 (fop-note-partial-source-info (namestring created plist) nil)
+  (setf (%fasl-input-partial-source-info (fasl-input))
+        (sb-c::make-debug-source :namestring namestring
+                                 :created created
+                                 :plist plist))
+  (values))
 
 ;;;; fops for code coverage
 

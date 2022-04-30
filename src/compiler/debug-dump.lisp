@@ -197,12 +197,12 @@
 ;;; the code/source map and live info. If true, VOP is the VOP
 ;;; associated with this location, for use in determining whether TNs
 ;;; are spilled.
-(defun dump-1-location (node block kind label live var-locs vop
+(defun dump-1-location (node block kind tlf-num label live var-locs vop
                         &optional context)
   (declare (type node node) (type ir2-block block)
            (type (or null local-tn-bit-vector) live)
            (type (or label index) label)
-           (type location-kind kind)
+           (type location-kind kind) (type (or index null) tlf-num)
            (type hash-table var-locs) (type (or vop null) vop))
   (let* ((byte-buffer *byte-buffer*)
          (stepping (and (combination-p node)
@@ -255,6 +255,8 @@
     (write-var-integer (- loc *previous-location*) byte-buffer)
     (setq *previous-location* loc)
 
+    (unless tlf-num
+      (write-var-integer (source-path-tlf-number path) byte-buffer))
     (unless (zerop form-number)
       (setf *previous-form-number* form-number)
       (write-var-integer form-number byte-buffer))
@@ -274,13 +276,14 @@
 
 ;;; Extract context info from a Location-Info structure and use it to
 ;;; dump a compiled code-location.
-(defun dump-location-from-info (loc var-locs)
-  (declare (type location-info loc)
+(defun dump-location-from-info (loc tlf-num var-locs)
+  (declare (type location-info loc) (type (or index null) tlf-num)
            (type hash-table var-locs))
   (let ((vop (location-info-vop loc)))
     (dump-1-location (vop-node vop)
                      (vop-block vop)
                      (location-info-kind loc)
+                     tlf-num
                      (location-info-label loc)
                      (vop-save-set vop)
                      var-locs
@@ -288,21 +291,44 @@
                      (location-info-context loc)))
   (values))
 
+;;; Scan all the blocks, determining if all locations are in the same
+;;; TLF, and returning it or NIL.
+(defun find-tlf-number (fun)
+  (declare (type clambda fun))
+  (let ((res (source-path-tlf-number (node-source-path (lambda-bind fun)))))
+    (declare (type (or index null) res))
+    (do-environment-ir2-blocks (2block (lambda-environment fun))
+      (let ((block (ir2-block-block 2block)))
+        (when (eq (block-info block) 2block)
+          (unless (eql (source-path-tlf-number
+                        (node-source-path
+                         (block-start-node block)))
+                       res)
+            (setq res nil)))
+
+        (dolist (loc (ir2-block-locations 2block))
+          (unless (eql (source-path-tlf-number
+                        (node-source-path
+                         (vop-node (location-info-vop loc))))
+                       res)
+            (setq res nil)))))
+    res))
+
 ;;; Dump out the number of locations and the locations for Block.
-(defun dump-block-locations (block locations var-locs)
+(defun dump-block-locations (block locations tlf-num var-locs)
   (declare (type cblock block) (list locations))
   (unless (and locations
                (eq (location-info-kind (first locations))
                    :non-local-entry))
       (let ((2block (block-info block)))
         (dump-1-location (block-start-node block)
-                         2block :block-start
+                         2block :block-start tlf-num
                          (ir2-block-%label 2block)
                          (ir2-block-live-out 2block)
                          var-locs
                          nil)))
   (dolist (loc locations)
-    (dump-location-from-info loc var-locs))
+    (dump-location-from-info loc tlf-num var-locs))
   (values))
 
 ;;; Return a vector and an integer (or null) suitable for use as the
@@ -312,6 +338,7 @@
   (let ((*previous-location* 0)
         *previous-live*
         *previous-form-number*
+        (tlf-num (find-tlf-number fun))
         (env (lambda-environment fun))
         (byte-buffer *byte-buffer*)
         prev-block
@@ -323,7 +350,7 @@
         (when (eq (block-info block) 2block)
           (when prev-block
             (dump-block-locations prev-block (nreverse (shiftf locations nil))
-                                  var-locs))
+                                  tlf-num var-locs))
           (setf prev-block block)))
       (dolist (loc (ir2-block-locations 2block))
         (if (label-elsewhere-p (location-info-label loc)
@@ -331,13 +358,15 @@
             (push loc elsewhere-locations)
             (push loc locations))))
 
-    (dump-block-locations prev-block (nreverse locations) var-locs)
+    (dump-block-locations prev-block (nreverse locations)
+                          tlf-num var-locs)
 
     (when elsewhere-locations
       (dolist (loc (nreverse elsewhere-locations))
-        (dump-location-from-info loc var-locs)))
+        (dump-location-from-info loc tlf-num var-locs)))
     ;; lz-compress accept any array of octets and returns a simple-array
-    (logically-readonlyize (lz-compress byte-buffer))))
+    (values (logically-readonlyize (lz-compress byte-buffer))
+            tlf-num)))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -354,7 +383,9 @@
                                (truename (file-info-truename file-info)))))
                         (if (pathnamep pathname) pathname))
                       file-info))
-     :created (file-info-write-date file-info)
+      :created (file-info-write-date file-info)
+      :start-positions (coerce-to-smallest-eltype
+                        (file-info-positions file-info))
      (if function
          (values :form (let ((direct-file-info (source-info-file-info info)))
                          (when (eq :lisp (file-info-truename direct-file-info))
@@ -658,7 +689,7 @@
 ;;;; debug functions
 
 ;;; Return a C-D-F structure with all the mandatory slots filled in.
-(defun dfun-from-fun (fun tlf)
+(defun dfun-from-fun (fun)
   (declare (type clambda fun))
   (let* ((2env (environment-info (lambda-environment fun)))
          (dispatch (lambda-optional-dispatch fun))
@@ -679,22 +710,7 @@
                       (second name))
                      (t
                       name))
-                   name))
-         (encoded-locs
-           (cdf-encode-locs
-            (label-position (ir2-environment-environment-start 2env))
-            (label-position (ir2-environment-elsewhere-start 2env))
-            (source-path-form-number (node-source-path (lambda-bind fun)))
-            (label-position (block-label (lambda-block fun)))
-            (when (ir2-environment-closure-save-tn 2env)
-              (tn-sc+offset (ir2-environment-closure-save-tn 2env)))
-            #+unwind-to-frame-and-call-vop
-            (when (ir2-environment-bsp-save-tn 2env)
-              (tn-sc+offset (ir2-environment-bsp-save-tn 2env)))
-            #-fp-and-pc-standard-save
-            (label-position (ir2-environment-lra-saved-pc 2env))
-            #-fp-and-pc-standard-save
-            (label-position (ir2-environment-cfp-saved-pc 2env)))))
+                   name)))
     (funcall (compiled-debug-fun-ctor kind)
              :name name
              #-fp-and-pc-standard-save :return-pc
@@ -704,21 +720,27 @@
              #-fp-and-pc-standard-save :old-fp
              #-fp-and-pc-standard-save (tn-sc+offset (ir2-environment-old-fp 2env))
              :encoded-locs
-             (if tlf
-                 (cons (pack-tlf-num+offset
-                        tlf
-                        (aref (file-info-positions
-                               (source-info-file-info *source-info*))
-                              tlf))
-                       encoded-locs)
-                 encoded-locs))))
+             (cdf-encode-locs
+              (label-position (ir2-environment-environment-start 2env))
+              (label-position (ir2-environment-elsewhere-start 2env))
+              (source-path-form-number (node-source-path (lambda-bind fun)))
+              (label-position (block-label (lambda-block fun)))
+              (when (ir2-environment-closure-save-tn 2env)
+                (tn-sc+offset (ir2-environment-closure-save-tn 2env)))
+              #+unwind-to-frame-and-call-vop
+              (when (ir2-environment-bsp-save-tn 2env)
+                (tn-sc+offset (ir2-environment-bsp-save-tn 2env)))
+              #-fp-and-pc-standard-save
+              (label-position (ir2-environment-lra-saved-pc 2env))
+              #-fp-and-pc-standard-save
+              (label-position (ir2-environment-cfp-saved-pc 2env))))))
 
 ;;; Return a complete C-D-F structure for FUN. This involves
 ;;; determining the DEBUG-INFO level and filling in optional slots as
 ;;; appropriate.
-(defun compute-1-debug-fun (fun var-locs tlf)
+(defun compute-1-debug-fun (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
-  (let* ((dfun (dfun-from-fun fun tlf))
+  (let* ((dfun (dfun-from-fun fun))
          (actual-level (policy (lambda-bind fun) compute-debug-fun))
          (level (cond #+sb-dyncount
                       (*collect-dynamic-statistics*
@@ -737,9 +759,13 @@
                  (compute-vars fun level var-locs))
            (setf (compiled-debug-fun-arguments dfun)
                  (compute-args fun var-locs))))
-    (when (>= level 1)
-      (setf (compiled-debug-fun-blocks dfun)
-            (compute-debug-blocks fun var-locs)))
+
+    (if (>= level 1)
+        (multiple-value-bind (blocks tlf-num)
+            (compute-debug-blocks fun var-locs)
+          (setf (compiled-debug-fun-blocks dfun) blocks
+                (compiled-debug-fun-tlf-number dfun) tlf-num))
+        (setf (compiled-debug-fun-tlf-number dfun) (find-tlf-number fun)))
     (if (xep-p fun)
         (setf (compiled-debug-fun-returns dfun) :standard)
         (let ((info (tail-set-info (lambda-tail-set fun))))
@@ -785,25 +811,12 @@
                                    :adjustable t))
         (*contexts* (make-array 10
                                 :fill-pointer 0
-                                :adjustable t))
-        component-tlf-num)
-    (dolist (lambda (component-lambdas component))
-      (unless (empty-fun-p lambda)
-        (let ((tlf-num (source-path-tlf-number
-                        (node-source-path (lambda-bind lambda)))))
-          (cond ((not component-tlf-num)
-                 (setf component-tlf-num tlf-num))
-                ((= component-tlf-num tlf-num))
-                (t
-                 (setf component-tlf-num :multiple)
-                 (return))))))
+                                :adjustable t)))
     (dolist (lambda (component-lambdas component))
       (unless (empty-fun-p lambda)
         (clrhash var-locs)
-        (let ((tlf-num (and (eq component-tlf-num :multiple)
-                            (source-path-tlf-number
-                             (node-source-path (lambda-bind lambda))))))
-          (push (compute-1-debug-fun lambda var-locs tlf-num) dfuns))))
+        (push (compute-1-debug-fun lambda var-locs)
+              dfuns)))
     (let* ((sorted (sort dfuns #'< :key #'compiled-debug-fun-offset))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info
@@ -817,14 +830,6 @@
                         (sb-c::entry-info-name (car entries)))
                    (component-name component)))
        :fun-map fun-map
-       :tlf-num+offset (if (eq component-tlf-num :multiple)
-                           component-tlf-num
-                           (pack-tlf-num+offset
-                            component-tlf-num
-                            (and component-tlf-num
-                                 (aref (file-info-positions
-                                        (source-info-file-info *source-info*))
-                                       component-tlf-num))))
        :contexts (compact-vector *contexts*)))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
