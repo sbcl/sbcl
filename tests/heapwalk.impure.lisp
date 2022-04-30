@@ -4,7 +4,8 @@
 
 (defun manymul (n &aux res)
   (dotimes (i n res)
-    (setq res (mul -4706957933656302 (+ i 1000)))))
+    (setq res (mul (floor (- (expt 2 (- sb-vm:n-word-bits 2))) 1000)
+                   (+ i 1000)))))
 (compile 'manymul)
 
 (defun walk ()
@@ -20,7 +21,8 @@
          (incf ct)))
      :dynamic)
     (let ((*print-level* 2)
-          (*print-length* 4))
+          (*print-length* 4)
+          (*standard-output* (make-broadcast-stream)))
       (dotimes (i ct)
         (princ (aref v i))))))
 (compile 'walk)
