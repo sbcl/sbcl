@@ -17,6 +17,9 @@
 
 #+(or (not sb-thread) freebsd) (sb-ext:exit :code 104)
 
+(setf (generation-number-of-gcs-before-promotion 0) 5)
+(setf (generation-number-of-gcs-before-promotion 1) 3)
+
 #+win32
 (with-scratch-file (solib "dll")
   (sb-ext:run-program "gcc"
@@ -110,7 +113,7 @@
                 (loop
                  (gc)
                  (incf *n-gcs*)
-                 (sleep .0001)
+                 (sleep .0005)
                  (sb-thread:barrier (:read))
                  (if (not *keepon*) (return)))))))
           (start (get-internal-real-time)))
