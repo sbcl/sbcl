@@ -1371,15 +1371,33 @@ of specialized arrays is supported."
 ;;; dangerous to do so: shrinking the size of an object accessible
 ;;; to another thread could cause it to access an out-of-bounds element.
 ;;; GC should generally be fine no matter what happens, because it either
-;;; reads the old length or the new length. If the old, and unboxed,
-;;; the whole vector is skipped; if simple-vector, then at worst it reads
-;;; the header word for a filler, which is a valid element (yup really!).
-;;; If it reads the new length, then the next object is filler.
-(defun %shrink-vector (vector new-length)
+;;; reads the old length or the new length. If it reads the old length,
+;;; then the whole vector is skipped if unboxed; if it reads the new length,
+;;; then the next object is a filler.
+;;; Exception: for SIMPLE-VECTOR we always zeroized the unused tail,
+;;; because the garbage collector can scan certain pages without regard
+;;; to object boundaries. The situation we need to avoid is this:
+;;;       "old" #(...............|.....)
+;;;       "new" #(..........)Fill|.....
+;;;                              ^ page boundary
+;;; where GC reads the objects on the page just after the filler
+;;; because it doesn't know not to.
+;;;
+(defun %shrink-vector (vector new-length
+                              &aux (old-length (length vector))
+                                   (new-length* new-length))
   (declare (vector vector))
-  (unless (or (array-header-p vector) (typep vector '(simple-array nil (*))))
-    (let ((old-length (length vector))
-          (new-length new-length))
+  (cond
+    ((simple-vector-p vector)
+     ;; We do in fact call %SHRINK-VECTOR a lot from sequence functions
+     ;; that overallocate a temporary result. In all places where that happens,
+     ;; the discarded suffix was never used. So assuming pre-zeroed heap,
+     ;; it kind of just worked. But I don't want to assume that.
+     ;; For what it's worth, adding this assertion prior to FILL:
+     ;;   (WHEN (FIND 0 VECTOR :START OLD-LENGTH :TEST #'NEQ) (BUG "No can do"))
+     ;; produced no failures in the regression suite.
+     (when (< new-length old-length) (fill vector 0 :start new-length)))
+    ((not (or (array-header-p vector) (typep vector '(simple-array nil (*)))))
       (when (simple-base-string-p vector)
         ;; We can blindly store the hidden #\null at NEW-LENGTH, but it would
         ;; appear to be an out-of-bounds access if the length is not
@@ -1390,14 +1408,11 @@ of specialized arrays is supported."
         ;; Now treat both the old and new lengths as if they include
         ;; the byte that holds the implicit string terminator.
         (incf old-length)
-        (incf new-length))
+        (incf new-length*))
       (let* ((n-bits-shift (aref %%simple-array-n-bits-shifts%%
                                  (%other-pointer-widetag vector)))
              (old-nwords (ceiling (ash old-length n-bits-shift) n-word-bits))
-             (new-nwords (ceiling (ash new-length n-bits-shift) n-word-bits)))
-        ;; If we want to impose a constraint that unused bytes above the
-        ;; new length and below the physical end are 0,
-        ;; then now would be the time to enforce that.
+             (new-nwords (ceiling (ash new-length* n-bits-shift) n-word-bits)))
         (when (< new-nwords old-nwords)
           (with-pinned-objects (vector)
             ;; VECTOR-SAP is only for unboxed vectors. Use the vop directly.

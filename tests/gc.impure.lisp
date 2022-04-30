@@ -477,3 +477,16 @@
   (gc)
   (let ((marks (sb-kernel:object-card-marks *vvv*)))
     (assert (not (find 1 marks)))))
+
+(with-test (:name :%shrink-vector)
+  (let ((v (make-array 25 :initial-element 'yikes)))
+    (sb-sys:with-pinned-objects (v)
+      ;; Can't call VECTOR-SAP on simple-vector.
+      ;; (Honestly I don't see what purpose that limitation serves)
+      (let ((sap (sb-sys:sap+ (sb-sys:int-sap (sb-kernel:get-lisp-obj-address v))
+                              (- (ash sb-vm:vector-data-offset sb-vm:word-shift)
+                                 sb-vm:other-pointer-lowtag))))
+        (sb-impl::%shrink-vector v 9)
+        (loop for i from 10 to 24
+              do
+           (assert (= (sb-sys:sap-ref-word sap (ash i sb-vm:word-shift)))))))))
