@@ -45,6 +45,7 @@
                           complex-array-widetag))
         (setf (svref infos code) info)))
 
+    ;; FIXME: do we still need this ?
     (setf (svref infos filler-widetag) (make-room-info 'filler))
 
     (dotimes (i (length *specialized-array-element-type-properties*))
@@ -189,21 +190,31 @@
         (end (descriptor-sap end)))
     (loop
      (if (sap>= start end) (return))
-     (binding* ((widetag (widetag@baseptr start))
-                (obj (lispobj@baseptr start widetag))
-                ((typecode size)
+     (let ((word (sap-ref-word start 0)))
+       (cond
+         ((= (logand word widetag-mask) filler-widetag) ; pseudo-object
+          (let ((size (+ (* (ash word -8) n-word-bytes) n-word-bytes)))
+            (setq start (sap+ start size))))
+         ((= word most-positive-word)
+          ;; has to be a pseudo-cons resulting from removing an insignificant
+          ;; sign word of a bignum. Don't call FUN
+          (setq start (sap+ start (* 2 n-word-bytes))))
+         (t
+          (binding*
+              ((widetag (widetag@baseptr start))
+               (obj (lispobj@baseptr start widetag))
+               ((typecode size)
                  ;; PRIMITIVE-OBJECT-SIZE works on conses, but they're exceptions already
                  ;; because of absence of a widetag, so may as well not call the sizer.
                  (if (listp obj)
                      (values list-pointer-lowtag (* 2 n-word-bytes))
                      (values widetag (primitive-object-size obj)))))
-       ;; SIZE is surely a fixnum. Non-fixnum would imply at least
-       ;; a 512MB object if 32-bit words, and is inconceivable if 64-bit.
-       ;; But check to be sure.
-       (aver (not (logtest (the fixnum size) lowtag-mask)))
-       (unless (= typecode filler-widetag)
-         (funcall fun obj typecode size))
-       (setq start (sap+ start size))))
+              ;; SIZE is surely a fixnum. Non-fixnum would imply at least
+              ;; a 512MB object if 32-bit words, and is inconceivable if 64-bit.
+              ;; But check to be sure.
+              (aver (not (logtest (the fixnum size) lowtag-mask)))
+              (funcall fun obj typecode size)
+              (setq start (sap+ start size)))))))
     (when strict-bound
      ;; If START is not eq to END, then we have blown past our endpoint.
       #+sb-devel
