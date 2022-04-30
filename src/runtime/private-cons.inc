@@ -62,6 +62,7 @@ static void release_pages_impl()
 #else
 
 static page_index_t private_cons_page_chain = -1;
+#define GC_PRIVATE_CONS_GENERATION 6
 
 static struct cons* private_cons_impl()
 {
@@ -75,7 +76,8 @@ static struct cons* private_cons_impl()
         page = alloc_start_page(PAGE_TYPE_UNBOXED, 0);
         page_index_t last_page __attribute__((unused)) =
             gc_find_freeish_pages(&page, GENCGC_PAGE_BYTES,
-                                  SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED, 0);
+                                  SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED,
+                                  GC_PRIVATE_CONS_GENERATION);
         // See question about last_page in gc_alloc_large
         set_alloc_start_page(PAGE_TYPE_UNBOXED, 0, page);
 
@@ -84,7 +86,7 @@ static struct cons* private_cons_impl()
             fprintf(stderr, "GC-private page @ %p\n", page_header);
         gc_assert(last_page == page);
         gc_dcheck(page_cards_all_marked_nonsticky(page));
-        page_table[page].gen = 0;
+        page_table[page].gen = GC_PRIVATE_CONS_GENERATION;
         page_table[page].type = PAGE_TYPE_UNBOXED;
         zero_dirty_pages(page, page, 0);
         page_index_t tail = private_cons_page_chain;
