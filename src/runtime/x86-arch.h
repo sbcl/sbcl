@@ -16,9 +16,6 @@
 #define ARCH_HAS_STACK_POINTER
 #define ALIEN_STACK_GROWS_DOWNWARD
 
-extern void fast_bzero_detect(void *, size_t);
-extern void (*fast_bzero_pointer)(void *, size_t);
-
 /* When single stepping, single_stepping holds the original instruction
  * PC location. */
 extern unsigned int *single_stepping;

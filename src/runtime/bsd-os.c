@@ -366,20 +366,6 @@ The system may fail to start.\n",
     }
     max_allocation_size = (os_vm_size_t)((rl.rlim_cur / 2) &
       ~(32 * 1024 * 1024));
-
-#ifdef LISP_FEATURE_X86
-    {
-        size_t len;
-        int sse;
-
-        len = sizeof(sse);
-        if (sysctlbyname("machdep.sse", &sse, &len,
-                         NULL, 0) == 0 && sse != 0) {
-            /* Use the SSE detector */
-            fast_bzero_pointer = fast_bzero_detect;
-        }
-     }
-#endif /* LISP_FEATURE_X86 */
 }
 
 /* Various routines in NetBSD's C library are compatibility wrappers
@@ -447,26 +433,6 @@ static void freebsd_init()
     else
         sig_memory_fault = SIGSEGV;
 #endif
-
-    /* Quote from sbcl-devel (NIIMI Satoshi): "Some OSes, like FreeBSD
-     * 4.x with GENERIC kernel, does not enable SSE support even on
-     * SSE capable CPUs". Detect this situation and skip the
-     * fast_bzero sse/base selection logic that's normally done in
-     * x86-assem.S.
-     */
-#ifdef LISP_FEATURE_X86
-    {
-        size_t len;
-        int instruction_sse;
-
-        len = sizeof(instruction_sse);
-        if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len,
-                         NULL, 0) == 0 && instruction_sse != 0) {
-            /* Use the SSE detector */
-            fast_bzero_pointer = fast_bzero_detect;
-        }
-    }
-#endif /* LISP_FEATURE_X86 */
 }
 
 #ifdef LISP_FEATURE_SB_FUTEX
@@ -502,17 +468,6 @@ futex_wake(int *lock_word, int n)
 #ifdef __DragonFly__
 static void dragonfly_init()
 {
-#ifdef LISP_FEATURE_X86
-    size_t len;
-    int instruction_sse;
-
-    len = sizeof(instruction_sse);
-    if (sysctlbyname("hw.instruction_sse", &instruction_sse, &len,
-                     NULL, 0) == 0 && instruction_sse != 0) {
-        /* Use the SSE detector */
-        fast_bzero_pointer = fast_bzero_detect;
-    }
-#endif /* LISP_FEATURE_X86 */
 }
 
 
@@ -628,9 +583,6 @@ openbsd_init()
     mib[1] = CPU_OSFXSR;
     size = sizeof (openbsd_use_fxsave);
     sysctl(mib, 2, &openbsd_use_fxsave, &size, NULL, 0);
-    if (openbsd_use_fxsave)
-        /* Use the SSE detector */
-        fast_bzero_pointer = fast_bzero_detect;
 #endif
 
     /* OpenBSD, like NetBSD, counts mmap()ed space against the

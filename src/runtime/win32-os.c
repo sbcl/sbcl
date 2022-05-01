@@ -862,9 +862,6 @@ void os_init()
     GetSystemInfo(&system_info);
     os_vm_page_size = system_info.dwPageSize > BACKEND_PAGE_BYTES?
         system_info.dwPageSize : BACKEND_PAGE_BYTES;
-#if defined(LISP_FEATURE_X86)
-    fast_bzero_pointer = fast_bzero_detect;
-#endif
     os_number_of_processors = system_info.dwNumberOfProcessors;
 
 #ifdef LISP_FEATURE_X86_64
