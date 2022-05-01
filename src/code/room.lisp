@@ -1267,6 +1267,7 @@ We could try a few things to mitigate this:
                 (type (ldb (byte 6 (+ #+big-endian 2)) flags))
                 (ok (if (consp obj)
                         (or (= type #b101) ; PAGE_TYPE_CONS
+                            (= type #b1101) ; PAGE_TYPE_THREAD_CONS
                             (and (eq (car obj) 0) (eq (cdr obj) 0)))
                         (/= type #b101))))
            (unless ok

@@ -70,6 +70,7 @@ int gencgc_handle_wp_violation(void *);
 // 4 bits for the type, 1 bit for SINGLE_OBJECT, 1 bit for OPEN_REGION
 
 #define PAGE_TYPE_MASK        15 // mask out 'single-object' and 'open-region' flags
+#define PRIMARY_TYPE_MASK      7 // keep all bits except THREAD_PAGE_FLAG
 #define PAGE_TYPE_UNBOXED      1 // #b001
 #define PAGE_TYPE_BOXED        2 // #b010
 #define PAGE_TYPE_MIXED        3 // #b011
@@ -84,6 +85,11 @@ int gencgc_handle_wp_violation(void *);
 #define SINGLE_OBJECT_FLAG    16
 #define OPEN_REGION_PAGE_FLAG 32
 #define FREE_PAGE_FLAG        0
+
+#define PAGE_TYPE_THREAD_BOXED   (THREAD_PAGE_FLAG|PAGE_TYPE_BOXED)
+#define PAGE_TYPE_THREAD_MIXED   (THREAD_PAGE_FLAG|PAGE_TYPE_MIXED)
+#define PAGE_TYPE_THREAD_CONS    (THREAD_PAGE_FLAG|PAGE_TYPE_CONS)
+#define PAGE_TYPE_THREAD_CODE    (THREAD_PAGE_FLAG|PAGE_TYPE_CODE)
 
 /* Note that this structure is also used from Lisp-side in
  * src/code/room.lisp, and the Lisp-side structure layout is currently

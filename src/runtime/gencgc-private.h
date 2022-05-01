@@ -86,7 +86,7 @@ static os_vm_size_t  __attribute__((unused)) page_scan_start_offset(page_index_t
 
 #endif
 
-#define is_code(type) ((type & PAGE_TYPE_MASK) == PAGE_TYPE_CODE)
+#define is_code(type) ((type & PRIMARY_TYPE_MASK) == PAGE_TYPE_CODE)
 
 // If *all* pages use soft card marks, then protection_mode() is not a thing.
 // Otherwise, only pages of code use soft card marks; return an enum indicating

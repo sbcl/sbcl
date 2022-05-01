@@ -1,6 +1,6 @@
 :64-bit
 :gencgc
-:use-cons-region
+:use-cons-region :eden-pages
 :soft-card-marks
 :stack-grows-downward-not-upward
 :c-stack-is-control-stack

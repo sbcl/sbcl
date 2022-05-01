@@ -317,10 +317,11 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                 // Any page can have a filler on it
                 if (pg >= 0) {
                     // Assert proper page type
+                    int pte_type = page_table[pg].type & ~THREAD_PAGE_FLAG;
                     if (state->object_header) // is not a cons
-                        gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
+                        gc_assert(pte_type != PAGE_TYPE_CONS);
 #ifdef LISP_FEATURE_USE_CONS_REGION
-                    else if (page_table[pg].type != PAGE_TYPE_CONS) {
+                    else if (pte_type != PAGE_TYPE_CONS) {
                         if (where[0] | where[1]) // "page-filler cons" is OK
                             // KLUDGE: allow negative bignum, but is it good/bad
                             // to check for a bignum widetag at where[-2] ?
@@ -376,10 +377,12 @@ static int verify_gen0_pagetypes(lispobj* start, lispobj* end,
     page_index_t firstpage = find_page_index(start);
     if (page_table[firstpage].gen != 0) lose("bad walk: have g%d", page_table[firstpage].gen);
     int page_type = page_table[firstpage].type;
-    if (page_type == PAGE_TYPE_CONS || page_type == PAGE_TYPE_MIXED || page_type == PAGE_TYPE_CODE
-        || page_type == PAGE_TYPE_SMALL_MIXED
-        || page_type == PAGE_TYPE_UNBOXED
-        || (page_type & SINGLE_OBJECT_FLAG)) return 0;
+    if ((page_type & ~(THREAD_PAGE_FLAG)) == PAGE_TYPE_BOXED) {
+        // For now we only assert that boxed pages contain just the boxed types,
+        // and not the converse. (This is a weaker but correct constraint)
+    } else {
+        return 0;
+    }
     lispobj* where = start;
     while (where < end) {
         if (is_cons_half(*where)) {
@@ -409,6 +412,7 @@ static int verify_gen0_pagetypes(lispobj* start, lispobj* end,
         case FILLER_WIDETAG:
         case CLOSURE_WIDETAG:
         case FUNCALLABLE_INSTANCE_WIDETAG:
+        case WEAK_POINTER_WIDETAG:
           boxed = 1;
           break;
         case INSTANCE_WIDETAG:
@@ -427,7 +431,6 @@ static int verify_gen0_pagetypes(lispobj* start, lispobj* end,
               int n = instance_length(*where);
               int i;
               for (i=1; i<=n; ++i) gc_assert(where[i]==0);
-              fprintf(stderr, "note: layoutless instance @ %p\n", where);
               boxed = 1;
           }
           break;

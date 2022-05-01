@@ -409,6 +409,17 @@ static void trace_object(lispobj* where)
 
 void prepare_for_full_mark_phase()
 {
+    // Change all thread-local pages to collector pages
+    page_index_t i;
+    for (i = 0; i < next_free_page; i++) {
+        int type = page_table[i].type;
+        if (type & THREAD_PAGE_FLAG)
+            page_table[i].type =
+                type == PAGE_TYPE_THREAD_CONS ? PAGE_TYPE_CONS :
+                type == PAGE_TYPE_THREAD_CODE ? PAGE_TYPE_CODE :
+                PAGE_TYPE_MIXED;
+    }
+
 #ifndef LISP_FEATURE_USE_CONS_REGION
     hopscotch_create(&mark_bits, HOPSCOTCH_HASH_FUN_DEFAULT,
                      N_WORD_BYTES, /* table values are machine words */

@@ -317,9 +317,8 @@
   (cond ((and (sc-is length-tn immediate) (= (tn-value length-tn) 0)) :boxed)
         ((not type) :mixed)
         ((= (logand type widetag-mask) simple-vector-widetag)
-         ;; FIXME: with (eventual) eden pages, any simple-vector
-         ;; can be considered boxed (never has random bits in it)
-         (if (logtest type +vector-alloc-mixed-region-bit+) :mixed :boxed))
+         #+eden-pages :boxed
+         #-eden-pages (if (logtest type +vector-alloc-mixed-region-bit+) :mixed :boxed))
         ((member (logand type widetag-mask)
                  `(,simple-array-unsigned-fixnum-widetag
                    ,simple-array-fixnum-widetag
@@ -338,10 +337,9 @@
                  `(,bignum-widetag ,double-float-widetag
                    ,complex-single-float-widetag ,complex-double-float-widetag
                    ,sap-widetag ,fdefn-widetag
+                   #-eden-pages ,weak-pointer-widetag
                    #+sb-simd-pack ,simd-pack-widetag
                    #+sb-simd-pack-256 ,simd-pack-256-widetag
-                   ;; FIXME: weak ptrs can go on eden boxed pages
-                   ,weak-pointer-widetag
                    ;; FIXME: some funinstances are purely boxed
                    ,funcallable-instance-widetag))
          thread-mixed-tlab-slot)
