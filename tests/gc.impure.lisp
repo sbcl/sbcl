@@ -135,8 +135,11 @@
   (sb-sys:with-code-pages-pinned (:dynamic) (gc))
   ;; this should not fail to find FUN at its old address
   (let ((fun (sb-kernel:make-lisp-obj (first *some-object-handles*))))
-    ;; this should fail to find a string at its old address
-    (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (second *some-object-handles*) nil))))
+    ;; To prove that _some_ things moved in memory,
+    ;; assert that we don't see the arbitrary string at its old address.
+    (multiple-value-bind (thing existsp)
+        (sb-kernel:make-lisp-obj (second *some-object-handles*) nil)
+      (assert (or (not existsp) (not (typep thing '(string 7))))))
     ;; this should similarly fail- STRING-TWO was transitively reachable but movable
     (multiple-value-bind (obj validp) (sb-kernel:make-lisp-obj (third *some-object-handles*) nil)
       (if validp
