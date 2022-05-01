@@ -362,10 +362,10 @@
   (:variant :ge))
 (define-vop (<=-fixnum-integer >-fixnum-integer)
   (:translate)
-  (:variant :le))
+  (:variant :ge))
 (define-vop (>=-fixnum-integer <-fixnum-integer)
   (:translate)
-  (:variant :ge))
+  (:variant :le))
 
 
 ;;; MOD type checks

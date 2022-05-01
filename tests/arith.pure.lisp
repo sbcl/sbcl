@@ -1032,3 +1032,23 @@
                 a b))
       (- a b))
    (((- (expt 2 sb-vm:n-word-bits) 10) (- (expt 2 sb-vm:n-word-bits) 9)) -1)))
+
+(with-test (:name :>=-fixnum-integer)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare (fixnum a))
+      (and (integerp b)
+           (>= a b)))
+   ((1 2) nil)
+   ((2 2) t)
+   ((3 2) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (declare (fixnum a))
+      (and (integerp b)
+           (<= a b)))
+   ((1 2) t)
+   ((2 2) t)
+   ((3 2) nil)))
