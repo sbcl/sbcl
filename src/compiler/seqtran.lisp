@@ -788,6 +788,25 @@
     (cond ((eq *wild-type* element-ctype)
            (delay-ir1-transform node :constraint)
            `(vector-fill* seq item start end))
+          ((and (array-type-p type)
+                (not (array-type-complexp type))
+                (or (not start)
+                    (and (constant-lvar-p start)
+                         (eql (lvar-value start) 0)))
+                (not end)
+                (typep (array-type-dimensions type) '(cons number null))
+                (<= (car (array-type-dimensions type))
+                    (cond #+soft-card-marks
+                          ((eq element-ctype *universal-type*)
+                           ;; Each write will have a store barrier,
+                           ;; marking it pretty large.
+                           2)
+                          (t
+                           10))))
+           `(progn
+              ,@(loop for i below (car (array-type-dimensions type))
+                      collect `(setf (aref seq ,i) item))
+              seq))
           #+x86-64
           ((and (type= element-ctype *universal-type*)
                 (csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
