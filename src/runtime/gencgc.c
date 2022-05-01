@@ -784,7 +784,8 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
         gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION
                                      && from_space == 0);
     boolean must_zero =
-        (page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0;
+        ((page_type == PAGE_TYPE_MIXED||page_type == PAGE_TYPE_BOXED)
+         && usable_by_lisp) || page_type == 0;
 #endif
 
     if (must_zero) {
@@ -4448,6 +4449,7 @@ collect_garbage(generation_index_t last_gen)
     struct thread *th;
     for_each_thread(th) {
         ensure_region_closed(THREAD_ALLOC_REGION(th,mixed), PAGE_TYPE_MIXED);
+        ensure_region_closed(THREAD_ALLOC_REGION(th,boxed), PAGE_TYPE_BOXED);
         ensure_region_closed(THREAD_ALLOC_REGION(th,cons), PAGE_TYPE_CONS);
     }
     ensure_region_closed(code_region, PAGE_TYPE_CODE);
@@ -4938,6 +4940,7 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     return lisp_alloc(largep, THREAD_ALLOC_REGION(self,tlab), nbytes, page_type, self); }
 
 DEFINE_LISP_ENTRYPOINT(alloc, nbytes >= LARGE_OBJECT_SIZE, mixed, PAGE_TYPE_MIXED)
+DEFINE_LISP_ENTRYPOINT(boxed_alloc, nbytes >= LARGE_OBJECT_SIZE, boxed, PAGE_TYPE_BOXED)
 #ifdef LISP_FEATURE_USE_CONS_REGION
 // for this variant of alloc_list to work properly, the allocation vops have to know
 // when to use the cons_tlab slot. Otherwise we would inadvertently allocate a CONS page
@@ -5096,11 +5099,12 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
 
 void sync_close_regions(int block_signals,
                         struct alloc_region *region_1, int page_type_1,
-                        struct alloc_region *region_2, int page_type_2)
+                        struct alloc_region *region_2, int page_type_2,
+                        struct alloc_region *region_3, int page_type_3)
 {
     sigset_t savedmask;
     int result;
-    int need_code_lock = (page_type_1 == PAGE_TYPE_CODE || page_type_2 == PAGE_TYPE_CODE);
+    int need_code_lock = page_type_1 == PAGE_TYPE_CODE;
     if (block_signals) block_blockable_signals(&savedmask);
     if (need_code_lock) {
         result = mutex_acquire(&code_allocator_lock);
@@ -5110,6 +5114,7 @@ void sync_close_regions(int block_signals,
     gc_assert(result);
     if (region_1) ensure_region_closed(region_1, page_type_1);
     if (region_2) ensure_region_closed(region_2, page_type_2);
+    if (region_3) ensure_region_closed(region_3, page_type_3);
     result = mutex_release(&free_pages_lock);
     gc_assert(result);
     if (need_code_lock) {
@@ -5126,14 +5131,16 @@ void sync_close_regions(int block_signals,
 void close_current_thread_tlab() {
     __attribute__((unused)) struct thread *self = get_sb_vm_thread();
     sync_close_regions(1, THREAD_ALLOC_REGION(self,mixed), PAGE_TYPE_MIXED,
+                          THREAD_ALLOC_REGION(self,boxed), PAGE_TYPE_BOXED,
                           THREAD_ALLOC_REGION(self,cons), PAGE_TYPE_CONS);
 }
 void close_code_region() {
-    sync_close_regions(1, code_region, PAGE_TYPE_CODE, 0, 0);
+    sync_close_regions(1, code_region, PAGE_TYPE_CODE, 0, 0, 0, 0);
 }
 /* This is called by unregister_thread() with STOP_FOR_GC blocked */
 void gc_close_thread_regions(struct thread* th) {
     sync_close_regions(0, &th->mixed_tlab, PAGE_TYPE_MIXED,
+                          &th->boxed_tlab, PAGE_TYPE_BOXED,
                           &th->cons_tlab, PAGE_TYPE_CONS);
 }
 

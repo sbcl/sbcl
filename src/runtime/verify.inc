@@ -367,6 +367,83 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
     return 0;
 }
 
+#define VERIFY_GEN0_PAGETYPES 0
+#if VERIFY_GEN0_PAGETYPES
+#include "genesis/defstruct-description.h"
+static int verify_gen0_pagetypes(lispobj* start, lispobj* end,
+                                 __attribute__((unused)) struct verify_state* state)
+{
+    page_index_t firstpage = find_page_index(start);
+    if (page_table[firstpage].gen != 0) lose("bad walk: have g%d", page_table[firstpage].gen);
+    int page_type = page_table[firstpage].type;
+    if (page_type == PAGE_TYPE_CONS || page_type == PAGE_TYPE_MIXED || page_type == PAGE_TYPE_CODE
+        || page_type == PAGE_TYPE_SMALL_MIXED
+        || page_type == PAGE_TYPE_UNBOXED
+        || (page_type & SINGLE_OBJECT_FLAG)) return 0;
+    lispobj* where = start;
+    while (where < end) {
+        if (is_cons_half(*where)) {
+            gc_assert((where[0] == (uword_t)-1 || where[0] == 0)
+                      && where[1] == 0);
+            where += 2;
+            continue;
+        }
+        int widetag = widetag_of(where);
+        int boxed = 0;
+        switch (widetag) {
+        case CODE_HEADER_WIDETAG:
+          if (!filler_obj_p(where)) lose("can't happen");
+        case RATIO_WIDETAG: case COMPLEX_WIDETAG:
+        case SIMPLE_VECTOR_WIDETAG:
+        case SIMPLE_ARRAY_FIXNUM_WIDETAG:
+        case SIMPLE_ARRAY_UNSIGNED_FIXNUM_WIDETAG:
+        case SIMPLE_ARRAY_NIL_WIDETAG:
+        case SIMPLE_ARRAY_WIDETAG:
+        case COMPLEX_ARRAY_WIDETAG:
+        case COMPLEX_BASE_STRING_WIDETAG:
+        case COMPLEX_CHARACTER_STRING_WIDETAG:
+        case COMPLEX_BIT_VECTOR_WIDETAG:
+        case COMPLEX_VECTOR_WIDETAG:
+        case VALUE_CELL_WIDETAG:
+        case SYMBOL_WIDETAG:
+        case FILLER_WIDETAG:
+        case CLOSURE_WIDETAG:
+        case FUNCALLABLE_INSTANCE_WIDETAG:
+          boxed = 1;
+          break;
+        case INSTANCE_WIDETAG:
+          if (instance_layout(where)) {
+              struct layout* l = LAYOUT(instance_layout(where));
+              struct bitmap bitmap = get_layout_bitmap(l);
+              if (bitmap.nwords == 1 && bitmap.bits[0] == (sword_t)-1 << INSTANCE_DATA_START)
+                  boxed = 1;
+              else if (instancep(l->_info)) {
+                  struct defstruct_description* dd = (void*)native_pointer(l->_info);
+                  if (dd->_element_type == T) boxed = 1;
+              } else
+                  lose("Unsure about instance @ %p", where);
+          } else {
+              // assert that all words are 0
+              int n = instance_length(*where);
+              int i;
+              for (i=1; i<=n; ++i) gc_assert(where[i]==0);
+              fprintf(stderr, "note: layoutless instance @ %p\n", where);
+              boxed = 1;
+          }
+          break;
+        }
+        if (boxed ||
+            (specialized_vector_widetag_p(widetag_of(where)) && !vector_len((void*)where))) {
+            // ok
+        }  else {
+            lose("Object @ %p not boxed", where);
+        }
+        where += OBJECT_SIZE(*where, where);
+    }
+    return 0;
+}
+#endif
+
 static int verify(lispobj start, lispobj* end, struct verify_state* state, int flags)
 {
     int savedflags = state->flags;
@@ -444,6 +521,11 @@ int verify_heap(int flags)
     if (verbose)
         fprintf(stderr, " [dynamic]");
     state.flags |= VERIFYING_GENERATIONAL;
+#if VERIFY_GEN0_PAGETYPES
+    // maybe not reliable
+    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_gen0_pagetypes,
+                    0, (uword_t)&state);
+#endif
     walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_range,
                     -1, (uword_t)&state);
     if (verbose && state.nerrors==0) fprintf(stderr, " passed\n");

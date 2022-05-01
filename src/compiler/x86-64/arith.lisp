@@ -600,7 +600,7 @@
     (zeroize rdx)
     allocate
     (pseudo-atomic ()
-      (allocation nil (pad-data-block (+ 2 bignum-digits-offset)) 0
+      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
                   r node alloc-temp thread-tn)
       (storew header r)
       (storew rax r 1)
@@ -633,7 +633,7 @@
     (inst movzx '(:byte :dword) high high)
     (inst neg high)
     (pseudo-atomic ()
-      (allocation nil (pad-data-block (+ 2 bignum-digits-offset)) 0
+      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
                   r node alloc-temp thread-tn)
       (storew header r)
       (storew low r 1)
@@ -666,7 +666,7 @@
     (inst movzx '(:byte :dword) high high)
     (inst neg high)
     (pseudo-atomic ()
-      (allocation nil (pad-data-block (+ 2 bignum-digits-offset)) 0
+      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
                   r node alloc-temp thread-tn)
       (storew header r)
       (storew low r 1)
@@ -699,7 +699,7 @@
     allocate
     (inst movzx '(:byte :dword) high high)
     (pseudo-atomic ()
-      (allocation nil (pad-data-block (+ 2 bignum-digits-offset)) 0
+      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
                   r node alloc-temp thread-tn)
       (storew header r)
       (storew low r 1)
@@ -739,7 +739,7 @@
     (inst movzx '(:byte :dword) high high)
     (inst neg high)
     (pseudo-atomic ()
-      (allocation nil (pad-data-block (+ 2 bignum-digits-offset)) 0
+      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
                   r node alloc-temp thread-tn)
       (storew header r)
       (storew low r 1)

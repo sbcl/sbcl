@@ -1292,12 +1292,12 @@
       (inst mov result nil-value)
       (inst jrcxz DONE)
       (unless stack-allocate-p
-        (instrument-alloc +cons-primtype+ rcx node (list value dst) thread-tn))
+        (instrument-alloc :list rcx node (list value dst) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
        ;; Produce an untagged pointer into DST
        (if stack-allocate-p
            (stack-allocation rcx 0 dst)
-           (allocation +cons-primtype+ rcx 0 dst node value thread-tn
+           (allocation :list rcx 0 dst node value thread-tn
                        :overflow (lambda ()
                                    (inst push rcx)
                                    (inst push context)

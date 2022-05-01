@@ -72,7 +72,7 @@ sb-vm::
            (words (- (/ bytes n-word-bytes) vector-data-offset)))
       (instrument-alloc nil bytes node temp)
       (pseudo-atomic ()
-       (allocation nil bytes 0 result node temp nil)
+       (allocation :mixed bytes 0 result node temp nil)
        (storew* simple-array-unsigned-byte-64-widetag result 0 0 t)
        (storew* (fixnumize words) result vector-length-slot 0 t)
        (inst or :byte result other-pointer-lowtag)))))

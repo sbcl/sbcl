@@ -51,10 +51,16 @@
     fpr-restore ; KLUDGE: this is element 6 of the entry point vector
     (do-fprs pop :xmm)))
 
-(define-assembly-routine (alloc-tramp) ()
+(define-assembly-routine (mixed-alloc-tramp) ()
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup "alloc" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
+
+(define-assembly-routine (boxed-alloc-tramp) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "boxed_alloc" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
 (define-assembly-routine (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*

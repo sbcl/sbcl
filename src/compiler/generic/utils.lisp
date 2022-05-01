@@ -312,6 +312,49 @@
   (declare (type (unsigned-byte 8) rank))
   (logand (1- rank) array-rank-mask))
 
+(defun pick-vector-tlab (type-tn length-tn
+                         &aux (type (if (sc-is type-tn immediate) (tn-value type-tn))))
+  (cond ((and (sc-is length-tn immediate) (= (tn-value length-tn) 0)) :boxed)
+        ((not type) :mixed)
+        ((= (logand type widetag-mask) simple-vector-widetag)
+         ;; FIXME: with (eventual) eden pages, any simple-vector
+         ;; can be considered boxed (never has random bits in it)
+         (if (logtest type +vector-alloc-mixed-region-bit+) :mixed :boxed))
+        ((member (logand type widetag-mask)
+                 `(,simple-array-unsigned-fixnum-widetag
+                   ,simple-array-fixnum-widetag
+                   ,simple-array-nil-widetag))
+         :boxed)
+        (t
+         :mixed)))
+
+(defun pick-tlab (type)
+  (cond ((typep type '(and symbol (not null)))
+         (ecase type
+           (:boxed thread-boxed-tlab-slot)
+           (:list thread-cons-tlab-slot)
+           (:mixed thread-mixed-tlab-slot)))
+        ((member (logand type widetag-mask)
+                 `(,bignum-widetag ,double-float-widetag
+                   ,complex-single-float-widetag ,complex-double-float-widetag
+                   ,sap-widetag ,fdefn-widetag
+                   #+sb-simd-pack ,simd-pack-widetag
+                   #+sb-simd-pack-256 ,simd-pack-256-widetag
+                   ;; FIXME: weak ptrs can go on eden boxed pages
+                   ,weak-pointer-widetag
+                   ;; FIXME: some funinstances are purely boxed
+                   ,funcallable-instance-widetag))
+         thread-mixed-tlab-slot)
+        (t
+         thread-boxed-tlab-slot)))
+
+#-sb-thread
+(defun tlab-to-static-region (tlab)
+  (case tlab
+    (#.thread-boxed-tlab-slot boxed-region)
+    (#.thread-cons-tlab-slot cons-region)
+    (t mixed-region)))
+
 (defun compute-object-header (nwords widetag-or-metadata)
   (let* ((widetag (if (typep widetag-or-metadata '(or wrapper defstruct-description))
                       instance-widetag
