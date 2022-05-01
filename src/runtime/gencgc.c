@@ -631,12 +631,6 @@ report_heap_exhaustion(long available, long requested, struct thread *th)
 }
 
 
-#if defined LISP_FEATURE_X86 && !defined LISP_FEATURE_LINUX
-void fast_bzero(void*, size_t); /* in <arch>-assem.S */
-#else
-#define fast_bzero(addr, count) memset(addr, 0, count)
-#endif
-
 /* Zero the memory at ADDR for LENGTH bytes, but use mmap/munmap instead
  * of zeroing it ourselves, i.e. in practice give the memory back to the
  * OS. Generally done after a large GC.
@@ -744,13 +738,8 @@ static inline void zero_pages(page_index_t start, page_index_t end) {
 #ifdef LISP_FEATURE_DARWIN_JIT
         zero_range_with_mmap(page_address(start), npage_bytes(1+end-start));
 #else
-        fast_bzero(page_address(start), npage_bytes(1+end-start));
+        memset(page_address(start), 0, npage_bytes(1+end-start));
 #endif
-}
-/* Zero the address range from START up to but not including END */
-static inline void zero_range(char* start, char* end) {
-    if (start < end)
-        fast_bzero(start, end-start);
 }
 
 /* The generation currently being allocated to. */
@@ -766,8 +755,6 @@ __attribute__((unused)) static const char * const page_type_description[8] =
 int mmap_does_not_zero;
 #endif
 void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
-    page_index_t i, j;
-
     // If allocating mixed pages to gen0 (or scratch which becomes gen0) then
     // this allocation is potentially going to be extended by lisp (if it happens to
     // pick up the tail of the page as its next available region)
@@ -776,33 +763,23 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
     // So we can avoid pre-zeroing all codes pages, all unboxed pages,
     // all strictly boxed pages, and all mixed pages allocated to gen>=1.
 
+    page_index_t i;
 #ifdef LISP_FEATURE_DARWIN_JIT
     /* Must always zero, as it may need changing the protection bits. */
-    boolean must_zero = 1;
+    boolean any_need_to_zero = 0;
+    for (i = start; i <= end; i++) any_need_to_zero |= page_need_to_zero(i);
+    if (any_need_to_zero) zero_pages(start, end);
 #else
     boolean usable_by_lisp =
         gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION
                                      && from_space == 0);
-    boolean must_zero =
-        (page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0;
+    if ((page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0) {
+        for (i = start; i <= end; i++)
+            if (page_need_to_zero(i)) zero_pages(i, i);
+    }
 #endif
 
-    if (must_zero) {
-        // look for contiguous ranges. This is probably without merit, since bzero
-        // does not go significantly faster for 2 pages than for 1 page and 1 page.
-        for (i = start; i <= end; i++) {
-            if (!page_need_to_zero(i)) continue;
-            // compute 'j' as the upper exclusive page index bound
-            for (j = i+1; (j <= end) && page_need_to_zero(j) ; j++)
-                ; /* empty body */
-            zero_pages(i, j-1);
-            i = j;
-        }
-    }
-
-    for (i = start; i <= end; i++) {
-        set_page_need_to_zero(i, 1);
-    }
+    for (i = start; i <= end; i++) set_page_need_to_zero(i, 1);
 }
 
 
@@ -1723,7 +1700,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
 #endif
         /* It checks out OK, free the page. */
         prev_bytes_used = page_bytes_used(page);
-        page_table[page].words_used_ = 0;
+        set_page_bytes_used(page, 0);
         reset_page_flags(page);
         bytes_freed += prev_bytes_used;
         page++;
@@ -4317,11 +4294,6 @@ find_next_free_page(void)
  * If the interior of the aligned range is nonempty,
  * perform three operations: unmap/remap, fill before, fill after.
  * Otherwise, just one operation to fill the whole range.
- *
- * This will make more sense once we do a few other things:
- *  - enable manual card marking in codegen
- *  - disable mmap-based page protection
- *  - enable hugepages (so the OS page is much larger than a card)
  */
 static void
 remap_page_range (page_index_t from, page_index_t to)
@@ -4344,17 +4316,20 @@ remap_page_range (page_index_t from, page_index_t to)
     char* aligned_start = PTR_ALIGN_UP(start, granularity);
     char* aligned_end   = PTR_ALIGN_DOWN(end, granularity);
 
+    /* NOTE: this is largely pointless because gencgc-release-granularity
+     * is everywhere defined to be EXACTLY +backend-page-bytes+
+     * which by definition is the quantum at which we'll unmap/map.
+     * Maybe we should remove the needless complexity? */
     if (aligned_start < aligned_end) {
         zero_range_with_mmap(aligned_start, aligned_end-aligned_start);
-        zero_range(start, aligned_start);
-        zero_range(aligned_end, end);
+        memset(start, 0, aligned_start - start);
+        memset(aligned_end, 0, end - aligned_end);
     } else {
         zero_pages(from, to);
     }
 #endif
     page_index_t i;
-    for (i = from; i <= to; i++)
-        set_page_need_to_zero(i, 0);
+    for (i = from; i <= to; i++) set_page_need_to_zero(i, 0);
 }
 
 static void
