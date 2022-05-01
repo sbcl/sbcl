@@ -892,11 +892,11 @@
          (b (list x y z))
          (c (list a b)))
     (declare (dynamic-extent c))
-    (values (first c) (second c))))
+    (values a b)))
 (with-test (:name :let-converted-vars-dx-allocated-bug)
-  (multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug 1 2 3)
-    (assert (and (equal i j)
-                 (equal i (list 1 2 3))))))
+  (multiple-value-bind (i j) (let-converted-vars-dx-allocated-bug-default 1 2 3)
+    (assert (equal i j))
+    (assert (equal i (list 1 2 3)))))
 
 ;;; workaround for bug 419 -- real issue remains, but check that the
 ;;; bandaid holds.
@@ -1694,3 +1694,15 @@
                       x)))
              (declare (dynamic-extent *)))))
     ((1) 1)))
+
+(with-test (:name :let-setf-aref)
+  (checked-compile
+   `(lambda ()
+      (declare (optimize debug))
+      (let ((x (let ((z (make-array 3)))
+                 (setf (aref z 0) 10)
+                 (setf (aref z 0) 20)
+                 z)))
+        (declare (dynamic-extent x))
+        (aref x 0)))
+   :allow-notes nil))

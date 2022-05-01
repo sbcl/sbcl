@@ -894,12 +894,16 @@
  (let* ((lvar (ref-lvar ref))
         (dest (when lvar (lvar-dest lvar))))
    (and (combination-p dest)
-        (eq :known (combination-kind dest))
-        (awhen (combination-fun-info dest)
-          (or (ir1-attributep (fun-info-attributes it) dx-safe)
-              (and (not (combination-lvar dest))
-                   (awhen (fun-info-result-arg it)
-                     (eql lvar (nth it (combination-args dest))))))))))
+        (case (combination-kind dest)
+          (:known
+           (awhen (combination-fun-info dest)
+             (or (ir1-attributep (fun-info-attributes it) dx-safe)
+                 (and (not (combination-lvar dest))
+                      (awhen (fun-info-result-arg it)
+                        (eql lvar (nth it (combination-args dest))))))))
+          (:local
+           (every #'trivial-lambda-var-ref-p
+                  (lambda-var-refs (lvar-lambda-var lvar))))))))
 
 (defun trivial-lambda-var-ref-p (use)
   (and (ref-p use)
@@ -909,12 +913,12 @@
                     (neq (lambda-var-extent var) 'indefinite-extent))
            (let ((home (lambda-var-home var))
                  (refs (lambda-var-refs var)))
-             ;; bound by a non-XEP system lambda, no other REFS that aren't
+             ;; bound by a non-XEP lambda, no other REFS that aren't
              ;; DX-SAFE, or are result-args when the result is discarded.
-             (when (and (lambda-system-lambda-p home)
-                        (neq :external (lambda-kind home))
+             (when (and (neq :external (lambda-kind home))
                         (dolist (ref refs t)
-                          (unless (or (eq use ref) (ref-good-for-dx-p ref))
+                          (unless (or (eq use ref)
+                                      (ref-good-for-dx-p ref))
                             (return nil))))
                ;; the LAMBDA this var is bound by has only a single REF, going
                ;; to a combination

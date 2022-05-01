@@ -1888,9 +1888,9 @@
   (always-translatable))
 ;;; The lowest-level vector SET operators should not return a value.
 ;;; Functions built upon them may return the input value.
-(defknown data-vector-set (array index t) (values) (always-translatable))
+(defknown data-vector-set (array index t) (values) (dx-safe always-translatable))
 (defknown data-vector-set-with-offset (array fixnum fixnum t) (values)
-  (always-translatable))
+  (dx-safe always-translatable))
 (defknown hairy-data-vector-ref (array index) t (foldable))
 (defknown hairy-data-vector-set (array index t) t ())
 (defknown hairy-data-vector-ref/check-bounds (array index) t (foldable))
