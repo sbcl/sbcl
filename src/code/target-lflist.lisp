@@ -99,7 +99,7 @@
 ;;; MAKE-MARKED-REF can only be called in the scope of WITH-PINNED-OBJECTS.
 ;;; The critical invariant is that once a 'next' pointer has been turned into
 ;;; a fixnum, it CAN NOT change. Therefore, the object that GC implicitly pins
-;;; - along with the explicit pin of NODE within MARKED+NEXT - is definitely the
+;;; - along with the explicit pin of NODE within GET-NEXT - is definitely the
 ;;; object whose tagged pointer is reconstructed. This is exactly why we choose
 ;;; the tagged state as the normal state and the untagged state as deleted.
 ;;; If that were reversed (so tag bits = deleted, no tag bits = normal) to be like
@@ -114,14 +114,13 @@
 (declaim (inline get-next))
 (defun get-next (node)
   ;; Storing NODE in *PINNED-OBJECTS* causes its successor to become pinned.
-  (#+cheneygc sb-sys:without-gcing #+gencgc progn
-   (let* ((sb-vm::*pinned-objects* (cons node sb-vm::*pinned-objects*))
-          (%next (%node-next node)))
-      (declare (truly-dynamic-extent sb-vm::*pinned-objects*))
-      (values (truly-the list-node
-               (%make-lisp-obj (logior (get-lisp-obj-address %next)
-                                       sb-vm:instance-pointer-lowtag)))
-              %next))))
+  (let* ((sb-vm::*pinned-objects* (cons node sb-vm::*pinned-objects*))
+         (%next (%node-next node)))
+    (declare (truly-dynamic-extent sb-vm::*pinned-objects*))
+    (values (truly-the list-node
+                       (%make-lisp-obj (logior (get-lisp-obj-address %next)
+                                               sb-vm:instance-pointer-lowtag)))
+            %next)))
 
 (defmethod print-object ((list linked-list) stream)
   (print-unreadable-object (list stream :type t)
@@ -251,6 +250,9 @@
         (unless (fixnump succ)
           ;; Pin here because we're taking the address of the successor object.
           ;; Instead we could use bit-test-and-set on the x86 architecture.
+          ;; This is the ordinary WITH-PINNED-OBJECTS which manipulates
+          ;; *PINNED-OBJECTS* only if precise GC. Compare/contrast with
+          ;; GET-NEXT which _always_ binds *PINNED-OBJECTS*.
           (with-pinned-objects (succ)
             ;; Step 2: logically delete 'this'
             (when (eq (cas (%node-next this) succ (make-marked-ref succ)) succ)
