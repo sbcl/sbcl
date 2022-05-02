@@ -297,7 +297,10 @@
               ;; Nonetheless it's far better than it was. In all other scenarios, don't pass
               ;; a constant TN, because we don't know that generated code is better.
               (cond #+x86-64 ; still moar cringe
-                    ((and (or bit-vector-p simple-vector-p) (constant-lvar-p value))
+                    ((and (or bit-vector-p simple-vector-p) (constant-lvar-p value)
+                          ;; check for constant named-ness to not
+                          ;; trigger load form processing.
+                          (not (leaf-has-source-name-p (nth-value 1 (lvar-value value)))))
                      (funcall setter (tnify i) (emit-constant (lvar-value value))))
                     (t
                      ;; FIXME: for simple-vector, fixnums should get stored via an ANY-REG

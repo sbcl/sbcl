@@ -106,3 +106,20 @@
    :block-compile t
    :load t)
   (assert (eq (bar) (symbol-value 'testconstant4))))
+
+
+(with-test (:name :block-defconstant-hairy-backq-dumping-test)
+  (ctu:file-compile
+   `((defconstant +stuff+
+       (if (boundp '+stuff+)
+           (symbol-value '+stuff+)
+           '(0 0)))
+
+     (defvar *backq-stuff*
+       `((0 ,(random 10))
+         (,@+stuff+ 1 2 (3 . 4))
+         (5 6 ,+stuff+))))
+   :block-compile t
+   :before-load (lambda () (unintern (find-symbol "+STUFF+")))
+   :load t)
+  (assert (= 0 (first (third (third (symbol-value '*backq-stuff*)))))))

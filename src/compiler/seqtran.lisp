@@ -2579,41 +2579,25 @@
   (define-trimmer-transform string-trim t t))
 
 
-;;; We use this structure to facilitate named constant reference dumping inside
-;;; constant folded backquoted structures.
-#-sb-xc-host
-(defstruct (named-constant-reference
-             (:constructor make-named-constant-reference (name)))
-  (name (missing-arg) :type symbol :read-only t))
 
-#-sb-xc-host
-(defmethod make-load-form ((object named-constant-reference) &optional environment)
-  (declare (ignore environment))
-  (named-constant-reference-name object))
-
-;;; Wrap the value of lvar-value if it comes from a named
-;;; reference. For bootstrap reasons we don't do this during
-;;; cross-compile.
-(defun maybe-wrapped-lvar-value (lvar)
-  #+sb-xc-host
-  (lvar-value lvar)
-  #-sb-xc-host
-  (multiple-value-bind (value leaf)
-      (lvar-value lvar)
-    (if (leaf-has-source-name-p leaf)
-        (make-named-constant-reference (leaf-source-name leaf))
-        value)))
-
-;;; Pop constant values from the end, list/list* them if any, and link
-;;; the remainder with list* at runtime.
+;;; Pop anonymous constant values from the end, list/list* them if
+;;; any, and link the remainder with list* at runtime. We don't try to
+;;; fold named constant references, because while theoretically
+;;; possible, in addition to needing to make a load form for a
+;;; structure recording the constant name which wraps the constant
+;;; value, the dumper would have to learn how to patch constant values
+;;; into list structure, to deal with the load form potentially being
+;;; evaluated for value earlier than the constant definition is
+;;; loaded.
 (defun transform-backq-list-or-list* (function values)
   (let ((gensyms (make-gensym-list (length values)))
         (reverse (reverse values))
         (constants '()))
     (loop while (and reverse
-                     (constant-lvar-p (car reverse)))
-          do (push (maybe-wrapped-lvar-value (pop reverse))
-                   constants))
+                     (constant-lvar-p (car reverse))
+                     (not (leaf-has-source-name-p
+                           (nth-value 1 (lvar-value (car reverse))))))
+          do (push (lvar-value (pop reverse)) constants))
     (if (null constants)
         `(lambda ,gensyms
            (,function ,@gensyms))
@@ -2644,8 +2628,10 @@
     ;; might avoid consing intermediate lists if ,@ is involved
     ;; though I doubt it would provide benefit to many real-world scenarios.
     (dolist (elt elts)
-      (cond ((constant-lvar-p elt)
-             (push (maybe-wrapped-lvar-value elt) constants))
+      (cond ((and (constant-lvar-p elt)
+                  (not (leaf-has-source-name-p
+                        (print (nth-value 1 (lvar-value elt))))))
+             (push (lvar-value elt) constants))
             (t
              (setq constants :fail)
              (return))))

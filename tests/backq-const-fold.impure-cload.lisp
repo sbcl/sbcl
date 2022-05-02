@@ -9,7 +9,7 @@
       (make-instance 'foo)))
 
 ;;; The `(,+foo+) expression was being compile-time-folded to (#<foo
-;;; xxxx>).  Consequently it is unclear whether the #<foo> inside that
+;;; xxxx>). Consequently it was unclear whether the #<foo> inside that
 ;;; list should require a load-form. We now track whether something
 ;;; comes from a named constant reference and dump the constant
 ;;; appropriately.
