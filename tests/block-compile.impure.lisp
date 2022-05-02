@@ -107,7 +107,6 @@
    :load t)
   (assert (eq (bar) (symbol-value 'testconstant4))))
 
-
 (with-test (:name :block-defconstant-hairy-backq-dumping-test)
   (ctu:file-compile
    `((defconstant +stuff+
