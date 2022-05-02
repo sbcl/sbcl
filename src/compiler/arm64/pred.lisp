@@ -76,10 +76,21 @@
                             tn)
                            (t
                             (make-representation-tn ptype scn)))))
-            (values vop
-                    (make-tn x-tn) (make-tn y-tn)
-                    (make-tn dst-tn)
-                    nil)))))))
+            (cond ((eq dst-tn y-tn)
+                   (values vop
+                           (make-tn x-tn) y-tn
+                           dst-tn
+                           nil))
+                  ((eq dst-tn x-tn)
+                   (values vop
+                           x-tn (make-tn y-tn)
+                           dst-tn
+                           nil))
+                  (t
+                   (values vop
+                           (make-tn x-tn) (make-tn y-tn)
+                           (make-tn dst-tn)
+                           nil)))))))))
 
 
 (define-vop (move-if)
