@@ -262,7 +262,7 @@ an error in that case."
 ;;; of any thread from any thread would simplify other things in this file
 ;;; as well as making MUTEX-OWNER more efficient.
 (defun mutex-owner-lookup (vmthread)
-  ;; Convert the "fixnum-encoded" value to a normal integer for 32-bit.
+  ;; Convert the "fixnum-encoded" thread ID to a word.
   ;; It's possible that a race could cause find to fail. If the mutex
   ;; really has a dead thread as its owner, you've got bigger problems.
   ;; Moreover, because 'struct thread' can be recycled (very quickly)

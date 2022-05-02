@@ -37,8 +37,7 @@
   ;; but the "funny fixnum" representation - i.e. N_WORD_BITS bits of significance, but
   ;; cast as fixnum when read - avoids consing on 32-bit builds, and also not all of them
   ;; implement RAW-INSTANCE-CAS which would be otherwise needed.
-  (%owner 0 :type #+64-bit sb-vm:word
-                  #-64-bit fixnum))
+  (%owner 0 :type fixnum))
 
 (sb-xc:defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
