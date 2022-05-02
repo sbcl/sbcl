@@ -2630,7 +2630,7 @@
     (dolist (elt elts)
       (cond ((and (constant-lvar-p elt)
                   (not (leaf-has-source-name-p
-                        (print (nth-value 1 (lvar-value elt))))))
+                        (nth-value 1 (lvar-value elt)))))
              (push (lvar-value elt) constants))
             (t
              (setq constants :fail)
