@@ -83,7 +83,7 @@
                    (return))
                  t)
                 (:local
-                 (functional-somewhat-letlike-p (combination-lambda prev)))
+                 (not (functional-somewhat-letlike-p (combination-lambda prev))))
                 (t t))
           (setf (ir2-block-covered-paths-ref block)
                 (list nil))))))
