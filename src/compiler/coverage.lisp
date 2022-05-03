@@ -28,10 +28,10 @@
       (let ((path (source-path-original-source *current-path*)))
         (when mode
           (push mode path))
+        ;; If this source path has already been instrumented in this
+        ;; block, don't instrument it again.
         (if (member (ctran-block start)
                     (gethash path (code-coverage-blocks metadata)))
-            ;; If this source path has already been instrumented in
-            ;; this block, don't instrument it again.
             start
             (let ((next (make-ctran))
                   (*allow-instrumenting* nil))
@@ -57,8 +57,36 @@
             (instrument-coverage start nil form))))
       start))
 
+;;; Emit a coverage mark for NODE if there is a possibility that
+;;; marking a previous coverage mark does not entail NODE's
+;;; evaluation. We scan backwards in the block, looking for any
+;;; intervening combinations between this node and another
+;;; %MARK-COVERED. If the intervening combination is a combination for
+;;; a LET or ASSIGNMENT lambda, then we don't need to emit a coverage
+;;; mark, as the control flow has been made explicit in the CFG.
+;;; KLUDGE: Technically we should stick with merging strictly adjacent
+;;; emitted coverage marks in the IR2, as that would make coverage
+;;; instrumentation interrupt safe as well. However, doing it this way
+;;; produces much less instrumentation.
 (defoptimizer (%mark-covered ir2-convert) ((path) node block)
   (aver (constant-lvar-p path))
+  (do ((prev (ctran-use (node-prev node))
+             (ctran-use (node-prev prev)))
+       (start-node (block-start-node (ir2-block-block block))))
+      ((eq prev start-node))
+    (when (basic-combination-p prev)
+      (let ((kind (basic-combination-kind prev)))
+        (when (case kind
+                (:known
+                 (when (eq (lvar-fun-name (basic-combination-fun prev) t)
+                           '%mark-covered)
+                   (return))
+                 t)
+                (:local
+                 (functional-somewhat-letlike-p (combination-lambda prev)))
+                (t t))
+          (setf (ir2-block-covered-paths-ref block)
+                (list nil))))))
   (let ((2comp (component-info (node-component node))))
     (unless (car (ir2-block-covered-paths-ref block))
       (vop mark-covered node block

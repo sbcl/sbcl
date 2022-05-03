@@ -133,6 +133,17 @@
 (assert (= (sb-cover::ok-of (getf sb-cover::*counts* :expression))
            (sb-cover::all-of (getf sb-cover::*counts* :expression))))
 
+;; Make sure we handle non-local exits from function calls correctly.
+(sb-cover:clear-coverage)
+(compile-load "test-data-5")
+(outer)
+(report)
+
+(assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
+(assert (zerop (sb-cover::all-of (getf sb-cover::*counts* :branch))))
+(assert (= 12 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
+(assert (= 16 (sb-cover::all-of (getf sb-cover::*counts* :expression))))
+
 ;; Clean up after the tests
 (map nil #'delete-file
      (directory (merge-pathnames #p"*.html" *output-directory*)))

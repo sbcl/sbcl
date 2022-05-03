@@ -5,6 +5,8 @@ changes relative to sbcl-2.2.4:
     policy) and may load faster, especially on high debug.
   * enhancement: debug source locations now work correctly for top level forms
     with policy DEBUG = 1, as well as for block compiled files.
+  * bug fix: coverage instrumentation behaves correctly with respect to
+    non-local exits.
 
 changes in sbcl-2.2.4 relative to sbcl-2.2.3:
   * enhancement: better constraint propagation in the compiler. Specifically,
