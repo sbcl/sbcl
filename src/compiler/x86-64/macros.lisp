@@ -183,6 +183,17 @@
 
 ;;;; PSEUDO-ATOMIC
 
+;;; Allocate an other-pointer object of fixed NWORDS with a single-word
+;;; header having the specified WIDETAG value. The result is placed in
+;;; RESULT-TN.  NWORDS counts the header word.
+;;; If there is a BODY then it should initialize the object.
+(defmacro alloc-other (widetag nwords result-tn node alloc-temp thread-temp &body body)
+  (if body
+      `(dx-flet ((thunk () ,@body))
+         (alloc-other-fn ,widetag ,nwords ,result-tn ,node ,alloc-temp ,thread-temp
+                         #'thunk))
+      `(alloc-other-fn ,widetag ,nwords ,result-tn ,node ,alloc-temp ,thread-temp)))
+
 ;;; This is used to wrap operations which leave untagged memory lying
 ;;; around.  It's an operation which the AOP weenies would describe as
 ;;; having "cross-cutting concerns", meaning it appears all over the

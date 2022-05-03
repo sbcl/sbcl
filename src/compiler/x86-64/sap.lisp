@@ -30,9 +30,14 @@
   #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
   (:note "SAP to pointer coercion")
   (:node-var node)
+  ;; TEMP and SAP can be in the same register because the allocator bitmap
+  ;; update is deferred until after SAP is stored.
+  ;; So regalloc can reuse the input register if it's not live.
+  (:temporary (:sc unsigned-reg :from :result) temp)
   (:generator 20
-    (alloc-other sap-widetag sap-size res node nil thread-tn)
-    (storew sap res sap-pointer-slot other-pointer-lowtag)))
+    (alloc-other sap-widetag sap-size res node nil thread-tn
+      (storew sap res sap-pointer-slot other-pointer-lowtag)
+      (set-object-livep-bit res temp))))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
 

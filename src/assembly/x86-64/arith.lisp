@@ -57,9 +57,12 @@
       (allocation bignum-widetag nbytes 0 alloc-tn nil nil nil)
       (storew* header alloc-tn 0 0 t)
       (storew source alloc-tn bignum-digits-offset 0)
-      (if (eq dest alloc-tn)
-          (inst or :byte dest other-pointer-lowtag)
-          (inst lea dest (ea other-pointer-lowtag alloc-tn))))))
+      (cond ((eq dest alloc-tn)
+             (set-object-livep-bit alloc-tn rax-tn)
+             (inst or :byte dest other-pointer-lowtag))
+            (t
+             (set-object-livep-bit alloc-tn dest)
+             (inst lea dest (ea other-pointer-lowtag alloc-tn)))))))
 
 (macrolet ((define-generic-arith-routine ((fun cost) &body body)
              `(define-assembly-routine (,(symbolicate "GENERIC-" fun)

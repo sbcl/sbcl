@@ -915,7 +915,9 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     tls[THREAD_VARYOBJ_CARD_COUNT_SLOT] = varyobj_space_size / IMMOBILE_CARD_BYTES;
     tls[THREAD_VARYOBJ_CARD_MARKS_SLOT] = (lispobj)varyobj_page_touched_bits;
 #endif
-
+#ifdef THREAD_ALLOCATOR_BITMAP_OFFSET_SLOT
+    tls[THREAD_ALLOCATOR_BITMAP_OFFSET_SLOT] = DYNAMIC_SPACE_START - 1;
+#endif
     th->os_address = spaces;
     th->control_stack_start = (lispobj*)aligned_spaces;
     th->binding_stack_start=

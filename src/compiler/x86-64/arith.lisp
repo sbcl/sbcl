@@ -573,6 +573,17 @@
       (inst imul r x y)
       (inst jmp :o error))))
 
+;;; Unhygienic macro.
+;;; This doesn't use alloc-other because the header word is non-constant.
+(defmacro with-2-digit-bignum (&body body)
+  `(pseudo-atomic ()
+     (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
+                 r node nil thread-tn)
+     (storew header r)
+     ,@body
+     (set-object-livep-bit r header)
+     (inst or r other-pointer-lowtag)))
+
 (define-vop (*/signed=>integer)
   (:translate *)
   (:args (x :scs (signed-reg) :target rax)
@@ -582,7 +593,7 @@
               rax)
   (:temporary (:sc signed-reg :offset rdx-offset :from (:argument 1))
               rdx)
-  (:temporary (:sc signed-reg :from (:argument 2)) header alloc-temp)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -599,13 +610,9 @@
     #+bignum-assertions
     (zeroize rdx)
     allocate
-    (pseudo-atomic ()
-      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
-                  r node alloc-temp thread-tn)
-      (storew header r)
+    (with-2-digit-bignum
       (storew rax r 1)
-      (storew rdx r 2)
-      (inst or r other-pointer-lowtag))
+      (storew rdx r 2))
     DONE))
 
 (define-vop (+/signed=>integer)
@@ -614,7 +621,7 @@
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg) high low)
-  (:temporary (:sc signed-reg :from (:argument 2)) header alloc-temp)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -632,13 +639,9 @@
     allocate
     (inst movzx '(:byte :dword) high high)
     (inst neg high)
-    (pseudo-atomic ()
-      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
-                  r node alloc-temp thread-tn)
-      (storew header r)
+    (with-2-digit-bignum
       (storew low r 1)
-      (storew high r 2)
-      (inst or r other-pointer-lowtag))
+      (storew high r 2))
     DONE))
 
 (define-vop (-/signed=>integer)
@@ -647,7 +650,7 @@
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg) high low)
-  (:temporary (:sc signed-reg :from (:argument 2)) header alloc-temp)
+  (:temporary (:sc signed-reg :from (:argument 2)) header)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -665,13 +668,9 @@
     allocate
     (inst movzx '(:byte :dword) high high)
     (inst neg high)
-    (pseudo-atomic ()
-      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
-                  r node alloc-temp thread-tn)
-      (storew header r)
+    (with-2-digit-bignum
       (storew low r 1)
-      (storew high r 2)
-      (inst or r other-pointer-lowtag))
+      (storew high r 2))
     DONE))
 
 (define-vop (+/unsigned=>integer)
@@ -680,7 +679,7 @@
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg) high low)
-  (:temporary (:sc unsigned-reg :from (:argument 2)) header alloc-temp)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -698,13 +697,9 @@
     (inst mov header (bignum-header-for-length 1))
     allocate
     (inst movzx '(:byte :dword) high high)
-    (pseudo-atomic ()
-      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
-                  r node alloc-temp thread-tn)
-      (storew header r)
+    (with-2-digit-bignum
       (storew low r 1)
-      (storew high r 2)
-      (inst or r other-pointer-lowtag))
+      (storew high r 2))
     DONE))
 
 (define-vop (-/unsigned=>integer)
@@ -713,7 +708,7 @@
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:temporary (:sc unsigned-reg) high low)
-  (:temporary (:sc unsigned-reg :from (:argument 2)) header alloc-temp)
+  (:temporary (:sc unsigned-reg :from (:argument 2)) header)
   (:results (r :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -738,13 +733,9 @@
     allocate
     (inst movzx '(:byte :dword) high high)
     (inst neg high)
-    (pseudo-atomic ()
-      (allocation bignum-widetag (pad-data-block (+ 2 bignum-digits-offset)) 0
-                  r node alloc-temp thread-tn)
-      (storew header r)
+    (with-2-digit-bignum
       (storew low r 1)
-      (storew high r 2)
-      (inst or r other-pointer-lowtag))
+      (storew high r 2))
     DONE))
 
 (define-vop ()

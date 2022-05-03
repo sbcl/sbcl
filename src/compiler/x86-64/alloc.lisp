@@ -258,18 +258,34 @@
                       (when (and (/= lowtag 0) (not temp) (not (tn-p size)))
                         (inst or :byte alloc-tn lowtag))
                       (inst jmp DONE))))))))
-  t)
+  (eq tlab thread-mixed-tlab-slot))
 
-;;; Allocate an other-pointer object of fixed NWORDS with a single-word
-;;; header having the specified WIDETAG value. The result is placed in
-;;; RESULT-TN.  NWORDS counts the header word.
-(defun alloc-other (widetag nwords result-tn node alloc-temp thread-temp
-                    &aux (bytes (pad-data-block nwords)))
+(defun set-object-livep-bit (alloc-tn temp)
+  (cond (temp
+         (aver (neq alloc-tn temp))
+         (inst mov temp (thread-slot-ea thread-allocator-bitmap-offset-slot))
+         (inst sub temp alloc-tn)
+         (inst sar temp n-lowtag-bits)
+         (inst bts (ea gc-card-table-reg-tn) temp))
+        (t
+         ;; (warn "inefficiently using push of alloc-tn")
+         (inst push alloc-tn)
+         (inst neg alloc-tn)
+         (inst add alloc-tn (thread-slot-ea thread-allocator-bitmap-offset-slot))
+         (inst sar alloc-tn n-lowtag-bits)
+         (inst bts (ea gc-card-table-reg-tn) alloc-tn)
+         (inst pop alloc-tn))))
+
+(defun alloc-other-fn (widetag nwords result-tn node alloc-temp thread-temp
+                       &optional (init nil initp)
+                       &aux (bytes (pad-data-block nwords)))
   (declare (ignorable thread-temp))
-  (let ((header (compute-object-header nwords widetag)))
+  (let ((header (compute-object-header nwords widetag))
+        (mixedp))
     #+bignum-assertions
     (when (= widetag bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (cond ((and (not alloc-temp) (location= result-tn r12-tn))
+           (bug "Can't happen?")
            ;; this is the problematic case for INSTRUMENT-ALLOC.
            ;; Therefore, allocate into RAX but save it in RESULT-TN
            ;; and then switch them back.
@@ -283,12 +299,19 @@
            (instrument-alloc widetag bytes node result-tn thread-temp)
            (pseudo-atomic ()
              (cond (alloc-temp
-                    (allocation widetag bytes 0 result-tn node alloc-temp thread-temp)
+                    (setq mixedp
+                          (allocation widetag bytes 0 result-tn node alloc-temp thread-temp))
                     (storew* header result-tn 0 0 t)
                     (inst or :byte result-tn other-pointer-lowtag))
                    (t
-                    (allocation widetag bytes other-pointer-lowtag result-tn node nil thread-temp)
-                    (storew* header result-tn 0 other-pointer-lowtag t))))))))
+                    (setq mixedp
+                          (allocation widetag bytes other-pointer-lowtag result-tn node nil thread-temp))
+                    (storew* header result-tn 0 other-pointer-lowtag t)))
+             (cond (initp
+                    ;; assume that INIT also marks the bitmap if require
+                    (funcall init))
+                   (mixedp
+                    (set-object-livep-bit result-tn alloc-temp))))))))
 
 ;;;; CONS, ACONS, LIST and LIST*
 (macrolet ((store-slot (tn list &optional (slot cons-car-slot)
@@ -597,9 +620,12 @@
                               type)
                           size-tn node instrumentation-temp thread-tn)
         (pseudo-atomic (:thread-tn thread-tn)
-         (allocation (pick-vector-tlab type length)
-                     size-tn 0 result node alloc-temp thread-tn)
-         (put-header result 0 type length t alloc-temp)
+         (let ((mixedp
+                (allocation (pick-vector-tlab type length)
+                            size-tn 0 result node alloc-temp thread-tn)))
+           (put-header result 0 type length t alloc-temp)
+           (when mixedp
+             (set-object-livep-bit result alloc-temp)))
          (inst or :byte result other-pointer-lowtag)))
       #+ubsan
       (cond ((want-shadow-bits)
@@ -871,7 +897,8 @@
                                (if (dd-has-raw-slot-p dd) :mixed :boxed)))
                             (%make-instance :boxed)
                             (%make-instance/mixed :mixed)
-                            (t type))))
+                            (t type)))
+                         (mixedp))
     #+bignum-assertions
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (unless stack-allocate-p
@@ -881,7 +908,8 @@
       ;; the header is written so that displacement can be 0.
       (if stack-allocate-p
           (stack-allocation bytes (if type 0 lowtag) result)
-          (allocation alloc-type bytes (if type 0 lowtag) result node alloc-temp thread-tn))
+          (setq mixedp (allocation alloc-type bytes (if type 0 lowtag)
+                                   result node alloc-temp thread-tn)))
       (let ((header (compute-object-header words type)))
         (cond #+compact-instance-header
               ((and (eq name '%make-structure-instance) stack-allocate-p)
@@ -897,6 +925,8 @@
       ;; but still, always having a layout is a good thing.
       (when (typep type 'wrapper) ; store its layout, while still in pseudo-atomic
         (inst mov :dword (ea 4 result) (make-fixup type :layout)))
+      (when mixedp
+        (set-object-livep-bit result alloc-temp))
       (inst or :byte result lowtag))))
   ;; DX is strictly redundant in these 2 vops, but they're written this way
   ;; so that backends can choose to use a single vop for both.
@@ -946,20 +976,23 @@
    #+bignum-assertions
    (when (= type bignum-widetag) (inst shl :dword bytes 1)) ; use 2x the space
    (cond (stack-allocate-p
-             (stack-allocation bytes lowtag result)
-             (storew header result 0 lowtag))
+          (stack-allocation bytes lowtag result)
+          (storew header result 0 lowtag))
          (t
              ;; can't pass RESULT as a possible choice of scratch register
              ;; because it might be in the same physical reg as BYTES.
              ;; Yup, the lifetime specs in this vop are pretty confusing.
-             (instrument-alloc type bytes node alloc-temp thread-tn)
-             (pseudo-atomic (:thread-tn thread-tn)
-              (let ((alloc-type (case name
-                                  (%make-instance :boxed)
-                                  (%make-instance/mixed :mixed)
-                                  (t type))))
-                (allocation alloc-type bytes lowtag result node alloc-temp thread-tn))
-              (storew header result 0 lowtag))))))
+          (instrument-alloc type bytes node alloc-temp thread-tn)
+          (pseudo-atomic (:thread-tn thread-tn)
+            (let* ((alloc-type (case name
+                                 (%make-instance :boxed)
+                                 (%make-instance/mixed :mixed)
+                                 (t type)))
+                   (mixedp
+                    (allocation alloc-type bytes 0 result node alloc-temp thread-tn)))
+              (storew header result 0 0)
+              (when mixedp (set-object-livep-bit result alloc-temp))
+              (inst or :byte result lowtag)))))))
 
 (macrolet ((c-call (name)
              `(let ((c-fun (make-fixup ,name :foreign)))

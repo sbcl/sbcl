@@ -162,6 +162,7 @@ struct page *page_table;
 unsigned char *gc_card_mark;
 lispobj gc_object_watcher;
 int gc_traceroot_criterion;
+long header_bitmap_nwords;
 // Filtered pins include code but not simple-funs,
 // and must not include invalid pointers.
 lispobj* gc_filtered_pins;
@@ -254,11 +255,66 @@ page_ends_contiguous_block_p(page_index_t page_index,
     return answer;
 }
 
+static inline int addr_to_bitmap_index(char* addr, long* word_index)
+{
+    // Object indices in the bitmap are negative:
+    //   -1 = DYNAMIC_SPACE_START
+    //   -2 = DYNAMIC_SPACE_START + 1 cons
+    // etc
+    // right-shifting a negative is "implementation-dependent"
+    // but does exactly what we want.
+    sword_t offset = DYNAMIC_SPACE_START - 1 - (uword_t)addr;
+    offset >>= N_LOWTAG_BITS;
+#ifdef LISP_FEATURE_64_BIT
+    *word_index = offset >> 6; /// word index
+    return offset & 0x3f; // bit index
+#else
+    *word_index = offset >> 5;
+    return offset & 0x1f;
+#endif
+}
+
+static boolean allocator_bitmap_bit(lispobj* obj)
+{
+    long word_index;
+    int bit_index = addr_to_bitmap_index((char*)obj, &word_index);
+    uword_t word = ((uword_t*)gc_card_mark)[word_index];
+    return (word >> bit_index) & 1;
+}
+
+/* On MIXED pages, we use 1 bit per cons-cell-sized allocation "quantum"  to record
+ * that the cell is in use. There are 2*N_WORD_BITS in a cell, and 1 bit of overhead
+ * for the allocator bitmap, so the value 1/(2*N_WORD_BITS) is the ratio of
+ * data bits to overhead bits.
+ * (It looks like - but is not to be confused with - the CONS page bitmap)
+ * The 1/N value is a scale factor - it applies to bits, bytes or words. Therefore,
+ * we can take the number of bytes per page and multiply by the factor to compute
+ * the number of bytes in the allocator bitmap for that page */
+#define ALLOCATOR_BITMAP_BYTES_PER_PAGE GENCGC_PAGE_BYTES/(2*N_WORD_BITS)
+
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
  * scan_start of zero, to optimize page_ends_contiguous_block_p().
  * Clear all the flags that don't pertain to a free page.
- * Particularly the 'need_zerofill' bit has to remain unchanged */
-static inline void reset_page_flags(page_index_t page) {
+ * Particularly the 'need_zerofill' bit has to remain unchanged.
+ * Eagerly clear the allocator bitmap if there was one, because after
+ * setting 'type' to 0 there's no way to know if there was one.
+ * MIXED pages are the least commonly used, and it would be wasteful
+ * to always zero the bitmap in gc_alloc_new_region.
+ * So we clear the bitmap of any pages subject to flag reset due to:
+ * - closing a region
+ * - shrinking a large object
+ * - freeing oldspace
+ */
+static void reset_page_flags(page_index_t page) {
+    int type = page_table[page].type;
+    if (type == PAGE_TYPE_MIXED || type == PAGE_TYPE_SMALL_MIXED) {
+        long bitmap_word_index;
+        /* The higher the address, the lower the bitmap word index.
+         * So take the index of the end, and clear from there up. */
+        addr_to_bitmap_index(page_address(page)+GENCGC_CARD_BYTES-1, &bitmap_word_index);
+        uword_t* bitmap = (uword_t*)gc_card_mark + bitmap_word_index;
+        memset(bitmap, 0, ALLOCATOR_BITMAP_BYTES_PER_PAGE);
+    }
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
     page_table[page].pinned = 0;
@@ -3389,9 +3445,10 @@ static uword_t
 free_oldspace(void)
 {
     uword_t bytes_freed = 0;
-    page_index_t first_page, last_page;
+    page_index_t first_page = 0;
 
-    first_page = 0;
+    /* I'm not sure why this has to locate the boundaries of contiguous blocks.
+     * For other than scanning eden MIXED pages, that is */
 
     do {
         /* Find a first page for the next region of pages. */
@@ -3403,31 +3460,23 @@ free_oldspace(void)
         if (first_page >= next_free_page)
             break;
 
-        /* Find the last page of this region. */
-        last_page = first_page;
-
+        /* Find the last page of this contiguous block */
+        page_index_t last_page = first_page;
         page_bytes_t last_page_bytes;
         do {
+            /* Should already be unprotected by unprotect_oldspace(). */
+            gc_assert(page_cards_all_marked_nonsticky(last_page));
             /* Free the page. */
             last_page_bytes = page_bytes_used(last_page);
             bytes_freed += last_page_bytes;
             reset_page_flags(last_page);
             set_page_bytes_used(last_page, 0);
-            /* Should already be unprotected by unprotect_oldspace(). */
-            gc_assert(page_cards_all_marked_nonsticky(last_page));
             last_page++;
-        }
-        while ((last_page < next_free_page)
-               && page_table[last_page].gen == from_space
-               && page_words_used(last_page));
-
-        /* 'last_page' is the exclusive upper bound on the page range starting
-         * at 'first'page'. We have an accurate count of the bytes in use on
-         * last_page but there may be intervening pages not 100% full which are
-         * treated as full. This can spuriously visit some (0 . 0) conses
-         * but is otherwise not a big deal */
-        visit_freed_objects(page_address(first_page),
-                            npage_bytes(last_page-first_page-1) + last_page_bytes);
+        } while (!page_ends_contiguous_block_p(last_page-1, from_space));
+        /* first_page to last_page (exclusive) can now be scanned
+         * for deleted objects if we wish*/
+        uword_t nbytes =  npage_bytes(last_page-first_page-1) + last_page_bytes;
+        visit_freed_objects(page_address(first_page), nbytes);
         first_page = last_page;
     } while (first_page < next_free_page);
 
@@ -3888,6 +3937,58 @@ __attribute__((unused)) static void check_contiguity()
         while (!page_ends_contiguous_block_p(last, page_table[first].gen)) ++last;
         first = last + 1;
       }
+}
+
+uword_t count_eden_objects(lispobj* where, lispobj* end, uword_t arg)
+{
+    page_index_t p = find_page_index(where);
+    if (page_table[p].type == PAGE_TYPE_THREAD_MIXED) {
+        int* histo = (void*)arg;
+        while (where < end) {
+            int tag = widetag_of(where);
+            if (tag != 0) {
+                histo[tag>>2]++;
+                if (tag != FILLER_WIDETAG && !allocator_bitmap_bit(where)) {
+                    histo[0] = 1; // lossage
+                    fprintf(stderr, "obj @ %p (%s) missing bit, index %ld\n",
+                            where, widetag_names[widetag_of(where)>>2],
+                            ((uword_t)where-DYNAMIC_SPACE_START)/16);
+                }
+            }
+            where += OBJECT_SIZE(*where, where);
+        }
+    }
+    return 0;
+}
+
+static void thread_mixed_page_histo()
+{
+    int histo[64];
+    memset(histo, 0, sizeof histo);
+    walk_generation(count_eden_objects, 0, (uword_t)histo);
+    int i;
+    fprintf(stderr, "Mixed-page Histogram:\n");
+    for (i=0; i<64; ++i) {
+        if (histo[i]) fprintf(stderr,  "  %2x %7d %s\n", i<<2, histo[i], widetag_names[i]);
+    }
+    if (histo[0]) {
+      uword_t* gc_header_map = (void*)gc_card_mark;
+      fprintf(stderr,"Bitmap scan\n");
+      long wordindex=-1;
+      long i;
+      lispobj* where = (void*)DYNAMIC_SPACE_START;
+      for (i=0; i<header_bitmap_nwords; ++i, --wordindex) {
+        uword_t word = gc_header_map[wordindex];
+        if (word) {
+            uword_t mask = 1;
+            for (mask = 0x8000000000000000; mask; mask >>= 1, where += 2)
+                if (word & mask) { fprintf(stderr, "%p\n", where); }
+        } else {
+            where += 2*N_WORD_BITS;
+        }
+      }
+      ldb_monitor("Incomplete bitmap");
+    }
 }
 
 int show_gc_generation_throughput = 0;
@@ -4530,8 +4631,10 @@ collect_garbage(generation_index_t last_gen)
     if (pre_verify_gen_0)
         verify_heap(VERIFY_PRE_GC);
 
-    if (gencgc_verbose > 1)
+    if (gencgc_verbose > 1) {
         print_generation_stats();
+        thread_mixed_page_histo();
+    }
 
     if (gc_mark_only) {
         garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0, &last_gen);
@@ -4707,6 +4810,10 @@ collect_garbage(generation_index_t last_gen)
         finalizer_thread_runflag = newval ? newval : 1;
     }
     THREAD_JIT(1);
+    // FOR TESTING ONLY - clear all bits in the allocator bitmap
+    uword_t nbytes = header_bitmap_nwords<<WORD_SHIFT;
+    unsigned char *clear_from = gc_card_mark - nbytes;
+    memset(clear_from, 0, nbytes);
 }
 
 /* Initialization of gencgc metadata is split into two steps:
@@ -4820,7 +4927,12 @@ void gc_allocate_ptes()
     num_gc_cards = 1L << gc_card_table_nbits;
 
     gc_card_table_mask =  num_gc_cards - 1;
-    gc_card_mark = successful_malloc(num_gc_cards);
+    long n_conses = dynamic_space_size / (CONS_SIZE*N_WORD_BYTES);
+    header_bitmap_nwords = ALIGN_UP(n_conses,N_WORD_BITS) / N_WORD_BITS;
+    long header_bitmap_nbytes = header_bitmap_nwords * N_WORD_BYTES;
+    unsigned char * tables = successful_malloc(header_bitmap_nbytes + num_gc_cards);
+    memset(tables, 0, header_bitmap_nbytes);
+    gc_card_mark = tables + header_bitmap_nbytes;
     /* The mark array used to work "by accident" if the numeric value of CARD_MARKED
      * is 0 - or equivalently the "WP'ed" state - which is the value that calloc()
      * fills with. If using malloc() we have to fill with CARD_MARKED,

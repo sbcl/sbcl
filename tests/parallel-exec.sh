@@ -28,7 +28,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
 (require :sb-sprof)
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
-#+(and x86-64 linux sb-thread)
+#+nil ; (and x86-64 linux sb-thread)
   (unless (find :gs-seg sb-impl:+internal-features+)
     (push :test-aprof *features*))
 (in-package run-tests)
