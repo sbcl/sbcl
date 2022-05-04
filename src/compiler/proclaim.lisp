@@ -542,7 +542,6 @@
              #+sb-xc-host
              (error "Type system not yet initialized.")))
         (freeze-type
-         #-sb-fluid
          (map-args #'process-freeze-type-declaration))
         ((start-block end-block)
          #-(and sb-devel sb-xc-host)
@@ -575,7 +574,7 @@
         ((disable-package-locks enable-package-locks)
          (setq *disabled-package-locks*
                (process-package-lock-decl form *disabled-package-locks*)))
-        ((#-sb-fluid inline notinline #-sb-fluid maybe-inline)
+        ((inline notinline maybe-inline)
          (map-args #'process-inline-declaration kind))
         (deprecated
          (destructuring-bind (state since &rest things) args

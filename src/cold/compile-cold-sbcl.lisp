@@ -85,8 +85,7 @@
         ;; optimizations. (ANSI says users aren't supposed to
         ;; redefine our functions anyway; and developers can
         ;; fend for themselves.)
-        (sb-ext:*derive-function-types*
-         (if (find :sb-fluid sb-xc:*features*) nil t))
+        (sb-ext:*derive-function-types* t)
         ;; Let the target know that we're the cross-compiler.
         (sb-xc:*features* (cons :sb-xc sb-xc:*features*))
         (*readtable* sb-cold:*xc-readtable*))

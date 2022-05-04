@@ -78,7 +78,7 @@
            ;; Developer mode features. A release build will never have them,
            ;; hence it makes no difference whether they're public or not.
            :METASPACE
-           :SB-FLUID :SB-DEVEL :SB-DEVEL-LOCK-PACKAGES)")))
+           :SB-DEVEL :SB-DEVEL-LOCK-PACKAGES)")))
        (removable-features
         (append non-target-features public-features)))
   (defconstant sb-impl:+internal-features+
@@ -316,7 +316,7 @@ Please check that all strings which were not recognizable to the compiler
 
   ;; Unintern no-longer-needed stuff before the possible PURIFY in
   ;; SAVE-LISP-AND-DIE.
-  #-(or sb-fluid sb-devel) (!unintern-init-only-stuff)
+  #-sb-devel (!unintern-init-only-stuff)
 
   ;; Mark interned immobile symbols so that COMPILE-FILE knows
   ;; which symbols will always be physically in immobile space.

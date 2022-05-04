@@ -12,14 +12,11 @@
 (in-package "SB-IMPL")
 
 (defmacro sb-xc:declaim (&rest declaration-specifiers)
-  #+(or sb-devel sb-fluid)
+  #+sb-devel
   (setq declaration-specifiers
         (remove-if (lambda (declaration-specifier)
                      (member (first declaration-specifier)
-                             '(#+sb-fluid inline
-                               #+sb-fluid maybe-inline
-                               #+sb-fluid sb-ext:freeze-type
-                               #+sb-devel start-block
+                             '(#+sb-devel start-block
                                #+sb-devel end-block)))
                    declaration-specifiers))
   `(cl:declaim ,@declaration-specifiers))

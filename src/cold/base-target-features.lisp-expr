@@ -115,15 +115,6 @@
  ;; run-time.
  ; :sb-qshow
 
- ;; Setting this makes SBCL more "fluid", i.e. more amenable to
- ;; modification at runtime, by suppressing various INLINE declarations,
- ;; compiler macro definitions, FREEZE-TYPE declarations; and by
- ;; suppressing various burning-our-ships-behind-us actions after
- ;; initialization is complete; and so forth. This tends to clobber the
- ;; performance of the system, so unless you have some special need for
- ;; this when hacking SBCL itself, you don't want this set.
- ; :sb-fluid
-
  ;; Enable code for collecting statistics on usage of various operations,
  ;; useful for performance tuning of the SBCL system itself. This code
  ;; is probably pretty stale (having not been tested since the fork from

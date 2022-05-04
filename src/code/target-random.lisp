@@ -420,9 +420,9 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
               (accept-reject-loop big-random-chunk))))))
 
 (defun random (arg &optional (state *random-state*))
-  #-sb-fluid (declare (inline %random-fixnum
-                               %random-single-float %random-double-float
-                               #+long-float %random-long-float))
+  (declare (inline %random-fixnum
+                   %random-single-float %random-double-float
+                   #+long-float %random-long-float))
   (declare (explicit-check))
   (cond
     ((and (fixnump arg) (> arg 0))

@@ -304,7 +304,7 @@
   (declare (type bignum result)
            (type bignum-length len)
            (muffle-conditions compiler-note)
-           #-sb-fluid (inline %normalize-bignum-buffer))
+           (inline %normalize-bignum-buffer))
   #+bignum-assertions (aver (= (%bignum-length result) len))
   (let ((newlen (%normalize-bignum-buffer result len)))
     (declare (type bignum-length newlen))

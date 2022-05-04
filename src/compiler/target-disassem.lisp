@@ -2727,8 +2727,8 @@
   ;; nontrivial, the code-generating code is not so useful after the
   ;; initial instruction space is built, so it can all be removed.
   ;; But if you need all these macros to exist for some reason,
-  ;; then define one of the two following features to keep them:
-  #-(or sb-fluid sb-retain-assembler-macros)
+  ;; then define the following feature to keep them:
+  #-sb-retain-assembler-macros
   (do-symbols (symbol sb-assem::*backend-instruction-set-package*)
     (remf (symbol-plist symbol) 'arg-type)
     (remf (symbol-plist symbol) 'inst-format)))

@@ -17,8 +17,6 @@
 ;;; attempt
 (defvar *pack-assign-costs* t)
 (defvar *pack-optimize-saves* t)
-;;; FIXME: Perhaps SB-FLUID should be renamed to SB-TWEAK and these
-;;; should be made conditional on SB-TWEAK.
 
 (declaim (ftype (function (component) index) ir2-block-count))
 
