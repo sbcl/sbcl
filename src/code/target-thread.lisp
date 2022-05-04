@@ -197,6 +197,7 @@ a simple-string (not necessarily unique) or NIL.")
                               (list "waiting on:" thing)))))
                         ((eq values :aborted) '(:aborted))
                         (t :finished)))
+           (*print-array* nil)
            (*print-level* 4))
       (format stream
               ;; if not finished, show the STATE as a list.

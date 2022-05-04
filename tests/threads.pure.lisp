@@ -13,6 +13,11 @@
 
 (use-package '("SB-EXT" "SB-THREAD"))
 
+(with-test (:name :dont-print-array)
+  (let ((thr (sb-thread:make-thread (lambda () (make-array 100)))))
+    (sb-thread:join-thread thr)
+    (assert (search "#<(SIMPLE-VECTOR" (write-to-string thr)))))
+
 (with-test (:name atomic-update
             :skipped-on (not :sb-thread))
   (let ((x (cons :count 0))
