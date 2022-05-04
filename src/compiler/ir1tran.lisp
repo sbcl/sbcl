@@ -232,19 +232,7 @@
 ;;; demanded a function.
 (declaim (ftype (sfunction (t string) global-var) find-free-fun))
 (defun find-free-fun (name context &aux (free-funs (free-funs *ir1-namespace*)))
-  (or (let ((old-free-fun (gethash name free-funs)))
-        (when old-free-fun
-          (when (or (not (defined-fun-p old-free-fun))
-                    (not (block-compile *compilation*))
-                    ;; When block-compiling, it is the case that we
-                    ;; could proclaim an inline, define some things,
-                    ;; then proclaim a notinline, and in the case that
-                    ;; the function's :inlinep info changes, the
-                    ;; old-free-fun is stale and we should make a new
-                    ;; one.
-                    (eq (info :function :inlinep name)
-                        (defined-fun-inlinep old-free-fun)))
-            old-free-fun)))
+  (or (gethash name free-funs)
       (let ((kind (info :function :kind name)))
         (ecase kind
           ((:macro :special-form)

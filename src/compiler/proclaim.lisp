@@ -414,11 +414,26 @@
     (when (typep class 'classoid)
       (seal-class class))))
 
+;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
+;;; global-var ensures that when we substitute a functional for a
+;;; global var (i.e. for DEFUN) that we won't clobber any uses
+;;; declared :NOTINLINE.
 (defun process-inline-declaration (name kind)
   (declare (type (and inlinep (not null)) kind))
   ;; since implicitly it is a function, also scrubs (FREE-FUNS *IR1-NAMESPACE*)
   (proclaim-as-fun-name name)
   (warn-if-inline-failed/proclaim name kind)
+  (when (boundp '*ir1-namespace*)
+    (let* ((free-funs (free-funs *ir1-namespace*))
+           (var (gethash name free-funs)))
+      (etypecase var
+        (null)
+        (global-var
+         (setf (gethash name free-funs)
+               ;; Use the universal type as the local type
+               ;; restriction, since we are processing this at
+               ;; top-level, and hence, in a null lexical environment.
+               (make-new-inlinep var kind *universal-type*))))))
   (setf (info :function :inlinep name) kind))
 
 (defun process-block-compile-declaration (entries kind)
