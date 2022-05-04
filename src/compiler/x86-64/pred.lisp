@@ -192,21 +192,10 @@
                      (if (eq (tn-kind tn) :constant)
                          tn
                          (make-tn))))
-            (cond ((eq dst-tn y-tn)
-                   (values vop
-                           x-tn (frob-tn y-tn)
-                           dst-tn
-                           nil))
-                  ((eq dst-tn x-tn)
-                   (values vop
-                           (frob-tn x-tn) y-tn
-                           dst-tn
-                           nil))
-                  (t
-                   (values vop
-                           (frob-tn x-tn) (frob-tn y-tn)
-                           (make-tn)
-                           nil)))))))))
+            (values vop
+                    (frob-tn x-tn) (frob-tn y-tn)
+                    (make-tn)
+                    nil)))))))
 
 (define-vop (move-if)
   (:args (then) (else))
