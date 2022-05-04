@@ -680,7 +680,7 @@
           (let ((use (principal-lvar-ref-use length-lvar)))
             (and (combination-p use)
                  (lvar-fun-is (combination-fun use)
-                              '(vector-length))
+                              '(vector-length length))
                  (car (combination-args use))))))
     (when (and (or index-var index-constant)
                array-lvar)

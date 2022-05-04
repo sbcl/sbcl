@@ -79,6 +79,15 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
 
+(with-test (:name :bounds-check-length)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (x y)
+                        (when (< x (length y))
+                          (svref y x))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             0)))
+
 (with-test (:name :local-call-tail-call)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda ()
