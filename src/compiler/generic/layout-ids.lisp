@@ -24,8 +24,10 @@
 (defparameter *popular-structure-types* (mapcar 'list '(
 SB-KERNEL:CTYPE
 HASH-TABLE
+SB-IMPL::GENERAL-HASH-TABLE
 SB-C::NODE
 SB-C::GLOBAL-CONFLICTS
+SB-C::GLOBAL-VAR
 SB-C::FUNCTIONAL
 SB-C::LEAF
 SB-KERNEL:ANSI-STREAM
@@ -41,6 +43,7 @@ SB-INT:SSET-ELEMENT
 SB-C:TN-REF
 SB-KERNEL:ARGS-TYPE
 SB-C::VOP
+SB-C:STORAGE-BASE
 SB-C:STORAGE-CLASS
 SB-KERNEL:LEXENV
 SB-ASSEM::ANNOTATION
@@ -64,6 +67,7 @@ SB-KERNEL:ARRAY-TYPE
 SB-KERNEL:COMPOUND-TYPE
 SB-KERNEL:NEGATION-TYPE
 SB-REGALLOC::VERTEX
+SB-THREAD:THREAD
 SB-THREAD::AVLNODE
 SB-C::ABSTRACT-LEXENV
 SB-KERNEL:UNKNOWN-TYPE
@@ -199,6 +203,8 @@ SB-ALIEN-INTERNALS:ALIEN-ENUM-TYPE
 SB-INT:DEPRECATION-INFO
 SB-DI::FUN-END-COOKIE
 SB-ALIEN::SHARED-OBJECT
+SB-PCL::FAST-METHOD-CALL
+SB-C::DXABLE-ARGS
 )))
 
 ;;; The rationale for using (signed-byte 8) for small IDs on the x86
@@ -236,3 +242,33 @@ SB-ALIEN::SHARED-OBJECT
        (rplacd item id)
        (setq id (if (= id -1) 5 ; hop over the wired IDs
                     (1+ id)))))))
+
+(defvar *general-layout-uniqueid-counter*  ; incremented before use
+  (ecase sb-kernel::layout-id-type
+    (signed-byte 127) ; predefined IDs range from -128 to 127
+    (unsigned-byte 255))) ; all IDs are unsigned integers
+;;; Conditions are numbered from -128 downward,
+;;; but only if layout IDs can be negative.
+(defvar *condition-layout-uniqueid-counter* -128) ; decremented before use
+
+(defun choose-layout-id (name conditionp)
+  ;; If you change these, then also change src/runtime/gc-private.h
+  ;; The ID of T is irrelevant since we'll never try to compare to it.
+  (case name
+    ((t) 0)
+    (structure-object 1)
+    #+metaspace (wrapper 2)
+    (#+metaspace sb-vm:layout #-metaspace wrapper 3)
+    (sb-lockless::list-node 4)
+    (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
+           (ecase sb-kernel::layout-id-type
+             (unsigned-byte
+              (incf *general-layout-uniqueid-counter*))
+             (signed-byte
+              (if conditionp
+                  ;; It doesn't really matter what ID is assigned to a CONDITION subtype
+                  ;; because we don't use the IDs for type testing. Nor for standard-object.
+                  ;; But I'd like to a have a quick visual scan of the IDs assigned during
+                  ;; genesis by giving them negative values which can't otherwise occur.
+                  (decf *condition-layout-uniqueid-counter*)
+                  (incf *general-layout-uniqueid-counter*))))))))

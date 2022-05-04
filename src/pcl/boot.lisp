@@ -1358,11 +1358,6 @@ bootstrapping.
                              `(list ,@required-args+rest-arg))
                         (method-call-call-method-args ,method-call)))
 
-(defstruct (fast-method-call (:copier nil))
-  (function #'identity :type function)
-  pv
-  next-method-call
-  arg-info)
 (defstruct (constant-fast-method-call
              (:copier nil) (:include fast-method-call))
   value)

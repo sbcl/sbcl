@@ -486,7 +486,8 @@ static inline int layout_depth2_id(struct layout* layout) {
     int32_t* vector = (int32_t*)&layout->uw_id_word0;
     return vector[0];
 }
-// Keep in sync with hardwired IDs in src/compiler/generic/genesis.lisp
+// Keep in sync with hardwired IDs in CHOOSE-LAYOUT-ID
+// in src/compiler/generic/layout-ids.lisp
 #define WRAPPER_LAYOUT_ID 2
 #define LAYOUT_LAYOUT_ID 3
 #define LFLIST_NODE_LAYOUT_ID 4

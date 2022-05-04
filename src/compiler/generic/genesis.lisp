@@ -1220,36 +1220,6 @@ core and return a descriptor to it."
                           descriptor)
                 make-cold-layout))
 
-(defvar *general-layout-uniqueid-counter*  ; incremented before use
-  (ecase sb-kernel::layout-id-type
-    (signed-byte 127) ; predefined IDs range from -128 to 127
-    (unsigned-byte 255))) ; all IDs are unsigned integers
-;;; Conditions are numbered from -128 downward,
-;;; but only if layout IDs can be negative.
-(defvar *condition-layout-uniqueid-counter* -128) ; decremented before use
-
-(defun choose-layout-id (name conditionp)
-  ;; If you change these, then also change src/runtime/gc-private.h
-  ;; The ID of T is irrelevant since we'll never try to compare to it.
-  (case name
-    ((t) 0)
-    (structure-object 1)
-    #+metaspace (wrapper 2)
-    (#+metaspace sb-vm:layout #-metaspace wrapper 3)
-    (sb-lockless::list-node 4)
-    (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
-           (ecase sb-kernel::layout-id-type
-             (unsigned-byte
-              (incf *general-layout-uniqueid-counter*))
-             (signed-byte
-              (if conditionp
-                  ;; It doesn't really matter what ID is assigned to a CONDITION subtype
-                  ;; because we don't use the IDs for type testing. Nor for standard-object.
-                  ;; But I'd like to a have a quick visual scan of the IDs assigned during
-                  ;; genesis by giving them negative values which can't otherwise occur.
-                  (decf *condition-layout-uniqueid-counter*)
-                  (incf *general-layout-uniqueid-counter*))))))))
-
 (defun cold-wrapper-id (wrapper-descriptor)
   (let* ((layout-descriptor (->layout wrapper-descriptor))
          (proxy (gethash (descriptor-bits layout-descriptor) *cold-layout-by-addr*)))
@@ -1275,7 +1245,7 @@ core and return a descriptor to it."
                                        (or (awhen (gethash 'wrapper *cold-layouts*)
                                              (cold-layout-descriptor it))
                                            (make-fixnum-descriptor 0))))
-         (this-id (choose-layout-id name (logtest flags +condition-layout-flag+)))
+         (this-id (sb-kernel::choose-layout-id name (logtest flags +condition-layout-flag+)))
          (hash (make-fixnum-descriptor (sb-impl::hash-layout-name name))))
 
     (let ((proxy (%make-cold-layout :id this-id
@@ -1900,7 +1870,8 @@ core and return a descriptor to it."
   ;; increment, so we need to add 1 to get to the next value for it because
   ;; we always pre-increment *general-layout-uniqueid-counter* when reading it.
   (cold-set 'sb-kernel::*layout-id-generator*
-            (cold-list (make-fixnum-descriptor (1+ *general-layout-uniqueid-counter*))))
+            (cold-list (make-fixnum-descriptor
+                        (1+ sb-kernel::*general-layout-uniqueid-counter*))))
   (cold-set 'sb-c::*!initial-parsed-types*
             (vector-in-core
              (mapcar (lambda (x)

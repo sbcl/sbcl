@@ -236,3 +236,10 @@
                  (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))
            nil nil nil)))
     (sb-c:compile-in-lexenv expr lexenv nil nil nil nil nil)))
+
+;;; This is here, moved from src/pcl/boot so that it gets a 1-byte layout ID
+(defstruct (fast-method-call (:copier nil))
+  (function #'identity :type function)
+  pv
+  next-method-call
+  arg-info)
