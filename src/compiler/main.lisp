@@ -1275,6 +1275,14 @@ necessary, since type inference may take arbitrarily long to converge.")
             (mapc #'clear-ir1-info components-from-dfo)
             result))))))
 
+;;; Clear the global hash tables held in IR1-NAMESPACE.
+(defun clear-ir1-namespace (ir1-namespace)
+  (clrhash (free-funs ir1-namespace))
+  (clrhash (free-vars ir1-namespace))
+  (clrhash (eql-constants ir1-namespace))
+  (clrhash (named-constants ir1-namespace))
+  (clrhash (similar-constants ir1-namespace)))
+
 ;;; Print some noise about FORM if *COMPILE-PRINT* is true.
 (defun note-top-level-form (form)
   (when *compile-print*
@@ -1693,7 +1701,8 @@ necessary, since type inference may take arbitrarily long to converge.")
           (compile-load-time-value-lambda lambdas)
           (compile-toplevel-lambdas lambdas top-level-closure)))
 
-    (mapc #'clear-ir1-info components))
+    (mapc #'clear-ir1-info components)
+    (clear-ir1-namespace *ir1-namespace*))
   (values))
 
 ;;; Actually compile any stuff that has been queued up for block
