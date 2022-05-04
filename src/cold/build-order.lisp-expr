@@ -606,8 +606,7 @@
  ("src/code/format") ; needs SB-XC:DEFMACRO
  ("src/code/target-format" :not-host)
 
- ("src/code/late-globaldb" :not-host)
- ("src/code/redblack" :not-host))
+ ("src/code/late-globaldb" :not-host))
 
 ;;; make-target-2 build steps
 (("src/code/early-ntrace" ; lets PCL hook into tracing

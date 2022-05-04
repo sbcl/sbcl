@@ -8,6 +8,9 @@
  ("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
  ("brothertree.impure.lisp"
   "src/code/brothertree.lisp")
+ ("redblack.impure.lisp"
+  "tests/bbtree-test-util.lisp"
+  "src/code/redblack.lisp")
  ("case.pure.lisp" "tests/case-test.lisp")
  ("chill.test.sh"
   "src/cold/chill.lisp"
