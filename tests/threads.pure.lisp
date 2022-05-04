@@ -13,7 +13,8 @@
 
 (use-package '("SB-EXT" "SB-THREAD"))
 
-(with-test (:name :dont-print-array)
+(with-test (:name :dont-print-array
+            :skipped-on (not :sb-thread))
   (let ((thr (sb-thread:make-thread (lambda () (make-array 100)))))
     (sb-thread:join-thread thr)
     (assert (search "#<(SIMPLE-VECTOR" (write-to-string thr)))))
