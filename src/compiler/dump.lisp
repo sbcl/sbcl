@@ -1172,6 +1172,7 @@
 
       ;; Dump the debug info.
       (let ((info (sb-c::debug-info-for-component component)))
+        (fasl-validate-structure info fasl-output)
         (dump-object info fasl-output)
         (push (dump-to-table fasl-output)
               (fasl-output-debug-info fasl-output)))
@@ -1359,9 +1360,8 @@
 
 (defun dump-structure (struct file)
   (unless (or (gethash struct (fasl-output-valid-structures file))
-              (typep struct
-                     '(or sb-c::debug-info sb-c::debug-fun sb-c::debug-source
-                          sb-c:definition-source-location sb-c::debug-name-marker)))
+              ;; Assume that DEBUG-FUNs are always valid to dump.
+              (typep struct 'sb-c::debug-fun))
     (error "attempt to dump invalid structure:~%  ~S~%How did this happen?"
            struct))
   (note-potential-circularity struct file)
