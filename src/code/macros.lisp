@@ -651,7 +651,11 @@ invoked. In that case it will store into PLACE and start over."
   ;; variable to work around Python's blind spot in type derivation.
   ;; For more complex places getting the type derived should not
   ;; matter so much anyhow.
-  (let ((expanded (%macroexpand place env)))
+  (let ((expanded (%macroexpand place env))
+        (type (let ((ctype (sb-c::careful-specifier-type type)))
+                (if ctype
+                    (type-specifier ctype)
+                    type))))
     (if (symbolp expanded)
         `(do ()
              ((typep ,place ',type))
