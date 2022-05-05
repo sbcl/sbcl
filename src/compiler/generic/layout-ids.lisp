@@ -224,10 +224,11 @@ SB-C::DXABLE-ARGS
 ;;;   2 = WRAPPER if #+metaspace, unused if #-metaspace
 ;;;   3 = SB-VM:LAYOUT if #+metaspace, WRAPPER if #-metaspace
 ;;;   4 = SB-LOCKLESS::LIST-NODE
+;;;   5 = SB-BROTHERTREE::UNARY-NODE
 (ecase layout-id-type
   (unsigned-byte
    ;; Assign all the above an (UNSIGNED-BYTE 8) layout-id.
-   (let ((id 4)) ; pre-increment when using
+   (let ((id 5)) ; pre-increment when using
      (dolist (item *popular-structure-types*)
        ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
        (rplacd item (incf id)))))
@@ -240,7 +241,7 @@ SB-C::DXABLE-ARGS
      (dolist (item *popular-structure-types*)
        ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
        (rplacd item id)
-       (setq id (if (= id -1) 5 ; hop over the wired IDs
+       (setq id (if (= id -1) 6 ; hop over the wired IDs
                     (1+ id)))))))
 
 (defvar *general-layout-uniqueid-counter*  ; incremented before use
@@ -260,6 +261,7 @@ SB-C::DXABLE-ARGS
     #+metaspace (wrapper 2)
     (#+metaspace sb-vm:layout #-metaspace wrapper 3)
     (sb-lockless::list-node 4)
+    (sb-brothertree::unary-node 5)
     (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
            (ecase sb-kernel::layout-id-type
              (unsigned-byte

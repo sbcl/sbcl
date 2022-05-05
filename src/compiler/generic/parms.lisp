@@ -220,6 +220,7 @@
 
     ;; threading support
     #+sb-thread ,@'(sb-thread::*starting-threads* *free-tls-index*)
+    *codeblob-tree*
 
     ;; runtime linking of lisp->C calls (regardless of whether
     ;; the C function is in a dynamic shared object or not)

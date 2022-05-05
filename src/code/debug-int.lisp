@@ -565,7 +565,7 @@
 ;;; (1) use unsafe %MAKE-LISP-OBJ, since we've already determined
 ;;;     where the code object starts with certainty, and we don't need
 ;;;     yet another search to test validity of the address.
-;;; (2) wrap the calls in WITHOUT-GCING.
+;;; (2) wrap the calls in WITH-CODE-PAGES-PINNED.
 ;;;
 ;;; Here's a concrete example, assuming the following objects exists:
 ;;;       0x8000: vector header     |
@@ -601,7 +601,7 @@
 ;;; to any object on a specified page.
 ;;;
 ;;; On top of the considerations about dynamic space, there is a further issue
-;;; with allocatin of immobile code. The allocator creates transient inconsistent
+;;; with allocation of immobile code. The allocator creates transient inconsistent
 ;;; states when it reuses holes. Even if the header could be written atomically,
 ;;; there can be junk in the remaining bytes of the hole that gets rewritten as
 ;;; a smaller hole. It's evident that acquiring the allocator mutex works around

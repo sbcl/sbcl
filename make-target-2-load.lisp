@@ -433,6 +433,7 @@ Please check that all strings which were not recognizable to the compiler
         #.(find-package "SB-PCL")
         #.(find-package "SB-MOP")
         #.(find-package "SB-PRETTY")
+        #.(find-package "SB-BROTHERTREE")
         #.(find-package "SB-KERNEL"))
        ;; Assume all and only external symbols must be retained
        (eq accessibility :external))

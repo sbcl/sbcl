@@ -18,9 +18,11 @@
 #include "search.h"
 #include "thread.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
+#include "brothertree.h"
 
 lispobj *
 search_read_only_space(void *pointer)
@@ -200,4 +202,25 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
 lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
 {
     return package ? search_package_symbols(package, symbol_name, hint) : 0;
+}
+
+uword_t brothertree_find_lesseql(uword_t key, lispobj tree)
+{
+    lispobj best = NIL;
+    while (tree != NIL) {
+        lispobj layout = instance_layout(INSTANCE(tree));
+        if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+            tree = ((struct unary_node*)INSTANCE(tree))->child;
+        } else {
+            struct binary_node* node = (void*)INSTANCE(tree);
+            if (node->key == key) return tree;
+            lispobj l = NIL, r = NIL;
+            int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT)
+                      & INSTANCE_LENGTH_MASK;
+            // unless a fringe node, read the left and right pointers
+            if (len > (int)(1+INSTANCE_DATA_START)) l = node->left, r = node->right;
+            if (key < node->key) tree = l; else { best = tree; tree = r; }
+        }
+    }
+    return best;
 }

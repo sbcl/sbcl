@@ -3531,6 +3531,12 @@ package is deprecated in favour of SB-MOP.")
            "CLASS-NOT-FOUND-ERROR"
            "SPECIALIZER-NAME-SYNTAX-ERROR"))
 
+(defpackage* "SB-BROTHERTREE"
+  (:use "CL" "SB-EXT" "SB-INT")
+  (:documentation "internal: 1-2-Brother tree")
+  (:shadow "DELETE")
+  (:export "INSERT" "DELETE"))
+
 (defpackage* "SB-LOCKLESS"
   (:documentation "internal: lockfree lists")
   (:use "CL" "SB-INT" "SB-EXT" "SB-SYS" "SB-KERNEL")

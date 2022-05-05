@@ -1432,9 +1432,9 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
                     - page_bytes_used(first_page)) > 0 &&
                    // "extensible" means all PTE fields are compatible
                    page_extensible_p(first_page, gen, page_type)) {
-            // XXX: Prefer to start non-code on new pages.
-            //      This is temporary until scavenging of small-object pages
-            //      is made a little more intelligent (work in progress).
+            // TODO: Now that BOXED, CONS, and SMALL_MIXED pages exist, investigate
+            // whether the bias against returning partial pages is still useful.
+            // It probably isn't.
             if (bytes_found < nbytes && !is_code(page_type)) {
                 if (bytes_found > most_bytes_found)
                     most_bytes_found = bytes_found;
@@ -1774,6 +1774,7 @@ copy_unboxed_object(lispobj object, sword_t nwords)
 
 /* This will NOT reliably work for objects in a currently open allocation region,
  * because page_words_used() is not sync'ed to the free pointer until closing */
+#include "brothertree.h"
 lispobj *search_dynamic_space(void *pointer)
 {
     page_index_t page_index = find_page_index(pointer);
@@ -1788,6 +1789,20 @@ lispobj *search_dynamic_space(void *pointer)
             return (lispobj*)(page_address(page_index) + ((wordindex >> 1) << (1+WORD_SHIFT)));
         else
             return NULL;
+    }
+    // Generation 0 code is in the tree usually - it isn't for objects
+    // in generation 0 following a non-promotion cycle.
+    if (type == PAGE_TYPE_CODE && page_table[page_index].gen == 0) {
+        lispobj node = brothertree_find_lesseql((uword_t)pointer,
+                                                SYMBOL(CODEBLOB_TREE)->value);
+        if (node != NIL) {
+            lispobj *codeblob = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
+            if (widetag_of(codeblob) != CODE_HEADER_WIDETAG)
+                lose("widetag @ %p is not code? %lx\n", codeblob, *codeblob);
+            int nwords = code_total_nwords((struct code*)codeblob);
+            lispobj *upper_bound = codeblob + nwords;
+            if (pointer < (void*)upper_bound) return codeblob;
+        }
     }
     lispobj *start;
     if (type == PAGE_TYPE_SMALL_MIXED) { // find the nearest card boundary below 'pointer'
@@ -4265,6 +4280,13 @@ garbage_collect_generation(generation_index_t generation, int raise,
     g->num_gc = raise ? 0 : (1 + g->num_gc);
 
 maybe_verify:
+    /* After a GC, pages of code are safe to linearly scan because
+     * there won't be random junk on them below page_bytes_used.
+     * And we don't want to see forwarding pointers on objects in the tree,
+     * so just erase the tree now.
+     * This is WRONG for immobile code, but not worse than status quo
+     * in terms of inability to find objects in the SIGPROF handler etc */
+    SYMBOL(CODEBLOB_TREE)->value = NIL;
     if (generation >= verify_gens)
         verify_heap(VERIFY_POST_GC | (generation<<16));
     extern int n_unboxed_instances;

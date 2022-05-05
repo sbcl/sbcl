@@ -453,6 +453,8 @@
 (defun immobile-space-obj-p (obj)
   (immobile-space-addr-p (get-lisp-obj-address obj)))
 
+(define-load-time-global *codeblob-tree* nil)
+
 ;;; Enforce limit on boxed words based on maximum total number of words
 ;;; that can be indicated in the header for 32-bit words.
 ;;; 22 bits = 4MiB, quite generous for one code object.
@@ -502,6 +504,14 @@
     (with-pinned-objects (code)
       (let ((sap (sap+ (int-sap (get-lisp-obj-address code))
                        (- other-pointer-lowtag))))
+        ;; Record it in the balanced tree.
+        (let ((tree *codeblob-tree*) (addr (sap-int sap)))
+          (loop (let ((newtree (sb-brothertree:insert addr tree)))
+                  ;; check that it hasn't been promoted from gen0 -> gen1 already
+                  ;; (very unlikely, but certainly possible).
+                  (unless (eq (generation-of code) 0) (return))
+                  (let ((oldval (cas *codeblob-tree* tree newtree)))
+                    (if (eq oldval tree) (return) (setq tree oldval))))))
         ;; The immobile space allocator pre-zeroes, and also it needs a nonzero
         ;; value in the boxed word count because otherwise it looks like
         ;; an immobile space page filler. So don't do any more zeroing there.
