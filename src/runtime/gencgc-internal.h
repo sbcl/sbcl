@@ -134,11 +134,7 @@ struct page {
         /* Whether the page was used at all. This is the only bit that can
          * be 1 on a free page */
         need_zerofill :1,
-        /* If this page should not be moved during a GC then this flag
-         * is set. It's only valid during a GC for allocated pages,
-         * and only meaningful for pages in the condemned set.
-         * (It can be spuriously 1 on a page in any generation) */
-        pinned :1;
+        dontuse :1;
 
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
@@ -284,22 +280,34 @@ find_page_index(void *addr)
 
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
 
+extern unsigned char* gc_page_pins;
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
     // Single-object pages can be pinned, but the object doesn't go
-    // in the hashtable. I'm a little surprised that the return value
-    // should be 0 in such case, but I think this never gets called
-    // on large objects because they've all been "moved" to newspace
-    // by adjusting the page table. Perhaps this should do:
-    //   gc_assert(!page_single_obj_p(page))
-    if (!page_table[page].pinned || page_single_obj_p(page)) return 0;
+    // in the hashtable. pinned_p can be queried on those pages,
+    // but the answer is always 'No', because if pinned, the page would
+    // already have had its generation changed to newspace.
+    if (page_single_obj_p(page)) return 0;
+
 #ifdef RETURN_PC_WIDETAG
-    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG)
+    // Yet another complication from the despised LRA objects- with the
+    // refinement of 8 pin bits per page, we either must set all possible bits
+    // for a simple-fun, or map LRAs to the code base address.
+    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG) {
+        // The hash-table stores tagged pointers.
         obj = make_lispobj(fun_code_header(native_pointer(obj)),
                            OTHER_POINTER_LOWTAG);
+        page = find_page_index((void*)obj);
+    }
 #endif
-    return hopscotch_containsp(&pinned_objects, obj);
+
+    unsigned char pins = gc_page_pins[page];
+    if (!pins) return 0;
+    unsigned addr_lowpart = obj & (GENCGC_PAGE_BYTES-1);
+    // Divide the page into 8 parts, see whether that part is pinned.
+    unsigned subpage = addr_lowpart / (GENCGC_PAGE_BYTES/8);
+    return (pins & (1<<subpage)) && hopscotch_containsp(&pinned_objects, obj);
 }
 
 // Return true only if 'obj' must be *physically* transported to survive gc.

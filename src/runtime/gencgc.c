@@ -159,6 +159,7 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
+unsigned char *gc_page_pins;
 unsigned char *gc_card_mark;
 lispobj gc_object_watcher;
 int gc_traceroot_criterion;
@@ -187,7 +188,7 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
     return (page_boxed_p(page)
             && !(page_table[page].type & OPEN_REGION_PAGE_FLAG)
             && (page_words_used(page) != 0)
-            && !page_table[page].pinned
+            && !gc_page_pins[page]
             && (page_table[page].gen == generation));
 }
 #endif
@@ -261,7 +262,8 @@ page_ends_contiguous_block_p(page_index_t page_index,
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
-    page_table[page].pinned = 0;
+    page_table[page].dontuse = 0;
+    gc_page_pins[page] = 0;
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
     //    page_table[page].gen = 0;
     // Free pages are dirty (MARKED) because MARKED is equivalent
@@ -379,7 +381,7 @@ static void show_pinnedobj_count()
     int nwords = 0;
     int n_pinned_largeobj = 0;
     for (page = 0; page < next_free_page; ++page) {
-        if (page_table[page].gen == from_space && page_table[page].pinned
+        if (page_table[page].gen == from_space && gc_page_pins[page]
                 && page_single_obj_p(page)) {
             nwords += page_words_used(page);
             if (page_starts_contiguous_block_p(page))
@@ -913,7 +915,7 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
     int attributes_match =
            page_table[index].type == type
         && page_table[index].gen == gen
-        && !page_table[index].pinned;
+        && !gc_page_pins[index];
 #else
     /* Test the three conditions above as a single comparison.
      *
@@ -1798,7 +1800,7 @@ lispobj *search_dynamic_space(void *pointer)
         if (node != NIL) {
             lispobj *codeblob = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
             if (widetag_of(codeblob) != CODE_HEADER_WIDETAG)
-                lose("widetag @ %p is not code? %lx\n", codeblob, *codeblob);
+                lose("widetag @ %p is not code? %"OBJ_FMTX"\n", codeblob, *codeblob);
             int nwords = code_total_nwords((struct code*)codeblob);
             lispobj *upper_bound = codeblob + nwords;
             if (pointer < (void*)upper_bound) return codeblob;
@@ -1828,7 +1830,7 @@ int pin_all_dynamic_space_code;
 static inline int immune_set_memberp(page_index_t page)
 {
     return (page_table[page].gen != from_space)
-        || (page_table[page].pinned &&
+        || (gc_page_pins[page] &&
             (page_single_obj_p(page) ||
              (is_code(page_table[page].type) && pin_all_dynamic_space_code)));
 }
@@ -2369,6 +2371,10 @@ static void obliterate_nonpinned_words()
     }
 }
 
+int sb_introspect_pinnedp(lispobj obj) {
+    return hopscotch_containsp(&pinned_objects, obj);
+}
+
 /* Add 'object' to the hashtable, and if the object is a code component,
  * then also add all of the embedded simple-funs.
  * It is OK to call this function on an object which is already pinned-
@@ -2391,6 +2397,7 @@ static void obliterate_nonpinned_words()
  * so the extra work here is quite minimal, even if it can generally add to
  * the number of keys in the hashtable.
  */
+#define PAGE_PINNED 0xFF
 static void pin_object(lispobj object)
 {
     if (!compacting_p()) {
@@ -2408,11 +2415,11 @@ static void pin_object(lispobj object)
      * here for large objects, though I do wonder why we can't move the object right now
      * and be done with it */
     if (page_single_obj_p(page)) {
-        if (page_table[page].pinned) return;
+        if (gc_page_pins[page]) return;
         sword_t nwords = OBJECT_SIZE(*object_start, object_start);
         maybe_adjust_large_object(object_start, page, nwords);
         page_index_t last_page = find_page_index(object_start + nwords - 1);
-        while (page <= last_page) page_table[page++].pinned = 1;
+        while (page <= last_page) gc_page_pins[page++] = PAGE_PINNED;
         return;
     }
 
@@ -2421,7 +2428,9 @@ static void pin_object(lispobj object)
     if (hopscotch_containsp(&pinned_objects, object)) return;
 
     hopscotch_insert(&pinned_objects, object, 1);
-    page_table[page].pinned = 1;
+    unsigned int addr_lowpart = object & (GENCGC_PAGE_BYTES-1);
+    // Divide the page into 8 parts, mark that part pinned
+    gc_page_pins[page] |= 1 << (addr_lowpart / (GENCGC_PAGE_BYTES/8));
     struct code* maybe_code = (struct code*)native_pointer(object);
     // Avoid iterating over embedded simple-funs until the debug info is set.
     // Prior to that, the unboxed payload will contain random bytes.
@@ -2430,18 +2439,10 @@ static void pin_object(lispobj object)
     if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG && maybe_code->debug_info) {
         for_each_simple_fun(i, fun, maybe_code, 0, {
             hopscotch_insert(&pinned_objects, make_lispobj(fun, FUN_POINTER_LOWTAG), 1);
-            page_table[find_page_index(fun)].pinned = 1;
+            addr_lowpart = (uword_t)fun & (GENCGC_PAGE_BYTES-1);
+            gc_page_pins[find_page_index(fun)] |=
+                1 << (addr_lowpart / (GENCGC_PAGE_BYTES/8));
         })
-#ifdef RETURN_PC_WIDETAG
-        /* Return PCs can't go in the hash-table, because there's no way to find them.
-         * But from_space_p() has to return false on return PCs in pinned code.
-         * pinned_p is mostly OK, but it needs to see the 'pinned' bit on for the page
-         * having the return PC. There's a chance that we would not set it properly
-         * in page-spanning objects, so loop over pages just like for a large object */
-        size_t nwords = OBJECT_SIZE(*object_start, object_start);
-        page_index_t last_page = find_page_index(object_start + nwords - 1);
-        while (page <= last_page) page_table[page++].pinned = 1;
-#endif
     }
 }
 
@@ -2495,7 +2496,9 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word)
     if (compacting_p()) {
         if (!hopscotch_containsp(&pinned_objects, word)) {
             hopscotch_insert(&pinned_objects, word, 1);
-            page_table[page].pinned = 1;
+            unsigned int addr_lowpart = word & (GENCGC_PAGE_BYTES-1);
+            // Divide the page into 8 parts, mark that part pinned
+            gc_page_pins[page] |= 1 << (addr_lowpart / (GENCGC_PAGE_BYTES/8));
         }
         return 1;
     }
@@ -2793,7 +2796,7 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
      * It's probably rare to pass boxed pages to the OS, but it could be
      * to read fixnums into a simple-vector. */
     for (page = first_page; page <= last_page; ++page)
-        if (page_table[page].pinned) return 0;
+        if (gc_page_pins[page]) return 0;
 #endif
 
     /* Now we attempt to find any 1 "witness" that the pages should NOT be protected.
@@ -3534,9 +3537,10 @@ move_pinned_pages_to_newspace()
 
     for (i = 0; i < next_free_page; i++) {
         /* 'pinned' is cleared lazily, so test the 'gen' field as well. */
-        if (page_table[i].gen == from_space && page_table[i].pinned &&
-            (page_single_obj_p(i) || (is_code(page_table[i].type)
-                                      && pin_all_dynamic_space_code))) {
+        if (gc_page_pins[i] == PAGE_PINNED &&
+            page_table[i].gen == from_space &&
+            (page_single_obj_p(i) ||
+             (is_code(page_table[i].type) && pin_all_dynamic_space_code))) {
             page_table[i].gen = new_space;
             /* And since we're moving the pages wholesale, also adjust
              * the generation allocation counters. */
@@ -3878,26 +3882,16 @@ garbage_collect_generation(generation_index_t generation, int raise,
         gc_alloc_generation = new_space;
         RESET_ALLOC_START_PAGES();
 
-    /* Before any pointers are preserved, the pinned flags on the
-     * pages need to be cleared. */
-    /* FIXME: consider moving this bitmap into its own range of words,
-     * out of the page table. Then we can just bzero() it.
-     * This will also obviate the extra test at the comment
-     * "pinned is cleared lazily" in move_pinned_pages_to_newspace().
-     */
         if (pin_all_dynamic_space_code) {
           /* This needs to happen before ambiguous root pinning, as the mechanisms
            * overlap in a way that all-code pinning wouldn't do the right thing if flipped.
            * FIXME: why would it not? More explanation needed!
            * Code objects should never get into the pins table in this case */
-          for (i = 0; i < next_free_page; i++) {
-              if (page_table[i].gen == from_space)
-                  page_table[i].pinned = page_words_used(i) != 0
-                                         && is_code(page_table[i].type);
-          }
-        } else {
-          for (i = 0; i < next_free_page; i++)
-              if (page_table[i].gen == from_space) page_table[i].pinned = 0;
+            for (i = 0; i < next_free_page; i++) {
+                if (page_table[i].gen == from_space
+                    && is_code(page_table[i].type) && page_words_used(i))
+                    gc_page_pins[i] = PAGE_PINNED;
+            }
         }
 
     /* Un-write-protect the old-space pages. This is essential for the
@@ -4461,6 +4455,7 @@ collect_garbage(generation_index_t last_gen)
     if (gencgc_verbose > 1)
         print_generation_stats();
 
+    page_index_t initial_nfp = next_free_page;
     if (gc_mark_only) {
         garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0, &last_gen);
         goto finish;
@@ -4635,6 +4630,10 @@ collect_garbage(generation_index_t last_gen)
         finalizer_thread_runflag = newval ? newval : 1;
     }
     THREAD_JIT(1);
+    // Clear all pin bits for the next GC cycle.
+    // This could be done in the background somehow maybe.
+    page_index_t max_nfp = initial_nfp > next_free_page ? initial_nfp : next_free_page;
+    memset(gc_page_pins, 0, max_nfp);
 }
 
 /* Initialization of gencgc metadata is split into two steps:
@@ -4713,6 +4712,8 @@ void gc_allocate_ptes()
      */
     page_table = calloc(1+page_table_pages, sizeof(struct page));
     gc_assert(page_table);
+    gc_page_pins = calloc(page_table_pages, 1);
+    gc_assert(gc_page_pins);
 
     // The card table size is a power of 2 at *least* as large
     // as the number of cards. These are the default values.

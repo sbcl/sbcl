@@ -752,6 +752,14 @@ Experimental.
 
 ;;;; ALLOCATION INTROSPECTION
 
+(eval-when (:compile-toplevel :execute)
+  (defmacro pinnedp (addr)
+    `(eql (sb-alien:alien-funcall
+           (sb-alien:extern-alien "sb_introspect_pinnedp"
+                                  (function sb-alien:int sb-alien:unsigned))
+           ,addr)
+          1)))
+
 (defun allocation-information (object)
   "Returns information about the allocation of OBJECT. Primary return value
 indicates the general type of allocation: :IMMEDIATE, :HEAP, :STACK,
@@ -822,18 +830,13 @@ Experimental: interface subject to change."
                                 (index (sb-vm:find-page-index
                                         (get-lisp-obj-address object)))
                                 (flags (sb-alien:slot page 'sb-vm::flags))
-                                .
-                                #+big-endian
-                                ((type      (ldb (byte 6 2) flags))
-                                 (dontmove  (logbitp 0 flags)))
-                                #+little-endian
-                                ((type      (ldb (byte 6 0) flags))
-                                 (dontmove  (logbitp 7 flags))))
+                                (type  #+little-endian (ldb (byte 6 0) flags)
+                                       #+big-endian (ldb (byte 6 2) flags)))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
                                  :boxed (> (logand type #xf) 1)
-                                 :pinned dontmove
+                                 :pinned (pinnedp (get-lisp-obj-address object))
                                  :large (logbitp 4 type)
                                  :page index)))
                        (list :space space))
