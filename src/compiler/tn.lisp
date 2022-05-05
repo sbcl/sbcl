@@ -231,8 +231,8 @@
                                       immed
                                       null-offset
                                       (specifier-type 'null)))))
-             (setf (tn-leaf tn) constant
-                   (leaf-info constant) tn))
+              (setf (tn-leaf tn) constant
+                    (leaf-info constant) tn))
             (let* ((boxed (or (not immed)
                               (boxed-immediate-sc-p immed)))
                    (component (component-info *component-being-compiled*))
