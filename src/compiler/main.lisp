@@ -822,6 +822,20 @@ necessary, since type inference may take arbitrarily long to converge.")
     ;; Its refs will be scanned redundantly, which is harmless.
     (blast (eql-constants ns)))
   (values))
+
+;;; Clear the global hash tables held in IR1-NAMESPACE.
+(defun clear-ir1-namespace (ir1-namespace)
+  (clrhash (free-funs ir1-namespace))
+  (clrhash (free-vars ir1-namespace))
+  ;; FIXME: It would make sense to clear these tables as well, but
+  ;; ARM64 relies on the constant for NIL to stay around in order to
+  ;; assign a wired TN to it, so we let people share it. Investigate a
+  ;; proper fix.
+  #+(or)
+  (progn
+    (clrhash (eql-constants ir1-namespace))
+    (clrhash (named-constants ir1-namespace))
+    (clrhash (similar-constants ir1-namespace))))
 
 ;;;; trace output
 
@@ -1274,14 +1288,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                                       (and store-source result))))
             (mapc #'clear-ir1-info components-from-dfo)
             result))))))
-
-;;; Clear the global hash tables held in IR1-NAMESPACE.
-(defun clear-ir1-namespace (ir1-namespace)
-  (clrhash (free-funs ir1-namespace))
-  (clrhash (free-vars ir1-namespace))
-  (clrhash (eql-constants ir1-namespace))
-  (clrhash (named-constants ir1-namespace))
-  (clrhash (similar-constants ir1-namespace)))
 
 ;;; Print some noise about FORM if *COMPILE-PRINT* is true.
 (defun note-top-level-form (form)
