@@ -1052,3 +1052,13 @@
    ((1 2) t)
    ((2 2) t)
    ((3 2) nil)))
+
+(with-test (:name :ash-signed-negation-overflow)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (fixnum a)
+                  (sb-vm:signed-word b))
+         (truly-the sb-vm:signed-word (ash a b)))
+    ((-44 (- (expt 2 (1- sb-vm:n-word-bits)))) -1)
+    ((44 2) 176)))

@@ -441,10 +441,10 @@
               ;; Only the first 6 bits count for shifts.
               ;; This sets all bits to 1 if AMOUNT is larger than 63,
               ;; cutting the amount to 63.
-              (inst csinv temp temp zr-tn :lt)
+              (inst csinv temp temp zr-tn :lo)
               (inst asr result number temp))
              (:unsigned
-              (inst csel result number zr-tn :lt)
+              (inst csel result number zr-tn :lo)
               (inst lsr result result temp)))))
 
     (inst b END)
@@ -454,7 +454,7 @@
            (inst lsl result number temp))
           (t
            (inst cmp temp n-word-bits)
-           (inst csel result number zr-tn :lt)
+           (inst csel result number zr-tn :lo)
            (inst lsl result result temp)))
     END))
 
@@ -485,10 +485,10 @@
               ;; Only the first 6 bits count for shifts.
               ;; This sets all bits to 1 if AMOUNT is larger than 63,
               ;; cutting the amount to 63.
-              (inst csinv temp temp zr-tn :lt)
+              (inst csinv temp temp zr-tn :lo)
               (inst asr temp-result number temp))
              (unsigned-reg
-              (inst csel temp-result number zr-tn :lt)
+              (inst csel temp-result number zr-tn :lo)
               (inst lsr temp-result temp-result temp)))))
 
     (inst b END)
@@ -498,7 +498,7 @@
            (inst lsl temp-result number temp))
           (t
            (inst cmp temp n-word-bits)
-           (inst csel temp-result number zr-tn :lt)
+           (inst csel temp-result number zr-tn :lo)
            (inst lsl temp-result temp-result temp)))
     END
     (inst lsl result temp-result n-fixnum-tag-bits)))
@@ -541,10 +541,10 @@
                                                 (specifier-type `(mod ,n-word-bits)))))
                            (inst cmp amount n-word-bits)
                            (cond ((location= amount result)
-                                  (inst csel tmp-tn number zr-tn :lt)
+                                  (inst csel tmp-tn number zr-tn :lo)
                                   (inst lsl result tmp-tn amount))
                                  (t
-                                  (inst csel result number zr-tn :lt)
+                                  (inst csel result number zr-tn :lo)
                                   (inst lsl result result amount))))
                           (t
                            (inst lsl result number amount)))))
