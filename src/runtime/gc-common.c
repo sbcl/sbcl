@@ -105,10 +105,10 @@ static void (*scav_ptr[4])(lispobj *where, lispobj object); /* forward decl */
  *
  * For GENCGC only:
  * - With 32-bit words, is_lisp_pointer(object) returns true if addr
- *   contains a broken heart marker (0x01), so we need a sanity check
- *   as the last case.
+ *   contains FORWARDING_HEADER (0x01), so we need a guard condition
+ *   as the last case, to make error detection possible.
  * - With 64-bit words, is_lisp_pointer(object) is false when addr
- *   contains a broken heart marker (0x01), so this won't get called.
+ *   contains FORWARDING_HEADER, so this function won't get called.
  */
 static inline void scav1(lispobj* addr, lispobj object)
 {
@@ -120,25 +120,31 @@ static inline void scav1(lispobj* addr, lispobj object)
             scav_ptr[PTR_SCAVTAB_INDEX(object)](addr, object);
     }
 #else
-    page_index_t page;
     /* In theory we can test forwarding_pointer_p on anything, but it's probably
      * better to avoid reading more memory than needed. Hence the pre-check
      * for a from_space object. But, rather than call from_space_p() which always
      * checks for object pinning, it's a performance boost to treat from_space_p()
      * as a leaky abstraction - reading one word at *native_pointer(object) is easier
      * than looking in a hashset, and 9 times out of 10 times we need to read it anyway.
-     * And if the object was already forwarded, we never need pinned_p. */
-    if ((page = find_page_index((void*)object)) >= 0) {
-        if (page_table[page].gen == from_space) {
+     * And if the object was already forwarded, we never need pinned_p.
+     *
+     * Based on some instrumentation added to this function, I determined
+     * that it makes sense to read the 'gen' even if find_page_index() returns -1,
+     * because approximately 25% of all calls to scav1() *do* find that the object
+     * is in from_space. The guard condition on page_index is not needed
+     * because it is legal to access page_table at index -1.
+     * Therefore, when the object is in from_space, we incur one fewer branch */
+
+    page_index_t page = find_page_index((void*)object);
+    if (page_table[page].gen == from_space) {
             if (forwarding_pointer_p(native_pointer(object)))
                 *addr = forwarding_pointer_value(native_pointer(object));
             else if (!pinned_p(object, page))
                 scav_ptr[PTR_SCAVTAB_INDEX(object)](addr, object);
-        }
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Test immobile_space_p() only if object was definitely not in dynamic space
-    else if (immobile_space_p(object)) {
+    else if (page < 0 && immobile_space_p(object)) {
         lispobj *ptr = base_pointer(object);
         if (immobile_obj_gen_bits(ptr) == from_space)
             enliven_immobile_obj(ptr, 1);

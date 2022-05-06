@@ -1781,9 +1781,9 @@ lispobj *search_dynamic_space(void *pointer)
 {
     page_index_t page_index = find_page_index(pointer);
 
-    /* The address may be invalid, so do some checks. */
-    if ((page_index == -1) || page_free_p(page_index))
-        return NULL;
+    /* The address may be invalid, so do some checks.
+     * page_index -1 is legal, and page_free_p returns true in that case. */
+    if (page_free_p(page_index)) return NULL;
     int type = page_table[page_index].type & PAGE_TYPE_MASK;
     if (type == PAGE_TYPE_CONS) {
         int wordindex = ((char*)pointer - page_address(page_index)) >> WORD_SHIFT;
@@ -4705,13 +4705,23 @@ void gc_allocate_ptes()
 #error "FREE_PAGE_FLAG is not 0"
 #endif
 
-    /* An extra struct exists as the end as a sentinel. Its 'scan_start_offset'
-     * and 'bytes_used' must be zero.
-     * Doing so avoids testing in page_ends_contiguous_block_p() whether the
-     * next page_index is within bounds, and whether that page contains data.
+    /* An extra 'struct page' exists at each end of the page table acting as
+     * a sentinel.
+     *
+     * For for leading sentinel:
+     * - all fields are zero except that 'gen' has an illegal value
+     *   which makes from_space_p() and new_space_p() both return false
+     *
+     * For the trailing sentinel:
+     * - all fields are zero which makes page_ends_contiguous_block_p()
+     *   return true for the last in-range page index (so the "illegal"
+     *   index at 1+ appears to start a contiguous block even though
+     *   it corresponds to no page)
      */
-    page_table = calloc(1+page_table_pages, sizeof(struct page));
+    page_table = calloc(page_table_pages+2, sizeof(struct page));
     gc_assert(page_table);
+    page_table[0].gen = 9; // an arbitrary never-used value
+    ++page_table;
     gc_page_pins = calloc(page_table_pages, 1);
     gc_assert(gc_page_pins);
 

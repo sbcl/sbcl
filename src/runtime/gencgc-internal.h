@@ -266,8 +266,7 @@ static inline void gc_init_region(struct alloc_region *region)
 
 /* Find the page index within the page_table for the given
  * address. Return -1 on failure. */
-static inline page_index_t
-find_page_index(void *addr)
+static inline page_index_t find_page_index(void *addr)
 {
     if (addr >= (void*)DYNAMIC_SPACE_START) {
         page_index_t index = ((uintptr_t)addr -
@@ -318,16 +317,18 @@ from_space_p(lispobj obj)
 {
     gc_dcheck(compacting_p());
     page_index_t page_index = find_page_index((void*)obj);
-    return page_index >= 0
-        && page_table[page_index].gen == from_space
-        && !pinned_p(obj, page_index);
+    // NOTE: It is legal to access page_table at index -1,
+    // and the 'gen' of page -1 is an otherwise unused value.
+    return page_table[page_index].gen == from_space && !pinned_p(obj, page_index);
 }
 
 static boolean __attribute__((unused)) new_space_p(lispobj obj)
 {
     gc_dcheck(compacting_p());
     page_index_t page_index = find_page_index((void*)obj);
-    return page_index >= 0 && page_table[page_index].gen == new_space;
+    // NOTE: It is legal to access page_table at index -1,
+    // and the 'gen' of page -1 is an otherwise unused value.
+    return page_table[page_index].gen == new_space;
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
