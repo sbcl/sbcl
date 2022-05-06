@@ -414,38 +414,6 @@
     (when (typep class 'classoid)
       (seal-class class))))
 
-;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
-;;; global-var ensures that when we substitute a functional for a
-;;; global var (i.e. for DEFUN) that we won't clobber any uses
-;;; declared :NOTINLINE.
-(defun process-inline-declaration (name kind)
-  (declare (type (and inlinep (not null)) kind))
-  ;; since implicitly it is a function, also scrubs (FREE-FUNS *IR1-NAMESPACE*)
-  (proclaim-as-fun-name name)
-  (warn-if-inline-failed/proclaim name kind)
-  (when (boundp '*ir1-namespace*)
-    (let* ((free-funs (free-funs *ir1-namespace*))
-           (var (gethash name free-funs)))
-      (etypecase var
-        (null)
-        (global-var
-         (setf (gethash name free-funs)
-               ;; Use the universal type as the local type
-               ;; restriction, since we are processing this at
-               ;; top-level, and hence, in a null lexical environment.
-               (make-new-inlinep var kind *universal-type*))))))
-  (setf (info :function :inlinep name) kind))
-
-(defun process-block-compile-declaration (entries kind)
-  (ecase kind
-    (start-block
-     (finish-block-compilation)
-     (let ((compilation *compilation*))
-       (setf (block-compile compilation) t)
-       (setf (entry-points compilation) entries)))
-    (end-block
-     (finish-block-compilation))))
-
 (defun check-deprecation-declaration (state since form)
   (unless (typep state 'deprecation-state)
     (error 'simple-type-error
@@ -520,6 +488,19 @@
 (defun %proclaim (raw-form location)
   (destructuring-bind (&whole form &optional kind &rest args)
       (canonized-decl-spec raw-form)
+    ;; It seems strange to test whether we are currently in
+    ;; compile-time mode this way, but the reason we don't just call
+    ;; %COMPILER-PROCLAIM in a :COMPILE-TOPLEVEL-only situation in the
+    ;; macro-expansion of DECLAIM is that unlike the DEFmumble macros,
+    ;; DECLAIM and PROCLAIM both exist, and it is unclear whether the
+    ;; intent of the ANSI specification is that
+    ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL ...)
+    ;;     (LET ()
+    ;;       (PROCLAIM ...)))
+    ;; should have the exact same compile time effects as (DECLAIM ...).
+    ;; We make the assumption that yes, they should have the same semantics.
+    (when (boundp '*compilation*)
+      (%compiler-proclaim kind args))
     (labels ((store-location (name &key (key kind))
                (if location
                    (setf (getf (info :source-location :declaration name) key)
@@ -558,14 +539,8 @@
              (error "Type system not yet initialized.")))
         (freeze-type
          (map-args #'process-freeze-type-declaration))
-        ((start-block end-block)
-         #-(and sb-devel sb-xc-host)
-         (when (and *compile-time-eval* (boundp '*compilation*))
-           (if (eq *block-compile-argument* :specified)
-               (process-block-compile-declaration args kind)
-               (compiler-notify "ignoring ~S declaration since ~
-                                :BLOCK-COMPILE is not :SPECIFIED"
-                                kind))))
+        ;; This only has compile-time effects.
+        ((start-block end-block))
         (optimize
          (multiple-value-bind (new-policy specified-qualities)
              (process-optimize-decl form *policy*)
@@ -590,7 +565,10 @@
          (setq *disabled-package-locks*
                (process-package-lock-decl form *disabled-package-locks*)))
         ((inline notinline maybe-inline)
-         (map-args #'process-inline-declaration kind))
+         (dolist (name args)
+           (warn-if-inline-failed/proclaim name kind)
+           (setf (info :function :inlinep name)
+                 (the (and inlinep (not null)) kind))))
         (deprecated
          (destructuring-bind (state since &rest things) args
            (multiple-value-bind (state software version)

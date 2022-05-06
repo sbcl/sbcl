@@ -1775,3 +1775,61 @@
                           :where-from :declared))))
 
 (declaim (end-block))
+
+
+;;;; Proclamations:
+;;;
+;;; PROCLAIM changes the global environment, so we must handle its
+;;; compile time side effects if we are to keep the information in the
+;;; (FREE-xxx *IR1-NAMESPACE*) tables up to date. When there is a var
+;;; structure we disown it by replacing it with an updated copy.  Uses
+;;; of the variable which were translated before the PROCLAIM will get
+;;; the old version, while subsequent references will get the updated
+;;; information.
+
+;;; If a special block compilation delimiter, then start or end the
+;;; block as appropriate. If :BLOCK-COMPILE is T or NIL, then we
+;;; ignore any start/end block declarations.
+(defun process-block-compile-proclamation (kind entry-points)
+  (if (eq *block-compile-argument* :specified)
+      (ecase kind
+        (start-block
+         (finish-block-compilation)
+         (let ((compilation *compilation*))
+           (setf (block-compile compilation) t)
+           (setf (entry-points compilation) entry-points)))
+        (end-block
+         (finish-block-compilation)))
+      (compiler-notify "ignoring ~S declaration since ~
+                        :BLOCK-COMPILE is not :SPECIFIED"
+                       kind)))
+
+;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
+;;; global-var ensures that when we substitute a functional for a
+;;; global var (i.e. for DEFUN) that we won't clobber any uses
+;;; declared :NOTINLINE.
+(defun process-inline-proclamation (kind funs)
+  (declare (type (and inlinep (not null)) kind))
+  (dolist (name funs)
+    (proclaim-as-fun-name name)
+    (let* ((free-funs (free-funs *ir1-namespace*))
+           (var (gethash name free-funs)))
+      (etypecase var
+        (null)
+        (global-var
+         (setf (gethash name free-funs)
+               ;; Use the universal type as the local type restriction,
+               ;; since we are processing the proclamation at the top
+               ;; level and hence in a null lexical environment.
+               (make-new-inlinep var kind *universal-type*)))))))
+
+;;; Handle the compile-time side effects of PROCLAIM that don't happen
+;;; at load time. These mostly side-effect the global state of the
+;;; compiler, rather than the global environment.
+(defun %compiler-proclaim (kind args)
+  (case kind
+    ((start-block end-block)
+     #-(and sb-devel sb-xc-host)
+     (process-block-compile-proclamation kind args))
+    ((inline notinline maybe-inline)
+     (process-inline-proclamation kind args))))
