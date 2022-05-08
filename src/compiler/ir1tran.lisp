@@ -643,18 +643,15 @@
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as
 ;;; needed. If LEAF represents a defined function which has already
-;;; been converted, and is not NOTINLINE, then reference the
-;;; functional instead.
+;;; been converted in the same compilation block, and is not
+;;; NOTINLINE, then reference the functional instead.
 (defun reference-leaf (start next result leaf &optional (name '.anonymous.))
   (declare (type ctran start next) (type (or lvar null) result) (type leaf leaf))
   (assure-leaf-live-p leaf)
   (let* ((type (lexenv-find leaf type-restrictions))
          (leaf (or (and (defined-fun-p leaf)
                         (neq (defined-fun-inlinep leaf) 'notinline)
-                        ;; Only reference defined functionals from named-lambda,
-                        ;; everything else should do this through recognize-known-call,
-                        ;; avoiding copying references to global functions
-                        (defined-fun-named-lambda-p leaf)
+                        (defined-fun-same-block-p leaf)
                         (let ((functional (defined-fun-functional leaf)))
                           (when (and functional (not (functional-kind functional)))
                             (maybe-reanalyze-functional functional))))
@@ -1361,7 +1358,9 @@
       (setf (defined-fun-inline-expansion res)
             (defined-fun-inline-expansion var))
       (setf (defined-fun-functionals res)
-            (defined-fun-functionals var)))
+            (defined-fun-functionals var))
+      (setf (defined-fun-same-block-p res)
+            (defined-fun-same-block-p var)))
     ;; FIXME: Is this really right? Needs we not set the FUNCTIONAL
     ;; to the original global-var?
     res))

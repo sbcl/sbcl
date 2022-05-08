@@ -935,16 +935,20 @@
   ;; global environment.
   (inlinep nil :type inlinep)
   (inline-expansion nil :type (or cons null))
-  ;; List of functionals corresponding to this DEFINED-FUN: either from the
-  ;; conversion of a NAMED-LAMBDA, or from inline-expansion (see
-  ;; RECOGNIZE-KNOWN-CALL) - we need separate functionals for each policy in
-  ;; which the function is used.
-  (functionals nil :type list)
-  (named-lambda-p nil))
+  ;; Was the function defined in this compilation block?
+  (same-block-p nil :type boolean)
+  ;; The block-local definition of this function (either because it
+  ;; was semi-inline, or because it was defined in this block). If
+  ;; this function is not an entry point, then this may be deleted or
+  ;; LET-converted. NULL if we haven't converted the expansion yet.
+  ;; Note: We need separate functionals for each policy in which
+  ;; the function is used.
+  (functionals nil :type list))
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
   inlinep
+  same-block-p
   (functionals :test functionals))
 
 ;;;; function stuff

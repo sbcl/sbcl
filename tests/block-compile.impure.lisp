@@ -122,3 +122,21 @@
    :before-load (lambda () (unintern (find-symbol "+STUFF+")))
    :load t)
   (assert (= 0 (first (third (third (symbol-value '*backq-stuff*)))))))
+
+(with-test (:name :block-compile-same-block-references-functional)
+  (ctu:file-compile
+   `((declaim (inline bar))
+     (defun bar (x) (cons x #'bar))
+
+     (defun foo (x) (cons (bar 9) #'bar)))
+   :block-compile t
+   :load t)
+  (let ((value (funcall (fdefinition 'foo) 9)))
+    (assert (eq (cdr value) (fdefinition 'bar)))
+    (assert (eq (cdar value) (fdefinition 'bar))))
+  (assert (eq (sb-kernel::fun-code-header (fdefinition 'foo))
+              (sb-kernel::fun-code-header (fdefinition 'bar))))
+  ;; Should not have to reference any FDEFN objects, as we are
+  ;; compiling in the same block, allowing us to directly reference
+  ;; the (simple) function objects directly.
+  (assert (null (ctu:find-named-callees #'foo))))
