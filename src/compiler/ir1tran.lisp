@@ -1781,7 +1781,7 @@
 ;;; PROCLAIM changes the global environment, so we must handle its
 ;;; compile time side effects if we are to keep the information in the
 ;;; (FREE-xxx *IR1-NAMESPACE*) tables up to date. When there is a var
-;;; structure we disown it by replacing it with an updated copy.  Uses
+;;; structure we disown it by replacing it with an updated copy. Uses
 ;;; of the variable which were translated before the PROCLAIM will get
 ;;; the old version, while subsequent references will get the updated
 ;;; information.
@@ -1867,6 +1867,20 @@
 ;;; compiler, rather than the global environment.
 (defun %compiler-proclaim (kind args)
   (case kind
+    ((special global)
+     (dolist (name args)
+       (let* ((free-vars (free-vars *ir1-namespace*))
+              (old (gethash name free-vars)))
+         (when old
+           (ecase (global-var-kind old)
+             (:special :global)
+             (:unknown
+              (setf (gethash name free-vars)
+                    (make-global-var :%source-name name :type (leaf-type old)
+                                     :where-from (leaf-where-from old)
+                                     :kind (ecase kind
+                                             (special :special)
+                                             (global :global))))))))))
     ((start-block end-block)
      #-(and sb-devel sb-xc-host)
      (process-block-compile-proclamation kind args))

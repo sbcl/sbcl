@@ -319,14 +319,8 @@
   (multiple-value-bind (allowed test)
       (ecase kind
         (special
-         ;; KLUDGE: There is probably a better place to do this.
-         (when (boundp '*ir1-namespace*)
-           (remhash name (free-vars *ir1-namespace*)))
          (values '(:special :unknown) #'eq))
         (global
-         ;; KLUDGE: Ditto.
-         (when (boundp '*ir1-namespace*)
-           (remhash name (free-vars *ir1-namespace*)))
          (values '(:global :unknown) #'eq))
         (always-bound (values '(:constant) #'neq)))
     (let ((old (info :variable :kind name)))
