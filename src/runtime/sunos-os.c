@@ -59,15 +59,6 @@ void os_invalidate(os_vm_address_t addr, os_vm_size_t len)
         perror("munmap");
 }
 
-
-void
-os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
-{
-    if(mprotect((void*)address, length, prot) == -1) {
-        perror("mprotect");
-    }
-}
-
 #if defined LISP_FEATURE_GENCGC
 
 void

@@ -370,3 +370,27 @@ char *copied_string(char *string)
 {
     return strcpy(successful_malloc(1+strlen(string)), string);
 }
+
+#ifdef LISP_FEATURE_UNIX
+void
+os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
+{
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    // dynamic space should not have protections manipulated
+    if (find_page_index(address) >= 0)
+        lose("unexpected call to os_protect with software card marks");
+#endif
+    if (mprotect(address, length, prot) < 0) {
+#ifdef LISP_FEATURE_LINUX
+        if (errno == ENOMEM) {
+            lose("An mprotect call failed with ENOMEM. This probably means that the maximum amount\n"
+                 "of separate memory mappings was exceeded. To fix the problem, either increase\n"
+                 "the maximum with e.g. 'echo 262144 > /proc/sys/vm/max_map_count' or recompile\n"
+                 "SBCL with a larger value for GENCGC-PAGE-BYTES in\n"
+                 "'src/compiler/"SBCL_TARGET_ARCHITECTURE_STRING"/parms.lisp'.");
+        }
+#endif
+        lose("mprotect(%p,%lx,%d) error %d", address, (long)length, prot, errno);
+    }
+}
+#endif

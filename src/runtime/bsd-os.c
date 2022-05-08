@@ -246,18 +246,6 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
     if (munmap(addr, len) == -1)
         perror("munmap");
 }
-
-void
-os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
-{
-    if (mprotect(address, length, prot) == -1) {
-
-        perror("mprotect");
-#ifdef LISP_FEATURE_DARWIN_JIT
-        lose("%p %lu", address, length);
-#endif
-    }
-}
 
 /*
  * any OS-dependent special low-level handling for signals

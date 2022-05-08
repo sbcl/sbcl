@@ -45,14 +45,6 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
     }
 }
 
-void
-os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
-{
-    if (mprotect(address, length, prot)) {
-        perror("mprotect");
-    }
-}
-
 char *os_get_runtime_executable_path()
 {
     int cookie = 0;
