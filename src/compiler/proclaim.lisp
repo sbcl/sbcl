@@ -313,9 +313,7 @@
   (when (and (eq kind 'always-bound) (eq info-value :always-bound)
              (not (boundp name))
              ;; Allow it to be unbound at compile-time.
-             (not *compile-time-eval*)
-             ;; Check if we are still bootstrapping.
-             (not (boundp '*queued-proclaims*)))
+             (not *compile-time-eval*))
     (error "Cannot proclaim an unbound symbol as ~A: ~S" kind name))
 
   (multiple-value-bind (allowed test)
