@@ -372,6 +372,7 @@ char *copied_string(char *string)
 }
 
 #ifdef LISP_FEATURE_UNIX
+#include "gc-internal.h"
 void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
