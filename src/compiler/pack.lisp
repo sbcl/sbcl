@@ -485,11 +485,14 @@
     (when (eq (tn-kind save) :specified-save)
       (setf (tn-kind save) :save))
     (aver (eq (tn-kind save) :save))
-    (emit-operand-load node block tn save
-                       (if (eq (vop-info-move-args (vop-info vop))
-                               :local-call)
-                           (reverse-find-vop 'allocate-frame vop)
-                           vop))
+    (multiple-value-bind (before block)
+        (if (eq (vop-info-move-args (vop-info vop)) :local-call)
+            (let ((before (reverse-find-vop 'allocate-frame vop)))
+              ;; Because of SPLIT-IR2-BLOCKS the ALLOCATE-FRAME VOP
+              ;; may be in a different block.
+              (values before (vop-block before)))
+            (values vop block))
+      (emit-operand-load node block tn save before))
     (emit-operand-load node block save tn next)))
 
 ;;; Return a VOP after which is an OK place to save the value of TN.
