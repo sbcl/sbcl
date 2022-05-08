@@ -7,6 +7,8 @@ changes relative to sbcl-2.2.4:
     with policy DEBUG = 1, as well as for block compiled files.
   * bug fix: coverage instrumentation behaves correctly with respect to
     non-local exits.
+  * bug fix: ftype proclamations now take effect immediately during block
+    compilation.
 
 changes in sbcl-2.2.4 relative to sbcl-2.2.3:
   * enhancement: better constraint propagation in the compiler. Specifically,

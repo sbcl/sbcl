@@ -1803,6 +1803,46 @@
                         :BLOCK-COMPILE is not :SPECIFIED"
                        kind)))
 
+;;; Update function type info cached in (FREE-FUNS *IR1-NAMESPACE*).
+;;; If:
+;;; -- there is a GLOBAL-VAR, then just update the type and remove the
+;;;    name from the list of undefined functions. Someday we should
+;;;    check for incompatible redeclaration.
+;;; -- there is a FUNCTIONAL, then apply the type assertion to that
+;;;    function.  This will only happen during block compilation.
+(defun process-1-ftype-proclamation (name type)
+  (proclaim-as-fun-name name)
+  (let* ((free-funs (free-funs *ir1-namespace*))
+         (var (gethash name free-funs)))
+    (etypecase var
+      (null)
+      (global-var
+       (setf (gethash name free-funs)
+             (let ((kind (global-var-kind var)))
+               (if (defined-fun-p var)
+                   (make-defined-fun
+                    :%source-name name :type type :where-from :declared :kind kind
+                    :inlinep (defined-fun-inlinep var)
+                    :inline-expansion (defined-fun-inline-expansion var)
+                    :same-block-p (defined-fun-same-block-p var)
+                    :functionals (defined-fun-functionals var))
+                   (make-global-var :%source-name name :type type
+                                    :where-from :declared :kind kind))))
+       (when (defined-fun-p var)
+         (let ((fun (defined-fun-functional var)))
+           (when fun
+             (assert-definition-type fun type
+                                     :unwinnage-fun #'compiler-notify
+                                     :where "this declaration"))))))))
+
+(defun process-ftype-proclamation (spec names)
+  (declare (list names))
+  (let ((type (specifier-type spec)))
+    (unless (csubtypep type (specifier-type 'function))
+      (error "Not a function type: ~/sb-impl:print-type/" spec))
+    (dolist (name names)
+      (process-1-ftype-proclamation name type))))
+
 ;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
 ;;; global-var ensures that when we substitute a functional for a
 ;;; global var (i.e. for DEFUN) that we won't clobber any uses
@@ -1830,5 +1870,8 @@
     ((start-block end-block)
      #-(and sb-devel sb-xc-host)
      (process-block-compile-proclamation kind args))
+    (ftype
+     (destructuring-bind (spec &rest args) args
+       (process-ftype-proclamation spec args)))
     ((inline notinline maybe-inline)
      (process-inline-proclamation kind args))))

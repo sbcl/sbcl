@@ -140,3 +140,16 @@
   ;; compiling in the same block, allowing us to directly reference
   ;; the (simple) function objects directly.
   (assert (null (ctu:find-named-callees #'foo))))
+
+(with-test (:name :block-compile-ftype-proclamation)
+  (ctu:file-compile
+   `((declaim (ftype function zoo))
+     (defun bar1 (x) (zoo x))
+
+     (declaim (ftype (function (t) (values integer &optional)) bar1))
+
+     (defun foo1 (z) (bar1 z)))
+   :block-compile t
+   :load t)
+  (assert (ctype= (caddr (sb-kernel::%simple-fun-type (fdefinition 'foo1)))
+                  '(values integer &optional))))
