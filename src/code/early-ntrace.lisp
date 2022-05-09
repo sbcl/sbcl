@@ -51,8 +51,6 @@
                                 (prin1 (trace-info-what x) stream)))))
   ;; the original representation of the thing traced
   (what nil :type (or function cons symbol))
-  ;; Is WHAT a function name whose definition we should track?
-  (named nil)
   ;; Is tracing to be done by encapsulation rather than breakpoints?
   ;; T implies NAMED.
   (encapsulated *trace-encapsulate-default*)

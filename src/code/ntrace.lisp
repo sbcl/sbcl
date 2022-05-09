@@ -17,76 +17,69 @@
 
 ;;;; utilities
 
-;;; Given a function name, a method name, a function or a macro name,
-;;; return the raw definition and some information. "Raw" means that
-;;; if the result is a closure, we strip off the closure and return
-;;; the bare code. The second value is T if the argument was a
-;;; function name. The third value is one of :COMPILED,
-;;; :COMPILED-CLOSURE, :INTERPRETED, :INTERPRETED-CLOSURE and
-;;; :FUNCALLABLE-INSTANCE. The fourth value is a method name, when
-;;; applicable.
-(defun trace-fdefinition (x)
-  (flet ((get-def (name)
-           (cond ((typep name '(cons (eql compiler-macro)))
-                  (compiler-macro-function (second name)))
-                 ((and (symbolp name) (macro-function name)))
-                 ((valid-function-name-p name)
-                  (if (fboundp name)
-                      (fdefinition name)
-                      (warn "~/sb-ext:print-symbol-with-prefix/ is ~
-                             undefined, not tracing." name)))
-                 (t
-                  (warn "~S is not a valid function name, not tracing." name)))))
-    (multiple-value-bind (res named-p method local)
-        (typecase x
-          (symbol
-           (cond ((special-operator-p x)
-                  (warn "~S is a special operator, not tracing." x))
-                 ((macro-function x))
-                 (t
-                  (values (get-def x) t))))
-          (function
-           x)
-          ((cons (eql compiler-macro))
-           (values (get-def x) nil))
-          ((cons (member flet labels)) ; ({FLET,LABELS} name :IN outer-function)
-           (multiple-value-bind (fun local-name)
-               (let ((outer (car (last x))))
-                 (flet ((simple-local-name ()
-                          (labels ((simplify (name)
-                                     (if (symbolp name)
-                                         name
-                                         (simplify (second name)))))
-                            `(,(first x) ,(second x) :in ,(simplify outer)))))
-                   (typecase outer
-                     ((cons (eql method))
-                      (values (get-def `(sb-pcl::fast-method ,@(rest outer)))
-                              (simple-local-name)))
-                     ((cons (member compiler-macro cas setf))
-                      (values (get-def outer) (simple-local-name)))
-                     (t
-                      (values (get-def outer) x)))))
-             (when fun
-               (if (sb-di:fun-debug-fun fun :local-name local-name)
-                   (values fun nil nil x)
-                   (warn "~S not found, not tracing." x)))))
-          ((cons (eql method))        ; (METHOD name qualifiers (specializers*))
-           (let ((gf (get-def (second x))))
-             (when gf
-               (if (find-method gf (butlast (cddr x)) (car (last x)) nil)
-                   (values gf t x)
-                   (warn "~S not found, not tracing." x)))))
-          (t
-           (values (get-def x) t)))
-      (typecase res
-        (closure
-         (values (%closure-fun res) named-p :compiled-closure method local))
-        (funcallable-instance
-         (values res named-p :funcallable-instance method local))
-        ;; FIXME: What about SB-KERNEL:INTERPRETED-FUNCTION -- it gets
-        ;; picked off by the FIN above, is that right?
-        (t
-         (values res named-p :compiled method local))))))
+;;; Given X -- a function object or an s-expression naming a global function,
+;;; local function, method, macro or compiler-macro -- return the following
+;;; values:
+;;;   * a function object suitable for introspection via
+;;;     SB-DI:FUN-DEBUG-FUN. For local functions, their parent function is
+;;;     returned. For methods, their generic function is returned, unless
+;;;     IF-METHOD is :FAST-METHOD, in which case their respective
+;;;     SB-PCL::FAST-METHOD function is returned.
+;;;   * The function's BLOCK name, useful for looking up local functions.
+;;;   * A keyword symbol describing what X denotes: :ANONYMOUS-FUNCTION,
+;;;     :FUNCTION, :LOCAL-FUNCTION, :METHOD, :MACRO-FUNCTION.
+;;;   * [For local functions only] A local name suitable for SB-DI:FUN-DEBUG-FUN
+;;;     lookup.
+(defun %trace-fdefinition (x &key (if-method :gf) definition)
+  (typecase x
+    (function
+     (values x nil :anonymous-function))
+    ((cons (eql compiler-macro) (cons t null))
+     (let ((fun (or definition (compiler-macro-function (second x)))))
+       (if fun
+           (values fun (second x) :compiler-macro)
+           (warn "~S is undefined, not tracing." x))))
+    ((cons (eql method))              ; (METHOD name qualifiers (specializers*))
+     (assert (null definition))
+     (multiple-value-bind (gf block-name)
+         (%trace-fdefinition (second x))
+       (when gf
+         (if (find-method gf (butlast (cddr x)) (car (last x)) nil)
+             (ecase if-method
+               (:fast-method
+                (%trace-fdefinition `(sb-pcl::fast-method ,@(rest x))))
+               (:gf
+                (values gf block-name :method)))
+             (warn "~S not found, not tracing." x)))))
+    ((cons (member flet labels))       ; ({FLET,LABELS} name :IN outer-function)
+     (destructuring-bind (flet/labels name &key in) x
+       (multiple-value-bind (fun block-name)
+           (%trace-fdefinition in :if-method :fast-method :definition definition)
+         (when fun
+           (let ((local-name `(,flet/labels ,name :in ,block-name)))
+             (if (sb-di:fun-debug-fun fun :local-name local-name)
+                 (values fun nil :local-function local-name)
+                 (warn "~S not found, not tracing." x)))))))
+    ((and symbol (satisfies special-operator-p))
+     (warn "~S is a special operator, not tracing." x))
+    ((and symbol (satisfies macro-function))
+     (values (or definition (macro-function x)) x :macro-function))
+    (t
+     (multiple-value-bind (valid block-name)
+         (valid-function-name-p x)
+       (cond ((not valid)
+              (warn "~S is not a valid function name, not tracing." x))
+             ((fboundp x)
+              (values (or definition (fdefinition x)) block-name :function))
+             (t
+              (warn "~/sb-ext:print-symbol-with-prefix/ is ~
+                    undefined, not tracing." x)))))))
+
+(defun trace-fdefinition (x &optional definition)
+  (multiple-value-bind (fun block-name kind local-name)
+      (%trace-fdefinition x :definition definition)
+    (declare (ignore block-name))
+    (values fun kind local-name)))
 
 (defun retrace-local-funs (fname &optional new-value)
   (dolist (local (gethash fname *traced-locals*))
@@ -97,8 +90,7 @@
 ;;; When a function name is redefined, and we were tracing that name,
 ;;; then untrace the old definition and trace the new one.
 (defun maybe-retrace (name new-value)
-  (let* ((fun (trace-fdefinition name))
-         (info (gethash fun *traced-funs*)))
+  (let ((info (gethash name *traced-funs*)))
     (when info
       (untrace-1 name)
       (trace-1 name info new-value))
@@ -373,98 +365,80 @@
 ;;; If non-null, DEFINITION is the new definition of a function that
 ;;; we are automatically retracing.
 (defun trace-1 (function-or-name info &optional definition)
-  (multiple-value-bind (fun named kind method local)
-      (if definition
-          (multiple-value-bind (fun named kind)
-              (trace-fdefinition definition)
-            (declare (ignore named))
-            (if (typep function-or-name '(cons (member flet labels)))
-                (values fun t kind nil function-or-name)
-                (values definition t kind)))
-          (trace-fdefinition function-or-name))
+  (multiple-value-bind (fun kind local-name)
+      (trace-fdefinition function-or-name definition)
     (when fun
-      (let ((trace-key (or local method fun)))
-        (when (gethash trace-key *traced-funs*)
-          (warn "~S is already TRACE'd, untracing it first." function-or-name)
-          (untrace-1 trace-key))
-        (let* ((local-name (when local
-                             (let ((outer (car (last local))))
-                               (typecase outer
-                                 ((cons (member method compiler-macro cas setf))
-                                  (labels ((simplify (name)
-                                             (if (symbolp name) name (simplify (second name)))))
-                                    `(,(first local) ,(second local) :in ,(simplify outer))))
-                                 (t local)))))
-               (debug-fun (sb-di:fun-debug-fun fun :local-name local-name))
-               (encapsulated
-                 (and named
-                      (if (eq (trace-info-encapsulated info) :default)
-                          (ecase kind
-                            (:compiled nil)
-                            (:compiled-closure
-                             (unless (functionp function-or-name)
-                               (warn "tracing shared code for ~S:~%  ~S"
-                                     function-or-name
-                                     fun))
-                             nil)
-                            ((:interpreted :interpreted-closure :funcallable-instance)
-                             t))
-                          (trace-info-encapsulated info))))
-               (loc (if encapsulated
-                        :encapsulated
-                        (sb-di:debug-fun-start-location debug-fun)))
-               (info (make-trace-info
-                      :what function-or-name
-                      :named named
-                      :encapsulated encapsulated
-                      :wherein (trace-info-wherein info)
-                      :methods (trace-info-methods info)
-                      :condition (coerce-form (trace-info-condition info) loc)
-                      :break (coerce-form (trace-info-break info) loc)
-                      :report (trace-info-report info)
-                      :print (coerce-form-list (trace-info-print info) loc)
-                      :break-after (coerce-form (trace-info-break-after info) nil)
-                      :condition-after
-                      (coerce-form (trace-info-condition-after info) nil)
-                      :print-after
-                      (coerce-form-list (trace-info-print-after info) nil))))
+      (when (closurep fun)
+        (setq fun (%closure-fun fun))
+        (when (eq (trace-info-encapsulated info) :default)
+          (warn "tracing shared code for ~S:~%  ~S" function-or-name fun)))
+      (when (gethash function-or-name *traced-funs*)
+        (warn "~S is already TRACE'd, untracing it first." function-or-name)
+        (untrace-1 function-or-name))
+      (let* ((debug-fun (sb-di:fun-debug-fun fun :local-name local-name))
+             (encapsulated
+               (ecase kind
+                 ((:function :method)
+                  (if (eq (trace-info-encapsulated info) :default)
+                      (funcallable-instance-p fun)
+                      (trace-info-encapsulated info)))
+                 ((:anonymous-function :compiler-macro :macro-function :local-function)
+                  nil)))
+             (loc (if encapsulated
+                      :encapsulated
+                      (sb-di:debug-fun-start-location debug-fun)))
+             (info (make-trace-info
+                    :what function-or-name
+                    :encapsulated encapsulated
+                    :wherein (trace-info-wherein info)
+                    :methods (trace-info-methods info)
+                    :condition (coerce-form (trace-info-condition info) loc)
+                    :break (coerce-form (trace-info-break info) loc)
+                    :report (trace-info-report info)
+                    :print (coerce-form-list (trace-info-print info) loc)
+                    :break-after (coerce-form (trace-info-break-after info) nil)
+                    :condition-after
+                    (coerce-form (trace-info-condition-after info) nil)
+                    :print-after
+                    (coerce-form-list (trace-info-print-after info) nil))))
 
-          (dolist (wherein (trace-info-wherein info))
-            (unless (or (stringp wherein)
-                        (fboundp wherein))
-              (warn ":WHEREIN name ~S is not a defined global function."
-                    wherein)))
+        (dolist (wherein (trace-info-wherein info))
+          (unless (or (stringp wherein)
+                      (fboundp wherein))
+            (warn ":WHEREIN name ~S is not a defined global function."
+                  wherein)))
 
-          (cond
-            (encapsulated
-             (if method
-                 (reinitialize-instance fun)
-                 (encapsulate function-or-name 'trace
-                              (lambda (function &rest args)
-                                (apply #'trace-call info function args)))))
-            (t
-             (multiple-value-bind (start-fun cookie-fun)
-                 (trace-start-breakpoint-fun info)
-               (let ((start (sb-di:make-breakpoint start-fun debug-fun
-                                                   :kind :fun-start))
-                     (end (sb-di:make-breakpoint
-                           (trace-end-breakpoint-fun info)
-                           debug-fun :kind :fun-end
-                           :fun-end-cookie cookie-fun)))
-                 (setf (trace-info-start-breakpoint info) start)
-                 (setf (trace-info-end-breakpoint info) end)
-                 ;; The next two forms must be in the order in which they
-                 ;; appear, since the start breakpoint must run before the
-                 ;; fun-end breakpoint's start helper (which calls the
-                 ;; cookie function.) One reason is that cookie function
-                 ;; requires that the CONDITIONP shared closure variable be
-                 ;; initialized.
-                 (sb-di:activate-breakpoint start)
-                 (sb-di:activate-breakpoint end)))))
+        (cond
+          (encapsulated
+           (if (eq kind :method)
+               (reinitialize-instance fun)
+               (encapsulate function-or-name 'trace
+                            (lambda (function &rest args)
+                              (apply #'trace-call info function args)))))
+          (t
+           (multiple-value-bind (start-fun cookie-fun)
+               (trace-start-breakpoint-fun info)
+             (let ((start (sb-di:make-breakpoint start-fun debug-fun
+                                                 :kind :fun-start))
+                   (end (sb-di:make-breakpoint
+                         (trace-end-breakpoint-fun info)
+                         debug-fun :kind :fun-end
+                         :fun-end-cookie cookie-fun)))
+               (setf (trace-info-start-breakpoint info) start)
+               (setf (trace-info-end-breakpoint info) end)
+               ;; The next two forms must be in the order in which they
+               ;; appear, since the start breakpoint must run before the
+               ;; fun-end breakpoint's start helper (which calls the
+               ;; cookie function.) One reason is that cookie function
+               ;; requires that the CONDITIONP shared closure variable be
+               ;; initialized.
+               (sb-di:activate-breakpoint start)
+               (sb-di:activate-breakpoint end)))))
 
-          (when local
-            (push local (gethash (fourth local) *traced-locals*)))
-          (setf (gethash trace-key *traced-funs*) info)))
+        (when (eq kind :local-function)
+          (push function-or-name
+                (gethash (fourth function-or-name) *traced-locals*)))
+        (setf (gethash function-or-name *traced-funs*) info))
 
       (when (and (typep fun 'generic-function)
                  (trace-info-methods info)
@@ -696,42 +670,32 @@ the N-th value returned by the function."
 
 ;;; Untrace one function.
 (defun untrace-1 (function-or-name)
-  (multiple-value-bind (fun named kind method local)
+  (multiple-value-bind (fun kind)
       (trace-fdefinition function-or-name)
-    (declare (ignore named kind))
-    (let* ((trace-key (or local method fun))
-           (info (when fun (gethash trace-key *traced-funs*))))
-      (cond
-        ((and fun (not info))
-         (warn "Function is not TRACEd: ~S" function-or-name))
-        ((not fun)
-         ;; Someone has FMAKUNBOUND it.
-         (let ((table *traced-funs*))
-           (with-system-mutex ((hash-table-lock table))
-             (maphash (lambda (key info)
-                        (when (equal function-or-name (trace-info-what info))
-                          (remhash key table)))
-                      table))))
-        (t
-         (cond
-           ((trace-info-encapsulated info)
-            (if method
-                (reinitialize-instance fun)
-                (unencapsulate (trace-info-what info) 'trace)))
-           (t
-            (sb-di:delete-breakpoint (trace-info-start-breakpoint info))
-            (sb-di:delete-breakpoint (trace-info-end-breakpoint info))))
-         (setf (trace-info-untraced info) t)
-         (when local
-           (let ((table *traced-locals*)
-                 (outer (fourth local)))
-             (with-system-mutex ((hash-table-lock table))
-               (let* ((locals (gethash outer table))
-                      (remaining (remove local locals :test #'equal)))
-                 (if remaining
-                     (setf (gethash outer table) remaining)
-                     (remhash outer table))))))
-         (remhash trace-key *traced-funs*))))))
+    (when fun
+      (let ((info (gethash function-or-name *traced-funs*)))
+        (cond ((and fun (not info))
+               (warn "Function is not TRACEd: ~S" function-or-name))
+              (t
+               (cond
+                 ((trace-info-encapsulated info)
+                  (if (eq kind :method)
+                      (reinitialize-instance fun)
+                      (unencapsulate (trace-info-what info) 'trace)))
+                 (t
+                  (sb-di:delete-breakpoint (trace-info-start-breakpoint info))
+                  (sb-di:delete-breakpoint (trace-info-end-breakpoint info))))
+               (setf (trace-info-untraced info) t)
+               (when (eq kind :local-function)
+                 (let ((table *traced-locals*)
+                       (outer (fourth function-or-name)))
+                   (with-system-mutex ((hash-table-lock table))
+                     (let* ((locals (gethash outer table))
+                            (remaining (remove function-or-name locals :test #'equal)))
+                       (if remaining
+                           (setf (gethash outer table) remaining)
+                           (remhash outer table))))))))))
+    (remhash function-or-name *traced-funs*)))
 
 ;;; Untrace all traced functions.
 (defun untrace-all ()
@@ -853,7 +817,6 @@ functions when called with no arguments."
          (info (make-trace-info :what (cond (fdefn (fdefn-name fdefn))
                                             (t (%fun-name traced-fun)))
                                 :encapsulated t
-                                :named t
                                 :report 'trace))
          (tracing-wrapper
            (compile-funobj-encapsulation 'trace-call info proxy-fun)))
