@@ -144,6 +144,18 @@
 (assert (= 12 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
 (assert (= 16 (sb-cover::all-of (getf sb-cover::*counts* :expression))))
 
+;; And then ensure that non-local exits from local calls are handled
+;; correctly as well.
+(sb-cover:clear-coverage)
+(compile-load "test-data-6")
+(nlx-from-flet)
+(report)
+
+(assert (zerop (sb-cover::ok-of (getf sb-cover::*counts* :branch))))
+(assert (zerop (sb-cover::all-of (getf sb-cover::*counts* :branch))))
+(assert (= 7 (sb-cover::ok-of (getf sb-cover::*counts* :expression))))
+(assert (= 11 (sb-cover::all-of (getf sb-cover::*counts* :expression))))
+
 ;; Clean up after the tests
 (map nil #'delete-file
      (directory (merge-pathnames #p"*.html" *output-directory*)))
