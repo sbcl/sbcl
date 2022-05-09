@@ -1161,3 +1161,39 @@
 (compile 'll-unknown)
 (with-test (:name :unknown-lambda-list)
   (assert (eq (sb-kernel:%fun-lambda-list #'ll-unknown) :unknown)))
+
+;;;; SB-DEBUG:*STACK-TOP-HINT* management
+
+(defun buggy-handler (c)
+  (declare (ignore c))
+  ;; signal a nondescript condition to avoid triggering WITH-TEST's error
+  ;; handling.
+  (error 'simple-condition :format-control "buggy handler"))
+
+(defun signal-and-handle-with-buggy-handler ()
+  (handler-bind ((program-error #'buggy-handler))
+    (signal 'program-error)))
+
+(defun call-getting-stack-top-on-invoke-debugger (fn)
+  (block nil
+    (let ((*invoke-debugger-hook*
+            (lambda (condition hook)
+              (declare (ignore condition hook))
+              (let ((top (sb-debug::resolve-stack-top-hint)))
+                (return (caar (sb-debug:list-backtrace :from top)))))))
+      (funcall fn))))
+
+;; If an error occurs within a signal handler, we want to see the handling
+;; frames in the backtrace.
+(with-test (:name (:stack-top-hint :signal))
+  (assert (eq 'buggy-handler
+              (call-getting-stack-top-on-invoke-debugger
+               #'signal-and-handle-with-buggy-handler))))
+
+;; When breaking on signals, we don't need to see the SIGNAL frame or other
+;; frames above that.
+(with-test (:name (:stack-top-hint :signal :break-on-signals))
+  (assert (eq 'signal-and-handle-with-buggy-handler
+              (let ((*break-on-signals* t))
+                (call-getting-stack-top-on-invoke-debugger
+                 #'signal-and-handle-with-buggy-handler)))))

@@ -79,10 +79,10 @@
   (declare (explicit-check))
   (%signal (apply #'coerce-to-condition datum 'simple-condition 'signal arguments)))
 (defun %signal (condition)
-  (let ((handler-clusters *handler-clusters*)
-        (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* '%signal)))
+  (let ((handler-clusters *handler-clusters*))
     (when *break-on-signals*
-      (maybe-break-on-signal condition))
+      (let ((sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* '%signal)))
+        (maybe-break-on-signal condition)))
     (do ((cluster (pop handler-clusters) (pop handler-clusters)))
         ((null cluster)
          nil)
