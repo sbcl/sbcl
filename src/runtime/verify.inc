@@ -321,11 +321,9 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                         gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
 #ifdef LISP_FEATURE_USE_CONS_REGION
                     else if (page_table[pg].type != PAGE_TYPE_CONS) {
-                        if (where[0] | where[1]) // "page-filler cons" is OK
-                            // KLUDGE: allow negative bignum, but is it good/bad
-                            // to check for a bignum widetag at where[-2] ?
-                            // this SHOULD be: lose("cons @ %p on non-cons page", where);
-                            gc_assert(where[0]==(uword_t)-1 && where[1]==0);
+                      if (where[0] | where[1]) // (0 . 0) cons is OK
+                            gc_assert(where[0]==(uword_t)-1 &&
+                                      (where[1]==0 || where[1]==(uword_t)-1));
                     }
 #endif
                     if (widetag == CODE_HEADER_WIDETAG) {

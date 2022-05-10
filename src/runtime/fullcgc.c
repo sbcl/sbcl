@@ -567,11 +567,35 @@ static void sweep_fixedobj_pages(long *zeroed)
 }
 #endif
 
+/* Overwrite exactly 1 object wit non-pointer words of some sort.
+ * This eliminates tenured garbage in pseudo-static-generation,
+ * and does NOT strive to to write as few words as possible,
+ * unlike deposit_filler() which tries to be efficient */
+static void clobber_headered_object(lispobj* addr, sword_t nwords)
+{
+    page_index_t page = find_page_index(addr);
+    if (page < 0) { // code space
+        struct code* code  = (struct code*)addr;
+        if (!filler_obj_p((lispobj*)code)) {
+            code->boxed_size = 0;
+            code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
+                           | CODE_HEADER_WIDETAG;
+            memset(addr+2, 0, (nwords - 2) * N_WORD_BYTES);
+        }
+    } else if (page_table[page].type == PAGE_TYPE_CODE) {
+        // Code pages don't want (0 . 0) fillers, otherwise heap checking
+        // gets an error: "object @ 0x..... is non-code on code page"
+        addr[0] = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+        addr[1] = 0;
+    } else {
+        memset(addr, 0, nwords * N_WORD_BYTES);
+    }
+}
+
 static uword_t sweep(lispobj* where, lispobj* end,
                      __attribute__((unused)) uword_t arg)
 {
     sword_t nwords;
-    extern void deposit_filler(uword_t addr, sword_t nbytes);
 
     for ( ; where < end ; where += nwords ) {
         lispobj word = *where;
@@ -580,22 +604,11 @@ static uword_t sweep(lispobj* where, lispobj* end,
             nwords = sizetab[header_widetag(word)](where);
             lispobj markbit = general_widetag_to_markbit(header_widetag(word));
             if (word & markbit) livep = 1, *where = word ^ markbit;
+            if (!livep) clobber_headered_object(where, nwords);
         } else {
             nwords = 2;
             livep = cons_markedp((lispobj)where);
-        }
-        if (!livep) {
-            if (find_page_index(where)>=0) // dynamic space
-                deposit_filler((uword_t)where, nwords<<WORD_SHIFT);
-            else { // immobile space
-                struct code* code  = (struct code*)where;
-                if (!filler_obj_p((lispobj*)code)) {
-                    code->boxed_size = 0;
-                    code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
-                                   | CODE_HEADER_WIDETAG;
-                    memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
-                }
-            }
+            if (!livep) where[0] = where[1] = (uword_t)-1;
         }
     }
     return 0;

@@ -560,7 +560,10 @@ static inline boolean plausible_tag_p(lispobj addr)
 {
     if (listp(addr))
         return is_cons_half(CONS(addr)->car)
-            && is_cons_half(CONS(addr)->cdr);
+            && is_cons_half(CONS(addr)->cdr)
+            // -1 can be left by the */signed=>integer vop
+            // and is also useful as filler on cons pages.
+            && CONS(addr)->car != (uword_t)-1;
     unsigned char widetag = widetag_of(native_pointer(addr));
     return other_immediate_lowtag_p(widetag)
         && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);

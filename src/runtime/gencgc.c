@@ -2240,42 +2240,40 @@ void visit_freed_objects(char __attribute__((unused)) *start,
 #endif
 }
 
-void deposit_filler(uword_t addr, sword_t nbytes) {
+/* Deposit a FILLER_WIDETAG object covering one or more dead objects.
+ * If using more than 1 card per page, scavenge_root_gens() is able to scan
+ * some pages without aligning to object boundaries. For that to work,
+ * it must not accidentally see a raw word or leftover garbage.
+ * Note that while CONS and SMALL_MIXED pages never have card-spanning objects,
+ * deposit_filler() deals with the "mirror image" of the pinned objects,
+ * hence it might get a card-spanning filler. It has to do something to ensure
+ * that no card will see garbage if scanned from its base address.
+ * To achieve that, an extra filler may be needed at the start of any spanned card.
+ * The sizes of extra fillers don't have to sum up to the total filler size.
+ * They serve the vital purpose of getting descriptors_scavenge() to skip a
+ * portion of the card they're on, but those fillers are never visited in a
+ * heap walk that steps by object from a page's page_scan_start.
+ * The final filler must be the correct size, so any algorithm that achieves
+ * the desired end result is OK */
+void deposit_filler(char* from, char* to) {
+    sword_t nbytes = to - from;
     if (!nbytes) return;
     gc_assert(nbytes > 0);
     sword_t nwords = nbytes >> WORD_SHIFT;
-    visit_freed_objects((char*)addr, nbytes);
     gc_assert((nwords - 1) <= 0x7FFFFF);
-    *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
-    page_index_t page = find_page_index((void*)addr);
-    // - MIXED does not need this because we always scan by object
-    // - SMALL_MIXED does because obliterate_nonpinned_words() uses as
-    //   few fillers as it can to cover all non-live ranges on a page.
-    if (page_table[page].type == PAGE_TYPE_BOXED ||
-        page_table[page].type == PAGE_TYPE_CONS ||
-        page_table[page].type == PAGE_TYPE_SMALL_MIXED) {
-        /* Strictly boxed cards are scanned without respect to object boundaries,
-         * so we might need to clobber all pointers that formerly occupied the bytes.
-         * If the range falls within 1 card, then we don't need to clear anything,
-         * because the scanning routine can see the filler object and skip over it. */
-        char* limit = (char*)addr + nbytes;
-        if (find_page_index(limit-1) == page) { // single page
-            long unsigned last_card = addr_to_card_index(limit-1);
-            /* Within 1 page, put fillers at the start of each card.
-             * The sizes of the extra fillers don't have to sum up to the total size,
-             * because although they serve the vital purpose of getting descriptors_scavenge()
-             * to skip the the leading portion of the card they're on, those pseudo-objects
-             * can never be visited in a normal heap walk. The final filler has to be the
-             * correct size, so any algorithm that achieves that is fine */
-            while (addr_to_card_index((char*)addr) != last_card) {
-                addr = ALIGN_DOWN(addr, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
-                nwords = (limit - (char*)addr) >> WORD_SHIFT;
-                *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
-            }
-        } else {
-            /* If more than 1 page, just do the obvious thing - zeroize all the words.
-             * I've never seen this case happen, so it's not worth optimizing for */
-            memset((char*)addr+N_WORD_BYTES, 0, nbytes-N_WORD_BYTES);
+    page_index_t page = find_page_index(from);
+    gc_assert(find_page_index(to-1) == page);
+    *(lispobj*)from = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    long unsigned last_card;
+    switch (page_table[page].type) {
+    case PAGE_TYPE_BOXED:
+    case PAGE_TYPE_CONS:
+    case PAGE_TYPE_SMALL_MIXED:
+        last_card = addr_to_card_index(to-1);
+        while (addr_to_card_index(from) != last_card) {
+            from = PTR_ALIGN_DOWN(from, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
+            nwords = (to - from) >> WORD_SHIFT;
+            *(lispobj*)from = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
         }
     }
 }
@@ -2315,8 +2313,8 @@ static void obliterate_nonpinned_words()
         lispobj* obj = native_pointer(keys[i]);
         page_index_t begin_page_index = find_page_index(obj);
         // Create a filler object occupying space from 'fill_from' up to but
-        // excluding 'obj'. If obj directly abuts its predecessor then don't.
-        deposit_filler(fill_from, (uword_t)obj - fill_from);
+        // excluding 'obj'.
+        deposit_filler((char*)fill_from, (char*)obj);
         if (fill_from == page_base((uword_t)obj)) {
             adjust_gen_usage(begin_page_index);
             // This pinned object started a new page of pins.
@@ -2355,8 +2353,8 @@ static void obliterate_nonpinned_words()
              * next GC. This phenomenon was especially bad if the only pinned objects
              * were at the start of a page, as it caused the entire rest of the page to
              * be unusable. :SMALLOBJ-AUTO-GC-TRIGGER from rev dfddbc8a tests this */
-            uword_t page_end = obj_end_pageaddr + page_bytes_used(end_page_index);
-            deposit_filler(obj_end, page_end - obj_end);
+            deposit_filler((char*)obj_end,
+                           (char*)obj_end_pageaddr + page_bytes_used(end_page_index));
             fill_from = page_base(keys[i+1]);
         }
     }
@@ -4694,6 +4692,13 @@ void gc_allocate_ptes()
      * Dynamic space size should be aligned on page size. */
     page_table_pages = dynamic_space_size/GENCGC_PAGE_BYTES;
     gc_assert(dynamic_space_size == npage_bytes(page_table_pages));
+
+    /* Assert that a cons whose car has MOST-POSITIVE-WORD
+     * can not be considered a valid cons, which is to say, even though
+     * MOST-POSITIVE-WORD seems to satisfy is_lisp_pointer(),
+     * it's OK to use as a filler marker. */
+    if (find_page_index((void*)(uword_t)-1) >= 0)
+        lose("dynamic space too large");
 
     /* Default nursery size to 5% of the total dynamic space size,
      * min 1Mb. */
