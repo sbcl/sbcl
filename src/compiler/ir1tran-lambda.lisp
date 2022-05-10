@@ -15,8 +15,6 @@
 
 ;;;; LAMBDA hackery
 
-;;;; FIXME: where is that file?
-;;;; Answer: As usual, with CMUCL.
 ;;;; Note: Take a look at the compiler-overview.tex section on "Hairy
 ;;;; function representation" before you seriously mess with this
 ;;;; stuff.
