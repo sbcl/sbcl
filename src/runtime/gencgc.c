@@ -2344,12 +2344,17 @@ static void obliterate_nonpinned_words()
         uword_t obj_end_pageaddr = page_base(obj_end - 1);
         // See if there's another pinned object on this page.
         // There is always a next object, due to the sentinel.
-        if ((uword_t)native_pointer(keys[i+1]) < obj_end_pageaddr + GENCGC_PAGE_BYTES) {
+        if (keys[i+1] < obj_end_pageaddr + GENCGC_PAGE_BYTES) {
             // Next object starts within the same page.
             fill_from = obj_end;
         } else {
-            // Next pinned object does not start on the same page this obj ends on.
-            // Any bytes following 'obj' up to its page end are garbage.
+            /* Next pinned object does not start on the same page this obj ends on.
+             * Any bytes following 'obj' up to its page end are garbage.
+             * The reason we don't merely reduce the page_bytes_used is that decreasing
+             * the grand total bytes allocated had a tendency to delay triggering the
+             * next GC. This phenomenon was especially bad if the only pinned objects
+             * were at the start of a page, as it caused the entire rest of the page to
+             * be unusable. :SMALLOBJ-AUTO-GC-TRIGGER from rev dfddbc8a tests this */
             uword_t page_end = obj_end_pageaddr + page_bytes_used(end_page_index);
             deposit_filler(obj_end, page_end - obj_end);
             fill_from = page_base(keys[i+1]);

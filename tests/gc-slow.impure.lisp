@@ -40,8 +40,7 @@
 ;;; an accumulation of pages in generation 1 each with 2 objects' worth
 ;;; of bytes, and the remainder waste. Because the waste was not accounted
 ;;; for, it did not trigger GC enough to avoid heap exhaustion.
-(with-test (:name :smallobj-auto-gc-trigger
-                  :skipped-on :cheneygc) ; test doesn't test anything
+(with-test (:name :smallobj-auto-gc-trigger)
   ;; Ensure that these are compiled functions because the interpreter
   ;; would make lots of objects of various sizes which is insufficient
   ;; to provoke the bug.
