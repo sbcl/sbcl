@@ -192,6 +192,14 @@
                         (1 trace-fact :exit  t 1)
                         (0 trace-fact :exit  t 2)))))))
 
+(with-test (:name (trace :anonymous))
+  (assert (equalp (call-collecting-traces
+                   (lambda ()
+                     (trace-fact 1))
+                   `(:function ,#'trace-fact :condition (plusp (sb-debug:arg 0))))
+                  '((0 trace-fact :enter 1)
+                    (0 trace-fact :exit 1)))))
+
 (defgeneric trace-gf (x)
   (:method         ((x float))      (+ x (call-next-method)))
   (:method :before ((x float))      'bf)

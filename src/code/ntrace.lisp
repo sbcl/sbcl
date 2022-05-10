@@ -522,14 +522,16 @@
            (current (parse-trace-options specs global-options)))
       (loop
         (when (endp current) (return))
-        (let ((name (pop current))
-              (options (copy-trace-info global-options)))
+        (let* ((name (pop current))
+               (fn (when (eq name :function)
+                     (pop current)))
+               (options (copy-trace-info global-options)))
           ;; parse options for the current spec.
           (setq current (parse-trace-options current options))
           (cond
            ((eq name :function)
             (let ((temp (gensym)))
-              (binds `(,temp ,(pop current)))
+              (binds `(,temp ,fn))
               (forms `(trace-1 ,temp ',options))))
            ((and (keywordp name)
                  (not (or (fboundp name) (macro-function name))))
