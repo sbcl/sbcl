@@ -57,45 +57,48 @@
 ;;; possibility that new references might be converted to it.
 (defun finalize-xep-definition (fun)
   (let* ((leaf (functional-entry-fun fun))
+         (source-name (and (leaf-has-source-name-p leaf)
+                           (leaf-source-name leaf)))
          (ns *ir1-namespace*)
          (defined-ftype (definition-type leaf)))
     (setf (leaf-type leaf) defined-ftype)
-    (when (and (leaf-has-source-name-p leaf)
-               (eq (leaf-source-name leaf) (functional-debug-name leaf))
-               (functional-top-level-defun-p leaf))
-      (let ((source-name (leaf-source-name leaf)))
-        (let* ((where (info :function :where-from source-name))
-               (*compiler-error-context* (lambda-bind (main-entry leaf)))
-               (global-def (gethash source-name (free-funs ns)))
-               (global-p (defined-fun-p global-def)))
-          (note-name-defined source-name :function)
-          (when global-p
-            (remhash source-name (free-funs ns)))
-          (ecase where
-            (:assumed
-             (let ((approx-type (info :function :assumed-type source-name)))
-               (when (and approx-type (fun-type-p defined-ftype))
-                 (valid-approximate-type approx-type defined-ftype))
-               ;; globaldb can't enforce invariants such as :assumed-type and
-               ;; :type being mutually exclusive. For that reason it would have
-               ;; made sense to use a single info-type holding either a true
-               ;; function type or an approximate-fun-type. Regardless, it is
-               ;; slightly preferable to clear the old before setting the new.
-               (clear-info :function :assumed-type source-name)
-               (setf (info :function :type source-name) defined-ftype))
-             (setf (info :function :where-from source-name) :defined))
-            ((:declared :defined-method)
-             (let ((declared-ftype (global-ftype source-name)))
-               (unless (defined-ftype-matches-declared-ftype-p
+    (when (and source-name
+               (eq source-name (functional-debug-name leaf))
+               ;; FIXME (?): We don't know how to set the globaldb
+               ;; info for these kinds of names.
+               (not (pcl-methodfn-name-p source-name)))
+      (let* ((where (info :function :where-from source-name))
+             (*compiler-error-context* (lambda-bind (main-entry leaf)))
+             (global-def (gethash source-name (free-funs ns)))
+             (global-p (defined-fun-p global-def)))
+        (note-name-defined source-name :function)
+        (when global-p
+          (remhash source-name (free-funs ns)))
+        (ecase where
+          (:assumed
+           (let ((approx-type (info :function :assumed-type source-name)))
+             (when (and approx-type (fun-type-p defined-ftype))
+               (valid-approximate-type approx-type defined-ftype))
+             ;; globaldb can't enforce invariants such as :assumed-type and
+             ;; :type being mutually exclusive. For that reason it would have
+             ;; made sense to use a single info-type holding either a true
+             ;; function type or an approximate-fun-type. Regardless, it is
+             ;; slightly preferable to clear the old before setting the new.
+             (clear-info :function :assumed-type source-name)
+             (setf (info :function :type source-name) defined-ftype))
+           (setf (info :function :where-from source-name) :defined))
+          ((:declared :defined-method)
+           (let ((declared-ftype (global-ftype source-name)))
+             (unless (defined-ftype-matches-declared-ftype-p
                          defined-ftype declared-ftype)
-                 (compiler-style-warn
-                  "~@<The previously declared FTYPE~
+               (compiler-style-warn
+                "~@<The previously declared FTYPE~
                    ~2I ~_~/sb-impl:print-type/~I ~_~
                    conflicts with the definition type ~
                    ~2I~_~/sb-impl:print-type/~:>"
-                  declared-ftype defined-ftype))))
-            (:defined
-             (setf (info :function :type source-name) defined-ftype)))))))
+                declared-ftype defined-ftype))))
+          (:defined
+           (setf (info :function :type source-name) defined-ftype))))))
   (values))
 
 ;;; Find all calls in COMPONENT to assumed functions and update the

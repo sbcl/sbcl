@@ -81,7 +81,7 @@
        sb-kernel::*gc-epoch*))
 
 (defun start-lisp (toplevel callable-exports)
-  (named-lambda start-lisp ()
+  (named-lambda %start-lisp ()
     (cond (callable-exports
            (reinit t)
            (dolist (export callable-exports)

@@ -284,9 +284,6 @@
 ;;;; in lieu of #+sb-xc-host elsewere which messes up toplevel form numbers.
 (in-package "SB-C")
 
-;;; For macro lambdas that are processed by the host
-(declaim (declaration top-level-form))
-
 ;;; The opposite of *undefined-fun-allowlist* - if certain full calls
 ;;; are seen, it is probably the result of a missed transform and/or
 ;;; misconfiguration.

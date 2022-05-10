@@ -165,8 +165,9 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                      ((t)
                       (let ((sb-c::*source-namestring* fullname)
                             (sb-ext:*derive-function-types*
-                              (unless (search "/pcl/" stem)
-                                t)))
+                              (if (search "/pcl/" stem)
+                                  :same-file
+                                  t)))
                         (ensure-directories-exist output)
                         ;; Like PROCLAIM-TARGET-OPTIMIZATION in 'compile-cold-sbcl'
                         ;; We should probably stash a copy of the POLICY instance from
