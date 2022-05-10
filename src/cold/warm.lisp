@@ -164,7 +164,6 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
                      ((t)
                       (let ((sb-c::*source-namestring* fullname)
-                            (sb-ext:*block-compile-default* :specified)
                             (sb-ext:*derive-function-types*
                               (if (search "/pcl/" stem)
                                   :same-file
