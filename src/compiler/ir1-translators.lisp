@@ -542,7 +542,30 @@ Return VALUE without evaluating it."
     (when context
       (list :in context))))
 
-;;;; FUNCTION and NAMED-LAMBDA
+;;;; FUNCTION and NAMED-LAMBgDA
+
+;;; `(NAMED-LAMBDA ,NAME ,@REST) is like `(FUNCTION (LAMBDA ,@REST)),
+;;; except that the value of NAME is passed to the compiler for use in
+;;; creation of debug information for the resulting function.
+;;;
+;;; NAME can be a legal function name or some arbitrary other thing.
+;;;
+;;; If NAME is a legal function name, then the caller should be
+;;; planning to set (FDEFINITION NAME) to the created function.
+;;; (Otherwise the debug names will be inconsistent and thus
+;;; unnecessarily confusing.)
+;;;
+;;; Arbitrary other things are appropriate for naming things which are
+;;; not the FDEFINITION of NAME. E.g.
+;;;   NAME = (:FLET FOO BAR)
+;;; for the FLET function in
+;;;   (DEFUN BAR (X)
+;;;     (FLET ((FOO (Y) (+ X Y)))
+;;;       FOO))
+;;; or
+;;;   NAME = (:METHOD PRINT-OBJECT :AROUND (STARSHIP T))
+;;; for the function used to implement
+;;;   (DEFMETHOD PRINT-OBJECT :AROUND ((SS STARSHIP) STREAM) ...).
 (defun name-lambdalike (thing)
   (case (car thing)
     ((named-lambda)
