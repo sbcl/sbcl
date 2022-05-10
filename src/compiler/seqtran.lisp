@@ -2785,3 +2785,16 @@
          `(sb-impl::tree-equal-eql list1 list2))
         (t
          (give-up-ir1-transform))))
+
+(defoptimizer (reduce derive-type) ((fun sequence
+                                         &key
+                                         initial-value
+                                         &allow-other-keys))
+  (declare (ignore sequence))
+  (let ((fun-type (lvar-type fun))
+        result)
+    (when (fun-type-p fun-type)
+      (setf result (single-value-type (fun-type-returns fun-type)))
+      (if initial-value
+          (type-union result (lvar-type initial-value))
+          result))))
