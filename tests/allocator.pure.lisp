@@ -59,7 +59,7 @@
               (pte (deref sb-vm:page-table (sb-vm:find-page-index addr))))
          (when (eq (slot pte 'sb-vm::gen) sb-vm:+pseudo-static-generation+)
            (assert (large-object-p obj))))))
-   :all))
+   :dynamic))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter large-n-words (/ sb-vm:large-object-size sb-vm:n-word-bytes))
