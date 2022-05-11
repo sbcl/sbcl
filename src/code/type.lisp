@@ -3427,7 +3427,8 @@ used for a COMPLEX component.~:@>"
 ;;; If either argument is not a NUMERIC-TYPE, then return NUMBER. This
 ;;; is useful mainly for allowing types that are technically numbers,
 ;;; but not a NUMERIC-TYPE.
-(defun numeric-contagion (type1 type2)
+(defun numeric-contagion (type1 type2 &key (rational t)
+                                           unsigned)
   (if (and (numeric-type-p type1) (numeric-type-p type2))
       (let ((class1 (numeric-type-class type1))
             (class2 (numeric-type-class type2))
@@ -3462,9 +3463,19 @@ used for a COMPLEX component.~:@>"
                                 (t :complex))))
               ((eq class2 'float) (numeric-contagion type2 type1))
               ((and (eq complexp1 :real) (eq complexp2 :real))
-               (make-numeric-type
-                :class (and class1 class2 'rational)
-                :complexp :real))
+               (if (or rational
+                       (or (neq class1 'integer)
+                           (neq class2 'integer)))
+                   (make-numeric-type
+                    :class (and class1 class2 'rational)
+                    :complexp :real)
+                   (make-numeric-type
+                    :class 'integer
+                    :complexp :real
+                    :low (and unsigned
+                              (typep (numeric-type-low type1) 'unsigned-byte)
+                              (typep (numeric-type-low type2) 'unsigned-byte)
+                              0))))
               (t
                (specifier-type 'number))))
       (specifier-type 'number)))
