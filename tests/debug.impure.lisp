@@ -131,18 +131,20 @@
                                     (lambda (f &rest stuff)
                                       (declare (ignore f stuff))))))
 
+(defparameter *breakpoint-tracing-expectations*
+  '(:fails-on (or (and :ppc (not :linux)) :arm64)
+    :broken-on :freebsd))
+
 ;;; bug 379
 (with-test (:name (trace :encapsulate nil)
-            :fails-on (or (and :ppc (not :linux)) :arm64)
-            :broken-on (or :freebsd))
+                  . #.*breakpoint-tracing-expectations*)
   (let ((output (with-traced-function (trace-this :encapsulate nil)
                   (assert (eq 'ok (trace-this))))))
     (assert (search "TRACE-THIS" output))
     (assert (search "returned OK" output))))
 
 (with-test (:name (trace :encapsulate nil :recursive)
-            :fails-on (or (and :ppc (not :linux)) :arm64)
-            :broken-on (or :freebsd))
+                  . #.*breakpoint-tracing-expectations*)
   (let ((output (with-traced-function (trace-fact :encapsulate nil)
                   (assert (= 120 (trace-fact 5))))))
     (assert (search "TRACE-FACT" output))
@@ -192,7 +194,7 @@
                         (1 trace-fact :exit  t 1)
                         (0 trace-fact :exit  t 2)))))))
 
-(with-test (:name (trace :anonymous))
+(with-test (:name (trace :anonymous) . #.*breakpoint-tracing-expectations*)
   (assert (equalp (call-collecting-traces
                    (lambda ()
                      (trace-fact 1))
@@ -252,7 +254,8 @@
                    (1 (method trace-gf :after (float)) :exit af)
                    (0 (method trace-gf :around (number)) :exit 84.0)))))
 
-(with-test (:name (trace :methods :encapsulate nil))
+(with-test (:name (trace :methods :encapsulate nil)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces (:encapsulate nil
                                      (method trace-gf :after (float))
                                      (method trace-gf :around (number))
@@ -320,7 +323,7 @@
                    (multiply x (fact (1- x)))))))
     (fact x)))
 
-(with-test (:name (trace :labels))
+(with-test (:name (trace :labels) . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((labels fact :in global-fact)
                                      (flet multiply :in global-fact))
                    (global-fact 1))
@@ -337,13 +340,15 @@
     (flet ((fact (x) (global-fact x)))
       (fact x))))
 
-(with-test (:name (trace :labels :within-method))
+(with-test (:name (trace :labels :within-method)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((flet fact :in (method gfact (number))))
                    (gfact 3))
                  '((0 (flet fact :in (method gfact (number))) :enter 3)
                    (0 (flet fact :in (method gfact (number))) :exit 6)))))
 
-(with-test (:name (trace :labels :within-untraced-method))
+(with-test (:name (trace :labels :within-untraced-method)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((method gfact (number))
                                      (flet fact :in (method gfact (number))))
                    (untrace (method gfact (number)))
@@ -368,7 +373,8 @@
          (funcall fn)
       (setf (fdefinition 'trace-foo) original))))
 
-(with-test (:name (trace :labels :redefined))
+(with-test (:name (trace :labels :redefined)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((flet body :in trace-foo))
                    (trace-foo)
                    (call-with-trace-foo-redefined 'trace-foo))
@@ -396,7 +402,8 @@
             (flet ((body () 'original-foo))
               (body))))))
 
-(with-test (:name (trace :labels :redefined-method))
+(with-test (:name (trace :labels :redefined-method)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((flet body :in (method trace-foo-gf ())))
                    (trace-foo-gf)
                    (call-with-trace-foo-gf-redefined 'trace-foo-gf))
@@ -412,13 +419,15 @@
   (flet ((body () 42))
     (body)))
 
-(with-test (:name (trace :compiler-macro))
+(with-test (:name (trace :compiler-macro)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((compiler-macro fn-with-cmac))
                    (compile nil '(lambda () (fn-with-cmac 0))))
                  '((0 (compiler-macro fn-with-cmac) :enter (fn-with-cmac 0) "unused argument")
                    (0 (compiler-macro fn-with-cmac) :exit 42)))))
 
-(with-test (:name (trace :flet :within-compiler-macro))
+(with-test (:name (trace :flet :within-compiler-macro)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((flet body :in (compiler-macro fn-with-cmac)))
                    (compile nil '(lambda () (fn-with-cmac 0))))
                  '((0 (flet body :in (compiler-macro fn-with-cmac)) :enter)
@@ -436,7 +445,8 @@
              (flet ((body () 42))
                (body))))))
 
-(with-test (:name (trace :compiler-macro :redefined))
+(with-test (:name (trace :compiler-macro :redefined)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((compiler-macro fn-with-cmac)
                                      (flet body :in (compiler-macro fn-with-cmac)))
                    (compile nil '(lambda () (fn-with-cmac 0)))
@@ -487,7 +497,8 @@
 (with-test (:name (trace :wherein :encapsulate t))
   (test-trace-inner-function :encapsulate t))
 
-(with-test (:name (trace :wherein :encapsulate nil))
+(with-test (:name (trace :wherein :encapsulate nil)
+                  . #.*breakpoint-tracing-expectations*)
   (test-trace-inner-function :encapsulate nil))
 
 (defun test-trace-fact-wherein (&key encapsulate)
@@ -500,20 +511,23 @@
 (with-test (:name (trace :wherein :recursive :encapsulate t))
   (test-trace-fact-wherein :encapsulate t))
 
-(with-test (:name (trace :wherein :recursive :encapsulate nil))
+(with-test (:name (trace :wherein :recursive :encapsulate nil)
+                  . #.*breakpoint-tracing-expectations*)
   (test-trace-fact-wherein :encapsulate nil))
 
 (defmacro macro-fact (x)
   (labels ((fact (x) (if (zerop x) 1 (* x (fact (1- x))))))
     (fact x)))
 
-(with-test (:name (trace :macro))
+(with-test (:name (trace :macro)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces (macro-fact)
                    (macroexpand-1 '(macro-fact 3)))
                  '((0 macro-fact :enter (macro-fact 3) "unused argument")
                    (0 macro-fact :exit 6)))))
 
-(with-test (:name (trace :labels :within-macro))
+(with-test (:name (trace :labels :within-macro)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((labels fact :in macro-fact))
                    (macroexpand-1 '(macro-fact 0)))
                  '((0 (labels fact :in macro-fact) :enter 0)
@@ -530,7 +544,8 @@
                (labels ((fact (x) (if (zerop x) 1 (* x (fact (1- x))))))
                  (fact x)))))))
 
-(with-test (:name (trace :macro :redefined))
+(with-test (:name (trace :macro :redefined)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces (macro-fact
                                      (labels fact :in macro-fact))
                    (macroexpand-1 '(macro-fact 0))
@@ -550,7 +565,8 @@
            (+ o n x)))
     (cas (body) old new)))
 
-(with-test (:name (trace :cas))
+(with-test (:name (trace :cas)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((cas trace-cas)
                                      (flet (cas body) :in (cas trace-cas)))
                    (cas (trace-cas 1) 21 20))
@@ -565,7 +581,8 @@
            (+ o n x)))
     (cas (body) old new)))
 
-(with-test (:name (trace :cas :generic))
+(with-test (:name (trace :cas :generic)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((method (cas trace-cas-gf) (t t t))
                                      (flet (cas body) :in (method (cas trace-cas-gf) (t t t))))
                    (cas (trace-cas-gf 1) 21 20))
@@ -580,7 +597,8 @@
            (+ value x)))
     (setf (body) value)))
 
-(with-test (:name (trace :setf))
+(with-test (:name (trace :setf)
+                  . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((setf trace-setf)
                                      (flet (setf body) :in (setf trace-setf)))
                    (setf (trace-setf 11) 31))
