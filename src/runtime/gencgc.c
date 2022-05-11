@@ -3800,7 +3800,6 @@ void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 garbage_collect_generation(generation_index_t generation, int raise,
                            void* approximate_stackptr)
 {
-    page_index_t i;
     struct thread *th;
 
     if (gencgc_verbose > 2) fprintf(stderr, "BEGIN gc_gen(%d,%d)\n", generation, raise);
@@ -3862,6 +3861,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
            * overlap in a way that all-code pinning wouldn't do the right thing if flipped.
            * FIXME: why would it not? More explanation needed!
            * Code objects should never get into the pins table in this case */
+            page_index_t i;
             for (i = 0; i < next_free_page; i++) {
                 if (page_table[i].gen == from_space
                     && is_code(page_table[i].type) && page_words_used(i))
@@ -4176,17 +4176,15 @@ garbage_collect_generation(generation_index_t generation, int raise,
     ASSERT_REGIONS_CLOSED();
     hopscotch_log_stats(&pinned_objects, "pins");
 
-    /* Free the pages in oldspace, but not those marked pinned. */
     free_oldspace();
 
-    /* If the GC is not raising the age then lower the generation back
-     * to its normal generation number */
+    /* If this cycle was not a promotion cycle, change SCRATCH_GENERATION back
+     * to its correct generation number */
     struct generation* g = &generations[generation];
     if (!raise) {
+        page_index_t i;
         for (i = 0; i < next_free_page; i++)
-            if ((page_words_used(i) != 0)
-                && (page_table[i].gen == SCRATCH_GENERATION))
-                page_table[i].gen = generation;
+            if (page_table[i].gen == SCRATCH_GENERATION) page_table[i].gen = generation;
         gc_assert(g->bytes_allocated == 0);
         g->bytes_allocated = generations[SCRATCH_GENERATION].bytes_allocated;
         generations[SCRATCH_GENERATION].bytes_allocated = 0;
