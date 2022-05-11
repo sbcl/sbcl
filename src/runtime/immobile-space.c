@@ -1433,7 +1433,7 @@ search_immobile_space(void *pointer)
             if (fixedobj_tempspace.start) // defragmenting
                 end = (char*)obj + spacing;
             else
-                end = (char*)(obj + sizetab[widetag_of(obj)](obj));
+                end = (char*)(obj + OBJECT_SIZE(*obj,obj));
             if ((char*)pointer < end) return obj;
         } else {
             return gc_search_space((lispobj*)page_base, pointer);
