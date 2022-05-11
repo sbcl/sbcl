@@ -1299,7 +1299,7 @@ void prepare_immobile_space_for_final_gc()
         if (mask & 1<<PSEUDO_STATIC_GENERATION) {
             lispobj* obj = (lispobj*)page_base;
             lispobj* limit = (lispobj*)((uword_t)obj + IMMOBILE_CARD_BYTES);
-            for ( ; obj < limit ; obj += sizetab[widetag_of(obj)](obj) )
+            for ( ; obj < limit ; obj += OBJECT_SIZE(*obj, obj) )
                 if (other_immediate_lowtag_p(*obj) &&
                     immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
                     assign_generation(obj, HIGHEST_NORMAL_GENERATION);
@@ -1344,7 +1344,7 @@ void prepare_immobile_space_for_save(boolean verbose)
     while (obj < limit) {
         if (other_immediate_lowtag_p(*obj))
             assign_generation(obj, PSEUDO_STATIC_GENERATION);
-        obj += sizetab[widetag_of(obj)](obj);
+        obj += OBJECT_SIZE(*obj, obj);
     }
 
     obj = (lispobj*)VARYOBJ_SPACE_START;

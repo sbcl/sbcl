@@ -243,10 +243,12 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
  = {~{~%  (void(*)(lispobj*,lispobj))~A~^,~}~%};~%" (length ptrtab) ptrtab)
       (write-table "static lispobj (*transother[64])(lispobj object)"
                    "trans_" transtab)
-      (format stream "#define size_pointer size_immediate~%")
+      (format stream "#define size_pointer (sizerfn)0~%")
+      (format stream "#define size_immediate (sizerfn)0~%")
       (format stream "#define size_unboxed size_boxed~%")
       (write-table "sword_t (*sizetab[256])(lispobj *where)"
                    "size_" sizetab)
+      (format stream "#undef size_immediate~%")
       (format stream "#undef size_pointer~%")
       (format stream "#undef size_unboxed~%")))
   (format stream "#endif~%"))

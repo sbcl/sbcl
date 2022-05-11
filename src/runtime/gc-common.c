@@ -758,12 +758,6 @@ scav_immediate(lispobj *where, lispobj object)
     return 2;
 }
 
-static sword_t
-size_immediate(lispobj __attribute__((unused)) *where)
-{
-    return 1;
-}
-
 //// General boxed object scav/trans/size functions
 
 #define DEF_SCAV_BOXED(suffix, sizer) \
