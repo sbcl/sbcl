@@ -1203,7 +1203,7 @@ care."
              (compiler-error "~S is a constant and thus can't be set." name))
            (when (lambda-var-p leaf)
              (let ((home-lambda (ctran-home-lambda-or-null start)))
-               (when home-lambda
+               (when (and home-lambda (neq (lambda-var-home leaf) home-lambda))
                  (sset-adjoin leaf (lambda-calls-or-closes home-lambda))))
              (when (lambda-var-ignorep leaf)
                ;; ANSI's definition of "Declaration IGNORE, IGNORABLE"
