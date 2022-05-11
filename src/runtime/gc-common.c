@@ -1958,31 +1958,32 @@ lispobj simple_fun_name_from_pc(char *pc, lispobj** pfun)
 /* Scan an area looking for an object which encloses the given pointer.
  * Return the object start on success, or NULL on failure. */
 lispobj *
-gc_search_space3(void *pointer, lispobj *start, void *limit)
+gc_search_space3(void *pointer, lispobj * const start, void *limit)
 {
     if (pointer < (void*)start || pointer >= limit) return NULL;
 
     size_t count;
+    lispobj* where = start;
+
 #if SEARCH_SPACE_FOLLOWS_FORWARDING_POINTERS
     /* CAUTION: this code is _significantly_ slower than the production version
-       due to the extra checks for forwarding.  Only use it if debugging */
-    for ( ; (void*)start < limit ; start += count) {
-        lispobj *forwarded_start;
-        if (forwarding_pointer_p(start))
-            forwarded_start = native_pointer(forwarding_pointer_value(start));
-        else
-            forwarded_start = start;
-        lispobj thing = *forwarded_start;
-        count = OBJECT_SIZE(thing, forwarded_start);
+       due to the extra checks for forwarding.
+       Also it is BROKEN. DO NOT ENABLE THE #define UNLESS/UNTIL FIXED. */
+    for ( ; (void*)where < limit ; where += count) {
+        lispobj *copy = where;
+        if (forwarding_pointer_p(where))
+            copy = native_pointer(forwarding_pointer_value(where));
+        // BUG: the size of a forwarded object may exceed the size of the original
+        // due to the addition of a stable hash slot.
+        count = OBJECT_SIZE(*copy, copy);
         /* Check whether the pointer is within this object. */
-        if (pointer < (void*)(start+count)) return start;
+        if (pointer < (void*)(where+count)) return where;
     }
 #else
-    for ( ; (void*)start < limit ; start += count) {
-        lispobj thing = *start;
-        count = OBJECT_SIZE(thing, start);
+    for ( ; (void*)where < limit ; where += count) {
+        count = OBJECT_SIZE(*where, where);
         /* Check whether the pointer is within this object. */
-        if (pointer < (void*)(start+count)) return start;
+        if (pointer < (void*)(where+count)) return where;
     }
 #endif
     return NULL;

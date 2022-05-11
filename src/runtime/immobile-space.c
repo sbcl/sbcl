@@ -2137,6 +2137,7 @@ static void defrag_immobile_space(boolean verbose)
         lispobj* fwdobj =
             forwarding_pointer_p(obj) ?
             tempspace_addr(native_pointer(forwarding_pointer_value(obj))) : obj;
+        // Sizing a forwarded object is OK here - code size can't change when copied.
         int size = sizetab[widetag_of(fwdobj)](fwdobj);
         // Supplying symbol_kind as 0 is fine - symbols can't exist in code space.
         if (executable_object_p(fwdobj))
