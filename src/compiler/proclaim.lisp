@@ -134,7 +134,7 @@
              (assert-symbol-home-package-unlocked name "proclaiming ~S as a function")))
 
       (let ((kind (info :function :kind name)))
-        ;; scrubbing old data I: possible collision with a macro
+        ;; scrubbing old data: possible collision with a macro
         ;; There's a silly little problem with fun names that are not ANSI-legal names,
         ;; e.g. (CAS mumble). We can't ask the host whether that is FBOUNDP,
         ;; because it would rightly complain. So, just assume that it is not FBOUNDP.
@@ -152,17 +152,6 @@
           ;; could only be of kind :FUNCTION if anything.
           (unless (pcl-methodfn-name-p name)
             (setf (info :function :kind name) :function))))))
-
-  ;; scrubbing old data II: dangling forward references
-  ;;
-  ;; (This could happen if someone executes PROCLAIM FTYPE at
-  ;; macroexpansion time, which is bad style, or at compile time, e.g.
-  ;; in EVAL-WHEN (:COMPILE) inside something like DEFSTRUCT, in which
-  ;; case it's reasonable style. Either way, NAME is no longer a free
-  ;; function.)
-  (when (boundp '*ir1-namespace*)       ; when compiling
-    (unless (block-compile *compilation*)
-      (remhash name (free-funs *ir1-namespace*))))
 
   (values))
 

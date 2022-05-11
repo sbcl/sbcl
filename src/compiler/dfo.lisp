@@ -303,9 +303,8 @@
 ;;; resulting components. Components with a :TOPLEVEL lambda, but no
 ;;; normal XEPs or potential non-local exits are marked as :TOPLEVEL.
 ;;; If there is a :TOPLEVEL lambda, and also a normal XEP, then we
-;;; treat the component as normal, but also return such components in
-;;; a list as the third value. Components with no entry of any sort
-;;; are deleted.
+;;; treat the component as normal. Components with no entry of any
+;;; sort are deleted.
 (defun separate-toplevelish-components (components)
   (declare (list components))
   (collect ((non-top)
@@ -344,10 +343,9 @@
                  (delete-component component))))))
     (values (non-top) (top))))
 
-;;; Given a list of top level lambdas, return
-;;;   (VALUES NONTOP-COMPONENTS TOP-COMPONENTS):
-;;;   NONTOP-COMPONENTS = non-top-level-ish COMPONENTs;
-;;;   TOP-COMPONENTS = top-level-ish COMPONENTs;
+;;; Given a list of top level lambdas, return two lists of components
+;;; representing the actual component division. The first value is the
+;;; non-top-level components, and the second is the top-level ones.
 ;;;
 ;;; We assign the DFO for each component, and delete any unreachable
 ;;; blocks. We assume that the FLAGS have already been cleared.

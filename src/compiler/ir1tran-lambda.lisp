@@ -996,7 +996,16 @@
     ((named-lambda)
      (let* ((name (cadr thing))
             (lambda-expression `(lambda ,@(cddr thing)))
-            (*inline-expansions* (list name 1 *inline-expansions*)))
+            (*inline-expansions* (list name 1 *inline-expansions*))
+            (simple-lexenv-p (simple-lexical-environment-p *lexenv*)))
+       ;; Discard any forward references to this function unless we
+       ;; are block compiling and the lexical environment doesn't
+       ;; contain any hair. If the lexical environment is too hairy, then we only
+       ;; install the definition during the processing of this NAMED-LAMBDA,
+       ;; ensuring that the function cannot be called outside of the correct
+       ;; environment.
+       (unless (and (block-compile *compilation*) simple-lexenv-p)
+         (remhash name (free-funs *ir1-namespace*)))
        (if (and name (legal-fun-name-p name))
            (let ((defined-fun-res (get-defined-fun name (second lambda-expression)))
                  (res (ir1-convert-lambda lambda-expression
@@ -1008,7 +1017,11 @@
              ;; FIXME: Should non-entry block compiled defuns have
              ;; this propagate?
              (assert-global-function-definition-type name res)
-             (push res (defined-fun-functionals defined-fun-res))
+             ;; If in a simple environment, then we can allow
+             ;; backward references to this function from following
+             ;; top-level forms.
+             (when simple-lexenv-p
+               (push res (defined-fun-functionals defined-fun-res)))
              (unless (or
                       (eq (defined-fun-inlinep defined-fun-res) 'notinline)
                       ;; Don't treat recursive stubs like CAR as self-calls
@@ -1272,6 +1285,18 @@
                 "previous declaration"
                 "previous definition"))))
 
+;;; The lexical environment is hairy if it has stuff like lexical
+;;; variables, blocks, or tags that are not load-time constants. Local
+;;; functions and macros are OK, since we are worried about outside
+;;; calls. Macros get expanded, and local functions are load-time
+;;; constants.
+(defun simple-lexical-environment-p (lexenv)
+  (and (null (lexenv-blocks lexenv))
+       (null (lexenv-tags lexenv))
+       (every (lambda (entry)
+                (consp (cdr entry)))
+              (lexenv-vars lexenv))))
+
 ;;; Used for global inline expansion. Earlier something like this was
 ;;; used by %DEFUN too. FIXME: And now it's probably worth rethinking
 ;;; whether this function is a good idea at all.
@@ -1318,9 +1343,10 @@
                          (fun-info-templates info)
                          (fun-info-ir2-convert info))))
       (substitute-leaf fun var)
-      ;; If in a simple environment, then we can allow backward references
-      ;; to this function from following top-level forms.
-      (when expansion
+      ;; If in a simple environment, then we can allow backward
+      ;; references to this function from following top-level
+      ;; forms.
+      (when (simple-lexical-environment-p *lexenv*)
         (push fun (defined-fun-functionals var))))
     fun))
 

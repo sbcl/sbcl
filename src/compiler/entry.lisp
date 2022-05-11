@@ -14,7 +14,7 @@
 (in-package "SB-C")
 
 ;;; This phase runs before IR2 conversion, initializing each XEP's
-;;; ENTRY-INFO structure.  If there was a forward reference to a function,
+;;; ENTRY-INFO structure. If there was a forward reference to a function,
 ;;; then the ENTRY-INFO will already exist, but will be uninitialized.
 (defun entry-analyze (component)
   (let ((2comp (component-info component)))

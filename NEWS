@@ -13,6 +13,7 @@ changes relative to sbcl-2.2.4:
     non-local exits.
   * bug fix: ftype proclamations now take effect immediately during block
     compilation.
+  * bug fix: block compilation of top-level closures now work.
 
 changes in sbcl-2.2.4 relative to sbcl-2.2.3:
   * enhancement: better constraint propagation in the compiler. Specifically,

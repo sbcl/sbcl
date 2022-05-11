@@ -171,8 +171,8 @@ tree structure resulting from the evaluation of EXPRESSION."
                 ',name))))))))
 
 ;;; This is one of the major places where the semantics of block
-;;; compilation is handled.  Substitution for global names is totally
-;;; inhibited if (block-compile *compilation*) is NIL.  And if
+;;; compilation is handled. Substitution for global names is totally
+;;; inhibited if (block-compile *compilation*) is NIL. And if
 ;;; (block-compile *compilation*) is true and entry points are
 ;;; specified, then we don't install global definitions for non-entry
 ;;; functions (effectively turning them into local lexical functions.)

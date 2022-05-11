@@ -153,3 +153,106 @@
    :load t)
   (assert (ctype= (caddr (sb-kernel::%simple-fun-type (fdefinition 'foo1)))
                   '(values integer &optional))))
+
+(with-test (:name :block-compile-top-level-closures)
+  (ctu:file-compile
+   `(;; test forward reference
+     (let ((y 0))
+       (defun foo2 (x)
+         (+ (bar2 x) (incf y))))
+
+     (let ((y 8))
+       (defun bar2 (x)
+         (+ (incf y) (baz2 (+ 3 x)))))
+
+     ;; test backward reference
+     (defun baz2 (x)
+       (if (zerop x)
+           (foo2 x)
+           x)))
+   :block-compile t
+   :load t)
+  ;; Make sure BAZ2 and BAR2 get a component together. FOO2 should not
+  ;; share a component with anyone, since it doesn't local call anyone
+  ;; with a compatible environment.
+  (assert (and (eq (sb-kernel::fun-code-header #'baz2)
+                   (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'bar2)))
+               (not (eq (sb-kernel::fun-code-header #'baz2)
+                        (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'foo2))))))
+  (assert (= (baz2 2) 2))
+  ;; Test calling the closures behave as expected.
+  (assert (= (baz2 0) 13))
+  (assert (= (baz2 0) 15))
+  (assert (= (baz2 0) 17))
+  (assert (= (baz2 0) 19)))
+
+;;; FLET should pose no problem.
+(with-test (:name :block-compile-top-level-closures.flet)
+  (ctu:file-compile
+   `(;; test forward reference
+     (flet ((blargh (x)
+              (+ x x)))
+       (defun boo (x)
+         (+ (blargh x) (blargh x))))
+     (defun zoo (x)
+       (boo x)))
+   :block-compile t
+   :load t)
+  ;; Make sure the defuns all get compiled into the same code
+  ;; component.
+  (assert (eq (sb-kernel::fun-code-header #'boo)
+              (sb-kernel::fun-code-header #'zoo)))
+  (assert (null (ctu:find-named-callees #'zoo)))
+  (assert (= (zoo 3) 12)))
+
+(with-test (:name :block-compile-top-level-closures.self-call)
+  (ctu:file-compile
+   `((let ((y 9))
+       (defun self-call (x)
+         (if (zerop x)
+             y
+             (+ (decf y) (self-call (1- x)))))))
+   :block-compile t
+   :load t)
+  ;; Test that we can call ourselves.
+  (assert (= (self-call 9) 36)))
+
+(with-test (:name :block-compile-top-level-closures.self-call.local-calls
+            :fails-on :sbcl)
+  ;; Test that we can local call ourselves in the same environment despite
+  ;; being a top level closure. (Not implemented yet.)
+  (assert (not (member #'self-call (ctu:find-named-callees #'self-call)))))
+
+(with-test (:name :block-compile-top-level-closures.same-environment)
+  (ctu:file-compile
+   `(;; test forward reference
+     (let ((y 0))
+       (defun foo3 (x)
+         (+ (bar2 x) (incf y)))
+
+       (defun bar3 (x)
+         (+ (incf y) (baz2 (+ 3 x))))
+
+       ;; test backward reference
+       (defun baz3 (x)
+         (if (zerop x)
+             (foo2 x)
+             x))))
+   :block-compile t
+   :load t)
+  ;; Test that calls in the same environment work.
+  (assert (= (baz3 0) 21))
+  (assert (= (baz3 0) 23))
+  (assert (= (baz3 0) 25))
+  (assert (= (baz3 0) 27)))
+
+(with-test (:name :block-compile-top-level-closures.same-environment.local-calls
+                  :fails-on :sbcl)
+  ;; FOO3, BAR3, and BAZ3 are all in the same lexical environment, so
+  ;; therefore have compatible runtime environments. Thus they should
+  ;; be able to all local call each other. (Not implemented yet.)
+  (assert (and (eq (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'baz3))
+                   (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'bar3)))
+               (eq (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'baz3))
+                   (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'foo3)))))
+  (assert (null (ctu:find-named-callees #'baz3))))
