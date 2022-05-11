@@ -2218,6 +2218,9 @@ void visit_freed_objects(char __attribute__((unused)) *start,
     while (where < end) {
         lispobj word = *where;
         if (forwarding_pointer_p(where)) { // live oject
+            /* CAUTION: This CAN NOT WORK RELIABLY. Due to gc_copy_object_resizing()
+             * we might compute the wrong size because we take it from the copy.
+             * Are there other places where we get this wrong??? I sure hope not */
             lispobj* fwd_where = native_pointer(forwarding_pointer_value(where));
             fprintf(stderr, "%p: -> %p\n", where, fwd_where);
             where += OBJECT_SIZE(*fwd_where, fwd_where);
@@ -3321,59 +3324,28 @@ unprotect_oldspace(void)
     }
 }
 
-/* Work through all the pages and free any in from_space. This
- * assumes that all objects have been copied or promoted to an older
- * generation. Bytes_allocated and the generation bytes_allocated
- * counter are updated. The number of bytes freed is returned. */
-static uword_t
-free_oldspace(void)
+/* Work through all the pages and free any in from_space.
+ * Live non-pinned objects will have been copied to new pages.
+ * Pinned objects are no longer in 'from_space', as the containing
+ * page is now in a different generation.
+ * Bytes_allocated and the generation bytes_allocated
+ * counter are updated. */
+static void free_oldspace(void)
 {
     uword_t bytes_freed = 0;
-    page_index_t first_page, last_page;
-
-    first_page = 0;
-
-    do {
-        /* Find a first page for the next region of pages. */
-        while ((first_page < next_free_page)
-               && ((page_words_used(first_page) == 0)
-                   || (page_table[first_page].gen != from_space)))
-            first_page++;
-
-        if (first_page >= next_free_page)
-            break;
-
-        /* Find the last page of this region. */
-        last_page = first_page;
-
-        page_bytes_t last_page_bytes;
-        do {
-            /* Free the page. */
-            last_page_bytes = page_bytes_used(last_page);
-            bytes_freed += last_page_bytes;
-            reset_page_flags(last_page);
-            set_page_bytes_used(last_page, 0);
+    page_index_t page;
+    for (page = 0; page < next_free_page; ++page) {
+        if (page_table[page].gen == from_space) {
             /* Should already be unprotected by unprotect_oldspace(). */
-            gc_assert(page_cards_all_marked_nonsticky(last_page));
-            last_page++;
+            gc_dcheck(page_cards_all_marked_nonsticky(last_page));
+            /* Free the page. */
+            bytes_freed += page_bytes_used(page);
+            reset_page_flags(page);
+            set_page_bytes_used(page, 0);
         }
-        while ((last_page < next_free_page)
-               && page_table[last_page].gen == from_space
-               && page_words_used(last_page));
-
-        /* 'last_page' is the exclusive upper bound on the page range starting
-         * at 'first'page'. We have an accurate count of the bytes in use on
-         * last_page but there may be intervening pages not 100% full which are
-         * treated as full. This can spuriously visit some (0 . 0) conses
-         * but is otherwise not a big deal */
-        visit_freed_objects(page_address(first_page),
-                            npage_bytes(last_page-first_page-1) + last_page_bytes);
-        first_page = last_page;
-    } while (first_page < next_free_page);
-
+    }
     generations[from_space].bytes_allocated -= bytes_freed;
     bytes_allocated -= bytes_freed;
-    return bytes_freed;
 }
 
 /* Call 'proc' with pairs of addresses demarcating ranges in the
