@@ -305,15 +305,6 @@
     (let ((lvar (nth n (combination-args call))))
       (when lvar (lvar-type lvar)))))
 
-;;; Derive the result type according to the float contagion rules, but
-;;; always return a float. This is used for irrational functions that
-;;; preserve realness of their arguments.
-(defun result-type-float-contagion (call)
-  (declare (type combination call))
-  (reduce #'numeric-contagion (combination-args call)
-          :key #'lvar-type
-          :initial-value (specifier-type 'single-float)))
-
 (defun simplify-list-type (type &key preserve-dimensions)
   ;; Preserve all the list types without dragging
   ;; (cons (eql 10)) stuff in.
