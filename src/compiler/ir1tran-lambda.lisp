@@ -1063,8 +1063,6 @@
             (allow (when (ll-kwds-allowp llks) '(&allow-other-keys))))
         (careful-specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
 
-(declaim (start-block maybe-inline-syntactic-closure))
-
 ;;; Return a lambda form that has been "closed" with respect to
 ;;; LEXENV, returning a LAMBDA-WITH-LEXENV if there are interesting
 ;;; declarations. To handle local macros, rather than closing over
@@ -1072,7 +1070,7 @@
 ;;; LAMBDA, so that nothing in the syntactic environment is needed in
 ;;; the expansion. If there is something too complex in the lexical
 ;;; environment (like a lexical variable), then we return NIL.
-(defun maybe-inline-syntactic-closure (lambda lexenv)
+(defun inline-syntactic-closure-lambda (lambda lexenv)
   (declare (type list lambda) (type lexenv-designator lexenv))
   (aver (eql (first lambda) 'lambda))
   (typecase lexenv
@@ -1124,8 +1122,6 @@
       `(lambda-with-lexenv ,it ,@(cdr lambda))))
    #+sb-fasteval
    (null lambda))) ; trivial case. Never occurs in the compiler.
-
-(declaim (end-block))
 
 (declaim (start-block ir1-convert-inline-lambda))
 

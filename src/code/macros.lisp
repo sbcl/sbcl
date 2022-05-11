@@ -131,7 +131,7 @@ tree structure resulting from the evaluation of EXPRESSION."
                   ;; a full inline expansion depending on the lexical environment.
                   ((save-inline-expansion-p name)
                   ;; we want to attempt to inline, so complain if we can't
-                   (cond ((sb-c:maybe-inline-syntactic-closure lambda env))
+                   (cond ((sb-c:inline-syntactic-closure-lambda lambda env))
                          (t
                           (#+sb-xc-host warn
                            #-sb-xc-host sb-c:maybe-compiler-notify
