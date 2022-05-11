@@ -30,7 +30,6 @@
 #include "arch.h"
 #include "interr.h"
 #include "search.h"
-#include "purify.h"
 #include "globals.h"
 #include "lispregs.h"
 #include "interrupt.h"
@@ -217,9 +216,7 @@ void save_gc_crashdump(char *pathname,
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd;
-static cmd backtrace_cmd, purify_cmd, catchers_cmd;
-static cmd grab_sigs_cmd;
-static cmd kill_cmd;
+static cmd backtrace_cmd, catchers_cmd;
 static cmd threads_cmd;
 
 extern void gc_stop_the_world(), gc_start_the_world();
@@ -300,13 +297,6 @@ static struct cmd {
     {"d", "(an alias for dump)", dump_cmd},
     {"exit", "Exit this instance of the monitor.", exit_cmd},
     {"flush", "Flush all temp variables.", flush_cmd},
-    /* (Classic CMU CL had a "gc" command here, which seems like a
-     * reasonable idea, but the code was stale (incompatible with
-     * gencgc) so I just flushed it. -- WHN 20000814 */
-    {"grab-signals", "Set the signal handlers to call LDB.", grab_sigs_cmd},
-    {"kill", "Kill ourself with signal number N (useful if running under gdb)",
-     kill_cmd},
-    {"purify", "Purify. (Caveat purifier!)", purify_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},
     {"pte", "Page table entry for address", pte_cmd},
@@ -457,16 +447,6 @@ pte_cmd(char **ptr)
 }
 
 static int
-kill_cmd(char **ptr)
-{
-#ifndef LISP_FEATURE_WIN32
-    int sig;
-    if (parse_number(ptr, &sig)) kill(getpid(), sig);
-#endif
-    return 0;
-}
-
-static int
 regs_cmd(char __attribute__((unused)) **ptr)
 {
     struct thread __attribute__((unused)) *thread=get_sb_vm_thread();
@@ -610,13 +590,6 @@ exit_cmd(char __attribute__((unused)) **ptr)
     return 1; // 'done' flag
 }
 
-static int
-purify_cmd(char __attribute__((unused)) **ptr)
-{
-    purify(NIL, NIL);
-    return 0;
-}
-
 static void
 print_context(os_context_t *context)
 {
@@ -650,12 +623,11 @@ print_context_cmd(char **ptr)
             printf("printing context %d\n", index);
             print_context(nth_interrupt_context(index, thread));
         } else {
-            printf("There aren't that many/few contexts.\n");
             printf("There are %d interrupt contexts.\n", free_ici);
         }
     } else {
         if (free_ici == 0)
-            printf("There are no interrupt contexts!\n");
+            printf("There are no interrupt contexts.\n");
         else {
             printf("There are %d interrupt contexts.\n", free_ici);
             printf("printing context %d\n", free_ici - 1);
@@ -718,34 +690,6 @@ catchers_cmd(char __attribute__((unused)) **ptr)
             catch = catch->previous_catch;
         }
     }
-    return 0;
-}
-
-/* SIGINT handler that invokes the monitor (for when Lisp isn't up to it) */
-static void
-sigint_handler(int __attribute__((unused)) signal,
-               siginfo_t __attribute__((unused)) *info,
-               void *context)
-{
-    extern void ldb_monitor();
-    fprintf(stderr, "\nSIGINT hit at %p\n", (void*)os_context_pc(context));
-    ldb_monitor();
-    fprintf(stderr, "Returning to lisp (if you're lucky).\n");
-}
-
-static int
-grab_sigs_cmd(char __attribute__((unused)) **ptr)
-{
-#ifdef LISP_FEATURE_WIN32
-    fprintf(stderr, "sorry no can do\n"); fflush(stderr);
-#else
-    printf("Grabbing SIGINT.\n");
-    struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = sigint_handler;
-    sigaction(SIGINT, &sa, 0);
-#endif
     return 0;
 }
 
