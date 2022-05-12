@@ -995,6 +995,26 @@
          ,'index
          nil)))
 
+(deftransforms (string=* simple-base-string=
+                         simple-character-string=)
+    ((string1 string2 start1 end1 start2 end2)
+     (t t (constant-arg t) (constant-arg t) (constant-arg t) (constant-arg t)))
+  (let* ((start1 (lvar-value start1))
+         (length1 (vector-type-length (lvar-type string1)))
+         (end1 (or (lvar-value end1)
+                   length1))
+         (start2 (lvar-value start2))
+         (length2 (vector-type-length (lvar-type string2)))
+         (end2 (or (lvar-value end2)
+                   length2)))
+    (if (and length1 length2
+             (<= start1 end1 length1)
+             (<= start2 end2 length2)
+             (/= (- end1 start1)
+                 (- end2 start2)))
+        nil
+        (give-up-ir1-transform))))
+
 (deftransform string/=* ((str1 str2 start1 end1 start2 end2) * * :node node
                          :important nil)
   ;; An IF node doesn't care about the mismatch index.
