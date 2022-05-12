@@ -41,12 +41,20 @@
   (expansion nil :read-only t))
 (declaim (freeze-type dxable-args))
 
+;;; FREE-VARS translates from the names of variables referenced
+;;; globally to the LEAF structures for them. FREE-FUNS is like
+;;; FREE-VARS, only it deals with function names.
+;;;
+;;; We must preserve the property that a proclamation for a global
+;;; thing only affects the code after it. This takes some work, since
+;;; a proclamation may appear in the middle of a block being
+;;; compiled. If there are references before the proclaim, then we
+;;; copy the current entry before modifying it. Code converted before
+;;; the proclaim sees the old Leaf, while code after it sees the new
+;;; LEAF.
 (defstruct (ir1-namespace (:conc-name "") (:copier nil) (:predicate nil))
-  ;; FREE-VARS translates from the names of variables referenced
-  ;; globally to the LEAF structures for them.
   (free-vars (make-hash-table :test 'eq) :read-only t :type hash-table)
-  ;; FREE-FUNS is like FREE-VARS, only it deals with function names.
-  (free-funs (make-hash-table :test 'equal) :read-only t :type hash-table)
+  (free-funs (make-hash-table :test #'equal) :read-only t :type hash-table)
   ;; These hashtables translate from constants to the LEAFs that
   ;; represent them.
   ;; Table 1: one entry per named constant

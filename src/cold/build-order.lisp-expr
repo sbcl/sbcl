@@ -348,7 +348,7 @@
  ("src/compiler/disassem")
  ("src/compiler/assem")
 
- ;; Compiling this requires fop definitions from code/fop.lisp and
+ ;; Compiling this requires fop definitions from code/load.lisp.
  ("src/compiler/dump")
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 
