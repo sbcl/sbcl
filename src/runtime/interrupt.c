@@ -1230,7 +1230,7 @@ interrupt_handle_pending(os_context_t *context)
         lose("pseudo_atomic_interrupted after interrupt_handle_pending");
 #endif
     /* It is possible that the end of this function was reached
-     * without never actually doing anything, the tests in Lisp for
+     * without actually doing anything, the tests in Lisp for
      * when to call receive-pending-interrupt are not exact. */
     FSHOW_SIGNAL((stderr, "/exiting interrupt_handle_pending\n"));
 }
