@@ -50,6 +50,7 @@
 #include "pseudo-atomic.h"
 #include "interrupt.h"
 #include "lispregs.h"
+#include "atomiclog.inc"
 
 #ifdef LISP_FEATURE_SB_THREAD
 
@@ -307,6 +308,22 @@ void reset_gc_stats() { // after sb-posix:fork
 }
 #endif
 
+#ifdef ATOMIC_LOGGING
+#define THREAD_NAME_MAP_MAX 20 /* KLUDGE */
+struct {
+  pthread_t thread;
+  char *name; // strdup'ed
+} thread_name_map[THREAD_NAME_MAP_MAX];
+int thread_name_map_count;
+
+char* thread_name_from_pthread(pthread_t pointer){
+    int i;
+    for(i=0; i<thread_name_map_count; ++i)
+        if (thread_name_map[i].thread == pointer) return thread_name_map[i].name;
+    return 0;
+}
+#endif
+
 void create_main_lisp_thread(lispobj function) {
 #ifdef LISP_FEATURE_WIN32
     InitializeCriticalSection(&all_threads_lock);
@@ -551,6 +568,14 @@ void* new_thread_trampoline(void* arg)
             pthread_setname_np((char*)VECTOR(name)->data);
 #endif
     }
+
+#ifdef ATOMIC_LOGGING
+      char* string = strdup((char*)VECTOR(name)->data);
+      int index = __sync_fetch_and_add(&thread_name_map_count, 1);
+      gc_assert(index < THREAD_NAME_MAP_MAX);
+      thread_name_map[index].thread = pthread_self();
+      thread_name_map[index].name = string;
+#endif
 
     struct vector* startup_info = VECTOR(lispthread->startup_info); // 'lispthread' is pinned
     gc_assert(header_widetag(startup_info->header) == SIMPLE_VECTOR_WIDETAG);
@@ -1196,7 +1221,7 @@ void gc_stop_the_world()
             gc_assert(state != STATE_RUNNING);
         }
     }
-    FSHOW_SIGNAL((stderr,"/gc_stop_the_world:end\n"));
+    event0("/gc_stop_the_world:end");
 #ifdef COLLECT_GC_STATS
     clock_gettime(CLOCK_MONOTONIC, &stw_end_time);
     stw_elapsed = (stw_end_time.tv_sec - stw_begin_time.tv_sec)*1000000000L

@@ -68,9 +68,9 @@
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
 #include "genesis/vector.h"
+#include "atomiclog.inc"
 
 #ifdef ATOMIC_LOGGING
-#include "atomiclog.inc"
 uword_t *eventdata;
 int n_logevents;
 #endif
@@ -299,25 +299,49 @@ void dump_eventlog()
 {
     int i = 0;
     uword_t *e = eventdata;
+    char buf[1024];
+    int nc, nc1; // number of chars in buffer
+    // Define buflen to be smaller than 'buf' so that we can prefix it
+    // with thread pointer and suffix it with a newline
+    // without too much hassle.
+#define buflen (sizeof buf-20)
+    nc = snprintf(buf, buflen, "Event log: used %d elements of %d max\n", n_logevents, EVENTBUFMAX);
+    write(2, buf, nc);
     while (i<n_logevents) {
         char *fmt = (char*)e[i+1];
-        switch (e[i]) {
+        uword_t prefix = e[i];
+        int nargs = prefix & 7;
+        void* thread_pointer = (void*)(prefix & ~7);
+        extern char* thread_name_from_pthread(void*);
+        char* name = thread_name_from_pthread(thread_pointer);
+        if (name) nc = sprintf(buf, "%s: ", name); else nc = sprintf(buf, "%p: ", thread_pointer);
+        switch (nargs) {
         default: printf("busted event log"); return;
-        case 2: printf(fmt); break;
-        case 3: printf(fmt,e[i+2]); break;
-        case 4: printf(fmt,e[i+2],e[i+3]); break;
-        case 5: printf(fmt,e[i+2],e[i+3],e[i+4]); break;
-        case 6: printf(fmt,e[i+2],e[i+3],e[i+4],e[i+5]); break;
-        case 7: printf(fmt,e[i+2],e[i+3],e[i+4],e[i+5],e[i+6]); break;
+        case 0: nc1 = snprintf(buf+nc, buflen, fmt, 0); break; // the 0 inhibits a warning
+        case 1: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2]); break;
+        case 2: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3]); break;
+        case 3: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4]); break;
+        case 4: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5]); break;
+        case 5: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5], e[i+6]); break;
+        case 6: nc1 = snprintf(buf+nc, buflen, fmt, e[i+2], e[i+3], e[i+4], e[i+5], e[i+6],
+                               e[i+7]); break;
         }
-        putchar('\n');
-        i += e[i];
+#undef buflen
+        buf[nc+nc1] = '\n';
+        write(2, buf, 1+nc+nc1);
+        i += nargs + 2;
     }
 }
+void sigdump_eventlog(int __attribute__((unused)) signal,
+                      siginfo_t __attribute__((unused)) *info,
+                      os_context_t *context)
+{
+    dump_eventlog();
+}
+
 static void record_signal(int sig, void* context)
 {
-    event3("sig%d @%p in %d", sig, (void*)os_context_pc(context),
-           (int)get_sb_vm_thread()->os_kernel_tid);
+    event2("got signal %d @ pc=%p", sig, os_context_pc(context));
 }
 #define RECORD_SIGNAL(sig,ctxt) if(sig!=SIGSEGV)record_signal(sig,ctxt);
 #else
@@ -1339,10 +1363,8 @@ can_handle_now(void *handler, struct interrupt_data *data,
      */
     if ((read_TLS(INTERRUPTS_ENABLED,thread) == NIL) ||
         in_leaving_without_gcing_race_p(thread)) {
-        FSHOW_SIGNAL((stderr,
-                      "/can_handle_now(%p,%d): deferred (RACE=%d)\n",
-                      handler,signal,
-                      in_leaving_without_gcing_race_p(thread)));
+        event3("can_handle_now(%p,%d): deferred (RACE=%d)", handler, signal,
+               in_leaving_without_gcing_race_p(thread));
         store_signal_data_for_later(data,handler,signal,info,context);
         write_TLS(INTERRUPT_PENDING, T,thread);
         answer = 0;
@@ -1351,9 +1373,7 @@ can_handle_now(void *handler, struct interrupt_data *data,
      * actually use its argument for anything on x86, so this branch
      * may succeed even when context is null (gencgc alloc()) */
     else if (arch_pseudo_atomic_atomic(context)) {
-        FSHOW_SIGNAL((stderr,
-                      "/can_handle_now(%p,%d): deferred(PA)\n",
-                      handler,signal));
+        event2("can_handle_now(%p,%d): deferred (PA)", handler, signal);
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
         answer = 0;
@@ -1395,11 +1415,11 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     /* Test for GC_INHIBIT _first_, else we'd trap on every single
      * pseudo atomic until gc is finally allowed. */
     if (read_TLS(GC_INHIBIT,thread) != NIL) {
-        FSHOW_SIGNAL((stderr, "sig_stop_for_gc deferred (*GC-INHIBIT*)\n"));
+        event0("stop_for_gc deferred for *GC-INHIBIT*");
         write_TLS(STOP_FOR_GC_PENDING,T,thread);
         return;
     } else if (arch_pseudo_atomic_atomic(context)) {
-        FSHOW_SIGNAL((stderr,"sig_stop_for_gc deferred (PA)\n"));
+        event0("stop_for_gc deferred for PA");
         write_TLS(STOP_FOR_GC_PENDING,T,thread);
         arch_set_pseudo_atomic_interrupted(context);
         maybe_save_gc_mask_and_block_deferrables
@@ -1407,7 +1427,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
         return;
     }
 
-    FSHOW_SIGNAL((stderr, "/sig_stop_for_gc_handler\n"));
+    event0("stop_for_gc");
 
     /* Not PA and GC not inhibited -- we can stop now. */
 
@@ -1432,7 +1452,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * GC. GC_BLOCKED_DEFERRABLES is also left at 1. So let's tidy it
      * up. */
     if (thread_interrupt_data(thread).gc_blocked_deferrables) {
-        FSHOW_SIGNAL((stderr,"cleaning up after gc_blocked_deferrables\n"));
+        event0("cleaning up after gc_blocked_deferrables");
         clear_pseudo_atomic_interrupted(thread);
         struct interrupt_data *interrupt_data = &thread_interrupt_data(thread);
         sigcopyset(os_context_sigmask_addr(context), &interrupt_data->pending_mask);
@@ -1450,7 +1470,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * occurs below at thread_wait_until_not(STATE_STOPPED). Note that sem_post()
      * is expressly permitted in signal handlers, and set_thread_state uses it */
     set_thread_state(thread, STATE_STOPPED, 0);
-    FSHOW_SIGNAL((stderr,"suspended\n"));
+    event0("suspended");
 
     /* While waiting for gc to finish occupy ourselves with zeroing
      * the unused portion of the control stack to reduce conservatism.
@@ -1485,7 +1505,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     int my_state = thread_wait_until_not(STATE_STOPPED, thread);
 #endif
 
-    FSHOW_SIGNAL((stderr,"resumed\n"));
+    event0("resumed");
 
     /* The state can't go from STOPPED to DEAD because it's this thread is reading
      * its own state, hence it must be running.
@@ -2008,7 +2028,13 @@ void
 interrupt_init(void)
 {
 #ifdef ATOMIC_LOGGING
-    eventdata = calloc(EVENTBUFMAX, N_WORD_BYTES);
+    // If fetch_and_add gives us an index that is less than EVENTBUFMAX,
+    // we assume that there is room to record an event with up to 8 arguments
+    // which means the prefix, the format string, and the arguments.
+    eventdata = calloc(EVENTBUFMAX+10, N_WORD_BYTES);
+    void sigdump_eventlog(int, siginfo_t*, os_context_t*);
+    // pick anything not used. SIGPWR is also a good choice
+    ll_install_handler(SIGINFO, sigdump_eventlog);
 #endif
     int __attribute__((unused)) i;
     SHOW("entering interrupt_init()");

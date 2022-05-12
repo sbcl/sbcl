@@ -719,7 +719,7 @@ void backtrace_lisp_threads(int __attribute__((unused)) signal,
     struct thread* this_thread = get_sb_vm_thread();
 #ifdef LISP_FEATURE_SB_THREAD
     if (backtrace_completion_pipe[1] >= 0) {
-        libunwind_backtrace(current_thread, context);
+        libunwind_backtrace(get_sb_vm_thread(), context);
         write(backtrace_completion_pipe[1], context /* any random byte */, 1);
         return;
     }
