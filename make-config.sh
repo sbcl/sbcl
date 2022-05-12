@@ -558,7 +558,6 @@ case "$sbcl_os" in
             printf ' :mach-exception-handler' >> $ltf
         fi
         if [ $sbcl_arch = "x86-64" ]; then
-            printf ' :mach-exception-handler' >> $ltf
             darwin_version=`uname -r`
             darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
 
