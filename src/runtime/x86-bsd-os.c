@@ -176,7 +176,6 @@ int arch_os_thread_init(struct thread *thread) {
         perror("i386_set_ldt");
         lose("unexpected i386_set_ldt(..) failure");
     }
-    FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     thread->tls_cookie=n;
     arch_os_load_ldt(thread);
 #endif
@@ -204,8 +203,6 @@ int arch_os_thread_cleanup(struct thread *thread) {
     /* Set the %%fs register back to 0 and free the ldt by setting it
      * to NULL.
      */
-    FSHOW_SIGNAL((stderr, "/ TLS: Freeing LDT %x\n", n));
-
     __asm__ __volatile__ ("mov %0, %%fs" : : "r"(0));
     i386_set_ldt(n, NULL, 1);
 #endif

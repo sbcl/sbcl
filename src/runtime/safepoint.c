@@ -1000,11 +1000,6 @@ void wake_thread_impl(struct thread_instance *lispthread)
 
 void* os_get_csp(struct thread* th)
 {
-    FSHOW_SIGNAL((stderr, "Thread %p has CSP %p, stack [%p,%p]\n",
-                  th,
-                  (void*)csp_around_foreign_call(th),
-                  th->control_stack_start,
-                  th->control_stack_end));
     return (void*)csp_around_foreign_call(th);
 }
 
@@ -1051,11 +1046,6 @@ int
 handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
 {
     struct thread *self = get_sb_vm_thread();
-
-    FSHOW_SIGNAL((stderr, "fault_address = %p, sp = %p, &csp = %p\n",
-                  fault_address,
-                  GC_SAFEPOINT_TRAP_ADDR, csp_around_foreign_call(self)));
-
 
     if (fault_address == (os_vm_address_t) GC_SAFEPOINT_TRAP_ADDR) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK

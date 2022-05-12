@@ -264,8 +264,6 @@ memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     void *fault_addr = arch_get_bad_addr(signal, siginfo, context);
 
 #if defined(LISP_FEATURE_RESTORE_TLS_SEGMENT_REGISTER_FROM_CONTEXT)
-    FSHOW_SIGNAL((stderr, "/ TLS: restoring fs: %p in memory_fault_handler\n",
-                  *CONTEXT_ADDR_FROM_STEM(fs)));
     os_restore_tls_segment_register(context);
 #endif
 

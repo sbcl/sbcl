@@ -714,7 +714,6 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
 #endif
     if ((!data->pending_handler) &&
         (!data->gc_blocked_deferrables)) {
-        FSHOW_SIGNAL((stderr,"/setting gc_blocked_deferrables\n"));
         data->gc_blocked_deferrables = 1;
         if (sigset) {
             /* This is the sigmask of some context. */
@@ -1083,8 +1082,6 @@ interrupt_handle_pending(os_context_t *context)
         lose("Handling pending interrupt in pseudo atomic.");
     }
 
-    FSHOW_SIGNAL((stderr, "/entering interrupt_handle_pending\n"));
-
     assert_blockables_blocked();
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     /*
@@ -1232,7 +1229,6 @@ interrupt_handle_pending(os_context_t *context)
     /* It is possible that the end of this function was reached
      * without actually doing anything, the tests in Lisp for
      * when to call receive-pending-interrupt are not exact. */
-    FSHOW_SIGNAL((stderr, "/exiting interrupt_handle_pending\n"));
 }
 
 
@@ -1275,8 +1271,6 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
             DX_ALLOC_SAP(context_sap, context);
             DX_ALLOC_SAP(info_sap, info);
 
-            FSHOW_SIGNAL((stderr,"/calling Lisp-level handler\n"));
-
             funcall3(handler,
                      make_fixnum(signal),
                      info_sap,
@@ -1305,7 +1299,6 @@ run_deferred_handler(struct interrupt_data *data, os_context_t *context)
         data->pending_handler;
 
     data->pending_handler=0;
-    FSHOW_SIGNAL((stderr, "/running deferred handler %p\n", pending_handler));
     (*pending_handler)(data->pending_signal,&(data->pending_info), context);
 }
 
@@ -1611,10 +1604,6 @@ arrange_return_to_c_function(os_context_t *context,
 
 #if defined(LISP_FEATURE_DARWIN)
     uint32_t *register_save_area = (uint32_t *)os_allocate(0x40);
-
-    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: preparing to go to function %x, sp: %x\n", function,
-                  *os_context_register_addr(context,reg_ESP)));
-    FSHOW_SIGNAL((stderr, "/arrange_return_to_lisp_function: context: %x, &context %x\n", context, &context));
 
     /* 1. os_validate (malloc/mmap) register_save_block
      * 2. copy register state into register_save_block

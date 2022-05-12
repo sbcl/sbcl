@@ -110,7 +110,7 @@
  ; :sb-show-assem
 
  ;; Compile the C runtime with support for low-level debugging output
- ;; through FSHOW and FSHOW_SIGNAL.  If enabled, this feature allows
+ ;; through FSHOW.  If enabled, this feature allows
  ;; users to turn on such debugging output using environment variables at
  ;; run-time.
  ; :sb-qshow

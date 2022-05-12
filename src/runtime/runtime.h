@@ -88,47 +88,11 @@ void gc_state_unlock();
  * you are a developer and want to affect FSHOW behaviour.
  */
 
-/* Enable extra-verbose low-level debugging output for signals? (You
- * probably don't want this unless you're trying to debug very early
- * cold boot on a new machine, or one where you've just messed up
- * signal handling.)
- *
- * Note: It may be that doing this is fundamentally unsound, since it
- * causes output from signal handlers, and the i/o libraries aren't
- * necessarily reentrant. But it can still be very convenient for
- * figuring out what's going on when you have a signal handling
- * problem.
- *
- * Possible values are:
- *   0 -- Never show signal-related output.  There is absolutely no
- *        run-time overhead from FSHOW_SIGNAL in this case.
- *
- *   1 -- (recommended)
- *        Show signal-related output only if selected at run-time
- *        (otherwise almost no run-time overhead).
- *
- *   2 -- Unconditionally show signal-related output.
- *        Very significant overhead.
- *
- * For reasons of tradition, we default to 0 on POSIX and 1 on Windows
- * through :SB-QSHOW.
- *
- * With option 1, set up environment variable SBCL_DYNDEBUG to include
- * "fshow" or "fshow_signal" before starting SBCL to enable output.
- *
- * There is no particular advantage to option 2 except that you do not
- * need to set environment variables in this case.
- */
 #ifdef LISP_FEATURE_SB_QSHOW
-# define QSHOW_SIGNALS 1
+# define QSHOW 1
 #else
-# define QSHOW_SIGNALS 0
+# define QSHOW 0
 #endif
-
-/* Enable low-level debugging output, if not zero. Defaults to enabled
- * if QSHOW_SIGNALS, disabled otherwise. Change it to 1 or 2 if you want
- * low-level debugging output but not the whole signal mess. */
-#define QSHOW QSHOW_SIGNALS
 
 /*
  * Configuration options end here -- the following defines do not
@@ -148,7 +112,6 @@ void fshow_fun(void *ignored, const char *fmt, ...);
  * declaration and definition. */
 extern struct dyndebug_config {
     int dyndebug_fshow;
-    int dyndebug_fshow_signal;
     int dyndebug_gencgc_verbose;
     int dyndebug_safepoints;
     int dyndebug_seh;
@@ -179,13 +142,6 @@ void dyndebug_init(void);
 #else
 # define FSHOW(args)
 # define SHOW(string)
-#endif
-
-#if QSHOW_SIGNALS
-# define FSHOW_SIGNAL(args)                                             \
-    do if (dyndebug_config.dyndebug_fshow_signal) fshow_fun args; while (0)
-#else
-# define FSHOW_SIGNAL(args)
 #endif
 
 #ifdef _WIN64

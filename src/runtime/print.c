@@ -40,14 +40,14 @@
  *
  * If enabled at all, environment variables control whether calls of the
  * form odxprint(name, ...) are enabled at run-time, e.g. using
- * SBCL_DYNDEBUG="fshow fshow_signal safepoints".
+ * SBCL_DYNDEBUG="fshow safepoints".
  *
- * In the case of FSHOW and FSHOW_SIGNAL, old-style code from runtime.h
+ * In the case of FSHOW, old-style code from runtime.h
  * can also be used to enable or disable these more aggressively.
  */
 
 struct dyndebug_config dyndebug_config = {
-    QSHOW == 2, QSHOW_SIGNALS == 2
+    QSHOW == 2,
 };
 
 void
@@ -68,7 +68,6 @@ dyndebug_init()
     int *ptrs[DYNDEBUG_NFLAGS];
 
     dyndebug_init1(fshow,          "FSHOW");
-    dyndebug_init1(fshow_signal,   "FSHOW_SIGNAL");
     dyndebug_init1(gencgc_verbose, "GENCGC_VERBOSE");
     dyndebug_init1(safepoints,     "SAFEPOINTS");
     dyndebug_init1(seh,            "SEH");
