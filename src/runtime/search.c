@@ -107,9 +107,8 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
     }
 #endif
     while (where < limit) {
-        lispobj word = *where;
         struct vector *string;
-        if (header_widetag(word) == SYMBOL_WIDETAG &&
+        if (widetag_of(where) == SYMBOL_WIDETAG &&
             (string = symbol_name((struct symbol*)where)) != 0 &&
             string->length_ == namelen) {
             if (gc_managed_addr_p((lispobj)string) &&
@@ -123,7 +122,7 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignor
                  ))
                 return where;
         }
-        where += OBJECT_SIZE(word, where);
+        where += object_size(where);
     }
     return 0;
 }
@@ -146,7 +145,7 @@ struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
             if (widetag == SYMBOL_WIDETAG &&
                 tls_index_of(((struct symbol*)where)) == tls_index)
                 return (struct symbol*)where;
-            where += OBJECT_SIZE(header, where);
+            where += object_size2(where, header);
         }
         if (where >= (lispobj*)DYNAMIC_SPACE_START)
             break;

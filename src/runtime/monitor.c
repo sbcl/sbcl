@@ -410,7 +410,7 @@ dump_cmd(char **ptr)
                 if (word != 0 && !is_lisp_pointer(word)
                     && valid_widetag_p(header_widetag(word))) {
                     printf(" %s", widetag_names[header_widetag(word)>>2]);
-                    next_object += sizetab[header_widetag(word)](next_object);
+                    next_object += headerobj_size2(next_object, word);
                 } else if (!is_header(word)) {
                     next_object += CONS_SIZE;
                 } else { // disable decoder if weirdness observed

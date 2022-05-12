@@ -305,7 +305,7 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
         /* Technically we should wait until after performing the widetag validity
          * tests before calling the sizer.  Otherwise the lossage message would
          * not be as good as it could be. I guess that failure doesn't happen much */
-        long nwords = OBJECT_SIZE(*where,where);
+        long nwords = object_size(where);
         state->object_addr = where;
         state->object_header = is_cons_half(*where) ? 0 : *where;
         if (state->flags & VERIFYING_GENERATIONAL) {
@@ -494,7 +494,7 @@ __attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, 
 {
     while (where < end) {
         fprintf(f, "%"OBJ_FMTX": %"OBJ_FMTX"\n", (uword_t)where, *where);
-        where += OBJECT_SIZE(*where, where);
+        where += object_size(where);
     }
 }
 static int dump_completely_p(lispobj* obj, struct verify_state* state)
@@ -549,7 +549,7 @@ void hexdump_spaces(struct verify_state* state, char *reason)
         fprintf(f, ")\n");
         lispobj *where = base;
         while (where<limit){
-            int nwords = OBJECT_SIZE(*where,where);
+            int nwords = object_size(where);
             /* If your'e having trouble with a subset of objects, and you can get
              * a reliable reproducer, this predicate can decide which objects to
              * output in full. Generally you don't need that much output */

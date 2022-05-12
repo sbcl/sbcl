@@ -159,8 +159,8 @@ static int find_ref(lispobj* source, lispobj target)
         check_ptr(1, source[1]);
         return -1;
     }
+    scan_limit = headerobj_size(source);
     int widetag = widetag_of(source);
-    scan_limit = sizetab[widetag](source);
     switch (widetag) {
     case INSTANCE_WIDETAG:
     case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -526,8 +526,7 @@ static lispobj trace1(lispobj object,
                     if (hopscotch_containsp(visited, (lispobj)ptr))
                         fprintf(stderr, "%p ", ptr);
                     else {
-                        lispobj word = *ptr;
-                        int nwords = OBJECT_SIZE(word, ptr);
+                        int nwords = object_size(ptr);
                         fprintf(stderr, "%p+%d ", ptr, nwords);
                     }
                     list1 = cell[1];
@@ -720,7 +719,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
     boolean count_only = !ss->record_ptrs;
     for ( ; where < end ; where += nwords ) {
         if (ss->ignored_objects && ignorep(where, ss->ignored_objects)) {
-            nwords = OBJECT_SIZE(*where, where);
+            nwords = object_size(where);
             continue;
         }
         ++n_objects;
@@ -731,8 +730,8 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             check_ptr(where[1]);
             continue;
         }
+        nwords = scan_limit = headerobj_size2(where, word);
         int widetag = header_widetag(word);
-        nwords = scan_limit = sizetab[widetag](where);
         switch (widetag) {
         case INSTANCE_WIDETAG:
         case FUNCALLABLE_INSTANCE_WIDETAG:

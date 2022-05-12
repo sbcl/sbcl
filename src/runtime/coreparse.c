@@ -662,7 +662,7 @@ void calc_asm_routine_bounds()
         asm_routines_start = READ_ONLY_SPACE_START;
     } else {
         lispobj *where = (lispobj*)STATIC_SPACE_OBJECTS_START;
-        for (; where < static_space_free_pointer; where += OBJECT_SIZE(*where, where))
+        for (; where < static_space_free_pointer; where += object_size(where))
             if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
                 asm_routines_start = (uword_t)where;
                 break;
@@ -1217,7 +1217,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
         case FUNCALLABLE_INSTANCE_WIDETAG:
             layout = layout_of(obj);
             graph_visit(ptr, layout, seen);
-            nwords = sizetab[widetag_of(obj)](obj);
+            nwords = headerobj_size(obj);
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             for (i=0; i<(nwords-1); ++i)
                 if (bitmap_logbitp(i, bitmap)) RECURSE(obj[1+i]);
@@ -1254,7 +1254,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             break;
         default:
             if (!leaf_obj_widetag_p(widetag_of(obj))) {
-                int size = sizetab[widetag_of(obj)](obj);
+                int size = headerobj_size(obj);
                 for(i=1; i<size; ++i) RECURSE(obj[i]);
             }
       }
@@ -1277,9 +1277,9 @@ static void tally(lispobj ptr, struct visitor* v)
     else {
         lispobj* obj = native_pointer(ptr);
         lispobj header = *obj;
+        int words = object_size2(obj, header);
         int widetag = header_widetag(header);
         int header_index = widetag>>2;
-        int words = OBJECT_SIZE(header, obj);
         ++v->headers[header_index].count;
         v->headers[header_index].words += words;
         if (widetag == SIMPLE_VECTOR_WIDETAG) {
@@ -1313,7 +1313,7 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
         lispobj ptr = compute_lispobj(obj);
         tally(ptr, v);
         if (!hopscotch_get(v->reached, ptr, 0)) printf("unreachable: %p\n", (void*)ptr);
-        obj += OBJECT_SIZE(*obj, obj);
+        obj += object_size(obj);
     }
     return 0;
 }
@@ -1341,7 +1341,7 @@ static void sanity_check_loaded_core(lispobj initial_function)
       lispobj* end = static_space_free_pointer;
       while (where<end) {
         graph_visit(0, compute_lispobj(where), &reached);
-        where += OBJECT_SIZE(*where, where);
+        where += object_size(where);
       }
     }
     graph_visit(0, initial_function, &reached); // not otherwise reachable

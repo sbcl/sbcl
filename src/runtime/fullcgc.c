@@ -438,7 +438,7 @@ void execute_full_mark_phase()
     while (where < end) {
         lispobj obj = compute_lispobj(where);
         gc_enqueue(obj);
-        where += listp(obj) ? 2 : sizetab[widetag_of(where)](where);
+        where += listp(obj) ? 2 : headerobj_size(where);
     }
 #ifdef LISP_FEATURE_METASPACE
     where = (lispobj*)METASPACE_START;
@@ -446,7 +446,7 @@ void execute_full_mark_phase()
     while (where < end) {
         lispobj obj = compute_lispobj(where);
         gc_enqueue(obj);
-        where += listp(obj) ? 2 : sizetab[widetag_of(where)](where);
+        where += listp(obj) ? 2 : headerobj_size(where);
     }
 #endif
     gc_mark_obj(lisp_package_vector);
@@ -562,7 +562,7 @@ static void sweep_fixedobj_pages(long *zeroed)
         lispobj header = *obj;
         uword_t markbit = boxedobj_widetag_to_markbit(header_widetag(header));
         if (header & markbit) *obj = header ^ markbit;
-        obj += sizetab[widetag_of(obj)](obj);
+        obj += headerobj_size(obj);
     }
 }
 #endif
@@ -601,7 +601,7 @@ static uword_t sweep(lispobj* where, lispobj* end,
         lispobj word = *where;
         int livep = 0;
         if (is_header(word)) {
-            nwords = sizetab[header_widetag(word)](where);
+            nwords = headerobj_size2(where, word);
             lispobj markbit = general_widetag_to_markbit(header_widetag(word));
             if (word & markbit) livep = 1, *where = word ^ markbit;
             if (!livep) clobber_headered_object(where, nwords);

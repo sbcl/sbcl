@@ -106,9 +106,25 @@ static inline int vector_is_weak_not_hashing_p(unsigned int header) {
 
 extern sword_t (*sizetab[256])(lispobj *where);
 typedef sword_t (*sizerfn)(lispobj*);
-static inline sword_t OBJECT_SIZE(uword_t header, lispobj* where) {
+static inline sword_t object_size(lispobj* where) {
+    sizerfn f = sizetab[widetag_of(where)];
+    return f ? f(where) : CONS_SIZE;
+}
+// These three variants are potentially more efficient -
+//  (1) if the widetag was loaded, avoids one memory read
+//  (2) if you know the object isn't a cons, use headerobj_size
+//  (3) both of the above pertain.
+// Cases 1 and 3 exist only because C doesn't have optional args.
+// These might be premature optimizations, I really don't know.
+static inline sword_t object_size2(lispobj* where, unsigned int header) {
     sizerfn f = sizetab[header & WIDETAG_MASK];
     return f ? f(where) : CONS_SIZE;
+}
+static inline sword_t headerobj_size(lispobj* where) {
+    return sizetab[widetag_of(where)](where);
+}
+static inline sword_t headerobj_size2(lispobj* where, unsigned int header) {
+    return sizetab[header & WIDETAG_MASK](where);
 }
 
 lispobj *gc_search_space3(void *pointer, lispobj *start, void *limit);

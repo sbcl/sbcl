@@ -540,7 +540,7 @@ verify_range(int purified, lispobj *base, lispobj *end)
     lispobj* where = base;
     int len, i;
     lispobj layout;
-    for ( ; where < end ; where += OBJECT_SIZE(*where, where) ) {
+    for ( ; where < end ; where += object_size(where) ) {
         if (is_cons_half(*where)) {
           CHECK_PTR(where+0, where[0]);
           CHECK_PTR(where+1, where[1]);
@@ -586,7 +586,7 @@ void dump_space_to_file(lispobj* where, lispobj* limit, char* pathname)
     f = fopen(pathname, "w");
     while (where < limit) {
         fprintf(f, "%p: %x\n", where, *where);
-        where += OBJECT_SIZE(*where, where);
+        where += object_size(where);
     }
     fprintf(f, "--\n");
     fclose(f);

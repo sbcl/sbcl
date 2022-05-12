@@ -2101,7 +2101,7 @@ static void refine_ambiguous_roots()
          * then we're done; the key was not found */
         while (1) {
             if (where < key) {
-                where += OBJECT_SIZE(*where, where);
+                where += object_size(where);
             } else if (where == key) {
                 break;
             } else { // 'where' went past the key, so the key is bad
@@ -2223,12 +2223,12 @@ void visit_freed_objects(char __attribute__((unused)) *start,
              * Are there other places where we get this wrong??? I sure hope not */
             lispobj* fwd_where = native_pointer(forwarding_pointer_value(where));
             fprintf(stderr, "%p: -> %p\n", where, fwd_where);
-            where += OBJECT_SIZE(*fwd_where, fwd_where);
+            where += object_size(fwd_where);
         } else { // dead object
             fprintf(stderr, "%p: %"OBJ_FMTX" %"OBJ_FMTX"\n", where, where[0], where[1]);
             if (is_header(word)) {
                 // Do something interesting
-                where += sizetab[header_widetag(word)](where);
+                where += headerobj_size(where, word);
             } else {
                 /* Can't do much useful with conses because often we can't distinguish
                  * filler from data. visit_freed_objects is called on ranges of pages
@@ -2328,7 +2328,7 @@ static void obliterate_nonpinned_words()
         // If 'obj' spans pages, move its successive page(s) to newspace and
         // ensure that those pages' scan_starts point at the same address
         // that this page's scan start does, which could be this page or earlier.
-        size_t nwords = OBJECT_SIZE(*obj, obj);
+        size_t nwords = object_size(obj);
         uword_t obj_end = (uword_t)(obj + nwords); // non-inclusive address bound
         page_index_t end_page_index = find_page_index((char*)obj_end - 1); // inclusive bound
 
@@ -2422,7 +2422,7 @@ static void pin_object(lispobj object)
      * and be done with it */
     if (page_single_obj_p(page)) {
         if (gc_page_pins[page]) return;
-        sword_t nwords = OBJECT_SIZE(*object_start, object_start);
+        sword_t nwords = object_size(object_start);
         maybe_adjust_large_object(object_start, page, nwords);
         page_index_t last_page = find_page_index(object_start + nwords - 1);
         while (page <= last_page) gc_page_pins[page++] = PAGE_PINNED;
@@ -2858,7 +2858,7 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
         gc_assert(is_code(page_table[i].type));
 
     lispobj* where = start;
-    for (; where < limit; where += sizetab[widetag_of(where)](where)) {
+    for (; where < limit; where += headerobj_size(where)) {
         switch (widetag_of(where)) {
         case CODE_HEADER_WIDETAG:
             if (header_rememberedp(*where)) return;
@@ -4117,10 +4117,17 @@ garbage_collect_generation(generation_index_t generation, int raise,
             lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
             while (where < limit) {
                 if (forwarding_pointer_p(where)) {
+                    // The codeblob already survived GC, so we just need to step over it.
                     lispobj* copy = native_pointer(forwarding_pointer_value(where));
-                    where += sizetab[widetag_of(copy)](copy);
+                    // NOTE: it's OK to size the newspace copy rather than the original
+                    // because code size can't change.
+                    where += headerobj_size(copy);
                 } else {
-                    sword_t nwords = sizetab[widetag_of(where)](where);
+                    // Compute 'nwords' before potentially moving the object
+                    // at 'where', because moving it stomps on the header word.
+                    sword_t nwords = headerobj_size(where);
+                    // If the object is not a filler and not a trampline, then create
+                    // a pointer to it and eliven the pointee.
                     if (widetag_of(where) == CODE_HEADER_WIDETAG
                         && where[1] != 0 /* has at least one boxed word */
                         && code_serialno((struct code*)where) != 0) {
@@ -4651,7 +4658,7 @@ static void __attribute__((unused)) gcbarrier_patch_code_range(uword_t start, vo
                 gcbarrier_patch_code(patch_where, gc_card_table_nbits);
             }
         }
-        where += OBJECT_SIZE(*where, where);
+        where += object_size(where);
     }
 }
 void gc_allocate_ptes()

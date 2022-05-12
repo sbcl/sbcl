@@ -1969,13 +1969,13 @@ gc_search_space3(void *pointer, lispobj * const start, void *limit)
             copy = native_pointer(forwarding_pointer_value(where));
         // BUG: the size of a forwarded object may exceed the size of the original
         // due to the addition of a stable hash slot.
-        count = OBJECT_SIZE(*copy, copy);
+        count = object_size(copy);
         /* Check whether the pointer is within this object. */
         if (pointer < (void*)(where+count)) return where;
     }
 #else
     for ( ; (void*)where < limit ; where += count) {
-        count = OBJECT_SIZE(*where, where);
+        count = object_size(where);
         /* Check whether the pointer is within this object. */
         if (pointer < (void*)(where+count)) return where;
     }
@@ -2692,5 +2692,5 @@ void gc_heapsort_uwords(heap array, int length)
 /// External function for calling from Lisp.
 uword_t primitive_object_size(lispobj ptr) {
     lispobj* addr = native_pointer(ptr);
-    return OBJECT_SIZE(*addr,addr) * N_WORD_BYTES;
+    return object_size(addr) * N_WORD_BYTES;
 }
