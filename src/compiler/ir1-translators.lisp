@@ -542,7 +542,7 @@ Return VALUE without evaluating it."
     (when context
       (list :in context))))
 
-;;;; FUNCTION and NAMED-LAMBgDA
+;;;; FUNCTION and NAMED-LAMBDA
 
 ;;; `(NAMED-LAMBDA ,NAME ,@REST) is like `(FUNCTION (LAMBDA ,@REST)),
 ;;; except that the value of NAME is passed to the compiler for use in
