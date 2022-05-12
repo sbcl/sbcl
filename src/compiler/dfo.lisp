@@ -349,48 +349,39 @@
 ;;;
 ;;; We assign the DFO for each component, and delete any unreachable
 ;;; blocks. We assume that the FLAGS have already been cleared.
-(defun find-initial-dfo (toplevel-lambdas)
-  (declare (list toplevel-lambdas))
+;;;
+;;; We iterate over the lambdas in each initial component, trying
+;;; to put each function in its own component, but joining it to
+;;; an existing component if we find that there are references
+;;; between them. Any code that is left in an initial component
+;;; must be unreachable, so we can delete it. Stray links to the
+;;; initial component tail (due to NIL function terminated blocks)
+;;; are moved to the appropriate new component tail.
+(defun find-initial-dfo (top-level-lambdas)
+  (declare (list top-level-lambdas))
   (collect ((components))
-    ;; We iterate over the lambdas in each initial component, trying
-    ;; to put each function in its own component, but joining it to
-    ;; an existing component if we find that there are references
-    ;; between them. Any code that is left in an initial component
-    ;; must be unreachable, so we can delete it. Stray links to the
-    ;; initial component tail (due to NIL function terminated blocks)
-    ;; are moved to the appropriate new component tail.
-    (dolist (toplevel-lambda toplevel-lambdas)
-      (let* ((old-component (lambda-component toplevel-lambda))
-             (old-component-lambdas (component-lambdas old-component))
-             (new-component nil))
-        (aver (member toplevel-lambda old-component-lambdas))
-        (dolist (component-lambda old-component-lambdas)
-          (aver (member (functional-kind component-lambda)
-                        '(:optional :external :toplevel nil :escape
-                                    :cleanup)))
-          (unless new-component
-            (setf new-component (make-empty-component))
-            (setf (component-name new-component)
-                  ;; This isn't necessarily an ideal name for the
-                  ;; component, since it might end up with multiple
-                  ;; lambdas in it, not just this one, but it does
-                  ;; seem a better name than just "<unknown>".
-                  (leaf-debug-name component-lambda)))
-          (let ((res (dfo-scavenge-dependency-graph component-lambda
-                                                    new-component)))
-            (when (eq res new-component)
-              (aver (not (position new-component (components))))
-              (components new-component)
-              (setq new-component nil))))
-        (when (eq (component-kind old-component) :initial)
-          (aver (null (component-lambdas old-component)))
-          (let ((tail (component-tail old-component)))
+    (let ((new (make-empty-component)))
+      (dolist (initial-component (mapcar #'lambda-component top-level-lambdas))
+        (unless (eq (component-kind initial-component) :deleted)
+          (dolist (component-lambda (component-lambdas initial-component))
+            (aver (member (functional-kind component-lambda)
+                          '(:optional :external :toplevel nil :escape
+                            :cleanup)))
+            (let ((res (dfo-scavenge-dependency-graph component-lambda
+                                                      new)))
+              (when (eq res new)
+                (aver (not (member new (components))))
+                (components new)
+                (setq new (make-empty-component)))))
+          (aver (eq (component-kind initial-component) :initial))
+          (aver (null (component-lambdas initial-component)))
+          (let ((tail (component-tail initial-component)))
             (dolist (pred (block-pred tail))
               (let ((pred-component (block-component pred)))
-                (unless (eq pred-component old-component)
+                (unless (eq pred-component initial-component)
                   (unlink-blocks pred tail)
                   (link-blocks pred (component-tail pred-component))))))
-          (delete-component old-component))))
+          (delete-component initial-component))))
 
     ;; When we are done, we assign DFNs.
     (dolist (component (components))

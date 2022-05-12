@@ -256,3 +256,49 @@
                (eq (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'baz3))
                    (sb-kernel::fun-code-header (sb-kernel::%closure-fun #'foo3)))))
   (assert (null (ctu:find-named-callees #'baz3))))
+
+(with-test (:name :block-compile-top-level-closures.simple-fun-reference)
+  (ctu:file-compile
+   `((defun simple (chr)
+       (char<= #\0 chr #\9))
+
+     (let ((scanner 3))
+       (defun closure ()
+         (values #'simple (incf scanner)))))
+   :block-compile t
+   :load t)
+  ;; Closure can directly reference the simple fun for SIMPLE.
+  (assert (not (member #'simple (ctu:find-named-callees #'closure))))
+  (multiple-value-bind (val counter)
+      (closure)
+    (assert (eq val #'simple))
+    (assert (eq counter 4)))
+  (multiple-value-bind (val counter)
+      (closure)
+    (assert (eq val #'simple))
+    (assert (eq counter 5))))
+
+(with-test (:name :block-compile-top-level-closures.closure-fun-reference)
+  (ctu:file-compile
+   `((defun simple1 ()
+       #'closure1)
+
+     (let ((scanner 3))
+       (defun closure1 (char)
+         (values (char<= #\0 char #\9) (incf scanner)))))
+   :block-compile t
+   :load t)
+  ;; SIMPLE1 cannot directly reference the simple fun for CLOSURE1. It
+  ;; must go through the closure function object instead through the
+  ;; FDEFN. TODO: It might be worthwhile in the future to treat
+  ;; top-level closures as load time constants, so that we can
+  ;; reference the closure object directly, rather than go through the
+  ;; FDEFN.
+  (multiple-value-bind (val counter)
+      (funcall (simple1) #\a)
+    (assert (eq val nil))
+    (assert (eq counter 4)))
+  (multiple-value-bind (val counter)
+      (funcall (simple1) #\1)
+    (assert (eq val t))
+    (assert (eq counter 5))))
