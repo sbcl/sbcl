@@ -217,10 +217,9 @@
   ;; Test that we can call ourselves.
   (assert (= (self-call 9) 36)))
 
-(with-test (:name :block-compile-top-level-closures.self-call.local-calls
-            :fails-on :sbcl)
+(with-test (:name :block-compile-top-level-closures.self-call.local-calls)
   ;; Test that we can local call ourselves in the same environment despite
-  ;; being a top level closure. (Not implemented yet.)
+  ;; being a top level closure.
   (assert (not (member #'self-call (ctu:find-named-callees #'self-call)))))
 
 (with-test (:name :block-compile-top-level-closures.same-environment)
