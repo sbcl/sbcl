@@ -1,7 +1,8 @@
-// Not sure which headers ared really needed ...
+// Not sure which headers are really needed ...
 #include "thread.h"
 #include <sys/_types.h>
 #include <sys/ucontext.h>
+#include <pthread.h>
 
 #if __DARWIN_UNIX03
 #include <sys/_structs.h>
