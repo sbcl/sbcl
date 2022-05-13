@@ -2820,56 +2820,69 @@
                                          &key
                                          initial-value
                                          key
+                                         start
+                                         end
                                          &allow-other-keys))
-  (let (result)
-    (multiple-value-bind (fun-type name) (lvar-fun-type fun)
-      (when (fun-type-p fun-type)
-        (let ((initial-value-type (and initial-value
-                                       (lvar-type initial-value))))
-          ;; Calling the type deriver would be more universal, but
-          ;; type derivers expect a combination, but even then there's
-          ;; not a lot of standard functions which are usually used
-          ;; with REDUCE and which benefit from improved type
-          ;; derivation.
-          (when (eq name '+)
-            (let* ((sequence-type (lvar-type sequence))
-                   (element-type
-                     (cond ((and key
-                                 (multiple-value-bind (key-type name) (lvar-fun-type key)
-                                   (cond ((eq name 'identity)
-                                          nil)
-                                         ((fun-type-p key-type)
-                                          (single-value-type (fun-type-returns key-type)))
-                                         (t
-                                          *universal-type*)))))
-                           ((csubtypep sequence-type (specifier-type 'array))
-                            (array-type-upgraded-element-type sequence-type)))))
-
-              (when (and element-type
-                         (neq element-type *wild-type*))
-                (let* ((non-empty (typep (vector-type-length sequence-type) '(integer 1)))
-                       (identity-p (and (not initial-value)
-                                        (not non-empty))))
-                  (labels ((try (type)
-                             (let ((type (specifier-type type)))
-                               (when (csubtypep element-type type)
-                                 (setf result
-                                       (cond (identity-p
-                                              (type-union type
-                                                          (specifier-type '(eql 0))))
-                                             (initial-value
-                                              (let ((contagion (numeric-contagion type initial-value-type
-                                                                                  :rational nil
-                                                                                  :unsigned t)))
-                                                (if non-empty
-                                                    contagion
-                                                    (type-union contagion initial-value-type))))
-                                             (t
-                                              type)))))))
-                    (some #'try '(double-float single-float float unsigned-byte integer rational real)))))))
-          (unless result
-            (setf result (single-value-type (fun-type-returns fun-type)))
-            (if initial-value-type
-                (type-union result initial-value-type)
-                result)))))
-    result))
+  (multiple-value-bind (fun-type name) (lvar-fun-type fun)
+    (when (fun-type-p fun-type)
+      (let* ((initial-value-type (and initial-value
+                                      (lvar-type initial-value)))
+             (sequence-type (lvar-type sequence))
+             (element-type
+               (cond ((and key
+                           (multiple-value-bind (key-type name) (lvar-fun-type key)
+                             (cond ((eq name 'identity)
+                                    nil)
+                                   ((fun-type-p key-type)
+                                    (single-value-type (fun-type-returns key-type)))
+                                   (t
+                                    *universal-type*)))))
+                     ((csubtypep sequence-type (specifier-type 'array))
+                      (array-type-upgraded-element-type sequence-type))))
+             (end (if end
+                      (and (constant-lvar-p end)
+                           (or (lvar-value end)
+                               (vector-type-length sequence-type)))
+                      (vector-type-length sequence-type)))
+             (start (if start
+                        (and (constant-lvar-p start)
+                             (lvar-value start))
+                        0))
+             (length (and start end
+                          (- end start))))
+        ;; Calling the type deriver would be more universal, but
+        ;; type derivers expect a combination, but even then there's
+        ;; not a lot of standard functions which are usually used
+        ;; with REDUCE and which benefit from improved type
+        ;; derivation.
+        (or
+         (when (and (eq name '+)
+                    element-type
+                    (neq element-type *wild-type*)
+                    (neq element-type *universal-type*))
+           (let* ((non-empty (typep length '(integer 1)))
+                  (identity-p (and (not initial-value)
+                                   (not non-empty))))
+             (labels ((try (type)
+                        (let ((type (specifier-type type)))
+                          (when (csubtypep element-type type)
+                            (cond (identity-p
+                                   (type-union type
+                                               (specifier-type '(eql 0))))
+                                  (initial-value
+                                   (let ((contagion (numeric-contagion type initial-value-type
+                                                                       :rational nil
+                                                                       :unsigned t)))
+                                     (if non-empty
+                                         contagion
+                                         (type-union contagion initial-value-type))))
+                                  (t
+                                   type))))))
+               (some #'try '(double-float single-float float unsigned-byte integer rational real)))))
+         (let ((fun-result (single-value-type (fun-type-returns fun-type))))
+           (cond (initial-value-type
+                  (type-union initial-value-type fun-result))
+                 ((typep length '(integer 2))
+                  fun-result)
+                 (element-type
+                  (type-union fun-result element-type)))))))))
