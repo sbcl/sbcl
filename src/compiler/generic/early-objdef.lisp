@@ -290,6 +290,63 @@
   unused-array-widetag                      ;  F2   FD  EA   F5
 ))
 
+;;; Map each widetag symbol to a string to go in 'tagnames.h'.
+;;; I didn't want to mess with the formatting of the table above.
+(defparameter *widetag-string-alist*
+  `((bignum-widetag "bignum")
+    (ratio-widetag "ratio")
+    (single-float-widetag "sfloat")
+    (double-float-widetag "dfloat")
+    (complex-widetag "cplxnum")
+    (complex-single-float-widetag "cplx-sfloat")
+    (complex-double-float-widetag "cplx-dfloat")
+    (symbol-widetag "symbol")
+    (instance-widetag "instance")
+    (funcallable-instance-widetag "funinstance")
+    (simple-fun-widetag "simplefun")
+    (closure-widetag "closure")
+    (code-header-widetag "codeblob")
+    (return-pc-widetag "LRA")
+    (value-cell-widetag "value-cell")
+    (character-widetag "char")
+    (sap-widetag "sap")
+    (unbound-marker-widetag "unbound-marker")
+    (weak-pointer-widetag "weakptr")
+    (fdefn-widetag "fdefn")
+    (no-tls-value-marker-widetag "no-TLS-val")
+    (simd-pack-widetag "SIMD-pack")
+    (simd-pack-256-widetag "SIMD-pack256")
+    (filler-widetag "filler")
+    (simple-array-widetag "simple-array")
+    (simple-array-nil-widetag "simple-array-NIL")
+    (simple-vector-widetag "simple-vec")
+    (simple-bit-vector-widetag "simple-bit-vec")
+    (simple-array-fixnum-widetag "fixnum-vec")
+    (simple-array-unsigned-fixnum-widetag "Ufixnum-vec")
+    ;; Autogenerate the arrays. Not all values of N are used, but it's OK
+    ,@(loop for n in '("2" "4" "7" "8" "15" "16" "31" "32" "63" "64")
+            append `((,(symbolicate "SIMPLE-ARRAY-UNSIGNED-BYTE-" n "-WIDETAG")
+                      ,(concatenate 'string "UB" n "-vec"))
+                     (,(symbolicate "SIMPLE-ARRAY-SIGNED-BYTE-" n "-WIDETAG")
+                      ,(concatenate 'string "SB" n "-vec"))))
+    (simple-array-single-float-widetag "sfloat-vec")
+    (simple-array-double-float-widetag "dfloat-vec")
+    (simple-array-complex-single-float-widetag "cplx-sfloat-vec")
+    (simple-array-complex-double-float-widetag "cplx-dfloat-vec")
+    (simple-base-string-widetag "simple-base-str")
+    (simple-character-string-widetag "simple-char-str")
+    ;; I proposed on sbcl-devel some years ago to rename "complex" to "fancy"
+    ;; to avoid confusion with complex numbers. That never gained traction.
+    (complex-base-string-widetag "fancy-base-str")
+    (complex-character-string-widetag "fancy-char-str")
+    (complex-bit-vector-widetag "fancy-bit-vec")
+    (complex-vector-widetag "fancy-vec")
+    (complex-array-widetag "fancy-array")))
+
+(defun widetag-string-name (symbol)
+  ;; Asserting found
+  (the string (second (assoc symbol *widetag-string-alist*))))
+
 ;;; Check that INSTANCE and FUNCALLABLE-INSTANCE differ at exactly 1 bit.
 (eval-when (:compile-toplevel)
   #-64-bit (assert (= (logxor instance-widetag funcallable-instance-widetag)

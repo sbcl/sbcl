@@ -2122,19 +2122,31 @@ static void refine_ambiguous_roots()
         count = new_index;
     }
     gc_pin_count = count;
-#if 0
-    fprintf(stderr, "Sorted pin list (%d):\n", count);
-    for (index = 0; index < count; ++index) {
-      lispobj* obj = native_pointer(workspace[index]);
-      lispobj word = *obj;
-      int widetag = header_widetag(word);
-      if (is_header(word))
-          fprintf(stderr, "%p: %d words (%s)\n", obj,
-                  (int)sizetab[widetag](obj), widetag_names[widetag>>2]);
-      else
-          fprintf(stderr, "%p: (cons)\n", obj);
+    if (gencgc_verbose & 4) {
+        // Print in multiple columns to fit more on a screen
+        // and sort like 'ls' (down varying fastest)
+        char description[24];
+        fprintf(stderr, "Sorted pin list (%d):\n", count);
+        const int ncolumns = 4;
+        int nrows = ALIGN_UP(count,ncolumns) / ncolumns;
+        int row, col;
+        for (row = 0; row < nrows; ++row) {
+            for (col = 0; col < ncolumns; ++col) {
+                int index = col * nrows + row;
+                if (index < count) {
+                    lispobj* obj = native_pointer(workspace[index]);
+                    lispobj word = *obj;
+                    strcpy(description, "cons");
+                    if (is_header(word))
+                        snprintf(description, sizeof description, "%s,%ldw",
+                                 widetag_names[header_widetag(word)>>2],
+                                 (long)object_size(obj));
+                    fprintf(stderr, " %"OBJ_FMTX": %-24s", (uword_t)obj, description);
+                }
+            }
+            putc('\n', stderr);
+        }
     }
-#endif
 }
 
 /* After scavenging of the roots is done, we go back to the pinned objects

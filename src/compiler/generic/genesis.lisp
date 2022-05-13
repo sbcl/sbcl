@@ -3189,13 +3189,17 @@ Legal values for OFFSET are -4, -8, -12, ..."
                collect symbol into tags
                finally (return (sort tags #'< :key #'symbol-value))))
        (write-tags (visibility kind limit ash-count)
+         ;; KIND is the string "-LOWTAG" or "-WIDETAG"
          (format out "~%~Aconst char *~(~A~)_names[] = {~%"
                  visibility (subseq kind 1))
          (let ((tags (list-sorted-tags kind)))
            (dotimes (i limit)
-             (if (eql i (ash (or (symbol-value (first tags)) -1) ash-count))
-                 (format out "    \"~A\"" (pretty-name (pop tags) kind))
-                 (format out "    \"unknown [~D]\"" i))
+             (let ((known (eql i (ash (or (symbol-value (first tags)) -1) ash-count))))
+               (if known
+                   (if (string= kind "-WIDETAG")
+                       (format out "    ~S" (sb-vm::widetag-string-name (pop tags)))
+                       (format out "    \"~A\"" (pretty-name (pop tags) kind)))
+                   (format out "    \"unknown [~D]\"" i)))
              (unless (eql i (1- limit))
                (write-string "," out))
              (terpri out)))
