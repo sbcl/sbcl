@@ -137,9 +137,6 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 }
 
 int arch_os_thread_init(struct thread *thread) {
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-    mach_lisp_thread_init(thread);
-#elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us
      * we've exhausted it */
@@ -148,7 +145,6 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
     sigaltstack(&sigstack,0);
-#endif
     return 1;                  /* success */
 }
 
