@@ -48,11 +48,20 @@ jobs:
     - name: instal host clisp
       run: |
         sudo apt-get -qq update | true
-        sudo apt-get -qq install clisp
+        sudo apt-get -qq install clisp git-restore-mtime
     - name: build
       env:  
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
-      run: ./make.sh --xc-host='clisp -on-error exit'
+      run: |
+        git restore-mtime
+        ./make.sh --xc-host='clisp -on-error exit'
+    - name: archive clisp-xc fasls
+      run: tar --transform 's,^,clisp-host/,' -cf clisp-host-fasls.tgz obj/from-xc/
+    - name: upload clisp-xc archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: xc-host-fasls
+        path: clisp-host-fasls.tgz
     
   ccl:
 
@@ -95,11 +104,22 @@ jobs:
         wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/cmucl.tar.bz2
         tar xf cmucl.tar.bz2
         echo '(setf ext:*gc-verbose* nil)' > ~/.cmucl-init.lisp
+        sudo apt-get -qq update | true
+        sudo apt-get -qq install git-restore-mtime
       working-directory: /tmp/
     - name: build
       env:  
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
-      run: ./make.sh --xc-host='/tmp/cmucl/bin/lisp -batch'
+      run: |
+        git restore-mtime
+        ./make.sh --xc-host='/tmp/cmucl/bin/lisp -batch'
+    - name: archive cmucl-xc fasls
+      run: tar --transform 's,^,cmucl-host/,' -cf cmucl-host-fasls.tgz obj/from-xc/
+    - name: upload cmucl-xc archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: xc-host-fasls
+        path: cmucl-host-fasls.tgz
 
   sbcl:
 
@@ -130,7 +150,7 @@ jobs:
 
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [ccl, sbcl]
+    needs: [ccl, sbcl, cmucl, clisp]
 
     steps:
     - name: download xc-host fasls
@@ -141,5 +161,10 @@ jobs:
       run: |
         tar xf ccl-host-fasls.tgz
         tar xf sbcl-host-fasls.tgz
+        tar xf clisp-host-fasls.tgz
+        tar xf cmucl-host-fasls.tgz
     - name: compare xc-host fasls
-      run: diff -ur sbcl-host/ ccl-host/
+      run: |
+        diff -ur sbcl-host/ ccl-host/
+        diff -ur sbcl-host/ clisp-host/ || true
+        diff -ur sbcl-host/ cmucl-host/ || true
