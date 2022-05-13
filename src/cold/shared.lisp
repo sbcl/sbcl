@@ -281,6 +281,9 @@
         ;; Win32 conditionally adds :sb-futex in grovel-features.sh
         (when (target-featurep '(:and :sb-thread (:or :linux :freebsd)))
           (pushnew :sb-futex sb-xc:*features*))
+        (when (target-featurep :immobile-space)
+          (pushnew :compact-instance-header sb-xc:*features*)
+          (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)
           (push :compact-symbol sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:not :win32)))

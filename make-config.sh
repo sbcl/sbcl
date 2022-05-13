@@ -638,7 +638,7 @@ case "$sbcl_arch" in
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf # not mandatory
     case "$sbcl_os" in
     linux | darwin | *bsd)
-        printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
+        printf ' :immobile-space' >> $ltf
     esac
     ;;
   ppc)
