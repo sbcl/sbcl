@@ -85,7 +85,7 @@ gc_general_alloc(__attribute__((unused)) void* ignore,
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords) {
     return gc_copy_object(object, nwords, 0, 0);
 }
-lispobj  copy_possibly_large_object(lispobj object, sword_t nwords,
+lispobj  copy_potential_large_object(lispobj object, sword_t nwords,
                                     __attribute__((unused)) void* region,
                                     __attribute__((unused)) int page_type) {
     return gc_copy_object(object, nwords, 0, 0);

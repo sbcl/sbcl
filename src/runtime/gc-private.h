@@ -34,11 +34,11 @@ gc_general_alloc(struct alloc_region* region, sword_t nbytes, int page_type)
     }
     return collector_alloc_fallback(region, nbytes, page_type);
 }
-lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
+lispobj copy_potential_large_object(lispobj object, sword_t nwords,
                                    struct alloc_region*, int page_type);
 #else
 void *gc_general_alloc(void*,sword_t,int);
-lispobj copy_possibly_large_object(lispobj object, sword_t nwords,
+lispobj copy_potential_large_object(lispobj object, sword_t nwords,
                                    void*, int page_type);
 #endif
 

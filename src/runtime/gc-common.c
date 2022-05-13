@@ -364,15 +364,24 @@ trans_code(struct code *code)
     gc_dcheck(widetag_of(&code->header) == CODE_HEADER_WIDETAG);
 
     /* prepare to transport the code vector */
-    lispobj l_code = make_lispobj(code, OTHER_POINTER_LOWTAG);
-    lispobj l_new_code = copy_possibly_large_object(l_code,
-                                           code_total_nwords(code),
-                                           code_region, PAGE_TYPE_CODE);
-
-#ifdef LISP_FEATURE_GENCGC
-    if (l_new_code == l_code)
-        return code;
+    long nwords = code_total_nwords(code);
+#ifndef LISP_FEATURE_64_BIT
+    /* 32-bit can allocate large code to ordinary (small object) pages
+     * because it uses code regions larger than LARGE_OBJECT_SIZE.
+     * This makes large code accidentally fit into the region.
+     * We can correct that problem here by closing the code region.
+     * This is simpler than (or more abstract than) calling gc_alloc_large()
+     * because whatever post-copying actions gc_copy_object() performs,
+     * we still want, such as the NOTE_TRANSPORTING macro invocation */
+    long nbytes = nwords << WORD_SHIFT;
+    if (nbytes >= LARGE_OBJECT_SIZE && !page_single_obj_p(find_page_index(code)))
+        ensure_region_closed(code_region, PAGE_TYPE_CODE);
 #endif
+    lispobj l_code = make_lispobj(code, OTHER_POINTER_LOWTAG);
+    lispobj l_new_code
+        = copy_potential_large_object(l_code, nwords, code_region, PAGE_TYPE_CODE);
+
+    if (l_new_code == l_code) return code;
 
     set_forwarding_pointer((lispobj *)code, l_new_code);
 
@@ -716,7 +725,7 @@ scav_other_pointer(lispobj *where, lispobj object)
 
     // If the object was large, then instead of transporting it,
     // gencgc might simply promote the pages and return the same pointer.
-    // That decision is made in copy_possibly_large_object().
+    // That decision is made in copy_potential_large_object().
     if (copy != object) {
         set_forwarding_pointer(first_pointer, copy);
         *where = copy;
@@ -970,7 +979,7 @@ static sword_t scav_bignum(lispobj __attribute__((unused)) *where, lispobj heade
 static lispobj trans_bignum(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
-    return copy_possibly_large_object(object, bignum_nwords(*native_pointer(object)),
+    return copy_potential_large_object(object, bignum_nwords(*native_pointer(object)),
                                       unboxed_region, PAGE_TYPE_UNBOXED);
 }
 
@@ -1058,7 +1067,7 @@ trans_vector_t(lispobj object)
         page_type = PAGE_TYPE_UNBOXED, region = unboxed_region;
     else if (v->header & mask)
         page_type = PAGE_TYPE_SMALL_MIXED, region = small_mixed_region;
-    return copy_possibly_large_object(object, ALIGN_UP(length + 2, 2), region, page_type);
+    return copy_potential_large_object(object, ALIGN_UP(length + 2, 2), region, page_type);
 }
 
 static sword_t
@@ -1118,7 +1127,7 @@ static inline void check_shadow_bits(__attribute((unused)) lispobj* v) {
   static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
     sword_t length = vector_len(VECTOR(object)); \
-    return copy_possibly_large_object(object, ALIGN_UP(nwords + 2, 2), \
+    return copy_potential_large_object(object, ALIGN_UP(nwords + 2, 2), \
                              SPECIALIZED_VECTOR_ARGS); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \

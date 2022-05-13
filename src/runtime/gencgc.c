@@ -1601,7 +1601,7 @@ void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int 
  * Possibly assign different 'gen' and 'allocated' values.
  *
  * maybe_adjust_large_object() specifies 'from_space' for 'new_gen'
- * and copy_possibly_large_object() specifies 'new_space'
+ * and copy_potential_large_object() specifies 'new_space'
  */
 
 static uword_t adjust_obj_ptes(page_index_t first_page,
@@ -1732,7 +1732,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
  *
  */
 lispobj
-copy_possibly_large_object(lispobj object, sword_t nwords,
+copy_potential_large_object(lispobj object, sword_t nwords,
                            struct alloc_region* region, int page_type)
 {
     page_index_t first_page;
@@ -3258,7 +3258,7 @@ scavenge_newspace(generation_index_t generation)
  * Thence:
  *   - scavenge_newspace_full_scan visits page 1000
  *   - assigns 'record_new_regions_below' = 1001
- *   - traces slots of FOO, calls copy_possibly_large_object(v)
+ *   - traces slots of FOO, calls copy_potential_large_object(v)
  *   - 'v' is promoted into gen3
  *   - call add_new_area on page 1300..1305
  *   - 1300 exceeds 1001 so we skip this area
