@@ -484,8 +484,7 @@
                               (pathname-type (compile-file-pathname stem)))))
         (:target-compile
          (values *target-obj-prefix*
-                 (cond ((find :extra-artifact flags) "")
-                       ((find :assem flags) *target-assem-obj-suffix*)
+                 (cond ((find :assem flags) *target-assem-obj-suffix*)
                        (t *target-obj-suffix*)))))
     (concatenate 'string obj-prefix (stem-remap-target stem) obj-suffix)))
 (compile 'stem-object-path)
