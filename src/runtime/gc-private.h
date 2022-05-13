@@ -64,7 +64,65 @@ void really_note_transporting(lispobj old,void*new,sword_t nwords);
 #define NOTE_TRANSPORTING(old, new, nwords) /* do nothing */
 #endif
 
+/* Translate a possibly-taggged pointer to its coordinates
+ * in the bitmap. Object indices in the bitmap are negative:
+ *   -1 = DYNAMIC_SPACE_START
+ *   -2 = DYNAMIC_SPACE_START + 1 cons
+ * etc
+ * Bits in a word of the bitmap are filled MSB to LSB. It's seemingly
+ * opposite the natural convention, but a consequence of using
+ * negative numbers as indices.
+ * Right-shifting a negative is "implementation-dependent"
+ * but does exactly what we want. */
+static inline int addr_to_bitmap_coordinates(char* addr, long* word_index)
+{
+    sword_t offset = DYNAMIC_SPACE_START - 1 - (uword_t)addr;
+    offset >>= N_LOWTAG_BITS;
+#ifdef LISP_FEATURE_64_BIT
+    *word_index = offset >> 6; /// word index
+    return offset & 0x3f; // bit index
+#else
+    *word_index = offset >> 5;
+    return offset & 0x1f;
+#endif
+}
+
+/* On MIXED pages, we use 1 bit per cons-cell-sized allocation "quantum"  to record
+ * that the cell is in use. There are 2*N_WORD_BITS in a cell, and 1 bit of overhead
+ * for the allocator bitmap, so the value 1/(2*N_WORD_BITS) is the ratio of
+ * data bits to overhead bits.
+ * (It looks like - but is not to be confused with - the CONS page bitmap)
+ * The 1/N value is a scale factor - it applies to bits, bytes or words. Therefore,
+ * we can take the number of bytes per page and multiply by the factor to compute
+ * the number of bytes in the allocator bitmap for that page */
+#define allocator_bitmap ((uword_t*)gc_card_mark)
+#define ALLOCATOR_BITMAP_BYTES_PER_PAGE (int)(GENCGC_PAGE_BYTES/(2*N_WORD_BITS))
+#define ALLOCATOR_BITMAP_WORDS_PER_PAGE (ALLOCATOR_BITMAP_BYTES_PER_PAGE/N_WORD_BYTES)
+
+static inline boolean allocator_bitmap_bit(void* obj)
+{
+    long word_index;
+    int bit_index = addr_to_bitmap_coordinates(obj, &word_index);
+    uword_t word = allocator_bitmap[word_index];
+    return (word >> bit_index) & 1;
+}
+static inline void set_allocator_bitmap_bit(void* obj)
+{
+    long word_index;
+    int bit_index = addr_to_bitmap_coordinates(obj, &word_index);
+    allocator_bitmap[word_index] |= (uword_t)1 << bit_index;
+}
+static inline void clear_allocator_bitmap_bit(void* obj)
+{
+    long word_index;
+    int bit_index = addr_to_bitmap_coordinates(obj, &word_index);
+    allocator_bitmap[word_index] &= ~((uword_t)1 << bit_index);
+}
+
 extern uword_t gc_copied_nwords;
+// what about PAGE_TYPE_UNBOXED ?
+#define page_type_has_objmap(x) (x == PAGE_TYPE_MIXED || x == PAGE_TYPE_SMALL_MIXED)
+
 static inline lispobj
 gc_copy_object(lispobj object, size_t nwords, void* region, int page_type)
 {
@@ -75,7 +133,8 @@ gc_copy_object(lispobj object, size_t nwords, void* region, int page_type)
     NOTE_TRANSPORTING(object, new,  nwords);
 
     /* Copy the object. */
-    memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
+    memcpy(new, native_pointer(object), nwords*N_WORD_BYTES);
+    if (page_type_has_objmap(page_type)) set_allocator_bitmap_bit(new);
 
     return make_lispobj(new, lowtag_of(object));
 }
@@ -90,6 +149,7 @@ gc_copy_object_resizing(lispobj object, long nwords, void* region, int page_type
     lispobj *new = gc_general_alloc(region, nwords*N_WORD_BYTES, page_type);
     NOTE_TRANSPORTING(object, new, old_nwords);
     memcpy(new, native_pointer(object), old_nwords*N_WORD_BYTES);
+    if (page_type_has_objmap(page_type)) set_allocator_bitmap_bit(new);
     return make_lispobj(new, lowtag_of(object));
 }
 

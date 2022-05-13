@@ -128,10 +128,10 @@ boolean gencgc_verbose = 0;
 /* We hunt for pointers to old-space, when GCing generations >= verify_gen.
  * Set verify_gens to HIGHEST_NORMAL_GENERATION + 2 to disable this kind of
  * check. */
-generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
+generation_index_t verify_gens = 0;//HIGHEST_NORMAL_GENERATION + 2;
 
 /* Should we do a pre-scan of the heap before it's GCed? */
-boolean pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
+boolean pre_verify_gen_0 = 1; // FIXME: should be named 'pre_verify_gc'
 
 
 /*
@@ -255,42 +255,23 @@ page_ends_contiguous_block_p(page_index_t page_index,
     return answer;
 }
 
-static inline int addr_to_bitmap_index(char* addr, long* word_index)
-{
-    // Object indices in the bitmap are negative:
-    //   -1 = DYNAMIC_SPACE_START
-    //   -2 = DYNAMIC_SPACE_START + 1 cons
-    // etc
-    // right-shifting a negative is "implementation-dependent"
-    // but does exactly what we want.
-    sword_t offset = DYNAMIC_SPACE_START - 1 - (uword_t)addr;
-    offset >>= N_LOWTAG_BITS;
-#ifdef LISP_FEATURE_64_BIT
-    *word_index = offset >> 6; /// word index
-    return offset & 0x3f; // bit index
-#else
-    *word_index = offset >> 5;
-    return offset & 0x1f;
-#endif
+void gc_show_objmap(page_index_t page) {
+    long wordindex;
+    addr_to_bitmap_coordinates(page_address(page), &wordindex);
+    fprintf(stderr, "page %ld bitmap @ %p:", page, allocator_bitmap+wordindex);
+    int i;
+    for(i=0; i<ALLOCATOR_BITMAP_WORDS_PER_PAGE; ++i, --wordindex)
+        fprintf(stderr, " %lx", allocator_bitmap[wordindex]);
+    fprintf(stderr,"\n");
 }
-
-static boolean allocator_bitmap_bit(lispobj* obj)
-{
-    long word_index;
-    int bit_index = addr_to_bitmap_index((char*)obj, &word_index);
-    uword_t word = ((uword_t*)gc_card_mark)[word_index];
-    return (word >> bit_index) & 1;
+boolean gc_objmap_anyset(page_index_t page) {
+    long wordindex;
+    addr_to_bitmap_coordinates(page_address(page), &wordindex);
+    int i;
+    for(i=0; i<ALLOCATOR_BITMAP_WORDS_PER_PAGE; ++i, --wordindex)
+        if (allocator_bitmap[wordindex]) return 1;
+    return 0;
 }
-
-/* On MIXED pages, we use 1 bit per cons-cell-sized allocation "quantum"  to record
- * that the cell is in use. There are 2*N_WORD_BITS in a cell, and 1 bit of overhead
- * for the allocator bitmap, so the value 1/(2*N_WORD_BITS) is the ratio of
- * data bits to overhead bits.
- * (It looks like - but is not to be confused with - the CONS page bitmap)
- * The 1/N value is a scale factor - it applies to bits, bytes or words. Therefore,
- * we can take the number of bytes per page and multiply by the factor to compute
- * the number of bytes in the allocator bitmap for that page */
-#define ALLOCATOR_BITMAP_BYTES_PER_PAGE GENCGC_PAGE_BYTES/(2*N_WORD_BITS)
 
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
  * scan_start of zero, to optimize page_ends_contiguous_block_p().
@@ -305,19 +286,37 @@ static boolean allocator_bitmap_bit(lispobj* obj)
  * - shrinking a large object
  * - freeing oldspace
  */
+#define PAGE_INDEX_FMT PRIdPTR
 static void reset_page_flags(page_index_t page) {
     int type = page_table[page].type;
-    if (type == PAGE_TYPE_MIXED || type == PAGE_TYPE_SMALL_MIXED) {
-        long bitmap_word_index;
+    long bitmap_word_index;
+    switch (type) {
+    case PAGE_TYPE_THREAD_MIXED:
+    case PAGE_TYPE_MIXED:
+    case PAGE_TYPE_SMALL_MIXED:
         /* The higher the address, the lower the bitmap word index.
          * So take the index of the end, and clear from there up. */
-        addr_to_bitmap_index(page_address(page)+GENCGC_CARD_BYTES-1, &bitmap_word_index);
-        uword_t* bitmap = (uword_t*)gc_card_mark + bitmap_word_index;
-        memset(bitmap, 0, ALLOCATOR_BITMAP_BYTES_PER_PAGE);
+        addr_to_bitmap_coordinates(page_address(page)+GENCGC_PAGE_BYTES-1, &bitmap_word_index);
+        memset(&allocator_bitmap[bitmap_word_index], 0, ALLOCATOR_BITMAP_BYTES_PER_PAGE);
+        break;
+    case SINGLE_OBJECT_FLAG | PAGE_TYPE_MIXED:
+        /* The VAR-ALLOC and ALLOCATE-VECTOR-ON-HEAP vops don't know NOT to set a bit
+         * in the allocator bitmap for large objects. So we clear that bit
+         * for the first page of the large object */
+        if (!page_table[page].scan_start_offset_) {
+            addr_to_bitmap_coordinates(page_address(page), &bitmap_word_index);
+            if (allocator_bitmap_bit(page_address(page))) fprintf(stderr, "largeobj on page %p had bitmap bit\n", page_address(page));
+            ((uword_t*)gc_card_mark)[bitmap_word_index] = 0;
+        }
+        break;
     }
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
     page_table[page].pinned = 0;
+    if (gc_objmap_anyset(page)) {
+      fprintf(stderr, "reset page flags on type %d, bitmap not empty\n", type);
+    }
+    gc_assert(!gc_objmap_anyset(page)); // XXX: too slow
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
     //    page_table[page].gen = 0;
     // Free pages are dirty (MARKED) because MARKED is equivalent
@@ -476,8 +475,6 @@ generation_average_age(generation_index_t gen_index)
 extern void fpu_save(void *);
 extern void fpu_restore(void *);
 #endif
-
-#define PAGE_INDEX_FMT PRIdPTR
 
 // You can call this with 0 and NULL to perform its assertions silently
 void gc_gen_report_to_file(int filedes, FILE *file)
@@ -1146,6 +1143,14 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         }
     }
 #endif
+    page_index_t page = find_page_index(alloc_region->start_addr);
+    page_index_t last = find_page_index(-1+(char*)alloc_region->end_addr);
+    //fprintf(stderr, "opened new region %p..%p p%ld..%ld type %d\n", alloc_region->start_addr, alloc_region->end_addr, page, last, page_type);
+    if (page_type == PAGE_TYPE_THREAD_MIXED || page_type_has_objmap(page_type)) {
+        // Should check no bits on above the free pointer
+    } else {
+        for (; page <= last; ++page) gc_assert(!gc_objmap_anyset(page));
+    }
     return alloc_region->free_pointer;
 }
 
@@ -1413,6 +1418,10 @@ gc_alloc_large(sword_t nbytes, int page_type_arg, struct alloc_region *alloc_reg
     }
 #endif
 
+    {
+    page_index_t page;
+    for (page=first_page; page<=last_page; ++page) gc_assert(!gc_objmap_anyset(page));
+    }
     return addr;
 }
 
@@ -1985,12 +1994,15 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         return 0;
     }
 
-#ifdef LISP_FEATURE_X86_64
+    // Use the legacy conservative_root_p logic for now
+
+#if 0 // def LISP_FEATURE_EDEN_PAGES
     // - Boxed objects won't have random bytes that masquerade as object headers,
     //   therefore any object header will demarcate an object start.
     // - Conses can only appear on dedicated pages.
+    // - Mixed pages require a valid header *and* a bit in the object header map.
     //
-    // For eden pages we don't check pages_bytes_used because the whole page
+    // For thread pages we don't check pages_bytes_used because the whole page
     // is prefilled with a recognizable value.
     // Pages allocated by GC don't prefill, so we do check bytes_used.
     //
@@ -1998,24 +2010,34 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
     // assigned prior to filling with the empty pattern. It needs to be flipped.
     int lowtag = lowtag_of(addr);
     int page_type = page_table[addr_page_index].type;
-    lispobj word;
-    // Don't look at single-object pages, let that get handled below.
-    switch (page_type & (SINGLE_OBJECT_FLAG | PRIMARY_TYPE_MASK)) {
-    case PAGE_TYPE_BOXED:
-        if (lowtag != 0
-            && is_header(word = *native_pointer(addr))
-            && lowtag == LOWTAG_FOR_WIDETAG(header_widetag(word))
-            && (page_type == PAGE_TYPE_THREAD_BOXED ||
-                (addr & (GENCGC_PAGE_BYTES-1)) < page_bytes_used(addr_page_index)))
-            return addr;
-        return 0;
+    lispobj word = *native_pointer(addr);
+    // Single-object pages where already handled.
+    switch (page_type & PAGE_TYPE_MASK) {
+    case PAGE_TYPE_THREAD_CONS:
     case PAGE_TYPE_CONS:
         if (lowtag == LIST_POINTER_LOWTAG
             && (addr & (GENCGC_PAGE_BYTES-1)) < (page_type == PAGE_TYPE_THREAD_CONS
                                                  ? CONS_PAGE_USABLE_BYTES
                                                  : page_bytes_used(addr_page_index))
-            && CONS(addr)->car != ~(uword_t)0
-            && CONS(addr)->cdr != ~(uword_t)0)
+            && word != ~(uword_t)0)
+            return addr;
+        return 0;
+    case PAGE_TYPE_THREAD_BOXED:
+    case PAGE_TYPE_BOXED:
+        if (is_header(word)
+            && lowtag == LOWTAG_FOR_WIDETAG(header_widetag(word))
+            && (page_type == PAGE_TYPE_THREAD_BOXED ||
+                (addr & (GENCGC_PAGE_BYTES-1)) < page_bytes_used(addr_page_index)))
+            return addr;
+        return 0;
+    case PAGE_TYPE_THREAD_MIXED:
+    case PAGE_TYPE_MIXED:
+    case PAGE_TYPE_SMALL_MIXED:
+        // Newly opened regions have the allocator bitmap entirely cleared,
+        // therefore a 1 bit demarcates a good object. But we have to confirm
+        // that the candidate pointer is tagged correctly.
+        if (allocator_bitmap_bit((char*)addr) &&
+            lowtag == LOWTAG_FOR_WIDETAG(header_widetag(word)))
             return addr;
         return 0;
     }
@@ -2181,7 +2203,8 @@ static void refine_ambiguous_roots()
     int removed = 0;
     for (index = 0 ; index < count ; ++index) {
         lispobj* key = native_pointer(workspace[index]);
-        lispobj* scan_start = page_scan_start(find_page_index(key));
+        page_index_t key_page = find_page_index(key);
+        lispobj* scan_start = page_scan_start(key_page);
         if (scan_start != previous_scan_start) where = previous_scan_start = scan_start;
         /* Scan forward from 'where'. This does not need a termination test based
          * on page_bytes_used because we know that 'key' was in-bounds for its page.
@@ -2192,6 +2215,13 @@ static void refine_ambiguous_roots()
             if (where < key) {
                 where += OBJECT_SIZE(*where, where);
             } else if (where == key) {
+                // The object won't get copied. If it's on a THREAD_BOXED page,
+                // that page will get turned into MIXED, and therefore will need
+                // a bit in the allocator bitmap.
+                if (page_table[key_page].type == PAGE_TYPE_THREAD_BOXED) {
+                    // fprintf(stderr, "root refinement: %p (%s)\n", key, widetag_names[widetag_of(key)>>2]);
+                    set_allocator_bitmap_bit(key);
+                }
                 break;
             } else { // 'where' went past the key, so the key is bad
                 workspace[index] = 0;
@@ -2222,10 +2252,10 @@ static void refine_ambiguous_roots()
         if (is_header(word)) {
             int words = (int)sizetab[widetag](obj);
             totwords += words;
-            n = snprintf(buf, sizeof buf, "%p: %d words (%s)\n", obj, words, widetag_names[widetag>>2]);
+            n = snprintf(buf, sizeof buf, "%p: %dw (%s)\n", obj, words, widetag_names[widetag>>2]);
         } else {
             totwords += 2;
-            n = snprintf(buf, sizeof buf, "%p: (cons)\n", obj);
+            n = snprintf(buf, sizeof buf, "%p: 2w\n", obj);
         }
         write(2, buf, n);
     }
@@ -2337,65 +2367,81 @@ void visit_freed_objects(char __attribute__((unused)) *start,
 #endif
 }
 
-void deposit_filler(uword_t addr, sword_t nbytes) {
+/* Translate 'from' and 'to' into coordinates in the allocator bitmap in 'bitmap'
+ * and clear all bits between those coordinates.
+ * This function is exposed to Lisp for testing */
+void clear_object_bitmap_range(uword_t* bitmap, char* from, char *to)
+{
+    // FIXME: use better algorithm a la (FILL (the simple-bit-vector ...) 0)
+    // but it's brain-hurty by negative indices.
+    struct cons* where = (void*)from;
+    while ((char*)where < to) {
+        clear_allocator_bitmap_bit(where);
+        ++where;
+    }
+    /*
+    int from_bit, to_bit;
+    long from_word, to_word;
+    from_bit = addr_to_bitmap_index(from, &from_word);
+    to_bit = addr_to_bitmap_index(to-1, &to_word);
+    */
+}
+
+/* Deposit a FILLER_WIDETAG object covering one or more dead objects.
+ * If using more than 1 card per page, scavenge_root_gens() is able to scan
+ * some pages without aligning to object boundaries. For that to work,
+ * it must not accidentally see a raw word or leftover garbage.
+ * Note that while CONS and SMALL_MIXED pages never have card-spanning objects,
+ * deposit_filler() deals with the "mirror image" of the pinned objects,
+ * hence it might get a card-spanning filler. It has to do something to ensure
+ * that no card will see garbage if scanned from its base address.
+ * To achieve that, an extra filler may be needed at the start of any spanned card.
+ * The sizes of extra fillers don't have to sum up to the total filler size.
+ * They serve the vital purpose of getting descriptors_scavenge() to skip a
+ * portion of the card they're on, but those fillers are never visited in a
+ * heap walk that steps by object from a page's page_scan_start.
+ * The final filler must be the correct size, so any algorithm that achieves
+ * the desired end result is OK */
+void deposit_filler(char* from, char* to) {
+    sword_t nbytes = to - from;
     if (!nbytes) return;
     gc_assert(nbytes > 0);
     sword_t nwords = nbytes >> WORD_SHIFT;
-    visit_freed_objects((char*)addr, nbytes);
     gc_assert((nwords - 1) <= 0x7FFFFF);
-    page_index_t page = find_page_index((void*)addr);
-#ifdef LISP_FEATURE_X86_64
-    gc_assert(!(page_table[page].type & OPEN_REGION_PAGE_FLAG));
+    page_index_t page = find_page_index(from);
+    gc_assert(find_page_index(to-1) == page);
+    //fprintf(stderr, "deposit_filler(%p,%p) pg %ld type %d\n", from, to, page, page_table[page].type);
+#ifdef LISP_FEATURE_EDEN_PAGES
+    /* With eden pages, we read a word at any putative object base address
+     * to see whether it's really an object. For that test to correctly fail
+     * on dead objects, the words have to be cleared in a manner particular
+     * to the page type */
     switch (page_table[page].type) {
     case PAGE_TYPE_CONS:
-    case PAGE_TYPE_THREAD_CONS:
-        memset((char*)addr, 0xff, nbytes);
-        return;
-    case PAGE_TYPE_BOXED:
-    case PAGE_TYPE_THREAD_BOXED:
-        // Clear it, but also deposit a filler header, satisfying two objectives:
-        // 1. conservative_root_p sees invalid headers everywhere
-        // 2. page-walking skips the range most quickly as 1 pseudo-object
-        //    rather than as a sequence of conse
-        memset((char*)addr, 0, nbytes);
-        *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
-        return;
-    case PAGE_TYPE_SMALL_MIXED: // fall into the non-x86-64 code
+        memset(from, 0xff, nbytes);
         break;
-    default:
-        *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
-        return;
+    case PAGE_TYPE_BOXED:
+        memset(from, 0, nbytes);
+        break;
+    case PAGE_TYPE_MIXED:
+    case PAGE_TYPE_SMALL_MIXED:
+        // The allocator bitmap needs to be cleared, and then we do the regular
+        // filler-insertion logic.
+        clear_object_bitmap_range(allocator_bitmap, from, to);
+        break;
     }
 #endif
-    *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
-    // - MIXED does not need this because we always scan by object
-    // - SMALL_MIXED does because obliterate_nonpinned_words() uses as
-    //   few fillers as it can to cover all non-live ranges on a page.
-    if (page_table[page].type == PAGE_TYPE_BOXED ||
-        page_table[page].type == PAGE_TYPE_CONS ||
-        page_table[page].type == PAGE_TYPE_SMALL_MIXED) {
-        /* Strictly boxed cards are scanned without respect to object boundaries,
-         * so we might need to clobber all pointers that formerly occupied the bytes.
-         * If the range falls within 1 card, then we don't need to clear anything,
-         * because the scanning routine can see the filler object and skip over it. */
-        char* limit = (char*)addr + nbytes;
-        if (find_page_index(limit-1) == page) { // single page
-            long unsigned last_card = addr_to_card_index(limit-1);
-            /* Within 1 page, put fillers at the start of each card.
-             * The sizes of the extra fillers don't have to sum up to the total size,
-             * because although they serve the vital purpose of getting descriptors_scavenge()
-             * to skip the the leading portion of the card they're on, those pseudo-objects
-             * can never be visited in a normal heap walk. The final filler has to be the
-             * correct size, so any algorithm that achieves that is fine */
-            while (addr_to_card_index((char*)addr) != last_card) {
-                addr = ALIGN_DOWN(addr, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
-                nwords = (limit - (char*)addr) >> WORD_SHIFT;
-                *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
-            }
-        } else {
-            /* If more than 1 page, just do the obvious thing - zeroize all the words.
-             * I've never seen this case happen, so it's not worth optimizing for */
-            memset((char*)addr+N_WORD_BYTES, 0, nbytes-N_WORD_BYTES);
+    *(lispobj*)from = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    long unsigned last_card;
+    switch (page_table[page].type) {
+    case PAGE_TYPE_BOXED:
+    case PAGE_TYPE_CONS:
+    case PAGE_TYPE_SMALL_MIXED:
+        last_card = addr_to_card_index(to-1);
+        while (addr_to_card_index(from) != last_card) {
+            from = PTR_ALIGN_DOWN(from, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
+            nwords = (to - from) >> WORD_SHIFT;
+            *(lispobj*)from = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
         }
     }
 }
@@ -2434,9 +2480,11 @@ static void obliterate_nonpinned_words()
     for (i = 0; i < n_pins; ++i) {
         lispobj* obj = native_pointer(keys[i]);
         page_index_t begin_page_index = find_page_index(obj);
+        gc_assert(!(page_table[begin_page_index].type &
+                    (OPEN_REGION_PAGE_FLAG | SINGLE_OBJECT_FLAG | THREAD_PAGE_FLAG)));
         // Create a filler object occupying space from 'fill_from' up to but
-        // excluding 'obj'. If obj directly abuts its predecessor then don't.
-        deposit_filler(fill_from, (uword_t)obj - fill_from);
+        // excluding 'obj'.
+        deposit_filler((char*)fill_from, (char*)obj);
         if (fill_from == page_base((uword_t)obj)) {
             adjust_gen_usage(begin_page_index);
             // This pinned object started a new page of pins.
@@ -2464,14 +2512,14 @@ static void obliterate_nonpinned_words()
         uword_t obj_end_pageaddr = page_base(obj_end - 1);
         // See if there's another pinned object on this page.
         // There is always a next object, due to the sentinel.
-        if ((uword_t)native_pointer(keys[i+1]) < obj_end_pageaddr + GENCGC_PAGE_BYTES) {
+        if (keys[i+1] < obj_end_pageaddr + GENCGC_PAGE_BYTES) {
             // Next object starts within the same page.
             fill_from = obj_end;
         } else {
             // Next pinned object does not start on the same page this obj ends on.
             // Any bytes following 'obj' up to its page end are garbage.
-            uword_t page_end = obj_end_pageaddr + page_bytes_used(end_page_index);
-            deposit_filler(obj_end, page_end - obj_end);
+            deposit_filler((char*)obj_end,
+                           (char*)obj_end_pageaddr + page_bytes_used(end_page_index));
             fill_from = page_base(keys[i+1]);
         }
     }
@@ -3473,10 +3521,6 @@ free_oldspace(void)
             set_page_bytes_used(last_page, 0);
             last_page++;
         } while (!page_ends_contiguous_block_p(last_page-1, from_space));
-        /* first_page to last_page (exclusive) can now be scanned
-         * for deleted objects if we wish*/
-        uword_t nbytes =  npage_bytes(last_page-first_page-1) + last_page_bytes;
-        visit_freed_objects(page_address(first_page), nbytes);
         first_page = last_page;
     } while (first_page < next_free_page);
 
@@ -3654,11 +3698,12 @@ move_pinned_pages_to_newspace()
 
     for (i = 0; i < next_free_page; i++) {
         int type = page_table[i].type;
+        // THREAD_CONS becomes CONS
+        // THREAD_CODE becomes CODE
+        // THREAD_BOXED and THREAD_MIXED become MIXED
         if (type & THREAD_PAGE_FLAG)
             page_table[i].type =
-                type == PAGE_TYPE_THREAD_CONS ? PAGE_TYPE_CONS :
-                type == PAGE_TYPE_THREAD_CODE ? PAGE_TYPE_CODE :
-                PAGE_TYPE_MIXED;
+                type == PAGE_TYPE_THREAD_BOXED ? PAGE_TYPE_MIXED : type & ~THREAD_PAGE_FLAG;
         /* 'pinned' is cleared lazily, so test the 'gen' field as well. */
         if (page_table[i].gen == from_space && page_table[i].pinned &&
             (page_single_obj_p(i) || (is_code(type) && pin_all_dynamic_space_code))) {
@@ -3937,58 +3982,6 @@ __attribute__((unused)) static void check_contiguity()
         while (!page_ends_contiguous_block_p(last, page_table[first].gen)) ++last;
         first = last + 1;
       }
-}
-
-uword_t count_eden_objects(lispobj* where, lispobj* end, uword_t arg)
-{
-    page_index_t p = find_page_index(where);
-    if (page_table[p].type == PAGE_TYPE_THREAD_MIXED) {
-        int* histo = (void*)arg;
-        while (where < end) {
-            int tag = widetag_of(where);
-            if (tag != 0) {
-                histo[tag>>2]++;
-                if (tag != FILLER_WIDETAG && !allocator_bitmap_bit(where)) {
-                    histo[0] = 1; // lossage
-                    fprintf(stderr, "obj @ %p (%s) missing bit, index %ld\n",
-                            where, widetag_names[widetag_of(where)>>2],
-                            ((uword_t)where-DYNAMIC_SPACE_START)/16);
-                }
-            }
-            where += OBJECT_SIZE(*where, where);
-        }
-    }
-    return 0;
-}
-
-static void thread_mixed_page_histo()
-{
-    int histo[64];
-    memset(histo, 0, sizeof histo);
-    walk_generation(count_eden_objects, 0, (uword_t)histo);
-    int i;
-    fprintf(stderr, "Mixed-page Histogram:\n");
-    for (i=0; i<64; ++i) {
-        if (histo[i]) fprintf(stderr,  "  %2x %7d %s\n", i<<2, histo[i], widetag_names[i]);
-    }
-    if (histo[0]) {
-      uword_t* gc_header_map = (void*)gc_card_mark;
-      fprintf(stderr,"Bitmap scan\n");
-      long wordindex=-1;
-      long i;
-      lispobj* where = (void*)DYNAMIC_SPACE_START;
-      for (i=0; i<header_bitmap_nwords; ++i, --wordindex) {
-        uword_t word = gc_header_map[wordindex];
-        if (word) {
-            uword_t mask = 1;
-            for (mask = 0x8000000000000000; mask; mask >>= 1, where += 2)
-                if (word & mask) { fprintf(stderr, "%p\n", where); }
-        } else {
-            where += 2*N_WORD_BITS;
-        }
-      }
-      ldb_monitor("Incomplete bitmap");
-    }
 }
 
 int show_gc_generation_throughput = 0;
@@ -4575,6 +4568,8 @@ void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 collect_garbage(generation_index_t last_gen)
 {
     ++n_gcs;
+    // fprintf(stderr, "Enter collect_garbage(%d). Backtrace:\n");
+    // backtrace_from_fp(__builtin_frame_address(0), 20, 0);
     THREAD_JIT(0);
     generation_index_t gen = 0, i;
     boolean gc_mark_only = 0;
@@ -4628,12 +4623,10 @@ collect_garbage(generation_index_t last_gen)
     update_immobile_nursery_bits();
 
     /* Verify the new objects created by Lisp code. */
-    if (pre_verify_gen_0)
-        verify_heap(VERIFY_PRE_GC);
+    if (pre_verify_gen_0) verify_heap(VERIFY_PRE_GC);
 
     if (gencgc_verbose > 1) {
         print_generation_stats();
-        thread_mixed_page_histo();
     }
 
     if (gc_mark_only) {
@@ -4810,10 +4803,6 @@ collect_garbage(generation_index_t last_gen)
         finalizer_thread_runflag = newval ? newval : 1;
     }
     THREAD_JIT(1);
-    // FOR TESTING ONLY - clear all bits in the allocator bitmap
-    uword_t nbytes = header_bitmap_nwords<<WORD_SHIFT;
-    unsigned char *clear_from = gc_card_mark - nbytes;
-    memset(clear_from, 0, nbytes);
 }
 
 /* Initialization of gencgc metadata is split into two steps:
@@ -4931,6 +4920,8 @@ void gc_allocate_ptes()
     header_bitmap_nwords = ALIGN_UP(n_conses,N_WORD_BITS) / N_WORD_BITS;
     long header_bitmap_nbytes = header_bitmap_nwords * N_WORD_BYTES;
     unsigned char * tables = successful_malloc(header_bitmap_nbytes + num_gc_cards);
+    //unsigned char* tables = mmap((void*)0xe0000000, header_bitmap_nbytes + num_gc_cards, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);
+    //fprintf(stderr, "tables @ %p\n", tables);
     memset(tables, 0, header_bitmap_nbytes);
     gc_card_mark = tables + header_bitmap_nbytes;
     /* The mark array used to work "by accident" if the numeric value of CARD_MARKED
@@ -5079,15 +5070,20 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
             if (remaining <= CONS_SIZE * N_WORD_BYTES) { // Refill now if <= 1 more cons to go
                 gc_close_region(region, page_type);
                 // Request > 2 words, forcing a new page to be claimed.
+                // char msg[] = "fallback allocator refreshing cons region\n"; write(2,msg,sizeof msg-1);
                 gc_alloc_new_region(4 * N_WORD_BYTES, page_type, region, 0); // don't release
             }
             ret = mutex_release(&free_pages_lock);
             gc_assert(ret);
-        } else if (remaining <= 4 * N_WORD_BYTES
-                   && TryEnterCriticalSection(&free_pages_lock)) {
-            gc_close_region(region, page_type);
-            // Request > 4 words, forcing a new page to be claimed.
-            gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region, 1); // do release
+        } else if (remaining <= 4 * N_WORD_BYTES) {
+          if  (TryEnterCriticalSection(&free_pages_lock)) {
+              // char msg[] = "fallback allocator refreshing mixed region\n"; write(2,msg,sizeof msg-1);
+              gc_close_region(region, page_type);
+              // Request > 4 words, forcing a new page to be claimed.
+              gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region, 1); // do release
+          } else {
+            // char msg[] = "fallback allocator FAIL\n"; write(2,msg,sizeof msg-1);
+          }
         }
     }
 
@@ -5518,6 +5514,7 @@ prepare_for_final_gc ()
  * plus literal strings in code compiled to memory. */
 char gc_coalesce_string_literals = 0;
 
+void verify_allocator_bitmap(int print);
 /* Do a non-conservative GC, and then save a core with the initial
  * function being set to the value of 'lisp_init_function' */
 void
@@ -5525,6 +5522,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
             boolean save_runtime_options, boolean compressed,
             int compression_level, int application_type)
 {
+    // fprintf(stderr, "enter gc_and_save\n");
+
     FILE *file;
     void *runtime_bytes = NULL;
     size_t runtime_size;
@@ -5706,7 +5705,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
     // by a divisor that is not the size of one element in that array.
     page_index_t max_pages_per_read = sizeof data / (sizeof (struct corefile_pte));
     page_index_t page = 0;
-    generation_index_t gen = CORE_PAGE_GENERATION;
+    const generation_index_t gen = CORE_PAGE_GENERATION;
     while (page < n_ptes) {
         page_index_t pages_remaining = n_ptes - page;
         page_index_t npages =
@@ -5736,9 +5735,28 @@ void gc_load_corefile_ptes(int card_table_nbits,
     }
     generations[gen].bytes_allocated = bytes_allocated;
     gc_assert((ssize_t)bytes_allocated <= (ssize_t)(n_ptes * GENCGC_PAGE_BYTES));
+    page_index_t p;
+
+    // Set allocator mark bits as required on certain page types
+    for (p = 0; p < next_free_page; ) {
+        if (page_type_has_objmap(page_table[p].type)) {
+            page_index_t last_page = p;
+            while (!page_ends_contiguous_block_p(last_page, gen)) ++last_page;
+            lispobj* where = (lispobj*)page_address(p);
+            lispobj* limit = (lispobj*)page_address(last_page) + page_words_used(last_page);
+            while (where <  limit) {
+                if (widetag_of(where) != FILLER_WIDETAG) set_allocator_bitmap_bit(where);
+                where += OBJECT_SIZE(*where, where);
+            }
+            p = 1 + last_page;
+        } else {
+            ++p;
+        }
+    }
+
+    // Clear card marks ("cleared" is not necessarily the default state)
     if (gen != 0 && ENABLE_PAGE_PROTECTION) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
-        page_index_t p;
         for (p = 0; p < next_free_page; ++p)
             if (page_words_used(p)) assign_page_card_marks(p, CARD_UNMARKED);
 #else

@@ -30,6 +30,7 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
 
     // Create the ordinary instance, total length 2 words
     lispobj instance = make_lispobj(where, INSTANCE_POINTER_LOWTAG);
+    if (page_type_has_objmap(page_type)) set_allocator_bitmap_bit(where);
     where[0] = (1 << INSTANCE_LENGTH_SHIFT) | INSTANCE_WIDETAG;
     where[1] = 0;
     where += 2;
@@ -50,6 +51,7 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
 
     // Create the funcallable instance, total length 6 words
     lispobj funinstance = make_lispobj(where, FUN_POINTER_LOWTAG);
+    if (page_type_has_objmap(page_type)) set_allocator_bitmap_bit(where);
     where[0] = (1 << N_WIDETAG_BITS) | FUNCALLABLE_INSTANCE_WIDETAG;
     where[1] = where[2] = where[3] = where[4] = where[5] = 0;
     where += 6;
@@ -72,7 +74,7 @@ static void perform_gc(lispobj* stackptr)
     gc_close_collector_regions(THREAD_PAGE_FLAG);
     close_current_thread_tlab();
     update_immobile_nursery_bits();
-    verify_heap(VERIFY_PRE_GC);
+    hexdump_and_verify_heap(VERIFY_PRE_GC);
     garbage_collect_generation(0, 0, stackptr);
     gc_active_p = 0;
 }
@@ -102,6 +104,7 @@ void run_cardmark_test(int page_type,
     instance_layout(native_pointer(funinstance)) = old_layout;
     gc_card_mark[instance_card] = CARD_MARKED;
     gc_card_mark[funinstance_card] = CARD_MARKED;
+    gencgc_verbose = 3;
     perform_gc(stackptr);
     // should have gotten unmarked
     gc_assert(gc_card_mark[instance_card] == CARD_UNMARKED);

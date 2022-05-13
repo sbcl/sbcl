@@ -280,6 +280,10 @@
 #+darwin
 (test-util::disable-profiling)
 
+;;; Too slow if verifying
+#+x86-64 (setf (extern-alien "pre_verify_gen_0" char) 0
+               (extern-alien "verify_gens" char) 10)
+
 ;;; This encounters the "backing off for retry" error if attempting
 ;;; to start too many threads.
 (defparameter *max-runnable-threads* #+x86-64 100 #-x86-64 5)

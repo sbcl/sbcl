@@ -322,11 +322,14 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                         gc_assert(pte_type != PAGE_TYPE_CONS);
 #ifdef LISP_FEATURE_USE_CONS_REGION
                     else if (pte_type != PAGE_TYPE_CONS) {
-                        if (where[0] | where[1]) // "page-filler cons" is OK
-                            // KLUDGE: allow negative bignum, but is it good/bad
-                            // to check for a bignum widetag at where[-2] ?
-                            // this SHOULD be: lose("cons @ %p on non-cons page", where);
-                            gc_assert(where[0]==(uword_t)-1 && where[1]==0);
+                        /*
+                        if (where[0] == (uword_t)-1 && where[1] == (uword_t)-1 &&
+                            page_table[find_page_index(where)].type == PAGE_TYPE_THREAD_MIXED)
+                            lose("wat");
+                        */
+                        if (where[0] | where[1]) // (0 . 0) cons is OK
+                            gc_assert(where[0]==(uword_t)-1 &&
+                                      (where[1]==0 || where[1]==(uword_t)-1));
                     }
 #endif
                     if (widetag == CODE_HEADER_WIDETAG) {
@@ -447,6 +450,94 @@ static int verify_gen0_pagetypes(lispobj* start, lispobj* end,
 }
 #endif
 
+static uword_t bitmap_scan_range(lispobj* where, lispobj* end, uword_t arg)
+{
+    page_index_t p = find_page_index(where);
+    page_index_t prev_page = p - 1;
+    switch (page_table[p].type) {
+      //    case PAGE_TYPE_UNBOXED:
+    case PAGE_TYPE_THREAD_MIXED:
+    case PAGE_TYPE_MIXED:
+    case PAGE_TYPE_SMALL_MIXED:
+        int* histo = (void*)arg;
+        while (where < end) {
+            p = find_page_index(where);
+            if (p != prev_page) {
+                long wordindex;
+                addr_to_bitmap_coordinates(page_address(p)+GENCGC_PAGE_BYTES-1,
+                                           &wordindex);
+                int i, this_page_nbits = 0;
+                for(i=0; i<ALLOCATOR_BITMAP_WORDS_PER_PAGE; ++i, ++wordindex)
+                    this_page_nbits += __builtin_popcountl(allocator_bitmap[wordindex]);
+                histo[1] += this_page_nbits;
+                prev_page = p;
+            }
+            int tag = widetag_of(where);
+            if (*where != (uword_t)-1 && tag) {
+                histo[tag>>2]++;
+                if (tag != FILLER_WIDETAG && !allocator_bitmap_bit(where)) {
+                    fprintf(stderr, "obj @ %p (%s) missing bit\n",
+                            where, widetag_names[widetag_of(where)>>2]);
+                }
+            }
+            where += OBJECT_SIZE(*where, where);
+        }
+        break;
+    case SINGLE_OBJECT_FLAG | PAGE_TYPE_MIXED:
+        // Don't know if this is a young object just allocated, or a gen0 object
+        // that survived a previous GC. Just clear the bit since we don't need it,
+        // and it being set messes up the popcount cross-check.
+        clear_allocator_bitmap_bit((char*)where);
+        break;
+    default:
+        {
+        page_index_t page = find_page_index(where);
+        page_index_t last = find_page_index((char*)end-1);
+        for ( ; page <= last ; ++page )
+            if (gc_objmap_anyset(page)) {
+                fprintf(stderr, "Page %ld type %d has random bits in objmap\n",
+                        page, page_table[page].type);
+                gc_show_objmap(page);
+            }
+        }
+    }
+    return 0;
+}
+
+/*static*/ void verify_allocator_bitmap(int print)
+{
+    int histo[64];
+    memset(histo, 0, sizeof histo);
+    walk_generation(bitmap_scan_range, -1, (uword_t)histo);
+    int i, tot = 0;
+    if (print) fprintf(stderr, "Mixed-page Histogram:\n");
+    for (i=3; i<64; ++i) {
+        if (print && histo[i]) fprintf(stderr,  "  %2x %7d %s\n", i<<2, histo[i], widetag_names[i]);
+        tot += histo[i];
+    }
+    tot -= histo[FILLER_WIDETAG>>2];
+    if (print)
+        fprintf(stderr, "   %9d Total (excluding filler), popcount=%d\n", tot,histo[1]);
+    if (tot != histo[1]) {
+      uword_t* gc_header_map = (void*)gc_card_mark;
+      fprintf(stderr,"Bitmap scan\n");
+      long wordindex=-1;
+      long i;
+      lispobj* where = (void*)DYNAMIC_SPACE_START;
+      for (i=0; i<header_bitmap_nwords; ++i, --wordindex) {
+        uword_t word = gc_header_map[wordindex];
+        if (word) {
+            uword_t mask = 1;
+            for (mask = 0x8000000000000000; mask; mask >>= 1, where += 2)
+                if (word & mask) { fprintf(stderr, "%p\n", where); }
+        } else {
+            where += 2*N_WORD_BITS;
+        }
+      }
+      ldb_monitor("Incomplete bitmap");
+    }
+}
+
 static int verify(lispobj start, lispobj* end, struct verify_state* state, int flags)
 {
     int savedflags = state->flags;
@@ -529,6 +620,10 @@ int verify_heap(int flags)
     walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_gen0_pagetypes,
                     0, (uword_t)&state);
 #endif
+    if (conservative_stack) {
+        if (verbose) fprintf(stderr, " [bitmap]");
+        verify_allocator_bitmap(from_space==-1);
+    }
     walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_range,
                     -1, (uword_t)&state);
     if (verbose && state.nerrors==0) fprintf(stderr, " passed\n");

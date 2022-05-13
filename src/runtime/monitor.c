@@ -39,7 +39,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/gc-tables.h"
 #include "gc-internal.h"
-
+#include "gc-private.h"
 
 /* When we need to do command input, we use this stream, which is not
  * in general stdin, so that things will "work" (as well as being
@@ -216,7 +216,7 @@ void save_gc_crashdump(char *pathname,
 
 static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
-static cmd print_context_cmd, pte_cmd, search_cmd;
+static cmd print_context_cmd, pte_cmd, objmap_cmd, search_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
 static cmd grab_sigs_cmd;
 static cmd kill_cmd;
@@ -306,6 +306,7 @@ static struct cmd {
     {"grab-signals", "Set the signal handlers to call LDB.", grab_sigs_cmd},
     {"kill", "Kill ourself with signal number N (useful if running under gdb)",
      kill_cmd},
+    {"objmap", "Object map for page", objmap_cmd},
     {"purify", "Purify. (Caveat purifier!)", purify_cmd},
     {"print", "Print object at ADDRESS.", print_cmd},
     {"p", "(an alias for print)", print_cmd},
@@ -381,7 +382,11 @@ dump_cmd(char **ptr)
     lispobj* next_object = decode ? (lispobj*)addr : 0;
 
     while (count-- > 0) {
-        printf("%p: ", (os_vm_address_t) addr);
+        int colon = ':';
+        page_index_t p = find_page_index(addr);
+        if (p>=0 && page_table[p].type==PAGE_TYPE_MIXED
+            && allocator_bitmap_bit(addr)) colon = '*';
+        printf("%p%c ", addr, colon);
         if (force || gc_managed_addr_p((lispobj)addr)) {
             unsigned long *lptr = (unsigned long *)addr;
             unsigned char *cptr = (unsigned char *)addr;
@@ -453,6 +458,14 @@ pte_cmd(char **ptr)
     extern void gc_show_pte(lispobj);
     lispobj obj;
     if (parse_lispobj(ptr, &obj)) gc_show_pte(obj);
+    return 0;
+}
+
+static int objmap_cmd(char **ptr)
+{
+    extern void gc_show_objmap(page_index_t);
+    int page;
+    if (parse_number(ptr, &page)) gc_show_objmap(page);
     return 0;
 }
 

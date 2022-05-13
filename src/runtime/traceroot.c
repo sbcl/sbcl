@@ -477,6 +477,7 @@ static lispobj make_sap(char* value)
         gc_general_alloc(unboxed_region, sizeof(struct sap), PAGE_TYPE_UNBOXED);
     sap->header = (1<<N_WIDETAG_BITS) | SAP_WIDETAG;
     sap->pointer = value;
+    // set_allocator_bitmap_bit(sap);
     return make_lispobj(sap, OTHER_POINTER_LOWTAG);
 }
 

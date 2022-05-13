@@ -409,17 +409,6 @@ static void trace_object(lispobj* where)
 
 void prepare_for_full_mark_phase()
 {
-    // Change all thread-local pages to collector pages
-    page_index_t i;
-    for (i = 0; i < next_free_page; i++) {
-        int type = page_table[i].type;
-        if (type & THREAD_PAGE_FLAG)
-            page_table[i].type =
-                type == PAGE_TYPE_THREAD_CONS ? PAGE_TYPE_CONS :
-                type == PAGE_TYPE_THREAD_CODE ? PAGE_TYPE_CODE :
-                PAGE_TYPE_MIXED;
-    }
-
 #ifndef LISP_FEATURE_USE_CONS_REGION
     hopscotch_create(&mark_bits, HOPSCOTCH_HASH_FUN_DEFAULT,
                      N_WORD_BYTES, /* table values are machine words */
@@ -578,11 +567,41 @@ static void sweep_fixedobj_pages(long *zeroed)
 }
 #endif
 
+/* Overwrite exactly 1 object wit non-pointer words of some sort.
+ * This eliminates tenured garbage in pseudo-static-generation,
+ * and does NOT strive to to write as few words as possible,
+ * unlike deposit_filler() which tries to be efficient */
+static void clobber_headered_object(lispobj* addr, sword_t nwords)
+{
+    page_index_t page = find_page_index(addr);
+    if (page < 0) { // code space
+        struct code* code  = (struct code*)addr;
+        if (!filler_obj_p((lispobj*)code)) {
+            code->boxed_size = 0;
+            code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
+                           | CODE_HEADER_WIDETAG;
+            memset(addr+2, 0, (nwords - 2) * N_WORD_BYTES);
+        }
+    } else if (page_table[page].type == PAGE_TYPE_CODE ||
+               page_table[page].type == PAGE_TYPE_THREAD_CODE) {
+        // Code pages don't want (0 . 0) fillers, otherwise heap checking
+        // gets an error: "object @ 0x..... is non-code on code page"
+        addr[0] = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+        addr[1] = 0;
+    } else {
+        switch (page_table[page].type) {
+        case PAGE_TYPE_MIXED: case PAGE_TYPE_SMALL_MIXED:
+        case PAGE_TYPE_THREAD_MIXED: case PAGE_TYPE_UNBOXED:
+          clear_allocator_bitmap_bit(addr);
+        }
+        memset(addr, 0, nwords * N_WORD_BYTES);
+    }
+}
+
 static uword_t sweep(lispobj* where, lispobj* end,
                      __attribute__((unused)) uword_t arg)
 {
     sword_t nwords;
-    extern void deposit_filler(uword_t addr, sword_t nbytes);
 
     for ( ; where < end ; where += nwords ) {
         lispobj word = *where;
@@ -591,22 +610,11 @@ static uword_t sweep(lispobj* where, lispobj* end,
             nwords = sizetab[header_widetag(word)](where);
             lispobj markbit = general_widetag_to_markbit(header_widetag(word));
             if (word & markbit) livep = 1, *where = word ^ markbit;
+            if (!livep) clobber_headered_object(where, nwords);
         } else {
             nwords = 2;
             livep = cons_markedp((lispobj)where);
-        }
-        if (!livep) {
-            if (find_page_index(where)>=0) // dynamic space
-                deposit_filler((uword_t)where, nwords<<WORD_SHIFT);
-            else { // immobile space
-                struct code* code  = (struct code*)where;
-                if (!filler_obj_p((lispobj*)code)) {
-                    code->boxed_size = 0;
-                    code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
-                                   | CODE_HEADER_WIDETAG;
-                    memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
-                }
-            }
+            if (!livep) where[0] = where[1] = (uword_t)-1;
         }
     }
     return 0;
@@ -658,7 +666,8 @@ void execute_full_sweep_phase()
 #ifdef LISP_FEATURE_USE_CONS_REGION
     page_index_t page;
     for (page = 0; page < next_free_page; ++page)
-        if (page_table[page].type == PAGE_TYPE_CONS) {
+        if (page_table[page].type == PAGE_TYPE_CONS ||
+            page_table[page].type == PAGE_TYPE_THREAD_CONS) {
             char* base = page_address(page);
             char* bits = base + CONS_PAGE_USABLE_BYTES;
             char* end  = base + GENCGC_PAGE_BYTES;
