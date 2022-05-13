@@ -147,11 +147,12 @@
     ;; (assert (not (nth-value 1 (sb-kernel:make-lisp-obj (third *some-object-handles*) nil))))
     (assert (string= (sb-kernel:%simple-fun-name fun) "two potayto"))))
 
-#+immobile-space
 (with-test (:name :generation-of-fdefn)
-  ;; generation-of broke when fdefns stopped storing a generation in word 0
+  ;; GENERATION-OF broke when fdefns stopped storing a generation in word 0.
+  ;; Normally we expect to see SB-VM:+PSEUDO-STATIC-GENERATION+
+  ;; but allow for varied definition of CORE_PAGE_GENERATION.
   (assert (= (sb-kernel:generation-of (sb-int:find-fdefn 'car))
-             sb-vm:+pseudo-static-generation+)))
+             (sb-kernel:generation-of #'car))))
 
 (with-test (:name :static-fdefn-space)
   (sb-int:dovector (name sb-vm:+static-fdefns+)
