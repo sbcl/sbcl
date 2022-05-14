@@ -87,7 +87,7 @@
       DONE))
 
   (define-vop (symbol-value checked-cell-ref)
-    (:translate symeval)
+    (:translate symbol-value)
     (:args (symbol :scs (descriptor-reg) :to :save
                    :load-if (not (and (sc-is symbol constant)
                                       (or (symbol-always-has-tls-value-p (tn-value symbol))
@@ -140,7 +140,7 @@
   (define-vop (set cell-set)
     (:variant symbol-value-slot other-pointer-lowtag))
   (define-vop (symbol-value checked-cell-ref)
-    (:translate symeval)
+    (:translate symbol-value)
     (:generator 9
                 (loadw value object symbol-value-slot other-pointer-lowtag)
                 (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
@@ -149,7 +149,7 @@
   (define-vop (fast-symbol-value cell-ref)
     (:variant symbol-value-slot other-pointer-lowtag)
     (:policy :fast)
-    (:translate symeval)))
+    (:translate symbol-value)))
 
 (define-vop (boundp)
   (:args (object :scs (descriptor-reg)))
@@ -180,11 +180,11 @@
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 (define-vop (symbol-global-value)
   (:policy :fast-safe)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)

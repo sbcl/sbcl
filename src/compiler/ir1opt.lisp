@@ -575,8 +575,9 @@
             (delete-lvar-use other-node)))
         (typecase node
           (ref
-           (delete-ref node)
-           (unlink-node node))
+           (when (flushable-reference-p node)
+             (delete-ref node)
+             (unlink-node node)))
           (combination
            (when (and (not (node-tail-p node))
                       (flushable-combination-p node))

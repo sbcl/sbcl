@@ -625,6 +625,15 @@
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
 
+;; If there's a possibility the variable might be unbound, then its
+;; references are unflushable.
+(defun flushable-reference-p (node)
+  (let ((leaf (ref-leaf node)))
+    (not (and (global-var-p leaf)
+              (member (global-var-kind leaf)
+                      '(:special :global :unknown))
+              (not (always-boundp (leaf-source-name leaf)))))))
+
 (defun flushable-callable-arg-p (name arg-count)
   (typecase name
     (null

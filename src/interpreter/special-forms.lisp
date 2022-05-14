@@ -9,9 +9,6 @@
 
 (in-package "SB-INTERPRETER")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (shadow "SYMEVAL"))
-
 ;;; Return a THE form that wraps EXPRESSION, but if CTYPE is NIL,
 ;;; just return EXPRESSION.
 (defun cast-to (ctype expression)

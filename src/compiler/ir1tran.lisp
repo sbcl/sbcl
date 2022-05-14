@@ -693,50 +693,39 @@
 (defun ir1-convert-var (start next result name)
   (declare (type ctran start next) (type (or lvar null) result) (symbol name))
   (let ((var (or (lexenv-find name vars) (find-free-var name))))
-    (if (and (global-var-p var) (not (always-boundp name)))
-        ;; KLUDGE: If the variable may be unbound, convert using SYMEVAL
-        ;; which is not flushable, so that unbound dead variables signal an
-        ;; error (bug 412, lp#722734): checking for null RESULT is not enough,
-        ;; since variables can become dead due to later optimizations.
-        (ir1-convert start next result
-                     (case (global-var-kind var)
-                       (:global `(sym-global-val ',name))
-                       (:unknown
-                        (when (not (deprecated-thing-p 'variable name))
-                          (note-undefined-reference name :variable))
-                        `(symeval ',name))
-                       (t
-                        `(symeval ',name))))
-        (etypecase var
-          (leaf
-           (cond
-             ((lambda-var-p var)
-              (let ((home (ctran-home-lambda-or-null start)))
-                (when (and home (neq (lambda-var-home var) home))
-                  (sset-adjoin var (lambda-calls-or-closes home))))
-              (when (lambda-var-ignorep var)
-                ;; (ANSI's specification for the IGNORE declaration requires
-                ;; that this be a STYLE-WARNING, not a full WARNING.)
-                #-sb-xc-host
-                (compiler-style-warn "reading an ignored variable: ~S" name)
-                ;; there's no need for us to accept ANSI's lameness when
-                ;; processing our own code, though.
-                #+sb-xc-host
-                (warn "reading an ignored variable: ~S" name))))
-           (reference-leaf start next result var name))
-          ((cons (eql macro)) ; symbol-macro
-           ;; FIXME: the following comment is probably wrong now.
-           ;; If we warn here on :early and :late deprecation
-           ;; then we get an extra warning somehow.
-           ;; This case signals {EARLY,LATE,FINAL}-DEPRECATION-WARNING
-           ;; for symbol-macros. Includes variables, constants,
-           ;; etc. in :FINAL deprecation.
-           (when (eq (deprecated-thing-p 'variable name) :final)
-             (check-deprecated-thing 'variable name))
-           ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
-           (ir1-convert start next result (cdr var)))
-          (heap-alien-info
-           (ir1-convert start next result `(%heap-alien ',var))))))
+    (etypecase var
+      (leaf
+       (when (lambda-var-p var)
+         (let ((home (ctran-home-lambda-or-null start)))
+           (when (and home (neq (lambda-var-home var) home))
+             (sset-adjoin var (lambda-calls-or-closes home))))
+         (when (lambda-var-ignorep var)
+           ;; (ANSI's specification for the IGNORE declaration requires
+           ;; that this be a STYLE-WARNING, not a full WARNING.)
+           #-sb-xc-host
+           (compiler-style-warn "reading an ignored variable: ~S" name)
+           ;; there's no need for us to accept ANSI's lameness when
+           ;; processing our own code, though.
+           #+sb-xc-host
+           (warn "reading an ignored variable: ~S" name)))
+       (when (and (global-var-p var)
+                  (eq (global-var-kind var) :unknown)
+                  (not (deprecated-thing-p 'variable name)))
+         (note-undefined-reference name :variable))
+       (reference-leaf start next result var name))
+      ((cons (eql macro)) ; symbol-macro
+       ;; FIXME: the following comment is probably wrong now.
+       ;; If we warn here on :early and :late deprecation
+       ;; then we get an extra warning somehow.
+       ;; This case signals {EARLY,LATE,FINAL}-DEPRECATION-WARNING
+       ;; for symbol-macros. Includes variables, constants,
+       ;; etc. in :FINAL deprecation.
+       (when (eq (deprecated-thing-p 'variable name) :final)
+         (check-deprecated-thing 'variable name))
+       ;; FIXME: [Free] type declarations. -- APD, 2002-01-26
+       (ir1-convert start next result (cdr var)))
+      (heap-alien-info
+       (ir1-convert start next result `(%heap-alien ',var)))))
   (values))
 
 ;;; Find a compiler-macro for a form, taking FUNCALL into account.
@@ -944,19 +933,13 @@
 ;;; instrumentation for?
 (defun step-form-p (form)
   (flet ((step-symbol-p (symbol)
-           ;; Consistent treatment of *FOO* vs (SYMBOL-VALUE '*FOO*):
-           ;; we insert calls to SYMEVAL for most non-lexical
-           ;; variable references in order to avoid them being elided
-           ;; if the value is unused.
-           (if (member symbol '(symeval sym-global-val))
-               (not (constantp (second form)))
-               (not (member (sb-xc:symbol-package symbol)
-                            (load-time-value
-                              ;; KLUDGE: packages we're not interested in
-                              ;; stepping.
-                              (mapcar #'find-package '(sb-c sb-int sb-impl
-                                                       sb-kernel sb-pcl))
-                             t))))))
+           (not (member (sb-xc:symbol-package symbol)
+                        (load-time-value
+                         ;; KLUDGE: packages we're not interested in
+                         ;; stepping.
+                         (mapcar #'find-package '(sb-c sb-int sb-impl
+                                                  sb-kernel sb-pcl))
+                         t)))))
     (and *allow-instrumenting*
          (policy *lexenv* (= insert-step-conditions 3))
          (listp form)
@@ -1843,6 +1826,21 @@
     (dolist (name names)
       (process-1-ftype-proclamation name type))))
 
+;;; Replace each old var entry with one having the new type.
+(defun process-type-proclamation (spec names)
+  (declare (list names))
+  (let ((free-vars (free-vars *ir1-namespace*))
+        (type (specifier-type spec)))
+    (dolist (name names)
+      (let ((var (gethash name free-vars)))
+        (etypecase var
+          (null)
+          (global-var
+           (setf (gethash name free-vars)
+                 (make-global-var :%source-name name
+                                  :type type :where-from :declared
+                                  :kind (global-var-kind var)))))))))
+
 ;;; Similar in effect to FTYPE, but change the :INLINEP. Copying the
 ;;; global-var ensures that when we substitute a functional for a
 ;;; global var (i.e. for DEFUN) that we won't clobber any uses
@@ -1887,5 +1885,8 @@
     (ftype
      (destructuring-bind (spec &rest args) args
        (process-ftype-proclamation spec args)))
+    (type
+     (destructuring-bind (spec &rest args) args
+       (process-type-proclamation spec args)))
     ((inline notinline maybe-inline)
      (process-inline-proclamation kind args))))

@@ -608,20 +608,20 @@
     (let* ((successors (ir2block-successors (vop-block next)))
            (info (vop-codegen-info next))
            (label-block (gethash (car info) *2block-info*))
-           (symeval-vop
+           (symbol-value-vop
             (ir2-block-start-vop
              (cond ((eq (second info) nil) label-block) ; not negated test.
                    ;; When negated, the BOUNDP case goes to the "other" successor
                    ;; block, i.e. whichever is not started by the #<label>.
                    ((eq label-block (first successors)) (second successors))
                    (t (first successors))))))
-      (when (and symeval-vop
-                 (or (eq (vop-name symeval-vop) 'symbol-value)
+      (when (and symbol-value-vop
+                 (or (eq (vop-name symbol-value-vop) 'symbol-value)
                      ;; Expect SYMBOL-GLOBAL-VALUE only for variables of kind :GLOBAL.
-                     (and (eq (vop-name symeval-vop) 'symbol-global-value)
+                     (and (eq (vop-name symbol-value-vop) 'symbol-global-value)
                           (constant-tn-p sym)
                           (eq (info :variable :kind (tn-value sym)) :global)))
-                 (eq sym (tn-ref-tn (vop-args symeval-vop)))
+                 (eq sym (tn-ref-tn (vop-args symbol-value-vop)))
                  ;; If the symbol is either a compile-time known symbol,
                  ;; or can only be the same thing for both vops,
                  ;; then we're fine to combine.
@@ -632,11 +632,11 @@
                  ;; Technically we could split the IR2 block and peel off the SYMBOL-VALUE,
                  ;; and if coming from the BRANCH-IF, jump to the block that contained
                  ;; everything else except the SYMBOL-VALUE vop.
-                 (not (cdr (ir2block-predecessors (vop-block symeval-vop)))))
-        (let ((replacement (if (eq (vop-name symeval-vop) 'symbol-global-value)
+                 (not (cdr (ir2block-predecessors (vop-block symbol-value-vop)))))
+        (let ((replacement (if (eq (vop-name symbol-value-vop) 'symbol-global-value)
                                'fast-symbol-global-value
                                'fast-symbol-value))
-              (result-tn (tn-ref-tn (vop-results symeval-vop))))
+              (result-tn (tn-ref-tn (vop-results symbol-value-vop))))
           (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                (template-or-lose replacement)
                                (reference-tn sym nil) (reference-tn result-tn t) next)
@@ -649,7 +649,7 @@
           ;; BRANCH-IF test is automagically correct after substitution.
           ;; Of course, this is machine-dependent.
           (delete-vop vop)
-          (delete-vop symeval-vop)
+          (delete-vop symbol-value-vop)
           next)))))
 
 ;;; Optimize (if x ... nil) to reuse the NIL coming from X.

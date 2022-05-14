@@ -55,7 +55,7 @@
 ;;; With Symbol-Value, we check that the value isn't the trap object.
 ;;;
 (define-vop (symbol-value checked-cell-ref)
-  (:translate symeval)
+  (:translate symbol-value)
   (:generator 9
     (move obj-temp object)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
@@ -84,7 +84,7 @@
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate symeval))
+  (:translate symbol-value))
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)
@@ -105,9 +105,9 @@
 ;;; On unithreaded builds these are just copies of the non-global versions.
 (define-vop (%set-symbol-global-value set))
 (define-vop (symbol-global-value symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 (define-vop (fast-symbol-global-value fast-symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 ;;;; Fdefinition (fdefn) objects.
 

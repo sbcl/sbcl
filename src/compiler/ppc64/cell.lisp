@@ -161,7 +161,7 @@
 
 ;;; With SYMBOL-VALUE, we check that the value isn't the trap object.
 (define-vop (symbol-global-value checked-cell-ref)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:generator 9
     ;; TODO: can this be made branchless somehow?
     (inst cmpld object null-tn)
@@ -179,7 +179,7 @@
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:ignore offset lowtag)
   (:generator 7
     (inst cmpld object null-tn)
@@ -210,7 +210,7 @@
 
 ;; With Symbol-Value, we check that the value isn't the trap object.
 (define-vop (symbol-value)
-  (:translate symeval)
+  (:translate symbol-value)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
@@ -239,7 +239,7 @@
   ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
   ;; CSR, 2003-04-22
   (:policy :fast)
-  (:translate symeval)
+  (:translate symbol-value)
   (:generator 8
     (inst cmpld object null-tn)
     (inst beq NULL)

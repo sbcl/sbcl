@@ -2331,11 +2331,17 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (do-nodes (node lvar block)
       (etypecase node
         (ref
-         (when lvar
-           (let ((2lvar (lvar-info lvar)))
-             ;; function REF in a local call is not annotated
-             (when (and 2lvar (not (eq (ir2-lvar-kind 2lvar) :delayed)))
-               (ir2-convert-ref node 2block)))))
+         (if lvar
+             (let ((2lvar (lvar-info lvar)))
+               ;; function REF in a local call is not annotated
+               (when (and 2lvar (not (eq (ir2-lvar-kind 2lvar) :delayed)))
+                 (ir2-convert-ref node 2block)))
+             (when (not (flushable-reference-p node))
+               (aver (global-var-p (ref-leaf node)))
+               ;; convert for effect only
+               (ir2-convert-global-var node 2block (ref-leaf node)
+                                       (make-normal-tn
+                                        *backend-t-primitive-type*)))))
         (combination
          (let ((kind (basic-combination-kind node)))
            (ecase kind

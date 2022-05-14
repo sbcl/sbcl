@@ -123,6 +123,33 @@
    :load t)
   (assert (= 0 (first (third (third (symbol-value '*backq-stuff*)))))))
 
+(with-test (:name :block-compile-ftype-proclamation)
+  (ctu:file-compile
+   `((declaim (ftype function zoo))
+     (defun bar1 (x) (zoo x))
+
+     (declaim (ftype (function (t) (values integer &optional)) bar1))
+
+     (defun foo1 (z) (bar1 z)))
+   :block-compile t
+   :load t)
+  (assert (ctype= (caddr (sb-kernel::%simple-fun-type (fdefinition 'foo1)))
+                  '(values integer &optional))))
+
+(with-test (:name :block-compile-variable-type-proclamation)
+  (ctu:file-compile
+   `((defvar *foo*)
+     (declaim (type integer *foo*))
+     (defun integer-type () *foo*)
+     (declaim (type character *foo*))
+     (defun character-type () *foo*))
+   :block-compile t
+   :load t)
+  (assert (ctype= (caddr (sb-kernel::%simple-fun-type (fdefinition 'integer-type)))
+                  '(values integer &optional)))
+  (assert (ctype= (caddr (sb-kernel::%simple-fun-type (fdefinition 'character-type)))
+                  '(values character &optional))))
+
 (with-test (:name :block-compile-same-block-references-functional)
   (ctu:file-compile
    `((declaim (inline bar))
@@ -140,19 +167,6 @@
   ;; compiling in the same block, allowing us to directly reference
   ;; the (simple) function objects directly.
   (assert (null (ctu:find-named-callees #'foo))))
-
-(with-test (:name :block-compile-ftype-proclamation)
-  (ctu:file-compile
-   `((declaim (ftype function zoo))
-     (defun bar1 (x) (zoo x))
-
-     (declaim (ftype (function (t) (values integer &optional)) bar1))
-
-     (defun foo1 (z) (bar1 z)))
-   :block-compile t
-   :load t)
-  (assert (ctype= (caddr (sb-kernel::%simple-fun-type (fdefinition 'foo1)))
-                  '(values integer &optional))))
 
 (with-test (:name :block-compile-top-level-closures)
   (ctu:file-compile

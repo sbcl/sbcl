@@ -1016,7 +1016,7 @@
   (checked-compile-and-assert
       ()
       `(lambda ()
-         (sb-kernel:symeval nil))
+         (symbol-value nil))
     (() nil)))
 
 (with-test (:name (:environment-analyze :deleted-lambda))

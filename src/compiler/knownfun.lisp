@@ -274,10 +274,10 @@
 
 ;;;; generic type inference methods
 
-(defun symeval-derive-type (node &aux (args (basic-combination-args node))
+(defun symbol-value-derive-type (node &aux (args (basic-combination-args node))
                                       (lvar (pop args)))
   (unless (and lvar (endp args))
-    (return-from symeval-derive-type))
+    (return-from symbol-value-derive-type))
   (if (constant-lvar-p lvar)
       (let* ((sym (lvar-value lvar))
              (var (maybe-find-free-var sym))

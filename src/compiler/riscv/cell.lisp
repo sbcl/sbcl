@@ -121,7 +121,7 @@
 ;;; With Symbol-Value, we check that the value isn't the trap object.
 #+sb-thread
 (define-vop (symbol-value checked-cell-ref)
-  (:translate symeval)
+  (:translate symbol-value)
   (:temporary (:scs (interior-reg)) lip)
   (:variant-vars check-boundp)
   (:variant t)
@@ -140,7 +140,7 @@
 
 #-sb-thread
 (define-vop (symbol-value checked-cell-ref)
-  (:translate symeval)
+  (:translate symbol-value)
   (:generator 9
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
@@ -188,14 +188,14 @@
 (define-vop (fast-symbol-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate symeval))
+  (:translate symbol-value))
 
 ;;; On unithreaded builds these are just copies of the non-global versions.
 (define-vop (%set-symbol-global-value set))
 (define-vop (symbol-global-value symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 (define-vop (fast-symbol-global-value fast-symbol-value)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 (define-vop (symbol-hash)
   (:policy :fast-safe)

@@ -93,11 +93,11 @@
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate sym-global-val))
+  (:translate symbol-global-value))
 
 (define-vop (symbol-global-value)
   (:policy :fast-safe)
-  (:translate sym-global-val)
+  (:translate symbol-global-value)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:vop-var vop)
@@ -129,7 +129,7 @@
 
   ;; With Symbol-Value, we check that the value isn't the trap object.
   (define-vop (symbol-value)
-    (:translate symeval)
+    (:translate symbol-value)
     (:policy :fast-safe)
     (:args (object :scs (descriptor-reg) :to (:result 1)))
     (:results (value :scs (descriptor-reg any-reg)))
@@ -157,7 +157,7 @@
     ;; unbound", which is used in the implementation of COPY-SYMBOL.  --
     ;; CSR, 2003-04-22
     (:policy :fast)
-    (:translate symeval)
+    (:translate symbol-value)
     (:generator 8
       (let ((ret-lab (gen-label)))
         (loadw value object symbol-tls-index-slot other-pointer-lowtag)
@@ -171,9 +171,9 @@
 #-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)
-    (:translate symeval))
+    (:translate symbol-value))
   (define-vop (fast-symbol-value fast-symbol-global-value)
-    (:translate symeval))
+    (:translate symbol-value))
   (define-vop (set %set-symbol-global-value)))
 
 #+sb-thread

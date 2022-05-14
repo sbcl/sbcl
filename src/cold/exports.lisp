@@ -2310,8 +2310,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "SUB-GC"
            "SYMBOL-TLS-INDEX"
            "SYMBOLS-DESIGNATOR"
-           "SYMEVAL"
-           "SYM-GLOBAL-VAL"
            "%INSTANCE-LENGTH"
            "%INSTANCE-REF" "%INSTANCE-REF-EQ"
            "%INSTANCE-SET"
