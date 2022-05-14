@@ -485,8 +485,9 @@
                ;; is used to determine whether it's immediate.
                #+(and (not sb-xc-host) immobile-space (not immobile-symbols))
                (or (logbitp +initial-core-symbol-bit+ (get-header-data value))
-                   (and (sb-c::core-object-p sb-c::*compile-object*)
-                        (immobile-space-obj-p value)))
+                   (locally (declare (notinline sb-c::producing-fasl-file))
+                     (and (not (sb-c::producing-fasl-file))
+                          (immobile-space-obj-p value))))
 
                (static-symbol-p value))
        immediate-sc-number))

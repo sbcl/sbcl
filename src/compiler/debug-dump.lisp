@@ -18,6 +18,7 @@
 (defvar *contexts*)
 (declaim (type (vector t) *contexts*))
 (defvar *local-call-context*)
+(defvar *location-context* nil)
 
 ;;;; debug blocks
 

@@ -423,15 +423,6 @@
   ;; SB-DI::COMPILED-DEBUG-FUN instances. Null when unassigned.
   (memo-cell nil :type list))
 
-;;; The TLF-NUMBER and CHAR-OFFSET of a compiled-debug-info can each be NIL,
-;;; but aren't often. However, to allow that, convert NIL to 0 and non-nil
-;;; value N to N+1.
-(defun pack-tlf-num+offset (tlf-number char-offset)
-  (with-adjustable-vector (v)
-    (write-var-integer (if tlf-number (1+ tlf-number) 0) v)
-    (write-var-integer (if char-offset (1+ char-offset) 0) v)
-    (integer-from-octets v)))
-
 ;;;; file reading
 ;;;;
 ;;;; When reading from a file, we have to keep track of some source

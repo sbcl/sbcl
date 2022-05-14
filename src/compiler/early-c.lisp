@@ -80,50 +80,22 @@
 (defvar *allow-instrumenting*)
 
 ;;; miscellaneous forward declarations
-#+sb-dyncount (defvar *collect-dynamic-statistics*)
 (defvar *component-being-compiled*)
 (defvar *compiler-error-context*)
-(defvar *compiler-error-count*)
-(defvar *compiler-warning-count*)
-(defvar *compiler-style-warning-count*)
-(defvar *compiler-note-count*)
 ;;; Bind this to a stream to capture various internal debugging output.
 (defvar *compiler-trace-output* nil)
 ;;; These are the default, but the list can also include
 ;;; :pre-ir2-optimize, :symbolic-asm, and :sb-graph.
 (defvar *compile-trace-targets* '(:ir1 :ir2 :vop :symbolic-asm :disassemble))
-(defvar *constraint-universe*)
 (defvar *current-path*)
 (defvar *current-component*)
-#+sb-dyncount
-(defvar *dynamic-counts-tn*)
 (defvar *elsewhere-label*)
-(defvar *event-note-threshold*)
-(defvar *failure-p*)
 (defvar *source-info*)
 (defvar *source-plist*)
 (defvar *source-namestring*)
-(defvar *undefined-warnings*)
-(defvar *warnings-p*)
-(defvar *lambda-conversions*)
-(defvar *compile-object* nil)
-(defvar *location-context* nil)
 
 (defvar *handled-conditions* nil)
 (defvar *disabled-package-locks* nil)
-
-(defvar *stack-allocate-dynamic-extent* t
-  "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
-and stack allocates otherwise inaccessible parts of the object whenever
-possible. Potentially long (over one page in size) vectors are, however, not
-stack allocated except in zero SAFETY code, as such a vector could overflow
-the stack without triggering overflow protection.")
-
-;;; *BLOCK-COMPILE-ARGUMENT* holds the original value of the :BLOCK-COMPILE
-;;; argument, which overrides any internal declarations.
-(defvar *block-compile-argument*)
-(declaim (type (member nil t :specified)
-               *block-compile-default* *block-compile-argument*))
 
 
 ;;;; miscellaneous utilities
@@ -188,30 +160,6 @@ the stack without triggering overflow protection.")
 (declaim (always-bound *compile-time-eval*))
 
 #-immobile-code (defmacro code-immobile-p (thing) `(progn ,thing nil))
-
-;;; Various error-code generating helpers
-(defvar *adjustable-vectors*)
-
-(defmacro with-adjustable-vector ((var) &rest body)
-  `(let ((,var (or (pop *adjustable-vectors*)
-                   (make-array 16
-                               :element-type '(unsigned-byte 8)
-                               :fill-pointer 0
-                               :adjustable t))))
-     ;; Don't declare the length - if it gets adjusted and pushed back
-     ;; onto the freelist, it's anyone's guess whether it was expanded.
-     ;; This code was wrong for >12 years, so nobody must have needed
-     ;; more than 16 elements. Maybe we should make it nonadjustable?
-     (declare (type (vector (unsigned-byte 8)) ,var))
-     (setf (fill-pointer ,var) 0)
-     ;; No UNWIND-PROTECT here - semantics are unaffected by nonlocal exit,
-     ;; and this macro is about speeding up the compiler, not slowing it down.
-     ;; GC will clean up any debris, and since the vector does not point
-     ;; to anything, even an accidental promotion to a higher generation
-     ;; will not cause transitive garbage retention.
-     (prog1 (progn ,@body)
-       (push ,var *adjustable-vectors*))))
-
 
 ;;; The allocation quantum for boxed code header words.
 ;;; 2 implies an even length boxed header; 1 implies no restriction.

@@ -1453,6 +1453,13 @@
          (setf (lambda-var-ignorep var) t)))))
   (values))
 
+(defvar *stack-allocate-dynamic-extent* t
+  "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
+and stack allocates otherwise inaccessible parts of the object whenever
+possible. Potentially long (over one page in size) vectors are, however, not
+stack allocated except in zero SAFETY code, as such a vector could overflow
+the stack without triggering overflow protection.")
+
 (defun process-extent-decl (names vars fvars kind)
   (let ((extent
           (ecase kind

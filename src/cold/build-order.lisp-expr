@@ -345,6 +345,9 @@
  #+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)
  #+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
 
+ #+sb-dyncount ("src/compiler/dyncount")
+ #+sb-dyncount ("src/code/dyncount")
+
  ("src/compiler/disassem")
  ("src/compiler/assem")
 
@@ -467,9 +470,6 @@
  ("src/compiler/pack-iterative")
  ("src/compiler/codegen")
  ("src/compiler/debug")
-
- #+sb-dyncount ("src/compiler/dyncount")
- #+sb-dyncount ("src/code/dyncount")
 
  ("src/code/format-time" :not-host)
 

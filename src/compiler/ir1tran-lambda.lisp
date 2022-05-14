@@ -871,6 +871,8 @@
 
     res))
 
+(defvar *lambda-conversions*)
+
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.)
                            debug-name maybe-add-debug-catch

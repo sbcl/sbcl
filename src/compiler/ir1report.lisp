@@ -477,48 +477,6 @@ has written, having proved that it is unreachable."))
              (compiler-macro-application-missed-warning-count condition)
              (compiler-macro-application-missed-warning-function condition)))))
 
-(macrolet ((with-condition ((condition datum args) &body body)
-             (with-unique-names (block)
-               `(block ,block
-                  (let ((,condition
-                          (apply #'coerce-to-condition ,datum
-                                 'simple-compiler-note 'with-condition
-                                 ,args)))
-                    (restart-case
-                        (signal ,condition)
-                      (muffle-warning ()
-                        (return-from ,block (values))))
-                    ,@body
-                    (values))))))
-
-  (defun compiler-notify (datum &rest args)
-    (unless (if *compiler-error-context*
-                (policy (if (ctran-p *compiler-error-context*)
-                            (ctran-next *compiler-error-context*)
-                            *compiler-error-context*)
-                    (= inhibit-warnings 3))
-                (policy *lexenv* (= inhibit-warnings 3)))
-      (with-condition (condition datum args)
-        (incf *compiler-note-count*)
-        (print-compiler-message
-         *error-output*
-         (format nil "note: ~~A")
-         (list (princ-to-string condition)))))
-    (values))
-
-  ;; Issue a note when we might or might not be in the compiler.
-  (defun maybe-compiler-notify (datum &rest args)
-    (if (boundp '*lexenv*) ; if we're in the compiler
-        (apply #'compiler-notify datum args)
-        (with-condition (condition datum args)
-          (let ((stream *error-output*))
-            (pprint-logical-block (stream nil :per-line-prefix ";")
-              (format stream " note: ~3I~_")
-              (pprint-logical-block (stream nil)
-                (format stream "~A" condition)))
-            ;; (outside logical block, no per-line-prefix)
-            (fresh-line stream))))))
-
 ;;; The politically correct way to print out progress messages and
 ;;; such like. We clear the current error context so that we know that
 ;;; it needs to be reprinted, and we also FORCE-OUTPUT so that the
@@ -588,6 +546,49 @@ has written, having proved that it is unreachable."))
   (setf *warnings-p* t)
   (print-compiler-condition condition)
   (muffle-warning condition))
+
+(macrolet ((with-condition ((condition datum args) &body body)
+             (with-unique-names (block)
+               `(block ,block
+                  (let ((,condition
+                          (apply #'coerce-to-condition ,datum
+                                 'simple-compiler-note 'with-condition
+                                 ,args)))
+                    (restart-case
+                        (signal ,condition)
+                      (muffle-warning ()
+                        (return-from ,block (values))))
+                    ,@body
+                    (values))))))
+
+  (defun compiler-notify (datum &rest args)
+    (unless (if *compiler-error-context*
+                (policy (if (ctran-p *compiler-error-context*)
+                            (ctran-next *compiler-error-context*)
+                            *compiler-error-context*)
+                    (= inhibit-warnings 3))
+                (policy *lexenv* (= inhibit-warnings 3)))
+      (with-condition (condition datum args)
+        (incf *compiler-note-count*)
+        (print-compiler-message
+         *error-output*
+         (format nil "note: ~~A")
+         (list (princ-to-string condition)))))
+    (values))
+
+  ;; Issue a note when we might or might not be in the compiler.
+  (defun maybe-compiler-notify (datum &rest args)
+    (if (boundp '*lexenv*) ; if we're in the compiler
+        (apply #'compiler-notify datum args)
+        (with-condition (condition datum args)
+          (let ((stream *error-output*))
+            (pprint-logical-block (stream nil :per-line-prefix ";")
+              (format stream " note: ~3I~_")
+              (pprint-logical-block (stream nil)
+                (format stream "~A" condition)))
+            ;; (outside logical block, no per-line-prefix)
+            (fresh-line stream))))))
+
 
 ;;;; undefined warnings
 

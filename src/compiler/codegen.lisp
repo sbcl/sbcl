@@ -276,6 +276,7 @@
     (let ((*print-pretty* nil)) ; force 1 line
       (format *compiler-trace-output* "~|~%assembly code for ~S~2%" component)))
   (let* ((prev-env nil)
+         (sb-vm::*adjustable-vectors* nil)
          ;; The first function's alignment word is zero-filled, but subsequent
          ;; ones can use a NOP which helps the disassembler not lose sync.
          (filler-pattern 0)

@@ -164,6 +164,7 @@
 ;; Unlike EQUAL-HASH, we never call EQ-HASH, because there is generally no reason
 ;; to try to look up an object that lacks a content-based hash value.
 (defun similar-hash (x)
+  (declare (special sb-c::*compile-object*))
   (named-let recurse ((x x))
     ;; There is no depth cutoff - X must not be circular,
     ;; which was already determined as a precondition to calling this,
