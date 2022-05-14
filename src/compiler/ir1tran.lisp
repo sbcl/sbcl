@@ -1873,7 +1873,7 @@
               (old (gethash name free-vars)))
          (when old
            (ecase (global-var-kind old)
-             (:special :global)
+             ((:special :global))
              (:unknown
               (setf (gethash name free-vars)
                     (make-global-var :%source-name name :type (leaf-type old)
