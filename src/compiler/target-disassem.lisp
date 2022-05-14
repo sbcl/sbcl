@@ -2534,32 +2534,7 @@
              (dovector (symbol sb-vm:+static-symbols+)
                (when (= (get-lisp-obj-address symbol) address)
                  (return-from found symbol))))
-           ;; Guess whether 'address' is an immobile-space symbol by looking at
-           ;; code header constants. If it matches any constant, assume that it
-           ;; is a use of the constant.  This has false positives of course,
-           ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
-           ;; used in an unboxed context, such as an ADD instruction,
-           ;; might be wrongly construed as an address.
-           #+immobile-space
-           (let ((code (seg-code (dstate-segment dstate))))
-             (when code
-               (loop for i downfrom (1- (code-header-words code))
-                     to sb-vm:code-constants-offset
-                     for const = (code-header-ref code i)
-                     when (eql (get-lisp-obj-address const) address)
-                     do (return-from found const))
-               ;; Kludge: layout of STREAM, FILE-STREAM, and STRING-STREAM can be used
-               ;; as immediate operands without a corresponding boxed header constant.
-               ;; I think we always elide the boxed constant for builtin layouts,
-               ;; but these three have some slightly unusual codegen that causes a PUSH
-               ;; instruction to need some help to show its operand as a lisp object.
-               (dolist (thing (load-time-value (list (find-layout 'stream)
-                                                     (find-layout 'file-stream)
-                                                     (find-layout 'string-stream))
-                                               t))
-                 (when (eql (get-lisp-obj-address thing) address)
-                   (return-from found thing)))))
-           (return-from maybe-note-static-symbol))))
+          (return-from maybe-note-static-symbol))))
     (note (lambda (s) (prin1 symbol s)) dstate)))
 
 (defun get-internal-error-name (errnum)

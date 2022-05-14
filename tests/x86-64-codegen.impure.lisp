@@ -1160,3 +1160,8 @@
     (assert (search ", 2" (nth (+ start 1) lines)))
     (assert (search ", 4" (nth (+ start 2) lines)))
     (assert (search ", 6" (nth (+ start 3) lines)))))
+
+(defglobal *myglobalvar* 3)
+(with-test (:name :disassemble-symbol-global-value)
+  (assert (loop for line in (disassembly-lines '(lambda () *myglobalvar*))
+                thereis (search "(SYMBOL-VALUE '*MYGLOBALVAR*)" line))))

@@ -206,24 +206,85 @@
       (print-mem-ref :ref value nil stream dstate)
       (print-xmmreg value stream dstate)))
 
-;;; Find the Lisp object, if any, called by a "CALL rel32offs"
-;;; instruction format and add it as an end-of-line comment.
-;;; Alternatively, the value might be an immediate operand to MOV,
-;;; which in general decodes as a signed integer. So ignore it
-;;; unless it looks like an address.
-#+immobile-space
-(defun maybe-note-lisp-callee (value dstate)
+;;; Guess whether VALUE is an immobile-space symbol or code blob by looking
+;;; at all code header constants. If it matches any constant, assume that it
+;;; is a use of the constant.  This has false positives of course,
+;;; as does MAYBE-NOTE-STATIC-SYMBOL and friends. Any random immediate value
+;;; used in an unboxed context, such as an ADD instruction,
+;;; can be wrongly construed as an address.
+;;; Note that for symbols we can match either the tagged pointer to it
+;;; OR the untagged address of the SYMBOL-VALUE slot.
+;;;
+;;; "static" in this usage implies "at a fixed address" - it could be
+;;; in static space or immobile space.
+;;;
+;;; TODO: probably should take an &OPTIONAL for ALLOW-INTERIOR-PTR to
+;;; reject false positives from instructions that don't access an object
+;;; except through a tagged pointer.
+(defun maybe-note-static-lispobj (value dstate &optional quote)
+  (when (maybe-note-static-symbol value dstate)
+    ;; Returning T prints VALUE using base 16
+    ;; (see the SIGNED-IMM-DATA printer, PRINT-IMM/ASM-ROUTINE)
+    ;; This should probably pass through the QUOTE option but it's not critical.
+    (return-from maybe-note-static-lispobj t))
+  (let ((code (seg-code (dstate-segment dstate)))
+        (adjusted-val (logior (- value (ash sb-vm:symbol-value-slot sb-vm:word-shift))
+                              sb-vm:other-pointer-lowtag))
+        (found-const)
+        (slot))
+    (when code
+      (loop for i downfrom (1- (code-header-words code)) to sb-vm:code-constants-offset
+            for const = (code-header-ref code i)
+            do (when (symbolp const)
+                 (let ((addr (get-lisp-obj-address const)))
+                   (cond ((eql addr value)
+                          (return (setq found-const const)))
+                         ((eql addr adjusted-val)
+                          (return (setq found-const const
+                                        slot sb-vm:symbol-value-slot)))))))
+      (unless found-const ; try static symbol's value slots
+        (dovector (symbol sb-vm:+static-symbols+)
+          (when (= (get-lisp-obj-address symbol) adjusted-val)
+            (return (setq found-const symbol
+                          slot sb-vm:symbol-value-slot)))))
+      (when found-const
+        (note (cond (slot
+                     (lambda (s) (format s "(SYMBOL-VALUE '~S)" found-const)))
+                    ((and (symbolp found-const) quote)
+                     (lambda (s) (write-char #\' s) (prin1 found-const s)))
+                    (t
+                     (lambda (s) (prin1 found-const s))))
+              dstate)
+        ;; Returning T prints in base 16 (see PRINT-IMM/ASM-ROUTINE)
+        (return-from maybe-note-static-lispobj t))))
+    #| This mysterious code seems to have no regression tests.
+       Comenting it out until I can figure out why it was in target-disassem
+    ;; Kludge: layout of STREAM, FILE-STREAM, and STRING-STREAM can be used
+    ;; as immediate operands without a corresponding boxed header constant.
+    ;; I think we always elide the boxed constant for builtin layouts,
+    ;; but these three have some slightly unusual codegen that causes a PUSH
+    ;; instruction to need some help to show its operand as a lisp object.
+    (dolist (thing (load-time-value (list (find-layout 'stream)
+                                          (find-layout 'file-stream)
+                                          (find-layout 'string-stream))
+                                    t))
+      (when (eql (get-lisp-obj-address thing) address)
+        (return-from found thing))))) |#
   (awhen (and (typep value 'word)
               (sb-disassem::find-code-constant-from-interior-pointer value dstate))
     (note (lambda (stream) (princ it stream)) dstate)))
 
+;;; Immobile symbols are heuristically detected with MAYBE-NOTE-STATIC-LISPOBJ
+;;; so that moving the tagged pointer to a symbol is shown thusly:
+;;; ";  BACF003C50       MOV EDX, #x503C00CF             ; '*MYVAR*"
+;;;
 (defun print-imm/asm-routine (value stream dstate)
   (cond ((not stream) (operand value dstate))
-        ((or #+immobile-space (maybe-note-lisp-callee value dstate)
-             (maybe-note-assembler-routine value nil dstate)
-             (maybe-note-static-symbol value dstate))
+        ((or (maybe-note-assembler-routine value nil dstate)
+             (maybe-note-static-lispobj value dstate t))
          (princ16 value stream))
-        (t (princ value stream))))
+        (t
+         (princ value stream))))
 
 ;;; Return an instance of REG or MACHINE-EA.
 ;;; MOD and R/M are the extracted bits from the instruction's ModRM byte.
@@ -352,8 +413,9 @@
              ;; absolute address as would be used for asm routines and static symbols.
              (or (minusp disp)
                  (maybe-note-assembler-routine disp nil dstate)
+                 ;; (FIXME: what does this comment mean?)
                  ;; Static symbols coming from CELL-REF
-                 (maybe-note-static-symbol (+ disp (- other-pointer-lowtag n-word-bytes))
+                 (maybe-note-static-lispobj (+ disp (- other-pointer-lowtag n-word-bytes))
                                            dstate)))
             (t
              (princ disp stream))))
@@ -382,6 +444,12 @@
                              (case width
                               (:qword (unboxed-constant-ref dstate addr disp))))
                      dstate))))))
+    ;; FIXME: is this extra case necessary? The disassembler is too confusing for mere mortals.
+    ;;    ;; If no base and no index, then it could be a SYMBOL-VALUE slot:
+    ;;    ;;   48891425D0003C50 MOV [#x503C00D0], RDX  ; (SYMBOL-VALUE '*MYVAR*)
+    ;;    (when (and (null base-reg) (null index-reg))
+    ;;      (when (maybe-note-static-lispobj disp dstate)
+    ;;        (return-from print-mem-ref)))
     #+sb-thread
     (flet ((guess-symbol (predicate)
              (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)

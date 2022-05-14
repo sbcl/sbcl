@@ -190,8 +190,11 @@
                    value))
   :printer (lambda (value stream dstate)
              (cond (stream
+                    ;; This use of MAYBE-NOTE-STATIC-LISPOBJ gets us the
+                    ;; code blob called using canonical 'CALL rel32' form.
                     (or #+immobile-space
-                        (and (integerp value) (maybe-note-lisp-callee value dstate))
+                        (and (integerp value)
+                             (maybe-note-static-lispobj value dstate))
                         (maybe-note-assembler-routine value nil dstate))
                     (print-label value stream dstate))
                    (t
@@ -248,7 +251,7 @@
                    ;; if it is in a location corresponding to an absolute code fixup.
                    (if (and (memq size '(:dword :qword))
                             (memq opcode '(mov cmp push))
-                            (maybe-note-static-symbol value dstate))
+                            (maybe-note-static-lispobj value dstate t))
                        (princ16 value stream)
                        (princ value stream))))))
 
