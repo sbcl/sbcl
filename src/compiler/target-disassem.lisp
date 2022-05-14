@@ -1797,7 +1797,7 @@
                   ))))
         (no-debug-blocks () nil)))))
 
-(defvar *disassemble-annotate* nil
+(defvar *disassemble-annotate* t
   "Annotate DISASSEMBLE output with source code.")
 
 (defun add-debugging-hooks (segment debug-fun &optional sfcache)
