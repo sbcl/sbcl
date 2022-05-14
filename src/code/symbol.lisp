@@ -204,9 +204,11 @@ distinct from the global value. Can also be SETF."
 (defun symbol-plist (symbol)
   "Return SYMBOL's property list."
   (let ((list (symbol-%info symbol)))
+    ;; The compiler can't possibly know that the CAR of LIST
+    ;; is also a list (if LIST is a LIST), so force it with a TRULY-THE.
     ;; See the comments above UPDATE-SYMBOL-INFO for a
     ;; reminder as to why this logic is right.
-    (if (%instancep list) nil (car list))))
+    (if (%instancep list) nil (truly-the list (car list)))))
 
 (declaim (ftype (sfunction (symbol t) cons) %ensure-plist-holder)
          (inline %ensure-plist-holder))
