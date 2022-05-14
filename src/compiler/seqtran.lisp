@@ -2838,7 +2838,11 @@
                                    (t
                                     *universal-type*)))))
                      ((csubtypep sequence-type (specifier-type 'array))
-                      (array-type-upgraded-element-type sequence-type))))
+                      (let ((upgraded-type
+                              (array-type-upgraded-element-type sequence-type)))
+                        (if (eq upgraded-type *wild-type*)
+                            *universal-type*
+                            upgraded-type)))))
              (end (if end
                       (and (constant-lvar-p end)
                            (or (lvar-value end)

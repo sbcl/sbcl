@@ -80,3 +80,10 @@
     (test '(lambda (x) (macrolet ((baz (arg) `(- ,arg))) (list (baz x)))))
     ;; Test 2: inline a function that captured a macrolet
     (test '(lambda (x) (make-mystruct :a x)))))
+
+(with-test (:name (reduce :type-deriver :wild-array-upgraded-type))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x) (declare (type vector x)) (reduce #'+ x))
+   ((#(1 2 3)) 6)
+   (((make-array 3 :element-type '(unsigned-byte 8) :initial-contents '(4 5 6))) 15)))
