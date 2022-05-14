@@ -1797,7 +1797,9 @@
                   ))))
         (no-debug-blocks () nil)))))
 
-(defvar *disassemble-annotate* t
+;;; Disabled because it produces poor annotations, especially around
+;;; macros.
+(defvar *disassemble-annotate* nil
   "Annotate DISASSEMBLE output with source code.")
 
 (defun add-debugging-hooks (segment debug-fun &optional sfcache)
