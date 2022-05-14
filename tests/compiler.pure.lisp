@@ -5111,12 +5111,13 @@
             :skipped-on (:not (:or :x86 :x86-64)))
   (flet ((approx-lines-of-assembly-code (type-expr)
            (count #\Newline
-                  (with-output-to-string (s)
-                    (disassemble
-                     `(lambda (x)
-                        (declare (optimize (sb-c:verify-arg-count 0)))
-                        (typep x ',type-expr))
-                     :stream s)))))
+                  (let ((sb-ext:*disassemble-annotate* nil))
+                    (with-output-to-string (s)
+                      (disassemble
+                       `(lambda (x)
+                          (declare (optimize (sb-c:verify-arg-count 0)))
+                          (typep x ',type-expr))
+                       :stream s))))))
     ;; These are fragile, but less bad than the possibility of messing up
     ;; any vops, especially since the generic code in 'vm-type' checks for
     ;; a vop by its name in a place that would otherwise be agnostic of the

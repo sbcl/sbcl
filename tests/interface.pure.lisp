@@ -211,19 +211,20 @@
 ;; if address printing is turned off. Should work on any backend, I think.
 (with-test (:name (disassemble :without-addresses))
   (flet ((disassembly-text (lambda-expr)
-         (let ((string
-                (let ((sb-disassem::*disassem-location-column-width* 0)
-                      (*print-pretty* nil)) ; prevent function name wraparound
-                  (with-output-to-string (s)
-                    (disassemble lambda-expr :stream s)))))
-           ;; Return all except the first two lines. This is subject to change
-           ;; any time we muck with the layout unfortunately.
-           (subseq string
-                   (1+ (position #\Newline string
-                                 :start (1+ (position #\Newline string))))))))
-  (let ((string1 (disassembly-text '(lambda (x) (car x))))
-        (string2 (disassembly-text '(lambda (y) (car y)))))
-    (assert (string= string1 string2)))))
+           (let ((string
+                   (let ((sb-disassem::*disassem-location-column-width* 0)
+                         (sb-ext:*disassemble-annotate* nil)
+                         (*print-pretty* nil)) ; prevent function name wraparound
+                     (with-output-to-string (s)
+                       (disassemble lambda-expr :stream s)))))
+             ;; Return all except the first two lines. This is subject to change
+             ;; any time we muck with the layout unfortunately.
+             (subseq string
+                     (1+ (position #\Newline string
+                                   :start (1+ (position #\Newline string))))))))
+    (let ((string1 (disassembly-text '(lambda (x) (car x))))
+          (string2 (disassembly-text '(lambda (y) (car y)))))
+      (assert (string= string1 string2)))))
 
 (with-test (:name :disassemble-assembly-routine)
   (disassemble sb-fasl:*assembler-routines* :stream (make-broadcast-stream)))
