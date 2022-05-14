@@ -374,9 +374,12 @@
            (type (member nil :byte :word :dword :qword) width)
            (type (or null stream) stream)
            (type disassem-state dstate))
+  ;; If disassembling into the dstate, print nothing; just stash the operand.
   (when (null stream)
     (return-from print-mem-ref
       (operand (cons value width) dstate)))
+
+  ;; Unpack and print the pieces of the machine EA.
   (let ((base-reg (machine-ea-base value))
         (disp (machine-ea-disp value))
         (index-reg (machine-ea-index value))
@@ -409,19 +412,20 @@
              (princ disp stream))
             (firstp
              (princ16 disp stream)
-             ;; Avoid the MAYBE-NOTE- calls if we can.  A negative offset is never an
+             ;; Avoid the MAYBE-NOTE call if we can.  A negative offset is never an
              ;; absolute address as would be used for asm routines and static symbols.
-             (or (minusp disp)
-                 (maybe-note-assembler-routine disp nil dstate)
-                 ;; (FIXME: what does this comment mean?)
-                 ;; Static symbols coming from CELL-REF
-                 (maybe-note-static-lispobj (+ disp (- other-pointer-lowtag n-word-bytes))
-                                           dstate)))
+             ;; FIRSTP implies lack of a base and index register.
+             (unless (minusp disp)
+               (maybe-note-assembler-routine disp nil dstate)))
             (t
              (princ disp stream))))
     (write-char #\] stream)
+
+    ;; Always try to add an end-of-line comment about the EA.
+    ;; Assembler routines were already handled above (not really sure why)
+    ;; so now we have to figure out everything else.
+
     (when (and (eq (machine-ea-base value) :rip) (neq mode :compute))
-      ;; Always try to print the EA as a note
       (block nil
        (binding* ((seg (dstate-segment dstate))
                   (code (seg-code seg) :exit-if-null)
@@ -444,13 +448,7 @@
                              (case width
                               (:qword (unboxed-constant-ref dstate addr disp))))
                      dstate))))))
-    ;; FIXME: is this extra case necessary? The disassembler is too confusing for mere mortals.
-    ;;    ;; If no base and no index, then it could be a SYMBOL-VALUE slot:
-    ;;    ;;   48891425D0003C50 MOV [#x503C00D0], RDX  ; (SYMBOL-VALUE '*MYVAR*)
-    ;;    (when (and (null base-reg) (null index-reg))
-    ;;      (when (maybe-note-static-lispobj disp dstate)
-    ;;        (return-from print-mem-ref)))
-    #+sb-thread
+
     (flet ((guess-symbol (predicate)
              (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
                         (header-n-words (code-header-words code-header)))
@@ -458,7 +456,15 @@
                      for obj = (code-header-ref code-header word-num)
                      when (and (symbolp obj) (funcall predicate obj))
                      do (return obj)))))
+      (when (and (not base-reg) (not index-reg) disp)
+        (let ((addr (+ disp ; guess that DISP points to a symbol-value slot
+                       (- (ash sb-vm:symbol-value-slot sb-vm:word-shift))
+                       sb-vm:other-pointer-lowtag)))
+          (awhen (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))
+            (note (lambda (stream) (prin1 it stream)) dstate)
+            (return-from print-mem-ref))))
       ;; Try to reverse-engineer which thread-local binding this is
+      #+sb-thread
       (cond ((and disp ; Test whether disp looks aligned to an object header
                   (not (logtest (- disp 4) sb-vm:lowtag-mask))
                   (not base-reg) (not index-reg))
@@ -466,8 +472,7 @@
                     (symbol
                      (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))))
                (when symbol
-                 ;; Q: what's the difference between "tls_index:" and "tls:" (below)?
-                 (note (lambda (stream) (format stream "tls_index: ~S" symbol))
+                 (note (lambda (stream) (format stream "tls: ~S" symbol))
                        dstate))))
             ;; thread slots
             ((and (eql base-reg sb-vm::thread-reg)
@@ -491,12 +496,6 @@
                  (return-from print-mem-ref
                    (note (lambda (stream) (format stream "tls: ~S" symbol))
                          dstate)))))
-            ((and (not base-reg) (not index-reg) disp)
-             (let ((addr (+ disp ; guess that DISP points to a symbol-value slot
-                            (- (ash sb-vm:symbol-value-slot sb-vm:word-shift))
-                            sb-vm:other-pointer-lowtag)))
-               (awhen (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))
-                 (note (lambda (stream) (format stream "~A" it)) dstate))))
             ))))
 
 (defun lea-compute-label (value dstate)

@@ -1164,4 +1164,4 @@
 (defglobal *myglobalvar* 3)
 (with-test (:name :disassemble-symbol-global-value)
   (assert (loop for line in (disassembly-lines '(lambda () *myglobalvar*))
-                thereis (search "(SYMBOL-VALUE '*MYGLOBALVAR*)" line))))
+                thereis (search "*MYGLOBALVAR*" line))))
