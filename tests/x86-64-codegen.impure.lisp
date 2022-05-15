@@ -63,16 +63,8 @@
                                       '(lambda () (sb-sys:%primitive tryme))))
                 thereis (search "MOV BYTE PTR GS:[RAX]" line))))
 
-(defun disasm (safety expr &optional (remove-epilogue t))
-  ;; This lambda has a name because if it doesn't, then the name
-  ;; is something stupid like (lambda () in ...) which pretty-prints
-  ;; on a random number of lines.
-  (let ((fun (compile nil
-                      `(sb-int:named-lambda test ()
-                         (declare (optimize (debug 0) (safety ,safety)
-                                            (sb-c:verify-arg-count 0)))
-                         ,expr))))
-    (let ((lines (disassembly-lines fun)))
+(defun strip-assem-junk (fun &optional (remove-epilogue t))
+    (let ((lines (disassembly-lines (compile nil fun))))
       ;; For human-readability, kill the whitespace
       (setq lines (mapcar (lambda (x) (string-left-trim " ;" x)) lines))
       (when (string= (car (last lines)) "")
@@ -87,16 +79,34 @@
                       '("MOV RSP, RBP" "CLC" "POP RBP" "RET")
                       (subseq lines (- (length lines) 4))))
           (butlast lines 4)
-          lines))))
+          lines)))
+(defun disasm-load (safety symbol)
+  ;; This lambda has a name because if it doesn't, then the name
+  ;; is something stupid like (lambda () in ...) which pretty-prints
+  ;; on a random number of lines.
+  (strip-assem-junk   `(sb-int:named-lambda test ()
+                         (declare (optimize (debug 0) (safety ,safety)
+                                            (sb-c:verify-arg-count 0)))
+                         ,symbol)))
+(defun disasm-store (sexpr)
+  (strip-assem-junk   `(sb-int:named-lambda test (x)
+                         (declare (ignorable x))
+                         (declare (optimize (debug 0)
+                                            (sb-c:verify-arg-count 0)))
+                         ,sexpr)))
 
 (with-test (:name :symeval-known-thread-local
             :skipped-on (not :sb-thread))
   ;; It should take 1 instruction to read a known thread-local var
-  (assert (= (length (disasm 1 'sb-thread:*current-thread*)) 1))
-  (assert (= (length (disasm 1 'sb-sys:*interrupt-pending*)) 1))
-  (assert (= (length (disasm 1 'sb-kernel:*gc-inhibit*)) 1))
-  (assert (= (length (disasm 1 'sb-kernel:*restart-clusters*)) 1))
-  (assert (= (length (disasm 1 'sb-kernel:*handler-clusters*)) 1)))
+  (assert (= (length (disasm-load 1 'sb-thread:*current-thread*)) 1))
+  (assert (= (length (disasm-load 1 'sb-sys:*interrupt-pending*)) 1))
+  (assert (= (length (disasm-load 1 'sb-kernel:*gc-inhibit*)) 1))
+  (assert (= (length (disasm-load 1 'sb-kernel:*restart-clusters*)) 1))
+  (assert (= (length (disasm-load 1 'sb-kernel:*handler-clusters*)) 1)))
+
+(with-test (:name :set-known-thread-local :skipped-on (not :sb-thread))
+  ;; It should take 1 instruction to write a known thread-local var
+  (assert (= (length (disasm-store '(setq sb-kernel:*gc-inhibit* x))) 1)))
 
 ;; Lack of earmuffs on this symbol allocates it in dynamic space
 (defvar foo)
@@ -113,7 +123,7 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142538F94B20 CMOVEQ RDX, [#x204BF938]  ; *PRINT-BASE*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
-  (let ((text (disasm 0 '*print-base*)))
+  (let ((text (disasm-load 0 '*print-base*)))
     (assert (= (length text) 3)) ; number of lines
     ;; two lines should be annotated with *PRINT-BASE*
     (assert (= (loop for line in text count (search "*PRINT-BASE*" line)) 2)))
@@ -123,7 +133,7 @@
   ;;    488B059EFFFFFF     MOV RAX, [RIP-98]         ; 'FOO
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
-  (let ((text (disasm 0 'foo)))
+  (let ((text (disasm-load 0 'foo)))
     (assert (= (length text) 4))
     ;; two lines should be annotated with FOO
     (assert (= (loop for line in text count (search "FOO" line)) 2))))
@@ -142,7 +152,7 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142518A24C20 CMOVEQ RDX, [#x204CA218] ; *BLUB*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
-  (let ((text (disasm 0 '*blub*)))
+  (let ((text (disasm-load 0 '*blub*)))
     (assert (= (length text) 4))
     ;; two lines should be annotated with *BLUB*
     (assert (= (loop for line in text count (search "*BLUB*" line)) 2)))
@@ -153,7 +163,7 @@
   ;;    4A8B142A           MOV RDX, [RDX+R13]
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
-  (assert (= (length (disasm 0 'blub)) 5)))
+  (assert (= (length (disasm-load 0 'blub)) 5)))
 
 (with-test (:name :object-not-type-error-encoding)
   ;; There should not be a "MOV Rnn, #xSYMBOL" instruction

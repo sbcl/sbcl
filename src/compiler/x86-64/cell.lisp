@@ -83,18 +83,93 @@
   (:generator 1
     (inst mov result (unbound-marker-bits))))
 
+(defmacro emit-symbol-write-barrier (sym &rest rest)
+  ;; IMMEDIATE sc means that the symbol is static or immobile.
+  ;; Static symbols are roots, and immobile symbols use page fault handling.
+  `(unless (sc-is ,sym immediate) (emit-gc-store-barrier ,sym ,@rest)))
+
 (define-vop (%set-symbol-global-value)
-  (:args (object :scs (descriptor-reg immediate))
+  (:args (symbol :scs (descriptor-reg immediate))
          (value :scs (descriptor-reg any-reg immediate)))
   (:policy :fast-safe)
   (:temporary (:sc unsigned-reg) val-temp)
   (:vop-var vop)
   (:generator 4
-    (emit-gc-store-barrier object nil val-temp (vop-nth-arg 1 vop) value)
-    (gen-cell-set (if (sc-is object immediate)
-                      (symbol-slot-ea (tn-value object) symbol-value-slot)
-                      (object-slot-ea object symbol-value-slot other-pointer-lowtag))
+    (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
+    (gen-cell-set (if (sc-is symbol immediate)
+                      (symbol-slot-ea (tn-value symbol) symbol-value-slot)
+                      (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))
                   value val-temp)))
+
+;;; This does not resolve the TLS-INDEX at load-time, because we don't want to
+;;; waste TLS indices for symbols that may never get thread-locally bound.
+;;; So instead we make a fixup to the address of the 4-byte TLS field in the symbol.
+(defun symbol-tls-index-ea (symbol)
+  (ea (make-fixup (tn-value symbol) :immobile-symbol (- 4 other-pointer-lowtag))))
+
+(defun get-symbol-value-slot-ea (ea-tn symbol)
+  (if (sc-is symbol immediate)
+      (inst mov ea-tn (make-fixup (tn-value symbol) :immobile-symbol
+                                  (- (ash symbol-value-slot word-shift) other-pointer-lowtag)))
+      (inst lea ea-tn (object-slot-ea symbol symbol-value-slot other-pointer-lowtag))))
+
+;;; As implemented for x86-64, SET performs at most one conditional branch and no
+;;; unconditional jump, contrasting with the other common approach of branching around
+;;; a store to either the TLS or the global value, followed by an unconditional jump
+;;; out, and in the middle doing the opposite of whichever store was jumped over.
+;;; (see the arm64, ppc64, and riscv implementations)
+;;; I would surmise that one unconditional branch is preferable.
+;;; Slightly in favor of that claim is that if you run this through a C compiler:
+;;;   void f1(long val, int test, long *a, long *b) {
+;;;       if (test) *a = val; else *b = val;
+;;;   }
+;;; it generates the same code as if you had written "*(test?a:b) = val;"
+;;; So while that's not 100% analagous to this situation here, it does imply
+;;; slight favoritism for branch-free code. It might be possible to use CMOV
+;;; if we don't need to emit the GC barrier such as when storing a fixnum.
+;;; On the other hand, Torvalds has ranted against writing branchless code
+;;; for its own sake (https://yarchive.net/comp/linux/cmov.html)
+;;;
+;;; FIXME: quite likely this vop should exist in several variants, for a known
+;;; symbol, variable symbol, etc. As it stands, we can see that a symbol is
+;;; always-thread-local only if immobile-space is in use, wherein the symbol's SC
+;;; is immediate.
+#+sb-thread
+(define-vop (set)
+  (:args (symbol :scs (descriptor-reg immediate))
+         (value :scs (descriptor-reg any-reg immediate)))
+  (:temporary (:sc unsigned-reg) val-temp cell)
+  #+gs-seg (:temporary (:sc unsigned-reg) thread-temp)
+  (:vop-var vop)
+  (:generator 4
+    (if (and (sc-is symbol immediate)
+             (eq (info :variable :wired-tls (tn-value symbol)) :always-thread-local))
+        ;; We never need the GC barrier for TLS.  I think it would be preferable
+        ;; to resolve this in IR1, maybe turning it into SET-TLS-VALUE.
+        (gen-cell-set (ea (make-fixup (tn-value symbol) :symbol-tls-index) thread-tn)
+                      value val-temp)
+        (let ((store (gen-label)))
+          (cond ((and (sc-is symbol immediate)
+                      (info :variable :wired-tls (tn-value symbol)))
+                 ;; The TLS index is arbitrary but known to be nonzero,
+                 ;; so we can resolve the displacement of the thread-local value
+                 ;; at load-time, saving one instruction over the general case.
+                 (inst lea cell (ea (make-fixup (tn-value symbol) :symbol-tls-index)
+                                    thread-tn)))
+                (t
+                 ;; These MOVs look the same, but when the symbol is immediate, this is
+                 ;; a load from an absolute address. Needless to say, the names of these
+                 ;; accessor macros are arbitrary - the difference is not very apparent.
+                 (inst mov :dword cell (if (sc-is symbol immediate)
+                                           (symbol-tls-index-ea symbol)
+                                           (tls-index-of symbol)))
+                 (inst add cell thread-tn)))
+          (inst cmp :dword (ea cell) no-tls-value-marker-widetag)
+          (inst jmp :ne STORE)
+          (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
+          (get-symbol-value-slot-ea cell symbol)
+          (emit-label STORE)
+          (gen-cell-set (ea cell) value val-temp)))))
 
 (define-vop (fast-symbol-global-value)
   (:args (object :scs (descriptor-reg immediate)))
@@ -132,34 +207,40 @@
       `(%cas-symbol-global-value symbol old new)
       (sb-c::give-up-ir1-transform)))
 
-(macrolet (;; Logic common to thread-aware SET and CAS. CELL is assigned
-           ;; to the location that should be accessed to modify SYMBOL's
-           ;; value either in the TLS or the symbol's value slot as follows:
-           ;; (1) make it look as if the TLS cell were a symbol by biasing
-           ;;     upward by other-pointer-lowtag less 1 word.
-           ;; (2) conditionally make CELL point to the symbol itself
-           (compute-virtual-symbol ()
-             `(progn
-                (inst mov :dword cell (tls-index-of symbol))
-                #+gs-seg (inst rdgsbase thread-temp)
-                (inst lea cell
-                      (ea (- other-pointer-lowtag (ash symbol-value-slot word-shift))
-                          #+gs-seg thread-temp
-                          #-gs-seg thread-tn
-                          cell))
-                (inst cmp :dword (symbol-value-slot-ea cell) ; TLS reference
-                      no-tls-value-marker-widetag)
-                (inst cmov :e cell symbol))) ; now possibly get the symbol
-           (access-wired-tls-val (sym) ; SYM is a symbol
+(macrolet ((access-wired-tls-val (sym) ; SYM is a symbol
              `(thread-tls-ea (load-time-tls-offset ,sym)))
            (symbol-value-slot-ea (sym) ; SYM is a TN
              `(ea (- (* symbol-value-slot n-word-bytes) other-pointer-lowtag)
-                  ,sym)))
+                  ,sym))
+           (load-oldval ()
+             `(if (sc-is old immediate)
+                  (inst mov rax (encode-value-if-immediate old))
+                  (move rax old))))
 
-  (define-vop (%compare-and-swap-symbol-value)
+(define-vop (%cas-symbol-global-value)
+    (:translate %cas-symbol-global-value)
+    (:args (symbol :scs (descriptor-reg immediate) :to (:result 0))
+           (old :scs (descriptor-reg any-reg constant immediate))
+           (new :scs (descriptor-reg any-reg)))
+    ;; RAX is the temp for computing the card mark, so it has to conflict
+    ;; with OLD and therefore the default lifetime spec is fine
+    (:temporary (:sc descriptor-reg :offset rax-offset :to (:result 0)) rax)
+    (:results (result :scs (descriptor-reg any-reg)))
+    (:policy :fast-safe)
+    (:vop-var vop)
+    (:generator 10
+      (emit-symbol-write-barrier symbol nil rax (vop-nth-arg 2 vop) new)
+      (load-oldval)
+      (inst cmpxchg :lock (if (sc-is symbol immediate)
+                              (symbol-slot-ea (tn-value symbol) symbol-value-slot)
+                              (symbol-value-slot-ea symbol))
+            new)
+      (move result rax)))
+
+(define-vop (%compare-and-swap-symbol-value)
     (:translate %compare-and-swap-symbol-value)
-    (:args (symbol :scs (descriptor-reg) :to (:result 0))
-           (old :scs (descriptor-reg any-reg) :target rax)
+    (:args (symbol :scs (descriptor-reg immediate) :to (:result 0))
+           (old :scs (descriptor-reg any-reg constant immediate) :target rax)
            (new :scs (descriptor-reg any-reg)))
     (:temporary (:sc descriptor-reg :offset rax-offset
                  :from (:argument 1) :to (:result 0)) rax)
@@ -168,6 +249,7 @@
     (:results (result :scs (descriptor-reg any-reg)))
     (:policy :fast-safe)
     (:vop-var vop)
+    (:node-var node)
     (:generator 15
     ;; This code has two pathological cases: NO-TLS-VALUE-MARKER
     ;; or UNBOUND-MARKER as NEW: in either case we would end up
@@ -175,63 +257,31 @@
     ;; Even worse: don't supply old=NO-TLS-VALUE with a symbol whose
     ;; tls-index=0, because that would succeed, assigning NEW to each
     ;; symbol in existence having otherwise no thread-local value.
-      ;; Possible optimization: don't frob the card mark when storing into TLS
-      (emit-gc-store-barrier symbol nil cell (vop-nth-arg 2 vop) new)
-      (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol)))
-        #+sb-thread (progn (compute-virtual-symbol)
-                            (move rax old)
-                            (inst cmpxchg :lock (symbol-value-slot-ea cell) new))
-        #-sb-thread (progn (move rax old)
-                            ;; is the :LOCK is necessary?
-                            (inst cmpxchg :lock (symbol-value-slot-ea symbol) new))
+      #+sb-thread (progn
+      (inst mov :dword cell (if (sc-is symbol immediate)
+                                (symbol-tls-index-ea symbol)
+                                (tls-index-of symbol)))
+      (inst add cell thread-tn)
+      (inst cmp :dword (ea cell) no-tls-value-marker-widetag)
+      (inst jmp :ne CAS))
+      ;; GLOBAL. All logic that follows is for both + and - sb-thread
+      (emit-symbol-write-barrier symbol nil cell (vop-nth-arg 2 vop) new)
+      (get-symbol-value-slot-ea cell symbol)
+      CAS
+      (load-oldval)
+      (inst cmpxchg :lock (ea cell) new)
+      ;; FIXME: if :ALWAYS-BOUND then elide the BOUNDP check.
+      ;; But we don't accept a constant or immediate, so how to know
+      ;; what symbol is being CASed? I kind of feel like whether to perform
+      ;; the check ought to be supplied as codegen info so that we don't
+      ;; conflate storage-class of an arg with whether we could elide the check.
+      (unless (policy node (= safety 0))
         (inst cmp :byte rax unbound-marker-widetag)
-        (inst jmp :e unbound)
-        (move result rax))))
-
-  (define-vop (%cas-symbol-global-value)
-    (:translate %cas-symbol-global-value)
-    (:args (symbol :scs (descriptor-reg immediate) :to (:result 0))
-           (old :scs (descriptor-reg any-reg) #|:target rax|#)
-           (new :scs (descriptor-reg any-reg)))
-    ;; if OLD were LOCATION= to RAX then we'd clobber OLD
-    ;; while computing the EA for the barrier.
-    (:temporary (:sc descriptor-reg :offset rax-offset
-                 #|:from (:argument 1)|# :to (:result 0)) rax)
-    (:results (result :scs (descriptor-reg any-reg)))
-    (:policy :fast-safe)
-    (:vop-var vop)
-    (:generator 10
-      (emit-gc-store-barrier symbol nil rax (vop-nth-arg 2 vop) new)
-      (move rax old)
-      (inst cmpxchg :lock
-            (if (sc-is symbol immediate)
-                (symbol-slot-ea (tn-value symbol) symbol-value-slot)
-                (symbol-value-slot-ea symbol))
-            new)
+        (inst jmp :e (generate-error-code vop 'unbound-symbol-error symbol)))
       (move result rax)))
 
   #+sb-thread
   (progn
-    ;; TODO: SET could be shorter for any known wired-tls symbol.
-    ;; Note that the 32-bit x86 code prefers to use branching code here, where it accesses
-    ;; either the symbol's slot or the segment-relative absolute displacement to the TLS.
-    ;; This prefers CMOV, which means we always need the thread's address in a GPR.
-    (define-vop (set)
-      (:args (symbol :scs (descriptor-reg))
-             (value :scs (descriptor-reg any-reg immediate)))
-      (:temporary (:sc descriptor-reg) cell)
-      (:temporary (:sc unsigned-reg) val-temp)
-      #+gs-seg (:temporary (:sc unsigned-reg) thread-temp)
-      (:vop-var vop)
-      (:generator 4
-        ;; Possible optimization: don't frob the card mark when storing into TLS
-        (emit-gc-store-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
-        ;; Compute the address into which to store. CMOV can only move into
-        ;; a register, so we can't conditionally move into the TLS and
-        ;; conditionally move in the opposite flag sense to the symbol.
-        (compute-virtual-symbol)
-        (gen-cell-set (symbol-value-slot-ea cell) value val-temp)))
-
     ;; This code is tested by 'codegen.impure.lisp'
     (defun emit-symeval (value symbol symbol-reg check-boundp vop)
       (let* ((known-symbol-p (sc-is symbol constant immediate))

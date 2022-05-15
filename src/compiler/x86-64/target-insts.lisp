@@ -472,7 +472,9 @@
                     (symbol
                      (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))))
                (when symbol
-                 (note (lambda (stream) (format stream "tls: ~S" symbol))
+                 ;; "tls_index:" is access to the half-sized slot within the
+                 ;; symbol header that provides an offset into TLS.
+                 (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
             ;; thread slots
             ((and (eql base-reg sb-vm::thread-reg)
@@ -494,6 +496,7 @@
                                      :key #'symbol-tls-index))))
                (when symbol
                  (return-from print-mem-ref
+                   ;; "tls:" refers to the current value of the symbol in TLS
                    (note (lambda (stream) (format stream "tls: ~S" symbol))
                          dstate)))))
             ))))
