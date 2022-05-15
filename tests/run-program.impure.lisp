@@ -19,8 +19,8 @@
     (length initially-open-fds)))
 
 (with-test (:name (run-program :autoclose-streams)
-            :skipped-on (:or :sbcl ;; not reliable enough
-                             (:not :linux)))
+            :broken-on :sbcl  ;; not reliable enough
+            :skipped-on (not :linux))
   (let ((n-initially-open-fds (bin-pwd-ignoring-result)))
     (gc)
     (sb-sys:scrub-control-stack) ; Make sure we're not referencing the #<process>
