@@ -209,18 +209,22 @@
 
 (defun line/col-from-charpos
     (stream &optional (charpos (ansi-stream-input-char-pos stream)))
-  (let* ((newlines (form-tracking-stream-newlines stream))
-         (index (position charpos newlines :test #'>= :from-end t)))
-    ;; Line numbers traditionally begin at 1, columns at 0.
-    (if index
-        ;; INDEX is 1 less than the number of newlines seen
-        ;; up to and including this startpos.
-        ;; e.g. index=0 => 1 newline seen => line=2
-        (cons (+ index 2)
-              ;; 1 char after the newline = column 0
-              (- charpos (aref newlines index) 1))
-        ;; zero newlines were seen
-        (cons 1 charpos))))
+  (let ((newlines (form-tracking-stream-newlines stream)))
+   (if charpos
+       (let ((index (position charpos newlines :test #'>= :from-end t)))
+         ;; Line numbers traditionally begin at 1, columns at 0.
+         (if index
+             ;; INDEX is 1 less than the number of newlines seen
+             ;; up to and including this startpos.
+             ;; e.g. index=0 => 1 newline seen => line=2
+             (cons (+ index 2)
+                   ;; 1 char after the newline = column 0
+                   (- charpos (aref newlines index) 1))
+             ;; zero newlines were seen
+             (cons 1 charpos)))
+       ;; No charpos means the error is before reading the first char
+       ;; e.g. an encoding error. Take the last Newline.
+       (cons (1+ (length newlines)) 0))))
 
 ;;;; CORE OUTPUT FUNCTIONS
 
