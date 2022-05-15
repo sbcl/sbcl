@@ -104,7 +104,8 @@
   (assert (= (length (disasm-load 1 'sb-kernel:*restart-clusters*)) 1))
   (assert (= (length (disasm-load 1 'sb-kernel:*handler-clusters*)) 1)))
 
-(with-test (:name :set-known-thread-local :skipped-on (not :sb-thread))
+(with-test (:name :set-known-thread-local :skipped-on (or (not :immobile-space)
+                                                          (not :sb-thread)))
   ;; It should take 1 instruction to write a known thread-local var
   (assert (= (length (disasm-store '(setq sb-kernel:*gc-inhibit* x))) 1)))
 
