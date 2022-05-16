@@ -88,38 +88,32 @@
                           (directory "*/"))))))
 
 (with-test (:name (directory *default-pathname-defaults* :bug-1740563))
-  ;; FIXME: this writes into the source directory depending on whether
-  ;; TEST_DIRECTORY has been made to point elsewhere or not.
-  (let ((test-directory (concatenate 'string (sb-ext:posix-getenv "TEST_DIRECTORY") "/")))
-    (ensure-directories-exist test-directory)
-    (close (open (merge-pathnames "a.txt" test-directory) :if-does-not-exist :create))
-    (close (open (merge-pathnames "b.lisp" test-directory) :if-does-not-exist :create))
-    (unwind-protect
-         (flet ((directory* (pattern &rest d-p-d-components)
-                  (let ((*default-pathname-defaults*
-                         (apply #'make-pathname
-                                :defaults *default-pathname-defaults*
-                                d-p-d-components)))
-                    (directory pattern))))
-           (let* ((*default-pathname-defaults* (pathname test-directory))
-                  (expected-wild (directory "*.*"))
-                  (expected-one-file (directory "a.txt"))
-                  (cases '((:name nil   :type "txt")
-                           (:name nil   :type :wild)
-                           (:name "a"   :type nil)
-                           (:name "a"   :type "txt")
-                           (:name "a"   :type :wild)
-                           (:name :wild :type nil)
-                           (:name :wild :type :wild)
-                           (:name :wild :type "txt"))))
-             (dolist (components cases)
-               (assert (equal (apply #'directory* "*.*" components)
-                              expected-wild))
-               (assert (equal (apply #'directory* "a.txt" components)
-                              expected-one-file)))
-             (assert (equal (directory* "" :name :wild :type :wild)
-                            expected-wild))))
-      (delete-directory test-directory :recursive t))))
+  (with-test-directory ()
+    (close (open "a.txt" :if-does-not-exist :create))
+    (close (open "b.lisp" :if-does-not-exist :create))
+    (flet ((directory* (pattern &rest d-p-d-components)
+             (let ((*default-pathname-defaults*
+                     (apply #'make-pathname
+                            :defaults *default-pathname-defaults*
+                            d-p-d-components)))
+               (directory pattern))))
+      (let* ((expected-wild (directory "*.*"))
+             (expected-one-file (directory "a.txt"))
+             (cases '((:name nil   :type "txt")
+                      (:name nil   :type :wild)
+                      (:name "a"   :type nil)
+                      (:name "a"   :type "txt")
+                      (:name "a"   :type :wild)
+                      (:name :wild :type nil)
+                      (:name :wild :type :wild)
+                      (:name :wild :type "txt"))))
+        (dolist (components cases)
+          (assert (equal (apply #'directory* "*.*" components)
+                         expected-wild))
+          (assert (equal (apply #'directory* "a.txt" components)
+                         expected-one-file)))
+        (assert (equal (directory* "" :name :wild :type :wild)
+                       expected-wild))))))
 
 ;;;; OPEN
 
@@ -404,22 +398,17 @@
                     (append (when namep '(:name :unspecific))
                             (when typep '(:type :unspecific)))))
            (test (as-file as-directory)
-             (let* ((test-directory (concatenate
-                                     'string
-                                     (sb-ext:posix-getenv "TEST_DIRECTORY") "/"))
-                    (delete-directory (merge-pathnames
-                                       (typecase as-file
-                                         (string (prepare as-file))
-                                         (pathname as-file))
-                                       test-directory)))
-               (ensure-directories-exist (merge-pathnames
-                                          (prepare as-directory)
-                                          test-directory))
-               (unwind-protect
-                    (progn
-                      (delete-directory delete-directory)
-                      (assert (not (probe-file (prepare as-directory)))))
-                 (delete-directory test-directory :recursive t)))))
+             (with-test-directory (test-directory)
+               (let ((delete-directory (merge-pathnames
+                                         (typecase as-file
+                                           (string (prepare as-file))
+                                           (pathname as-file))
+                                         test-directory)))
+                 (ensure-directories-exist (merge-pathnames
+                                            (prepare as-directory)
+                                            test-directory))
+                 (delete-directory delete-directory)
+                 (assert (not (probe-file (prepare as-directory))))))))
     ;; Name component present
     #-win32 (test "aE?b"                    "aE?b/")
     #-win32 (test "aE*b"                    "aE*b/")

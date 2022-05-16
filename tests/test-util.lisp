@@ -34,6 +34,8 @@
            #:scratch-file-name
            #:*scratch-file-prefix*
            #:with-scratch-file
+           #:with-test-directory
+           #:*test-directory*
            #:opaque-identity
            #:runtime #:split-string #:integer-sequence #:shuffle))
 
@@ -883,6 +885,27 @@
        (unwind-protect
             (let ((,var ,tempname)) ,@forms) ; rebind, as test might asssign into VAR
          (ignore-errors (delete-file ,tempname))))))
+
+(defvar *test-directory*)
+
+(defun call-with-test-directory (fn)
+  ;; FIXME: this writes into the source directory depending on whether
+  ;; TEST_DIRECTORY has been made to point elsewhere or not.
+  (let ((test-directory (parse-native-namestring (posix-getenv "TEST_DIRECTORY")
+                                                 nil *default-pathname-defaults*
+                                                 :as-directory t)))
+    (ensure-directories-exist test-directory)
+    (unwind-protect
+         (let ((*default-pathname-defaults* test-directory)
+               (*test-directory* test-directory))
+           (funcall fn test-directory))
+      (delete-directory test-directory :recursive t))))
+
+(defmacro with-test-directory ((&optional (test-directory-var (gensym)))
+                               &body body)
+  `(call-with-test-directory (lambda (,test-directory-var)
+                               (declare (ignorable ,test-directory-var))
+                               ,@body)))
 
 ;;; Take a list of lists and assemble them as though they are
 ;;; instructions inside the body of a vop. There is no need

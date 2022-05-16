@@ -159,7 +159,10 @@
            (stem= (a b)
              (string= (stem-of a) (stem-of b)))
            (starts-with-p (string prefix)
-             (= (mismatch string prefix) (length prefix))))
+             (= (mismatch string prefix) (length prefix)))
+           (within-directory-p (path directory)
+             (starts-with-p (namestring (merge-pathnames path))
+                            (namestring directory))))
     (unless (eq (pathname-host filename) sb-impl::*physical-host*)
       (return-from check-manifest))
     (let ((string (namestring filename)))
@@ -174,9 +177,10 @@
                 (starts-with-p string "/tmp/")
                 (starts-with-p string "/var/tmp/")
                 (starts-with-p string "/private/var/folders/")
+                (and (boundp '*test-directory*)
+                     (within-directory-p filename *test-directory*))
                 (string= string "exists")
                 (member (stem-of filename) '("compiler-test-util.lisp"
-                                             "a.txt" "b.lisp"
                                              "no-such-file")
                         :test #'string=)
                 (string= (pathname-name filename) "i-am-not") ; any extension
