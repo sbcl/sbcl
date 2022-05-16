@@ -569,6 +569,16 @@
   (:result-types unsigned-num)
   (:translate %raw-instance-cas/word))
 
+(define-vop (%raw-instance-cas/signed-word %instance-cas)
+  (:args (object)
+         (index)
+         (old-value :scs (signed-reg))
+         (new-value :scs (signed-reg)))
+  (:arg-types * tagged-num signed-num signed-num)
+  (:results (result :scs (signed-reg) :from :load))
+  (:result-types signed-num)
+  (:translate %raw-instance-cas/signed-word))
+
 
 ;;;; Code object frobbing.
 
