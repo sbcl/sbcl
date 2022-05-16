@@ -11,16 +11,6 @@
 
 (in-package "SB-IMPL")
 
-(defmacro sb-xc:declaim (&rest declaration-specifiers)
-  #+sb-devel
-  (setq declaration-specifiers
-        (remove-if (lambda (declaration-specifier)
-                     (member (first declaration-specifier)
-                             '(#+sb-devel start-block
-                               #+sb-devel end-block)))
-                   declaration-specifiers))
-  `(cl:declaim ,@declaration-specifiers))
-
 (declaim (declaration truly-dynamic-extent))
 
 ;;; MAYBE-INLINE, FREEZE-TYPE, and block compilation declarations can be safely ignored

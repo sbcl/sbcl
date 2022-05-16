@@ -292,10 +292,6 @@
     "UPGRADED-ARRAY-ELEMENT-TYPE"
     "UPGRADED-COMPLEX-PART-TYPE"
     "WITH-COMPILATION-UNIT"
-
-    ;; For debugging purposes, we want to be able to intercept inline
-    ;; and block compilation declamations in the host.
-    "DECLAIM"
     ))
 
 ;;; A symbol in the "dual personality" list refers to the symbol in CL unless
