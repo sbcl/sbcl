@@ -72,19 +72,26 @@
 #+sb-thread
 (progn
   (define-vop (set)
-    (:args (object :scs (descriptor-reg))
+    (:args (object :scs (descriptor-reg)
+                   :load-if (not (and (sc-is object constant)
+                                      (symbol-always-has-tls-value-p (tn-value object)))))
            (value :scs (descriptor-reg any-reg zero)))
     (:temporary (:sc any-reg) tls-index)
     (:generator 4
-      (inst ldr (32-bit-reg tls-index) (tls-index-of object))
-      (inst ldr tmp-tn (@ thread-tn tls-index))
-      (inst cmp tmp-tn no-tls-value-marker-widetag)
-      (inst b :ne LOCAL)
-      (storew value object symbol-value-slot other-pointer-lowtag)
-      (inst b DONE)
-      LOCAL
-      (inst str value (@ thread-tn tls-index))
-      DONE))
+      (sc-case object
+        (constant
+         (inst str value (@ thread-tn (make-fixup (tn-value object) :symbol-tls-index))))
+        (t
+         (assemble ()
+           (inst ldr (32-bit-reg tls-index) (tls-index-of object))
+           (inst ldr tmp-tn (@ thread-tn tls-index))
+           (inst cmp tmp-tn no-tls-value-marker-widetag)
+           (inst b :ne LOCAL)
+           (storew value object symbol-value-slot other-pointer-lowtag)
+           (inst b DONE)
+           LOCAL
+           (inst str value (@ thread-tn tls-index))
+           DONE)))))
 
   (define-vop (symbol-value checked-cell-ref)
     (:translate symbol-value)
