@@ -454,6 +454,11 @@
 (define-full-compare-and-swap %raw-instance-cas/word instance
   instance-slots-offset instance-pointer-lowtag
   (unsigned-reg) unsigned-num %raw-instance-cas/word)
+
+(define-full-compare-and-swap %raw-instance-cas/signed-word instance
+  instance-slots-offset instance-pointer-lowtag
+  (signed-reg) signed-num %raw-instance-cas/signed-word)
+
 
 ;;;; code object frobbing
 

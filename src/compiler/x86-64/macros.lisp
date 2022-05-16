@@ -291,7 +291,7 @@
                (%instance-cas
                 ;; store barrier affects only the object's base address
                 '((emit-gc-store-barrier object nil rax (vop-nth-arg 3 vop) new-value)))
-               (%raw-instance-cas/word))
+               ((%raw-instance-cas/word %raw-instance-cas/signed-word)))
            (move rax old-value)
            (inst cmpxchg :lock ea new-value)
            (move value rax))))))
