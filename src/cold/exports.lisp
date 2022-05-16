@@ -2730,6 +2730,13 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 
            "BRANCH"  "FLUSHABLE"))
 
+(defpackage* #.(backend-asm-package-name)
+  (:documentation "private: backend-specific assembler mnemonics")
+  (:use "CL" "SB-ASSEM" "SB-DISASSEM"
+        "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
+        "SB-SYS" "SB-C")
+  (:shadow "SEGMENT" "MAKE-SEGMENT"))
+
 (defpackage* "SB-THREAD"
   (:documentation "public (but low-level): native thread support")
   (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-KERNEL")

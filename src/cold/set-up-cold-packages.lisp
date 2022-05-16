@@ -492,35 +492,8 @@
       (dolist (name (apply #'append (read data)))
         (setf (gethash name *undefined-fun-allowlist*) t)))))
 
-(defvar *asm-package-use-list*
-  '("SB-ASSEM" "SB-DISASSEM"
-    "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
-    "SB-SYS" ; for SAP accessors
-    ;; Dependence of the assembler on the compiler feels a bit backwards,
-    ;; but assembly needs TN-SC, TN-OFFSET, etc. because the compiler
-    ;; doesn't speak the assembler's language. Rather vice-versa.
-    "SB-C"))
-(defun make-assembler-package (pkg-name)
-  (when (find-package pkg-name)
-    (delete-package pkg-name))
-  (let ((pkg (make-package pkg-name
-                           :use (cons "XC-STRICT-CL" (cddr *asm-package-use-list*)))))
-    ;; Both SB-ASSEM and SB-DISASSEM export these two symbols.
-    ;; Neither is shadowing-imported. If you need one, package-qualify it.
-    (shadow '("SEGMENT" "MAKE-SEGMENT") pkg)
-    (use-package '("SB-ASSEM" "SB-DISASSEM") pkg)
-    pkg))
-
-;; Each backend should have a different package for its instruction set
-;; so that they can co-exist.
-(make-assembler-package (backend-asm-package-name))
-
 (defun package-list-for-genesis ()
-  (append *package-data-list*
-          (let ((asm-package (backend-asm-package-name)))
-            (list (make-package-data :name asm-package
-                                     :use (list* "CL" *asm-package-use-list*)
-                                     :documentation nil)))))
+  *package-data-list*)
 
 ;;; Not all things shown by this are actually unused. Some get removed
 ;;; by the tree-shaker as intended.
