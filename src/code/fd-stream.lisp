@@ -1935,9 +1935,9 @@
         ;; us with a dangling finalizer (that would close the same
         ;; --possibly reassigned-- FD again), or a stream with a closed
         ;; FD that appears open.
+        (cancel-finalization fd-stream)
         (sb-unix:unix-close (fd-stream-fd fd-stream))
-        (set-closed-flame fd-stream)
-        (cancel-finalization fd-stream))
+        (set-closed-flame fd-stream))
     ;; On error unwind from WITHOUT-INTERRUPTS.
     (serious-condition (e)
       (error e)))
