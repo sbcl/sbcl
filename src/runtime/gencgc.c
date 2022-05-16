@@ -1994,9 +1994,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         return 0;
     }
 
-    // Use the legacy conservative_root_p logic for now
-
-#if 0 // def LISP_FEATURE_EDEN_PAGES
+#ifdef LISP_FEATURE_EDEN_PAGES
     // - Boxed objects won't have random bytes that masquerade as object headers,
     //   therefore any object header will demarcate an object start.
     // - Conses can only appear on dedicated pages.
@@ -2040,6 +2038,14 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
             lowtag == LOWTAG_FOR_WIDETAG(header_widetag(word)))
             return addr;
         return 0;
+    case PAGE_TYPE_UNBOXED:
+        // For unboxed, we're going to have to do one of two things:
+        // * linearly scan for the object
+        //   (would it make sense to have SMALL_UNBOXED pages so that we can
+        //   scan from a card base? Probably not. Card alignment is only
+        //   intended to benefit root page scavenging)
+        // * maintain the bitmap
+        //   this is easy because it doesn't involve lisp at all.
     }
 #endif
 
@@ -2367,24 +2373,36 @@ void visit_freed_objects(char __attribute__((unused)) *start,
 #endif
 }
 
-/* Translate 'from' and 'to' into coordinates in the allocator bitmap in 'bitmap'
- * and clear all bits between those coordinates.
+// clear bits in a word between [start,end] inclusive.
+// 'start' is a higher number than 'end' because we fill bits
+// from most-significant to least-significant.
+#define clear_bits(start,end,wordindex) { \
+    int nbits = start - end + 1; \
+    gc_assert(nbits > 0); \
+    bitmap[wordindex] &= ~((all_ones >> (N_WORD_BITS - nbits)) << end); }
+  
+/* Translate 'from' (inclusive) and 'to' (exclusive) into coordinates in
+ * the allocator bitmap in 'bitmap' and unset all bits between those coordinates.
  * This function is exposed to Lisp for testing */
-void clear_object_bitmap_range(uword_t* bitmap, char* from, char *to)
+void unset_objmap_range(uword_t* bitmap, char* from, char *to)
 {
-    // FIXME: use better algorithm a la (FILL (the simple-bit-vector ...) 0)
-    // but it's brain-hurty by negative indices.
-    struct cons* where = (void*)from;
-    while ((char*)where < to) {
-        clear_allocator_bitmap_bit(where);
-        ++where;
-    }
-    /*
     int from_bit, to_bit;
     long from_word, to_word;
-    from_bit = addr_to_bitmap_index(from, &from_word);
-    to_bit = addr_to_bitmap_index(to-1, &to_word);
-    */
+    from_bit = addr_to_bitmap_coordinates(from, &from_word);
+    to_bit = addr_to_bitmap_coordinates(to-1, &to_word);
+    const uword_t all_ones = ~(uword_t)0;
+    if (from_word != to_word) {
+        // There are at least 2 words to affect, and 0 or more words
+        // in between those words.
+        int n_interior_words = from_word - to_word - 1;
+        gc_assert(n_interior_words >= 0);
+        clear_bits(from_bit, 0, from_word);
+        clear_bits(63, to_bit,  to_word);
+        // remember, negative indexing means that 'to' is numerically lower
+        memset(&bitmap[to_word+1], 0, n_interior_words*N_WORD_BYTES);
+    } else { // all bits are within a single bitmap word
+        clear_bits(from_bit, to_bit, from_word);
+    }
 }
 
 /* Deposit a FILLER_WIDETAG object covering one or more dead objects.
@@ -2427,7 +2445,14 @@ void deposit_filler(char* from, char* to) {
     case PAGE_TYPE_SMALL_MIXED:
         // The allocator bitmap needs to be cleared, and then we do the regular
         // filler-insertion logic.
-        clear_object_bitmap_range(allocator_bitmap, from, to);
+#if 0
+        struct cons* where = (void*)from;
+        while ((char*)where < to) {
+             clear_allocator_bitmap_bit(where);
+             ++where;
+        }
+#endif
+        unset_objmap_range(allocator_bitmap, from, to);
         break;
     }
 #endif
@@ -2658,6 +2683,8 @@ static boolean NO_SANITIZE_MEMORY preserve_pointer(uword_t word)
     lispobj object = conservative_root_p(word, page);
     if (!object) return 0;
     if (object != AMBIGUOUS_POINTER) {
+        // This can't happen, right?
+        gc_assert(widetag_of(native_pointer(object)) != FILLER_WIDETAG);
         pin_object(object);
         return 1;
     }

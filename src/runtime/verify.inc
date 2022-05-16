@@ -534,7 +534,7 @@ static uword_t bitmap_scan_range(lispobj* where, lispobj* end, uword_t arg)
             where += 2*N_WORD_BITS;
         }
       }
-      ldb_monitor("Incomplete bitmap");
+      lose("Incomplete bitmap");
     }
 }
 

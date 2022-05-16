@@ -1,3 +1,74 @@
+(defun bitmap-coordinates (object-address)
+  (let ((offset
+         (ash (- (1- sb-vm:dynamic-space-start) object-address)
+              (- sb-vm:n-lowtag-bits))))
+    #+64-bit (values (ash offset -6) (logand offset #x3f))
+    #-64-bit (values (ash offset -5) (logand offset #x1f))))
+
+;;; The allocator bitmap is accessed from its end.
+(defun bitmap-end-sap (bitmap)
+  (sb-sys:sap+ (sb-sys:vector-sap bitmap) (/ (length bitmap) sb-vm:n-byte-bits)))
+
+;;; The "reference" algorithm operates on a single bit at a time
+(defun simple-bitmap-clear (bitmap cons-index n-conses)
+  (loop for object-address
+        from (+ sb-vm:dynamic-space-start (* sb-vm:cons-size sb-vm:n-word-bytes cons-index))
+        by (* sb-vm:cons-size sb-vm:n-word-bytes)
+        repeat n-conses
+        do (multiple-value-bind (word bit) (bitmap-coordinates object-address)
+             (let* ((sap (bitmap-end-sap bitmap))
+                    (offset (ash word sb-vm:word-shift)))
+               (setf (sb-sys:sap-ref-word sap offset)
+                     (logandc2 (sb-sys:sap-ref-word sap offset) (ash 1 bit)))))))
+
+(defun c-bitmap-clear (bitmap cons-index n-conses)
+  (let* ((object-address
+          (+ sb-vm:dynamic-space-start (* sb-vm:cons-size sb-vm:n-word-bytes cons-index)))
+         (limit
+          (+ object-address (* sb-vm:cons-size sb-vm:n-word-bytes n-conses))))
+  (alien-funcall (extern-alien "unset_objmap_range"
+                               (function void system-area-pointer unsigned unsigned))
+                 (bitmap-end-sap bitmap) object-address limit)))
+
+(defun allocator-bitmap-clearing-test ()
+  (let* ((n-words-of-bits 7)
+         (nbits (* n-words-of-bits sb-vm:n-word-bits))
+         (bitmap-a (make-array nbits :element-type 'bit))
+         (bitmap-b (make-array nbits :element-type 'bit)))
+    (sb-sys:with-pinned-objects (bitmap-a bitmap-b)
+      (loop for start-cons-index below nbits do
+        (loop for n-conses from 1 below (- nbits start-cons-index) do
+          (assert (<= n-conses nbits))
+          (fill bitmap-a 1)
+          (fill bitmap-b 1)
+          (simple-bitmap-clear bitmap-a start-cons-index n-conses)
+          (c-bitmap-clear bitmap-b start-cons-index n-conses)
+          (unless (equalp bitmap-a bitmap-b)
+            (format t "~&Shmegege~%~S~%~S~%" bitmap-a bitmap-b)
+            (error "Test case ~D,~D bitmaps differ at indices: ~S"
+                   start-cons-index n-conses
+                   (loop for i below nbits
+                         unless (= (sbit bitmap-a i) (sbit bitmap-b i))
+                         collect i))))))))
+
+(mapc 'compile
+      '(bitmap-coordinates bitmap-end-sap
+        simple-bitmap-clear c-bitmap-clear
+        allocator-bitmap-clearing-test))
+
+(with-test (:name :bitmap-lowtag-insensitive)
+  (loop for obj from sb-vm:dynamic-space-start by (* 2 sb-vm:n-word-bytes)
+        repeat 10
+        do
+     (multiple-value-bind (expect-word expect-bit) (bitmap-coordinates obj)
+       (loop for lowtag from 1 to sb-vm:lowtag-mask
+             do (multiple-value-bind (x y) (bitmap-coordinates (logior obj lowtag))
+                  (assert (= x expect-word))
+                  (assert (= y expect-bit)))))))
+
+(with-test (:name :allocator-bitmap-operations)
+  (allocator-bitmap-clearing-test))
+
 #+gencgc
 (progn
 (defun large-object-p (x)
