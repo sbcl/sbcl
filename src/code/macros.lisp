@@ -1933,7 +1933,7 @@ symbol-case giving up: case=((V U) (F))
              #+(or arm64 ppc ppc64 riscv x86 x86-64)
              ((word) '%raw-instance-cas/word)
              #+(or riscv x86 x86-64)
-             ((signed-word) '%raw-instance-cas/signed-word))))
+             ((sb-vm:signed-word) '%raw-instance-cas/signed-word))))
     (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
                 for a typed slot: ~S"
