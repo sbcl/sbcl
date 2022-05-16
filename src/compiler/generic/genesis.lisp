@@ -211,6 +211,7 @@
   (code-free-ranges (list nil))
   (non-code-free-ranges (list nil))
   ;; for metaspace
+  #+metaspace
   current-slab
   ;; Address of every object created in this space.
   (objects (or #+sb-devel (make-array 700000 :fill-pointer 0 :adjustable t)))
@@ -356,6 +357,7 @@
 ;;; If the current slab (at the head of METASPACE-SLABS)
 ;;; has room, then use it. Otherwise allocate a new slab
 ;;; at a lower address.
+#+metaspace
 (defun allocate-metaspace-layout (gspace nbytes)
   (assert (= nbytes (* 8 sb-vm:n-word-bytes)))
   (let ((slab (gspace-current-slab gspace)))
@@ -391,13 +393,15 @@
 ;;; is needed, we grow the GSPACE. The descriptor returned is a
 ;;; pointer of type LOWTAG.
 (defun allocate-cold-descriptor (gspace length lowtag &optional (page-type :mixed))
-  (let ((des
-         (if (and (eq gspace *read-only*) (eq lowtag sb-vm:instance-pointer-lowtag))
-             (allocate-metaspace-layout gspace length)
-             (let* ((relative-ptr (ash (gspace-claim-n-bytes gspace length page-type)
-                                       sb-vm:word-shift))
-                    (ptr (+ (gspace-byte-address gspace) relative-ptr)))
-               (make-descriptor (logior ptr lowtag) gspace relative-ptr)))))
+  (let* ((relative-ptr (ash (gspace-claim-n-bytes gspace length page-type)
+                            sb-vm:word-shift))
+         (ptr (+ (gspace-byte-address gspace) relative-ptr))
+         (des (if (and (eq gspace *read-only*) (eq lowtag sb-vm:instance-pointer-lowtag))
+                  #+metaspace
+                  (allocate-metaspace-layout gspace length)
+                  #-metaspace
+                  (error "Shouldn't happen.")
+                  (make-descriptor (logior ptr lowtag) gspace relative-ptr))))
     (awhen (gspace-objects gspace) (vector-push-extend des it))
     des))
 
