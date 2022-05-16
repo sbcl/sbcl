@@ -224,4 +224,4 @@
              (format t "~&~50t ~f~%" total-time))
            (sb-c::dump/restore-interesting-types 'write)))
      (sb-kernel::write-structure-definitions-as-text
-      (sb-cold:find-bootstrap-file "output/defstructs.lisp-expr")))))
+      (sb-cold:find-bootstrap-file "output/defstructs.lisp-expr" t)))))

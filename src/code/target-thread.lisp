@@ -2571,7 +2571,7 @@ mechanism for inter-thread communication."
 
 (eval-when (:compile-toplevel)
   ;; Inform genesis of the index <-> symbol mapping made by DEFINE-THREAD-LOCAL
-  (with-open-file (output (sb-cold:find-bootstrap-file "output/tls-init.lisp-expr")
+  (with-open-file (output (sb-cold:find-bootstrap-file "output/tls-init.lisp-expr" t)
                           :direction :output :if-exists :supersede)
     (let ((list (mapcar (lambda (x &aux (symbol (car x)))
                           (cons (info :variable :wired-tls symbol) symbol))
