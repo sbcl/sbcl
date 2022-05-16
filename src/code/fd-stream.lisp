@@ -2310,16 +2310,13 @@
     (set-fd-stream-routines stream element-type external-format
                             input output input-buffer-p)
     (when auto-close
-      ;; FIXME: this is broken
-      ;; the fd may have already been recycled for another stream.
-      ;; (finalize stream
-      ;;           (lambda ()
-      ;;             (sb-unix:unix-close fd)
-      ;;             #+sb-show
-      ;;             (format *terminal-io* "** closed file descriptor ~W **~%"
-      ;;                     fd))
-      ;;           :dont-save t)
-      )
+      (finalize stream
+                (lambda ()
+                  (sb-unix:unix-close fd)
+                  #+sb-show
+                  (format *terminal-io* "** closed file descriptor ~W **~%"
+                          fd))
+                :dont-save t))
     stream))
 
 ;;; Pick a name to use for the backup file for the :IF-EXISTS

@@ -1,4 +1,3 @@
-exit 104
 # Don't try to run sbcl from /tmp on openbsd as it's unlikely to be
 # mounted with wxallowed
 if [ "$SBCL_SOFTWARE_TYPE" != OpenBSD ]; then

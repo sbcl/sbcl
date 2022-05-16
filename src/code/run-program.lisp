@@ -406,8 +406,11 @@ status slot."
 
 ;;;; RUN-PROGRAM and close friends
 
-;;; list of file descriptors to close when RUN-PROGRAM exits due to an error
-(defvar *close-on-error* nil)
+;;; list of file descriptors and streams to close when RUN-PROGRAM
+;;; exits due to an error
+(defvar *close-fds-on-error* nil)
+;;; Separate from fds to ensure the finalizer and all the buffers are cleared too.
+(defvar *close-streams-on-error* nil)
 
 ;;; list of file descriptors to close when RUN-PROGRAM returns in the parent
 (defvar *close-in-parent* nil)
@@ -493,13 +496,13 @@ status slot."
       (multiple-value-bind
             (master slave name)
           (find-a-pty)
-        (push master *close-on-error*)
+        (push master *close-fds-on-error*)
         (push slave *close-in-parent*)
         (when (streamp pty)
           (multiple-value-bind (new-fd errno) (sb-unix:unix-dup master)
             (unless new-fd
               (error "couldn't SB-UNIX:UNIX-DUP ~W: ~A" master (strerror errno)))
-            (push new-fd *close-on-error*)
+            (push new-fd *close-fds-on-error*)
             (copy-descriptor-to-stream new-fd pty cookie external-format)))
         (values name
                 (make-fd-stream master :input t :output t
@@ -837,7 +840,7 @@ Users Manual for details about the PROCESS structure.
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to
          ;; communicate cleanup info.
-         *close-on-error*
+         *close-fds-on-error*
          *close-in-parent*
          *handlers-installed*
          ;; Establish PROC at this level so that we can return it.
@@ -967,8 +970,10 @@ Users Manual for details about the PROCESS structure.
       (dolist (fd *close-in-parent*)
         (sb-unix:unix-close fd))
       (unless proc
-        (dolist (fd *close-on-error*)
+        (dolist (fd *close-fds-on-error*)
           (sb-unix:unix-close fd))
+        (dolist (stream *close-streams-on-error*)
+          (close stream :abort t))
         #-win32
         (dolist (handler *handlers-installed*)
           (remove-fd-handler handler)))
@@ -1184,26 +1189,26 @@ Users Manual for details about the PROCESS structure.
                      (eq direction :output))
                (case direction
                  (:input
-                    (push read-fd *close-in-parent*)
-                    (push write-fd *close-on-error*)
-                    (let ((stream (make-fd-stream write-fd :output t
+                  (push read-fd *close-in-parent*)
+                  (let ((stream (make-fd-stream write-fd :output t
                                                          :element-type :default
                                                          :external-format external-format
                                                          :auto-close t)))
-                      (values read-fd stream)))
+                    (push stream *close-streams-on-error*)
+                    (values read-fd stream)))
                  (:output
-                    (push read-fd *close-on-error*)
-                    (push write-fd *close-in-parent*)
-                    (let ((stream (make-fd-stream read-fd :input t
-                                                         :element-type :default
-                                                         :external-format external-format
-                                                         :auto-close t)))
-                      (values write-fd stream)))
+                  (push write-fd *close-in-parent*)
+                  (let ((stream (make-fd-stream read-fd :input t
+                                                        :element-type :default
+                                                        :external-format external-format
+                                                        :auto-close t)))
+                    (push stream *close-streams-on-error*)
+                    (values write-fd stream)))
                  (t
-                    (sb-unix:unix-close read-fd)
-                    (sb-unix:unix-close write-fd)
-                    (fail "Direction must be either :INPUT or :OUTPUT, not ~S."
-                           direction)))))
+                  (sb-unix:unix-close read-fd)
+                  (sb-unix:unix-close write-fd)
+                  (fail "Direction must be either :INPUT or :OUTPUT, not ~S."
+                        direction)))))
             ((or (pathnamep object) (stringp object))
              ;; GET-DESCRIPTOR-FOR uses &allow-other-keys, so rather
              ;; than munge the &rest list for OPEN, just disable keyword
@@ -1317,7 +1322,7 @@ Users Manual for details about the PROCESS structure.
                   (setf (sb-win32::inheritable-handle-p write-fd) t)
                   (copy-descriptor-to-stream read-fd object cookie
                                              external-format)
-                  (push read-fd *close-on-error*)
+                  (push read-fd *close-fds-on-error*)
                   (push write-fd *close-in-parent*)
                   (return (values write-fd nil)))))))
           (t
