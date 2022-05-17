@@ -371,7 +371,6 @@
  ("src/compiler/constraint")
  ("src/compiler/equality-constraints")
  ("src/compiler/array-tran")
- ("src/compiler/seqtran")
  ("src/compiler/saptran")
  ("src/compiler/modarith")
  ("src/compiler/sxhash")
@@ -418,6 +417,7 @@
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")
+ ("src/compiler/seqtran")
  ("src/compiler/typetran")
  ("src/compiler/generic/vm-typetran")
  ("src/code/cross-modular"  :not-target)
