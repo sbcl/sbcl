@@ -30,7 +30,7 @@
                 (checkit (if (listp entry) (car entry) entry))))))))))
 
 (defvar *fds*)
-(defun threadfun ()
+(defun make-streams ()
   (let (streams)
     (dotimes (i 6)
       (setq streams (nconc (list (open "test-util.lisp")
@@ -50,48 +50,18 @@
   (let ((errno (nth-value 1 (sb-unix:unix-lseek fd 0 sb-unix:l_incr))))
     (assert (= errno sb-unix:ebadf))))
 
-;;; A separate thread should always leave this thread with
-;;; a clean stack. But the interpreter might retain garbage.
-;;; So if we think garbage might be retained, don't require
-;;; that finalization happened, but do check that if the weak-pointer
-;;; to a stream got smashed, then the FD is invalid.
-#+(or :interpreter (not :sb-thread))
-(progn (threadfun)
-       ;; This FMAKUNBOUND definitely seems to be needed
-       ;; for sb-fasteval.
-       (fmakunbound 'threadfun)
-       (sb-sys:scrub-control-stack)
-       (gc)
-       ;; I have no idea how this write-to-string is helping,
-       ;; but without it the test becomes unreliable.
-       (write-to-string *fds*)
-       (dolist (entry *fds*)
-         (let ((fd (car entry))
-               (wp (cdr entry)))
-           (unless (weak-pointer-value wp)
-             (assert-invalid-file-descriptor fd))))
-       (sb-ext:exit :code 104))
+(compile 'make-streams)
 
-(compile 'threadfun)
-
-(let ((thread (sb-thread:make-thread #'threadfun)))
-  (sb-thread:join-thread thread))
-(gc)
-(sb-kernel:run-pending-finalizers)
-
-;;; The file descriptors should cease to be valid.
-;;; Obviously it wouldn't do any good to hold on to the lisp streams
-;;; to check that the FD slot gets clobbered once and only once,
-;;; but perhaps someone could rig up a test involving strace of the
-;;; close() system call.
 (with-test (:name :finalizer-closes-fdstream)
-  (let ((countbad 0))
-    (dolist (fd *fds*)
-      (let ((errno (nth-value 1 (sb-unix:unix-lseek (car fd)
-                                                    0 sb-unix:l_incr))))
-        (unless (= errno 0)
-          (assert (= errno sb-unix:ebadf))
-          (incf countbad))))
-    ;; I'm seeing all descriptors opened in this test get closed, but ymmv.
-    ;; Let's say 90% of them is passing.
-    (assert (>= countbad 10))))
+  (make-streams)
+  (gc)
+  (sb-kernel:run-pending-finalizers)
+  (sb-sys:scrub-control-stack)
+  (let ((nsmashed 0))
+    (dolist (entry *fds*)
+      (let ((fd (car entry))
+            (wp (cdr entry)))
+        (unless (weak-pointer-value wp)
+          (incf nsmashed)
+          (assert-invalid-file-descriptor fd))))
+    (format t "::: INFO: ~d streams closed~%" nsmashed)))
