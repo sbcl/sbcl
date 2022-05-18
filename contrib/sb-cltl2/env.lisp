@@ -443,7 +443,7 @@ appear."
                     (info :variable :deprecated name))
                    (extra-pairs :variable name var *lexenv*)))))
 
-;;; Unlike policy-related declarations which the interpeter itself needs
+;;; Unlike policy-related declarations which the interpreter itself needs
 ;;; for correct operation of some macros, muffled conditions are irrelevant,
 ;;; since warnings are not signaled much, if at all.
 ;;; This is even more useless than env-package-locks.

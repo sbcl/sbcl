@@ -59,7 +59,7 @@
 (declaim (type cons sb-kernel::*gc-epoch*))
 (define-load-time-global sb-kernel::*gc-epoch* '(nil . nil))
 
-;;; Default evaluator mode (interpeter / compiler)
+;;; Default evaluator mode (interpreter / compiler)
 
 (declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)
                *evaluator-mode*))
