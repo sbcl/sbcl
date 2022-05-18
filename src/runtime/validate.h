@@ -58,7 +58,7 @@
 
 #endif
 
-#ifdef ALIEN_STACK_GROWS_DOWNWARD
+#ifndef ALIEN_STACK_GROWS_UPWARD
 
 #define ALIEN_STACK_HARD_GUARD_PAGE(th)         \
     ((os_vm_address_t)(th->alien_stack_start))
@@ -67,7 +67,7 @@
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) + os_vm_page_size)
 
-#elif defined(ALIEN_STACK_GROWS_UPWARD)
+#else
 
 #define ALIEN_STACK_HARD_GUARD_PAGE(th)                            \
     (((os_vm_address_t)th->alien_stack_start) + ALIEN_STACK_SIZE - \
@@ -77,8 +77,6 @@
 #define ALIEN_STACK_RETURN_GUARD_PAGE(th) \
     (ALIEN_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
-#else
-#error ALIEN_STACK_GROWS_DOWNWARD or ALIEN_STACK_GROWS_UPWARD has to be defined
 #endif
 
 #define BINDING_STACK_HARD_GUARD_PAGE(th)                              \

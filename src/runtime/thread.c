@@ -1006,11 +1006,17 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     th->state_word.sprof_enable = 0;
     th->state_word.user_thread_p = 1;
 
-#ifdef ALIEN_STACK_GROWS_DOWNWARD
-    th->alien_stack_pointer=(lispobj*)((char*)th->alien_stack_start
-                                       + ALIEN_STACK_SIZE-N_WORD_BYTES);
+    lispobj* alien_stack_end = (lispobj*)((char*)th->alien_stack_start + ALIEN_STACK_SIZE);
+#ifdef ALIEN_STACK_GROWS_UPWARD
+    th->alien_stack_pointer = alien_stack_start;
+#elif defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+    /* It is not necessary to subtract a word from the starting stack pointer
+     * because consuming C stack space pre-decrements before using the pointer.
+     * So this choice has nothing to do with saving a word of memory, and everything
+     * to do with my lack of understanding of the conventions for non-x86. */
+    th->alien_stack_pointer = alien_stack_end;
 #else
-    th->alien_stack_pointer=(lispobj*)((char*)th->alien_stack_start);
+    th->alien_stack_pointer = alien_stack_end - 1;
 #endif
 
 #ifdef HAVE_THREAD_PSEUDO_ATOMIC_BITS_SLOT

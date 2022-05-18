@@ -14,7 +14,6 @@
 #include "interr.h"                     /* for declaration of lose() */
 
 #define ARCH_HAS_STACK_POINTER
-#define ALIEN_STACK_GROWS_DOWNWARD
 
 /* When single stepping, single_stepping holds the original instruction
  * PC location. */
