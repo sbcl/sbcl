@@ -123,7 +123,7 @@ extern uword_t gc_copied_nwords;
 static const int bitmapped_page_types =
     ((1<<PAGE_TYPE_MIXED) | (1<<PAGE_TYPE_SMALL_MIXED) |
      (1<<PAGE_TYPE_THREAD_MIXED) | (1<<PAGE_TYPE_UNBOXED));
-     
+
 #define page_type_has_objmap(x) ((1<<x) & bitmapped_page_types)
 
 static inline lispobj

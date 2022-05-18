@@ -192,6 +192,7 @@
              (mov :qword :tlab-freeptr ?end)
              (mov ?_ (ea 0 ?free) ?header)
              (:optional (mov ?_ (ea ?_ ?free) ?vector-len))
+             (:bitmap-update)
              (:or (or ?free ?lowtag)
                   (lea :qword ?result (ea ?lowtag ?free))))
 
@@ -297,6 +298,7 @@
           (return-from %matchp new-bindings)))))
   (let ((inst (get-instruction input)))
     (note "Pat=~S Inst=~S bindings=~S~%" pattern inst bindings)
+    #+nil
     (when (eq (car pattern) :if)
       (unless (funcall (cadr pattern) inst bindings)
         (return-from %matchp :fail))
@@ -352,6 +354,8 @@
        (when (null pattern)
          (return (if (null inst) bindings)))))))
 
+;;; As a very special case, if PATTERN is :BITMAP-UPDATE
+;;; then try to recognize the hardwired sequence in SET-OBJECT-LIVEP-BIT.
 (defun matchp (input template bindings &aux (start (car input)))
   (macrolet ((inst-matchp (input pattern)
                `(let ((new-bindings (%matchp ,input ,pattern bindings)))
@@ -374,7 +378,31 @@
                   (cond ((eq bindings :fail)
                          (setf (car input) start)) ; don't match
                         (t
+                         ;; The reason we RETURN from the whole loop is that MATCHP
+                         ;; was invoked recursively on the template's tail, so if it
+                         ;; succeeded, then this match attempt succeeded.
                          (return bindings))))))
+             (:bitmap-update
+                ;; optionally match instructions from SET-OBJECT-LIVEP-BIT
+              (dolist (template `(((mov :qword ?bmindex (ea ,(ash sb-vm::thread-allocator-bitmap-offset-slot
+                                                                  sb-vm:word-shift)
+                                                            ,(get-gpr :qword sb-vm::thread-reg)))
+                                   (sub ?bmindex ?obj)
+                                   (sar ?bmindex ,sb-vm:n-lowtag-bits)
+                                   (bts :qword (ea 0 ,(get-gpr :qword 12)) ?bmindex))
+                                  ((push ?obj)
+                                   (neg ?obj)
+                                   (add ?obj (ea ,(ash sb-vm::thread-allocator-bitmap-offset-slot
+                                                       sb-vm:word-shift)
+                                                 ,(get-gpr :qword sb-vm::thread-reg)))
+                                   (sar ?obj ,sb-vm:n-lowtag-bits)
+                                   (bts (ea ,(get-gpr :qword 12)) ?obj)
+                                   (pop ?obj))))
+                (let ((new-bindings (matchp input template nil)))
+                  (cond ((eq new-bindings :fail)
+                         (setf (car input) start)) ; don't match, skip this template piece
+                        (t
+                         (return))))))
              (:repeat
               ;; :REPEAT matches zero or more instructions, as few as possible.
                 (let ((next-pattern (pop template)))

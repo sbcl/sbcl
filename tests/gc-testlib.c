@@ -74,7 +74,7 @@ static void perform_gc(lispobj* stackptr)
     gc_close_collector_regions(THREAD_PAGE_FLAG);
     close_current_thread_tlab();
     update_immobile_nursery_bits();
-    hexdump_and_verify_heap(VERIFY_PRE_GC);
+    verify_heap(VERIFY_PRE_GC);
     garbage_collect_generation(0, 0, stackptr);
     gc_active_p = 0;
 }

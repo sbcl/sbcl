@@ -2016,6 +2016,7 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
     case PAGE_TYPE_THREAD_CONS:
     case PAGE_TYPE_CONS:
         if (lowtag == LIST_POINTER_LOWTAG
+            && header_widetag(word) != FILLER_WIDETAG
             && (addr & (GENCGC_PAGE_BYTES-1)) < (page_type == PAGE_TYPE_THREAD_CONS
                                                  ? CONS_PAGE_USABLE_BYTES
                                                  : page_bytes_used(addr_page_index))
