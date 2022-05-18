@@ -77,6 +77,8 @@
 (let ((thread (sb-thread:make-thread #'threadfun)))
   (sb-thread:join-thread thread))
 (gc)
+(sb-kernel:run-pending-finalizers)
+
 ;;; The file descriptors should cease to be valid.
 ;;; Obviously it wouldn't do any good to hold on to the lisp streams
 ;;; to check that the FD slot gets clobbered once and only once,
