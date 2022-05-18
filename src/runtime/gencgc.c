@@ -128,10 +128,10 @@ boolean gencgc_verbose = 0;
 /* We hunt for pointers to old-space, when GCing generations >= verify_gen.
  * Set verify_gens to HIGHEST_NORMAL_GENERATION + 2 to disable this kind of
  * check. */
-generation_index_t verify_gens = 0;//HIGHEST_NORMAL_GENERATION + 2;
+generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 
 /* Should we do a pre-scan of the heap before it's GCed? */
-boolean pre_verify_gen_0 = 1; // FIXME: should be named 'pre_verify_gc'
+boolean pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
 
 
 /*
@@ -290,31 +290,33 @@ boolean gc_objmap_anyset(page_index_t page) {
 static void reset_page_flags(page_index_t page) {
     int type = page_table[page].type;
     long bitmap_word_index;
-    switch (type) {
-    case PAGE_TYPE_THREAD_MIXED:
-    case PAGE_TYPE_MIXED:
-    case PAGE_TYPE_SMALL_MIXED:
+
+    if (type & SINGLE_OBJECT_FLAG) {
+        /* The VAR-ALLOC and ALLOCATE-VECTOR-ON-HEAP vops don't know NOT to set a bit
+         * in the allocator bitmap for large objects.
+         * Similarly, gc_copy_object() does not decide whether ultimately the placement
+         * is on a large-object page, so it unconditionally sets a bit whether or not
+         * it should. So clear the bit for the first word of any large-object */
+        if (!page_table[page].scan_start_offset_) {
+            addr_to_bitmap_coordinates(page_address(page), &bitmap_word_index);
+            // This could be done using a 1-byte store, but just KISS
+            ((uword_t*)gc_card_mark)[bitmap_word_index] = 0;
+        }
+    } else if (page_type_has_objmap(type)) {
         /* The higher the address, the lower the bitmap word index.
          * So take the index of the end, and clear from there up. */
         addr_to_bitmap_coordinates(page_address(page)+GENCGC_PAGE_BYTES-1, &bitmap_word_index);
         memset(&allocator_bitmap[bitmap_word_index], 0, ALLOCATOR_BITMAP_BYTES_PER_PAGE);
-        break;
-    case SINGLE_OBJECT_FLAG | PAGE_TYPE_MIXED:
-        /* The VAR-ALLOC and ALLOCATE-VECTOR-ON-HEAP vops don't know NOT to set a bit
-         * in the allocator bitmap for large objects. So we clear that bit
-         * for the first page of the large object */
-        if (!page_table[page].scan_start_offset_) {
-            addr_to_bitmap_coordinates(page_address(page), &bitmap_word_index);
-            if (allocator_bitmap_bit(page_address(page))) fprintf(stderr, "largeobj on page %p had bitmap bit\n", page_address(page));
-            ((uword_t*)gc_card_mark)[bitmap_word_index] = 0;
-        }
-        break;
     }
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
     page_table[page].pinned = 0;
     if (gc_objmap_anyset(page)) {
       fprintf(stderr, "reset page flags on type %d, bitmap not empty\n", type);
+    }
+    if (gc_objmap_anyset(page)) {
+      fprintf(stderr, "bogus objmap. Page %ld type %d\n", page, type);
+      gc_show_objmap(page);
     }
     gc_assert(!gc_objmap_anyset(page)); // XXX: too slow
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
@@ -1146,7 +1148,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
     page_index_t page = find_page_index(alloc_region->start_addr);
     page_index_t last = find_page_index(-1+(char*)alloc_region->end_addr);
     //fprintf(stderr, "opened new region %p..%p p%ld..%ld type %d\n", alloc_region->start_addr, alloc_region->end_addr, page, last, page_type);
-    if (page_type == PAGE_TYPE_THREAD_MIXED || page_type_has_objmap(page_type)) {
+    if (page_type_has_objmap(page_type)) {
         // Should check no bits on above the free pointer
     } else {
         for (; page <= last; ++page) gc_assert(!gc_objmap_anyset(page));
@@ -2380,7 +2382,7 @@ void visit_freed_objects(char __attribute__((unused)) *start,
     int nbits = start - end + 1; \
     gc_assert(nbits > 0); \
     bitmap[wordindex] &= ~((all_ones >> (N_WORD_BITS - nbits)) << end); }
-  
+
 /* Translate 'from' (inclusive) and 'to' (exclusive) into coordinates in
  * the allocator bitmap in 'bitmap' and unset all bits between those coordinates.
  * This function is exposed to Lisp for testing */
@@ -2443,6 +2445,7 @@ void deposit_filler(char* from, char* to) {
         break;
     case PAGE_TYPE_MIXED:
     case PAGE_TYPE_SMALL_MIXED:
+    case PAGE_TYPE_UNBOXED:
         // The allocator bitmap needs to be cleared, and then we do the regular
         // filler-insertion logic.
 #if 0

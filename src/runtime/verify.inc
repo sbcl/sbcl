@@ -450,31 +450,36 @@ static int verify_gen0_pagetypes(lispobj* start, lispobj* end,
 }
 #endif
 
-static uword_t bitmap_scan_range(lispobj* where, lispobj* end, uword_t arg)
+static uword_t bitmap_scan_range(lispobj* start, lispobj* end, uword_t arg)
 {
-    page_index_t p = find_page_index(where);
+    page_index_t p = find_page_index(start);
     page_index_t prev_page = p - 1;
-    switch (page_table[p].type) {
-      //    case PAGE_TYPE_UNBOXED:
-    case PAGE_TYPE_THREAD_MIXED:
-    case PAGE_TYPE_MIXED:
-    case PAGE_TYPE_SMALL_MIXED:
-        int* histo = (void*)arg;
+    int page_type = page_table[p].type;
+    int nbits = 0, nobjects = 0;
+    int* histo = (void*)arg;
+    // See also reset_page_flags()
+    if (page_type & SINGLE_OBJECT_FLAG) {
+        // Don't know if this is a young object just allocated, or a gen0 object
+        // that survived a previous GC. Just clear the bit since we don't need it,
+        // and it being set messes up the popcount cross-check.
+        clear_allocator_bitmap_bit((char*)start);
+    } else if (page_type_has_objmap(page_type)) {
+        lispobj* where = start;
         while (where < end) {
             p = find_page_index(where);
             if (p != prev_page) {
                 long wordindex;
                 addr_to_bitmap_coordinates(page_address(p)+GENCGC_PAGE_BYTES-1,
                                            &wordindex);
-                int i, this_page_nbits = 0;
+                int i;
                 for(i=0; i<ALLOCATOR_BITMAP_WORDS_PER_PAGE; ++i, ++wordindex)
-                    this_page_nbits += __builtin_popcountl(allocator_bitmap[wordindex]);
-                histo[1] += this_page_nbits;
+                    nbits += __builtin_popcountl(allocator_bitmap[wordindex]);
                 prev_page = p;
             }
             int tag = widetag_of(where);
             if (*where != (uword_t)-1 && tag) {
                 histo[tag>>2]++;
+                if (tag != FILLER_WIDETAG) ++nobjects;
                 if (tag != FILLER_WIDETAG && !allocator_bitmap_bit(where)) {
                     fprintf(stderr, "obj @ %p (%s) missing bit\n",
                             where, widetag_names[widetag_of(where)>>2]);
@@ -482,16 +487,8 @@ static uword_t bitmap_scan_range(lispobj* where, lispobj* end, uword_t arg)
             }
             where += OBJECT_SIZE(*where, where);
         }
-        break;
-    case SINGLE_OBJECT_FLAG | PAGE_TYPE_MIXED:
-        // Don't know if this is a young object just allocated, or a gen0 object
-        // that survived a previous GC. Just clear the bit since we don't need it,
-        // and it being set messes up the popcount cross-check.
-        clear_allocator_bitmap_bit((char*)where);
-        break;
-    default:
-        {
-        page_index_t page = find_page_index(where);
+    } else {
+        page_index_t page = find_page_index(start);
         page_index_t last = find_page_index((char*)end-1);
         for ( ; page <= last ; ++page )
             if (gc_objmap_anyset(page)) {
@@ -499,8 +496,11 @@ static uword_t bitmap_scan_range(lispobj* where, lispobj* end, uword_t arg)
                         page, page_table[page].type);
                 gc_show_objmap(page);
             }
-        }
     }
+    if (nbits != nobjects)
+        lose("bitmap failure in range %p..%p, pagetype %d, nobjects=%d, nbits=%d",
+             start, end, page_type, nobjects, nbits);
+    histo[1] += nbits;
     return 0;
 }
 
@@ -518,6 +518,7 @@ static uword_t bitmap_scan_range(lispobj* where, lispobj* end, uword_t arg)
     tot -= histo[FILLER_WIDETAG>>2];
     if (print)
         fprintf(stderr, "   %9d Total (excluding filler), popcount=%d\n", tot,histo[1]);
+#if 0
     if (tot != histo[1]) {
       uword_t* gc_header_map = (void*)gc_card_mark;
       fprintf(stderr,"Bitmap scan\n");
@@ -536,6 +537,7 @@ static uword_t bitmap_scan_range(lispobj* where, lispobj* end, uword_t arg)
       }
       lose("Incomplete bitmap");
     }
+#endif
 }
 
 static int verify(lispobj start, lispobj* end, struct verify_state* state, int flags)
