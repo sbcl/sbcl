@@ -530,10 +530,7 @@ new string COUNT long filled with the fill character."
          (cases #.+character-cases+))
         ((>= index end))
       (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-      (let ((char (schar (truly-the (or simple-base-string
-                                        simple-character-string)
-                                    string)
-                         index)))
+      (let ((char (schar string index)))
         (with-case-info (char case-index cases
                          :cases cases)
           (let ((code (aref cases case-index)))

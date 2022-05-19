@@ -255,11 +255,13 @@
 ;;; element type.
 (defun derive-%with-array-data/mumble-type (array)
   (let ((atype (lvar-type array)))
-    (when (array-type-p atype)
-      (specifier-type
-       `(simple-array ,(type-specifier
-                        (array-type-specialized-element-type atype))
-                      (*))))))
+    (cond ((array-type-p atype)
+           (specifier-type
+            `(simple-array ,(type-specifier
+                             (array-type-specialized-element-type atype))
+                           (*))))
+          ((csubtypep atype (specifier-type 'string))
+           (specifier-type 'simple-string)))))
 (defoptimizer (%with-array-data derive-type) ((array start end))
   (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
