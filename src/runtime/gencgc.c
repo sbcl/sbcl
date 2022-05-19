@@ -258,7 +258,7 @@ page_ends_contiguous_block_p(page_index_t page_index,
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
  * scan_start of zero, to optimize page_ends_contiguous_block_p().
  * Clear all the flags that don't pertain to a free page.
- * Particularly the 'need_zerofill' bit has to remain unchanged */
+ * Particularly the 'need_zerofill' bit MUST remain as-is */
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
     page_table[page].type = 0;
@@ -750,13 +750,14 @@ __attribute__((unused)) static const char * const page_type_description[8] =
   {0, "unboxed", "boxed", "mixed", "sm_mix", "cons", "?", "code"};
 
 /* Zero the pages from START to END (inclusive), except for those
- * pages that are known to already zeroed. Mark all pages in the
- * ranges as non-zeroed.
+ * pages which: (a) don't require pre-clearing, or (b) do but are already clear.
+ * For each page in the range that got cleared right now, change the
+ * page's need_to_zero flag to 0; otherwise, leave that flag alone.
  */
 #if defined LISP_FEATURE_RISCV && defined LISP_FEATURE_LINUX // KLUDGE
 int mmap_does_not_zero;
 #endif
-void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
+void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type) {
     // If allocating mixed pages to gen0 (or scratch which becomes gen0) then
     // this allocation is potentially going to be extended by lisp (if it happens to
     // pick up the tail of the page as its next available region)
@@ -770,18 +771,22 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
     /* Must always zero, as it may need changing the protection bits. */
     boolean any_need_to_zero = 0;
     for (i = start; i <= end; i++) any_need_to_zero |= page_need_to_zero(i);
-    if (any_need_to_zero) zero_pages(start, end);
+    if (any_need_to_zero) {
+        zero_pages(start, end);
+        for (i = start; i <= end; i++) set_page_need_to_zero(i, 0);
+    }
 #else
     boolean usable_by_lisp =
         gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION
                                      && from_space == 0);
     if ((page_type == PAGE_TYPE_MIXED && usable_by_lisp) || page_type == 0) {
         for (i = start; i <= end; i++)
-            if (page_need_to_zero(i)) zero_pages(i, i);
+            if (page_need_to_zero(i)) {
+                zero_pages(i, i);
+                set_page_need_to_zero(i, 0);
+            }
     }
 #endif
-
-    for (i = start; i <= end; i++) set_page_need_to_zero(i, 1);
 }
 
 
@@ -993,6 +998,31 @@ static page_index_t find_single_page(int page_type, sword_t nbytes, generation_i
     gc_heap_exhausted_error_or_lose(bytes_avail, nbytes);
 }
 
+/* CONS pages have a subrange (about 1/128th or 1/64th of the page)
+ * that demands prezeroing, but the bulk of the page does not require zeroing.
+ * We can't accurately represent the need_to_zero state on a part of the page.
+ * So if the page is in need_to_zero state, clear that subrange,
+ * but KEEP the need_to_zero state, because overall it is in that state. */
+static inline void ensure_cons_markbits_clear(page_index_t page)
+{
+    // If and only if the page was already completely zeroed, skip this
+    if (page_need_to_zero(page)) {
+        char *trailer = page_address(page) + CONS_PAGE_USABLE_BYTES;
+        memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_USABLE_BYTES);
+    }
+}
+
+#if 0
+boolean page_is_zeroed(page_index_t page)
+{
+    int nwords_per_page = GENCGC_PAGE_BYTES/N_WORD_BYTES;
+    uword_t *pagebase = (void*)page_address(page);
+    int i;
+    for (i=0; i<nwords_per_page; ++i) if (pagebase[i]) return 0;
+    return 1;
+}
+#endif
+
 static void*
 gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_region, int unlock)
 {
@@ -1013,17 +1043,11 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
 #ifdef LISP_FEATURE_DARWIN_JIT
         if (!page_words_used(page))
             /* May need to be remapped from PAGE_TYPE_CODE */
-            zero_dirty_pages(page, page, page_type);
-        else
-            set_page_need_to_zero(page, 1);
-#else
-        if (page_type == PAGE_TYPE_CONS && page_need_to_zero(page) && !page_words_used(page)) {
-            // Zero the trailing data (the cons cell mark bits)
-            char *trailer = page_address(page) + CONS_PAGE_USABLE_BYTES;
-            memset(trailer, 0, GENCGC_PAGE_BYTES - CONS_PAGE_USABLE_BYTES);
-        }
-        set_page_need_to_zero(page, 1); // would normally be set in zero_dirty_pages()
+            zeroize_pages_if_needed(page, page, page_type);
 #endif
+        // TODO: move this out of the mutex scope
+        if (page_type == PAGE_TYPE_CONS && !page_words_used(page))
+            ensure_cons_markbits_clear(page);
         // Don't need to set the scan_start_offset because free pages have it 0
         // (and each of these page types starts a new contiguous block)
         gc_dcheck(page_table[page].scan_start_offset_ == 0);
@@ -1086,7 +1110,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         first_page++;
     }
 
-    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
+    INSTRUMENTING(zeroize_pages_if_needed(first_page, last_page, page_type), et_bzeroing);
 
 #ifdef LISP_FEATURE_DARWIN_JIT
     if (page_type == PAGE_TYPE_CODE) {
@@ -1184,6 +1208,17 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
  *
  * This is the internal implementation of ensure_region_closed(),
  * and not to be invoked as the interface to closing a region.
+ *
+ * Note that in no case will closing a region alter the need_to_zero bit
+ * on any page in the region. It is legal to set that bit as late as possible,
+ * because we only have to know just-in-time - when changing the page
+ * (at some point later) from FREE to non-free - whether to zeroize it.
+ * Therefore, we can set the need_to_zero bit only when there is otherwise
+ * no way to detect that it ever held nonzero data, namely immediately
+ * before doing reset_page_flags() or setting the words_used to 0.
+ * Reflecting the words_used into that bit each time we update words_used
+ * from a region's free pointer would be redundant (newspace scavenging
+ * can open/close/open/close a region several times on the same page).
  */
 void
 gc_close_region(struct alloc_region *alloc_region, int page_type)
@@ -1342,7 +1377,7 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
     }
-    INSTRUMENTING(zero_dirty_pages(first_page, last_page, page_type), et_bzeroing);
+    INSTRUMENTING(zeroize_pages_if_needed(first_page, last_page, page_type), et_bzeroing);
 
     /* Add the region to the new_areas if requested. */
     if (boxed_type_p(page_type)) add_new_area(first_page, 0, nbytes);
@@ -1610,6 +1645,13 @@ void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int 
  *
  * maybe_adjust_large_object() specifies 'from_space' for 'new_gen'
  * and copy_potential_large_object() specifies 'new_space'
+ *
+ * Note that creating a large object might not affect the 'need_to_zero'
+ * flag on any of pages consumed (it would if the page type demands prezeroing
+ * and wasn't zero), but freeing the unused pages of a shrunken object DOES
+ * set the need_to_zero bit unconditionally.  We have to suppose that the object
+ * constructor wrote bytes on each of its pages, and we don't know whether the tail
+ * of the object got zeroed versus bashed into FILLER_WIDETAG + random bits.
  */
 
 static uword_t adjust_obj_ptes(page_index_t first_page,
@@ -1710,6 +1752,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
 #endif
         /* It checks out OK, free the page. */
         prev_bytes_used = page_bytes_used(page);
+        set_page_need_to_zero(page, 1);
         set_page_bytes_used(page, 0);
         reset_page_flags(page);
         bytes_freed += prev_bytes_used;
@@ -3359,9 +3402,11 @@ static void free_oldspace(void)
             /* Should already be unprotected by unprotect_oldspace(). */
             gc_dcheck(page_cards_all_marked_nonsticky(last_page));
             /* Free the page. */
-            bytes_freed += page_bytes_used(page);
-            reset_page_flags(page);
+            int used = page_words_used(page);
+            if (used) set_page_need_to_zero(page, 1);
             set_page_bytes_used(page, 0);
+            reset_page_flags(page);
+            bytes_freed += used << WORD_SHIFT;
         }
     }
     generations[from_space].bytes_allocated -= bytes_freed;
@@ -5559,7 +5604,6 @@ void gc_load_corefile_ptes(int card_table_nbits,
                 page_table[page].words_used_ = pte.words_used;
                 set_page_scan_start_offset(page, pte.sso & ~0x07);
                 page_table[page].gen = gen;
-                set_page_need_to_zero(page, 1);
             }
             bytes_allocated += pte.words_used << WORD_SHIFT;
         }

@@ -92,7 +92,7 @@ static void* get_free_page() {
         lose("Needed more space to GC");
     page_table[free_page].type = PAGE_TYPE_UNBOXED;
     char* mem = page_address(free_page);
-    zero_dirty_pages(free_page, free_page, 0);
+    zeroize_pages_if_needed(free_page, free_page, 0);
     return mem;
 }
 
@@ -673,8 +673,8 @@ void execute_full_sweep_phase()
     if (sweeplog)
         fflush(sweeplog);
 
-    free_page = next_free_page;
-    while (free_page < page_table_pages) {
-        page_table[free_page++].type = FREE_PAGE_FLAG;
-    }
+    for (free_page = next_free_page; free_page < page_table_pages; ++free_page) {
+        set_page_need_to_zero(free_page, 1);
+        page_table[free_page].type = FREE_PAGE_FLAG;
+      }
 }

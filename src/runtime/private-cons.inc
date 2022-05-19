@@ -82,12 +82,14 @@ static struct cons* private_cons_impl()
 
         struct cons* page_header = (struct cons*)page_address(page);
         if (PRIVATE_CONS_DEBUG)
-            fprintf(stderr, "GC-private page @ %p\n", page_header);
+            fprintf(stderr, "GC-private page %"PAGE_INDEX_FMT" @ %p\n", page, page_header);
         gc_assert(last_page == page);
         gc_dcheck(page_cards_all_marked_nonsticky(page));
         page_table[page].gen = GC_PRIVATE_CONS_GENERATION;
         page_table[page].type = PAGE_TYPE_UNBOXED;
-        zero_dirty_pages(page, page, 0);
+        /* I'm surprised that the GC needs to prezero private conses.
+         * Was I just not thinking clearly? */
+        zeroize_pages_if_needed(page, page, 0);
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused
         page_header->cdr = (lispobj)(tail >= 0 ? page_address(tail) : 0);
@@ -110,6 +112,7 @@ static void release_pages_impl()
             if (PRIVATE_CONS_DEBUG)
                 fprintf(stderr, "Freeing GC-private page @ %p (index %ld)\n",
                         list, (long)index);
+            set_page_need_to_zero(index, 1);
             set_page_bytes_used(index, 0);
             reset_page_flags(index);
         }

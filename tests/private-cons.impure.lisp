@@ -51,9 +51,7 @@
         (push index pages)
         (assert (= cons (+ base-address (* 2 sb-vm:n-word-bytes))))
         ;; words-used should be 4, for 2 conses,
-        ;; and the need_zerofill bit should be 1.
         (assert (= (slot (deref sb-vm::page-table index) 'sb-vm::words-used) 4))
-        (assert (page-need-to-zero index))
         (dotimes (i (1- conses-per-page))
           (setq final (private-list (incf counter))))
         (assert (= final (+ base-address sb-vm:gencgc-page-bytes
