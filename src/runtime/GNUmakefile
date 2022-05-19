@@ -107,7 +107,7 @@ heap-reloc-test: ../../tests/heap-reloc/fake-mman.c $(OBJS)
 
 # Enable compiling gencgc with even more assertions and/or
 # data collection, with COMPILING_TESTS. Not really used yet.
-gc-unit-tests.o: CFLAGS=-DCOMPILING_TESTS
+gc-unit-tests.o: CFLAGS=-g -DCOMPILING_TESTS
 unit-tests: gc-unit-tests.o libsbcl.a
 	cc -g -no-pie -o $@ $^ -ldl -lpthread -lm
 
