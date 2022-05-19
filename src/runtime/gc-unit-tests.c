@@ -92,7 +92,6 @@ void test_adjust_obj_ptes()
             // and pick the generation.
             gc_init_region(&test_region);
             RESET_ALLOC_START_PAGES();
-            test_region.last_page = -1;
             gc_alloc_generation = SCRATCH_GENERATION;
 
             // Wipe out the page table and the allocation counts,
@@ -102,7 +101,7 @@ void test_adjust_obj_ptes()
             for (gen=0; gen < NUM_GENERATIONS; ++gen)
               generations[gen].bytes_allocated = 0;
             bytes_allocated = 0;
-            void *result = gc_alloc_large(request, PAGE_TYPE_UNBOXED, &test_region, 0);
+            void *result = gc_alloc_large(request, PAGE_TYPE_UNBOXED);
 
             // Assert some things about the reference object.
             gc_assert(result == (void*)DYNAMIC_SPACE_START);
@@ -141,12 +140,12 @@ void shrink_obj_test(int ending_size, int initial_type,
             if (initial_size >= ending_size) {
                 gc_init_region(&test_region);
                 RESET_ALLOC_START_PAGES();
-                test_region.last_page = -1;
 
                 // Start with a fresh page table
                 page_table = calloc(1+page_table_pages, sizeof(struct page));
+                gc_page_pins = calloc(page_table_pages, 1);
                 from_space = gc_alloc_generation = 2;
-                void *result = gc_alloc_large(initial_size, initial_type, &test_region, 0);
+                void *result = gc_alloc_large(initial_size, initial_type);
                 // We're in trouble if pages other than expected were gotten
                 gc_assert(result == (void*)DYNAMIC_SPACE_START);
 

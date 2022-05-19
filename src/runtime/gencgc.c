@@ -890,8 +890,18 @@ struct alloc_region gc_alloc_region[6];
 
 static page_index_t
   alloc_start_pages[8], // one for each value of PAGE_TYPE_x
-  gencgc_alloc_start_page; // initializer for the preceding array
+  gencgc_alloc_start_page, // initializer for the preceding array
+  max_alloc_start_page; // the largest of any array element
 
+/* Each 'start_page' informs the region-opening logic where it should
+ * attempt to continue allocating after closing a region associated
+ * with a particular page type. We aren't very clever about this -
+ * either the start_page has space remaining or it doesn't, and when it
+ * doesn't, then we should hop over *all* allocated pages regardless of
+ * type that intercede between the page we couldn't use up to next_free_page.
+ * It's kind of dumb that there is one start_page per type,
+ * other than it serves its purpose for picking up where it left off
+ * on a partially full page during GC */
 #define RESET_ALLOC_START_PAGES() \
         alloc_start_pages[0] = gencgc_alloc_start_page; \
         alloc_start_pages[1] = gencgc_alloc_start_page; \
@@ -900,20 +910,22 @@ static page_index_t
         alloc_start_pages[4] = gencgc_alloc_start_page; \
         alloc_start_pages[5] = gencgc_alloc_start_page; \
         alloc_start_pages[6] = gencgc_alloc_start_page; \
-        alloc_start_pages[7] = gencgc_alloc_start_page;
+        alloc_start_pages[7] = gencgc_alloc_start_page; \
+        max_alloc_start_page = gencgc_alloc_start_page;
 
 static inline page_index_t
-alloc_start_page(unsigned int page_type, int large)
+get_alloc_start_page(unsigned int page_type)
 {
     if (page_type > 15) lose("bad page_type: %d", page_type);
-    return alloc_start_pages[large ? 0 : page_type & PRIMARY_TYPE_MASK];
+    return alloc_start_pages[page_type & PRIMARY_TYPE_MASK];
 }
 
 static inline void
-set_alloc_start_page(unsigned int page_type, int large, page_index_t page)
+set_alloc_start_page(unsigned int page_type, page_index_t page)
 {
     if (page_type > 15) lose("bad page_type: %d", page_type);
-    alloc_start_pages[large ? 0 : page_type & PRIMARY_TYPE_MASK] = page;
+    alloc_start_pages[page_type & PRIMARY_TYPE_MASK] = page;
+    if (page > max_alloc_start_page) max_alloc_start_page = page;
 }
 #include "private-cons.inc"
 
@@ -1085,7 +1097,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         return alloc_region->free_pointer;
     }
 
-    page_index_t first_page = alloc_start_page(page_type, 0), last_page;
+    page_index_t first_page = get_alloc_start_page(page_type), last_page;
 
     INSTRUMENTING(
     last_page = gc_find_freeish_pages(&first_page, nbytes,
@@ -1308,7 +1320,7 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
         generations[gc_alloc_generation].bytes_allocated += region_size;
 
         /* Set the alloc restart page to the last page of the region. */
-        set_alloc_start_page(page_type, 0, next_page-1);
+        set_alloc_start_page(page_type, next_page-1);
 
         /* Add the region to the new_areas if requested. */
         if (boxed_type_p(page_type))
@@ -1330,8 +1342,7 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
 }
 
 /* Allocate a possibly large object. */
-void *
-gc_alloc_large(sword_t nbytes, int page_type_arg, struct alloc_region *alloc_region, int unlock)
+void *gc_alloc_large(sword_t nbytes, int page_type_arg)
 {
     page_index_t first_page, last_page;
     int page_type = page_type_arg & ~THREAD_PAGE_FLAG;
@@ -1340,24 +1351,21 @@ gc_alloc_large(sword_t nbytes, int page_type_arg, struct alloc_region *alloc_reg
     if (page_type == PAGE_TYPE_BOXED || page_type == PAGE_TYPE_SMALL_MIXED)
         page_type = PAGE_TYPE_MIXED;
 
-    first_page = alloc_start_page(page_type, 1);
-    // FIXME: really we want to try looking for space following the highest of
-    // the last page of all other small object regions. That's impossible - there's
-    // not enough information. At best we can skip some work in only the case where
-    // the supplied region was the one most recently created. To do this right
-    // would entail a malloc-like allocator at the page granularity.
-    page_index_t min = find_page_index(alloc_region->end_addr);
-    if (first_page < min) first_page = min;
+    int locked = !gc_active_p;
+    if (locked) {
+        int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
+        gc_assert(ret);
+    }
 
+    first_page = max_alloc_start_page;
     INSTRUMENTING(
     last_page = gc_find_freeish_pages(&first_page, nbytes,
                                       SINGLE_OBJECT_FLAG | page_type,
                                       gc_alloc_generation),
     et_find_freeish_page);
 
-    // FIXME: Should this be 1+last_page ?
-    // (Doesn't matter too much since it'll be skipped on restart if unusable)
-    set_alloc_start_page(page_type, 1, last_page);
+    // No need to check whether last_page > old max; it's gotta be.
+    max_alloc_start_page = last_page;
 
     /* Set up the pages. */
     page_index_t page;
@@ -1378,10 +1386,10 @@ gc_alloc_large(sword_t nbytes, int page_type_arg, struct alloc_region *alloc_reg
     // Anyway it's best if the new page resembles a valid object ASAP.
     uword_t nwords = nbytes >> WORD_SHIFT;
     lispobj* addr = (lispobj*)page_address(first_page);
-    if (unlock)
+    if (locked)
         THREAD_JIT(0);
     *addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
-    if (unlock) // avoid enabling while GCing
+    if (locked) // avoid enabling while GCing
         THREAD_JIT(1);
 
     os_vm_size_t scan_start_offset = 0;
@@ -1398,7 +1406,7 @@ gc_alloc_large(sword_t nbytes, int page_type_arg, struct alloc_region *alloc_reg
     bytes_allocated += nbytes;
     generations[gc_alloc_generation].bytes_allocated += nbytes;
 
-    if (unlock) {
+    if (locked) {
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
     }
@@ -1599,8 +1607,7 @@ void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int 
      * because genesis does not use large-object pages. So cold-init could fail,
      * depending on whether objects in the cold core are sufficiently large that
      * they ought to have gone on large object pages if they could have. */
-    if (nbytes >= LARGE_OBJECT_SIZE)
-        return gc_alloc_large(nbytes, page_type, region, 0);
+    if (nbytes >= LARGE_OBJECT_SIZE) return gc_alloc_large(nbytes, page_type);
 
     if (page_type != PAGE_TYPE_SMALL_MIXED)
         return new_region(region, nbytes, page_type);
@@ -5038,10 +5045,14 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
         region->free_pointer = new_free_pointer;
 #if defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC || \
     defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_X86_64
-        // Most allocations should never get here, but two page types are special.
+        /* Most allocations should never get here, but two page types are special.
+         * - CODE always comes through here.
+         * - CONS can come through here because when overflow occurs in lisp,
+         *   the fallback logic will call lisp_alloc one or more times,
+         *   obtaining possibly discontiguous pages of conses */
         gc_assert(page_type == PAGE_TYPE_THREAD_CONS || page_type == PAGE_TYPE_THREAD_CODE);
 #endif
-        return(new_obj);        /* yup */
+        return new_obj;
     }
 
     /* We don't want to count nbytes against auto_gc_trigger unless we
@@ -5083,54 +5094,51 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
             }
         }
     }
-    int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
-    gc_assert(ret);
-    if (largep)
-        new_obj = gc_alloc_large(nbytes, page_type, region, 1);
-    else {
-        ensure_region_closed(region, page_type);
-        // hold the lock after alloc_new_region if a cons page
-        int release = page_type != PAGE_TYPE_THREAD_CONS;
-        new_obj = gc_alloc_new_region(nbytes, page_type, region, release);
-        region->free_pointer = (char*)new_obj + nbytes;
-        // addr_diff asserts that 'end' >= 'free_pointer'
-        int remaining = addr_diff(region->end_addr, region->free_pointer);
-        // Try to avoid the next Lisp -> C -> Lisp round-trip by possibly
-        // requesting yet another region.
-        if (page_type == PAGE_TYPE_THREAD_CONS) {
-            if (remaining <= CONS_SIZE * N_WORD_BYTES) { // Refill now if <= 1 more cons to go
-                gc_close_region(region, page_type);
-                // Request > 2 words, forcing a new page to be claimed.
-                // char msg[] = "fallback allocator refreshing cons region\n"; write(2,msg,sizeof msg-1);
-                gc_alloc_new_region(4 * N_WORD_BYTES, page_type, region, 0); // don't release
-            }
-            ret = mutex_release(&free_pages_lock);
-            gc_assert(ret);
-        } else if (remaining <= 4 * N_WORD_BYTES) {
-          if  (TryEnterCriticalSection(&free_pages_lock)) {
-              // char msg[] = "fallback allocator refreshing mixed region\n"; write(2,msg,sizeof msg-1);
-              gc_close_region(region, page_type);
-              // Request > 4 words, forcing a new page to be claimed.
-              gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region, 1); // do release
-          } else {
-            // char msg[] = "fallback allocator FAIL\n"; write(2,msg,sizeof msg-1);
-          }
-        }
-    }
 
+    /* For the architectures which do NOT use a trap instruction for allocation,
+     * overflow, record a backtrace now if statistical profiling is enabled.
+     * The ones which use a trap will backtrace from the signal handler.
+     * Code allocations are ignored, because every code allocation
+     * comes through lisp_alloc() which makes this not a statistical
+     * sample. Also the trapping ones don't trap for code.
+     * #+win32 doesn't seem to work, but neither does CPU profiling */
 #if !(defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 \
       || defined LISP_FEATURE_SPARC || defined LISP_FEATURE_WIN32)
-    // Architectures which utilize a trap instruction to invoke the overflow
-    // handler use the signal context from which to record a backtrace.
-    // That's reliable, but access_control_frame_pointer(thread) isn't.
-    // x86[-64] use the ABI frame pointer register which seems not to work
-    // for win32, but sb-sprof never did work there anyway.
     extern void allocator_record_backtrace(void*, struct thread*);
-    if (gencgc_alloc_profiler && thread->state_word.sprof_enable)
+    if (page_type != PAGE_TYPE_CODE && gencgc_alloc_profiler
+        && thread->state_word.sprof_enable)
         allocator_record_backtrace(__builtin_frame_address(0), thread);
 #endif
 
-    return (new_obj);
+    if (largep) return gc_alloc_large(nbytes, page_type);
+
+    int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
+    gc_assert(ret);
+    ensure_region_closed(region, page_type);
+    // hold the lock after alloc_new_region if a cons page
+    int release = page_type != PAGE_TYPE_CONS;
+    new_obj = gc_alloc_new_region(nbytes, page_type, region, release);
+    region->free_pointer = (char*)new_obj + nbytes;
+    // addr_diff asserts that 'end' >= 'free_pointer'
+    int remaining = addr_diff(region->end_addr, region->free_pointer);
+    // Try to avoid the next Lisp -> C -> Lisp round-trip by possibly
+    // requesting yet another region.
+    if (page_type == PAGE_TYPE_THREAD_CONS) {
+        if (remaining <= CONS_SIZE * N_WORD_BYTES) { // Refill now if <= 1 more cons to go
+            gc_close_region(region, page_type);
+            // Request > 2 words, forcing a new page to be claimed.
+            gc_alloc_new_region(4 * N_WORD_BYTES, page_type, region, 0); // don't release
+        }
+        ret = mutex_release(&free_pages_lock);
+        gc_assert(ret);
+    } else if (remaining <= 4 * N_WORD_BYTES
+               && TryEnterCriticalSection(&free_pages_lock)) {
+        gc_close_region(region, page_type);
+        // Request > 4 words, forcing a new page to be claimed.
+        gc_alloc_new_region(6 * N_WORD_BYTES, page_type, region, 1); // do release
+    }
+
+    return new_obj;
 }
 
 // Code allocation is always serialized

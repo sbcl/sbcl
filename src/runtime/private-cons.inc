@@ -73,13 +73,12 @@ static struct cons* private_cons_impl()
     if (page >= 0 && (bytes_used = page_bytes_used(page)) < GENCGC_PAGE_BYTES) {
         cons = (struct cons*)(page_address(page) + bytes_used);
     } else {
-        page = alloc_start_page(PAGE_TYPE_UNBOXED, 0);
+        page = get_alloc_start_page(PAGE_TYPE_UNBOXED);
         page_index_t last_page __attribute__((unused)) =
             gc_find_freeish_pages(&page, GENCGC_PAGE_BYTES,
                                   SINGLE_OBJECT_FLAG | PAGE_TYPE_UNBOXED,
                                   GC_PRIVATE_CONS_GENERATION);
-        // See question about last_page in gc_alloc_large
-        set_alloc_start_page(PAGE_TYPE_UNBOXED, 0, page);
+        set_alloc_start_page(PAGE_TYPE_UNBOXED, page);
 
         struct cons* page_header = (struct cons*)page_address(page);
         if (PRIVATE_CONS_DEBUG)
