@@ -1114,12 +1114,8 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
 
 #ifdef LISP_FEATURE_DARWIN_JIT
     if (page_type == PAGE_TYPE_CODE) {
-        page_index_t first = first_page;
-        if (page_words_used(first) != 0) {
-            first++;
-        }
-        if (last_page >= first) {
-            os_protect(page_address(first), npage_bytes(1+last_page-first), OS_VM_PROT_ALL);
+        if (last_page >= first_page) {
+            os_protect(page_address(first_page), npage_bytes(1+last_page-first_page), OS_VM_PROT_ALL);
         }
     }
 #endif
