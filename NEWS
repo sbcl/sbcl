@@ -1,21 +1,35 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.2.4:
-  * slightly incompatible change: SB-EXT:*DERIVE-FUNCTION-TYPES* being NIL now
+  * minor incompatible change: SB-EXT:*DERIVE-FUNCTION-TYPES* being NIL now
     means that function calls will strictly only use type information from
     proclaimed ftypes. The previous behavior (still the default) of using
     derived type information from the same file is specified with :SAME-FILE.
+    (lp#1393302)
   * minor incompatible change: RENAME-FILE now overwrites the target file on
     Windows too, making its behaviour consistent with other platforms.
+  * platform support:
+    ** single-stepping is now supported on 64-bit PowerPC platforms.  (thanks
+       to Thomas Fitzsimmons)
   * optimization: fasl files are now usually smaller (up to 10% on default
     policy) and may load faster, especially on high debug.
+  * optimization: improved type derivation of REDUCE with some known reducing
+    functions.
   * enhancement: debug source locations now work correctly for top level forms
     with policy DEBUG = 1, as well as for block compiled files.
+  * enhancement: TRACE now supports tracing macro functions, compiler-macro
+    functions, individual methods and local functions.  See the user manual for
+    more details.  (lp#375314)
+  * bug fix: fix integer comparisons on x86-64 and arm64 (lp#1971088, reported
+    by Guillaume LE VAILLANT)
   * bug fix: coverage instrumentation behaves correctly with respect to
     non-local exits.
   * bug fix: ftype proclamations now take effect immediately during block
     compilation.
-  * bug fix: block compilation of top-level closures now work.
+  * bug fix: block compilation of top-level closures now work.  (lp#1931730,
+    reported by Sean Maher)
+  * bug fix: streams opened from RUN-PROGRAM but left unclosed because of a
+    non-local exit no longer cause unrelated streams to be closed later.
 
 changes in sbcl-2.2.4 relative to sbcl-2.2.3:
   * enhancement: better constraint propagation in the compiler. Specifically,
