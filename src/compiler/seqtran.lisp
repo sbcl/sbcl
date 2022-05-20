@@ -1772,7 +1772,8 @@
       ;;  (1+ (position (the (member :x :y) item) #(:foo :bar :x :y))).
       ;; In that example, a more exact bound could be determined too.
       (cond ((or (not (constant-lvar-p sequence))
-                 start end key test test-not))
+                 start end key test test-not
+                 (not item)))
             (t
              (let ((const-seq (lvar-value sequence))
                    (item-type (lvar-type item)))
@@ -1790,19 +1791,50 @@
                           integer-range
                           `(or ,integer-range null))))))
 
+(defun find-derive-type (item sequence key test start end from-end)
+  (declare (ignore start end from-end))
+  (let ((type *universal-type*)
+        (key-identity-p (or (not key)
+                            (lvar-value-is-nil key)
+                            (lvar-fun-is key '(identity)))))
+    (flet ((fun-accepts-type (fun-lvar argument)
+             (when fun-lvar
+               (let ((fun-type (lvar-fun-type fun-lvar)))
+                 (when (fun-type-p fun-type)
+                   (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
+                     (when arg
+                       (setf type
+                             (type-intersection type arg)))))))))
+      (when (and item
+                 key-identity-p
+                 (or (not test)
+                     (lvar-fun-is test '(eq eql char= char-equal))
+                     (lvar-value-is-nil test)))
+        ;; Maybe FIND returns ITEM itself (or an EQL number).
+        (setf type (lvar-type item)))
+      ;; Should return something the functions can accept
+      (if key-identity-p
+          (fun-accepts-type test (if item 1 0)) ;; the -if variants.
+          (fun-accepts-type key 0)))
+    (when (csubtypep (lvar-type sequence) (specifier-type 'array))
+      (let ((upgraded-type
+              (array-type-upgraded-element-type (lvar-type sequence))))
+        (unless (eq upgraded-type *wild-type*)
+          (setf type
+                (type-intersection type upgraded-type)))))
+    (unless (eq type *empty-type*)
+      (type-union type
+                  (specifier-type 'null)))))
+
+(defoptimizer (find derive-type) ((item sequence &key key test
+                                        start end from-end))
+  (find-derive-type item sequence key test start end from-end))
+
 (defoptimizer (position derive-type) ((item sequence
                                             &key start end
                                             key test test-not
                                             &allow-other-keys))
   (position-derive-type item sequence start end key test test-not))
-
-(defoptimizer (%find-position derive-type) ((item sequence from-end start end key test))
-  (let ((find (find-derive-type item sequence key test start end from-end))
-        (position (position-derive-type item sequence start end key test nil)))
-    (when (or find position)
-      (make-values-type :required
-                        (list (or find *universal-type*)
-                              (or position *universal-type*))))))
 
 (defoptimizer (position-if derive-type) ((function sequence
                                                    &key start end
@@ -1819,6 +1851,30 @@
   (multiple-value-bind (min max)
       (index-into-sequence-derive-type sequence start end :inclusive nil)
     (specifier-type `(or (integer ,min ,max) null))))
+
+(defoptimizer (%find-position derive-type) ((item sequence from-end start end key test))
+  (let ((find (find-derive-type item sequence key test start end from-end))
+        (position (position-derive-type item sequence start end key test nil)))
+    (when (or find position)
+      (make-values-type :required
+                        (list (or find *universal-type*)
+                              (or position *universal-type*))))))
+
+(defoptimizer (%find-position-if derive-type) ((predicate sequence from-end start end key))
+  (let ((find (find-derive-type nil sequence key predicate start end from-end))
+        (position (position-derive-type nil sequence start end key predicate nil)))
+    (when (or find position)
+      (make-values-type :required
+                        (list (or find *universal-type*)
+                              (or position *universal-type*))))))
+
+(defoptimizer (%find-position-if-not derive-type) ((predicate sequence from-end start end key))
+  (let ((find (find-derive-type nil sequence key predicate start end from-end))
+        (position (position-derive-type nil sequence start end key predicate nil)))
+    (when (or find position)
+      (make-values-type :required
+                        (list (or find *universal-type*)
+                              (or position *universal-type*))))))
 
 (defoptimizer (count derive-type) ((item sequence
                                          &key start end
@@ -2111,44 +2167,6 @@
            (cons-type-cdr-type type)))))
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
-
-(defun find-derive-type  (item sequence key test start end from-end)
-  (declare (ignore start end from-end))
-  (let ((type *universal-type*)
-        (key-identity-p (or (not key)
-                            (lvar-value-is-nil key)
-                            (lvar-fun-is key '(identity)))))
-    (flet ((fun-accepts-type (fun-lvar argument)
-             (when fun-lvar
-               (let ((fun-type (lvar-fun-type fun-lvar)))
-                 (when (fun-type-p fun-type)
-                   (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
-                     (when arg
-                       (setf type
-                             (type-intersection type arg)))))))))
-      (when (and key-identity-p
-                 (or (not test)
-                     (lvar-fun-is test '(eq eql char= char-equal))
-                     (lvar-value-is-nil test)))
-        ;; Maybe FIND returns ITEM itself (or an EQL number).
-        (setf type (lvar-type item)))
-      ;; Should return something the functions can accept
-      (if key-identity-p
-          (fun-accepts-type test 1)
-          (fun-accepts-type key 0)))
-    (when (csubtypep (lvar-type sequence) (specifier-type 'array))
-      (let ((upgraded-type
-              (array-type-upgraded-element-type (lvar-type sequence))))
-        (unless (eq upgraded-type *wild-type*)
-          (setf type
-                (type-intersection type upgraded-type)))))
-    (unless (eq type *empty-type*)
-      (type-union type
-                  (specifier-type 'null)))))
-
-(defoptimizer (find derive-type) ((item sequence &key key test
-                                        start end from-end))
-  (find-derive-type item sequence key test start end from-end))
 
 ;;; We want to make sure that %FIND-POSITION is inline-expanded into
 ;;; %FIND-POSITION-IF only when %FIND-POSITION-IF has an inline
