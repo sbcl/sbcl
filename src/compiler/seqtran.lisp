@@ -1797,8 +1797,7 @@
   (position-derive-type item sequence start end key test test-not))
 
 (defoptimizer (%find-position derive-type) ((item sequence from-end start end key test))
-  (declare (ignore from-end))
-  (let ((find (find-derive-type item sequence start end key test nil))
+  (let ((find (find-derive-type item sequence key test start end from-end))
         (position (position-derive-type item sequence start end key test nil)))
     (when (or find position)
       (make-values-type :required
@@ -2114,33 +2113,38 @@
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
 (defun find-derive-type  (item sequence key test start end from-end)
-  (declare (ignore sequence start end from-end))
-  (let ((key-fun (or (and key (lvar-fun-name* key)) 'identity)))
-    ;; If :KEY is a known function, then regardless of the :TEST,
-    ;; FIND returns an object of the type that KEY accepts, or nil.
-    ;; If LVAR-FUN-NAME can't be determined, it returns NIL.
-    ;; :KEY NIL is valid, and means #'IDENTITY.
-    ;; So either way, we get IDENTITY which skips this code.
-    (unless (eq key-fun 'identity)
-      (acond ((info :function :info key-fun)
-              (let ((type (info :function :type key-fun)))
-                (return-from find-derive-type
-                  (awhen (and (fun-type-p type)
-                              (fun-type-required type))
-                    (type-union (first it) (specifier-type 'null))))))
-             ((structure-instance-accessor-p key-fun)
-              (return-from find-derive-type
-                (specifier-type `(or ,(dd-name (car it)) null)))))))
-  ;; Otherwise maybe FIND returns ITEM itself (or an EQL number).
-  ;; :TEST is allowed only if EQ or EQL (where NIL means EQL).
-  ;; :KEY is allowed only if IDENTITY or NIL.
-  (when (and (or (not test)
-                 (lvar-fun-is test '(eq eql))
-                 (lvar-value-is-nil test))
-             (or (not key)
-                 (lvar-fun-is key '(identity))
-                 (lvar-value-is-nil key)))
-    (type-union (lvar-type item) (specifier-type 'null))))
+  (declare (ignore start end from-end))
+  (let ((type *universal-type*)
+        (key-identity-p (or (not key)
+                            (lvar-value-is-nil key)
+                            (lvar-fun-is key '(identity)))))
+    (flet ((fun-accepts-type (fun-lvar argument)
+             (when fun-lvar
+               (let ((fun-type (lvar-fun-type fun-lvar)))
+                 (when (fun-type-p fun-type)
+                   (let ((arg (nth argument (fun-type-n-arg-types (1+ argument) fun-type))))
+                     (when arg
+                       (setf type
+                             (type-intersection type arg)))))))))
+      (when (and key-identity-p
+                 (or (not test)
+                     (lvar-fun-is test '(eq eql char= char-equal))
+                     (lvar-value-is-nil test)))
+        ;; Maybe FIND returns ITEM itself (or an EQL number).
+        (setf type (lvar-type item)))
+      ;; Should return something the functions can accept
+      (if key-identity-p
+          (fun-accepts-type test 1)
+          (fun-accepts-type key 0)))
+    (when (csubtypep (lvar-type sequence) (specifier-type 'array))
+      (let ((upgraded-type
+              (array-type-upgraded-element-type (lvar-type sequence))))
+        (unless (eq upgraded-type *wild-type*)
+          (setf type
+                (type-intersection type upgraded-type)))))
+    (unless (eq type *empty-type*)
+      (type-union type
+                  (specifier-type 'null)))))
 
 (defoptimizer (find derive-type) ((item sequence &key key test
                                         start end from-end))
