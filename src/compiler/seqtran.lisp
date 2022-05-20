@@ -1761,10 +1761,7 @@
   (multiple-value-bind (min max) (index-into-sequence-derive-type sequence1 start1 end1)
     (specifier-type `(or (integer ,min ,max) null))))
 
-(defoptimizer (position derive-type) ((item sequence
-                                            &key start end
-                                            key test test-not
-                                            &allow-other-keys))
+(defun position-derive-type (item sequence start end key test test-not)
   (multiple-value-bind (min max)
       (index-into-sequence-derive-type sequence start end :inclusive nil)
     (let ((integer-range `(integer ,min ,max))
@@ -1792,6 +1789,21 @@
       (specifier-type (if definitely-foundp
                           integer-range
                           `(or ,integer-range null))))))
+
+(defoptimizer (position derive-type) ((item sequence
+                                            &key start end
+                                            key test test-not
+                                            &allow-other-keys))
+  (position-derive-type item sequence start end key test test-not))
+
+(defoptimizer (%find-position derive-type) ((item sequence from-end start end key test))
+  (declare (ignore from-end))
+  (let ((find (find-derive-type item sequence start end key test nil))
+        (position (position-derive-type item sequence start end key test nil)))
+    (when (or find position)
+      (make-values-type :required
+                        (list (or find *universal-type*)
+                              (or position *universal-type*))))))
 
 (defoptimizer (position-if derive-type) ((function sequence
                                                    &key start end
@@ -2101,8 +2113,7 @@
 
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
-(defoptimizer (find derive-type) ((item sequence &key key test
-                                        start end from-end))
+(defun find-derive-type  (item sequence key test start end from-end)
   (declare (ignore sequence start end from-end))
   (let ((key-fun (or (and key (lvar-fun-name* key)) 'identity)))
     ;; If :KEY is a known function, then regardless of the :TEST,
@@ -2113,12 +2124,12 @@
     (unless (eq key-fun 'identity)
       (acond ((info :function :info key-fun)
               (let ((type (info :function :type key-fun)))
-                (return-from find-derive-type-optimizer
+                (return-from find-derive-type
                   (awhen (and (fun-type-p type)
                               (fun-type-required type))
                     (type-union (first it) (specifier-type 'null))))))
              ((structure-instance-accessor-p key-fun)
-              (return-from find-derive-type-optimizer
+              (return-from find-derive-type
                 (specifier-type `(or ,(dd-name (car it)) null)))))))
   ;; Otherwise maybe FIND returns ITEM itself (or an EQL number).
   ;; :TEST is allowed only if EQ or EQL (where NIL means EQL).
@@ -2130,6 +2141,10 @@
                  (lvar-fun-is key '(identity))
                  (lvar-value-is-nil key)))
     (type-union (lvar-type item) (specifier-type 'null))))
+
+(defoptimizer (find derive-type) ((item sequence &key key test
+                                        start end from-end))
+  (find-derive-type item sequence key test start end from-end))
 
 ;;; We want to make sure that %FIND-POSITION is inline-expanded into
 ;;; %FIND-POSITION-IF only when %FIND-POSITION-IF has an inline
