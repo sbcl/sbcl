@@ -459,16 +459,6 @@
             (max-dim (lvar-type lvar))
             (values max min))))))
 
-(defun position-derive-type (call)
-  (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
-    (when (integerp dim)
-      (specifier-type `(or (integer 0 (,dim)) null)))))
-
-(defun count-derive-type (call)
-  (let ((dim (sequence-lvar-dimensions (second (combination-args call)))))
-    (when (integerp dim)
-      (specifier-type `(integer 0 ,dim)))))
-
 ;;; This used to be done in DEFOPTIMIZER DERIVE-TYPE, but
 ;;; ASSERT-CALL-TYPE already asserts the ARRAY type, so it gets an extra
 ;;; assertion that may not get eliminated and requires extra work.
