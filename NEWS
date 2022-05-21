@@ -8,10 +8,13 @@ changes relative to sbcl-2.2.4:
     (lp#1393302)
   * minor incompatible change: RENAME-FILE now overwrites the target file on
     Windows too, making its behaviour consistent with other platforms.
-  * minor change: inlining of local function is inhibited if policy DEBUG = 3.
+  * minor incompatible change: inlining of local function is inhibited if
+    policy DEBUG = 3.
   * platform support:
     ** single-stepping is now supported on 64-bit PowerPC platforms.  (thanks
        to Thomas Fitzsimmons)
+    ** the :SB-LINKABLE-RUNTIME feature is now supported on 32-bit and 64-bit
+       PowerPC platforms.  (thanks to Thomas Fitzsimmons)
   * optimization: improved type derivation of REDUCE with some known reducing
     functions.
   * enhancement: debug source locations now work correctly for top level forms
