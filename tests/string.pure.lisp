@@ -278,3 +278,11 @@ claim that any particular result from these edge cases constitutes a bug.
   (assert-error
    (funcall (opaque-identity 'make-string) 10
             :element-type '(member #\a #\b #\c) :initial-element #\x)))
+
+(with-test (:name :%sp-string-compare-argument-order)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (string/= "_" (the simple-string x)))
+   (("_") nil)
+   (("a") 0)))

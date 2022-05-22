@@ -95,11 +95,11 @@
 (defknown pointer-hash (t) fixnum (flushable))
 
 (defknown %sp-string-compare
-  (simple-string index (or null index) simple-string index (or null index))
+  (simple-string simple-string index (or null index) index (or null index))
   (values index fixnum)
   (foldable flushable no-verify-arg-count))
 (defknown %sp-string=
-  (simple-string index (or null index) simple-string index (or null index))
+  (simple-string simple-string index (or null index) index (or null index))
   boolean
   (foldable flushable no-verify-arg-count))
 

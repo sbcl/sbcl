@@ -176,7 +176,7 @@
                                    t)))
                    (char-loop character base-char))))))
       #-sb-unicode
-      (%sp-string= string1 start1 end1 string2 start2 end2)))
+      (%sp-string= string1 string2 start1 end1 start2 end2)))
 
   (defun simple-base-string= (string1 string2 start1 end1 start2 end2)
     (with-two-strings string1 string2 start1 end1 nil start2 end2
@@ -206,7 +206,7 @@
 (defun string/=* (string1 string2 start1 end1 start2 end2)
   (with-two-strings string1 string2 start1 end1 offset1 start2 end2
     (multiple-value-bind (index diff)
-        (%sp-string-compare string1 start1 end1 string2 start2 end2)
+        (%sp-string-compare string1 string2 start1 end1 start2 end2)
       (if (zerop diff)
           nil
           (- index offset1)))))
@@ -214,8 +214,8 @@
 (defmacro string<>=*-body (test index)
   `(with-two-strings string1 string2 start1 end1 offset1 start2 end2
      (multiple-value-bind (index diff)
-         (%sp-string-compare string1 start1 end1
-                             string2 start2 end2)
+         (%sp-string-compare string1 string2
+                             start1 end1 start2 end2)
        (if (,test diff 0)
            ,(if index '(- index offset1) nil)
            ,(if index nil '(- index offset1))))))
