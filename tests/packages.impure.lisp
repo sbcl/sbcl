@@ -11,6 +11,16 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(require :sb-md5)
+#+64-bit
+(progn
+  (defun spid (x) (sb-impl::symbol-package-id (the symbol x))) ; no stub?
+  (compile 'spid)
+  (let ((n 0))
+    (do-all-symbols (s)
+      (when (> (spid s) 100) (incf n)))
+    (assert (= n 0))))
+
 (defun set-bad-package (x)
   (declare (optimize (safety 0)))
   (setq *package* x))

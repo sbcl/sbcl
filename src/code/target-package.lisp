@@ -836,6 +836,26 @@ Experimental: interface subject to change."
 ;;; list of a package) into TABLE (the hashtable in *PACKAGE-NAMES*),
 ;;; taking care to adjust the count of phantom entries.
 (defun %register-package (table name object)
+  ;; Registration ensures a non-null id if it can (even for a "deferred" package)
+  (let ((package (if (listp object) (car object) object)))
+    (unless (package-id package)
+      ;; manipulation of the id->package vector is hard to do lock-freeely
+      ;; and it's not really a bottleneck, so just grab a lock.
+      (with-package-names (dummy)
+        (let* ((vector *id->package*)
+               ;; 30 is an arbitrary constant exceeding the number of builtin packages
+               (new-id (position nil vector :start 30)))
+          (when (and (null new-id) (< (length vector) +package-id-overflow+))
+            (let* ((current-length (length vector))
+                   (new-length (min (+ current-length 10) +package-id-overflow+))
+                   (new-vector (make-array new-length :initial-element nil)))
+              (replace new-vector vector)
+              (setf *id->package* new-vector)
+              (setf new-id current-length
+                    vector new-vector)))
+          (when new-id
+            (setf (package-id package) new-id
+                  (aref vector new-id) package))))))
   (let ((oldval (info-gethash name table)))
     (unless oldval ; if any value existed, no new physical cell is claimed
       (when (> (info-env-tombstones table)
@@ -1034,20 +1054,6 @@ implementation it is ~S." *!default-package-use-list*)
          ;; other MAKE-PACKAGE operations, but we need the additional lock
          ;; so that it synchronizes with RENAME-PACKAGE.
          (with-package-names (table)
-           (let* ((vector *id->package*)
-                  ;; 30 is an arbitrary constant exceeding the number of builtin packages
-                  (new-id (position nil vector :start 30)))
-             (when (and (null new-id) (< (length vector) +package-id-overflow+))
-               (let* ((current-length (length vector))
-                      (new-length (min (+ current-length 10) +package-id-overflow+))
-                      (new-vector (make-array new-length :initial-element nil)))
-                 (replace new-vector vector)
-                 (setf *id->package* new-vector)
-                 (setf new-id current-length
-                       vector new-vector)))
-             (when new-id
-               (setf (package-id package) new-id
-                     (aref vector new-id) package)))
            (%register-package table name package))
          (atomic-incf *package-names-cookie*)
          (return package))
