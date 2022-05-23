@@ -1538,7 +1538,7 @@
              (return-from scan-obj))
            (case widetag
              (#.instance-widetag
-              (let ((type (translate (%instance-layout obj) spaces)))
+              (let ((type (truly-the layout (translate (%instance-layout obj) spaces))))
                 (do-layout-bitmap (i taggedp type (%instance-length obj))
                   (when taggedp
                     (scanptr vaddr obj (1+ i)))))
