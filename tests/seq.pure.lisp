@@ -654,3 +654,41 @@
            unsigned-byte)
     (check (reduce '+ x :key #'length :initial-value -1)
            integer)))
+
+(with-test (:name :find-type-derive)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (equal (second
+                   (third
+                    (sb-kernel:%simple-fun-type
+                     (checked-compile '(lambda (x y)
+                                        (declare (ignorable x y))
+                                        ,fun)))))
+                  ',expected))))
+    (check (find x y) t)
+    (check (find 1 y) (or (integer 1 1) null))
+    (check (find x y :key #'car) list)
+    (check (find x y :test #'=) (or number null))
+    (check (find x y :key #'car :test #'=) list)
+    (check (find x (the vector y) :key #'car) list)
+    ;; (check (find-if #'evenp y) (or integer null))
+    (check (find-if #'evenp (the list y) :key #'car) list)
+    (check (find x (the simple-base-string y)) (or base-char null))))
+
+(with-test (:name :position-type-derive)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (ctype= (second
+                    (third
+                     (sb-kernel:%simple-fun-type
+                      (checked-compile '(lambda (x y)
+                                         (declare (ignorable x y))
+                                         ,fun)))))
+                   ',expected))))
+    (check (position x y) (or (integer 0 (#.(1- array-dimension-limit))) null))
+    (check (position x (the (simple-string 10) y)) (or (mod 10) null))
+    (check (position x y :end 10) (or (mod 10) null))
+    (check (position x (the cons y) :start 5 :end 10) (or (integer 5 9) null))
+    (check (position-if x y :end 10) (or (mod 10) null))))
