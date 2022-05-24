@@ -1238,9 +1238,9 @@
                     ,@(mapcar (lambda (spec) `((,(cadr spec)) ,(car spec)))
                               specs)))
                 ,@(mapcar (lambda (spec)
-                            `(define-fop ,(car spec)
-                                          (,(symbolicate "FOP-LAYOUT-OF-"
-                                                         (cadr spec)))
+                            `(define-fop ,(car spec) :not-host
+                               (,(symbolicate "FOP-LAYOUT-OF-"
+                                              (cadr spec)))
                                ,(find-layout (cadr spec))))
                           specs))))
   (frob (#x68 t)
