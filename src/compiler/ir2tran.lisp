@@ -130,10 +130,13 @@
        ;; will eventually be defined. If that's untrue, e.g. if we referred
        ;; to #'DESCRIBE during cold-load, we'd just fix it locally by declaring
        ;; DESCRIBE notinline.
-       ;; But in the target, more caution is warranted because users might
-       ;; DEFKNOWN a function but fail to define it. And they shouldn't be
-       ;; expected to understand the failure mode and the remedy.
-       (cond ((and #-sb-xc-host (find-fdefn name)
+       ;; But don't do this for non-internal packages, because users
+       ;; might DEFKNOWN a function but fail to define it, or they
+       ;; might try to redefine it and get the old definition. And
+       ;; they shouldn't be expected to understand the failure mode
+       ;; and the remedy.
+       (cond ((and (internal-name-p name)
+                   #-sb-xc-host (find-fdefn name)
                    (info :function :info name)
                    (let ((*lexenv* (node-lexenv node)))
                      (not (fun-lexically-notinline-p name))))
