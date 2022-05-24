@@ -2553,27 +2553,22 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (defvar *load-time-value-counter*)
 
-(flet ((pop-args (argc fasl-input)
-         (let ((args)
-               (stack (%fasl-input-stack fasl-input)))
-           (dotimes (i argc (values (pop-fop-stack stack) args))
-             (push (pop-fop-stack stack) args)))))
-  (define-cold-fop (fop-funcall (n))
-    (multiple-value-bind (fun args) (pop-args n (fasl-input))
-      (if args
-          (case fun
-           (values-specifier-type
-            (let* ((des (first args))
-                   (spec (if (descriptor-p des) (host-object-from-core des) des)))
-              (ctype-to-core spec (if (eq spec '*)
-                                      *wild-type*
-                                      (funcall fun spec)))))
-           (t (error "Can't FOP-FUNCALL with function ~S in cold load." fun)))
-          (let ((counter *load-time-value-counter*))
-            (push (cold-list (cold-intern :load-time-value) fun
-                             (number-to-core counter)) *!cold-toplevels*)
-            (setf *load-time-value-counter* (1+ counter))
-            (make-ltv-patch counter))))))
+(define-cold-fop (fop-funcall (n))
+  (if (= n 0)
+      (let ((counter *load-time-value-counter*))
+        (push (cold-list (cold-intern :load-time-value)
+                         (pop-stack)
+                         (number-to-core counter)) *!cold-toplevels*)
+        (setf *load-time-value-counter* (1+ counter))
+        (make-ltv-patch counter))
+      (let ((des (pop-stack)))
+        (unless (and (= n 1)
+                     (eq (pop-stack) 'values-specifier-type))
+          (error "Can't FOP-FUNCALL random stuff in cold load."))
+        (let ((spec (if (descriptor-p des) (host-object-from-core des) des)))
+          (ctype-to-core spec (if (eq spec '*)
+                                  *wild-type*
+                                  (values-specifier-type spec)))))))
 
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*
