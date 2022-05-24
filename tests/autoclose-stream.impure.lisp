@@ -33,9 +33,7 @@
 (defun make-streams ()
   (let (streams)
     (dotimes (i 6)
-      (setq streams (nconc (list (open "test-util.lisp")
-                                 (open "assertoid.lisp"))
-                           streams)))
+      (push (open "autoclose-stream.impure.lisp") streams))
     (dolist (stream streams)
       (assert (fd-has-finalizer-p (sb-impl::fd-stream-fd stream))))
     (setq *fds*

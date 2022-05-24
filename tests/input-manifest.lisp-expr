@@ -4,7 +4,6 @@
 (("aprof.impure.lisp"
   "src/code/aprof.lisp"
   "src/code/shaketree.lisp")
- ("autoclose-stream.impure.lisp" "tests/test-util.lisp" "tests/assertoid.lisp")
  ("avltree.pure.lisp" "tests/bbtree-test-util.lisp")
  ("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
  ("brothertree.impure.lisp"
