@@ -135,7 +135,16 @@
        ;; might try to redefine it and get the old definition. And
        ;; they shouldn't be expected to understand the failure mode
        ;; and the remedy.
-       (cond ((and (internal-name-p name)
+       (cond ((and (labels ((internal-name-p (what)
+                              (typecase what
+                                (list
+                                 (every #'internal-name-p what))
+                                (symbol
+                                 (let ((pkg (sb-xc:symbol-package what)))
+                                   (or (and pkg (system-package-p pkg))
+                                       (eq pkg *cl-package*))))
+                                (t t))))
+                     (internal-name-p name))
                    #-sb-xc-host (find-fdefn name)
                    (info :function :info name)
                    (let ((*lexenv* (node-lexenv node)))
