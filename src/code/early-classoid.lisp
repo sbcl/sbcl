@@ -327,7 +327,9 @@
            ;; that has this bitmap we can use the layout of T.
            ((eq wrapper (find-layout t)) 0)
            (t
-            +layout-all-tagged+))))
+            +layout-all-tagged+)))
+  (defun %layout-bitmap (layout) (wrapper-bitmap layout))
+) ; end PROGN #+sb-xc-host
 
 (defun equalp-err (a b)
   (bug "EQUALP ~S ~S" a b))
@@ -400,8 +402,27 @@
 #+64-bit
 (defun wrapper-depthoid (wrapper) (layout-depthoid (wrapper-friend wrapper)))
 
+;;; Extract the bitmap from 1 or more words of bits that have the same format
+;;; as a BIGNUM - least-significant word first, native bit order within each word,
+;;; all but the last are unsigned, and the last is signed.
+(defun %layout-bitmap (wrapper)
+  (declare (type wrapper wrapper))
+  (do ((accumulator 0)
+       (shift 0)
+       (index (bitmap-start wrapper) (1+ index))
+       (last (1- (%instance-length wrapper))))
+      ((> index last) accumulator)
+    (setf accumulator (logior accumulator
+                              (ash (if (= index last)
+                                       (%raw-instance-ref/signed-word wrapper index)
+                                       (%raw-instance-ref/word wrapper index))
+                                   shift)))
+    (incf shift sb-vm:n-word-bits)))
+
 (defun wrapper-bitmap (wrapper)
   (declare (type wrapper wrapper))
+  ;; Whenever we call WRAPPER-BITMAP on a structure-object subtype,
+  ;; it's supposed to have the INFO slot populated, linking it to a defstruct-description.
   (acond ((wrapper-info wrapper) (dd-bitmap it))
          ;; Instances lacking DD-INFO are CLOS objects, which can't generally have
          ;; raw slots, except that funcallable-instances may have 2 raw slots -
@@ -409,14 +430,16 @@
          ;; on the platform, and the layout is tagged but a special case.
          ;; In any event, the bitmap is always 1 word, and there are no "extra ID"
          ;; words preceding it.
-         (t (the fixnum
-                 (%raw-instance-ref/signed-word (wrapper-friend wrapper)
-                                                (type-dd-length sb-vm:layout))))))
+         (t
+          (aver (not (logtest +structure-layout-flag+ (wrapper-flags wrapper))))
+          (the fixnum
+               (%raw-instance-ref/signed-word (wrapper-friend wrapper)
+                                              (type-dd-length sb-vm:layout))))))
 #+64-bit
 (defmacro wrapper-length (wrapper) ; SETFable
   `(ldb (byte 16 16) (layout-flags (wrapper-friend ,wrapper))))
 
-) ; end PROGN
+) ; end PROGN #-sb-xc-host
 
 ;;; True of STANDARD-OBJECT, which include generic functions.
 (declaim (inline layout-for-pcl-obj-p))

@@ -218,7 +218,9 @@
                   old-context old-length
                   context length)
             t))
-        (let ((old-bitmap (wrapper-bitmap old-layout)))
+        ;; The "%" accessor reads the bitmap from the layout,
+        ;; not from its related defstruct-description.
+        (let ((old-bitmap (%layout-bitmap old-layout)))
           (unless (= old-bitmap bitmap)
             (warn "change in placement of raw slots of class ~S ~
 between the ~A definition and the ~A definition"

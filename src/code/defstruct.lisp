@@ -1524,7 +1524,7 @@ or they must be declared locally notinline at each call site.~@:>"
   (declare (type wrapper old-layout new-layout))
   (if (wrapper-info old-layout)
       (let ((old-bitmap (wrapper-bitmap old-layout))
-            (new-bitmap (wrapper-bitmap new-layout)))
+            (new-bitmap (%layout-bitmap new-layout)))
         ;; The number of extra ID words has to match, as does the number of bitmap
         ;; words, or else GC will croak when parsing the bitmap.
         (and (= (calculate-extra-id-words (wrapper-depthoid old-layout))

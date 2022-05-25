@@ -79,6 +79,7 @@
       (dotimes (i bitmap-words)
         (%raw-instance-set/word layout (+ bitmap-base i)
               (ldb (byte sb-vm:n-word-bits (* i sb-vm:n-word-bits)) bitmap))))
+    (aver (= (%layout-bitmap layout) bitmap)) ; verify it reads back the same
     ;; It's not terribly important that we recycle layout IDs, but I have some other
     ;; changes planned that warrant a finalizer per layout.
     ;; FIXME: structure IDs should never be recycled because code blobs referencing
