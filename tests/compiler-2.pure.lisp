@@ -3667,3 +3667,15 @@
           nil))
    ((-1) nil)
    (((- (expt 2 300))) t)))
+
+(with-test (:name :cmov-branch)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x y)
+      (assert
+       (let ((res nil))
+         (when x (setf res (not res)))
+         (when y (setf res (not res)))
+         (not res))))
+   ((1 2) nil)
+   ((nil nil) nil)))

@@ -152,6 +152,10 @@
                          vop node 2block
                          &aux (prev (vop-prev vop)))
   (delete-vop vop)
+  (let ((last (ir2-block-last-vop 2block)))
+    (when (and last
+               (eq (vop-name last) 'branch))
+      (delete-vop last)))
   (cond
     ((and (constant-tn-p arg-if)
           (constant-tn-p arg-else)
