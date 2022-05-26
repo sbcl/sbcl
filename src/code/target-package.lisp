@@ -1021,6 +1021,7 @@ implementation it is ~S." *!default-package-use-list*)
          (nicks (stringify-string-designators nicknames))
          (package
           (or (resolve-deferred-package name)
+              (resolve-rehoming-package name)
               (%make-package (make-package-hashtable internal-symbols)
                              (make-package-hashtable external-symbols))))
          clobber)
@@ -1184,12 +1185,14 @@ implementation it is ~S." *!default-package-use-list*)
                   (dolist (used (package-use-list package))
                     (unuse-package used package))
                   (setf (package-%local-nicknames package) nil)
-                  (flet ((nullify-home (symbols)
-                           (dovector (x (package-hashtable-cells symbols))
-                             (when (and (symbolp x) (eq (symbol-package x) package))
-                               (%set-symbol-package x nil)))))
-                    (nullify-home (package-internal-symbols package))
-                    (nullify-home (package-external-symbols package)))
+                  (let ((rehoming-package (make-rehoming-package package)))
+                    (flet ((nullify-home (symbols)
+                             (dovector (x (package-hashtable-cells symbols))
+                               (when (and (symbolp x)
+                                          (eq (symbol-package x) package))
+                                 (%set-symbol-package x rehoming-package)))))
+                      (nullify-home (package-internal-symbols package))
+                      (nullify-home (package-external-symbols package))))
                   (with-package-names (table)
                     (awhen (package-id package)
                       (setf (aref *id->package* it) nil (package-id package) nil))
@@ -2120,8 +2123,8 @@ PACKAGE."
               ;; cookie. i.e. a cached NIL is correct until the next cache invalidation.
               (or (null pkg) (and (packagep pkg) (package-%name pkg)))))
 
-
-;;;; deferred package handling
+
+;;;; special package hacks for the loader
 
 (defvar *deferred-package-names*)
 
@@ -2150,8 +2153,8 @@ PACKAGE."
               (setf (package-%name package) name)
               package)))))
 
-;;; Return the deferred package object for NAME if it exists,
-;;; otherwise return NIL.
+;;; Return the deferred package object for NAME if it exists, otherwise
+;;; return NIL.
 (defun resolve-deferred-package (name)
   (and (boundp '*deferred-package-names*)
        *deferred-package-names*
@@ -2161,13 +2164,46 @@ PACKAGE."
            (setf (info-gethash name *deferred-package-names*) :deleted))
          package)))
 
-;;; Bind the deferred package name table and test to see if the
-;;; deferred package table still has any unresolved entries after
-;;; FUNCTION is called.
-(defun call-with-deferred-package-names (function)
+(defvar *rehoming-package-names*)
+
+;;; When we are in the loader, DELETE-PACKAGE installs a rehoming
+;;; package in the SYMBOL-PACKAGE of its internal symbols. This has
+;;; the effect that when a package of the same name is newly redefined
+;;; later in the compiled file, the package gets updated and those
+;;; internal symbols get rehomed properly.
+(defun make-rehoming-package (package)
+  (and (boundp '*rehoming-package-names*)
+       (let ((name (package-%name package)))
+         (unless *rehoming-package-names* ; bind on demand
+           (setq *rehoming-package-names*
+                 (make-info-hashtable :comparator #'pkg-name=
+                                      :hash-function #'sxhash)))
+         (aver (not (%get-package name *rehoming-package-names*)))
+         (let ((package (%make-package (package-internal-symbols package)
+                                       (package-external-symbols package))))
+           (%register-package *rehoming-package-names* name package)
+           (setf (package-%name package) name)
+           package))))
+
+;;; Return the rehoming object for NAME if it exists, otherwise return
+;;; NIL.
+(defun resolve-rehoming-package (name)
+  (and (boundp '*rehoming-package-names*)
+       *rehoming-package-names*
+       (let ((package (%get-package name *rehoming-package-names*)))
+         (when package
+           ;; To simulate remhash.
+           (setf (info-gethash name *rehoming-package-names*) :deleted))
+         package)))
+
+;;; Bind the deferred and rehoming package name tables and test to see
+;;; if the deferred package table still has any unresolved entries
+;;; after FUNCTION is called.
+(defun call-with-loader-package-names (function)
   (let* ((boundp (boundp '*deferred-package-names*))
          ;; bind on demand
-         (*deferred-package-names* (if boundp *deferred-package-names* nil)))
+         (*deferred-package-names* (if boundp *deferred-package-names* nil))
+         (*rehoming-package-names* (if boundp *rehoming-package-names* nil)))
     (funcall function)
     (when (and (not boundp) *deferred-package-names*)
       (info-maphash

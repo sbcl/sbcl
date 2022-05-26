@@ -121,11 +121,11 @@
 
 (defmacro package-lock (package) `(logbitp 0 (package-%bits ,package)))
 
-(defmacro with-deferred-package-names (&body body)
+(defmacro with-loader-package-names (&body body)
   #+sb-xc-host
   `(progn ,@body)
   #-sb-xc-host
-  `(call-with-deferred-package-names (lambda () ,@body)))
+  `(call-with-loader-package-names (lambda () ,@body)))
 
 ;;;; IN-PACKAGE
 (proclaim '(special *package*))

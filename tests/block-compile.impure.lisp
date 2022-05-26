@@ -63,6 +63,25 @@
   (assert (not (eq (fdefinition (find-symbol "+" "BLOCK-DEFPACKAGE2"))
                    #'cl:+))))
 
+(defpackage block-defpackage3
+  (:use :cl))
+
+(with-test (:name :block-defpackage-delete-package-redefpackage)
+  (ctu:file-compile
+   `((when (find-package '#:block-defpackage3)
+       (delete-package '#:block-defpackage3))
+     (defpackage block-defpackage3
+       (:use :cl))
+     (in-package block-defpackage3)
+     ;; This can barf if, for example, F loses its package because
+     ;; DELETE-PACKAGE and never gets it back when the package gets
+     ;; defined again.
+     (export '(block-defpackage3::f)))
+   :block-compile t
+   :load t)
+  (assert (eq (nth-value 1 (find-symbol "F" "BLOCK-DEFPACKAGE3"))
+              :external)))
+
 (with-test (:name :block-defconstant-then-load-fasl)
   (ctu:file-compile
    ;; test a non-EQL-comparable constant.

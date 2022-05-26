@@ -716,7 +716,7 @@
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))
   (maybe-announce-load stream verbose)
   (let ((fasl-input (make-fasl-input stream print)))
-    (with-deferred-package-names
+    (with-loader-package-names
       (unwind-protect
            (loop while (load-fasl-group fasl-input))
         ;; Nuke the table and stack to avoid keeping garbage on
