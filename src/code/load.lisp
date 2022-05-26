@@ -760,7 +760,7 @@
     (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
       (declare (type index ptr))
       ;; FIXME: this is basically DO-LAYOUT-BITMAP, but probably not as efficient.
-      (let ((bitmap (wrapper-bitmap layout)))
+      (let ((bitmap (sb-kernel::%layout-bitmap layout)))
         ;; Values on the stack are in the same order as in the structure itself.
         (do ((i sb-vm:instance-data-start (1+ i)))
             ((>= i size))
