@@ -286,3 +286,21 @@ claim that any particular result from these edge cases constitutes a bug.
       (string/= "_" (the simple-string x)))
    (("_") nil)
    (("a") 0)))
+
+(with-test (:name :string=-derive-type)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (equal (second
+                   (third
+                    (sb-kernel:%simple-fun-type
+                     (checked-compile '(lambda (x y)
+                                        (declare (ignorable x y))
+                                        ,fun)))))
+                  ',expected))))
+    (check (string= (the (simple-string 1) x)
+                    (the (simple-string 2) y)) null)
+    (check (string= (the (simple-base-string 1) x)
+                    (the (simple-base-string 2) y)) null)
+    (check (string= (the (simple-array character (1)) x)
+                    (the (simple-array character (2)) y)) null)))
