@@ -428,6 +428,16 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                          ,@clears
                          (values ,@results)))))))
 
+(defun mpz->bignum (z)
+  "Convert a GMP MPZ Z into a Lisp BIGNUM."
+  (let* ((size (abs (sb-alien:slot z 'mp_size)))
+         (neg? (minusp (sb-alien:slot z 'mp_size)))
+         (bigint (allocate-bignum (1+ size))))
+    (sb-sys:with-pinned-objects (bigint)
+      (* (if neg? -1 1)
+         (gmp-z-to-bignum (slot z 'mp_d) bigint size)))))
+
+
 ;;; function definition and foreign function relationships
 (defmacro defgmpfun (name args &body body)
   `(progn
@@ -765,6 +775,19 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                      (slot (slot ,mpqvar 'mp_den) 'mp_d)
                      (bignum-data-sap ad))
                ,@body))))))
+
+(defun mpq->rational (q)
+  "Convert a GMP MPQ into a Lisp RATIONAL."
+  (sb-kernel:build-ratio (mpz->bignum (slot q 'mp_num))
+                         (mpz->bignum (slot q 'mp_den))))
+
+(declaim (inline __gmpq_init))
+(define-alien-routine __gmpq_init void
+  (x (* (struct gmprat))))
+
+(declaim (inline __gmpq_clear))
+(define-alien-routine __gmpq_clear void
+  (x (* (struct gmprat))))
 
 (defmacro defmpqfun (name gmpfun)
   `(progn

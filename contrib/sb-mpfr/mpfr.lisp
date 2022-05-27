@@ -198,10 +198,11 @@
 
 (defun %load-mpfr ()
   (or (some #'try-load-shared-object
-            #-(or win32 darwin) '("libmpfr.so" "libmpfr.so.4")
-            #+darwin '("libmpfr.dylib" "libmpfr.4.dylib")
+            #-(or win32 darwin) '("libmpfr.so" "libmpfr.so.4" "libmpfr.so.6")
+            #+darwin '("libmpfr.dylib" "libmpfr.4.dylib" "libmpfr.6.dylib")
             #+win32 '("mpfr.dll"))
-      (warn "MPFR not loaded.")))
+      (warn "MPFR was not loaded. This is likely because the shared library ~
+             was not found.")))
 
 (defun load-mpfr (&key (persistently t))
   (setf *mpfr-version* nil
@@ -1783,6 +1784,19 @@
   (x (* (struct mpfrfloat)))
   (rnd mpfr_rnd_enum))
 
+(declaim (inline mpfr_get_q))
+(define-alien-routine mpfr_get_q void
+  (rop (* (struct sb-gmp::gmprat)))
+  (op  (* (struct mpfrfloat))))
+
+(defun mpfrfloat->rational (f)
+  "Convert a raw MPFRFLOAT F into a CL:RATIONAL."
+  (with-alien ((q (struct sb-gmp::gmprat)))
+    (sb-gmp::__gmpq_init (addr q))
+    (mpfr_get_q (addr q) f)
+    (prog1 (sb-gmp::mpq->rational q)
+      (sb-gmp::__gmpq_clear (addr q)))))
+
 (defun coerce (x type &optional (round *mpfr-rnd*))
   (cond
     ((typep x 'mpfr-float)
@@ -1792,6 +1806,9 @@
           (mpfr_get_flt x-ref round))
          (double-float
           (mpfr_get_d x-ref round))
+         (rational
+          ;; this will always be exact
+          (mpfrfloat->rational x-ref))
          (mpfr-float
           (let ((result (make-mpfr-float)))
             (mpfr_set (mpfr-float-ref result) x-ref round)

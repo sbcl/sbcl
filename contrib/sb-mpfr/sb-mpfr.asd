@@ -19,7 +19,7 @@
   (if (not (member :sb-mpfr *features*))
       (warn "unable to test sb-mpfr: libmpfr unavailable")
       (multiple-value-bind (soft strict pending)
-          (funcall (intern "DO-TESTS" (find-package "SB-RT")))
+          (funcall (find-symbol "DO-TESTS" "SB-RT"))
         (declare (ignorable pending))
         (fresh-line)
         (unless strict
