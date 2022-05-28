@@ -82,6 +82,45 @@
   (assert (eq (nth-value 1 (find-symbol "F" "BLOCK-DEFPACKAGE3"))
               :external)))
 
+;;; Similar to the above test case, but with RENAME-PACKAGE.
+(with-test (:name :block-defpackage-rename-package-redefpackage
+                  :fails-on :sbcl)
+  (ctu:file-compile
+   `((eval-when (:compile-toplevel :load-toplevel :execute)
+       (when (find-package "BLOCK-DEFPACKAGE4")
+         (rename-package "BLOCK-DEFPACKAGE4" "OLD-BLOCK-DEFPACKAGE4")))
+     (defpackage "BLOCK-DEFPACKAGE4"
+       (:use :cl))
+     (in-package "BLOCK-DEFPACKAGE4")
+     (eval-when (:compile-toplevel :load-toplevel :execute)
+       (export '(f))))
+   :block-compile t
+   :load t)
+  (assert (eq (nth-value 1 (find-symbol "F" "BLOCK-DEFPACKAGE4"))
+              :external)))
+
+;;; Doesn't work yet.
+(with-test (:name :block-defpackage-rename-package
+                  :fails-on :sbcl)
+  (ctu:file-compile
+   `((eval-when (:compile-toplevel :load-toplevel :execute)
+       (cond
+         ((find-package "BLOCK-DEFPACKAGE-FOO")
+          (rename-package "BLOCK-DEFPACKAGE-FOO"
+                          "BLOCK-DEFPACKAGE-BAR"))
+         ((not (find-package "BLOCK-DEFPACKAGE-BAR"))
+          (make-package "BLOCK-DEFPACKAGE-BAR" :use '("CL")))))
+
+     (in-package "BLOCK-DEFPACKAGE-BAR")
+
+     (defun stable-union (bar) bar))
+   :block-compile t
+   :before-load (lambda ()
+                  (delete-package "BLOCK-DEFPACKAGE-BAR")
+                  (defpackage block-defpackage-foo (:use :cl)))
+   :load t)
+  (assert (find-symbol "STABLE-UNION" "BLOCK-DEFPACKAGE-BAR")))
+
 (with-test (:name :block-defconstant-then-load-fasl)
   (ctu:file-compile
    ;; test a non-EQL-comparable constant.

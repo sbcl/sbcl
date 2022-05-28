@@ -11,8 +11,6 @@ changes relative to sbcl-2.2.4:
   * platform support:
     ** single-stepping is now supported on 64-bit PowerPC platforms.  (thanks
        to Thomas Fitzsimmons)
-  * optimization: fasl files are now usually smaller (up to 10% on default
-    policy) and may load faster, especially on high debug.
   * optimization: improved type derivation of REDUCE with some known reducing
     functions.
   * enhancement: debug source locations now work correctly for top level forms
