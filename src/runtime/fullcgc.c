@@ -52,6 +52,8 @@
 #define BIGNUM_MARK_BIT MARK_BIT
 #endif
 
+extern lispobj lisp_init_function, gc_object_watcher;
+
 static inline uword_t boxedobj_widetag_to_markbit(int widetag) {
     return (widetag == FDEFN_WIDETAG || widetag == WEAK_POINTER_WIDETAG)
          ? FDEFN_MARK_BIT : MARK_BIT;
@@ -212,6 +214,7 @@ void __mark_obj(lispobj pointer)
         lispobj header = *base;
         int widetag = header_widetag(header);
         if (widetag == BIGNUM_WIDETAG) {
+            if (points_to_asm_code_p(pointer)) return;
             *base |= BIGNUM_MARK_BIT;
             return; // don't enqueue - no pointers
         } else {
@@ -450,6 +453,9 @@ void execute_full_mark_phase()
     }
 #endif
     gc_mark_obj(lisp_package_vector);
+    gc_mark_obj(lisp_init_function);
+    gc_mark_obj(gc_object_watcher);
+    gc_mark_obj(alloc_profile_data);
     do {
         lispobj ptr = gc_dequeue();
         gc_dcheck(ptr != 0);

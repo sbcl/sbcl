@@ -416,6 +416,8 @@ We could try a few things to mitigate this:
           (when (and (logbitp (logand (slot (deref page-table start-page) 'gen) 7)
                               generation-mask)
                      (= (logand flags page-type-mask) page-type-constraint))
+            ;; FIXME: should exclude (0 . 0) conses on PAGE_TYPE_{BOXED,UNBOXED}
+            ;; resulting from zeroing the tail of a bignum or vector etc.
             (map-objects-in-range fun
                                   (%make-lisp-obj (sap-int start))
                                   (%make-lisp-obj (sap-int end))
