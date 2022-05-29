@@ -232,7 +232,15 @@ tree structure resulting from the evaluation of EXPRESSION."
                 ;; Non-continuable error.
                 (about-to-modify-symbol-value name 'defconstant)
                 (let ((old (symbol-value name)))
-                  (unless (eql value old)
+                  (unless (or (eql value old)
+                              ;; SAPs behave like numbers but yet EQL doesn't work on them,
+                              ;; special case it.
+                              ;; Nobody will notices that the constant
+                              ;; is not EQ, since it can be copied at
+                              ;; any time anyway.
+                              (and (system-area-pointer-p old)
+                                   (system-area-pointer-p value)
+                                   (sap= old value)))
                     (multiple-value-bind (ignore aborted)
                         (with-simple-restart (abort "Keep the old value.")
                           (cerror "Go ahead and change the value."
