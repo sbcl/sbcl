@@ -1730,7 +1730,7 @@
                            ,@defines))))
 
 (define-onearg-no-rnd-mpfr-funs
-    ((ceil mpfr_ceil)
+    ((ceiling mpfr_ceil)
      (floor mpfr_floor)
      (round mpfr_round)
      (truncate mpfr_trunc)))
