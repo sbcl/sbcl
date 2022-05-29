@@ -238,6 +238,7 @@ tree structure resulting from the evaluation of EXPRESSION."
                               ;; Nobody will notices that the constant
                               ;; is not EQ, since it can be copied at
                               ;; any time anyway.
+                              #-sb-xc-host
                               (and (system-area-pointer-p old)
                                    (system-area-pointer-p value)
                                    (sap= old value)))
