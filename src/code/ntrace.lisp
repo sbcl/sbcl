@@ -584,6 +584,8 @@ The NAMEs are not evaluated. Each may be one of the following:
   * (LABELS FNAME :IN OUTER-NAME) or (FLET FNAME :IN OUTER-NAME)
     denoting a local function where OUTER-NAME may be any of the
     previous names for functions, macros, methods or compiler macros.
+    Tracing local functions may require DEBUG policy 3 to inhibit
+    inlining.
   * STRING denoting all functions fbound to symbols whose home package
     is the package with the given name.
 

@@ -8,6 +8,7 @@ changes relative to sbcl-2.2.4:
     (lp#1393302)
   * minor incompatible change: RENAME-FILE now overwrites the target file on
     Windows too, making its behaviour consistent with other platforms.
+  * minor change: inlining of local function is inhibited if policy DEBUG = 3.
   * platform support:
     ** single-stepping is now supported on 64-bit PowerPC platforms.  (thanks
        to Thomas Fitzsimmons)
