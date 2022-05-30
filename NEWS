@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.2.4:
+changes in sbcl-2.2.5 relative to sbcl-2.2.4:
   * minor incompatible change: SB-EXT:*DERIVE-FUNCTION-TYPES* being NIL now
     means that function calls will strictly only use type information from
     proclaimed ftypes. The previous behavior (still the default) of using
