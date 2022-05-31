@@ -904,7 +904,24 @@
   ;; and some range-based testing rather than just 2 EQ tests.
   (check-integerp-cmp-opcodes 2 '(integer 1 2)))
 
-(defun typep-asm-code-length (type)
+(defun show-pretty-lines (type lines)
+  (format t ";;;; Type: ~s~%" type)
+  (dolist (line lines)
+    (when (plusp (length line))
+      (let* ((label
+              (if (char= (char line 0) #\L)
+                  (subseq line 0 (1+ (position #\: line)))
+                  ""))
+             (opcode-bytes
+              (progn
+                (setq line (string-left-trim " " (subseq line (length label))))
+                (subseq line 0 (position #\Space line)))))
+        (setq line (string-left-trim " " (subseq line (length opcode-bytes))))
+        (format t "; ~4a~20a~a~%"
+                label opcode-bytes line))))
+  (terpri))
+
+(defun typep-asm-code-length (type &optional print)
   (let* ((lines
           (disassembly-lines
            (compile nil
@@ -915,6 +932,7 @@
           (some (lambda (x) (or (search "#<FUNCTION" x)
                                 (search "#<FDEFN" x)))
                 lines)))
+    (when print (show-pretty-lines type lines))
     (values (length lines) callp)))
 
 ;;; Counting instructions of assembly is sort of a very rough guess
@@ -940,7 +958,48 @@
 (write-golden-typep-data "../interesting-types.lisp-expr"
                          "typep-golden-data.txt")
 
-(defun compare-to-golden-typep-data (pathname)
+;;; FIXME: Some time after the MANY-INTERESTING-ARRAY-TYPES test
+;;; got disabled, the code size changed either due to a regression,
+;;; or more aggressive inlining of ">=" and "<="
+;;; which now causes these warnings. Figure out the new baseline.
+;;
+;; WARNING: (AND INTEGER (NOT (SIGNED-BYTE 31))) was 32 is 38
+;; WARNING: (AND INTEGER (NOT (SIGNED-BYTE 32))) was 32 is 38
+;; WARNING: (INTEGER (0) *) was 18 is 22
+;; WARNING: (INTEGER * -1) was 18 is 22
+;; WARNING: (INTEGER * -1000000) was 18 is 22
+;; WARNING: (INTEGER * -1073741825) was 18 is 23
+;; WARNING: (INTEGER * -12) was 18 is 22
+;; WARNING: (INTEGER * -14) was 18 is 22
+;; WARNING: (INTEGER * -17) was 18 is 22
+;; WARNING: (INTEGER * -2) was 18 is 22
+;; WARNING: (INTEGER * -2147483649) was 18 is 23
+;; WARNING: (INTEGER * -4611686018427387901) was 18 is 23
+;; WARNING: (INTEGER * -54043195528445951) was 18 is 23
+;; WARNING: (INTEGER * -541073411) was 18 is 22
+;; WARNING: (INTEGER * -6) was 18 is 22
+;; WARNING: (INTEGER * -9) was 18 is 22
+;; WARNING: (INTEGER * 0) was 24 is 22
+;; WARNING: (INTEGER * 20) was 18 is 22
+;; WARNING: (INTEGER * 2047) was 18 is 22
+;; WARNING: (INTEGER * 2147483647) was 18 is 23
+;; WARNING: (INTEGER * 4611686018427387900) was 18 is 23
+;; WARNING: (INTEGER * 576460752303423487) was 18 is 23
+;; WARNING: (INTEGER * 65535) was 18 is 22
+;; WARNING: (INTEGER -1) was 18 is 22
+;; WARNING: (INTEGER 1) was 18 is 22
+;; WARNING: (INTEGER 1073741824) was 18 is 23
+;; WARNING: (INTEGER 1152921504606846961) was 18 is 23
+;; WARNING: (INTEGER 1899) was 18 is 22
+;; WARNING: (INTEGER 2) was 18 is 22
+;; WARNING: (INTEGER 2147483648) was 18 is 23
+;; WARNING: (INTEGER 2305843009214) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387900) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387901) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387902) was 18 is 23
+;; WARNING: (INTEGER 4611686018427387903) was 18 is 23
+;; WARNING: (INTEGER 63) was 18 is 22
+(defun compare-to-golden-typep-data (pathname &optional print)
   (with-open-file (input pathname)
     (let ((*package* (find-package "SB-KERNEL")))
       (loop (let ((line (read-line input nil input)))
@@ -948,13 +1007,15 @@
               (with-input-from-string (stream line :start 2)
                 (let ((expect-n (read stream))
                       (type (read stream)))
-                  (multiple-value-bind (linecount callp) (typep-asm-code-length type)
+                  (multiple-value-bind (linecount callp)
+                      (typep-asm-code-length type print)
                     (declare (ignore callp))
                     (when (/= linecount expect-n)
                       (warn "~S was ~d is ~d" type expect-n linecount))))))))))
 
-(with-test (:name :many-interesting-array-types :skipped-on (or (:not :sb-unicode)
-                                                                (not :sb-devel)))
+(with-test (:name :many-interesting-array-types
+                  :skipped-on (:or (:not :sb-unicode)
+                                   (:not :immobile-space)))
   (compare-to-golden-typep-data "typep-golden-data.txt"))
 
 (with-test (:name :integerp->bignump-strength-reduction)
