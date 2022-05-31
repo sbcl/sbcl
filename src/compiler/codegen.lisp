@@ -16,24 +16,22 @@
 
 ;;;; utilities used during code generation
 
+;;; KLUDGE: the assembler can not emit backpatches comprising jump tables without
+;;; knowing the boxed code header length. But there is no compiler IR2 metaobject,
+;;; for SB-FASL:*ASSEMBLER-ROUTINES*. We have to return a fixed answer for that.
+(defun asm-routines-boxed-header-nwords ()
+  (align-up (+ sb-vm:code-constants-offset
+               #+x86-64 1) ; KLUDGE: make room for 1 boxed constant
+            2))
 ;;; the number of bytes used by the code object header
-
-(macrolet ((header-length-in-bytes (comp)
-             `(let* ((2comp (component-info ,comp))
-                     (constants (ir2-component-constants 2comp)))
-                (ash (align-up (length constants) code-boxed-words-align)
-                     sb-vm:word-shift))))
-  #-sb-xc-host
-  (defun component-header-length (&optional (component *component-being-compiled*))
-    (header-length-in-bytes component))
-  ;; KLUDGE: the assembler can not emit backpatches comprising jump tables without
-  ;; knowing the boxed code header length. But there is no compiler IR2 metaobject,
-  ;; for SB-FASL:*ASSEMBLER-ROUTINES*. We have to return a fixed answer for that.
-  #+sb-xc-host
-  (defun component-header-length ()
-    (if (boundp '*component-being-compiled*)
-        (header-length-in-bytes *component-being-compiled*)
-        (* sb-vm:n-word-bytes (align-up sb-vm:code-constants-offset 2)))))
+(defun component-header-length ()
+  (cond #+sb-xc-host ((not (boundp '*component-being-compiled*))
+                      (* sb-vm:n-word-bytes (asm-routines-boxed-header-nwords)))
+        (t
+         (let* ((2comp (component-info *component-being-compiled*))
+                (constants (ir2-component-constants 2comp)))
+           (ash (align-up (length constants) code-boxed-words-align)
+                sb-vm:word-shift)))))
 
 (defun component-n-jump-table-entries (&optional (component *component-being-compiled*))
   (ir2-component-n-jump-table-entries (component-info component)))

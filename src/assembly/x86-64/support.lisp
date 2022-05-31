@@ -93,7 +93,7 @@
        ;; KLUDGE: index of FPR-SAVE is 4
        ;; (inst call (ea (make-fixup 'fpr-save :assembly-routine*)))
        (inst call (ea (make-fixup nil :code-object
-                                  (+ (ash code-constants-offset word-shift)
+                                  (+ (component-header-length)
                                      (* 4 sb-vm:n-word-bytes)
                                      (- other-pointer-lowtag)))
                       rip-tn))
@@ -103,7 +103,7 @@
        ;; KLUDGE: index of FPR-RESTORE is 6
        ;; (inst call (ea (make-fixup 'fpr-restore :assembly-routine*)))
        (inst call (ea (make-fixup nil :code-object
-                                  (+ (ash code-constants-offset word-shift)
+                                  (+ (component-header-length)
                                      (* 6 sb-vm:n-word-bytes)
                                      (- other-pointer-lowtag)))
                       rip-tn))

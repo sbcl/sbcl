@@ -877,15 +877,15 @@ core and return a descriptor to it."
                            (+ start index)
                            (logand remainder sb-ext:most-positive-word))))
 
-(defun bignum-to-core (n)
+(defun bignum-to-core (n &optional (space *dynamic*))
   "Copy a bignum to the cold core."
   (let* ((words (ceiling (1+ (integer-length n)) sb-vm:n-word-bits))
          (handle
-          #-bignum-assertions (allocate-otherptr *dynamic* (1+ words) sb-vm:bignum-widetag)
+          #-bignum-assertions (allocate-otherptr space (1+ words) sb-vm:bignum-widetag)
           #+bignum-assertions
           (let* ((aligned-words (1+ (logior words 1))) ; round to odd, slap on a header
                  (physical-words (* aligned-words 2))
-                 (handle (allocate-otherptr *dynamic* physical-words sb-vm:bignum-widetag)))
+                 (handle (allocate-otherptr space physical-words sb-vm:bignum-widetag)))
             ;; rewrite the header to indicate the logical size
             (write-wordindexed/raw handle 0 (logior (ash words 8) sb-vm:bignum-widetag))
             handle)))
@@ -2788,10 +2788,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (n-routines (read-word-arg (fasl-input-stream)))
          (n-fixups (read-word-arg (fasl-input-stream)))
          (rounded-length (round-up length (* 2 sb-vm:n-word-bytes)))
-         (header-n-words
-          ;; Note: we round the number of constants up to ensure that
-          ;; the code vector will be properly aligned.
-          (round-up sb-vm:code-constants-offset 2))
+         (header-n-words (sb-c::asm-routines-boxed-header-nwords))
          (space (or #+(and immobile-code (not metaspace)) *immobile-varyobj*
                     ;; If there is a read-only space, use it, else use static space.
                     (if (> sb-vm:read-only-space-end sb-vm:read-only-space-start)
@@ -2800,7 +2797,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (asm-code
           (allocate-cold-descriptor
                   space
-                  (+ (ash header-n-words sb-vm:word-shift) length)
+                  (+ (ash header-n-words sb-vm:word-shift) rounded-length)
                   sb-vm:other-pointer-lowtag)))
     (setf *cold-assembler-obj* asm-code)
     (write-code-header-words asm-code header-n-words rounded-length 0)
@@ -2810,6 +2807,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
                                       (fasl-input-stream)
                                       :start start
                                       :end (+ start length)))
+    ;; Write a bignum reference into the boxed constants.
+    ;; All the backends should do this, as its avoids consing in GENERIC-NEGATE
+    ;; when the argument is MOST-NEGATIVE-FIXNUM.
+    #+x86-64 (write-wordindexed asm-code sb-vm:code-constants-offset
+                                (bignum-to-core (- most-negative-fixnum)
+                                                #-immobile-space *static*))
     ;; Update the name -> address table.
     (let (table)
       (dotimes (i n-routines)
@@ -3886,8 +3889,11 @@ III. initially undefined function references (alphabetically):
 
       ;; Load all assembler code
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
-        (dolist (file-name (remove-if-not #'assembler-file-p object-file-names))
-          (cold-load file-name verbose))
+        (let ((files (remove-if-not #'assembler-file-p object-file-names)))
+          ;; There should be exactly 1 assembler file, and 1 code object in it.
+          (when files ; But it's present only in 2nd genesis.
+            (assert (singleton-p files))
+            (cold-load (car files) verbose)))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
       (mapc 'funcall *deferred-undefined-tramp-refs*)
       (makunbound '*deferred-undefined-tramp-refs*)

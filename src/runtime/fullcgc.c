@@ -214,7 +214,6 @@ void __mark_obj(lispobj pointer)
         lispobj header = *base;
         int widetag = header_widetag(header);
         if (widetag == BIGNUM_WIDETAG) {
-            if (points_to_asm_code_p(pointer)) return;
             *base |= BIGNUM_MARK_BIT;
             return; // don't enqueue - no pointers
         } else {

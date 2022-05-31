@@ -384,9 +384,6 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
 {
     gc_assert(widetag_of(ptr) != SIMPLE_FUN_WIDETAG); // can't enliven interior pointer
     gc_assert(immobile_obj_gen_bits(ptr) == from_space);
-    // KLUDGE: disregard embedded objects in SB-FASL:*ASSEMBLER-ROUTINES*
-    if (points_to_asm_code_p((uword_t)ptr)
-        && (uword_t)native_pointer((uword_t)ptr) != asm_routines_start) return;
     int pointerish = !leaf_obj_widetag_p(widetag_of(ptr));
     int bits = (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG);
     // enlivening makes the object appear as if written, so that
