@@ -1208,32 +1208,26 @@
 (defoptimizer (replace ir2-hook) ((seq1 seq2 &key &allow-other-keys) node block)
   (declare (ignore block))
   (flet ((element-type (lvar)
-           (let ((type (lvar-type lvar)))
-             (when (csubtypep type (specifier-type 'array))
-               (multiple-value-bind (upgraded other)
-                   (array-type-upgraded-element-type type)
-                 (or other upgraded))))))
+           (type-array-element-type (lvar-type lvar))))
     (let ((type1 (element-type seq1))
           (type2 (element-type seq2)))
-      (when (and type1
-                 (neq type1 *wild-type*))
-        (if type2
-            (unless (or (eq type2 *wild-type*)
-                        (types-equal-or-intersect type1 type2))
-              (let ((*compiler-error-context* node))
-                (compiler-warn "Incompatible array element types: ~a and ~a"
-                               (type-specifier type1)
-                               (type-specifier type2))))
-            (when (constant-lvar-p seq2)
-              (map nil (lambda (x)
-                         (unless (ctypep x type1)
-                           (let ((*compiler-error-context* node))
-                             (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
-                                            x
-                                            (type-specifier type1)))
-                           (return-from replace-ir2-hook-optimizer))
-                         x)
-                   (lvar-value seq2))))))))
+      (cond ((eq type1 *wild-type*))
+            ((eq type2 *wild-type*)
+             (when (constant-lvar-p seq2)
+               (map nil (lambda (x)
+                          (unless (ctypep x type1)
+                            (let ((*compiler-error-context* node))
+                              (compiler-warn "The source sequence has an element ~s incompatible with the target array element type ~a."
+                                             x
+                                             (type-specifier type1)))
+                            (return-from replace-ir2-hook-optimizer))
+                          x)
+                    (lvar-value seq2))))
+            ((not (types-equal-or-intersect type1 type2))
+             (let ((*compiler-error-context* node))
+               (compiler-warn "Incompatible array element types: ~a and ~a"
+                              (type-specifier type1)
+                              (type-specifier type2))))))))
 
 (defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-contents &allow-other-keys)
                                       node block)
@@ -1244,12 +1238,7 @@
                         :key #'sb-vm:saetp-typecode))
            (element-type (sb-vm:saetp-ctype saetp))
            (initial-contents-type (lvar-type initial-contents))
-           (initial-contents-element-type
-             (if (csubtypep initial-contents-type (specifier-type 'array))
-                 (multiple-value-bind (upgraded other)
-                     (array-type-upgraded-element-type initial-contents-type)
-                   (or other upgraded))
-                 *wild-type*)))
+           (initial-contents-element-type (type-array-element-type initial-contents-type)))
       (cond ((not (or (eq initial-contents-element-type *wild-type*)
                       (types-equal-or-intersect element-type initial-contents-element-type)))
              (let ((*compiler-error-context* node))
@@ -1270,11 +1259,8 @@
 (defun check-sequence-item (item seq node format-string)
   (let ((seq-type (lvar-type seq))
         (item-type (lvar-type item)))
-    (when (and (neq item-type *wild-type*)
-               (csubtypep seq-type (specifier-type 'array)))
-      (let ((element-type (multiple-value-bind (upgraded other)
-                              (array-type-upgraded-element-type seq-type)
-                            (or other upgraded))))
+    (when (neq item-type *wild-type*)
+      (let ((element-type (type-array-element-type seq-type)))
         (unless (or (eq element-type *wild-type*)
                     (types-equal-or-intersect item-type element-type))
           (let ((*compiler-error-context* node))
@@ -1816,12 +1802,10 @@
       (if key-identity-p
           (fun-accepts-type test (if item 1 0)) ;; the -if variants.
           (fun-accepts-type key 0)))
-    (when (csubtypep (lvar-type sequence) (specifier-type 'array))
-      (let ((upgraded-type
-              (array-type-upgraded-element-type (lvar-type sequence))))
-        (unless (eq upgraded-type *wild-type*)
-          (setf type
-                (type-intersection type upgraded-type)))))
+    (let ((upgraded-type (type-array-element-type (lvar-type sequence))))
+      (unless (eq upgraded-type *wild-type*)
+        (setf type
+              (type-intersection type upgraded-type))))
     (unless (eq type *empty-type*)
       (type-union type
                   (specifier-type 'null)))))

@@ -676,8 +676,7 @@
     (check (find-if #'evenp y) (or integer null))
     (check (find-if #'evenp (the list y) :key #'car) list)
     (check (find x (the (simple-array character (*)) y)) (or character null))
-    #-sbcl
-    (check (find x (the simple-string y)) (or character null))))
+    (check (find x (the string y)) (or character null))))
 
 (with-test (:name :position-type-derive)
   (macrolet

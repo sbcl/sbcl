@@ -113,6 +113,13 @@
      ;; 2002-08-21
      (values *wild-type* nil))))
 
+(defun type-array-element-type (type)
+  (if (csubtypep type (specifier-type 'array))
+      (multiple-value-bind (upgraded other)
+          (array-type-upgraded-element-type type)
+        (or other upgraded))
+      *wild-type*))
+
 (defun declared-array-element-type (type)
   (if (array-type-p type)
       (array-type-element-type type)
@@ -140,9 +147,7 @@
 ;;;; DERIVE-TYPE optimizers
 
 (defun derive-aref-type (array)
-  (multiple-value-bind (uaet other)
-      (array-type-upgraded-element-type (lvar-type array))
-    (or other uaet)))
+  (type-array-element-type (lvar-type array)))
 
 (deftransform array-in-bounds-p ((array &rest subscripts))
   (block nil
