@@ -56,14 +56,11 @@
            #+long-float simple-array-complex-long-float-p
            simple-rank-1-array-*-p
            system-area-pointer-p realp
-           ;; #-64-bit
+           signed-byte-8-p signed-byte-16-p
            unsigned-byte-32-p
-           ;; #-64-bit
            signed-byte-32-p
-           #+64-bit
-           unsigned-byte-64-p
-           #+64-bit
-           signed-byte-64-p
+           #+64-bit unsigned-byte-64-p
+           #+64-bit signed-byte-64-p
            weak-pointer-p code-component-p lra-p
            sb-int:unbound-marker-p
            pointerp

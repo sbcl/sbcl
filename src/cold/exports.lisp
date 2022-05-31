@@ -2270,6 +2270,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "TEST-HEADER-DATA-BIT"
            "SHIFT-TOWARDS-END"
            "SHIFT-TOWARDS-START" "SHRINK-VECTOR" "%SHRINK-VECTOR"
+           "SIGNED-BYTE-8-P" "SIGNED-BYTE-16-P"
            "SIGNED-BYTE-32-P" "SIGNED-BYTE-64-P"
            "SIMPLE-RANK-1-ARRAY-*-P"
            "SIMPLE-ARRAY-COMPLEX-DOUBLE-FLOAT-P"

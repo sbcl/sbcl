@@ -313,6 +313,43 @@
   (:generator 5
     (inst test value value)))
 
+(macrolet ((define (name src-size)
+             `(progn
+                (define-vop (,name)
+                  (:translate ,name)
+                  (:args (value :scs (any-reg descriptor-reg)))
+                  (:conditional :z)
+                  (:args-var arg-ref)
+                  (:policy :fast-safe)
+                  (:temporary (:sc unsigned-reg) temp temp2)
+                  (:generator 6
+                    ;; Optimistically assume that the argument is a fixnum.
+                    ;; If it is, then we're shifting out the tag bit, otherwise
+                    ;; putting random bits in the low byte, which is harmless.
+                    (move temp value)
+                    (inst sar temp n-fixnum-tag-bits)
+                    (inst movsx '(,src-size :qword) temp2 temp)
+                    (inst cmp temp2 temp)
+                    ;; If the input wasn't known to be a fixnum, and it passed
+                    ;; the sign-extension test, then check FIXNUMP now.
+                    (unless (csubtypep (tn-ref-type arg-ref) (specifier-type 'fixnum))
+                      (inst jmp :nz OUT) ; did NOT pass the sign-extension test
+                      (inst test :byte value fixnum-tag-mask))
+                    OUT))
+                (define-vop (,(symbolicate name "/SIGNED"))
+                  (:translate ,name)
+                  (:args (value :scs (signed-reg)))
+                  (:arg-types signed-num)
+                  (:conditional :z)
+                  (:policy :fast-safe)
+                  (:temporary (:sc unsigned-reg) temp)
+                  (:generator 2
+                    (inst movsx '(,src-size :qword) temp value)
+                    (inst cmp temp value))))))
+  (define signed-byte-8-p :byte)
+  (define signed-byte-16-p :word)
+  (define signed-byte-32-p :dword))
+
 ;;; Sign bit and fixnum tag bit.
 (defconstant non-negative-fixnum-mask-constant
   #x8000000000000001)
