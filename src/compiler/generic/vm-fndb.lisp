@@ -74,6 +74,8 @@
            non-null-symbol-p)
     (t) boolean (movable foldable flushable))
 
+(defknown car-eq-if-listp (t t) boolean (movable foldable flushable))
+
 (defknown #.(loop for (name) in *vector-without-complex-typecode-infos*
                   collect name)
     (t) boolean (movable foldable flushable))

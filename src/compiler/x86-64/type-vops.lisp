@@ -499,6 +499,24 @@
   (:translate non-null-symbol-p)
   (:generator 3 (test-other-ptr value args symbol-widetag temp out) out))
 
+;;; It would be far better if we could recognize the IR1 for
+;;;  (AND (CONSP X) (EQ (CAR X) 'FOO))
+;;; rather than treating (TYPEP X '(CONS (EQL FOO))) as a special case,
+;;; but hey at least this provides the IR2 support for it.
+(define-vop (car-eq-if-listp)
+  (:args (value :scs (descriptor-reg))
+         (obj :scs (immediate any-reg descriptor-reg)))
+  (:temporary (:sc unsigned-reg) temp)
+  (:conditional :z)
+  (:policy :fast-safe)
+  (:translate car-eq-if-listp)
+  (:generator 3
+    (inst lea temp (ea (- list-pointer-lowtag) value))
+    (inst test :byte temp lowtag-mask)
+    (inst jmp :nz out)
+    (inst cmp :qword (ea temp) (encode-value-if-immediate obj))
+    out))
+
 (eval-when (:compile-toplevel) (aver (= sb-impl::package-id-bits 16)))
 (define-vop (keywordp symbolp)
   (:translate keywordp)
