@@ -1814,6 +1814,12 @@
                                         start end from-end))
   (find-derive-type item sequence key test start end from-end))
 
+(defoptimizer (find-if derive-type) ((predicate sequence &key key start end from-end))
+  (find-derive-type nil sequence key predicate start end from-end))
+
+(defoptimizer (find-if-not derive-type) ((predicate sequence &key key start end from-end))
+  (find-derive-type nil sequence key predicate start end from-end))
+
 (defoptimizer (position derive-type) ((item sequence
                                             &key start end
                                             key test test-not

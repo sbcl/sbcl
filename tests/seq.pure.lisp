@@ -672,7 +672,6 @@
     (check (find x y :test #'=) (or number null))
     (check (find x y :key #'car :test #'=) list)
     (check (find x (the vector y) :key #'car) list)
-    #-sbcl
     (check (find-if #'evenp y) (or integer null))
     (check (find-if #'evenp (the list y) :key #'car) list)
     (check (find x (the (simple-array character (*)) y)) (or character null))
