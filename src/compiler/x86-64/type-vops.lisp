@@ -231,12 +231,17 @@
 
 ;;;; other integer ranges
 
+(define-vop (simple-type-predicate)
+  (:args (value :scs (any-reg descriptor-reg control-stack)))
+  (:conditional)
+  (:args-var args)
+  (:policy :fast-safe))
+
 (define-vop (fixnump/unsigned-byte-64 simple-type-predicate)
   (:args (value :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:translate fixnump)
   (:temporary (:sc unsigned-reg :from (:argument 0)) tmp)
-  (:info)
   (:conditional :z)
   (:generator 3
     (move tmp value)
@@ -245,7 +250,6 @@
 #-#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (fixnump/signed-byte-64 simple-type-predicate)
   (:args (value :scs (signed-reg)))
-  (:info)
   (:conditional :z)
   (:temporary (:sc unsigned-reg) temp)
   (:arg-types signed-num)
@@ -262,7 +266,6 @@
 #+#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (fixnump/signed-byte-64 simple-type-predicate)
   (:args (value :scs (signed-reg) :target temp))
-  (:info)
   (:conditional :no)
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:arg-types signed-num)
@@ -469,7 +472,6 @@
 (macrolet ((define (name widetag)
              `(define-vop (,name simple-type-predicate)
                 (:translate ,name)
-                (:info)
                 (:conditional :z)
                 (:generator 1 (inst cmp :byte value ,widetag)))))
   (define single-float-p single-float-widetag)
@@ -490,10 +492,11 @@
   (define %instancep instance-pointer-lowtag)
   (define %other-pointer-p other-pointer-lowtag))
 
+;;; Function subtypes produce a flag result
 (macrolet ((define (name widetag)
              `(define-vop (,name type-predicate)
                 (:translate ,name)
-                (:info)
+                (:info) ; nullify the info
                 (:conditional :z)
                 (:generator 4
                   (inst lea temp (ea (- fun-pointer-lowtag) value))
@@ -504,12 +507,35 @@
   (define closurep closure-widetag)
   (define simple-fun-p simple-fun-widetag)
   (define funcallable-instance-p funcallable-instance-widetag))
+;;; Various OTHER-POINTER objects produce a flag result.
+;;; The parens around widetag are from copy&paste of generic/type-vops
+(macrolet ((define (name (widetag))
+             `(define-vop (,name type-predicate)
+                (:translate ,name)
+                (:info) ; nullify the info
+                (:conditional :z)
+                (:generator 4
+                  (test-other-ptr value args ,widetag temp out)
+                  out))))
+  (define bignump (bignum-widetag))
+  (define ratiop (ratio-widetag))
+  (define complex-rational-p (complex-widetag))
+  (define complex-single-float-p (complex-single-float-widetag))
+  (define complex-double-float-p (complex-double-float-widetag))
+  (define double-float-p (double-float-widetag))
+  (define system-area-pointer-p (sap-widetag))
+  (define weak-pointer-p (weak-pointer-widetag))
+  (define code-component-p (code-header-widetag))
+  (define fdefn-p (fdefn-widetag))
+  (define simple-array-header-p (simple-array-widetag))
+  (define complex-vector-p (complex-vector-widetag)))
 
 ;;;; list/symbol types
 ;;;
 ;;; symbolp (or symbol (eq nil))
 ;;; consp (and list (not (eq nil)))
 
+;;; Test whether ARG is an other-pointer to WIDETAG, setting the Z flag if so
 (defun test-other-ptr (arg arg-ref widetag temp label)
   (inst cmp :byte
         (cond ((other-pointer-tn-ref-p arg-ref)
@@ -665,7 +691,6 @@
   (:translate fixnump)
   (:args-var arg-ref)
   (:args (value :scs (any-reg descriptor-reg) :load-if (tn-ref-memory-access arg-ref)))
-  (:info)
   (:conditional :z)
   ;; the compiler is very sensitive to this cost here as regards boxing. DON'T TOUCH !!!
   (:generator 3
