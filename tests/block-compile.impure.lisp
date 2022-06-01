@@ -102,8 +102,7 @@
   (assert (eq (nth-value 1 (find-symbol "F" "BLOCK-DEFPACKAGE4"))
               :external)))
 
-(with-test (:name :block-defpackage-rename-package
-                  :fails-on :win32)
+(with-test (:name :block-defpackage-rename-package)
   (ctu:file-compile
    `((eval-when (:compile-toplevel :load-toplevel :execute)
        (cond

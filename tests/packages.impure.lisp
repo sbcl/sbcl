@@ -1093,6 +1093,16 @@ if a restart was invoked."
   ;;; But not a global name of any package
   (assert-error  (find-symbol "ZOOK" "SP"))
   (delete-package "SOMEPACKAGE")
+  ;; Assert that the local nickname vector has not yet removed the
+  ;; deleted package. DELETE-PACKAGE does not scan all packages to adjust
+  ;; their local nicknames. (There's no "locally nicknamed by" accessor so it
+  ;; definitely would need to visit all packages which I didn't like.
+  ;; It wouldn't be the worst thing, but I opted not to store a reverse lookup)
+  ;; Rather interestingly, this operation overwrites a words of the control stack
+  ;; that might otherwise randomly contain the very package that got deleted.
+  (assert (= (length (cdr (sb-impl::package-%local-nicknames
+                           (find-package "MYPKG"))))
+             2))
   (sb-sys:scrub-control-stack)
   (gc :full t)
   (assert (not (weak-pointer-value *the-weak-ptr*)))

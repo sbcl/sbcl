@@ -1146,7 +1146,6 @@ implementation it is ~S." *!default-package-use-list*)
          ;; If a loader package exists, resolve it and have the
          ;; package-to-be renamed take on the resolved packages
          ;; symbols, so that it gets cleaned up.
-         #-win32 ; This leaves dangling weak pointers on win32... bug?
          (let ((loader-package
                  (or (resolve-deferred-package name)
                      (resolve-rehoming-package name))))
