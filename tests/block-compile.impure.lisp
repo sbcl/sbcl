@@ -82,7 +82,10 @@
   (assert (eq (nth-value 1 (find-symbol "F" "BLOCK-DEFPACKAGE3"))
               :external)))
 
-;;; Similar to the above test case, but with RENAME-PACKAGE.
+;;; Similar to the above test case, but with RENAME-PACKAGE. This is
+;;; probably, strictly speaking, non-conforming code according to ANSI
+;;; 3.2.4.4 under item 1 for symbol, taking package "same"ness to mean
+;;; EQness. We don't expect this to work under block compilation.
 (with-test (:name :block-defpackage-rename-package-redefpackage
                   :fails-on :sbcl)
   (ctu:file-compile

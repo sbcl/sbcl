@@ -1046,6 +1046,14 @@ implementation it is ~S." *!default-package-use-list*)
         "Clobber existing package."
         "A package named ~S already exists" name)
        (setf clobber t))
+     ;; Force pending top-level lambdas at compile time, to prevent a
+     ;; potentially observable behavioral change with
+     ;; RENAME-PACKAGE. See test
+     ;; :BLOCK-DEFPACKAGE-RENAME-PACKAGE-REDEFPACKAGE which shows the
+     ;; failing scenario. Forcing top-level lambdas like this does not
+     ;; apply to block compilation.
+     (when (boundp 'sb-c::*compilation*)
+       (sb-c::compile-toplevel-lambdas '() t))
      (with-package-graph ()
          ;; Check for race, signal the error outside the lock.
          (when (and (not clobber) (find-package name))

@@ -67,10 +67,6 @@ echo //doing warm init - load and dump phase
 (setf sb-c::*merge-pathnames* t)
 ;;; and for storing pathname namestrings in fasls too.
 (setq sb-c::*name-context-file-path-selector* 'truename)
-;;; FIXME: Workaround for possible incorrect RENAME-PACKAGE behavior
-;;; with top-level-lambda merging. Remove this when the tests
-;;; :block-defpackage-rename-package etc works.
-(setq sb-c::top-level-lambda-max 0)
 (let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
  (sb-ext:save-lisp-and-die "output/sbcl.core"))
 EOF
