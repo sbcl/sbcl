@@ -163,6 +163,11 @@
 
 (define-type-vop arrayp
   (simple-array-widetag
+  ;; TEST-TYPE can't figure out how to generate the most efficient code
+  ;; if there are gaps in the range of widetags.
+  ;; Hack it by stuffing in the "unused" widetags for #-sb-unicode.
+   #-sb-unicode unused-simple-char-string
+   #-sb-unicode unused-complex-char-string
    complex-array-widetag
    complex-vector-widetag .
    #.(append

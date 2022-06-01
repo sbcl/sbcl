@@ -444,13 +444,9 @@ static inline int instance_length(lispobj header)
     return (((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF) + extra;
 }
 
-// One bit differentiates FUNCALLABLE_INSTANCE_WIDETAG from INSTANCE_WIDETAG.
-// This is index of that bit.
-#ifdef LISP_FEATURE_64_BIT
-#  define FUNINSTANCE_SELECTOR_BIT_NUMBER 3
-#else
-#  define FUNINSTANCE_SELECTOR_BIT_NUMBER 2
-#endif
+// This is index of the bit that differentiates FUNCALLABLE_INSTANCE_WIDETAG
+// from INSTANCE_WIDETAG.
+#define FUNINSTANCE_SELECTOR_BIT_NUMBER 2
 static inline boolean instanceoid_widetag_p(unsigned char widetag) {
     return (widetag | (1<<FUNINSTANCE_SELECTOR_BIT_NUMBER)) == FUNCALLABLE_INSTANCE_WIDETAG;
 }

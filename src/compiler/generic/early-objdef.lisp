@@ -180,114 +180,104 @@
           ;; a long, horrible death.  --njf, 2004-08-09
           :start #.(+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
           :step 4)
-                                            ; +unicode -unicode
-;;                             Word bits    ;  32 | 64  32 | 64
-                                            ;------------------
-                                            ; [ all numbers are hex ]
-  bignum-widetag                            ;  0A   11  0A   11       \
-  ratio-widetag                             ;  0E   15  0E   15        |
-  single-float-widetag                      ;  12   19  12   19        |
-  double-float-widetag                      ;  16   1D  16   1D        | EQL-hash picks off this
-  complex-widetag                           ;  1A   21  1A   21        | range of widetags
-  complex-single-float-widetag              ;  1E   25  1E   25        |
-  complex-double-float-widetag              ;  22   29  22   29        |
-                                            ;                          |
-  symbol-widetag                            ;  26   2D  26   2D       /
+;;                             Word bits          ;  32 | 64
+                                                  ;---------
+                                                  ; [ all numbers are hex ]
 
-  #-64-bit instance-widetag                 ;  2A       2A
-  #-64-bit funcallable-instance-widetag     ;  2E       2E
-  #-64-bit simple-fun-widetag               ;  32       32
-  #-64-bit closure-widetag                  ;  36       36
-  #-64-bit code-header-widetag              ;  3A       3A
+  ;; NOTE: If changing the widetags bracketed by the comment about EQL-hash,
+  ;; check that the definition of stable_eql_hash_p() in gc-common is correct.
+  ;; FIXME: EQL-HASH should treat SAP like a number
+  ;; -- start of numeric widetags --
+  bignum-widetag                                  ;  0A   11       \
+  ratio-widetag                                   ;  0E   15       |
+  single-float-widetag                            ;  12   19       |
+  double-float-widetag                            ;  16   1D       | EQL-hash picks off this
+  complex-widetag                                 ;  1A   21       | range of widetags.
+  complex-single-float-widetag                    ;  1E   25       |
+  complex-double-float-widetag                    ;  22   29       |
+  ;; -- end of numeric widetags --                                 |
+  symbol-widetag                                  ;  26   2D       /
+  sap-widetag                                     ;  2A   31
 
-  #+64-bit code-header-widetag              ;       31       31
-  #+64-bit instance-widetag                 ;       35       35
-  #+64-bit simple-fun-widetag               ;       39       39
-  #+64-bit funcallable-instance-widetag     ;       3D       3D
-  #+64-bit closure-widetag                  ;       41       41
+  code-header-widetag                             ;  2E   35
+  instance-widetag                                ;  32   39
+  funcallable-instance-widetag                    ;  36   3D
+  simple-fun-widetag                              ;  3A   41
+  closure-widetag                                 ;  3E   45
 
-  ;; x86[-64] does not have objects with this widetag,
-  #-(or x86 x86-64 arm64 riscv) return-pc-widetag ;  3E   45  3E   45
+  #-(or x86 x86-64 arm64 riscv) return-pc-widetag ;  42   49
   #+(or x86 x86-64 arm64 riscv) lra-widetag-notused
 
-  value-cell-widetag                        ;  42   49  42   49
-  character-widetag                         ;  46   4D  46   4D
-  sap-widetag                               ;  4A   51  4A   51
-  #-64-bit unbound-marker-widetag           ;  4E   55  4E   55
+  value-cell-widetag                              ;  46   4D
+  character-widetag                               ;  4A   51
+  #-64-bit unbound-marker-widetag                 ;  4E   55
   #+64-bit unused00-widetag
-  weak-pointer-widetag                      ;  52   59  52   59
-  fdefn-widetag                             ;  56   5D  56   5D
+  weak-pointer-widetag                            ;  52   59
+  fdefn-widetag                                   ;  56   5D
 
-  no-tls-value-marker-widetag               ;  5A   61  5A   61
-  #+sb-simd-pack simd-pack-widetag          ;       65       65
-  #-sb-simd-pack unused01-widetag           ;  5E       5E
-  #+sb-simd-pack-256 simd-pack-256-widetag  ;  62   69  62   69
-  #-sb-simd-pack-256 unused03-widetag       ;  62   69  62   69
-  filler-widetag                            ;  66   6D  66   6D
-  unused04-widetag                          ;  6A   71  6A   71
-  unused05-widetag                          ;  6E   75  6E   75
-  unused06-widetag                          ;  72   79  72   79
-  unused07-widetag                          ;  76   7D  76   7D
-  #-64-bit unused08-widetag                 ;  7A       7A
-  #-64-bit unused09-widetag                 ;  7E       7E
+  no-tls-value-marker-widetag                     ;  5A   61
+  #+sb-simd-pack simd-pack-widetag                ;       65
+  #-sb-simd-pack unused01-widetag                 ;  5E
+  #+sb-simd-pack-256 simd-pack-256-widetag        ;       69
+  #-sb-simd-pack-256 unused03-widetag             ;  62
+  filler-widetag                                  ;  66   6D
+  unused04-widetag                                ;  6A   71
+  unused05-widetag                                ;  6E   75
+  unused06-widetag                                ;  72   79
+  unused07-widetag                                ;  76   7D
+  #-64-bit unused08-widetag                       ;  7A
+  #-64-bit unused09-widetag                       ;  7E
 
-  simple-array-widetag                      ;  82   81  82   81
+  simple-array-widetag                            ;  82   81
   ;; NIL element type is not in the contiguous range of widetags
   ;; corresponding to SIMPLE-UNBOXED-ARRAY
-  simple-array-nil-widetag
+  simple-array-nil-widetag                        ;  86
 
   ;; IF YOU CHANGE THIS ORDER, THEN MANUALLY VERIFY CORRECTNESS OF:
   ;; - leaf_obj_widetag_p()
   ;; - conservative_root_p()
   ;; - anything else I forgot to mention
-  simple-vector-widetag                     ;
-  simple-bit-vector-widetag                 ;
-  simple-array-unsigned-byte-2-widetag      ;
-  simple-array-unsigned-byte-4-widetag      ;
-  simple-array-unsigned-byte-7-widetag      ;
-  simple-array-unsigned-byte-8-widetag      ;
-  simple-array-unsigned-byte-15-widetag     ;
-  simple-array-unsigned-byte-16-widetag     ;
+  simple-vector-widetag                           ;  8A
+  simple-bit-vector-widetag                       ;  8E
+  simple-array-unsigned-byte-2-widetag            ;  92
+  simple-array-unsigned-byte-4-widetag            ;  96
+  simple-array-unsigned-byte-7-widetag            ;  9A
+  simple-array-unsigned-byte-8-widetag            ;  9E
+  simple-array-unsigned-byte-15-widetag           ;  A2
+  simple-array-unsigned-byte-16-widetag           ;  A6
 
-  #-64-bit
-  simple-array-unsigned-fixnum-widetag      ;
-  simple-array-unsigned-byte-31-widetag     ;
-  simple-array-unsigned-byte-32-widetag     ;
-  #+64-bit
-  simple-array-unsigned-fixnum-widetag      ;
-  #+64-bit
-  simple-array-unsigned-byte-63-widetag     ;
-  #+64-bit
-  simple-array-unsigned-byte-64-widetag     ;
-  simple-array-signed-byte-8-widetag        ;
-  simple-array-signed-byte-16-widetag       ;
-  #-64-bit
-  simple-array-fixnum-widetag               ;
-  simple-array-signed-byte-32-widetag       ;
-  #+64-bit
-  simple-array-fixnum-widetag               ;
-  #+64-bit
-  simple-array-signed-byte-64-widetag       ;
-  simple-array-single-float-widetag         ;
-  simple-array-double-float-widetag         ;
-  simple-array-complex-single-float-widetag ;
-  simple-array-complex-double-float-widetag ;
+  #-64-bit simple-array-unsigned-fixnum-widetag   ;
+  simple-array-unsigned-byte-31-widetag           ;
+  simple-array-unsigned-byte-32-widetag           ;
+  #+64-bit simple-array-unsigned-fixnum-widetag   ;
+  #+64-bit simple-array-unsigned-byte-63-widetag  ;
+  #+64-bit simple-array-unsigned-byte-64-widetag  ;
+  simple-array-signed-byte-8-widetag              ;
+  simple-array-signed-byte-16-widetag             ;
+  #-64-bit simple-array-fixnum-widetag            ;
+  simple-array-signed-byte-32-widetag             ;
+  #+64-bit simple-array-fixnum-widetag            ;
+  #+64-bit simple-array-signed-byte-64-widetag    ;
+  simple-array-single-float-widetag               ;
+  simple-array-double-float-widetag               ;
+  simple-array-complex-single-float-widetag       ;
+  simple-array-complex-double-float-widetag       ;
 
   ;; WARNING: If you change the order of anything here,
   ;; be sure to examine COMPUTE-OBJECT-HEADER to see that it works
   ;; properly for all non-simple array headers.
-  simple-base-string-widetag                ;  D6   E1  D6   E1       \
-  #+sb-unicode                              ;                          |
-  simple-character-string-widetag           ;  DA   E5                 | Strings
-  ;; From here down commence the non-simple array types                |
-  complex-base-string-widetag               ;  DE   E9  DA   E5        |
-  #+sb-unicode                              ;                          |
-  complex-character-string-widetag          ;  E2   ED                /
+  simple-base-string-widetag                      ;  D6   E1       \
+  #+sb-unicode simple-character-string-widetag    ;  DA   E5       | Strings
+  #-sb-unicode unused-simple-char-string          ;                |
+  ;; From here down commence the non-simple array types            |
+  complex-base-string-widetag                     ;  DE   E9       |
+  #+sb-unicode complex-character-string-widetag   ;  E2   ED       /
+  #-sb-unicode unused-complex-char-string
 
-  complex-bit-vector-widetag                ;  E6   F1  DE   E9
-  complex-vector-widetag                    ;  EA   F5  E2   ED
-  complex-array-widetag                     ;  EE   F9  E6   F1
-  unused-array-widetag                      ;  F2   FD  EA   F5
+  complex-bit-vector-widetag                      ;  E6   F1
+  complex-vector-widetag                          ;  EA   F5
+  complex-array-widetag                           ;  EE   F9
+  unused-array-widetag                            ;  F2   FD
 ))
 
 ;;; Map each widetag symbol to a string to go in 'tagnames.h'.
@@ -347,12 +337,15 @@
   ;; Asserting found
   (the string (second (assoc symbol *widetag-string-alist*))))
 
-;;; Check that INSTANCE and FUNCALLABLE-INSTANCE differ at exactly 1 bit.
+;;; Check that INSTANCE and FUNCALLABLE-INSTANCE differ at exactly 1 bit
+;;; and that FUNCALLABLE-INSTANCE is the larger of the two widetags.
 (eval-when (:compile-toplevel)
-  #-64-bit (assert (= (logxor instance-widetag funcallable-instance-widetag)
-                      #b0100))
-  #+64-bit (assert (= (logxor instance-widetag funcallable-instance-widetag)
-                      #b1000)))
+  (assert (= (logcount (logand (logxor instance-widetag funcallable-instance-widetag)
+                               lowtag-mask))
+             1))
+  ;; Note: you must adjust FUNINSTANCE_SELECTOR_BIT_NUMBER (= 2) if the widetags change
+  (assert (= funcallable-instance-widetag
+             (logior instance-widetag (ash 1 2)))))
 
 (defconstant-eqx +function-widetags+
     '#.(list funcallable-instance-widetag simple-fun-widetag closure-widetag)
