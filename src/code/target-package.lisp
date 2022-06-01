@@ -989,6 +989,19 @@ Experimental: interface subject to change."
               "~S is already a nickname for ~S."
               nickname (package-%name found)))))))
 
+;;; Set the home package of each symbol in package OLD to NEW. NEW may
+;;; be NULL to indicate deletion.
+(defun rehome-package-symbols (old new)
+  (declare (type package old)
+           (type (or null package) new))
+  (flet ((rehome (symbols)
+           (dovector (x (package-hashtable-cells symbols))
+             (when (and (symbolp x)
+                        (eq (symbol-package x) old))
+               (%set-symbol-package x new)))))
+    (rehome (package-internal-symbols old))
+    (rehome (package-external-symbols old))))
+
 ;;; ANSI specifies that:
 ;;;  (1) MAKE-PACKAGE and DEFPACKAGE use the same default package-use-list
 ;;;  (2) that it (as an implementation-defined value) should be documented,
@@ -1122,6 +1135,31 @@ implementation it is ~S." *!default-package-use-list*)
            (assert-package-unlocked
             package "renaming as ~A~@[ with nickname~*~P ~1@*~{~A~^, ~}~]"
             name nicks (length nicks)))
+         ;; If a loader package exists, resolve it and have the
+         ;; package-to-be renamed take on the resolved packages
+         ;; symbols, so that it gets cleaned up.
+         (let ((loader-package
+                 (or (resolve-deferred-package name)
+                     (resolve-rehoming-package name))))
+           (when loader-package
+             (let ((loader-internals (package-internal-symbols
+                                      loader-package))
+                   (loader-externals (package-external-symbols
+                                      loader-package))
+                   (package-internals (package-internal-symbols
+                                       package))
+                   (package-externals (package-external-symbols
+                                       package)))
+               ;; FIXME: What should/can we do with conflicts?
+               (dovector (x (package-hashtable-cells loader-internals))
+                 (when (and (symbolp x)
+                            (eq (symbol-package x) loader-package))
+                   (add-symbol package-internals x)))
+               (dovector (x (package-hashtable-cells loader-externals))
+                 (when (and (symbolp x)
+                            (eq (symbol-package x) loader-package))
+                   (add-symbol package-externals x))))
+             (rehome-package-symbols loader-package package)))
          (with-package-names (table)
            ;; Check for race conditions now that we have the lock.
            (unless (eq package (find-package package-designator))
@@ -1185,14 +1223,7 @@ implementation it is ~S." *!default-package-use-list*)
                   (dolist (used (package-use-list package))
                     (unuse-package used package))
                   (setf (package-%local-nicknames package) nil)
-                  (let ((rehoming-package (make-rehoming-package package)))
-                    (flet ((nullify-home (symbols)
-                             (dovector (x (package-hashtable-cells symbols))
-                               (when (and (symbolp x)
-                                          (eq (symbol-package x) package))
-                                 (%set-symbol-package x rehoming-package)))))
-                      (nullify-home (package-internal-symbols package))
-                      (nullify-home (package-external-symbols package))))
+                  (rehome-package-symbols package (make-rehoming-package package))
                   (with-package-names (table)
                     (awhen (package-id package)
                       (setf (aref *id->package* it) nil (package-id package) nil))

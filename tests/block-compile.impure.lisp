@@ -99,9 +99,7 @@
   (assert (eq (nth-value 1 (find-symbol "F" "BLOCK-DEFPACKAGE4"))
               :external)))
 
-;;; Doesn't work yet.
-(with-test (:name :block-defpackage-rename-package
-                  :fails-on :sbcl)
+(with-test (:name :block-defpackage-rename-package)
   (ctu:file-compile
    `((eval-when (:compile-toplevel :load-toplevel :execute)
        (cond
