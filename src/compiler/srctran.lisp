@@ -1106,6 +1106,13 @@
 (defun interval-sqr (x)
   (declare (type interval x))
   (interval-func (lambda (x) (sb-xc:* x x)) (interval-abs x)))
+
+(defun interval<n (interval n)
+  (let ((high (interval-high interval)))
+    (and high
+         (if (consp high)
+             (<= (car high) n)
+             (< high n)))))
 
 ;;;; numeric DERIVE-TYPE methods
 

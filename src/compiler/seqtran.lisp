@@ -2975,3 +2975,24 @@
                   fun-result)
                  (element-type
                   (type-union fun-result element-type)))))))))
+
+(defoptimizer (nth derive-type) ((n list))
+  (when (constant-lvar-p list)
+    (let* ((list (lvar-value list))
+           (rest list)
+           type
+           (seen (list list)))
+      (loop for element = (pop rest)
+            do (setf type
+                     (if type
+                         (type-union (ctype-of element) type)
+                         (ctype-of element)))
+            until (or (memq rest seen)
+                      (atom rest))
+            do (push rest seen)
+            finally (unless (or rest
+                                (let ((n-int (type-approximate-interval (lvar-type n))))
+                                  (and n-int
+                                       (interval<n n-int (length list)))))
+                      (setf type (type-union (specifier-type 'null) type))))
+            type)))
