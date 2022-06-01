@@ -478,3 +478,28 @@
                  (setq combined (logand combined hash))))
              (sb-kernel:classoid-subclasses (sb-kernel:find-classoid 't)))
     (assert (/= 0 combined))))
+
+(defun c-murmur-fmix (word)
+  (declare (type sb-vm:word word))
+  (alien-funcall (extern-alien #+64-bit "murmur3_fmix64"
+                               #-64-bit "murmur3_fmix32"
+                               (function unsigned unsigned))
+                 word))
+(compile 'c-murmur-fmix)
+;;; Assert that the Lisp translation of the C murmur hash matches.
+;;; This is slightly redundant with the :ADDRESS-BASED-SXHASH-GCING test,
+;;; though this one is a strictly a unit test of the hashing function,
+;;; and the other is a test that GC does the right thing.
+;;; So it's not a bad idea to have both.
+(defun murmur-compare (random-state n-iter)
+  (let ((limit (1+ sb-ext:most-positive-word)))
+    (loop repeat (the fixnum n-iter)
+          do
+       (let* ((n (random limit random-state))
+              (lisp-hash (sb-impl::murmur-fmix-word n))
+              (c-hash (c-murmur-fmix n)))
+         (assert (= lisp-hash c-hash))))))
+(compile 'murmur-compare)
+
+(with-test (:name :mumur-hash-compare)
+  (murmur-compare (make-random-state t) 100000))

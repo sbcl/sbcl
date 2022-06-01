@@ -142,24 +142,37 @@
 ;;; Please excuse the C-like syle.
 #-64-bit
 (progn
-(declaim (maybe-inline murmur3-fmix32))
+(declaim (inline murmur3-fmix32))
 (defun murmur3-fmix32 (h)
-  (declare (type (unsigned-byte 32) h))
+  (declare (type sb-vm:word h))
   (setq h (logxor h (ash h -16)))
   (setq h (logand (* h #x85ebca6b) #.most-positive-word))
   (setq h (logxor h  (ash h -13)))
   (setq h (logand (* h #xc2b2ae35) #.most-positive-word))
-  (logxor h (ash h -16))))
+  (logxor h (ash h -16)))
+(defmacro murmur3-fmix-word (x) `(murmur3-fmix32 ,x)))
 
 #+64-bit
 (progn
-(declaim (maybe-inline murmur3-fmix64))
+(declaim (inline murmur3-fmix64))
 (defun murmur3-fmix64 (k)
+  (declare (type sb-vm:word k))
   (setq k (logxor k (ash k -33)))
   (setq k (logand (* k #xff51afd7ed558ccd) most-positive-word))
   (setq k (logxor k (ash k -33)))
   (setq k (logand (* k #xc4ceb9fe1a85ec53) most-positive-word))
-  (logxor k (ash k -33))))
+  (logxor k (ash k -33)))
+(defmacro murmur3-fmix-word (x) `(murmur3-fmix64 ,x)))
+
+(defun murmur-fmix-word (x)
+  (murmur3-fmix-word (truly-the sb-vm:word x)))
+(export 'murmur-fmix-word) ; for unit testing vs C code
+
+;;; The "good" hash function on sb-vm:word returns a fixnum, does not cons,
+;;; and has better avalanche behavior then SXHASH - changing any one input bit
+;;; should affect each bit of output with equal chance.
+(defun good-hash-word->fixnum (x)
+  (logand (murmur3-fmix-word (truly-the sb-vm:word x)) most-positive-fixnum))
 
 ;;;; support for the hash values used by CLOS when working with LAYOUTs
 
@@ -188,8 +201,7 @@
   (let ((limit (1+ (ash most-positive-fixnum -1))))
     (declare (notinline random))
     (logior (if (typep name '(and symbol (not null)))
-                (flet ((improve-hash (x)
-                         (#+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32 x)))
+                (flet ((improve-hash (x) (murmur3-fmix-word x)))
                   (mix (logand
                         (improve-hash (sb-impl::%sxhash-simple-string (symbol-name name)))
                         most-positive-fixnum)

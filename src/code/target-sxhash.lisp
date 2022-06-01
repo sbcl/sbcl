@@ -90,8 +90,6 @@
 ;;; that's what I'm going with.
 ;;;
 (defun %instance-sxhash (instance)
-  ;; to avoid consing in fmix
-  (declare (inline #+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32))
   ;; LAYOUT must not acquire an extra slot for the stable hash,
   ;; because the bitmap length is derived from the instance length.
   ;; It would probably be simple to eliminate this as a special case
@@ -113,8 +111,7 @@
                    #+sb-thread (%primitive sb-vm::set-instance-hashed instance))
                  (get-lisp-obj-address instance))))
     ;; perturb the address
-    (logand (#+64-bit murmur3-fmix64 #-64-bit murmur3-fmix32 addr)
-            most-positive-fixnum)))
+    (logand (murmur3-fmix-word addr) most-positive-fixnum)))
 
 (declaim (inline instance-sxhash))
 (defun instance-sxhash (instance)
@@ -297,8 +294,7 @@
   ;;    so we should pick off SYMBOL sooner than INSTANCE as well.
   ;;  * INSTANCE (except for PATHNAME) doesn't recurse anyway - in fact
   ;;    it is particularly dumb (by design), so performing that test later
-  ;;    doesn't incur much of a penalty. And our users probably know that
-  ;;    SXHASH on instance doesn't really do anything.
+  ;;    doesn't incur much of a penalty.
   ;; Anyway, afaiu, the code below was previously ordered by gut feeling
   ;; rather than than actual measurement, so having any rationale for ordering
   ;; is better than having no rationale. And as a further comment observes,
@@ -589,18 +585,6 @@
                      (t (mix (recurse (car x) (1- depthoid))
                              (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))
-
-;;; These "good" hashers act on sb-vm:word, returning a fixnum, do not cons,
-;;; and have better avalanche behavior then SXHASH - changing any one input bit
-;;; should affect each bit of output with equal chance.
-#+64-bit
-(defun good-hash-word->fixnum (x)
-  (declare (inline murmur3-fmix64))
-  (logand (murmur3-fmix64 (truly-the sb-vm:word x)) most-positive-fixnum))
-#-64-bit
-(defun good-hash-word->fixnum (x)
-  (declare (inline murmur3-fmix32))
-  (logand (murmur3-fmix32 (truly-the sb-vm:word x)) most-positive-fixnum))
 
 ;;; Not needed post-build
 (clear-info :function :inlining-data '%sxhash-simple-substring)
