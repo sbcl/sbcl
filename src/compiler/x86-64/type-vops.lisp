@@ -529,6 +529,52 @@
   (define fdefn-p (fdefn-widetag))
   (define simple-array-header-p (simple-array-widetag))
   (define complex-vector-p (complex-vector-widetag)))
+
+(macrolet ((fail-if-not-otherptr ()
+             `(cond ((other-pointer-tn-ref-p value-tn-ref)
+                     (inst mov :byte temp (ea (- other-pointer-lowtag) value)))
+                    (t
+                     (inst lea temp (ea (- other-pointer-lowtag) value))
+                     (inst test :byte temp lowtag-mask)
+                     ;; TEST clears the Carry, so if this jump occurs,
+                     ;; it returns the correct answer for the vops that return
+                     ;; their result in Z or C.
+                     (inst jmp :nz out)
+                     (inst mov :byte temp (ea temp))))))
+  #+sb-unicode
+  (macrolet ((define (name (simple nonsimple))
+               (aver (= (logior 8 (symbol-value simple)) (symbol-value nonsimple)))
+               `(define-vop (,name type-predicate)
+                  (:translate ,name)
+                  (:info) ; nullify the info
+                  (:conditional :z)
+                  (:args-var value-tn-ref)
+                  (:generator 4
+                    (fail-if-not-otherptr)
+                    (inst or :byte temp 8)
+                    (inst cmp :byte temp ,nonsimple)
+                    out))))
+    (define base-string-p (simple-base-string-widetag complex-base-string-widetag))
+    (define character-string-p
+        (simple-character-string-widetag complex-character-string-widetag)))
+  (macrolet ((define (name widetags)
+               (let* ((widetags (symbol-value widetags))
+                      (min (reduce #'min widetags))
+                      (max (reduce #'max widetags)))
+                 `(define-vop (,name type-predicate)
+                    (:translate ,name)
+                    (:info)
+                    (:conditional :c) ; Carry flag = "below" (unsigned)
+                    (:args-var value-tn-ref)
+                    (:generator 4
+                      (fail-if-not-otherptr)
+                      (inst sub :byte temp ,min)
+                      (inst cmp :byte temp ,(1+ (- max min)))
+                      OUT)))))
+    (define simple-rank-1-array-*-p +simple-rank-1-array-widetags+)
+    (define vectorp +vector-widetags+)
+    (define simple-array-p +simple-array-widetags+)
+    #+sb-unicode (define stringp +string-widetags+)))
 
 ;;;; list/symbol types
 ;;;

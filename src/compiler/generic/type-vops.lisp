@@ -90,12 +90,8 @@
                   *specialized-array-element-type-properties*))))
   (define-simple-array-type-vops))
 
-(macrolet
-    ((def ()
-       `(define-type-vop simple-rank-1-array-*-p
-         ,(map 'list #'saetp-typecode
-               *specialized-array-element-type-properties*))))
-  (def)) ; simple-rank-1-array-*-p
+;;; Stupid name for this because SIMPLE-VECTOR means something else.
+(define-type-vop simple-rank-1-array-*-p #.+simple-rank-1-array-widetags+)
 
 (define-type-vop system-area-pointer-p (sap-widetag))
 
@@ -117,10 +113,7 @@
 (define-type-vop simple-array-header-p
   (simple-array-widetag))
 
-(define-type-vop stringp
-  (#+sb-unicode simple-character-string-widetag
-   #+sb-unicode complex-character-string-widetag
-   simple-base-string-widetag complex-base-string-widetag))
+(define-type-vop stringp #.+string-widetags+)
 
 (define-type-vop base-string-p
   (simple-base-string-widetag complex-base-string-widetag))
@@ -132,16 +125,7 @@
 (define-type-vop character-string-p
   (simple-character-string-widetag complex-character-string-widetag))
 
-(define-type-vop vectorp
-  (complex-vector-widetag .
-   #.(append
-      (map 'list
-           #'saetp-typecode
-           *specialized-array-element-type-properties*)
-      (mapcan (lambda (saetp)
-                (when (saetp-complex-typecode saetp)
-                  (list (saetp-complex-typecode saetp))))
-              (coerce *specialized-array-element-type-properties* 'list)))))
+(define-type-vop vectorp #.+vector-widetags+)
 
 ;;; Note that this "type VOP" is sort of an oddball; it doesn't so
 ;;; much test for a Lisp-level type as just expose a low-level type
@@ -155,29 +139,9 @@
 ;;; ordinary type VOPs.
 (define-type-vop complex-vector-p (complex-vector-widetag))
 
-(define-type-vop simple-array-p
-  (simple-array-widetag .
-   #.(map 'list
-          #'saetp-typecode
-          *specialized-array-element-type-properties*)))
+(define-type-vop simple-array-p #.+simple-array-widetags+)
 
-(define-type-vop arrayp
-  (simple-array-widetag
-  ;; TEST-TYPE can't figure out how to generate the most efficient code
-  ;; if there are gaps in the range of widetags.
-  ;; Hack it by stuffing in the "unused" widetags for #-sb-unicode.
-   #-sb-unicode unused-simple-char-string
-   #-sb-unicode unused-complex-char-string
-   complex-array-widetag
-   complex-vector-widetag .
-   #.(append
-      (map 'list
-           #'saetp-typecode
-           *specialized-array-element-type-properties*)
-      (mapcan (lambda (saetp)
-                (when (saetp-complex-typecode saetp)
-                  (list (saetp-complex-typecode saetp))))
-              (coerce *specialized-array-element-type-properties* 'list)))))
+(define-type-vop arrayp #.+array-widetags+)
 
 (define-type-vop numberp
   (bignum-widetag

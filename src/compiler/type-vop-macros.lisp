@@ -14,6 +14,49 @@
   `(,unbound-marker-widetag ,character-widetag #+64-bit ,single-float-widetag)
   #'equal)
 
+(defconstant-eqx +simple-rank-1-array-widetags+
+  (map 'list #'saetp-typecode *specialized-array-element-type-properties*)
+  #'equal)
+
+(defconstant-eqx +vector-widetags+
+  `(,complex-vector-widetag
+    #-sb-unicode ,unused-simple-char-string ; because of the contiguity assertion
+    #-sb-unicode ,unused-complex-char-string
+    ,@(append
+       (map 'list #'saetp-typecode *specialized-array-element-type-properties*)
+       (mapcan (lambda (saetp)
+                 (when (saetp-complex-typecode saetp)
+                   (list (saetp-complex-typecode saetp))))
+               (coerce *specialized-array-element-type-properties* 'list))))
+  #'equal)
+
+(defconstant-eqx +simple-array-widetags+
+  `(,simple-array-widetag ,@+simple-rank-1-array-widetags+)
+  #'equal)
+
+(defconstant-eqx +array-widetags+
+  `(,simple-array-widetag ,complex-array-widetag ,@+vector-widetags+)
+  #'equal)
+
+(defconstant-eqx +string-widetags+
+  `(#+sb-unicode ,simple-character-string-widetag
+    #+sb-unicode ,complex-character-string-widetag
+    ,simple-base-string-widetag ,complex-base-string-widetag)
+  #'equal)
+
+#+sb-xc-host
+(flet ((check (list)
+         ;; Assert that LIST is a contiguous range of widetags
+         (let* ((sorted (sort (copy-list list) #'<))
+                (min (first sorted))
+                (max (car (last sorted))))
+           (assert (equal sorted (loop for w from min to max by 4 collect w))))))
+  (check +simple-rank-1-array-widetags+)
+  (check +vector-widetags+)
+  (check +simple-array-widetags+)
+  (check +array-widetags+)
+  #+sb-unicode (check +string-widetags+)) ; they're discontiguous if #-sb-unicode
+
 ;; Given a list of widetags in HEADERS, compress into a minimal list of ranges
 ;; and/or singletons that should be tested.
 ;; FIXME: At present the "is it effectively a one-sided test" is re-implemented
