@@ -97,10 +97,16 @@
 #+sb-unicode (define-type-predicate simple-character-string-p
                   (simple-array character (*)))
 (define-type-predicate system-area-pointer-p system-area-pointer)
+
+(when-vop-existsp (:translate signed-byte-8-p)
+  (define-type-predicate signed-byte-8-p (signed-byte 8)))
+(when-vop-existsp (:translate signed-byte-16-p)
+  (define-type-predicate signed-byte-16-p (signed-byte 16)))
+
 #-64-bit
 (define-type-predicate unsigned-byte-32-p (unsigned-byte 32))
-#-64-bit
-(define-type-predicate signed-byte-32-p (signed-byte 32))
+(when-vop-existsp (:translate signed-byte-32-p)
+  (define-type-predicate signed-byte-32-p (signed-byte 32)))
 #+64-bit
 (define-type-predicate unsigned-byte-64-p (unsigned-byte 64))
 #+64-bit

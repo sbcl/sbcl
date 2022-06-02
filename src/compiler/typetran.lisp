@@ -326,19 +326,6 @@
               ;; in %SOURCE-TRANSFORM-TYPEP, but even if it wasn't,
               ;; the OR will drop out due to constraint propagation.
               `(or (eq ,object ,low) (eq ,object ,high)))
-             ((and (eq type (specifier-type '(signed-byte 8)))
-                   (vop-existsp :translate signed-byte-8-p))
-              `(signed-byte-8-p ,object))
-             ((and (eq type (specifier-type '(signed-byte 16)))
-                   (vop-existsp :translate signed-byte-16-p))
-              `(signed-byte-16-p ,object))
-             ;; On 32-bit backends (SIGNED-BYTE 32) is primitive.
-             ;; I think it would have already been recognized
-             ;; and turned into a call to the right predicate.
-             #+64-bit
-             ((and (eq type (specifier-type '(signed-byte 32)))
-                   (vop-existsp :translate signed-byte-32-p))
-              `(signed-byte-32-p ,object))
              #+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
              ((and (eql (numeric-type-class type) 'integer)
                    (or (eql low 0) (eql low 1))
