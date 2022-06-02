@@ -126,10 +126,15 @@
   (def-type-predicate-wrapper system-area-pointer-p)
   (def-type-predicate-wrapper unbound-marker-p)
   (def-type-predicate-wrapper weak-pointer-p)
-  #-64-bit
-  (progn
-    (def-type-predicate-wrapper unsigned-byte-32-p)
+
+  (sb-c::when-vop-existsp (:translate signed-byte-8-p)
+    (def-type-predicate-wrapper signed-byte-8-p))
+  (sb-c::when-vop-existsp (:translate signed-byte-16-p)
+    (def-type-predicate-wrapper signed-byte-16-p))
+  (sb-c::when-vop-existsp (:translate signed-byte-32-p)
     (def-type-predicate-wrapper signed-byte-32-p))
+  #-64-bit
+  (def-type-predicate-wrapper unsigned-byte-32-p)
   #+64-bit
   (progn
     (def-type-predicate-wrapper unsigned-byte-64-p)
