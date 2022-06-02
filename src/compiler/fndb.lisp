@@ -1260,7 +1260,8 @@
   (string-designator &key
    (:start (inhibit-flushing index 0))
    (:end (inhibit-flushing sequence-end nil)))
-  simple-string (flushable))
+  simple-string (flushable)
+  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
 
 (defknown (nstring-upcase nstring-downcase nstring-capitalize)
   ((modifying string) &key (:start index) (:end sequence-end))
