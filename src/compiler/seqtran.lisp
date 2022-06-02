@@ -1082,6 +1082,57 @@
   (def string-greaterp)
   (def string-lessp))
 
+(defun string-cmp-deriver (string1 string2 start1 end1 start2 end2)
+  (flet ((dims (string start end)
+           (let* ((type (lvar-type string))
+                  (length (vector-type-length type))
+                  (start (cond ((not start)
+                                0)
+                               ((constant-lvar-p start)
+                                (lvar-value start))))
+                  (end (or (if (and end
+                                    (constant-lvar-p end))
+                               (lvar-value end))
+                           length)))
+             (values
+              start
+              end
+              (and start end
+                   (- end start))))))
+    (multiple-value-bind (start1 end1)
+        (dims string1 start1 end1)
+      (let (low
+            high
+            (length2 (nth-value 2 (dims string2 start2 end2))))
+        (when start1
+          (setf low start1))
+        (when end1
+          (setf high end1))
+        (when (and length2 start1)
+          (let ((high2 (1- (+ start1 length2))))
+            (when (or (not high)
+                      (> high high2))
+              (setf high high2))))
+        (when (or low high)
+          (specifier-type `(or (integer ,(or low '*)
+                                        ,(or high '*))
+                               null)))))))
+
+(macrolet ((def (name)
+             `(defoptimizer (,name derive-type) ((string1 string2 start1 end1 start2 end2))
+                (string-cmp-deriver string1 string2 start1 end1 start2 end2))))
+  (def string<*)
+  (def string>*)
+  (def string<=*)
+  (def string>=*)
+  (def %sp-string-compare))
+
+(macrolet ((def (name)
+             `(defoptimizer (,name derive-type) ((string1 string2 &key start1 end1 start2 end2))
+                (string-cmp-deriver string1 string2 start1 end1 start2 end2))))
+  (def string-greaterp)
+  (def string-lessp))
+
 (deftransform string ((x) (symbol)) '(symbol-name x))
 (deftransform string ((x) (string)) '(progn x))
 
