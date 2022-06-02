@@ -218,8 +218,8 @@
             (alien-funcall (extern-alien "mpfr_get_version"
                                          (function c-string)))))
     (cond ((null *mpfr-version*))
-          ((string<= *mpfr-version* "3.1")
-           (warn "SB-MPFR requires at least MPFR version 3.1")
+          ((string<= *mpfr-version* "4.0.0")
+           (warn "SB-MPFR requires at least MPFR version 4.0.0")
            (setf success nil))
           (t
            (setf +mpfr-precision+
