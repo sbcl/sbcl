@@ -327,7 +327,7 @@
                                        preserve-vector-type)
   (lambda (call)
     (declare (type combination call))
-    (let ((lvar (nth (1- n) (combination-args call))))
+    (let ((lvar (nth n (combination-args call))))
       (when lvar
         (let ((type (lvar-type lvar)))
           (cond ((simplify-list-type type
@@ -349,7 +349,7 @@
 (defun result-type-specifier-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
-    (let ((lvar (nth (1- n) (combination-args call))))
+    (let ((lvar (nth n (combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
         (careful-specifier-type (lvar-value lvar))))))
 
@@ -367,7 +367,7 @@
 (defun creation-result-type-specifier-nth-arg (n)
   (lambda (call)
     (declare (type combination call))
-    (let ((lvar (nth (1- n) (combination-args call))))
+    (let ((lvar (nth n (combination-args call))))
       (when (and lvar (constant-lvar-p lvar))
         (let* ((specifier (lvar-value lvar))
                (lspecifier (if (atom specifier) (list specifier) specifier)))

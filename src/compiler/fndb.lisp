@@ -19,7 +19,7 @@
     ;; Note:
     ;; This is not FLUSHABLE because it's defined to signal errors.
     (movable)
-  ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 2 ? Nope... (COERCE 1 'COMPLEX)
+  ;; :DERIVE-TYPE RESULT-TYPE-SPEC-NTH-ARG 1 ? Nope... (COERCE 1 'COMPLEX)
   ;; returns REAL/INTEGER, not COMPLEX.
   )
 ;; These each check their input sequence for type-correctness,
@@ -517,15 +517,15 @@
   (flushable))
 
 (defknown copy-seq (proper-sequence) consed-sequence (flushable)
-  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown length (proper-sequence) index (foldable flushable dx-safe))
 
 (defknown reverse (proper-sequence) consed-sequence (flushable)
-  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown nreverse ((modifying sequence)) sequence (important-result)
-  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
                                           :preserve-vector-type t))
 
 (defknown make-sequence (type-specifier index
@@ -533,10 +533,10 @@
                                         (:initial-element t))
   consed-sequence
   (movable)
-  :derive-type (creation-result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown concatenate (type-specifier &rest proper-sequence) consed-sequence ()
-  :derive-type (creation-result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown %concatenate-to-string (&rest sequence) simple-string
   (flushable no-verify-arg-count))
@@ -633,7 +633,7 @@
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown substitute
   (t t proper-sequence &rest t &key (:from-end t)
@@ -645,7 +645,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown (remove-if remove-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) proper-sequence
@@ -656,7 +656,7 @@
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown (substitute-if substitute-if-not)
   (t (function-designator ((nth-arg 2 :sequence t :key :key))) proper-sequence
@@ -667,7 +667,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown delete
   (t (modifying sequence) &rest t &key (:from-end t)
@@ -678,7 +678,7 @@
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
   (call important-result)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown nsubstitute
   (t t (modifying sequence) &rest t &key (:from-end t)
@@ -689,7 +689,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
   (call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown (delete-if delete-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) (modifying sequence)
@@ -698,7 +698,7 @@
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
   (call important-result)
-  :derive-type (sequence-result-nth-arg 2))
+  :derive-type (sequence-result-nth-arg 1))
 
 (defknown (nsubstitute-if nsubstitute-if-not)
   (t (function-designator ((nth-arg 2 :sequence t :key :key))) (modifying sequence)
@@ -707,7 +707,7 @@
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
   (call)
-  :derive-type (sequence-result-nth-arg 3))
+  :derive-type (sequence-result-nth-arg 2))
 
 (defknown remove-duplicates
   (proper-sequence &rest t &key
@@ -721,7 +721,7 @@
             (:key (function-designator ((nth-arg 0 :sequence t)))))
   consed-sequence
   (flushable call)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 0))
 
 (defknown delete-duplicates
   ((modifying sequence)
@@ -735,7 +735,7 @@
    (:key (function-designator ((nth-arg 0 :sequence t)))))
   sequence
   (call important-result)
-  :derive-type (sequence-result-nth-arg 1))
+  :derive-type (sequence-result-nth-arg 0))
 
 (defknown find
   (t proper-sequence &rest t &key
@@ -857,7 +857,7 @@
                                                      (nth-arg 2 :sequence t))))))
   sequence
   (call important-result)
-  :derive-type (creation-result-type-specifier-nth-arg 1))
+  :derive-type (creation-result-type-specifier-nth-arg 0))
 
 (defknown read-sequence ((modifying sequence) stream
                          &key
@@ -1261,7 +1261,7 @@
    (:start (inhibit-flushing index 0))
    (:end (inhibit-flushing sequence-end nil)))
   simple-string (flushable)
-  :derive-type (sequence-result-nth-arg 1 :preserve-dimensions t))
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t))
 
 (defknown (nstring-upcase nstring-downcase nstring-capitalize)
   ((modifying string) &key (:start index) (:end sequence-end))
