@@ -1082,7 +1082,7 @@
   (def string-greaterp)
   (def string-lessp))
 
-(defun string-cmp-deriver (string1 string2 start1 end1 start2 end2)
+(defun string-cmp-deriver (string1 string2 start1 end1 start2 end2 &optional equality)
   (flet ((dims (string start end)
            (let* ((type (lvar-type string))
                   (length (vector-type-length type))
@@ -1099,7 +1099,7 @@
               end
               (and start end
                    (- end start))))))
-    (multiple-value-bind (start1 end1)
+    (multiple-value-bind (start1 end1 length1)
         (dims string1 start1 end1)
       (let (low
             high
@@ -1114,24 +1114,32 @@
                       (> high high2))
               (setf high high2))))
         (when (or low high)
-          (specifier-type `(or (integer ,(or low '*)
-                                        ,(or high '*))
-                               null)))))))
+          (let ((type (make-numeric-type :class 'integer :high  high :low low)))
+            (if (and equality length1 length2
+                     (/= length1 length2))
+                (if (eq equality '%sp-string-compare)
+                    (make-values-type :required
+                                      (list type
+                                            (specifier-type '(and integer (not (eql 0))))))
+                    type)
+                (type-union type
+                            (specifier-type 'null)))))))))
 
-(macrolet ((def (name)
+(macrolet ((def (name &optional equality)
              `(defoptimizer (,name derive-type) ((string1 string2 start1 end1 start2 end2))
-                (string-cmp-deriver string1 string2 start1 end1 start2 end2))))
+                (string-cmp-deriver string1 string2 start1 end1 start2 end2 ,equality))))
   (def string<*)
   (def string>*)
   (def string<=*)
   (def string>=*)
-  (def %sp-string-compare))
+  (def %sp-string-compare '%sp-string-compare))
 
-(macrolet ((def (name)
+(macrolet ((def (name &optional equality)
              `(defoptimizer (,name derive-type) ((string1 string2 &key start1 end1 start2 end2))
-                (string-cmp-deriver string1 string2 start1 end1 start2 end2))))
+                (string-cmp-deriver string1 string2 start1 end1 start2 end2 ,equality))))
   (def string-greaterp)
-  (def string-lessp))
+  (def string-lessp)
+  (def string-not-equal t))
 
 (deftransform string ((x) (symbol)) '(symbol-name x))
 (deftransform string ((x) (string)) '(progn x))
