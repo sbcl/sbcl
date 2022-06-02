@@ -3,7 +3,7 @@
 ;;; due to co-located tests.
 
 ;;; don't know how to check validity of a HANDLE in the win32 api
-#-unix (sb-ext:exit :code 104)
+#-unix (invoke-restart 'run-tests::skip-file)
 
 (defun fd-has-finalizer-p (fd)
   ;; Finalizer function can be:

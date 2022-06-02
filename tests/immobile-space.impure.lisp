@@ -1,5 +1,5 @@
 
-#-immobile-space (sb-ext:exit :code 104)
+#-immobile-space (invoke-restart 'run-tests::skip-file)
 
 ;;; If an instance was allocated but its layout not stored yet
 ;;; it could crash

@@ -14,7 +14,7 @@
 
 ;;; The debugger doesn't have any native knowledge of the interpreter
 (when (eq sb-ext:*evaluator-mode* :interpret)
-  (sb-ext:exit :code 104))
+  (invoke-restart 'run-tests::skip-file))
 
 (declaim (optimize debug))
 

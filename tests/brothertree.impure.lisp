@@ -1,4 +1,4 @@
-#+interpreter (sb-ext:exit :code 104)
+#+interpreter (invoke-restart 'run-tests::skip-file)
 
 (let ((*evaluator-mode* :compile))
   (load "../src/code/brothertree.lisp"))

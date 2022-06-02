@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-#-(and (or x86 x86-64) (not interpreter)) (sb-ext:exit :code 104)
+#-(and (or x86 x86-64) (not interpreter)) (invoke-restart 'run-tests::skip-file)
 
 (test-util:with-test (:name :basic-cpuid)
   (flet ((to-ascii (bits)

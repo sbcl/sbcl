@@ -70,7 +70,7 @@
     (process-all-interrupts))
   (check-deferrables-unblocked-or-lose 0))
 
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 ;;;; Now the real tests...
 

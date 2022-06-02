@@ -15,7 +15,7 @@
 ;;;  - garbage_collect: no SP known for thread 0x802bea000 (OS 34367133952)
 ;;;  - failed AVER: (NOT (SB-THREAD::AVL-FIND ADDR SB-THREAD::OLD))
 
-#+(or (not sb-thread) freebsd) (sb-ext:exit :code 104)
+#+(or (not sb-thread) freebsd) (invoke-restart 'run-tests::skip-file)
 
 (setf (generation-number-of-gcs-before-promotion 0) 5)
 (setf (generation-number-of-gcs-before-promotion 1) 3)
@@ -157,7 +157,7 @@
   (f 5 5 200 t))
 
 ;;; The next test hasn't been made to run on windows, but should.
-#+win32 (exit :code 104)
+#+win32 (invoke-restart 'run-tests::skip-file)
 
 ;;; Check that you get an error trying to join a foreign thread
 (defglobal *my-foreign-thread* nil)

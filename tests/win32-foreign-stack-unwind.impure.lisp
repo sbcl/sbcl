@@ -11,8 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-win32 (exit :code 104) ;; This is extremely win32-specific.
-#-x86   (exit :code 104) ;; And our AMD64 backend does not aim to support it.
+#-win32 (invoke-restart 'run-tests::skip-file) ;; This is extremely win32-specific.
+#-x86   (invoke-restart 'run-tests::skip-file) ;; And our AMD64 backend does not aim to support it.
 
 (use-package :sb-alien)
 

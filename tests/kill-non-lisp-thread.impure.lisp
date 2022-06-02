@@ -11,8 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+(or :win32 (not :sb-thread))
-(sb-ext:exit :code 104)
+#+(or :win32 (not :sb-thread)) (invoke-restart 'run-tests::skip-file)
 
 (use-package :sb-alien)
 

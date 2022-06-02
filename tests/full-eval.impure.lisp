@@ -11,8 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(or sb-eval sb-fasteval)
-(sb-ext:exit :code 104)
+#-(or sb-eval sb-fasteval) (invoke-restart 'run-tests::skip-file)
 
 (setf sb-ext:*evaluator-mode* :interpret)
 

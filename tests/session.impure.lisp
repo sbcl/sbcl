@@ -11,7 +11,7 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 (setf sb-unix::*on-dangerous-wait* :error)
 

@@ -20,7 +20,7 @@
 ;; or actually reasonable things to test.
 (when (and (eq sb-ext:*evaluator-mode* :interpret)
            (not (member :sb-fasteval *features*)))
-  (sb-ext:exit :code 104))
+  (invoke-restart 'run-tests::skip-file))
 
 (load "compiler-test-util.lisp")
 

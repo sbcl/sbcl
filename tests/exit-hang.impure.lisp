@@ -1,4 +1,4 @@
-#+(or (not sb-thread) win32) (sb-ext:exit :code 104)
+#+(or (not sb-thread) win32) (invoke-restart 'run-tests::skip-file)
 
 ;;; Not an exactly an "exit hang" test, but there was a different hang
 ;;; regarding concurrent JOIN-THREAD on 1 thread.
@@ -74,4 +74,3 @@
 ;;; Give ourselves 3 seconds to exit.
 (alien-funcall (extern-alien "prepare_exit_test" (function void int)) 3)
 (setq sb-ext:*forcibly-terminate-threads-on-exit* nil)
-(exit :code 104)

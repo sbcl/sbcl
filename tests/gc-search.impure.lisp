@@ -1,5 +1,5 @@
 
-#-immobile-space (sb-ext:exit :code 104)
+#-immobile-space (invoke-restart 'run-tests::skip-file)
 
 (defun make-page-full-of-fdefns ()
   ;; Make a bunch of fdefns until we're aligned at a page boundary.

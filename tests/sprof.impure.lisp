@@ -5,7 +5,7 @@
 ;;; but I need to try to see it behaving badly (if it does),
 ;;; and there's really no other way than to watch for bad output.
 
-#+win32 (sb-ext:exit :code 104)
+#+win32 (invoke-restart 'run-tests::skip-file)
 
 (require :sb-sprof)
 (load "../contrib/sb-sprof/test.lisp")

@@ -1,4 +1,4 @@
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 (import '(sb-thread:join-thread
           sb-thread:make-mutex

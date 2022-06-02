@@ -9,7 +9,7 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 
 ;;; Using a fresh package as a namespace for classes is a quick-and-dirty
 ;;; way to create a class hierarchy without anonymous classes.

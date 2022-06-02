@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-x86-64 (sb-ext:exit :code 104)
+#-x86-64 (invoke-restart 'run-tests::skip-file)
 
 ;;; This trivial function failed to compile due to rev 88d078fe
 (defun foo (&key k)

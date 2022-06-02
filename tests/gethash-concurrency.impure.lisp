@@ -1,6 +1,6 @@
 ;;; HASH TABLES
 
-#-sb-thread (sb-ext:exit :code 104)
+#-sb-thread (invoke-restart 'run-tests::skip-file)
 (use-package "SB-THREAD")
 (use-package "SB-SYS")
 
