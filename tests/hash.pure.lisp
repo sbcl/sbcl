@@ -503,3 +503,14 @@
 
 (with-test (:name :mumur-hash-compare)
   (murmur-compare (make-random-state t) 100000))
+
+(with-test (:name :sap-hash)
+  (assert (/= (sxhash (sb-sys:int-sap #x1000))
+              (sxhash (sb-sys:int-sap 0))))
+  (let ((list-of-saps
+         (loop for i below 1000 collect (sb-sys:int-sap i))))
+    (ctu:assert-no-consing
+     (opaque-identity
+      (let ((foo 0))
+        (dolist (sap list-of-saps foo)
+          (setq foo (logxor foo (sxhash sap)))))))))

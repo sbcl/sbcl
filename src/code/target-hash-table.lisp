@@ -66,6 +66,12 @@
   (values (pointer-hash key)
           (sb-vm:is-lisp-pointer (get-lisp-obj-address key))))
 
+;;; Note: We could somewhat easily add SAP-WIDETAG into the list of types
+;;; that get a stable hash for EQL tables (via SAP-HASH), however:
+;;; - we don't compare SAPs with SAP= when the table's test is EQL,
+;;;   so there is no real advantage (nor requirement) to have a hash
+;;;   derived from the object's contents.
+;;; - I don't imagine that users often store SAPs in hash-tables.
 (declaim (inline eql-hash eql-hash-no-memoize))
 (macrolet
     ((define-eql-hash (name symbol-hash-fun)

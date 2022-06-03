@@ -277,6 +277,11 @@
 ;;; To avoid "note: Return type not fixed values ..."
 (declaim (ftype (sfunction (t) hash-code) pathname-sxhash))
 
+(defun sap-hash (x)
+  ;; toss in a LOGNOT so that (the word a) and (int-sap a) hash differently
+  (let ((w (logand (lognot (sap-int x)) most-positive-word)))
+    (logand (murmur3-fmix-word w) most-positive-fixnum)))
+
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
   ;; fast, in case it is the bottleneck somewhere.  -- CSR, 2003-03-14
@@ -344,6 +349,7 @@
                     (fsc-instance-hash x)
                     ;; funcallable structure, not funcallable-standard-object
                     9550684))
+               (system-area-pointer (sap-hash x))
                (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
 
