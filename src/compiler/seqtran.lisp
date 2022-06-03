@@ -1024,45 +1024,45 @@
       `(if (string=* str1 str2 start1 end1 start2 end2) nil 0)
       (give-up-ir1-transform)))
 
-(defun check-string-ranges (string1 string2 start1 end1 start2 end2 node)
-  (flet ((check (i string start end)
-           (let* ((type (lvar-type string))
-                  (length (vector-type-length type)))
-             (when length
-               (flet ((check (index name length-type)
-                        (when index
-                          (let ((index-type (lvar-type index)))
-                            (unless (types-equal-or-intersect index-type
-                                                              (specifier-type length-type))
-                              (let ((*compiler-error-context* node))
-                                (compiler-warn "Bad :~a~s ~a for string~s of type ~a"
-                                               name i
-                                               (type-specifier index-type)
-                                               i
-                                               (type-specifier type))))))))
-                 (check start "start" `(integer 0 ,length))
-                 (check end "end" `(or null (integer 0 ,length)))))
-             (when (and start end)
-              (let* ((start-type (lvar-type start))
-                    (start-interval (type-approximate-interval start-type))
-                    (end-type (lvar-type end))
-                    (end-interval (type-approximate-interval end-type)))
-                (when (and (interval-p start-interval)
-                           (interval-p end-interval)
-                           (interval-< end-interval start-interval))
-                  (let ((*compiler-error-context* node))
-                    (compiler-warn ":start~a ~a is greater than :end~a ~a"
-                                   i
-                                   (type-specifier start-type)
-                                   i
-                                   (type-specifier end-type)))))))))
-    (check 1 string1 start1 end1)
-    (check 2 string2 start2 end2)))
+(defun check-string-ranges (string start end node &optional (suffix ""))
+  (let* ((type (lvar-type string))
+         (length (vector-type-length type)))
+    (when length
+      (flet ((check (index name length-type)
+               (when index
+                 (let ((index-type (lvar-type index)))
+                   (unless (types-equal-or-intersect index-type
+                                                     (specifier-type length-type))
+                     (let ((*compiler-error-context* node))
+                       (compiler-warn "Bad :~a~a ~a for~a ~a"
+                                      name suffix
+                                      (type-specifier index-type)
+                                      (if (equal suffix "")
+                                          suffix
+                                          (format nil " for string~a of type" suffix))
+                                      (type-specifier type))))))))
+        (check start "start" `(integer 0 ,length))
+        (check end "end" `(or null (integer 0 ,length)))))
+    (when (and start end)
+      (let* ((start-type (lvar-type start))
+             (start-interval (type-approximate-interval start-type))
+             (end-type (lvar-type end))
+             (end-interval (type-approximate-interval end-type)))
+        (when (and (interval-p start-interval)
+                   (interval-p end-interval)
+                   (interval-< end-interval start-interval))
+          (let ((*compiler-error-context* node))
+            (compiler-warn ":start~a ~a is greater than :end~a ~a"
+                           suffix
+                           (type-specifier start-type)
+                           suffix
+                           (type-specifier end-type))))))))
 
 (macrolet ((def (name)
              `(defoptimizer (,name ir2-hook) ((string1 string2 start1 end1 start2 end2) node block)
                 (declare (ignore block))
-                (check-string-ranges string1 string2 start1 end1 start2 end2 node))))
+                (check-string-ranges string1 start1 end1 node 1)
+                (check-string-ranges string2 start2 end2 node 2))))
   (def string=*)
   (def string<*)
   (def string>*)
@@ -1076,11 +1076,23 @@
 (macrolet ((def (name)
              `(defoptimizer (,name ir2-hook) ((string1 string2 &key start1 end1 start2 end2) node block)
                 (declare (ignore block))
-                (check-string-ranges string1 string2 start1 end1 start2 end2 node))))
+                (check-string-ranges string1 start1 end1 node 1)
+                (check-string-ranges string2 start2 end2 node 2))))
   (def string-equal)
   (def string-not-equal)
   (def string-greaterp)
   (def string-lessp))
+
+(macrolet ((def (name)
+             `(defoptimizer (,name ir2-hook) ((string &key start end) node block)
+                (declare (ignore block))
+                (check-string-ranges string start end node))))
+  (def string-downcase)
+  (def string-upcase)
+  (def nstring-downcase)
+  (def nstring-upcase)
+  (def string-capitalize)
+  (def nstring-capitalize))
 
 (defun string-cmp-deriver (string1 string2 start1 end1 start2 end2 &optional equality)
   (flet ((dims (string start end)
