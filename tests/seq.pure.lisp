@@ -299,7 +299,7 @@
          (declare (simple-vector x))
          (search x #(t t t) :key k))
     ((#() nil) 0))
-  (checked-compile-and-assert (:optimize :safe)
+  (checked-compile-and-assert (:optimize :safe :allow-warnings 'warning)
       `(lambda (x)
          (declare (simple-vector x))
          (search x #(t t t) :start2 1 :end2 0 :end1 0))
