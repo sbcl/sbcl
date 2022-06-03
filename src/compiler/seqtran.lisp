@@ -1109,7 +1109,7 @@
         (when end1
           (setf high end1))
         (when (and length2 start1)
-          (let ((high2 (1- (+ start1 length2))))
+          (let ((high2 (+ start1 length2)))
             (when (or (not high)
                       (> high high2))
               (setf high high2))))

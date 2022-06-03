@@ -693,3 +693,17 @@
     (check (position x y :end 10) (or (mod 10) null))
     (check (position x (the cons y) :start 5 :end 10) (or (integer 5 9) null))
     (check (position-if x y :end 10) (or (mod 10) null))))
+
+(with-test (:name :string-cmp)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (ctype= (second
+                    (third
+                     (sb-kernel:%simple-fun-type
+                      (checked-compile '(lambda (x y)
+                                         (declare (ignorable x y))
+                                         ,fun)))))
+                   ',expected))))
+    (check (string/= (the simple-string x) (the simple-string y) :end2 0)
+           (or (integer 0 0) null))))
