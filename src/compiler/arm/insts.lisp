@@ -1205,7 +1205,7 @@
   (:vop-var vop)
   (:emitter
    (emit-back-patch
-    segment 12
+    segment 16
     (lambda (segment position)
       (assemble (segment vop)
         ;; Calculate the address of the code component.  This is an
@@ -1221,11 +1221,9 @@
                                   other-pointer-lowtag)))
         ;; Next, we read the function header.
         (inst ldr temp (@ lip (- other-pointer-lowtag)))
+        (inst bic temp temp widetag-mask)
         ;; And finally we use the header value (a count in words),
-        ;; plus the fact that the top two bits of the widetag are
-        ;; clear (SIMPLE-FUN-WIDETAG is #x2A and
-        ;; RETURN-PC-WIDETAG is #x36) to compute the boxed
-        ;; address of the code component.
+        ;; to compute the boxed address of the code component.
         (inst sub code lip (lsr temp (- 8 word-shift))))))))
 
 ;;; Compute the address of a nearby LRA object by dead reckoning from
