@@ -1033,14 +1033,6 @@ implementation it is ~S." *!default-package-use-list*)
         "Clobber existing package."
         "A package named ~S already exists" name)
        (setf clobber t))
-     ;; Force pending top-level lambdas at compile time, to prevent a
-     ;; potentially observable behavioral change with
-     ;; RENAME-PACKAGE. See test
-     ;; :BLOCK-DEFPACKAGE-RENAME-PACKAGE-REDEFPACKAGE which shows the
-     ;; failing scenario. Forcing top-level lambdas like this does not
-     ;; apply to block compilation.
-     (when (boundp 'sb-c::*compilation*)
-       (sb-c::compile-toplevel-lambdas '() t))
      (with-package-graph ()
          ;; Check for race, signal the error outside the lock.
          (when (and (not clobber) (find-package name))
@@ -1065,6 +1057,8 @@ implementation it is ~S." *!default-package-use-list*)
          (with-package-names (table)
            (%register-package table name package))
          (atomic-incf *package-names-cookie*)
+         (when (boundp 'sb-c::*compilation*)
+           (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
          (return package))
      (bug "never")))
 
@@ -1152,6 +1146,8 @@ implementation it is ~S." *!default-package-use-list*)
          ;; not ideal to hold the lock for the entire duration.
          (%enter-new-nicknames package nicks))
        (atomic-incf *package-names-cookie*)
+       (when (boundp 'sb-c::*compilation*)
+         (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
        (return package))))
 
 (defun delete-package (package-designator)
@@ -1213,6 +1209,8 @@ implementation it is ~S." *!default-package-use-list*)
                           ;; for tidiness and to help the GC.
                           (package-%nicknames package) nil))
                   (atomic-incf *package-names-cookie*)
+                  (when (boundp 'sb-c::*compilation*)
+                    (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
                   (setf (package-%use-list package) nil
                         (package-tables package) #()
                         (package-%shadowing-symbols package) nil

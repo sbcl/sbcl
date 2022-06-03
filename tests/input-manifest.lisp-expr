@@ -71,7 +71,13 @@
  ("octets.pure.lisp"
   "tests/data/compile-file-pos.lisp"
   "tests/data/compile-file-pos-utf16be.lisp")
- ("packages.impure.lisp" "contrib/sb-md5.fasl" "contrib/sb-rotate-byte.fasl")
+ ("packages.impure.lisp"
+  "contrib/sb-md5.fasl"
+  "contrib/sb-rotate-byte.fasl"
+  "tests/package-test-1.lisp"
+  "tests/package-test-2.lisp"
+  "tests/package-test-3.lisp"
+  "tests/package-test-4.lisp")
  ("redblack.pure.lisp" "tests/bbtree-test-util.lisp")
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
  ("sb-graph.impure.lisp" "contrib/sb-graph.fasl" "contrib/uiop.fasl")

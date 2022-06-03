@@ -1620,7 +1620,7 @@ necessary, since type inference may take arbitrarily long to converge.")
       (core-object (core-call-toplevel-lambda      tll object))
       (null))))
 
-;;; Add LAMBDAS to the pending lambdas.  If this leaves more than
+;;; Add LAMBDAS to the pending lambdas. If this leaves more than
 ;;; TOP-LEVEL-LAMBDA-MAX lambdas in the list, or if FORCE-P is true,
 ;;; then smash the lambdas into a single component, compile it, and
 ;;; arrange for the resulting function to be called.
@@ -1632,13 +1632,15 @@ necessary, since type inference may take arbitrarily long to converge.")
     (let ((pending (pending-toplevel-lambdas compilation)))
       (when (and pending
                  (or (> (length pending) top-level-lambda-max)
-                     force-p))
+                     force-p
+                     (package-environment-changed compilation)))
         (multiple-value-bind (component tll)
             (merge-toplevel-lambdas pending)
           (setf (pending-toplevel-lambdas compilation) ())
           (compile-component component)
           (clear-ir1-info component)
-          (object-call-toplevel-lambda tll)))))
+          (object-call-toplevel-lambda tll))
+        (setf (package-environment-changed compilation) nil))))
   (values))
 
 ;;; Compile top level code and call the top level lambdas. We pick off

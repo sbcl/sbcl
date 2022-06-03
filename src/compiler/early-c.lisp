@@ -223,7 +223,11 @@
   ;; We build a list of top-level lambdas, and then periodically smash them
   ;; together into a single component and compile it.
   (pending-toplevel-lambdas nil :type list)
-
+  ;; We record whether the package environment has changed during the
+  ;; compilation of some sequence top level forms. This allows the
+  ;; compiler to dump symbols in such a way that the loader can
+  ;; reconstruct them in the correct package.
+  (package-environment-changed nil :type boolean)
   ;; Bidrectional map between IR1/IR2/assembler abstractions and a corresponding
   ;; small integer or string identifier. One direction could be done by adding
   ;; the ID as slot to each object, but we want both directions.
