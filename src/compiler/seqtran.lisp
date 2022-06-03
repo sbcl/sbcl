@@ -1132,6 +1132,7 @@
   (def string>*)
   (def string<=*)
   (def string>=*)
+  (def string/=* t)
   (def %sp-string-compare '%sp-string-compare))
 
 (macrolet ((def (name &optional equality)
