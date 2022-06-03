@@ -1416,6 +1416,50 @@
   (declare (ignore block min-extension))
   (check-sequence-item item vector node "Can't push ~a into ~a"))
 
+(defun check-concatenate (type sequences node &optional (description "concatenate"))
+  (let ((result-element-type (if (ctype-p type)
+                                 type
+                                 (type-array-element-type (specifier-type type)))))
+    (unless (or (eq result-element-type *wild-type*)
+                (eq result-element-type *universal-type*))
+      (loop for i from 0
+            for sequence in sequences
+            for sequence-type = (lvar-type sequence)
+            for element-type = (type-array-element-type sequence-type)
+            do (unless (or (eq element-type *wild-type*)
+                           (types-equal-or-intersect element-type result-element-type))
+                 (let ((*compiler-error-context* node))
+                   (compiler-warn "Can't ~a ~s into ~s"
+                                  description
+                                  (type-specifier sequence-type)
+                                  (if (ctype-p type)
+                                      (type-specifier (make-array-type '(*)
+                                                                       :specialized-element-type type
+                                                                       :element-type type))
+                                      type))))))))
+
+(defoptimizer (%concatenate-to-string ir2-hook) ((&rest args) node block)
+  (declare (ignore block))
+  (check-concatenate 'string args node))
+
+(defoptimizer (%concatenate-to-base-string ir2-hook) ((&rest args) node block)
+  (declare (ignore block))
+  (check-concatenate 'base-string args node))
+
+(defoptimizer (%concatenate-to-vector ir2-hook) ((widetag &rest args) node block)
+  (declare (ignore block))
+  (when (constant-lvar-p widetag)
+    (check-concatenate (sb-vm:saetp-ctype
+                        (find (lvar-value widetag)
+                              sb-vm:*specialized-array-element-type-properties*
+                              :key #'sb-vm:saetp-typecode))
+                       args node)))
+
+(defoptimizer (merge ir2-hook) ((type sequence1 sequence2 predicate &key &allow-other-keys) node block)
+  (declare (ignore predicate block))
+  (when (constant-lvar-p type)
+   (check-concatenate (lvar-value type) (list sequence1 sequence2) node "merge")))
+
 ;;; Expand simple cases of UB<SIZE>-BASH-COPY inline.  "simple" is
 ;;; defined as those cases where we are doing word-aligned copies from
 ;;; both the source and the destination and we are copying from the same
