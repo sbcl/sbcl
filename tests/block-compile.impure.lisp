@@ -122,6 +122,36 @@
    :load t)
   (assert (find-symbol "STABLE-UNION" "BLOCK-DEFPACKAGE-BAR")))
 
+(with-test (:name :block-defpackage-rename-package-symbol-conflict
+                  :fails-on :sbcl)
+  (with-scratch-file (fasl2 "fasl")
+    (compile-file "package-test-2.lisp" :output-file fasl2
+                                        :block-compile t)
+    (delete-package "BAR")
+    (with-scratch-file (fasl1 "fasl")
+      (compile-file "package-test-1.lisp" :output-file fasl1
+                                          :block-compile t)
+      (load fasl2)))
+  (assert (eq (symbol-package (find-symbol "BAZ" "BAR"))
+              (find-package "BAR")))
+  (assert (eq (funcall (find-symbol "BAZ" "BAR"))
+              :good))
+  (delete-package "BAR"))
+
+(with-test (:name :block-defpackage-rename-package-preserve-externals
+                  :fails-on :sbcl)
+  (with-scratch-file (fasl4 "fasl")
+    (compile-file "package-test-4.lisp" :output-file fasl4
+                                        :block-compile t)
+    (delete-package "FOO-NEW")
+    (with-scratch-file (fasl3 "fasl")
+      (compile-file "package-test-3.lisp" :output-file fasl3
+                                          :block-compile t)
+      (load fasl4)))
+  (assert (eq (nth-value 1 (find-symbol "BAR" "FOO-NEW"))
+              :external))
+  (delete-package "FOO-NEW"))
+
 (with-test (:name :block-defconstant-then-load-fasl)
   (ctu:file-compile
    ;; test a non-EQL-comparable constant.

@@ -40,6 +40,11 @@
   "tests/block-compile-test-4.lisp"
   "tests/block-compile-test-5.lisp")
  ("debug.impure.lisp" "tests/bug-414.lisp")
+ ("block-compile.impure.lisp"
+  "tests/package-test-1.lisp"
+  "tests/package-test-2.lisp"
+  "tests/package-test-3.lisp"
+  "tests/package-test-4.lisp")
  ("defstruct.impure-cload.lisp" "tests/block-compile-defstruct-test.lisp")
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
  ("exit-hang.impure.lisp" "tests/fcb-threads.so")
