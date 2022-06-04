@@ -1255,7 +1255,7 @@
   (define-rvc-sp-load-instruction c.lwsp  #b010 emit-ci-load-32-inst)
   #+64-bit
   (define-rvc-sp-load-instruction c.ldsp  #b011 emit-ci-load-64-inst)
-  #-(and 64-bit soft-doubles)
+  #+(and (not 64-bit) soft-doubles)
   (define-rvc-sp-load-instruction c.flwsp #b011 emit-ci-load-32-inst)
   (define-rvc-sp-load-instruction c.fldsp #b001 emit-ci-load-64-inst))
 
@@ -1274,7 +1274,7 @@
   (define-rvc-sp-store-instruction c.swsp  #b110 32)
   #+64-bit
   (define-rvc-sp-store-instruction c.sdsp  #b111 64)
-  #-(and 64-bit soft-doubles)
+  #+(and (not 64-bit) soft-doubles)
   (define-rvc-sp-store-instruction c.fswsp #b111 32)
   (define-rvc-sp-store-instruction c.fsdsp #b101 64))
 
@@ -1292,13 +1292,13 @@
   (define-rvc-load/store-instruction c.lw  #b010 32 rd*)
   #+64-bit
   (define-rvc-load/store-instruction c.ld  #b011 64 rd*)
-  #-(and 64-bit soft-doubles)
+  #+(and (not 64-bit) soft-doubles)
   (define-rvc-load/store-instruction c.flw #b011 32 rd*)
   (define-rvc-load/store-instruction c.fld #b001 64 rd*)
   (define-rvc-load/store-instruction c.sw  #b110 32 rs2*)
   #+64-bit
   (define-rvc-load/store-instruction c.sd  #b111 64 rs2*)
-  #-(and 64-bit soft-doubles)
+  #+(and (not 64-bit) soft-doubles)
   (define-rvc-load/store-instruction c.fsw #b111 32 rs2*)
   (define-rvc-load/store-instruction c.fsd #b101 64 rs2*))
 
@@ -1317,7 +1317,8 @@
              `(define-instruction ,name (segment rs1)
                 (:printer cr
                           ((funct4 ,funct4)
-                           (opcode #b10)))
+                           (opcode #b10)
+                           (rs2 0)))
                 (:emitter
                  (%emit-cr-inst segment ,funct4 (reg-tn-encoding rs1) 0 #b10)))))
   (define-rvc-cr-jump-instruction c.jr #b1000)
@@ -1354,7 +1355,7 @@
   (define-rvc-ci-arith-instruction c.addi  #b000 #b01)
   #+64-bit
   (define-rvc-ci-arith-instruction c.addiw #b001 #b01)
-  (define-rvc-ci-arith-instruction c.slli  #b001 #b10))
+  (define-rvc-ci-arith-instruction c.slli  #b000 #b10))
 
 (define-instruction c.addisp16 (segment imm)
   (:emitter
