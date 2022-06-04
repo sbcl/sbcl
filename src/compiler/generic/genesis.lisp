@@ -3895,17 +3895,10 @@ III. initially undefined function references (alphabetically):
         (init-runtime-routines))
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
-      ;; from common-lisp-exports.lisp-expr.
-      ;; Packages whose names match SB-THING were set up on the host according
-      ;; to "package-data-list.lisp-expr" which expresses the desired target
-      ;; package configuration, so we can just mirror the host into the target.
-      ;; But by waiting to observe calls to COLD-INTERN that occur during the
-      ;; loading of the cross-compiler's outputs, it is possible to rid the
-      ;; target of accidental leftover symbols, not that it wouldn't also be
-      ;; a good idea to clean up package-data-list once in a while.
-      (dolist (exported-name
-               (sb-cold:read-from-file "^common-lisp-exports.lisp-expr"))
-        (cold-intern (intern exported-name *cl-package*) :access :external))
+      ;; from XC-STRICT-CL.
+      (do-external-symbols (symbol (find-package "XC-STRICT-CL"))
+        (cold-intern (intern (symbol-name symbol) *cl-package*)
+                     :access :external))
 
       ;; Make LOGICALLY-READONLYIZE no longer a no-op
       (setf (symbol-function 'logically-readonlyize)
@@ -3913,7 +3906,8 @@ III. initially undefined function references (alphabetically):
 
       ;; Cold load.
       (dolist (file-name object-file-names)
-        (push (cold-cons :begin-file (base-string-to-core file-name)) *!cold-toplevels*)
+        (push (cold-cons :begin-file (base-string-to-core file-name))
+              *!cold-toplevels*)
         (cold-load file-name verbose))
 
       (sb-cold::check-no-new-cl-symbols)
