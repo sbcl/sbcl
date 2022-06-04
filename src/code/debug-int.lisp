@@ -369,7 +369,7 @@
   ;; This is the byte offset into the component.
   (offset nil :type index :read-only t)
   ;; The original instruction replaced by the breakpoint.
-  (instruction nil :type (or null sb-vm:word))
+  (instruction nil :type (or null word))
   ;; A list of user breakpoints at this location.
   (breakpoints nil :type list))
 (defmethod print-object ((obj breakpoint-data) str)
@@ -526,7 +526,7 @@
 ;;; "#define REAL_LRA_SLOT" in breakpoint.c. These have unfortunately
 ;;; different values, because this slot is relative to the object base
 ;;; address, whereas the one in C is an index into code->constants.
-(defconstant real-lra-slot sb-vm:code-constants-offset)
+(defconstant real-lra-slot code-constants-offset)
 
 (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
@@ -541,12 +541,12 @@
     (and (sap< x (current-sp))
          (sap<= control-stack-start x)
          (or (not aligned) (zerop (logand (sap-int x)
-                                          (1- (ash 1 sb-vm:word-shift))))))
+                                          (1- (ash 1 word-shift))))))
     #+stack-grows-downward-not-upward
     (and (sap>= x (current-sp))
          (sap> control-stack-end x)
          (or (not aligned) (zerop (logand (sap-int x)
-                                          (1- (ash 1 sb-vm:word-shift))))))))
+                                          (1- (ash 1 word-shift))))))))
 
 (declaim (inline valid-lisp-pointer-p))
 (sb-alien:define-alien-routine valid-lisp-pointer-p sb-alien:int
@@ -631,9 +631,8 @@
                                    (function sb-alien:unsigned system-area-pointer))
             (etypecase pc
               (system-area-pointer pc)
-              (sb-vm:word (int-sap pc))))))
-      (unless (= base-ptr 0)
-        (%make-lisp-obj (logior base-ptr sb-vm:other-pointer-lowtag))))))
+              (word (int-sap pc))))))
+      (unless (= base-ptr 0) (%make-lisp-obj (logior base-ptr other-pointer-lowtag))))))
 
 ;;;; (OR X86 X86-64) support
 
@@ -883,7 +882,7 @@
               (if code
                   (values code
                           (* (1+ (- word-offset (code-header-words code)))
-                             sb-vm:n-word-bytes)
+                             n-word-bytes)
                           nil)
                   (values :foreign-function
                           0
@@ -997,11 +996,11 @@
 
 (defun nth-interrupt-context (n)
   (declare (muffle-conditions compiler-note))
-  (declare (type (mod #.sb-vm:max-interrupts) n)
+  (declare (type (mod #.max-interrupts) n)
            (optimize (speed 3) (safety 0)))
   (let ((tls-words (ash (sb-alien:extern-alien "dynamic_values_bytes"
                                                (sb-alien:unsigned 32))
-                        (- sb-vm:word-shift))))
+                        (- word-shift))))
     (sb-alien:sap-alien (sb-vm::current-thread-offset-sap (+ tls-words n))
                         (* os-context-t))))
 
@@ -1145,10 +1144,9 @@ For some architectures (such as PPC) this will not be the $LRA
 register."
   (with-pinned-objects (code)
     (let ((return-machine-address (sb-vm::return-machine-address scp))
-          (code-header-len (* (code-header-words code) sb-vm:n-word-bytes)))
+          (code-header-len (* (code-header-words code) n-word-bytes)))
       (values (- return-machine-address
-                 (- (get-lisp-obj-address code)
-                    sb-vm:other-pointer-lowtag)
+                 (- (get-lisp-obj-address code) other-pointer-lowtag)
                  code-header-len)
               return-machine-address))))
 
@@ -1211,9 +1209,9 @@ register."
                               (normalize-candidate
                                #+ppc64
                                (let ((code (context-register context sb-vm::code-offset)))
-                                 (%make-lisp-obj (if (logtest sb-vm:lowtag-mask code)
+                                 (%make-lisp-obj (if (logtest lowtag-mask code)
                                                      code
-                                                     (logior code sb-vm:other-pointer-lowtag))))
+                                                     (logior code other-pointer-lowtag))))
                                #-ppc64
                                (boxed-context-register context sb-vm::code-offset)))
       (let ((candidate
@@ -1407,7 +1405,7 @@ register."
   (let* ((fun (%fun-fun function))
          (code (fun-code-header fun)))
     (- (%fun-code-offset fun)
-       (* (code-header-words code) sb-vm:n-word-bytes))))
+       (* (code-header-words code) n-word-bytes))))
 
 ;;; Return the object of type FUNCTION associated with the DEBUG-FUN,
 ;;; or NIL if the function is unavailable or is non-existent as a user
@@ -2374,15 +2372,15 @@ register."
 (defun make-lisp-obj (val &optional (errorp t))
   (if (or
        ;; fixnum
-       (zerop (logand val sb-vm:fixnum-tag-mask))
+       (zerop (logand val fixnum-tag-mask))
        ;; immediate single float, 64-bit only
        #+64-bit
-       (= (logand val #xff) sb-vm:single-float-widetag)
+       (= (logand val #xff) single-float-widetag)
        ;; character
        (and (zerop (logandc2 val #x1fffffff)) ; Top bits zero
-            (= (logand val #xff) sb-vm:character-widetag)) ; char tag
+            (= (logand val #xff) character-widetag)) ; char tag
        ;; unbound marker
-       (= val sb-vm:unbound-marker-widetag))
+       (= val unbound-marker-widetag))
       (values (%make-lisp-obj val) t)
       ;; To mitigate the danger of GC running in between testing pointer
       ;; validity and returning the object, we must pin a potentially
@@ -2414,8 +2412,7 @@ register."
   ;; highlight its brokenness.
   (macrolet ((with-escaped-value ((var) &body forms)
                `(if escaped
-                    (let ((,var (sb-vm:context-register
-                                 escaped
+                    (let ((,var (context-register escaped
                                  (sb-c:sc+offset-offset sc+offset))))
                       ,@forms)
                     :invalid-value-for-unescaped-register-storage))
@@ -2427,8 +2424,7 @@ register."
                     :invalid-value-for-unescaped-register-storage))
              (escaped-float-value (format)
                `(if escaped
-                    (sb-vm:context-float-register
-                     escaped
+                    (context-float-register escaped
                      (sb-c:sc+offset-offset sc+offset) ',format)
                     :invalid-value-for-unescaped-register-storage))
              (with-nfp ((var) &body body)
@@ -2440,41 +2436,39 @@ register."
                #-c-stack-is-control-stack
                `(let ((,var (if escaped
                                 (int-sap
-                                 (sb-vm:context-register escaped
-                                                         sb-vm::nfp-offset))
-                                (sap-ref-sap fp (* nfp-save-offset
-                                                   sb-vm:n-word-bytes)))))
+                                 (context-register escaped sb-vm::nfp-offset))
+                                (sap-ref-sap fp (* nfp-save-offset n-word-bytes)))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
                #+(or x86 x86-64)
                `(+ (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
                    ,offset)
                #-(or x86 x86-64)
-               `(+ (* (sb-c:sc+offset-offset sc+offset) sb-vm:n-word-bytes)
+               `(+ (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
     (ecase (sb-c:sc+offset-scn sc+offset)
-      ((#.sb-vm:any-reg-sc-number
-        #.sb-vm:descriptor-reg-sc-number)
+      ((#.any-reg-sc-number
+        #.descriptor-reg-sc-number)
        (escaped-boxed-value))
-      (#.sb-vm:character-reg-sc-number
+      (#.character-reg-sc-number
        (with-escaped-value (val)
          (code-char val)))
-      (#.sb-vm:sap-reg-sc-number
+      (#.sap-reg-sc-number
        (with-escaped-value (val)
          (int-sap val)))
-      (#.sb-vm:signed-reg-sc-number
+      (#.signed-reg-sc-number
        (with-escaped-value (val)
-         (if (logbitp (1- sb-vm:n-word-bits) val)
-             (logior val (ash -1 sb-vm:n-word-bits))
+         (if (logbitp (1- n-word-bits) val)
+             (logior val (ash -1 n-word-bits))
              val)))
-      (#.sb-vm:unsigned-reg-sc-number
+      (#.unsigned-reg-sc-number
        (with-escaped-value (val)
          val))
       #-(or x86 x86-64)
-      (#.sb-vm:non-descriptor-reg-sc-number
+      (#.non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
       #-(or x86 x86-64 arm64)
-      (#.sb-vm:interior-reg-sc-number
+      (#.interior-reg-sc-number
        (error "Local interior register access?"))
       #+sb-simd-pack
       ((#.sb-vm::sse-reg-sc-number #.sb-vm::int-sse-reg-sc-number)
@@ -2542,65 +2536,65 @@ register."
           (sap-ref-double nfp (number-stack-offset 8))
           (sap-ref-double nfp (number-stack-offset 16))
           (sap-ref-double nfp (number-stack-offset 24)))))
-      (#.sb-vm:single-reg-sc-number
+      (#.single-reg-sc-number
        (escaped-float-value single-float))
-      (#.sb-vm:double-reg-sc-number
+      (#.double-reg-sc-number
        (escaped-float-value double-float))
       #+long-float
-      (#.sb-vm:long-reg-sc-number
+      (#.long-reg-sc-number
        (escaped-float-value long-float))
-      (#.sb-vm:complex-single-reg-sc-number
+      (#.complex-single-reg-sc-number
        (escaped-float-value complex-single-float))
-      (#.sb-vm:complex-double-reg-sc-number
+      (#.complex-double-reg-sc-number
        (escaped-float-value complex-double-float))
       #+long-float
-      (#.sb-vm:complex-long-reg-sc-number
+      (#.complex-long-reg-sc-number
        (escaped-float-value sb-kernel::complex-long-float))
-      (#.sb-vm:single-stack-sc-number
+      (#.single-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-single nfp (number-stack-offset))))
-      (#.sb-vm:double-stack-sc-number
+      (#.double-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-double nfp (number-stack-offset))))
       #+long-float
-      (#.sb-vm:long-stack-sc-number
+      (#.long-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-long nfp (number-stack-offset))))
-      (#.sb-vm:complex-single-stack-sc-number
+      (#.complex-single-stack-sc-number
        (with-nfp (nfp)
          (complex
           (sap-ref-single nfp (number-stack-offset))
           (sap-ref-single nfp (number-stack-offset 4)))))
-      (#.sb-vm:complex-double-stack-sc-number
+      (#.complex-double-stack-sc-number
        (with-nfp (nfp)
          (complex
           (sap-ref-double nfp (number-stack-offset))
           (sap-ref-double nfp (number-stack-offset 8)))))
       #+long-float
-      (#.sb-vm:complex-long-stack-sc-number
+      (#.complex-long-stack-sc-number
        (with-nfp (nfp)
          (complex
           (sap-ref-long nfp (number-stack-offset))
           (sap-ref-long nfp
                         (number-stack-offset #+sparc 4
                                              #+(or x86 x86-64) 3)))))
-      (#.sb-vm:control-stack-sc-number
+      (#.control-stack-sc-number
        (stack-ref fp (sb-c:sc+offset-offset sc+offset)))
-      (#.sb-vm:character-stack-sc-number
+      (#.character-stack-sc-number
        (with-nfp (nfp)
          (code-char (sap-ref-word nfp (number-stack-offset)))))
-      (#.sb-vm:unsigned-stack-sc-number
+      (#.unsigned-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-word nfp (number-stack-offset))))
-      (#.sb-vm:signed-stack-sc-number
+      (#.signed-stack-sc-number
        (with-nfp (nfp)
          (signed-sap-ref-word nfp (number-stack-offset))))
-      (#.sb-vm:sap-stack-sc-number
+      (#.sap-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-sap nfp (number-stack-offset))))
       (#.constant-sc-number
        (if escaped
-           (let ((code (code-header-from-pc (sb-vm:context-pc escaped))))
+           (let ((code (code-header-from-pc (context-pc escaped))))
              (if code
                  (code-header-ref code (sb-c:sc+offset-offset sc+offset))
                  :invalid-code-object-at-pc))
@@ -2654,8 +2648,7 @@ register."
   ;; systems.
   (macrolet ((set-escaped-value (val)
                `(if escaped
-                    (setf (sb-vm:context-register
-                           escaped
+                    (setf (context-register escaped
                            (sb-c:sc+offset-offset sc+offset))
                           ,val)
                     value))
@@ -2668,8 +2661,7 @@ register."
                     value))
              (set-escaped-float-value (format val)
                `(if escaped
-                    (setf (sb-vm:context-float-register
-                           escaped
+                    (setf (context-float-register escaped
                            (sb-c:sc+offset-offset sc+offset)
                            ',format)
                           ,val)
@@ -2682,37 +2674,33 @@ register."
                   ,@body)
                #-c-stack-is-control-stack
                `(let ((,var (if escaped
-                                (int-sap
-                                 (sb-vm:context-register escaped
-                                                         sb-vm::nfp-offset))
-                                (sap-ref-sap fp
-                                             (* nfp-save-offset
-                                                sb-vm:n-word-bytes)))))
+                                (int-sap (context-register escaped sb-vm::nfp-offset))
+                                (sap-ref-sap fp (* nfp-save-offset n-word-bytes)))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
                #+(or x86 x86-64)
                `(+ (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
                    ,offset)
                #-(or x86 x86-64)
-               `(+ (* (sb-c:sc+offset-offset sc+offset) sb-vm:n-word-bytes)
+               `(+ (* (sb-c:sc+offset-offset sc+offset) n-word-bytes)
                    ,offset)))
     (ecase (sb-c:sc+offset-scn sc+offset)
-      ((#.sb-vm:any-reg-sc-number
-        #.sb-vm:descriptor-reg-sc-number)
+      ((#.any-reg-sc-number
+        #.descriptor-reg-sc-number)
        (set-escaped-boxed-value value))
-      (#.sb-vm:character-reg-sc-number
+      (#.character-reg-sc-number
        (set-escaped-value (char-code value)))
-      (#.sb-vm:sap-reg-sc-number
+      (#.sap-reg-sc-number
        (set-escaped-value (sap-int value)))
-      (#.sb-vm:signed-reg-sc-number
+      (#.signed-reg-sc-number
        (set-escaped-value (logand value most-positive-word)))
-      (#.sb-vm:unsigned-reg-sc-number
+      (#.unsigned-reg-sc-number
        (set-escaped-value value))
       #-(or x86 x86-64)
-      (#.sb-vm:non-descriptor-reg-sc-number
+      (#.non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
       #-(or x86 x86-64 arm64)
-      (#.sb-vm:interior-reg-sc-number
+      (#.interior-reg-sc-number
        (error "Local interior register access?"))
       #+sb-simd-pack
       ((#.sb-vm::sse-reg-sc-number #.sb-vm::int-sse-reg-sc-number)
@@ -2780,35 +2768,35 @@ register."
                  (sap-ref-double nfp (number-stack-offset 8)) b
                  (sap-ref-double nfp (number-stack-offset 16)) c
                  (sap-ref-double nfp (number-stack-offset 24)) d))))
-      (#.sb-vm:single-reg-sc-number
+      (#.single-reg-sc-number
        #-(or x86 x86-64) ;; don't have escaped floats.
        (set-escaped-float-value single-float value))
-      (#.sb-vm:double-reg-sc-number
+      (#.double-reg-sc-number
        (set-escaped-float-value double-float value))
       #+long-float
-      (#.sb-vm:long-reg-sc-number
+      (#.long-reg-sc-number
        (set-escaped-float-value long-float value))
-      (#.sb-vm:complex-single-reg-sc-number
+      (#.complex-single-reg-sc-number
        (set-escaped-float-value complex-single-float value))
-      (#.sb-vm:complex-double-reg-sc-number
+      (#.complex-double-reg-sc-number
        (set-escaped-float-value complex-double-float value))
       #+long-float
-      (#.sb-vm:complex-long-reg-sc-number
+      (#.complex-long-reg-sc-number
        (set-escaped-float-value complex-long-float))
-      (#.sb-vm:single-stack-sc-number
+      (#.single-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-single nfp (number-stack-offset))
                (the single-float value))))
-      (#.sb-vm:double-stack-sc-number
+      (#.double-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-double nfp (number-stack-offset))
                (the double-float value))))
       #+long-float
-      (#.sb-vm:long-stack-sc-number
+      (#.long-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-long nfp (number-stack-offset))
                (the long-float value))))
-      (#.sb-vm:complex-single-stack-sc-number
+      (#.complex-single-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-single nfp (number-stack-offset))
                #+(or x86 x86-64)
@@ -2820,7 +2808,7 @@ register."
                (imagpart (the (complex single-float) value))
                #-(or x86 x86-64)
                (the single-float (realpart value)))))
-      (#.sb-vm:complex-double-stack-sc-number
+      (#.complex-double-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-double nfp (number-stack-offset))
                #+(or x86 x86-64)
@@ -2833,7 +2821,7 @@ register."
                #-(or x86 x86-64)
                (the double-float (realpart value)))))
       #+long-float
-      (#.sb-vm:complex-long-stack-sc-number
+      (#.complex-long-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-long
                 nfp (number-stack-offset))
@@ -2848,21 +2836,21 @@ register."
                (imagpart (the (complex long-float) value))
                #-(or x86 x86-64)
                (the long-float (realpart value)))))
-      (#.sb-vm:control-stack-sc-number
+      (#.control-stack-sc-number
        (%set-stack-ref fp (sb-c:sc+offset-offset sc+offset) value)
        value) ; I doubt that the return value matters, but who knows ...
-      (#.sb-vm:character-stack-sc-number
+      (#.character-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-word nfp (number-stack-offset 0))
                (char-code (the character value)))))
-      (#.sb-vm:unsigned-stack-sc-number
+      (#.unsigned-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-word nfp (number-stack-offset 0)) (the word value))))
-      (#.sb-vm:signed-stack-sc-number
+      (#.signed-stack-sc-number
        (with-nfp (nfp)
          (setf (signed-sap-ref-word nfp (number-stack-offset))
                (the signed-word value))))
-      (#.sb-vm:sap-stack-sc-number
+      (#.sap-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-sap nfp (number-stack-offset))
                (the system-area-pointer value)))))))
@@ -2872,7 +2860,7 @@ register."
 ;;; indirection cell.
 (defun indirect-value-cell-p (x)
   (and (%other-pointer-p x)
-       (eql (%other-pointer-widetag x) sb-vm:value-cell-widetag)))
+       (eql (%other-pointer-widetag x) value-cell-widetag)))
 
 ;;; Return three values reflecting the validity of DEBUG-VAR's value
 ;;; at BASIC-CODE-LOCATION:
@@ -3387,7 +3375,7 @@ register."
                                      :unknown-return-partner)
                                  (eq (compiled-code-location-kind loc)
                                      :single-value-return))
-                             sb-vm:single-value-return-byte-offset
+                             single-value-return-byte-offset
                              0))))))
 
 (defun activate-compiled-fun-start-breakpoint (breakpoint)
@@ -3637,12 +3625,12 @@ register."
 
 (defun signal-context-frame (signal-context)
   (let* ((scp (sb-alien:sap-alien signal-context (* os-context-t)))
-         (cfp (int-sap (sb-vm:context-register scp sb-vm::cfp-offset))))
+         (cfp (int-sap (context-register scp sb-vm::cfp-offset))))
     (compute-calling-frame cfp
                            ;; KLUDGE: This argument is ignored on
                            ;; x86oids in this scenario, but is
                            ;; declared to be a SAP.
-                           #+(or x86 x86-64) (sb-vm:context-pc scp)
+                           #+(or x86 x86-64) (context-pc scp)
                            #-(or x86 x86-64) nil
                            nil)))
 
@@ -3676,7 +3664,7 @@ register."
                cookie))))
 
 (defun get-fun-end-breakpoint-values (scp)
-  (let ((ocfp (int-sap (sb-vm:context-register
+  (let ((ocfp (int-sap (context-register
                         scp
                         #-(or x86 x86-64) sb-vm::ocfp-offset
                         #+x86-64 sb-vm::rbx-offset
@@ -3723,19 +3711,19 @@ register."
               ;; For x86[-64]: one boxed constant holds the code object to which
               ;; to return, and one holds the displacement into that object.
               ;; Ensure required boxed header alignment.
-              (align-up (+ sb-vm:code-constants-offset 1 #+(or x86-64 x86) 1)
+              (align-up (+ code-constants-offset 1 #+(or x86-64 x86) 1)
                         sb-c::code-boxed-words-align)
               (+ length
-                 sb-vm:n-word-bytes   ; Jump Table prefix word
+                 n-word-bytes   ; Jump Table prefix word
                  ;; Alignment padding, LRA header
-                 #-(or x86 x86-64) (* 2 sb-vm:n-word-bytes)
+                 #-(or x86 x86-64) (* 2 n-word-bytes)
                  ;; 2 extra raw bytes represent CODE-N-ENTRIES (which is zero)
                  2))))
       (setf (%code-debug-info code-object) :bpt-lra)
       (with-pinned-objects (code-object)
         #+(or x86 x86-64 arm64)
         (let ((instructions   ; Don't touch the jump table prefix word
-                (sap+ (code-instructions code-object) sb-vm:n-word-bytes)))
+                (sap+ (code-instructions code-object) n-word-bytes)))
           (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
             (setf (code-header-ref code-object real-lra-slot) code
                   (code-header-ref code-object (1+ real-lra-slot)) offset)
@@ -3745,25 +3733,25 @@ register."
             ;; to return a SAP to the instructions.
             ;; TRAP-OFFSET is the distance from CODE-INSTRUCTIONS to the trapping
             ;; opcode, for which we have to account for the jump table prefix word.
-            (values instructions code-object (+ (trap-offset) sb-vm:n-word-bytes))))
+            (values instructions code-object (+ (trap-offset) n-word-bytes))))
         #-(or x86 x86-64 arm64)
         (let* ((lra-header-addr
                  ;; Skip over the jump table prefix, and align properly for LRA header
-                 (sap+ (code-instructions code-object) (* 2 sb-vm:n-word-bytes)))
+                 (sap+ (code-instructions code-object) (* 2 n-word-bytes)))
                ;; Compute the LRA->code backpointer in words
                (delta (ash (sap- lra-header-addr
                                  (int-sap (logandc2 (get-lisp-obj-address code-object)
-                                                    sb-vm:lowtag-mask)))
-                           (- sb-vm:word-shift))))
+                                                    lowtag-mask)))
+                           (- word-shift))))
           (setf (code-header-ref code-object real-lra-slot) real-lra)
           (setf (sap-ref-word lra-header-addr 0)
-                (logior (ash delta sb-vm:n-widetag-bits) sb-vm:return-pc-widetag))
+                (logior (ash delta n-widetag-bits) return-pc-widetag))
           (system-area-ub8-copy (int-sap src-start) 0
-                                (sap+ lra-header-addr sb-vm:n-word-bytes)
+                                (sap+ lra-header-addr n-word-bytes)
                                 0 length)
-          (values (%make-lisp-obj (logior (sap-int lra-header-addr) sb-vm:other-pointer-lowtag))
-                  (sb-vm:sanctify-for-execution code-object)
-                  (+ (trap-offset) (* 3 sb-vm:n-word-bytes))))))))
+          (values (%make-lisp-obj (logior (sap-int lra-header-addr) other-pointer-lowtag))
+                  (sanctify-for-execution code-object)
+                  (+ (trap-offset) (* 3 n-word-bytes))))))))
 
 ;;;; miscellaneous
 
@@ -3849,7 +3837,7 @@ register."
                  (t
                   #+ppc64
                   (logior (context-register context callee-register-offset)
-                          sb-vm:other-pointer-lowtag)
+                          other-pointer-lowtag)
                   #-ppc64
                   (context-register context callee-register-offset)))))
          (step-info (single-step-info-from-context context)))
@@ -3915,7 +3903,7 @@ register."
          (t
           (setf (context-register context callee-register-offset)
                 #+ppc64
-                (logandc2 (get-lisp-obj-address new-callee) sb-vm:lowtag-mask)
+                (logandc2 (get-lisp-obj-address new-callee) lowtag-mask)
                 #-ppc64
                 (get-lisp-obj-address new-callee))))))))
 
