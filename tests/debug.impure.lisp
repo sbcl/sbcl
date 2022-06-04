@@ -445,6 +445,7 @@
              (flet ((body () 42))
                (body))))))
 
+#-(or ppc ppc64)
 (with-test (:name (trace :compiler-macro :redefined)
                   . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces ((compiler-macro fn-with-cmac)
@@ -544,6 +545,7 @@
                (labels ((fact (x) (if (zerop x) 1 (* x (fact (1- x))))))
                  (fact x)))))))
 
+#-(or ppc ppc64)
 (with-test (:name (trace :macro :redefined)
                   . #.*breakpoint-tracing-expectations*)
   (assert (equal (collecting-traces (macro-fact
