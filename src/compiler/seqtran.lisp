@@ -3131,16 +3131,11 @@
 
 (defoptimizer (nth derive-type) ((n list))
   (when (constant-lvar-p list)
-    (let* ((index-range (type-approximate-interval (lvar-type n)))
-           (index-from (max 0 (interval-low index-range)))
-           (index-to (or (interval-high index-range)
-                         array-dimension-limit))
-           (list (nthcdr index-from (lvar-value list)))
+    (let* ((list (lvar-value list))
            (rest list)
            type
            (seen (list list)))
-      (loop repeat (- index-to index-from)
-            for element = (pop rest)
+      (loop for element = (pop rest)
             do (setf type
                      (if type
                          (type-union (ctype-of element) type)
