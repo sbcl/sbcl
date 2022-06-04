@@ -56,7 +56,7 @@
   (:variant-vars lowtag)
   (:generator 5
     (loadw temp thing 0 lowtag)
-    ;; SLEAZY ASSUMPTION: THE WIDETAG HAS TWO HIGH ZERO BITS
+    (inst bic temp temp widetag-mask)
     (inst mov temp (lsr temp (- n-widetag-bits word-shift)))
     (inst cmp temp 0)
     (unless (= lowtag other-pointer-lowtag)
