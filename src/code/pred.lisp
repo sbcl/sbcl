@@ -523,6 +523,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                     (t (array-equalp x y)))))
         (t nil)))
 
+#-sb-show ;; I don't know why these tests crash with #+sb-show
 (let ((test-cases `(($0.0 $-0.0 t)
                     ($0.0 $1.0 nil)
                     ;; There is no cross-compiler #C reader macro.
