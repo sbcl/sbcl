@@ -218,16 +218,10 @@ Please check that all strings which were not recognizable to the compiler
 (as the first argument to WARN, etc.) are wrapped in SB-FORMAT:TOKENS"))
       wps)))
 
-;;; Either set some more package docstrings, or remove any and all docstrings
-;;; that snuck in (as can happen with any file compiled in warm load)
-;;; depending on presence of the :sb-doc internal feature.
-(if (member :sb-doc sb-impl:+internal-features+)
-  (setf (documentation (find-package "COMMON-LISP") t)
-        "public: home of symbols defined by the ANSI language specification"
-        (documentation (find-package "COMMON-LISP-USER") t)
-        "public: the default package for user code and data"
-        (documentation (find-package "KEYWORD") t)
-        "public: home of keywords")
+;;; If the SB-DOC internal feature is not present, remove any and all
+;;; docstrings that snuck in (as can happen with any file compiled in
+;;; warm load).
+(unless (member :sb-doc sb-impl:+internal-features+)
   (let ((count 0))
     (macrolet ((clear-it (place)
                  `(when ,place

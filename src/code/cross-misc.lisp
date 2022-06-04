@@ -200,10 +200,18 @@
 
 (declaim (declaration enable-package-locks disable-package-locks))
 
+;;; The XC-STRICT-CL and SB-XC packages are called COMMON-LISP in the
+;;; target image.
+(defun sb-xc:package-name (package)
+  (if (or (eq package #.(find-package "SB-XC"))
+          (eq package #.(find-package "XC-STRICT-CL")))
+      "COMMON-LISP"
+      (cl:package-name package)))
+
 ;; Nonstandard accessor for when you know you have a valid package in hand.
 ;; This avoids double lookup in *PACKAGE-NAMES* in a few places.
 ;; But portably we have to just fallback to PACKAGE-NAME.
-(defun package-%name (x) (package-name x))
+(defun package-%name (x) (sb-xc:package-name x))
 
 ;;; This definition collapses SB-XC back into COMMON-LISP.
 ;;; Use CL:SYMBOL-PACKAGE if that's not the behavior you want.

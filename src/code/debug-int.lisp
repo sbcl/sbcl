@@ -1544,7 +1544,7 @@ register."
 (defun debug-fun-symbol-vars (debug-fun symbol)
   (let ((vars (ambiguous-debug-vars debug-fun (symbol-name symbol)))
         (package (and (sb-xc:symbol-package symbol)
-                      (package-name (sb-xc:symbol-package symbol)))))
+                      (sb-xc:package-name (sb-xc:symbol-package symbol)))))
     (delete-if (if (stringp package)
                    (lambda (var)
                      (let ((p (debug-var-package-name var)))
@@ -2276,7 +2276,7 @@ register."
 ;;; be acceptable to have NIL returned, or that it's only called on
 ;;; DEBUG-VARs whose symbols have non-NIL packages.
 (defun debug-var-package-name (debug-var)
-  (package-name (sb-xc:symbol-package (debug-var-symbol debug-var))))
+  (sb-xc:package-name (sb-xc:symbol-package (debug-var-symbol debug-var))))
 
 ;;; Return the value stored for DEBUG-VAR in frame, or if the value is
 ;;; not :VALID, then signal an INVALID-VALUE error.

@@ -328,6 +328,7 @@
 ;;; see by default, so that using them by accident fails.
 (defparameter *undefineds*
   '("SYMBOL-PACKAGE"
+    "PACKAGE-NAME"
     ;; Float decoding: don't want to see these used either.
     "DECODE-FLOAT" "INTEGER-DECODE-FLOAT"
     "FLOAT-DIGITS" "FLOAT-PRECISION" "FLOAT-RADIX"
@@ -403,7 +404,8 @@
       (dolist (string (package-data-shadow package-data))
         (shadow string package))
       (dolist (string (package-data-export package-data))
-        (export (intern string package) package))))
+        (export (intern string package) package))
+      (setf (documentation package t) (package-data-documentation package-data))))
   ;; Now that all packages exist, we can set up package-package
   ;; references.
   (dolist (package-data package-data-list)
@@ -514,13 +516,6 @@
 ;; Each backend should have a different package for its instruction set
 ;; so that they can co-exist.
 (make-assembler-package (backend-asm-package-name))
-
-(defun package-list-for-genesis ()
-  (append *package-data-list*
-          (let ((asm-package (backend-asm-package-name)))
-            (list (make-package-data :name asm-package
-                                     :use (list* "CL" *asm-package-use-list*)
-                                     :documentation nil)))))
 
 ;;; Not all things shown by this are actually unused. Some get removed
 ;;; by the tree-shaker as intended.

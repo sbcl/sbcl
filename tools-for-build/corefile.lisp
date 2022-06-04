@@ -1,7 +1,4 @@
-
-;;; This package name does not persist after the build is complete,
-;;; so it does not have an "!" in it.
-;;; It it needed by genesis and SB-EDITCORE
+;;; This is needed by genesis and SB-EDITCORE
 (defpackage "SB-COREFILE"
   (:use "CL")
   (:export #:core-magic

@@ -213,7 +213,7 @@
                           ;; host happens to have standard symbols homed elsewhere.
                           (cond #+sb-xc ((eq package *cl-package*) "COMMON-LISP")
                                 ((not package) "uninterned")
-                                (t (package-name package)))))))
+                                (t (sb-xc:package-name package)))))))
                 ;; This L-T-V form has to remain out of the common path,
                 ;; or else cheneygc will crash in cold-init.
                 ;; Cold-init calls HASH-LAYOUT-NAME many times *before* the L-T-V

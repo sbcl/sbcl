@@ -22,7 +22,7 @@
 (defstruct (delayed-defstruct (:constructor make-delayed-defstruct (args)))
   (args nil :type cons)
   ;; because the expansion autogenerates slot names based on current package
-  (package (package-name *package*) :type string))
+  (package (cl:package-name *package*) :type string))
 ;; a list of DELAYED-DEFSTRUCTs stored until we get SB-XC:DEFSTRUCT
 ;; working fully so that we can apply it to them then. After
 ;; SB-XC:DEFSTRUCT is made to work fully, this list is processed, then

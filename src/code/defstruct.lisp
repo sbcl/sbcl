@@ -2350,8 +2350,8 @@ or they must be declared locally notinline at each call site.~@:>"
                           (flet ((pred (x y)
                                    (or (string< x y)
                                        (and (string= x y)
-                                            (let ((xpn (package-name (cl:symbol-package x)))
-                                                  (ypn (package-name (cl:symbol-package y))))
+                                            (let ((xpn (cl:package-name (cl:symbol-package x)))
+                                                  (ypn (cl:package-name (cl:symbol-package y))))
                                               (string< xpn ypn))))))
                             (sort (%hash-table-alist subclassoids)
                                   #'pred

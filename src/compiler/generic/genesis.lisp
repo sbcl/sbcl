@@ -673,7 +673,7 @@
            (descriptor-bits
             ;; If we're passed a symbol as a value then it needs to be interned.
             (cond ((symbolp value) (cold-intern value))
-                  ((packagep value) (cdr (cold-find-package-info (package-name value))))
+                  ((packagep value) (cdr (cold-find-package-info (sb-xc:package-name value))))
                   (t value)))))))
 
   (defun write-wordindexed/raw (address index bits)
@@ -1457,9 +1457,94 @@ core and return a descriptor to it."
 (defvar *cold-package-symbols*)
 (declaim (type hash-table *cold-package-symbols*))
 
+;;; preincrement on use. the first non-preassigned ID is 5
+(defvar *package-id-count* 4)
+
+;;; Initialize the cold package named by NAME. The information is
+;;; usually derived from the host package of the same name, except
+;;; where the host package does not reflect the target package
+;;; information, as for COMMON-LISP, KEYWORD, and COMMON-LISP-USER.
+(defun initialize-cold-package (cold-package name)
+  (multiple-value-bind (nicknames docstring id shadow use-list)
+      (cond ((string= name "COMMON-LISP")
+             (values '("CL")
+                     "public: home of symbols defined by the ANSI language specification"
+                     sb-impl::+package-id-lisp+
+                     '()
+                     '()))
+            ((string= name "KEYWORD")
+             (values '()
+                     "public: home of keywords"
+                     sb-impl::+package-id-keyword+
+                     '()
+                     '()))
+            ((string= name "COMMON-LISP-USER")
+             (values '("CL-USER")
+                     "public: the default package for user code and data"
+                     sb-impl::+package-id-user+
+                     '()
+                     ;; ANSI encourages us to put extension packages in
+                     ;; the USE list of COMMON-LISP-USER.
+                     '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG"
+                       "SB-EXT" "SB-GRAY" "SB-PROFILE")))
+            (t
+             (let ((package (find-package name)))
+               ;; 'exports' contains no nicknames.
+               ;; (See comment in 'set-up-cold-packages')
+               (aver (null (package-nicknames package)))
+               (values (package-nicknames package)
+                       (documentation package t)
+                       (if (string= name "SB-KERNEL")
+                           sb-impl::+package-id-kernel+
+                           (incf *package-id-count*))
+                       (sort (package-shadowing-symbols package) #'string<)
+                       ;; SB-COREFILE is not actually part of
+                       ;; the use list for SB-FASL. It's
+                       ;; just needed for Genesis.
+                       (if (string= name "SB-FASL")
+                           (remove (find-package "SB-COREFILE")
+                                   (package-use-list package))
+                           (package-use-list package))))))
+    (write-slots cold-package
+                 :id (make-fixnum-descriptor id)
+                 :%name (set-readonly
+                         (base-string-to-core name))
+                 :%nicknames (list-to-core
+                              (mapcar #'base-string-to-core nicknames))
+                 :%bits (make-fixnum-descriptor
+                         (if (system-package-p name)
+                             sb-impl::+initial-package-bits+
+                             0))
+                 :doc-string (if (and docstring #-sb-doc nil)
+                                 (set-readonly
+                                  (base-string-to-core docstring))
+                                 *nil-descriptor*)
+                 :%use-list (list-to-core
+                             (mapcar (lambda (use)
+                                       (cdr (cold-find-package-info
+                                             (sb-xc:package-name use))))
+                                     use-list)))
+    (dolist (use use-list)
+      ;; Push onto the "used-by" list.
+      (let ((cold (cdr (cold-find-package-info (sb-xc:package-name use)))))
+        (write-slots cold
+                     :%used-by-list (cold-cons cold-package
+                                               (read-slot cold :%used-by-list)))))
+    ;; COLD-INTERN AVERs that the package has an ID, so delay writing
+    ;; the shadowing-symbols until the package is ready.
+    (write-slots cold-package
+                 :%shadowing-symbols (list-to-core
+                                      (mapcar 'cold-intern shadow)))))
+
 (defun cold-find-package-info (package-name)
+  ;; Create package info on demand.
   (or (gethash package-name *cold-package-symbols*)
-      (error "Genesis could not find a target package named ~S" package-name)))
+      (let* ((cold-package (allocate-struct-of-type 'package))
+             (info (cons (cons nil nil) cold-package)))
+        (write-slots cold-package :%used-by-list *nil-descriptor*)
+        (setf (gethash package-name *cold-package-symbols*) info)
+        (initialize-cold-package cold-package package-name)
+        info)))
 
 (defvar *classoid-cells*)
 (defun cold-find-classoid-cell (name &key create)
@@ -1481,102 +1566,6 @@ core and return a descriptor to it."
                                           (ash sb-vm:+vector-shareable+
                                                sb-vm:array-flags-position)))
   vector)
-
-(defun initialize-packages ()
-  (let ((package-data-list
-         ;; docstrings are set in src/cold/warm. It would work to do it here,
-         ;; but seems preferable not to saddle Genesis with such responsibility.
-         (list* (sb-cold:make-package-data :name "COMMON-LISP" :documentation nil)
-                (sb-cold:make-package-data :name "KEYWORD" :documentation nil)
-                ;; ANSI encourages us to put extension packages
-                ;; in the USE list of COMMON-LISP-USER.
-                (sb-cold:make-package-data
-                 :name "COMMON-LISP-USER" :documentation nil
-                 :use '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-PROFILE"))
-                (sb-cold::package-list-for-genesis)))
-        (target-pkg-list nil))
-    (labels ((init-cold-package (id name shadow &optional docstring)
-               (let ((cold-package (allocate-struct-of-type 'package)))
-                 (setf (gethash name *cold-package-symbols*)
-                       (cons (cons nil nil) cold-package))
-                 ;; Initialize string slots
-                 (write-slots cold-package
-                              :id (make-fixnum-descriptor id)
-                              :%name (set-readonly
-                                      (base-string-to-core name))
-                              :%nicknames (chill-nicknames name)
-                              :%bits (make-fixnum-descriptor
-                                      (if (system-package-p name)
-                                          sb-impl::+initial-package-bits+ 0))
-                              :doc-string (if docstring
-                                              (set-readonly
-                                               (base-string-to-core docstring))
-                                              *nil-descriptor*)
-                              :%use-list *nil-descriptor*)
-                 ;; COLD-INTERN AVERs that the package has an ID, so delay writing
-                 ;; the shadowing-symbols until the package is ready.
-                 (write-slots cold-package
-                              :%shadowing-symbols (list-to-core (mapcar 'cold-intern shadow)))
-                 ;; the cddr of this will accumulate the 'used-by' package list
-                 (push (list name cold-package) target-pkg-list)))
-             (chill-nicknames (pkg-name)
-                 ;; Make the package nickname lists for the standard packages
-                 ;; be the minimum specified by ANSI, regardless of what value
-                 ;; the cross-compilation host happens to use.
-                 ;; For packages other than the standard packages, the nickname
-                 ;; list was specified by our package setup code, and we can just
-                 ;; propagate the current state into the target.
-               (list-to-core
-                  (mapcar #'base-string-to-core
-                          (cond ((string= pkg-name "COMMON-LISP") '("CL"))
-                                ((string= pkg-name "COMMON-LISP-USER")
-                                 '("CL-USER"))
-                                ((string= pkg-name "KEYWORD") '())
-                                (t
-                                 ;; 'package-data-list' contains no nicknames.
-                                 ;; (See comment in 'set-up-cold-packages')
-                                 (aver (null (package-nicknames
-                                              (find-package pkg-name))))
-                                 nil)))))
-             (find-cold-package (name)
-               (cadr (find-package-cell name)))
-             (find-package-cell (name)
-               (or (assoc (if (string= name "CL") "COMMON-LISP" name)
-                          target-pkg-list :test #'string=)
-                   (error "No cold package named ~S" name))))
-      ;; pass 1: make all proto-packages
-      (let ((count 4)) ; preincrement on use. the first non-preassigned ID is 5
-        (dolist (pd package-data-list)
-          ;; Shadowing symbols include those specified in exports.lisp
-          ;; plus those added in by MAKE-ASSEMBLER-PACKAGE.
-          (let* ((name (sb-cold:package-data-name pd))
-                 (id (cond ((string= name "KEYWORD") sb-impl::+package-id-keyword+)
-                           ((string= name "COMMON-LISP") sb-impl::+package-id-lisp+)
-                           ((string= name "COMMON-LISP-USER")
-                            sb-impl::+package-id-user+)
-                           ((string= name "SB-KERNEL") sb-impl::+package-id-kernel+)
-                           (t (incf count))))
-                 (shadows (when (eql (mismatch name "SB-") 3)
-                            (sort (package-shadowing-symbols (find-package name))
-                                  #'string<))))
-            (init-cold-package id name shadows
-                               #+sb-doc (sb-cold::package-data-documentation pd)))))
-      ;; pass 2: set the 'use' lists and collect the 'used-by' lists
-      (dolist (pd package-data-list)
-        (let ((this (find-cold-package (sb-cold:package-data-name pd)))
-              (use nil))
-          (dolist (that (sb-cold:package-data-use pd))
-            (let ((cell (find-package-cell that)))
-              (push (cadr cell) use)
-              (push this (cddr cell))))
-          (write-slots this :%use-list (list-to-core (nreverse use)))))
-      ;; pass 3: set the 'used-by' lists
-      (dolist (cell target-pkg-list)
-        (write-slots (cadr cell) :%used-by-list (list-to-core (cddr cell))))
-      ;; finally, assign *PACKAGE* since it supposed to be always-bound
-      ;; and various things assume that it is. e.g. FIND-PACKAGE has an
-      ;; (IF (BOUNDP '*PACKAGE*)) test which the compiler elides.
-      (cold-set '*package* (find-cold-package "COMMON-LISP-USER")))))
 
 (defvar *uninterned-symbol-table* (make-hash-table :test #'equal))
 ;; This coalesces references to uninterned symbols, which is allowed because
@@ -1643,7 +1632,7 @@ core and return a descriptor to it."
   (cond ((eq package *cl-package*)
          (setq symbol (find-symbol name (canonical-home-package name))))
         ((not (or (eq package *keyword-package*)
-                  (= (mismatch (package-name package) "SB-") 3)))
+                  (= (mismatch (cl:package-name package) "SB-") 3)))
          (bug "~S in bad package for target: ~A" symbol package)))
 
   (or (get symbol 'cold-intern-info)
@@ -1653,7 +1642,7 @@ core and return a descriptor to it."
       ;; doesn't exist, as long as only a deferred interpreter processor is used
       ;; and not an immediate processor.
       (let* ((pkg-info
-              (when core-file-name (cold-find-package-info (package-name package))))
+              (when core-file-name (cold-find-package-info (sb-xc:package-name package))))
              (handle (allocate-symbol
                       (if (or (eq (info :function :kind symbol) :special-form)
                               (member symbol '(sb-sys:with-pinned-objects)))
@@ -1762,14 +1751,14 @@ core and return a descriptor to it."
 (defun initialize-static-space (tls-init)
   "Initialize the cold load symbol-hacking data structures."
   (declare (ignorable tls-init))
-  ;; NIL did not have its package assigned. Do that now.
-  (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
-    ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
-    #-compact-symbol
-    (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-id-slot 1)
-                       (make-fixnum-descriptor sb-impl::+package-id-lisp+))
-    (when core-file-name
-      (record-accessibility :external target-cl-pkg-info *nil-descriptor*)))
+  ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
+  #-compact-symbol
+  (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-id-slot 1)
+                     (make-fixnum-descriptor sb-impl::+package-id-lisp+))
+  (when core-file-name
+    ;; NIL did not have its package assigned. Do that now.
+    (record-accessibility :external (cold-find-package-info "COMMON-LISP")
+                          *nil-descriptor*))
   ;; Intern the others.
   (dovector (symbol sb-vm:+static-symbols+)
     (let* ((des (cold-intern symbol :gspace *static*))
@@ -1957,6 +1946,11 @@ core and return a descriptor to it."
                      (vector-in-core (cdar pkg-info)))))
       (sort (%hash-table-alist *cold-package-symbols*)
             #'string< :key #'car))))) ; Sort by package-name
+
+  ;; assign *PACKAGE* since it supposed to be always-bound
+  ;; and various things assume that it is. e.g. FIND-PACKAGE has an
+  ;; (IF (BOUNDP '*PACKAGE*)) test which the compiler elides.
+  (cold-set '*package* (cdr (cold-find-package-info "COMMON-LISP-USER")))
 
   (dump-symbol-infos
    (attach-fdefinitions-to-symbols
@@ -3504,8 +3498,8 @@ III. initially undefined function references (alphabetically):
 ==========  ====~:{~%~10,'0X  ~S~}~%"
             *boilerplate-text*
             (sort undefs
-                    (lambda (a b &aux (pkg-a (package-name (sb-xc:symbol-package a)))
-                                      (pkg-b (package-name (sb-xc:symbol-package b))))
+                    (lambda (a b &aux (pkg-a (sb-xc:package-name (sb-xc:symbol-package a)))
+                                      (pkg-b (sb-xc:package-name (sb-xc:symbol-package b))))
                       (cond ((string< pkg-a pkg-b) t)
                             ((string> pkg-a pkg-b) nil)
                             (t (string< a b))))
@@ -3877,8 +3871,6 @@ III. initially undefined function references (alphabetically):
         (read-structure-definitions defstruct-descriptions))
       ;; Prepare for cold load.
       (initialize-layouts)
-      (when core-file-name
-        (initialize-packages))
       (initialize-static-space tls-init)
       (cold-set 'sb-c::*!cold-allocation-patch-point* *nil-descriptor*)
 

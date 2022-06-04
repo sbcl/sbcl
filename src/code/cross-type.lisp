@@ -69,7 +69,7 @@
 ;;; Defined here so that CROSS-TYPEP can use it.
 ;;; The target variant of this is in src/code/package.
 (defmacro system-package-p (package)
-  `(eql (mismatch "SB-" (package-name ,package)) 3))
+  `(eql (mismatch "SB-" (cl:package-name ,package)) 3))
 
 ;;; This is like TYPEP, except that it asks whether OBJ (a host object acting
 ;;; as a proxy for some logically equivalent object in the target sytem)

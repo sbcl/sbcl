@@ -726,7 +726,7 @@
   (declare (inline assoc))
   (cond ((cdr (assoc pkg (fasl-output-packages file) :test #'eq)))
         (t
-         (let ((s (package-name pkg)))
+         (let ((s (sb-xc:package-name pkg)))
            (dump-fop 'fop-named-package-save file (length s))
            ;; Package names are always dumped as varint-encoded character strings
            ;; except on non-unicode builds.
