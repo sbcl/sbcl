@@ -618,9 +618,6 @@
   ;; The definition in cold-error is good enough for self-build.
   "src/code/warm-error"
   "src/code/icf"
-  ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
-  ;; It could be done in genesis, but not earlier,
-  ;; since the host has a package of that name.
   "src/code/defpackage"
   "src/code/target-lflist")
 

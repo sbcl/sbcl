@@ -11,31 +11,25 @@
 
 (in-package "SB-IMPL")
 
-;;; FIXME: figure out why a full call to FORMAT this early in warm load
-;;; says that CLASS is not a known type. (Obviously it needs to parse
-;;; a type spec, but then why it is only a style-warning and not an error?)
-;;; Weirder still, why does it depend on the target architecture?
-
 (defmacro defpackage (package &rest options)
-  #.(locally (declare (notinline format))
-     (format nil
-  "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
+  #.(format nil
+     "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
    following: ~{~&~4T~A~}
    All options except ~{~A, ~}and :DOCUMENTATION can be used multiple
    times."
-  '((:use "{package-name}*")
-    (:export "{symbol-name}*")
-    (:import-from "<package-name> {symbol-name}*")
-    (:shadow "{symbol-name}*")
-    (:shadowing-import-from "<package-name> {symbol-name}*")
-    (:local-nicknames "{(local-nickname actual-package-name)}*")
-    (:lock "boolean")
-    (:implement "{package-name}*")
-    (:documentation "doc-string")
-    (:intern "{symbol-name}*")
-    (:size "<integer>")
-    (:nicknames "{package-name}*"))
-  '(:size :lock)))
+     '((:use "{package-name}*")
+       (:export "{symbol-name}*")
+       (:import-from "<package-name> {symbol-name}*")
+       (:shadow "{symbol-name}*")
+       (:shadowing-import-from "<package-name> {symbol-name}*")
+       (:local-nicknames "{(local-nickname actual-package-name)}*")
+       (:lock "boolean")
+       (:implement "{package-name}*")
+       (:documentation "doc-string")
+       (:intern "{symbol-name}*")
+       (:size "<integer>")
+       (:nicknames "{package-name}*"))
+     '(:size :lock))
   (let ((nicknames nil)
         (local-nicknames nil)
         (size nil)
@@ -64,7 +58,7 @@
            (%program-error "can't specify ~S more than once." optname))
          (unless (typep optval '(cons t null))
            (%program-error "~S expects a single argument. Got ~S"
-                          (car option) (cdr option)))
+                           (car option) (cdr option)))
          (push optname seen)
          (setq optval (car optval))))
       (case optname
@@ -402,17 +396,3 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                     :format-control "no symbol named ~S in ~S"
                     :format-arguments (list name (package-name package))))
            (intern name package)))))
-
-;;;; One more package-related transform. I'm unsure why this can't be installed
-;;;; sooner, but it can't. It's a symptom of our build weirdness involving
-;;;; the lack of a class definition for the class CLASS, but I can't see what
-;;;; that's got to do with anything.
-(in-package "SB-C")
-
-;;; As for the INTERN transform, you could be screwed if you use any of the
-;;; standard package names as a local nickname of a random package.
-(deftransform find-package ((name) ((constant-arg string-designator)))
-  (multiple-value-bind (form constp) (find-package-xform name)
-    ;; standard packages are effectively constant objects, otherwise
-    ;; we have to invoke the find function.
-    (if constp form `(sb-impl::cached-find-package ,form))))

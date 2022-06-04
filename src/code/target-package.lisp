@@ -2255,3 +2255,11 @@ PACKAGE."
 
 (deftransform find-symbol ((name package-name) (t (constant-arg string-designator)))
   `(sb-impl::find-symbol2 name ,(find-package-xform package-name)))
+
+;;; As for the INTERN transform, you could be screwed if you use any of the
+;;; standard package names as a local nickname of a random package.
+(deftransform find-package ((name) ((constant-arg string-designator)))
+  (multiple-value-bind (form constp) (find-package-xform name)
+    ;; standard packages are effectively constant objects, otherwise
+    ;; we have to invoke the find function.
+    (if constp form `(sb-impl::cached-find-package ,form))))
