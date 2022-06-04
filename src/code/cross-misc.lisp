@@ -125,6 +125,8 @@
        (or (not (typep x 'simple-array))
            (/= (array-rank x) 1))))
 
+;;; We maintain a separate GENSYM counter since the host is allowed to
+;;; mutate its counter however it wishes.
 (defvar sb-xc:*gensym-counter* 0)
 
 (defun sb-xc:gensym (&optional (thing "G"))
