@@ -1741,12 +1741,12 @@
                                  total-bits assembly-unit-bits))
                         quo))
            (bytes (make-array num-bytes :initial-element nil))
-           (segment-arg (sb-xc:gensym "SEGMENT-")))
+           (segment-arg (gensym "SEGMENT-")))
       (dolist (byte-spec-expr byte-specs)
         (let* ((byte-spec (eval byte-spec-expr))
                (byte-size (byte-size byte-spec))
                (byte-posn (byte-position byte-spec))
-               (arg (sb-xc:gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
+               (arg (gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
           (when (ldb-test (byte byte-size byte-posn) overall-mask)
             (error "The byte spec ~S either overlaps another byte spec, or ~
                     extends past the end."

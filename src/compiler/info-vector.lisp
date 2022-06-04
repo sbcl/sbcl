@@ -254,7 +254,7 @@
 ;; Iterate over PACKED-INFO, binding DATA-INDEX to the index of each aux-key in turn.
 ;; TOTAL-N-FIELDS is deliberately exposed to invoking code.
 ;;
-(defmacro do-packed-info-aux-key ((packed-info &optional (data-index (sb-xc:gensym)))
+(defmacro do-packed-info-aux-key ((packed-info &optional (data-index (gensym)))
                                   step-form &optional result-form)
   (with-unique-names (descriptor-idx field-idx info)
      `(let* ((,info ,packed-info)

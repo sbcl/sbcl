@@ -306,7 +306,7 @@ place with bits from the low-order end of the new value."
              (byte (if (cdr byte-args) (cons 'byte byte-args) (car byte-args)))
              ((place-tempvars place-tempvals stores setter getter)
               (get-setf-expansion place env))
-             (newval (sb-xc:gensym "NEW"))
+             (newval (gensym "NEW"))
              (new-int `(,store-fun
                         ,(if (eq load-fun 'logbitp) `(if ,newval 1 0) newval)
                         ,byte ,getter)))

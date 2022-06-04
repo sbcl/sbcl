@@ -270,10 +270,10 @@
       (append
        (loop for gpr in gprs
              collect `(:temporary (:sc any-reg :offset ,gpr :from :eval :to :result)
-                                  ,(car (push (sb-xc:gensym) vars))))
+                                  ,(car (push (gensym) vars))))
        (loop for float to 31
              collect `(:temporary (:sc single-reg :offset ,float :from :eval :to :result)
-                                  ,(car (push (sb-xc:gensym) vars))))
+                                  ,(car (push (gensym) vars))))
        `((:ignore ,@vars))))))
 
 (define-vop (call-out)

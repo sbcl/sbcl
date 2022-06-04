@@ -438,7 +438,7 @@ evaluated as a PROGN."
     (prog-expansion-from-let varlist body-decls 'let*)))
 
 (sb-xc:defmacro prog1 (result &body body)
-  (let ((n-result (sb-xc:gensym)))
+  (let ((n-result (gensym)))
     `(let ((,n-result ,result))
        (progn
          ,@body
@@ -478,7 +478,7 @@ evaluated as a PROGN."
            ;; Preserve non-toplevelness of the form!
            (let ((car (car forms))) (if nested car `(the t ,car))))
           (t
-           (let ((n-result (sb-xc:gensym)))
+           (let ((n-result (gensym)))
              `(let ((,n-result ,(first forms)))
                 (if ,n-result
                     ,n-result
@@ -502,7 +502,7 @@ evaluated as a PROGN."
       ;; Certainly for the evaluator it's preferable.
       `(let ((,(car vars) ,value-form))
          ,@body)
-      (let ((ignore (sb-xc:gensym)))
+      (let ((ignore (gensym)))
         `(multiple-value-call #'(lambda (&optional ,@(mapcar #'list vars)
                                          &rest ,ignore)
                                   (declare (ignore ,ignore))
@@ -537,7 +537,7 @@ evaluated as a PROGN."
                                           1000
                                           10))) ; Arbitrary limit.
         (let ((dummy-list (make-gensym-list val))
-              (keeper (sb-xc:gensym "KEEPER")))
+              (keeper (gensym "KEEPER")))
           `(multiple-value-bind (,@dummy-list ,keeper) ,form
              (declare (ignore ,@dummy-list))
              ,keeper))
@@ -670,7 +670,7 @@ invoked. In that case it will store into PLACE and start over."
            (setf ,place (check-type-error ',place ,place ',type
                                           ,@(and type-string
                                                  `(,type-string)))))
-        (let ((value (sb-xc:gensym)))
+        (let ((value (gensym)))
           `(do ((,value ,place ,place))
                ((typep ,value ',type))
              (setf ,place
@@ -1151,9 +1151,9 @@ symbol-case giving up: case=((V U) (F))
            (clause->bins (make-array (length clauses) :initial-element nil))
            (table-nbits (byte-size (if (vectorp byte) (elt byte 0) byte)))
            (bins (make-array (ash 1 table-nbits) :initial-element 0))
-           (symbol (sb-xc:gensym "S"))
-           (hash (sb-xc:gensym "H"))
-           (vector (sb-xc:gensym "V"))
+           (symbol (gensym "S"))
+           (hash (gensym "H"))
+           (vector (gensym "V"))
            (is-hashable
             ;; For x86-64, any non-immediate object is considered hashable,
             ;; so we only do a lowtag test on the object, though the correct hash
@@ -1355,7 +1355,7 @@ symbol-case giving up: case=((V U) (F))
 
         ;; Produce a COND only if the backend supports the multiway branch vop.
         #+(or x86 x86-64)
-        (let ((block (sb-xc:gensym "B"))
+        (let ((block (gensym "B"))
               (unused-bins))
           ;; Take note of the unused bins
           (dotimes (i (length bins))
@@ -1407,7 +1407,7 @@ symbol-case giving up: case=((V U) (F))
 (defun case-body (name keyform cases multi-p test errorp proceedp needcasesp)
   (unless (or cases (not needcasesp))
     (warn "no clauses in ~S" name))
-  (let ((keyform-value (sb-xc:gensym))
+  (let ((keyform-value (gensym))
         (clauses ())
         (keys ())
         (keys-seen (make-hash-table :test #'eql)))
@@ -1643,7 +1643,7 @@ symbol-case giving up: case=((V U) (F))
 ;;; only for strings, hence the name. Renaming it to something more
 ;;; generic might not be a bad idea.
 (sb-xc:defmacro string-dispatch ((&rest types) var &body body)
-  (let ((fun (sb-xc:gensym "STRING-DISPATCH-FUN")))
+  (let ((fun (gensym "STRING-DISPATCH-FUN")))
     `(flet ((,fun (,var)
               ,@body))
        (declare (inline ,fun))
@@ -1666,7 +1666,7 @@ symbol-case giving up: case=((V U) (F))
 (sb-xc:defmacro with-open-file ((stream filespec &rest options)
                                 &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
-    (let ((abortp (sb-xc:gensym)))
+    (let ((abortp (gensym)))
       `(let ((,stream (open ,filespec ,@options))
              (,abortp t))
          ,@decls
@@ -1710,7 +1710,7 @@ symbol-case giving up: case=((V U) (F))
                                          var name))))
                           varlist))))
            (multiple-value-bind (code decls) (parse-body decls-and-code nil)
-             (let ((label-1 (sb-xc:gensym)) (label-2 (sb-xc:gensym)))
+             (let ((label-1 (gensym)) (label-2 (gensym)))
                `(block ,block
                   (,bind ,inits
                     ,@decls
@@ -1726,7 +1726,7 @@ symbol-case giving up: case=((V U) (F))
 
   ;; This is like DO, except it has no implicit NIL block.
   (sb-xc:defmacro do-anonymous (varlist endlist &rest body)
-    (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (sb-xc:gensym)))
+    (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (gensym)))
 
   (sb-xc:defmacro do (varlist endlist &body body)
   "DO ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
@@ -1753,7 +1753,7 @@ symbol-case giving up: case=((V U) (F))
 (sb-xc:defmacro dotimes ((var count &optional (result nil)) &body body)
   ;; A nice optimization would be that if VAR is never referenced,
   ;; it's slightly more efficient to count backwards, but that's tricky.
-  (let ((c (if (integerp count) count (sb-xc:gensym))))
+  (let ((c (if (integerp count) count (gensym))))
     `(do ((,var 0 (1+ ,var))
           ,@(if (symbolp c) `((,c (the integer ,count)))))
          ((>= ,var ,c) ,result)
@@ -1770,8 +1770,8 @@ symbol-case giving up: case=((V U) (F))
   ;; since we don't want to use IGNORABLE on what might be a special
   ;; var.
   (binding* (((forms decls) (parse-body body nil))
-             (n-list (sb-xc:gensym "LIST"))
-             (start (sb-xc:gensym "START"))
+             (n-list (gensym "LIST"))
+             (start (gensym "START"))
              ((clist members clist-ok)
               (with-current-source-form (list)
                 (cond
@@ -1862,7 +1862,7 @@ symbol-case giving up: case=((V U) (F))
                   (cons (eql quote) (cons symbol null))
                   (cons (eql lambda))))
       (values nil `(funcall ,funarg . ,arg-forms))
-    (let ((fn-sym (sb-xc:gensym))) ; for ONCE-ONLY-ish purposes
+    (let ((fn-sym (gensym))) ; for ONCE-ONLY-ish purposes
       (values `((,fn-sym (%coerce-callable-to-fun ,funarg)))
               `(sb-c::%funcall ,fn-sym . ,arg-forms)))))
 

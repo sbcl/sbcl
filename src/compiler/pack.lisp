@@ -1342,7 +1342,7 @@
                           &rest keys &key limit reads writes)
                          &body body)
   (declare (ignore limit reads writes))
-  (let ((callback (sb-xc:gensym "CALLBACK")))
+  (let ((callback (gensym "CALLBACK")))
     `(flet ((,callback (,target-variable)
               ,@body))
        (declare (dynamic-extent #',callback))

@@ -590,7 +590,7 @@ NOTE: This interface is experimental and subject to change."
                              (let* ,(case (length temps)
                                      (2 `((,(first temps) (car ,entry))
                                           (,(second temps) (cdr ,entry))))
-                                     (3 (let ((arg-temp (sb-xc:gensym "ARGS")))
+                                     (3 (let ((arg-temp (gensym "ARGS")))
                                           `((,arg-temp (cdr ,entry))
                                             (,(first temps) (car ,entry))
                                             (,(second temps)
@@ -827,7 +827,7 @@ NOTE: This interface is experimental and subject to change."
           (let* ((name (first spec))
                  (exp-temp (gensym "ONCE-ONLY")))
             `(let ((,exp-temp ,(second spec))
-                   (,name (sb-xc:gensym ,(symbol-name name))))
+                   (,name (gensym ,(symbol-name name))))
                `(let ((,,name ,,exp-temp))
                   ,,(frob (rest specs) body))))))))
 

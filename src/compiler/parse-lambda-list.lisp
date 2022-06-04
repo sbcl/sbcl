@@ -807,7 +807,7 @@
                                   (if sup-p-var `(values ,def nil) def))))
              (cond ((not sup-p-var) (bind-pat var vals))
                    ((not (symbolp var))
-                    (let ((var-temp (sb-xc:gensym))
+                    (let ((var-temp (gensym))
                           (sup-p-temp (copy-symbol suppliedp)))
                       (bind `((,var-temp ,sup-p-temp) ,vals))
                       (descend var var-temp)
@@ -830,7 +830,7 @@
              ;; in theory, (MULTIPLE-VALUE-BIND () (EXPR) ...)
              ;; but in practice it becomes a binding of an ignored gensym.
              (let* ((bindings-p (or whole required opt rest keys))
-                    (temp (and bindings-p (sb-xc:gensym))))
+                    (temp (and bindings-p (gensym))))
                (bind `(,temp
                        ,(cond ((or emit-pre-test (ll-kwds-keyp llks))
                                (emit-ds-bind-check parsed-lambda-list input
@@ -880,7 +880,7 @@
              (dolist (elt keys)
                (multiple-value-bind (keyword var def sup-p-var)
                    (parse-key-arg-spec elt default-default)
-                 (let ((temp (sb-xc:gensym)))
+                 (let ((temp (gensym)))
                    (bind `(,temp (ds-getf ,input ',keyword)))
                    (bind-if :not `(eql ,temp 0) `(car (truly-the cons ,temp))
                             var sup-p-var def))))

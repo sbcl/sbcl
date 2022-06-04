@@ -1735,7 +1735,7 @@ the stack without triggering overflow protection.")
                             &body forms)
   (declare (symbol ctran lvar))
   (let ((post-binding-lexenv-p (not (null post-binding-lexenv)))
-        (post-binding-lexenv (or post-binding-lexenv (sb-xc:gensym "LEXENV"))))
+        (post-binding-lexenv (or post-binding-lexenv (gensym "LEXENV"))))
     `(%processing-decls ,decls ,vars ,fvars ,ctran ,lvar
                         ,post-binding-lexenv-p
                         (lambda (,ctran ,lvar ,post-binding-lexenv)

@@ -465,7 +465,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; Automatically handle *PRINT-LEVEL* abbreviation. If we are too
 ;;; deep, then a #\# is printed to STREAM and BODY is ignored.
 (defmacro descend-into ((stream) &body body)
-  (let ((flet-name (sb-xc:gensym "DESCEND")))
+  (let ((flet-name (gensym "DESCEND")))
     `(flet ((,flet-name ()
               ,@body))
        (cond ((and (null *print-readably*)

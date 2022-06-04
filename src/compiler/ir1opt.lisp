@@ -1080,7 +1080,7 @@
                       (make-gensym-list (length (combination-args node))))
                 (setq passed-args (copy-list received-args)))
               (let ((tempname (let ((*gensym-counter* (length dx-flets)))
-                                (sb-xc:gensym "LAMBDA")))
+                                (gensym "LAMBDA")))
                     (original-lambda
                      (functional-inline-expansion
                       (lambda-entry-fun (ref-leaf use)))))

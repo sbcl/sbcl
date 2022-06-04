@@ -309,7 +309,7 @@
                 (dolist (default defaults)
                   (if (constantp default)
                       (default-vals default)
-                      (let ((var (sb-xc:gensym)))
+                      (let ((var (gensym)))
                         (default-bindings `(,var ,default))
                         (default-vals var))))
                 (let ((bindings (default-bindings))
@@ -449,10 +449,10 @@
                                  :type (leaf-type var)
                                  :where-from (leaf-where-from var))))
 
-    (let* ((n-context (sb-xc:gensym "N-CONTEXT-"))
+    (let* ((n-context (gensym "N-CONTEXT-"))
            (context-temp (make-lambda-var :%source-name n-context
                                           :arg-info (make-arg-info :kind :more-context)))
-           (n-count (sb-xc:gensym "N-COUNT-"))
+           (n-count (gensym "N-COUNT-"))
            (count-temp (make-lambda-var :%source-name n-count
                                         :type (specifier-type 'index)
                                         :arg-info (make-arg-info :kind :more-count))))
@@ -472,11 +472,11 @@
       ;; and take advantage of the base+index+displacement addressing
       ;; mode on x86oids.)
       (when (optional-dispatch-keyp res)
-        (let ((n-index (sb-xc:gensym "N-INDEX-"))
-              (n-key (sb-xc:gensym "N-KEY-"))
-              (n-value-temp (sb-xc:gensym "N-VALUE-TEMP-"))
-              (n-allowp (sb-xc:gensym "N-ALLOWP-"))
-              (n-lose (sb-xc:gensym "N-LOSE-"))
+        (let ((n-index (gensym "N-INDEX-"))
+              (n-key (gensym "N-KEY-"))
+              (n-value-temp (gensym "N-VALUE-TEMP-"))
+              (n-allowp (gensym "N-ALLOWP-"))
+              (n-lose (gensym "N-LOSE-"))
               (allowp (or (optional-dispatch-allowp res)
                           (policy *lexenv* (zerop safety))))
               (found-allow-p nil))
@@ -500,9 +500,9 @@
                      (keyword (arg-info-key info))
                      (supplied-p (arg-info-supplied-p info))
                      (supplied-used-p (arg-info-supplied-used-p info))
-                     (n-value (sb-xc:gensym "N-VALUE-"))
+                     (n-value (gensym "N-VALUE-"))
                      (clause (cond (supplied-p
-                                    (let ((n-supplied (sb-xc:gensym "N-SUPPLIED-")))
+                                    (let ((n-supplied (gensym "N-SUPPLIED-")))
                                       (temps (list n-supplied
                                                    (if supplied-used-p
                                                        nil
@@ -629,10 +629,10 @@
         ;; Make up two extra variables, and squirrel them away in
         ;; ARG-INFO-DEFAULT for transforming (VALUES-LIST REST) into
         ;; (%MORE-ARG-VALUES CONTEXT 0 COUNT) when possible.
-        (let* ((context-name (sb-xc:gensym "REST-CONTEXT-"))
+        (let* ((context-name (gensym "REST-CONTEXT-"))
                (context (make-lambda-var :%source-name context-name
                                          :arg-info (make-arg-info :kind :more-context)))
-               (count-name (sb-xc:gensym "REST-COUNT-"))
+               (count-name (gensym "REST-COUNT-"))
                (count (make-lambda-var :%source-name count-name
                                        :arg-info (make-arg-info :kind :more-count)
                                        :type (specifier-type 'index))))
@@ -660,7 +660,7 @@
         (main-vars val-temp)
         (bind-vars key)
         (cond ((or hairy-default supplied-p)
-               (let* ((n-supplied (sb-xc:gensym "N-SUPPLIED-"))
+               (let* ((n-supplied (gensym "N-SUPPLIED-"))
                       (supplied-temp (make-lambda-var
                                       :%source-name n-supplied)))
                  (unless supplied-p

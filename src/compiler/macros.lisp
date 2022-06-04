@@ -380,7 +380,7 @@
 ;;; methods are passed an additional POLICY argument, and IR2-CONVERT
 ;;; methods are passed an additional IR2-BLOCK argument.
 (defmacro defoptimizer (what (lambda-list
-                              &optional (node (sb-xc:gensym) node-p)
+                              &optional (node (gensym) node-p)
                               &rest vars)
                         &body body)
   (let ((name (flet ((function-name (name)
@@ -448,7 +448,7 @@
 (defmacro do-blocks ((block-var component &optional ends result) &body body)
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
-  (let ((n-component (sb-xc:gensym))
+  (let ((n-component (gensym))
         (n-tail (gensym)))
     `(let* ((,n-component ,component)
             (,n-tail ,(if (member ends '(:both :tail))
@@ -464,7 +464,7 @@
 (defmacro do-blocks-backwards ((block-var component &optional ends result) &body body)
   (unless (member ends '(nil :head :tail :both))
     (error "losing ENDS value: ~S" ends))
-  (let ((n-component (sb-xc:gensym))
+  (let ((n-component (gensym))
         (n-head (gensym)))
     `(let* ((,n-component ,component)
             (,n-head ,(if (member ends '(:both :head))
@@ -695,8 +695,8 @@
               #-sb-xc-host get-setf-expansion place env)
            (when (cdr stores)
              (error "multiple store variables for ~S" place))
-           (let ((newval (sb-xc:gensym))
-                 (n-place (sb-xc:gensym))
+           (let ((newval (gensym))
+                 (n-place (gensym))
                  (mask (encode-attribute-mask attributes ,vector)))
              (values `(,@temps ,n-place)
                      `(,@values ,getter)

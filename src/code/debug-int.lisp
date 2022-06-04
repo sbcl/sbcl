@@ -1375,7 +1375,7 @@ register."
 ;;; DEBUG-BLOCK information.
 (defmacro do-debug-fun-blocks ((block-var debug-fun &optional result)
                                &body body)
-  (let ((blocks (sb-xc:gensym))
+  (let ((blocks (gensym))
         (i (gensym)))
     `(let ((,blocks (debug-fun-debug-blocks ,debug-fun)))
        (declare (simple-vector ,blocks))

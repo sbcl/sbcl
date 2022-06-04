@@ -3915,7 +3915,7 @@
           (t
            (do* ((i (1- nargs) (1- i))
                  (last nil current)
-                 (current (sb-xc:gensym) (sb-xc:gensym))
+                 (current (gensym) (gensym))
                  (vars (list current) (cons current vars))
                  (result t (if not-p
                                `(if (,predicate ,current ,last)

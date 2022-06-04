@@ -56,7 +56,7 @@
   (collect ((do-clauses)
             (args-to-fn)
             (tests))
-    (let ((n-first (sb-xc:gensym)))
+    (let ((n-first (gensym)))
       (dolist (a (if accumulate
                      arglists
                      `(,n-first ,@(rest arglists))))

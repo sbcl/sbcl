@@ -173,7 +173,7 @@
                     handler
                     (let* ((name (let ((*gensym-counter*
                                          (length (cluster-entries))))
-                                   (sb-xc:gensym "H")))
+                                   (gensym "H")))
                            (lexpr
                              (typecase handler
                                ;; These two are merely expansion prettifiers,

@@ -61,7 +61,7 @@
                           (stem (if (every #'alpha-char-p symbol-name)
                                     symbol-name
                                     (string (gensymify* symbol-name "-")))))
-                     `(,symbol (sb-xc:gensym ,stem))))
+                     `(,symbol (gensym ,stem))))
                  symbols)
      ,@body))
 
@@ -69,7 +69,7 @@
 ;;; macros and other code-manipulating code.)
 (defun make-gensym-list (n &optional name)
   (let ((arg (if name (string name) "G")))
-    (loop repeat n collect (sb-xc:gensym arg))))
+    (loop repeat n collect (gensym arg))))
 
 ;;;; miscellany
 
@@ -92,8 +92,8 @@
 
 (defun gensymify (x)
   (if (symbolp x)
-      (sb-xc:gensym (symbol-name x))
-      (sb-xc:gensym)))
+      (gensym (symbol-name x))
+      (gensym)))
 
 (eval-when (:load-toplevel :execute #+sb-xc-host :compile-toplevel)
 (labels ((symbol-concat (package &rest things)

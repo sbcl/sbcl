@@ -469,7 +469,7 @@
         (collect ((expander-bindings) (runtime-bindings))
           (dolist (spec specs)
             (destructuring-bind (var default) spec
-              (let ((symbol (sb-xc:gensym "FVAR")))
+              (let ((symbol (gensym "FVAR")))
                 (expander-bindings
                  `(,var ',symbol))
                 (runtime-bindings
@@ -504,8 +504,8 @@
   (let ((defun-name (intern (format nil
                                     "~:@(~:C~)-FORMAT-DIRECTIVE-EXPANDER"
                                     char)))
-        (directive (sb-xc:gensym "DIRECTIVE"))
-        (directives (if lambda-list (car (last lambda-list)) (sb-xc:gensym "DIRECTIVES"))))
+        (directive (gensym "DIRECTIVE"))
+        (directives (if lambda-list (car (last lambda-list)) (gensym "DIRECTIVES"))))
     `(progn
        (defun ,defun-name (,directive ,directives)
          ,@(if lambda-list
@@ -519,7 +519,7 @@
        (%set-format-directive-expander ,char #',defun-name))))
 
 (defmacro def-format-directive (char lambda-list &body body)
-  (let ((directives (sb-xc:gensym "DIRECTIVES"))
+  (let ((directives (gensym "DIRECTIVES"))
         (declarations nil)
         (body-without-decls body))
     (loop
@@ -592,7 +592,7 @@
 
 (def-format-directive #\C (colonp atsignp params string end)
   (expand-bind-defaults () params
-    (let ((n-arg (sb-xc:gensym "ARG")))
+    (let ((n-arg (gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
          (unless (typep ,n-arg 'character)
            (format-error-at ,string ,(1- end)
@@ -646,7 +646,7 @@
       ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
        (commainterval 3))
       params
-    (let ((n-arg (sb-xc:gensym "ARG")))
+    (let ((n-arg (gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
          (unless (or ,base
                      (integerp ,n-arg))
@@ -1336,7 +1336,7 @@
     (collect ((param-names) (bindings))
       (dolist (param-and-offset params)
         (let ((param (cdr param-and-offset)))
-          (let ((param-name (sb-xc:gensym "PARAM")))
+          (let ((param-name (gensym "PARAM")))
             (param-names param-name)
             (bindings `(,param-name
                         ,(case param

@@ -176,7 +176,7 @@
   (declare (type functional fun))
   (etypecase fun
     (clambda
-     (let* ((n-supplied (sb-xc:gensym))
+     (let* ((n-supplied (gensym))
             (nargs (length (lambda-vars fun)))
             (temps (make-gensym-list nargs)))
        `(lambda (,n-supplied ,@temps)
@@ -189,7 +189,7 @@
      (let* ((min (optional-dispatch-min-args fun))
             (max (optional-dispatch-max-args fun))
             (more (optional-dispatch-more-entry fun))
-            (n-supplied (sb-xc:gensym))
+            (n-supplied (gensym))
             (temps (make-gensym-list max))
             (main (optional-dispatch-main-entry fun))
             (optional-vars (nthcdr min (lambda-vars main)))

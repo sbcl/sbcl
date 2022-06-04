@@ -27,7 +27,7 @@ garbage collection."
   #+(and gencgc (or x86 x86-64))
   (if objects
       (let ((pins (make-gensym-list (length objects)))
-            (wpo (sb-xc:gensym "WITH-PINNED-OBJECTS-THUNK")))
+            (wpo (gensym "WITH-PINNED-OBJECTS-THUNK")))
         ;; BODY is stuffed in a function to preserve the lexical
         ;; environment.
         `(flet ((,wpo () (progn ,@body)))

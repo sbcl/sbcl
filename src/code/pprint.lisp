@@ -1398,7 +1398,7 @@ line break."
 (defmacro with-pretty-stream ((stream-var
                                      &optional (stream-expression stream-var))
                                     &body body)
-  (let ((flet-name (sb-xc:gensym "WITH-PRETTY-STREAM")))
+  (let ((flet-name (gensym "WITH-PRETTY-STREAM")))
     `(flet ((,flet-name (,stream-var)
               ,@body))
        (let ((stream ,stream-expression))

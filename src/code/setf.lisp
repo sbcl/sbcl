@@ -217,7 +217,7 @@
                                 (thunk (cdr mv-bindings) (cdr getters) setters))
                    setters)))
       (let ((outputs (loop for i below (length (car (mv-bindings)))
-                           collect (sb-xc:gensym "OUT"))))
+                           collect (gensym "OUT"))))
         (car (gen-let* (reduce #'nconc (let*-bindings))
                        (gen-mv-bind outputs (car (getters))
                                     (thunk (mv-bindings) (cdr (getters))
