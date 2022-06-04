@@ -1489,9 +1489,6 @@ core and return a descriptor to it."
                        "SB-EXT" "SB-GRAY" "SB-PROFILE")))
             (t
              (let ((package (find-package name)))
-               ;; 'exports' contains no nicknames.
-               ;; (See comment in 'set-up-cold-packages')
-               (aver (null (package-nicknames package)))
                (values (package-nicknames package)
                        (documentation package t)
                        (if (string= name "SB-KERNEL")

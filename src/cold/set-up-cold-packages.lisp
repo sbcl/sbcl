@@ -148,6 +148,8 @@
   (name (error "missing PACKAGE-DATA-NAME datum"))
   ;; a doc string
   (documentation (error "missing PACKAGE-DOCUMENATION datum"))
+  ;; a list of nicknames
+  nicknames
   ;; a list of string designators for shadowing symbols
   shadow
   ;; a list of string designators for exported symbols which'll be set
@@ -400,7 +402,9 @@
   ;; Build all packages that we need, and initialize them as far as we
   ;; can without referring to any other packages.
   (dolist (package-data package-data-list)
-    (let ((package (make-package (package-data-name package-data) :use nil)))
+    (let ((package (make-package (package-data-name package-data)
+                                 :use nil
+                                 :nicknames (package-data-nicknames package-data))))
       (dolist (string (package-data-shadow package-data))
         (shadow string package))
       (dolist (string (package-data-export package-data))
@@ -467,8 +471,8 @@
   (let ((flattened-options '()))
     (dolist (option options)
       (destructuring-bind (kind . args) option
-        (case kind
-          ((:use :export :reexport :shadow)
+        (ecase kind
+          ((:use :export :reexport :shadow :nicknames)
            (let ((existing-option (assoc kind flattened-options)))
              (if existing-option
                  (setf (second (second existing-option))

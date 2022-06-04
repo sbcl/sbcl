@@ -244,6 +244,7 @@ SBCL itself")
         "SB-FASL" "SB-GRAY" "SB-INT" "SB-KERNEL" "SB-SYS"))
 
 (defpackage* "SB-SEQUENCE"
+  (:nicknames "SEQUENCE")
   (:documentation "semi-public: implements something which might eventually
 be submitted as a CDR")
   (:export "PROTOCOL-UNIMPLEMENTED"
@@ -1651,6 +1652,11 @@ SB-KERNEL) have been undone, but probably more remain.")
    "WITH-INTERRUPT-BINDINGS"))
 
 (defpackage* "SB-ALIEN"
+  ;; FIXME: This nickname is a deprecated hack for backwards
+  ;; compatibility with code which assumed the CMU-CL-style
+  ;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
+  ;; in 0.7.0, so we should get rid of this nickname after a while.
+  (:nicknames "SB-C-CALL")
   (:documentation "public: the ALIEN foreign function interface (If you're
 porting CMU CL code, note that this package corresponds roughly to a union
 of the packages ALIEN and C-CALL at the time of the SBCL fork. SB-C-CALL
@@ -1746,6 +1752,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)")
            "NOTE-LOCAL-ALIEN-TYPE"
            "PARSE-ALIEN-TYPE" "UNPARSE-ALIEN-TYPE"))
 
+#+(and x86-64 sb-thread)
 (defpackage* "SB-APROF"
   (:documentation "public: the interface to the deterministic consing profiler")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-ALIEN" "SB-SYS"))

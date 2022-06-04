@@ -416,16 +416,3 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
     ;; standard packages are effectively constant objects, otherwise
     ;; we have to invoke the find function.
     (if constp form `(sb-impl::cached-find-package ,form))))
-
-;;;; package hacking
-
-;;; FIXME: This nickname is a deprecated hack for backwards
-;;; compatibility with code which assumed the CMU-CL-style
-;;; SB-ALIEN/SB-C-CALL split. That split went away and was deprecated
-;;; in 0.7.0, so we should get rid of this nickname after a while.
-(let ((package (find-package "SB-ALIEN")))
-  (rename-package package package
-                  (cons "SB-C-CALL" (package-nicknames package))))
-
-(let ((package (find-package "SB-SEQUENCE")))
-  (rename-package package package (list "SEQUENCE")))
