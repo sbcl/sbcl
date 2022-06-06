@@ -598,10 +598,17 @@
   (:info)
   (:conditional :z)
   (:generator 5
-    ;; SYMBOLP would have been IR1-transformed to NON-NULL-SYMBOL-P when possible
+    ;; If the VALUE were known to be an OTHER-POINTER, the the IR1 lvar type
+    ;; can't intersect NULL. So the IR1 should have been transformed to NON-NULL-SYMBOL-P.
+    ;; Hence this must *not* be known to be an OTHER-POINTER.
+    (aver (not (other-pointer-tn-ref-p args)))
+    (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
+    (inst test :byte temp lowtag-mask)
+    (inst jmp :e compare-widetag)
     (inst cmp value nil-value)
-    (inst jmp :e out)
-    (test-other-ptr value args symbol-widetag temp out)
+    (inst jmp out)
+    compare-widetag
+    (inst cmp :byte (ea temp) symbol-widetag)
     out))
 
 (define-vop (non-null-symbol-p symbolp)
