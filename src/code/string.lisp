@@ -502,88 +502,118 @@ new string COUNT long filled with the fill character."
               (when initial-element (fill string initial-element))
               string)))))
 
+(defmacro nstring-case (case-index a z)
+  (declare (ignorable a z))
+  `(with-one-string (string start end)
+     (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+     (cond ((simple-base-string-p string)
+            (do ((index start (1+ index)))
+                ((>= index end))
+              (let ((char (char-code (schar string index))))
+                (setf (schar string index)
+                      (truly-the base-char
+                                 (code-char
+                                  (truly-the
+                                   char-code
+                                   (if (<= (char-code ,a) char (char-code ,z))
+                                       (logxor char #x20)
+                                       char))))))))
+           (t
+            (do ((index start (1+ index))
+                 (cases #.+character-cases+))
+                ((>= index end))
+              (let ((char (schar string index)))
+                (with-case-info (char case-index cases
+                                 :cases cases)
+                  (let ((code (aref cases ,case-index)))
+                    (unless (zerop code)
+                      (setf (schar string index)
+                            (code-char (truly-the char-code code))))))))))))
+
 (defun nstring-upcase (string &key (start 0) end)
-  (with-one-string (string start end)
-    (do ((index start (1+ index))
-         (cases +character-cases+))
-        ((>= index end))
-      (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-      (let ((char (schar string index)))
-        (with-case-info (char case-index cases
-                         :cases cases)
-          (let ((code (aref cases (1+ case-index))))
-            (unless (zerop code)
-              (setf (schar string index)
-                    (code-char (truly-the char-code code)))))))))
+  (nstring-case (1+ case-index) #\a #\z)
   string)
 
 (defun nstring-downcase (string &key (start 0) end)
-  (with-one-string (string start end)
-    (do ((index start (1+ index))
-         (cases #.+character-cases+))
-        ((>= index end))
-      (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-      (let ((char (schar string index)))
-        (with-case-info (char case-index cases
-                         :cases cases)
-          (let ((code (aref cases case-index)))
-            (declare (optimize (safety 0))) ;; avoid checking for base-char
-            (unless (zerop code)
-              (setf (schar string index)
-                    (code-char code))))))))
+  (nstring-case case-index #\A #\Z)
   string)
 
-(defmacro string-case (case-index)
+(defmacro string-case (case-index a z)
+  (declare (ignorable a z))
   `(let ((string (%string string)))
      (with-array-data ((string-data string :offset-var offset)
                        (s-start start)
                        (s-end end)
                        :check-fill-pointer t)
-       (let* ((length (length string))
-              (new (cond #+sb-unicode
-                         ((simple-base-string-p string-data)
-                          (make-string length :element-type 'base-char))
-                         (t
-                          (make-string length)))))
-         (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-         (when (> start 0)
-           (loop for d-i below start
-                 for s-i from offset
-                 do
-                 (locally (declare (optimize (safety 0)))
-                  (setf (schar new d-i)
-                        (schar string-data s-i)))))
-         (when (and end
-                    (< end length))
-           (loop for d-i from end below length
-                 for s-i from s-end
-                 do (locally (declare (optimize (safety 0)))
+       (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+       (let ((length (length string)))
+         (cond #+sb-unicode
+               ((simple-base-string-p string-data)
+                (let* ((new (make-string length :element-type 'base-char)))
+                  (when (> start 0)
+                    (loop for d-i below start
+                          for s-i from offset
+                          do
+                          (locally (declare (optimize (safety 0)))
+                            (setf (schar new d-i)
+                                  (schar string-data s-i)))))
+                  (when (and end
+                             (< end length))
+                    (loop for d-i from end below length
+                          for s-i from s-end
+                          do (locally (declare (optimize (safety 0)))
+                               (setf (schar new d-i)
+                                     (schar string-data s-i)))))
+                  (do ((s-i s-start (truly-the index (1+ s-i)))
+                       (d-i start (truly-the index (1+ d-i))))
+                      ((>= s-i s-end))
+                    (declare (index d-i))
+                    (let ((char (char-code (schar string-data s-i))))
                       (setf (schar new d-i)
-                            (schar string-data s-i)))))
-         (do ((s-i s-start (truly-the index (1+ s-i)))
-              (d-i start (truly-the index (1+ d-i)))
-              (cases #.+character-cases+))
-             ((>= s-i s-end))
-           (declare (index d-i))
-           (let* ((char (schar string-data s-i))
-                  (cased (with-case-info (char case-index cases
-                                          :cases cases
-                                          :miss-value char)
-                           (let ((code (aref cases ,case-index)))
-                             (if (zerop code)
-                                 char
-                                 (code-char (truly-the char-code code)))))))
-             (locally (declare (optimize (safety 0))) ;; avoid checking for base-char
-               (setf (schar new d-i) cased))))
-         new))))
+                            (code-char
+                             (if (<= (char-code ,a) char (char-code ,z))
+                                 (truly-the char-code (logxor char #x20))
+                                 char)))))
+                  new))
+               (t
+                (let ((new (make-string length)))
+                  (when (> start 0)
+                    (loop for d-i below start
+                          for s-i from offset
+                          do
+                          (locally (declare (optimize (safety 0)))
+                            (setf (schar new d-i)
+                                  (schar string-data s-i)))))
+                  (when (and end
+                             (< end length))
+                    (loop for d-i from end below length
+                          for s-i from s-end
+                          do (locally (declare (optimize (safety 0)))
+                               (setf (schar new d-i)
+                                     (schar string-data s-i)))))
+                  (do ((s-i s-start (truly-the index (1+ s-i)))
+                       (d-i start (truly-the index (1+ d-i)))
+                       (cases #.+character-cases+))
+                      ((>= s-i s-end))
+                    (declare (index d-i))
+                    (let* ((char (schar string-data s-i))
+                           (cased (with-case-info (char case-index cases
+                                                   :cases cases
+                                                   :miss-value char)
+                                    (let ((code (aref cases ,case-index)))
+                                      (if (zerop code)
+                                          char
+                                          (code-char (truly-the char-code code)))))))
+                      (setf (schar new d-i) cased)))
+                  new)))))))
 
 (defun string-upcase (string &key (start 0) end)
   (declare (explicit-check))
-  (string-case (1+ case-index)))
+  (string-case (1+ case-index) #\a #\z))
 
 (defun string-downcase (string &key (start 0) end)
   (declare (explicit-check))
-  (string-case case-index))
+  (string-case case-index #\A #\Z))
 
 (flet ((%capitalize (string start end)
          (declare (string string) (index start) (type sequence-end end))
