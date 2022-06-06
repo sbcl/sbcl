@@ -2606,7 +2606,7 @@ mechanism for inter-thread communication."
           (setf (aref names (sb-vm::slot-offset slot)) (sb-vm::slot-name slot)))
     (flet ((safely-read (sap offset &aux (bits (sap-ref-word sap offset)))
              (cond ((eql bits sb-vm:no-tls-value-marker) :no-tls-value)
-                   ((eql (logand bits sb-vm:widtag-mask) sb-vm:unbound-marker-widetag) :unbound)
+                   ((eql (logand bits sb-vm:widetag-mask) sb-vm:unbound-marker-widetag) :unbound)
                    (t (sap-ref-lispobj sap offset))))
            (show (sym val)
              (let ((*print-right-margin* 128)
