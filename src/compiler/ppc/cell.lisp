@@ -75,7 +75,7 @@
       (inst stwx new thread-base-tn temp)
       DONT-STORE-TLS
 
-      (inst cmpwi result no-tls-value-marker-widetag)
+      (inst cmpwi result no-tls-value-marker)
       (inst bne CHECK-UNBOUND))
 
     (inst li temp (- (* symbol-value-slot n-word-bytes)
@@ -129,7 +129,7 @@
     (:generator 4
       (loadw tls-slot symbol symbol-tls-index-slot other-pointer-lowtag)
       (inst lwzx temp thread-base-tn tls-slot)
-      (inst cmpwi temp no-tls-value-marker-widetag)
+      (inst cmpwi temp no-tls-value-marker)
       (inst beq GLOBAL-VALUE)
       (inst stwx value thread-base-tn tls-slot)
       (inst b DONE)
@@ -148,7 +148,7 @@
     (:generator 9
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst lwzx value thread-base-tn value)
-      (inst cmpwi value no-tls-value-marker-widetag)
+      (inst cmpwi value no-tls-value-marker)
       (inst bne CHECK-UNBOUND)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       CHECK-UNBOUND
@@ -166,7 +166,7 @@
     (:generator 8
       (loadw value object symbol-tls-index-slot other-pointer-lowtag)
       (inst lwzx value thread-base-tn value)
-      (inst cmpwi value no-tls-value-marker-widetag)
+      (inst cmpwi value no-tls-value-marker)
       (inst bne DONE)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       DONE)))
@@ -193,7 +193,7 @@
   (:generator 9
     (loadw value object symbol-tls-index-slot other-pointer-lowtag)
     (inst lwzx value thread-base-tn value)
-    (inst cmpwi value no-tls-value-marker-widetag)
+    (inst cmpwi value no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND

@@ -197,9 +197,7 @@ void run_gencgc_tests()
     for(i=0; i<256; ++i) if (fixnump(i)) gc_assert(!is_header(i));
     gc_assert(!is_header(CHARACTER_WIDETAG));
     gc_assert(!is_header(UNBOUND_MARKER_WIDETAG));
-#ifdef NO_TLS_VALUE_MARKER_WIDETAG
-    gc_assert(!is_header(NO_TLS_VALUE_MARKER_WIDETAG));
-#endif
+    gc_assert(!is_header(NO_TLS_VALUE_MARKER & WIDETAG_MASK));
 #ifdef LISP_FEATURE_64_BIT
     gc_assert(!is_header(SINGLE_FLOAT_WIDETAG));
 #endif

@@ -129,7 +129,7 @@
     (inst bne DONT-STORE-TLS)
     (inst stdx new thread-base-tn temp)
     DONT-STORE-TLS
-    (inst cmpdi result no-tls-value-marker-widetag)
+    (inst cmpdi result no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
 
     (inst li temp (- (* symbol-value-slot n-word-bytes)
@@ -199,7 +199,7 @@
   (:generator 4
     (load-tls-index tls-slot symbol)
     (inst ldx temp thread-base-tn tls-slot)
-    (inst cmpdi temp no-tls-value-marker-widetag)
+    (inst cmpdi temp no-tls-value-marker)
     (inst beq GLOBAL-VALUE)
     (inst stdx value thread-base-tn tls-slot)
     (inst b DONE)
@@ -221,7 +221,7 @@
     (inst beq NULL)
     (load-tls-index value object)
     (inst ldx value thread-base-tn value)
-    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst cmpdi value no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
@@ -245,7 +245,7 @@
     (inst beq NULL)
     (load-tls-index value object)
     (inst ldx value thread-base-tn value)
-    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst cmpdi value no-tls-value-marker)
     (inst bne DONE)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     (inst b DONE)
@@ -267,7 +267,7 @@
     (inst beq (if not-p out target))
     (load-tls-index value object)
     (inst ldx value thread-base-tn value)
-    (inst cmpdi value no-tls-value-marker-widetag)
+    (inst cmpdi value no-tls-value-marker)
     (inst bne CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND

@@ -1859,7 +1859,7 @@ session."
                                                    (function system-area-pointer
                                                              system-area-pointer unsigned))
                                      (or reuse (int-sap 0))
-                                     sb-vm:no-tls-value-marker-widetag)))
+                                     sb-vm:no-tls-value-marker)))
       (when (and (not reuse) (/= (sap-int thread-sap) 0))
         ;; these would have been done already if reusing the memory
         ;; of a completed thread.
@@ -2427,14 +2427,16 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 (progn
   (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
 
-  (defun %symbol-value-in-thread (symbol thread)
+  (defun %symbol-value-in-thread (symbol thread &aux (tlsindex (symbol-tls-index symbol)))
     (with-deathlok (thread c-thread)
       (if (/= c-thread 0)
-          (let ((val (sap-ref-lispobj (int-sap c-thread) (symbol-tls-index symbol))))
-            (case (get-lisp-obj-address val)
-              (#.sb-vm:no-tls-value-marker-widetag (values nil :no-tls-value))
-              (#.sb-vm:unbound-marker-widetag (values nil :unbound-in-thread))
-              (t (values val :ok))))
+          ;; Avoid loading not-really-an-object markers into a descriptor register.
+          (macrolet ((read-using (reader) `(,reader (int-sap c-thread) tlsindex)))
+            (let ((bits (read-using sap-ref-word)))
+              (cond ((eql bits sb-vm:no-tls-value-marker) (values nil :no-tls-value))
+                    ((eql (logand bits sb-vm:widetag-mask) sb-vm:unbound-marker-widetag)
+                     (values nil :unbound-in-thread))
+                    (t (values (read-using sap-ref-lispobj) :ok)))))
           (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
@@ -2602,11 +2604,10 @@ mechanism for inter-thread communication."
     (loop for slot across slots
           do
           (setf (aref names (sb-vm::slot-offset slot)) (sb-vm::slot-name slot)))
-    (flet ((safely-read (sap offset)
-             (let ((word (sap-ref-word sap offset)))
-               (cond ((= word sb-vm:no-tls-value-marker-widetag) :no-tls-value)
-                     ((= word sb-vm:unbound-marker-widetag) :unbound)
-                     (t (sap-ref-lispobj sap offset)))))
+    (flet ((safely-read (sap offset &aux (bits (sap-ref-word sap offset)))
+             (cond ((eql bits sb-vm:no-tls-value-marker) :no-tls-value)
+                   ((eql (logand bits sb-vm:widtag-mask) sb-vm:unbound-marker-widetag) :unbound)
+                   (t (sap-ref-lispobj sap offset))))
            (show (sym val)
              (let ((*print-right-margin* 128)
                    (*print-lines* 4))

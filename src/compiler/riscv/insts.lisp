@@ -351,7 +351,12 @@
                   (:printer i ((funct3 ,funct3)
                                (opcode #b0010011)))
                   (:emitter
-                   (emit-i-inst segment imm rs ,funct3 rd #b0010011)))
+                   ,(if (eq name 'xori)
+                        ;; Use something like PLAUSIBLE-SIGNED-IMM32-OPERAND-P in the amd64 assembler.
+                        ;; This is totally ad-hoc and just enough to emit a logical NOT instruction.
+                        `(flet ((cast-to-imm (x) (if (= x most-positive-word) -1 x)))
+                           (emit-i-inst segment (cast-to-imm imm) rs ,funct3 rd #b0010011))
+                        `(emit-i-inst segment imm rs ,funct3 rd #b0010011))))
                 ,(when word-name
                    #+64-bit
                    `(define-instruction ,word-name (segment rd rs imm)

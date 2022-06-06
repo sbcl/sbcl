@@ -70,7 +70,7 @@
       (inst bne result old DONT-STORE-TLS)
       (storew new lip)
       DONT-STORE-TLS
-      (inst xori temp result no-tls-value-marker-widetag)
+      (inst xori temp result no-tls-value-marker)
       (inst bne temp zero-tn CHECK-UNBOUND))
 
     (inst addi lip symbol (- (* symbol-value-slot n-word-bytes)
@@ -97,7 +97,7 @@
     (load-tls-index tls-slot symbol)
     (inst add lip thread-base-tn tls-slot)
     (loadw temp lip)
-    (inst xori temp temp no-tls-value-marker-widetag)
+    (inst xori temp temp no-tls-value-marker)
     (inst bne temp zero-tn TLS-VALUE)
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     (inst j DONE)
@@ -129,7 +129,7 @@
     (load-tls-index value object)
     (inst add lip thread-base-tn value)
     (loadw value lip)
-    (inst xori temp value no-tls-value-marker-widetag)
+    (inst xori temp value no-tls-value-marker)
     (inst bne temp zero-tn CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
@@ -162,7 +162,7 @@
     (load-tls-index value object)
     (inst add lip thread-base-tn value)
     (loadw value lip)
-    (inst xori temp value no-tls-value-marker-widetag)
+    (inst xori temp value no-tls-value-marker)
     (inst bne temp zero-tn CHECK-UNBOUND)
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND

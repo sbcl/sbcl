@@ -164,7 +164,7 @@
                                            (symbol-tls-index-ea symbol)
                                            (tls-index-of symbol)))
                  (inst add cell thread-tn)))
-          (inst cmp :dword (ea cell) no-tls-value-marker-widetag)
+          (inst cmp :qword (ea cell) no-tls-value-marker)
           (inst jmp :ne STORE)
           (emit-symbol-write-barrier symbol nil val-temp (vop-nth-arg 1 vop) value)
           (get-symbol-value-slot-ea cell symbol)
@@ -262,7 +262,7 @@
                                 (symbol-tls-index-ea symbol)
                                 (tls-index-of symbol)))
       (inst add cell thread-tn)
-      (inst cmp :dword (ea cell) no-tls-value-marker-widetag)
+      (inst cmp :qword (ea cell) no-tls-value-marker)
       (inst jmp :ne CAS))
       ;; GLOBAL. All logic that follows is for both + and - sb-thread
       (emit-symbol-write-barrier symbol nil cell (vop-nth-arg 2 vop) new)
@@ -323,7 +323,7 @@
               (setq symbol-reg symbol)))
 
            ;; Load the global value if the TLS value didn't exist
-           (inst cmp :dword value no-tls-value-marker-widetag)
+           (inst cmp :qword value no-tls-value-marker)
            (inst cmov :e value
                  (if (and known-symbol-p (sc-is symbol immediate))
                      (symbol-slot-ea known-symbol symbol-value-slot) ; MOV Rxx, imm32
@@ -388,8 +388,8 @@
       (:temporary (:sc unsigned-reg) temp)
       (:generator 9
         (inst mov :dword temp (tls-index-of object))
-        (inst mov :dword temp (thread-tls-ea temp))
-        (inst cmp :dword temp no-tls-value-marker-widetag)
+        (inst mov :qword temp (thread-tls-ea temp))
+        (inst cmp :qword temp no-tls-value-marker)
         (inst cmov :dword :e temp (symbol-value-slot-ea object))
         (inst cmp :byte temp unbound-marker-widetag))))
 

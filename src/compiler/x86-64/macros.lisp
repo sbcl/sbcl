@@ -358,7 +358,7 @@
            (when (memq name '(data-vector-ref-with-offset/simple-vector
                               data-vector-ref-with-offset/simple-vector-c))
              `((when (sb-c::policy (sb-c::vop-node vop) (> sb-c::aref-trapping 0))
-                 (inst cmp :byte ea no-tls-value-marker-widetag)
+                 (inst cmp :byte ea unwritten-vector-element-marker)
                  (inst jmp :e (generate-error-code
                                vop 'uninitialized-element-error object
                                ,index-to-encode)))))))

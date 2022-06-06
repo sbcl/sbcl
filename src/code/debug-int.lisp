@@ -711,6 +711,8 @@
     (when saved-fp
       (compute-calling-frame saved-fp saved-pc up-frame t))))
 
+#+c-stack-is-control-stack
+(progn
 (defun walk-binding-stack (symbol function)
   (let* (#+sb-thread
          (tls-index (symbol-tls-index symbol))
@@ -719,8 +721,10 @@
            (sap-ref-lispobj (sb-thread::current-thread-sap) tls-index)
            #-sb-thread
            (symbol-value symbol)))
-    (unless (eq (get-lisp-obj-address current-value)
-                no-tls-value-marker-widetag)
+    ;; This is slightly dangerous - the right thing would be
+    ;; to access using SAP-REF-WORD and compare like a few lines below.
+    ;; Why does #-sb-thread even check for this at all?
+    (unless (eql (get-lisp-obj-address current-value) no-tls-value-marker)
       (funcall function current-value)
       (loop for start = (descriptor-sap *binding-stack-start*)
             for pointer = (descriptor-sap sb-vm::*binding-stack-pointer*)
@@ -730,13 +734,11 @@
             #+sb-thread (eq (sap-ref-word pointer (* n-word-bytes -1)) tls-index)
             #-sb-thread (eq (sap-ref-lispobj pointer (* n-word-bytes -1)) symbol)
             do (unless (or #+sb-thread
-                           (= (sap-ref-word pointer (* n-word-bytes -2))
-                              no-tls-value-marker-widetag))
+                           (= (sap-ref-word pointer (* n-word-bytes -2)) no-tls-value-marker))
                  (funcall function
                           (sap-ref-lispobj pointer
                                            (* n-word-bytes -2))))))))
 
-#+c-stack-is-control-stack
 (defun find-saved-fp-and-pc (fp)
   (block nil
     (walk-binding-stack
@@ -756,6 +758,7 @@
                              (sap-ref-sap saved-fp
                                           (sb-vm::frame-byte-offset
                                            return-pc-save-offset)))))))))))
+) ; end PROGN
 
 (defun return-pc-offset-for-location (debug-fun location)
   (declare (ignorable debug-fun location))

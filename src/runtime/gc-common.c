@@ -2362,35 +2362,25 @@ scavenge_control_stack(struct thread *th)
      * the compiler isn't allowed to store unboxed objects on the
      * control stack.  -- AB, 2011-Dec-02 */
 
-    /* FIXME: I believe that this loop could be replaced by scavenge(),
-     * as it can not "... blow past the end" on header words,
-     * the way that heap_scavenge() might */
     for (object_ptr = th->control_stack_start;
          object_ptr < access_control_stack_pointer(th);
          object_ptr++) {
-
-        lispobj object = *object_ptr;
-#ifdef LISP_FEATURE_GENCGC
-        if (forwarding_pointer_p(object_ptr))
+        lispobj word = *object_ptr;
+        if (word == FORWARDING_HEADER)
             lose("unexpected forwarding pointer in scavenge_control_stack: %p, start=%p, end=%p",
                  object_ptr, th->control_stack_start, access_control_stack_pointer(th));
+        else if (is_lisp_pointer(word)) { scav1(object_ptr, word); }
+#ifdef LISP_FEATURE_PPC64
+        /* For ppc64, ~0 does not satisfy is_lisp_pointer() or is_lisp_immediate(),
+         * but it can be ignored. It nominally satisfies is_lisp_pointer() on other
+         * architectures, and gets ignored because it does not point to the heap. */
+        else if (is_lisp_immediate(word) || word == ~(uword_t)0) { } // ignore
+#else
+        else if (is_lisp_immediate(word)) { } // ignore
 #endif
-        if (is_lisp_pointer(object) && from_space_p(object)) {
-            /* It currently points to old space. Check for a
-             * forwarding pointer. */
-            lispobj *ptr = native_pointer(object);
-            if (forwarding_pointer_p(ptr)) {
-                /* Yes, there's a forwarding pointer. */
-                *object_ptr = forwarding_pointer_value(ptr);
-            } else {
-                /* Scavenge that pointer. */
-                long n_words_scavenged =
-                    (scavtab[header_widetag(object)])(object_ptr, object);
-                gc_assert(n_words_scavenged == 1);
-            }
-        } else if (scavtab[header_widetag(object)] == scav_lose) {
+        else if (scavtab[header_widetag(word)] == scav_lose) {
             lose("unboxed object in scavenge_control_stack: %p->%"OBJ_FMTX", start=%p, end=%p",
-                 object_ptr, object, th->control_stack_start, access_control_stack_pointer(th));
+                 object_ptr, word, th->control_stack_start, access_control_stack_pointer(th));
         }
     }
 }

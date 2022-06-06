@@ -528,7 +528,7 @@
                                                (vector-extra-data vector))
                                            (ash (sap-ref-word (current-fp) n-word-bytes) 3)) ; XXX: magic
                     (cond ((= widetag simple-vector-widetag)
-                           (fill vector (%make-lisp-obj no-tls-value-marker-widetag)))
+                           (fill vector (%make-lisp-obj unwritten-vector-element-marker)))
                           ((array-may-contain-random-bits-p widetag)
                            ;; Leave the last word alone for base-string,
                            ;; in case the mandatory trailing null is part of a data word.

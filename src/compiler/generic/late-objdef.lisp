@@ -81,8 +81,6 @@
     (instance "instance" "lose" "instance")
     (fdefn "fdefn")
 
-    (no-tls-value-marker "immediate")
-
     #+sb-simd-pack (simd-pack "unboxed")
     #+sb-simd-pack-256 (simd-pack-256 "unboxed")
     (filler "unboxed")

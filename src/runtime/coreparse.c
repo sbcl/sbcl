@@ -1375,7 +1375,6 @@ static void sanity_check_loaded_core(lispobj initial_function)
             ((strncmp(widetag_names[i], "unk", 3)
               && (i != CHARACTER_WIDETAG>>2)
               && (i != SIMPLE_FUN_WIDETAG>>2)
-              && (i != NO_TLS_VALUE_MARKER_WIDETAG>>2)
               && (i != UNBOUND_MARKER_WIDETAG>>2)))) {
             int mismatch = v[0].headers[i].count != v[1].headers[i].count;
             printf("%8d %11d  | %8d %11d   | %s%s\n",

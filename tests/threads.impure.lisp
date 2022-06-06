@@ -670,7 +670,7 @@
       (let* ((i (sb-kernel:symbol-tls-index mysym))
              (j (+ i sb-vm:n-word-bytes)))
         (assert (eql (sap-ref-word (sb-thread::current-thread-sap) j)
-                     sb-vm:no-tls-value-marker-widetag))
+                     sb-vm:no-tls-value-marker))
         (setf (sap-ref-lispobj (sb-thread::current-thread-sap) i) fool1
               (sap-ref-lispobj (sb-thread::current-thread-sap) j) fool2)
         ;; assert that my pointer arithmetic worked as expected
@@ -681,7 +681,7 @@
           (assert (not (member fool2 list))))
         ;; repair the TLS entry that was corrupted by the test
         (setf (sap-ref-word (sb-thread::current-thread-sap) j)
-              sb-vm:no-tls-value-marker-widetag)))))
+              sb-vm:no-tls-value-marker)))))
 
 
 #|  ;; a cll post from eric marsden

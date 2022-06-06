@@ -71,6 +71,10 @@
 ;;; With Symbol-Value, we check that the value isn't the trap object.
 #+sb-thread
 (progn
+  (eval-when (:compile-toplevel)
+    ;; Assert that "CMN reg, 1" is the same as "CMP reg, NO-TLS-VALUE-MARKER"
+    (aver (= (ldb (byte 64 0) -1) no-tls-value-marker)))
+  (defmacro compare-to-no-tls-value-marker (x) `(inst cmn ,x 1))
   (define-vop (set)
     (:args (object :scs (descriptor-reg)
                    :load-if (not (and (sc-is object constant)
@@ -85,7 +89,7 @@
          (assemble ()
            (inst ldr (32-bit-reg tls-index) (tls-index-of object))
            (inst ldr tmp-tn (@ thread-tn tls-index))
-           (inst cmp tmp-tn no-tls-value-marker-widetag)
+           (compare-to-no-tls-value-marker tmp-tn)
            (inst b :ne LOCAL)
            (storew value object symbol-value-slot other-pointer-lowtag)
            (inst b DONE)
@@ -122,7 +126,7 @@
               (inst ldr value (@ thread-tn tls-index))))
 
            (assemble ()
-             (inst cmp value no-tls-value-marker-widetag)
+             (compare-to-no-tls-value-marker value)
              (inst b :ne LOCAL)
              (when known-symbol
                (load-constant vop symbol (setf symbol (tn-ref-load-tn symbol-tn-ref))))
@@ -169,7 +173,7 @@
   (:generator 9
       (inst ldr (32-bit-reg value) (tls-index-of object))
       (inst ldr value (@ thread-tn value))
-      (inst cmp value no-tls-value-marker-widetag)
+      (compare-to-no-tls-value-marker value)
       (inst b :ne LOCAL)
       (loadw value object symbol-value-slot other-pointer-lowtag)
       LOCAL
@@ -260,7 +264,7 @@
       (inst str new (@ thread-tn tls-index))
       DONT-STORE-TLS
 
-      (inst cmp result no-tls-value-marker-widetag)
+      (compare-to-no-tls-value-marker result)
       (inst b :ne CHECK-UNBOUND))
     (inst add-sub lip symbol (- (* symbol-value-slot n-word-bytes)
                                 other-pointer-lowtag))
@@ -302,7 +306,7 @@
       (inst str new (@ thread-tn tls-index))
       DONT-STORE-TLS
 
-      (inst cmp result no-tls-value-marker-widetag)
+      (compare-to-no-tls-value-marker result)
       (inst b :ne CHECK-UNBOUND))
     (inst add-sub lip symbol (- (* symbol-value-slot n-word-bytes)
                                 other-pointer-lowtag))

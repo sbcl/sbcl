@@ -1362,7 +1362,7 @@ We could try a few things to mitigate this:
     (when (dotimes (i (length v))
             (declare (optimize (sb-c::aref-trapping 0)))
             (let ((val (svref v i)))
-              (when (= (get-lisp-obj-address val) no-tls-value-marker-widetag)
+              (when (= (get-lisp-obj-address val) unwritten-vector-element-marker)
                 (return t))))
       (push (make-weak-pointer v) result)
       (let* ((origin (vector-extra-data v))

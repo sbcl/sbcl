@@ -491,7 +491,7 @@ during backtrace.
 (define-primitive-object (thread :size primitive-thread-object-length)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
   ;; pass the address of the start routine into new_thread_trampoline.
-  ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
+  ;; tls[0] = NO_TLS_VALUE_MARKER because a the tls index slot
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
 

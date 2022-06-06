@@ -292,7 +292,7 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
     }
     if ((state->flags & VERIFYING_UNFORMATTED)) {
         while (where < end) {
-            if (*where != NO_TLS_VALUE_MARKER_WIDETAG) {
+            if (*where != NO_TLS_VALUE_MARKER) {
                 int result = verify_pointer(*where, where, state);
                 if (result) return result;
             }

@@ -330,7 +330,7 @@ void create_main_lisp_thread(lispobj function) {
     InitializeCriticalSection(&recyclebin_lock);
     InitializeCriticalSection(&in_gc_lock);
 #endif
-    struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER_WIDETAG);
+    struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
     th->state_word.sprof_enable = 1;
@@ -621,7 +621,7 @@ void* new_thread_trampoline(void* arg)
     init_thread_data scribble;
 
     lispobj function = th->no_tls_value_marker;
-    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
+    th->no_tls_value_marker = NO_TLS_VALUE_MARKER;
     init_new_thread(th, &scribble,
                     GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
     funcall0(function);
@@ -688,8 +688,7 @@ static void attach_os_thread(init_thread_data *scribble)
     block_deferrable_signals(&scribble->oldset);
 #endif
     void* recycled_memory = get_recyclebin_item();
-    struct thread *th = alloc_thread_struct(recycled_memory,
-                                            NO_TLS_VALUE_MARKER_WIDETAG);
+    struct thread *th = alloc_thread_struct(recycled_memory, NO_TLS_VALUE_MARKER);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
@@ -921,9 +920,10 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
     memset(th, 0, sizeof *th);
     lispobj* ptr = (lispobj*)(th + 1);
     lispobj* end = (lispobj*)((char*)th + dynamic_values_bytes);
-    while (ptr < end) *ptr++ = NO_TLS_VALUE_MARKER_WIDETAG;
+    memset(ptr, NO_TLS_VALUE_MARKER & 0xFF, (char*)end-(char*)ptr);
     th->tls_size = dynamic_values_bytes;
 #endif
+
     __attribute((unused)) lispobj* tls = (lispobj*)th;
 #ifdef THREAD_T_NIL_CONSTANTS_SLOT
     tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | T;

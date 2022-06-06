@@ -2043,7 +2043,14 @@ variable: an unreadable object representing the error is printed instead.")
     ;; as opposed to any other unbound marker.
     (print-unreadable-object (object stream) (write-string "unbound" stream))
     (return-from print-object))
-  (when (eql (get-lisp-obj-address object) sb-vm:no-tls-value-marker-widetag)
+  ;; NO-TLS-VALUE was added here as a printable object type for #+ubsan which,
+  ;; among other things, detects read-before-write on a per-array-element basis.
+  ;; Git rev 22d8038118 caused uninitialized SIMPLE-VECTORs to get prefilled
+  ;; with NO_TLS_VALUE_MARKER, but a better choice would be
+  ;; (logior (mask-field (byte (- n-word-bits 8) 8) -1) unbound-marker-widetag).
+  ;; #+ubsan has probably bitrotted for other reasons, so this is untested.
+  #+ubsan
+  (when (eql (get-lisp-obj-address object) unwritten-vector-element-marker)
     (print-unreadable-object (object stream) (write-string "novalue" stream))
     (return-from print-object))
   (print-unreadable-object (object stream :identity t)

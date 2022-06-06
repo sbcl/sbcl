@@ -215,7 +215,7 @@
   weak-pointer-widetag                            ;  52   59
   fdefn-widetag                                   ;  56   5D
 
-  no-tls-value-marker-widetag                     ;  5A   61
+  unused-widetag                                  ;  5A   61
   #+sb-simd-pack simd-pack-widetag                ;       65
   #-sb-simd-pack unused01-widetag                 ;  5E
   #+sb-simd-pack-256 simd-pack-256-widetag        ;       69
@@ -280,6 +280,11 @@
   unused-array-widetag                            ;  F2   FD
 ))
 
+;;; A filler cons whose first word is all 1s looks like this marker pattern,
+;;; but there's no ambiguity, because no-tls-value can't appear in an object
+;;; on the heap.
+(defconstant no-tls-value-marker most-positive-word)
+
 ;;; Map each widetag symbol to a string to go in 'tagnames.h'.
 ;;; I didn't want to mess with the formatting of the table above.
 (defparameter *widetag-string-alist*
@@ -303,7 +308,6 @@
     (unbound-marker-widetag "unbound-marker")
     (weak-pointer-widetag "weakptr")
     (fdefn-widetag "fdefn")
-    (no-tls-value-marker-widetag "no-TLS-val")
     (simd-pack-widetag "SIMD-pack")
     (simd-pack-256-widetag "SIMD-pack256")
     (filler-widetag "filler")
