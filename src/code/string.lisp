@@ -510,14 +510,9 @@ new string COUNT long filled with the fill character."
             (do ((index start (1+ index)))
                 ((>= index end))
               (let ((char (char-code (schar string index))))
-                (setf (schar string index)
-                      (truly-the base-char
-                                 (code-char
-                                  (truly-the
-                                   char-code
-                                   (if (<= (char-code ,a) char (char-code ,z))
-                                       (logxor char #x20)
-                                       char))))))))
+                (when (<= (char-code ,a) char (char-code ,z))
+                  (setf (schar string index)
+                        (code-char (truly-the char-code (logxor char #x20))))))))
            (t
             (do ((index start (1+ index))
                  (cases #.+character-cases+))
