@@ -3679,3 +3679,13 @@
          (not res))))
    ((1 2) nil)
    ((nil nil) nil)))
+
+(with-test (:name :constant-type-proclamation)
+  (ctu:file-compile
+   `((defconstant +foo+ 4)
+
+     (defun bar () +foo+)
+
+     (declaim (type integer +foo+)))
+   :load t)
+  (assert (eq (funcall 'bar) 4)))

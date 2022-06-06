@@ -1842,6 +1842,10 @@ the stack without triggering overflow protection.")
       (let ((var (gethash name free-vars)))
         (etypecase var
           (null)
+          ;; Constants cannot be redefined, and we already give the
+          ;; constant object the tightest type possible. We will error
+          ;; if the type is incompatible.
+          (constant)
           (global-var
            (setf (gethash name free-vars)
                  (make-global-var :%source-name name
