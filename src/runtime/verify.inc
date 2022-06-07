@@ -379,7 +379,8 @@ extern void save_gc_crashdump(char *, lispobj*);
  * You might want to use that as a deciding factor for dump the heap
  * to a file (which takes time, and generally isn't needed).
  * But if a particular verification fails, then do dump it */
-int verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
+int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
+                int flags)
 {
     int verbose = gencgc_verbose | ((flags & VERIFY_VERBOSE) != 0);
 

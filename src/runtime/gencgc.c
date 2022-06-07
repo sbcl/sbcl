@@ -3915,6 +3915,8 @@ garbage_collect_generation(generation_index_t generation, int raise,
 #endif
 
     /* Set the global src and dest. generations */
+    generation_index_t original_alloc_generation = gc_alloc_generation;
+
     if (generation < PSEUDO_STATIC_GENERATION) {
 
         from_space = generation;
@@ -4339,6 +4341,7 @@ maybe_verify:
 
     extern int n_unboxed_instances;
     n_unboxed_instances = 0;
+    gc_alloc_generation = original_alloc_generation;
 }
 
 static page_index_t
@@ -4610,12 +4613,6 @@ collect_garbage(generation_index_t last_gen)
     }
     }
 #endif
-
-    /* Set gc_alloc() back to generation 0. The global regions were
-     * already asserted to be closed after each generation's collection.
-     * i.e. no more allocations can accidentally occur to any other
-     * generation than 0 */
-    gc_alloc_generation = 0;
 
     /* Save the high-water mark before updating next_free_page */
     if (next_free_page > high_water_mark)
