@@ -470,6 +470,10 @@
                             sb-kernel::%compiler-defclass))
             (sb-int:unencapsulate symbol 'defblah-guard)))))
     (makunbound '*allowed-inputs*)
+    ;; fullcgc doesn't get tested much
+    ;; (and we usually only find problems when save-lisp-and-die fails)
+    ;; so just run it once now.
+    (gc :gen 7)
     ;; after all the files are done
     (append-failures)))
 
