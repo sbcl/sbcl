@@ -136,7 +136,9 @@ WARNING occur during the compilation, and NIL otherwise.
 Tertiary value is true if any conditions of type ERROR, or WARNING that are
 not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 "
-  (multiple-value-bind (compiled-definition warnings-p failure-p)
+  (binding*
+     ((clock-start (get-thread-virtual-time))
+      ((compiled-definition warnings-p failure-p)
       ;; TODO: generic functions with any interpreted methods
       ;; should compile the methods and reinstall them.
       (if (compiled-function-p definition)
@@ -146,7 +148,8 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                   (values (the cons definition) (make-null-lexenv))
                   #+(or sb-eval sb-fasteval)
                   (prepare-for-compile definition))
-            (compile-in-lexenv sexpr lexenv name nil nil nil nil)))
+            (compile-in-lexenv sexpr lexenv name nil nil nil nil)))))
+    (accumulate-compiler-time '*compile-elapsed-time* clock-start)
     (values (cond (name
                    (if (and (symbolp name) (macro-function name))
                        (setf (macro-function name) compiled-definition)

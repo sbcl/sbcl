@@ -1902,6 +1902,37 @@ necessary, since type inference may take arbitrarily long to converge.")
                        (source-info-start-real-time source-info))))
   (values))
 
+(defglobal *compile-elapsed-time* 0) ; nanoseconds
+(defglobal *compile-file-elapsed-time* 0) ; nanoseconds
+(defun get-thread-virtual-time ()
+  #+(and linux (not sb-xc-host))
+  (multiple-value-bind (sec nsec)
+      (sb-unix::clock-gettime sb-unix:clock-thread-cputime-id)
+    (cons sec nsec))
+  #-(and linux (not sb-xc-host))
+  '(0 . 0))
+
+(defun accumulate-compiler-time (symbol start)
+  (declare (ignorable symbol start))
+  #+(and linux (not sb-xc-host))
+  (destructuring-bind (sec-after . nsec-after) (get-thread-virtual-time)
+    (destructuring-bind (sec-before . nsec-before) start
+      (let* ((sec-diff (- sec-after sec-before))
+             (nsec-diff (- nsec-after nsec-before))
+             (total-nsec-diff (+ (* sec-diff (* 1000 1000 1000))
+                                 nsec-diff))
+             (old (symbol-global-value symbol)))
+          (loop
+            ;; FIXME: should we define #'(CAS SYMBOL-GLOBAL-VALUE) ?
+            ;; Probably want to get it working everywhere first.
+            (let ((new (+ old total-nsec-diff)))
+              (when (eq old (setq old
+                                  #-x86-64
+                                  (cas (symbol-value symbol) old new)
+                                  #+x86-64
+                                  (%cas-symbol-global-value symbol old new)))
+                (return))))))))
+
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds
 ;;; out of the compile, then abort the writing of the output file, so
 ;;; that we don't overwrite it with known garbage.
@@ -1977,6 +2008,7 @@ returning its filename.
          (abort-p t)
          (warnings-p nil)
          (failure-p t) ; T in case error keeps this from being set later
+         (clock-start (get-thread-virtual-time))
          (input-pathname (verify-source-file input-file))
          (source-info
           (make-file-source-info input-pathname external-format
@@ -2035,6 +2067,8 @@ returning its filename.
       ;; Don't nuke stdout if you use :trace-file *standard-output*
       (when (and trace-file (not (streamp trace-file)))
         (close *compiler-trace-output*)))
+
+    (accumulate-compiler-time '*compile-file-elapsed-time* clock-start)
 
     ;; CLHS says that the first value is NIL if the "file could not
     ;; be created". We interpret this to mean "a valid fasl could not

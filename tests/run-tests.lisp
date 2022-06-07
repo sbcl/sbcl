@@ -196,6 +196,8 @@
   (flet ((maybe (p s) (and (find-package p)
                            (find-symbol s p))))
     `(sb-c::*code-serialno*
+      sb-c::*compile-elapsed-time*
+      sb-c::*compile-file-elapsed-time*
       sb-impl::*package-names-cookie*
       sb-impl::*available-buffers*
       sb-impl::*token-buf-pool*
@@ -470,10 +472,6 @@
                             sb-kernel::%compiler-defclass))
             (sb-int:unencapsulate symbol 'defblah-guard)))))
     (makunbound '*allowed-inputs*)
-    ;; fullcgc doesn't get tested much
-    ;; (and we usually only find problems when save-lisp-and-die fails)
-    ;; so just run it once now.
-    (gc :gen 7)
     ;; after all the files are done
     (append-failures)))
 

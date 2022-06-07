@@ -357,6 +357,8 @@ sufficiently motivated to do lengthy fixes."
   (finalizers-deinit)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
+  (setf sb-c::*compile-elapsed-time* 0
+        sb-c::*compile-file-elapsed-time* 0)
   (setf * nil ** nil *** nil
         - nil + nil ++ nil +++ nil
         /// nil // nil / nil))

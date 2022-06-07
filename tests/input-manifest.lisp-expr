@@ -83,7 +83,8 @@
  ("sb-graph.impure.lisp" "contrib/sb-graph.fasl" "contrib/uiop.fasl")
  ("signals.impure.lisp" "contrib/sb-posix.fasl")
  ("stream.impure.lisp" "contrib/sb-posix.fasl")
- ("sprof.impure.lisp" "../contrib/sb-sprof/test.lisp" "../contrib/sb-sprof/graph.lisp")
+ ("sprof.impure.lisp" "contrib/sb-sprof.fasl"
+  "../contrib/sb-sprof/test.lisp" "../contrib/sb-sprof/graph.lisp")
  ("threads.impure.lisp"
   "tests/alloca.so"
   "tests/threads-foreign.so")
