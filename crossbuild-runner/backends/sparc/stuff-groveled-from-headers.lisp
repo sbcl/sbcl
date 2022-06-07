@@ -134,6 +134,7 @@
 
 (defconstant clock-process-cputime-id 2) ; #x2
 (defconstant clock-monotonic-coarse 6) ; #x6
+(defconstant clock-thread-cputime-id 3) ; #x3
 
 ;;; structures
 (define-alien-type nil
