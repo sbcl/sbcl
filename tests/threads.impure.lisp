@@ -727,11 +727,6 @@
     (mapc #'join-thread threads)
     (assert (not deadline-handler-run-twice?))))
 
-(with-test (:name (:mutex :finalization))
-  (let ((a nil))
-    (dotimes (i 500000)
-      (setf a (make-mutex)))))
-
 ;; You have to shoehorn this arbitrary sexpr into a feature expression
 ;; to have the test summary show that a test was disabled.
 #+gencgc
