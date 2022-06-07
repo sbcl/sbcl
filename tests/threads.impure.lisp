@@ -677,6 +677,8 @@
         (assert (eq (symbol-value mysym) fool1))
         ;; assert that FOOL1 is found by the TLS scan and that FOOL2 is not.
         (let ((list (sb-thread::%thread-local-references)))
+          (assert (not (find sb-vm:no-tls-value-marker list
+                             :key #'sb-kernel:get-lisp-obj-address)))
           (assert (member fool1 list))
           (assert (not (member fool2 list))))
         ;; repair the TLS entry that was corrupted by the test

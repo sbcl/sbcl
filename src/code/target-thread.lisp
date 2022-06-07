@@ -2468,11 +2468,14 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
          (list))
         ((< index (ash sb-vm::primitive-thread-object-length sb-vm:word-shift))
          list)
-      (let ((obj (sap-ref-lispobj sap index)))
-        (when (and obj ; don't bother returning NIL
-                   (sb-vm:is-lisp-pointer (get-lisp-obj-address obj))
-                   (not (memq obj list)))
-          (push obj list))))))
+      ;; NO-TLS-VALUE-MARKER may or may not satisfy IS-LISP-POINTER,
+      ;; so be sure to exclude it in case it does.
+      (unless (eql (sap-ref-word sap index) sb-vm:no-tls-value-marker)
+        (let ((obj (sap-ref-lispobj sap index)))
+          (when (and obj ; don't bother returning NIL
+                     (sb-vm:is-lisp-pointer (get-lisp-obj-address obj))
+                     (not (memq obj list)))
+            (push obj list)))))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
   "Return the local value of SYMBOL in THREAD, and a secondary value of T
