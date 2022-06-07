@@ -1,6 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.2.5:
+  * enhancement: core compression now uses zstd instead of zlib.
   * optimization: fasl files are now usually smaller (up to 10% on default
     policy) and may load faster, especially on high debug.
 

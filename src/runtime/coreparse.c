@@ -45,7 +45,7 @@
 #include <errno.h>
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-# include <zlib.h>
+# include <zstd.h>
 #endif
 
 /* build_id must match between the C code and .core file because a core
@@ -169,74 +169,53 @@ lose:
 
 #ifndef LISP_FEATURE_SB_CORE_COMPRESSION
 # define inflate_core_bytes(fd,offset,addr,len) \
-    lose("This runtime was not built with zlib-compressed core support... aborting")
+    lose("This runtime was not built with zstd-compressed core support... aborting")
 #else
-# define ZLIB_BUFFER_SIZE (1u<<16)
 static void inflate_core_bytes(int fd, os_vm_offset_t offset,
                                os_vm_address_t addr, int len)
 {
-    z_stream stream;
-    unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
-    int ret;
-
 # ifdef LISP_FEATURE_WIN32
-    /* Ensure the memory is committed so zlib doesn't segfault trying to
-       inflate. */
+    /* Ensure the memory is committed so zstd doesn't segfault trying
+       to inflate. */
     os_commit_memory(addr, len);
 # endif
-
-    if (-1 == lseek(fd, offset, SEEK_SET)) {
+    if (-1 == lseek(fd, offset, SEEK_SET))
         lose("Unable to lseek() on corefile");
-    }
 
-    stream.zalloc = NULL;
-    stream.zfree = NULL;
-    stream.opaque = NULL;
-    stream.avail_in = 0;
-    stream.next_in = buf;
+    int ret;
+    size_t buf_size = ZSTD_DStreamInSize();
+    unsigned char* buf = successful_malloc(buf_size);
+    ZSTD_inBuffer input;
+    input.src = buf;
+    input.pos = 0;
 
-    ret = inflateInit(&stream);
-    if (ret != Z_OK)
-        lose("zlib error %i", ret);
+    ZSTD_outBuffer output;
+    output.dst = (void*)addr;
+    output.size = len;
+    output.pos = 0;
 
-    stream.next_out  = (void*)addr;
-    stream.avail_out = len;
+    ZSTD_DStream *stream = ZSTD_createDStream();
+    if (stream == NULL)
+        lose("unable to create zstd decompression context");
+    ret = ZSTD_initDStream(stream);
+    if (ZSTD_isError(ret))
+        lose("ZSTD_initDStream failed with error: %s", ZSTD_getErrorName(ret));
+
+    /* Read in exactly one frame. */
     do {
-        ssize_t count = read(fd, buf, ZLIB_BUFFER_SIZE);
+        ssize_t count = read(fd, buf, buf_size);
         if (count < 0)
             lose("unable to read core file (errno = %i)", errno);
-        stream.next_in = buf;
-        stream.avail_in = count;
-        if (count == 0) break;
-        ret = inflate(&stream, Z_NO_FLUSH);
-        switch (ret) {
-        case Z_STREAM_END:
-            break;
-        case Z_OK:
-            if (stream.avail_out == 0)
-                lose("Runaway gzipped core directory... aborting");
-            if (stream.avail_in > 0)
-                lose("zlib inflate returned without fully"
-                     "using up input buffer... aborting");
-            break;
-        default:
-            lose("zlib inflate error: %i", ret);
-            break;
-        }
-    } while (ret != Z_STREAM_END);
+        input.size = count;
+        input.pos = 0;
+        ret = ZSTD_decompressStream(stream, &output, &input);
+        if (ZSTD_isError(ret))
+            lose("ZSTD_decompressStream failed with error: %s",
+                 ZSTD_getErrorName(ret));
+    } while (ret != 0);
 
-    if (stream.avail_out > 0) {
-        if (stream.avail_out >= os_vm_page_size)
-            fprintf(stderr, "Warning: gzipped core directory significantly"
-                    "shorter than expected (%lu bytes)", (unsigned long)stream.avail_out);
-        /* Is this needed? */
-        memset(stream.next_out, 0, stream.avail_out);
-    }
-
-    inflateEnd(&stream);
-    free(buf);
+    ZSTD_freeDStream(stream);
 }
-# undef ZLIB_BUFFER_SIZE
 #endif
 
 #define DYNAMIC_SPACE_ADJ_INDEX 0

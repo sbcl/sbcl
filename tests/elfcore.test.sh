@@ -86,7 +86,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "${tmpcore}")
 EOF
 
-m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
+m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lzstd") #+x86 (princ " -m32"))' --quit`
 
 (cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a; make libsbcl.a)
 run_sbcl --script ../tools-for-build/editcore.lisp split \

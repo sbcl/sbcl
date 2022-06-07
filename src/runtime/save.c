@@ -42,7 +42,7 @@
 #include "search.h"
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-# include <zlib.h>
+# include <zstd.h>
 #endif
 
 #define GENERAL_WRITE_FAILURE_MSG "error writing to core file"
@@ -91,31 +91,42 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
             }
         }
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-    } else if ((compression >= -1) && (compression <= 9)) {
-# define ZLIB_BUFFER_SIZE (1u<<16)
-        z_stream stream;
-        unsigned char* buf = successful_malloc(ZLIB_BUFFER_SIZE);
+    } else if ((compression >= -7) && (compression <= 22)) {
+        int ret;
+        ZSTD_inBuffer input;
+        input.src = addr;
+        input.size = bytes;
+        input.pos = 0;
+
+        size_t buf_size = ZSTD_CStreamOutSize();
+        unsigned char* buf = successful_malloc(buf_size);
+        ZSTD_outBuffer output;
+        output.dst = buf;
+        output.size = buf_size;
+
         unsigned char * written, * end;
         long total_written = 0;
-        int ret;
-        stream.zalloc = NULL;
-        stream.zfree = NULL;
-        stream.opaque = NULL;
-        stream.avail_in = bytes;
-        stream.next_in  = (void*)addr;
-        ret = deflateInit(&stream, compression);
-        if (ret != Z_OK)
-            lose("deflateInit: %i", ret);
+        ZSTD_CStream *stream = ZSTD_createCStream();
+        if (stream == NULL)
+            lose("failed to create zstd compression context");
+        ret = ZSTD_initCStream(stream, compression);
+        if (ZSTD_isError(ret))
+            lose("ZSTD_initCStream failed with error: %s",
+                 ZSTD_getErrorName(ret));
         do {
-            stream.avail_out = ZLIB_BUFFER_SIZE;
-            stream.next_out = buf;
-            ret = deflate(&stream, Z_FINISH);
-            if (ret < 0) lose("zlib deflate error: %i... exiting", ret);
+            output.pos = 0;
+            if (input.pos < bytes)
+                ret = ZSTD_compressStream(stream, &output, &input);
+            else
+                ret = ZSTD_endStream(stream, &output);
+            if (ZSTD_isError(ret))
+                lose("ZSTD_compressStream2 failed with error: %s",
+                     ZSTD_getErrorName(ret));
             written = buf;
-            end     = buf+ZLIB_BUFFER_SIZE-stream.avail_out;
-            total_written += end - written;
+            end = buf + output.pos;
+            total_written += output.pos;
             while (written < end) {
-                long count = fwrite(written, 1, end-written, file);
+                long count = fwrite(written, 1, output.pos, file);
                 if (count > 0) {
                     written += count;
                 } else {
@@ -123,18 +134,17 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
                     lose("core file is incomplete or corrupt");
                 }
             }
-        } while (stream.avail_out == 0);
-        deflateEnd(&stream);
-        free(buf);
+        } while (ret != 0);
         printf("compressed %lu bytes into %lu at level %i\n",
                bytes, total_written, compression);
-# undef ZLIB_BUFFER_SIZE
+
+        ZSTD_freeCStream(stream);
 #endif
     } else {
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
         lose("Unknown core compression level %i, exiting", compression);
 #else
-        lose("zlib-compressed core support not built in this runtime");
+        lose("zstd-compressed core support not built in this runtime");
 #endif
     }
 

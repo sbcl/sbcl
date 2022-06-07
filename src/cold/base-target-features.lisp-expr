@@ -277,9 +277,9 @@
  ;; foreign code that uses a 32-bit off_t.
  ; :largefile
 
- ;; SBCL has optional support for zlib-based compressed core files.  Enable
+ ;; SBCL has optional support for zstd-based compressed core files.  Enable
  ;; this feature to compile it in.  Obviously, doing so adds a dependency
- ;; on zlib.
+ ;; on zstd.
  ; :sb-core-compression
 
  ;; On certain thread-enabled platforms, synchronization between threads

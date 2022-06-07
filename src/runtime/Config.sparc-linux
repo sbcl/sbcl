@@ -19,7 +19,7 @@ ARCH_SRC = sparc-arch.c
 OS_SRC = linux-os.c linux-mman.c sparc-linux-os.c
 OS_LIBS = -ldl
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-  OS_LIBS += -lz
+  OS_LIBS += -lzstd
 endif
 
 GC_SRC = fullcgc.c gencgc.c traceroot.c
