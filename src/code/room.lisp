@@ -405,10 +405,7 @@ We could try a few things to mitigate this:
                                                 end-page-bytes-used)
                                              most-positive-word)))))
       (when (sap> end start)
-        ;; The bits in the 6-bit 'type' field have fixed positions,
-        ;; but the position of the field itself depends on endianness.
-        (let ((flags (ldb (byte 6 (+ #+big-endian 2))
-                          (slot (deref page-table start-page) 'flags))))
+        (let ((flags (slot (deref page-table start-page) 'flags)))
           ;; The GEN slot is declared as (SIGNED 8) which does not satisfy the
           ;; type restriction on the first argument to LOGBITP.
           ;; Masking it to 3 bits fixes that, and allows using the other 5 bits
@@ -1157,8 +1154,8 @@ We could try a few things to mitigate this:
                         (setq page-num next-page seen-filler nil))))))))
     (let ((i 0))
       (loop while (< i total-pages)
-            do (let ((type (ldb (byte 2 0) (slot (deref page-table i) 'flags))))
-                 (if (= type 3)
+            do (let ((type (slot (deref page-table i) 'flags)))
+                 (if (= (logand type 7) 7)
                      (setq i (dump-page i))
                      (incf i)))))
     (let* ((n-pages (count 1 pages))
@@ -1227,8 +1224,7 @@ We could try a few things to mitigate this:
          ;; gen0 conses on MIXED pages, but even that is not enough- pinned conses
          ;; will promote but keep their MIXED page type. So don't bother with this.
          #+use-cons-region
-         (let* ((flags (slot (deref page-table (find-page-index obj-addr)) 'flags))
-                (type (ldb (byte 6 (+ #+big-endian 2)) flags))
+         (let* ((type (slot (deref page-table (find-page-index obj-addr)) 'flags))
                 (ok (if (consp obj)
                         (or (= type #b101) ; PAGE_TYPE_CONS
                             (and (eq (car obj) 0) (eq (cdr obj) 0)))

@@ -24,7 +24,6 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
     page_table[page].gen = 1;
     gc_assert(page_table[page].scan_start_offset_ == 0);
     page_table[page].words_used_ = (2 * GENCGC_CARD_BYTES) >> WORD_SHIFT;
-    page_table[page].need_zerofill = 1;
     bytes_allocated += 2 * GENCGC_CARD_BYTES;
     generations[gen].bytes_allocated += 2 * GENCGC_CARD_BYTES;
 

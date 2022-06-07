@@ -114,7 +114,7 @@ static void release_pages_impl()
             if (PRIVATE_CONS_DEBUG)
                 fprintf(stderr, "Freeing GC-private page @ %p (index %ld)\n",
                         list, (long)index);
-            set_page_need_to_zero(index, 1);
+            set_page_needs_zerofill(index);
             set_page_bytes_used(index, 0);
             reset_page_flags(index);
         }

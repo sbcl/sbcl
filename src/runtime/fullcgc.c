@@ -711,7 +711,7 @@ void execute_full_sweep_phase()
     for (page = free_page; page < page_table_pages; ++page) {
         gc_assert((page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED);
         gc_assert(!page_bytes_used(page));
-        set_page_need_to_zero(page, 1);
+        set_page_needs_zerofill(page);
         page_table[page].type = FREE_PAGE_FLAG;
       }
 }
