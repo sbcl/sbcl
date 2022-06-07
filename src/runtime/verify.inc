@@ -374,12 +374,12 @@ static int verify(lispobj start, lispobj* end, struct verify_state* state, int f
     return result;
 }
 
-extern void save_gc_crashdump(char *, uword_t);
+extern void save_gc_crashdump(char *, lispobj*);
 /* Return the number of verification errors found.
  * You might want to use that as a deciding factor for dump the heap
  * to a file (which takes time, and generally isn't needed).
  * But if a particular verification fails, then do dump it */
-int verify_heap(int flags)
+int verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
 {
     int verbose = gencgc_verbose | ((flags & VERIFY_VERBOSE) != 0);
 
@@ -489,7 +489,7 @@ void gc_show_pte(lispobj obj)
 
 #include <stdio.h>
 
-static int n_dumps;
+static int hexdump_counter;
 __attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, FILE*f)
 {
     while (where < end) {
@@ -509,13 +509,42 @@ static int dump_completely_p(lispobj* obj, struct verify_state* state)
         if (state->err_objs[i] == (uword_t)obj) return 1;
     return 0;
 }
+static void hexdump_control_stacks(__attribute__((unused)) void* approximate_stackptr,
+                                   __attribute__((unused)) FILE *stream)
+{
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    struct thread* th;
+    for_each_thread(th) {
+        if (th->state_word.state == STATE_DEAD) continue;
+        lispobj* stackptr;
+        if (th == get_sb_vm_thread()) {
+            stackptr = approximate_stackptr;
+        } else {
+            int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1;
+            os_context_t *c = nth_interrupt_context(ici, th);
+            stackptr = (lispobj*) *os_context_register_addr(c,reg_SP);
+        }
+        gc_assert(((uword_t)stackptr & (LOWTAG_MASK>>1)) == 0); // lispword-aligned
+        lispobj* where = th->control_stack_end;
+        fprintf(stream, "\nThread @ %p\n", th);
+        for (--where; where >= stackptr; --where) {
+            lispobj word = *where;
+            if (!fixnump(word) && gc_managed_addr_p(word))
+                fprintf(stream, "  %p: %"OBJ_FMTX"\n", where, word);
+        }
+    }
+#endif
+}
+
+#define HEXDUMP_PATH_TEMPLATE "/var/tmp/heap-%d-%d.txt"
+
 /* Dump spaces as human-readable text (hexadecimal) */
 void hexdump_spaces(struct verify_state* state, char *reason)
 {
     char path[100];
 
-    ++n_dumps;
-    sprintf(path, "heap-%d-%d.txt", getpid(), n_dumps);
+    ++hexdump_counter;
+    sprintf(path, HEXDUMP_PATH_TEMPLATE, getpid(), hexdump_counter);
     FILE *f = fopen(path, "w");
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -604,24 +633,25 @@ void hexdump_spaces(struct verify_state* state, char *reason)
         fprintf(f,"--\n");
         firstpage = 1+lastpage;
     }
+    hexdump_control_stacks(&reason, f);
     fclose(f);
     fprintf(stderr, "%s: wrote [%s]\n", reason, path);
 }
 
-int hexdump_and_verify_heap(int flags)
+int hexdump_enabled = 0;
+
+int hexdump_and_verify_heap(lispobj* cur_thread_approx_stackptr, int flags)
 {
-    if (gencgc_verbose>1) {
-        hexdump_spaces(0, flags & VERIFY_POST_GC ? "post-GC" : "pre-GC");
+    if (hexdump_enabled) hexdump_spaces(0, flags & VERIFY_POST_GC ? "post-GC" : "pre-GC");
 #if 0
-        if (n_gcs == snapshot_this_gc_cycle) {
-            char pathname[128];
-            sprintf(pathname, "gc-%d-%d-%d-%s.bin",
-                    getpid(), n_gcs, from_space,
-                    flags & VERIFY_POST_GC ? "post" : "pre");
-            save_gc_crashdump(pathname, (uword_t)__builtin_frame_address(0));
-            fprintf(stderr, "Wrote [%s]\n", pathname);
-        }
-#endif
+    if (hexdump_counter >= 9) {
+        char pathname[128];
+        sprintf(pathname, "gc-%d-%d-%d-%s.bin",
+                getpid(), n_gcs, from_space,
+                flags & VERIFY_POST_GC ? "post" : "pre");
+        save_gc_crashdump(pathname, cur_thread_approx_stackptr);
+        fprintf(stderr, "Wrote [%s]\n", pathname);
     }
-    return verify_heap(flags);
+#endif
+    return verify_heap(cur_thread_approx_stackptr, flags);
 }

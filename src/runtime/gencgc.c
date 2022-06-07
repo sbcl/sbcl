@@ -2174,30 +2174,29 @@ static void refine_ambiguous_roots()
         count = new_index;
     }
     gc_pin_count = count;
-    if (gencgc_verbose & 4) {
-        // Print in multiple columns to fit more on a screen
-        // and sort like 'ls' (down varying fastest)
-        char description[24];
-        fprintf(stderr, "Sorted pin list (%d):\n", count);
-        const int ncolumns = 4;
-        int nrows = ALIGN_UP(count,ncolumns) / ncolumns;
-        int row, col;
-        for (row = 0; row < nrows; ++row) {
-            for (col = 0; col < ncolumns; ++col) {
-                int index = col * nrows + row;
-                if (index < count) {
-                    lispobj* obj = native_pointer(workspace[index]);
-                    lispobj word = *obj;
-                    strcpy(description, "cons");
-                    if (is_header(word))
-                        snprintf(description, sizeof description, "%s,%ldw",
-                                 widetag_names[header_widetag(word)>>2],
-                                 (long)object_size(obj));
-                    fprintf(stderr, " %"OBJ_FMTX": %-24s", (uword_t)obj, description);
-                }
+    if (!(gencgc_verbose & 4)) return;
+    // Print in multiple columns to fit more on a screen
+    // and sort like 'ls' (down varying fastest)
+    char description[24];
+    fprintf(stderr, "Sorted pin list (%d):\n", count);
+    const int ncolumns = 4;
+    int nrows = ALIGN_UP(count,ncolumns) / ncolumns;
+    int row, col;
+    for (row = 0; row < nrows; ++row) {
+        for (col = 0; col < ncolumns; ++col) {
+            int index = col * nrows + row;
+            if (index < count) {
+                lispobj* obj = native_pointer(workspace[index]);
+                lispobj word = *obj;
+                strcpy(description, "cons");
+                if (is_header(word))
+                    snprintf(description, sizeof description, "%s,%ldw",
+                             widetag_names[header_widetag(word)>>2],
+                             (long)object_size(obj));
+                fprintf(stderr, " %"OBJ_FMTX": %-24s", (uword_t)obj, description);
             }
-            putc('\n', stderr);
         }
+        putc('\n', stderr);
     }
 }
 
@@ -3722,7 +3721,7 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 conservative_stack_scan(struct thread* th,
                         __attribute__((unused)) generation_index_t gen,
-                        void* stack_hot_end)
+                        lispobj* cur_thread_approx_stackptr)
 {
     /* there are potentially two stacks for each thread: the main
      * stack, which may contain Lisp pointers, and the alternate stack.
@@ -3774,6 +3773,10 @@ conservative_stack_scan(struct thread* th,
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
     int i;
+    /* fprintf(stderr, "Thread %p, ici=%d stack[%p:%p] (%dw)",
+            th, fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th)),
+            th->control_stack_start, th->control_stack_end,
+            th->control_stack_end - th->control_stack_start); */
     for (i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th))-1; i>=0; i--) {
         os_context_t *c = nth_interrupt_context(i, th);
         preserve_context_registers(context_method, c);
@@ -3782,14 +3785,16 @@ conservative_stack_scan(struct thread* th,
             esp = esp1;
     }
     if (th == get_sb_vm_thread()) {
-        lispobj* esp1 = PTR_ALIGN_DOWN(stack_hot_end, N_WORD_BYTES);
-        if ((void*)esp1 < esp) esp = esp1;
+        if ((void*)cur_thread_approx_stackptr < esp) esp = cur_thread_approx_stackptr;
     }
 # else
-    esp = PTR_ALIGN_DOWN(stack_hot_end, N_WORD_BYTES);
+    esp = cur_thread_approx_stackptr;
 # endif
     if (!esp || esp == (void*) -1)
         UNKNOWN_STACK_POINTER_ERROR("garbage_collect", th);
+    /* fprintf(stderr, " SP=%p (%dw)%s\n",
+            esp, (int)(th->control_stack_end - (lispobj*)esp),
+            (th == get_sb_vm_thread()) ? " CURRENT":""); */
 
     // Words on the stack which point into the stack are likely
     // frame pointers or alien or DX object pointers. In any case
@@ -3864,7 +3869,7 @@ int show_gc_generation_throughput = 0;
  * generation are not raised to the next generation. */
 void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 garbage_collect_generation(generation_index_t generation, int raise,
-                           void* approximate_stackptr)
+                           void* cur_thread_approx_stackptr)
 {
     struct thread *th;
 
@@ -3969,7 +3974,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
             /* Pin everything in fromspace with a stack root, and also set the
              * sticky card mark on any page (in any generation)
              * referenced from the stack. */
-            conservative_stack_scan(th, generation, approximate_stackptr);
+            conservative_stack_scan(th, generation, cur_thread_approx_stackptr);
 #elif defined LISP_FEATURE_MIPS || defined LISP_FEATURE_PPC64
             // Pin code if needed
             semiconservative_pin_stack(th, generation);
@@ -4039,8 +4044,10 @@ garbage_collect_generation(generation_index_t generation, int raise,
      * inserted rather than at each insertion */
     refine_ambiguous_roots();
 
-    if (gencgc_verbose > 1)
-        show_pinnedobj_count();
+    if (gencgc_verbose > 1) {
+        extern void dump_marked_objects();
+        if (compacting_p()) show_pinnedobj_count(); else dump_marked_objects();
+    }
 
     /* Now that all of the pinned pages are known, and
      * before we start to scavenge (and thus relocate) objects,
@@ -4328,7 +4335,8 @@ maybe_verify:
      * in terms of inability to find objects in the SIGPROF handler etc */
     SYMBOL(CODEBLOB_TREE)->value = NIL;
     if (generation >= verify_gens)
-        verify_heap(VERIFY_POST_GC | (generation<<16));
+        hexdump_and_verify_heap(cur_thread_approx_stackptr, VERIFY_POST_GC | (generation<<16));
+
     extern int n_unboxed_instances;
     n_unboxed_instances = 0;
 }
@@ -4494,16 +4502,19 @@ collect_garbage(generation_index_t last_gen)
        (not touched on every object allocation) so do it now */
     update_immobile_nursery_bits();
 
+    lispobj* cur_thread_approx_stackptr =
+        (lispobj*)ALIGN_DOWN((uword_t)&last_gen, N_WORD_BYTES);
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0)
-        verify_heap(VERIFY_PRE_GC);
+        hexdump_and_verify_heap(cur_thread_approx_stackptr, VERIFY_PRE_GC);
 
     if (gencgc_verbose > 1)
         print_generation_stats();
 
     page_index_t initial_nfp = next_free_page;
     if (gc_mark_only) {
-        garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0, &last_gen);
+        garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0,
+                                   cur_thread_approx_stackptr);
         goto finish;
     }
 
@@ -4538,7 +4549,7 @@ collect_garbage(generation_index_t last_gen)
 
         memset(n_scav_calls, 0, sizeof n_scav_calls);
         memset(n_scav_skipped, 0, sizeof n_scav_skipped);
-        garbage_collect_generation(gen, raise, &last_gen);
+        garbage_collect_generation(gen, raise, cur_thread_approx_stackptr);
 
         if (gencgc_verbose)
             fprintf(stderr,
@@ -5498,7 +5509,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     /* All global allocation regions should be empty */
     ASSERT_REGIONS_CLOSED();
     // Enforce (rather, warn for lack of) self-containedness of the heap
-    verify_heap(VERIFY_FINAL | VERIFY_QUICK);
+    verify_heap(0, VERIFY_FINAL | VERIFY_QUICK);
     if (verbose)
         printf(" done]\n");
 

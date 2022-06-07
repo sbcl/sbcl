@@ -85,7 +85,7 @@ struct crash_thread_preamble {
 const int CRASH_PREAMBLE_SIGNATURE =
     (sizeof (struct crash_preamble) << 16) | sizeof (struct crash_thread_preamble);
 
-#if defined LISP_FEATURE_X86_64 // un-tested elsewhere
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 // un-tested elsewhere
 #include <errno.h>
 static void checked_write(int fd, void* buf, long nbytes)
 {
@@ -95,7 +95,7 @@ static void checked_write(int fd, void* buf, long nbytes)
 
 #include "immobile-space.h"
 void save_gc_crashdump(char *pathname,
-                       uword_t approx_stackptr_at_gc_start)
+                       lispobj* cur_thread_approx_stackptr)
 {
     extern int pin_all_dynamic_space_code;
     int fd = open(pathname, O_WRONLY|O_CREAT, 0666);
@@ -177,7 +177,7 @@ void save_gc_crashdump(char *pathname,
               _exit(1);
             }
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-            sp = approx_stackptr_at_gc_start;
+            sp = (uword_t)cur_thread_approx_stackptr;
 #else
             sp = access_control_stack_pointer(th);
 #endif
@@ -242,9 +242,9 @@ static int save_cmd(char **ptr) {
         fprintf(stderr, "Need filename\n");
         return 1;
     }
-#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
+#if (defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64) && defined LISP_FEATURE_SB_THREAD
     suspend_other_threads();
-    save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
+    save_gc_crashdump(name, (lispobj*)__builtin_frame_address(0));
     unsuspend_other_threads();
 #else
     fprintf(stderr, "Unimplemented\n");
@@ -265,7 +265,7 @@ static int threads_cmd(char __attribute__((unused)) **ptr) {
 static int verify_cmd(char __attribute__((unused)) **ptr) {
     gencgc_verbose = 1;
     suspend_other_threads();
-    verify_heap(0);
+    verify_heap(0, 0);
     unsuspend_other_threads();
     return 0;
 }
@@ -826,8 +826,8 @@ int load_gc_crashdump(char* pathname)
     struct crash_preamble preamble;
     struct crash_thread_preamble thread_preamble;
     checked_read(fd, &preamble, sizeof preamble);
-    printf("static=%lx nbytes=%x\n", preamble.static_start, (int)preamble.static_nbytes);
-    printf("heap_start=%lx npages=%d\n", preamble.dynspace_start, (int)preamble.dynspace_npages);
+    printf("static=%"OBJ_FMTX" nbytes=%x\n", preamble.static_start, (int)preamble.static_nbytes);
+    printf("heap_start=%"OBJ_FMTX" npages=%d\n", preamble.dynspace_start, (int)preamble.dynspace_npages);
     // pin_dynspace_code is for display only. It gets recomputed as the
     // logical OR of all threads' values of *GC-PIN-CODE-PAGES*.
     printf("sprof_enabled=%d pin_dynspace_code=%d packages=%p\n",
@@ -836,8 +836,8 @@ int load_gc_crashdump(char* pathname)
     lisp_package_vector = preamble.lisp_package_vector;
     sb_sprof_enabled = preamble.sprof_enabled;
     if (preamble.signature != CRASH_PREAMBLE_SIGNATURE)
-        lose("Can't load crashdump: bad header (have %lx, expect %lx)",
-             preamble.signature, (long)CRASH_PREAMBLE_SIGNATURE);
+        lose("Can't load crashdump: bad header (have %"OBJ_FMTX", expect %"OBJ_FMTX")",
+             preamble.signature, (uword_t)CRASH_PREAMBLE_SIGNATURE);
     if (preamble.card_size != GENCGC_CARD_BYTES)
         lose("Can't load crashdump: memory parameters differ");
     gc_card_table_nbits = preamble.card_table_nbits;
@@ -853,7 +853,7 @@ int load_gc_crashdump(char* pathname)
         lose("Didn't map dynamic space where expected: %p vs %p",
              dynspace, (char*)preamble.dynspace_start);
     checked_read(fd, (char*)DYNAMIC_SPACE_START, dynspace_nbytes);
-    fprintf(stderr, "snapshot: %ld pages in use (%ld bytes)\n",
+    fprintf(stderr, "snapshot: %"PRIdPTR" pages in use (%ld bytes)\n",
             next_free_page, dynspace_nbytes);
     checked_read(fd, page_table, sizeof (struct page) * next_free_page);
     recompute_gen_bytes_allocated();
@@ -906,6 +906,10 @@ int load_gc_crashdump(char* pathname)
         }
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         *os_context_sp_addr(context) = (uword_t)stackptr;
+#ifdef LISP_FEATURE_X86
+        *os_context_register_addr(context,reg_SP) = (os_context_register_t)stackptr;
+#endif
+        gc_assert(*os_context_register_addr(context,reg_SP) == (os_context_register_t)stackptr);
 #else
         *os_context_register_addr(context, reg_CSP) = (uword_t)stackptr;
 #endif
