@@ -237,12 +237,12 @@ static void unsuspend_other_threads() {
 }
 
 static int save_cmd(char **ptr) {
-#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
     char *name  = parse_token(ptr);
     if (!name) {
         fprintf(stderr, "Need filename\n");
         return 1;
     }
+#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_SB_THREAD
     suspend_other_threads();
     save_gc_crashdump(name, (uword_t)__builtin_frame_address(0));
     unsuspend_other_threads();

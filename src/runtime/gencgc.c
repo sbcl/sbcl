@@ -254,6 +254,11 @@ page_ends_contiguous_block_p(page_index_t page_index,
 #endif
     return answer;
 }
+page_index_t contiguous_block_final_page(page_index_t first) {
+    page_index_t last = first;
+    while (!page_ends_contiguous_block_p(last, page_table[first].gen)) ++last;
+    return last;
+}
 
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
  * scan_start of zero, to optimize page_ends_contiguous_block_p().

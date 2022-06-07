@@ -88,13 +88,16 @@ static page_index_t free_page;
  * If it collides with 'next_free_page', then you lose.
  * TODO: It would be reasonably simple to have this request more memory from
  * the OS instead of failing on overflow */
-static void* get_free_page() {
+static void* get_free_page(boolean prezero) {
     --free_page;
     if (free_page < next_free_page)
         lose("Needed more space to GC");
     page_table[free_page].type = PAGE_TYPE_UNBOXED;
     char* mem = page_address(free_page);
-    zeroize_pages_if_needed(free_page, free_page, 0);
+#ifdef LISP_FEATURE_DARWIN_JIT
+    prezero = 1; // Might need to alter MMU-based protection
+#endif
+    if (prezero) zeroize_pages_if_needed(free_page, free_page, 0);
     return mem;
 }
 
@@ -112,10 +115,10 @@ static inline uword_t compute_page_key(lispobj cons) {
 static void* allocate_cons_mark_bits() {
     int nbytes = GENCGC_PAGE_BYTES / (2 * N_WORD_BYTES) / 8;
     if (suballocator_free_ptr + nbytes > suballocator_end_ptr) {
-        suballocator_free_ptr = get_free_page();
+        suballocator_free_ptr = get_free_page(1);
         suballocator_end_ptr = suballocator_free_ptr + GENCGC_PAGE_BYTES;
     }
-    void* mem = suballocator_free_ptr;
+    char* mem = suballocator_free_ptr;
     suballocator_free_ptr += nbytes;
     return mem;
 }
@@ -130,13 +133,14 @@ static void gc_enqueue(lispobj object)
         next = scav_queue.recycler;
         if (next) {
             scav_queue.recycler = next->next;
-            next->next = 0;
             dprintf(("Popped recycle list\n"));
         } else {
-            next = (struct Qblock*)get_free_page();
+            next = (struct Qblock*)get_free_page(0);
             dprintf(("Alloc'd new block\n"));
         }
         block = block->next = next;
+        block->next = 0;
+        block->tail = block->count = 0;
         scav_queue.tail_block = block;
     }
     block->elements[block->tail] = object;
@@ -202,6 +206,28 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     if (embedded_obj_p(widetag))
         header = *fun_code_header(native_pointer(pointer));
     return (header & MARK_BIT) != 0;
+}
+
+extern page_index_t contiguous_block_final_page(page_index_t);
+void dump_marked_objects() {
+    fprintf(stderr, "Marked objects:\n");
+    page_index_t first = 0;
+    int n = 0;
+    while (first < next_free_page) {
+        page_index_t last = contiguous_block_final_page(first);
+        lispobj* where = (lispobj*)page_address(first);
+        lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
+        while (where < limit) {
+            lispobj obj = compute_lispobj(where);
+            if (pointer_survived_gc_yet(obj)) {
+                ++n;
+                fprintf(stderr, " %"OBJ_FMTX"\n", obj);
+            }
+            where += object_size(where);
+        }
+        first = 1 + last;
+    }
+    fprintf(stderr, "Total: %d\n", n);
 }
 
 void __mark_obj(lispobj pointer)
@@ -420,12 +446,13 @@ void prepare_for_full_mark_phase()
 
     free_page = page_table_pages;
     suballocator_free_ptr = suballocator_end_ptr = 0;
-    struct Qblock* block = (struct Qblock*)get_free_page();
+    struct Qblock* block = (struct Qblock*)get_free_page(0);
     dprintf(("Queue block holds %d objects\n", (int)QBLOCK_CAPACITY));
     scav_queue.head_block = block;
     scav_queue.tail_block = block;
     scav_queue.recycler   = 0;
-    gc_assert(!scav_queue.head_block->count);
+    block->next = 0;
+    block->tail = block->count = 0;
 }
 
 void execute_full_mark_phase()
@@ -578,6 +605,7 @@ static void sweep_fixedobj_pages(long *zeroed)
  * unlike deposit_filler() which tries to be efficient */
 static void clobber_headered_object(lispobj* addr, sword_t nwords)
 {
+    // FIXME: clobbering an object on single-object pages should free entire pages
     page_index_t page = find_page_index(addr);
     if (page < 0) { // code space
         struct code* code  = (struct code*)addr;
@@ -587,7 +615,7 @@ static void clobber_headered_object(lispobj* addr, sword_t nwords)
                            | CODE_HEADER_WIDETAG;
             memset(addr+2, 0, (nwords - 2) * N_WORD_BYTES);
         }
-    } else if (page_table[page].type == PAGE_TYPE_CODE) {
+    } else if ((SINGLE_OBJECT_FLAG|page_table[page].type) == (SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE)) {
         // Code pages don't want (0 . 0) fillers, otherwise heap checking
         // gets an error: "object @ 0x..... is non-code on code page"
         addr[0] = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
@@ -662,8 +690,9 @@ void execute_full_sweep_phase()
             fprintf(stderr, "%ld%s", words_zeroed[i], i?"+":"");
         fprintf(stderr, " words zeroed]\n");
     }
-#ifdef LISP_FEATURE_USE_CONS_REGION
     page_index_t page;
+#ifdef LISP_FEATURE_USE_CONS_REGION
+    // Clear all cons mark bits
     for (page = 0; page < next_free_page; ++page)
         if (page_table[page].type == PAGE_TYPE_CONS) {
             char* base = page_address(page);
@@ -678,8 +707,11 @@ void execute_full_sweep_phase()
     if (sweeplog)
         fflush(sweeplog);
 
-    for (free_page = next_free_page; free_page < page_table_pages; ++free_page) {
-        set_page_need_to_zero(free_page, 1);
-        page_table[free_page].type = FREE_PAGE_FLAG;
+    // Give back all private-use pages and indicate need-to-zero
+    for (page = free_page; page < page_table_pages; ++page) {
+        gc_assert((page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED);
+        gc_assert(!page_bytes_used(page));
+        set_page_need_to_zero(page, 1);
+        page_table[page].type = FREE_PAGE_FLAG;
       }
 }

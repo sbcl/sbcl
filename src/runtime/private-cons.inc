@@ -87,9 +87,11 @@ static struct cons* private_cons_impl()
         gc_dcheck(page_cards_all_marked_nonsticky(page));
         page_table[page].gen = GC_PRIVATE_CONS_GENERATION;
         page_table[page].type = PAGE_TYPE_UNBOXED;
-        /* I'm surprised that the GC needs to prezero private conses.
-         * Was I just not thinking clearly? */
-        zeroize_pages_if_needed(page, page, 0);
+#ifdef LISP_FEATURE_DARWIN_JIT
+        // UNBOXED pages do not generally required zero-fill.
+        // arm64+Darwin might perform zeroing to alter MMU-based protection.
+        zeroize_pages_if_needed(page, page, PAGE_TYPE_UNBOXED);
+#endif
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused
         page_header->cdr = (lispobj)(tail >= 0 ? page_address(tail) : 0);
@@ -133,12 +135,19 @@ uword_t gc_private_cons(uword_t car, uword_t cdr)
         cons = private_cons_impl();
     cons->car = car;
     cons->cdr = cdr;
+#if PRIVATE_CONS_DEBUG
+    if (cdr) fprintf(stderr, "private_cons(%p,%p)=%p\n", (void*)car, (void*)cdr, cons);
+#endif
     return (uword_t)cons;
 }
 
 /* Push all the conses in 'list' onto the recycle list. */
 void gc_private_free(struct cons* list)
 {
+#if PRIVATE_CONS_DEBUG
+    { int n = 0; struct cons* tail = list; while(tail) ++n, tail = (void*)tail->cdr;
+      if (n>1) fprintf(stderr, "private_free(%p){%d}\n", list, n); }
+#endif
     struct cons* head = list;
     while (list->cdr)
         list = (struct cons*)list->cdr;
