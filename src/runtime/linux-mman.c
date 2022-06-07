@@ -24,7 +24,11 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
 #endif
     actual = sbcl_mmap(addr, len, protection, flags, -1, 0);
     if (actual == MAP_FAILED) {
-        perror("mmap");
+        if (errno == ENOMEM)
+            fprintf(stderr, "os_validate(%d,%p,%lx) failed with ENOMEM\n",
+                    attributes, addr, len);
+        else
+            perror("mmap");
         return 0;               /* caller should check this */
     }
 

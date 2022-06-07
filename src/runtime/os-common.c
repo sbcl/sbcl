@@ -289,7 +289,10 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
                   MAP_PRIVATE | (addr ? MAP_FIXED : 0),
                   fd, (off_t) offset);
     if (actual == MAP_FAILED) {
-        perror("mmap");
+        if (errno == ENOMEM)
+            fprintf(stderr, "load_core_bytes: mmap(%p,%lx,...) failed with ENOMEM\n", addr, len);
+        else
+            perror("mmap");
         fail = 1;
     } else if (addr && (addr != actual)) {
         fail = 1;
