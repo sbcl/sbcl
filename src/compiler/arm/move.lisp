@@ -20,7 +20,7 @@
 ;;; This should be put into composite-immediate-instruction, but that
 ;;; macro is too scary.
 (defun load-repeating-pattern (dest val)
-  (declare (type (signed-byte 32) val))
+  (declare (type (unsigned-byte 32) val))
   (inst mov dest (ldb (byte 8 0) val))
   (inst orr dest dest (mask-field (byte 8 8) val))
   (inst orr dest dest (lsl dest 16)))
