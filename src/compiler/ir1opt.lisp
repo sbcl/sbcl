@@ -37,13 +37,14 @@
         ;; check for EQL types and singleton numeric types
         (values (type-singleton-p type)))))
 
-(defun constant-lvar-ignore-types-p (lvar)
+(defun constant-lvar-ignore-types-p (lvar &optional (singleton-types t))
   (declare (type lvar lvar))
   (let ((use (principal-lvar-use lvar)))
     (or (and (ref-p use)
              (constant-p (ref-leaf use)))
         ;; check for EQL types and singleton numeric types
-        (values (type-singleton-p (lvar-type lvar))))))
+        (and singleton-types
+             (values (type-singleton-p (lvar-type lvar)))))))
 
 ;;; Are all the uses constant?
 (defun constant-lvar-uses-p (lvar)

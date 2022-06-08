@@ -123,6 +123,10 @@ optimizations.
 When enabled, the variable is preserved and can be seen in the
 debugger.")
 
+(define-optimization-quality preserve-constants
+  0
+  ("no" "no" "no" "yes"))
+
 (define-optimization-quality insert-array-bounds-checks
     (if (= safety 0) 0 3)
   ("no" "yes" "yes" "yes"))

@@ -556,7 +556,13 @@
                       (funcall (second type) value)
                       (sb-xc:typep value type))))
           (cond (lvar
-                 (and (constant-lvar-p lvar)
+                 (and (if (policy (let ((uses (lvar-uses lvar)))
+                                    (if (consp uses)
+                                        (car uses)
+                                        uses))
+                              (= preserve-constants 3))
+                          (constant-lvar-ignore-types-p lvar nil)
+                          (constant-lvar-p lvar))
                       (type-p (lvar-value lvar) (cdr restr))))
                 (tn
                  (and (eq (tn-kind tn) :constant)
