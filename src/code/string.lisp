@@ -742,8 +742,3 @@ new string COUNT long filled with the fill character."
                             sb-vm:+vector-shareable+
                             sb-vm:+vector-shareable-nonstd+)))
   vector)
-
-(clear-info :function :inlining-data 'nstring-upcase)
-(clear-info :function :inlinep 'nstring-upcase)
-(clear-info :function :inlining-data 'nstring-downcase)
-(clear-info :function :inlinep 'nstring-downcase)
