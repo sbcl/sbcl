@@ -148,10 +148,6 @@
   ;; a list of string designators for exported symbols which'll be set
   ;; up at package creation time.
   export
-  ;; a list of string designators for exported symbols which don't necessarily
-  ;; originate in this package (so their EXPORT operations should be handled
-  ;; after USE operations have been done, so that duplicates aren't created)
-  reexport
   ;; a list of sublists describing imports. Each sublist has the format as an
   ;; IMPORT-FROM list in DEFPACKAGE: the first element is the name of the
   ;; package to import from, and the remaining elements are the names of
@@ -408,8 +404,14 @@
                              (package-data-use package-data)
                              :test 'string=)
                  (package-data-name package-data))
+    ;; Note: Unlike plain-old DEFPACKAGE, this IMPORT-FROM does
+    ;; potentially intern NAME into the FROM-PACKAGE to make forward
+    ;; references work.
     (dolist (sublist (package-data-import-from package-data))
-      (let ((from-package (first sublist)))
+      (let* ((from-package (first sublist))
+             (from-package (if (string= from-package "CL")
+                               "XC-STRICT-CL"
+                               from-package)))
         (import (mapcar (lambda (name) (intern name from-package))
                         (rest sublist))
                 (package-data-name package-data))))
@@ -417,56 +419,21 @@
       (export (intern string (package-data-name package-data))
               (package-data-name package-data))))
 
-  (unhide-host-format-funs)
-
-  ;; Now that all package-package references exist, we can handle
-  ;; REEXPORT operations. (We have to wait until now because they
-  ;; interact with USE operations.)  This code handles dependencies
-  ;; properly, but is somewhat ugly.
-  (let (done)
-    (labels
-        ((reexport (package-data)
-           (let ((package (find-package (package-data-name package-data))))
-             (cond
-               ((member package done))
-               ((null (package-data-reexport package-data))
-                (push package done))
-               (t
-                (mapcar #'reexport
-                        (remove-if-not
-                         (lambda (x)
-                           (member x (package-data-use package-data)
-                                   :test #'string=))
-                         package-data-list
-                         :key #'package-data-name))
-                (dolist (symbol-name (package-data-reexport package-data))
-                  (multiple-value-bind (symbol status)
-                      (find-symbol symbol-name package)
-                    (unless status
-                      (error "No symbol named ~S is accessible in ~S."
-                             symbol-name package))
-                    (when (eq (symbol-package symbol) package)
-                      (error
-                       "~S is not inherited/imported, but native to ~S."
-                       symbol-name package))
-                    (export symbol package)))
-                (push package done))))))
-      (dolist (x package-data-list)
-        (reexport x))
-      (assert (= (length done) (length package-data-list))))))
+  (unhide-host-format-funs))
 
 (export '*undefined-fun-allowlist*)
 (defvar *undefined-fun-allowlist* (make-hash-table :test 'equal))
 
 (defparameter *package-data-list* '())
 
-;;; Like DEFPACKAGE, but can handle :REEXPORT.
+;;; Like DEFPACKAGE, but does some special stuff to make forward
+;;; references work.
 (defmacro defpackage* (name &rest options)
   (let ((flattened-options '()))
     (dolist (option options)
       (destructuring-bind (kind . args) option
         (ecase kind
-          ((:use :export :reexport :shadow :nicknames)
+          ((:use :export :shadow :nicknames)
            (let ((existing-option (assoc kind flattened-options)))
              (if existing-option
                  (setf (second (second existing-option))

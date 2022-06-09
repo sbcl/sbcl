@@ -52,8 +52,6 @@ user.  This package only tries to implement what happens to be needed
 by the current implementation of SBCL, and makes no guarantees of
 interface stability.")
   (:use "CL" "SB-ALIEN" "SB-EXT" "SB-INT" "SB-SYS")
-  (:reexport "OFF-T"
-             "SIZE-T")
   (:export
    ;; wrappers around Unix stuff to give just what Lisp needs
    "NANOSLEEP"
@@ -64,6 +62,8 @@ interface stability.")
    "UNIX-OFFSET"
    "FD-TYPE"
 
+   "SIZE-T"
+   "OFF-T"
    ;; Most of this is random detritus worthy of deletion,
    ;; and the ordering is not alphabetical or anything sane.
 
@@ -283,7 +283,6 @@ be submitted as a CDR")
 (defpackage* "SB-EVAL"
   (:documentation "internal: the evaluator implementation used to execute code without compiling it.")
   (:use "CL" "SB-KERNEL" "SB-EXT" "SB-INT")
-  (:reexport "*EVAL-CALLS*")
   (:export "INTERPRETED-FUNCTION-NAME"
            "INTERPRETED-FUNCTION-DEBUG-NAME"
            "INTERPRETED-FUNCTION-LAMBDA-LIST"
@@ -332,7 +331,6 @@ structure representations")
   (:use "CL" "SB-ALIEN" "SB-ALIEN-INTERNALS" "SB-ASSEM" "SB-C"
         "SB-EXT" "SB-FASL" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-UNIX")
   (:import-from "SB-C" "VOP-ARGS" "VOP-RESULTS")
-  (:reexport "WORD")
   (:export "*PRIMITIVE-OBJECTS*"
            "+HIGHEST-NORMAL-GENERATION+"
            "+PSEUDO-STATIC-GENERATION+"
@@ -620,7 +618,7 @@ structure representations")
            "WEAK-POINTER-SIZE" "WEAK-POINTER-WIDETAG"
            "WEAK-POINTER-VALUE-SLOT"
            "N-WORD-BITS" "N-WORD-BYTES" "N-MACHINE-WORD-BITS" "N-MACHINE-WORD-BYTES"
-           "WORD-REG-SC-NUMBER" "WORD-SHIFT"
+           "WORD" "WORD-REG-SC-NUMBER" "WORD-SHIFT"
            #+win32 "CONTEXT-RESTORE-TRAP"
            "ZERO-SC-NUMBER")
   #+immobile-space
@@ -710,11 +708,11 @@ basic stuff like BACKTRACE and ARG. For now, the actual supported interface
 is still mixed indiscriminately with low-level internal implementation stuff
 like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
   (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL" "SB-DI")
-  (:reexport "*DEBUG-PRINT-VARIABLE-ALIST*")
   (:export "*BACKTRACE-FRAME-COUNT*"
            "*DEBUG-BEGINNER-HELP-P*"
            "*DEBUG-CONDITION*"
            "*DEBUG-READTABLE*" "*DEBUG-HELP-STRING*"
+           "*DEBUG-PRINT-VARIABLE-ALIST*"
            "*FLUSH-DEBUG-ERRORS*" "*IN-THE-DEBUGGER*"
            "*METHOD-FRAME-STYLE*"
            "*TRACE-INDENTATION-STEP*" "*MAX-TRACE-INDENTATION*"
@@ -735,6 +733,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
 (defpackage* "SB-EXT"
   (:documentation "public: miscellaneous supported extensions to the ANSI Lisp spec")
   (:use "CL" "SB-ALIEN" "SB-INT" "SB-SYS" "SB-GRAY")
+  (:import-from "SB-VM" "WORD")
+  (:import-from "SB-DEBUG" "*DEBUG-PRINT-VARIABLE-ALIST*")
   (:export
    ;; Information about how the program was invoked is
    ;; nonstandard but very useful.
@@ -1147,15 +1147,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
   (:documentation "private: primitives used to write debuggers")
   (:use "CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-VM")
   (:import-from "SB-C"
-                "DEBUG-SOURCE-NAMESTRING"
-                "DEBUG-SOURCE-CREATED"
+                "DEBUG-SOURCE" "DEBUG-SOURCE-NAMESTRING"
+                "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-P"
                 "DEBUG-SOURCE-START-POSITIONS" "MAKE-DEBUG-SOURCE"
-                "DEBUG-SOURCE" "DEBUG-SOURCE-P"
                 "CORE-DEBUG-SOURCE" "CORE-DEBUG-SOURCE-P"
                 "CORE-DEBUG-SOURCE-FORM")
-  (:reexport "DEBUG-SOURCE-NAMESTRING"
-             "DEBUG-SOURCE-START-POSITIONS" "DEBUG-SOURCE-CREATED"
-             "DEBUG-SOURCE" "DEBUG-SOURCE-P")
   (:export "ACTIVATE-BREAKPOINT"
            "AMBIGUOUS-DEBUG-VARS" "AMBIGUOUS-VAR-NAME" "BREAKPOINT"
            "BREAKPOINT-ACTIVE-P" "BREAKPOINT-HOOK-FUN" "BREAKPOINT-INFO"
@@ -1170,7 +1166,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "DEBUG-FUN" "DEBUG-FUN-FUN" "DEBUG-FUN-KIND"
            "DEBUG-FUN-LAMBDA-LIST" "DEBUG-FUN-NAME" "DEBUG-FUN-CLOSURE-NAME"
            "DEBUG-FUN-P" "DEBUG-FUN-START-LOCATION"
-           "DEBUG-FUN-SYMBOL-VARS"
+           "DEBUG-FUN-SYMBOL-VARS"  "DEBUG-SOURCE"
+           "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-NAMESTRING"
+           "DEBUG-SOURCE-P" "DEBUG-SOURCE-START-POSITIONS"
            "DEBUG-VAR" "DEBUG-VAR-ID" "DEBUG-VAR-INFO-AVAILABLE"
            "DEBUG-VAR-SYMBOL-NAME" "DEBUG-VAR-P" "DEBUG-VAR-PACKAGE-NAME"
            "DEBUG-VAR-SYMBOL" "DEBUG-VAR-VALID-VALUE"
@@ -1247,8 +1245,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
   (:use "CL" "SB-ALIEN-INTERNALS" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM"
         #+sb-dyncount "SB-DYNCOUNT" "SB-EXT" "SB-FASL" "SB-INT"
         "SB-KERNEL" "SB-SYS")
-  ;; But why do we need SLOT re-exported?
-  (:reexport "SLOT" "FLUSHABLE")
   (:export "%ALIEN-FUNCALL"
            "%CATCH-BREAKUP" "%CONTINUE-UNWIND" "%UNWIND"
            "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
@@ -1280,6 +1276,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "ANY" "ASSEMBLE-FILE"
            "ATTRIBUTES" "ATTRIBUTES-INTERSECTION" "ATTRIBUTES-UNION"
            "ATTRIBUTES="
+           "BRANCH"
            "CALL" "CALL-LOCAL" "CALL-NAMED" "CALL-VARIABLE"
            "CALL-OUT" "CALL-OUT-NAMED"
            "CALLEE-NFP-TN" "CALLEE-RETURN-PC-TN"
@@ -1325,7 +1322,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "FIXUP-NOTE-KIND"
            "FIXUP-NOTE-FIXUP"
            "FIXUP-NOTE-POSITION"
-           "FOLDABLE"
+           "FLUSHABLE" "FOLDABLE"
            "FORCE-TN-TO-STACK"
            "FUN-INFO-DERIVE-TYPE" "FUN-INFO-IR2-CONVERT"
            "FUN-INFO-LTN-ANNOTATE" "FUN-INFO-OPTIMIZER"
@@ -1411,6 +1408,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "XEP-SETUP-SP"
            "LABEL-ID" "FIXUP" "FIXUP-FLAVOR" "FIXUP-NAME" "FIXUP-OFFSET"
            "FIXUP-P" "MAKE-FIXUP"
+           "SLOT"
            "DEF-ALLOC"
            "VAR-ALLOC"
            "SAFE-FDEFN-FUN"
@@ -1663,37 +1661,36 @@ of the packages ALIEN and C-CALL at the time of the SBCL fork. SB-C-CALL
 is a deprecated nickname to help ease the transition from older versions
 of SBCL which maintained the CMU-CL-style split into two packages.)")
   (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-ALIEN-INTERNALS")
-  (:reexport "ARRAY"
-             "BOOLEAN" "CHAR" "DOUBLE-FLOAT"
-             "FLOAT" "FUNCTION" "INTEGER" "LONG-FLOAT"
-             "SINGLE-FLOAT"
-             ;; FIXME: Do we really want to reexport
-             ;; SYSTEM-AREA-POINTER here? Why?
-             "SYSTEM-AREA-POINTER"
-             "UNION"  "VALUES" "*")
-  (:export "ADDR"
-           "ALIEN"
-           "ALIEN-FUNCALL" "ALIEN-SAP" "ALIEN-SIZE"
-           "CAST" "C-STRING"
+  (:import-from "CL" "*" "ARRAY" "CHAR" "DOUBLE-FLOAT" "FLOAT" "FUNCTION"
+                "BOOLEAN" "INTEGER" "LONG-FLOAT" "SINGLE-FLOAT" "UNION" "VALUES")
+  (:import-from "SB-SYS" "SYSTEM-AREA-POINTER")
+  (:import-from "SB-UNIX" "OFF-T" "SIZE-T")
+  (:export "*" "ADDR" "ALIEN" "ALIEN-FUNCALL" "ALIEN-SAP"
+           "ALIEN-SIZE" "ARRAY" "BOOLEAN" "CAST" "CHAR" "C-STRING"
            "DEFINE-ALIEN-ROUTINE" "DEFINE-ALIEN-TYPE" "DEFINE-ALIEN-VARIABLE"
-           "DEREF" "DOUBLE"
-           "ENUM" "EXTERN-ALIEN"
-           "FREE-ALIEN"
+           "DEREF" "DOUBLE-FLOAT" "DOUBLE" "ENUM" "EXTERN-ALIEN"
+           "FLOAT" "FREE-ALIEN" "FUNCTION"
+           "LONG-FLOAT"
            "GET-ERRNO"
            "INT"
+           "INTEGER"
            "LOAD-1-FOREIGN" "LOAD-FOREIGN" "LOAD-SHARED-OBJECT" "LONG" "LONG-LONG"
            "MAKE-ALIEN"
            "MAKE-ALIEN-STRING"
            "NULL-ALIEN"
            "OFF-T"
            "SAP-ALIEN" "SHORT" "SIGNED"
+           "SINGLE-FLOAT"
            "SIZE-T" "SSIZE-T"
            "SLOT" "STRUCT"
+           "SYSTEM-AREA-POINTER"
            "UNDEFINED-ALIEN-ERROR"
+           "UNION"
            "UNLOAD-SHARED-OBJECT"
            "UNSIGNED"
            "UNSIGNED-CHAR" "UNSIGNED-INT" "UNSIGNED-LONG" "UNSIGNED-LONG-LONG" "UNSIGNED-SHORT"
            "UTF8-STRING"
+           "VALUES"
            "VOID"
            "WITH-ALIEN"))
 
@@ -1794,16 +1791,17 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
   (:use "CL" "SB-ALIEN" "SB-ALIEN-INTERNALS" "SB-BIGNUM"
         "SB-EXT" "SB-FASL" "SB-INT" "SB-SYS" "SB-GRAY")
   #+sb-simd-pack
-  (:reexport "SIMD-PACK"
-             "SIMD-PACK-P"
-             "%MAKE-SIMD-PACK-UB32"
-             "%MAKE-SIMD-PACK-UB64"
-             "%MAKE-SIMD-PACK-DOUBLE"
-             "%MAKE-SIMD-PACK-SINGLE"
-             "%SIMD-PACK-UB32S"
-             "%SIMD-PACK-UB64S"
-             "%SIMD-PACK-DOUBLES"
-             "%SIMD-PACK-SINGLES")
+  (:import-from "SB-EXT"
+                "SIMD-PACK"
+                "SIMD-PACK-P"
+                "%MAKE-SIMD-PACK-UB32"
+                "%MAKE-SIMD-PACK-UB64"
+                "%MAKE-SIMD-PACK-DOUBLE"
+                "%MAKE-SIMD-PACK-SINGLE"
+                "%SIMD-PACK-UB32S"
+                "%SIMD-PACK-UB64S"
+                "%SIMD-PACK-DOUBLES"
+                "%SIMD-PACK-SINGLES")
   (:export "%%DATA-VECTOR-REFFERS%%"
            "%%DATA-VECTOR-SETTERS%%"
            "%ACOS"
@@ -2660,6 +2658,17 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"
            "%WITH-OUTPUT-TO-STRING")
   #+sb-simd-pack
+  (:export "SIMD-PACK"
+           "SIMD-PACK-P"
+           "%MAKE-SIMD-PACK-UB32"
+           "%MAKE-SIMD-PACK-UB64"
+           "%MAKE-SIMD-PACK-DOUBLE"
+           "%MAKE-SIMD-PACK-SINGLE"
+           "%SIMD-PACK-UB32S"
+           "%SIMD-PACK-UB64S"
+           "%SIMD-PACK-DOUBLES"
+           "%SIMD-PACK-SINGLES")
+  #+sb-simd-pack
   (:export "%SIMD-PACK-TAG"
            "%SIMD-PACK-LOW"
            "%SIMD-PACK-HIGH")
@@ -2688,6 +2697,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 (defpackage* "SB-ASSEM"
   (:documentation "private: the assembler, used by the compiler")
   (:use "CL" "SB-EXT" "SB-INT")
+  (:import-from "SB-C" "BRANCH" "FLUSHABLE")
   (:export "ASSEMBLY-UNIT"
            "ASSEMBLY-UNIT-BITS"
            "+INST-ALIGNMENT-BYTES+"
@@ -2729,15 +2739,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "STMT-PREV" "STMT-NEXT"
            "ADD-STMT-LABELS" "DELETE-STMT"
            "LABELED-STATEMENT-P"
-           "DEFPATTERN"
-
-           ;; FIXME: These are in the SB-ASSEM package now, but
-           ;; (left over from CMU CL) are defined in files which
-           ;; are IN-PACKAGE SB-C. It would probably be cleaner
-           ;; to move at least most of them to files which are
-           ;; IN-PACKAGE SB-ASSEM.
-
-           "BRANCH"  "FLUSHABLE"))
+           "DEFPATTERN"))
 
 (defpackage* "SB-THREAD"
   (:documentation "public (but low-level): native thread support")
@@ -3420,28 +3422,35 @@ possibly temporarily, because it might be used internally.")
 The Art of the Metaobject Protocol, by Kiczales, des Rivieres and Bobrow:
 ISBN 0-262-61074-4, with exceptions as noted in the User Manual.")
   (:use "CL")
-  (:reexport "ADD-METHOD"
-             "ALLOCATE-INSTANCE"
-             "CLASS-NAME" "COMPUTE-APPLICABLE-METHODS"
-             "ENSURE-GENERIC-FUNCTION" "MAKE-INSTANCE"
-             "METHOD-QUALIFIERS" "REMOVE-METHOD"
-             "BUILT-IN-CLASS" "CLASS"
-             "FUNCTION" "GENERIC-FUNCTION"
-             "METHOD" "METHOD-COMBINATION"
-             "STANDARD-CLASS" "STANDARD-GENERIC-FUNCTION"
-             "STANDARD-METHOD" "STANDARD-OBJECT" "T")
+  (:import-from "CL"
+                "ADD-METHOD"
+                "ALLOCATE-INSTANCE"
+                "CLASS-NAME" "COMPUTE-APPLICABLE-METHODS"
+                "ENSURE-GENERIC-FUNCTION" "MAKE-INSTANCE"
+                "METHOD-QUALIFIERS" "REMOVE-METHOD"
+                "BUILT-IN-CLASS" "CLASS"
+                "FUNCTION" "GENERIC-FUNCTION"
+                "METHOD" "METHOD-COMBINATION"
+                "STANDARD-CLASS" "STANDARD-GENERIC-FUNCTION"
+                "STANDARD-METHOD" "STANDARD-OBJECT" "T")
   (:export "ADD-DEPENDENT"
            "ADD-DIRECT-METHOD"
            "ADD-DIRECT-SUBCLASS"
+           "ADD-METHOD"
+           "ALLOCATE-INSTANCE"
+           "BUILT-IN-CLASS"
+           "CLASS"
            "CLASS-DEFAULT-INITARGS"
            "CLASS-DIRECT-DEFAULT-INITARGS"
            "CLASS-DIRECT-SLOTS"
            "CLASS-DIRECT-SUBCLASSES"
            "CLASS-DIRECT-SUPERCLASSES"
            "CLASS-FINALIZED-P"
+           "CLASS-NAME"
            "CLASS-PRECEDENCE-LIST"
            "CLASS-PROTOTYPE"
            "CLASS-SLOTS"
+           "COMPUTE-APPLICABLE-METHODS"
            "COMPUTE-APPLICABLE-METHODS-USING-CLASSES"
            "COMPUTE-CLASS-PRECEDENCE-LIST"
            "COMPUTE-DEFAULT-INITARGS"
@@ -3455,6 +3464,7 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual.")
            "EFFECTIVE-SLOT-DEFINITION-CLASS"
            "ENSURE-CLASS"
            "ENSURE-CLASS-USING-CLASS"
+           "ENSURE-GENERIC-FUNCTION"
            "ENSURE-GENERIC-FUNCTION-USING-CLASS"
            "EQL-SPECIALIZER"
            "EQL-SPECIALIZER-OBJECT"
@@ -3466,7 +3476,9 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual.")
            "FUNCALLABLE-STANDARD-CLASS"
            "FUNCALLABLE-STANDARD-INSTANCE-ACCESS"
            "FUNCALLABLE-STANDARD-OBJECT"
+           "FUNCTION"
            "GENERIC-FUNCTION-ARGUMENT-PRECEDENCE-ORDER"
+           "GENERIC-FUNCTION"
            "GENERIC-FUNCTION-DECLARATIONS"
            "GENERIC-FUNCTION-LAMBDA-LIST"
            "GENERIC-FUNCTION-METHOD-CLASS"
@@ -3474,18 +3486,23 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual.")
            "GENERIC-FUNCTION-METHODS"
            "GENERIC-FUNCTION-NAME"
            "INTERN-EQL-SPECIALIZER"
+           "MAKE-INSTANCE"
            "MAKE-METHOD-LAMBDA"
            "MAP-DEPENDENTS"
            "METAOBJECT"
+           "METHOD"
+           "METHOD-COMBINATION"
            "METHOD-FUNCTION"
            "METHOD-GENERIC-FUNCTION"
            "METHOD-LAMBDA-LIST"
+           "METHOD-QUALIFIERS"
            "METHOD-SPECIALIZERS"
            "ACCESSOR-METHOD-SLOT-DEFINITION"
            "READER-METHOD-CLASS"
            "REMOVE-DEPENDENT"
            "REMOVE-DIRECT-METHOD"
            "REMOVE-DIRECT-SUBCLASS"
+           "REMOVE-METHOD"
            "SET-FUNCALLABLE-INSTANCE-FUNCTION"
            "SLOT-BOUNDP-USING-CLASS"
            "SLOT-DEFINITION"
@@ -3504,12 +3521,17 @@ ISBN 0-262-61074-4, with exceptions as noted in the User Manual.")
            "SPECIALIZER-DIRECT-GENERIC-FUNCTIONS"
            "SPECIALIZER-DIRECT-METHODS"
            "STANDARD-ACCESSOR-METHOD"
+           "STANDARD-CLASS"
            "STANDARD-DIRECT-SLOT-DEFINITION"
            "STANDARD-EFFECTIVE-SLOT-DEFINITION"
+           "STANDARD-GENERIC-FUNCTION"
            "STANDARD-INSTANCE-ACCESS"
+           "STANDARD-METHOD"
+           "STANDARD-OBJECT"
            "STANDARD-READER-METHOD"
            "STANDARD-SLOT-DEFINITION"
            "STANDARD-WRITER-METHOD"
+           "T"
            "UPDATE-DEPENDENT"
            "VALIDATE-SUPERCLASS"
            "WRITER-METHOD-CLASS"))
