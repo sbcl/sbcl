@@ -1087,28 +1087,31 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         set_page_scan_start_offset(i,
             addr_diff(page_address(i), alloc_region->start_addr));
     }
+#ifdef LISP_FEATURE_DARWIN_JIT
+    if (page_type == PAGE_TYPE_CODE) {
+        /* Remap before releasing the mutex so that no other thread can manipulate
+         * this range of code until it has been correctly set up. If page(s) were
+         * previously utilized for code, this is not necessary, but there's no way
+         * to know that.  If the first page was already in use, remapping would trash
+         * what's there, so don't do that */
+        int remap_from = first_page + (page_words_used(first_page)?1:0);
+        if (last_page >= remap_from) {
+            long len = npage_bytes(1+last_page-remap_from);
+            os_invalidate(page_address(remap_from), len);
+            mmap(page_address(remap_from), len,
+                 OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
+        }
+    }
+#endif
     if (unlock) {
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
         gc_assert(ret);
     }
 
-    /* If the first page was only partial, don't check whether it's
-     * zeroed (it won't be) and don't zero it (since the parts that
-     * we're interested in are guaranteed to be zeroed).
-     */
-    if (page_words_used(first_page)) {
-        first_page++;
-    }
+    // Like above: if first page was in use, don't zeroize
+    INSTRUMENTING(zeroize_pages_if_needed(first_page+(page_words_used(first_page)?1:0),
+                                          last_page, page_type), et_bzeroing);
 
-    INSTRUMENTING(zeroize_pages_if_needed(first_page, last_page, page_type), et_bzeroing);
-
-#ifdef LISP_FEATURE_DARWIN_JIT
-    if (page_type == PAGE_TYPE_CODE) {
-        if (last_page >= first_page) {
-            os_protect(page_address(first_page), npage_bytes(1+last_page-first_page), OS_VM_PROT_ALL);
-        }
-    }
-#endif
     return alloc_region->free_pointer;
 }
 
@@ -1877,7 +1880,8 @@ static inline int immune_set_memberp(page_index_t page)
   (w==BIGNUM_WIDETAG || w==CODE_HEADER_WIDETAG || \
    (w>=SIMPLE_VECTOR_WIDETAG && w < COMPLEX_BASE_STRING_WIDETAG))
 
-static inline int lowtag_ok_for_page_type(__attribute__((unused)) lispobj ptr,
+static inline __attribute__((unused))
+int lowtag_ok_for_page_type(__attribute__((unused)) lispobj ptr,
                                           __attribute__((unused)) int page_type) {
     // If the young generation goes to mixed-region, this filter is not valid
 #ifdef LISP_FEATURE_USE_CONS_REGION
