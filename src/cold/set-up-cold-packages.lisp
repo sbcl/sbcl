@@ -400,8 +400,6 @@
                                  :nicknames (package-data-nicknames package-data))))
       (dolist (string (package-data-shadow package-data))
         (shadow string package))
-      (dolist (string (package-data-export package-data))
-        (export (intern string package) package))
       (setf (documentation package t) (package-data-documentation package-data))))
   ;; Now that all packages exist, we can set up package-package
   ;; references.
@@ -414,7 +412,10 @@
       (let ((from-package (first sublist)))
         (import (mapcar (lambda (name) (intern name from-package))
                         (rest sublist))
-                (package-data-name package-data)))))
+                (package-data-name package-data))))
+    (dolist (string (package-data-export package-data))
+      (export (intern string (package-data-name package-data))
+              (package-data-name package-data))))
 
   (unhide-host-format-funs)
 
