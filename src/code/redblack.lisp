@@ -9,8 +9,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-RBTREE")
-
 ;;; For testing
 ;;; (declaim (optimize sb-c:store-coverage-data))
 
@@ -22,6 +20,19 @@
 ;;; An allegedly simpler deletion algorithm is presented in
 ;;; http://matt.might.net/papers/germane2014deletion.pdf
 ;;; which I found to be less simple when translated from Haskell.
+
+(defpackage "SB-RBTREE"
+  (:use "CL" "SB-INT" "SB-EXT"))
+(defpackage "SB-RBTREE.WORD"
+  (:use "CL")
+  (:shadow "DELETE")
+  (:export "INSERT" "DELETE"))
+(defpackage "SB-RBTREE.MAP"
+  (:use "CL")
+  (:shadow "DELETE")
+  (:export "INSERT" "DELETE"))
+
+(in-package "SB-RBTREE")
 
 (defmacro define-tree-class (&key key-type value-type (lessp '<)
                              &aux (data-type (if value-type 'cons key-type))
@@ -238,8 +249,6 @@
                      ((,lessp key (node-key node)) (recurse (left node) node))
                      ((,lessp (node-key node) key) (recurse (right node) best))
                      (t node))))))))
-
-(mapc 'unintern '(define-tree-class define-search-methods))
 
 ;;; Each specialization of the structure is in its own package.
 ;;; This may not be the best way to do it.

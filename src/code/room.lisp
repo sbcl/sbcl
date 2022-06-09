@@ -225,27 +225,8 @@
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
-#+gencgc
+#+immobile-space
 (progn
-  (define-alien-type (struct page)
-      (struct page
-              ;; To cut down the size of the page table, the scan_start_offset
-              ;; - a/k/a "start" - is measured in 4-byte integers regardless
-              ;; of word size. This is fine for 32-bit address space,
-              ;; but if 64-bit then we have to scale the value. Additionally
-              ;; there is a fallback for when even the scaled value is too big.
-              (start #+64-bit (unsigned 32) #-64-bit signed)
-              ;; On platforms with small enough GC pages, this field
-              ;; will be a short. On platforms with larger ones, it'll
-              ;; be an int. It should probably never be an int.
-              (words-used (unsigned
-                           #.(if (typep gencgc-page-words '(unsigned-byte 16))
-                                 16
-                                 32)))
-              (flags (unsigned 8)) ; in C this is {type, need_zerofill, pinned}
-              (gen (signed 8))))
-  #+immobile-space
-  (progn
     (define-alien-type (struct immobile-page)
         ;; ... and yet another place for Lisp to become out-of-sync with C.
         (struct immobile-page
@@ -257,11 +238,7 @@
                 (page-link (unsigned 16))
                 (prior-free-index (unsigned 16))))
     (define-alien-variable "fixedobj_pages" (* (struct immobile-page))))
-  (declaim (inline find-page-index))
-  (define-alien-routine ("ext_find_page_index" find-page-index)
-    long (index unsigned))
-  (define-alien-variable "next_free_page" sb-kernel::page-index-t)
-  (define-alien-variable "page_table" (* (struct page))))
+(define-alien-variable "next_free_page" sb-kernel::page-index-t)
 
 #+immobile-space
 (progn
@@ -1205,21 +1182,6 @@ We could try a few things to mitigate this:
       (map-objects-in-range #'show
         (%make-lisp-obj varyobj-space-start)
         (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))))
-
-#+gencgc
-(defun generation-of (object)
-  (with-pinned-objects (object)
-    (let* ((addr (get-lisp-obj-address object))
-           (page (find-page-index addr)))
-      (cond ((>= page 0) (slot (deref page-table page) 'gen))
-            #+immobile-space
-            ((immobile-space-addr-p addr)
-             ;; SIMPLE-FUNs don't contain a generation byte
-             (when (simple-fun-p object)
-               (setq addr (get-lisp-obj-address (fun-code-header object))))
-             (let ((sap (int-sap (logandc2 addr lowtag-mask))))
-               (logand (if (fdefn-p object) (sap-ref-8 sap 1) (sap-ref-8 sap 3))
-                       #xF)))))))
 
 ;;; Show objects in a much simpler way than print-allocated-objects.
 ;;; Probably don't use this for generation 0 of dynamic space. Other spaces are ok.

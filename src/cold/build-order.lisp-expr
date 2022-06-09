@@ -518,6 +518,7 @@
                                                 ;   "compiler/generic/core"
 
  ("src/code/alloc"             :not-host) ; needs foo-SPACE-START
+ ("src/code/brothertree"       :not-host)
  #+metaspace ("src/code/metaspace" :not-host)
  ("src/code/simple-fun"        :not-host) ; function slot accessors
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
@@ -606,8 +607,7 @@
  ("src/code/format") ; needs SB-XC:DEFMACRO
  ("src/code/target-format" :not-host)
 
- ("src/code/late-globaldb" :not-host)
- ("src/code/redblack" :not-host))
+ ("src/code/late-globaldb" :not-host))
 
 ;;; make-target-2 build steps
 (("src/code/early-ntrace" ; lets PCL hook into tracing

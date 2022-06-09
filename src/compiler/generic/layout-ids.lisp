@@ -24,13 +24,14 @@
 (defparameter *popular-structure-types* (mapcar 'list '(
 SB-KERNEL:CTYPE
 HASH-TABLE
+SB-IMPL::GENERAL-HASH-TABLE
 SB-C::NODE
 SB-C::GLOBAL-CONFLICTS
+SB-C::GLOBAL-VAR
 SB-C::FUNCTIONAL
 SB-C::LEAF
 SB-KERNEL:ANSI-STREAM
 SB-C::IR2-BLOCK
-SB-RBTREE::RBNODE
 SB-C::VALUED-NODE
 RANDOM-STATE
 CAST
@@ -40,15 +41,14 @@ SB-SYS:FD-STREAM
 SB-C::BASIC-COMBINATION
 SB-INT:SSET-ELEMENT
 SB-C:TN-REF
-SB-RBTREE::RED-NODE
 SB-KERNEL:ARGS-TYPE
 SB-C::VOP
+SB-C:STORAGE-BASE
 SB-C:STORAGE-CLASS
 SB-KERNEL:LEXENV
 SB-ASSEM::ANNOTATION
 SB-KERNEL:INTERSECTION-TYPE
 SB-C:PRIMITIVE-TYPE
-SB-RBTREE::BLACK-NODE
 #+sb-fasteval SB-INTERPRETER:BASIC-ENV
 SB-KERNEL:NUMERIC-TYPE
 SB-KERNEL:CLASSOID
@@ -67,6 +67,7 @@ SB-KERNEL:ARRAY-TYPE
 SB-KERNEL:COMPOUND-TYPE
 SB-KERNEL:NEGATION-TYPE
 SB-REGALLOC::VERTEX
+SB-THREAD:THREAD
 SB-THREAD::AVLNODE
 SB-C::ABSTRACT-LEXENV
 SB-KERNEL:UNKNOWN-TYPE
@@ -202,6 +203,8 @@ SB-ALIEN-INTERNALS:ALIEN-ENUM-TYPE
 SB-INT:DEPRECATION-INFO
 SB-DI::FUN-END-COOKIE
 SB-ALIEN::SHARED-OBJECT
+SB-PCL::FAST-METHOD-CALL
+SB-C::DXABLE-ARGS
 )))
 
 ;;; The rationale for using (signed-byte 8) for small IDs on the x86
@@ -221,10 +224,11 @@ SB-ALIEN::SHARED-OBJECT
 ;;;   2 = WRAPPER if #+metaspace, unused if #-metaspace
 ;;;   3 = SB-VM:LAYOUT if #+metaspace, WRAPPER if #-metaspace
 ;;;   4 = SB-LOCKLESS::LIST-NODE
+;;;   5 = SB-BROTHERTREE::UNARY-NODE
 (ecase layout-id-type
   (unsigned-byte
    ;; Assign all the above an (UNSIGNED-BYTE 8) layout-id.
-   (let ((id 4)) ; pre-increment when using
+   (let ((id 5)) ; pre-increment when using
      (dolist (item *popular-structure-types*)
        ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
        (rplacd item (incf id)))))
@@ -237,5 +241,36 @@ SB-ALIEN::SHARED-OBJECT
      (dolist (item *popular-structure-types*)
        ;; Because of (MAPCAR #'LIST ...) it is ok to modify this list.
        (rplacd item id)
-       (setq id (if (= id -1) 5 ; hop over the wired IDs
+       (setq id (if (= id -1) 6 ; hop over the wired IDs
                     (1+ id)))))))
+
+(defvar *general-layout-uniqueid-counter*  ; incremented before use
+  (ecase sb-kernel::layout-id-type
+    (signed-byte 127) ; predefined IDs range from -128 to 127
+    (unsigned-byte 255))) ; all IDs are unsigned integers
+;;; Conditions are numbered from -128 downward,
+;;; but only if layout IDs can be negative.
+(defvar *condition-layout-uniqueid-counter* -128) ; decremented before use
+
+(defun choose-layout-id (name conditionp)
+  ;; If you change these, then also change src/runtime/gc-private.h
+  ;; The ID of T is irrelevant since we'll never try to compare to it.
+  (case name
+    ((t) 0)
+    (structure-object 1)
+    #+metaspace (wrapper 2)
+    (#+metaspace sb-vm:layout #-metaspace wrapper 3)
+    (sb-lockless::list-node 4)
+    (sb-brothertree::unary-node 5)
+    (t (or (cdr (assq name sb-kernel::*popular-structure-types*))
+           (ecase sb-kernel::layout-id-type
+             (unsigned-byte
+              (incf *general-layout-uniqueid-counter*))
+             (signed-byte
+              (if conditionp
+                  ;; It doesn't really matter what ID is assigned to a CONDITION subtype
+                  ;; because we don't use the IDs for type testing. Nor for standard-object.
+                  ;; But I'd like to a have a quick visual scan of the IDs assigned during
+                  ;; genesis by giving them negative values which can't otherwise occur.
+                  (decf *condition-layout-uniqueid-counter*)
+                  (incf *general-layout-uniqueid-counter*))))))))

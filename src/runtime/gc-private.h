@@ -553,6 +553,7 @@ static inline int layout_depth2_id(struct layout* layout) {
 #define WRAPPER_LAYOUT_ID 2
 #define LAYOUT_LAYOUT_ID 3
 #define LFLIST_NODE_LAYOUT_ID 4
+#define BROTHERTREE_UNARY_NODE_LAYOUT_ID 5
 
 /// Return true if 'thing' is a layout.
 /// This predicate is careful, as is it used to verify heap invariants.

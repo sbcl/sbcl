@@ -3530,17 +3530,9 @@ package is deprecated in favour of SB-MOP.")
            "CLASS-NOT-FOUND-ERROR"
            "SPECIALIZER-NAME-SYNTAX-ERROR"))
 
-(defpackage* "SB-RBTREE"
-  (:documentation "internal: red/black tree")
-  (:use "CL" "SB-INT" "SB-EXT"))
-(defpackage* "SB-RBTREE.WORD"
-  (:documentation nil)
-  (:use "CL")
-  (:shadow "DELETE")
-  (:export "INSERT" "DELETE"))
-(defpackage* "SB-RBTREE.MAP"
-  (:documentation nil)
-  (:use "CL")
+(defpackage* "SB-BROTHERTREE"
+  (:use "CL" "SB-EXT" "SB-INT")
+  (:documentation "internal: 1-2-Brother tree")
   (:shadow "DELETE")
   (:export "INSERT" "DELETE"))
 

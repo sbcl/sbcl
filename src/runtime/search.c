@@ -18,9 +18,11 @@
 #include "search.h"
 #include "thread.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
+#include "brothertree.h"
 
 lispobj *
 search_read_only_space(void *pointer)
@@ -200,4 +202,58 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
 lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
 {
     return package ? search_package_symbols(package, symbol_name, hint) : 0;
+}
+
+uword_t brothertree_find_lesseql(uword_t key, lispobj tree)
+{
+    lispobj best = NIL;
+    while (tree != NIL) {
+        lispobj layout = instance_layout(INSTANCE(tree));
+        if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+            tree = ((struct unary_node*)INSTANCE(tree))->child;
+        } else {
+            struct binary_node* node = (void*)INSTANCE(tree);
+            if (node->key == key) return tree;
+            lispobj l = NIL, r = NIL;
+            int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT)
+                      & INSTANCE_LENGTH_MASK;
+            // unless a fringe node, read the left and right pointers
+            if (len > (int)(1+INSTANCE_DATA_START)) l = node->left, r = node->right;
+            if (key < node->key) tree = l; else { best = tree; tree = r; }
+        }
+    }
+    return best;
+}
+
+#include <stdio.h>
+
+static void validate_recurse(lispobj tree, int* n_nodes, int* n_keys)
+{
+    if (tree == NIL) return;
+    lispobj layout = instance_layout(INSTANCE(tree));
+    ++*n_nodes;
+    if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+        validate_recurse(((struct unary_node*)INSTANCE(tree))->child,
+                         n_nodes, n_keys);
+    } else {
+       ++*n_keys;
+        struct binary_node* node = (void*)INSTANCE(tree);
+        lispobj key = node->key;
+        gc_assert(lowtag_of(key) == 0);
+        gc_assert(find_page_index((void*)key) >= 0);
+        gc_assert(widetag_of((lispobj*)key) == CODE_HEADER_WIDETAG);
+        lispobj l = NIL, r = NIL;
+        int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT)
+                  & INSTANCE_LENGTH_MASK;
+        // unless a fringe node, read the left and right pointers
+        if (len > (int)(1+INSTANCE_DATA_START)) l = node->left, r = node->right;
+        if (l != NIL) validate_recurse(l, n_nodes, n_keys);
+        if (r != NIL) validate_recurse(r, n_nodes, n_keys);
+    }
+}
+
+void validate_brothertree(lispobj tree) {
+    int n_nodes = 0, n_keys = 0;
+    validate_recurse(tree, &n_nodes, &n_keys);
+    printf("code tree: %d nodes, %d keys\n", n_nodes, n_keys);
 }

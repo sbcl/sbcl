@@ -9,11 +9,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(defpackage "SB-BROTHERTREE"
-  (:use "CL" "SB-EXT")
-  (:import-from "SB-INT" #:named-let #:binding* #:awhen #:acond #:it)
-  (:shadow #:delete))
-
 (in-package "SB-BROTHERTREE")
 
 ;;;; Translated from the Haskell code in
@@ -21,10 +16,12 @@
 
 ;(declaim (optimize (sb-c::store-coverage-data 3)))
 
+(deftype keytype () 'sb-vm:word)
+
 (defstruct (binary-node (:copier nil)
                         (:constructor make-binary-node (key %left %right)))
   ;; key must be in slot index 0 because fringe binary nodes have only this slot
-  (key 0 :type fixnum)
+  (key 0 :type keytype)
   %left %right)
 (defstruct (unary-node (:copier nil)
                        (:conc-name "")
@@ -79,9 +76,11 @@
           (error "won't make binary node from ~S ~S" left right))
   (if (or left right)
       (make-binary-node key left right)
-      (let ((instance (sb-kernel:%new-instance #.(sb-kernel:find-layout 'binary-node)
-                                               (1+ sb-vm:instance-data-start))))
-        (sb-kernel:%instance-set instance sb-vm:instance-data-start key)
+      (let ((instance (sb-kernel:%make-instance/mixed
+                       (1+ sb-vm:instance-data-start))))
+        (sb-kernel:%set-instance-layout instance #.(sb-kernel:find-layout 'binary-node))
+        ;; Nodes are immutable, hence no setf'er exists.
+        (sb-kernel:%raw-instance-set/word instance sb-vm:instance-data-start key)
         (truly-the binary-node instance))))
 
 (defmacro binary-node-parts (node)
@@ -108,8 +107,9 @@
       (format stream "child=~D"
               (if child (binary-node-key child))))))
 
-(defun insert (a tree)
-  (declare (fixnum a))
+(defun insert (a tree &aux (leaf (L2 a)))
+  (declare (keytype a))
+  (declare (dynamic-extent leaf))
   ;; The Haskell code uses different definitions of 'root' and 'n2'
   ;; for insert and delete. That's certainly confusing.
   ;; Anyway these have to be internal functions to avoid duplication.
@@ -156,7 +156,7 @@
                           (values l b (ins r)))))
               (|n2| new-left new-key new-right)))
          (unary-node (|n1| (ins (child x))))
-         (null (L2 a))))
+         (null leaf)))
      (root (x) ; bubble up. not sure why 'root' is a good name for this
        (typecase x
          ((cons (eql leaf)) (N2 nil (cdr x) nil))
@@ -172,7 +172,6 @@
 ;;; sure we don't wrongly pick the last.
 ;;; Hence it doesn't really matter much in what order the others are tried.
 (defglobal *cases* (make-array 8))
-(eval-when (:compile-toplevel :execute)
 (defmacro pattern-case ((L R) &rest clauses &aux (n -1))
   (flet ((shape-is (node shape)
            ;; SHAPE has a small number of hardcoded possibilities which are
@@ -206,10 +205,10 @@
                                     ,(shape-is R (second test)))
                                ;; (incf (aref *cases* ,n))
                                ,consequent))))
-                   clauses)))))
+                   clauses))))
 
 (defun delete (a tree)
-  (declare (fixnum a))
+  (declare (keytype a))
   (labels ((|n2| (left key right)
              ;; this surely isn't as readable as pattern-matching in Haskell,
              ;; but it'll do.
@@ -293,7 +292,7 @@
                (t x))))
   (root (del tree))))
 
-(defun print-tree (tree)
+(defun print-tree (tree &optional converter)
   (named-let recurse ((depth 0) (node tree))
     (etypecase node
       (unary-node
@@ -302,13 +301,17 @@
        (recurse (1+ depth) (child node)))
       (binary-node
        (multiple-value-bind (left key right) (binary-node-parts node)
-         (format t "~2d: ~v@t Key=~D ~x~%"
-                 depth (* depth 2) key (sb-kernel:get-lisp-obj-address node))
+         (let ((*print-pretty* nil))
+           (format t "~2d: ~v@t Key=~X ~x~@[ ~A~]~%"
+                   depth (* depth 2) key (sb-kernel:get-lisp-obj-address node)
+                   (if converter (funcall converter node key))))
          (recurse (1+ depth) left)
          (recurse (1+ depth) right)))
       (null))))
+(export 'print-tree)
 
 (defun find= (key tree)
+  (declare (keytype key))
   (loop
    (typecase tree
      (binary-node
@@ -320,7 +323,7 @@
      (null (return nil)))))
 
 (defun find<= (key tree)
-  (declare (fixnum key))
+  (declare (keytype key))
   (when tree
     (named-let recurse ((node tree) (best nil))
       (if (unary-node-p (truly-the sb-kernel:instance node))

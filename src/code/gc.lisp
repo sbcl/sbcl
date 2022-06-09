@@ -424,6 +424,42 @@ statistics are appended to it."
 (define-alien-variable generations
     (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
 
+;;; Why is PAGE-INDEX-T in SB-KERNEL but PAGE and the page table are in SB-VM?
+(define-alien-type (struct sb-vm::page)
+    (struct sb-vm::page
+            ;; To cut down the size of the page table, the scan_start_offset
+            ;; - a/k/a "start" - is measured in 4-byte integers regardless
+            ;; of word size. This is fine for 32-bit address space,
+            ;; but if 64-bit then we have to scale the value. Additionally
+            ;; there is a fallback for when even the scaled value is too big.
+            (sb-vm::start #+64-bit (unsigned 32) #-64-bit signed)
+            ;; On platforms with small enough GC pages, this field
+            ;; will be a short. On platforms with larger ones, it'll
+            ;; be an int. It should probably never be an int.
+            (sb-vm::words-used (unsigned
+                                #.(if (typep sb-vm::gencgc-page-words '(unsigned-byte 16))
+                                      16
+                                      32)))
+            (sb-vm::flags (unsigned 8)) ; in C this is {type, need_zerofill, pinned}
+            (sb-vm::gen (signed 8))))
+(define-alien-variable ("page_table" sb-vm:page-table) (* (struct sb-vm::page)))
+(declaim (inline sb-vm:find-page-index))
+(define-alien-routine ("ext_find_page_index" sb-vm:find-page-index) page-index-t (address unsigned))
+
+(defun generation-of (object)
+  (with-pinned-objects (object)
+    (let* ((addr (get-lisp-obj-address object))
+           (page (sb-vm:find-page-index addr)))
+      (cond ((>= page 0) (slot (deref sb-vm:page-table page) 'sb-vm::gen))
+            #+immobile-space
+            ((immobile-space-addr-p addr)
+             ;; SIMPLE-FUNs don't contain a generation byte
+             (when (simple-fun-p object)
+               (setq addr (get-lisp-obj-address (fun-code-header object))))
+             (let ((sap (int-sap (logandc2 addr sb-vm:lowtag-mask))))
+               (logand (if (fdefn-p object) (sap-ref-8 sap 1) (sap-ref-8 sap 3))
+                       #xF)))))))
+
 (export 'page-protected-p)
 (macrolet ((addr->mark (addr)
              `(sap-ref-8 (extern-alien "gc_card_mark" system-area-pointer)

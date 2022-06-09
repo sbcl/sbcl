@@ -1,5 +1,7 @@
 ;;;; Tests
 
+(let ((*evaluator-mode* :compile)) (load "../src/code/redblack.lisp"))
+
 (add-package-local-nickname "REDBLACK" "SB-RBTREE.MAP")
 (use-package 'sb-int)
 (import 'sb-rbtree::(red black))

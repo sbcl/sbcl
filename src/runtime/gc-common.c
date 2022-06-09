@@ -1907,6 +1907,8 @@ sword_t scav_code_blob(lispobj *object, lispobj header);
 lispobj *
 component_ptr_from_pc(char *pc)
 {
+    /* FIXME: this is the wrong way to go about finding code,
+     * because it won't look in the codeblob tree for immobile space. */
     lispobj *object = search_all_gc_spaces(pc);
 
     if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
