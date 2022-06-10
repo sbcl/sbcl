@@ -430,6 +430,24 @@
                              (symbolicate "FUN-INFO-" (second what)))
                           (fun-info-or-lose ',(first what)))
                          #',name))))))))
+
+(defmacro defoptimizers (kind names (lambda-list
+                                     &optional (node (gensym))
+                                     &rest vars)
+                         &body body)
+  (let ((optimizer-name (symbolicate (car names)
+                                     "-"
+                                     kind
+                                     "-OPTIMIZER")))
+    `(progn
+       (defoptimizer ,optimizer-name
+           (,lambda-list ,node ,@vars)
+         ,@body)
+       ,@(loop for name in names
+               collect `(setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
+                                  (symbolicate "FUN-INFO-" kind))
+                               (fun-info-or-lose ',name))
+                              #',optimizer-name)))))
 
 ;;;; IR groveling macros
 

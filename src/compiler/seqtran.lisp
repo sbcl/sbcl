@@ -1057,69 +1057,46 @@
                            (type-specifier start-type)
                            suffix
                            (type-specifier end-type))))))))
+(defoptimizers ir2-hook
+    (string=* string<* string>* string<=* string>=*
+     %sp-string-compare simple-base-string=
+     #+sb-unicode simple-character-string=)
+    ((string1 string2 start1 end1 start2 end2) node)
+  (check-sequence-ranges string1 start1 end1 node 1 'string1)
+  (check-sequence-ranges string2 start2 end2 node 2 'string2))
 
-(macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((string1 string2 start1 end1 start2 end2) node)
-                (check-sequence-ranges string1 start1 end1 node 1 'string1)
-                (check-sequence-ranges string2 start2 end2 node 2 'string2))))
-  (def string=*)
-  (def string<*)
-  (def string>*)
-  (def string<=*)
-  (def string>=*)
-  (def %sp-string-compare)
-  (def simple-base-string=)
-  #+sb-unicode
-  (def simple-character-string=))
+(defoptimizers ir2-hook
+    (string-equal string-not-equal string-greaterp string-lessp)
+    ((string1 string2 &key start1 end1 start2 end2) node)
+  (check-sequence-ranges string1 start1 end1 node 1 'string1)
+  (check-sequence-ranges string2 start2 end2 node 2 'string2))
 
-(macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((string1 string2 &key start1 end1 start2 end2) node)
-                (check-sequence-ranges string1 start1 end1 node 1 'string1)
-                (check-sequence-ranges string2 start2 end2 node 2 'string2))))
-  (def string-equal)
-  (def string-not-equal)
-  (def string-greaterp)
-  (def string-lessp))
+(defoptimizers ir2-hook
+    (string-downcase string-upcase
+     nstring-downcase nstring-upcase
+     string-capitalize nstring-capitalize)
+    ((string &key start end) node)
+  (check-sequence-ranges string start end node))
 
-(macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((string &key start end) node)
-                (check-sequence-ranges string start end node))))
-  (def string-downcase)
-  (def string-upcase)
-  (def nstring-downcase)
-  (def nstring-upcase)
-  (def string-capitalize)
-  (def nstring-capitalize))
+(defoptimizers ir2-hook
+    (find find-if find-if-not position position-if position-if-not
+     remove remove-if remove-if-not delete delete-if delete-if-not
+     count count-if count-if-not reduce
+     remove-duplicates delete-duplicates)
+    ((x sequence &key start end &allow-other-keys) node)
+  (check-sequence-ranges sequence start end node))
 
-(macrolet ((def (name &optional no-arg)
-             `(defoptimizer (,name ir2-hook) ((,@(unless no-arg '(x)) sequence &key start end &allow-other-keys) node)
-                (check-sequence-ranges sequence start end node))))
-  (def find)
-  (def find-if)
-  (def find-if-not)
-  (def position)
-  (def position-if)
-  (def position-if-not)
-  (def remove)
-  (def remove-if)
-  (def remove-if-not)
-  (def delete)
-  (def delete-if)
-  (def delete-if-not)
-  (def count)
-  (def count-if)
-  (def count-if-not)
-  (def reduce)
-  (def remove-duplicates t)
-  (def delete-duplicates t))
+(defoptimizers ir2-hook
+    (remove-duplicates delete-duplicates)
+    ((sequence &key start end &allow-other-keys) node)
+  (check-sequence-ranges sequence start end node))
 
 (defoptimizer (%find-position ir2-hook) ((item sequence from-end start end key test) node)
   (check-sequence-ranges sequence start end node))
 
-(defoptimizer (%find-position-if ir2-hook) ((predicate sequence from-end start end key) node)
-  (check-sequence-ranges sequence start end node))
-
-(defoptimizer (%find-position-if-not ir2-hook) ((predicate sequence from-end start end key) node)
+(defoptimizers ir2-hook
+    (%find-position-if %find-position-if-not)
+    ((predicate sequence from-end start end key) node)
   (check-sequence-ranges sequence start end node))
 
 (defoptimizer (fill ir2-hook) ((sequence item &key start end) node)
@@ -1378,16 +1355,12 @@
                            (type-specifier item-type)
                            (type-specifier seq-type))))))))
 
-(macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((new x seq &key start end &allow-other-keys) node)
-                (check-sequence-ranges seq start end node)
-                (check-sequence-item new seq node "Can't substitute ~a into ~a"))))
-  (def substitute)
-  (def substitute-if)
-  (def substitute-if-not)
-  (def nsubstitute)
-  (def nsubstitute-if)
-  (def nsubstitute-if-not))
+(defoptimizers ir2-hook
+    (substitute substitute-if substitute-if-not
+                nsubstitute nsubstitute-if nsubstitute-if-not)
+    ((new x seq &key start end &allow-other-keys) node)
+  (check-sequence-ranges seq start end node)
+  (check-sequence-item new seq node "Can't substitute ~a into ~a"))
 
 (defoptimizer (vector-fill* ir2-hook) ((seq item start end) node)
   (check-sequence-ranges seq start end node)

@@ -229,12 +229,11 @@
 (defoptimizer ((setf aref) derive-type) ((new-value array &rest subscripts))
   (assert-new-value-type new-value array))
 
-(macrolet ((define (name)
-             `(defoptimizer (,name derive-type) ((array index))
-                (derive-aref-type array))))
-  (define hairy-data-vector-ref)
-  (define hairy-data-vector-ref/check-bounds)
-  (define data-vector-ref))
+(defoptimizers derive-type
+    (hairy-data-vector-ref hairy-data-vector-ref/check-bounds
+     data-vector-ref)
+    ((array index))
+  (derive-aref-type array))
 
 #+(or x86 x86-64)
 (defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
@@ -243,13 +242,12 @@
 (defoptimizer (vector-pop derive-type) ((array))
   (derive-aref-type array))
 
-(macrolet ((define (name)
-             `(defoptimizer (,name derive-type) ((array index new-value))
-                (assert-new-value-type new-value array))))
-  (define hairy-data-vector-set)
-  (define hairy-data-vector-set/check-bounds)
-  ;; DATA-VECTOR-SET is never used for value, so it doesn't need a type deriver.
-  )
+(defoptimizers derive-type
+    (hairy-data-vector-set
+     hairy-data-vector-set/check-bounds)
+    ;; DATA-VECTOR-SET is never used for value, so it doesn't need a type deriver.
+    ((array index new-value))
+  (assert-new-value-type new-value array))
 
 ;;; Figure out the type of the data vector if we know the argument
 ;;; element type.
