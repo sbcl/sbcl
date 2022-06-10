@@ -395,7 +395,6 @@
               )))))))
 
 (defoptimizer (mask-signed-field optimizer) ((width x) node)
-  (declare (ignore width))
   (let ((result-type (single-value-type (node-derived-type node))))
     (multiple-value-bind (low high)
         (integer-type-numeric-bounds result-type)

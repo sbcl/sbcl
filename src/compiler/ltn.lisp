@@ -162,8 +162,7 @@
   (values))
 
 #+call-symbol
-(defoptimizer (%coerce-callable-for-call ltn-annotate) ((fun) node ltn-policy)
-  (declare (ignore ltn-policy))
+(defoptimizer (%coerce-callable-for-call ltn-annotate) ((fun) node)
   (multiple-value-bind (dest dest-lvar)
       (and (node-lvar node)
            (principal-lvar-dest-and-lvar (node-lvar node)))
@@ -500,24 +499,17 @@
 ;;; (The default is o.k. for %CATCH, since environment analysis
 ;;; converted the reference to the escape function into a constant
 ;;; reference to the NLX-INFO.)
-(defoptimizer (%unwind-protect ltn-annotate) ((escape cleanup)
-                                              node
-                                              ltn-policy)
-  (declare (ignore escape cleanup ltn-policy))
+(defoptimizer (%unwind-protect ltn-annotate) ((escape cleanup) node)
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil))
 
 ;;; Make sure that arguments of magic functions are not annotated.
 ;;; (Otherwise the compiler may dump its internal structures as
 ;;; constants :-()
-(defoptimizer (%pop-values ltn-annotate) ((%lvar) node ltn-policy)
-  (declare (ignore %lvar node ltn-policy)))
-(defoptimizer (%dummy-dx-alloc ltn-annotate) ((target source) node ltn-policy)
-  (declare (ignore target source node ltn-policy)))
+(defoptimizer (%pop-values ltn-annotate) ((%lvar)))
+(defoptimizer (%dummy-dx-alloc ltn-annotate) ((target source)))
 
-(defoptimizer (%nip-values ltn-annotate) ((&rest lvars)
-                                          node ltn-policy)
-  (declare (ignore node ltn-policy))
+(defoptimizer (%nip-values ltn-annotate) ((&rest lvars))
   ;; Undo the optimization performed by LTN-ANALYZE-MV-CALL,
   ;; which only uses the CSP of the first argument.
   (loop for lvar-lvar in lvars

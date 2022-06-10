@@ -201,7 +201,6 @@
     (foldable flushable movable))
 
 (defoptimizer (sign-extend derive-type) ((x size))
-  (declare (ignore x))
   (when (sb-c:constant-lvar-p size)
     (specifier-type `(signed-byte ,(sb-c:lvar-value size)))))
 

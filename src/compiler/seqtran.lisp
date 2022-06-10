@@ -1059,8 +1059,7 @@
                            (type-specifier end-type))))))))
 
 (macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((string1 string2 start1 end1 start2 end2) node block)
-                (declare (ignore block))
+             `(defoptimizer (,name ir2-hook) ((string1 string2 start1 end1 start2 end2) node)
                 (check-sequence-ranges string1 start1 end1 node 1 'string1)
                 (check-sequence-ranges string2 start2 end2 node 2 'string2))))
   (def string=*)
@@ -1074,8 +1073,7 @@
   (def simple-character-string=))
 
 (macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((string1 string2 &key start1 end1 start2 end2) node block)
-                (declare (ignore block))
+             `(defoptimizer (,name ir2-hook) ((string1 string2 &key start1 end1 start2 end2) node)
                 (check-sequence-ranges string1 start1 end1 node 1 'string1)
                 (check-sequence-ranges string2 start2 end2 node 2 'string2))))
   (def string-equal)
@@ -1084,8 +1082,7 @@
   (def string-lessp))
 
 (macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((string &key start end) node block)
-                (declare (ignore block))
+             `(defoptimizer (,name ir2-hook) ((string &key start end) node)
                 (check-sequence-ranges string start end node))))
   (def string-downcase)
   (def string-upcase)
@@ -1095,8 +1092,7 @@
   (def nstring-capitalize))
 
 (macrolet ((def (name &optional no-arg)
-             `(defoptimizer (,name ir2-hook) ((,@(unless no-arg '(x)) sequence &key start end &allow-other-keys) node block)
-                (declare (ignore ,@(unless no-arg '(x)) block))
+             `(defoptimizer (,name ir2-hook) ((,@(unless no-arg '(x)) sequence &key start end &allow-other-keys) node)
                 (check-sequence-ranges sequence start end node))))
   (def find)
   (def find-if)
@@ -1117,29 +1113,23 @@
   (def remove-duplicates t)
   (def delete-duplicates t))
 
-(defoptimizer (%find-position ir2-hook) ((item sequence from-end start end key test) node block)
-  (declare (ignore item from-end key test block))
+(defoptimizer (%find-position ir2-hook) ((item sequence from-end start end key test) node)
   (check-sequence-ranges sequence start end node))
 
-(defoptimizer (%find-position-if ir2-hook) ((predicate sequence from-end start end key) node block)
-  (declare (ignore predicate from-end key block))
+(defoptimizer (%find-position-if ir2-hook) ((predicate sequence from-end start end key) node)
   (check-sequence-ranges sequence start end node))
 
-(defoptimizer (%find-position-if-not ir2-hook) ((predicate sequence from-end start end key) node block)
-  (declare (ignore predicate from-end key block))
+(defoptimizer (%find-position-if-not ir2-hook) ((predicate sequence from-end start end key) node)
   (check-sequence-ranges sequence start end node))
 
-(defoptimizer (fill ir2-hook) ((sequence item &key start end) node block)
-  (declare (ignore item block))
+(defoptimizer (fill ir2-hook) ((sequence item &key start end) node)
   (check-sequence-ranges sequence start end node))
 
-(defoptimizer (search ir2-hook) ((sub-sequence1 main-sequence2 &key start1 end1 start2 end2 &allow-other-keys) node block)
-  (declare (ignore block))
+(defoptimizer (search ir2-hook) ((sub-sequence1 main-sequence2 &key start1 end1 start2 end2 &allow-other-keys) node)
   (check-sequence-ranges sub-sequence1 start1 end1 node 1 'sub-sequence1)
   (check-sequence-ranges main-sequence2 start2 end2 node 2 'main-sequence2))
 
-(defoptimizer (mismatch ir2-hook) ((sequence1 sequence2 &key start1 end1 start2 end2 &allow-other-keys) node block)
-  (declare (ignore block))
+(defoptimizer (mismatch ir2-hook) ((sequence1 sequence2 &key start1 end1 start2 end2 &allow-other-keys) node)
   (check-sequence-ranges sequence1 start1 end1 node 1 'sequence1)
   (check-sequence-ranges sequence2 start2 end2 node 2 'sequence2))
 
@@ -1326,8 +1316,7 @@
                        :node node)
   (transform-replace nil node)))
 
-(defoptimizer (replace ir2-hook) ((seq1 seq2 &key start1 end1 start2 end2) node block)
-  (declare (ignore block))
+(defoptimizer (replace ir2-hook) ((seq1 seq2 &key start1 end1 start2 end2) node)
   (flet ((element-type (lvar)
            (type-array-element-type (lvar-type lvar))))
     (let ((type1 (element-type seq1))
@@ -1352,9 +1341,7 @@
                               (type-specifier type1)
                               (type-specifier type2))))))))
 
-(defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-contents &allow-other-keys)
-                                      node block)
-  (declare (ignore dimensions n-bits block))
+(defoptimizer (%make-array ir2-hook) ((dimensions widetag n-bits &key initial-contents &allow-other-keys) node)
   (when (and (constant-lvar-p widetag)
              initial-contents)
     (let* ((saetp (find (lvar-value widetag) sb-vm:*specialized-array-element-type-properties*
@@ -1392,8 +1379,7 @@
                            (type-specifier seq-type))))))))
 
 (macrolet ((def (name)
-             `(defoptimizer (,name ir2-hook) ((new x seq &key start end &allow-other-keys) node block)
-                (declare (ignore x block))
+             `(defoptimizer (,name ir2-hook) ((new x seq &key start end &allow-other-keys) node)
                 (check-sequence-ranges seq start end node)
                 (check-sequence-item new seq node "Can't substitute ~a into ~a"))))
   (def substitute)
@@ -1403,17 +1389,14 @@
   (def nsubstitute-if)
   (def nsubstitute-if-not))
 
-(defoptimizer (vector-fill* ir2-hook) ((seq item start end) node block)
-  (declare (ignore block))
+(defoptimizer (vector-fill* ir2-hook) ((seq item start end) node)
   (check-sequence-ranges seq start end node)
   (check-sequence-item item seq node "Can't fill ~a into ~a"))
 
-(defoptimizer (vector-push ir2-hook) ((item vector) node block)
-  (declare (ignore block))
+(defoptimizer (vector-push ir2-hook) ((item vector) node)
   (check-sequence-item item vector node "Can't push ~a into ~a"))
 
-(defoptimizer (vector-push-extend ir2-hook) ((item vector &optional min-extension) node block)
-  (declare (ignore block min-extension))
+(defoptimizer (vector-push-extend ir2-hook) ((item vector &optional min-extension) node)
   (check-sequence-item item vector node "Can't push ~a into ~a"))
 
 (defun check-concatenate (type sequences node &optional (description "concatenate"))
@@ -1438,16 +1421,13 @@
                                                                        :element-type type))
                                       type))))))))
 
-(defoptimizer (%concatenate-to-string ir2-hook) ((&rest args) node block)
-  (declare (ignore block))
+(defoptimizer (%concatenate-to-string ir2-hook) ((&rest args) node)
   (check-concatenate 'string args node))
 
-(defoptimizer (%concatenate-to-base-string ir2-hook) ((&rest args) node block)
-  (declare (ignore block))
+(defoptimizer (%concatenate-to-base-string ir2-hook) ((&rest args) node)
   (check-concatenate 'base-string args node))
 
-(defoptimizer (%concatenate-to-vector ir2-hook) ((widetag &rest args) node block)
-  (declare (ignore block))
+(defoptimizer (%concatenate-to-vector ir2-hook) ((widetag &rest args) node)
   (when (constant-lvar-p widetag)
     (check-concatenate (sb-vm:saetp-ctype
                         (find (lvar-value widetag)
@@ -1455,8 +1435,7 @@
                               :key #'sb-vm:saetp-typecode))
                        args node)))
 
-(defoptimizer (merge ir2-hook) ((type sequence1 sequence2 predicate &key &allow-other-keys) node block)
-  (declare (ignore predicate block))
+(defoptimizer (merge ir2-hook) ((type sequence1 sequence2 predicate &key &allow-other-keys) node)
   (when (constant-lvar-p type)
    (check-concatenate (lvar-value type) (list sequence1 sequence2) node "merge")))
 
@@ -2972,7 +2951,6 @@
            (give-up-ir1-transform)))))
 
 (defoptimizer (union derive-type) ((list1 list2 &rest args))
-  (declare (ignore args))
   (let ((cons-type (specifier-type 'cons)))
     (if (or (csubtypep (lvar-type list1) cons-type)
             (csubtypep (lvar-type list2) cons-type))
@@ -2980,7 +2958,6 @@
         (specifier-type 'list))))
 
 (defoptimizer (nunion derive-type) ((list1 list2 &rest args))
-  (declare (ignore args))
   (let ((cons-type (specifier-type 'cons)))
     (if (or (csubtypep (lvar-type list1) cons-type)
             (csubtypep (lvar-type list2) cons-type))

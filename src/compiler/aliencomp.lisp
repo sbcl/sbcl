@@ -236,7 +236,6 @@
 
 #+nil ;; Shouldn't be necessary.
 (defoptimizer (deref derive-type) ((alien &rest noise))
-  (declare (ignore noise))
   (block nil
     (catch 'give-up-ir1-transform
       (return (make-alien-type-type (find-deref-element-type alien))))
@@ -252,7 +251,6 @@
 
 #+nil ;; ### Again, the value might be coerced.
 (defoptimizer (%set-deref derive-type) ((alien value &rest noise))
-  (declare (ignore noise))
   (block nil
     (catch 'give-up-ir1-transform
       (let ((type (make-alien-type-type
@@ -272,7 +270,6 @@
              value))))
 
 (defoptimizer (%deref-addr derive-type) ((alien &rest noise))
-  (declare (ignore noise))
   (block nil
     (catch 'give-up-ir1-transform
       (return (make-alien-type-type
@@ -414,7 +411,6 @@
         '(error "This should be eliminated as dead code."))))
 
 (defoptimizer (%local-alien-addr derive-type) ((info var))
-  (declare (ignore var))
   (if (constant-lvar-p info)
       (let* ((info (lvar-value info))
              (alien-type (local-alien-info-type info)))
@@ -433,7 +429,6 @@
 ;;;; %CAST
 
 (defoptimizer (%cast derive-type) ((alien type))
-  (declare (ignore alien))
   (or (when (constant-lvar-p type)
         (let ((alien-type (lvar-value type)))
           (when (alien-type-p alien-type)
@@ -466,7 +461,6 @@
        (give-up-ir1-transform)))))
 
 (defoptimizer (%sap-alien derive-type) ((sap type))
-  (declare (ignore sap))
   (if (constant-lvar-p type)
       (make-alien-type-type (lvar-value type))
       *wild-type*))
@@ -594,7 +588,6 @@
                ,body)))))))
 
 (defoptimizer (%alien-funcall derive-type) ((function type &rest args))
-  (declare (ignore function args))
   (unless (and (constant-lvar-p type)
                (alien-fun-type-p (lvar-value type)))
     (error "Something is broken."))
@@ -604,8 +597,7 @@
     (if (eq spec '*) *wild-type* (values-specifier-type spec))))
 
 (defoptimizer (%alien-funcall ltn-annotate)
-              ((function type &rest args) node ltn-policy)
-  (declare (ignore type ltn-policy))
+              ((function type &rest args) node)
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil)
   (unless (and (constant-lvar-p function)

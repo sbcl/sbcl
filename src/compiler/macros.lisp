@@ -380,7 +380,7 @@
 ;;; methods are passed an additional POLICY argument, and IR2-CONVERT
 ;;; methods are passed an additional IR2-BLOCK argument.
 (defmacro defoptimizer (what (lambda-list
-                              &optional (node (gensym) node-p)
+                              &optional (node (gensym))
                               &rest vars)
                         &body body)
   (let ((name (flet ((function-name (name)
@@ -405,28 +405,25 @@
                    `(set-vop-optimizer (template-or-lose ',vop-name) #',name)))
         (binding* (((forms decls) (parse-body body nil))
                    ((var-decls more-decls) (extract-var-decls decls vars))
-                   ;; In case the BODY declares IGNORE of the formal NODE var,
-                   ;; we rebind it from N-NODE and never reference it from BINDS.
-                   (n-node (make-symbol "NODE"))
-                   ((binds lambda-vars gensyms)
-                    (parse-deftransform lambda-list n-node
+                   ((binds lambda-vars)
+                    (parse-deftransform lambda-list node
                                         `(return-from ,name
                                            ,(if (and (consp what)
                                                      (eq (second what)
                                                          'equality-constraint))
                                                 :give-up
-                                                nil)))))
+                                                nil))))
+                   (args (gensym)))
           (declare (ignore lambda-vars))
           `(progn
              ;; We can't stuff the BINDS as &AUX vars into the lambda list
              ;; because there can be a RETURN-FROM in there.
-             (defun ,name (,n-node ,@vars)
+             (defun ,name (,node ,@vars &rest ,args)
+               (declare (ignorable ,node ,@(butlast vars))
+                        (ignore ,args))
                ,@(if var-decls (list var-decls))
-               (let* (,@binds ,@(if node-p `((,node ,n-node))))
-                 ;; Syntax requires naming NODE even if undesired if VARS
-                 ;; are present, so in that case make NODE ignorable.
-                 (declare (ignorable ,@(if (and vars node-p) `(,node))
-                                     ,@gensyms))
+               (let* (,@binds)
+                 (declare (ignorable ,@(mapcar #'car binds)))
                  ,@more-decls ,@forms))
              ,@(when (consp what)
                  `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))

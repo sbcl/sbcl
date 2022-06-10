@@ -224,16 +224,13 @@
                 (give-up))))))))
 
 (defoptimizer (aref derive-type) ((array &rest subscripts))
-  (declare (ignore subscripts))
   (derive-aref-type array))
 
 (defoptimizer ((setf aref) derive-type) ((new-value array &rest subscripts))
-  (declare (ignore subscripts))
   (assert-new-value-type new-value array))
 
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index))
-                (declare (ignore index))
                 (derive-aref-type array))))
   (define hairy-data-vector-ref)
   (define hairy-data-vector-ref/check-bounds)
@@ -241,7 +238,6 @@
 
 #+(or x86 x86-64)
 (defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
-  (declare (ignore index offset))
   (derive-aref-type array))
 
 (defoptimizer (vector-pop derive-type) ((array))
@@ -249,7 +245,6 @@
 
 (macrolet ((define (name)
              `(defoptimizer (,name derive-type) ((array index new-value))
-                (declare (ignore index))
                 (assert-new-value-type new-value array))))
   (define hairy-data-vector-set)
   (define hairy-data-vector-set/check-bounds)
@@ -268,18 +263,14 @@
           ((csubtypep atype (specifier-type 'string))
            (specifier-type 'simple-string)))))
 (defoptimizer (%with-array-data derive-type) ((array start end))
-  (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
 (defoptimizer (%with-array-data/fp derive-type) ((array start end))
-  (declare (ignore start end))
   (derive-%with-array-data/mumble-type array))
 
 (defoptimizer (row-major-aref derive-type) ((array index))
-  (declare (ignore index))
   (derive-aref-type array))
 
 (defoptimizer (%set-row-major-aref derive-type) ((array index new-value))
-  (declare (ignore index))
   (assert-new-value-type new-value array))
 
 (defun check-array-dimensions (dims node)
@@ -358,7 +349,6 @@
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
            &allow-other-keys)
      node)
-  (declare (ignore n-bits))
   (let ((saetp (and (constant-lvar-p widetag)
                     (find (lvar-value widetag)
                           sb-vm:*specialized-array-element-type-properties*
@@ -1995,13 +1985,11 @@
                     nil)))))))
 
 (defoptimizer (array-header-p constraint-propagate-if)
-    ((array) node gen)
-  (declare (ignore gen))
+    ((array))
   (values array (specifier-type '(and array (not (simple-array * (*)))))))
 
 ;;; If ARRAY-HAS-FILL-POINTER-P returns true, then ARRAY
 ;;; is of the specified type.
 (defoptimizer (array-has-fill-pointer-p constraint-propagate-if)
-    ((array) node gen)
-  (declare (ignore gen))
+    ((array))
   (values array (specifier-type '(and vector (not simple-array)))))

@@ -1457,7 +1457,6 @@
                        #'sb-xc:*))
 
 (defoptimizer (%multiply-high derive-type) ((x y) node)
-  (declare (ignore x y))
   (%signed-multiply-high-derive-type-optimizer node))
 
 (defun /-derive-type-aux (x y same-arg)
@@ -2224,7 +2223,6 @@
                      (t `(,high))))))
 
 (defoptimizer (random derive-type) ((bound &optional state))
-  (declare (ignore state))
   (one-arg-derive-type bound #'random-derive-type-aux nil))
 
 ;;;; miscellaneous derive-type methods
@@ -2419,7 +2417,6 @@
     (xform spec env int '%deposit-field newbyte)))
 
 (defoptimizer (%ldb derive-type) ((size posn num))
-  (declare (ignore posn num))
   (let ((size (lvar-type size)))
     (if (and (numeric-type-p size)
              (csubtypep size (specifier-type 'integer)))
@@ -2430,7 +2427,6 @@
         *universal-type*)))
 
 (defoptimizer (%mask-field derive-type) ((size posn num))
-  (declare (ignore num))
   (let ((size (lvar-type size))
         (posn (lvar-type posn)))
     (if (and (numeric-type-p size)
@@ -2477,11 +2473,9 @@
                  `(unsigned-byte* ,raw-bit-count)))))))))
 
 (defoptimizer (%dpb derive-type) ((newbyte size posn int))
-  (declare (ignore newbyte))
   (%deposit-field-derive-type-aux size posn int))
 
 (defoptimizer (%deposit-field derive-type) ((newbyte size posn int))
-  (declare (ignore newbyte))
   (%deposit-field-derive-type-aux size posn int))
 
 (deftransform %ldb ((size posn int) (fixnum fixnum integer) word)
@@ -2531,7 +2525,6 @@
              (logand int (lognot mask)))))
 
 (defoptimizer (mask-signed-field derive-type) ((size x))
-  (declare (ignore x))
   (let ((size (lvar-type size)))
     (if (numeric-type-p size)
         (let ((size-high (numeric-type-high size)))
@@ -2914,7 +2907,6 @@
 
 (defoptimizer (truncate constraint-propagate)
     ((x y) node gen)
-  (declare (ignore node x))
   (when (csubtypep (lvar-type y) (specifier-type 'rational))
     (let ((var (ok-lvar-lambda-var y gen)))
       (when var
@@ -2922,7 +2914,6 @@
 
 (defoptimizer (/ constraint-propagate)
     ((x y) node gen)
-  (declare (ignore node x))
   (when (csubtypep (lvar-type y) (specifier-type 'rational))
     (let ((var (ok-lvar-lambda-var y gen)))
       (when var
@@ -4640,7 +4631,6 @@
           (lambda (node) (check-format-args node fun arg-n nil)))))
 
 (defoptimizer (format derive-type) ((dest control &rest args))
-  (declare (ignore control args))
   (when (lvar-value-is-nil dest)
     (specifier-type 'simple-string)))
 
@@ -4840,7 +4830,6 @@
            result-typeoid))))))
 
 (defoptimizer (compile derive-type) ((nameoid function))
-  (declare (ignore function))
   (when (csubtypep (lvar-type nameoid)
                    (specifier-type 'null))
     (values-specifier-type '(values function boolean boolean))))
@@ -5032,8 +5021,7 @@
 
 ;;; Can fold only when time-zone is supplied.
 (defoptimizer (encode-universal-time optimizer)
-    (#1=(second minute hour date month year time-zone) node)
-  (declare (ignore . #1#))
+    ((second minute hour date month year time-zone) node)
   (when (every #'constant-lvar-p (basic-combination-args node))
     (constant-fold-call node)
     t))
@@ -5149,7 +5137,6 @@
 #+sb-thread
 (progn
 (defoptimizer (sb-thread::call-with-mutex derive-type) ((function mutex waitp timeout))
-  (declare (ignore mutex))
   (let ((type (lvar-fun-type function)))
     (when (fun-type-p type)
       (let ((null-p (not (and (constant-lvar-p waitp)

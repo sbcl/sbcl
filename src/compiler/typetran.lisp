@@ -140,8 +140,7 @@
          (error "Class not yet defined: ~S" name))))
 
 (defoptimizer (%typep-wrapper constraint-propagate-if)
-    ((test-value variable type) node gen)
-  (declare (ignore test-value gen))
+    ((test-value variable type) node)
   (aver (constant-lvar-p type))
   (let ((type (lvar-value type)))
     (values variable (if (ctype-p type)
@@ -174,7 +173,6 @@
   nil)
 
 (defoptimizer (%type-constraint constraint-propagate) ((x type) node gen)
-  (declare (ignore node))
   (let ((var (ok-lvar-lambda-var x gen)))
     (when var
       (let ((type (lvar-value type)))

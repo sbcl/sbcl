@@ -563,8 +563,7 @@
                                (ir2-lvar-locs 2value)
                                (ir2-lvar-locs 2lvar)))))))
 
-(defoptimizer (%check-bound ir2-hook) ((array bound index) node block)
-  (declare (ignore block))
+(defoptimizer (%check-bound ir2-hook) ((array bound index) node)
   (let* ((bound-type (lvar-type bound))
          (bound-type
            (specifier-type `(integer 0
@@ -780,7 +779,6 @@
 ;;; case of IR2-CONVERT-TEMPLATE is that there can be codegen-info
 ;;; arguments.
 (defoptimizer (%%primitive ir2-convert) ((template info &rest args) call block)
-  (declare (ignore args))
   (let* ((template (lvar-value template))
          (info (lvar-value info))
          (lvar (node-lvar call))
@@ -801,7 +799,6 @@
   (values))
 
 (defoptimizer (%%primitive derive-type) ((template info &rest args))
-  (declare (ignore info args))
   (let* ((template (lvar-value template))
          (type (template-type template)))
     (cond ((zerop (vop-info-num-results template))
@@ -1841,7 +1838,6 @@ not stack-allocated LVAR ~S." source-lvar)))))
             (emit-constant name))))))
 
 (defoptimizer (%special-unbind ir2-convert) ((&rest symbols) node block)
-  (declare (ignorable symbols))
   (if-vop-existsp (:named sb-c:unbind-n)
     (vop unbind-n node block (mapcar #'lvar-value symbols))
     (vop unbind node block)))
@@ -1919,7 +1915,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 ;;; %CLEANUP-POINT doesn't do anything except prevent the body from
 ;;; being entirely deleted.
-(defoptimizer (%cleanup-point ir2-convert) ((&rest args) node block) args node block)
+(defoptimizer (%cleanup-point ir2-convert) ((&rest args)))
 
 ;;; This function invalidates a lexical exit on exiting from the
 ;;; dynamic extent. This is done by storing 0 into the indirect value
@@ -2005,7 +2001,6 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (check-catch-tag-type tag)
   (emit-nlx-start node block (lvar-value info-lvar) tag))
 (defoptimizer (%unwind-protect ir2-convert) ((info-lvar cleanup) node block)
-  (declare (ignore cleanup))
   (emit-nlx-start node block (lvar-value info-lvar) nil))
 
 ;;; Emit the entry code for a non-local exit. We receive values and
@@ -2186,7 +2181,6 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (defoptimizer (%compile-time-type-error ir2-convert)
     ((objects atype dtype detail code-context cast-context) node block)
-  (declare (ignore objects code-context))
   ;; Remove %COMPILE-TIME-TYPE-ERROR bits
   (setf (node-source-path node)
         (cdr (node-source-path node)))
@@ -2198,8 +2192,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (ir2-convert-full-call node block))
 
 (defoptimizer (%compile-time-type-style-warn ir2-convert)
-    ((objects atype dtype detail code-context cast-context) node block)
-  (declare (ignore objects code-context block))
+    ((objects atype dtype detail code-context cast-context) node)
   ;; Remove %COMPILE-TIME-TYPE-ERROR bits
   (setf (node-source-path node)
         (cddr (node-source-path node)))
@@ -2211,8 +2204,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                                  :condition 'type-style-warning))
 
 #-sb-xc-host ;; package-lock-violation-p is not present yet
-(defoptimizer (set ir2-hook) ((symbol value) node block)
-  (declare (ignore value block))
+(defoptimizer (set ir2-hook) ((symbol value) node)
   (when (constant-lvar-p symbol)
     (let* ((symbol (lvar-value symbol))
            (kind (info :variable :kind symbol)))
