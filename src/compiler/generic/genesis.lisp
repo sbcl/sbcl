@@ -1042,6 +1042,7 @@ core and return a descriptor to it."
 (declaim (inline cold-svref))
 (defun cold-svref (vector i)
   (declare (type index i))
+  (aver (< i (cold-vector-len vector)))
   (read-wordindexed vector (+ i sb-vm:vector-data-offset)))
 (defun vector-from-core (descriptor &optional (transform #'identity))
   (let* ((len (cold-vector-len descriptor))
@@ -1606,8 +1607,10 @@ core and return a descriptor to it."
 
 ;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
 (defun cold-symbol-function (symbol &optional (errorp t))
-  (declare (symbol symbol))
-  (let ((f (cold-fdefn-fun (ensure-cold-fdefn symbol))))
+  (let* ((symbol (if (symbolp symbol)
+                     symbol
+                     (warm-symbol symbol)))
+         (f (cold-fdefn-fun (ensure-cold-fdefn symbol))))
     (cond ((not (cold-null f)) f)
           (errorp (error "Expected a definition for ~S in cold load" symbol))
           (t nil))))
@@ -2676,30 +2679,34 @@ Legal values for OFFSET are -4, -8, -12, ..."
                                        sb-vm:other-pointer-lowtag))
   #-untagged-fdefns (write-wordindexed code index fdefn))
 
-(define-cold-fop (fop-load-code (header code-size n-fixups))
-  (let* ((n-entries (read-unsigned-byte-32-arg (fasl-input-stream)))
+(define-cold-fop (fop-load-code (header n-code-bytes n-fixup-elts))
+  (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+         (n-boxed-words (ash header -1))
+         (n-constants (- n-boxed-words sb-vm:code-constants-offset))
+         (stack-elts-consumed (+ n-constants 1 n-fixup-elts))
          (immobile (oddp header)) ; decode the representation used by dump
          ;; The number of constants is rounded up to even (if required)
          ;; to ensure that the code vector will be properly aligned.
-         (n-boxed-words (ash header -1))
          (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
-         (debug-info (pop-stack))
+         (stack (%fasl-input-stack (fasl-input)))
+         (stack-index (fop-stack-pop-n stack stack-elts-consumed))
          (des (allocate-cold-descriptor
                   (or #+immobile-code (and immobile *immobile-varyobj*)
                       *dynamic*)
-                  (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
+                  (+ (ash aligned-n-boxed-words sb-vm:word-shift) n-code-bytes)
                   sb-vm:other-pointer-lowtag :code)))
     (declare (ignorable immobile))
-    (write-code-header-words des aligned-n-boxed-words code-size n-named-calls)
-    (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
+    (write-code-header-words des aligned-n-boxed-words n-code-bytes n-named-calls)
+    (write-wordindexed des sb-vm:code-debug-info-slot
+                       (svref stack (+ stack-index n-constants)))
 
     (let* ((start (+ (descriptor-byte-offset des)
                      (ash aligned-n-boxed-words sb-vm:word-shift)))
-           (end (+ start code-size)))
+           (end (+ start n-code-bytes)))
       (read-bigvec-as-sequence-or-die (descriptor-mem des) (fasl-input-stream)
                                       :start start :end end)
-      (aver (= (code-n-entries des) n-entries))
+      (aver (= (code-n-entries des) n-simple-funs))
       (let ((jumptable-word (read-bits-wordindexed des aligned-n-boxed-words)))
         (aver (zerop (ash jumptable-word -14)))
         ;; assign serialno
@@ -2710,7 +2717,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (when *show-pre-fixup-code-p*
         (format *trace-output*
                 "~&LOAD-CODE: ~d header words, ~d code bytes.~%"
-                n-boxed-words code-size)
+                n-boxed-words n-code-bytes)
         (do ((i start (+ i sb-vm:n-word-bytes)))
             ((>= i end))
           (format *trace-output*
@@ -2719,10 +2726,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (* 2 sb-vm:n-word-bytes)
                   (bvref-word (descriptor-mem des) i)))))
 
-    (let* ((header-index sb-vm:code-constants-offset)
-           (stack (%fasl-input-stack (fasl-input)))
-           (n-constants (- n-boxed-words sb-vm:code-constants-offset))
-           (stack-index (fop-stack-pop-n stack n-constants)))
+    (apply-fixups des stack (+ stack-index (1+ n-constants)) n-fixup-elts)
+    (let ((header-index sb-vm:code-constants-offset))
       (declare (type index header-index stack-index))
       (dotimes (fun-index (code-n-entries des))
         (let ((fn (%code-entry-point des fun-index)))
@@ -2752,8 +2757,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                 (write-wordindexed des header-index constant))))
         (incf header-index)
         (incf stack-index)))
-
-    (apply-fixups (%fasl-input-stack (fasl-input)) des n-fixups)))
+    des))
 
 (defun resolve-deferred-known-funs ()
   (dolist (item *deferred-known-fun-refs*)
@@ -2770,9 +2774,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (define-cold-fop (fop-assembler-code)
   (aver (not *cold-assembler-obj*))
-  (let* ((length (read-word-arg (fasl-input-stream)))
-         (n-routines (read-word-arg (fasl-input-stream)))
-         (n-fixups (read-word-arg (fasl-input-stream)))
+  (let* ((n-routines (read-word-arg (fasl-input-stream)))
+         (length (read-word-arg (fasl-input-stream)))
+         (n-fixup-elts (read-word-arg (fasl-input-stream)))
          (rounded-length (round-up length (* 2 sb-vm:n-word-bytes)))
          (header-n-words (sb-c::asm-routines-boxed-header-nwords))
          (space (or #+(and immobile-code (not metaspace)) *immobile-varyobj*
@@ -2809,14 +2813,15 @@ Legal values for OFFSET are -4, -8, -12, ..."
       ;; at assembly time, they can all be sorted at this point.
       ;; We used to combine them with some magic in genesis.
       (setq *cold-assembler-routines* (sort table #'< :key #'cdr)))
+    (let ((stack (%fasl-input-stack (fasl-input))))
+      (apply-fixups asm-code stack (fop-stack-pop-n stack n-fixup-elts) n-fixup-elts))
     #+(or x86 x86-64) ; fill in the indirect call table
     (let ((index (code-header-words asm-code)))
       (dolist (item *cold-assembler-routines*)
         ;; Preincrement because we skip 1 word for the word containing
         ;; the number of absolute fixups that follow.
         (write-wordindexed/raw asm-code (incf index)
-                               (lookup-assembler-reference (car item)))))
-    (apply-fixups (%fasl-input-stack (fasl-input)) asm-code n-fixups)))
+                               (lookup-assembler-reference (car item)))))))
 
 ;; The partial source info is not needed during the cold load, since
 ;; it can't be interrupted.
@@ -2827,48 +2832,53 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (values))
 
 ;;; Target variant of this is defined in 'target-load'
-(defun apply-fixups (fop-stack code-obj n-fixups)
-  (let ((alloc-points (pop-fop-stack fop-stack)))
-    (when alloc-points
-      (cold-set 'sb-c::*!cold-allocation-patch-point*
-                (cold-cons (cold-cons code-obj alloc-points)
-                           (cold-symbol-value 'sb-c::*!cold-allocation-patch-point*)))))
-  (dotimes (i n-fixups code-obj)
-    (binding* ((info (descriptor-fixnum (pop-fop-stack fop-stack)))
-               (sym (pop-fop-stack fop-stack))
-               ((offset kind flavor) (!unpack-fixup-info info)))
+(defun apply-fixups (code-obj fixups index count &aux (end (1- (+ index count))))
+  (binding* ((alloc-points (svref fixups index) :exit-if-null))
+    (cold-set 'sb-c::*!cold-allocation-patch-point*
+              (cold-cons (cold-cons code-obj alloc-points)
+                         (cold-symbol-value (cold-intern
+                                             'sb-c::*!cold-allocation-patch-point*)))))
+  (loop
+    (when (>= index end) (return))
+    (binding* (((offset kind flavor)
+                (!unpack-fixup-info (descriptor-fixnum (svref fixups (incf index)))))
+               (name (cond ((member flavor '(:code-object :gc-barrier)) nil)
+                           (t (svref fixups (incf index)))))
+               (string
+                (when (descriptor-p name)
+                  (let ((widetag (logand (read-bits-wordindexed name 0) sb-vm:widetag-mask)))
+                    (when (= widetag sb-vm:simple-base-string-widetag)
+                      (base-string-from-core name))))))
       (if (eq flavor :static-call)
-          (push (list sym kind code-obj offset) *cold-static-call-fixups*)
+          (push (list name kind code-obj offset) *cold-static-call-fixups*)
           (cold-fixup
            code-obj offset
            (ecase flavor
-             (:assembly-routine (lookup-assembler-reference sym))
-             (:assembly-routine* (lookup-assembler-reference sym :indirect))
+             (:assembly-routine (lookup-assembler-reference name))
+             (:assembly-routine* (lookup-assembler-reference name :indirect))
              (:asm-routine-nil-offset
-              (- (lookup-assembler-reference sym) sb-vm:nil-value))
-             (:foreign
-              (linkage-table-note-symbol (base-string-from-core sym) nil))
-             (:foreign-dataref
-              (linkage-table-note-symbol (base-string-from-core sym) t))
+              (- (lookup-assembler-reference name) sb-vm:nil-value))
+             (:foreign (linkage-table-note-symbol string nil))
+             (:foreign-dataref (linkage-table-note-symbol string t))
              (:code-object (descriptor-bits code-obj))
              #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
-             (:symbol-tls-index (ensure-symbol-tls-index sym))
-             (:layout (cold-layout-descriptor-bits sym))
+             (:symbol-tls-index (ensure-symbol-tls-index name))
+             (:layout (cold-layout-descriptor-bits name))
              (:layout-id ; SYM is a #<WRAPPER>
-              (cold-layout-id (gethash (descriptor-bits (->layout sym))
+              (cold-layout-id (gethash (descriptor-bits (->layout name))
                                        *cold-layout-by-addr*)))
              ;; The machine-dependent code decides how to patch in 'nbits'
              #+gencgc (:gc-barrier sb-vm::gencgc-card-table-index-nbits)
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
-              (descriptor-bits (if (symbolp sym) (cold-intern sym) sym)))
-             (:symbol-value
-              (descriptor-bits (cold-symbol-value sym)))
+              (descriptor-bits (if (symbolp name) (cold-intern name) name)))
+             (:symbol-value (descriptor-bits (cold-symbol-value name)))
              (:named-call
-              (+ (descriptor-bits (ensure-cold-fdefn sym))
-                 (- 2 sb-vm:other-pointer-lowtag))))
-           kind flavor)))))
+              (+ (descriptor-bits (ensure-cold-fdefn name))
+                 (- 2 sb-vm:other-pointer-lowtag)))) ; wtf?
+           kind flavor))))
+  code-obj)
 
 ;;;; sanity checking space layouts
 

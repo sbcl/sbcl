@@ -71,6 +71,9 @@
                          (* sb-vm:simple-fun-self-slot sb-vm:n-word-bytes))
                (get-lisp-obj-address self))))
 
+(define-load-time-global sb-fasl::*asm-routine-index-to-name* #())
+(declaim (simple-vector sb-fasl::*asm-routine-index-to-name*))
+
 (flet ((fixup (code-obj offset name kind flavor preserved-lists statically-link-p)
          (declare (ignorable statically-link-p))
          ;; NAME depends on the kind and flavor of fixup.
@@ -144,18 +147,24 @@
          ;; Return fixups amenable to static linking
          (aref preserved-lists 0)))
 
-  (defun apply-fasl-fixups (fop-stack code-obj n-fixups &aux (top (svref fop-stack 0)))
+  (defun apply-fasl-fixups (code-obj fixups index count &aux (end (1- (+ index count))))
     (dx-let ((preserved (make-array 5 :initial-element nil)))
-      (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
-        (binding* ((alloc-points (pop-fop-stack) :exit-if-null))
-          (setf (gethash code-obj *allocation-patch-points*) alloc-points))
-        (dotimes (i n-fixups (setf (svref fop-stack 0) top))
-          (multiple-value-bind (offset kind flavor)
-              (sb-fasl::!unpack-fixup-info (pop-fop-stack))
-            (fixup code-obj offset (pop-fop-stack) kind flavor preserved nil))))
+      (awhen (svref fixups index)
+        (setf (gethash code-obj *allocation-patch-points*) it))
+      (loop
+        (when (>= index end) (return))
+        (binding* (((offset kind flavor data)
+                    (sb-fasl::!unpack-fixup-info (svref fixups (incf index))))
+                   (name
+                    (cond ((member flavor '(:code-object :gc-barrier)) nil)
+                          ((and (plusp data)
+                                (member flavor '(:assembly-routine :assembly-routine*)))
+                           (aref sb-fasl::*asm-routine-index-to-name* data))
+                          (t (svref fixups (incf index))))))
+          (fixup code-obj offset name kind flavor preserved nil)))
       (finish-fixups code-obj preserved)))
 
-  (defun apply-core-fixups (fixup-notes code-obj)
+  (defun apply-core-fixups (code-obj fixup-notes)
     (declare (list fixup-notes))
     (dx-let ((preserved (make-array 5 :initial-element nil)))
       (dolist (note fixup-notes)
@@ -291,16 +300,16 @@
                  (when (eq kind :named-call) (incf count)))))))
          (code-obj (allocate-code-object (component-mem-space component)
                                          n-named-calls nboxed length))
-         (named-call-fixups
+         (bytes
+          (the (simple-array assembly-unit 1) (segment-contents-as-vector segment)))
+         (named-call-fixups))
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
       ;; A very specific store order is necessary to allow using uninitialized memory
       ;; pages for code. Storing of the debug-info slot does not need the code pinned,
       ;; but that store must occur between steps 1 and 2.
-          (with-pinned-objects (code-obj)
-           (let ((bytes (the (simple-array assembly-unit 1)
-                             (segment-contents-as-vector segment))))
+    (with-pinned-objects (code-obj)
              ;; Note that this does not have to take care to ensure atomicity
              ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
              ;; interrupted in between the store of any individual byte, this code
@@ -313,9 +322,6 @@
              (with-pinned-objects (bytes)
                (sb-vm::jit-memcpy (code-instructions code-obj) (vector-sap bytes) (length bytes)))
 
-             ;; Serial# shares a word with the jump-table word count,
-             ;; so we can't assign serial# until after all raw bytes are copied in.
-             (assign-code-serialno code-obj))
            ;; Enforce that the final unboxed data word is published to memory
            ;; before the debug-info is set.
            (sb-thread:barrier (:write))
@@ -326,7 +332,10 @@
            ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
            ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
             (setf (%code-debug-info code-obj) debug-info)
-            (apply-core-fixups fixup-notes code-obj))))
+            (setq named-call-fixups (apply-core-fixups code-obj fixup-notes))
+           ;; Serial# shares a word with the jump-table word count,
+           ;; so we can't assign serial# until after all raw bytes are copied in.
+           (assign-code-serialno code-obj))
 
     (when alloc-points
       #+(and x86-64 sb-thread)

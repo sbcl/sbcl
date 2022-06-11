@@ -1042,39 +1042,56 @@
   #'equalp)
 
 ;;; Pack the aspects of a fixup into an integer.
+;;; DATA is for asm routine fixups. The routine can be represented in 7 bits,
+;;; so the fixup can be reduced to one word instead of an integer and a symbol.
 (declaim (inline !pack-fixup-info))
-(defun !pack-fixup-info (offset kind flavor)
+(defun !pack-fixup-info (offset kind flavor data)
   ;; ARM gets "error during constant folding"
   #+arm (declare (notinline position))
-  (logior (ash (the (mod 16) (or (position flavor +fixup-flavors+)
-                                 (error "Bad fixup flavor ~s" flavor)))
-               3)
+  (logior ;; 3 bits
           (the (mod 8) (or (position kind +fixup-kinds+)
                            (error "Bad fixup kind ~s" kind)))
-          (ash offset 7)))
+          ;; 4 bits
+          (ash (the (mod 16) (or (position flavor +fixup-flavors+)
+                                 (error "Bad fixup flavor ~s" flavor)))
+               3)
+          ;; 7 bits
+          (ash (the (mod 128) data) 7)
+          ;; whatever it needs
+          (ash offset 14)))
 
 ;;; Unpack an integer from DUMP-FIXUPs. Shared by genesis and target fasloader
 (declaim (inline !unpack-fixup-info))
-(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor)
+(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor data)
   ;; ARM gets "error during constant folding"
   #+arm (declare (notinline aref))
-  (values (ash packed-info -7)
+  (values (ash packed-info -14)
           (aref +fixup-kinds+ (ldb (byte 3 0) packed-info))
-          (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))))
+          (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))
+          (ldb (byte 7 7) packed-info)))
 
 ;;; Dump all the fixups.
 ;;;  - foreign (C) symbols: named by a string
 ;;;  - code object references: don't need a name.
 ;;;  - everything else: a symbol for the name.
-(defun dump-fixups (fixups fasl-output &aux (n 0))
+(defun dump-fixups (fixups alloc-points fasl-output &aux (nwords 1))
   (declare (list fixups) (type fasl-output fasl-output))
-  (dolist (note fixups n)
+  (dump-object alloc-points fasl-output)
+  (dolist (note fixups nwords)
     (let* ((fixup (fixup-note-fixup note))
            (name (fixup-name fixup))
            (flavor (fixup-flavor fixup))
-           (info (!pack-fixup-info (fixup-note-position note)
-                                   (fixup-note-kind note)
-                                   flavor))
+           (named (not (member flavor '(:code-object :gc-barrier))))
+           (data
+            (or #-sb-xc-host ; ASM routine indices aren't known to the cross-compiler
+                (when (member flavor '(:assembly-routine :assembly-routine*))
+                  (setq named nil)
+                  (the (integer 1 *) ; data can't be 0
+                       (cddr (gethash name (%code-debug-info *assembler-routines*)))))
+                0))
+           (info
+            (!pack-fixup-info (fixup-note-position note) (fixup-note-kind note)
+                              flavor data))
            (operand
             (ecase flavor
               ((:code-object :gc-barrier) (the null name))
@@ -1098,9 +1115,9 @@
                (the symbol name))
               ((:foreign :foreign-dataref) (the string name))
               ((:named-call :static-call) name))))
-      (dump-object operand fasl-output)
-      (dump-integer info fasl-output))
-    (incf n)))
+      (dump-object info fasl-output)
+      (incf nwords (cond (named (dump-object operand fasl-output) 2)
+                         (t 1))))))
 
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.
@@ -1118,12 +1135,10 @@
   (declare (type component component)
            (type index code-length)
            (type fasl-output fasl-output))
-  (let* ((n-fixups (dump-fixups fixups fasl-output))
-         (2comp (component-info component))
+  (let* ((2comp (component-info component))
          (constants (sb-c:ir2-component-constants 2comp))
          (header-length (length constants))
          (n-named-calls 0))
-    (dump-object alloc-points fasl-output)
     (collect ((patches)
               (named-constants))
       ;; Dump the constants, noting any :ENTRY constants that have to
@@ -1178,10 +1193,12 @@
         (push (dump-to-table fasl-output)
               (fasl-output-debug-info fasl-output)))
 
-      (dump-fop 'fop-load-code fasl-output
-                (logior (ash header-length 1)
-                        (if (sb-c::code-immobile-p component) 1 0))
-                code-length n-fixups)
+      (let ((n-fixup-elts (dump-fixups fixups alloc-points fasl-output)))
+        (dump-fop 'fop-load-code fasl-output
+                  (logior (ash header-length 1)
+                          (if (sb-c::code-immobile-p component) 1 0))
+                  code-length
+                  n-fixup-elts))
       ;; Fasl dumper/loader convention allows at most 3 integer args.
       ;; Others have to be written with explicit calls.
       (dump-integer-as-n-bytes (length (sb-c::ir2-component-entries 2comp))
@@ -1206,8 +1223,7 @@
 ;;; This is only called from assemfile, which doesn't exist in the target.
 #+sb-xc-host
 (defun dump-assembler-routines (code-segment octets fixups alloc-points routines file)
-  (let ((n-fixups (dump-fixups fixups file)))
-    (dump-object alloc-points file)
+  (let ((n-fixup-elts (dump-fixups fixups alloc-points file)))
     ;; The name -> address table has to be created before applying fixups
     ;; because a fixup may refer to an entry point in the same code component.
     ;; So these go on the stack last, i.e. nearest the top.
@@ -1215,12 +1231,12 @@
     ;; except possibly when there are multiple entry points to one routine
     (dolist (routine (reverse routines))
       (dump-object (car routine) file)
-      (dump-integer (+ (label-position (cadr routine))
-                       (caddr routine))
+      (dump-integer (+ (label-position (cadr routine)) (caddr routine))
                     file))
     (dump-fop 'fop-assembler-code file)
-    (dolist (word (list (length octets) (length routines) n-fixups))
-      (dump-word word file))
+    (dump-word (length routines) file)
+    (dump-word (length octets) file)
+    (dump-word n-fixup-elts file)
     (write-segment-contents code-segment (fasl-output-stream file))
     (dump-pop file)))
 

@@ -136,6 +136,11 @@
   (partial-source-info nil :type (or null sb-c::debug-source)))
 (declaim (freeze-type fasl-input))
 
+;;; Lisp assembler routines are named by Lisp symbols, not strings,
+;;; and so can be compared by EQ.
+(define-load-time-global *assembler-routines* nil)
+#-sb-xc-host (declaim (code-component *assembler-routines*))
+
 ;;; Output the current number of semicolons after a fresh-line.
 ;;; FIXME: non-mnemonic name
 (defun load-fresh-line ()
@@ -439,7 +444,8 @@
     (when (functionp function)
       (let ((oname (nth-value 2 (function-lambda-expression function))))
         (when (and oname (not (eq oname name)))
-          (error "fop ~S with opcode ~D conflicts with fop ~S."
+          (cerror "Define it anyway"
+                  "fop ~S with opcode ~D conflicts with fop ~S."
                  name opcode oname))))
     (let ((existing-opcode (get name 'opcode)))
       (when (and existing-opcode (/= existing-opcode opcode))
@@ -1082,13 +1088,16 @@
 ;;; fasl file header.)
 
 (define-load-time-global *show-new-code* nil)
-(define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixups)))
+(define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixup-elts)))
+  ;; The stack looks like:
+  ;; ... | constant0 constant1 ... constantN | DEBUG-INFO | FIXUPS-ITEMS ....   ||
+  ;;     | <--------- n-constants ---------> |            | <-- n-fixup-elts -> ||
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
-         (n-constants (- n-boxed-words sb-vm:code-constants-offset)))
-    ;; stack has (at least) N-CONSTANTS words plus debug-info
-    (with-fop-stack ((stack (operand-stack)) ptr (1+ n-constants))
+         (n-constants (- n-boxed-words sb-vm:code-constants-offset))
+         (stack-elts-consumed (+ n-constants 1 n-fixup-elts)))
+    (with-fop-stack ((stack (operand-stack)) ptr stack-elts-consumed)
       ;; We've already ensured that all FDEFNs the code uses exist.
       ;; This happened by virtue of calling fop-fdefn for each.
       (let ((stack-index (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))))
@@ -1116,9 +1125,10 @@
           ;; so we can't assign serial# until after all raw bytes are copied in.
           (sb-c::assign-code-serialno code)
           (sb-thread:barrier (:write))
-          ;; Assign debug-info last. A code object that has no debug-info will never
+          ;; Assign debug-info. A code object that has no debug-info will never
           ;; have its fun table accessed in conservative_root_p() or pin_object().
           (setf (%code-debug-info code) (svref stack (+ ptr n-constants)))
+          (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts)
           (setf (sb-c::debug-info-source (%code-debug-info code))
                 (%fasl-input-partial-source-info (fasl-input)))
           ;; Boxed constants can be assigned only after figuring out where the range
@@ -1127,11 +1137,10 @@
           (let* ((header-index sb-vm:code-constants-offset)
                  (stack-index ptr))
             (declare (type index header-index stack-index))
-            (dotimes (n n-simple-funs)
-              (dotimes (i sb-vm:code-slots-per-simple-fun)
-                (setf (code-header-ref code header-index) (svref stack stack-index))
-                (incf header-index)
-                (incf stack-index)))
+            (dotimes (n (* n-simple-funs sb-vm:code-slots-per-simple-fun))
+              (setf (code-header-ref code header-index) (svref stack stack-index))
+              (incf header-index)
+              (incf stack-index))
             (dotimes (i n-named-calls)
               (sb-c::set-code-fdefn code header-index (svref stack stack-index))
               (incf header-index)
@@ -1139,13 +1148,10 @@
             (do () ((>= header-index n-boxed-words))
               (setf (code-header-ref code header-index) (svref stack stack-index))
               (incf header-index)
-              (incf stack-index)))
-          ;; Now apply fixups. The fixups to perform are popped from the fasl stack.
-          (sb-c::apply-fasl-fixups stack code n-fixups))
+              (incf stack-index))))
         (when *show-new-code*
           (let ((*print-pretty* nil))
             (format t "~&New code(~Db,load): ~A~%" (code-object-size code) code)))
-        #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.

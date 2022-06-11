@@ -351,11 +351,6 @@
 
 ;;;; linkage fixups
 
-;;; Lisp assembler routines are named by Lisp symbols, not strings,
-;;; and so can be compared by EQ.
-(define-load-time-global *assembler-routines* nil)
-(declaim (code-component *assembler-routines*))
-
 (defun calc-asm-routine-bounds ()
   (loop for v being each hash-value of (%code-debug-info *assembler-routines*)
         minimize (car v) into min
@@ -383,9 +378,11 @@
          (count (length vector))
          (ht (make-hash-table))) ; keys are symbols
     (rplaca (%code-debug-info code) ht)
+    (setf *asm-routine-index-to-name* (make-array (1+ (length vector))))
     (dotimes (i count)
       (destructuring-bind (name . offset) (svref vector i)
         (let ((next-offset (if (< (1+ i) count) (cdr (svref vector (1+ i))) size)))
+          (setf (aref *asm-routine-index-to-name* (1+ i)) name)
           ;; Must be in ascending order, but one address can have more than one name.
           (aver (>= next-offset offset))
           ;; store inclusive bounds on PC offset range and the function index
