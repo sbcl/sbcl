@@ -2841,7 +2841,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (loop
     (when (>= index end) (return))
     (binding* (((offset kind flavor)
-                (!unpack-fixup-info (descriptor-fixnum (svref fixups (incf index)))))
+                (!unpack-fixup-info (descriptor-integer (svref fixups (incf index)))))
                (name (cond ((member flavor '(:code-object :gc-barrier)) nil)
                            (t (svref fixups (incf index)))))
                (string
