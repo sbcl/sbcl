@@ -434,7 +434,7 @@ void gc_gen_report_to_file(int filedes, FILE *file)
 #endif
 
 #define OUTPUT(str, len) \
-    {if (file) fwrite(str, 1, len, file); if (filedes>=0) write(filedes, str, len);}
+    {if (file) fwrite(str, 1, len, file); if (filedes>=0) ignore_value(write(filedes, str, len));}
 
     /* Print the heap stats. */
     char header[] =
