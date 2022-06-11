@@ -1046,8 +1046,6 @@
 ;;; so the fixup can be reduced to one word instead of an integer and a symbol.
 (declaim (inline !pack-fixup-info))
 (defun !pack-fixup-info (offset kind flavor data)
-  ;; ARM gets "error during constant folding"
-  #+arm (declare (notinline position))
   (logior ;; 3 bits
           (the (mod 8) (or (position kind +fixup-kinds+)
                            (error "Bad fixup kind ~s" kind)))
@@ -1063,8 +1061,6 @@
 ;;; Unpack an integer from DUMP-FIXUPs. Shared by genesis and target fasloader
 (declaim (inline !unpack-fixup-info))
 (defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor data)
-  ;; ARM gets "error during constant folding"
-  #+arm (declare (notinline aref))
   (values (ash packed-info -14)
           (aref +fixup-kinds+ (ldb (byte 3 0) packed-info))
           (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))
