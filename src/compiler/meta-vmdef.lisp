@@ -1716,6 +1716,7 @@
   (collect ((input)
             (args)
             (arg-types)
+            (infos)
             (temps)
             (results)
             (result-types))
@@ -1727,14 +1728,24 @@
           for prev = (if this-sc
                          var
                          prev)
-          do (cond (arg
+          do (cond ((eq name :info)
+                    (infos this-sc)
+                    (input arg))
+                   (arg
                     (input arg)
                     (args (list* name :scs (list sc) rest))
                     (arg-types (or type '*)))
                    (t
                     (temps `(:temporary (:sc ,sc ,@rest)
                                         ,name)))))
-    (loop for (name sc type . rest) in results
+    (loop for result in results
+          for (name this-sc) = result
+          for (nil sc type . rest) = (if this-sc
+                                         result
+                                         prev)
+          for prev = (if this-sc
+                         result
+                         prev)
           do (results (list* name :scs (list sc) rest))
              (result-types (or type '*)))
     `(inline-%primitive
@@ -1748,6 +1759,8 @@
                                               (list* :results (results)))
                                          (and (result-types)
                                               (list* :result-types (result-types)))
+                                         (and (infos)
+                                              (list* :info (infos)))
                                          (list* :generator 0 body)
                                          (temps)))
                           nil))
@@ -1808,8 +1821,7 @@
                            (setf (vop-info-type vop-info) (vop-info-type other))
                            (return-from found t)))
                        *backend-template-names*))
-      (setf (vop-info-type vop-info) (specifier-type my-type-spec)))
-    vop-info)
+      (setf (vop-info-type vop-info) (specifier-type my-type-spec))))
   (flet ((find-equalp (accessor)
            ;; Read the slot from VOP-INFO and try to find any other vop-info
            ;; that has an EQUALP value in that slot, returning that value.

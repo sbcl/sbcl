@@ -4,6 +4,7 @@ changes relative to sbcl-2.2.5:
   * enhancement: core compression now uses zstd instead of zlib.
   * optimization: fasl files are now usually smaller (up to 10% on default
     policy) and may load faster, especially on high debug.
+  * optimization: faster [n]string-down/upcase.
 
 changes in sbcl-2.2.5 relative to sbcl-2.2.4:
   * minor incompatible change: SB-EXT:*DERIVE-FUNCTION-TYPES* being NIL now
