@@ -66,7 +66,7 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     void* fault_addr = (void*)info->si_addr;
 
-    if (gencgc_handle_wp_violation(fault_addr)) return;
+    if (gencgc_handle_wp_violation(context, fault_addr)) return;
 
     if (!handle_guard_page_triggered(context, fault_addr))
             lisp_memory_fault_error(context, fault_addr);

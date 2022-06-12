@@ -36,7 +36,7 @@ static inline char *page_address(page_index_t page_num) {
     return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
 }
 
-int gencgc_handle_wp_violation(void *);
+int gencgc_handle_wp_violation(void*, void*);
 
 
 #if N_WORD_BITS == 64

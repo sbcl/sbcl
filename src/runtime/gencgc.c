@@ -5237,7 +5237,7 @@ boolean ignore_memoryfaults_on_unprotected_pages = 0;
 extern boolean continue_after_memoryfault_on_unprotected_pages;
 boolean continue_after_memoryfault_on_unprotected_pages = 0;
 
-int gencgc_handle_wp_violation(void* fault_addr)
+int gencgc_handle_wp_violation(void* context, void* fault_addr)
 {
     page_index_t page_index = find_page_index(fault_addr);
 
@@ -5291,10 +5291,11 @@ int gencgc_handle_wp_violation(void* fault_addr)
             void lisp_backtrace(int frames);
             lisp_backtrace(10);
             fprintf(stderr,
-                    "Fault @ %p, page %"PAGE_INDEX_FMT" (~WP) mark=%#x\n"
+                    "Fault @ %p, PC=%p, page %"PAGE_INDEX_FMT" (~WP) mark=%#x gc_active=%d\n"
                     "  mixed_region=%p:%p\n"
                     "  page.scan_start: %p .words_used: %u .type: %d .gen: %d\n",
-                    fault_addr, page_index, mark,
+                    fault_addr, (void*)(context?os_context_pc(context):-1), page_index,
+                    mark, gc_active_p,
                     mixed_region->start_addr, mixed_region->end_addr,
                     page_scan_start(page_index),
                     page_words_used(page_index),

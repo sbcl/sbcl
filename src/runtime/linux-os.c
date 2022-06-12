@@ -389,7 +389,7 @@ sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 #endif
 
 #ifdef LISP_FEATURE_GENCGC
-    if (gencgc_handle_wp_violation(addr)) return;
+    if (gencgc_handle_wp_violation(context, addr)) return;
 #else
     if (cheneygc_handle_wp_violation(context, addr)) return;
 #endif

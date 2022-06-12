@@ -404,7 +404,7 @@ catch_exception_raise(mach_port_t exception_port,
          * And because the GC uses signals to stop the world it might
          * interfere with that bookkeeping, because there's a window
          * before block_blockable_signals is performed. */
-        if (gencgc_handle_wp_violation(addr))
+        if (gencgc_handle_wp_violation(0, addr))
             goto do_not_handle;
 
         /* Undefined alien */

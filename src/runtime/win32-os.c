@@ -1140,7 +1140,7 @@ handle_access_violation(os_context_t *ctx,
                          os_vm_page_size);
         return 0;
     }
-    if (gencgc_handle_wp_violation(fault_address)) {
+    if (gencgc_handle_wp_violation(ctx, fault_address)) {
         return 0;
     }
 
