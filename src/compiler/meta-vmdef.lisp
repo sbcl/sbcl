@@ -1632,6 +1632,9 @@
 ;;;     Indicates if and how the more args should be moved into a
 ;;;     different frame.
 (defmacro define-vop ((&optional name inherits) &body specs)
+  (%define-vop name inherits specs t))
+
+(defun %define-vop (name inherits specs set)
   (declare (type symbol name))
   ;; Parse the syntax into a VOP-PARSE structure, and then expand into
   ;; code that creates the appropriate VOP-INFO structure at load time.
@@ -1647,8 +1650,9 @@
       (let ((clause (assoc :translate specs)))
         (when (singleton-p (cdr clause))
           (setf name (cadr clause)))))
-    (aver (typep name '(and symbol (not null))))
-    (setf (vop-parse-name parse) name)
+    (when set
+      (aver (typep name '(and symbol (not null))))
+      (setf (vop-parse-name parse) name))
     (setf (vop-parse-inherits parse) inherits)
 
     (parse-define-vop parse specs)
@@ -1663,79 +1667,131 @@
                          (vop-parse-more-results parse)
                          (vop-parse-result-types parse)
                          nil)
-    `(progn
-       (eval-when (:compile-toplevel)
-         (setf (gethash ',name *backend-parsed-vops*) ',parse))
-       (register-vop-parse
-        ,@(macrolet
-              ((quotify-slots ()
-                 (collect ((forms))
-                   (dolist (x vop-parse-slot-names (cons 'list (forms)))
-                     (let ((reader (package-symbolicate (sb-xc:symbol-package 'vop-parse)
-                                                        "VOP-PARSE-" x)))
-                       (forms
-                        (case x
-                          (source-location ''(source-location))
-                          ((temps args results) `(quotify-list (,reader parse)))
-                          ((more-args more-results) `(quotify (,reader parse)))
-                          (t `(list 'quote (,reader parse))))))))))
-            (labels ((quotify (operand-or-nil)
-                       (when operand-or-nil
-                         (list 'quote (quotify-1 operand-or-nil))))
-                     (quotify-list (operands)
-                       (list 'quote (mapcar #'quotify-1 operands)))
-                     (quotify-1 (x) ; Return everything except the KIND, quoted
-                       `(,(operand-parse-name x)
-                         ,(operand-parse-target x) ,(operand-parse-temp x)
-                         ,(operand-parse-born x) ,(operand-parse-dies x)
-                         ,(operand-parse-load-tn x) ,(operand-parse-load x)
-                         ,(operand-parse-scs x) ,(operand-parse-offset x))))
-              (quotify-slots))))
-       ,@(unless (eq (vop-parse-body parse) :unspecified)
-           `((let ((,n-res ,(set-up-vop-info inherited-parse parse)))
-               (store-vop-info ,n-res)
-               ,@(set-up-fun-translation parse n-res))))
-       ',name)))
+    (if set
+        `(progn
+           (eval-when (:compile-toplevel)
+             (setf (gethash ',name *backend-parsed-vops*) ',parse))
+           (register-vop-parse
+            ,@(macrolet
+                  ((quotify-slots ()
+                     (collect ((forms))
+                       (dolist (x vop-parse-slot-names (cons 'list (forms)))
+                         (let ((reader (package-symbolicate (sb-xc:symbol-package 'vop-parse)
+                                                            "VOP-PARSE-" x)))
+                           (forms
+                            (case x
+                              (source-location ''(source-location))
+                              ((temps args results) `(quotify-list (,reader parse)))
+                              ((more-args more-results) `(quotify (,reader parse)))
+                              (t `(list 'quote (,reader parse))))))))))
+                (labels ((quotify (operand-or-nil)
+                           (when operand-or-nil
+                             (list 'quote (quotify-1 operand-or-nil))))
+                         (quotify-list (operands)
+                           (list 'quote (mapcar #'quotify-1 operands)))
+                         (quotify-1 (x) ; Return everything except the KIND, quoted
+                           `(,(operand-parse-name x)
+                             ,(operand-parse-target x) ,(operand-parse-temp x)
+                             ,(operand-parse-born x) ,(operand-parse-dies x)
+                             ,(operand-parse-load-tn x) ,(operand-parse-load x)
+                             ,(operand-parse-scs x) ,(operand-parse-offset x))))
+                  (quotify-slots))))
+           ,@(unless (eq (vop-parse-body parse) :unspecified)
+               `((let ((,n-res ,(set-up-vop-info inherited-parse parse)))
+                   (store-vop-info ,n-res)
+                   ,@(set-up-fun-translation parse n-res))))
+           ',name)
+        `(let ((info ,(set-up-vop-info inherited-parse parse)))
+           (setf (vop-info-type info)
+                 (specifier-type (template-type-specifier info)))
+           info))))
+
+;;; (inline-vop
+;;;     (((param unsigned-reg unsigned-num :to :save) arg)
+;;;      ((temp unsigned-reg unsigned-num))
+;;;      ((temp2))) ;; will reuse the previous specifications
+;;;     ((result unsigned-reg unsigned-num))
+;;;   (inst x result temp param))
+(defmacro inline-vop (vars results &body body)
+  (collect ((input)
+            (args)
+            (arg-types)
+            (temps)
+            (results)
+            (result-types))
+    (loop for (var arg) in vars
+          for (name this-sc) = var
+          for (nil sc type . rest) = (if this-sc
+                                         var
+                                         prev)
+          for prev = (if this-sc
+                         var
+                         prev)
+          do (cond (arg
+                    (input arg)
+                    (args (list* name :scs (list sc) rest))
+                    (arg-types (or type '*)))
+                   (t
+                    (temps `(:temporary (:sc ,sc ,@rest)
+                                        ,name)))))
+    (loop for (name sc type . rest) in results
+          do (results (list* name :scs (list sc) rest))
+             (result-types (or type '*)))
+    `(inline-%primitive
+      ,(eval (%define-vop nil nil
+                          (delete nil
+                                  (list* (and (args)
+                                              (list* :args (args)))
+                                         (and (arg-types)
+                                              (list* :arg-types (arg-types)))
+                                         (and (results)
+                                              (list* :results (results)))
+                                         (and (result-types)
+                                              (list* :result-types (result-types)))
+                                         (list* :generator 0 body)
+                                         (temps)))
+                          nil))
+      ,@(input))))
 
 (macrolet
-   ((def ()
-     `(defun register-vop-parse ,vop-parse-slot-names
-       ;; Try to share each OPERAND-PARSE structure with a similar existing one.
-       (labels ((share-list (operand-specs accessor kind)
-                  (let ((new (mapcar (lambda (x) (share x kind)) operand-specs)))
-                    (dohash ((key parse) *backend-parsed-vops* :result new)
-                      (declare (ignore key))
-                      (when (equal (funcall accessor parse) new)
-                        (return (funcall accessor parse))))))
-                (share (operand-spec kind)
-                  ;; OPERAND-PARSE structures are immutable. Scan all vops for one
-                  ;; with an operand matching OPERAND-SPEC, and use that if found.
-                  (destructuring-bind (name targ temp born dies load-tn load scs offs)
-                      operand-spec
-                    (let ((op (make-operand-parse
-                               :name name :kind kind :target targ :temp temp
-                               :born born :dies dies :load-tn load-tn :load load
-                               :scs scs :offset offs)))
-                      (dohash ((key parse) *backend-parsed-vops* :result op)
-                        (declare (ignore key))
-                        (awhen (find op (vop-parse-operands parse) :test #'operand=)
-                          (return it))))))
-                (operand= (a b)
-                  ;; EQUALP is too weak a comparator for arbitrary sexprs,
-                  ;; since (EQUALP "foo" #(#\F #\O #\O)) is T, not that
-                  ;; we expect such weirdness in the LOAD-IF expression.
-                  (and (equal (operand-parse-load a) (operand-parse-load b))
-                       (equalp a b))))
-         (setq temps (share-list temps #'vop-parse-temps :temporary)
-               args (share-list args #'vop-parse-args :argument)
-               results (share-list results #'vop-parse-results :result))
-         (when more-args (setq more-args (share more-args :more-argument)))
-         (when more-results (setq more-results (share more-results :more-result))))
-       (let ((parse
-              (make-vop-parse ,@(mapcan (lambda (x) (list (keywordicate x) x))
-                                        vop-parse-slot-names))))
-         (set-vop-parse-operands parse)
-         (setf (gethash name *backend-parsed-vops*) parse)))))
+    ((def ()
+       `(defun register-vop-parse ,vop-parse-slot-names
+          ;; Try to share each OPERAND-PARSE structure with a similar existing one.
+          (labels ((share-list (operand-specs accessor kind)
+                     (let ((new (mapcar (lambda (x) (share x kind)) operand-specs)))
+                       (dohash ((key parse) *backend-parsed-vops* :result new)
+                         (declare (ignore key))
+                         (when (equal (funcall accessor parse) new)
+                           (return (funcall accessor parse))))))
+                   (share (operand-spec kind)
+                     ;; OPERAND-PARSE structures are immutable. Scan all vops for one
+                     ;; with an operand matching OPERAND-SPEC, and use that if found.
+                     (destructuring-bind (name targ temp born dies load-tn load scs offs)
+                         operand-spec
+                       (let ((op (make-operand-parse
+                                  :name name :kind kind :target targ :temp temp
+                                  :born born :dies dies :load-tn load-tn :load load
+                                  :scs scs :offset offs)))
+                         (dohash ((key parse) *backend-parsed-vops* :result op)
+                           (declare (ignore key))
+                           (awhen (find op (vop-parse-operands parse) :test #'operand=)
+                             (return it))))))
+                   (operand= (a b)
+                     ;; EQUALP is too weak a comparator for arbitrary sexprs,
+                     ;; since (EQUALP "foo" #(#\F #\O #\O)) is T, not that
+                     ;; we expect such weirdness in the LOAD-IF expression.
+                     (and (equal (operand-parse-load a) (operand-parse-load b))
+                          (equalp a b))))
+            (setq temps (share-list temps #'vop-parse-temps :temporary)
+                  args (share-list args #'vop-parse-args :argument)
+                  results (share-list results #'vop-parse-results :result))
+            (when more-args (setq more-args (share more-args :more-argument)))
+            (when more-results (setq more-results (share more-results :more-result))))
+          (let ((parse
+                  (make-vop-parse ,@(mapcan (lambda (x) (list (keywordicate x) x))
+                                            vop-parse-slot-names))))
+            (set-vop-parse-operands parse)
+            (setf (gethash name *backend-parsed-vops*) parse)))))
   (def))
 
 (defun store-vop-info (vop-info)
@@ -1752,7 +1808,8 @@
                            (setf (vop-info-type vop-info) (vop-info-type other))
                            (return-from found t)))
                        *backend-template-names*))
-      (setf (vop-info-type vop-info) (specifier-type my-type-spec))))
+      (setf (vop-info-type vop-info) (specifier-type my-type-spec)))
+    vop-info)
   (flet ((find-equalp (accessor)
            ;; Read the slot from VOP-INFO and try to find any other vop-info
            ;; that has an EQUALP value in that slot, returning that value.

@@ -2656,7 +2656,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%SET-ROW-MAJOR-AREF" "%SET-FILL-POINTER"
            "%SET-FDEFINITION" "%SCHARSET"
            "%RPLACD" "%RPLACA" "%PUT" "%CHARSET"
-           "%WITH-OUTPUT-TO-STRING")
+           "%WITH-OUTPUT-TO-STRING"
+           "INLINE-VOP")
   #+sb-simd-pack
   (:export "SIMD-PACK"
            "SIMD-PACK-P"

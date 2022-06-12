@@ -101,7 +101,7 @@
                               (or
                                (not (cl:symbol-package (leaf-debug-name leaf)))
                                (policy (vop-node vop)
-                                       (or (= speed 3) (< debug 2))))
+                                   (= preserve-single-use-debug-variables 0)))
                               ;; arguments of local functions have hidden write
                               (not (and (lambda-var-p leaf)
                                         (memq (functional-kind (lambda-var-home leaf))

@@ -468,6 +468,35 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
                                   (subseq args required min))
                                ,@(subseq args 0 required)
                                ,@(subseq args min)))))
+
+(defmacro inline-%primitive (template &rest args)
+  (let* ((required (length (template-arg-types template)))
+         (info (template-info-arg-count template))
+         (min (+ required info))
+         (nargs (length args)))
+    (if (template-more-args-type template)
+        (when (< nargs min)
+          (bug "Primitive was called with ~R argument~:P, ~
+                but wants at least ~R."
+               nargs
+               min))
+        (unless (= nargs min)
+          (bug "Primitive was called with ~R argument~:P, ~
+                but wants exactly ~R."
+               nargs
+               min)))
+
+    (when (template-conditional-p template)
+      (bug "%PRIMITIVE was used with a conditional template."))
+
+    (when (template-more-results-type template)
+      (bug "%PRIMITIVE was used with an unknown values template."))
+
+    `(%%primitive ',template
+                  ',(eval-info-args
+                     (subseq args required min))
+                  ,@(subseq args 0 required)
+                  ,@(subseq args min))))
 
 ;;;; QUOTE
 
