@@ -747,13 +747,15 @@ functions when called with no arguments."
 
 (defun set-tracing-bit (code bit)
   (declare (ignorable code bit))
-  #+64-bit ; there are no bits to spare in a 32-bit header word
+  ;; there are no bits to spare in a 32-bit header word,
+  ;; and with darwin-jit it's not worth the extra complexity
+  #+(and 64-bit (not darwin-jit))
   (with-pinned-objects (code)
     (let ((sap (int-sap (get-lisp-obj-address code))))
       ;; NB: This is not threadsafe on machines that don't promise that
       ;; stores to single bytes are atomic.
-      (setf (sb-vm::sap-ref-8-jit sap #+little-endian (- 1 sb-vm:other-pointer-lowtag)
-                                      #+big-endian (- 6 sb-vm:other-pointer-lowtag))
+      (setf (sap-ref-8 sap #+little-endian (- 1 sb-vm:other-pointer-lowtag)
+                           #+big-endian (- 6 sb-vm:other-pointer-lowtag))
             bit)
       ;; touch the card mark
       (setf (code-header-ref code 1) (code-header-ref code 1)))))

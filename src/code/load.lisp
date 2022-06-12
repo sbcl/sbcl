@@ -1087,6 +1087,26 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
+;;; Caution: don't try to "test" WITH-WRITABLE-CODE-INSTRUCTIONS on any architecture
+;;; where fixup application cares what the address of the code actually is.
+;;; This means x86 is disqualified. You're just wasting your time if you try, as I did.
+(defmacro with-writable-code-instructions ((code-var debug-info-var) &body body)
+  (declare (ignorable debug-info-var))
+  #+darwin-jit
+  `(with-pinned-objects (,code-var ,debug-info-var)
+     (let* ((temp-copy (alien-funcall (extern-alien "duplicate_codeblob_offheap"
+                                                    (function unsigned unsigned))
+                                      (get-lisp-obj-address ,code-var)))
+            (aligned (+ temp-copy (logand temp-copy sb-vm:n-word-bytes))))
+       ;; Rebind CODE-VAR to the replica, then execute BODY
+       (let ((,code-var (%make-lisp-obj (logior aligned sb-vm:other-pointer-lowtag)))) ,@body)
+       ;; Copy back, and fixup the simple-funs in the managed object
+       (alien-funcall (extern-alien "jit_copy_code_insts" (function void unsigned unsigned))
+                      (get-lisp-obj-address ,code-var)
+                      temp-copy)))
+  #-darwin-jit
+  `(with-pinned-objects (,code-var) ,@body))
+
 (define-load-time-global *show-new-code* nil)
 (define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixup-elts)))
   ;; The stack looks like:
@@ -1108,18 +1128,13 @@
                    (if (oddp header) :immobile :dynamic)
                    n-named-calls
                    (align-up n-boxed-words sb-c::code-boxed-words-align)
-                   n-code-bytes)))
-        (with-pinned-objects (code)
+                   n-code-bytes))
+            (debug-info (svref stack (+ ptr n-constants))))
+        (with-writable-code-instructions (code debug-info)
           ;; * DO * NOT * SEPARATE * THESE * STEPS *
           ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
           ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS etc.
-          #-darwin-jit
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
-          #+darwin-jit
-          (let ((buf (make-array n-code-bytes :element-type '(unsigned-byte 8))))
-            (read-n-bytes (fasl-input-stream) buf 0 n-code-bytes)
-            (with-pinned-objects (buf)
-              (sb-vm::jit-memcpy (code-instructions code) (vector-sap buf) n-code-bytes)))
           (aver (= (code-n-entries code) n-simple-funs))
           ;; Serial# shares a word with the jump-table word count,
           ;; so we can't assign serial# until after all raw bytes are copied in.
@@ -1127,13 +1142,18 @@
           (sb-thread:barrier (:write))
           ;; Assign debug-info. A code object that has no debug-info will never
           ;; have its fun table accessed in conservative_root_p() or pin_object().
-          (setf (%code-debug-info code) (svref stack (+ ptr n-constants)))
-          (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts)
+          (setf (%code-debug-info code) debug-info)
+          (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts))
+        ;; Don't need the code pinned from here on
+        (progn
           (setf (sb-c::debug-info-source (%code-debug-info code))
                 (%fasl-input-partial-source-info (fasl-input)))
           ;; Boxed constants can be assigned only after figuring out where the range
           ;; of implicitly tagged words is, which requires knowing how many functions
           ;; are in the code component, which requires reading the code trailer.
+          #+darwin-jit (sb-c::assign-code-constants
+                        code (subseq stack ptr (+ ptr n-constants)))
+          #-darwin-jit
           (let* ((header-index sb-vm:code-constants-offset)
                  (stack-index ptr))
             (declare (type index header-index stack-index))

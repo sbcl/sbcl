@@ -132,7 +132,9 @@
              (setf (sb-vm::%code-fixups code-obj)
                    (sb-c:pack-code-fixup-locs abs-fixups rel-fixups gc-barrier-fixups))))
 
-         ;; Assign all SIMPLE-FUN-SELF slots
+         ;; Assign all SIMPLE-FUN-SELF slots unless #+darwin-jit in which case the simple-funs
+         ;; are assigned by jit_memcpy_codeblob()
+         #-darwin-jit
          (dotimes (i (code-n-entries code-obj))
            (let ((fun (%code-entry-point code-obj i)))
              (assign-simple-fun-self fun)
@@ -142,8 +144,10 @@
                                (- 4 sb-vm:fun-pointer-lowtag))
                    (truly-the (unsigned-byte 32)
                      (get-lisp-obj-address (wrapper-friend #.(find-layout 'function)))))))
-         ;; And finally, make the memory range executable
-         #-(or x86 x86-64) (sb-vm:sanctify-for-execution code-obj)
+         ;; And finally, make the memory range executable.
+         ;; x86 doesn't need it, and darwin-jit doesn't do it because the
+         ;; temporary object is not executable.
+         #-(or x86 x86-64 darwin-jit) (sb-vm:sanctify-for-execution code-obj)
          ;; Return fixups amenable to static linking
          (aref preserved-lists 0)))
 
@@ -220,20 +224,25 @@
   (setf (gethash info (core-object-entry-table object)) function)
   (values))
 
-;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
-;;; function hasn't been compiled yet, make a note in the patch table.
-(defun reference-core-fun (code-obj i fun object)
-  (declare (type core-object object) (type functional fun)
-           (type index i))
+;;; Stick a reference to the function FUN in CODEBLOB-OR-VECTOR at index I.
+;;; The function has to have been compiled already. (This wasn't always the case I guess?)
+(defun reference-core-fun (codeblob-or-vector i fun core-object)
+  (declare (type (or simple-vector code-component) codeblob-or-vector)
+           (type index i)
+           (type functional fun)
+           (type core-object object))
   (let* ((info (leaf-info fun))
-         (found (gethash info (core-object-entry-table object))))
-    ;; A  core component should not have cross-component references.
+         (found (gethash info (core-object-entry-table core-object))))
+    ;; A core component can't have any cross-component references.
     ;; If it could, then the entries would have placed into one component.
-    (aver found)
-    (if found
-        (setf (code-header-ref code-obj i) found)
-        (push (cons code-obj i)
-              (gethash info (core-object-patch-table object)))))
+    (cond (found
+           (if (simple-vector-p codeblob-or-vector)
+               (setf (svref codeblob-or-vector (- i sb-vm:code-constants-offset)) found)
+               (setf (code-header-ref codeblob-or-vector i) found)))
+          (t
+           (bug "Forward-reference to core function can't occur")
+           ;; Was: (push (cons code-obj i) (gethash info (core-object-patch-table object)))
+           )))
   (values))
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
@@ -267,9 +276,16 @@
          (insts (code-instructions code-obj))
          (jumptable-word (sap-ref-word insts 0)))
     (aver (zerop (ash jumptable-word -14)))
-    (setf (sb-vm::sap-ref-word-jit insts 0) ; insert serialno
+    (setf (sap-ref-word insts 0) ; insert serialno
           (logior (ash serialno (byte-position sb-vm::code-serialno-byte))
                   jumptable-word))))
+
+#+darwin-jit
+(defun assign-code-constants (code data)
+  (let* ((sb-vm::*pinned-objects* ; Pin DATA plus every element of it.
+          (list* code data (nconc (coerce data 'list) sb-vm::*pinned-objects*))))
+    (sb-vm::jit-copy-code-constants (get-lisp-obj-address code)
+                                    (get-lisp-obj-address data))))
 
 (defun make-core-component (component segment length fixup-notes alloc-points object)
   (declare (type component component)
@@ -280,7 +296,13 @@
   (let* ((debug-info (debug-info-for-component component))
          (2comp (component-info component))
          (constants (ir2-component-constants 2comp))
-         (nboxed (align-up (length constants) sb-c::code-boxed-words-align))
+         (nboxed (align-up (length constants) code-boxed-words-align))
+         (boxed-data
+          ;; <header, boxed_size, debug_info, fixups> are absent from the simple-vector
+          #+darwin-jit
+          (make-array (- nboxed sb-vm:code-constants-offset)
+                      :initial-element (%make-lisp-obj (logior #xff00
+                                                               sb-vm:unbound-marker-widetag))))
          (n-named-calls
           ;; Pre-scan for fdefinitions to ensure their existence.
           ;; Doing so guarantees that storing them into the boxed header now
@@ -309,19 +331,17 @@
       ;; A very specific store order is necessary to allow using uninitialized memory
       ;; pages for code. Storing of the debug-info slot does not need the code pinned,
       ;; but that store must occur between steps 1 and 2.
-    (with-pinned-objects (code-obj)
+    (sb-fasl::with-writable-code-instructions (code-obj debug-info)
              ;; Note that this does not have to take care to ensure atomicity
              ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
              ;; interrupted in between the store of any individual byte, this code
              ;; is GC-safe because we no longer need to know where simple-funs are embedded
              ;; within the object to trace pointers. We *do* need to know where the funs
              ;; are when transporting the object, but it's currently pinned.
-             #-darwin-jit
-             (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
-             #+darwin-jit
-             (with-pinned-objects (bytes)
-               (sb-vm::jit-memcpy (code-instructions code-obj) (vector-sap bytes) (length bytes)))
-
+           (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
+           ;; Serial# shares a word with the jump-table word count,
+           ;; so we can't assign serial# until after all raw bytes are copied in.
+           (assign-code-serialno code-obj)
            ;; Enforce that the final unboxed data word is published to memory
            ;; before the debug-info is set.
            (sb-thread:barrier (:write))
@@ -332,10 +352,7 @@
            ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
            ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
             (setf (%code-debug-info code-obj) debug-info)
-            (setq named-call-fixups (apply-core-fixups code-obj fixup-notes))
-           ;; Serial# shares a word with the jump-table word count,
-           ;; so we can't assign serial# until after all raw bytes are copied in.
-           (assign-code-serialno code-obj))
+            (setq named-call-fixups (apply-core-fixups code-obj fixup-notes)))
 
     (when alloc-points
       #+(and x86-64 sb-thread)
@@ -343,49 +360,58 @@
           (setf (gethash code-obj *allocation-patch-points*) alloc-points)
           (funcall 'sb-aprof::patch-code code-obj alloc-points)))
 
-      ;; Don't need code pinned now
-      ;; (It will implicitly be pinned on the conservatively scavenged backends)
-    (let* ((entries (ir2-component-entries 2comp))
-           (fun-index (length entries)))
-      (dolist (entry-info entries)
-        (let ((fun (%code-entry-point code-obj (decf fun-index)))
-              (w (+ sb-vm:code-constants-offset
-                    (* sb-vm:code-slots-per-simple-fun fun-index))))
-          (aver (functionp fun)) ; in case %CODE-ENTRY-POINT returns NIL
-          (setf (code-header-ref code-obj (+ w sb-vm:simple-fun-name-slot))
-                (entry-info-name entry-info)
-                (code-header-ref code-obj (+ w sb-vm:simple-fun-arglist-slot))
-                (entry-info-arguments entry-info)
-                (code-header-ref code-obj (+ w sb-vm:simple-fun-source-slot))
-                (entry-info-form/doc entry-info)
-                (code-header-ref code-obj (+ w sb-vm:simple-fun-info-slot))
-                (entry-info-type/xref entry-info))
-          (note-fun entry-info fun object))))
-
     (push debug-info (core-object-debug-info object))
 
-    (do ((index (+ sb-vm:code-constants-offset
-                   (* (length (ir2-component-entries 2comp))
-                      sb-vm:code-slots-per-simple-fun))
-                (1+ index)))
-        ((>= index (length constants)))
-      (let* ((const (aref constants index))
-             (kind (if (listp const) (car const) const)))
-        (case kind
-          (:entry
-           (reference-core-fun code-obj index (cadr const) object))
-          ((nil))
-          (t
-           (let ((referent
-                  (etypecase kind
-                   ((member :named-call :fdefinition) (cadr const))
-                   ((eql :known-fun)
-                    (%coerce-name-to-fun (cadr const)))
-                   (constant
-                    (constant-value const)))))
-             (if (eq kind :named-call)
-                 (set-code-fdefn code-obj index referent)
-                 (setf (code-header-ref code-obj index) referent)))))))
+    ;; Don't need code pinned now
+    ;; (It will implicitly be pinned on the conservatively scavenged backends)
+    (macrolet ((set-boxed-word (i val &optional fdefnp)
+                 (declare (ignorable fdefnp))
+                 ;; Thankfully we don't mix untagged fdefns with darwin-jit
+                 #+darwin-jit
+                 `(setf (svref boxed-data (- ,i ,sb-vm:code-constants-offset)) ,val)
+                 #-darwin-jit
+                 (if (not fdefnp) ; statically not an fdefn
+                     `(setf (code-header-ref code-obj ,i) ,val)
+                     `(if ,fdefnp ; else choose which setter to use
+                          (set-code-fdefn code-obj ,i ,val)
+                          (setf (code-header-ref code-obj ,i) ,val)))))
+
+      (let* ((entries (ir2-component-entries 2comp))
+             (fun-index (length entries)))
+        (dolist (entry-info entries)
+          (let ((fun (%code-entry-point code-obj (decf fun-index)))
+                (w (+ sb-vm:code-constants-offset
+                      (* sb-vm:code-slots-per-simple-fun fun-index))))
+            (aver (functionp fun)) ; in case %CODE-ENTRY-POINT returns NIL
+            (set-boxed-word (+ w sb-vm:simple-fun-name-slot) (entry-info-name entry-info))
+            (set-boxed-word (+ w sb-vm:simple-fun-arglist-slot) (entry-info-arguments entry-info))
+            (set-boxed-word (+ w sb-vm:simple-fun-source-slot) (entry-info-form/doc entry-info))
+            (set-boxed-word (+ w sb-vm:simple-fun-info-slot) (entry-info-type/xref entry-info))
+            (note-fun entry-info fun object))))
+
+      (do ((index (+ sb-vm:code-constants-offset
+                     (* (length (ir2-component-entries 2comp))
+                        sb-vm:code-slots-per-simple-fun))
+                  (1+ index)))
+          ((>= index (length constants)))
+        (let* ((const (aref constants index))
+               (kind (if (listp const) (car const) const)))
+          (case kind
+            (:entry
+             (reference-core-fun (or boxed-data code-obj) index (cadr const) object))
+            ((nil))
+            (t
+             (let ((referent
+                    (etypecase kind
+                     ((member :named-call :fdefinition) (cadr const))
+                     ((eql :known-fun)
+                      (%coerce-name-to-fun (cadr const)))
+                     (constant
+                      (constant-value const)))))
+               (set-boxed-word index referent (eq kind :named-call)))))))
+
+      #+darwin-jit (assign-code-constants code-obj boxed-data))
+
     (when named-call-fixups
       (sb-vm::statically-link-code-obj code-obj named-call-fixups))
     (when sb-fasl::*show-new-code*

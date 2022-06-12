@@ -398,3 +398,14 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     }
 }
 #endif
+
+lispobj* duplicate_codeblob_offheap(lispobj code)
+{
+    int nwords = code_total_nwords((struct code*)(code-OTHER_POINTER_LOWTAG));
+    lispobj* mem = malloc((nwords+1) * N_WORD_BYTES);
+    if ((uword_t)mem & LOWTAG_MASK) lose("this is unexpected\n");
+    // add 1 word if not dualword aligned
+    lispobj* copy = (lispobj*)((uword_t)mem + ((uword_t)mem & N_WORD_BYTES));
+    memcpy(copy, (char*)code-OTHER_POINTER_LOWTAG, nwords<<WORD_SHIFT);
+    return mem;
+}

@@ -25,21 +25,37 @@ void jit_patch(lispobj* address, lispobj value) {
     THREAD_JIT(1);
 }
 
-void jit_patch_int(int* address, int value) {
+void jit_copy_code_insts(lispobj dst, lispobj* src)
+{
+    lispobj* aligned_src = (lispobj*)(src + ((uword_t)src & N_WORD_BYTES)); // align up
+    struct code* code = (struct code*)(dst-OTHER_POINTER_LOWTAG);
+    int nwords = code_total_nwords(code);
+    gc_assert(code_total_nwords((struct code*)aligned_src));
     THREAD_JIT(0);
-    *address = value;
+    memcpy(code, aligned_src, nwords<<WORD_SHIFT);
+    for_each_simple_fun(i, fun, code, 1, { fun->self = fun_self_from_baseptr(fun); })
     THREAD_JIT(1);
+    free(src);
+    // FINISH-FIXUPS didn't call SB-VM:SANCTIFY-FOR-EXECUTION
+    // because the copy of the code on which it operates was only temporary.
+    __clear_cache(code, (lispobj*)code + nwords);
 }
 
-void jit_patch_uint(unsigned* address, unsigned value) {
+void jit_copy_code_constants(lispobj lispcode, lispobj constants)
+{
+    struct code* code = (void*)(lispcode - OTHER_POINTER_LOWTAG);
+    gc_assert(header_widetag(code->header) == CODE_HEADER_WIDETAG);
+    struct vector* v = VECTOR(constants);
+    gc_assert(header_widetag(v->header) == SIMPLE_VECTOR_WIDETAG);
+    gc_assert(find_page_index((void*)code) >= 0);
     THREAD_JIT(0);
-    *address = value;
-    THREAD_JIT(1);
-}
-
-void jit_patch_uchar(unsigned char* address, unsigned char value) {
-    THREAD_JIT(0);
-    *address = value;
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIG_STOP_FOR_GC);
+    thread_sigmask(SIG_BLOCK, &mask, 0);
+    SET_WRITTEN_FLAG((lispobj*)code);
+    memcpy(&code->constants, v->data, vector_len(v) * N_WORD_BYTES);
+    thread_sigmask(SIG_UNBLOCK, &mask, 0);
     THREAD_JIT(1);
 }
 
@@ -48,12 +64,28 @@ void jit_memcpy(void* dst, void* src, size_t n) {
     memcpy(dst, src, n);
     THREAD_JIT(1);
 }
+
 void jit_patch_code(lispobj code, lispobj value, unsigned long index) {
-    THREAD_JIT(0);
-    gc_card_mark[addr_to_card_index(code)] = 1; // CARD_MARKED
-    SET_WRITTEN_FLAG(native_pointer(code));
-    native_pointer(code)[index] = value;
-    THREAD_JIT(1);
+    /* It is critical that we NOT touch the mark table if the object is off-heap.
+     * With soft protection, it's doesn't matter - it's merely suboptimal - but arm64
+     * uses physical protection for now, and a page fault on a page that is erroneously
+     * marked (i.e. not write-protected, allegedly) would be an error.
+     * Disallow GC in between setting the WRITTEN flag and doing the assigmment */
+    if (find_page_index((void*)code) >= 0) {
+        THREAD_JIT(0);
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, SIG_STOP_FOR_GC);
+        thread_sigmask(SIG_BLOCK, &mask, 0);
+        gc_card_mark[addr_to_card_index(code)] = CARD_MARKED;
+        SET_WRITTEN_FLAG(native_pointer(code));
+        native_pointer(code)[index] = value;
+        thread_sigmask(SIG_UNBLOCK, &mask, 0);
+        THREAD_JIT(1);
+    } else { // Off-heap code objects can't be executed (or GC'd)
+        SET_WRITTEN_FLAG(native_pointer(code));
+        native_pointer(code)[index] = value;
+    }
 }
 
 

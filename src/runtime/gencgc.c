@@ -259,6 +259,11 @@ page_index_t contiguous_block_final_page(page_index_t first) {
  * Clear all the flags that don't pertain to a free page. */
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
+#ifdef LISP_FEATURE_DARWIN_JIT
+    // Whenever a page was mapped as code, it potentially needs to be remapped on the next use.
+    // This avoids any affect of pthread_jit_write_protect_np when next used.
+    if (page_table[page].type == PAGE_TYPE_CODE) set_page_needs_zerofill(page);
+#endif
     page_table[page].type = 0;
     gc_page_pins[page] = 0;
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
@@ -5032,11 +5037,17 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
     THREAD_JIT(0);
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
+#ifdef LISP_FEATURE_DARWIN_JIT
+    // Zeroize everything so that lisp doesn't have to.
+    // One memcpy is cheaper than 2 system calls per boxed word.
+    memset(&code->boxed_size, 0, nbytes - N_WORD_BYTES);
+#else
     // Code pages are not prezeroed, so these assignments are essential to prevent GC
     // from seeing bad pointers if it runs as soon as the mutator allows GC.
     code->boxed_size = 0;
     code->debug_info = 0;
     ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
+#endif
     THREAD_JIT(1);
 
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
@@ -5237,7 +5248,7 @@ boolean ignore_memoryfaults_on_unprotected_pages = 0;
 extern boolean continue_after_memoryfault_on_unprotected_pages;
 boolean continue_after_memoryfault_on_unprotected_pages = 0;
 
-int gencgc_handle_wp_violation(void* context, void* fault_addr)
+int gencgc_handle_wp_violation(__attribute__((unused)) void* context, void* fault_addr)
 {
     page_index_t page_index = find_page_index(fault_addr);
 
@@ -5763,7 +5774,7 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
         }
 #endif
 
-#ifdef LISP_FEATURE_64_BIT
+#if defined LISP_FEATURE_64_BIT && !defined LISP_FEATURE_DARWIN_JIT
         /* If any function in this code object redirects to a function outside
          * the object, then scavenge all entry points. Otherwise there is no need,
          * as trans_code() made necessary adjustments to internal entry points.

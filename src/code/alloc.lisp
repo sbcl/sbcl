@@ -516,13 +516,15 @@
         ;; value in the boxed word count because otherwise it looks like
         ;; an immobile space page filler. So don't do any more zeroing there.
         ;; (Could dead immobile objects be converted to use FILLER-WIDETAG instead?)
+        ;; For #+darwin-jit the entire object (other than first word) is cleared in C.
+        #-darwin-jit
         (unless (immobile-space-obj-p code)
           ;; Before writing the boxed word count, zeroize up to and including 1 word
           ;; after the boxed header so that all pointers can be safely read by GC,
           ;; and so that the jump table count word is 0.
           (loop for byte-index from (ash boxed word-shift) downto (ash 2 word-shift)
                 by n-word-bytes
-                do (setf (sap-ref-word-jit sap byte-index) 0)))
+                do (setf (sap-ref-word sap byte-index) 0)))
         ;; The 1st slot beyond the header stores the boxed header size in bytes
         ;; as an untagged number, which has the same representation as a tagged
         ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
@@ -543,10 +545,4 @@
     ;; But what about other things that create code objects?
     ;; It could be a subtle source of nondeterministic core images.
 
-    ;; FIXME: Sort out 64-bit and cheneygc.
-    #+(and 64-bit cheneygc)
-    (setf (code-header-ref code 0)
-          (%make-lisp-obj
-           (logior (ash total-words 32)
-                   sb-vm:code-header-widetag)))
     code))

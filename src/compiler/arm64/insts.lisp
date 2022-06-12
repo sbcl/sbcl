@@ -3014,21 +3014,21 @@
   (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
-       (setf (sb-vm::sap-ref-word-jit sap offset) value))
+       (setf (sap-ref-word sap offset) value))
       (:layout-id
-       (setf (sb-vm::signed-sap-ref-32-jit sap offset) value))
+       (setf (signed-sap-ref-32 sap offset) value))
       (:cond-branch
-       (setf (ldb (byte 19 5) (sb-vm::sap-ref-32-jit sap offset))
+       (setf (ldb (byte 19 5) (sap-ref-32 sap offset))
              (ash (- value (+ (sap-int sap) offset)) -2)))
       (:uncond-branch
-       (setf (ldb (byte 26 0) (sb-vm::sap-ref-32-jit sap offset))
+       (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
              (ash (- value (+ (sap-int sap) offset)) -2)))
       (:ldr-str
-       (setf (ldb (byte 12 10) (sb-vm::sap-ref-32-jit sap offset))
+       (setf (ldb (byte 12 10) (sap-ref-32 sap offset))
              (ash (the (unsigned-byte #.(+ 12 word-shift)) value)
                   (- word-shift))))
       (:move-wide
-       (setf (ldb (byte 16 5) (sb-vm::sap-ref-32-jit sap offset))
+       (setf (ldb (byte 16 5) (sap-ref-32 sap offset))
              (the (unsigned-byte 16) value)))))
   nil)
 
