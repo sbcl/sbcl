@@ -53,23 +53,19 @@
 
 ;;; Point FUN's 'self' slot to FUN.
 ;;; FUN must be pinned when calling this.
-(declaim (inline assign-simple-fun-self))
-(defun assign-simple-fun-self (fun)
-  (let ((self ;; x86 backends store the address of the entrypoint in 'self'
-          #+(or x86 x86-64 arm64)
-          (%make-lisp-obj
-           (truly-the word (+ (get-lisp-obj-address fun)
-                              (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)
-                              (- sb-vm:fun-pointer-lowtag))))
-          ;; non-x86 backends store the function itself (what else?) in 'self'
-          #-(or x86 x86-64 arm64) fun))
-    #-darwin-jit
-    (setf (sb-vm::%simple-fun-self fun) self)
-    #+darwin-jit
-    (sb-vm::jit-patch (+ (get-lisp-obj-address fun)
-                         (- sb-vm:fun-pointer-lowtag)
-                         (* sb-vm:simple-fun-self-slot sb-vm:n-word-bytes))
-               (get-lisp-obj-address self))))
+#-darwin-jit ; done entirely by C for #+darwin-jit
+(defmacro assign-simple-fun-self (fun)
+  `(let* ((fun ,fun)
+          (self
+           ;; a few architectures store the untagged address of the entrypoint in 'self'
+           #+(or x86 x86-64 arm64)
+           (%make-lisp-obj
+            (truly-the word (+ (get-lisp-obj-address fun)
+                               (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)
+                               (- sb-vm:fun-pointer-lowtag))))
+           ;; all others store the function itself (what else?) in 'self'
+           #-(or x86 x86-64 arm64) fun))
+     (setf (sb-vm::%simple-fun-self fun) self)))
 
 (define-load-time-global sb-fasl::*asm-routine-index-to-name* #())
 (declaim (simple-vector sb-fasl::*asm-routine-index-to-name*))
@@ -181,7 +177,12 @@
                  preserved t)))
       (finish-fixups code-obj preserved))))
 
-;;; Return a behaviorally identical copy of CODE.
+;;; Return a behaviorally identical copy of CODE which is used for TRACE
+;;; in "funobj encapsulation" mode where we just switch an entry point
+;;; so that it jumps to a tracing routine and then back again.
+;;; The code that gets copied is just the tracing wrapper.
+;;; See the example at COMPILE-FUNOBJ-ENCAPSULATION in ntrace
+#+(or x86 x86-64)
 (defun copy-code-object (code)
   ;; Must have one simple-fun
   (aver (= (code-n-entries code) 1))
@@ -197,10 +198,7 @@
          (copy (allocate-code-object
                 :dynamic (code-n-named-calls code) boxed unboxed)))
     (with-pinned-objects (code copy)
-      #-darwin-jit
       (%byte-blt (code-instructions code) 0 (code-instructions copy) 0 unboxed)
-      #+darwin-jit
-      (sb-vm::jit-memcpy (code-instructions copy) (code-instructions code) unboxed)
       ;; copy boxed constants so that the fixup step (if needed) sees the 'fixups'
       ;; slot from the new object.
       (loop for i from 2 below boxed

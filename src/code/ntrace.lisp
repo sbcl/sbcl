@@ -764,6 +764,28 @@ functions when called with no arguments."
 (eval-when (:compile-toplevel :load-toplevel)
   (export 'sb-int::encapsulate-funobj 'sb-int))
 
+;;; Suppose you want to trace function #'FOO no matter how a caller
+;;; references it (maybe capturing #'FOO in a variable before asking
+;;; to trace FOO). We can do that without resorting to breakpoints,
+;;; by replacing the simple-fun entry point in the header of the code
+;;; that contains FOO such that it points to a different simple-fun
+;;; outside of itself. That other simple-fun calls the tracing routine
+;;; and then the real FOO. An entry point can't be replaced with a
+;;; closure, because CLOSURE and SIMPLE-FUN are not fungible.
+;;;
+;;;   +-------------------------+        +--------------------+
+;;;   | codeblob foo            |        | codeblob "TRACER"  |
+;;;   | ...                     |        |                    |
+;;;   | ... boxed data ...      |        | boxed word: #'foo  | -> the "real" FOO
+;;;   | ...                     |        |                    |
+;;;   | ... unboxed data ...    |        |                    |
+;;;   | ...                     |        +--------------------+
+;;;   | simple-fun-header #'foo |    --> | call trace helper  |
+;;;   | redirected entry point  | --/    +--------------------+
+;;;   | instructions of #'FOO   |
+;;;   | ...                     |
+;;;   +-------------------------+
+
 (defun compile-funobj-encapsulation (wrapper info actual-fun)
   #+(or x86 x86-64)
   (let ((code
