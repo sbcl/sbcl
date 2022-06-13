@@ -506,41 +506,42 @@ new string COUNT long filled with the fill character."
   (declare (ignorable a z))
   `(cond ((and (zerop start)
                (not end)
-               (cond #+sb-unicode
-                     ((simple-base-string-p string)
-                      (let* ((repeat (ldb (byte sb-vm:n-word-bits 0) #x0101010101010101))
-                             (a-mask (* (- 128 (char-code ,a)) repeat))
-                             (z-mask (* (- 127 (char-code ,z)) repeat))
-                             (7-mask (* 128 repeat)))
-                        (declare (optimize sb-c::preserve-single-use-debug-variables
-                                           sb-c::preserve-constants))
-                        (flet ((%case (bits)
-                                 (logxor bits (ash (logand (logxor (+ bits a-mask)
-                                                                   (+ bits z-mask))
-                                                           7-mask)
-                                                   -2))))
-                          (declare (inline %case))
-                          (loop for i below (ceiling (length string) sb-vm:n-word-bytes)
-                                do
-                                (setf (%vector-raw-bits string i)
-                                      (%case (%vector-raw-bits string i))))))
-                      string)
-                     #+x86-64
-                     ((simple-character-string-p string)
-                      (let ((length (length string)))
-                        (sb-vm::simd-case ,a string string
-                                          i
-                                          (do ((index i (1+ index))
-                                               (cases +character-cases+))
-                                              ((>= index length))
-                                            (let ((char (schar string index)))
-                                              (with-case-info (char case-index cases
-                                                               :cases cases)
-                                                (let ((code (aref cases ,case-index)))
-                                                  (unless (zerop code)
-                                                    (setf (schar string index)
-                                                          (code-char (truly-the char-code code))))))))))
-                      string))))
+               (typecase string
+                 #+sb-unicode
+                 (simple-base-string
+                  (let* ((repeat (ldb (byte sb-vm:n-word-bits 0) #x0101010101010101))
+                         (a-mask (* (- 128 (char-code ,a)) repeat))
+                         (z-mask (* (- 127 (char-code ,z)) repeat))
+                         (7-mask (* 128 repeat)))
+                    (declare (optimize sb-c::preserve-single-use-debug-variables
+                                       sb-c::preserve-constants))
+                    (flet ((%case (bits)
+                             (logxor bits (ash (logand (logxor (+ bits a-mask)
+                                                               (+ bits z-mask))
+                                                       7-mask)
+                                               -2))))
+                      (declare (inline %case))
+                      (loop for i below (ceiling (length string) sb-vm:n-word-bytes)
+                            do
+                            (setf (%vector-raw-bits string i)
+                                  (%case (%vector-raw-bits string i))))))
+                  string)
+                 #+x86-64
+                 ((simple-array character)
+                  (let ((length (length string)))
+                    (sb-vm::simd-case ,a string string
+                                      i
+                                      (do ((index i (1+ index))
+                                           (cases +character-cases+))
+                                          ((>= index length))
+                                        (let ((char (schar string index)))
+                                          (with-case-info (char case-index cases
+                                                           :cases cases)
+                                            (let ((code (aref cases ,case-index)))
+                                              (unless (zerop code)
+                                                (setf (schar string index)
+                                                      (code-char (truly-the char-code code))))))))))
+                  string))))
          (t
           (with-one-string (string start end)
             (declare (optimize (sb-c:insert-array-bounds-checks 0)))
@@ -578,44 +579,45 @@ new string COUNT long filled with the fill character."
      (or
       (and (eql start 0)
            (not end)
-           (cond #+sb-unicode
-                 ((simple-base-string-p string)
-                  (let* ((repeat (ldb (byte sb-vm:n-word-bits 0) #x0101010101010101))
-                         (a-mask (* (- 128 (char-code ,a)) repeat))
-                         (z-mask (* (- 127 (char-code ,z)) repeat))
-                         (7-mask (* 128 repeat)))
-                    (declare (optimize sb-c::preserve-single-use-debug-variables
-                                       sb-c::preserve-constants))
-                    (flet ((%case (bits)
-                             (logxor bits (ash (logand (logxor (+ bits a-mask)
-                                                               (+ bits z-mask))
-                                                       7-mask)
-                                               -2))))
-                      (declare (inline %case))
-                      (let ((new (make-string length :element-type 'base-char)))
-                        (loop for i below (ceiling (length string) sb-vm:n-word-bytes)
-                              do
-                              (setf (%vector-raw-bits new i)
-                                    (%case (%vector-raw-bits string i))))
-                        new))))
-                 #+x86-64
-                 ((simple-character-string-p string)
-                  (let ((new (make-string length)))
-                    (sb-vm::simd-case ,a string new
-                                      i
-                                      (do ((index i (1+ index))
-                                           (cases +character-cases+))
-                                          ((>= index length))
-                                        (let* ((char (schar string index))
-                                               (cased (with-case-info (char case-index cases
-                                                                       :cases cases
-                                                                       :miss-value char)
-                                                        (let ((code (aref cases ,case-index)))
-                                                          (if (zerop code)
-                                                              char
-                                                              (code-char (truly-the char-code code)))))))
-                                          (setf (schar new index) cased))))
+           (typecase string
+             #+sb-unicode
+             (simple-base-string
+              (let* ((repeat (ldb (byte sb-vm:n-word-bits 0) #x0101010101010101))
+                     (a-mask (* (- 128 (char-code ,a)) repeat))
+                     (z-mask (* (- 127 (char-code ,z)) repeat))
+                     (7-mask (* 128 repeat)))
+                (declare (optimize sb-c::preserve-single-use-debug-variables
+                                   sb-c::preserve-constants))
+                (flet ((%case (bits)
+                         (logxor bits (ash (logand (logxor (+ bits a-mask)
+                                                           (+ bits z-mask))
+                                                   7-mask)
+                                           -2))))
+                  (declare (inline %case))
+                  (let ((new (make-string length :element-type 'base-char)))
+                    (loop for i below (ceiling (length string) sb-vm:n-word-bytes)
+                          do
+                          (setf (%vector-raw-bits new i)
+                                (%case (%vector-raw-bits string i))))
                     new))))
+             #+x86-64
+             ((simple-array character)
+              (let ((new (make-string length)))
+                (sb-vm::simd-case ,a string new
+                                  i
+                                  (do ((index i (1+ index))
+                                       (cases +character-cases+))
+                                      ((>= index length))
+                                    (let* ((char (schar string index))
+                                           (cased (with-case-info (char case-index cases
+                                                                   :cases cases
+                                                                   :miss-value char)
+                                                    (let ((code (aref cases ,case-index)))
+                                                      (if (zerop code)
+                                                          char
+                                                          (code-char (truly-the char-code code)))))))
+                                      (setf (schar new index) cased))))
+                new))))
       (with-array-data ((string-data string :offset-var offset)
                         (s-start start)
                         (s-end end)
