@@ -5044,6 +5044,7 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
     /* Must intialize to an arbitrary non-pointer value so that GC doesn't crash after the
      * size is assigned (at some point prior to storing the constants) */
     for ( ; p < end ; ++p) *p = UNBOUND_MARKER_WIDETAG;
+    *p = 0; // 'p' now points to the jump table count word which must be 0
     ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
     THREAD_JIT(1);
 
