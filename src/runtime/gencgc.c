@@ -2051,8 +2051,18 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         || is_code(page->type))
         return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
 
+    /* Take special care not to return fillers. A real-world example:
+     * - a boxed register contains 0x528b4000
+     * - the object formerly at 0x528b4000 is a filler
+     * - compute_lispobj(0x528b4000) returns 0x528b4000 because LOWTAG_FOR_WIDETAG
+     *   says that FILLER_WIDTAG has a 0 lowtag.
+     *   compute_lispobj simply ORs in the 0 which gives back the original address
+     *   and that of course satisfies the equality test. */
+
     // Correctly tagged pointer: ok
-    if (addr == compute_lispobj(object_start)) return addr;
+    if (addr == compute_lispobj(object_start)
+        && widetag_of(object_start) != FILLER_WIDETAG)
+        return addr;
     return 0;
 }
 #endif

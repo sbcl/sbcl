@@ -1289,6 +1289,10 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
     struct visitor* v = (struct visitor*)arg;
     lispobj* obj = where;
     while (obj < limit) {
+        if (widetag_of(obj) == FILLER_WIDETAG) {
+            obj += object_size(obj);
+            continue;
+        }
         lispobj ptr = compute_lispobj(obj);
         tally(ptr, v);
         if (!hopscotch_get(v->reached, ptr, 0)) printf("unreachable: %p\n", (void*)ptr);
