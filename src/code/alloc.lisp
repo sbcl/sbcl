@@ -488,19 +488,13 @@
                                         (eq space :immobile)))
                ;; x86-64 has a vop which wraps pseudo-atomic around the foreign call,
                ;; as is the custom for allocation trampolines.
-               #+x86-64 (%primitive sb-vm::alloc-code total-words)
+               #+x86-64 (%primitive sb-vm::alloc-code total-words boxed)
                #-x86-64
                (without-gcing
                  (%make-lisp-obj
                   (alien-funcall (extern-alien "alloc_code_object"
-                                               (function unsigned (unsigned 32)))
-                                 total-words))))
-           #+cheneygc
-           (%primitive var-alloc total-words 'alloc-code
-                       ;; subtract 1 because var-alloc always adds 1 word
-                       ;; for the header, which is not right for code objects.
-                       -1 code-header-widetag other-pointer-lowtag nil)))
-
+                                               (function unsigned (unsigned 32) (unsigned 32)))
+                                 total-words boxed))))))
     (with-pinned-objects (code)
       (let ((sap (sap+ (int-sap (get-lisp-obj-address code))
                        (- other-pointer-lowtag))))
@@ -512,19 +506,6 @@
                   (unless (eq (generation-of code) 0) (return))
                   (let ((oldval (cas *codeblob-tree* tree newtree)))
                     (if (eq oldval tree) (return) (setq tree oldval))))))
-        ;; The immobile space allocator pre-zeroes, and also it needs a nonzero
-        ;; value in the boxed word count because otherwise it looks like
-        ;; an immobile space page filler. So don't do any more zeroing there.
-        ;; (Could dead immobile objects be converted to use FILLER-WIDETAG instead?)
-        ;; For #+darwin-jit the entire object (other than first word) is cleared in C.
-        #-darwin-jit
-        (unless (immobile-space-obj-p code)
-          ;; Before writing the boxed word count, zeroize up to and including 1 word
-          ;; after the boxed header so that all pointers can be safely read by GC,
-          ;; and so that the jump table count word is 0.
-          (loop for byte-index from (ash boxed word-shift) downto (ash 2 word-shift)
-                by n-word-bytes
-                do (setf (sap-ref-word sap byte-index) 0)))
         ;; The 1st slot beyond the header stores the boxed header size in bytes
         ;; as an untagged number, which has the same representation as a tagged
         ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.

@@ -5016,7 +5016,7 @@ DEFINE_LISP_ENTRYPOINT(alloc_list, 0, cons, PAGE_TYPE_CONS)
 DEFINE_LISP_ENTRYPOINT(alloc_list, 0, mixed, PAGE_TYPE_MIXED)
 #endif
 
-lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
+lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
 {
     struct thread *th = get_sb_vm_thread();
     // x86-64 uses pseudo-atomic. Others should too, but instead use WITHOUT-GCING
@@ -5037,17 +5037,14 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words)
     THREAD_JIT(0);
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
-#ifdef LISP_FEATURE_DARWIN_JIT
-    // Zeroize everything so that lisp doesn't have to.
-    // One memcpy is cheaper than 2 system calls per boxed word.
-    memset(&code->boxed_size, 0, nbytes - N_WORD_BYTES);
-#else
-    // Code pages are not prezeroed, so these assignments are essential to prevent GC
-    // from seeing bad pointers if it runs as soon as the mutator allows GC.
-    code->boxed_size = 0;
+    code->boxed_size = 0; // gets reassigned from lisp
     code->debug_info = 0;
+    code->fixups = 0;
+    lispobj* p = &code->constants[0], *end = (lispobj*)code + boxed;
+    /* Must intialize to an arbitrary non-pointer value so that GC doesn't crash after the
+     * size is assigned (at some point prior to storing the constants) */
+    for ( ; p < end ; ++p) *p = UNBOUND_MARKER_WIDETAG;
     ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
-#endif
     THREAD_JIT(1);
 
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
