@@ -300,9 +300,7 @@
          (boxed-data
           ;; <header, boxed_size, debug_info, fixups> are absent from the simple-vector
           #+darwin-jit
-          (make-array (- nboxed sb-vm:code-constants-offset)
-                      :initial-element (%make-lisp-obj (logior #xff00
-                                                               sb-vm:unbound-marker-widetag))))
+          (make-array (- nboxed sb-vm:code-constants-offset) :initial-element 0))
          (n-named-calls
           ;; Pre-scan for fdefinitions to ensure their existence.
           ;; Doing so guarantees that storing them into the boxed header now
