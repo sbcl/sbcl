@@ -237,13 +237,30 @@
                 "S")
             value)))
 
+(defun decode-vector-size (q size)
+  (case q
+    (0
+     (case size
+       (#b00 "8B")
+       (#b01 "4H")
+       (#b10 "2S")))
+    (1
+     (case size
+       (#b00 "16B")
+       (#b01 "8H")
+       (#b10 "4S")
+       (#b11 "2D")))))
+
 (defun print-simd-reg (value stream dstate)
   (declare (ignore dstate))
-  (destructuring-bind (size offset) value
+  (multiple-value-bind (q size offset)
+      (if (= (length value) 3)
+          (destructuring-bind (q size offset) value
+            (values q size offset))
+          (destructuring-bind (q offset) value
+            (values q 0 offset)))
     (format stream "V~d.~a" offset
-            (if (zerop size)
-                "8B"
-                "16B"))))
+            (decode-vector-size q size))))
 
 (defun print-vbhs (value stream dstate)
   (declare (ignore dstate))

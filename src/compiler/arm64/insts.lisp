@@ -2517,8 +2517,14 @@
                                                3))))))
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
-                                (if (sc-is dest 32-bit-reg) #b00 #b01)
-                                0
+                                (sc-case dest
+                                  (32-bit-reg #b00)
+                                  (sb-vm::complex-double-reg
+                                   #b10)
+                                  (t #b01))
+                                (if (fp-register-p dest)
+                                    1
+                                    0)
                                 (ldb (byte 19 0)
                                      (ash (compute-delta position) -2))
                                 (reg-offset dest)))
@@ -2623,32 +2629,66 @@
   (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
 
-(defun decode-vector-size (size)
-  (ecase size
-    (:8b 0)
-    (:16b 1)))
+(define-instruction-format (simd-three-same-sized 32
+                            :include simd-three-same
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
+  (rm :fields (list (byte 1 30) (byte 2 22) (byte 5 16)) :type 'simd-reg)
+  (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 2 22) (byte 5 0)) :type 'simd-reg))
 
-(define-instruction s-orr (segment rd rn rm &optional (size :16b))
-  (:printer simd-three-same ((u #b0) (size #b10) (op #b00011))
-            '((:cond
-                ((rn :same-as rm) 'mov)
-                (t 'orr))
-              :tab rd  ", " rn (:unless (:same-as rn) "," rm)))
-  (:emitter
-   (emit-simd-three-same segment
-                         (decode-vector-size size)
-                         #b0
-                         #b10
-                         (reg-offset rm)
-                         #b00011
-                         (reg-offset rn)
-                         (reg-offset rd))))
+(defun encode-vector-size (size)
+  (ecase size
+    (:8b (values 0 0))
+    (:16b (values 1 0))
+    (:4h (values 0 #b01))
+    (:8h (values 1 #b01))
+    (:2s (values 0 #b10))
+    (:4s (values 1 #b10))
+    (:2d (values 1 #b11))))
 
 (define-instruction-macro s-mov (rd rn &optional (size :16b))
   `(let ((rd ,rd)
          (rn ,rn)
          (size ,size))
      (inst s-orr rd rn rn size)))
+
+(macrolet ((def (name u size op &rest printer)
+             `(define-instruction ,name (segment rd rn rm &optional (size :16b))
+                (:printer simd-three-same ((u ,u) (size ,size) (op ,op))
+                          ,@printer)
+                (:emitter
+                 (emit-simd-three-same segment
+                                       (encode-vector-size size)
+                                       ,u
+                                       ,size
+                                       (reg-offset rm)
+                                       ,op
+                                       (reg-offset rn)
+                                       (reg-offset rd))))))
+  (def s-orr #b0 #b10 #b00011
+    '((:cond
+        ((rn :same-as rm) 'mov)
+        (t 'orr))
+      :tab rd  ", " rn (:unless (:same-as rn) ", " rm)))
+  (def s-and #b0 #b00 #b00011)
+  (def s-eor #b1 #b00 #b00011))
+
+(macrolet ((def (name u op)
+             `(define-instruction ,name (segment rd rn rm &optional (size :16b))
+                (:printer simd-three-same-sized ((u ,u) (op ,op)))
+                (:emitter
+                 (multiple-value-bind (q size) (encode-vector-size size)
+                   (emit-simd-three-same segment
+                                         q
+                                         ,u
+                                         size
+                                         (reg-offset rm)
+                                         ,op
+                                         (reg-offset rn)
+                                         (reg-offset rd)))))))
+  (def s-sub #b1 #b10000)
+  (def cmeq #b1 #b10001)
+  (def cmgt #b0 #b00110))
 
 (def-emitter simd-scalar-three-same
     (#b01 2 30)
@@ -2675,26 +2715,10 @@
   (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
 
-(define-instruction cmeq (segment rd rn rm &optional size)
-  (:printer simd-three-same ((u #b1)  (op #b10001)))
-  (:emitter
-   (multiple-value-bind (size q)
-       (ecase size
-         (:8b (values 0 0))
-         (:16b (values 0 1)))
-     (emit-simd-three-same segment
-                           q
-                           1
-                           size
-                           (reg-offset rm)
-                           #b10001
-                           (reg-offset rn)
-                           (reg-offset rd)))))
-
 ;;;
 
 (def-emitter simd-extract
-  (#b0 1 31)
+    (#b0 1 31)
   (q 1 30)
   (#b101110000 9 21)
   (rm 5 16)
@@ -2707,7 +2731,7 @@
 (define-instruction ext (segment rd rn rm index &optional (size :16b))
   (:emitter
    (emit-simd-extract segment
-                      (decode-vector-size size)
+                      (encode-vector-size size)
                       (reg-offset rm)
                       index
                       (reg-offset rn)
@@ -2794,7 +2818,7 @@
   (op2 :field (byte 5 24) :value #b01110)
   (size :field (byte 2 22))
   (op3 :field (byte 5 17) :value #b11000)
-  (op :field (byte 4 12))
+  (op :field (byte 5 12))
   (op4 :field (byte 2 10) :value #b10)
   (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'vx.t)
   (rd :fields (list (byte 2 22) (byte 5 0)) :type 'vbhs))
@@ -2853,26 +2877,22 @@
     (reg-offset rn)
     (reg-offset rd))))
 
-(define-instruction uminv (segment rd sized rn sizen)
-  (:printer simd-across-lanes  ((u 1) (op #b11010)
-                                      (rd nil :type 'vhsd)))
-  (:emitter
-   (emit-simd-across-lanes
-    segment
-    (ecase sizen
-      (:8b 0)
-      (:16b 1)
-      (:4h 0)
-      (:8h 1)
-      (:4s 1))
-    1
-    (ecase sized
-      (:b 0)
-      (:h 1)
-      (:s #b10))
-    #b11010
-    (reg-offset rn)
-    (reg-offset rd))))
+(macrolet ((def (name u op)
+             `(define-instruction ,name (segment rd rn size)
+                (:printer simd-across-lanes  ((u ,u) (op ,op)
+                                              (rd nil :type 'vhsd)))
+                (:emitter
+                 (multiple-value-bind (q size) (encode-vector-size size)
+                   (emit-simd-across-lanes
+                    segment
+                    q
+                    ,u
+                    size
+                    ,op
+                    (reg-offset rn)
+                    (reg-offset rd)))))))
+  (def uminv 1 #b11010)
+  (def umaxv 1 #b01010))
 
 (define-instruction-format (simd-two-misc 32
                             :default-printer '(:name :tab rd ", " rn))
@@ -2887,18 +2907,20 @@
   (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
 
-(define-instruction cnt (segment rd rn size)
-  (:printer simd-two-misc ((u 0) (op #b00101)))
-  (:emitter
-   (emit-simd-two-misc segment
-                       (ecase size
-                         (:8b 0)
-                         (:16b 1))
-                       0
-                       00
-                       #b00101
-                       (reg-offset rn)
-                       (reg-offset rd))))
+(macrolet
+    ((def (name u size op)
+       `(define-instruction ,name (segment rd rn &optional (size :16b))
+          (:printer simd-two-misc ((u ,u) (size ,size) (op ,op)))
+          (:emitter
+           (emit-simd-two-misc segment
+                               (encode-vector-size size)
+                               ,u
+                               ,size
+                               ,op
+                               (reg-offset rn)
+                               (reg-offset rd))))))
+  (def cnt #b0 #b00 #b00101)
+  (def s-mvn #b1 #b00 #b00101))
 
 ;;; Inline constants
 (defun canonicalize-inline-constant (constant)
@@ -2926,7 +2948,7 @@
         (setf constant (list :complex-double-float first)))))
     (destructuring-bind (type value) constant
       (ecase type
-        ((:byte :word :dword :qword)
+        ((:byte :word :dword :qword :oword)
          (etypecase value
            ((or integer (cons (eql :layout-id)))
             (cons type value))))
