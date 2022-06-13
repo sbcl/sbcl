@@ -49,7 +49,7 @@
        ((res int-sse-reg simd-pack-ub32))
      (inst movdqa res (register-inline-constant :sse value))))
 
-(defmacro simd-case (a source destination index fallback)
+(defmacro simd-string-case (a source destination index fallback)
   `(let ((ascii-p (simd-mask 192))
          (a-mask (simd-mask ,(+ (expt 2 31) (char-code a))))
          (z-mask (simd-mask ,(+ (expt 2 31) 25)))

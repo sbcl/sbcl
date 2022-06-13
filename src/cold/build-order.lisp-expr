@@ -483,10 +483,12 @@
  ;; compiled as part of the compiler
 
  ("src/code/macroexpand")
- #+sb-simd-pack
+ #+(or arm64 x86-64)
  ("src/code/simd-fndb")
  #+x86-64
  ("src/code/x86-64-simd"   :not-host)
+ #+arm64
+ ("src/code/arm64-simd"   :not-host)
  ("src/code/target-unicode" :not-host)
  ("src/code/mipsstrops"     :not-host)
  ("src/code/string"         :not-host)

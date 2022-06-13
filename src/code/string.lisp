@@ -526,10 +526,10 @@ new string COUNT long filled with the fill character."
                             (setf (%vector-raw-bits string i)
                                   (%case (%vector-raw-bits string i))))))
                   string)
-                 #+x86-64
+                 #+(or x86-64 arm64)
                  ((simple-array character)
                   (let ((length (length string)))
-                    (sb-vm::simd-case ,a string string
+                    (sb-vm::simd-string-case ,a string string
                                       i
                                       (do ((index i (1+ index))
                                            (cases +character-cases+))
@@ -600,23 +600,23 @@ new string COUNT long filled with the fill character."
                           (setf (%vector-raw-bits new i)
                                 (%case (%vector-raw-bits string i))))
                     new))))
-             #+x86-64
+             #+(or x86-64 arm64)
              ((simple-array character)
               (let ((new (make-string length)))
-                (sb-vm::simd-case ,a string new
-                                  i
-                                  (do ((index i (1+ index))
-                                       (cases +character-cases+))
-                                      ((>= index length))
-                                    (let* ((char (schar string index))
-                                           (cased (with-case-info (char case-index cases
-                                                                   :cases cases
-                                                                   :miss-value char)
-                                                    (let ((code (aref cases ,case-index)))
-                                                      (if (zerop code)
-                                                          char
-                                                          (code-char (truly-the char-code code)))))))
-                                      (setf (schar new index) cased))))
+                (sb-vm::simd-string-case ,a string new
+                                         i
+                                         (do ((index i (1+ index))
+                                              (cases +character-cases+))
+                                             ((>= index length))
+                                           (let* ((char (schar string index))
+                                                  (cased (with-case-info (char case-index cases
+                                                                          :cases cases
+                                                                          :miss-value char)
+                                                           (let ((code (aref cases ,case-index)))
+                                                             (if (zerop code)
+                                                                 char
+                                                                 (code-char (truly-the char-code code)))))))
+                                             (setf (schar new index) cased))))
                 new))))
       (with-array-data ((string-data string :offset-var offset)
                         (s-start start)

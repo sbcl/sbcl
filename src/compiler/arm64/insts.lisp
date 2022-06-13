@@ -2688,7 +2688,10 @@
                                          (reg-offset rd)))))))
   (def s-sub #b1 #b10000)
   (def cmeq #b1 #b10001)
-  (def cmgt #b0 #b00110))
+  (def cmgt #b0 #b00110)
+  (def cmge #b0 #b00111)
+  (def cmhi #b1 #b00110)
+  (def cmhs #b1 #b00111))
 
 (def-emitter simd-scalar-three-same
     (#b01 2 30)

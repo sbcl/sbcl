@@ -9,8 +9,12 @@
 
 (in-package "SB-VM")
 
-(defknown vector-ref-128 (t index) (simd-pack (unsigned-byte 32))
-  (flushable))
+(deftype 128-element ()
+  #+x86-64 '(simd-pack (unsigned-byte 32))
+  #+arm64 'complex-double-float)
 
-(defknown (setf vector-ref-128) (simd-pack t index) (values)
+(defknown vector-ref-128 (t index) 128-element
+    (flushable))
+
+(defknown (setf vector-ref-128) (128-element t index) (values)
   ())
