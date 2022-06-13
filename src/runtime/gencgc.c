@@ -5313,7 +5313,7 @@ int gencgc_handle_wp_violation(__attribute__((unused)) void* context, void* faul
                     "Fault @ %p, PC=%p, page %"PAGE_INDEX_FMT" (~WP) mark=%#x gc_active=%d\n"
                     "  mixed_region=%p:%p\n"
                     "  page.scan_start: %p .words_used: %u .type: %d .gen: %d\n",
-                    fault_addr, (void*)(context?os_context_pc(context):-1), page_index,
+                    fault_addr, (void*)(context?os_context_pc(context):(uword_t)-1), page_index,
                     mark, gc_active_p,
                     mixed_region->start_addr, mixed_region->end_addr,
                     page_scan_start(page_index),

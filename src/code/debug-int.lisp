@@ -527,6 +527,20 @@
 ;;; different values, because this slot is relative to the object base
 ;;; address, whereas the one in C is an index into code->constants.
 (defconstant real-lra-slot code-constants-offset)
+(eval-when (:compile-toplevel :execute)
+  #+(or mips x86 x86-64) (pushnew :have-cookie-slot sb-xc:*features*))
+#+have-cookie-slot
+(defconstant cookie-slot (+ code-constants-offset 1 #+(or x86 x86-64) 1))
+(defconstant bpt-lra-boxed-nwords
+  ;; * For non-x86: a single boxed constant holds the true LRA.
+  ;;   Additionally, MIPS gets a boxed slot for the cookie
+  ;;   that formerly went in a weak hash-table.
+  ;; * For x86[-64]: one boxed constant holds the code object to which
+  ;;   to return, one holds the displacement into that object,
+  ;;   and one holds the cookie
+  (+ code-constants-offset 1
+     #+(or x86-64 x86) 1
+     #+have-cookie-slot 1))
 
 (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
@@ -3270,9 +3284,11 @@ register."
 ;;; This maps bpt-lra objects to cookies, so that
 ;;; HANDLE-FUN-END-BREAKPOINT can find the appropriate cookie for the
 ;;; breakpoint hook.
-;;; FIXME: assuming the preceding comment is correct, this seems an incredibly bad
-;;; way to store the data. Why not just allocate an additional boxed slot in every
-;;; bpt-lra object to store its cookies? Why use a hash table?
+;;; FIXME: this is an inefficient way to store the data - each hit of the
+;;; breakpoint requires removing a key from a synchronized weak hash-table.
+;;; The problem is that most of the architectures have a terribly constraining
+;;; layout of the so-called bpt-lra.
+#-have-cookie-slot
 (define-load-time-global *fun-end-cookies*
     (make-hash-table :test 'eq :synchronized t))
 
@@ -3289,16 +3305,17 @@ register."
   (lambda (frame breakpoint)
     (declare (ignore breakpoint)
              (type frame frame))
-    (multiple-value-bind (lra component offset)
+    (multiple-value-bind (lra bpt-codeblob offset)
         (make-bpt-lra (frame-saved-lra frame debug-fun))
       (setf (frame-saved-lra frame debug-fun) lra)
       (let ((end-bpts (breakpoint-%info starter-bpt)))
-        (let ((data (breakpoint-data component offset)))
+        (let ((data (breakpoint-data bpt-codeblob offset)))
           (setf (breakpoint-data-breakpoints data) end-bpts)
           (dolist (bpt end-bpts)
             (setf (breakpoint-internal-data bpt) data)))
         (let ((cookie (make-fun-end-cookie lra debug-fun)))
-          (setf (gethash component *fun-end-cookies*) cookie)
+          #+have-cookie-slot (setf (code-header-ref bpt-codeblob cookie-slot) cookie)
+          #-have-cookie-slot (setf (gethash bpt-codeblob *fun-end-cookies*) cookie)
           (dolist (bpt end-bpts)
             (let ((fun (breakpoint-cookie-fun bpt)))
               (when fun (funcall fun frame cookie)))))))))
@@ -3658,8 +3675,9 @@ register."
   (let* ((scp (sb-alien:sap-alien signal-context (* os-context-t)))
          (frame (signal-context-frame signal-context))
          (component (breakpoint-data-component data))
-         (cookie (gethash component *fun-end-cookies*)))
-    (remhash component *fun-end-cookies*)
+         (cookie #+have-cookie-slot (code-header-ref component cookie-slot)
+                 #-have-cookie-slot (gethash component *fun-end-cookies*)))
+    #-have-cookie-slot (remhash component *fun-end-cookies*)
     (dolist (bpt breakpoints)
       (funcall (breakpoint-hook-fun bpt)
                frame bpt
@@ -3685,6 +3703,9 @@ register."
 
 ;;;; MAKE-BPT-LRA (used for :FUN-END breakpoints)
 
+;;; FIXME: why does this imply that it makes an LRA when it actually makes
+;;; a code blob?  Despite the rename in git rev 2437d7f139 apparently I took a cue
+;;; from the former name ("MAKE-BOGUS-LRA") as if that spoke the truth.
 ;;; Make a breakpoint LRA object that signals a breakpoint trap when returned to.
 ;;; If the breakpoint trap handler returns, REAL-LRA is returned to.
 ;;; Three values are returned: the new LRA object, the code component it is part of,
@@ -3710,12 +3731,8 @@ register."
            (code-object
              (sb-c:allocate-code-object
               nil 0
-              ;; For non-x86: a single boxed constant holds the true LRA.
-              ;; For x86[-64]: one boxed constant holds the code object to which
-              ;; to return, and one holds the displacement into that object.
               ;; Ensure required boxed header alignment.
-              (align-up (+ code-constants-offset 1 #+(or x86-64 x86) 1)
-                        sb-c::code-boxed-words-align)
+              (align-up bpt-lra-boxed-nwords sb-c::code-boxed-words-align)
               (+ length
                  n-word-bytes   ; Jump Table prefix word
                  ;; Alignment padding, LRA header
