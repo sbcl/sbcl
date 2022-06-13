@@ -403,11 +403,12 @@ any non-negative real number."
   (exit :code 1))
 
 
-(defvar *runtime-options*
+(defconstant-eqx +runtime-options+
   #("--noinform" "--core" "--help" "--version" "--dynamic-space-size"
     "--control-stack-size" "--tls"
     "--debug-environment" "--disable-ldb" "--lose-on-corruption"
-    "--end-runtime-options" "--merge-core-pages" "--no-merge-core-pages"))
+    "--end-runtime-options" "--merge-core-pages" "--no-merge-core-pages")
+  #'equalp)
 
 ;;; the default system top level function
 (defun toplevel-init ()
@@ -504,7 +505,7 @@ any non-negative real number."
                    ((string= option "--end-toplevel-options")
                     (pop-option)
                     (return))
-                   ((find option *runtime-options* :test #'string=)
+                   ((find option +runtime-options+ :test #'string=)
                     (startup-error "C runtime option ~a in the middle of Lisp options."
                                    option))
                    (t
