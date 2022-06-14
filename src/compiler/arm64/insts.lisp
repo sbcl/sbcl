@@ -1103,24 +1103,52 @@
 
 (define-instruction-format (data-processing-1 32
                             :default-printer '(:name :tab rd  ", " rn))
+  (size :field (byte 1 31))
   (op2 :field (byte 18 13) :value #b101101011000000000)
   (op :field (byte 3 10))
   (rn :field (byte 5 5) :type 'reg)
   (rd :field (byte 5 0) :type 'reg))
 
-(defmacro def-data-processing-1 (name opc)
+(defmacro def-data-processing-1 (name opc &optional 32-bit-opcode)
   `(define-instruction ,name (segment rd rn)
      (:printer data-processing-1 ((op ,opc)))
      (:emitter
-      (emit-data-processing-1 segment +64-bit-size+
-                              ,opc (reg-offset rn) (reg-offset rd)))))
+      (emit-data-processing-1 segment
+                              (reg-size rd)
+                              ,(if 32-bit-opcode
+                                   `(sc-case rd
+                                     (32-bit-reg
+                                      ,32-bit-opcode)
+                                      (t
+                                       ,opc))
+                                   opc)
+                              (reg-offset rn)
+                              (reg-offset rd)))))
 
 (def-data-processing-1 rbit #b000)
 (def-data-processing-1 rev16 #b001)
-(def-data-processing-1 rev32 #b010)
-(def-data-processing-1 rev #b011)
 (def-data-processing-1 clz #b100)
 (def-data-processing-1 cls #b101)
+
+(define-instruction rev32 (segment rd rn)
+  (:printer data-processing-1 ((size 1) (op #b10)))
+  (:emitter
+   (emit-data-processing-1 segment
+                           (reg-size rd)
+                           #b10
+                           (reg-offset rn)
+                           (reg-offset rd))))
+
+(define-instruction rev (segment rd rn)
+  (:printer data-processing-1 ((size #b1) (op #b11)))
+  (:printer data-processing-1 ((size #b0) (op #b10)))
+  (:emitter
+   (emit-data-processing-1 segment (reg-size rd)
+                           (sc-case rd
+                             (32-bit-reg #b10)
+                             (t #b11))
+                           (reg-offset rn)
+                           (reg-offset rd))))
 
 ;;;
 
@@ -2721,7 +2749,7 @@
 ;;;
 
 (def-emitter simd-extract
-    (#b0 1 31)
+  (#b0 1 31)
   (q 1 30)
   (#b101110000 9 21)
   (rm 5 16)
@@ -2731,7 +2759,17 @@
   (rn 5 5)
   (rd 5 0))
 
+(define-instruction-format (simd-scalar-three-same 32
+                            :default-printer '(:name :tab rd ", " rn ", " rm))
+  (op3 :field (byte 1 31) :value #b0)
+  (op4 :field (byte 9 21) :value #b101110000)
+  (rm :fields (list (byte 1 30) (byte 5 16)) :type 'simd-reg)
+  (op6 :field (byte 1 15) :value #b0)
+  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
+
 (define-instruction ext (segment rd rn rm index &optional (size :16b))
+  (:printer simd-scalar-three-same ())
   (:emitter
    (emit-simd-extract segment
                       (encode-vector-size size)
@@ -2911,19 +2949,24 @@
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
 
 (macrolet
-    ((def (name u size op)
+    ((def (name u op &optional (sizes '(:8b :16b)))
        `(define-instruction ,name (segment rd rn &optional (size :16b))
-          (:printer simd-two-misc ((u ,u) (size ,size) (op ,op)))
+          (:printer simd-two-misc ((u ,u) (op ,op)))
           (:emitter
-           (emit-simd-two-misc segment
-                               (encode-vector-size size)
-                               ,u
-                               ,size
-                               ,op
-                               (reg-offset rn)
-                               (reg-offset rd))))))
-  (def cnt #b0 #b00 #b00101)
-  (def s-mvn #b1 #b00 #b00101))
+           (check-type size (member ,@sizes))
+           (multiple-value-bind (q size) (encode-vector-size size)
+             (emit-simd-two-misc segment
+                                 q
+                                 ,u
+                                 size
+                                 ,op
+                                 (reg-offset rn)
+                                 (reg-offset rd)))))))
+  (def cnt #b0 #b00101)
+  (def s-mvn #b1 #b00101)
+  (def s-rev16 #b0 #b00001)
+  (def s-rev32 #b1 #b00000 (:8b :16b :4h :8h))
+  (def rev64 #b0 #b00000 (:8b :16b :4h :8h :2s :4s)))
 
 ;;; Inline constants
 (defun canonicalize-inline-constant (constant)
