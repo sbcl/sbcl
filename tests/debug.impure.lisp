@@ -15,9 +15,6 @@
 
 (cl:in-package :cl-user)
 
-#+(and (or sparc mips x86 x86-64) (not sb-devel))
-(assert (not (find-symbol "*FUN-END-COOKIES*" "SB-DI")))
-
 ;;; The debugger doesn't have any native knowledge of the interpreter
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (invoke-restart 'run-tests::skip-file))
@@ -100,6 +97,12 @@
   (declare (ignore arg))
   'ok)
 
+(defun mv-trace-this (&optional arg)
+  (case arg
+    (2 (values 'ok "hi"))
+    (3 (values 'ok "hi" :foo))
+    (4 (values 'ok "hi" :foo :bar))))
+
 (defun trace-fact (n)
   (if (zerop n)
       1
@@ -135,8 +138,8 @@
                                       (declare (ignore f stuff))))))
 
 (defparameter *breakpoint-tracing-expectations*
-  '(:fails-on (or (and :ppc (not :linux)) :arm :arm64)
-    :broken-on :freebsd))
+  '(:fails-on (or :arm :arm64)
+    :broken-on (or :ppc :ppc64)))
 
 ;;; bug 379
 (with-test (:name (trace :encapsulate nil)
@@ -144,6 +147,23 @@
   (let ((output (with-traced-function (trace-this :encapsulate nil)
                   (assert (eq 'ok (trace-this))))))
     (assert (search "TRACE-THIS" output))
+    (assert (search "returned OK" output))))
+
+(with-test (:name :breakpoint-trace-multival . #.*breakpoint-tracing-expectations*)
+  (let ((output (with-traced-function (mv-trace-this :encapsulate nil)
+                  (assert (equal (multiple-value-list (mv-trace-this 2))
+                                 '(ok "hi"))))))
+    (assert (search "MV-TRACE-THIS" output))
+    (assert (search "returned OK" output)))
+  (let ((output (with-traced-function (mv-trace-this :encapsulate nil)
+                  (assert (equal (multiple-value-list (mv-trace-this 3))
+                                 '(ok "hi" :foo))))))
+    (assert (search "MV-TRACE-THIS" output))
+    (assert (search "returned OK" output)))
+  (let ((output (with-traced-function (mv-trace-this :encapsulate nil)
+                  (assert (equal (multiple-value-list (mv-trace-this 4))
+                                 '(ok "hi" :foo :bar))))))
+    (assert (search "MV-TRACE-THIS" output))
     (assert (search "returned OK" output))))
 
 (with-test (:name (trace :encapsulate nil :recursive)

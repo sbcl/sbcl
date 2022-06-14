@@ -526,11 +526,6 @@
 ;;; "#define REAL_LRA_SLOT" in breakpoint.c. These have unfortunately
 ;;; different values, because this slot is relative to the object base
 ;;; address, whereas the one in C is an index into code->constants.
-(defconstant real-lra-slot code-constants-offset)
-(eval-when (:compile-toplevel :execute)
-  #+(or sparc mips x86 x86-64) (pushnew :have-cookie-slot sb-xc:*features*))
-#+have-cookie-slot
-(defconstant cookie-slot (+ code-constants-offset 1 #+(or x86 x86-64) 1))
 (defconstant bpt-lra-boxed-nwords
   ;; * For non-x86: a single boxed constant holds the true LRA.
   ;;   Additionally, MIPS gets a boxed slot for the cookie
@@ -538,9 +533,9 @@
   ;; * For x86[-64]: one boxed constant holds the code object to which
   ;;   to return, one holds the displacement into that object,
   ;;   and one holds the cookie
-  (+ code-constants-offset 1
-     #+(or x86-64 x86) 1
-     #+have-cookie-slot 1))
+  (+ code-constants-offset 2 #+(or x86-64 x86) 1))
+(defconstant real-lra-slot code-constants-offset)
+(defconstant cookie-slot (+ code-constants-offset 1 #+(or x86 x86-64) 1))
 
 (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
@@ -3281,17 +3276,6 @@ register."
   ;; the DEBUG-FUN associated with this cookie
   (debug-fun nil :read-only t))
 
-;;; This maps bpt-lra objects to cookies, so that
-;;; HANDLE-FUN-END-BREAKPOINT can find the appropriate cookie for the
-;;; breakpoint hook.
-;;; FIXME: this is an inefficient way to store the data - each hit of the
-;;; breakpoint requires removing a key from a synchronized weak hash-table.
-;;; The problem is that most of the architectures have a terribly constraining
-;;; layout of the so-called bpt-lra.
-#-have-cookie-slot
-(define-load-time-global *fun-end-cookies*
-    (make-hash-table :test 'eq :synchronized t))
-
 ;;; This returns a hook function for the start helper breakpoint
 ;;; associated with a :FUN-END breakpoint. The returned function
 ;;; makes a fake LRA that all returns go through, and this piece of
@@ -3314,8 +3298,7 @@ register."
           (dolist (bpt end-bpts)
             (setf (breakpoint-internal-data bpt) data)))
         (let ((cookie (make-fun-end-cookie lra debug-fun)))
-          #+have-cookie-slot (setf (code-header-ref bpt-codeblob cookie-slot) cookie)
-          #-have-cookie-slot (setf (gethash bpt-codeblob *fun-end-cookies*) cookie)
+          (setf (code-header-ref bpt-codeblob cookie-slot) cookie)
           (dolist (bpt end-bpts)
             (let ((fun (breakpoint-cookie-fun bpt)))
               (when fun (funcall fun frame cookie)))))))))
@@ -3532,6 +3515,11 @@ register."
 ;;;; breakpoint handlers (layer between C and exported interface)
 
 ;;; This maps components to a mapping of offsets to BREAKPOINT-DATAs.
+;;; FIXME: these data should hang off of the component itself.
+;;; We already have a thin wrapper on %CODE-DEBUG-INFO which allows it to
+;;; hold both the compiler-generated metadata and the debugger's data.
+;;; It might be preferable not to write to code if #+darwin-jit
+;;; but I don't think so - the hash-table entails far more overhead.
 (define-load-time-global *component-breakpoint-offsets*
     (make-hash-table :test 'eq :synchronized t))
 
@@ -3675,9 +3663,7 @@ register."
   (let* ((scp (sb-alien:sap-alien signal-context (* os-context-t)))
          (frame (signal-context-frame signal-context))
          (component (breakpoint-data-component data))
-         (cookie #+have-cookie-slot (code-header-ref component cookie-slot)
-                 #-have-cookie-slot (gethash component *fun-end-cookies*)))
-    #-have-cookie-slot (remhash component *fun-end-cookies*)
+         (cookie (code-header-ref component cookie-slot)))
     (dolist (bpt breakpoints)
       (funcall (breakpoint-hook-fun bpt)
                frame bpt
@@ -3771,6 +3757,7 @@ register."
                                 0 length)
           (values (%make-lisp-obj (logior (sap-int lra-header-addr) other-pointer-lowtag))
                   (sanctify-for-execution code-object)
+                  ;; FIXME: what does "3" represent in this formula?
                   (+ (trap-offset) (* 3 n-word-bytes))))))))
 
 ;;;; miscellaneous
