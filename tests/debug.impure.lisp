@@ -15,6 +15,9 @@
 
 (cl:in-package :cl-user)
 
+#+(and (or sparc mips x86 x86-64) (not sb-devel))
+(assert (not (find-symbol "*FUN-END-COOKIES*" "SB-DI")))
+
 ;;; The debugger doesn't have any native knowledge of the interpreter
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (invoke-restart 'run-tests::skip-file))
@@ -132,7 +135,7 @@
                                       (declare (ignore f stuff))))))
 
 (defparameter *breakpoint-tracing-expectations*
-  '(:fails-on (or (and :ppc (not :linux)) :arm64)
+  '(:fails-on (or (and :ppc (not :linux)) :arm :arm64)
     :broken-on :freebsd))
 
 ;;; bug 379

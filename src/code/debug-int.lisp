@@ -528,7 +528,7 @@
 ;;; address, whereas the one in C is an index into code->constants.
 (defconstant real-lra-slot code-constants-offset)
 (eval-when (:compile-toplevel :execute)
-  #+(or mips x86 x86-64) (pushnew :have-cookie-slot sb-xc:*features*))
+  #+(or sparc mips x86 x86-64) (pushnew :have-cookie-slot sb-xc:*features*))
 #+have-cookie-slot
 (defconstant cookie-slot (+ code-constants-offset 1 #+(or x86 x86-64) 1))
 (defconstant bpt-lra-boxed-nwords
