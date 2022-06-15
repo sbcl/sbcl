@@ -45,6 +45,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        "gethash-concurrency.impure"
                        "arith-slow.pure"))
 (defvar *filter* nil)
+(defglobal *delete-logs* nil)
 (defun choose-order (tests)
   (when *filter*
     (let (strings)
@@ -154,12 +155,12 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
           (wait))
         (let ((pid (sb-posix:fork)))
           (when (zerop pid)
+          (let  ((mylog (format nil "$logdir/~a~@[-~d~]" (car file) (cdr file))))
             #+(and linux sb-thread 64-bit)
             (sb-alien:alien-funcall (sb-alien:extern-alien "reset_gc_stats"
                                     (function sb-alien:void)))
             ;; FILE is (filename . test-iteration)
-            (with-open-file (stream (format nil "$logdir/~a~@[-~d~]" (car file) (cdr file))
-                                    :direction :output :if-exists :supersede)
+            (with-open-file (stream mylog :direction :output :if-exists :supersede)
               (alien-funcall (extern-alien "dup2" (function int int int))
                              (sb-sys:fd-stream-fd stream) 1)
               (alien-funcall (extern-alien "dup2" (function int int int)) 1 2))
@@ -202,7 +203,8 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
                    (sb-sprof:report :type :flat)
                    (gc :gen  7)
-                   (exit :code (if (unexpected-failures) 1 104)))))
+                   (when (and (not (unexpected-failures)) *delete-logs*) (delete-file mylog))
+                   (exit :code (if (unexpected-failures) 1 104))))))
           (format t "~A: pid ~d~@[ (trial ~d)~]~%" (car file) pid (cdr file))
           (incf subprocess-count)
           (push (list pid file (get-internal-real-time)) subprocess-list)))
@@ -261,6 +263,9 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                          argv (cddr argv)))
                   (t
                    (return))))
+      (when (>= runs-per-test 10)
+	(format t "~&Note: will not keep logs of passing runs~%")
+	(setq *delete-logs* t))
       (setq argv
         (mapcar (lambda (file)
                   (probe-file file) ; for effect
