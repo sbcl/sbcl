@@ -214,12 +214,6 @@
 
 #+sb-xc-host (deftype sb-xc:fixnum () `(signed-byte ,n-fixnum-bits))
 
-#-darwin-jit
-(progn
-  (declaim (inline (setf sap-ref-word-jit)))
-  (defun (setf sap-ref-word-jit) (value sap offset)
-    (setf (sap-ref-word sap offset) value)))
-
 ;;; Supporting code for LAYOUT allocated in metadata space a/k/a "metaspace".
 ;;; These objects are manually allocated and freed.
 ;;; Tracts are the unit of allocation requested from the OS.

@@ -778,12 +778,11 @@
 ;;; Arrange boxed constants so that all :NAMED-CALL constants are first,
 ;;; then constant leaves, and finally LOAD-TIME-VALUE constants.
 ;;; There exist a few reasons for placing all the FDEFNs first:
-;;;  * FDEFNs which are referenced for lisp call - as opposed to referenced
-;;;    in #'FUN syntax - could be stored as untagged pointers which would
-;;;    benefit the PPC64 architecture by removing a few instructions from each
-;;;    use of such fdefn by not having to subtract its lowtag prior to loading
-;;;    from both the fun and raw-fun slots. GC would need to be aware of the
-;;;    untagged pointer convention.
+;;;  * FDEFNs which are referenced for call (versus for value as in #'FUN)
+;;;    may be stored in the code header as untagged pointers. This benefits PPC64
+;;;    because lowtag subtraction can't be had "for free" due to the architectural
+;;;    requirement that lispword-aligned loads need a displacement that is
+;;;    a multiple of 4, which OTHER-POINTER-LOWTAG does not satisfy.
 ;;;  * In the current approach for so-called "static" linking of immobile code,
 ;;;    we change code instruction bytes so that they call into a simple-fun
 ;;;    directly rather than through an fdefn, but the approach is subject to a

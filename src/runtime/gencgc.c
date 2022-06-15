@@ -5047,7 +5047,9 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
     THREAD_JIT(0);
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
-    code->boxed_size = 0; // gets reassigned from lisp
+    // 'boxed_size' is an untagged word expressing the number of *bytes* in the boxed section
+    // (so CODE-INSTRUCTIONS can simply add rather than shift and add).
+    code->boxed_size = boxed * N_WORD_BYTES;
     code->debug_info = 0;
     code->fixups = 0;
     lispobj* p = &code->constants[0], *end = (lispobj*)code + boxed;

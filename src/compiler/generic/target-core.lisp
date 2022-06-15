@@ -192,11 +192,11 @@
   #+x86-64
   (aver (not (nth-value
               1 (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))))
+  (aver (zerop (code-n-named-calls code)))
   (let* ((nbytes (code-object-size code))
          (boxed (code-header-words code)) ; word count
          (unboxed (- nbytes (ash boxed sb-vm:word-shift))) ; byte count
-         (copy (allocate-code-object
-                :dynamic (code-n-named-calls code) boxed unboxed)))
+         (copy (allocate-code-object :dynamic boxed unboxed)))
     (with-pinned-objects (code copy)
       (%byte-blt (code-instructions code) 0 (code-instructions copy) 0 unboxed)
       ;; copy boxed constants so that the fixup step (if needed) sees the 'fixups'
@@ -317,17 +317,17 @@
                  (setf (second const) (find-or-create-fdefn (second const)))
                  (when (eq kind :named-call) (incf count)))))))
          (code-obj (allocate-code-object (component-mem-space component)
-                                         n-named-calls nboxed length))
+                                         nboxed length))
          (bytes
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment)))
          (named-call-fixups))
+    (declare (ignorable n-named-calls))
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
       ;; A very specific store order is necessary to allow using uninitialized memory
-      ;; pages for code. Storing of the debug-info slot does not need the code pinned,
-      ;; but that store must occur between steps 1 and 2.
-    (sb-fasl::with-writable-code-instructions (code-obj debug-info)
+      ;; pages for code. Storing of the debug-info slot must occur between steps 1 and 2.
+    (sb-fasl::with-writable-code-instructions (code-obj debug-info n-named-calls)
              ;; Note that this does not have to take care to ensure atomicity
              ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
              ;; interrupted in between the store of any individual byte, this code

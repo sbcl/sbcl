@@ -458,18 +458,19 @@
 ;;; Enforce limit on boxed words based on maximum total number of words
 ;;; that can be indicated in the header for 32-bit words.
 ;;; 22 bits = 4MiB, quite generous for one code object.
+;;;   (I think the reasoning behind 22 is that after adding 8 for the widetag,
+;;;    it's 30, and the other 2 bits are the fixnum tag)
 ;;; 25 bits is the maximum unboxed size expressed in bytes,
 ;;; if n-word-bytes = 8 and almost the entire code object is unboxed
 ;;; which is, practically speaking, not really possible.
-(declaim (ftype (sfunction (t (unsigned-byte 16) (unsigned-byte 22) (unsigned-byte 25))
-                           code-component)
+(declaim (ftype (sfunction (t (unsigned-byte 22) (unsigned-byte 25)) code-component)
                 allocate-code-object))
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
 ;;; BOXED must be the exact count of boxed words desired. No adjustments
 ;;; are made for alignment considerations or the fixed slots.
-(defun allocate-code-object (space n-named-calls boxed unboxed)
-  (declare (ignorable space n-named-calls))
+(defun allocate-code-object (space boxed unboxed)
+  (declare (ignorable space))
   (let* ((total-words
            (the (unsigned-byte 22) ; Enforce limit on total words as well
                 (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
@@ -505,18 +506,7 @@
                   ;; (very unlikely, but certainly possible).
                   (unless (eq (generation-of code) 0) (return))
                   (let ((oldval (cas *codeblob-tree* tree newtree)))
-                    (if (eq oldval tree) (return) (setq tree oldval))))))
-        ;; The 1st slot beyond the header stores the boxed header size in bytes
-        ;; as an untagged number, which has the same representation as a tagged
-        ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
-        ;; This boxed-size MUST be 0 prior to writing any pointers into the object
-        ;; because the boxed words will not necessarily have been pre-zeroed;
-        ;; scavenging them prior to zeroing them out would see wild pointers.
-        (setf (sap-ref-word-jit sap (ash code-boxed-size-slot word-shift))
-              ;; For 32-bit words, we'll have to add another primitive-object slot.
-              ;; But so far nothing makes use of the n-named-calls value.
-              (logior #+64-bit (ash n-named-calls 32)
-                      (ash boxed word-shift)))))
+                    (if (eq oldval tree) (return) (setq tree oldval))))))))
 
     ;; FIXME: there may be random values in the unboxed payload and it's not obvious
     ;; that all callers of ALLOCATE-CODE-OBJECT always write all raw bytes.

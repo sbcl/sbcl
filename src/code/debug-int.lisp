@@ -3716,7 +3716,7 @@ register."
                                  src-start)))
            (code-object
              (sb-c:allocate-code-object
-              nil 0
+              nil
               ;; Ensure required boxed header alignment.
               (align-up bpt-lra-boxed-nwords sb-c::code-boxed-words-align)
               (+ length

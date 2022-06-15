@@ -210,7 +210,7 @@
 (defconstant trampoline-entry-offset n-word-bytes)
 (defun make-simplifying-trampoline (fun)
   (let ((code (truly-the (values code-component &optional)
-                         (allocate-code-object :dynamic 0 3 24)))) ; KLUDGE
+                         (allocate-code-object :dynamic 3 24)))) ; KLUDGE
     (setf (%code-debug-info code) fun)
     (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
           (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)

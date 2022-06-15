@@ -462,7 +462,7 @@
                ;; but the large object size can be as small as 16K.
                ;; 16K might fit in the free space of an open region,
                ;; and by accident would not go on a large object page.
-               (sb-c:allocate-code-object nil 0 0
+               (sb-c:allocate-code-object nil 0
                 (max (* 4 sb-vm:gencgc-page-bytes) #-64-bit 65536))))
       (declare (notinline format))
       (format (make-string-output-stream) "~%")

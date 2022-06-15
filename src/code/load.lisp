@@ -1087,13 +1087,24 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
-;;; Caution: don't try to "test" WITH-WRITABLE-CODE-INSTRUCTIONS on any architecture
-;;; where fixup application cares what the address of the code actually is.
+;;; Caution: don't try to "test" WITH-WRITABLE-CODE-INSTRUCTIONS in copy-in/out mode
+;;; on any architecture where fixup application cares what the address of the code actually is.
 ;;; This means x86 is disqualified. You're just wasting your time if you try, as I did.
-(defmacro with-writable-code-instructions ((code-var debug-info-var) &body body)
-  (declare (ignorable debug-info-var))
+(defmacro with-writable-code-instructions ((code-var debug-info-var n-fdefns) &body body)
+  (declare (ignorable debug-info-var n-fdefns))
+  ;; N-FDEFNS is important for PPC64, slightly important for X86-64, not important for
+  ;; any others, and doesn't even have a place to store it if lispwords are 32 bits.
+  ;; The :DEDUPLICATED-FDEFNS test in compiler-2.pure asserts that the value is valid
+  #+64-bit
+  (push `(setf (sap-ref-32 (int-sap (get-lisp-obj-address ,code-var))
+                           (+ (ash sb-vm:code-boxed-size-slot sb-vm:word-shift) #+little-endian 4
+                              (- sb-vm:other-pointer-lowtag)))
+               ,n-fdefns)
+        body)
   #+darwin-jit
   `(with-pinned-objects (,code-var ,debug-info-var)
+     ;; DEBUG-INFO is pinned so that after assigning it into the temporary
+     ;; block of memory, the off-heap word which is invisible to GC remains valid.
      (let* ((temp-copy (alien-funcall (extern-alien "duplicate_codeblob_offheap"
                                                     (function unsigned unsigned))
                                       (get-lisp-obj-address ,code-var)))
@@ -1126,11 +1137,10 @@
           (incf stack-index)))
       (let ((code (sb-c:allocate-code-object
                    (if (oddp header) :immobile :dynamic)
-                   n-named-calls
                    (align-up n-boxed-words sb-c::code-boxed-words-align)
                    n-code-bytes))
             (debug-info (svref stack (+ ptr n-constants))))
-        (with-writable-code-instructions (code debug-info)
+        (with-writable-code-instructions (code debug-info n-named-calls)
           ;; * DO * NOT * SEPARATE * THESE * STEPS *
           ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
           ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS etc.

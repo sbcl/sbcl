@@ -403,7 +403,7 @@
   (assert (thing-ref-thing-ref (make-thing :x (make-thing :x 3)) 'foo)))
 
 (with-test (:name :huge-code :skipped-on (not :immobile-code))
-  (sb-vm::allocate-code-object :immobile 0 4 (* 2 1024 1024)))
+  (sb-vm::allocate-code-object :immobile 4 (* 2 1024 1024)))
 
 (defun bbb (x y z)
   ;; I don't want the number of expected comparisons to depend on whether
