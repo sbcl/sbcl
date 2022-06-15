@@ -212,6 +212,8 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
     #+ppc64
     (progn
       (fill ptrtab "scav_lose")
+      (setf (aref scavtab #xff) "consfiller"
+            (aref sizetab #xff) "consfiller")
       (setf (nth instance-pointer-lowtag ptrtab) "scav_instance_pointer"
             (nth list-pointer-lowtag ptrtab)     "scav_list_pointer"
             (nth fun-pointer-lowtag ptrtab)      "scav_fun_pointer"

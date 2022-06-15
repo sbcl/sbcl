@@ -312,6 +312,15 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
             page_index_t pg = find_page_index(where);
             state->object_gen = pg >= 0 ? page_table[pg].gen :
               gc_gen_of((lispobj)where, ARTIFICIALLY_HIGH_GEN);
+#ifdef LISP_FEATURE_PPC64
+            // Cons fillers (two words of all 1s) cause failure of
+            // the default verification logic, so brute-force skip them
+            // regardless of whether the page type is PAGE_TYPE_CONS.
+            if (*where == (uword_t)-1 && where[1] == (uword_t)-1) {
+                where +=2;
+                continue;
+            }
+#endif
             // FIXME: should not have code acting as filler
             if (widetag != FILLER_WIDETAG && !filler_obj_p(where)) {
                 // Any page can have a filler on it

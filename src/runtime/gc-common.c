@@ -767,6 +767,22 @@ scav_immediate(lispobj *where, lispobj object)
     return 2;
 }
 
+#ifdef LISP_FEATURE_PPC64
+/* Dead conses are clobbered to contain all 1s. The first word of such a cons
+ * does NOT look like a valid cons half due to unusual lowtag arrangement */
+static sword_t scav_consfiller(lispobj *where, lispobj object)
+{
+    gc_assert(object == (uword_t)-1);
+    gc_assert(where[1] == (uword_t)-1);
+    return 2;
+}
+static sword_t size_consfiller(lispobj *where)
+{
+    gc_assert(where[0] == (uword_t)-1 && where[1] == (uword_t)-1);
+    return 2;
+}
+#endif
+
 //// General boxed object scav/trans/size functions
 
 #define DEF_SCAV_BOXED(suffix, sizer) \

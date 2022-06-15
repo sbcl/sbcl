@@ -641,6 +641,9 @@ static uword_t sweep(lispobj* where, lispobj* end,
         } else {
             nwords = 2;
             livep = cons_markedp((lispobj)where);
+            /* This bit pattern indicates unambiguously that a cons cell
+             * has gotten clobbered. Using (0 . 0) leaves open to question
+             * whether the cons is actually live */
             if (!livep) where[0] = where[1] = (uword_t)-1;
         }
     }
