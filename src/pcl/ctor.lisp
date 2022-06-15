@@ -143,20 +143,59 @@
 
 ;;; Reset CTOR to use a default function that will compute an
 ;;; optimized constructor function when called.
+;;;
+;;; Note that lp#1951341 saw a very rare failure which suggested
+;;; a memory ordering issue. Indeed, here is what happened:
+;;;  - thread A allocates a CTOR
+;;;    CTOR    ->   +-------------------------------+
+;;;                 | word 0: funinstance header    |
+;;;                 | word 1: trampline             |
+;;;                 | word 2: layout-of-CTOR        |
+;;;                 | word 3: funinstance function  |
+;;;                 | ... more slots ...            |
+;;;                 +-------------------------------+
+;;;
+;;;  - thread A creates a lambda that captures CTOR
+;;;    CLOSURE ->   +------------------------------+
+;;;                 | word 0: closure header       |
+;;;                 | word 1: underlying function  |
+;;;                 | word 2: CTOR                 |
+;;;                 +------------------------------+
+;;;
+;;; - thread A stores CLOSURE into word 3 of CTOR
+;;;   by way of (SETF (%FUNCALLABLE-INSTANCE-FUN CTOR) ...)
+;;;
+;;; - thread B gets ahold of CTOR - how? I'm not clear
+;;;   on the protocol, but I guess it was already installed
+;;;   as the class's constructor
+;;;
+;;; - thread B reads word 3 out of the CTOR and calls
+;;;   the CLOSURE (successfully entering into its instructions)
+;;;
+;;; - CLOSURE's code loads CTOR from itself and calls
+;;;   INSTALL-OPTIMIZED-CONSTRUCTOR with an argument of 0
+;;;   because B did not observe a store into word 2
+;;;   of CLOSURE
+;;;
+;;; The fix is to use properly paired barriers.
 (defun install-initial-constructor (ctor &optional force-p)
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil
           (ctor-state ctor) 'initial)
-    (setf (%funcallable-instance-fun ctor)
-          (ecase (ctor-type ctor)
-            (ctor
-             (lambda (&rest args)
-               (install-optimized-constructor ctor)
-               (apply ctor args)))
-            (allocator
-             (lambda ()
-               (install-optimized-allocator ctor)
-               (funcall ctor)))))))
+    (let ((closure
+           (ecase (ctor-type ctor)
+             (ctor
+              (lambda (&rest args)
+                (sb-thread:barrier (:read))
+                (install-optimized-constructor ctor)
+                (apply ctor args)))
+             (allocator
+              (lambda ()
+                (sb-thread:barrier (:read))
+                (install-optimized-allocator ctor)
+                (funcall ctor))))))
+      (sb-thread:barrier (:write))
+      (setf (%funcallable-instance-fun ctor) closure))))
 
 (defun make-ctor-function-name (class-name initargs safe-code-p)
   (labels ((arg-name (x)
