@@ -665,14 +665,17 @@
           (assert (= (sap-ref-32 sap 0) (* n-threads n-increments))))))))
 
 (define-alien-variable "small_generation_limit" (signed 8))
-#+(or x86-64 ppc64)
+;; PPC64 shouldn't fail, but depending on the CPU revision it might not
+;; have the needed instruction, and I don't know how to test for it.
+;; And surely it doesn't really depend on endian-ness, but the machine
+;; that I'm testing on which is little-endian passes the test.
+#+(and sb-thread (or x86-64 (and ppc64 little-endian)))
+(progn
 (defun cas-an-alien-byte (x y) (cas small-generation-limit x y))
-#+(or x86-64 ppc64)
 (compile 'cas-an-alien-byte)
-(test-util:with-test (:name :cas-alien
-                            :skipped-on (not (and :sb-thread (or :ppc64 :x86-64))))
+(test-util:with-test (:name :cas-alien)
   (assert (= small-generation-limit 1))
   (assert (= (cas-an-alien-byte 0 5) 1))
   (assert (= (cas-an-alien-byte 1 6) 1))
   (assert (= small-generation-limit 6))
-  (setf small-generation-limit 1))
+  (setf small-generation-limit 1)))
