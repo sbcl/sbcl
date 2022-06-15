@@ -964,6 +964,11 @@ many elements are copied."
                          (svref vector right-index) left))))
               ((word-specialized-vector-tag-p tag)
                (nreverse-word-specialized-vector vector start end))
+              #+arm64
+              ((typep vector '(or (simple-array base-char (*))
+                                  (simple-array (signed-byte 8) (*))
+                                  (simple-array (unsigned-byte 8) (*))))
+               (sb-vm::simd-nreverse8 vector start end))
               (t
                (let* ((getter (the function (svref %%data-vector-reffers%% tag)))
                       (setter (the function (svref %%data-vector-setters%% tag))))
