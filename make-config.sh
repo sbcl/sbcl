@@ -387,6 +387,7 @@ if [ "$sbcl_os" = "sunos" ] && [ `isainfo -k` = "amd64" ]; then
 fi
 
 # Under Darwin, uname -m returns "i386" even if CPU is x86_64.
+# (I suspect this is not true any more - it reports "x86_64 for me)
 if [ "$sbcl_os" = "darwin" ] && [ "`/usr/sbin/sysctl -n hw.optional.x86_64`" = "1" ]; then
     guessed_sbcl_arch=x86-64
 fi
@@ -554,9 +555,6 @@ case "$sbcl_os" in
         ;;
     darwin)
         printf ' :unix :bsd :darwin :mach-o' >> $ltf
-        if [ $sbcl_arch = "x86" ]; then
-            printf ' :mach-exception-handler' >> $ltf
-        fi
         if [ $sbcl_arch = "x86-64" ]; then
             darwin_version=`uname -r`
             darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
@@ -624,6 +622,10 @@ cd "$original_dir"
 
 case "$sbcl_arch" in
   x86)
+    if [ "$sbcl_os" = "darwin" ]; then
+        echo "Unsupported configuration"
+        exit 1
+    fi
     if [ "$sbcl_os" = "win32" ]; then
         # of course it doesn't provide dlopen, but there is
         # roughly-equivalent magic nevertheless.
