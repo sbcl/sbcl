@@ -82,7 +82,7 @@
   (declare ((simple-array * (*)) vector)
            (fixnum start end)
            (optimize speed (safety 0)))
-  (let* ((sap (vector-sap vector)))
+  (let ((sap (vector-sap vector)))
     (inline-vop (((left sap-reg t) sap)
                  ((start any-reg tagged-num) start)
                  ((end) end)
@@ -95,7 +95,7 @@
       (inst add right left (lsr end 1))
       (inst add left left (lsr start 1))
       (inst sub gl right left)
-      (inst cmp gl (fixnumize 32))
+      (inst cmp gl 32)
       (inst b :lt WORD)
       (inst sub right right 16)
 
@@ -148,3 +148,62 @@
             (inst b :ge DONE))
       DONE))
   vector)
+
+(defun simd-nreverse32 (vector start end)
+  (declare ((simple-array * (*)) vector)
+           (fixnum start end)
+           (optimize speed (safety 0)))
+  (let ((sap (vector-sap vector)))
+    (inline-vop (((left sap-reg t) sap)
+                 ((start any-reg tagged-num) start)
+                 ((end) end)
+                 ((right signed-reg signed-num))
+                 ((vl complex-double-reg complex-double-float))
+                 ((vr))
+                 ((gl signed-reg signed-num))
+                 ((gr)))
+        ()
+      (inst add right left (lsl end 1))
+      (inst add left left (lsl start 1))
+      (inst sub gl right left)
+      (inst cmp gl 32)
+      (inst b :lt SCALAR)
+      (inst sub right right 16)
+
+      LOOP
+      (inst ldr vl (@ left))
+      (inst ldr vr (@ right))
+
+      (inst rev64 vl vl :4s)
+      (inst ext vl vl vl 8)
+      (inst rev64 vr vr :4s)
+      (inst ext vr vr vr 8)
+
+      (inst str vr (@ left 16 :post-index))
+      (inst str vl (@ right -16 :post-index))
+      (inst cmp left right)
+      (inst b :lt loop)
+
+      (inst add right right 16)
+      (inst sub tmp-tn right left)
+      (inst cmp tmp-tn 1)
+      (inst b :le DONE)
+
+      SCALAR
+      (inst sub right right 4)
+      (inst cmp right left)
+      (inst b :lt DONE)
+      (setf gl (32-bit-reg gl)
+            gr (32-bit-reg gr))
+
+      (loop repeat 3
+            do
+            (inst ldr gl (@ left))
+            (inst ldr gr (@ right))
+            (inst str gr (@ left 4 :post-index))
+            (inst str gl (@ right -4 :post-index))
+            (inst cmp left right)
+            (inst b :ge DONE))
+      DONE))
+  vector)
+

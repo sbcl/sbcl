@@ -2942,8 +2942,8 @@
   (op3 :field (byte 5 17) :value #b10000)
   (op :field (byte 4 12))
   (op4 :field (byte 2 10) :value #b10)
-  (rn :fields (list (byte 1 30) (byte 5 5)) :type 'simd-reg)
-  (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
+  (rn :fields (list (byte 1 30) (byte 2 22) (byte 5 5)) :type 'simd-reg)
+  (rd :fields (list (byte 1 30) (byte 2 22) (byte 5 0)) :type 'simd-reg))
 
 (macrolet
     ((def (name u op &optional (sizes '(:8b :16b)))
