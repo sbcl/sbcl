@@ -18,8 +18,8 @@
 ;;; I have absolutely no idea what's going on with ppc64 little-endian,
 ;;; but this file's realtime is just ridiculous on the test machine
 ;;; and it totally dominates the time taken in parallel-exec:
-;;;    big-endian:    real	0m3.265s
-;;;    little-endian: real	2m53.039s
+;;;    big-endian:    real        0m3.265s
+;;;    little-endian: real        2m53.039s
 ;;; Whereas, with this one file eliminated on ppc64le, the total wallclock
 ;;; time for parallel-exec (with 12 workers) is approximately 94 seconds
 ;;; on either machine. What is so horrible about our external-format codecs
