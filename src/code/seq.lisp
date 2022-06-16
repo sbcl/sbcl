@@ -919,6 +919,13 @@ many elements are copied."
                                (simple-array (signed-byte 8) (*))
                                (simple-array (unsigned-byte 8) (*))))
                (sb-vm::simd-reverse8 vector start length new-vector))
+              #+arm64
+              ((typep vector '(or #+sb-unicode
+                               (simple-array character (*))
+                               (simple-array (signed-byte 32) (*))
+                               (simple-array (unsigned-byte 32) (*))
+                               (simple-array single-float (*))))
+               (sb-vm::simd-reverse32 vector start length new-vector))
               (t
                (let ((getter (the function (svref %%data-vector-reffers%% tag)))
                      (setter (the function (svref %%data-vector-setters%% tag))))

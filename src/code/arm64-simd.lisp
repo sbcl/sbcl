@@ -225,7 +225,7 @@
       (inst add source source (lsr start 1))
       (inst mov t-i 0)
       (inst lsr s-i length 1)
-      (inst cmp s-i 15)
+      (inst cmp s-i 16)
       (inst b :lt WORD)
       (inst sub s-i s-i 16)
 
@@ -251,7 +251,8 @@
       (inst add t-i t-i 8)
 
       BYTE
-      (inst sub s-i s-i 1)
+      (inst subs s-i s-i 1)
+      (inst b :lt DONE)
 
       (loop repeat 7
             do
@@ -259,6 +260,55 @@
             (inst strb g (@ target t-i))
             (inst add t-i t-i 1)
             (inst subs s-i s-i 1)
+            (inst b :lt DONE))
+      DONE))
+  target)
+
+(defun simd-reverse32 (source start length target)
+  (declare ((simple-array * (*)) vector target)
+           (fixnum start length)
+           (optimize speed (safety 0)))
+  (let ((source (vector-sap source))
+        (target (vector-sap target)))
+    (inline-vop (((source sap-reg t) source)
+                 ((target sap-reg t) target)
+                 ((start any-reg tagged-num) start)
+                 ((length) length)
+                 ((s-i signed-reg signed-num))
+                 ((t-i))
+                 ((g))
+                 ((v complex-double-reg complex-double-float)))
+        ()
+      (inst add source source (lsl start 1))
+      (inst mov t-i 0)
+      (inst lsl s-i length 1)
+      (inst cmp s-i 16)
+      (inst b :lt SCALAR)
+      (inst sub s-i s-i 16)
+
+      LOOP
+      (inst ldr v (@ source s-i))
+
+      (inst rev64 v v :4s)
+      (inst ext v v v 8)
+      (inst str v (@ target t-i))
+
+      (inst add t-i t-i 16)
+      (inst subs s-i s-i 16)
+      (inst b :ge LOOP)
+      (inst add s-i s-i 16)
+
+      SCALAR
+      (inst subs s-i s-i 4)
+      (inst b :lt DONE)
+
+      (setf g (32-bit-reg g))
+      (loop repeat 3
+            do
+            (inst ldr g (@ source s-i))
+            (inst str g (@ target t-i))
+            (inst add t-i t-i 4)
+            (inst subs s-i s-i 4)
             (inst b :lt DONE))
       DONE))
   target)
