@@ -899,7 +899,6 @@ many elements are copied."
   (let ((length (length vector)))
     (with-array-data ((vector vector) (start) (end)
                       :check-fill-pointer t)
-      (declare (ignore start))
       (let* ((tag (%other-pointer-widetag vector))
              (new-vector (sb-vm::allocate-vector-with-widetag
                           #+ubsan nil tag length
@@ -914,6 +913,11 @@ many elements are copied."
                        (svref vector right-index))))
               ((word-specialized-vector-tag-p tag)
                (reverse-word-specialized-vector vector new-vector end))
+              #+arm64
+              ((typep vector '(or (simple-array base-char (*))
+                               (simple-array (signed-byte 8) (*))
+                               (simple-array (unsigned-byte 8) (*))))
+               (sb-vm::simd-reverse8 vector start length new-vector))
               (t
                (let ((getter (the function (svref %%data-vector-reffers%% tag)))
                      (setter (the function (svref %%data-vector-setters%% tag))))
