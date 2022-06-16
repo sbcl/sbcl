@@ -139,7 +139,7 @@
 
 (defparameter *breakpoint-tracing-expectations*
   '(:fails-on (or :arm :arm64)
-    :broken-on (or :ppc :ppc64)))
+    :broken-on (or :freebsd :ppc :ppc64)))
 
 ;;; bug 379
 (with-test (:name (trace :encapsulate nil)
