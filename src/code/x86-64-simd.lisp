@@ -81,3 +81,61 @@
                      (inst pandn temp flip)
                      (move res bits)
                      (inst pxor res temp)))))))
+
+(defun simd-nreverse8 (vector start end)
+  (declare ((simple-array * (*)) vector)
+           (fixnum start end)
+           (optimize speed (safety 0)))
+  (let ((sap (vector-sap vector)))
+    (inline-vop (((left sap-reg t) sap)
+                 ((start any-reg tagged-num) start)
+                 ((end) end)
+                 ((right signed-reg signed-num))
+                 ((l))
+                 ((r)))
+        ()
+      (inst shr end 1)
+      (inst shr start 1)
+      (inst lea right (ea left end))
+      (inst add left start)
+      (inst mov l right)
+      (inst sub l left)
+      (inst cmp l 16)
+      (inst jmp :b BYTE)
+      (inst sub right 8)
+
+      LOOP
+      (inst mov l (ea left))
+      (inst mov r (ea right))
+      (inst bswap l)
+      (inst bswap r)
+      (inst mov (ea left) r)
+      (inst mov (ea right) l)
+      (inst add left 8)
+      (inst sub right 8)
+      (inst cmp left right)
+      (inst jmp :b LOOP)
+
+      (inst add right 8)
+
+      BYTE
+      (inst sub right 1)
+      (inst cmp right left)
+      (inst jmp :b DONE)
+
+      ;; After the 16-element copy above there are at most 15
+      ;; elements, have to swap 14 elements with one staying in the
+      ;; middle.
+      (loop repeat 7
+            do
+            (inst mov :byte l (ea left))
+            (inst mov :byte r (ea right))
+            (inst mov :byte (ea left) r)
+            (inst mov :byte (ea right) l)
+            (inst add left 1)
+            (inst sub right 1)
+            (inst cmp left right)
+            (inst jmp :ge DONE))
+      DONE))
+  vector)
+
