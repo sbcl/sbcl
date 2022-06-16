@@ -482,11 +482,11 @@
                  ;; Indicate that there are initially 2 boxed words, otherwise
                  ;; immobile space GC thinks this object is freeable.
                  (alloc-immobile-code (ash total-words word-shift)
-                                        (logior (ash total-words code-header-size-shift)
-                                                code-header-widetag)
-                                        (ash 2 n-fixnum-tag-bits)
-                                        other-pointer-lowtag
-                                        (eq space :immobile)))
+                                      (logior (ash total-words code-header-size-shift)
+                                              code-header-widetag)
+                                      (* boxed n-word-bytes)
+                                      other-pointer-lowtag
+                                      (eq space :immobile)))
                ;; x86-64 has a vop which wraps pseudo-atomic around the foreign call,
                ;; as is the custom for allocation trampolines.
                #+x86-64 (%primitive sb-vm::alloc-code total-words boxed)
