@@ -899,6 +899,7 @@ many elements are copied."
   (let ((length (length vector)))
     (with-array-data ((vector vector) (start) (end)
                       :check-fill-pointer t)
+      (declare (ignorable start))
       (let* ((tag (%other-pointer-widetag vector))
              (new-vector (sb-vm::allocate-vector-with-widetag
                           #+ubsan nil tag length
