@@ -981,7 +981,7 @@ many elements are copied."
                                   (simple-array (signed-byte 8) (*))
                                   (simple-array (unsigned-byte 8) (*))))
                (sb-vm::simd-nreverse8 vector start end))
-              #+arm64
+              #+(or arm64 x86-64)
               ((typep vector '(or #+sb-unicode
                                (simple-array character (*))
                                (simple-array (signed-byte 32) (*))
