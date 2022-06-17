@@ -641,7 +641,9 @@ report_heap_exhaustion(long available, long requested, struct thread *th)
  */
 static void __attribute__((unused))
 zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
-#ifdef LISP_FEATURE_LINUX
+#ifdef LISP_FEATURE_WIN32
+    os_revalidate_bzero(addr, length);
+#elif defined LISP_FEATURE_LINUX
     // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
     // Linux treats it as a demand that the memory be 0-filled, or refreshed
     // from a file that backs the range. BSD takes it as a hint that you don't
@@ -655,19 +657,18 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
     if ((os_vm_address_t)addr >= anon_dynamic_space_start) {
         if (madvise(addr, length, MADV_DONTNEED) != 0)
             lose("madvise failed");
-    } else
-#endif
-#ifdef LISP_FEATURE_WIN32
-        os_revalidate_bzero(addr, length);
+    } else { // See doc/internals-notes/zero-with-mmap-bug.txt
+        // Trying to see how often this happens.
+        // fprintf(stderr, "zero_range_with_mmap: fallback to memset()\n");
+        memset(addr, 0, length);
+    }
 #else
-    {
-        void *new_addr;
-        os_invalidate(addr, length);
-        new_addr = os_validate(NOT_MOVABLE, addr, length, 0, 1);
-        if (new_addr == NULL || new_addr != addr) {
-            lose("remap_free_pages: page moved, %p ==> %p",
-                 addr, new_addr);
-        }
+    void *new_addr;
+    os_invalidate(addr, length);
+    new_addr = os_validate(NOT_MOVABLE, addr, length, 0, 1);
+    if (new_addr == NULL || new_addr != addr) {
+        lose("remap_free_pages: page moved, %p ==> %p",
+             addr, new_addr);
     }
 #endif
 }

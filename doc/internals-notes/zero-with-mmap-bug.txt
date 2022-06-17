@@ -1,0 +1,48 @@
+zero_range_with_mmap is not threadsafe if using unmap/remap
+-----------------------------------------------------------
+
+Consider a case where SBCL is not able to get its default heap address
+of 0x1000000000 (x86-64 linux)
+Instead it gets something way up high where there are all sorts of other
+memory mappings (from malloc and shared libraries, etc).
+
+At the time of failure, the lisp heap was "almost" covered by 6 lines
+from /proc/self/maps which we output to stderr in os_validate on failure.
+(Excerpt below)
+In this lisp process, unmap/remap had already happened several times
+as evident from the multiple lines. The kernel hadn't re-combined those
+distinct ranges yet. It may do so at its leisure.
+
+  ... many other mappings
+  range 7F3D0851F000 7F3D08520000 rwxp size 1000
+  range 7F3D08520000 7F3D09918000 rwxp size 13F8000
+  range 7F3D09930000 7F3D09938000 rwxp size 8000
+  range 7F3D09938000 7F3D09948000 rwxp size 10000
+  range 7F3D09948000 7F3D15710000 rwxp size BDC8000
+  range 7F3D15710000 7F410851F000 rwxp size 3F2E0F000
+  ... many other mappings
+
+Our lisp heap size is exactly (- #x7F410851F000 #x7F3D0851F000)
+which is 16 GiB.
+
+So unfortunately we then saw a failure
+"mmap: wanted 98304 bytes at 0x7f3d09918000, actually mapped at 0x7f3d044da000"
+which precisely corresponds to the missing range between the second
+and third line of the fragment above.
+(98304 = 3 x sb-vm:gencgc-page-bytes)
+
+In light of the postmortem dump of /proc/self/maps not being an atomic snapshot,
+one of two things must have happened:
+- the kernel randomly decided to be adversarial and not give back
+  an address that was just a moment ago unmapped by this thread
+- some other thread intruded between os_invalidate() and os_validate().
+
+As a matter of fact there were about 20 non-lisp threads in the lisp process
+which did not participate in the stop-for-GC protocol.
+Any of them could have gotten this memory at just the right moment to interfere
+with the unmap+remap technique.
+
+The fix is actually easy for linux - if MADV_DONTNEED is inapplicable,
+then use memset.  Since that case is not expected to occur often
+(an entire page of file-backed data should not often become dead)
+this does not add additional overhead except after running a fullcgc.
