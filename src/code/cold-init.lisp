@@ -408,7 +408,8 @@ process to continue normally."
   (when (eq *invoke-debugger-hook* 'sb-debug::debugger-disabled-hook)
     (sb-debug::disable-debugger))
   (call-hooks "initialization" *init-hooks*)
-  #+sb-thread (finalizer-thread-start))
+  #+sb-thread (finalizer-thread-start)
+  (sb-vm::setup-cpu-specific-routines))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code

@@ -139,6 +139,113 @@
       DONE))
   vector)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun concat-ub8 (ub8s)
+    (let ((result 0))
+      (loop for ub8 in ub8s
+            do (setf result (logior (ash result 8) ub8)))
+      result)))
+
+(def-variant simd-nreverse8 :avx2 (vector start end)
+  (declare ((simple-array * (*)) vector)
+           (fixnum start end)
+           (optimize speed (safety 0)))
+  (let ((sap (vector-sap vector)))
+    (inline-vop (((left sap-reg t) sap)
+                 ((start any-reg tagged-num) start)
+                 ((end) end)
+                 ((right signed-reg signed-num))
+                 ((l))
+                 ((r))
+                 ((vl int-avx2-reg))
+                 ((vr))
+                 ((reverse-mask))
+                 ((reverse-mask-xmm int-sse-reg))
+                 ((vl-xmm))
+                 ((vr-xmm)))
+        ()
+      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub8 (loop for i below 32 collect i)))))
+        (assemble ()
+          (inst shr end 1)
+          (inst shr start 1)
+          (inst lea right (ea left end))
+          (inst add left start)
+          (inst mov l right)
+          (inst sub l left)
+          (inst cmp l 64)
+          (inst jmp :b XMM)
+          (inst sub right 32)
+
+          (inst vmovdqu reverse-mask reverse-mask-c)
+          LOOP
+          (inst vmovdqu vl (ea left))
+          (inst vmovdqu vr (ea right))
+          (inst vperm2i128 vl vl vl 1)
+          (inst vperm2i128 vr vr vr 1)
+          (inst vpshufb vl vl reverse-mask)
+          (inst vpshufb vr vr reverse-mask)
+          (inst vmovdqu (ea left) vr)
+          (inst vmovdqu (ea right) vl)
+          (inst add left 32)
+          (inst sub right 32)
+          (inst cmp left right)
+          (inst jmp :b LOOP)
+
+          (inst vzeroupper)
+          (inst add right 32)
+
+          XMM
+          (inst mov r right)
+          (inst sub r 32)
+          (inst cmp r left)
+          (inst jmp :b WORD)
+
+          (inst sub right 16)
+          (inst vmovdqu reverse-mask-xmm reverse-mask-c)
+          (inst vmovdqu vl-xmm (ea left))
+          (inst vmovdqu vr-xmm (ea right))
+          (inst vpshufb vl-xmm vl-xmm reverse-mask-c)
+          (inst vpshufb vr-xmm vr-xmm reverse-mask-c)
+          (inst vmovdqu (ea left) vr-xmm)
+          (inst vmovdqu (ea right) vl-xmm)
+          (inst add left 16)
+
+          WORD
+
+          (inst mov r right)
+          (inst sub r 16)
+          (inst cmp r left)
+          (inst jmp :b BYTE)
+
+          (inst sub right 8)
+          (inst mov l (ea left))
+          (inst mov r (ea right))
+          (inst bswap l)
+          (inst bswap r)
+          (inst mov (ea left) r)
+          (inst mov (ea right) l)
+          (inst add left 8)
+
+
+          BYTE
+          (inst sub right 1)
+          (inst cmp right left)
+          (inst jmp :b DONE)
+
+          (loop repeat 7
+                do
+                (inst mov :byte l (ea left))
+                (inst mov :byte r (ea right))
+                (inst mov :byte (ea left) r)
+                (inst mov :byte (ea right) l)
+                (inst add left 1)
+                (inst sub right 1)
+                (inst cmp left right)
+                (inst jmp :ge DONE))
+
+          DONE))))
+  vector)
+
 (defun simd-nreverse32 (vector start end)
   (declare ((simple-array * (*)) vector)
            (fixnum start end)

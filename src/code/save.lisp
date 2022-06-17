@@ -355,6 +355,7 @@ sufficiently motivated to do lengthy fixes."
   #+immobile-code (sb-vm::statically-link-core)
   (invalidate-fd-streams)
   (finalizers-deinit)
+  (sb-vm::restore-cpu-specific-routines)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
   (setf sb-c::*compile-elapsed-time* 0

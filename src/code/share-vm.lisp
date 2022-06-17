@@ -137,3 +137,44 @@
 ;;; change our notion of what we think they are.
 (declaim (inline descriptor-sap))
 (defun descriptor-sap (x) (int-sap (get-lisp-obj-address x)))
+
+
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *cpu-features* nil))
+
+(defmacro def-cpu-feature (name detect)
+  ;; eval-when doesn't work correctly in the XC
+  (setf (getf *cpu-features* name) detect)
+  `(progn
+     (defglobal ,(symbolicate '+ name '-routines+) ())
+     (setf (getf *cpu-features* ',name) ',detect)))
+
+(defmacro def-variant (name cpu-feature lambda-list &body body)
+  (let ((variant (symbolicate name '- cpu-feature)))
+    `(progn
+       (defun ,variant ,lambda-list
+         ,@body)
+       ;; Avoid STATICALLY-LINK-CORE from making it harder to redefine.
+       (proclaim '(notinline ,name))
+       (setf (getf ,(symbolicate '+ cpu-feature '-routines+) (find-fdefn ',name))
+             #',variant))))
+
+(defvar *previous-cpu-routines* nil)
+
+(defmacro setup-cpu-specific-routines ()
+  `(progn
+     ,@(loop for (feature detect) on *cpu-features* by #'cddr
+             collect
+             `(when ,detect
+                (loop for (fdefn definition) on ,(package-symbolicate :sb-vm '+ feature '-routines+)
+                      by #'cddr
+                      do
+                      (push (cons fdefn (fdefn-fun fdefn))
+                            *previous-cpu-routines*)
+                      (setf (fdefn-fun fdefn) definition))))))
+
+(defun restore-cpu-specific-routines ()
+  (loop for (fdefn . fun) in *previous-cpu-routines*
+        do (setf (fdefn-fun fdefn) fun))
+  (setf *previous-cpu-routines* nil))

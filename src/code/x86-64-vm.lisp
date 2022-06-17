@@ -490,3 +490,6 @@
     (let ((flags (context-flags context)))
       (values (logbitp of-bit flags)
               (logbitp cf-bit flags)))))
+
+(def-cpu-feature :avx2
+    (plusp (sb-alien:extern-alien "avx2_supported" int)))
