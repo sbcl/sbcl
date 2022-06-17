@@ -995,18 +995,21 @@
                                  :remaining-bytes 1)
                  (emit-byte segment imm)))))
   (def vpermpd #x66 #x01)
-  (def vpermpq #x66 #x00))
+  (def vpermq #x66 #x00))
 
-(define-instruction vpermps (segment dst src src2)
-  (:emitter
-   (emit-avx2-inst segment src2 dst #x66 #x16
-                   :opcode-prefix #x0f38
-                   :vvvv src
-                   :w 0 :l 1))
-  . #.(avx2-inst-printer-list 'ymm-ymm/mem #x66 #x16
-                              :w 0 :l 1
-                              :nds t
-                              :opcode-prefix #x0f38))
+(macrolet ((def (name op)
+             `(define-instruction ,name (segment dst src src2)
+                ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 op
+                                          :w 0 :l 1
+                                          :nds t
+                                          :opcode-prefix #x0f38)
+                (:emitter
+                 (emit-avx2-inst segment src2 dst #x66 ,op
+                                 :opcode-prefix #x0f38
+                                 :vvvv src
+                                 :w 0 :l 1)))))
+  (def vpermps #x16)
+  (def vpermd #x36))
 
 (macrolet ((def (name op op-imm)
              `(define-instruction ,name (segment dst src src2/imm)
