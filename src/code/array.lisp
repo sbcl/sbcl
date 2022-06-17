@@ -1383,6 +1383,11 @@ of specialized arrays is supported."
 ;;; where GC reads the objects on the page just after the filler
 ;;; because it doesn't know not to.
 ;;;
+(defmacro make-filler (n)
+  `(logior (ash ,n #+64-bit 32 #-64-bit ,n-widetag-bits) filler-widetag))
+(defmacro filler-nwords (header)
+  `(ash ,header #+64-bit -32 #-64-bit ,(- n-widetag-bits)))
+
 (defun %shrink-vector (vector new-length
                               &aux (old-length (length vector))
                                    (new-length* new-length))
@@ -1432,8 +1437,7 @@ of specialized arrays is supported."
                     ;; if GC sees this bit pattern prior to setting the new length;
                     ;; but even for SIMPLE-VECTOR, it's OK, it turns out.
                     (setf (sap-ref-word data (ash aligned-new word-shift))
-                          (logior (ash (1- diff) n-widetag-bits)
-                                  filler-widetag)))))))))))
+                          (make-filler diff)))))))))))
   ;; Only arrays have fill-pointers, but vectors have their length
   ;; parameter in the same place.
   (setf (%array-fill-pointer vector) new-length)

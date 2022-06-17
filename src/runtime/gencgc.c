@@ -1349,7 +1349,7 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
     lispobj* addr = (lispobj*)page_address(first_page);
     if (locked)
         THREAD_JIT(0);
-    *addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    *addr = make_filler_header(nwords);
     if (locked) // avoid enabling while GCing
         THREAD_JIT(1);
 
@@ -1615,8 +1615,7 @@ void *collector_alloc_fallback(struct alloc_region* region, sword_t nbytes, int 
              * Never insert that much filler */
             if (fill_nwords >= SMALL_MIXED_NWORDS_LIMIT)
                 return new_region(mixed_region, nbytes, PAGE_TYPE_MIXED);
-            *(lispobj*)region->free_pointer =
-                (fill_nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+            *(lispobj*)region->free_pointer = make_filler_header(fill_nwords);
         }
         region->free_pointer = next_card;
         region->end_addr = next_card + GENCGC_CARD_BYTES;
@@ -2333,7 +2332,7 @@ void deposit_filler(char* from, char* to) {
     gc_assert((nwords - 1) <= 0x7FFFFF);
     page_index_t page = find_page_index(from);
     gc_assert(find_page_index(to-1) == page);
-    *(lispobj*)from = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    *(lispobj*)from = make_filler_header(nwords);
     long unsigned last_card;
     switch (page_table[page].type) {
     case PAGE_TYPE_BOXED:
@@ -2343,7 +2342,7 @@ void deposit_filler(char* from, char* to) {
         while (addr_to_card_index(from) != last_card) {
             from = PTR_ALIGN_DOWN(from, GENCGC_CARD_BYTES) + GENCGC_CARD_BYTES;
             nwords = (to - from) >> WORD_SHIFT;
-            *(lispobj*)from = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+            *(lispobj*)from = make_filler_header(nwords);
         }
     }
 }

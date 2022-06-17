@@ -35,7 +35,7 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
 
     // Fill to the end of the card
     int filler_nwords = (GENCGC_CARD_BYTES >> WORD_SHIFT) - 2;
-    *where = ((filler_nwords - 1) << N_WIDETAG_BITS) | FILLER_WIDETAG;
+    *where = make_filler_header(filler_nwords);
 
     // Assert that no tagged pointer can point to the filler
     // fprintf(stderr, "Filler @ %p: %"OBJ_FMTX"\n", where, *where);
@@ -55,7 +55,7 @@ static void make_instances(int page_type, generation_index_t gen, lispobj result
 
     // Fill to the end of the card
     filler_nwords = (GENCGC_CARD_BYTES >> WORD_SHIFT) - 6;
-    *where = ((filler_nwords - 1) << N_WIDETAG_BITS) | FILLER_WIDETAG;
+    *where = make_filler_header(filler_nwords);
     where += filler_nwords;
 
     result[0] = instance;

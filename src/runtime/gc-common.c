@@ -284,9 +284,10 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
             goto immobile_obj;
 #endif
         else {
-            // Advancing by the filler payload count causes 'where' to be exactly
-            // at the next object after the loop increments it as usual.
-            if (header_widetag(ptr) == FILLER_WIDETAG) where += ptr >> N_WIDETAG_BITS;
+            // Advancing by the filler payload count (= total - 1) causes 'where' to
+            // align exactly to the next object after the loop steps by 1 as usual.
+            if (header_widetag(ptr) == FILLER_WIDETAG)
+                where += filler_total_nwords(ptr)-1;
             continue;
         }
         // Dear lord, I hate the numbering scheme with SCRATCH_GENERATION higher than everything
@@ -737,6 +738,11 @@ scav_other_pointer(lispobj *where, lispobj object)
 /*
  * immediate, boxed, and unboxed objects
  */
+
+static sword_t size_filler(lispobj *where) {  return filler_total_nwords(*where); }
+static sword_t scav_filler(__attribute__((unused)) lispobj *where, lispobj object) {
+    return filler_total_nwords(object);
+}
 
  /* The immediate object scavenger basically wants to be "scav_cons",
   * and so returns 2. To see why it's right, observe that scavenge() will

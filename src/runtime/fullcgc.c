@@ -618,7 +618,7 @@ static void clobber_headered_object(lispobj* addr, sword_t nwords)
     } else if ((SINGLE_OBJECT_FLAG|page_table[page].type) == (SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE)) {
         // Code pages don't want (0 . 0) fillers, otherwise heap checking
         // gets an error: "object @ 0x..... is non-code on code page"
-        addr[0] = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+        addr[0] = make_filler_header(nwords);
         addr[1] = 0;
     } else {
         memset(addr, 0, nwords * N_WORD_BYTES);

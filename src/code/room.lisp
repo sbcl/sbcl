@@ -190,7 +190,7 @@
      (let ((word (sap-ref-word start 0)))
        (cond
          ((= (logand word widetag-mask) filler-widetag) ; pseudo-object
-          (let ((size (+ (* (ash word -8) n-word-bytes) n-word-bytes)))
+          (let ((size (ash (filler-nwords word) word-shift)))
             (setq start (sap+ start size))))
          ((= word most-positive-word)
           ;; has to be a pseudo-cons resulting from removing an insignificant

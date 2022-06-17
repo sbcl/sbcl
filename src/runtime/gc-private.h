@@ -565,4 +565,12 @@ static inline boolean plausible_tag_p(lispobj addr)
         && lowtag_of(addr) == LOWTAG_FOR_WIDETAG(widetag);
 }
 
+#ifdef LISP_FEATURE_64_BIT
+# define make_filler_header(n) (((uword_t)(n)<<32)|FILLER_WIDETAG)
+# define filler_total_nwords(header) ((header)>>32)
+#else
+# define make_filler_header(n) (((n)<<N_WIDETAG_BITS)|FILLER_WIDETAG)
+# define filler_total_nwords(header) ((header)>>N_WIDETAG_BITS)
+#endif
+
 #endif /* _GC_PRIVATE_H_ */

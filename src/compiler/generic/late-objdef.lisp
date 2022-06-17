@@ -83,7 +83,7 @@
 
     #+sb-simd-pack (simd-pack "unboxed")
     #+sb-simd-pack-256 (simd-pack-256 "unboxed")
-    (filler "unboxed")
+    (filler "filler" "lose" "filler")
 
     (simple-array "array")
     (simple-array-unsigned-byte-2 "vector_unsigned_byte_2")
@@ -142,7 +142,7 @@
             min (ldb (byte 32 32) bits))
     ;; Union in the bits for other unboxed object types.
     (dolist (entry *scav/trans/size*)
-      (when (member (second entry) '("bignum" "unboxed") :test 'string=)
+      (when (member (second entry) '("bignum" "unboxed" "filler") :test 'string=)
         (setf bits (logior bits (ash 1 (ash (car entry) -2))))))
     (format stream "static inline int leaf_obj_widetag_p(unsigned char widetag) {~%")
     #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
