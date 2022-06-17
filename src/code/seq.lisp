@@ -914,7 +914,7 @@ many elements are copied."
                        (svref vector right-index))))
               ((word-specialized-vector-tag-p tag)
                (reverse-word-specialized-vector vector new-vector end))
-              #+arm64
+              #+(or arm64 x86-64)
               ((typep vector '(or (simple-array base-char (*))
                                (simple-array (signed-byte 8) (*))
                                (simple-array (unsigned-byte 8) (*))))

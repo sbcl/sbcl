@@ -158,7 +158,7 @@
       (inst mov l right)
       (inst sub l left)
       (inst cmp l 16)
-      (inst jmp :b BYTE)
+      (inst jmp :b SCALAR)
       (inst sub right 8)
 
       LOOP
@@ -175,7 +175,7 @@
 
       (inst add right 8)
 
-      BYTE
+      SCALAR
       (inst sub right 4)
       (inst cmp right left)
       (inst jmp :b DONE)
@@ -186,3 +186,50 @@
       (inst mov :dword (ea right) l)
       DONE))
   vector)
+
+(defun simd-reverse8 (source start length target)
+  (declare ((simple-array * (*)) vector target)
+           (fixnum start length)
+           (optimize speed (safety 0)))
+  (let ((source (vector-sap source))
+        (target (vector-sap target)))
+    (inline-vop (((source sap-reg t) source)
+                 ((target sap-reg t) target)
+                 ((start any-reg tagged-num) start)
+                 ((length) length)
+                 ((s-i signed-reg signed-num))
+                 ((t-i))
+                 ((g)))
+        ()
+      (inst shr start 1)
+      (inst add source start)
+      (zeroize t-i)
+      (inst mov s-i length)
+      (inst shr s-i 1)
+      (inst cmp s-i 8)
+      (inst jmp :b SCALAR)
+      (inst sub s-i 8)
+
+      LOOP
+      (inst mov g (ea source s-i))
+      (inst bswap g)
+      (inst mov (ea target t-i) g)
+
+      (inst add t-i 8)
+      (inst sub s-i 8)
+      (inst jmp :ge LOOP)
+      (inst add s-i 8)
+
+      SCALAR
+      (inst sub s-i 1)
+      (inst jmp :b DONE)
+
+      (loop repeat 7
+            do
+            (inst mov :byte g (ea source s-i))
+            (inst mov :byte (ea target t-i) g)
+            (inst add t-i 1)
+            (inst sub s-i 1)
+            (inst jmp :b DONE))
+      DONE))
+  target)
