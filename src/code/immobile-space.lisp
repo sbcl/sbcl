@@ -133,7 +133,9 @@
                           ;; within the same code object
                           (unless (and (<= code-begin target) (< target code-end))
                             (let ((fdefn (sb-vm::find-called-object target)))
-                              (when (fdefn-p fdefn)
+                              (when (and (fdefn-p fdefn)
+                                         (neq (info :function :inlinep (fdefn-name fdefn))
+                                              'notinline))
                                 (push (cons (+ (sap- sap code-insts)
                                                (sb-disassem:dstate-cur-offs dstate)
                                                1)
