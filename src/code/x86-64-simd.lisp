@@ -144,6 +144,12 @@
     (let ((result 0))
       (loop for ub8 in ub8s
             do (setf result (logior (ash result 8) ub8)))
+      result))
+
+  (defun concat-ub32 (ub32s)
+    (let ((result 0))
+      (loop for ub32 in ub32s
+            do (setf result (logior (ash result 32) ub32)))
       result)))
 
 (def-variant simd-nreverse8 :avx2 (vector start end)
@@ -294,6 +300,93 @@
       DONE))
   vector)
 
+(def-variant simd-nreverse32 :avx2 (vector start end)
+  (declare ((simple-array * (*)) vector)
+           (fixnum start end)
+           (optimize speed (safety 0)))
+  (let ((sap (vector-sap vector)))
+    (inline-vop (((left sap-reg t) sap)
+                 ((start any-reg tagged-num) start)
+                 ((end) end)
+                 ((right signed-reg signed-num))
+                 ((l))
+                 ((r))
+                 ((vl int-avx2-reg))
+                 ((vr))
+                 ((reverse-mask))
+                 ((vl-xmm int-sse-reg))
+                 ((vr-xmm)))
+        ()
+      (inst shl end 1)
+      (inst shl start 1)
+      (inst lea right (ea left end))
+      (inst add left start)
+      (inst mov l right)
+      (inst sub l left)
+      (inst cmp l 64)
+      (inst jmp :b XMM)
+      (inst sub right 32)
+
+      (inst vmovdqu reverse-mask (register-inline-constant :avx2 (concat-ub32 (loop for i to 7 collect i))))
+      LOOP
+      (inst vmovdqu vl (ea left))
+      (inst vmovdqu vr (ea right))
+      (inst vpermd vl reverse-mask vl)
+      (inst vpermd vr reverse-mask vr)
+
+      (inst vmovdqu (ea left) vr)
+      (inst vmovdqu (ea right) vl)
+      (inst add left 32)
+      (inst sub right 32)
+      (inst cmp left right)
+      (inst jmp :b LOOP)
+
+      (inst vzeroupper)
+      (inst add right 32)
+
+      XMM
+      (inst mov r right)
+      (inst sub r 32)
+      (inst cmp r left)
+      (inst jmp :b WORD)
+
+      (inst sub right 16)
+      (inst vmovdqu vl-xmm (ea left))
+      (inst vmovdqu vr-xmm (ea right))
+      (inst vpshufd vl-xmm vl-xmm 27)
+      (inst vpshufd vr-xmm vr-xmm 27)
+      (inst vmovdqu (ea left) vr-xmm)
+      (inst vmovdqu (ea right) vl-xmm)
+      (inst add left 16)
+
+      WORD
+
+      (inst mov r right)
+      (inst sub r 16)
+      (inst cmp r left)
+      (inst jmp :b SCALAR)
+
+      (inst sub right 8)
+      (inst mov l (ea left))
+      (inst mov r (ea right))
+      (inst ror l 32)
+      (inst ror r 32)
+      (inst mov (ea left) r)
+      (inst mov (ea right) l)
+      (inst add left 8)
+
+      SCALAR
+      (inst sub right 4)
+      (inst cmp right left)
+      (inst jmp :b DONE)
+
+      (inst mov :dword l (ea left))
+      (inst mov :dword r (ea right))
+      (inst mov :dword (ea left) r)
+      (inst mov :dword (ea right) l)
+      DONE))
+  vector)
+
 (defun simd-reverse8 (source start length target)
   (declare ((simple-array * (*)) vector target)
            (fixnum start length)
@@ -341,6 +434,82 @@
       DONE))
   target)
 
+(def-variant simd-reverse8 :avx2 (source start length target)
+  (declare ((simple-array * (*)) vector target)
+           (fixnum start length)
+           (optimize speed (safety 0)))
+  (let ((source (vector-sap source))
+        (target (vector-sap target)))
+    (inline-vop (((source sap-reg t) source)
+                 ((target sap-reg t) target)
+                 ((start any-reg tagged-num) start)
+                 ((length) length)
+                 ((s-i signed-reg signed-num))
+                 ((t-i))
+                 ((g))
+                 ((v int-avx2-reg))
+                 ((reverse-mask))
+                 ((reverse-mask-xmm int-sse-reg))
+                 ((v-xmm)))
+        ()
+      (let ((reverse-mask-c (register-inline-constant :avx2 (concat-ub8 (loop for i below 32 collect i)))))
+        (assemble ()
+          (inst shr start 1)
+          (inst add source start)
+          (zeroize t-i)
+          (inst mov s-i length)
+          (inst shr s-i 1)
+          (inst cmp s-i 32)
+          (inst jmp :b XMM)
+          (inst sub s-i 32)
+
+          (inst vmovdqu reverse-mask reverse-mask-c)
+          LOOP
+          (inst vmovdqu v (ea source s-i))
+          (inst vperm2i128 v v v 1)
+          (inst vpshufb v v reverse-mask)
+          (inst vmovdqu (ea target t-i) v)
+          (inst add t-i 32)
+          (inst sub s-i 32)
+          (inst jmp :ge LOOP)
+          (inst vzeroupper)
+          (inst add s-i 32)
+
+          XMM
+          (inst cmp s-i 16)
+          (inst jmp :b WORD)
+
+          (inst sub s-i 16)
+          (inst vmovdqu reverse-mask-xmm reverse-mask-c)
+          (inst vmovdqu v-xmm (ea source s-i))
+          (inst vpshufb v-xmm v-xmm reverse-mask-c)
+          (inst vmovdqu (ea target t-i) v-xmm)
+          (inst add t-i 16)
+
+          WORD
+          (inst cmp s-i 8)
+          (inst jmp :b BYTE)
+
+          (inst sub s-i 8)
+          (inst mov g (ea source s-i))
+          (inst bswap g)
+          (inst mov (ea target t-i) g)
+          (inst add t-i 8)
+
+          BYTE
+          (inst sub s-i 1)
+          (inst jmp :b DONE)
+
+          (loop repeat 7
+                do
+                (inst mov :byte g (ea source s-i))
+                (inst mov :byte (ea target t-i) g)
+                (inst add t-i 1)
+                (inst sub s-i 1)
+                (inst jmp :b DONE))
+          DONE))))
+  target)
+
 (defun simd-reverse32 (source start length target)
   (declare ((simple-array * (*)) vector target)
            (fixnum start length)
@@ -373,6 +542,74 @@
       (inst sub s-i 8)
       (inst jmp :ge LOOP)
       (inst add s-i 8)
+
+      SCALAR
+      (inst sub s-i 4)
+      (inst jmp :b DONE)
+
+      (inst mov :dword g (ea source s-i))
+      (inst mov :dword (ea target t-i) g)
+      DONE))
+  target)
+
+
+(def-variant simd-reverse32 :avx2 (source start length target)
+  (declare ((simple-array * (*)) vector target)
+           (fixnum start length)
+           (optimize speed (safety 0)))
+  (let ((source (vector-sap source))
+        (target (vector-sap target)))
+    (inline-vop (((source sap-reg t) source)
+                 ((target sap-reg t) target)
+                 ((start any-reg tagged-num) start)
+                 ((length) length)
+                 ((s-i signed-reg signed-num))
+                 ((t-i))
+                 ((g))
+                 ((v int-avx2-reg))
+                 ((reverse-mask))
+                 ((reverse-mask-xmm int-sse-reg))
+                 ((v-xmm)))
+        ()
+      (inst shl start 1)
+      (inst add source start)
+      (zeroize t-i)
+      (inst mov s-i length)
+      (inst shl s-i 1)
+      (inst cmp s-i 32)
+      (inst jmp :b XMM)
+      (inst sub s-i 32)
+
+      (inst vmovdqu reverse-mask (register-inline-constant :avx2 (concat-ub32 (loop for i to 7 collect i))))
+      LOOP
+      (inst vmovdqu v (ea source s-i))
+      (inst vpermd v reverse-mask v)
+      (inst vmovdqu (ea target t-i) v)
+      (inst add t-i 32)
+      (inst sub s-i 32)
+      (inst jmp :ge LOOP)
+      (inst vzeroupper)
+      (inst add s-i 32)
+
+      XMM
+      (inst cmp s-i 16)
+      (inst jmp :b WORD)
+
+      (inst sub s-i 16)
+      (inst vmovdqu v-xmm (ea source s-i))
+      (inst vpshufd v-xmm v-xmm 27)
+      (inst vmovdqu (ea target t-i) v-xmm)
+      (inst add t-i 16)
+
+      WORD
+      (inst cmp s-i 8)
+      (inst jmp :b SCALAR)
+
+      (inst sub s-i 8)
+      (inst mov g (ea source s-i))
+      (inst ror g 32)
+      (inst mov (ea target t-i) g)
+      (inst add t-i 8)
 
       SCALAR
       (inst sub s-i 4)
