@@ -37,7 +37,12 @@
       (inst lsl offset index (1+ (- word-shift n-fixnum-tag-bits)))
       (inst add offset offset (- (* vector-data-offset n-word-bytes)
                                 other-pointer-lowtag))
-      (inst str value (@ vector offset)))))
+      (inst str value (@ vector offset))))
+
+  (defun reg-in-sc (tn sc)
+    (make-random-tn :kind :normal
+                    :sc (sc-or-lose sc)
+                    :offset (tn-offset tn))))
 
 (defmacro simd-mask (value)
   `(inline-vop
@@ -312,3 +317,104 @@
             (inst b :lt DONE))
       DONE))
   target)
+
+;;; Basically like the x86 with-pinned-object,
+;;; but here only the boxed registers are pinned.
+;;; This doesn't prevent the var from going to the stack, but none of
+;;; the routines should do that.
+(defmacro with-pinned-objects-in-registers (vars &body body)
+  `(multiple-value-prog1 ,@body
+     ,@(loop for var in vars
+             collect `(touch-object ,var))))
+
+(defun simd-cmp-8-32 (byte-array 32-bit-array)
+  (declare ((simple-array * (*)) byte-array 32-bit-array)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (byte-array 32-bit-array)
+    (inline-vop (((byte-array sap-reg t) (vector-sap byte-array))
+                 ((32-bit-array sap-reg t) (vector-sap 32-bit-array))
+                 ((length any-reg) (length byte-array))
+                 ((32-bits complex-double-reg))
+                 ((bytes single-reg))
+                 ((cmp unsigned-reg))
+                 ((end)))
+        ((res descriptor-reg t :from :load))
+      (load-symbol res t)
+      (inst cbz length DONE)
+      (inst add end byte-array (lsr length 1))
+      LOOP
+      (inst ldr bytes (@ byte-array 4 :post-index))
+      (inst ldr 32-bits (@ 32-bit-array 16 :post-index))
+      (setf bytes (reg-in-sc bytes 'complex-double-reg))
+
+      (inst ushll bytes :8h bytes :8b 0)
+      (inst ushll bytes :4s bytes :4h 0)
+
+      (inst cmeq bytes bytes 32-bits :4s)
+      (inst uminv bytes bytes :4s)
+      (inst umov cmp bytes 0 :s)
+      (inst cbz cmp FALSE)
+      (inst cmp byte-array end)
+      (inst b :lt LOOP)
+      (inst b DONE)
+      FALSE
+      (inst mov res null-tn)
+      DONE)))
+
+(defun simd-cmp-8-8 (a b)
+  (declare ((simple-array * (*)) a b)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (a b)
+    (inline-vop (((a-array sap-reg t) (vector-sap a))
+                 ((b-array sap-reg t) (vector-sap b))
+                 ((length any-reg) (length a))
+                 ((a complex-double-reg))
+                 ((b))
+                 ((cmp unsigned-reg))
+                 ((end)))
+        ((res descriptor-reg t :from :load))
+      (load-symbol res t)
+      (inst cbz length DONE)
+      (inst add end a-array (lsr length 1))
+      LOOP
+      (inst ldr a (@ a-array 16 :post-index))
+      (inst ldr b (@ b-array 16 :post-index))
+      (inst cmeq a a b :16b)
+      (inst uminv a a :16b)
+      (inst umov cmp a 0 :b)
+      (inst cbz cmp FALSE)
+      (inst cmp a-array end)
+      (inst b :lt LOOP)
+      (inst b DONE)
+      FALSE
+      (inst mov res null-tn)
+      DONE)))
+
+(defun simd-cmp-32-32 (a b)
+  (declare ((simple-array * (*)) a b)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (a b)
+    (inline-vop (((a-array sap-reg t) (vector-sap a))
+                 ((b-array sap-reg t) (vector-sap b))
+                 ((length any-reg) (length a))
+                 ((a complex-double-reg))
+                 ((b))
+                 ((cmp unsigned-reg))
+                 ((end)))
+        ((res descriptor-reg t :from :load))
+      (load-symbol res t)
+      (inst cbz length DONE)
+      (inst add end a-array (lsl length 1))
+      LOOP
+      (inst ldr a (@ a-array 16 :post-index))
+      (inst ldr b (@ b-array 16 :post-index))
+      (inst cmeq a a b :4s)
+      (inst uminv a a :4s)
+      (inst umov cmp a 0 :s)
+      (inst cbz cmp FALSE)
+      (inst cmp a-array end)
+      (inst b :lt LOOP)
+      (inst b DONE)
+      FALSE
+      (inst mov res null-tn)
+      DONE)))

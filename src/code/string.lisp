@@ -127,6 +127,54 @@
                     (return nil))))))
 
   (defun string=* (string1 string2 start1 end1 start2 end2)
+    #+arm64
+    (when (and (zerop start1)
+               (zerop start2)
+               (not end1)
+               (not end2))
+      ;; With the range spanning the whole string it can be compared
+      ;; 128 bits at a time without the need to process any leftover
+      ;; bits.
+      (prog ((string1 string1)
+             (string2 string2))
+         (cond ((simple-base-string-p string1)
+                (cond #+sb-unicode
+                      ((simple-character-string-p string2)
+                       (go 8-32))
+                      #+arm64
+                      ((simple-base-string-p string2)
+                       (go 8-8))
+                      (t
+                       (go normal))))
+               #+sb-unicode
+               ((simple-character-string-p string1)
+                (cond ((simple-base-string-p string2)
+                       (rotatef string1 string2)
+                       (go 8-32))
+                      #+arm64
+                      ((simple-character-string-p string2)
+                       (go 32-32))
+                      (t
+                       (go normal))))
+               (t
+                (go normal)))
+       8-32
+         (return-from string=*
+           (and (= (length string1)
+                   (length string2))
+                (sb-vm::simd-cmp-8-32 string1 string2)))
+       8-8
+         (return-from string=*
+           (and (= (length string1)
+                   (length string2))
+                (sb-vm::simd-cmp-8-8 string1 string2)))
+
+       32-32
+         (return-from string=*
+           (and (= (length string1)
+                   (length string2))
+                (sb-vm::simd-cmp-32-32 string1 string2)))
+       normal))
     (with-two-strings string1 string2 start1 end1 nil start2 end2
       (let ((len (- end1 start1)))
         (unless (= len (- end2 start2)) ; trivial
@@ -179,6 +227,17 @@
       (%sp-string= string1 string2 start1 end1 start2 end2)))
 
   (defun simple-base-string= (string1 string2 start1 end1 start2 end2)
+    #+arm64
+    (when (and (zerop start1)
+               (zerop start2)
+               (not end1)
+               (not end2)
+               (simple-base-string-p string1)
+               (simple-base-string-p string2))
+      (return-from simple-base-string=
+        (and (= (length string1)
+                (length string2))
+             (sb-vm::simd-cmp-8-8 string1 string2))))
     (with-two-strings string1 string2 start1 end1 nil start2 end2
       (let ((len (- end1 start1)))
         (cond ((/= len (- end2 start2))
@@ -192,6 +251,17 @@
 
   #+sb-unicode
   (defun simple-character-string= (string1 string2 start1 end1 start2 end2)
+    #+arm64
+    (when (and (zerop start1)
+               (zerop start2)
+               (not end1)
+               (not end2)
+               (simple-character-string-p string1)
+               (simple-character-string-p string2))
+      (return-from simple-character-string=
+        (and (= (length string1)
+                (length string2))
+             (sb-vm::simd-cmp-32-32 string1 string2))))
     (with-two-strings string1 string2 start1 end1 nil start2 end2
       (let ((len (- end1 start1)))
         (cond ((/= len (- end2 start2))
