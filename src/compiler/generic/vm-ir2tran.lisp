@@ -478,3 +478,11 @@
                     (primitive-object-slots (primitive-object 'array)))
                '(fill-pointer elements data
                  displacement displaced-p displaced-from dimensions)))
+
+(define-vop (touch-object)
+  (:translate touch-object)
+  (:args (object))
+  (:ignore object)
+  (:policy :fast-safe)
+  (:arg-types t)
+  (:generator 0))
