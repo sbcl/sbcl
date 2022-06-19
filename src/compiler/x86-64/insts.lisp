@@ -2773,10 +2773,14 @@
          (setq dst (sized-thing dst size)
                src (sized-thing src size))
          (cond ((xmm-register-p dst)
-                (emit-sse-inst segment dst src #x66 #x6e))
+                (emit-sse-inst segment dst src #x66 #x6e
+                               :operand-size (and (ea-p src)
+                                                  :do-not-set)))
                (t
                 (aver (xmm-register-p src))
-                (emit-sse-inst segment src dst #x66 #x7e)))))
+                (emit-sse-inst segment src dst #x66 #x7e
+                               :operand-size (and (ea-p dst)
+                                                  :do-not-set))))))
   (define-instruction movd (segment dst src)
     (:emitter (move-xmm<->gpr segment dst src :dword))
     . #.(append (sse-inst-printer 'xmm-reg/mem #x66 #x6e
