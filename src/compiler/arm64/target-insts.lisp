@@ -262,6 +262,32 @@
     (format stream "V~d.~a" offset
             (decode-vector-size q size))))
 
+(defun print-simd-immh-reg (value stream dstate)
+  (declare (ignore dstate))
+  (if (= (length value) 2)
+      (destructuring-bind (immh offset) value
+        (format stream "V~d.~a" offset
+                (cond ((logbitp 0 immh)
+                       "8H")
+                      ((logbitp 1 immh)
+                       "4S")
+                      ((logbitp 2 immh)
+                       "2D"))))
+      (destructuring-bind (q immh offset) value
+        (format stream "V~d.~a" offset
+                (cond ((logbitp 0 immh)
+                       (if (zerop q)
+                           "8B"
+                           "16B"))
+                      ((logbitp 1 immh)
+                       (if (zerop q)
+                           "4H"
+                           "8H"))
+                      ((logbitp 2 immh)
+                       (if (zerop q)
+                           "2S"
+                           "4S")))))))
+
 (defun print-vbhs (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (size offset) value

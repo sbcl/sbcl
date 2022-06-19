@@ -112,6 +112,8 @@
 
   (define-arg-type simd-copy-reg :printer #'print-simd-copy-reg)
 
+  (define-arg-type simd-immh-reg :printer #'print-simd-immh-reg)
+
   (define-arg-type sys-reg :printer #'print-sys-reg)
 
   (define-arg-type cond :printer #'print-cond)
@@ -295,7 +297,7 @@
 ;;;; Data-processing instructions
 
 
-(defmacro def-emitter (name &rest specs)
+(defmacro def-emitter (name &body specs)
   (collect ((arg-names) (arg-types))
     (let* ((total-bits 32)
            (overall-mask (ash -1 total-bits))
@@ -2756,7 +2758,7 @@
   (rn 5 5)
   (rd 5 0))
 
-(define-instruction-format (simd-scalar-three-same 32
+(define-instruction-format (simd-extract 32
                             :default-printer '(:name :tab rd ", " rn ", " rm))
   (op3 :field (byte 1 31) :value #b0)
   (op4 :field (byte 9 21) :value #b101110000)
@@ -2766,7 +2768,7 @@
   (rd :fields (list (byte 1 30) (byte 5 0)) :type 'simd-reg))
 
 (define-instruction ext (segment rd rn rm index &optional (size :16b))
-  (:printer simd-scalar-three-same ())
+  (:printer simd-extract ())
   (:emitter
    (emit-simd-extract segment
                       (encode-vector-size size)
@@ -2960,10 +2962,76 @@
                                  (reg-offset rn)
                                  (reg-offset rd)))))))
   (def cnt #b0 #b00101)
-  (def s-mvn #b1 #b00101)
   (def s-rev16 #b0 #b00001)
   (def s-rev32 #b1 #b00000 (:8b :16b :4h :8h))
   (def rev64 #b0 #b00000 (:8b :16b :4h :8h :2s :4s)))
+
+
+
+(def-emitter simd-shift-by-imm
+  (#b0 1 31)
+  (q 1 30)
+  (u 1 29)
+  (#b011110 6 23)
+  (immh 4 19)
+  (immb 3 16)
+  (op 5 11)
+  (#b1 1 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction-format (simd-shift-by-imm 32
+                            :default-printer '(:name :tab rd ", " rn))
+  (o1 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (u :field (byte 1 29))
+  (op2 :field (byte 6 23) :value #b011110)
+  (immh :field (byte 4 19))
+  (immb :field (byte 3 16))
+  (op :field (byte 5 11))
+  (op3 :field (byte 1 10) :value #b1)
+  (rn :fields (list (byte 1 30) (byte 4 19) (byte 5 5)) :type 'simd-immh-reg)
+  (rd :fields (list (byte 4 19) (byte 5 0)) :type 'simd-immh-reg))
+
+(macrolet
+    ((def (name q u op)
+       `(define-instruction ,name (segment rd sized rn sizen shift)
+          (:printer simd-shift-by-imm ((q ,q) (u ,u) (op ,op)))
+          (:emitter
+           (let ((immh 0)
+                 (immb 0))
+             (ecase sized
+               (:8h
+                (aver (eq sizen
+                          (if (zerop ,q)
+                              :8B
+                              :16B)))
+                (setf immh #b1))
+               (:4s
+                (aver (eq sizen
+                          (if (zerop ,q)
+                              :4H
+                              :8H)))
+                (setf immh #b10)
+                (setf (ldb (byte 1 0) immh) (ldb (byte 1 3) shift)))
+               (:2d
+                (aver (eq sizen
+                          (if (zerop ,q)
+                              :2S
+                              :4S)))
+                (setf immh #b100)
+                (setf (ldb (byte 2 0) immh) (ldb (byte 2 3) shift))))
+             (setf immb (ldb (byte 3 0) shift))
+             (emit-simd-shift-by-imm segment
+                                     ,q
+                                     ,u
+                                     immh
+                                     immb
+                                     ,op
+                                     (reg-offset rn)
+                                     (reg-offset rd)))))))
+  (def ushll #b0 #b1 #b10100)
+  (def ushll2 #b1 #b1 #b10100))
 
 ;;; Inline constants
 (defun canonicalize-inline-constant (constant)

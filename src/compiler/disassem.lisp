@@ -240,7 +240,7 @@
 
 (defmacro define-instruction-format ((format-name length-in-bits
                                       &key default-printer include)
-                                     &rest arg-specs)
+                                     &body arg-specs)
   #+sb-xc-host (declare (ignore default-printer))
   "DEFINE-INSTRUCTION-FORMAT (Name Length {Format-Key Value}*) Arg-Def*
   Define an instruction format NAME for the disassembler's use. LENGTH is
