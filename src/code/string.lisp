@@ -127,7 +127,7 @@
                     (return nil))))))
 
   (defun string=* (string1 string2 start1 end1 start2 end2)
-    #+arm64
+    #+(or arm64 (and x86-64 sb-unicode))
     (when (and (zerop start1)
                (zerop start2)
                (not end1)
@@ -162,14 +162,18 @@
          (return-from string=*
            (and (= (length string1)
                    (length string2))
-                (sb-vm::simd-cmp-8-32 string1 string2)))
+                (let ((x (sb-vm::simd-cmp-8-32 string1 string2)))
+                  (aver (eq x (string=* (coerce string1 'simple-character-string) string2 start1 end1 start2 end2)))
+                  x)))
        8-8
+         #+arm64
          (return-from string=*
            (and (= (length string1)
                    (length string2))
                 (sb-vm::simd-cmp-8-8 string1 string2)))
 
        32-32
+         #+arm64
          (return-from string=*
            (and (= (length string1)
                    (length string2))
