@@ -211,38 +211,6 @@
       (assign-simple-fun-self (%code-entry-point copy 0)))
     copy))
 
-;;; Note the existence of FUNCTION.
-(defun note-fun (info function object)
-  (declare (type function function)
-           (type core-object object))
-  (let ((patch-table (core-object-patch-table object)))
-    (dolist (patch (gethash info patch-table))
-      (setf (code-header-ref (car patch) (the index (cdr patch))) function))
-    (remhash info patch-table))
-  (setf (gethash info (core-object-entry-table object)) function)
-  (values))
-
-;;; Stick a reference to the function FUN in CODEBLOB-OR-VECTOR at index I.
-;;; The function has to have been compiled already. (This wasn't always the case I guess?)
-(defun reference-core-fun (codeblob-or-vector i fun core-object)
-  (declare (type (or simple-vector code-component) codeblob-or-vector)
-           (type index i)
-           (type functional fun)
-           (type core-object object))
-  (let* ((info (leaf-info fun))
-         (found (gethash info (core-object-entry-table core-object))))
-    ;; A core component can't have any cross-component references.
-    ;; If it could, then the entries would have placed into one component.
-    (cond (found
-           (if (simple-vector-p codeblob-or-vector)
-               (setf (svref codeblob-or-vector (- i sb-vm:code-constants-offset)) found)
-               (setf (code-header-ref codeblob-or-vector i) found)))
-          (t
-           (bug "Forward-reference to core function can't occur")
-           ;; Was: (push (cons code-obj i) (gethash info (core-object-patch-table object)))
-           )))
-  (values))
-
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
 
@@ -299,16 +267,16 @@
           ;; <header, boxed_size, debug_info, fixups> are absent from the simple-vector
           #+darwin-jit
           (make-array (- nboxed sb-vm:code-constants-offset) :initial-element 0))
+         (const-patch-start-index
+          (+ sb-vm:code-constants-offset (* (length (ir2-component-entries 2comp))
+                                            sb-vm:code-slots-per-simple-fun)))
          (n-named-calls
           ;; Pre-scan for fdefinitions to ensure their existence.
           ;; Doing so guarantees that storing them into the boxed header now
           ;; can't create any old->young pointer, which is important since gencgc
           ;; does not deal with untagged pointers when looking for old->young.
           (do ((count 0)
-               (index (+ sb-vm:code-constants-offset
-                         (* (length (ir2-component-entries 2comp))
-                            sb-vm:code-slots-per-simple-fun))
-                      (1+ index)))
+               (index const-patch-start-index (1+ index)))
               ((>= index (length constants)) count)
             (let* ((const (aref constants index))
                    (kind (if (listp const) (car const) const)))
@@ -321,7 +289,7 @@
          (bytes
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment)))
          (named-call-fixups))
-    (declare (ignorable n-named-calls))
+    (declare (ignorable n-named-calls boxed-data))
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
@@ -383,28 +351,22 @@
             (set-boxed-word (+ w sb-vm:simple-fun-arglist-slot) (entry-info-arguments entry-info))
             (set-boxed-word (+ w sb-vm:simple-fun-source-slot) (entry-info-form/doc entry-info))
             (set-boxed-word (+ w sb-vm:simple-fun-info-slot) (entry-info-type/xref entry-info))
-            (note-fun entry-info fun object))))
+            (setf (gethash entry-info (core-object-entry-table object)) fun))))
 
-      (do ((index (+ sb-vm:code-constants-offset
-                     (* (length (ir2-component-entries 2comp))
-                        sb-vm:code-slots-per-simple-fun))
-                  (1+ index)))
+      (do ((index const-patch-start-index (1+ index)))
           ((>= index (length constants)))
         (let* ((const (aref constants index))
                (kind (if (listp const) (car const) const)))
-          (case kind
-            (:entry
-             (reference-core-fun (or boxed-data code-obj) index (cadr const) object))
-            ((nil))
-            (t
-             (let ((referent
-                    (etypecase kind
-                     ((member :named-call :fdefinition) (cadr const))
-                     ((eql :known-fun)
-                      (%coerce-name-to-fun (cadr const)))
-                     (constant
-                      (constant-value const)))))
-               (set-boxed-word index referent (eq kind :named-call)))))))
+          (set-boxed-word
+           index
+           (etypecase kind
+             ((eql :entry)
+              (the function (gethash (leaf-info (cadr const))
+                                     (core-object-entry-table object))))
+             ((member :named-call :fdefinition) (cadr const))
+             ((eql :known-fun) (%coerce-name-to-fun (cadr const)))
+             (constant (constant-value const)))
+           (eq kind :named-call))))
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 
@@ -430,7 +392,6 @@
 (defun fix-core-source-info (info object &optional function)
   (declare (type core-object object))
   (declare (type (or null function) function))
-  (aver (zerop (hash-table-count (core-object-patch-table object))))
   (let ((source (debug-source-for-info info :function function)))
     (dolist (info (core-object-debug-info object))
       (setf (debug-info-source info) source)))

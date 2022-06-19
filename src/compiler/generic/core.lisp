@@ -29,10 +29,6 @@
   ;; A hashtable translating ENTRY-INFO structures to the corresponding actual
   ;; FUNCTIONs for functions in this compilation.
   (entry-table (make-hash-table :test 'eq) :type hash-table)
-  ;; A hashtable translating ENTRY-INFO structures to a list of pairs
-  ;; (<code object> . <offset>) describing the places that need to be
-  ;; backpatched to point to the function for ENTRY-INFO.
-  (patch-table (make-hash-table :test 'eq) :type hash-table)
   ;; A list of all the DEBUG-INFO objects created, kept so that we can
   ;; backpatch with the source info.
   (debug-info () :type list))
