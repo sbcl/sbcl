@@ -162,9 +162,7 @@
          (return-from string=*
            (and (= (length string1)
                    (length string2))
-                (let ((x (sb-vm::simd-cmp-8-32 string1 string2)))
-                  (aver (eq x (string=* (coerce string1 'simple-character-string) string2 start1 end1 start2 end2)))
-                  x)))
+                (sb-vm::simd-cmp-8-32 string1 string2)))
        8-8
          #+arm64
          (return-from string=*
