@@ -90,17 +90,31 @@ EOF
 done
 
 if [ -z "$*" ]; then
-    contribs_to_build="`cd ./contrib ; echo *`"
+    contrib_candidates="`cd ./contrib ; echo *`"
 else
-    contribs_to_build="$*"
+    contrib_candidates=="$*"
 fi
+
+# Filter out candidates that are not actually contribs and skip those that
+# have been blocked explicitly with a --without-CONTRIB argument to
+# make.sh.
+contrib_dirs=""
+for candidate in $contrib_candidates
+do
+    if [ -d "contrib/$candidate" -a -f "contrib/$candidate/Makefile" ]; then
+        case $CONTRIB_BLOCKLIST in
+            *"$candidate"*) ;;
+            *) contrib_dirs="$contrib_dirs $candidate" ;;
+    esac
+    fi
+done
 
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...
 HEADER_HAS_BEEN_PRINTED=false
-for dir in $contribs_to_build
+for dir in $contrib_dirs
 do
-  if [ -d "contrib/$dir" -a -f "contrib/$dir/Makefile" -a ! -f "obj/asdf-cache/$dir/test-passed.test-report" ]; then
+  if [ ! -f "obj/asdf-cache/$dir/test-passed.test-report" ]; then
       if $HEADER_HAS_BEEN_PRINTED; then
           echo > /dev/null
       else

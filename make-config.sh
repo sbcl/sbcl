@@ -37,6 +37,13 @@ bad_option() {
 WITH_FEATURES=""
 WITHOUT_FEATURES=""
 FANCY_FEATURES=":sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
+CONTRIBS=""
+for dir in `cd contrib ; echo *`; do
+    if [ -d "contrib/$dir" -a -f "contrib/$dir/Makefile" ]; then
+        CONTRIBS="$CONTRIBS ${dir}"
+    fi
+done
+CONTRIB_BLOCKLIST=""
 
 perform_host_lisp_check=no
 fancy=false
@@ -88,6 +95,10 @@ do
         ;;
       --without)
         WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
+        case $CONTRIBS
+        in *"$optarg"*)
+               CONTRIB_BLOCKLIST="$CONTRIB_BLOCKLIST $optarg"
+        ;; esac
 	;;
       --fancy)
         WITH_FEATURES="$WITH_FEATURES $FANCY_FEATURES"
@@ -260,6 +271,7 @@ find_gnumake
 
 echo "GNUMAKE=\"$GNUMAKE\"; export GNUMAKE" >> output/build-config
 echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
+echo "CONTRIB_BLOCKLIST=\"$CONTRIB_BLOCKLIST\"; export CONTRIB_BLOCKLIST" >> output/build-config
 if [ -n "$SBCL_HOST_LOCATION" ]; then
     echo "SBCL_HOST_LOCATION=\"$SBCL_HOST_LOCATION\"; export SBCL_HOST_LOCATION" >> output/build-config
 fi
