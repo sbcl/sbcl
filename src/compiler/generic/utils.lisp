@@ -357,3 +357,11 @@
 (defmacro id-bits-offset ()
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
     (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))
+
+(define-vop (touch-object)
+  (:translate touch-object)
+  (:args (object))
+  (:ignore object)
+  (:policy :fast-safe)
+  (:arg-types t)
+  (:generator 0))

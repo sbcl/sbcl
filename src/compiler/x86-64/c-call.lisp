@@ -419,17 +419,6 @@
           (inst sub :qword (alien-stack-ptr) delta)))
       (inst mov result (alien-stack-ptr)))))
 
-;;; not strictly part of the c-call convention, but needed for the
-;;; WITH-PINNED-OBJECTS macro used for "locking down" lisp objects so
-;;; that GC won't move them while foreign functions go to work.
-(define-vop (touch-object)
-  (:translate touch-object)
-  (:args (object))
-  (:ignore object)
-  (:policy :fast-safe)
-  (:arg-types t)
-  (:generator 0))
-
 ;;; Callbacks
 
 #-sb-xc-host

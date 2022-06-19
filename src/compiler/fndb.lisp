@@ -2023,7 +2023,6 @@
 (defknown %alien-funcall ((or string system-area-pointer) alien-type &rest t) *)
 
 ;; Used by WITH-PINNED-OBJECTS
-#+(or x86 x86-64)
 (defknown sb-vm::touch-object (t) (values)
   (always-translatable))
 
