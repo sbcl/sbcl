@@ -9,6 +9,8 @@
 
 (in-package "SB-VM")
 
+(assert (= base-char-code-limit 128))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (define-vop ()
     (:translate vector-ref-128)
@@ -42,9 +44,21 @@
   (defun reg-in-sc (tn sc)
     (make-random-tn :kind :normal
                     :sc (sc-or-lose sc)
-                    :offset (tn-offset tn))))
+                    :offset (tn-offset tn)))
 
-(defmacro simd-mask (value)
+  (defun concat-ub8 (ub8s)
+    (let ((result 0))
+      (loop for ub8 in ub8s
+            do (setf result (logior (ash result 8) ub8)))
+      result))
+
+  (defun concat-ub8-repeat (n ub8)
+    (let ((result 0))
+      (loop repeat n
+            do (setf result (logior (ash result 8) ub8)))
+      result)))
+
+(defmacro simd-mask-32 (value)
   `(inline-vop
        (((:info value) ,(logior value
                                 (ash value 32)
@@ -53,11 +67,17 @@
        ((res complex-double-reg complex-double-float))
      (load-inline-constant res :oword value)))
 
+(defmacro simd-mask-8 (value)
+  `(inline-vop
+       (((:info value) ,(concat-ub8-repeat 16 value)))
+       ((res complex-double-reg complex-double-float))
+     (load-inline-constant res :oword value)))
+
 (defmacro simd-string-case (a source destination index fallback)
-  `(let ((ascii-p (simd-mask 192))
-         (a-mask (simd-mask ,(char-code a)))
-         (z-mask (simd-mask 25))
-         (flip (simd-mask #x20)))
+  `(let ((ascii-p (simd-mask-32 192))
+         (a-mask (simd-mask-32 ,(char-code a)))
+         (z-mask (simd-mask-32 25))
+         (flip (simd-mask-32 #x20)))
      (declare (optimize sb-c::preserve-single-use-debug-variables))
      (loop for ,index below (ceiling length (/ 128 32))
            do
@@ -413,6 +433,110 @@
       (inst umov cmp a 0 :s)
       (inst cbz cmp FALSE)
       (inst cmp a-array end)
+      (inst b :lt LOOP)
+      (inst b DONE)
+      FALSE
+      (inst mov res null-tn)
+      DONE)))
+
+(defun simd-base-string-equal (a b)
+  (declare (simple-base-string a b)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (a b)
+    (inline-vop (((a-array sap-reg t) (vector-sap a))
+                 ((b-array sap-reg t) (vector-sap b))
+                 ((length any-reg) (length a))
+                 ((a complex-double-reg))
+                 ((b))
+                 ((cmp unsigned-reg))
+                 ((end))
+                 ((a-mask complex-double-reg complex-double-float)
+                  (simd-mask-8 #.(char-code #\a)))
+                 ((z-mask) (simd-mask-8 25))
+                 ((flip) (simd-mask-8 #x20))
+                 ((temp))
+                 ((temp2)))
+        ((res descriptor-reg t :from :load))
+      (load-symbol res t)
+      (inst cbz length DONE)
+      (inst add end a-array (lsr length 1))
+      LOOP
+      (inst ldr a (@ a-array 16 :post-index))
+      (inst ldr b (@ b-array 16 :post-index))
+
+      ;; Upcase a
+      (inst s-sub temp a a-mask)
+      (inst cmhs temp z-mask temp)
+      (inst s-and temp temp flip)
+      (inst s-eor a a temp)
+
+      ;; Upcase b
+      (inst s-sub temp2 b a-mask)
+      (inst cmhs temp2 z-mask temp2)
+      (inst s-and temp2 temp2 flip)
+      (inst s-eor b b temp2)
+
+      (inst cmeq a a b)
+      (inst uminv a a :16b)
+      (inst umov cmp a 0 :b)
+      (inst cbz cmp FALSE)
+
+      (inst cmp a-array end)
+      (inst b :lt LOOP)
+      (inst b DONE)
+      FALSE
+      (inst mov res null-tn)
+      DONE)))
+
+#+sb-unicode
+(defun simd-base-character-string-equal (base-string character-string)
+  (declare ((simple-array * (*)) base-string character-string)
+           (optimize speed (safety 0)))
+  (with-pinned-objects-in-registers (base-string character-string)
+    (inline-vop (((base-string sap-reg t) (vector-sap base-string))
+                 ((character-string sap-reg t) (vector-sap character-string))
+                 ((length any-reg) (length base-string))
+                 ((characters complex-double-reg))
+                 ((base-chars single-reg))
+                 ((cmp unsigned-reg))
+                 ((end))
+                 ((a-mask complex-double-reg complex-double-float)
+                  (simd-mask-32 #.(char-code #\a)))
+                 ((z-mask) (simd-mask-32 25))
+                 ((flip) (simd-mask-32 #x20))
+                 ((temp))
+                 ((temp2)))
+        ((res descriptor-reg t :from :load))
+      (load-symbol res t)
+      (inst cbz length DONE)
+      (inst add end base-string (lsr length 1))
+      LOOP
+      (inst ldr base-chars (@ base-string 4 :post-index))
+      (inst ldr characters (@ character-string 16 :post-index))
+      (setf base-chars (reg-in-sc base-chars 'complex-double-reg))
+
+      ;; Upcase 32-bit wide characters
+      (inst s-sub temp characters a-mask :4s)
+      (inst cmhs temp z-mask temp :4s)
+      (inst s-and temp temp flip)
+      (inst s-eor characters characters temp)
+
+      ;; Widen 8-bit wide characters to 32-bits
+      (inst ushll base-chars :8h base-chars :8b 0)
+      (inst ushll base-chars :4s base-chars :4h 0)
+
+      ;; And upcase them too
+      (inst s-sub temp2 base-chars a-mask :4s)
+      (inst cmhs temp2 z-mask temp2 :4s)
+      (inst s-and temp2 temp2 flip)
+      (inst s-eor base-chars base-chars temp2)
+
+      (inst cmeq base-chars base-chars characters :4s)
+      (inst uminv base-chars base-chars :4s)
+      (inst umov cmp base-chars 0 :s)
+      (inst cbz cmp FALSE)
+
+      (inst cmp base-string end)
       (inst b :lt LOOP)
       (inst b DONE)
       FALSE

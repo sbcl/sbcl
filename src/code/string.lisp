@@ -405,6 +405,42 @@
         (string-not-equal-loop 1 t nil)))))
 
 (defun two-arg-string-equal (string1 string2)
+  #+arm64
+  (prog ((string1 string1)
+         (string2 string2))
+     (cond ((simple-base-string-p string1)
+            (cond #+sb-unicode
+                  ((simple-character-string-p string2)
+                   (go 8-32))
+                  ((simple-base-string-p string2)
+                   (go 8-8))
+                  (t
+                   (go normal))))
+           #+sb-unicode
+           ((simple-character-string-p string1)
+            (cond ((simple-base-string-p string2)
+                   (rotatef string1 string2)
+                   (go 8-32))
+                  #+(or)
+                  ((simple-character-string-p string2)
+                   (go 32-32))
+                  (t
+                   (go normal))))
+           (t
+            (go normal)))
+   8-32
+     #+sb-unicode
+     (return-from two-arg-string-equal
+       (and (= (length string1)
+               (length string2))
+            (sb-vm::simd-base-character-string-equal string1 string2)))
+   8-8
+     (return-from two-arg-string-equal
+       (and (= (length string1)
+               (length string2))
+            (sb-vm::simd-base-string-equal string1 string2)))
+   32-32
+   normal)
   (with-two-arg-strings string1 string2 start1 end1 nil start2 end2
     (let ((slen1 (- (the fixnum end1) start1))
           (slen2 (- (the fixnum end2) start2)))

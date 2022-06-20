@@ -2964,9 +2964,8 @@
   (def cnt #b0 #b00101)
   (def s-rev16 #b0 #b00001)
   (def s-rev32 #b1 #b00000 (:8b :16b :4h :8h))
-  (def rev64 #b0 #b00000 (:8b :16b :4h :8h :2s :4s)))
-
-
+  (def rev64 #b0 #b00000 (:8b :16b :4h :8h :2s :4s))
+  (def not #b1 #b00101))
 
 (def-emitter simd-shift-by-imm
   (#b0 1 31)
