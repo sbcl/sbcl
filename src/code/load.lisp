@@ -1090,33 +1090,62 @@
 ;;; Caution: don't try to "test" WITH-WRITABLE-CODE-INSTRUCTIONS in copy-in/out mode
 ;;; on any architecture where fixup application cares what the address of the code actually is.
 ;;; This means x86 is disqualified. You're just wasting your time if you try, as I did.
-(defmacro with-writable-code-instructions ((code-var debug-info-var n-fdefns) &body body)
-  (declare (ignorable debug-info-var n-fdefns))
+(defmacro with-writable-code-instructions ((code-var debug-info-var n-fdefns n-funs)
+                                           &key copy fixup)
+  (declare (ignorable n-fdefns))
   ;; N-FDEFNS is important for PPC64, slightly important for X86-64, not important for
   ;; any others, and doesn't even have a place to store it if lispwords are 32 bits.
   ;; The :DEDUPLICATED-FDEFNS test in compiler-2.pure asserts that the value is valid
-  #+64-bit
-  (push `(setf (sap-ref-32 (int-sap (get-lisp-obj-address ,code-var))
-                           (+ (ash sb-vm:code-boxed-size-slot sb-vm:word-shift) #+little-endian 4
-                              (- sb-vm:other-pointer-lowtag)))
-               ,n-fdefns)
-        body)
-  #+darwin-jit
-  `(with-pinned-objects (,code-var ,debug-info-var)
-     ;; DEBUG-INFO is pinned so that after assigning it into the temporary
-     ;; block of memory, the off-heap word which is invisible to GC remains valid.
-     (let* ((temp-copy (alien-funcall (extern-alien "duplicate_codeblob_offheap"
-                                                    (function unsigned unsigned))
-                                      (get-lisp-obj-address ,code-var)))
-            (aligned (+ temp-copy (logand temp-copy sb-vm:n-word-bytes))))
-       ;; Rebind CODE-VAR to the replica, then execute BODY
-       (let ((,code-var (%make-lisp-obj (logior aligned sb-vm:other-pointer-lowtag)))) ,@body)
-       ;; Copy back, and fixup the simple-funs in the managed object
-       (alien-funcall (extern-alien "jit_copy_code_insts" (function void unsigned unsigned))
-                      (get-lisp-obj-address ,code-var)
-                      temp-copy)))
-  #-darwin-jit
-  `(with-pinned-objects (,code-var) ,@body))
+  (let ((body
+         ;; The following operations need the code pinned:
+         ;; 1. copying into code-instructions (a SAP)
+         ;; 2. apply-core-fixups and sanctify-for-execution
+         ;; A very specific store order is necessary to allow using uninitialized memory
+         ;; pages for code. Storing of the debug-info slot must occur between steps 1 and 2.
+         ;; Note that this does not have to take care to ensure atomicity
+         ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
+         ;; interrupted in between the store of any individual byte, this code
+         ;; is GC-safe because we no longer need to know where simple-funs are embedded
+         ;; within the object to trace pointers. We *do* need to know where the funs
+         ;; are when transporting the object, but it's pinned within the body forms.
+         `(,copy
+           #+64-bit
+           (setf (sap-ref-32 (int-sap (get-lisp-obj-address ,code-var))
+                             (+ (ash sb-vm:code-boxed-size-slot sb-vm:word-shift) #+little-endian 4
+                                (- sb-vm:other-pointer-lowtag)))
+                 ,n-fdefns)
+           ;; Check that the code trailer matches our expectation on number of embedded simple-funs
+           (aver (= (code-n-entries ,code-var) ,n-funs))
+           ;; Serial# shares a word with the jump-table word count,
+           ;; so we can't assign serial# until after all raw bytes are copied in.
+           #-sb-xc-host (sb-c::assign-code-serialno ,code-var)
+           ;; Enforce that the final unboxed data word is published to memory
+           ;; before the debug-info is set.
+           (sb-thread:barrier (:write))
+           ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
+           ;; into this object, because the C code assumes that the fun table is in an
+           ;; invalid/incomplete state (i.e. can't be read) until the code has debug-info.
+           ;; That is, C code can't deal with an interior code pointer until the fun-table
+           ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
+           ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
+           (setf (%code-debug-info ,code-var) ,debug-info-var)
+           ,fixup)))
+    #+darwin-jit
+    `(with-pinned-objects (,code-var ,debug-info-var)
+       ;; DEBUG-INFO is pinned so that after assigning it into the temporary
+       ;; block of memory, the off-heap word which is invisible to GC remains valid.
+       (let* ((temp-copy (alien-funcall (extern-alien "duplicate_codeblob_offheap"
+                                                      (function unsigned unsigned))
+                                        (get-lisp-obj-address ,code-var)))
+              (aligned (+ temp-copy (logand temp-copy sb-vm:n-word-bytes))))
+         ;; Rebind CODE-VAR to the replica, then execute BODY
+         (let ((,code-var (%make-lisp-obj (logior aligned sb-vm:other-pointer-lowtag)))) ,@body)
+         ;; Copy back, and fixup the simple-funs in the managed object
+         (alien-funcall (extern-alien "jit_copy_code_insts" (function void unsigned unsigned))
+                        (get-lisp-obj-address ,code-var)
+                        temp-copy)))
+    #-darwin-jit
+    `(with-pinned-objects (,code-var) ,@body)))
 
 (define-load-time-global *show-new-code* nil)
 (define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixup-elts)))
@@ -1140,20 +1169,9 @@
                    (align-up n-boxed-words sb-c::code-boxed-words-align)
                    n-code-bytes))
             (debug-info (svref stack (+ ptr n-constants))))
-        (with-writable-code-instructions (code debug-info n-named-calls)
-          ;; * DO * NOT * SEPARATE * THESE * STEPS *
-          ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
-          ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS etc.
-          (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
-          (aver (= (code-n-entries code) n-simple-funs))
-          ;; Serial# shares a word with the jump-table word count,
-          ;; so we can't assign serial# until after all raw bytes are copied in.
-          (sb-c::assign-code-serialno code)
-          (sb-thread:barrier (:write))
-          ;; Assign debug-info. A code object that has no debug-info will never
-          ;; have its fun table accessed in conservative_root_p() or pin_object().
-          (setf (%code-debug-info code) debug-info)
-          (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts))
+        (with-writable-code-instructions (code debug-info n-named-calls n-simple-funs)
+          :copy (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
+          :fixup (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts))
         ;; Don't need the code pinned from here on
         (progn
           (setf (sb-c::debug-info-source (%code-debug-info code))
@@ -1334,4 +1352,3 @@
       (dolist (m times)
         (format t "~30S: ~6,2F~%" (car m) (/ (float (cdr m)) 60.0))))))
 |#
-

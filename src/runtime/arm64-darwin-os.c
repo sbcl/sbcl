@@ -32,7 +32,8 @@ void jit_copy_code_insts(lispobj dst, lispobj* src)
     int nwords = code_total_nwords(code);
     gc_assert(code_total_nwords((struct code*)aligned_src));
     THREAD_JIT(0);
-    memcpy(code, aligned_src, nwords<<WORD_SHIFT);
+    // Leave the header word alone
+    memcpy(&code->boxed_size, aligned_src + 1, (nwords-1)<<WORD_SHIFT);
     for_each_simple_fun(i, fun, code, 1, { fun->self = fun_self_from_baseptr(fun); })
     THREAD_JIT(1);
     free(src);

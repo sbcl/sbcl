@@ -237,6 +237,8 @@
 ;;; Similar considerations pertain to x86[-64] fixups within the machine code.
 
 (defun assign-code-serialno (code-obj)
+  ;; Do we need unique IDs on the various strange kind of code blobs? These would
+  ;; include code from MAKE-SIMPLIFYING-TRAMPOLINE, ENCAPSULATE-FUNOBJ, MAKE-BPT-LRA.
   (let* ((serialno (ldb (byte (byte-size sb-vm::code-serialno-byte) 0)
                         (atomic-incf *code-serialno*)))
          (insts (code-instructions code-obj))
@@ -288,35 +290,13 @@
                                          nboxed length))
          (bytes
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment)))
+         (n-simple-funs (length (ir2-component-entries 2comp)))
          (named-call-fixups))
     (declare (ignorable n-named-calls boxed-data))
-      ;; The following operations need the code pinned:
-      ;; 1. copying into code-instructions (a SAP)
-      ;; 2. apply-core-fixups and sanctify-for-execution
-      ;; A very specific store order is necessary to allow using uninitialized memory
-      ;; pages for code. Storing of the debug-info slot must occur between steps 1 and 2.
-    (sb-fasl::with-writable-code-instructions (code-obj debug-info n-named-calls)
-             ;; Note that this does not have to take care to ensure atomicity
-             ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
-             ;; interrupted in between the store of any individual byte, this code
-             ;; is GC-safe because we no longer need to know where simple-funs are embedded
-             ;; within the object to trace pointers. We *do* need to know where the funs
-             ;; are when transporting the object, but it's currently pinned.
-           (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
-           ;; Serial# shares a word with the jump-table word count,
-           ;; so we can't assign serial# until after all raw bytes are copied in.
-           (assign-code-serialno code-obj)
-           ;; Enforce that the final unboxed data word is published to memory
-           ;; before the debug-info is set.
-           (sb-thread:barrier (:write))
-           ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
-           ;; into this object, because the C code assumes that the fun table is in an
-           ;; invalid/incomplete state (i.e. can't be read) until the code has debug-info.
-           ;; That is, C code can't deal with an interior code pointer until the fun-table
-           ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
-           ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
-            (setf (%code-debug-info code-obj) debug-info)
-            (setq named-call-fixups (apply-core-fixups code-obj fixup-notes)))
+    (sb-fasl::with-writable-code-instructions (code-obj debug-info
+                                               n-named-calls n-simple-funs)
+      :copy (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
+      :fixup (setq named-call-fixups (apply-core-fixups code-obj fixup-notes)))
 
     (when alloc-points
       #+(and x86-64 sb-thread)
