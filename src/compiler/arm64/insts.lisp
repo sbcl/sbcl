@@ -113,6 +113,8 @@
   (define-arg-type simd-copy-reg :printer #'print-simd-copy-reg)
 
   (define-arg-type simd-immh-reg :printer #'print-simd-immh-reg)
+  (define-arg-type simd-modified-imm :printer #'print-simd-modified-imm)
+  (define-arg-type simd-reg-cmode :printer #'print-simd-reg-cmode)
 
   (define-arg-type sys-reg :printer #'print-sys-reg)
 
@@ -2315,7 +2317,7 @@
     (fp-data-processing-3 32
      :include fp-data-processing
      :default-printer '(:name :tab rd ", " rn ", " rm ", " ra))
-  (op4 :field (byte 9 23) :value #b000011110)
+  (op4 :field (byte 9 23) :value #b000111110)
   (op1 :field (byte 1 21))
   (op2 :field (byte 1 15))
   (rm :field (byte 5 16) :type 'float-reg)
@@ -3031,6 +3033,63 @@
                                      (reg-offset rd)))))))
   (def ushll #b0 #b1 #b10100)
   (def ushll2 #b1 #b1 #b10100))
+
+(def-emitter simd-modified-imm
+  (#b0 1 31)
+  (q 1 30)
+  (op 1 29)
+  (#b0111100000 10 19)
+  (abc 3 16)
+  (cmode 4 12)
+  (o2 1 11)
+  (#b1 1 10)
+  (defgh 5 5)
+  (rd 5 0))
+
+(define-instruction-format (simd-modified-imm 32
+                            :default-printer '(:name :tab rd ", " imm))
+  (o1 :field (byte 1 31) :value #b0)
+  (q :field (byte 1 30))
+  (op :field (byte 1 29))
+  (op2 :field (byte 10 19) :value #b0111100000)
+  (cmode :field (byte 4 12))
+  (o2 :field (byte 1 11))
+  (op3 :field (byte 1 10) :value #b1)
+  (imm :fields (list (byte 3 16) (byte 4 12) (byte 5 5)) :type 'simd-modified-imm)
+  (rd :fields (list (byte 1 30) (byte 4 12) (byte 5 0)) :type 'simd-reg-cmode))
+
+(macrolet
+    ((def (name o2)
+       `(define-instruction ,name (segment rd imm size &optional (shift 0))
+          ;; 8-bit
+          (:printer simd-modified-imm ((o2 ,o2) (op 0)))
+          (:emitter
+           (let ((abc 0)
+                 (defgh 0)
+                 (cmode 0)
+                 (op 0))
+             (setf abc (ldb (byte 3 5) imm)
+                   defgh (ldb (byte 5 0) imm))
+             (ecase size
+               ((:8b :16b)
+                (setf cmode #b1110))
+               ((:2s :4s)
+                (setf cmode
+                      (ash (ecase shift
+                             (0 0)
+                             (8 1)
+                             (16 2)
+                             (24 3))
+                           1))))
+             (emit-simd-modified-imm  segment
+                                     (encode-vector-size size)
+                                     op
+                                     abc
+                                     cmode
+                                     ,o2
+                                     defgh
+                                     (reg-offset rd)))))))
+  (def movi 0))
 
 ;;; Inline constants
 (defun canonicalize-inline-constant (constant)

@@ -288,6 +288,31 @@
                            "2S"
                            "4S")))))))
 
+(defun print-simd-reg-cmode (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (q cmode offset) value
+    (format stream "V~d.~a" offset
+            (cond ((eq cmode #b1110)
+                   (if (zerop q)
+                       "8B"
+                       "16B"))
+                  ((zerop (logand cmode #b1001))
+                   (if (zerop q)
+                       "2S"
+                       "4S"))))))
+
+(defun print-simd-modified-imm (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (abc cmode defgh) value
+    (let ((shift
+            (cond ((eq cmode #b1110)
+                   0)
+                  ((zerop (logand cmode #b1001))
+                   (ash cmode 2)))))
+      (princ (dpb abc (byte 3 5) defgh) stream)
+      (when (plusp shift)
+        (format t ", LSL #~d" shift)))))
+
 (defun print-vbhs (value stream dstate)
   (declare (ignore dstate))
   (destructuring-bind (size offset) value
