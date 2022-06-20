@@ -869,7 +869,7 @@
    "(FUNCALL CONT (1- X) CONT)"
    "1]"))
 
-(with-test (:name (:debugger :bogus-debug-fun :source))
+(with-test (:name (:debugger :bogus-debug-fun :source) :skipped-on :ppc)
   (test-debugger
    "d
     debugger-test-done!"
