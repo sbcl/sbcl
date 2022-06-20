@@ -109,6 +109,13 @@
 
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 
+;;; Need to get access these sb-sys symbols unqualified from sb-assem
+;;; during make-host-2. Make-host-1 would have already converted its
+;;; code via DEFSETF so it should be insensitive to this substitution.
+(unintern 'sb-assem::sap-ref-16 'sb-assem)
+(unintern 'sb-assem::sap-ref-32 'sb-assem)
+(import '(sb-sys:sap-ref-16 sb-sys:sap-ref-32) 'sb-assem)
+
 (read-undefined-fun-allowlist)
 (defun parallel-make-host-2 (max-jobs)
   (let ((subprocess-count 0)

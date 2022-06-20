@@ -280,6 +280,42 @@
 (defmacro sap-ref-word (sap offset)
   `(#+64-bit sap-ref-64 #-64-bit sap-ref-32 ,sap ,offset))
 
+;;; Needed for assembler.
+(defstruct (asm-sap-wrapper (:constructor vector-sap (vector)))
+  (vector (missing-arg) :type (simple-array (unsigned-byte 8) (*))))
+(defmacro with-pinned-objects (list &body body)
+  (declare (ignore list))
+  `(progn ,@body))
+;;; The assembler does not USE-PACKAGE sb-sys, which works to our advantage
+;;; in that we can define SAP-REF-16 and -32 as macros in the ASM package
+;;; which avoids conflict with genesis. Genesis has its own SAP emulations in SB-SYS
+;;; so all the definitions of FIXUP-CODE-OBJECT using the native accessors
+;;; can transparently operate on genesis's model of target code blobs.
+(defsetf sb-assem::sap-ref-16 sb-assem::asm-set-sap-ref-16)
+(defsetf sb-assem::sap-ref-32 sb-assem::asm-set-sap-ref-32)
+(defun sb-assem::asm-set-sap-ref-16 (sap index val)
+  (declare (type asm-sap-wrapper sap))
+  (multiple-value-bind (b0 b1)
+    #+little-endian (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
+    #+big-endian    (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
+    (let ((octets (asm-sap-wrapper-vector sap)))
+      (setf (aref octets (+ index 0)) b0
+            (aref octets (+ index 1)) b1)))
+  val)
+(defun sb-assem::asm-set-sap-ref-32 (sap index val)
+  (declare (type asm-sap-wrapper sap))
+  (multiple-value-bind (b0 b1 b2 b3)
+      #+little-endian (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
+                              (ldb (byte 8 16) val) (ldb (byte 8 24) val))
+      #+big-endian    (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
+                              (ldb (byte 8  8) val) (ldb (byte 8  0) val))
+    (let ((octets (asm-sap-wrapper-vector sap)))
+      (setf (aref octets (+ index 0)) b0
+            (aref octets (+ index 1)) b1
+            (aref octets (+ index 2)) b2
+            (aref octets (+ index 3)) b3)))
+  val)
+
 (defun logically-readonlyize (x) x)
 
 ;;; Mainly for the fasl loader

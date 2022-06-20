@@ -1513,32 +1513,14 @@
                      `(.skip ,trailer-len)
                      `(.align ,sb-vm:n-lowtag-bits))
                section)))
-         (octets (segment-buffer (%assemble segment combined))))
-    (flet ((store-ub16 (index val)
-             (multiple-value-bind (b0 b1)
-                 #+little-endian
-                 (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
-                 #+big-endian
-                 (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
-               (setf (aref octets (+ index 0)) b0
-                     (aref octets (+ index 1)) b1)))
-           (store-ub32 (index val)
-             (multiple-value-bind (b0 b1 b2 b3)
-                 #+little-endian
-                 (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
-                         (ldb (byte 8 16) val) (ldb (byte 8 24) val))
-                 #+big-endian
-                 (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
-                         (ldb (byte 8  8) val) (ldb (byte 8  0) val))
-               (setf (aref octets (+ index 0)) b0
-                     (aref octets (+ index 1)) b1
-                     (aref octets (+ index 2)) b2
-                     (aref octets (+ index 3)) b3))))
-      (let ((index (length octets))
-            (fun-offsets))
-        ;; Total size of the code object must be multiple of 2 lispwords
-        (aver (not (logtest (+ (segment-header-skew segment) index)
-                            sb-vm:lowtag-mask)))
+         (fun-offsets)
+         (octets (segment-buffer (%assemble segment combined)))
+         (index (length octets)))
+    ;; Total size of the code object must be multiple of 2 lispwords
+    (aver (not (logtest (+ (segment-header-skew segment) index)
+                        sb-vm:lowtag-mask)))
+    (sb-sys:with-pinned-objects (octets)
+      (let ((sap (sb-sys:vector-sap octets)))
         ;; TODO: as the comment in GENERATE-CODE suggests, we would like to align
         ;; code objects to 16 bytes for 32-bit x86. That's simple - all we have to do
         ;; is ensure that each code blob is a multiple of 16 bytes in size.
@@ -1552,8 +1534,8 @@
                        (typep n-entries '(unsigned-byte 12))
                        (typep padding '(unsigned-byte 4)))
             (bug "Oversized code component?"))
-          (store-ub16 (- index 2) trailer-len)
-          (store-ub16 (- index 4) (logior (ash n-entries 4) padding)))
+          (setf (sap-ref-16 sap (- index 2)) trailer-len)
+          (setf (sap-ref-16 sap (- index 4)) (logior (ash n-entries 4) padding)))
         (decf index trailer-len)
         ;; Iteration over label positions occurs from numerically highest
         ;; to lowest, which is right because the 0th indexed simple-fun
@@ -1565,13 +1547,13 @@
         (dolist (label simple-fun-labels)
           (let ((val (label-position label)))
             (push val fun-offsets)
-            (store-ub32 index val)
-            (incf index 4)))
-        (aver (= index (- (length octets) 4)))
-        (values segment
-                (label-position end-text)
-                (segment-fixup-notes segment)
-                fun-offsets)))))
+            (setf (sap-ref-32 sap index) val)
+            (incf index 4)))))
+    (aver (= index (- (length octets) 4)))
+    (values segment
+            (label-position end-text)
+            (segment-fixup-notes segment)
+            fun-offsets)))
 
 ;;; Most backends do not convert register TNs into a different type of
 ;;; internal object prior to handing the operands off to the emitter.
