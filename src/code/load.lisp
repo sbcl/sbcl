@@ -1090,7 +1090,8 @@
 ;;; Caution: don't try to "test" WITH-WRITABLE-CODE-INSTRUCTIONS in copy-in/out mode
 ;;; on any architecture where fixup application cares what the address of the code actually is.
 ;;; This means x86 is disqualified. You're just wasting your time if you try, as I did.
-(defmacro with-writable-code-instructions ((code-var debug-info-var n-fdefns n-funs)
+(defmacro with-writable-code-instructions ((code-var total-nwords debug-info-var
+                                            n-fdefns n-funs)
                                            &key copy fixup)
   (declare (ignorable n-fdefns))
   ;; N-FDEFNS is important for PPC64, slightly important for X86-64, not important for
@@ -1109,19 +1110,9 @@
          ;; within the object to trace pointers. We *do* need to know where the funs
          ;; are when transporting the object, but it's pinned within the body forms.
          `(,copy
-           #+64-bit
-           (setf (sap-ref-32 (int-sap (get-lisp-obj-address ,code-var))
-                             (+ (ash sb-vm:code-boxed-size-slot sb-vm:word-shift) #+little-endian 4
-                                (- sb-vm:other-pointer-lowtag)))
-                 ,n-fdefns)
+           (sb-c::code-header/trailer-adjust ,code-var ,total-nwords ,n-fdefns)
            ;; Check that the code trailer matches our expectation on number of embedded simple-funs
            (aver (= (code-n-entries ,code-var) ,n-funs))
-           ;; Serial# shares a word with the jump-table word count,
-           ;; so we can't assign serial# until after all raw bytes are copied in.
-           #-sb-xc-host (sb-c::assign-code-serialno ,code-var)
-           ;; Enforce that the final unboxed data word is published to memory
-           ;; before the debug-info is set.
-           (sb-thread:barrier (:write))
            ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
            ;; into this object, because the C code assumes that the fun table is in an
            ;; invalid/incomplete state (i.e. can't be read) until the code has debug-info.
@@ -1164,12 +1155,14 @@
         (dotimes (i n-named-calls)
           (aver (typep (svref stack stack-index) 'fdefn))
           (incf stack-index)))
-      (let ((code (sb-c:allocate-code-object
+      (binding* (((code total-nwords)
+                  (sb-c:allocate-code-object
                    (if (oddp header) :immobile :dynamic)
                    (align-up n-boxed-words sb-c::code-boxed-words-align)
                    n-code-bytes))
             (debug-info (svref stack (+ ptr n-constants))))
-        (with-writable-code-instructions (code debug-info n-named-calls n-simple-funs)
+        (with-writable-code-instructions
+            (code total-nwords debug-info n-named-calls n-simple-funs)
           :copy (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
           :fixup (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts))
         ;; Don't need the code pinned from here on

@@ -1516,6 +1516,9 @@
          (fun-offsets)
          (octets (segment-buffer (%assemble segment combined)))
          (index (length octets)))
+    ;; N-ENTRIES is packed into a uint16 with 5 other bits
+    (declare (type (unsigned-byte 11) n-entries))
+
     ;; Total size of the code object must be multiple of 2 lispwords
     (aver (not (logtest (+ (segment-header-skew segment) index)
                         sb-vm:lowtag-mask)))
@@ -1532,10 +1535,12 @@
                            (- index trailer-len (label-position end-text)))))
           (unless (and (typep trailer-len '(unsigned-byte 16))
                        (typep n-entries '(unsigned-byte 12))
+                       ;; Padding must be representable in 4 bits at assembly time,
+                       ;; but CODE-HEADER/TRAILER-ADJUST can increase the padding.
                        (typep padding '(unsigned-byte 4)))
             (bug "Oversized code component?"))
           (setf (sap-ref-16 sap (- index 2)) trailer-len)
-          (setf (sap-ref-16 sap (- index 4)) (logior (ash n-entries 4) padding)))
+          (setf (sap-ref-16 sap (- index 4)) (logior (ash n-entries 5) padding)))
         (decf index trailer-len)
         ;; Iteration over label positions occurs from numerically highest
         ;; to lowest, which is right because the 0th indexed simple-fun

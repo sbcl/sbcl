@@ -236,7 +236,10 @@
 ;;; are 0, so the jump table count is 0.
 ;;; Similar considerations pertain to x86[-64] fixups within the machine code.
 
-(defun assign-code-serialno (code-obj)
+(defun code-header/trailer-adjust (code-obj expected-nwords n-fdefns)
+  (declare (ignorable expected-nwords n-fdefns))
+  ;; Serial# shares a word with the jump-table word count,
+  ;; so we can't assign serial# until after all raw bytes are copied in.
   ;; Do we need unique IDs on the various strange kind of code blobs? These would
   ;; include code from MAKE-SIMPLIFYING-TRAMPOLINE, ENCAPSULATE-FUNOBJ, MAKE-BPT-LRA.
   (let* ((serialno (ldb (byte (byte-size sb-vm::code-serialno-byte) 0)
@@ -246,7 +249,39 @@
     (aver (zerop (ash jumptable-word -14)))
     (setf (sap-ref-word insts 0) ; insert serialno
           (logior (ash serialno (byte-position sb-vm::code-serialno-byte))
-                  jumptable-word))))
+                  jumptable-word)))
+  #+64-bit
+  (let ((base (sap+ (int-sap (get-lisp-obj-address code-obj)) (- sb-vm:other-pointer-lowtag)))
+        (physical-nwords ; upper 4 bytes of the header word
+         (ash (get-header-data code-obj) -24)))
+    (setf (sap-ref-32 base (+ (ash sb-vm:code-boxed-size-slot sb-vm:word-shift)
+                              #+little-endian 4))
+          n-fdefns)
+    (when (/= physical-nwords expected-nwords)
+      ;; Oversized allocation must be exactly 2 words more than requested
+      (aver (= (- physical-nwords 2) expected-nwords))
+      ;; Point just beyond the trailer word (physically and where it should be)
+      (let* ((new-trailer (sap+ base (ash physical-nwords sb-vm:word-shift)))
+             (old-trailer (sap+ base (ash (- physical-nwords 2) sb-vm:word-shift)))
+             (trailer-length (sap-ref-16 old-trailer -2)) ; in bytes
+             (trailer-nelements (floor trailer-length 4)))
+        ;; this is a memmove() and memset()
+        (dotimes (i trailer-nelements)
+          ;; Transfer 4 bytes per element (uint32_t), highest address first
+          ;; since we're moving upward in memory.
+          (let ((offset (* (1+ i) -4)))
+            (setf (sap-ref-32 new-trailer offset) (sap-ref-32 old-trailer offset) )))
+        ;; Zeroize at most 4 elements in the "old" trailer. These will be the
+        ;; items at the lowest addresses (the highest indices in negative order).
+        ;; If there are fewer than 4 elements, then only zeroize that many.
+        (loop for offset from (* trailer-nelements -4) by 4
+              repeat (min trailer-nelements 4)
+              do (setf (sap-ref-32 old-trailer offset) 0))
+        ;; Increase the trailer length by 2 lispwords
+        (incf (sap-ref-16 new-trailer -2) (* 2 sb-vm:n-word-bytes)))))
+  ;; Enforce that the final unboxed data word is published to memory
+  ;; before the debug-info is set.
+  (sb-thread:barrier (:write)))
 
 #+darwin-jit
 (defun assign-code-constants (code data)
@@ -261,14 +296,15 @@
            (type index length)
            (list fixup-notes)
            (type core-object object))
-  (let* ((debug-info (debug-info-for-component component))
+  (binding*
+        ((debug-info (debug-info-for-component component))
          (2comp (component-info component))
          (constants (ir2-component-constants 2comp))
-         (nboxed (align-up (length constants) code-boxed-words-align))
+         (n-boxed-words (length constants))
          (boxed-data
           ;; <header, boxed_size, debug_info, fixups> are absent from the simple-vector
-          #+darwin-jit
-          (make-array (- nboxed sb-vm:code-constants-offset) :initial-element 0))
+          (or #+darwin-jit
+              (make-array (- n-boxed-words sb-vm:code-constants-offset) :initial-element 0)))
          (const-patch-start-index
           (+ sb-vm:code-constants-offset (* (length (ir2-component-entries 2comp))
                                             sb-vm:code-slots-per-simple-fun)))
@@ -279,22 +315,23 @@
           ;; does not deal with untagged pointers when looking for old->young.
           (do ((count 0)
                (index const-patch-start-index (1+ index)))
-              ((>= index (length constants)) count)
-            (let* ((const (aref constants index))
-                   (kind (if (listp const) (car const) const)))
-              (case kind
-                ((member :named-call :fdefinition)
-                 (setf (second const) (find-or-create-fdefn (second const)))
-                 (when (eq kind :named-call) (incf count)))))))
-         (code-obj (allocate-code-object (component-mem-space component)
-                                         nboxed length))
+              ((>= index n-boxed-words) count)
+            (let ((const (aref constants index)))
+              (when (and (listp const) (case (car const)
+                                         (:named-call (incf count))
+                                         (:fdefinition t)))
+                (setf (second const) (find-or-create-fdefn (second const)))))))
+         ((code-obj total-nwords)
+          (allocate-code-object (component-mem-space component)
+                                (align-up n-boxed-words code-boxed-words-align)
+                                length))
          (bytes
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment)))
          (n-simple-funs (length (ir2-component-entries 2comp)))
-         (named-call-fixups))
-    (declare (ignorable n-named-calls boxed-data))
-    (sb-fasl::with-writable-code-instructions (code-obj debug-info
-                                               n-named-calls n-simple-funs)
+         (named-call-fixups nil))
+    (declare (ignorable boxed-data))
+    (sb-fasl::with-writable-code-instructions
+        (code-obj total-nwords debug-info n-named-calls n-simple-funs)
       :copy (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
       :fixup (setq named-call-fixups (apply-core-fixups code-obj fixup-notes)))
 
@@ -334,7 +371,7 @@
             (setf (gethash entry-info (core-object-entry-table object)) fun))))
 
       (do ((index const-patch-start-index (1+ index)))
-          ((>= index (length constants)))
+          ((>= index n-boxed-words))
         (let* ((const (aref constants index))
                (kind (if (listp const) (car const) const)))
           (set-boxed-word

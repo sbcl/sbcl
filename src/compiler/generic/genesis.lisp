@@ -2209,7 +2209,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; TODO: Maybe put them somewhere that gets defined for both?
 ;;; (Minor problem of CODE-COMPONENT not being a primitive type though)
 (defun code-n-entries (code)
-  (ash (code-fun-table-count code) -4))
+  (ash (code-fun-table-count code) -5))
 (defun %code-fun-offset (code fun-index)
   ;; The 4-byte quantity at "END" - 4 is the trailer count, the word at -8 is
   ;; the offset to the 0th simple-fun, -12 is the next, etc...

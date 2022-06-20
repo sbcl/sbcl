@@ -463,7 +463,8 @@
 ;;; 25 bits is the maximum unboxed size expressed in bytes,
 ;;; if n-word-bytes = 8 and almost the entire code object is unboxed
 ;;; which is, practically speaking, not really possible.
-(declaim (ftype (sfunction (t (unsigned-byte 22) (unsigned-byte 25)) code-component)
+(declaim (ftype (sfunction (t (unsigned-byte 22) (unsigned-byte 25))
+                           (values code-component (integer 0)))
                 allocate-code-object))
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
@@ -516,4 +517,4 @@
     ;; But what about other things that create code objects?
     ;; It could be a subtle source of nondeterministic core images.
 
-    code))
+    (values code total-words)))

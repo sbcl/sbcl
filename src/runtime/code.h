@@ -65,7 +65,7 @@ static inline unsigned short code_n_funs(struct code* code) {
     // Do not attempt to read the fun table size from a code object with no trailer.
     // If there is a nonzero trailer length, assume it is at least enough to store
     // the length of the fun table.
-    return !code_trailer_len(code) ? 0 : *(unsigned short*)code_fun_table(code) >> 4;
+    return !code_trailer_len(code) ? 0 : *(unsigned short*)code_fun_table(code) >> 5;
 }
 
 static inline char* code_text_start(struct code* code) {
