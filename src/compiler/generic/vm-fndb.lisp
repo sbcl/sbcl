@@ -546,6 +546,7 @@
 
 (defknown %bignum-ref (bignum bignum-index) bignum-element-type
   (flushable #-bignum-assertions always-translatable))
+
 #+(or x86 x86-64)
 (defknown %bignum-ref-with-offset (bignum fixnum (signed-byte 24))
   bignum-element-type (flushable always-translatable))
@@ -554,18 +555,25 @@
   (values)
   (#-bignum-assertions always-translatable))
 
+(defknown %half-bignum-ref (bignum sb-kernel::half-bignum-index) sb-kernel::half-bignum-element-type
+    (flushable #-bignum-assertions always-translatable))
+
+(defknown (setf %half-bignum-ref) (sb-kernel::half-bignum-element-type bignum sb-kernel::half-bignum-index)
+    (values)
+    (#-bignum-assertions always-translatable))
+
 ;;; Return T if digit is positive, or NIL if negative.
 (defknown %digit-0-or-plusp (bignum-element-type) boolean
-  (foldable flushable movable always-translatable))
+    (foldable flushable movable always-translatable))
 
 ;;; %ADD-WITH-CARRY returns a bignum digit and a carry resulting from adding
 ;;; together a, b, and an incoming carry.
 ;;; %SUBTRACT-WITH-BOROW returns a bignum digit and a borrow resulting from
 ;;; subtracting b from a, and subtracting a possible incoming borrow.
 (defknown (%add-with-carry %subtract-with-borrow)
-          (bignum-element-type bignum-element-type (mod 2))
-  (values bignum-element-type (mod 2))
-  (foldable flushable movable always-translatable))
+    (bignum-element-type bignum-element-type (mod 2))
+    (values bignum-element-type (mod 2))
+    (foldable flushable movable always-translatable))
 
 ;;; This multiplies x-digit and y-digit, producing high and low digits
 ;;; manifesting the result. Then it adds the low digit, res-digit, and
@@ -578,19 +586,19 @@
 ;;; accumulating partial results which is where the res-digit comes
 ;;; from.
 (defknown %multiply-and-add
-          (bignum-element-type bignum-element-type bignum-element-type
-                               &optional bignum-element-type)
-  (values bignum-element-type bignum-element-type)
-  (foldable flushable movable always-translatable))
+    (bignum-element-type bignum-element-type bignum-element-type
+                         &optional bignum-element-type)
+    (values bignum-element-type bignum-element-type)
+    (foldable flushable movable always-translatable))
 
 ;;; Multiply two digit-size numbers, returning a 2*digit-size result
 ;;; split into two digit-size quantities.
 (defknown %multiply (bignum-element-type bignum-element-type)
-  (values bignum-element-type bignum-element-type)
-  (foldable flushable movable always-translatable))
+    (values bignum-element-type bignum-element-type)
+    (foldable flushable movable always-translatable))
 
 (defknown %lognot (bignum-element-type) bignum-element-type
-  (foldable flushable movable always-translatable))
+    (foldable flushable movable always-translatable))
 
 (defknown (%logand %logior %logxor) (bignum-element-type bignum-element-type)
   bignum-element-type
@@ -605,11 +613,15 @@
   (values bignum-element-type bignum-element-type)
   (foldable flushable movable always-translatable))
 
+(defknown %half-bigfloor (half-bignum-element-type half-bignum-element-type half-bignum-element-type)
+  (values half-bignum-element-type half-bignum-element-type)
+  (foldable flushable movable always-translatable))
+
 ;;; Convert the input, a BIGNUM-ELEMENT-TYPE, to a signed word.
 ;;; FIXME: considering that both the input and output have N-WORD-BITS significant bits,
 ;;; this is really a bad name for the operation.
 (defknown %fixnum-digit-with-correct-sign (bignum-element-type) sb-vm:signed-word
-  (foldable flushable movable always-translatable))
+    (foldable flushable movable always-translatable))
 
 ;;; %ASHR- take a digit-size quantity and shift it to the left,
 ;;; returning a digit-size quantity.

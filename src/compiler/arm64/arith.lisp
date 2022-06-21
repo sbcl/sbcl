@@ -1179,6 +1179,17 @@
 (define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num sb-bignum:%bignum-set)
 
+(define-partial-reffer sb-c::%half-bignum-ref bignum
+  :word nil bignum-digits-offset other-pointer-lowtag (unsigned-reg signed-reg)
+  positive-fixnum
+  sb-bignum:%half-bignum-ref)
+
+(define-partial-setter sb-c::%half-bignum-set bignum
+  :word bignum-digits-offset other-pointer-lowtag (unsigned-reg signed-reg)
+  positive-fixnum
+  (setf sb-bignum:%half-bignum-ref))
+
+
 (define-vop (digit-0-or-plus)
   (:translate sb-bignum:%digit-0-or-plusp)
   (:policy :fast-safe)
@@ -1187,8 +1198,8 @@
   (:conditional)
   (:info target not-p)
   (:generator 2
-     (inst cmp digit 0)
-     (inst b (if not-p :lt :ge) target)))
+    (inst cmp digit 0)
+    (inst b (if not-p :lt :ge) target)))
 
 (define-vop (add-w/carry)
   (:translate sb-bignum:%add-with-carry)
@@ -1222,7 +1233,7 @@
     (inst cmp c 1) ;; Set carry if (fixnum 0 or 1) c=0, else clear.
     (inst sbcs result a b)
     (unless (eq (tn-kind borrow) :unused)
-     (inst cset borrow :cs))))
+      (inst cset borrow :cs))))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)
@@ -1332,6 +1343,18 @@
         (inst adcs quo quo quo)
         (unless (= i 64)
           (inst adc rem rem rem))))))
+
+(define-vop (half-bignum-floor bignum-floor)
+  (:translate sb-bignum:%half-bigfloor)
+  (:args (div-high :scs (unsigned-reg) :to :save)
+         (div-low :scs (unsigned-reg) :target x)
+         (divisor :scs (unsigned-reg) :to (:result 1)))
+  (:temporary (:sc unsigned-reg :from (:argument 1)) x)
+  (:generator 30
+    (move x div-low)
+    (inst bfm x div-high 32 31)
+    (inst udiv quo x divisor)
+    (inst msub rem quo divisor x)))
 
 (define-vop (signify-digit)
   (:translate sb-bignum:%fixnum-digit-with-correct-sign)

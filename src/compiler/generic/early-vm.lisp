@@ -78,6 +78,9 @@
   ;; I haven't exercised our math routines to anywhere near that limit.
   #+64-bit #xFFFFFFFF)
 
+(defconstant maximum-half-bignum-length
+  #+64-bit (* #xFFFFFFFF 2))
+
 ;;; The ANSI-specified minimum is 8.
 ;;; Since the array rank is stored as rank-1 in the array header,
 ;;; having it stop at 128 ensures that adding 1 produces an unsigned

@@ -423,47 +423,57 @@
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
                                  &optional translate)
-  `(define-vop (,name)
-     ,@(when translate
-             `((:translate ,translate)))
-     (:policy :fast-safe)
-     (:args (object :scs (descriptor-reg))
-            (index :scs (any-reg unsigned-reg immediate))
-            (value :scs ,scs
-                   :load-if (not (and (sc-is value immediate)
-                                      (eql (tn-value value) 0)))))
-     (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (non-descriptor-reg)) lip)
-     (:generator 5
-       (when (sc-is value immediate)
-         (setf value zr-tn))
-       ,@(multiple-value-bind (op shift)
-             (ecase size
-               (:byte
-                (values 'strb 0))
-               (:short
-                (values 'strh 1))
-               (:word
-                (values 'str 2)))
-           (let ((value (if (eq size :word)
-                            '(32-bit-reg value)
-                            'value)))
-             `((sc-case index
-                 (immediate
-                  (inst ,op ,value (@ object (load-store-offset
-                                              (+
-                                               (ash (tn-value index) ,shift)
-                                               (- (* ,offset n-word-bytes) ,lowtag))))))
-                 (t
-                  (let ((shift ,shift))
-                    (sc-case index
-                      (any-reg
-                       (decf shift n-fixnum-tag-bits)))
-                    (inst add lip object (if (minusp shift)
-                                             (asr index (- shift))
-                                             (lsl index shift)))
-                    (inst ,op
-                          ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))))))))
+  (let ((value `((value :scs ,scs
+                             :load-if (not (and (sc-is value immediate)
+                                                (eql (tn-value value) 0))))))
+        (setf-p (typep translate '(cons (eql setf)))))
+   `(define-vop (,name)
+      ,@(when translate
+          `((:translate ,translate)))
+      (:policy :fast-safe)
+      (:args ,@(when setf-p
+                 value)
+             (object :scs (descriptor-reg))
+             (index :scs (any-reg unsigned-reg immediate))
+             ,@(unless setf-p
+                 value))
+      (:arg-types ,@(when setf-p
+                      `(,el-type))
+                  ,type
+                  tagged-num
+                  ,@(unless setf-p
+                      `(,el-type)))
+      (:temporary (:scs (non-descriptor-reg)) lip)
+      (:generator 5
+        (when (sc-is value immediate)
+          (setf value zr-tn))
+        ,@(multiple-value-bind (op shift)
+              (ecase size
+                (:byte
+                 (values 'strb 0))
+                (:short
+                 (values 'strh 1))
+                (:word
+                 (values 'str 2)))
+            (let ((value (if (eq size :word)
+                             '(32-bit-reg value)
+                             'value)))
+              `((sc-case index
+                  (immediate
+                   (inst ,op ,value (@ object (load-store-offset
+                                               (+
+                                                (ash (tn-value index) ,shift)
+                                                (- (* ,offset n-word-bytes) ,lowtag))))))
+                  (t
+                   (let ((shift ,shift))
+                     (sc-case index
+                       (any-reg
+                        (decf shift n-fixnum-tag-bits)))
+                     (inst add lip object (if (minusp shift)
+                                              (asr index (- shift))
+                                              (lsl index shift)))
+                     (inst ,op
+                           ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))))))))
 
 (defun load-inline-constant (dst &rest constant-descriptor)
   (destructuring-bind (size . label) (apply #'register-inline-constant constant-descriptor)

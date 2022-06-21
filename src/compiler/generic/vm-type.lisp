@@ -63,6 +63,10 @@
 (sb-xc:deftype bignum-index () `(mod ,maximum-bignum-length))
 (sb-xc:deftype bignum-length () `(mod ,(1+ maximum-bignum-length)))
 
+(sb-xc:deftype half-bignum-element-type () `(unsigned-byte ,(/ sb-vm:n-word-bits 2)))
+(sb-xc:deftype half-bignum-index () `(mod ,sb-vm::maximum-half-bignum-length))
+(sb-xc:deftype half-bignum-length () `(mod ,(1+ sb-vm::maximum-half-bignum-length)))
+
 ;;; an index into an integer
 (sb-xc:deftype bit-index ()
   `(integer 0 ,(* (1- (ash 1 (- sb-vm:n-word-bits sb-vm:n-widetag-bits)))
