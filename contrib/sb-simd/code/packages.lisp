@@ -549,6 +549,7 @@
      #:s64-aref
      #:s64-row-major-aref
      ;; Simple Strings
+     #+sb-unicode
      #:charvec
      #:char-array
      ;; Integer Packers
@@ -805,7 +806,10 @@
      #:u32.4-decf
      #:u32.4-aref #:u32.4-row-major-aref
      #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref
-     #:u32.4-string-ref #:u32.4-row-major-string-ref
+     #+sb-unicode
+     #:u32.4-string-ref
+     #+sb-unicode
+     #:u32.4-row-major-string-ref
      ;; u64.2
      #:make-u64.2
      #:u64.2
@@ -1393,7 +1397,10 @@
      #:u32.4-permute
      #:u32.4-aref #:u32.4-row-major-aref
      #:u32.4-non-temporal-aref #:u32.4-non-temporal-row-major-aref
-     #:u32.4-string-ref #:u32.4-row-major-string-ref
+     #+sb-unicode
+     #:u32.4-string-ref
+     #+sb-unicode
+     #:u32.4-row-major-string-ref
      ;; u64.2
      #:make-u64.2
      #:u64.2
@@ -1450,7 +1457,10 @@
      #:u32.8-insert-u32.4
      #:u32.8-aref #:u32.8-row-major-aref
      #:u32.8-non-temporal-aref #:u32.8-non-temporal-row-major-aref
-     #:u32.8-string-ref #:u32.8-row-major-string-ref
+     #+sb-unicode
+     #:u32.8-string-ref
+     #+sb-unicode
+     #:u32.8-row-major-string-ref
      ;; u64.4
      #:make-u64.4
      #:u64.4

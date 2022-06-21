@@ -19,6 +19,7 @@
    (f32     32  single-float       #:single-float (#:single-reg))
    (f64     64  double-float       #:double-float (#:double-reg))
    ;; Vectors
+   #+sb-unicode
    (charvec 64  (simple-array character (*))          #:simple-character-string)
    ( u8vec  64  (simple-array (unsigned-byte 8) (*))  #:simple-array-unsigned-byte-8)
    (u16vec  64  (simple-array (unsigned-byte 16) (*)) #:simple-array-unsigned-byte-16)
