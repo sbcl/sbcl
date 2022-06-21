@@ -2820,8 +2820,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (binding* ((alloc-points (svref fixups index) :exit-if-null))
     (cold-set 'sb-c::*!cold-allocation-patch-point*
               (cold-cons (cold-cons code-obj alloc-points)
-                         (cold-symbol-value (cold-intern
-                                             'sb-c::*!cold-allocation-patch-point*)))))
+                         (cold-symbol-value 'sb-c::*!cold-allocation-patch-point*))))
   (loop
     (when (>= index end) (return))
     (binding* (((offset kind flavor)
