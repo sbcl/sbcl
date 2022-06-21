@@ -45,8 +45,6 @@ for dir in `cd contrib ; echo *`; do
 done
 SBCL_CONTRIB_BLOCKLIST=${SBCL_CONTRIB_BLOCKLIST:-""}
 
-echo $SBCL_CONTRIB_BLOCKLIST
-
 perform_host_lisp_check=no
 fancy=false
 some_options=false
@@ -498,8 +496,6 @@ case "$sbcl_arch" in
     x86-64) ;; *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd" ;;
 esac
 
-echo "SBCL_CONTRIB_BLOCKLIST=\"$SBCL_CONTRIB_BLOCKLIST\"; export SBCL_CONTRIB_BLOCKLIST" >> output/build-config
-
 echo //setting up OS-dependent information
 
 original_dir=`pwd`
@@ -658,6 +654,12 @@ case "$sbcl_arch" in
     ;;
   x86-64)
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf # not mandatory
+
+    $GNUMAKE -C tools-for-build avx2
+    if tools-for-build/avx2; then
+       SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd"
+    fi
+
     case "$sbcl_os" in
     linux | darwin | *bsd)
         printf ' :immobile-space' >> $ltf
@@ -708,6 +710,8 @@ sh tools-for-build/grovel-features.sh >> $ltf
 echo //finishing $ltf
 printf " %s" "`cat crossbuild-runner/backends/${sbcl_arch}/features`" >> $ltf
 echo ")) (list$WITHOUT_FEATURES)))" >> $ltf
+
+echo "SBCL_CONTRIB_BLOCKLIST=\"$SBCL_CONTRIB_BLOCKLIST\"; export SBCL_CONTRIB_BLOCKLIST" >> output/build-config
 
 # FIXME: The version system should probably be redone along these lines:
 #
