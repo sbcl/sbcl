@@ -603,7 +603,7 @@
                       :default-printer '(:name :tab rd ", " rn ", " rm))
   (op2 :field (byte 8 21) :value #b11010000)
   (rm :field (byte 5 16) :type 'reg)
-  (op :field (byte 6 10) :value 0)
+  (op3 :field (byte 6 10) :value 0)
   (rn :type 'reg)
   (rd :type 'reg))
 
@@ -611,7 +611,9 @@
   `(define-instruction ,name (segment rd rn rm)
      (:printer add-sub-carry ((op ,opc)))
      (:emitter
-      (emit-add-sub-carry segment +64-bit-size+ ,opc
+      (emit-add-sub-carry segment
+                          (reg-size rd)
+                          ,opc
                           (reg-offset rm) (reg-offset rn) (reg-offset rd)))))
 
 (def-add-sub-carry adc #b00)
@@ -1221,7 +1223,9 @@
      (:printer data-processing-3 ((op31 ,op31) (o0 ,o0)))
      ,@printers
      (:emitter
-      (emit-data-processing-3 segment +64-bit-size+ ,op31
+      (emit-data-processing-3 segment
+                              (reg-size rd)
+                              ,op31
                               (reg-offset rm)
                               ,o0 (reg-offset ra) (reg-offset rn) (reg-offset rd)))))
 
@@ -1247,14 +1251,14 @@
   (:printer data-processing-3 ((op31 #b010) (o0 0) (ra 31))
             '(:name :tab rd  ", " rn ", " rm))
   (:emitter
-   (emit-data-processing-3 segment +64-bit-size+ #b010 (reg-offset rm)
+   (emit-data-processing-3 segment (reg-size rd) #b010 (reg-offset rm)
                            0 31 (reg-offset rn) (reg-offset rd))))
 
 (define-instruction umulh (segment rd rn rm)
   (:printer data-processing-3 ((op31 #b110) (o0 0) (ra 31))
             '(:name :tab rd  ", " rn ", " rm))
   (:emitter
-   (emit-data-processing-3 segment +64-bit-size+ #b110 (reg-offset rm)
+   (emit-data-processing-3 segment (reg-size rd) #b110 (reg-offset rm)
                            0 31 (reg-offset rn) (reg-offset rd))))
 ;;;
 
