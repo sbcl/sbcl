@@ -271,7 +271,6 @@ find_gnumake
 
 echo "GNUMAKE=\"$GNUMAKE\"; export GNUMAKE" >> output/build-config
 echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
-echo "CONTRIB_BLOCKLIST=\"$CONTRIB_BLOCKLIST\"; export CONTRIB_BLOCKLIST" >> output/build-config
 if [ -n "$SBCL_HOST_LOCATION" ]; then
     echo "SBCL_HOST_LOCATION=\"$SBCL_HOST_LOCATION\"; export SBCL_HOST_LOCATION" >> output/build-config
 fi
@@ -491,6 +490,13 @@ echo ';;;; This is a machine-generated file.' > $ltf
 echo ';;;; Please do not edit it by hand.' >> $ltf
 echo ';;;; See make-config.sh.' >> $ltf
 echo "(lambda (features) (set-difference (union features (list :${sbcl_arch}$WITH_FEATURES " >> $ltf
+
+# Automatically block sb-simd on non-x86 platforms, at least for now.
+case "$sbcl_arch" in
+    x86-64) ;; *) CONTRIB_BLOCKLIST="$CONTRIB_BLOCKLIST sb-simd" ;;
+esac
+
+echo "CONTRIB_BLOCKLIST=\"$CONTRIB_BLOCKLIST\"; export CONTRIB_BLOCKLIST" >> output/build-config
 
 echo //setting up OS-dependent information
 

@@ -3,7 +3,7 @@ vpath %.fasl ../obj/sbcl-home/contrib/
 contribs = asdf sb-posix sb-bsd-sockets sb-introspect sb-cltl2 sb-aclrepl \
      sb-sprof sb-capstone sb-md5 sb-capstone sb-executable sb-gmp sb-mpfr \
      sb-queue sb-rotate-byte sb-simple-streams sb-concurrency sb-cover \
-     sb-graph
+     sb-graph sb-simd
 
 active_contribs = $(filter-out $(CONTRIB_BLOCKLIST),$(contribs))
 
@@ -50,4 +50,6 @@ sb-rotate-byte.fasl: asdf.fasl
 sb-simple-streams.fasl: asdf.fasl sb-posix.fasl sb-bsd-sockets.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-graph.fasl: asdf.fasl sb-rt.fasl
+	sh ./build-contrib $(basename $(@F))
+sb-simd.fasl: asdf.fasl
 	sh ./build-contrib $(basename $(@F))
