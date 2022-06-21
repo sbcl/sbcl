@@ -43,7 +43,9 @@ for dir in `cd contrib ; echo *`; do
         CONTRIBS="$CONTRIBS ${dir}"
     fi
 done
-CONTRIB_BLOCKLIST=""
+SBCL_CONTRIB_BLOCKLIST=${SBCL_CONTRIB_BLOCKLIST:-""}
+
+echo $SBCL_CONTRIB_BLOCKLIST
 
 perform_host_lisp_check=no
 fancy=false
@@ -97,7 +99,7 @@ do
         WITHOUT_FEATURES="$WITHOUT_FEATURES :$optarg"
         case $CONTRIBS
         in *"$optarg"*)
-               CONTRIB_BLOCKLIST="$CONTRIB_BLOCKLIST $optarg"
+               SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST $optarg"
         ;; esac
 	;;
       --fancy)
@@ -493,10 +495,10 @@ echo "(lambda (features) (set-difference (union features (list :${sbcl_arch}$WIT
 
 # Automatically block sb-simd on non-x86 platforms, at least for now.
 case "$sbcl_arch" in
-    x86-64) ;; *) CONTRIB_BLOCKLIST="$CONTRIB_BLOCKLIST sb-simd" ;;
+    x86-64) ;; *) SBCL_CONTRIB_BLOCKLIST="$SBCL_CONTRIB_BLOCKLIST sb-simd" ;;
 esac
 
-echo "CONTRIB_BLOCKLIST=\"$CONTRIB_BLOCKLIST\"; export CONTRIB_BLOCKLIST" >> output/build-config
+echo "SBCL_CONTRIB_BLOCKLIST=\"$SBCL_CONTRIB_BLOCKLIST\"; export SBCL_CONTRIB_BLOCKLIST" >> output/build-config
 
 echo //setting up OS-dependent information
 

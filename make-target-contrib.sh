@@ -102,7 +102,7 @@ contrib_dirs=""
 for candidate in $contrib_candidates
 do
     if [ -d "contrib/$candidate" -a -f "contrib/$candidate/Makefile" ]; then
-        case $CONTRIB_BLOCKLIST in
+        case $SBCL_CONTRIB_BLOCKLIST in
             *"$candidate"*) ;;
             *) contrib_dirs="$contrib_dirs $candidate" ;;
     esac

@@ -5,7 +5,7 @@ contribs = asdf sb-posix sb-bsd-sockets sb-introspect sb-cltl2 sb-aclrepl \
      sb-queue sb-rotate-byte sb-simple-streams sb-concurrency sb-cover \
      sb-graph sb-simd
 
-active_contribs = $(filter-out $(CONTRIB_BLOCKLIST),$(contribs))
+active_contribs = $(filter-out $(SBCL_CONTRIB_BLOCKLIST),$(contribs))
 
 fasls = $(active_contribs:=.fasl)
 
