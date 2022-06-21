@@ -1,13 +1,26 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.2.5:
-  * minor incompatible change: support for 32-bit x86 on macOS has been removed.
+  * minor incompatible change: support for 32-bit x86 on macOS has been
+    removed.
+  * new contrib: sb-simd, to provide a convenient interface for SIMD
+    programming.  (Thanks to Marco Heisig and other sb-simd contributors)
   * enhancement: core compression now uses zstd instead of zlib.
+  * enhancement: provide compiler warnings for specialized array type
+    mismatches in CONCATENATE.
+  * enhancement: provide compiler warnings for bad sequence bounding index
+    designator arguments to sequence functions.
+  * enhancement: The sb-mpfr contrib now allows coercion from MPFR-FLOATs
+    to CL:RATIONAL.  (Thanks to Robert Smith)
+  * bug fix: fix compilation failure related to declaiming types of constants.
+    (lp#1977726, reported by Pierre Neidhardt)
   * optimization: fasl files are now usually smaller (up to 10% on default
     policy) and may load faster, especially on high debug.
-  * optimization: faster [n]string-down/upcase.
+  * optimization: faster string comparisons on arm64, x86-64.
+  * optimization: faster [n]string-down/upcase on arm64, x86-64.
   * optimization: faster [n]reverse for 8- and 32-bit element vectors on
     arm64, x86-64.
+  * optimization: faster type tests for (CONS (EQL symbol)) on x86-64.
 
 changes in sbcl-2.2.5 relative to sbcl-2.2.4:
   * minor incompatible change: SB-EXT:*DERIVE-FUNCTION-TYPES* being NIL now
