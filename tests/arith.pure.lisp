@@ -1062,3 +1062,11 @@
          (truly-the sb-vm:signed-word (ash a b)))
     ((-44 (- (expt 2 (1- sb-vm:n-word-bits)))) -1)
     ((44 2) 176)))
+
+(with-test (:name :-constant-mnf)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (logand most-positive-fixnum
+                 (- (the fixnum a) most-negative-fixnum)))
+    ((10) 10)))

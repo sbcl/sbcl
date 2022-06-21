@@ -190,13 +190,26 @@
              `(progn
                 (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum) fast-fixnum-binop-c)
                   (:translate ,translate)
-                  (:generator 1 (generate-fast-+-c r x (fixnumize (,translate y)))))
+                  (:generator 1
+                    (cond ((and (eq ',translate '-)
+                                (= y most-negative-fixnum))
+                           (inst lr temp-reg-tn (fixnumize y))
+                           (inst sub r x temp-reg-tn))
+                          (t
+                           (generate-fast-+-c r x (fixnumize (,translate y)))))))
                 (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed) fast-signed-binop-c)
                   (:translate ,translate)
-                  (:generator ,untagged-penalty (generate-fast-+-c r x (,translate y))))
+                  (:generator ,untagged-penalty
+                    (cond ((and (eq ',translate '-)
+                                (= y (- (expt 2 (1- n-word-bits)))))
+                           (inst lr temp-reg-tn y)
+                           (inst sub r x temp-reg-tn))
+                          (t
+                           (generate-fast-+-c r x (,translate y))))))
                 (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned) fast-unsigned-binop-c)
                   (:translate ,translate)
-                  (:generator ,untagged-penalty (generate-fast-+-c r x (,translate y)))))))
+                  (:generator ,untagged-penalty
+                    (generate-fast-+-c r x (,translate y)))))))
   (define-const-binop + 4)
   (define-const-binop - 4))
 
