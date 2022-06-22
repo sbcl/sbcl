@@ -319,7 +319,18 @@
                        (res (%unary-truncate (/ number float-div))))
                   (values res
                           (- number
-                             (* (coerce res ',rtype) float-div))))))
+                             (* (coerce res ',rtype) float-div)))))
+             (single-digit-bignum-p (x)
+               #+(or x86-64 x86 ppc64)
+               `(or (typep ,x 'word)
+                    (typep ,x 'sb-vm:signed-word))
+               ;; Other backends don't have native double-word/word division,
+               ;; and their bigfloor implementation doesn't handle
+               ;; full-width divisors.
+               #-(or x86-64 x86 ppc64)
+               `(or (typep ,x '(unsigned-byte ,(1- sb-vm:n-word-bits)))
+                    (typep ,x '(integer ,(- 1 (expt 2 (- sb-vm:n-word-bits 1)))
+                                ,(1- (expt 2 (- sb-vm:n-word-bits 1))))))))
     (number-dispatch ((number real) (divisor real))
       ((fixnum fixnum) (truncate number divisor))
       (((foreach fixnum bignum) ratio)
@@ -330,8 +341,7 @@
                          (numerator divisor))
              (values quot (/ rem (denominator divisor))))))
       ((fixnum bignum)
-       (if (or (typep divisor 'word)
-               (typep divisor 'sb-vm:signed-word))
+       (if (single-digit-bignum-p divisor)
            (bignum-truncate-single-digit (make-small-bignum number) divisor)
            (bignum-truncate (make-small-bignum number) divisor)))
       ((ratio (or float rational))
@@ -341,8 +351,7 @@
       ((bignum fixnum)
        (bignum-truncate-single-digit number divisor))
       ((bignum bignum)
-       (if (or (typep divisor 'word)
-               (typep divisor 'sb-vm:signed-word))
+       (if (single-digit-bignum-p divisor)
            (bignum-truncate-single-digit number divisor)
            (bignum-truncate number divisor)))
       (((foreach single-float double-float #+long-float long-float)
