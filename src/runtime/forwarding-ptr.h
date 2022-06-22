@@ -12,10 +12,15 @@ in_gc_p(void) {
 
 inline static boolean
 forwarding_pointer_p(lispobj *pointer) {
-    lispobj first_word=*pointer;
 #ifdef LISP_FEATURE_GENCGC
-    return (first_word == FORWARDING_HEADER);
+# ifdef LISP_FEATURE_LITTLE_ENDIAN
+    // no need to compare the entire word
+    return *(char*)pointer == 1;
+# else
+    return (*pointer == FORWARDING_HEADER);
+#endif
 #else
+    lispobj first_word=*pointer;
     // FIXME: change 5c0d71f92c371769f911e6a2ac60b2dd9fbde349 added
     // an extra test here, which theoretically slowed things down.
     // This was in response to 044e22192c25578efceedba042554dc9a96124c6
