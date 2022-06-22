@@ -46,8 +46,7 @@
         (let ((v (%make-lisp-obj (sap-int (sap+ pointer other-pointer-lowtag)))))
           (setf (%array-fill-pointer v) length
             ;; then store the widetag
-                (sap-ref-8 pointer #+big-endian (1- sb-vm:n-word-bytes)
-                                   #+little-endian 0)
+                (sap-ref-8 pointer (+ #+big-endian (1- n-word-bytes)))
                 widetag)
           v)
         (error 'simple-storage-condition
@@ -118,7 +117,7 @@
   ;; provided that no zero bits would be right-shifted out.
   (aver (zerop (logand newval lowtag-mask)))
   (setf (deref varyobj-pages index)
-        (logior (ash newval (- 8 (1+ sb-vm:word-shift)))
+        (logior (ash newval (- 8 (1+ word-shift)))
                 (logand (deref varyobj-pages index) #xFF)))
   newval)
 
@@ -225,7 +224,7 @@
            (- (nth-value 1 (ceiling free-ptr immobile-card-bytes)))))
       (setf (sap-ref-word (int-sap free-ptr) 0) simple-array-fixnum-widetag
             (%array-fill-pointer
-             (%make-lisp-obj (logior free-ptr sb-vm:other-pointer-lowtag)))
+             (%make-lisp-obj (logior free-ptr other-pointer-lowtag)))
             ;; Convert bytes to words, subtract the header and vector length.
             (- (ash n-trailing-bytes (- word-shift)) 2)))))
 
@@ -432,10 +431,8 @@
                   (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)))))
     ;; symbol-hash was initialized to 0
     (%set-symbol-global-value symbol (make-unbound-marker))
-    (%primitive sb-vm::set-slot symbol nil
-                'make-symbol sb-vm:symbol-info-slot sb-vm:other-pointer-lowtag)
-    (%primitive sb-vm::set-slot symbol name
-                'make-symbol sb-vm:symbol-name-slot sb-vm:other-pointer-lowtag)
+    (%primitive set-slot symbol nil 'make-symbol symbol-info-slot other-pointer-lowtag)
+    (%primitive set-slot symbol name 'make-symbol symbol-name-slot other-pointer-lowtag)
     (%set-symbol-package symbol nil)
     symbol))
 
@@ -490,7 +487,7 @@
                                       (eq space :immobile)))
                ;; x86-64 has a vop which wraps pseudo-atomic around the foreign call,
                ;; as is the custom for allocation trampolines.
-               #+x86-64 (%primitive sb-vm::alloc-code total-words boxed)
+               #+x86-64 (%primitive alloc-code total-words boxed)
                #-x86-64
                (without-gcing
                  (%make-lisp-obj
