@@ -64,8 +64,8 @@
 (sb-xc:deftype bignum-length () `(mod ,(1+ maximum-bignum-length)))
 
 (sb-xc:deftype half-bignum-element-type () `(unsigned-byte ,(/ sb-vm:n-word-bits 2)))
-(sb-xc:deftype half-bignum-index () `(mod ,sb-vm::maximum-half-bignum-length))
-(sb-xc:deftype half-bignum-length () `(mod ,(1+ sb-vm::maximum-half-bignum-length)))
+(sb-xc:deftype half-bignum-index () `(mod ,(* maximum-bignum-length 2)))
+(sb-xc:deftype half-bignum-length () `(mod ,(1+ (* maximum-bignum-length 2))))
 
 ;;; an index into an integer
 (sb-xc:deftype bit-index ()
