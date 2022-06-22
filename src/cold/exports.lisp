@@ -204,7 +204,7 @@ SBCL itself")
                          "BIGNUM-LOGCOUNT" "BIGNUM-LOGICAL-AND"
                          "BIGNUM-LOGICAL-IOR" "BIGNUM-LOGICAL-NOT"
                          "BIGNUM-LOGICAL-XOR" "BIGNUM-PLUS-P"
-                         "BIGNUM-TO-FLOAT" "BIGNUM-TRUNCATE"
+                         "BIGNUM-TO-FLOAT" "BIGNUM-TRUNCATE" "BIGNUM-TRUNCATE-SINGLE-DIGIT"
                          "MAKE-SMALL-BIGNUM"
                          "MULTIPLY-BIGNUM-AND-FIXNUM" "MULTIPLY-BIGNUMS"
                          "MULTIPLY-FIXNUMS" "NEGATE-BIGNUM"
