@@ -100,7 +100,6 @@
          (subprocess-list nil)
          ;; Start timing only after all the DIRECTORY calls are done (above)
          (start-time (get-internal-real-time))
-         (missing-usage)
          (losing)
          (metricsfilename (format nil "~A/performance" *logdir*))
          (metricsfile

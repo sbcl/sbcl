@@ -23,6 +23,7 @@
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
 #include "brothertree.h"
+#include "forwarding-ptr.h"
 
 lispobj *
 search_read_only_space(void *pointer)
@@ -203,27 +204,73 @@ lispobj* find_symbol(char* symbol_name, lispobj package, unsigned int* hint)
     return package ? search_package_symbols(package, symbol_name, hint) : 0;
 }
 
-uword_t brothertree_find_lesseql(uword_t key, lispobj tree)
+static inline boolean fringe_node_p(struct binary_node* node)
 {
-    lispobj best = NIL;
+    int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT) & INSTANCE_LENGTH_MASK;
+    return len <= (int)(1+INSTANCE_DATA_START);
+}
+
+/* I anticipate using the brothertree search algorithms to find code
+ * while GC has already potentially moved some of the tree nodes,
+ * thus the use of follow_fp() before dereferencing a node pointer */
+uword_t brothertree_find_eql(uword_t key, lispobj tree)
+{
     while (tree != NIL) {
-        lispobj layout = instance_layout(INSTANCE(tree));
+        tree = follow_fp(tree);
+        lispobj layout = follow_fp(instance_layout(INSTANCE(tree)));
         if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
             tree = ((struct unary_node*)INSTANCE(tree))->child;
         } else {
             struct binary_node* node = (void*)INSTANCE(tree);
             if (node->key == key) return tree;
             lispobj l = NIL, r = NIL;
-            int len = ((unsigned int)node->header >> INSTANCE_LENGTH_SHIFT)
-                      & INSTANCE_LENGTH_MASK;
             // unless a fringe node, read the left and right pointers
-            if (len > (int)(1+INSTANCE_DATA_START)) l = node->left, r = node->right;
+            if (!fringe_node_p(node)) l = node->left, r = node->right;
+            if (key < node->key) tree = l; else tree = r;
+        }
+    }
+    return 0;
+}
+
+uword_t brothertree_find_lesseql(uword_t key, lispobj tree)
+{
+    lispobj best = NIL;
+    while (tree != NIL) {
+        tree = follow_fp(tree);
+        lispobj layout = follow_fp(instance_layout(INSTANCE(tree)));
+        if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+            tree = ((struct unary_node*)INSTANCE(tree))->child;
+        } else {
+            struct binary_node* node = (void*)INSTANCE(tree);
+            if (node->key == key) return tree;
+            lispobj l = NIL, r = NIL;
+            // unless a fringe node, read the left and right pointers
+            if (!fringe_node_p(node)) l = node->left, r = node->right;
             if (key < node->key) tree = l; else { best = tree; tree = r; }
         }
     }
     return best;
 }
 
+uword_t brothertree_find_greatereql(uword_t key, lispobj tree)
+{
+    lispobj best = NIL;
+    while (tree != NIL) {
+        tree = follow_fp(tree);
+        lispobj layout = follow_fp(instance_layout(INSTANCE(tree)));
+        if (layout_depth2_id(LAYOUT(layout)) == BROTHERTREE_UNARY_NODE_LAYOUT_ID) {
+            tree = ((struct unary_node*)INSTANCE(tree))->child;
+        } else {
+            struct binary_node* node = (void*)INSTANCE(tree);
+            if (node->key == key) return tree;
+            lispobj l = NIL, r = NIL;
+            // unless a fringe node, read the left and right pointers
+            if (!fringe_node_p(node)) l = node->left, r = node->right;
+            if (key > node->key) tree = r; else { best = tree; tree = l; }
+        }
+    }
+    return best;
+}
 
 /* Binary search a sorted vector (of code base addresses).
  * This might be useful for generations other than 0,
@@ -243,6 +290,21 @@ int bsearch_lesseql(uword_t item, uword_t* array, int nelements)
         else if (probe > item) high = mid - 1;
         else return mid;
     }
-    if (high >= 0 && array[high] < item) return high;
+    if (high >= 0) return high;
+    return -1;
+}
+
+int bsearch_greatereql(uword_t item, uword_t* array, int nelements)
+{
+    int low = 0;
+    int high = nelements - 1;
+    while (low <= high) {
+        int mid = (low + high) / 2;
+        uword_t probe = array[mid];
+        if (probe < item) low = mid + 1;
+        else if (probe > item) high = mid - 1;
+        else return mid;
+    }
+    if (low < nelements) return low;
     return -1;
 }

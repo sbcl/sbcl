@@ -1,7 +1,8 @@
 #+interpreter (invoke-restart 'run-tests::skip-file)
 
 (let ((*evaluator-mode* :compile))
-  (load "../src/code/brothertree.lisp"))
+  (handler-bind ((warning #'muffle-warning))
+    (load "../src/code/brothertree.lisp")))
 
 (in-package sb-brothertree)
 
@@ -240,35 +241,50 @@
     (assert (null tree))
     ))
 
-(defun c-find<= (key tree)
-  (declare (sb-vm:word key))
-  (sb-sys:with-pinned-objects (tree)
-    (let ((result
-           (sb-alien:alien-funcall
-            (sb-alien:extern-alien "brothertree_find_lesseql"
-                                   (function sb-alien:unsigned sb-alien:unsigned
-                                             sb-alien:unsigned))
-                          key
-                          (sb-kernel:get-lisp-obj-address tree))))
-      (unless (eql result sb-vm:nil-value)
-        (sb-kernel:make-lisp-obj result)))))
+(macrolet ((define-c-wrapper (lisp-name c-name)
+             `(defun ,lisp-name (key tree)
+                (declare (sb-vm:word key))
+                (sb-sys:with-pinned-objects (tree)
+                  (let ((result
+                         (sb-alien:alien-funcall
+                          (sb-alien:extern-alien ,c-name
+                                                 (function sb-alien:unsigned sb-alien:unsigned
+                                                           sb-alien:unsigned))
+                                        key
+                                        (sb-kernel:get-lisp-obj-address tree))))
+                    (unless (eql result sb-vm:nil-value)
+                      (sb-kernel:make-lisp-obj result)))))))
+  (define-c-wrapper c-find<= "brothertree_find_lesseql")
+  (define-c-wrapper c-find>= "brothertree_find_greatereql"))
 
-(test-util:with-test (:name :find<=)
-  (let* ((list (test-util:shuffle (loop for i from 100 by 100 repeat 25 collect i)))
-         (tree (tree-from-list list)))
-    (assert (not (find<= 99 tree)))
-    (assert (not (c-find<= 99 tree)))
-    (loop for key from 100 by 100 repeat 25
-          do
-       (let ((node (find<= key tree)))
-         (assert (= (binary-node-key node) key))
-         (assert (eq (c-find<= key tree) node)))
-       (let ((node (find<= (1+ key) tree)))
-         (assert (= (binary-node-key node) key))
-         (assert (eq (c-find<= (1+ key) tree) node)))
-       (let ((node (find<= (+ key 99) tree)))
-         (assert (= (binary-node-key node) key))
-         (assert (eq (c-find<= (+ key 99) tree) node))))))
+(test-util:with-test (:name :find-inequality)
+  (dotimes (i 10) ; try with various trees resulting from different shuffles
+    (let* ((list (test-util:shuffle (loop for i from 100 by 100 repeat 25 collect i)))
+           (tree (tree-from-list list)))
+      (assert (not (find<= 99 tree)))
+      (assert (not (c-find<= 99 tree)))
+      (assert (not (find>= 10000 tree)))
+      (assert (not (c-find>= 10000 tree)))
+      (loop for key from 100 by 100 repeat 25
+            do
+         (let ((node (find<= key tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find<= key tree) node)))
+         (let ((node (find>= key tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find>= key tree) node)))
+         (let ((node (find<= (1+ key) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find<= (1+ key) tree) node)))
+         (let ((node (find>= (1- key) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find>= (1- key) tree) node)))
+         (let ((node (find<= (+ key 99) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find<= (+ key 99) tree) node)))
+         (let ((node (find>= (- key 99) tree)))
+           (assert (= (binary-node-key node) key))
+           (assert (eq (c-find>= (- key 99) tree) node)))))))
 
 (test-util:with-test (:name :insert-delete)
   (try-delete-everything (tree-from-list (random-big-list 2500))))

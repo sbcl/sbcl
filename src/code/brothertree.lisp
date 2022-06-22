@@ -321,15 +321,24 @@
 
 (defun find<= (key tree)
   (declare (keytype key))
-  (when tree
-    (named-let recurse ((node tree) (best nil))
-      (if (unary-node-p (truly-the sb-kernel:instance node))
-          (if (child node) (recurse (child node) best) best)
-          (let ((node (truly-the binary-node node)))
-            (cond ((= key (binary-node-key node)) node)
-                  ((fringe-binary-node-p node)
-                   (if (< (binary-node-key node) key) node best))
-                  ((< key (binary-node-key node))
-                   (recurse (binary-node-%left node) best))
-                  (t
-                   (recurse (binary-node-%right node) node))))))))
+  (named-let recurse ((node tree) (best nil))
+    (typecase node
+      (binary-node
+       (multiple-value-bind (left node-key right) (binary-node-parts node)
+        (cond ((< key node-key) (recurse left best))
+              ((< node-key key) (recurse right node))
+              (t node))))
+      (unary-node (recurse (child node) best))
+      (t best))))
+
+(defun find>= (key tree)
+  (declare (keytype key))
+  (named-let recurse ((node tree) (best nil))
+    (typecase node
+      (binary-node
+       (multiple-value-bind (left node-key right) (binary-node-parts node)
+        (cond ((< key node-key) (recurse left node))
+              ((< node-key key) (recurse right best))
+              (t node))))
+      (unary-node (recurse (child node) best))
+      (t best))))
