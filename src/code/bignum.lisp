@@ -1932,13 +1932,7 @@
                         rem
                         (%normalize-bignum rem (%bignum-length rem))))))))))
 
-;;; Divide X by Y when Y is a single bignum digit.
-;;; We don't have to worry about shifting Y to make its most
-;;; significant digit sufficiently large for %BIGFLOOR to return
-;;; digit-size quantities for the q-digit and r-digit. If Y is
-;;; a single digit bignum, it is already large enough for
-;;; %BIGFLOOR. That is, it has some bits on pretty high in the
-;;; digit.
+;;; Divide X by Y when Y fits in a word.
 (defun bignum-truncate-single-digit (x y)
   (declare (type bignum x)
            (type (or word sb-vm:signed-word) y)
