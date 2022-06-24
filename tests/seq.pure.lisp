@@ -713,7 +713,8 @@
         for type = (sb-kernel:type-specifier (sb-vm:saetp-ctype saetp))
         when type
         do
-        (let ((value-transformer (cond ((eq type 'base-char)
+        (let ((value-transformer (cond ((eq type #+sb-unicode 'base-char
+                                                 #-sb-unicode 'character)
                                         (lambda (x)
                                           (code-char
                                            (if (>= x sb-int:base-char-code-limit)
