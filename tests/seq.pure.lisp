@@ -707,3 +707,52 @@
                    ',expected))))
     (check (string/= (the simple-string x) (the simple-string y) :end2 0)
            (or (integer 0 0) null))))
+
+(with-test (:name :reverse-specialized-arrays)
+  (loop for saetp across sb-vm:*specialized-array-element-type-properties*
+        for type = (sb-kernel:type-specifier (sb-vm:saetp-ctype saetp))
+        when type
+        do
+        (let ((value-transformer (cond ((eq type 'base-char)
+                                        (lambda (x)
+                                          (code-char
+                                           (if (>= x sb-int:base-char-code-limit)
+                                               (random sb-int:base-char-code-limit)
+                                               x))))
+                                       #+sb-unicode
+                                       ((eq type 'character)
+                                        (lambda (x)
+                                          (code-char x)))
+                                       ((eq type 'bit)
+                                        (lambda (x)
+                                          x
+                                          (random 2)))
+                                       ((subtypep type 'integer)
+                                        (if (eq type 'fixnum)
+                                            #'identity
+                                            (let* ((signed (eq (car type) 'signed-byte))
+                                                   (width (second type))
+                                                   (mod (expt 2 (- width
+                                                                   (if signed
+                                                                       1
+                                                                       0)))))
+                                              (if (< mod 1300)
+                                                  (lambda (x)
+                                                    (if (>= x mod)
+                                                        (random mod)
+                                                        x))
+                                                  (lambda (x)
+                                                    x)))))
+                                       (t
+                                        (lambda (x)
+                                          (coerce x type))))))
+          (loop for i to (floor 1300
+                                (ceiling (sb-vm:saetp-n-bits saetp) sb-vm:n-word-bytes))
+                for list = (loop for j from 1 to i
+                                 collect (funcall value-transformer j))
+                for reverse = (reverse list)
+                for vector = (make-array i :element-type type
+                                           :initial-contents list)
+                do
+                (assert (equal reverse (coerce (reverse vector) 'list)))
+                (assert (equal reverse (coerce (nreverse vector) 'list)))))))
