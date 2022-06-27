@@ -83,6 +83,10 @@
        do (setf (gethash string hash) index))
     hash))
 
+(defun index-or-lose (key table kind)
+  (or (gethash key table)
+      (error "unknown ~A: ~S" kind key)))
+
 (defun clear-flag (bit integer)
   (logandc2 integer (ash 1 bit)))
 
@@ -169,7 +173,7 @@ Length should be adjusted when the standard changes.")
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
             (let ((range (parse-codepoint-range codepoints))
-                  (index (gethash value *east-asian-widths*)))
+                  (index (index-or-lose value *east-asian-widths* "East Asian width")))
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
@@ -184,7 +188,7 @@ Length should be adjusted when the standard changes.")
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
             (let ((range (parse-codepoint-range codepoints))
-                  (index (gethash (subseq value 1) *scripts*)))
+                  (index (index-or-lose (subseq value 1) *scripts* "script")))
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
@@ -198,9 +202,13 @@ Length should be adjusted when the standard changes.")
        do (destructuring-bind (codepoints value)
               (split-string
                (string-right-trim " " (subseq line 0 (position #\# line))) #\;)
-            (let ((range (parse-codepoint-range codepoints))
-                  ;; Hangul syllables temporarily go to "Unkwown"
-                  (index (gethash value *line-break-classes* 0)))
+            (let* ((range (parse-codepoint-range codepoints))
+                   ;; Hangul syllables are marked as "Unknown", and programmatically
+                   ;; handled in SB-UNICODE:LINE-BREAK-CLASS
+                   (value
+                     (or (and (member value '("JL" "JV" "JT" "H2" "H3") :test 'string=) "XX")
+                         value))
+                   (index (index-or-lose value *line-break-classes* "line break")))
               (loop for i from (car range) to (cadr range)
                  do (setf (gethash i hash) index))))
        finally (return hash)))
@@ -419,12 +427,9 @@ Length should be adjusted when the standard changes.")
         (progn
           (setf *block-first* code-point)
           nil)
-        (let* ((gc-index (or (gethash general-category *general-categories*)
-                             (error "unknown general category ~A"
-                                    general-category)))
-               (bidi-index (or (gethash bidi-class *bidi-classes*)
-                               (error "unknown bidirectional class ~A"
-                                      bidi-class)))
+        (let* ((gc-index
+                 (index-or-lose general-category *general-categories* "general category"))
+               (bidi-index (index-or-lose bidi-class *bidi-classes* "bidirectional class"))
                (ccc (parse-integer canonical-combining-class))
                (digit-index (if (string= "" digit) 128 ; non-digits have high bit
                                 (let ((%digit (parse-integer digit)))
