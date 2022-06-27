@@ -359,7 +359,7 @@
 
 ;;; The character database is made of several arrays.
 ;;; +CHARACTER-MISC-DATABASE+ is an array of bytes that encode character
-;;; attributes. Each entry in the misc database is +misc-width+ (currently 9)
+;;; attributes. Each entry in the misc database is +MISC-WIDTH+ (currently 9)
 ;;; bytes wide. Within each entry, the bytes represent: general category, BIDI
 ;;; class, canonical combining class, digit value, decomposition info, other
 ;;; flags, script, line break class, and age, respectively. Several of the
@@ -392,7 +392,7 @@
 ;;; codepoint, all times two to account for the widtth of the entries. The
 ;;; value in +CHARACTER-LOW-PAGES+ at this point is the misc entry number. To
 ;;; transform a misc entry number into an index into
-;;; +CHARACTER-MISC-DATABASE+, multiply it by +misc-width*. This gives the
+;;; +CHARACTER-MISC-DATABASE+, multiply it by +MISC-WIDTH+. This gives the
 ;;; index of the start of the charater's misc entry in
 ;;; +CHARACTER-MISC-DATABASE+.
 ;;;

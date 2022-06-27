@@ -585,7 +585,7 @@ Length should be adjusted when the standard changes.")
                          :element-type '(unsigned-byte 8))
       (setf (gethash "output/CaseFolding.txt" *ucd-outputs*) 'made)
       ;; KLUDGE: it's inefficient, though simple, to do the I/O
-      ;; byte-by-bite.
+      ;; byte-by-byte.
       (do ((inbyte (read-byte in nil nil) (read-byte in nil nil))
            (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
            (eszet-count 0)
