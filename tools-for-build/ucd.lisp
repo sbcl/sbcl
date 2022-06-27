@@ -737,10 +737,11 @@ Length should be adjusted when the standard changes.")
 (defun parse-collation-line (line)
   (destructuring-bind (%code-points %keys) (split-string line #\;)
     (let* ((code-points (parse-codepoints %code-points))
+           (%keys (subseq %keys 0 (search " #" %keys)))
            (keys
-            (remove
-             ""
-             (split-string (remove #\[ (remove #\Space %keys)) #\]) :test #'string=))
+             (remove
+              ""
+              (split-string (remove #\[ (remove #\Space %keys)) #\]) :test #'string=))
            (ret
             (loop for key in keys
                for variable-p = (position #\* key)
@@ -759,7 +760,7 @@ Length should be adjusted when the standard changes.")
   (with-input-txt-file (stream "allkeys")
     (loop with hash = (make-hash-table :test #'equal)
        for line = (read-line stream nil nil) while line
-       unless (eql 0 (position #\# line))
+       unless (or (string= line "") (eql 0 (position #\@ line)) (eql 0 (position #\# line)))
        do (multiple-value-bind (codepoints keys) (parse-collation-line line)
             (setf (gethash codepoints hash) keys))
        finally (return hash))))
