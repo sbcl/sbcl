@@ -1345,7 +1345,7 @@ it defaults to 80 characters"
                            (t
                             #xFB80)))
                    (a (+ base (ash cp -15)))
-                   (b (logior #.(ash 1 15) (logand cp #x7FFFF))))
+                   (b (logior #.(ash 1 15) (logand cp #x7FFF))))
               (list (list a #x20 #x2) (list b 0 0))))))))
 
 (defun sort-key (string)
