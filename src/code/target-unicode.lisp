@@ -242,8 +242,8 @@ If the character is not a Hangul syllable or Jamo, returns NIL"
 (defun line-break-class (character &key resolve)
   "Returns the line breaking class of CHARACTER, as specified in UAX #14.
 If :RESOLVE is NIL, returns the character class found in the property file.
-If :RESOLVE is non-NIL, centain line-breaking classes will be mapped to othec
-classes as specified in the applicable standards. Addinionally, if :RESOLVE
+If :RESOLVE is non-NIL, certain line-breaking classes will be mapped to other
+classes as specified in the applicable standards. Additionally, if :RESOLVE
 is :EAST-ASIAN, Ambigious (class :AI) characters will be mapped to the
 Ideographic (:ID) class instead of Alphabetic (:AL)."
   (when (and resolve (listp character)) (setf character (car character)))
@@ -260,7 +260,7 @@ Ideographic (:ID) class instead of Alphabetic (:AL)."
     (when resolve
       (setf raw-class
             (case raw-class
-              (:ai (if (eql resolve :east-asion) :ID :AL))
+              (:ai (if (eql resolve :east-asian) :ID :AL))
               ; If we see :CM when resolving, we have a CM that isn't subject
               ; to LB9, so we do LB10
               ((:xx :cm) :al)
