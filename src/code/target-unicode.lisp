@@ -1327,25 +1327,21 @@ it defaults to 80 characters"
       (t
        ;; There are never more than three characters in a contraction, right?
        (return-from collation-key nil)))
-    (let ((packed-key (gethash (pack-3-codepoints
-                                (char-code char1)
-                                (char-code char2)
-                                (char-code char3))
-                               **character-collations**)))
+    (let* ((code1 (char-code char1))
+           (packed-key (gethash (pack-3-codepoints code1 (char-code char2) (char-code char3))
+                                **character-collations**)))
       (if packed-key
           (unpack-collation-key packed-key)
           (when (char= (code-char 0) char2 char3)
-            (let* ((cp (char-code char1))
+            (let* ((unified-ideograph-p (proplist-p char1 :unified-ideograph))
                    (base
-                     (cond ((not (proplist-p char1 :unified-ideograph))
-                            #xFBC0)
-                           ((or (<= #x4E00 cp #x9FFF)
-                                (<= #xF900 cp #xFAFF))
+                     (cond ((and unified-ideograph-p
+                                 (or (<= #x4E00 code1 #x9FFF) (<= #xF900 code1 #xFAFF)))
                             #xFB40)
-                           (t
-                            #xFB80)))
-                   (a (+ base (ash cp -15)))
-                   (b (logior #.(ash 1 15) (logand cp #x7FFF))))
+                           (unified-ideograph-p #xFB80)
+                           (t #xFBC0)))
+                   (a (+ base (ash code1 -15)))
+                   (b (logior #.(ash 1 15) (logand code1 #x7FFF))))
               (list (list a #x20 #x2) (list b 0 0))))))))
 
 (defun sort-key (string)
