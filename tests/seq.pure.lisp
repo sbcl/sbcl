@@ -215,7 +215,7 @@
 ;;; a proper sequence".
 (with-test (:name (copy-seq type-error))
   (locally (declare (optimize safety))
-    (multiple-value-bind (seq err) (ignore-errors (copy-seq '(1 2 3 . 4)))
+    (multiple-value-bind (seq err) (ignore-errors (copy-seq (opaque-identity '(1 2 3 . 4))))
       (assert (not seq))
       (assert (typep err 'type-error)))))
 
@@ -755,5 +755,21 @@
                 for vector = (make-array i :element-type type
                                            :initial-contents list)
                 do
+                (let* ((offset (1+ (random 120)))
+                       (prefix (loop for j from 1 to offset
+                                     collect (funcall value-transformer j)))
+                       (suffix (loop for j from 1 to (- 128 offset)
+                                     collect (funcall value-transformer j)))
+                       (contents (concatenate 'list prefix list suffix))
+                       (source (make-array (+ i 128) :element-type type
+                                                     :initial-contents contents))
+                       (displaced (make-array i :element-type type
+                                                :displaced-to source
+                                                :displaced-index-offset offset
+                                                :fill-pointer i)))
+                  (assert (equal reverse (coerce (reverse displaced) 'list)))
+                  (assert (equal reverse (coerce (nreverse displaced) 'list)))
+                  (assert (equal prefix (coerce (subseq source 0 offset) 'list)))
+                  (assert (equal suffix (coerce (subseq source (+ offset i)) 'list))))
                 (assert (equal reverse (coerce (reverse vector) 'list)))
                 (assert (equal reverse (coerce (nreverse vector) 'list)))))))
