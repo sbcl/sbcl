@@ -78,6 +78,7 @@
   (:info name offset lowtag)
   (:temporary (:scs (non-descriptor-reg)) t1)
   (:vop-var vop)
+  (:ignore name)
   (:generator 1
     (emit-gc-store-barrier object nil (list t1) (vop-nth-arg 1 vop) value)
     (storew value object offset lowtag)))
