@@ -1247,7 +1247,8 @@
     (split-string (get-output-stream-string string-stream)
                   #\newline)))
 
-(defun assert-has-gc-barrier (match-string lines)
+(defun assert-has-gc-barrier (match-string lines &optional (skip 0))
+
   (let (found)
 ;; Look for something like this in the trace output:
 ;; "VOP CLOSURE-INIT t9[RBX(d)] :NORMAL t13[RSI(d)] :NORMAL {0} "
@@ -1256,7 +1257,10 @@
 ;; "        AND     6, #<TN t14[RAX(u)] :NORMAL>, #S(FIXUP :NAME NIL :FLAVOR GC-BARRIER :OFFSET 0)"
 ;; "        MOV     4, PTR [R12+RAX+0], 0"
 ;; "        MOV     7, PTR [RBX+5], #<TN t13[RSI(d)] :NORMAL>"
-    (loop (when (search match-string (car lines))
+    (loop while lines
+          do
+          (when (and (search match-string (car lines))
+                     (minusp (decf skip)))
             (setq found t)
             (let ((barrier-fixup-line (nth 3 lines)))
               (assert (search ":FLAVOR GC-BARRIER" barrier-fixup-line))
@@ -1277,8 +1281,9 @@
 (defstruct (point (:constructor make-point (x))) x (y 0) (z 0))
 (with-test (:name :structure-init-gc-barrier)
   (let ((lines
-         (compiler-trace-output-lines
-          '(lambda (val)
+          (compiler-trace-output-lines
+           '(lambda (val)
              (declare (double-float val) (inline make-point))
-            (let ((neg (- val))) (make-point neg))))))
-    (assert-has-gc-barrier "SET-SLOT" lines)))
+             (let ((neg (- val))) (make-point neg))))))
+    (assert-has-gc-barrier "SET-SLOT" lines
+                           #-compact-instance-header 1)))
