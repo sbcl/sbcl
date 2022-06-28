@@ -79,10 +79,7 @@
   (:temporary (:scs (non-descriptor-reg)) t1)
   (:vop-var vop)
   (:generator 1
-    ;; gencgc does not need to emit the barrier for constructors
-    (unless (member name '(%make-structure-instance make-weak-pointer
-                           %make-ratio %make-complex))
-      (emit-gc-store-barrier object nil (list t1) (vop-nth-arg 1 vop) value))
+    (emit-gc-store-barrier object nil (list t1) (vop-nth-arg 1 vop) value)
     (storew value object offset lowtag)))
 
 (define-vop (compare-and-swap-slot)
@@ -459,7 +456,9 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:info offset)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
+    (emit-gc-store-barrier object nil (list temp))
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)

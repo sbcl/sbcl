@@ -1237,3 +1237,48 @@
 (with-test (:name :disassemble-symbol-global-value)
   (assert (loop for line in (disassembly-lines '(lambda () *myglobalvar*))
                 thereis (search "*MYGLOBALVAR*" line))))
+
+(defun compiler-trace-output-lines (lexpr)
+  (let ((string-stream (make-string-output-stream)))
+    (let ((sb-c::*compiler-trace-output* string-stream)
+          (sb-c::*compile-trace-targets* '(:vop))
+          (*print-pretty* nil))
+      (compile nil lexpr))
+    (split-string (get-output-stream-string string-stream)
+                  #\newline)))
+
+(defun assert-has-gc-barrier (match-string lines)
+  (let (found)
+;; Look for something like this in the trace output:
+;; "VOP CLOSURE-INIT t9[RBX(d)] :NORMAL t13[RSI(d)] :NORMAL {0} "
+;; "        MOV     0, #<TN t14[RAX(u)] :NORMAL>, #<TN t9[RBX(d)] :NORMAL>"
+;; "        SHR     0, #<TN t14[RAX(u)] :NORMAL>, 10"
+;; "        AND     6, #<TN t14[RAX(u)] :NORMAL>, #S(FIXUP :NAME NIL :FLAVOR GC-BARRIER :OFFSET 0)"
+;; "        MOV     4, PTR [R12+RAX+0], 0"
+;; "        MOV     7, PTR [RBX+5], #<TN t13[RSI(d)] :NORMAL>"
+    (loop (when (search match-string (car lines))
+            (setq found t)
+            (let ((barrier-fixup-line (nth 3 lines)))
+              (assert (search ":FLAVOR GC-BARRIER" barrier-fixup-line))
+              (return)))
+          (pop lines))
+    ;; Fail if we didn't find the sentinel CLOSURE-INIT
+    (assert found)))
+
+(with-test (:name :closure-init-gc-barrier)
+  (let ((lines
+         (compiler-trace-output-lines
+           '(lambda (address)
+             (declare (sb-vm:word address))
+             (let ((sap (sb-sys:int-sap address)))
+               (lambda () sap))))))
+    (assert-has-gc-barrier "CLOSURE-INIT" lines)))
+
+(defstruct (point (:constructor make-point (x))) x (y 0) (z 0))
+(with-test (:name :structure-init-gc-barrier)
+  (let ((lines
+         (compiler-trace-output-lines
+          '(lambda (val)
+             (declare (double-float val) (inline make-point))
+            (let ((neg (- val))) (make-point neg))))))
+    (assert-has-gc-barrier "SET-SLOT" lines)))

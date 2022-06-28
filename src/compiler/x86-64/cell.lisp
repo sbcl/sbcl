@@ -764,15 +764,23 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:info offset)
+  (:vop-var vop)
+  ;; temp is wasted if we don't need a barrier, which we almost never do
+  (:temporary (:sc unsigned-reg) temp)
   (:generator 4
-    ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
+    (let* ((value-tn (tn-ref-tn (tn-ref-across (vop-args vop))))
+           (prim-type (sb-c::tn-primitive-type value-tn))
+           (scs (and prim-type (sb-c::primitive-type-scs prim-type))))
+      (when (and (not (singleton-p scs))
+                 (member descriptor-reg-sc-number scs))
+        (emit-gc-store-barrier object nil temp (vop-nth-arg 1 vop) value)))
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)
   (:args (object :scs (descriptor-reg)))
   (:info offset)
   (:generator 4
-    ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
+    ;; RBP-TN looks like a fixnum (non-pointer) so no barrier
     (storew rbp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 ;;;; value cell hackery

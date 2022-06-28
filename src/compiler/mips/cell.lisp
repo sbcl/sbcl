@@ -264,8 +264,11 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg)))
   (:info offset)
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
-    (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
+    (without-scheduling ()
+      (emit-gc-store-barrier object nil temp)
+      (storew value object (+ closure-info-offset offset) fun-pointer-lowtag))))
 
 (define-vop (closure-init-from-fp)
   (:args (object :scs (descriptor-reg)))
