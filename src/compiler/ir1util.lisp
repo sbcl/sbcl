@@ -435,34 +435,27 @@
             (values (car (last args 2))
                     (car (last args)))
             (values (first args) (second args)))
-      (when (and (lvar-info value-lvar)
-                 ;; Can this lvar be boxed after the allocator?
-                 (let ((prim-type (ir2-lvar-primitive-type (lvar-info value-lvar))))
-                   (and prim-type
-                        (or (singleton-p (primitive-type-scs prim-type))
-                            (not (member sb-vm:descriptor-reg-sc-number
-                                         (primitive-type-scs prim-type)))))))
-        (let ((allocator (principal-lvar-ref-use object-lvar))
-              (value-ref (principal-lvar-ref value-lvar))
-              (uses (lvar-uses value-lvar)))
-          (when (and (combination-p allocator)
-                     (lvar-fun-is (combination-fun allocator) '(list* list
-                                                                %make-instance
-                                                                %make-funcallable-instance)))
+      (let ((allocator (principal-lvar-ref-use object-lvar))
+            (value-ref (principal-lvar-ref value-lvar))
+            (uses (lvar-uses value-lvar)))
+        (when (and (combination-p allocator)
+                   (lvar-fun-is (combination-fun allocator) '(list* list
+                                                              %make-instance
+                                                              %make-funcallable-instance)))
 
-            (when value-ref
-              (let ((var (ref-leaf value-ref)))
-                (when (and (lambda-var-p (ref-leaf value-ref))
-                           (not (lambda-var-sets (ref-leaf value-ref))))
-                  (when (member (functional-kind (lambda-var-home var))
-                                '(:external :optional))
-                    (return-from set-slot-old-p t))
-                  (setf uses (principal-lvar-ref-use value-lvar)))))
-            (when uses
-              (if (consp uses)
-                  (loop for use in uses
-                        always (node-dominates-p use allocator))
-                  (node-dominates-p uses allocator)))))))))
+          (when value-ref
+            (let ((var (ref-leaf value-ref)))
+              (when (and (lambda-var-p (ref-leaf value-ref))
+                         (not (lambda-var-sets (ref-leaf value-ref))))
+                (when (member (functional-kind (lambda-var-home var))
+                              '(:external :optional))
+                  (return-from set-slot-old-p t))
+                (setf uses (principal-lvar-ref-use value-lvar)))))
+          (when uses
+            (if (consp uses)
+                (loop for use in uses
+                      always (node-dominates-p use allocator))
+                (node-dominates-p uses allocator))))))))
 
 ;;;; block starting/creation
 
