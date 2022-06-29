@@ -37,17 +37,21 @@
               (remove "" (split-string string #\Space) :test #'string=))))
     (if (not (or (cdr list) singleton-list)) (car list) list)))
 
-(defun test-line (fn line)
+(defun test-line (fn line n)
   (let ((relevant-portion (subseq line 0 (position #\# line))))
     (when (string/= relevant-portion "")
-      (let ((string
-             (coerce (mapcar
-                      #'code-char
-                      (parse-codepoints
-                       (remove +mul+ (remove +div+ relevant-portion))))
-                     'string)))
-        (assert (equalp (funcall fn string)
-                        (line-to-clusters relevant-portion)))))))
+      (let* ((string
+               (coerce (mapcar
+                        #'code-char
+                        (parse-codepoints
+                         (remove +mul+ (remove +div+ relevant-portion))))
+                       'string))
+             (actual (funcall fn string))
+             (expected (line-to-clusters relevant-portion)))
+        (assert (equalp actual expected)
+                ()
+                "~@<line ~D: ~S - expected: ~S, actual: ~S~@:>"
+                n line expected actual)))))
 
 (defun test-graphemes ()
   (declare (optimize (debug 2)))
@@ -55,8 +59,9 @@
                     :skipped-on (not :sb-unicode))
     (with-open-file (s "data/GraphemeBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
+            for n from 0
             while line
-            do (test-line #'graphemes (remove #\Tab line))))))
+            do (test-line #'graphemes (remove #\Tab line) n)))))
 
 (test-graphemes)
 
@@ -66,8 +71,9 @@
                     :skipped-on (not :sb-unicode))
     (with-open-file (s "data/WordBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
+            for n from 0
             while line
-            do (test-line #'words (remove #\Tab line))))))
+            do (test-line #'words (remove #\Tab line) n)))))
 
 (test-words)
 
@@ -77,8 +83,9 @@
                     :skipped-on (not :sb-unicode))
     (with-open-file (s "data/SentenceBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
+            for n from 0
             while line
-            do (test-line #'sentences (remove #\Tab line))))))
+            do (test-line #'sentences (remove #\Tab line) n)))))
 
 (test-sentences)
 
@@ -110,6 +117,7 @@
       (setf (gethash s line-break-exceptions) t))
     (with-open-file (s "data/LineBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
+            for n from 0
             while line
             do (let ((string (subseq line 0 (max 0 (1- (or (position #\# line) 1))))))
                  (unless (string= string "")
@@ -118,5 +126,11 @@
                                       (string-from-line-break-line string)))
                           (actual (substitute :can :must annotated)))
                      (if (gethash string line-break-exceptions)
-                         (assert (not (equal expected actual)))
-                         (assert (equal expected actual))))))))))
+                         (assert (not (equal expected actual))
+                                 ()
+                                 "~@<line ~D: ~S - expected: ~S, actual; ~S~:@>"
+                                 n string expected actual)
+                         (assert (equal expected actual)
+                                 ()
+                                 "~@<line ~D: ~S - expected: ~S, actual; ~S~:@>"
+                                 n string expected actual)))))))))
