@@ -18,15 +18,18 @@
      (setf (gethash (format nil "tools-for-build/~A.txt" ,name) *ucd-inputs*) 'used)
      ,@body))
 
-(defmacro with-input-utf8-file ((s name &key (eszets 0)) &body body)
-  ;; KLUDGE: CaseFolding.txt as distributed by Unicode contains a
-  ;; non-ASCII character, an eszet, within a comment to act as an
+(defmacro with-input-utf8-file
+    ((s name &key (eszets 0) (registereds 1) (copyrights 1)) &body body)
+  ;; KLUDGE: Unicode data files in general have registered and
+  ;; copyright marks (non-ASCII characters) in the header;
+  ;; additionally, CaseFolding.txt as distributed by Unicode contains
+  ;; a non-ASCII character, an eszet, within a comment to act as an
   ;; example.  We can't in general assume that our host lisp will let
-  ;; us read that, and we can't portably write that we don't care
+  ;; us read those, and we can't portably write that we don't care
   ;; about the text content of anything on a line after a hash because
-  ;; text decoding happens at a lower level.  So here we rewrite the
-  ;; CaseFolding.txt file to exclude the UTF-8 sequence corresponding
-  ;; to the eszet character.
+  ;; text decoding happens at a lower level.  So here we rewrite data
+  ;; files to exclude the UTF-8 sequences corresponding to those
+  ;; characters (and error if we see any other UTF-8 sequence).
   (let ((in (gensym "IN"))
         (out (gensym "OUT")))
     `(let ((filename (format nil "~A.txt" ,name)))
@@ -43,11 +46,21 @@
            (setf (gethash (format nil "output/~A.txt" ,name) *ucd-outputs*) 'made)
            (do ((inbyte (read-byte ,in nil nil) (read-byte ,in nil nil))
                 (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
-                (eszet-count 0))
+                (eszet-count 0)
+                (copyright (map '(vector (unsigned-byte 8)) 'char-code "<copyright>"))
+                (copyright-count 0)
+                (registered (map '(vector (unsigned-byte 8)) 'char-code "<registered>"))
+                (registered-count 0))
                ((null inbyte)
                 (unless (= eszet-count ,eszets)
                   (error "Unexpected number of eszets in ~A: ~D (expected ~D)"
-                         filename eszet-count ,eszets)))
+                         filename eszet-count ,eszets))
+                (unless (= copyright-count ,copyrights)
+                  (error "Unexpected number of copyright symbols in ~A: ~D (expected ~D)"
+                         filename copyright-count ,copyrights))
+                (unless (= registered-count ,registereds)
+                  (error "Unexpected number of registered symbols in ~A: ~D (expected ~D)"
+                         filename registered-count ,registereds)))
              (cond
                ((= inbyte #xc3)
                 (let ((second (read-byte ,in nil nil)))
@@ -57,6 +70,13 @@
                     ((= second #x9f) (incf eszet-count) (write-sequence eszet ,out))
                     (t (error "Unexpected continuation after #xc3 in ~A: #x~X"
                               filename second)))))
+               ((= inbyte #xc2)
+                (let ((second (read-byte ,in nil nil)))
+                  (cond
+                    ((null second)
+                     (error "No continuation after #xc2 in ~A" filename))
+                    ((= second #xa9) (incf copyright-count) (write-sequence copyright ,out))
+                    ((= second #xae) (incf registered-count) (write-sequence registered ,out)))))
                ((>= inbyte #x7f)
                 (error "Unexpected octet in ~A: #x~X" filename inbyte))
                (t (write-byte inbyte ,out))))))
@@ -148,7 +168,7 @@
               :adjustable t)) ; 10000 is not a significant number
 
 (defparameter *decomposition-corrections*
-  (with-input-txt-file (s "NormalizationCorrections")
+  (with-input-utf8-file (s "NormalizationCorrections")
     (loop with result = nil
        for line = (read-line s nil nil) while line
        do (when (position #\; line)
@@ -163,7 +183,7 @@
 
 (defparameter *compositions* (make-hash-table :test #'equal))
 (defparameter *composition-exclusions*
-  (with-input-txt-file (s "CompositionExclusions")
+  (with-input-utf8-file (s "CompositionExclusions")
     (loop with result = nil
        for line = (read-line s nil nil) while line
        when (and (> (length line) 0) (char/= (char line 0) #\#))
@@ -175,7 +195,7 @@
 (defparameter *different-casefolds* nil)
 
 (defparameter *case-mapping*
-  (with-input-txt-file (s "SpecialCasing")
+  (with-input-utf8-file (s "SpecialCasing")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -211,7 +231,7 @@ Length should be adjusted when the standard changes.")
 (defparameter *line-break-classes* (init-indices '*line-break-classes*))
 
 (defparameter *east-asian-width-table*
-  (with-input-txt-file (s "EastAsianWidth")
+  (with-input-utf8-file (s "EastAsianWidth")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -226,7 +246,7 @@ Length should be adjusted when the standard changes.")
   "Table of East Asian Widths. Used in the creation of misc entries.")
 
 (defparameter *script-table*
-  (with-input-txt-file (s "Scripts")
+  (with-input-utf8-file (s "Scripts")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -241,7 +261,7 @@ Length should be adjusted when the standard changes.")
 "Table of scripts. Used in the creation of misc entries.")
 
 (defparameter *line-break-class-table*
-  (with-input-txt-file (s "LineBreak")
+  (with-input-utf8-file (s "LineBreak")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -261,7 +281,7 @@ Length should be adjusted when the standard changes.")
 "Table of line break classes. Used in the creation of misc entries.")
 
 (defparameter *age-table*
-  (with-input-txt-file (s "DerivedAge")
+  (with-input-utf8-file (s "DerivedAge")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -427,7 +447,7 @@ Length should be adjusted when the standard changes.")
          (ncount (* vcount tcount))
          (table (make-hash-table)))
     (declare (ignore lcount))
-    (with-input-txt-file (*standard-input* "Jamo")
+    (with-input-utf8-file (*standard-input* "Jamo")
       (loop for line = (read-line nil nil)
             while line
             if (position #\; line)
@@ -678,7 +698,7 @@ Length should be adjusted when the standard changes.")
       (push result **proplist-properties**))))
 
 (defun slurp-proplist ()
-  (with-input-txt-file (s "PropList")
+  (with-input-utf8-file (s "PropList")
     (parse-property s) ;; Initial comments
     (parse-property s :white-space)
     (parse-property s :bidi-control)
@@ -708,12 +728,13 @@ Length should be adjusted when the standard changes.")
     (parse-property s :logical-order-exception)
     (parse-property s :other-id-start)
     (parse-property s :other-id-continue)
-    (parse-property s :sterm)
+    (parse-property s :sentence-terminal)
     (parse-property s :variation-selector)
     (parse-property s :pattern-white-space)
-    (parse-property s :pattern-syntax))
+    (parse-property s :pattern-syntax)
+    (parse-property s :prepended-concatenation-mark))
 
-  (with-input-txt-file (s "DerivedNormalizationProps")
+  (with-input-utf8-file (s "DerivedNormalizationProps")
     (parse-property s) ;; Initial comments
     (parse-property s) ;; FC_NFKC_Closure
     (parse-property s) ;; FC_NFKC_Closure
@@ -796,7 +817,7 @@ Length should be adjusted when the standard changes.")
   "List of confusable codepoint sets")
 
 (defparameter *bidi-mirroring-glyphs*
-  (with-input-txt-file (s "BidiMirroring")
+  (with-input-utf8-file (s "BidiMirroring")
     (loop for line = (read-line s nil nil) while line
           when (and (plusp (length line))
                     (char/= (char line 0) #\#))
@@ -808,7 +829,7 @@ Length should be adjusted when the standard changes.")
 
 (defparameter *blocks*
   (let (ranges names)
-    (with-input-txt-file (stream "Blocks")
+    (with-input-utf8-file (stream "Blocks")
       (loop
        (let ((line (read-line stream nil nil)))
          (cond ((not line) (return))

@@ -139,7 +139,7 @@ Wanted ~S, got ~S."
 
 (defun test-bidi-class ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "data/DerivedBidiClass.txt" :external-format :ascii)
+  (with-open-file (s "data/DerivedBidiClass.txt" :external-format :utf-8)
     (with-test (:name (:bidi-class))
       (loop for line = (read-line s nil nil)
             while line
@@ -150,7 +150,7 @@ Wanted ~S, got ~S."
 
 (defun test-hangul-syllable-type ()
   (declare (optimize (debug 2)))
-  (with-open-file (s "data/HangulSyllableType.txt" :external-format :ascii)
+  (with-open-file (s "data/HangulSyllableType.txt" :external-format :utf-8)
     (with-test (:name (:hangul-syllable-type))
       (loop for line = (read-line s nil nil)
             while line
@@ -162,7 +162,7 @@ Wanted ~S, got ~S."
 (defun test-east-asian-width ()
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/EastAsianWidth.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:east-asian-width))
       (loop for line = (read-line s nil nil)
             while line
@@ -174,7 +174,7 @@ Wanted ~S, got ~S."
 (defun test-script ()
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/Scripts.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:script))
       (loop for line = (read-line s nil nil)
             while line
@@ -186,7 +186,7 @@ Wanted ~S, got ~S."
 (defun test-block ()
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/Blocks.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:block))
       (loop for line = (read-line s nil nil)
             while line
@@ -203,7 +203,7 @@ Wanted ~S, got ~S."
 (defun test-proplist ()
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/PropList.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:proplist))
       (loop for line = (read-line s nil nil)
          while line
@@ -228,7 +228,7 @@ Wanted ~S, got ~S."
 (defun test-bidi-mirroring-glyph ()
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/BidiMirroring.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:bidi-mirroring-glyph)
                 :skipped-on (not :sb-unicode))
       (loop for line = (read-line s nil nil)
@@ -251,7 +251,7 @@ Wanted ~S, got ~S."
 (defun test-age ()
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/DerivedAge.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:age))
       (loop for line = (read-line s nil nil)
          while line
@@ -275,7 +275,7 @@ Wanted ~S, got ~S."
 (defun test-grapheme-break-class ()
   (declare (optimize (debug 2)))
   (with-open-file (s "data/GraphemeBreakProperty.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:grapheme-break-class))
       (loop for line = (read-line s nil nil)
             while line
@@ -289,7 +289,7 @@ Wanted ~S, got ~S."
 (defun test-word-break-class ()
   (declare (optimize (debug 2)))
   (with-open-file (s "data/WordBreakProperty.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:word-break-class))
       (loop for line = (read-line s nil nil)
             while line
@@ -302,7 +302,7 @@ Wanted ~S, got ~S."
 (defun test-sentence-break-class ()
   (declare (optimize (debug 2)))
   (with-open-file (s "data/SentenceBreakProperty.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:sentence-break-class))
       (loop for line = (read-line s nil nil)
             while line
@@ -314,7 +314,7 @@ Wanted ~S, got ~S."
 (defun test-line-break-class ()
   (declare (optimize (debug 2)))
   (with-open-file (s "../tools-for-build/LineBreak.txt"
-                     :external-format :ascii)
+                     :external-format :utf-8)
     (with-test (:name (:line-break-class))
       (loop for line = (read-line s nil nil)
             while line
