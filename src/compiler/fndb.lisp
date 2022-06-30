@@ -570,7 +570,8 @@
                     &rest proper-sequence)
   sequence
   (call)
-  :derive-type #'result-type-first-arg)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t))
 
 (defknown #.(loop for info across sb-vm:*specialized-array-element-type-properties*
                   collect
@@ -601,7 +602,8 @@
 (defknown fill ((modifying sequence) t &rest t &key
                 (:start index) (:end sequence-end)) sequence
     ()
-  :derive-type #'result-type-first-arg
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t)
   :result-arg 0)
 ;;; Like FILL but with no keyword argument parsing
 (defknown quickfill ((modifying (simple-array * 1)) t) (simple-array * 1) ()
@@ -620,7 +622,8 @@
 (defknown replace ((modifying sequence) proper-sequence &rest t &key (:start1 index)
                    (:end1 sequence-end) (:start2 index) (:end2 sequence-end))
   sequence ()
-  :derive-type #'result-type-first-arg
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t)
   :result-arg 0)
 
 (defknown remove
@@ -833,7 +836,8 @@
    &key (:key (function-designator ((nth-arg 0 :sequence t)))))
   sequence
   (call)
-  :derive-type #'result-type-first-arg)
+  :derive-type (sequence-result-nth-arg 0 :preserve-dimensions t
+                                          :preserve-vector-type t))
 (defknown sb-impl::stable-sort-list (list function function) list
   (call important-result no-verify-arg-count))
 (defknown sb-impl::sort-vector (vector index index function (or function null))

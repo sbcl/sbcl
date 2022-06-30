@@ -773,3 +773,17 @@
                   (assert (equal suffix (coerce (subseq source (+ offset i)) 'list))))
                 (assert (equal reverse (coerce (reverse vector) 'list)))
                 (assert (equal reverse (coerce (nreverse vector) 'list)))))))
+
+(with-test (:name :list-derived-type)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (ctype= (second
+                    (third
+                     (sb-kernel:%simple-fun-type
+                      (checked-compile '(lambda (x y)
+                                         (declare (ignorable x y))
+                                         ,fun)))))
+                   ',expected))))
+    (check (sort (the (cons (eql 0)) x) y)
+           cons)))

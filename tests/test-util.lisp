@@ -87,7 +87,6 @@
     ;; To actually exercise the type operation, remove the memoized parse.
     (sb-int:drop-all-hash-caches)
     (let ((b (sb-kernel:values-specifier-type right)))
-      (assert (not (eq a b)))
       (sb-kernel:type= a b))))
 
 (defmacro assert-tri-eq (expected-result expected-certainp form)
