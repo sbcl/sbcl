@@ -590,7 +590,7 @@
             (coerce 0 '(dispatch-type number))))))))
 
 (macrolet ((def (type)
-             `(defun ,(symbolicate '%unary-truncate/ type '-to-bignum) (number)
+             `(defun ,(symbolicate 'unary-truncate- type '-to-bignum) (number)
                 (multiple-value-bind (bits exp sign) (integer-decode-float number)
                   (values
                    (ash (if (minusp sign)
