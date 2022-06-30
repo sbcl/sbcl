@@ -822,11 +822,16 @@
             (allocation nil bytes fun-pointer-lowtag result node temp thread-tn))
         (storew* #-immobile-space header ; write the widetag and size
                  #+immobile-space        ; ... plus the layout pointer
-                 (progn (inst mov temp header)
-                        (inst or temp #-sb-thread (static-symbol-value-ea 'function-layout)
-                                      #+sb-thread
-                                      (thread-slot-ea thread-function-layout-slot))
-                        temp)
+                 (let ((layout #-sb-thread (static-symbol-value-ea 'function-layout)
+                               #+sb-thread (thread-slot-ea thread-function-layout-slot)))
+                   (cond ((typep header '(unsigned-byte 16))
+                          (inst mov temp layout)
+                          ;; emit a 2-byte constant, the low 4 of TEMP were zeroed
+                          (inst mov :word temp header))
+                         (t
+                          (inst mov temp header)
+                          (inst or temp layout)))
+                   temp)
                  result 0 fun-pointer-lowtag (not stack-allocate-p)))
       ;; Finished with the pseudo-atomic instructions
       ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here, but other other GC strategies might.
