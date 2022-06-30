@@ -941,7 +941,7 @@ many elements are copied."
 ;;;; NREVERSE
 
 (defun list-nreverse (list)
-  (do ((1st (cdr list) (if (endp 1st) 1st (cdr 1st)))
+  (do ((1st (cdr (truly-the list list)) (cdr 1st))
        (2nd list 1st)
        (3rd '() 2nd))
       ((atom 2nd) 3rd)
