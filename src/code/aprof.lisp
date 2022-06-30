@@ -158,7 +158,7 @@
          (cmp :qword ?end :tlab-limit)
          (jmp :nbe ?_)
          (mov :qword :tlab-freeptr ?end)
-         (add ?end ?bias)
+         (:or (add ?end ?bias) (dec ?end))
          (mov ?_ (ea ?_ ?end) ?header))
 
         (var-array

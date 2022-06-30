@@ -255,7 +255,8 @@
                           (t
                            ;; SUB can compute the result and tagify it.
                            ;; The fallback also has to tagify.
-                           (inst add alloc-tn (+ (- size) lowtag))
+                           (let ((bias (+ (- size) lowtag)))
+                             (if (= bias -1) (inst dec alloc-tn) (inst add alloc-tn bias)))
                            (emit-label DONE)))))
              (assemble (:elsewhere)
                (emit-label NOT-INLINE)
