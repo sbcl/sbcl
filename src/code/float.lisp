@@ -566,6 +566,41 @@
                     bits)
                 exp))))))
 
+;;; Produce both values, unlike %unary-truncate
+(defun unary-truncate (number)
+  (number-dispatch ((number real))
+    ((integer) (values number 0))
+    ((ratio)
+     (let ((truncated (truncate (numerator number) (denominator number))))
+       (values truncated
+               (- number truncated))))
+    (((foreach single-float double-float #+long-float long-float))
+     (if (and (<= (float most-negative-fixnum number) number)
+              (< number (float most-positive-fixnum number)))
+         (let* ((truncated (truly-the fixnum (%unary-truncate number))))
+           (values truncated
+                   (- number
+                      (coerce truncated '(dispatch-type number)))))
+         (multiple-value-bind (bits exp sign) (integer-decode-float number)
+           (values
+            (ash (if (minusp sign)
+                     (- bits)
+                     bits)
+                 exp)
+            (coerce 0 '(dispatch-type number))))))))
+
+(macrolet ((def (type)
+             `(defun ,(symbolicate '%unary-truncate/ type '-to-bignum) (number)
+                (multiple-value-bind (bits exp sign) (integer-decode-float number)
+                  (values
+                   (ash (if (minusp sign)
+                            (- bits)
+                            bits)
+                        exp)
+                   (coerce 0 ',type))))))
+  (def double-float)
+  (def single-float))
+
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
              `(defun ,name (number)

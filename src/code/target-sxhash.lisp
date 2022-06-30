@@ -361,9 +361,10 @@
              (let ((lo (coerce most-negative-fixnum type))
                    (hi (coerce most-positive-fixnum type)))
                `(let ((key ,key))
-                  (cond ( ;; This clause allows FIXNUM-sized integer
+                  (cond (;; This clause allows FIXNUM-sized integer
                          ;; values to be handled without consing.
-                         (<= ,lo key ,hi)
+                         (and (<= ,lo key)
+                              (< key ,hi))
                          (multiple-value-bind (q r) (floor (the (,type ,lo ,hi) key))
                            (if (zerop (the ,type r))
                                (sxhash q)

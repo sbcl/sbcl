@@ -1553,22 +1553,39 @@
 
 
 ;;;; TRUNCATE, FLOOR, CEILING, and ROUND
+(deftransform truncate ((x &optional by)
+                        (t &optional (constant-arg (member 1))))
+  '(unary-truncate x))
 
-(macrolet ((define-frobs (fun ufun)
-             `(deftransform ,fun ((x &optional by)
-                                  (t &optional (constant-arg (member 1))))
-                  '(let ((res (,ufun x)))
-                    (values res (locally
-                                    (declare (flushable %single-float
-                                                        %double-float))
-                                  (- x res)))))))
-  (define-frobs truncate %unary-truncate)
-  (define-frobs round %unary-round))
+(deftransform round ((x &optional by)
+                     (t &optional (constant-arg (member 1))))
+  '(let ((res (%unary-round x)))
+    (values res (locally
+                    (declare (flushable %single-float
+                                        %double-float))
+                  (- x res)))))
 
 (deftransform %unary-truncate ((x) (single-float))
   `(%unary-truncate/single-float x))
 (deftransform %unary-truncate ((x) (double-float))
   `(%unary-truncate/double-float x))
+
+(deftransform unary-truncate ((x) * * :result result)
+  (if (lvar-single-value-p result)
+      `(values (%unary-truncate x) x)
+      (give-up-ir1-transform)))
+
+(macrolet ((def (type)
+             `(deftransform unary-truncate ((number) (,type))
+                '(if (and (<= (float most-negative-fixnum number) number)
+                      (< number (float most-positive-fixnum number)))
+                  (let ((truncated (truly-the fixnum (%unary-truncate number))))
+                    (values truncated
+                            (- number
+                               (coerce truncated ',type))))
+                  (,(symbolicate 'unary-truncate- type '-to-bignum) number)))))
+  (def single-float)
+  (def double-float))
 
 ;;; Convert (TRUNCATE x y) to the obvious implementation.
 ;;;
@@ -1596,11 +1613,7 @@
                     (if (or (not y)
                             (and (constant-lvar-p y) (= 1 (lvar-value y))))
                         (if compute-all
-                            `(let ((res (,',unary x)))
-                               (values res (- x (locally
-                                                    ;; Can be flushed as it will produce no errors.
-                                                    (declare (flushable ,',coerce))
-                                                    (,',coerce res)))))
+                            `(unary-truncate x)
                             `(let ((res (,',unary x)))
                                ;; Dummy secondary value!
                                (values res x)))

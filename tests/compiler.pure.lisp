@@ -4280,17 +4280,16 @@
     (((cons 1.0 2.0) :test '=) t)))
 
 (with-test (:name (compile truncate :wild-values))
-  (let ((sb-c::*check-consistency* t))
-    (checked-compile-and-assert ()
-        `(lambda (a)
-           (declare (type (member 1d0 2d0) a))
-           (block return-value-tag
-             (funcall
-              (the function
-                   (catch 'debug-catch-tag
-                     (return-from return-value-tag
-                       (progn (truncate a))))))))
-      ((2d0) (values 2 0d0)))))
+  (checked-compile-and-assert ()
+                              `(lambda (a)
+                                 (declare (type (member 1d0 2d0) a))
+                                 (block return-value-tag
+                                   (funcall
+                                    (the function
+                                         (catch 'debug-catch-tag
+                                           (return-from return-value-tag
+                                             (progn (truncate a))))))))
+                              ((2d0) (values 2 0d0))))
 
 (with-test (:name (compile :boxed-fp-constant-for-full-call))
   (let ((fun (checked-compile

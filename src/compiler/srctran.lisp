@@ -1720,6 +1720,22 @@
   (one-arg-derive-type number
                        #'%unary-truncate-derive-type-aux
                        #'%unary-truncate))
+
+(defoptimizer (unary-truncate derive-type) ((number))
+  (let* ((one (specifier-type '(integer 1 1)))
+         (quot (one-arg-derive-type number
+                                    (lambda (x)
+                                      (truncate-derive-type-quot-aux x one nil))
+                                    #'truncate))
+         (rem (one-arg-derive-type number
+                                   (lambda (x) (truncate-derive-type-rem-aux x one nil))
+                                   #'rem)))
+    (when (and quot rem)
+      (make-values-type :required (list quot rem)))))
+
+(deftransform unary-truncate ((number) (integer))
+  '(values number 0))
+
 #-round-float
 (progn
   (defun ftruncate-derive-type-quot (number-type divisor-type)

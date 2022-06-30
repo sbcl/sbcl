@@ -344,6 +344,12 @@
   (real &optional real) (values integer real)
   (movable foldable flushable recursive))
 
+(defknown unary-truncate (real) (values integer real)
+  (movable foldable flushable))
+
+(defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0)))
+(defknown unary-truncate-double-float-to-bignum (double-float) (values bignum (eql $0d0)))
+
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
 
