@@ -560,11 +560,11 @@
      (if (and (<= (float most-negative-fixnum number) number)
               (< number (float most-positive-fixnum number)))
          (truly-the fixnum (%unary-truncate number))
-         (multiple-value-bind (bits exp) (integer-decode-float number)
-           (let ((res (ash bits exp)))
-             (if (minusp number)
-                 (- res)
-                 res)))))))
+         (multiple-value-bind (bits exp sign) (integer-decode-float number)
+           (ash (if (minusp sign)
+                    (- bits)
+                    bits)
+                exp))))))
 
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
