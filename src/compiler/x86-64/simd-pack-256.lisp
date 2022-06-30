@@ -162,47 +162,28 @@
 
 (define-vop (%simd-pack-256-0)
   (:translate %simd-pack-256-0)
-  (:args (x :scs (int-avx2-reg double-avx2-reg single-avx2-reg)))
+  (:args (x :scs (descriptor-reg)))
   (:arg-types simd-pack-256)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:generator 3
-    (inst vmovq dst x)))
+    (loadw dst x simd-pack-256-p0-slot other-pointer-lowtag)))
 
-(define-vop (%simd-pack-256-1)
+(define-vop (%simd-pack-256-1 %simd-pack-256-0)
   (:translate %simd-pack-256-1)
-  (:args (x :scs (int-avx2-reg double-avx2-reg single-avx2-reg)))
-  (:arg-types simd-pack-256)
-  (:results (dst :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
-    (inst vpextrq dst x 1)))
+    (loadw dst x simd-pack-256-p1-slot other-pointer-lowtag)))
 
-(define-vop (%simd-pack-256-2)
+(define-vop (%simd-pack-256-2 %simd-pack-256-0)
   (:translate %simd-pack-256-2)
-  (:args (x :scs (int-avx2-reg double-avx2-reg single-avx2-reg)))
-  (:arg-types simd-pack-256)
-  (:temporary (:sc ymm-reg :from (:argument 1)) tmp)
-  (:results (dst :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
-    (inst vextracti128 tmp x 1)
-    (inst vmovq dst tmp)))
+    (loadw dst x simd-pack-256-p2-slot other-pointer-lowtag)))
 
-(define-vop (%simd-pack-256-3)
+(define-vop (%simd-pack-256-3 %simd-pack-256-0)
   (:translate %simd-pack-256-3)
-  (:args (x :scs (int-avx2-reg double-avx2-reg single-avx2-reg)))
-  (:arg-types simd-pack-256)
-  (:temporary (:sc ymm-reg :from (:argument 1)) tmp)
-  (:results (dst :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
   (:generator 3
-    (inst vextracti128 tmp x 1)
-    (inst vpextrq dst tmp 1)))
+    (loadw dst x simd-pack-256-p3-slot other-pointer-lowtag)))
 
 (define-vop (%make-simd-pack-256)
   (:translate %make-simd-pack-256)
