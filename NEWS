@@ -4,7 +4,8 @@ changes relative to sbcl-2.2.5:
   * minor incompatible change: support for 32-bit x86 on macOS has been
     removed.
   * new contrib: sb-simd, to provide a convenient interface for SIMD
-    programming.  (Thanks to Marco Heisig and other sb-simd contributors)
+    programming on x86-64.  (Thanks to Marco Heisig and other sb-simd
+    contributors)
   * enhancement: core compression now uses zstd instead of zlib.  (lp#1881089)
   * enhancement: provide compiler warnings for specialized array type
     mismatches in CONCATENATE.
@@ -15,6 +16,8 @@ changes relative to sbcl-2.2.5:
   * bug fix: fix compilation failure related to declaiming types of constants.
     (lp#1977726, reported by Pierre Neidhardt)
   * bug fix: fix race condition in CLOS optimized constructors.  (lp#1951341)
+  * bug fix: fix too-eager elision of allocation barriers when initializing
+    closure and structure objects.
   * optimization: fasl files are now usually smaller (up to 10% on default
     policy) and may load faster, especially on high debug.
   * optimization: faster string comparisons on arm64, x86-64.
