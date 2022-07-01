@@ -1076,7 +1076,7 @@
 ;;;  - code object references: don't need a name.
 ;;;  - everything else: a symbol for the name.
 (defun dump-fixups (fixup-notes alloc-points fasl-output &aux (nelements 2))
-  (declare (list fixups-notes) (type fasl-output fasl-output))
+  (declare (type list fixup-notes) (type fasl-output fasl-output))
   ;; "retained" fixups are those whose offset in the code needs to be
   ;; remembered for subsequent reapplication by the garbage collector,
   ;; or in some cases, on core startup.
