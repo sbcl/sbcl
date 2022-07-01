@@ -2233,10 +2233,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
 
-;;; In case we need to store code fixups in code objects.
-;;; At present only the x86 backends use this
-(defvar *code-fixup-notes*)
-
 (defun code-jump-table-words (code)
   (ldb (byte 14 0) (read-bits-wordindexed code (code-header-words code))))
 
@@ -2246,11 +2242,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                            descriptor)
                 cold-fixup))
 (defun cold-fixup (code-object after-header value kind flavor)
-  (let ((classification
-         (sb-vm:fixup-code-object code-object after-header value kind flavor)))
-    (when classification
-      (push (cons classification after-header)
-            (gethash (descriptor-bits code-object) *code-fixup-notes*))))
+  (sb-vm:fixup-code-object code-object after-header value kind flavor)
   code-object)
 
 (defun resolve-static-call-fixups ()
@@ -2259,18 +2251,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (cold-fixup code offset
                   (cold-fun-entry-addr (cold-symbol-function name))
                   kind :static-call))))
-
-;;; Save packed lists of fixups.
-;;; (cf. FINISH-FIXUPS in generic/target-core.)
-(defun repack-fixups (list)
-  (collect ((immediate) (relative) (absolute))
-    (dolist (item list)
-      (ecase (car item)
-        ;; There should be no absolute64 fixups to preserve
-        (:immediate (immediate (cdr item)))
-        (:relative (relative (cdr item)))
-        (:absolute (absolute (cdr item)))))
-    (number-to-core (sb-c:pack-code-fixup-locs (absolute) (relative) (immediate)))))
 
 (defun linkage-table-note-symbol (symbol-name datap)
   "Register a symbol and return its address in proto-linkage-table."
@@ -2817,6 +2797,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 ;;; Target variant of this is defined in 'target-load'
 (defun apply-fixups (code-obj fixups index count &aux (end (1- (+ index count))))
+  (let ((retained-fixups (svref fixups index)))
+    (write-wordindexed code-obj sb-vm::code-fixups-slot retained-fixups)
+    (incf index))
   (binding* ((alloc-points (svref fixups index) :exit-if-null))
     (cold-set 'sb-c::*!cold-allocation-patch-point*
               (cold-cons (cold-cons code-obj alloc-points)
@@ -3851,7 +3834,6 @@ III. initially undefined function references (alphabetically):
            *cold-assembler-routines*
            *cold-assembler-obj*
            *deferred-undefined-tramp-refs*
-           (*code-fixup-notes* (make-hash-table))
            (*deferred-known-fun-refs* nil))
 
       (make-nil-descriptor)
@@ -3918,9 +3900,6 @@ III. initially undefined function references (alphabetically):
       (resolve-deferred-known-funs)
       (resolve-static-call-fixups)
       (foreign-symbols-to-core)
-      (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
-        (write-wordindexed (make-random-descriptor (car pair))
-                           sb-vm::code-fixups-slot (repack-fixups (cdr pair))))
       (when core-file-name
         (finish-symbols))
       (finalize-load-time-value-noise)

@@ -1066,14 +1066,23 @@
           (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))
           (ldb (byte 7 7) packed-info)))
 
+#+(or arm arm64 riscv sparc) ; these don't have any retained packed fixups (yet)
+(defun sb-c::pack-retained-fixups (fixup-notes)
+  (declare (ignore fixup-notes))
+  0) ; as if from PACK-CODE-FIXUP-LOCS
+
 ;;; Dump all the fixups.
 ;;;  - foreign (C) symbols: named by a string
 ;;;  - code object references: don't need a name.
 ;;;  - everything else: a symbol for the name.
-(defun dump-fixups (fixups alloc-points fasl-output &aux (nwords 1))
+(defun dump-fixups (fixup-notes alloc-points fasl-output &aux (nelements 2))
   (declare (list fixups) (type fasl-output fasl-output))
+  ;; "retained" fixups are those whose offset in the code needs to be
+  ;; remembered for subsequent reapplication by the garbage collector,
+  ;; or in some cases, on core startup.
+  (dump-object (sb-c::pack-retained-fixups fixup-notes) fasl-output)
   (dump-object alloc-points fasl-output)
-  (dolist (note fixups nwords)
+  (dolist (note fixup-notes nelements)
     (let* ((fixup (fixup-note-fixup note))
            (name (fixup-name fixup))
            (flavor (fixup-flavor fixup))
@@ -1112,8 +1121,8 @@
               ((:foreign :foreign-dataref) (the string name))
               ((:named-call :static-call) name))))
       (dump-object info fasl-output)
-      (incf nwords (cond (named (dump-object operand fasl-output) 2)
-                         (t 1))))))
+      (incf nelements (cond (named (dump-object operand fasl-output) 2)
+                            (t 1))))))
 
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.

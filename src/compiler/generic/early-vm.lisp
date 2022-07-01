@@ -178,35 +178,6 @@
   (and (integerp x)
        (<= most-negative-fixnum x most-positive-fixnum)))
 
-;;; Helper macro for defining FIXUP-CODE-OBJECT with emulation of SAP
-;;; accessors so that the host and target can use the same fixup logic.
-#+(or x86 x86-64)
-(defmacro with-code-instructions ((sap-var code-var) &body body)
-  #+sb-xc-host
-  `(macrolet ((self-referential-code-fixup-p (value self)
-                `(let* ((base (sb-fasl::descriptor-base-address ,self))
-                        (limit (+ base (1- (code-object-size ,self)))))
-                   (<= base ,value limit)))
-              (containing-memory-space (code)
-                `(sb-fasl::descriptor-gspace-name ,code)))
-     (let ((,sap-var (code-instructions ,code-var)))
-       ,@body))
-  #-sb-xc-host
-  `(macrolet ((self-referential-code-fixup-p (value self)
-                ;; Using SAPs keeps all the arithmetic machine-word-sized.
-                ;; Otherwise it would potentially involve bignums on 32-bit
-                ;; if code starts at #x20000000 and up.
-                `(let* ((base (sap+ (int-sap (get-lisp-obj-address ,self))
-                                    (- sb-vm:lowtag-mask)))
-                        (limit (sap+ base (1- (code-object-size ,self))))
-                        (value-sap (int-sap ,value)))
-                   (and (sap>= value-sap base) (sap<= value-sap limit))))
-              (containing-memory-space (code)
-                (declare (ignore code))
-                :dynamic))
-    (let ((,sap-var (code-instructions ,code-var)))
-      ,@body)))
-
 #+sb-safepoint
 ;;; The offset from the fault address reported to the runtime to the
 ;;; END of the global safepoint page.

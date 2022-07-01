@@ -1449,8 +1449,7 @@
                     (= (ldb (byte 10 11) next) (logior (ash rd 5) rd))
                     (= (ldb (byte 6 0) next) #b000010)))
          (setf (sap-ref-32 sap offset) (dpb left-shamt (byte 5 6) inst))
-         (setf (sap-ref-32 sap (+ offset 4)) (dpb right-shamt (byte 5 6) next))
-         (return-from fixup-code-object :immediate)))
+         (setf (sap-ref-32 sap (+ offset 4)) (dpb right-shamt (byte 5 6) next))))
       (:jump
        (aver (zerop (ash value -28)))
        (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
@@ -1462,6 +1461,13 @@
        (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
              (ldb (byte 16 0) value)))))
   nil)
+
+(defun sb-c::pack-retained-fixups (fixup-notes)
+  (let (result)
+    (dolist (note fixup-notes (sb-c:pack-code-fixup-locs nil nil result))
+      (let ((fixup (fixup-note-fixup note)))
+        (when (eq (fixup-flavor fixup) :gc-barrier)
+          (push (fixup-note-position note) result))))))
 
 (define-instruction store-coverage-mark (segment mark-index)
   ;; Don't need to annotate the dependence on code-tn, I think?
