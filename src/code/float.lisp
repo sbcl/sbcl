@@ -598,11 +598,12 @@
 (macrolet ((def (type)
              `(defun ,(symbolicate 'unary-truncate- type '-to-bignum) (number)
                 (multiple-value-bind (bits exp sign) (integer-decode-float number)
-                  (let ((truncated (if (minusp sign)
-                                       (- bits)
-                                       bits)))
+                  (let ((truncated (ash (if (minusp sign)
+                                            (- bits)
+                                            bits)
+                                        exp)))
                     (values
-                     (ash truncated exp)
+                     truncated
                      ,(case type
                         ((single-float #+64-bit double-float)
                          `(coerce 0 ',type))
