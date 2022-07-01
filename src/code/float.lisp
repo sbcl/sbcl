@@ -582,22 +582,32 @@
                    (- number
                       (coerce truncated '(dispatch-type number)))))
          (multiple-value-bind (bits exp sign) (integer-decode-float number)
-           (values
-            (ash (if (minusp sign)
-                     (- bits)
-                     bits)
-                 exp)
-            (coerce 0 '(dispatch-type number))))))))
+           (let ((truncated (ash (if (minusp sign)
+                                     (- bits)
+                                     bits)
+                                 exp)))
+             (values
+              truncated
+              #+64-bit
+              (coerce 0 '(dispatch-type number))
+              #-64-bit
+              (if (eq '(dispatch-type number) 'single-float)
+                  (coerce 0 '(dispatch-type number))
+                  (- number (coerce truncated '(dispatch-type number)))))))))))
 
 (macrolet ((def (type)
              `(defun ,(symbolicate 'unary-truncate- type '-to-bignum) (number)
                 (multiple-value-bind (bits exp sign) (integer-decode-float number)
-                  (values
-                   (ash (if (minusp sign)
-                            (- bits)
-                            bits)
-                        exp)
-                   (coerce 0 ',type))))))
+                  (let ((truncated (if (minusp sign)
+                                       (- bits)
+                                       bits)))
+                    (values
+                     (ash truncated exp)
+                     ,(case type
+                        ((single-float #+64-bit double-float)
+                         `(coerce 0 ',type))
+                        (t
+                         `(- number (coerce truncated ',type))))))))))
   (def double-float)
   (def single-float))
 

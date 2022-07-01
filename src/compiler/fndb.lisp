@@ -348,7 +348,8 @@
   (movable foldable flushable))
 
 (defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0)))
-(defknown unary-truncate-double-float-to-bignum (double-float) (values bignum (eql $0d0)))
+(defknown unary-truncate-double-float-to-bignum (double-float) (values bignum #+64-bit (eql $0d0)
+                                                                              #-64-bit double-float))
 
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
