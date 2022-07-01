@@ -18,6 +18,52 @@
      (setf (gethash (format nil "tools-for-build/~A.txt" ,name) *ucd-inputs*) 'used)
      ,@body))
 
+(defmacro with-input-utf8-file ((s name &key (eszets 0)) &body body)
+  ;; KLUDGE: CaseFolding.txt as distributed by Unicode contains a
+  ;; non-ASCII character, an eszet, within a comment to act as an
+  ;; example.  We can't in general assume that our host lisp will let
+  ;; us read that, and we can't portably write that we don't care
+  ;; about the text content of anything on a line after a hash because
+  ;; text decoding happens at a lower level.  So here we rewrite the
+  ;; CaseFolding.txt file to exclude the UTF-8 sequence corresponding
+  ;; to the eszet character.
+  (let ((in (gensym "IN"))
+        (out (gensym "OUT")))
+    `(let ((filename (format nil "~A.txt" ,name)))
+       (with-open-file (,in (make-pathname :name ,name :type "txt"
+                                           :defaults *unicode-character-database*)
+                            :element-type '(unsigned-byte 8))
+         (setf (gethash (format nil "tools-for-build/~A.txt" ,name) *ucd-inputs*) 'used)
+         (with-open-file (,out (make-pathname :name ,name :type "txt"
+                                              :defaults *output-directory*)
+                               :element-type '(unsigned-byte 8)
+                               :direction :output
+                               :if-exists :supersede
+                               :if-does-not-exist :create)
+           (setf (gethash (format nil "output/~A.txt" ,name) *ucd-outputs*) 'made)
+           (do ((inbyte (read-byte ,in nil nil) (read-byte ,in nil nil))
+                (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
+                (eszet-count 0))
+               ((null inbyte)
+                (unless (= eszet-count ,eszets)
+                  (error "Unexpected number of eszets in ~A: ~D (expected ~D)"
+                         filename eszet-count ,eszets)))
+             (cond
+               ((= inbyte #xc3)
+                (let ((second (read-byte ,in nil nil)))
+                  (cond
+                    ((null second)
+                     (error "No continuation after #xc3 in ~A" filename))
+                    ((= second #x9f) (incf eszet-count) (write-sequence eszet ,out))
+                    (t (error "Unexpected continuation after #xc3 in ~A: #x~X"
+                              filename second)))))
+               ((>= inbyte #x7f)
+                (error "Unexpected octet in ~A: #x~X" filename inbyte))
+               (t (write-byte inbyte ,out))))))
+       (with-open-file (,s (make-pathname :name ,name :type "txt"
+                                          :defaults *output-directory*))
+         ,@body))))
+
 (defmacro with-output-dat-file ((s name) &body body)
   `(with-open-file (,s (make-pathname :name ,name :type "dat"
                                       :defaults *output-directory*)
@@ -565,61 +611,18 @@ Length should be adjusted when the standard changes.")
              (setf (ucd-misc (gethash code-point *ucd-entries*)) new-misc))))))
 
 (defun fixup-casefolding ()
-  ;; KLUDGE: CaseFolding.txt as distributed by Unicode contains a
-  ;; non-ASCII character, an eszet, within a comment to act as an
-  ;; example.  We can't in general assume that our host lisp will let
-  ;; us read that, and we can't portably write that we don't care
-  ;; about the text content of anything on a line after a hash because
-  ;; text decoding happens at a lower level.  So here we rewrite the
-  ;; CaseFolding.txt file to exclude the UTF-8 sequence corresponding
-  ;; to the eszet character.
-  (with-open-file (in (make-pathname :name "CaseFolding" :type "txt"
-                                     :defaults *unicode-character-database*)
-                      :element-type '(unsigned-byte 8))
-    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
-    (with-open-file (out (make-pathname :name "CaseFolding" :type "txt"
-                                        :defaults *output-directory*)
-                         :direction :output
-                         :if-exists :supersede
-                         :if-does-not-exist :create
-                         :element-type '(unsigned-byte 8))
-      (setf (gethash "output/CaseFolding.txt" *ucd-outputs*) 'made)
-      ;; KLUDGE: it's inefficient, though simple, to do the I/O
-      ;; byte-by-byte.
-      (do ((inbyte (read-byte in nil nil) (read-byte in nil nil))
-           (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
-           (eszet-count 0)
-           (filename "CaseFolding.txt"))
-          ((null inbyte)
-           (unless (= eszet-count 1)
-             (error "Unexpected number of eszets in ~A: ~D"
-                    filename eszet-count)))
-        (cond
-          ((= inbyte #xc3)
-           (let ((second (read-byte in nil nil)))
-              (cond
-                ((null second)
-                 (error "No continuation after #xc3 in ~A" filename))
-                ((= second #x9f) (incf eszet-count) (write-sequence eszet out))
-                (t (error "Unexpected continuation after #xc3 in ~A: #x~X"
-                          filename second)))))
-          ((>= inbyte #x7f)
-           (error "Unexpected octet in ~A: #x~X" filename inbyte))
-          (t (write-byte inbyte out))))))
-  (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
-                                    :defaults *output-directory*))
-    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
+  (with-input-utf8-file (s "CaseFolding" :eszets 1)
     (loop for line = (read-line s nil nil)
-       while line
-       unless (or (not (position #\; line)) (equal (position #\# line) 0))
-       do (destructuring-bind (original type mapping comment)
-              (split-string line #\;)
-            (declare (ignore comment))
-            (let ((cp (parse-integer original :radix 16))
-                  (fold (parse-codepoints mapping :singleton-list nil)))
-              (unless (or (string= type " S") (string= type " T"))
-                (when (not (equal (cdr (gethash cp *case-mapping*)) fold))
-                  (push (cons cp fold) *different-casefolds*))))))))
+          while line
+          unless (or (not (position #\; line)) (equal (position #\# line) 0))
+            do (destructuring-bind (original type mapping comment)
+                   (split-string line #\;)
+                 (declare (ignore comment))
+                 (let ((cp (parse-integer original :radix 16))
+                       (fold (parse-codepoints mapping :singleton-list nil)))
+                   (unless (or (string= type " S") (string= type " T"))
+                     (when (not (equal (cdr (gethash cp *case-mapping*)) fold))
+                       (push (cons cp fold) *different-casefolds*))))))))
 
 (defun fixup-ages ()
   (let ((age (sort
