@@ -235,7 +235,7 @@ static int get_freeish_page(int hint_page, int attributes)
 
 /// Size class is specified by lisp now
 #define MAX_ALLOCATOR_SIZE_CLASSES 10
-long fixedobj_page_hint[MAX_ALLOCATOR_SIZE_CLASSES];
+uint32_t fixedobj_page_hint[MAX_ALLOCATOR_SIZE_CLASSES];
 
 // Unused, but possibly will be for some kind of collision-avoidance scheme
 // on claiming of new free pages.
@@ -268,15 +268,18 @@ alloc_immobile_fixedobj(int size_class, int spacing_words, uword_t header)
   spacing_words = fixnum_value(spacing_words);
   header = fixnum_value(header);
 
-  int page;
+  unsigned int page;
   lispobj word;
-  char * page_data, * obj_ptr, * next_obj_ptr, * limit, * next_free;
   int page_attributes = MAKE_ATTR(spacing_words);
   int spacing_in_bytes = spacing_words << WORD_SHIFT;
   const int npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
 
   page = fixedobj_page_hint[size_class];
-  if (!page) page = get_freeish_page(0, page_attributes);
+  if (!page) {
+      page = get_freeish_page(0, page_attributes);
+      __sync_val_compare_and_swap(&fixedobj_page_hint[size_class], 0, page);
+  }
+
   /* BUG: This assertion is itself buggy and has to be commented out
    * if running with extra debug assertions.
    * It's only OK in single-threaded code, but consider two threads:
@@ -297,24 +300,27 @@ alloc_immobile_fixedobj(int size_class, int spacing_words, uword_t header)
    *   5. pass the dcheck */
   // gc_dcheck(fixedobj_page_address(page) < (void*)fixedobj_free_pointer);
   do {
-      page_data = fixedobj_page_address(page);
-      obj_ptr = page_data + fixedobj_pages[page].free_index;
-      limit = page_data + IMMOBILE_CARD_BYTES - spacing_in_bytes;
+      char *page_data = fixedobj_page_address(page);
+      char *limit = page_data + IMMOBILE_CARD_BYTES - spacing_in_bytes;
+      char *obj_ptr = page_data + fixedobj_pages[page].free_index;
+      gc_assert(obj_ptr <= limit || (char*)obj_ptr == (page_data + IMMOBILE_CARD_BYTES));
       while (obj_ptr <= limit) {
           word = *(lispobj*)obj_ptr;
-          next_obj_ptr = obj_ptr + spacing_in_bytes;
+          char *next_obj_ptr = obj_ptr + spacing_in_bytes;
           if (fixnump(word) // a fixnum marks free space
               && __sync_bool_compare_and_swap((lispobj*)obj_ptr,
                                               word, header)) {
               // The value formerly in the header word was the offset to
               // the next hole. Use it to update the freelist pointer.
-              // Just slam it in.
-              fixedobj_pages[page].free_index = next_obj_ptr + word - page_data;
+              // Just slam it in, unless too large to use for the next object.
+              int new_free_index = next_obj_ptr + word - page_data;
+              if (new_free_index + spacing_in_bytes <= (int)IMMOBILE_CARD_BYTES)
+                  fixedobj_pages[page].free_index = new_free_index;
               return compute_lispobj((lispobj*)obj_ptr);
           }
           // If some other thread updated the free_index
           // to a larger value, use that. (See example below)
-          next_free = page_data + fixedobj_pages[page].free_index;
+          char *next_free = page_data + fixedobj_pages[page].free_index;
           obj_ptr = next_free > next_obj_ptr ? next_free : next_obj_ptr;
       }
       set_page_full(page);

@@ -426,14 +426,14 @@
 
 (defun make-immobile-symbol (name)
   (let ((symbol (truly-the symbol
-                 (alloc-immobile-fixedobj
-                  symbol-size
-                  (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)))))
-    ;; symbol-hash was initialized to 0
-    (%set-symbol-global-value symbol (make-unbound-marker))
-    (%primitive set-slot symbol nil 'make-symbol symbol-info-slot other-pointer-lowtag)
+                 (or (%primitive fast-alloc-immobile-symbol)
+                     (alloc-immobile-fixedobj
+                      symbol-size
+                      (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))))))
+    ;; symbol-hash and package ID start out as 0
     (%primitive set-slot symbol name 'make-symbol symbol-name-slot other-pointer-lowtag)
-    (%set-symbol-package symbol nil)
+    (%primitive set-slot symbol nil 'make-symbol symbol-info-slot other-pointer-lowtag)
+    (%set-symbol-global-value symbol (make-unbound-marker))
     symbol))
 
 ) ; end PROGN

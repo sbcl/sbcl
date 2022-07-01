@@ -962,11 +962,11 @@
               (allocation nil bytes lowtag result node alloc-temp thread-tn)
               (storew header result 0 lowtag))))))
 
+#+immobile-space
 (macrolet ((c-call (name)
              `(let ((c-fun (make-fixup ,name :foreign)))
                 (inst call (cond ((sb-c::code-immobile-p node) c-fun)
                                  (t (progn (inst mov rax c-fun) rax)))))))
-#+immobile-space
 (define-vop (alloc-immobile-fixedobj)
   (:args (size-class :scs (any-reg) :target c-arg1)
          (nwords :scs (any-reg) :target c-arg2)
@@ -987,5 +987,74 @@
    (pseudo-atomic ()
      (c-call "alloc_immobile_fixedobj")
      (move result rax))))
+
+;;; Timing test:
+;;; Dynamic-space allocation:
+;;; * (defun f (n) (dotimes (i n) (make-symbol "b")))
+;;; * (time (f 500000))
+;;; Evaluation took: 0.004 seconds of real time
+;;; Immobile-space:
+;;; * (defun f (n) (dotimes (i n) (sb-vm::make-immobile-symbol "b")))
+;;; Evaluation took: 0.043 seconds of real time
+;;; With vop:  0.028 seconds of real time
+
+(define-vop (fast-alloc-immobile-symbol)
+  (:results (result :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:temporary (:sc unsigned-reg :offset rbx-offset) rbx)
+  (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+  (:temporary (:sc unsigned-reg) header)
+  (:generator 1
+    ;; fixedobj_pages linkage entry: 1 PTE per page, 12-byte struct
+    (inst mov rbx (ea (make-fixup "fixedobj_pages" :foreign-dataref)))
+    ;; fixedobj_page_hint: 1 hint per sizeclass. C type = uint32_t
+    (inst mov rax (ea (make-fixup "fixedobj_page_hint" :foreign-dataref)))
+    (inst mov rbx (ea rbx)) ; get the base of the fixedobj_pages array
+    ;; This has to be pseudoatomic as soon as the page hint is loaded.
+    ;; Consider the situation where there is exactly one symbol on a page that
+    ;; is almost all free, and the symbol page hint points to that page.
+    ;; If GC occurs, it might dispose that symbol, resetting the page attributes
+    ;; and page hint. It would be an error to allocate to that page
+    ;; because it is no longer a page of symbols but rather a free page.
+    ;; There is no way to inform GC that we are currently looking at a page
+    ;; in anticipation of allocating to it.
+    (pseudo-atomic ()
+     (assemble ()
+       (inst mov :dword rax (ea 4 rax)) ; rax := fixedobj_page_hint[1] (sizeclass=SYMBOL)
+       (inst test :dword rax rax)
+       (inst jmp :z FAIL) ; fail if hint page is 0
+       (inst lea rcx (ea rax rax 2))  ; rcx := rax * 3
+       (inst lea rbx (ea rbx rcx 4))  ; rbx := &fixedobj_pages[hint].free_index
+       ;; compute fixedobj_page_address(hint) into RAX
+       (inst mov rcx (ea (make-fixup "FIXEDOBJ_SPACE_START" :foreign-dataref)))
+       (inst shl rax (integer-length (1- immobile-card-bytes)))
+       (inst add rax (ea rcx))
+       ;; load the page's free pointer
+       (inst mov :dword rcx (ea rbx)) ; rcx := fixedobj_pages[hint].free_index
+       ;; fail if set_page_full() was invoked on the page
+       (inst cmp :dword rcx immobile-card-bytes)
+       (inst jmp :ae FAIL)
+       ;; compute address of the allegedly free memory block into RESULT
+       (inst lea result (ea rcx rax)) ; free_index + page_base
+       ;; read the potential symbol header
+       (inst mov rax (ea result))
+       (inst test :dword rax 1)
+       (inst jmp :nz FAIL) ; not a fixnum implies already taken
+       ;; try to claim this word of memory
+       (inst mov header (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))
+       (inst cmpxchg :lock (ea result) header)
+       (inst jmp :ne FAIL) ; already taken
+       ;; compute new free_index = spacing + old header + free_index
+       (inst lea :dword rax (ea (* symbol-size n-word-bytes) rax rcx))
+       (inst cmp :dword rax ; don't store if it's not a valid object index
+             (- immobile-card-bytes (rem immobile-card-bytes (* symbol-size n-word-bytes))))
+       (inst jmp :ae NO-WRITEBACK)
+       (inst mov :dword (ea rbx) rax) ; store new free_index
+       NO-WRITEBACK
+       (inst or :byte result other-pointer-lowtag) ; make_lispobj()
+       (inst jmp OUT)
+       FAIL
+       (inst mov result nil-value)
+       OUT))))
 
 ) ; end MACROLET
