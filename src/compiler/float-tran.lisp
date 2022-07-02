@@ -1570,10 +1570,11 @@
 (deftransform %unary-truncate ((x) (double-float))
   `(%unary-truncate/double-float x))
 
-(deftransform unary-truncate ((x) * * :result result)
-  (if (lvar-single-value-p result)
-      `(values (%unary-truncate x) x)
-      (give-up-ir1-transform)))
+(deftransform unary-truncate ((x) * * :result result :node node)
+  (unless (lvar-single-value-p result)
+    (give-up-ir1-transform))
+  (derive-node-type node (single-value-type (node-derived-type node)) :from-scratch t)
+  `(%unary-truncate x))
 
 (macrolet ((def (type)
              `(deftransform unary-truncate ((number) (,type))

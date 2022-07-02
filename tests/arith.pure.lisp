@@ -1070,3 +1070,11 @@
          (logand most-positive-fixnum
                  (- (the fixnum a) most-negative-fixnum)))
     ((10) 10)))
+
+(with-test (:name :unary-truncate-discard-second-value)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (truncate (expt (complex a 0) 0))
+      1)
+   ((1) 1)))
