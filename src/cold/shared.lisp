@@ -304,7 +304,8 @@
           ;; Just print something and go on with life.
           (setq sb-xc:*features* (remove :int4-breakpoints sb-xc:*features*))
           (warn "Removed :INT4-BREAKPOINTS from target features"))
-        (when (target-featurep '(:or :arm64 :sse4))
+        (when (or (target-featurep :arm64)
+                  (member :sse4 backend-subfeatures))
           (push :round-float sb-xc:*features*))
         (when (target-featurep '(:and :arm64 :darwin))
           (push :arm-v8.1 backend-subfeatures))
