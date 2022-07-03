@@ -1620,10 +1620,19 @@
                                (values res x)))
                         (if compute-all
                             `(let* ((f (,',coerce y))
-                                    (res (,',unary (/ x f))))
-                               (values res (- x (* f (locally
-                                                         (declare (flushable ,',coerce))
-                                                       (,',coerce res))))))
+                                    (div (/ x f))
+                                    (res (,',unary div)))
+                               (values res
+                                       (- x (* f
+                                               #+round-float
+                                               (,',(ecase type
+                                                    (double-float 'round-double)
+                                                    (single-float 'round-single))
+                                                div :truncate)
+                                               #-round-float
+                                               (locally
+                                                   (declare (flushable ,',coerce))
+                                                 (,',coerce res))))))
                             `(let* ((f (,',coerce y))
                                     (res (,',unary (/ x f))))
                                ;; Dummy secondary value!

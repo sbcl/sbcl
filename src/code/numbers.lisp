@@ -316,10 +316,18 @@
   (declare (explicit-check))
   (macrolet ((truncate-float (rtype)
                `(let* ((float-div (coerce divisor ',rtype))
-                       (res (%unary-truncate (/ number float-div))))
+                       (divided (/ number float-div))
+                       (res (%unary-truncate divided)))
                   (values res
                           (- number
-                             (* (coerce res ',rtype) float-div)))))
+                             (* #-round-float
+                                (coerce res ',rtype)
+                                #+round-float
+                                (,(ecase rtype
+                                    (double-float 'round-double)
+                                    (single-float 'round-single))
+                                 divided :truncate)
+                                float-div)))))
              (single-digit-bignum-p (x)
                #+(or x86-64 x86 ppc64)
                `(or (typep ,x 'word)
