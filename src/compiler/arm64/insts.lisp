@@ -3553,3 +3553,15 @@
         (add-stmt-labels next (stmt-labels stmt))
         (delete-stmt stmt)
         next))))
+
+(defpattern "fmul + fsub -> fmsub" ((fmul) (fsub)) (stmt next)
+  (destructuring-bind (dst1 srcn1 srcm1) (stmt-operands stmt)
+    (destructuring-bind (dst2 srcn2 srcm2) (stmt-operands next)
+      (when (and (location= dst1 srcm2)
+                 (not (location= srcn2 srcm2))
+                 (stmt-delete-safe-p dst1 dst2 '(-)))
+        (setf (stmt-mnemonic next) 'fmsub
+              (stmt-operands next) (list dst2 srcn1 srcm1 srcn2))
+        (add-stmt-labels next (stmt-labels stmt))
+        (delete-stmt stmt)
+        next))))
