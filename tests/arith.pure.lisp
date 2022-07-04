@@ -1078,3 +1078,15 @@
       (truncate (expt (complex a 0) 0))
       1)
    ((1) 1)))
+
+(with-test (:name :unary-truncate-discard-second-value.2)
+  (checked-compile-and-assert
+   (:allow-style-warnings t)
+   `(lambda (a b)
+      (boole boole-nand
+             (dpb (* b (unwind-protect 0 b)) (byte 31 28) a)
+             (ignore-errors
+              (truncate
+               (eval
+                (values 1 2))))))
+   ((1 2) -2)))
