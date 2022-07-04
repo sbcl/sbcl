@@ -1574,11 +1574,13 @@
   (labels ((try (x)
              (when (ctypep x type)
                (return-from value-within-numeric-type x)))
+           #-sb-xc-host
            (next-float (float)
              (multiple-value-bind (frac exp sign)
                  (integer-decode-float float)
                (* (scale-float (float (1+ frac) float) exp)
                   sign)))
+           #-sb-xc-host
            (prev-float (float)
              (multiple-value-bind (frac exp sign)
                  (integer-decode-float float)
@@ -1588,6 +1590,7 @@
              (typecase x
                (integer
                 (1+ x))
+               #-sb-xc-host
                (float
                 (next-float x))
                (t
@@ -1596,6 +1599,7 @@
              (typecase x
                (integer
                 (1- x))
+               #-sb-xc-host
                (float
                 (prev-float x))
                (t
