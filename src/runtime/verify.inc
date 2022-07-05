@@ -500,6 +500,8 @@ void gc_show_pte(lispobj obj)
 #include <stdio.h>
 
 static int hexdump_counter;
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
 __attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, FILE*f)
 {
     uword_t prev_page = 0;
@@ -517,6 +519,8 @@ __attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, 
         where += object_size(where);
     }
 }
+#endif
+
 static int dump_completely_p(lispobj* obj, struct verify_state* state)
 {
     int i;
