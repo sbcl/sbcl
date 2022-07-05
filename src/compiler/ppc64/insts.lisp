@@ -2232,6 +2232,7 @@
   (:delay 0)
   (:emitter
    (etypecase word
+     #-64-bit
      (fixup
       (note-fixup segment :absolute word)
       (emit-word segment 0))
@@ -2243,6 +2244,7 @@
   (:delay 0)
   (:emitter
    (etypecase dword
+     #+64-bit
      (fixup
       (note-fixup segment :absolute dword)
       (emit-dword segment 0))
@@ -2401,9 +2403,7 @@
     (ecase kind
       (:absolute
        ;; There is an implicit addend currently stored in the fixup location.
-       (incf (sap-ref-32 sap offset) value))
-      (:absolute64
-       (incf (sap-ref-64 sap offset) value))
+       (incf (sap-ref-word sap offset) value))
       (:layout-id
        (aver (zerop (sap-ref-32 sap offset)))
        (setf (signed-sap-ref-32 sap offset) (the layout-id value)))

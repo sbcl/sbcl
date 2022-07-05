@@ -1963,13 +1963,12 @@
        (cond ((label-p val)
               ;; note a fixup prior to writing the backpatch so that the fixup's
               ;; position is the location counter at the patch point
-              ;; (i.e. prior to skipping 8 bytes)
+              ;; (i.e. prior to skipping N-WORD-BYTES bytes)
               ;; This fixup is *not* recorded in code->fixups. Instead, trans_code()
               ;; will fixup a counted initial subsequence of unboxed words.
               ;; Q: why are fixup notes a "compiler" abstractions?
               ;; They seem pretty assembler-related to me.
-              (sb-c:note-fixup segment (or #+64-bit :absolute64 :absolute)
-                               (sb-c:make-fixup nil :code-object 0))
+              (sb-c:note-fixup segment :absolute (sb-c:make-fixup nil :code-object 0))
               (emit-back-patch
                segment
                sb-vm:n-word-bytes
