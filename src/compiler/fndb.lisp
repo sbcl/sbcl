@@ -349,8 +349,12 @@
 
 (defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0))
    (foldable movable flushable))
-(defknown unary-truncate-double-float-to-bignum (double-float) (values bignum #+64-bit (eql $0d0)
-                                                                              #-64-bit double-float)
+(defknown unary-truncate-double-float-to-bignum (double-float)
+    (values bignum (and
+                    #+(and 64-bit
+                           (not (or riscv ppc64))) ;; they can't survive cold-init
+                    (eql $0d0)
+                    double-float))
    (foldable movable flushable))
 
 (defknown %multiply-high (word word) word
