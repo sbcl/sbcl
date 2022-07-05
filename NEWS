@@ -1,4 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-2.2.6:
+  * optimization: faster TRUNCATE with float arguments.
 
 changes in sbcl-2.2.6 relative to sbcl-2.2.5:
   * minor incompatible change: support for 32-bit x86 on macOS has been
