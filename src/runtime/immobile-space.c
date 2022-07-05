@@ -303,7 +303,6 @@ alloc_immobile_fixedobj(int size_class, int spacing_words, uword_t header)
       char *page_data = fixedobj_page_address(page);
       char *limit = page_data + IMMOBILE_CARD_BYTES - spacing_in_bytes;
       char *obj_ptr = page_data + fixedobj_pages[page].free_index;
-      gc_assert(obj_ptr <= limit || (char*)obj_ptr == (page_data + IMMOBILE_CARD_BYTES));
       while (obj_ptr <= limit) {
           word = *(lispobj*)obj_ptr;
           char *next_obj_ptr = obj_ptr + spacing_in_bytes;
@@ -312,10 +311,11 @@ alloc_immobile_fixedobj(int size_class, int spacing_words, uword_t header)
                                               word, header)) {
               // The value formerly in the header word was the offset to
               // the next hole. Use it to update the freelist pointer.
-              // Just slam it in, unless too large to use for the next object.
+              // Just slam it in
               int new_free_index = next_obj_ptr + word - page_data;
-              if (new_free_index + spacing_in_bytes <= (int)IMMOBILE_CARD_BYTES)
-                  fixedobj_pages[page].free_index = new_free_index;
+              fixedobj_pages[page].free_index = new_free_index;
+              // Indicate in the generation mask that there is a generation0 object
+              __sync_fetch_and_or(&fixedobj_pages[page].attr.parts.gens_, 1);
               return compute_lispobj((lispobj*)obj_ptr);
           }
           // If some other thread updated the free_index
@@ -360,9 +360,6 @@ Threads A, and B, and C each want to claim index 6.
 
 void update_immobile_nursery_bits()
 {
-  low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
-  low_page_index_t page;
-
   if (ENABLE_PAGE_PROTECTION) {
       // Unprotect the in-use ranges. Any page could be written during scavenge
       os_protect((os_vm_address_t)FIXEDOBJ_SPACE_START,
@@ -370,15 +367,6 @@ void update_immobile_nursery_bits()
                  OS_VM_PROT_ALL);
   }
 
-  for (page=0; page <= max_used_fixedobj_page ; ++page) {
-      // any page whose free index changed contains nursery objects
-      if (fixedobj_pages[page].free_index >> WORD_SHIFT !=
-          fixedobj_pages[page].prior_gc_free_word_index)
-          fixedobj_pages[page].gens |= 1;
-#ifdef VERIFY_PAGE_GENS
-      check_fixedobj_page(page, 0xff, 0xff);
-#endif
-  }
 #ifdef VERIFY_PAGE_GENS
   check_varyobj_pages();
 #endif
@@ -997,8 +985,6 @@ sweep_fixedobj_pages(int raise)
         } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
         if ( hole ) // terminate the chain of holes
             *hole = (lispobj)((char*)obj - ((char*)hole + obj_spacing));
-        fixedobj_pages[page].prior_gc_free_word_index =
-          fixedobj_pages[page].free_index >> WORD_SHIFT;
 
         COMPUTE_NEW_MASK(mask, fixedobj_pages[page].gens);
         if ( mask ) {

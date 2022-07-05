@@ -502,7 +502,17 @@ void gc_show_pte(lispobj obj)
 static int hexdump_counter;
 __attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, FILE*f)
 {
+    uword_t prev_page = 0;
     while (where < end) {
+        if (ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES) != prev_page) {
+            low_page_index_t page = find_fixedobj_page_index(where);
+            fprintf(f, " page @ %p: gens=%x free=%x%s\n",
+                    (void*)ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES),
+                    fixedobj_pages[page].attr.parts.gens_,
+                    fixedobj_pages[page].free_index,
+                    (fixedobj_pages[page].attr.parts.flags & 0x80)?" WP":"");
+            prev_page = ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES);
+        }
         fprintf(f, "%"OBJ_FMTX": %"OBJ_FMTX"\n", (uword_t)where, *where);
         where += object_size(where);
     }

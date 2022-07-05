@@ -1023,17 +1023,16 @@
        (inst mov :dword rax (ea 4 rax)) ; rax := fixedobj_page_hint[1] (sizeclass=SYMBOL)
        (inst test :dword rax rax)
        (inst jmp :z FAIL) ; fail if hint page is 0
-       (inst lea rcx (ea rax rax 2))  ; rcx := rax * 3
-       (inst lea rbx (ea rbx rcx 4))  ; rbx := &fixedobj_pages[hint].free_index
+       (inst lea rbx (ea rbx rax 8))  ; rbx := &fixedobj_pages[hint].free_index
        ;; compute fixedobj_page_address(hint) into RAX
        (inst mov rcx (ea (make-fixup "FIXEDOBJ_SPACE_START" :foreign-dataref)))
        (inst shl rax (integer-length (1- immobile-card-bytes)))
        (inst add rax (ea rcx))
        ;; load the page's free pointer
        (inst mov :dword rcx (ea rbx)) ; rcx := fixedobj_pages[hint].free_index
-       ;; fail if set_page_full() was invoked on the page
-       (inst cmp :dword rcx immobile-card-bytes)
-       (inst jmp :ae FAIL)
+       ;; fail if allocation would overrun the page
+       (inst cmp :dword rcx (- immobile-card-bytes (* symbol-size n-word-bytes)))
+       (inst jmp :a FAIL)
        ;; compute address of the allegedly free memory block into RESULT
        (inst lea result (ea rcx rax)) ; free_index + page_base
        ;; read the potential symbol header
@@ -1046,11 +1045,9 @@
        (inst jmp :ne FAIL) ; already taken
        ;; compute new free_index = spacing + old header + free_index
        (inst lea :dword rax (ea (* symbol-size n-word-bytes) rax rcx))
-       (inst cmp :dword rax ; don't store if it's not a valid object index
-             (- immobile-card-bytes (rem immobile-card-bytes (* symbol-size n-word-bytes))))
-       (inst jmp :ae NO-WRITEBACK)
        (inst mov :dword (ea rbx) rax) ; store new free_index
-       NO-WRITEBACK
+       ;; set the low bit of the 'gens' field
+       (inst or :lock :byte (ea 3 rbx) 1)
        (inst or :byte result other-pointer-lowtag) ; make_lispobj()
        (inst jmp OUT)
        FAIL

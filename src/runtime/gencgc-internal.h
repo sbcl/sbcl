@@ -332,7 +332,7 @@ static boolean __attribute__((unused)) new_space_p(lispobj obj)
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-struct fixedobj_page { // 12 bytes per page
+struct fixedobj_page { // 8 bytes per page
     unsigned int free_index; // index is in bytes. 4 bytes
     union immobile_page_attr {
       int packed;
@@ -344,9 +344,6 @@ struct fixedobj_page { // 12 bytes per page
         unsigned char gens_; // a bitmap
       } parts;
     } attr;
-    unsigned short int prior_gc_free_word_index; // index is in words. 2 bytes
-    /* page index of next page with same attributes */
-    short int page_link; // 2 bytes
 };
 extern struct fixedobj_page *fixedobj_pages;
 #define fixedobj_page_obj_align(i) (fixedobj_pages[i].attr.parts.obj_align<<WORD_SHIFT)
