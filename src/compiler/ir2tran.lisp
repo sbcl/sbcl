@@ -1073,15 +1073,20 @@
   (let ((args (basic-combination-args node))
         (last nil)
         (first nil))
-    (dotimes (num (length args))
-      (let ((loc (standard-arg-location num)))
-        (emit-move node block (lvar-tn node block (elt args num)) loc)
-        (let ((ref (reference-tn loc nil)))
-          (if last
-              (setf (tn-ref-across last) ref)
-              (setf first ref))
-          (setq last ref))))
-      first))
+    (multiple-value-bind (fixed-args-state fixed-args-types)
+        (fixed-args-state node)
+      (dotimes (num (length args))
+        (let ((loc (cond (fixed-args-state
+                          (sb-vm::fixed-call-arg-location (pop fixed-args-types) fixed-args-state))
+                         (t
+                          (standard-arg-location num)))))
+          (emit-move node block (lvar-tn node block (elt args num)) loc)
+          (let ((ref (reference-tn loc nil)))
+            (if last
+                (setf (tn-ref-across last) ref)
+                (setf first ref))
+            (setq last ref))))
+      (values first fixed-args-state))))
 
 #+call-symbol
 (defun fun-tn-type (lvar tn)
@@ -1110,34 +1115,48 @@
   (let* ((env (environment-info (node-environment node)))
          (args (basic-combination-args node))
          (nargs (length args))
-         (pass-refs (move-tail-full-call-args node block))
          (old-fp (ir2-environment-old-fp env))
          (return-pc (ir2-environment-return-pc env))
          (fun-lvar (basic-combination-fun node))
          (nargs (if (pass-nargs-p node)
                     nargs
                     (list nargs))))
-    (multiple-value-bind (fun-tn named)
-        (fun-lvar-tn node block fun-lvar)
-      (cond ((not named)
-             (vop* tail-call node block
-                   (fun-tn old-fp return-pc pass-refs)
-                   (nil)
-                   nargs (emit-step-p node)
-                   #+call-symbol
-                   (fun-tn-type fun-lvar fun-tn)))
-            #-immobile-code
-            ((eq fun-tn named)
-             (vop* static-tail-call-named node block
-                   (old-fp return-pc pass-refs) ; args
-                   (nil)                        ; results
-                   nargs named (emit-step-p node)))
-            (t
-             (vop* tail-call-named node block
-                   (#-immobile-code fun-tn old-fp return-pc pass-refs) ; args
-                   (nil)                ; results
-                   nargs #+immobile-code named (emit-step-p node)))))) ; info
+    (multiple-value-bind (pass-refs fixed-args-p)
+        (move-tail-full-call-args node block)
+        (multiple-value-bind (fun-tn named)
+            (fun-lvar-tn node block fun-lvar)
+          (cond ((not named)
+                 (vop* tail-call node block
+                       (fun-tn old-fp return-pc pass-refs)
+                       (nil)
+                       nargs (emit-step-p node)
+                       #+call-symbol
+                       (fun-tn-type fun-lvar fun-tn)))
+                #-immobile-code
+                ((eq fun-tn named)
+                 (vop* static-tail-call-named node block
+                       (old-fp return-pc pass-refs) ; args
+                       (nil)                        ; results
+                       nargs named (emit-step-p node)))
+                (fixed-args-p
+                 (when-vop-existsp (:named sb-vm::fixed-tail-call-named)
+                  (vop* sb-vm::fixed-tail-call-named node block
+                        (#-immobile-code fun-tn old-fp return-pc pass-refs) ; args
+                        (nil)           ; results
+                        nargs #+immobile-code named (emit-step-p node))))
+                (t
+                 (vop* tail-call-named node block
+                       (#-immobile-code fun-tn old-fp return-pc pass-refs) ; args
+                       (nil)            ; results
+                       nargs #+immobile-code named (emit-step-p node))))))) ; info
   (values))
+
+(defun fixed-args-state (node)
+  (let ((info (combination-fun-info node)))
+    (when (and info
+               (ir1-attributep (fun-info-attributes info) fixed-args))
+      (values (sb-vm::make-fixed-call-args-state)
+              (fun-type-required (info :function :type (combination-fun-source-name node) ))))))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
 (defun ir2-convert-full-call-args (node block)
@@ -1145,27 +1164,34 @@
   (let* ((args (basic-combination-args node))
          (nargs (length args))
          (fp (make-stack-pointer-tn nargs)))
-    (vop allocate-full-call-frame node block nargs fp)
-    (collect ((locs))
-      (let ((last nil)
-            (first nil))
-        (dotimes (num nargs)
-          (locs (sb-vm::standard-call-arg-location num))
-          (let ((ref (reference-tn (lvar-tn node block (elt args num))
-                                   nil)))
-            (if last
-                (setf (tn-ref-across last) ref)
-                (setf first ref))
-            (setq last ref)))
+    (multiple-value-bind (fixed-args-state fixed-args-types)
+        (fixed-args-state node)
+      (vop allocate-full-call-frame node block nargs fp)
+      (collect ((locs))
+        (let ((last nil)
+              (first nil))
+          (dotimes (num nargs)
+            (let* ((arg (elt args num))
+                   (ref (reference-tn (lvar-tn node block arg)
+                                      nil)))
+              (locs
+               (cond (fixed-args-state
+                      (sb-vm::fixed-call-arg-location (pop fixed-args-types) fixed-args-state))
+                     (t
+                      (sb-vm::standard-call-arg-location num))))
 
-        (values fp first (locs) nargs)))))
+              (if last
+                  (setf (tn-ref-across last) ref)
+                  (setf first ref))
+              (setq last ref)))
+          (values fp first (locs) nargs fixed-args-state))))))
 
 ;;; Do full call when a fixed number of values are desired. We make
 ;;; STANDARD-RESULT-TNS for our lvar, then deliver the result using
 ;;; MOVE-LVAR-RESULT. We do named or normal call, as appropriate.
 (defun ir2-convert-fixed-full-call (node block)
   (declare (type combination node) (type ir2-block block))
-  (multiple-value-bind (fp args arg-locs nargs)
+  (multiple-value-bind (fp args arg-locs nargs fixed-args-p)
       (ir2-convert-full-call-args node block)
     (let* ((lvar (node-lvar node))
            (locs (and lvar
@@ -1198,6 +1224,13 @@
                      (loc-refs)
                      arg-locs nargs named nvals
                      (emit-step-p node)))
+              (fixed-args-p
+               (when-vop-existsp (:named sb-vm::fixed-call-named)
+                 (vop* sb-vm::fixed-call-named node block
+                       (fp #-immobile-code fun-tn args) ; args
+                       (loc-refs)                       ; results
+                       arg-locs nargs #+immobile-code named nvals ; info
+                       (emit-step-p node))))
               (t
                (vop* call-named node block
                      (fp #-immobile-code fun-tn args) ; args
@@ -1427,21 +1460,32 @@
           (vop setup-closure-environment node block start-label closure)
           (let ((n -1))
             (dolist (loc (ir2-environment-closure env))
-              (vop closure-ref node block closure (incf n) (cdr loc)))))))
-    (unless (eq (functional-kind fun) :toplevel)
-      (let ((vars (lambda-vars fun))
-            (n 0))
-        (when (leaf-refs (first vars))
-          (emit-move node block arg-count-tn (leaf-info (first vars))))
-        (dolist (arg (rest vars))
-          (when (leaf-refs arg)
-            (let ((pass (standard-arg-location n))
-                  (home (leaf-info arg)))
-              (if (and (lambda-var-indirect arg)
-                       (lambda-var-explicit-value-cell arg))
-                  (emit-make-value-cell node block pass home)
-                  (emit-move node block pass home))))
-          (incf n))))
+              (vop closure-ref node block closure (incf n) (cdr loc))))))
+      (unless (eq (functional-kind fun) :toplevel)
+        (let* ((vars (lambda-vars fun))
+               (n 0)
+               (name (functional-%source-name ef))
+               (fun-info (info :function :info name))
+               (fixed-args
+                 (and fun-info
+                      (ir1-attributep (fun-info-attributes fun-info) fixed-args)))
+               (arg-types (and fixed-args
+                               (fun-type-required (info :function :type name))))
+               (fixed-arg-state (and fixed-args
+                                     (sb-vm::make-fixed-call-args-state))))
+          (when (leaf-refs (first vars))
+            (emit-move node block arg-count-tn (leaf-info (first vars))))
+          (dolist (arg (rest vars))
+            (when (leaf-refs arg)
+              (let ((pass (if fixed-args
+                              (sb-vm::fixed-call-arg-location (pop arg-types) fixed-arg-state)
+                              (standard-arg-location n)))
+                    (home (leaf-info arg)))
+                (if (and (lambda-var-indirect arg)
+                         (lambda-var-explicit-value-cell arg))
+                    (emit-make-value-cell node block pass home)
+                    (emit-move node block pass home))))
+            (incf n)))))
     #-fp-and-pc-standard-save
     (emit-move node block (make-old-fp-passing-location)
                (ir2-environment-old-fp env)))

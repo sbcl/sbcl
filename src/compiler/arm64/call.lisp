@@ -861,7 +861,7 @@
 ;;; In tail call with fixed arguments, the passing locations are passed as a
 ;;; more arg, but there is no new-FP, since the arguments have been set up in
 ;;; the current frame.
-(defmacro define-full-call (name named return variable)
+(defmacro define-full-call (name named return variable &optional args)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
                 ,@(when (eq return :unknown)
@@ -881,15 +881,20 @@
           '((old-fp)
             (return-pc)))
 
-      ,@(unless variable '((args :more t :scs (descriptor-reg)))))
+      ,@(unless variable `((args :more t ,@(unless (eq args :fixed)
+                                             '(:scs (descriptor-reg)))))))
 
      ,@(when (eq return :fixed)
          '((:results (values :more t))))
 
      (:save-p ,(if (eq return :tail) :compute-only t))
 
-     ,@(unless (or (eq return :tail) variable)
-         '((:move-args :full-call)))
+     ,@(unless (or (eq return :tail)
+                   variable)
+         `((:move-args ,(if (eq args :fixed)
+                            :fixed
+                            :full-call))))
+
 
      (:vop-var vop)
      (:node-var node)
@@ -1076,6 +1081,8 @@
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
 
+(define-full-call fixed-call-named t :fixed nil :fixed)
+(define-full-call fixed-tail-call-named t :tail nil :fixed)
 ;;; Defined separately, since needs special code that BLT's the
 ;;; arguments down.
 (define-vop (tail-call-variable)
@@ -1099,9 +1106,9 @@
         (inst add nsp-tn cur-nfp (add-sub-immediate
                                   (bytes-needed-for-non-descriptor-stack-frame)))))
     (load-inline-constant tmp-tn
-                          (if (eq fun-type :function)
-                              '(:fixup tail-call-variable :assembly-routine)
-                              '(:fixup tail-call-callable-variable :assembly-routine)))
+      (if (eq fun-type :function)
+          '(:fixup tail-call-variable :assembly-routine)
+          '(:fixup tail-call-callable-variable :assembly-routine)))
     (inst br tmp-tn)))
 
 ;;; Invoke the function-designator FUN.
@@ -1282,3 +1289,4 @@
     ;; single-step-before-trap.
     (inst brk single-step-before-trap)
     DONE))
+

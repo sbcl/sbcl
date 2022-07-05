@@ -178,10 +178,18 @@
     (clambda
      (let* ((n-supplied (gensym))
             (nargs (length (lambda-vars fun)))
-            (temps (make-gensym-list nargs)))
+            (temps (make-gensym-list nargs))
+            (info (info :function :info (functional-%source-name fun)))
+            (types (and info
+                        (ir1-attributep (fun-info-attributes info) fixed-args)
+                        (loop for var in (lambda-vars fun)
+                              for temp in temps
+                              collect `(type ,(type-specifier (lambda-var-type var)) ,temp)))))
+
        `(lambda (,n-supplied ,@temps)
           (declare (type index ,n-supplied)
-                   (ignore ,n-supplied))
+                   (ignore ,n-supplied)
+                   ,@types)
           (%funcall ,fun ,@temps))))
     (optional-dispatch
      ;; Force conversion of all entries

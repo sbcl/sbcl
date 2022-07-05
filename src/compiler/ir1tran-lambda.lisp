@@ -873,10 +873,19 @@
 
 (defvar *lambda-conversions*)
 
+(defun add-types-for-fixed-args (fun vars)
+  (let ((fun-info (info :function :info fun)))
+    (when (and fun-info
+               (ir1-attributep (fun-info-attributes fun-info) fixed-args))
+      (loop for type in (fun-type-required (info :function :type fun))
+            for var in vars
+            do (setf (lambda-var-type var) type))))
+  vars)
+
 ;;; Convert a LAMBDA form into a LAMBDA leaf or an OPTIONAL-DISPATCH leaf.
 (defun ir1-convert-lambda (form &key (source-name '.anonymous.)
-                           debug-name maybe-add-debug-catch
-                           system-lambda)
+                                     debug-name maybe-add-debug-catch
+                                     system-lambda)
   (unless (consp form)
     (compiler-error "A ~S was found when expecting a lambda expression:~%  ~S"
                     (type-of form)
@@ -926,7 +935,8 @@
                                                    :debug-name debug-name
                                                    :system-lambda system-lambda))
                         (t
-                         (ir1-convert-lambda-body forms vars
+                         (ir1-convert-lambda-body forms
+                                                  (add-types-for-fixed-args source-name vars)
                                                   :aux-vars aux-vars
                                                   :aux-vals aux-vals
                                                   :post-binding-lexenv post-binding-lexenv
@@ -1018,7 +1028,9 @@
                    (defined-fun-same-block-p defined-fun-res) t)
              ;; FIXME: Should non-entry block compiled defuns have
              ;; this propagate?
-             (assert-global-function-definition-type name res)
+             (unless (and info
+                          (ir1-attributep (fun-info-attributes info) fixed-args))
+               (assert-global-function-definition-type name res))
              ;; If in a simple environment, then we can allow
              ;; backward references to this function from following
              ;; top-level forms.

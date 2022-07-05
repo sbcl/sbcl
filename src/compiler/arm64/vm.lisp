@@ -93,7 +93,10 @@
   (defconstant register-arg-count 4)
   ;; names and offsets for registers used to pass arguments
   (defregset *register-arg-offsets*  r0 r1 r2 r3)
-  (defparameter *register-arg-names* '(r0 r1 r2 r3)))
+  (defparameter *register-arg-names* '(r0 r1 r2 r3))
+  (defregset *desctiptor-args* r0 r1 r2 r3 r4 r5 r6 r7 r8 r9)
+  (defregset *non-desctiptor-args* nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9)
+  (defparameter *float-args* (loop for i below 32 collect i)))
 
 
 ;;;; SB and SC definition:

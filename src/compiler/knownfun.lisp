@@ -173,6 +173,11 @@
     (pushnew 'unsafely-flushable attributes))
   #-(or x86-64 arm64) ;; Needs to be supported by the call VOPs
   (setf attributes (remove 'no-verify-arg-count attributes))
+  #-arm64 ;; Needs to be supported by the call VOPs, sb-vm::fixed-call-arg-location
+  (setf attributes (remove 'fixed-args attributes))
+  (when (memq 'fixed-args attributes)
+    (pushnew 'no-verify-arg-count attributes))
+
   (multiple-value-bind (type annotation)
       (split-type-info arg-types result-type)
     `(%defknown ',(if (and (consp name)

@@ -695,7 +695,7 @@
   ;;
   ;; :KNOWN-RETURN
   ;;     If needed, the old NFP is computed using COMPUTE-OLD-NFP.
-  (move-args nil :type (member nil :full-call :local-call :known-return))
+  (move-args nil :type (member nil :full-call :local-call :known-return :fixed))
   ;; a list of sc-vectors representing the loading costs of each fixed
   ;; argument and result
   (arg-costs nil :type list)

@@ -142,6 +142,32 @@
                       (nth n *register-arg-offsets*))
       (make-sc+offset control-stack-sc-number n)))
 
+(defstruct fixed-call-args-state
+  (descriptors -1 :type fixnum)
+  (non-descriptors -1 :type fixnum)
+  (float -1 :type fixnum))
+
+(defvar *float-args*)
+(defvar *non-desctiptor-args*)
+(defvar *desctiptor-args*)
+
+(defun fixed-call-arg-location (type state)
+  (let* ((primtype (primitive-type type))
+         (sc (find descriptor-reg-sc-number (sb-c::primitive-type-scs primtype) :test-not #'eql)))
+    (case (primitive-type-name primtype)
+      ((double-float single-float)
+       (make-wired-tn primtype
+                      sc
+                      (elt *float-args* (incf (fixed-call-args-state-float state)))))
+      ((unsigned-byte-64 signed-byte-64)
+       (make-wired-tn primtype
+                      sc
+                      (elt *non-desctiptor-args* (incf (fixed-call-args-state-non-descriptors state)))))
+      (t
+       (make-wired-tn primtype
+                      descriptor-reg-sc-number
+                      (elt *desctiptor-args* (incf (fixed-call-args-state-descriptors state))))))))
+
 ;;; Make a TN to hold the number-stack frame pointer.  This is allocated
 ;;; once per component, and is component-live.
 (defun make-nfp-tn ()

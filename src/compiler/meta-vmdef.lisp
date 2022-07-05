@@ -341,7 +341,7 @@
   (save-p nil :type (member t nil :compute-only :force-to-stack))
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
-  (move-args nil :type (member nil :local-call :full-call :known-return))
+  (move-args nil :type (member nil :local-call :full-call :known-return :fixed))
   (args-var '.args. :type symbol)
   (results-var '.results. :type symbol)
   (before-load :unspecified :type (or (member :unspecified) list)))
@@ -1065,7 +1065,7 @@
         (:move-args
          (setf (vop-parse-move-args parse)
                (vop-spec-arg spec '(member nil :local-call :full-call
-                                    :known-return))))
+                                    :known-return :fixed))))
         (:node-var
          (setf (vop-parse-node-var parse) (vop-spec-arg spec 'symbol)))
         (:note

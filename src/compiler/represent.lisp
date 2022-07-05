@@ -569,21 +569,22 @@
 
         (change-tn-ref-tn val pass-tn)
         (let* ((this-fp
-                (cond ((not (sc-number-stack-p pass-sc)) fp-tn)
-                      (nfp-tn)
-                      (t
-                       (aver (eq how :known-return))
-                       (setq nfp-tn (make-number-stack-pointer-tn))
-                       (setf (tn-sc nfp-tn)
-                             (svref *backend-sc-numbers*
-                                    (first (primitive-type-scs
-                                            (tn-primitive-type nfp-tn)))))
-                       (emit-context-template
-                        node block
-                        (template-or-lose 'compute-old-nfp)
-                        nfp-tn vop)
-                       (aver (not (sc-number-stack-p (tn-sc nfp-tn))))
-                       nfp-tn)))
+                 (cond ((or (eq how :fixed)
+                            (not (sc-number-stack-p pass-sc))) fp-tn)
+                       (nfp-tn)
+                       (t
+                        (aver (eq how :known-return))
+                        (setq nfp-tn (make-number-stack-pointer-tn))
+                        (setf (tn-sc nfp-tn)
+                              (svref *backend-sc-numbers*
+                                     (first (primitive-type-scs
+                                             (tn-primitive-type nfp-tn)))))
+                        (emit-context-template
+                         node block
+                         (template-or-lose 'compute-old-nfp)
+                         nfp-tn vop)
+                        (aver (not (sc-number-stack-p (tn-sc nfp-tn))))
+                        nfp-tn)))
                (new (emit-move-arg-template node block res val-tn this-fp
                                             pass-tn vop))
                (after
