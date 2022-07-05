@@ -1663,8 +1663,14 @@
 ;;; depending on FLOAT-ACCURACY. Finally, leave out the secondary value when
 ;;; we know it is unused: COERCE is not flushable.
 (macrolet ((def (type other-float-arg-types)
-             (let ((unary (symbolicate "%UNARY-TRUNCATE/" type))
-                   (coerce (symbolicate "%" type)))
+             (let* ((unary (symbolicate "%UNARY-TRUNCATE/" type))
+                    (unary-to-bignum (symbolicate '%unary-truncate- type '-to-bignum))
+                    (coerce (symbolicate "%" type))
+                    (unary `(lambda (number)
+                              (if (and (<= ,(coerce most-negative-fixnum type) number)
+                                       (< number ,(coerce most-positive-fixnum type)))
+                                  (truly-the fixnum (,unary number))
+                                  (,unary-to-bignum number)))))
                `(deftransform truncate ((x &optional y)
                                         (,type
                                          &optional (or ,type ,@other-float-arg-types integer))
@@ -1689,8 +1695,8 @@
                                        (- x (* f
                                                #+round-float
                                                (,',(ecase type
-                                                    (double-float 'round-double)
-                                                    (single-float 'round-single))
+                                                     (double-float 'round-double)
+                                                     (single-float 'round-single))
                                                 div :truncate)
                                                #-round-float
                                                (locally

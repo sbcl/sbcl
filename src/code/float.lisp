@@ -612,6 +612,16 @@
   (def double-float)
   (def single-float))
 
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+              `(defun ,(symbolicate '%unary-truncate- type '-to-bignum) (number)
+                 (declare (inline ,decode))
+                 (multiple-value-bind (bits exp sign) (,decode number)
+                   (ash (if (minusp sign) (- bits) bits)
+                        exp))))))
+  (def double-float)
+  (def single-float))
+
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
              `(defun ,name (number)

@@ -357,6 +357,11 @@
                     double-float))
    (foldable movable flushable))
 
+(defknown %unary-truncate-single-float-to-bignum (single-float) bignum
+   (foldable movable flushable fixed-args))
+(defknown %unary-truncate-double-float-to-bignum (double-float) bignum
+   (foldable movable flushable fixed-args))
+
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
 

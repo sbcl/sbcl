@@ -1962,6 +1962,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%UNARY-FTRUNCATE"
            "UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
            "UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
+           "%UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
+           "%UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
 
            "%WITH-ARRAY-DATA"
            "%WITH-ARRAY-DATA/FP"
