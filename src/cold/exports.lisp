@@ -3407,10 +3407,6 @@ possibly temporarily, because it might be used internally.")
            "*REPL-PROMPT-FUN*"
            "*REPL-READ-FORM-FUN*"
 
-            ;; Character database
-
-           "**CHARACTER-COLLATIONS**"
-
             ;; Character database access
 
            "MISC-INDEX"

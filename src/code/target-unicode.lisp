@@ -1426,6 +1426,15 @@ it defaults to 80 characters"
 (defun variable-p (x)
   (<= 1 x +maximum-variable-primary-element+))
 
+(macrolet ((collations-hash-table ()
+             (let ((data (let ((*read-base* 16))
+                           (sb-cold:read-from-file "output/collation.lisp-expr"))))
+               #+64-bit (dovector (item data) (aver (fixnump (car item))))
+               `(load-time-value
+                 (sb-impl::%stuff-hash-table
+                  (make-hash-table :size ,(length data) #+64-bit :test #+64-bit 'eq)
+                  ',data)
+                 t))))
 (defun collation-key (string start end)
   (let (char1
         (char2 (code-char 0))
@@ -1442,7 +1451,7 @@ it defaults to 80 characters"
        (return-from collation-key nil)))
     (let* ((code1 (char-code char1))
            (packed-key (gethash (pack-3-codepoints code1 (char-code char2) (char-code char3))
-                                **character-collations**)))
+                                (collations-hash-table))))
       (if packed-key
           (unpack-collation-key packed-key)
           (when (char= (code-char 0) char2 char3)
@@ -1457,7 +1466,7 @@ it defaults to 80 characters"
                            (t #xFBC0)))
                    (a (+ base (if tangut-p 0 (ash code1 -15))))
                    (b (logior #x8000 (if tangut-p (- code1 #x17000) (logand code1 #x7FFF)))))
-              (list (list a #x20 #x2) (list b 0 0))))))))
+              (list (list a #x20 #x2) (list b 0 0)))))))))
 
 (defun sort-key (string)
   (let* ((str (normalize-string string :nfd))

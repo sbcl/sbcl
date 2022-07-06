@@ -785,15 +785,6 @@ Length should be adjusted when the standard changes.")
                    (bitpack-collation-key primary secondary tertiary)))))
     (values code-points ret))))
 
-(defparameter *collation-table*
-  (with-input-txt-file (stream "allkeys")
-    (loop with hash = (make-hash-table :test #'equal)
-       for line = (read-line stream nil nil) while line
-       unless (or (string= line "") (eql 0 (position #\@ line)) (eql 0 (position #\# line)))
-       do (multiple-value-bind (codepoints keys) (parse-collation-line line)
-            (setf (gethash codepoints hash) keys))
-       finally (return hash))))
-
 
 ;;; Other properties
 (defparameter *confusables*
@@ -850,13 +841,6 @@ Used to look up block data.")
   (write-byte (ldb (byte 8 16) code-point) stream)
   (write-byte (ldb (byte 8 8) code-point) stream)
   (write-byte (ldb (byte 8 0) code-point) stream))
-
-(defun write-4-byte (value stream)
-  (declare (type (unsigned-byte 32) value))
-  (write-byte (ldb (byte 8 24) value) stream)
-  (write-byte (ldb (byte 8 16) value) stream)
-  (write-byte (ldb (byte 8 8) value) stream)
-  (write-byte (ldb (byte 8 0) value) stream))
 
 (defun output-misc-data ()
   (with-output-dat-file (stream "ucdmisc")
@@ -964,37 +948,30 @@ Used to look up block data.")
       (print casing-pages stream))))
 
 (defun output-collation-data ()
-  (with-output-dat-file (stream "collation")
-    (flet ((length-tag (list1 list2)
-             ;; takes two lists of UB32 (with the caveat that list1[0]
-             ;; needs its high 8 bits free (codepoints always have
-             ;; that) and do
-             (let* ((l1 (length list1)) (l2 (length list2))
-                    (tag (dpb l1 (byte 4 28) (dpb l2 (byte 5 23) (car list1)))))
-               (assert (<= l1 3))
-               (write-4-byte tag stream)
-               (map nil #'(lambda (l) (write-4-byte l stream)) (append (cdr list1) list2)))))
-      (let (coll)
-        (maphash (lambda (k v) (push (cons k v) coll)) *collation-table*)
-        (labels ((sorter (o1 o2)
-                   (cond
-                     ((null o1) t)
-                     ((null o2) nil)
-                     (t (or (< (car o1) (car o2))
-                            (and (= (car o1) (car o2))
-                                 (sorter (cdr o1) (cdr o2))))))))
-          (setq coll (sort coll #'sorter :key #'car)))
-        (loop for (k . v) in coll
-           do (length-tag k v)))))
+  (with-output-lisp-expr-file (output "collation")
+    (format output ";;;; This is 'allkeys.txt' converted to Lisp syntax~%")
+    (format output ";;;; Assume *READ-BASE* is 16.~%#(~%")
+    (with-input-txt-file (input "allkeys")
+      (loop for line = (read-line input nil nil) while line
+            unless (or (string= line "")
+                       (eql 0 (position #\@ line)) (eql 0 (position #\# line)))
+            do
+         (multiple-value-bind (codepoints keys) (parse-collation-line line)
+           (format output "(~x . ~x)~%"
+                   ;; Pack up to 3 codepoints, rightmost in the highest bits
+                   (destructuring-bind (first &optional second third) codepoints
+                     (cond (third (logior (ash third 42) (ash second 21) first))
+                           (second (logior (ash second 21) first))
+                           (t first)))
+                   ;; Pack the blob of "keys" using 32 bits each
+                   (let ((sum 0))
+                     (dolist (part (reverse keys) sum)
+                       (setq sum (logior (ash sum 32) part))))))))
+    (format output ")~%"))
   (with-output-lisp-expr-file (*standard-output* "other-collation-info")
     (write-string ";;; The highest primary variable collation index")
     (terpri)
-    (prin1 *maximum-variable-key*) (terpri))
-  (with-output-lisp-expr-file (*standard-output* "n-collation-entries")
-    (write-string ";;; The number of entries in the collation table")
-    (terpri)
-    (prin1 (hash-table-count *collation-table*))
-    (terpri)))
+    (prin1 *maximum-variable-key*) (terpri)))
 
 (defun output (&optional (*output-directory* *output-directory*))
   (output-misc-data)

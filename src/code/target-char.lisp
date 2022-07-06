@@ -90,7 +90,6 @@
                      (decompositions (read-ub8-vector (file "decomp" "dat")))
                      (case-data (read-ub8-vector (file "case" "dat")))
                      (case-pages (read-ub8-vector (file "casepages" "dat")))
-                     (collations (read-ub8-vector (file "collation" "dat")))
                      (high-pages (make-ubn-vector ucd-high-pages 2))
                      (low-pages (make-ubn-vector ucd-low-pages 2))
                      (%*character-case-pages*% (make-ubn-vector case-pages 1)))
@@ -159,39 +158,6 @@
                                            (aref table (1+ (* i 2))) upper)))))
                           `((defconstant-eqx +character-unicode-cases+ ,unicode-table #'equalp)
                             (defconstant-eqx +character-cases+ ,table #'equalp)))
-
-                    (define-load-time-global **character-collations**
-                             ,(let* ((n-entries
-                                         (with-open-file (s (file "n-collation-entries" "lisp-expr"))
-                                           (read s)))
-                                     (table)
-                                     (index 0)
-                                     (info (make-ubn-vector collations 4))
-                                     (len (length info)))
-                                (loop while (< index len) do
-                                      (let* ((entry-head (aref info index))
-                                             (cp-length (ldb (byte 4 28) entry-head))
-                                             (key-length (ldb (byte 5 23) entry-head))
-                                             (key 0)
-                                             (codepoints nil))
-                                        (aver (and (/= cp-length 0) (/= key-length 0)))
-                                        (loop repeat cp-length do
-                                              (push (dpb 0 (byte 10 22) (aref info index))
-                                                    codepoints)
-                                              (incf index))
-                                        (setf codepoints (nreverse codepoints))
-                                        (dotimes (i key-length)
-                                          (setf (ldb (byte 32 (* i 32)) key) (aref info index))
-                                          (incf index))
-                                        ;; verify the validity of
-                                        ;; :test 'eq on 64-bit
-                                        #+64-bit (aver (sb-xc:typep (apply #'pack-3-codepoints codepoints)
-                                                                    'sb-xc:fixnum))
-                                        (push (cons (apply #'pack-3-codepoints codepoints) key) table)))
-                                (aver (= (length table) n-entries))
-                                `(%stuff-hash-table
-                                  (make-hash-table :size ,n-entries #+64-bit :test #+64-bit #'eq)
-                                  ,(nreverse (coerce table 'vector)))))
 
                     ,@(with-open-file
                          (stream (file "ucd-names" "lisp-expr"))
