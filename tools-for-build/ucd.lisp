@@ -1024,12 +1024,9 @@ Used to look up block data.")
     (setf *unicode-1-names* nil))
 
   (with-output-lisp-expr-file (*standard-output* "numerics")
-    (let ((result (make-array (* (length *different-numerics*) 2))))
-      (loop for (code . value) in (sort *different-numerics* #'< :key #'car)
-         for i by 2
-         do (setf (aref result i) code
-                  (aref result (1+ i)) (read-from-string value)))
-      (prin1 result)))
+    (prin1 (mapcar (lambda (x) (cons (car x) (read-from-string (cdr x))))
+                   ;; Print it low to high. It was collected with PUSH
+                   (reverse *different-numerics*))))
   (with-output-lisp-expr-file (*standard-output* "titlecases")
     (prin1 *different-titlecases*))
   (with-output-lisp-expr-file (*standard-output* "foldcases")

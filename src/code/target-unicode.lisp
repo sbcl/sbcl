@@ -11,10 +11,6 @@
 
 (in-package "SB-UNICODE")
 
-(defconstant-eqx +special-numerics+
-    #.(sb-cold:read-from-file "output/numerics.lisp-expr")
-    #'equalp)
-
 (eval-when (:compile-toplevel)
   (defun plist-to-alist (list)
     (loop for (key value) on list by #'cddr collect (cons key value))))
@@ -169,7 +165,14 @@ that have a digit value but no decimal digit value"
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
-  (or (double-vector-binary-search (char-code character) +special-numerics+)
+  (or (gethash character
+               (load-time-value
+                   (let* ((list '#.(sb-cold:read-from-file "output/numerics.lisp-expr"))
+                          (hash (make-hash-table :test #'eq :size (length list))))
+                     (loop for (k . v) in list
+                           do (setf (gethash (code-char k) hash) v))
+                     hash)
+                   t))
       (digit-value character)))
 
 (defun mirrored-p (character)
