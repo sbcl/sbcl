@@ -165,14 +165,15 @@ that have a digit value but no decimal digit value"
   "Returns the numeric value of CHARACTER or NIL if there is no such value.
 Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
-  (or (gethash character
+  (or #+sb-unicode
+      (gethash character
                (load-time-value
-                   (let* ((list '#.(sb-cold:read-from-file "output/numerics.lisp-expr"))
-                          (hash (make-hash-table :test #'eq :size (length list))))
-                     (loop for (k . v) in list
-                           do (setf (gethash (code-char k) hash) v))
-                     hash)
-                   t))
+                (let* ((list '#.(sb-cold:read-from-file "output/numerics.lisp-expr"))
+                       (hash (make-hash-table :test #'eq :size (length list))))
+                  (loop for (k . v) in list
+                        do (setf (gethash (code-char k) hash) v))
+                  hash)
+                t))
       (digit-value character)))
 
 (defun mirrored-p (character)
