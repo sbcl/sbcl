@@ -150,8 +150,8 @@
 
 (declaim (#+sb-xc-host special
           #-sb-xc-host sb-ext:global
-          *float-args* *desctiptor-args*
-          #-c-stack-is-control-stack *non-desctiptor-args*))
+          *float-args* *descriptor-args*
+          #-c-stack-is-control-stack *non-descriptor-args*))
 
 (defun fixed-call-arg-location (type state)
   (let* ((primtype (primitive-type type))
