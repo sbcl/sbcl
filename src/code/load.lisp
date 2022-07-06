@@ -1160,11 +1160,12 @@
                    (if (oddp header) :immobile :dynamic)
                    (align-up n-boxed-words sb-c::code-boxed-words-align)
                    n-code-bytes))
-            (debug-info (svref stack (+ ptr n-constants))))
+                 (real-code code)
+                 (debug-info (svref stack (+ ptr n-constants))))
         (with-writable-code-instructions
             (code total-nwords debug-info n-named-calls n-simple-funs)
           :copy (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
-          :fixup (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts))
+          :fixup (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts real-code))
         ;; Don't need the code pinned from here on
         (progn
           (setf (sb-c::debug-info-source (%code-debug-info code))

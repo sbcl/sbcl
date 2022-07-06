@@ -70,7 +70,8 @@
 (define-load-time-global sb-fasl::*asm-routine-index-to-name* #())
 (declaim (simple-vector sb-fasl::*asm-routine-index-to-name*))
 
-(flet ((fixup (code-obj offset name kind flavor preserved-lists statically-link-p)
+(flet ((fixup (code-obj offset name kind flavor preserved-lists statically-link-p
+               real-code-obj)
          (declare (ignorable statically-link-p preserved-lists))
          ;; NAME depends on the kind and flavor of fixup.
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
@@ -87,7 +88,7 @@
                        (if (eq flavor :asm-routine-nil-offset) sb-vm:nil-value 0)))
                    (:foreign (foreign-symbol-address name))
                    (:foreign-dataref (foreign-symbol-address name t))
-                   (:code-object (get-lisp-obj-address code-obj))
+                   (:code-object (get-lisp-obj-address real-code-obj))
                    #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index name))
                    (:layout (get-lisp-obj-address
                              (wrapper-friend (if (symbolp name) (find-layout name) name))))
@@ -127,7 +128,7 @@
          ;; Return fixups amenable to static linking
          (aref preserved-lists 0)))
 
-  (defun apply-fasl-fixups (code-obj fixups index count &aux (end (1- (+ index count))))
+  (defun apply-fasl-fixups (code-obj fixups index count real-code-obj &aux (end (1- (+ index count))))
     (dx-let ((preserved (make-array 5 :initial-element nil)))
       (let ((retained-fixups (svref fixups index)))
         (incf index)
@@ -145,10 +146,10 @@
                                 (member flavor '(:assembly-routine :assembly-routine*)))
                            (aref sb-fasl::*asm-routine-index-to-name* data))
                           (t (svref fixups (incf index))))))
-          (fixup code-obj offset name kind flavor preserved nil)))
+          (fixup code-obj offset name kind flavor preserved nil real-code-obj)))
       (finish-fixups code-obj preserved)))
 
-  (defun apply-core-fixups (code-obj fixup-notes retained-fixups)
+  (defun apply-core-fixups (code-obj fixup-notes retained-fixups real-code-obj)
     (declare (list fixup-notes))
     (unless (eql retained-fixups 0)
       (setf (sb-vm::%code-fixups code-obj) retained-fixups))
@@ -160,7 +161,8 @@
                  (fixup-name fixup)
                  (fixup-note-kind note)
                  (fixup-flavor fixup)
-                 preserved t)))
+                 preserved t
+                 real-code-obj)))
       (finish-fixups code-obj preserved))))
 
 ;;; Return a behaviorally identical copy of CODE which is used for TRACE
@@ -315,13 +317,14 @@
          (bytes
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment)))
          (n-simple-funs (length (ir2-component-entries 2comp)))
-         (named-call-fixups nil))
+         (named-call-fixups nil)
+         (real-code-obj code-obj))
     (declare (ignorable boxed-data))
     (sb-fasl::with-writable-code-instructions
         (code-obj total-nwords debug-info n-named-calls n-simple-funs)
       :copy (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
       :fixup (setq named-call-fixups
-                   (apply-core-fixups code-obj fixup-notes retained-fixups)))
+                   (apply-core-fixups code-obj fixup-notes retained-fixups real-code-obj)))
 
     (when alloc-points
       #+(and x86-64 sb-thread)
