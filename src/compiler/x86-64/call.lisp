@@ -589,7 +589,7 @@
 ;;; In tail call with fixed arguments, the passing locations are
 ;;; passed as a more arg, but there is no new-FP, since the arguments
 ;;; have been set up in the current frame.
-(macrolet ((define-full-call (vop-name named return variable)
+(macrolet ((define-full-call (vop-name named return variable &optional args)
             (aver (not (and variable (eq return :tail))))
             #+immobile-code (when named (setq named :direct))
             `(define-vop (,vop-name ,@(when (eq return :unknown)
@@ -610,7 +610,9 @@
                    '((old-fp)
                      (return-pc)))
 
-               ,@(unless variable '((args :more t :scs (descriptor-reg)))))
+               ,@(unless variable
+                   `((args :more t ,@(unless (eq args :fixed)
+                                       '(:scs (descriptor-reg)))))))
 
                ,@(when (eq return :fixed)
                    '((:results (values :more t))))
@@ -618,7 +620,9 @@
                (:save-p ,(if (eq return :tail) :compute-only t))
 
                ,@(unless (or (eq return :tail) variable)
-               '((:move-args :full-call)))
+                   `((:move-args ,(if (eq args :fixed)
+                                      :fixed
+                                      :full-call))))
 
                (:vop-var vop)
                (:node-var node)
@@ -850,7 +854,9 @@
   (define-full-call static-tail-call-named :direct :tail nil)
 
   (define-full-call call-variable nil :fixed t)
-  (define-full-call multiple-call-variable nil :unknown t))
+  (define-full-call multiple-call-variable nil :unknown t)
+  (define-full-call fixed-call-named t :fixed nil :fixed)
+  (define-full-call fixed-tail-call-named t :tail nil :fixed))
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)

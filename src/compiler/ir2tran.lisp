@@ -1156,7 +1156,7 @@
     (when (and info
                (ir1-attributep (fun-info-attributes info) fixed-args))
       (values (sb-vm::make-fixed-call-args-state)
-              (fun-type-required (info :function :type (combination-fun-source-name node) ))))))
+              (fun-type-required (info :function :type (combination-fun-source-name node)))))))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
 (defun ir2-convert-full-call-args (node block)

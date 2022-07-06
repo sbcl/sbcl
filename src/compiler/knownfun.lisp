@@ -171,9 +171,9 @@
     (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
-  #-(or x86-64 arm64) ;; Needs to be supported by the call VOPs
+  #-(or arm64 x86-64) ;; Needs to be supported by the call VOPs
   (setf attributes (remove 'no-verify-arg-count attributes))
-  #-arm64 ;; Needs to be supported by the call VOPs, sb-vm::fixed-call-arg-location
+  #-(or arm64 x86-64) ;; Needs to be supported by the call VOPs, sb-vm::fixed-call-arg-location
   (setf attributes (remove 'fixed-args attributes))
   (when (memq 'fixed-args attributes)
     (pushnew 'no-verify-arg-count attributes))

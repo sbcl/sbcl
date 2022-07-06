@@ -144,12 +144,14 @@
 
 (defstruct fixed-call-args-state
   (descriptors -1 :type fixnum)
+  #-c-stack-is-control-stack
   (non-descriptors -1 :type fixnum)
   (float -1 :type fixnum))
 
-(defvar *float-args*)
-(defvar *non-desctiptor-args*)
-(defvar *desctiptor-args*)
+(declaim (#+sb-xc-host special
+          #-sb-xc-host sb-ext:global
+          *float-args* *desctiptor-args*
+          #-c-stack-is-control-stack *non-desctiptor-args*))
 
 (defun fixed-call-arg-location (type state)
   (let* ((primtype (primitive-type type))
@@ -158,15 +160,19 @@
       ((double-float single-float)
        (make-wired-tn primtype
                       sc
-                      (elt *float-args* (incf (fixed-call-args-state-float state)))))
+                      (elt *float-regs* (incf (fixed-call-args-state-float state)))))
       ((unsigned-byte-64 signed-byte-64)
        (make-wired-tn primtype
                       sc
-                      (elt *non-desctiptor-args* (incf (fixed-call-args-state-non-descriptors state)))))
+                      (elt #-c-stack-is-control-stack *non-descriptor-args*
+                           #+c-stack-is-control-stack *descriptor-args*
+                           (incf (#-c-stack-is-control-stack fixed-call-args-state-non-descriptors
+                                  #+c-stack-is-control-stack fixed-call-args-state-descriptors
+                                  state)))))
       (t
        (make-wired-tn primtype
                       descriptor-reg-sc-number
-                      (elt *desctiptor-args* (incf (fixed-call-args-state-descriptors state))))))))
+                      (elt *descriptor-args* (incf (fixed-call-args-state-descriptors state))))))))
 
 ;;; Make a TN to hold the number-stack frame pointer.  This is allocated
 ;;; once per component, and is component-live.
