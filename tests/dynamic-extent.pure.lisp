@@ -775,9 +775,12 @@
 
 (defun test-hash-table ()
   (setf (gethash 5 *table*) 13)
-  (gethash 5 *table*))
+  (setf (gethash 6 *table*) 14)
+  (values (gethash 5 *table*)
+          (gethash 6 *table*)))
 
 (with-test (:name (:no-consing :hash-tables))
+  (test-hash-table) ;; initialize all the vectors first
   (assert-no-consing (test-hash-table)))
 
 ;;; Both with-pinned-objects and without-gcing should not cons
