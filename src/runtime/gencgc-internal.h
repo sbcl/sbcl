@@ -30,12 +30,7 @@
 #endif
 
 #define GENCGC_PAGE_WORDS (GENCGC_PAGE_BYTES/N_WORD_BYTES)
-
-/* Calculate the start address for the given page number. */
-static inline char *page_address(page_index_t page_num) {
-    return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
-}
-
+extern char *page_address(page_index_t);
 int gencgc_handle_wp_violation(void*, void*);
 
 
@@ -126,6 +121,7 @@ struct page {
     // !!! If bit positions are changed, be sure to reflect the changes into
     // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
     // and WALK-DYNAMIC-SPACE.
+    unsigned char
         /*
          * The 4 low bits of 'type' are defined by PAGE_TYPE_x constants.
          *  0000 free
@@ -134,7 +130,11 @@ struct page {
          *  ?011 mixed boxed/unboxed non-code objects
          *  ?111 code
          * The next two bits are SINGLE_OBJECT and OPEN_REGION */
-    unsigned char type;
+        type :6,
+        /* Whether the page was used at all. This is the only bit that can
+         * be 1 on a free page */
+        need_zerofill :1,
+        dontuse :1;
 
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current

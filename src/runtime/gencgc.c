@@ -193,6 +193,12 @@ static inline boolean protect_page_p(page_index_t page, generation_index_t gener
 }
 #endif
 
+/* Calculate the start address for the given page number. */
+inline char *page_address(page_index_t page_num)
+{
+    return (void*)(DYNAMIC_SPACE_START + (page_num * GENCGC_PAGE_BYTES));
+}
+
 /* Calculate the address where the allocation region associated with
  * the page starts. */
 static inline void *
@@ -256,7 +262,8 @@ page_index_t contiguous_block_final_page(page_index_t first) {
 
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
  * scan_start of zero, to optimize page_ends_contiguous_block_p().
- * Clear all the flags that don't pertain to a free page. */
+ * Clear all the flags that don't pertain to a free page.
+ * Particularly the 'need_zerofill' bit MUST remain as-is */
 static inline void reset_page_flags(page_index_t page) {
     page_table[page].scan_start_offset_ = 0;
 #ifdef LISP_FEATURE_DARWIN_JIT
@@ -265,6 +272,7 @@ static inline void reset_page_flags(page_index_t page) {
     if (page_table[page].type == PAGE_TYPE_CODE) set_page_needs_zerofill(page);
 #endif
     page_table[page].type = 0;
+    page_table[page].dontuse = 0;
     gc_page_pins[page] = 0;
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
     //    page_table[page].gen = 0;
@@ -827,7 +835,7 @@ void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type
     for (i = start; i <= end; i++) any_need_to_zero |= page_need_to_zero(i);
     if (any_need_to_zero) {
         zero_pages(start, end);
-        // Zeroing the page clears the need-to-zerofill status implicitly
+        for (i = start; i <= end; i++) set_page_need_to_zero(i, 0);
     }
 #else
     boolean usable_by_lisp =
@@ -837,7 +845,7 @@ void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type
         for (i = start; i <= end; i++)
             if (page_need_to_zero(i)) {
                 zero_pages(i, i);
-                // Zeroing the page clears the need-to-zerofill status implicitly
+                set_page_need_to_zero(i, 0);
             }
     }
 #endif
@@ -988,11 +996,18 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
         && page_table[index].gen == gen
         && !gc_page_pins[index];
 #else
-    /* Test 'gen' and 'type' as one comparison.
-     * The type is at 1 byte prior to 'gen' in the page structure.
+    /* Test the three conditions above as a single comparison.
+     *
+     *      pin -\
+     *            v vvvvvv -- type
+     * #b11111111_10111111
+     *             ^
+     *              need_zerofill (ignored)
+     *
+     * The flags reside at 1 byte prior to 'gen' in the page structure.
      */
     int attributes_match =
-        *(int16_t*)(&page_table[index].gen-1) == ((gen<<8)|type);
+        (*(int16_t*)(&page_table[index].gen-1) & 0xFFBF) == ((gen<<8)|type);
 #endif
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     return attributes_match && page_cards_all_marked_nonsticky(index);
@@ -1797,7 +1812,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
 #endif
         /* It checks out OK, free the page. */
         prev_bytes_used = page_bytes_used(page);
-        set_page_needs_zerofill(page);
+        set_page_need_to_zero(page, 1);
         set_page_bytes_used(page, 0);
         reset_page_flags(page);
         bytes_freed += prev_bytes_used;
@@ -3458,7 +3473,7 @@ static void free_oldspace(void)
             gc_dcheck(page_cards_all_marked_nonsticky(last_page));
             /* Free the page. */
             int used = page_words_used(page);
-            if (used) set_page_needs_zerofill(page);
+            if (used) set_page_need_to_zero(page, 1);
             set_page_bytes_used(page, 0);
             reset_page_flags(page);
             bytes_freed += used << WORD_SHIFT;
@@ -4456,7 +4471,8 @@ remap_page_range (page_index_t from, page_index_t to)
         zero_pages(from, to);
     }
 #endif
-    // Zeroing the range clears the need-to-zerofill status implicitly
+    page_index_t i;
+    for (i = from; i <= to; i++) set_page_need_to_zero(i, 0);
 }
 
 static void

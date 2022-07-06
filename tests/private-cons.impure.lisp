@@ -34,8 +34,8 @@
 #+gencgc
 (progn
 (defun page-need-to-zero (index)
-  (let ((addr (+ sb-vm:dynamic-space-start (* index sb-vm:gencgc-page-bytes))))
-    (/= 0 (sb-sys:sap-ref-word (sb-sys:int-sap addr) 0))))
+  (logbitp #+little-endian 6 #+big-endian 1
+           (slot (deref sb-vm::page-table index) 'sb-vm::flags)))
 (defun test-private-consing ()
   (let ((conses-per-page ; subtract one for the page header cons
          (1- (/ sb-vm:gencgc-page-bytes (* 2 sb-vm:n-word-bytes))))

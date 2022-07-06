@@ -829,7 +829,9 @@ Experimental: interface subject to change."
                          (let* ((wp (page-protected-p object))
                                 (index (sb-vm:find-page-index
                                         (get-lisp-obj-address object)))
-                                (type (sb-alien:slot page 'sb-vm::flags)))
+                                (flags (sb-alien:slot page 'sb-vm::flags))
+                                (type  #+little-endian (ldb (byte 6 0) flags)
+                                       #+big-endian (ldb (byte 6 2) flags)))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
