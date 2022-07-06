@@ -3409,7 +3409,6 @@ possibly temporarily, because it might be used internally.")
 
             ;; Character database
 
-           "**CHARACTER-PRIMARY-COMPOSITIONS**"
            "**CHARACTER-COLLATIONS**"
 
             ;; Character database access

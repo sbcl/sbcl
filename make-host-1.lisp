@@ -98,7 +98,7 @@
                  "output/casepages.dat"
                  "output/casepages.lisp-expr"
                  "output/collation.dat"
-                 "output/comp.dat"
+                 "output/comp.lisp-expr"
                  "output/CompositionExclusions.txt"
                  "output/confusables.lisp-expr"
                  "output/decomp.dat"

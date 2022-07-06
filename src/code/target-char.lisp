@@ -88,7 +88,6 @@
                      (ucd-high-pages (read-ub8-vector (file "ucdhigh" "dat")))
                      (ucd-low-pages (read-ub8-vector (file "ucdlow" "dat")))
                      (decompositions (read-ub8-vector (file "decomp" "dat")))
-                     (primary-compositions (read-ub8-vector (file "comp" "dat")))
                      (case-data (read-ub8-vector (file "case" "dat")))
                      (case-pages (read-ub8-vector (file "casepages" "dat")))
                      (collations (read-ub8-vector (file "collation" "dat")))
@@ -103,19 +102,6 @@
                     (defconstant-eqx sb-unicode::+character-decompositions+
                         ,(make-ubn-vector decompositions 3) #'equalp)
                     (defconstant-eqx +character-case-pages+ ,%*character-case-pages*% #'equalp)
-                    (declaim (hash-table **character-primary-compositions**))
-                    (define-load-time-global **character-primary-compositions**
-                        ,(let ((info (make-ubn-vector primary-compositions 3))
-                               (alist))
-                           (dotimes (i (/ (length info) 3))
-                             (let* ((3i (* 3 i))
-                                    (key (dpb (aref info 3i) (byte 21 21) (aref info (1+ 3i))))
-                                    (value (aref info (+ 3i 2))))
-                               (push (cons key value) alist)))
-                           `(%stuff-hash-table (make-hash-table #+64-bit :test #+64-bit #'eq
-                                                                :size ,(/ (length info) 3))
-                                               ,(nreverse (coerce alist 'vector)))))
-
                     ,@(let* ((unicode-table
                                  (make-array
                                   (* 64 (1+ (aref %*character-case-pages*%

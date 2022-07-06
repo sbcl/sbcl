@@ -925,14 +925,14 @@ Used to look up block data.")
     (print (length *decompositions*))))
 
 (defun output-composition-data ()
-  (with-output-dat-file (stream "comp")
+  (with-output-lisp-expr-file (stream "comp")
     (let (comp)
       (maphash (lambda (k v) (push (cons k v) comp)) *compositions*)
-      (setq comp (sort comp #'< :key #'cdr))
-      (loop for (k . v) in comp
-         do (write-codepoint (car k) stream)
-           (write-codepoint (cdr k) stream)
-           (write-codepoint v stream)))))
+      (format stream "#(~%")
+      (loop for (k . v) in (sort comp #'< :key #'cdr)
+         do (format stream "(~D . ~D) ; #x~X + #x~X~%"
+                    (logior (ash (car k) 21) (cdr k)) v (car k) (cdr k)))
+      (format stream ")~%"))))
 
 (defun output-case-data ()
   (let (casing-pages points-with-case)

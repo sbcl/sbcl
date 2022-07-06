@@ -450,8 +450,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
       (nreverse chars))))
 
 (defun primary-composition (char1 char2)
-  (flet ((maybe (fn x) (when x (funcall fn x)))
-         (composition-hangul-syllable-type (cp)
+  (flet ((composition-hangul-syllable-type (cp)
            (cond
              ((and (<= #x1100 cp) (<= cp #x1112)) :L)
              ((and (<= #x1161 cp) (<= cp #x1175)) :V)
@@ -461,19 +460,24 @@ disappears when accents are placed on top of it. and NIL otherwise"
     (declare (inline composition-hangul-syllable-type))
     (let ((c1 (char-code char1))
           (c2 (char-code char2)))
-      (maybe
-       #'code-char
        (cond
          ((gethash (dpb c1 (byte 21 21) c2)
-                   **character-primary-compositions**))
+                   (load-time-value
+                    (let* ((data '#.(sb-cold:read-from-file "output/comp.lisp-expr"))
+                           (hash (make-hash-table :size (length data)
+                                                  #+64-bit :test #+64-bit #'eq)))
+                      (dovector (pair data hash)
+                        (when (< (cdr pair) char-code-limit) ; Why is this even defined if #-sb-unicode?
+                          (setf (gethash (car pair) hash) (code-char (cdr pair))))))
+                    t)))
          ((and (eql (composition-hangul-syllable-type c1) :L)
                (eql (composition-hangul-syllable-type c2) :V))
           (let ((lindex (- c1 #x1100))
                 (vindex (- c2 #x1161)))
-            (+ #xac00 (* lindex 588) (* vindex 28))))
+            (code-char (+ #xac00 (* lindex 588) (* vindex 28)))))
          ((and (eql (composition-hangul-syllable-type c1) :LV)
                (eql (composition-hangul-syllable-type c2) :T))
-          (+ c1 (- c2 #x11a7))))))))
+          (code-char (+ c1 (- c2 #x11a7))))))))
 
 (defun canonically-compose (list)
   (let* ((result list)
