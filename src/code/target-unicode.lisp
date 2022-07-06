@@ -15,13 +15,13 @@
     #.(sb-cold:read-from-file "output/numerics.lisp-expr")
     #'equalp)
 
-(sb-ext:define-load-time-global **proplist-properties**
-    (let* ((list '#.(sb-cold:read-from-file "output/misc-properties.lisp-expr"))
-           (hash (make-hash-table :size (length list))))
-      (loop for (symbol ranges) on list by #'cddr
-            do (setf (gethash symbol hash)
-                     (coerce ranges '(vector (unsigned-byte 32)))))
-      hash))
+(eval-when (:compile-toplevel)
+  (defun plist-to-alist (list)
+    (loop for (key value) on list by #'cddr collect (cons key value))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *proplist-properties*
+    (mapcar (lambda (x) (cons (car x) (sb-xc:coerce (cdr x) '(vector (unsigned-byte 32)))))
+            '#.(plist-to-alist (sb-cold:read-from-file "output/misc-properties.lisp-expr")))))
 
 (sb-ext:define-load-time-global **confusables**
     (let* ((data '#.(sb-cold:read-from-file "output/confusables.lisp-expr"))
@@ -96,8 +96,19 @@
   "Returns T if CHARACTER has the specified PROPERTY.
 PROPERTY is a keyword representing one of the properties from PropList.txt,
 with underscores replaced by dashes."
-  (ordered-ranges-member (char-code character)
-                         (gethash property **proplist-properties**)))
+  (macrolet ((get-ub32-vector ()
+               ;; This ECASE gets optimized into parallel arrays,
+               ;; and does not depend on jump tables
+               `(ecase property ,@(mapcar (lambda (x) (list (car x) (cdr x)))
+                                          *proplist-properties*))))
+    (ordered-ranges-member (char-code character) (get-ub32-vector))))
+
+(define-compiler-macro proplist-p (&whole form character property)
+  (if (keywordp property)
+      `(ordered-ranges-member (char-code ,character)
+                              ,(or (cdr (assoc property *proplist-properties*))
+                                   (error "No such property ~S" property)))
+      form))
 
 (eval-when (:compile-toplevel)
   (defvar *slurped-random-constants*
@@ -1585,3 +1596,5 @@ according to the IDNA confusableSummary.txt table"
            (skeleton1 (normalize-string (canonically-deconfuse str1) form))
            (skeleton2 (normalize-string (canonically-deconfuse str2) form)))
       (string= skeleton1 skeleton2)))
+
+(clear-info :function :compiler-macro-function 'proplist-p)
