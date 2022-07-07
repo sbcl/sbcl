@@ -965,6 +965,8 @@ Used to look up block data.")
                            (t first)))
                    ;; Pack the blob of "keys" using 32 bits each
                    (let ((sum 0))
+                     ;; reversal here is magic. Don't worry about getting it wrong-
+                     ;; unicode-collation.pure checks that.
                      (dolist (part (reverse keys) sum)
                        (setq sum (logior (ash sum 32) part))))))))
     (format output ")~%"))

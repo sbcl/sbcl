@@ -1970,10 +1970,23 @@ table itself."
 ;;; Stuff an association list, or a vector, into HASH-TABLE. Return the hash table,
 ;;; so that we can use this for the *PRINT-READABLY* case in PRINT-OBJECT (HASH-TABLE T)
 ;;; without having to worry about LET forms and readable gensyms and stuff.
-(defun %stuff-hash-table (hash-table data)
+(defun %stuff-hash-table (hash-table data &optional pure)
   (if (vectorp data)
       (dovector (x data) (setf (gethash (car x) hash-table) (cdr x)))
       (dolist (x data) (setf (gethash (car x) hash-table) (cdr x))))
+  (when pure
+    ;; Mark the index vector, next-vector, hash-vector (if present),
+    ;; and even the key vector, as shareable, provided that no key is hashed
+    ;; address-sensitively. As a first crack I'm just requiring keys to be
+    ;; fixnum or character, but some table types would stably hash more things.
+    (let ((stably-hashed
+           (loop for k being each hash-key of hash-table
+                 always (typep k '(or fixnum character)))))
+      (when stably-hashed
+        (logically-readonlyize (hash-table-pairs hash-table))
+        (logically-readonlyize (hash-table-index-vector hash-table))
+        (logically-readonlyize (hash-table-next-vector hash-table))
+        (awhen (hash-table-hash-vector hash-table) (logically-readonlyize it)))))
   hash-table)
 
 ;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE

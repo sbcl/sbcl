@@ -414,8 +414,8 @@ lispobj* duplicate_codeblob_offheap(lispobj code)
 #if 0 // interceptors for debugging so I don't have to reinvent them every time
 static void decode_protbits(int prot, char result[4]) {
     result[0] = (prot & PROT_READ) ? 'r' : '-';
-    result[1] = (prot & PROT_READ) ? 'w' : '-';
-    result[2] = (prot & PROT_READ) ? 'x' : '-';
+    result[1] = (prot & PROT_WRITE) ? 'w' : '-';
+    result[2] = (prot & PROT_EXEC) ? 'x' : '-';
     result[3] = 0;
 }
 static void decode_flagbits(int flags, char result[40]) {

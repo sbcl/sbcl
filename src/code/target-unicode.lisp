@@ -20,11 +20,12 @@
             '#.(plist-to-alist (sb-cold:read-from-file "output/misc-properties.lisp-expr")))))
 
 (sb-ext:define-load-time-global **confusables**
-    (let* ((data '#.(sb-cold:read-from-file "output/confusables.lisp-expr"))
-           (hash (make-hash-table :test #'eq #+sb-unicode :size #+sb-unicode (length data))))
-      (loop for (source . target) in data
+    (let ((data '#.(sb-cold:read-from-file "output/confusables.lisp-expr")))
+      (sb-impl::%stuff-hash-table
+        (make-hash-table :test #'eq #+sb-unicode :size #+sb-unicode (length data))
+        (loop for (source . target) in data
             when (and #-sb-unicode (< source char-code-limit))
-            do (flet ((minimize (x)
+            collect (flet ((minimize (x)
                         (case (length x)
                           (1
                            (elt x 0))
@@ -35,14 +36,15 @@
                           (t
                            (logically-readonlyize
                             (possibly-base-stringize (map 'string #'code-char x)))))))
-                 (setf (gethash (code-char source) hash) (minimize target))))
-      hash))
+                      (cons (code-char source) (minimize target))))
+        t)))
 
 (sb-ext:define-load-time-global **bidi-mirroring-glyphs**
-    (let* ((list '#.(sb-cold:read-from-file "output/bidi-mirrors.lisp-expr"))
-           (hash (make-hash-table :test #'eq :size (length list))))
-      (loop for (k v) in list do (setf (gethash k hash) v))
-      hash))
+    (let ((list '#.(sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
+      (sb-impl::%stuff-hash-table
+       (make-hash-table :test #'eq :size (length list))
+       (loop for (k v) in list collect (cons k v))
+       t)))
 
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
@@ -167,12 +169,13 @@ Numeric value is the most general of the Unicode numeric properties.
 The only constraint on the numeric value is that it be a rational number."
   (or (gethash character
                (load-time-value
-                (let* ((list '#.(sb-cold:read-from-file "output/numerics.lisp-expr"))
-                       (hash (make-hash-table :test #'eq :size (length list))))
-                  (loop for (k . v) in list
-                        when (< k char-code-limit)
-                        do (setf (gethash (code-char k) hash) v))
-                  hash)
+                (let ((list '#.(sb-cold:read-from-file "output/numerics.lisp-expr")))
+                  (sb-impl::%stuff-hash-table
+                   (make-hash-table :test #'eq :size (length list))
+                   (loop for (k . v) in list
+                         when (< k char-code-limit)
+                         collect (cons (code-char k) v))
+                   t))
                 t))
       (digit-value character)))
 
@@ -463,12 +466,13 @@ disappears when accents are placed on top of it. and NIL otherwise"
        (cond
          ((gethash (dpb c1 (byte 21 21) c2)
                    (load-time-value
-                    (let* ((data '#.(sb-cold:read-from-file "output/comp.lisp-expr"))
-                           (hash (make-hash-table :size (length data)
-                                                  #+64-bit :test #+64-bit #'eq)))
-                      (dovector (pair data hash)
-                        (when (< (cdr pair) char-code-limit) ; Why is this even defined if #-sb-unicode?
-                          (setf (gethash (car pair) hash) (code-char (cdr pair))))))
+                    (let ((data '#.(sb-cold:read-from-file "output/comp.lisp-expr")))
+                      (sb-impl::%stuff-hash-table
+                       (make-hash-table :size (length data) #+64-bit :test #+64-bit #'eq)
+                       (loop for pair across data
+                             when (< (cdr pair) char-code-limit) ; Why is this even defined if #-sb-unicode?
+                             collect (cons (car pair) (code-char (cdr pair))))
+                       t))
                     t)))
          ((and (eql (composition-hangul-syllable-type c1) :L)
                (eql (composition-hangul-syllable-type c2) :V))
@@ -1433,7 +1437,7 @@ it defaults to 80 characters"
                `(load-time-value
                  (sb-impl::%stuff-hash-table
                   (make-hash-table :size ,(length data) #+64-bit :test #+64-bit 'eq)
-                  ',data)
+                  ',data t)
                  t))))
 (defun collation-key (string start end)
   (let (char1

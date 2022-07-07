@@ -1,13 +1,17 @@
 (in-package "SB-IMPL")
 
 (defmacro define-multibyte-mapper (name list)
-  (let ((list (sort (copy-list list) #'< :key #'car))
-        (hi (loop for x in list maximize (max (car x) (cadr x)))))
-    `(defconstant-eqx ,name
-       (make-array '(,(length list) 2)
-                   :element-type '(integer 0 ,hi)
-                   :initial-contents ',list)
-       #'equalp)))
+  (let* ((list (sort (copy-list list) #'< :key #'car))
+         (hi (loop for x in list maximize (max (car x) (cadr x))))
+         (array (make-array `(,(length list) 2)
+                            :element-type `(integer 0 ,hi)
+                            :initial-contents list)))
+    ;; This used to invoke MAKE-ARRAY in the defining form, but a quoted constant
+    ;; is better - it's literal and therefore implicitly readonly.
+    ;; And the cross-compiler dumps specialized arrays correctly these days,
+    ;; but guess what, this is compiled in warm build anyway, so who even cares
+    ;; what the cross-compiler used to not be OK with?
+    `(defconstant-eqx ,name ,array #'equalp)))
 
 (defun get-multibyte-mapper (table code)
   (declare (optimize speed #.*safety-0*)
