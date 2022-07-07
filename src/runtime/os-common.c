@@ -410,3 +410,44 @@ lispobj* duplicate_codeblob_offheap(lispobj code)
     memcpy(copy, (char*)code-OTHER_POINTER_LOWTAG, nwords<<WORD_SHIFT);
     return mem;
 }
+
+#if 0 // interceptors for debugging so I don't have to reinvent them every time
+static void decode_protbits(int prot, char result[4]) {
+    result[0] = (prot & PROT_READ) ? 'r' : '-';
+    result[1] = (prot & PROT_READ) ? 'w' : '-';
+    result[2] = (prot & PROT_READ) ? 'x' : '-';
+    result[3] = 0;
+}
+static void decode_flagbits(int flags, char result[40]) {
+    char *p = result;
+    char delim = '{';
+#define APPEND(str) { *p++ = delim; delim = '|'; strcpy(p, str); p += sizeof str-1; }
+    if (flags & MAP_PRIVATE) APPEND("Pvt");
+    if (flags & MAP_ANON) APPEND("Anon");
+    if (flags & MAP_NORESERVE) APPEND("NoRsv");
+    if (flags & MAP_JIT) APPEND("JIT");
+#undef APPEND
+    strcpy(p, "}");
+}
+void* sbcl_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
+    char decoded_prot[4], decoded_flags[40];
+    decode_protbits(prot, decoded_prot);
+    decode_flagbits(flags, decoded_flags);
+    void* result = mmap(addr, length, prot, flags, fd, offset);
+    fprintf(stderr, "mmap(%p,%lx,%s,%s,%d,%llx)=%p\n", addr, length,
+            decoded_prot, decoded_flags, fd, offset, result);
+    return result;
+}
+int sbcl_munmap(void* addr, size_t length) {
+    int result = munmap(addr, length);
+    fprintf(stderr, "munmap(%p,%lx)=%d\n", addr, length, result);
+    return result;
+}
+int sbcl_mprotect(void* addr, size_t length, int prot) {
+    char decoded_prot[4];
+    decode_protbits(prot, decoded_prot);
+    int result = mprotect(addr, length, prot);
+    fprintf(stderr, "mprotect(%p,%lx,%s)=%d\n", addr, length, decoded_prot, result);
+    return result;
+}
+#endif
