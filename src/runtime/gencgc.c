@@ -269,7 +269,7 @@ static inline void reset_page_flags(page_index_t page) {
 #ifdef LISP_FEATURE_DARWIN_JIT
     // Whenever a page was mapped as code, it potentially needs to be remapped on the next use.
     // This avoids any affect of pthread_jit_write_protect_np when next used.
-    if (page_table[page].type == PAGE_TYPE_CODE) set_page_needs_zerofill(page);
+    if (page_table[page].type == PAGE_TYPE_CODE) set_page_need_to_zero(page, 1);
 #endif
     page_table[page].type = 0;
     page_table[page].dontuse = 0;
@@ -1172,6 +1172,9 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
             os_invalidate(page_address(remap_from), len);
             mmap(page_address(remap_from), len,
                  OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
+            page_index_t p;
+            // Ensure that zeroize_pages_if_needed() below does ABSOLUTELY NOTHING!
+            for(p=remap_from; p<=last_page; ++p) set_page_need_to_zero(p,0);
         }
     }
 #endif
