@@ -153,6 +153,9 @@
 (defmacro def-variant (name cpu-feature lambda-list &body body)
   (let ((variant (symbolicate name '- cpu-feature)))
     `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (setf (info :function :type ',variant) (info :function :type ',name)
+               (info :function :info ',variant) (info :function :info ',name)))
        (defun ,variant ,lambda-list
          ,@body)
        ;; Avoid STATICALLY-LINK-CORE from making it harder to redefine.

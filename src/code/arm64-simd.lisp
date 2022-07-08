@@ -58,6 +58,15 @@
        ((res complex-double-reg complex-double-float))
      (inst movi res value :16b)))
 
+;;; Basically like the x86 with-pinned-object,
+;;; but here only the boxed registers are pinned.
+;;; This doesn't prevent the var from going to the stack, but none of
+;;; the routines should do that.
+(defmacro with-pinned-objects-in-registers (vars &body body)
+  `(multiple-value-prog1 ,@body
+     ,@(loop for var in vars
+             collect `(touch-object ,var))))
+
 (defmacro simd-string-case (a source destination index fallback)
   `(let ((ascii-p (simd-mask-32 192))
          (a-mask (simd-mask-32 ,(char-code a)))
@@ -88,83 +97,85 @@
                      (inst s-and temp temp flip)
                      (inst s-eor res bits temp)))))))
 
-(defun simd-nreverse8 (vector start end)
+(defun simd-nreverse8 (result vector start end)
   (declare ((simple-array * (*)) vector)
            (fixnum start end)
            (optimize speed (safety 0)))
   (let ((sap (vector-sap vector)))
-    (inline-vop (((left sap-reg t) sap)
-                 ((start any-reg tagged-num) start)
-                 ((end) end)
-                 ((right signed-reg signed-num))
-                 ((gl))
-                 ((gr))
-                 ((vl complex-double-reg complex-double-float))
-                 ((vr)))
-        ()
-      (inst add right left (lsr end 1))
-      (inst add left left (lsr start 1))
-      (inst sub gl right left)
-      (inst cmp gl 32)
-      (inst b :lt WORD)
-      (inst sub right right 16)
+    (with-pinned-objects-in-registers (vector)
+      (inline-vop (((left sap-reg t) sap)
+                   ((start any-reg tagged-num) start)
+                   ((end) end)
+                   ((right signed-reg signed-num))
+                   ((gl))
+                   ((gr))
+                   ((vl complex-double-reg complex-double-float))
+                   ((vr)))
+          ()
+        (inst add right left (lsr end 1))
+        (inst add left left (lsr start 1))
+        (inst sub gl right left)
+        (inst cmp gl 32)
+        (inst b :lt WORD)
+        (inst sub right right 16)
 
-      LOOP
-      (inst ldr vl (@ left))
-      (inst ldr vr (@ right))
+        LOOP
+        (inst ldr vl (@ left))
+        (inst ldr vr (@ right))
 
-      (inst rev64 vl vl)
-      (inst ext vl vl vl 8)
-      (inst rev64 vr vr)
-      (inst ext vr vr vr 8)
+        (inst rev64 vl vl)
+        (inst ext vl vl vl 8)
+        (inst rev64 vr vr)
+        (inst ext vr vr vr 8)
 
-      (inst str vr (@ left 16 :post-index))
-      (inst str vl (@ right -16 :post-index))
-      (inst cmp left right)
-      (inst b :lt loop)
+        (inst str vr (@ left 16 :post-index))
+        (inst str vl (@ right -16 :post-index))
+        (inst cmp left right)
+        (inst b :lt loop)
 
-      (inst add right right 16)
-      (inst sub tmp-tn right left)
-      (inst cmp tmp-tn 1)
-      (inst b :le DONE)
+        (inst add right right 16)
+        (inst sub tmp-tn right left)
+        (inst cmp tmp-tn 1)
+        (inst b :le DONE)
 
-      WORD
-      (inst sub tmp-tn right left)
-      (inst cmp tmp-tn 16)
-      (inst b :lt BYTE)
+        WORD
+        (inst sub tmp-tn right left)
+        (inst cmp tmp-tn 16)
+        (inst b :lt BYTE)
 
-      (inst ldr gl (@ left))
-      (inst ldr gr (@ right -8 :pre-index))
-      (inst rev gl gl)
-      (inst rev gr gr)
-      (inst str gr (@ left 8 :post-index))
-      (inst str gl (@ right))
+        (inst ldr gl (@ left))
+        (inst ldr gr (@ right -8 :pre-index))
+        (inst rev gl gl)
+        (inst rev gr gr)
+        (inst str gr (@ left 8 :post-index))
+        (inst str gl (@ right))
 
-      BYTE
-      (inst sub right right 1)
-      (inst cmp right left)
-      (inst b :lt DONE)
+        BYTE
+        (inst sub right right 1)
+        (inst cmp right left)
+        (inst b :lt DONE)
 
-      ;; After the 16-element copy above there are at most 15
-      ;; elements, have to swap 14 elements with one staying in the
-      ;; middle.
-      (loop repeat 7
-            do
-            (inst ldrb gl (@ left))
-            (inst ldrb gr (@ right))
-            (inst strb gr (@ left 1 :post-index))
-            (inst strb gl (@ right -1 :post-index))
-            (inst cmp left right)
-            (inst b :ge DONE))
-      DONE))
-  vector)
+        ;; After the 16-element copy above there are at most 15
+        ;; elements, have to swap 14 elements with one staying in the
+        ;; middle.
+        (loop repeat 7
+              do
+              (inst ldrb gl (@ left))
+              (inst ldrb gr (@ right))
+              (inst strb gr (@ left 1 :post-index))
+              (inst strb gl (@ right -1 :post-index))
+              (inst cmp left right)
+              (inst b :ge DONE))
+        DONE)))
+  result)
 
-(defun simd-nreverse32 (vector start end)
+(defun simd-nreverse32 (result vector start end)
   (declare ((simple-array * (*)) vector)
            (fixnum start end)
            (optimize speed (safety 0)))
-  (let ((sap (vector-sap vector)))
-    (inline-vop (((left sap-reg t) sap)
+
+  (with-pinned-objects-in-registers (vector)
+    (inline-vop (((left sap-reg t) (vector-sap vector))
                  ((start any-reg tagged-num) start)
                  ((end) end)
                  ((right signed-reg signed-num))
@@ -215,7 +226,7 @@
             (inst cmp left right)
             (inst b :ge DONE))
       DONE))
-  vector)
+  result)
 
 (defun simd-reverse8 (source start length target)
   (declare ((simple-array * (*)) vector target)
@@ -322,15 +333,6 @@
             (inst b :lt DONE))
       DONE))
   target)
-
-;;; Basically like the x86 with-pinned-object,
-;;; but here only the boxed registers are pinned.
-;;; This doesn't prevent the var from going to the stack, but none of
-;;; the routines should do that.
-(defmacro with-pinned-objects-in-registers (vars &body body)
-  `(multiple-value-prog1 ,@body
-     ,@(loop for var in vars
-             collect `(touch-object ,var))))
 
 (defun simd-cmp-8-32 (byte-array 32-bit-array)
   (declare ((simple-array * (*)) byte-array 32-bit-array)

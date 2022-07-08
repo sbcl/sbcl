@@ -19,13 +19,13 @@
 (defknown (setf vector-ref-128) (128-element t index) (values)
   ())
 
-(defknown (simd-nreverse8 simd-nreverse32) ((simple-array * (*)) fixnum fixnum)
-    (simple-array * (*))
-    (sb-c::no-verify-arg-count))
+(defknown (simd-nreverse8 simd-nreverse32) (vector (simple-array * (*)) fixnum fixnum)
+    vector
+    (sb-c::fixed-args))
 
 (defknown (simd-reverse8 simd-reverse32) ((simple-array * (*)) fixnum fixnum (simple-array * (*)))
     (simple-array * (*))
-    (sb-c::no-verify-arg-count))
+    (sb-c::fixed-args))
 
 (defknown (simd-cmp-8-8 simd-cmp-8-32 simd-cmp-32-32 simd-base-string-equal
            simd-base-character-string-equal)
