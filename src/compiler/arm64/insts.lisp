@@ -157,12 +157,6 @@
             (fp-register-p tn)))
   (tn-offset tn))
 
-(defmacro assert-same-size (&rest things)
-  `(assert (= ,@(loop for thing in things
-                      collect `(reg-size ,thing)))
-           ,things
-           "Registers should have the same size: ~@{~a~%, ~}" ,@things))
-
 (define-instruction byte (segment byte)
   (:emitter
    (emit-byte segment byte)))
@@ -475,7 +469,6 @@
        (cond ((or (register-p rm)
                   (shifter-operand-p rm))
               (multiple-value-bind (shift amount rm) (encode-shifted-register rm)
-                (assert-same-size rd rn rm)
                 (emit-add-sub-shift-reg segment size ,op shift (reg-offset rm)
                                         amount (reg-offset rn) (reg-offset rd))))
              ((extend-p rm)
@@ -490,7 +483,6 @@
                                (:sxtw #b110)
                                (:sxtx #b111)))
                      (rm (extend-register rm)))
-                (assert-same-size rd rn rm)
                 (emit-add-sub-ext-reg segment size ,op
                                       (reg-offset rm)
                                       extend shift (reg-offset rn) (reg-offset rd))))
@@ -502,7 +494,6 @@
                            (not (ldb-test (byte 12 0) imm)))
                   (setf imm (ash imm -12)
                         shift 1))
-                (assert-same-size rn rd)
                 (emit-add-sub-imm segment size ,op shift imm
                                   (reg-offset rn) (reg-offset rd)))))))))
 
@@ -943,7 +934,6 @@
                 (t :name))
               :tab rd  ", " rn (:unless (:same-as rn) ", " rm) ", " imm))
   (:emitter
-   (assert-same-size rd rn rm)
    (let ((size (reg-size rd)))
     (emit-extract segment size size
                   (reg-offset rm)
@@ -1181,7 +1171,6 @@
                ,@(and alias
                       `('(',alias :tab rd ", " rn ", " rm))))
      (:emitter
-      (assert-same-size rd rn rm)
       (emit-data-processing-2 segment (reg-size rd)
                               (reg-offset rm)
                               ,opc (reg-offset rn) (reg-offset rd)))))
