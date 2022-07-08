@@ -998,6 +998,9 @@
 ;;; Evaluation took: 0.043 seconds of real time
 ;;; With vop:  0.028 seconds of real time
 
+(eval-when (:compile-toplevel)
+  (aver (evenp symbol-size))) ; assumptions in the code below
+
 (define-vop (fast-alloc-immobile-symbol)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset rax-offset) rax)
@@ -1047,7 +1050,7 @@
        (inst lea :dword rax (ea (* symbol-size n-word-bytes) rax rcx))
        (inst mov :dword (ea rbx) rax) ; store new free_index
        ;; set the low bit of the 'gens' field
-       (inst or :lock :byte (ea 3 rbx) 1)
+       (inst or :lock :byte (ea 7 rbx) 1) ; 7+rbx = &fixedobj_pages[i].attr.parts.gens_
        (inst or :byte result other-pointer-lowtag) ; make_lispobj()
        (inst jmp OUT)
        FAIL
