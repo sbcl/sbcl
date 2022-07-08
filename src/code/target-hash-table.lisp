@@ -1538,9 +1538,7 @@ nnnn 1_    any       linear scan
 ;;; Three argument version of GETHASH
 (defun gethash3 (key hash-table default)
   (declare (type hash-table hash-table))
-  (funcall (truly-the (sfunction (t t t) (values t boolean))
-                      (hash-table-gethash-impl hash-table))
-           key hash-table default))
+  (funcall (hash-table-gethash-impl hash-table) key hash-table default))
 
 ;;; so people can call #'(SETF GETHASH)
 ;;; FIXME: this function is not mandated. Why do we have it?
@@ -1892,15 +1890,12 @@ there was such an entry, or NIL if not."
                      :test (hash-table-test-fun hash-table))))
     (when cell
       (setf (hash-table-%alist hash-table) (delq1 cell (hash-table-%alist hash-table)))))
-  (funcall (truly-the (sfunction (t t) (values boolean &optional))
-                      (hash-table-remhash-impl hash-table))
-           key hash-table))
+  (funcall (hash-table-remhash-impl hash-table) key hash-table))
 
 (defun clrhash (hash-table)
   "This removes all the entries from HASH-TABLE and returns the hash
 table itself."
-  (truly-the (values hash-table &optional)
-             (funcall (hash-table-clrhash-impl hash-table) hash-table)))
+  (funcall (hash-table-clrhash-impl hash-table) hash-table))
 
 (defun clrhash-impl (hash-table)
   ;; This used to do nothing at all for tables that has a COUNT of 0,

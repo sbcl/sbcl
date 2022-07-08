@@ -77,10 +77,10 @@
                                 next-vector
                                 hash-vector)))
 
-  (gethash-impl #'error :type function :read-only t)
-  (puthash-impl #'error :type function :read-only t)
-  (remhash-impl #'error :type function :read-only t)
-  (clrhash-impl #'error :type function :read-only t)
+  (gethash-impl #'error :type (sfunction * (values t boolean)) :read-only t)
+  (puthash-impl #'error :type (sfunction * t) :read-only t)
+  (remhash-impl #'error :type (sfunction * t) :read-only t)
+  (clrhash-impl #'error :type (sfunction * t) :read-only t)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements
