@@ -134,13 +134,10 @@
         (inst b :lt loop)
 
         (inst add right right 16)
-        (inst sub tmp-tn right left)
-        (inst cmp tmp-tn 1)
-        (inst b :le DONE)
 
+        (inst sub gl right left)
         WORD
-        (inst sub tmp-tn right left)
-        (inst cmp tmp-tn 16)
+        (inst cmp gl 16)
         (inst b :lt BYTE)
 
         (inst ldr gl (@ left))
@@ -206,9 +203,6 @@
       (inst b :lt loop)
 
       (inst add right right 16)
-      (inst sub tmp-tn right left)
-      (inst cmp tmp-tn 1)
-      (inst b :le DONE)
 
       SCALAR
       (inst sub right right 4)

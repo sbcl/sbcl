@@ -200,12 +200,11 @@
           (inst vzeroupper)
           (inst add right 32)
 
+          (inst mov l right)
+          (inst sub l left)
           XMM
-          (inst mov r right)
-          (inst sub r 32)
-          (inst cmp r left)
-          (inst jmp :b WORD)
-
+          (inst cmp l 32)
+          (inst jmp :l WORD)
           (inst sub right 16)
           (inst vmovdqu reverse-mask-xmm reverse-mask-c)
           (inst vmovdqu vl-xmm (ea left))
@@ -216,12 +215,13 @@
           (inst vmovdqu (ea right) vl-xmm)
           (inst add left 16)
 
+
+          (inst mov l right)
+          (inst sub l left)
           WORD
 
-          (inst mov r right)
-          (inst sub r 16)
-          (inst cmp r left)
-          (inst jmp :b BYTE)
+          (inst cmp l 16)
+          (inst jmp :l BYTE)
 
           (inst sub right 8)
           (inst mov l (ea left))
@@ -231,7 +231,6 @@
           (inst mov (ea left) r)
           (inst mov (ea right) l)
           (inst add left 8)
-
 
           BYTE
           (inst sub right 1)
@@ -344,11 +343,11 @@
       (inst vzeroupper)
       (inst add right 32)
 
+      (inst mov l right)
+      (inst sub l left)
       XMM
-      (inst mov r right)
-      (inst sub r 32)
-      (inst cmp r left)
-      (inst jmp :b WORD)
+      (inst cmp l 32)
+      (inst jmp :l WORD)
 
       (inst sub right 16)
       (inst vmovdqu vl-xmm (ea left))
@@ -359,12 +358,11 @@
       (inst vmovdqu (ea right) vl-xmm)
       (inst add left 16)
 
+      (inst mov l right)
+      (inst sub l left)
       WORD
-
-      (inst mov r right)
-      (inst sub r 16)
-      (inst cmp r left)
-      (inst jmp :b SCALAR)
+      (inst cmp l 16)
+      (inst jmp :l SCALAR)
 
       (inst sub right 8)
       (inst mov l (ea left))
