@@ -160,8 +160,12 @@
          ,@body)
        ;; Avoid STATICALLY-LINK-CORE from making it harder to redefine.
        (proclaim '(notinline ,name))
-       (setf (getf ,(symbolicate '+ cpu-feature '-routines+) (find-fdefn ',name))
-             #',variant))))
+       (let ((fdefn (find-fdefn ',name))
+             (fun (fdefinition ',variant)))
+         (setf (getf ,(symbolicate '+ cpu-feature '-routines+) fdefn) fun)
+         ;; Redifinition at run-time.
+         (when (eq (%fun-name (fdefn-fun fdefn)) ',variant)
+           (setf (fdefn-fun fdefn) fun))))))
 
 (defvar *previous-cpu-routines* nil)
 
