@@ -127,9 +127,10 @@
                     (return nil))))))
 
   (defun string=* (string1 string2 start1 end1 start2 end2)
+    (declare (explicit-check))
     #+(or arm64 (and x86-64 sb-unicode))
-    (when (and (zerop start1)
-               (zerop start2)
+    (when (and (eql start1 0)
+               (eql start2 0)
                (not end1)
                (not end2))
       ;; With the range spanning the whole string it can be compared
