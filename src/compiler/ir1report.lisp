@@ -652,6 +652,12 @@ has written, having proved that it is unreachable."))
           (incf (undefined-warning-count res))))))
   (values))
 
+(defun maybe-note-undefined-variable-reference (var name)
+  (when (and (global-var-p var)
+             (eq (global-var-kind var) :unknown)
+             (not (deprecated-thing-p 'variable name)))
+    (note-undefined-reference name :variable)))
+
 (defun note-key-arg-mismatch (name keys)
   (let* ((found (find name
                       *argument-mismatch-warnings*

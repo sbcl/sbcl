@@ -27,7 +27,8 @@
 ;;; isn't declared as a variable, but to set its SYMBOL-VALUE anyway.
 ;;;
 ;;; This bug was in sbcl-0.6.11.13.
-(print (setq improperly-declared-var '(1 2)))
+(locally (declare (sb-ext:muffle-conditions warning))
+  (print (setq improperly-declared-var '(1 2))))
 (assert (equal (symbol-value 'improperly-declared-var) '(1 2)))
 (makunbound 'improperly-declared-var)
 ;;; This is a slightly different way of getting the same symptoms out

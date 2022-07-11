@@ -386,7 +386,7 @@
   result)
 
 (defun simd-reverse8 (source start length target)
-  (declare ((simple-array * (*)) vector target)
+  (declare ((simple-array * (*)) source target)
            (fixnum start length)
            (optimize speed (safety 0)))
   (let ((source (vector-sap source))
@@ -433,7 +433,7 @@
   target)
 
 (def-variant simd-reverse8 :avx2 (source start length target)
-  (declare ((simple-array * (*)) vector target)
+  (declare ((simple-array * (*)) source target)
            (fixnum start length)
            (optimize speed (safety 0)))
   (let ((source (vector-sap source))
@@ -509,7 +509,7 @@
   target)
 
 (defun simd-reverse32 (source start length target)
-  (declare ((simple-array * (*)) vector target)
+  (declare ((simple-array * (*)) source target)
            (fixnum start length)
            (optimize speed (safety 0)))
   (let ((source (vector-sap source))
@@ -552,7 +552,7 @@
 
 
 (def-variant simd-reverse32 :avx2 (source start length target)
-  (declare ((simple-array * (*)) vector target)
+  (declare ((simple-array * (*)) source target)
            (fixnum start length)
            (optimize speed (safety 0)))
   (let ((source (vector-sap source))

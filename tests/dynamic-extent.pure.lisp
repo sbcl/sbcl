@@ -1120,7 +1120,7 @@
     (test `(lambda () (declare (dynamic-extent #'bar)))
           :allow-style-warnings 'style-warning)
     (test `(lambda () (declare (dynamic-extent bar)))
-          :allow-style-warnings 'style-warning)
+          :allow-warnings 'warning)
     (test `(lambda (bar) (cons bar (lambda () (declare (dynamic-extent bar)))))
           :allow-notes 'sb-ext:compiler-note)
     (test `(lambda ()

@@ -279,6 +279,11 @@
 
 ;;;; generic type inference methods
 
+(defun maybe-find-free-var (name)
+  (let ((found (gethash name (free-vars *ir1-namespace*))))
+    (unless (eq found :deprecated)
+      found)))
+
 (defun symbol-value-derive-type (node &aux (args (basic-combination-args node))
                                       (lvar (pop args)))
   (unless (and lvar (endp args))

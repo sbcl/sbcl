@@ -1,5 +1,12 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
 changes relative to sbcl-2.2.6:
+  * minor incompatible change: the compiler emits full WARNINGs for undefined
+    references to variables in TYPE and DYNAMIC-EXTENT declarations, and for
+    SETQ of an undefined variable.  (This was the historic behaviour for
+    everything except the DYNAMIC-EXTENT case, which used to emit a
+    STYLE-WARNING, but these diagnostics got lost in a refactoring since
+    sbcl-2.2.2)
   * optimization: faster TRUNCATE with float arguments.
 
 changes in sbcl-2.2.6 relative to sbcl-2.2.5:

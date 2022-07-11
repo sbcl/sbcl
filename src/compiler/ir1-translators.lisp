@@ -1226,6 +1226,7 @@ care."
       (let* ((name (first things))
              (value-form (second things))
              (leaf (or (lexenv-find name vars) (find-free-var name))))
+        (maybe-note-undefined-variable-reference leaf name)
         (etypecase leaf
           (leaf
            (when (constant-p leaf)

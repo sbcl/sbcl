@@ -600,5 +600,29 @@ cat > $tmpfilename <<EOF
 EOF
 expect_clean_cload $tmpfilename
 
+# Test compiler warning generation for unbound variables from type declaration...
+cat > $tmpfilename <<EOF
+(defun foo (bar)
+  (declare (type vector baz))
+  (length bar))
+EOF
+expect_failed_compile $tmpfilename
+
+# ... extent declaration ...
+cat > $tmpfilename <<EOF
+(defun foo (n)
+  (declare (type (mod 32) n))
+  (let ((vect (make-array n :element-type 'fixnum)))
+    (declare (dynamic-extent vec))
+    (1+ (length vect))))
+EOF
+expect_failed_compile $tmpfilename
+
+# ... and setq
+cat > $tmpfilename <<EOF
+(setq nonexistent t)
+EOF
+expect_failed_compile $tmpfilename
+
 # success
 exit $EXIT_TEST_WIN
