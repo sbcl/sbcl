@@ -98,9 +98,7 @@
                      (inst s-eor res bits temp)))))))
 
 (defun simd-nreverse8 (result vector start end)
-  (declare ((simple-array * (*)) vector)
-           (fixnum start end)
-           (optimize speed (safety 0)))
+  (declare (optimize speed (safety 0)))
   (let ((sap (vector-sap vector)))
     (with-pinned-objects-in-registers (vector)
       (inline-vop (((left sap-reg t) sap)
@@ -167,10 +165,7 @@
   result)
 
 (defun simd-nreverse32 (result vector start end)
-  (declare ((simple-array * (*)) vector)
-           (fixnum start end)
-           (optimize speed (safety 0)))
-
+  (declare (optimize speed (safety 0)))
   (with-pinned-objects-in-registers (vector)
     (inline-vop (((left sap-reg t) (vector-sap vector))
                  ((start any-reg tagged-num) start)
@@ -222,10 +217,8 @@
       DONE))
   result)
 
-(defun simd-reverse8 (source start length target)
-  (declare ((simple-array * (*)) source target)
-           (fixnum start length)
-           (optimize speed (safety 0)))
+(defun simd-reverse8 (target source start length)
+  (declare (optimize speed (safety 0)))
   (let ((source (vector-sap source))
         (target (vector-sap target)))
     (inline-vop (((source sap-reg t) source)
@@ -279,10 +272,8 @@
       DONE))
   target)
 
-(defun simd-reverse32 (source start length target)
-  (declare ((simple-array * (*)) source target)
-           (fixnum start length)
-           (optimize speed (safety 0)))
+(defun simd-reverse32 (target source start length)
+  (declare (optimize speed (safety 0)))
   (let ((source (vector-sap source))
         (target (vector-sap target)))
     (inline-vop (((source sap-reg t) source)

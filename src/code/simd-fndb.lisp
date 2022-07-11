@@ -23,7 +23,7 @@
     vector
     (sb-c::fixed-args))
 
-(defknown (simd-reverse8 simd-reverse32) ((simple-array * (*)) fixnum fixnum (simple-array * (*)))
+(defknown (simd-reverse8 simd-reverse32) ((simple-array * (*)) (simple-array * (*)) fixnum fixnum)
     (simple-array * (*))
     (sb-c::fixed-args))
 
