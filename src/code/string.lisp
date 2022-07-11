@@ -161,22 +161,25 @@
                 (go normal)))
        8-32
          (return-from string=*
-           (and (= (length string1)
-                   (length string2))
-                (sb-vm::simd-cmp-8-32 string1 string2)))
+           (let ((length1 (length string1)))
+             (and (= length1
+                     (length string2))
+                  (sb-vm::simd-cmp-8-32 string1 string2 length1))))
        8-8
          #+arm64
          (return-from string=*
-           (and (= (length string1)
-                   (length string2))
-                (sb-vm::simd-cmp-8-8 string1 string2)))
+           (let ((length1 (length string1)))
+             (and (= length1
+                     (length string2))
+                  (sb-vm::simd-cmp-8-8 string1 string2 length1))))
 
        32-32
          #+arm64
          (return-from string=*
-           (and (= (length string1)
-                   (length string2))
-                (sb-vm::simd-cmp-32-32 string1 string2)))
+           (let ((length1 (length string1)))
+             (and (= length1
+                     (length string2))
+                  (sb-vm::simd-cmp-32-32 string1 string2 length1))))
        normal))
     (with-two-strings string1 string2 start1 end1 nil start2 end2
       (let ((len (- end1 start1)))
@@ -234,13 +237,12 @@
     (when (and (zerop start1)
                (zerop start2)
                (not end1)
-               (not end2)
-               (simple-base-string-p string1)
-               (simple-base-string-p string2))
+               (not end2))
       (return-from simple-base-string=
-        (and (= (length string1)
-                (length string2))
-             (sb-vm::simd-cmp-8-8 string1 string2))))
+        (let ((length1 (length string1)))
+          (and (= length1
+                  (length string2))
+               (sb-vm::simd-cmp-8-8 string1 string2 length1)))))
     (with-two-strings string1 string2 start1 end1 nil start2 end2
       (let ((len (- end1 start1)))
         (cond ((/= len (- end2 start2))
@@ -255,16 +257,15 @@
   #+sb-unicode
   (defun simple-character-string= (string1 string2 start1 end1 start2 end2)
     #+arm64
-    (when (and (zerop start1)
-               (zerop start2)
+    (when (and (eql start1 0)
+               (eql start2 0)
                (not end1)
-               (not end2)
-               (simple-character-string-p string1)
-               (simple-character-string-p string2))
+               (not end2))
       (return-from simple-character-string=
-        (and (= (length string1)
-                (length string2))
-             (sb-vm::simd-cmp-32-32 string1 string2))))
+        (let ((length1 (length string1)))
+          (and (= length1
+                  (length string2))
+               (sb-vm::simd-cmp-32-32 string1 string2 length1)))))
     (with-two-strings string1 string2 start1 end1 nil start2 end2
       (let ((len (- end1 start1)))
         (cond ((/= len (- end2 start2))
@@ -432,14 +433,16 @@
    8-32
      #+sb-unicode
      (return-from two-arg-string-equal
-       (and (= (length string1)
-               (length string2))
-            (sb-vm::simd-base-character-string-equal string1 string2)))
+       (let ((length1 (length string1)))
+         (and (= length1
+                 (length string2))
+              (sb-vm::simd-base-character-string-equal string1 string2 length1))))
    8-8
      (return-from two-arg-string-equal
-       (and (= (length string1)
-               (length string2))
-            (sb-vm::simd-base-string-equal string1 string2)))
+       (let ((length1 (length string1)))
+         (and (= length1
+                 (length string2))
+              (sb-vm::simd-base-string-equal string1 string2 length1))))
    32-32
    normal)
   (with-two-arg-strings string1 string2 start1 end1 nil start2 end2

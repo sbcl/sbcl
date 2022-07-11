@@ -29,6 +29,6 @@
 
 (defknown (simd-cmp-8-8 simd-cmp-8-32 simd-cmp-32-32 simd-base-string-equal
            simd-base-character-string-equal)
-    ((simple-array * (*)) (simple-array * (*)))
+    ((simple-array * (*)) (simple-array * (*)) fixnum)
     (boolean)
     (sb-c::no-verify-arg-count))
