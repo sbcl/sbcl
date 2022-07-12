@@ -358,13 +358,12 @@
 ;;; like SXHASH, but for EQUALP hashing instead of EQUAL hashing
 (macrolet ((hash-float (type key)
              ;; Floats that represent integers must hash as the integer would.
-             (let ((lo (coerce most-negative-fixnum type))
-                   (hi (coerce most-positive-fixnum type)))
+             (let ((lo (symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type)))
+                   (hi (symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
                `(let ((key ,key))
                   (cond (;; This clause allows FIXNUM-sized integer
                          ;; values to be handled without consing.
-                         (and (<= ,lo key)
-                              (< key ,hi))
+                         (<= ,lo key ,hi)
                          (multiple-value-bind (q r) (floor (the (,type ,lo ,hi) key))
                            (if (zerop (the ,type r))
                                (sxhash q)
