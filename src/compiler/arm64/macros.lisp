@@ -476,10 +476,7 @@
                            ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))))))))
 
 (defun load-inline-constant (dst &rest constant-descriptor)
-  (destructuring-bind (size . label) (apply #'register-inline-constant constant-descriptor)
-    (ecase size
-      ((:qword :oword)
-       (inst load-from-label dst label)))))
+  (inst load-from-label dst (cdr (apply #'register-inline-constant constant-descriptor))))
 
 ;;;
 

@@ -479,15 +479,35 @@
   (declare (ignore stream))
   (let* ((value (* 4 value))
          (seg (dstate-segment dstate))
-         (code (seg-code seg)))
+         (code (seg-code seg))
+         (inst (current-instruction dstate))
+         (v (ldb (byte 1 26) inst))
+         (addr (+ (dstate-cur-addr dstate) value)))
     (when code
-      (or (note-code-constant (sb-disassem::segment-offs-to-code-offs
-                               (+ (dstate-cur-offs dstate) value) seg)
-                              dstate)
-          (let ((addr (+ (dstate-cur-addr dstate) value)))
-            (and (sb-disassem::points-to-code-constant-p addr code)
-                 (maybe-note-assembler-routine (sap-ref-word (int-sap addr) 0)
-                                               nil dstate)))))))
+      (if (plusp v)
+          (when (sb-disassem::points-to-code-constant-p addr code)
+            (case (ldb (byte 2 30) inst)
+              (#b00
+               (note (lambda (stream)
+                       (format stream "~a" (sap-ref-single (int-sap addr) 0)))
+                     dstate))
+              (#b01
+               (note
+                (lambda (stream)
+                  (format stream "~a" (sap-ref-double (int-sap addr) 0)))
+                dstate))
+              (#b10
+               (note
+                (lambda (stream)
+                  (format stream "~x ~x"(sap-ref-double (int-sap addr) 0)
+                          (sap-ref-double (int-sap addr) 8)))
+                dstate))))
+          (or (note-code-constant (sb-disassem::segment-offs-to-code-offs
+                                   (+ (dstate-cur-offs dstate) value) seg)
+                                  dstate)
+              (and (sb-disassem::points-to-code-constant-p addr code)
+                   (maybe-note-assembler-routine (sap-ref-word (int-sap addr) 0)
+                                                 nil dstate)))))))
 
 ;;;; special magic to support decoding internal-error and related traps
 ;;; See EMIT-ERROR-BREAK for the scheme

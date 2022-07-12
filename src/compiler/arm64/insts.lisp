@@ -2540,9 +2540,8 @@
             (one-instruction-emitter (segment position)
               (emit-ldr-literal segment
                                 (sc-case dest
-                                  (32-bit-reg #b00)
-                                  (sb-vm::complex-double-reg
-                                   #b10)
+                                  ((32-bit-reg single-reg) #b00)
+                                  (complex-double-reg #b10)
                                   (t #b01))
                                 (if (fp-register-p dest)
                                     1

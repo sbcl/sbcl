@@ -115,7 +115,6 @@
   ;; Anything else that can be an immediate.
   (immediate immediate-constant)
 
-
   ;; **** The stacks.
 
   ;; The control stack.  (Scanned by GC)
@@ -189,17 +188,17 @@
 
   ;; **** Things that can go in the floating point registers.
 
-  ;; Non-Descriptor single-floats.
+  (single-immediate immediate-constant)
+  (double-immediate immediate-constant)
+
   (single-reg float-registers
               :locations #.(loop for i below 32 collect i)
-              :constant-scs ()
+              :constant-scs (single-immediate)
               :save-p t
               :alternate-scs (single-stack))
-
-  ;; Non-Descriptor double-floats.
   (double-reg float-registers
               :locations #.(loop for i below 32 collect i)
-              :constant-scs ()
+              :constant-scs (double-immediate)
               :save-p t
               :alternate-scs (double-stack))
 
@@ -258,7 +257,11 @@
          nil))
     ((eql $0.0)
      ;; Can be encoded in a single instruction
-     immediate-sc-number)))
+     immediate-sc-number)
+    (double-float
+     double-immediate-sc-number)
+    (single-float
+     single-immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))

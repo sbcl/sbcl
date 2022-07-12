@@ -28,6 +28,12 @@
 (define-move-fun (store-double 2) (vop x y)
                  ((double-reg) (double-stack))
   (storew x (current-nfp-tn vop) (tn-offset y)))
+
+(define-move-fun (load-fp-immediate 1) (vop x y)
+                 ((single-immediate) (single-reg)
+                  (double-immediate) (double-reg))
+  (load-inline-constant y (tn-value x)))
+
 
 ;;;; Move VOPs:
 
@@ -188,7 +194,6 @@
                           other-pointer-lowtag))))))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
-
 
 ;;;
 ;;; Move from a descriptor to a complex float register
