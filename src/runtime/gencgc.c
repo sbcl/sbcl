@@ -701,7 +701,7 @@ report_heap_exhaustion(long available, long requested, struct thread *th)
 static void __attribute__((unused))
 zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
 #ifdef LISP_FEATURE_WIN32
-    os_revalidate_bzero(addr, length);
+    os_decommit_mem(addr, length);
 #elif defined LISP_FEATURE_LINUX
     // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
     // Linux treats it as a demand that the memory be 0-filled, or refreshed
@@ -1106,6 +1106,9 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         if (!page_words_used(page))
             /* May need to be remapped from PAGE_TYPE_CODE */
             zeroize_pages_if_needed(page, page, page_type);
+#elif defined LISP_FEATURE_WIN32
+        // don't incur access violations
+        os_commit_memory(page_address(page), GENCGC_PAGE_BYTES);
 #endif
         // TODO: move this out of the mutex scope
         if (page_type == PAGE_TYPE_CONS && !page_words_used(page))
@@ -1177,6 +1180,11 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
             for(p=remap_from; p<=last_page; ++p) set_page_need_to_zero(p,0);
         }
     }
+#elif defined LISP_FEATURE_WIN32
+    // don't incur access violations
+    long commit_from = first_page + (page_words_used(first_page)?1:0);
+    long len = npage_bytes(1+last_page-commit_from);
+    os_commit_memory(page_address(commit_from), len);
 #endif
     if (unlock) {
         int __attribute__((unused)) ret = mutex_release(&free_pages_lock);
@@ -1406,6 +1414,11 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
         page_table[page].type = SINGLE_OBJECT_FLAG | page_type;
         page_table[page].gen = gc_alloc_generation;
     }
+
+#ifdef LISP_FEATURE_WIN32
+    // don't incur access violations
+    os_commit_memory(page_address(first_page), npage_bytes(1+last_page-first_page));
+#endif
 
     // Store a filler so that a linear heap walk does not try to examine
     // these pages cons-by-cons (or whatever they happen to look like).
@@ -4728,6 +4741,12 @@ collect_garbage(generation_index_t last_gen)
     if (gen > small_generation_limit) {
         if (next_free_page > high_water_mark)
             high_water_mark = next_free_page;
+        // BUG? high_water_mark is the highest value of next_free_page,
+        // which means that page_table[high_water_mark] was actually NOT ever
+        // used, because next_free_page is an exclusive bound on the range
+        // of pages used. But remap_free_pages takes to 'to' as an *inclusive*
+        // bound. The only reason it's not an array overrun error is that
+        // the page_table has one more element than there are pages.
         remap_free_pages(0, high_water_mark);
         high_water_mark = 0;
     }
@@ -5690,6 +5709,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
             /* It is possible, though rare, for the saved page table
              * to contain free pages below alloc_ptr. */
             if (type != FREE_PAGE_FLAG) {
+                gc_assert(pte.words_used);
                 page_table[page].words_used_ = pte.words_used;
                 set_page_scan_start_offset(page, pte.sso & ~0x07);
                 page_table[page].gen = gen;

@@ -92,11 +92,6 @@ typedef CHAR console_char;
 /* win_aver function: basic building block for miscellaneous
  * ..AVER.. macrology (below) */
 
-/* To do: These routines used to be "customizable" with dyndebug_init()
- * and variables like dyndebug_survive_aver, dyndebug_skip_averlax based
- * on environment variables.  Those features got lost on the way, but
- * ought to be reintroduced. */
-
 static inline
 intptr_t win_aver(intptr_t value, char* comment, char* file, int line,
                   int justwarn)
@@ -173,17 +168,6 @@ intptr_t sys_aver(long value, char* comment, char* file, int line,
             win_aver((intptr_t)(call), #call, __FILE__, __LINE__, 0);      \
         me;})
 
-/* AVERLAX(call): do the same check as AVER did, but be mild on
- * failure: print an annoying unrequested message to stderr, and
- * continue. With dyndebug_skip_averlax flag, AVERLAX stop even to
- * check and complain. */
-
-#define AVERLAX(call)                                                   \
-    ({ __typeof__(call) __attribute__((unused)) me =                    \
-            (__typeof__(call))                                          \
-            win_aver((intptr_t)(call), #call, __FILE__, __LINE__, 1);      \
-        me;})
-
 /* Now, when failed AVER... prints both errno and GetLastError(), two
  * variants of "POSIX/lowio" style checks below are almost useless
  * (they build on sys_aver like the two above do on win_aver). */
@@ -192,12 +176,6 @@ intptr_t sys_aver(long value, char* comment, char* file, int line,
     ({ __typeof__(call) __attribute__((unused)) me =            \
             (__typeof__(call))                                  \
             sys_aver((call), #call, __FILE__, __LINE__, 0);     \
-        me;})
-
-#define CRT_AVERLAX_NONNEGATIVE(call)                           \
-    ({ __typeof__(call) __attribute__((unused)) me =            \
-            (__typeof__(call))                                  \
-            sys_aver((call), #call, __FILE__, __LINE__, 1);     \
         me;})
 
 /* to be removed */
@@ -889,7 +867,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
     if (!addr) {
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
         return
-            AVERLAX(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection));
+            AVER(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection));
     }
 
     os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
@@ -903,7 +881,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
             return 0;
         }
 
-        return AVERLAX(VirtualAlloc(NULL, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+        return AVER(VirtualAlloc(NULL, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE));
     }
 
     return actual;
@@ -923,27 +901,26 @@ os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len)
             fflush(stderr);
             return 0;
         }
-        return AVERLAX(VirtualAlloc(NULL, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+        return AVER(VirtualAlloc(NULL, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE));
     }
 
     return actual;
 }
 
-void* os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
+void os_commit_memory(os_vm_address_t addr, os_vm_size_t len)
 {
-    return
-        AVERLAX(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+    if (len) gc_assert(VirtualAlloc(addr, len, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
 }
 
-
-void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len) {
-    AVERLAX(VirtualFree(addr, len, MEM_DECOMMIT));
+void os_decommit_mem(os_vm_address_t addr,  os_vm_size_t len) {
+    gc_assert(gc_active_p);
+    gc_assert(VirtualFree(addr, len, MEM_DECOMMIT));
 }
 
 void
 os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
-    AVERLAX(VirtualFree(addr, 0, MEM_RELEASE));
+    AVER(VirtualFree(addr, 0, MEM_RELEASE));
 }
 
 /*
@@ -1117,7 +1094,6 @@ handle_access_violation(os_context_t *ctx,
 #endif
 
     /* Safepoint pages */
-#ifdef LISP_FEATURE_SB_THREAD
     if (fault_address == (void *) GC_SAFEPOINT_TRAP_ADDR) {
         thread_in_lisp_raised(ctx);
         return 0;
@@ -1127,15 +1103,13 @@ handle_access_violation(os_context_t *ctx,
         thread_in_safety_transition(ctx);
         return 0;
     }
-#endif
 
     /* dynamic space */
     page_index_t page = find_page_index(fault_address);
-    if (page != -1
-#ifndef LISP_FEATURE_SOFT_CARD_MARKS
-        && !PAGE_WRITEPROTECTED_P(page)
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    if (page >= 0) lose("should not get access violation in dynamic space");
 #endif
-        ) {
+    if (page != -1 && !PAGE_WRITEPROTECTED_P(page)) {
         os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
                          os_vm_page_size);
         return 0;
@@ -1385,9 +1359,9 @@ veh(EXCEPTION_POINTERS *ep)
     DWORD code = ep->ExceptionRecord->ExceptionCode;
     BOOL from_lisp =
         (rip >= READ_ONLY_SPACE_START &&
-         rip <= READ_ONLY_SPACE_END) ||
+         rip < READ_ONLY_SPACE_END) ||
         (rip >= DYNAMIC_SPACE_START &&
-         rip <= DYNAMIC_SPACE_START+dynamic_space_size);
+         rip < DYNAMIC_SPACE_START+dynamic_space_size);
 
     if (code == EXCEPTION_ACCESS_VIOLATION ||
         code == STATUS_HEAP_CORRUPTION ||

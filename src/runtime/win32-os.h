@@ -85,7 +85,7 @@ void wos_install_interrupt_handlers(struct lisp_exception_frame *handler);
 char *dirname(char *path);
 
 boolean win32_maybe_interrupt_io(void* thread);
-void os_revalidate_bzero(os_vm_address_t addr,  os_vm_size_t len);
+void os_decommit_mem(os_vm_address_t addr,  os_vm_size_t len);
 
 int sb_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
 
