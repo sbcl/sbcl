@@ -345,7 +345,7 @@
   (movable foldable flushable recursive))
 
 (defknown unary-truncate (real) (values integer real)
-  (movable foldable flushable))
+  (movable foldable flushable no-verify-arg-count))
 
 (defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0))
    (foldable movable flushable fixed-args))

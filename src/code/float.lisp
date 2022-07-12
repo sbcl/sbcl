@@ -548,6 +548,7 @@
 ;;; In the float case, we pick off small arguments so that compiler
 ;;; can use special-case operations.
 (defun %unary-truncate (number)
+  (declare (explicit-check number))
   (macrolet ((fits-fixnum (type)
                `(<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
                     number
@@ -566,6 +567,7 @@
 
 ;;; Produce both values, unlike %unary-truncate
 (defun unary-truncate (number)
+  (declare (explicit-check number))
   (macrolet ((fits-fixnum (type)
                `(<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
                     number
@@ -689,6 +691,7 @@
 ;;; so all single-floats larger than most-positive-fixnum can be precisely
 ;;; represented by an integer.]
 (defun %unary-round (number)
+  (declare (explicit-check))
   (macrolet ((fits-fixnum (type)
                `(<= ,(symbol-value (symbolicate 'most-negative-fixnum- type))
                     number
