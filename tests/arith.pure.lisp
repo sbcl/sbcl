@@ -286,15 +286,6 @@
              (assert-error (funcall fn 1) division-by-zero))))
     (mapc #'frob '(mod truncate rem / floor ceiling))))
 
-(defconstant most-positive-exactly-single-float-fixnum
-  (min (expt 2 sb-vm:single-float-digits) most-positive-fixnum))
-(defconstant most-negative-exactly-single-float-fixnum
-  (max (- (expt 2 sb-vm:single-float-digits)) most-negative-fixnum))
-(defconstant most-positive-exactly-double-float-fixnum
-  (min (expt 2 sb-vm:double-float-digits) most-positive-fixnum))
-(defconstant most-negative-exactly-double-float-fixnum
-  (max (- (expt 2 sb-vm:double-float-digits)) most-negative-fixnum))
-
 ;; Check that the logic in SB-KERNEL::BASIC-COMPARE for doing fixnum/float
 ;; comparisons without rationalizing the floats still gives the right anwers
 ;; in the edge cases (had a fencepost error).
@@ -303,7 +294,8 @@
                     floats
                     (start (- ,(find-symbol (format nil
                                                     "MOST-~A-EXACTLY-~A-FIXNUM"
-                                                    sign type))
+                                                    sign type)
+                                            :sb-kernel)
                               ,range)))
                 (dotimes (i (1+ (* ,range 2)))
                   (let* ((x (+ start i))
