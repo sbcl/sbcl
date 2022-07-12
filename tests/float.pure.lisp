@@ -526,12 +526,12 @@
 
 (with-test (:name :conservative-floor-bounds)
   (assert
-   (equal (sb-kernel:%simple-fun-type
-           (checked-compile
-            `(lambda (x)
-               (declare (unsigned-byte x))
-               (values (truncate 1.0 x)))))
-          '(function (unsigned-byte) (values unsigned-byte &optional)))))
+   (subtypep (second (third (sb-kernel:%simple-fun-type
+                          (checked-compile
+                           `(lambda (x)
+                              (declare (unsigned-byte x))
+                              (values (truncate 1.0 x)))))))
+             'unsigned-byte)))
 
 (with-test (:name :single-float-sign-stubs)
   (checked-compile-and-assert

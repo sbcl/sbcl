@@ -385,7 +385,7 @@
                                  (if (zerop (the ,type r))
                                      (sxhash q)
                                      (sxhash key)))
-                              (,bignum-hash key))))))))
+                              `(,bignum-hash key))))))))
 (defun psxhash (key)
   (declare (optimize speed))
   (labels
