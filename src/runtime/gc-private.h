@@ -64,7 +64,9 @@ void really_note_transporting(lispobj old,void*new,sword_t nwords);
 #define NOTE_TRANSPORTING(old, new, nwords) /* do nothing */
 #endif
 
-extern uword_t gc_copied_nwords;
+// In-situ live objects are those which get logically "moved" from oldspace to newspace
+// by frobbing the generation byte in the page table, not copying.
+extern uword_t gc_copied_nwords, gc_in_situ_live_nwords;
 static inline lispobj
 gc_copy_object(lispobj object, size_t nwords, void* region, int page_type)
 {

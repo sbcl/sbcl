@@ -1874,6 +1874,7 @@ copy_potential_large_object(lispobj object, sword_t nwords,
         bytes_allocated -= bytes_freed;
 
         /* Add the region to the new_areas if requested. */
+        gc_in_situ_live_nwords += nbytes>>WORD_SHIFT;
         if (boxed_type_p(page_type)) add_new_area(first_page, 0, nbytes);
 
         return object;
@@ -3414,8 +3415,11 @@ unprotect_oldspace(void)
     __attribute__((unused)) char *page_addr = 0;
     uword_t region_bytes = 0;
 
-    // should never have protection applied to gen0, do so nothing.
-    if (from_space == 0) return;
+    /* Gen0 never has protection applied, so we can usually skip the un-protect step,
+     * however, in the final GC, because everything got moved to gen0 by brute force
+     * adjustment of the page table, we don't know the state of the protection.
+     * Therefore only skip out if NOT in the final GC */
+    if (conservative_stack && from_space == 0) return;
 
     for (i = 0; i < next_free_page; i++) {
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
@@ -4379,9 +4383,10 @@ garbage_collect_generation(generation_index_t generation, int raise,
     // can't use fprintf() inside GC because of malloc. snprintf() can deadlock too,
     // but seems to do so much less often.
     int n = snprintf(buffer, sizeof buffer,
-                     "gen%d: %ldw copied in %f sec (%.0f %s/sec),"
-                     " %d pinned objects (%ldw), %ldw freed (%.1f%%)\n",
+                     "gen%d: %ldw copied in %f sec (%.0f %s/sec), %ldw in-situ,"
+                     " %d pins (%ldw), %ldw freed (%.1f%%)\n",
                      generation, gc_copied_nwords, et_sec, speed, units,
+                     gc_in_situ_live_nwords,
                      gc_pin_count, gc_pinned_nwords,
                      bytes_freed >> WORD_SHIFT, pct_freed*100.0);
     write(2, buffer, n);
@@ -4390,7 +4395,7 @@ garbage_collect_generation(generation_index_t generation, int raise,
                  root_vector_words_scanned, root_mixed_words_scanned);
     write(2, buffer, n);
     }
-    gc_copied_nwords = gc_pinned_nwords = 0;
+    gc_copied_nwords = gc_in_situ_live_nwords = gc_pinned_nwords = 0;
     root_boxed_words_scanned = root_vector_words_scanned = root_mixed_words_scanned = 0;
 #endif
 
@@ -4574,9 +4579,14 @@ collect_garbage(generation_index_t last_gen)
     ensure_region_closed(code_region, PAGE_TYPE_CODE);
     if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_gcs, last_gen);
 
-    /* Immobile space generation bits are lazily updated for gen0
-       (not touched on every object allocation) so do it now */
-    update_immobile_nursery_bits();
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+  if (ENABLE_PAGE_PROTECTION) {
+      // Unprotect the in-use ranges. Any page could be written during scavenge
+      os_protect((os_vm_address_t)FIXEDOBJ_SPACE_START,
+                 (lispobj)fixedobj_free_pointer - FIXEDOBJ_SPACE_START,
+                 OS_VM_PROT_ALL);
+  }
+#endif
 
     lispobj* cur_thread_approx_stackptr =
         (lispobj*)ALIGN_DOWN((uword_t)&last_gen, N_WORD_BYTES);
@@ -5434,9 +5444,8 @@ zero_all_free_ranges() /* called only by gc_and_save() */
  *
  * + Single-object pages aren't moved by the GC, so we need to
  *   unset that flag from all pages.
- * + The pseudo-static generation isn't normally collected, but it seems
- *   reasonable to collect it at least when saving a core. So move the
- *   pages to a normal generation.
+ * + Change all pages' generations to 0 so that we can do all the collection
+ *   in a single invocation of collect_generation()
  * + Instances on unboxed pages need to have their layout pointer visited,
  *   so all pages have to be turned to boxed.
  */
@@ -5454,11 +5463,12 @@ prepare_for_final_gc ()
         // which were relocated to unboxed pages get scanned and fixed.
         if ((page_table[i].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED)
             page_table[i].type = PAGE_TYPE_MIXED;
-        if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
+        generation_index_t gen = page_table[i].gen;
+        if (gen != 0) {
             int used = page_bytes_used(i);
-            page_table[i].gen = HIGHEST_NORMAL_GENERATION;
-            generations[PSEUDO_STATIC_GENERATION].bytes_allocated -= used;
-            generations[HIGHEST_NORMAL_GENERATION].bytes_allocated += used;
+            page_table[i].gen = 0;
+            generations[gen].bytes_allocated -= used;
+            generations[0].bytes_allocated += used;
         }
     }
 
@@ -5470,14 +5480,8 @@ prepare_for_final_gc ()
     char *end = (char*)thread + dynamic_values_bytes;
     memset(start, 0, end-start);
 #endif
-    // Make sure that it's done after zeroing above, the GC needs to
-    // see a list there
-#ifdef PINNED_OBJECTS
-    struct thread *th;
-    for_each_thread(th) {
-        write_TLS(PINNED_OBJECTS, NIL, th);
-    }
-#endif
+    // After zeroing, make sure PINNED_OBJECTS is a list again.
+    write_TLS(PINNED_OBJECTS, NIL, thread);
 }
 
 /* Set this switch to 1 for coalescing of strings dumped to fasl,
@@ -5551,20 +5555,15 @@ gc_and_save(char *filename, boolean prepend_runtime,
      *  as empty pages, because we can't represent discontiguous ranges.
      */
     conservative_stack = 0;
-    /* We MUST collect all generations now, or else the coalescing by similarity
-     * would have to be extra cautious not to create any old->young pointers.
-     * Resetting oldest_gen_to_gc to its default is legal, because it is merely
-     * a hint to the collector that no significant amount of memory would be
-     * freed by increasingly aggressive levels of collection. It is NOT a mandate
-     * that some objects be retained despite appearing to be unreachable.
-     */
-    gencgc_oldest_gen_to_gc = HIGHEST_NORMAL_GENERATION;
+    gencgc_oldest_gen_to_gc = 0;
     // From here on until exit, there is no chance of continuing
     // in Lisp if something goes wrong during GC.
+    pre_verify_gen_0 = 1;
     prepare_for_final_gc();
     unwind_binding_stack();
     gencgc_alloc_start_page = next_free_page;
-    collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+    collect_garbage(0);
+    verify_heap(0, VERIFY_POST_GC);
 
     THREAD_JIT(0);
 
@@ -5585,7 +5584,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     if (verbose) { printf("[performing final GC..."); fflush(stdout); }
     prepare_for_final_gc();
     gencgc_alloc_start_page = 0;
-    collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+    collect_garbage(0);
     /* All global allocation regions should be empty */
     ASSERT_REGIONS_CLOSED();
     // Enforce (rather, warn for lack of) self-containedness of the heap

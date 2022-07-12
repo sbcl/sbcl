@@ -358,20 +358,6 @@ Threads A, and B, and C each want to claim index 6.
 #define calc_max_used_fixedobj_page() find_fixedobj_page_index(fixedobj_free_pointer-1)
 #define calc_max_used_varyobj_page() find_varyobj_page_index(varyobj_free_pointer-1)
 
-void update_immobile_nursery_bits()
-{
-  if (ENABLE_PAGE_PROTECTION) {
-      // Unprotect the in-use ranges. Any page could be written during scavenge
-      os_protect((os_vm_address_t)FIXEDOBJ_SPACE_START,
-                 (lispobj)fixedobj_free_pointer - FIXEDOBJ_SPACE_START,
-                 OS_VM_PROT_ALL);
-  }
-
-#ifdef VERIFY_PAGE_GENS
-  check_varyobj_pages();
-#endif
-}
-
 /* Turn a white object grey. Also enqueue the object for re-scan if required */
 void
 enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
@@ -1267,8 +1253,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     page_attributes_valid = 1;
 }
 
-// Demote pseudo-static to highest normal generation
-// so that all objects become eligible for collection.
+// Change all objects to generation 0
 void prepare_immobile_space_for_final_gc()
 {
     int page;
@@ -1278,38 +1263,28 @@ void prepare_immobile_space_for_final_gc()
     // The list of holes need not be saved.
     SYMBOL(IMMOBILE_FREELIST)->value = NIL;
 
-    // This scan allow dissimilar object sizes. In the grand scheme of things
-    // it's not terribly important to optimize out the calls to the sizing function
-    // for the pages which have a unique size of object.
     for (page = 0, page_base = fixedobj_page_address(page) ;
          page_base < page_end ;
          page_base += IMMOBILE_CARD_BYTES, ++page) {
-        unsigned char mask = fixedobj_pages[page].gens;
-        if (mask & 1<<PSEUDO_STATIC_GENERATION) {
-            lispobj* obj = (lispobj*)page_base;
-            lispobj* limit = (lispobj*)((uword_t)obj + IMMOBILE_CARD_BYTES);
-            for ( ; obj < limit ; obj += object_size(obj) )
-                if (other_immediate_lowtag_p(*obj) &&
-                    immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
-                    assign_generation(obj, HIGHEST_NORMAL_GENERATION);
-            fixedobj_pages[page].gens = (mask & ~(1<<PSEUDO_STATIC_GENERATION))
-                                        | 1<<HIGHEST_NORMAL_GENERATION;
+        lispobj* obj = (lispobj*)page_base;
+        lispobj* limit = (lispobj*)((uword_t)obj + IMMOBILE_CARD_BYTES);
+        // Never set the generation mask on an empty page!
+        int spacing = fixedobj_page_obj_align(page) >> WORD_SHIFT;
+        if (spacing) {
+            for ( ; obj < limit ; obj += spacing ) {
+                if (other_immediate_lowtag_p(*obj) && immobile_obj_gen_bits(obj) != 0)
+                    assign_generation(obj, 0);
+            }
+            fixedobj_pages[page].gens = 1; // only generation 0 is present
         }
     }
 
     lispobj* obj = (lispobj*)VARYOBJ_SPACE_START;
     lispobj* limit = varyobj_free_pointer;
     for ( ; obj < limit ; obj += headerobj_size(obj) ) {
-        if (immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
-            assign_generation(obj, HIGHEST_NORMAL_GENERATION);
-    }
-    int max_page = find_varyobj_page_index(limit-1);
-    for ( page = 0 ; page <= max_page ; ++page ) {
-        int mask = varyobj_pages[page].generations;
-        if (mask & (1<<PSEUDO_STATIC_GENERATION)) {
-            varyobj_pages[page].generations
-                = (mask & ~(1<<PSEUDO_STATIC_GENERATION))
-                                      | 1<<HIGHEST_NORMAL_GENERATION;
+        if (!filler_obj_p(obj) && immobile_obj_gen_bits(obj) != 0) {
+            assign_generation(obj, 0);
+            varyobj_pages[find_varyobj_page_index(obj)].generations = 1;
         }
     }
 }

@@ -23,7 +23,6 @@
 extern void prepare_immobile_space_for_final_gc(void);
 extern void prepare_immobile_space_for_save(boolean verbose);
 extern boolean immobile_space_preserve_pointer(void*);
-extern void update_immobile_nursery_bits(void);
 extern void scavenge_immobile_roots(generation_index_t,generation_index_t);
 extern void scavenge_immobile_newspace(void);
 extern void sweep_immobile_space(int raise);
@@ -118,7 +117,6 @@ static inline boolean immobile_space_p(lispobj __attribute__((unused)) obj) { re
 #define scavenge_immobile_roots(dummy1,dummy2)
 #define scavenge_immobile_newspace(dummy)
 #define sweep_immobile_space(dummy)
-#define update_immobile_nursery_bits()
 #define write_protect_immobile_space()
 #define immobile_scav_queue_count 0
 #define immobile_card_protected_p(dummy) (0)
