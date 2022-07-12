@@ -1641,9 +1641,9 @@
 
 (macrolet ((def (type)
              `(deftransform unary-truncate ((number) (,type))
-                '(if (<= ,(package-symbolicate :sb-kernel 'most-negative-fixnum- type)
+                '(if (<= ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
                       number
-                      ,(package-symbolicate :sb-kernel 'most-positive-fixnum- type))
+                      ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))
                   (let ((truncated (truly-the fixnum (%unary-truncate number))))
                     (values truncated
                             (- number
@@ -1668,9 +1668,9 @@
                     (unary-to-bignum (symbolicate '%unary-truncate- type '-to-bignum))
                     (coerce (symbolicate "%" type))
                     (unary `(lambda (number)
-                              (if (<= ,(package-symbolicate :sb-kernel 'most-negative-fixnum- type)
+                              (if (<= ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
                                       number
-                                      ,(package-symbolicate :sb-kernel 'most-positive-fixnum- type))
+                                      ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))
                                   (truly-the fixnum (,unary number))
                                   (,unary-to-bignum number)))))
                `(deftransform truncate ((x &optional y)
