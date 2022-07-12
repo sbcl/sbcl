@@ -7,6 +7,9 @@ changes relative to sbcl-2.2.6:
     everything except the DYNAMIC-EXTENT case, which used to emit a
     STYLE-WARNING, but these diagnostics got lost in a refactoring since
     sbcl-2.2.2)
+  * enhancement: Unicode support has been updated to support version 10.0.0 of
+    the Unicode standard, including addition of characters and refinements to
+    breaking and collation algorithms.
   * optimization: faster TRUNCATE with float arguments.
 
 changes in sbcl-2.2.6 relative to sbcl-2.2.5:

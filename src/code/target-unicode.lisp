@@ -802,8 +802,9 @@ The result is not guaranteed to have the same length as the input."
             #x26F9
             #x270A #x270B #x270C #x270D
             #x1F385
-            #x1F3C3 #x1F3C4
-            #x1F3CA #x1F3CB
+            #x1F3C2 #x1F3C3 #x1F3C4
+            #x1F3C7
+            #x1F3CA #x1F3CB #x1F3CC
             #x1F442 #x1F443
             #x1F446 #x1F447 #x1F448 #x1F449 #x1F44A #x1F44B #x1F44C #x1F44D #x1F44E #x1F44F #x1F450
             #x1F46E
@@ -812,7 +813,7 @@ The result is not guaranteed to have the same length as the input."
             #x1F481 #x1F482 #x1F483
             #x1F485 #x1F486 #x1F487
             #x1F4AA
-            #x1F575
+            #x1F574 #x1F575
             #x1F57A
             #x1F590
             #x1F595 #x1F596
@@ -821,15 +822,38 @@ The result is not guaranteed to have the same length as the input."
             #x1F6A3
             #x1F6B4 #x1F6B5 #x1F6B6
             #x1F6C0
-            #x1F918 #x1F919 #x1F91A #x1F91B #x1F91C #x1F91D #x1F91E
+            #x1F6CC
+            #x1F918 #x1F919 #x1F91A #x1F91B #x1F91C
+            #x1F91E #x1F91F
             #x1F926
-            #x1F930
-            #x1F933 #x1F934 #x1F935 #x1F936 #x1F937 #x1F938 #x1F939
-            #x1F93C #x1F93D #x1F93E)))
+            #x1F930 #x1F931 #x1F932 #x1F933 #x1F934 #x1F935 #x1F936 #x1F937 #x1F938 #x1F939
+            #x1F93D #x1F93E
+            #x1F9D1 #x1F9D2 #x1F9D3 #x1F9D4 #x1F9D5 #x1F9D6 #x1F9D7 #x1F9D8 #x1F9D9 #x1F9DA #x1F9DB #x1F9DC #x1F9DD))
+        (glue-after-zwj
+          #(#x2640
+            #x2642
+            #x2695 #x2696
+            #x2708
+            #x2764
+            #x1F308
+            #x1F33E
+            #x1F373
+            #x1F393
+            #x1F3A4
+            #x1F3A8
+            #x1F3EB
+            #x1F3ED
+            #x1F48B
+            #x1F4BB #x1F4BC
+            #x1F527
+            #x1F52C
+            #x1F5E8
+            #x1F680
+            #x1F692)))
     (cond
       ((binary-search code e-base) :e-base)
       ((<= #x1F3FB code #x1F3FF) :e-modifier)
-      ((or (= code #x2764) (= code #x1F48B) (= code #x1F5E8)) :glue-after-zwj)
+      ((binary-search code glue-after-zwj) :glue-after-zwj)
       ((<= #x1F466 code #x1F469) :e-base-gaz))))
 
 (defun grapheme-break-class (char)
@@ -943,6 +967,11 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
           #(#x3031 #x3035 #x309B #x309C
             #x30A0 #x30A0 #x30FC #x30FC
             #xFF70 #xFF70)))
+        (also-aletter
+         #(#x02C2 #x02C3 #x02C4 #x02C5 #x02D2 #x02D3 #x02D4 #x02D5 #x02D6 #x02D7
+           #x02DE #x02DF #x02ED #x02EF #x02F0 #x02F1 #x02F2 #x02F3 #x02F4 #x02F5
+           #x02F6 #x02F7 #x02F8 #x02F9 #x02FA #x02FB #x02FC #x02FD #x02FE #x02FF
+           #x05F3 #xA720 #xA721 #xA789 #xA78A #xAB5B))
         (midnumlet #(#x002E #x2018 #x2019 #x2024 #xFE52 #xFF07 #xFF0E))
         (midletter
          #(#x003A #x00B7 #x002D7 #x0387 #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))
@@ -956,14 +985,14 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
       ((= cp 13) :CR)
       ((ordered-ranges-member cp newlines) :newline)
       ((or (eql (grapheme-break-class char) :extend)
-           (eql gc :mc)) :extend)
+           (and (eql gc :mc) (not (= cp #x200D)))) :extend)
       ((= cp #x200D) :zwj)
       ((<= #x1F1E6 cp #x1F1FF) :regional-indicator)
       ((and (eql gc :Cf) (not (<= #x200B cp #x200D))) :format)
       ((or (eql (script char) :katakana)
            (ordered-ranges-member cp also-katakana)) :katakana)
       ((and (eql (script char) :Hebrew) (eql gc :lo)) :hebrew-letter)
-      ((and (or (alphabetic-p char) (= cp #x05F3))
+      ((and (or (alphabetic-p char) (binary-search cp also-aletter))
             (not (or (ideographic-p char)
                      (eql (line-break-class char) :sa)
                      (eql (script char) :hiragana)))) :aletter)
@@ -1461,15 +1490,18 @@ it defaults to 80 characters"
           (when (char= (code-char 0) char2 char3)
             (let* ((unified-ideograph-p (proplist-p char1 :unified-ideograph))
                    (tangut-p (<= #x17000 code1 #x18AFF))
+                   (nushu-p (<= #x1B170 code1 #x1B2FF))
+                   (boffset 0)
                    (base
                      (cond ((and unified-ideograph-p
                                  (or (<= #x4E00 code1 #x9FFF) (<= #xF900 code1 #xFAFF)))
                             #xFB40)
                            (unified-ideograph-p #xFB80)
-                           (tangut-p #xFB00)
+                           (tangut-p (setq boffset #x17000) #xFB00)
+                           (nushu-p (setq boffset #x1B170) #xFB01)
                            (t #xFBC0)))
-                   (a (+ base (if tangut-p 0 (ash code1 -15))))
-                   (b (logior #x8000 (if tangut-p (- code1 #x17000) (logand code1 #x7FFF)))))
+                   (a (+ base (if (or tangut-p nushu-p) 0 (ash code1 -15))))
+                   (b (logior #x8000 (if (or tangut-p nushu-p) (- code1 boffset) (logand code1 #x7FFF)))))
               (list (list a #x20 #x2) (list b 0 0)))))))))
 
 (defun sort-key (string)

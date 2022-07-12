@@ -334,12 +334,12 @@ Length should be adjusted when the standard changes.")
            (when (ordered-ranges-member code-point vector)
              (gethash class *bidi-classes*))))
     (cond
-      ((in
-         #(#x0600 #x07BF #x08A0 #x08FF #xFB50 #xFDCF #xFDF0 #xFDFF #xFE70 #xFEFF
-           #x1EE00 #x1EEFF) "AL"))
-      ((in
-         #(#x0590 #x05FF #x07C0 #x089F #xFB1D #xFB4F #x10800 #x10FFF #x1E800 #x1EDFF
-           #x1EF00 #x1EFFF) "R"))
+      ((in #(#x0600 #x07BF #x0860 #x086F #x08A0 #x08FF
+             #xFB50 #xFDCF #xFDF0 #xFDFF #xFE70 #xFEFF
+             #x1EE00 #x1EEFF) "AL"))
+      ((in #(#x0590 #x05FF #x07C0 #x085F #x0870 #x089F
+             #xFB1D #xFB4F #x10800 #x10FFF #x1E800 #x1EDFF
+             #x1EF00 #x1EFFF) "R"))
       ((in #(#x20A0 #x20CF) "ET"))
       ;; BN is non-characters and default-ignorable.
       ;; Default-ignorable will be dealt with elsewhere
@@ -732,7 +732,8 @@ Length should be adjusted when the standard changes.")
     (parse-property s :variation-selector)
     (parse-property s :pattern-white-space)
     (parse-property s :pattern-syntax)
-    (parse-property s :prepended-concatenation-mark))
+    (parse-property s :prepended-concatenation-mark)
+    (parse-property s :regional-indicator))
 
   (with-input-utf8-file (s "DerivedNormalizationProps")
     (parse-property s) ;; Initial comments
