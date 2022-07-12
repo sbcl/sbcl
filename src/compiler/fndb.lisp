@@ -350,11 +350,12 @@
 (defknown unary-truncate-single-float-to-bignum (single-float) (values bignum (eql $0f0))
    (foldable movable flushable fixed-args))
 (defknown unary-truncate-double-float-to-bignum (double-float)
-    (values bignum (and
-                    #+(and 64-bit
-                           (not (or riscv ppc64))) ;; they can't survive cold-init
-                    (eql $0d0)
-                    double-float))
+    (values #+64-bit bignum #-64-bit integer
+            (and
+             #+(and 64-bit
+                    (not (or riscv ppc64))) ;; they can't survive cold-init
+             (eql $0d0)
+             double-float))
    (foldable movable flushable fixed-args))
 
 (defknown %unary-truncate-single-float-to-bignum (single-float) bignum
