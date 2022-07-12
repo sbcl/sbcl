@@ -1417,11 +1417,9 @@ void *gc_alloc_large(sword_t nbytes, int page_type)
     // Anyway it's best if the new page resembles a valid object ASAP.
     uword_t nwords = nbytes >> WORD_SHIFT;
     lispobj* addr = (lispobj*)page_address(first_page);
-    if (locked)
-        THREAD_JIT(0);
+    if (locked) { THREAD_JIT(0); }
     *addr = make_filler_header(nwords);
-    if (locked) // avoid enabling while GCing
-        THREAD_JIT(1);
+    if (locked) { THREAD_JIT(1); } // avoid enabling while GCing
 
     os_vm_size_t scan_start_offset = 0;
     for (page = first_page; page < last_page; ++page) {
