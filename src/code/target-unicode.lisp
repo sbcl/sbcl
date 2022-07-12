@@ -1550,7 +1550,7 @@ If :STRICT is NIL, UNICODE= tests compatibility equavalence instead."
 
 (defun unicode-equal (string1 string2 &key (start1 0) end1 (start2 0) end2 (strict t))
   "Determines whether STRING1 and STRING2 are canonically equivalent after
-casefoldin8 (that is, ignoring case differences) according to Unicode. The
+casefolding (that is, ignoring case differences) according to Unicode. The
 START and END arguments behave like the arguments to STRING=. If :STRICT is
 NIL, UNICODE= tests compatibility equavalence instead."
   (let ((str1 (normalize-string (subseq string1 start1 end1) (if strict :nfd :nfkd)))
@@ -1561,7 +1561,7 @@ NIL, UNICODE= tests compatibility equavalence instead."
 
 (defun unicode< (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Determines whether STRING1 sorts before STRING2 using the Unicode Collation
-Algorithm, The function uses an untailored Default Unicode Collation Element Table
+Algorithm. The function uses an untailored Default Unicode Collation Element Table
 to produce the sort keys. The function uses the Shifted method for dealing
 with variable-weight characters, as described in UTS #10"
   (let* ((s1 (subseq string1 start1 end1))
