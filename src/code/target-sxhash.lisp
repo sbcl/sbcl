@@ -359,12 +359,14 @@
 (macrolet ((hash-float (type key)
              ;; Floats that represent integers must hash as the integer would.
              (let ((lo (symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type)))
-                   (hi (symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
+                   (hi (symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type)))
+                   (bignum-hash (symbolicate 'sxhash-bignum- type)))
                `(let ((key ,key))
+                  (declare (inline float-infinity-p))
                   (cond (;; This clause allows FIXNUM-sized integer
                          ;; values to be handled without consing.
                          (<= ,lo key ,hi)
-                         (multiple-value-bind (q r) (floor (the (,type ,lo ,hi) key))
+                         (multiple-value-bind (q r) (truly-the fixnum (floor (the (,type ,lo ,hi) key)))
                            (if (zerop (the ,type r))
                                (sxhash q)
                                (sxhash (coerce key 'double-float)))))
@@ -373,11 +375,17 @@
                          (if (minusp key)
                              (sxhash sb-ext:single-float-negative-infinity)
                              (sxhash sb-ext:single-float-positive-infinity)))
+                        #+64-bit
                         (t
-                         (multiple-value-bind (q r) (floor key)
-                           (if (zerop (the ,type r))
-                               (sxhash q)
-                               (sxhash (coerce key 'double-float))))))))))
+                         (,bignum-hash key))
+                        #-64-bit
+                        (t
+                         ,(if (eq type 'double-float)
+                              `(multiple-value-bind (q r) (floor key)
+                                 (if (zerop (the ,type r))
+                                     (sxhash q)
+                                     (sxhash key)))
+                              (,bignum-hash key))))))))
 (defun psxhash (key)
   (declare (optimize speed))
   (labels

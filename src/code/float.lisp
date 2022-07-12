@@ -625,6 +625,45 @@
   (def double-float)
   (def single-float))
 
+;;; Needs to be synchronized with sxhash-bignum
+(macrolet ((def (type)
+             (let ((decode (symbolicate 'integer-decode- type)))
+               `(defun ,(symbolicate 'sxhash-bignum- type) (number)
+                  (declare (inline ,decode))
+                  (let ((result 316495330)
+                        (digit-size sb-bignum::digit-size))
+                    (declare (type fixnum result))
+                    (multiple-value-bind (bits exp sign) (,decode number)
+                      (let ((bits (if (minusp sign)
+                                      (- bits)
+                                      bits)))
+                        (multiple-value-bind (digits remaining) (truncate exp digit-size)
+                          (dotimes (i digits)
+                            do (mixf result 0))
+                          ;; Taken from bignum-ashift-left-fixnum.
+                          (let* ((right-half (ldb (byte digit-size 0)
+                                                  (ash bits remaining)))
+                                 (sign-bit-p
+                                   (logbitp (1- digit-size) right-half))
+                                 (left-half (ash bits
+                                                 (- remaining digit-size)))
+                                 (left-half-p (if sign-bit-p
+                                                  (/= left-half -1)
+                                                  (/= left-half 0))))
+                            (mixf result
+                                  (logand most-positive-fixnum
+                                          (logxor right-half
+                                                  (ash right-half -7))))
+                            (when left-half-p
+                              (let ((left-half (ldb (byte digit-size 0) left-half)))
+                                (mixf result
+                                      (logand most-positive-fixnum
+                                              (logxor left-half
+                                                      (ash left-half -7))))))))))
+                    result)))))
+  (def double-float)
+  (def single-float))
+
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
              `(defun ,name (number)

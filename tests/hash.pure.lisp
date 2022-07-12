@@ -405,7 +405,9 @@
     (assert-error (sxhash displaced-string))))
 
 (with-test (:name :array-psxhash-non-consing :skipped-on :interpreter)
-   (let ((a (make-array 1000 :element-type 'double-float)))
+   (let ((a (make-array 1000 :element-type 'double-float
+                        :initial-element (+ 0d0 #+(or arm64 x86-64)
+                                                1d300))))
      (ctu:assert-no-consing (sb-int:psxhash a))))
 
 (with-test (:name :array-psxhash)

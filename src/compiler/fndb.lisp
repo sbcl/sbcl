@@ -363,6 +363,11 @@
 (defknown %unary-truncate-double-float-to-bignum (double-float) bignum
    (foldable movable flushable fixed-args))
 
+(defknown sxhash-bignum-double-float (double-float) hash-code
+  (foldable movable flushable fixed-args))
+(defknown sxhash-bignum-single-float (single-float) hash-code
+  (foldable movable flushable fixed-args))
+
 (defknown %multiply-high (word word) word
     (movable foldable flushable))
 

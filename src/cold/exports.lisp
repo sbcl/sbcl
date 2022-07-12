@@ -1964,6 +1964,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
            "%UNARY-TRUNCATE-SINGLE-FLOAT-TO-BIGNUM"
            "%UNARY-TRUNCATE-DOUBLE-FLOAT-TO-BIGNUM"
+           "SXHASH-BIGNUM-DOUBLE-FLOAT" "SXHASH-BIGNUM-SINGLE-FLOAT"
 
            "%WITH-ARRAY-DATA"
            "%WITH-ARRAY-DATA/FP"

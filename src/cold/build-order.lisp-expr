@@ -252,6 +252,8 @@
  ;; around the compilation of "code/class". Why?
  ("src/code/class" :c-headers)
  ("src/pcl/pre-warm")
+ ("src/code/number-dispatch" :not-host)
+ ("src/code/float-inf-nan"   :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/debug-info" :c-headers)
@@ -323,8 +325,6 @@
  ("src/code/unix"            :not-host)
  ("src/code/symbol"          :not-host)
  ("src/code/bignum"          :not-host #-(or bignum-assertions sb-devel) :block-compile)
- ("src/code/number-dispatch" :not-host)
- ("src/code/float-inf-nan"   :not-host)
  ("src/code/numbers"         :not-host)
  ("src/code/float-trap"      :not-host)
  ("src/code/float"           :not-host)
