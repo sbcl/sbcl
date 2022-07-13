@@ -794,7 +794,7 @@ set_up_win64_seh_thunk(size_t page_size)
     volatile uint8_t *tramp = seh_data->handler_trampoline;
     tramp[0] = 0xFF; // jmp qword ptr [rip+2]
     tramp[1] = 0x25;
-    UNALIGNED_STORE32((tramp+2), 2);
+    UNALIGNED_STORE32((void*volatile)(tramp+2), 2);
     tramp[6] = 0x66; // 2-byte nop
     tramp[7] = 0x90;
     *(void **)(tramp+8) = handle_exception;
@@ -1108,7 +1108,7 @@ handle_access_violation(os_context_t *ctx,
     page_index_t page = find_page_index(fault_address);
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     if (page >= 0) lose("should not get access violation in dynamic space");
-#endif
+#else
     if (page != -1 && !PAGE_WRITEPROTECTED_P(page)) {
         os_commit_memory(PTR_ALIGN_DOWN(fault_address, os_vm_page_size),
                          os_vm_page_size);
@@ -1117,6 +1117,7 @@ handle_access_violation(os_context_t *ctx,
     if (gencgc_handle_wp_violation(ctx, fault_address)) {
         return 0;
     }
+#endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     extern int immobile_space_handle_wp_violation(void*);
@@ -1185,7 +1186,7 @@ signal_internal_error_or_lose(os_context_t *ctx,
             (void*)(intptr_t)exception_record->ExceptionCode);
     fprintf(stderr, "Faulting IP: %p.\n",
             (void*)(intptr_t)exception_record->ExceptionAddress);
-    if (exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
+    if ((long int)exception_record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION) {
         MEMORY_BASIC_INFORMATION mem_info;
 
         if (VirtualQuery(fault_address, &mem_info, sizeof mem_info)) {
@@ -1356,7 +1357,7 @@ veh(EXCEPTION_POINTERS *ep)
     }
 
     DWORD64 rip = ep->ContextRecord->Rip;
-    DWORD code = ep->ExceptionRecord->ExceptionCode;
+    long int code = ep->ExceptionRecord->ExceptionCode;
     BOOL from_lisp =
         (rip >= READ_ONLY_SPACE_START &&
          rip < READ_ONLY_SPACE_END) ||
@@ -1466,8 +1467,8 @@ socket_input_available(HANDLE socket, long time, long utime)
 
     FD_ZERO(&readfds);
     FD_ZERO(&errfds);
-    FD_SET(socket, &readfds);
-    FD_SET(socket, &errfds);
+    FD_SET((uword_t)socket, &readfds);
+    FD_SET((uword_t)socket, &errfds);
 
     count = select(0, &readfds, NULL, &errfds, &timeout);
     SetLastError(wsaErrno);
