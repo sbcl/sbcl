@@ -157,3 +157,27 @@ void
 os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
 }
+
+/*
+ * The stubs below are replacements for the windows versions,
+ * which can -fail- when used in our memory spaces because they
+ * validate the memory spaces they are passed in a way that
+ * denies our exception handler a chance to run.
+ */
+
+void *memmove(void *dest, const void *src, size_t n)
+{
+    if (dest < src) {
+        size_t i;
+        for (i = 0; i < n; i++) *(((char *)dest)+i) = *(((char *)src)+i);
+    } else {
+        while (n--) *(((char *)dest)+n) = *(((char *)src)+n);
+    }
+    return dest;
+}
+
+void *memcpy(void *dest, const void *src, size_t n)
+{
+    while (n--) *(((char *)dest)+n) = *(((char *)src)+n);
+    return dest;
+}
