@@ -104,7 +104,7 @@
 
 #-(or linux darwin)
 (!gencgc-space-setup #x20000000
-                     #-win32 :read-only-space-size #-win32 0
+                     :read-only-space-size 0
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
 

@@ -1359,10 +1359,9 @@ veh(EXCEPTION_POINTERS *ep)
     DWORD64 rip = ep->ContextRecord->Rip;
     long int code = ep->ExceptionRecord->ExceptionCode;
     BOOL from_lisp =
-        (rip >= READ_ONLY_SPACE_START &&
-         rip < READ_ONLY_SPACE_END) ||
-        (rip >= DYNAMIC_SPACE_START &&
-         rip < DYNAMIC_SPACE_START+dynamic_space_size);
+        (rip >= DYNAMIC_SPACE_START && rip < DYNAMIC_SPACE_START+dynamic_space_size) ||
+        (rip >= READ_ONLY_SPACE_START && rip < READ_ONLY_SPACE_END) ||
+        (rip >= STATIC_SPACE_START && rip < (uword_t)static_space_free_pointer);
 
     if (code == EXCEPTION_ACCESS_VIOLATION ||
         code == STATUS_HEAP_CORRUPTION ||
