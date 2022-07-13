@@ -19,7 +19,7 @@
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
             ldr-str-offset-encodable ldp-stp-offset-p
-            bic-mask extend lsl lsr asr ror @) "SB-VM")
+            bic-mask extend lsl lsr asr ror @ encode-fp-immediate) "SB-VM")
   ;; Imports from SB-VM into this package
   (import '(sb-vm::*register-names*
             sb-vm::add-sub-immediate
@@ -115,6 +115,8 @@
   (define-arg-type simd-immh-reg :printer #'print-simd-immh-reg)
   (define-arg-type simd-modified-imm :printer #'print-simd-modified-imm)
   (define-arg-type simd-reg-cmode :printer #'print-simd-reg-cmode)
+
+  (define-arg-type fp-imm :printer #'print-fp-imm)
 
   (define-arg-type sys-reg :printer #'print-sys-reg)
 
@@ -2473,12 +2475,81 @@
 (def-fp-conversion fcvtzs #b11000)
 (def-fp-conversion fcvtzu #b11001)
 
+(defun encode-fp-immediate (float)
+  (typecase float
+    (double-float
+     (let* ((bits (double-float-bits float))
+            (sign (ldb (byte 1 63) bits))
+            (exp (ldb (byte 11 52) bits))
+            (frac (ldb (byte 52 0) bits)))
+       (when (and (zerop (ldb (byte 48 0) frac))
+                  (=
+                   (ldb (byte 8 2) exp)
+                   (if (zerop (ldb (byte 1 10) exp))
+                       (ldb (byte 8 0) -1)
+                       0)))
+         (logior (ash sign 7)
+                 (ash (logandc1 (ldb (byte 1 10) exp) 1) 6)
+                 (ash (ldb (byte 2 0) exp) 4)
+                 (ldb (byte 4 48) frac)))))
+    (single-float
+     (let* ((bits (single-float-bits float))
+            (sign (ldb (byte 1 31) bits))
+            (exp (ldb (byte 8 23) bits))
+            (frac (ldb (byte 23 0) bits)))
+       (when (and (zerop (ldb (byte 19 0) frac))
+                  (=  (ldb (byte 5 2) exp)
+                      (if (zerop (ldb (byte 1 7) exp))
+                          (ldb (byte 5 0) -1)
+                          0)))
+         (logior (ash sign 7)
+                 (ash (logandc1 (ldb (byte 1 7) exp) 1) 6)
+                 (ash (ldb (byte 2 0) exp) 4)
+                 (ldb (byte 4 19) frac)))))))
+
+(def-emitter fp-immediate
+  (m 1 31)
+  (#b0 1 30)
+  (s 1 29)
+  (#b11110 5 24)
+  (type 2 22)
+  (#b1 1 21)
+  (imm8 8 13)
+  (#b100 3 10)
+  (imm5 5 5)
+  (rd 5 0))
+
+(define-instruction-format (fp-immediate 32
+                            :default-printer '(:name :tab rd ", " imm))
+  (#b0 :field (byte 1 31))
+  (#b0 :field (byte 1 30))
+  (#b0 :field (byte 1 29))
+  (#b11110 :field (byte 5 24))
+  (#b1 :field (byte 1 21))
+  (imm :fields (list (byte 2 22) (byte 8 13)) :type 'fp-imm)
+  (#b100 :field (byte 3 10))
+  (#b0 :field (byte 5 5))
+  (rd :field (byte 5 0) :type 'float-reg))
+
 (define-instruction fmov (segment rd rn)
   (:printer fp-conversion ((op #b110) (rd nil :type 'reg)))
   (:printer fp-conversion ((op #b111) (rn nil :type 'reg)))
   (:printer fp-data-processing-1 ((op #b0)))
+  (:printer fp-immediate ())
   (:emitter
-   (cond ((or (sc-is rd complex-double-reg complex-single-reg)
+   (cond ((double-float-p rn)
+          (aver (sc-is rd double-reg))
+          (emit-fp-immediate segment 0 0 #b01
+                             (encode-fp-immediate rn)
+                             0
+                             (reg-offset rd)))
+         ((single-float-p rn)
+          (aver (sc-is rd single-reg))
+          (emit-fp-immediate segment 0 0 #b00
+                             (encode-fp-immediate rn)
+                             0
+                             (reg-offset rd)))
+         ((or (sc-is rd complex-double-reg complex-single-reg)
               (sc-is rn complex-double-reg complex-single-reg))
           (break "Implement"))
          ((and (fp-register-p rd)

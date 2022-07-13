@@ -311,7 +311,43 @@
                    (ash cmode 2)))))
       (princ (dpb abc (byte 3 5) defgh) stream)
       (when (plusp shift)
-        (format t ", LSL #~d" shift)))))
+        (format stream ", LSL #~d" shift)))))
+
+(defun decode-fp-immediate (imm type)
+  (case type
+    (double-float
+     (let* ((sign (ldb (byte 1 7) imm))
+            (exp (ldb (byte 3 4) imm))
+            (frac (ldb (byte 4 0) imm)))
+       (sb-kernel::double-from-bits
+        sign
+        (logior (ash (logandc1 (ldb (byte 1 2) exp) 1) 10)
+                (ash (if (zerop (ldb (byte 1 2) exp))
+                         0
+                         (ldb (byte 8 0) -1))
+                     3)
+                (ldb (byte 2 0) exp))
+        (ash frac 48))))
+    (single-float
+     (let* ((sign (ldb (byte 1 7) imm))
+            (exp (ldb (byte 3 4) imm))
+            (frac (ldb (byte 4 0) imm)))
+       (sb-kernel::single-from-bits
+        sign
+        (logior (ash (logandc1 (ldb (byte 1 2) exp) 1) 7)
+                (ash (if (zerop (ldb (byte 1 2) exp))
+                         0
+                         (ldb (byte 5 0) -1))
+                     3)
+                (ldb (byte 2 0) exp))
+        (ash frac 19))))))
+
+(defun print-fp-imm (value stream dstate)
+  (declare (ignore dstate))
+  (destructuring-bind (type imm) value
+    (format stream "#~a" (decode-fp-immediate imm (if (= type 0)
+                                                      'single-float
+                                                      'double-float)))))
 
 (defun print-vbhs (value stream dstate)
   (declare (ignore dstate))

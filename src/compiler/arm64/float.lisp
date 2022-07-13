@@ -32,7 +32,14 @@
 (define-move-fun (load-fp-immediate 1) (vop x y)
                  ((single-immediate) (single-reg)
                   (double-immediate) (double-reg))
-  (load-inline-constant y (tn-value x)))
+  (let ((x (tn-value x)))
+    (cond ((or (eql x $0f0)
+               (eql x $0d0))
+           (inst fmov y zr-tn))
+          ((encode-fp-immediate  x)
+           (inst fmov y x))
+          (t
+           (load-inline-constant y x)))))
 
 
 ;;;; Move VOPs:

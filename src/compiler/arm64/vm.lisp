@@ -255,9 +255,6 @@
      (if (static-symbol-p value)
          immediate-sc-number
          nil))
-    ((eql $0.0)
-     ;; Can be encoded in a single instruction
-     immediate-sc-number)
     (double-float
      double-immediate-sc-number)
     (single-float
