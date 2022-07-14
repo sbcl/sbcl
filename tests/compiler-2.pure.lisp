@@ -3689,3 +3689,23 @@
      (declaim (type integer +foo+)))
    :load t)
   (assert (eq (funcall 'bar) 4)))
+
+(with-test (:name :if-split-let-blocks)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a e)
+         (labels ((f1 (b)
+                    (map nil
+                         (lambda (n)
+                           (return-from f1 n))
+                         b)
+                    nil)
+                  (f (n)
+                    (let ((x (eval e))
+                          (y (f1 n)))
+                      (if y
+                          y
+                          x))))
+           (f a)))
+    ((() 1) 1)
+    (('(2) 1) 2)))

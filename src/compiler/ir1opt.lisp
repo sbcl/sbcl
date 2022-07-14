@@ -815,13 +815,13 @@
                (when (and lvar
                           (listp (lvar-uses lvar)))
                  (do-uses (use lvar)
-                   (let ((block (node-block use)))
-                     (when (and (immediately-used-p lvar use)
-                                (type= (single-value-type (node-derived-type use))
-                                       (specifier-type 'null))
-                                (eq (block-last block) use)
-                                (or good-lambda-shape
-                                    (setf good-lambda-shape (split-let var lambda))))
+                   (when (and (immediately-used-p lvar use)
+                              (type= (single-value-type (node-derived-type use))
+                                     (specifier-type 'null))
+                              (eq (block-last (node-block use)) use)
+                              (or good-lambda-shape
+                                  (setf good-lambda-shape (split-let var lambda))))
+                     (let ((block (node-block use)))
                        (change-block-successor block
                                                (car (block-succ block))
                                                (if-alternative node))
