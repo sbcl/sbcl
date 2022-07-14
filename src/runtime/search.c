@@ -272,39 +272,51 @@ uword_t brothertree_find_greatereql(uword_t key, lispobj tree)
     return best;
 }
 
+#define BSEARCH_ALGORITHM_IMPL \
+    int low = 0; \
+    int high = nelements - 1; \
+    while (low <= high) { \
+        /* Many authors point out that this is a bug if overflow occurs \
+         * and it can be avoided by using low+(high-low)/2 or similar. \
+         * But we will never have so many code blobs that overflow occurs. */ \
+        int mid = (low + high) / 2; \
+        uword_t probe = array[mid]; \
+        if (probe < item) low = mid + 1; \
+        else if (probe > item) high = mid - 1; \
+        else return mid; \
+    } \
+
 /* Binary search a sorted vector (of code base addresses).
  * This might be useful for generations other than 0,
  * because we only need to rebuild the vector in GC, which is
  * easily done; and it's much denser than a tree */
-int bsearch_lesseql(uword_t item, uword_t* array, int nelements)
+int bsearch_lesseql_uword(uword_t item, uword_t* array, int nelements)
 {
-    int low = 0;
-    int high = nelements - 1;
-    while (low <= high) {
-        // Many authors point out that this is a bug if overflow occurs
-        // and it can be avoided by using low+(high-low)/2 or similar.
-        // But we will never have so many code blobs that overflow occurs.
-        int mid = (low + high) / 2;
-        uword_t probe = array[mid];
-        if (probe < item) low = mid + 1;
-        else if (probe > item) high = mid - 1;
-        else return mid;
-    }
+    BSEARCH_ALGORITHM_IMPL
     if (high >= 0) return high;
     return -1;
 }
 
-int bsearch_greatereql(uword_t item, uword_t* array, int nelements)
+int bsearch_greatereql_uword(uword_t item, uword_t* array, int nelements)
 {
-    int low = 0;
-    int high = nelements - 1;
-    while (low <= high) {
-        int mid = (low + high) / 2;
-        uword_t probe = array[mid];
-        if (probe < item) low = mid + 1;
-        else if (probe > item) high = mid - 1;
-        else return mid;
-    }
+    BSEARCH_ALGORITHM_IMPL
     if (low < nelements) return low;
     return -1;
 }
+
+#ifdef LISP_FEATURE_64_BIT
+/// As above, but using space-relative pointers which halve the storage requirement
+int bsearch_lesseql_uint32(uint32_t item, uint32_t* array, int nelements)
+{
+    BSEARCH_ALGORITHM_IMPL
+    if (high >= 0) return high;
+    return -1;
+}
+
+int bsearch_greatereql_uint32(uint32_t item, uint32_t* array, int nelements)
+{
+    BSEARCH_ALGORITHM_IMPL
+    if (low < nelements) return low;
+    return -1;
+}
+#endif

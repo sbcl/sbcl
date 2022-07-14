@@ -11,8 +11,8 @@
                                         (sb-sys:vector-sap array) (length array))))
                     (unless (eql result -1)
                       (values result (aref array result))))))))
-  (define-c-wrapper c-bsearch<= "bsearch_lesseql")
-  (define-c-wrapper c-bsearch>= "bsearch_greatereql"))
+  (define-c-wrapper c-bsearch<= "bsearch_lesseql_uword")
+  (define-c-wrapper c-bsearch>= "bsearch_greatereql_uword"))
 
 (defun test-c-bsearch-sorted-vector ()
   (dotimes (vector-len 51) ; test the edge case of an empty vector
