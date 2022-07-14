@@ -5466,12 +5466,10 @@ zero_all_free_ranges() /* called only by gc_and_save() */
  * + Instances on unboxed pages need to have their layout pointer visited,
  *   so all pages have to be turned to boxed.
  */
-static void
-prepare_for_final_gc ()
+static void prepare_dynamic_space_for_final_gc()
 {
     page_index_t i;
 
-    prepare_immobile_space_for_final_gc ();
     for (i = 0; i < next_free_page; i++) {
         // Compaction requires that we permit large objects to be copied henceforth.
         // Object of size >= LARGE_OBJECT_SIZE get re-allocated to single-object pages.
@@ -5488,17 +5486,6 @@ prepare_for_final_gc ()
             generations[0].bytes_allocated += used;
         }
     }
-
-#ifdef LISP_FEATURE_SB_THREAD
-    // Avoid tenuring of otherwise-dead objects referenced by
-    // dynamic bindings which disappear on image restart.
-    struct thread *thread = get_sb_vm_thread();
-    char *start = (char*)&thread->lisp_thread;
-    char *end = (char*)thread + dynamic_values_bytes;
-    memset(start, 0, end-start);
-#endif
-    // After zeroing, make sure PINNED_OBJECTS is a list again.
-    write_TLS(PINNED_OBJECTS, NIL, thread);
 }
 
 /* Set this switch to 1 for coalescing of strings dumped to fasl,
@@ -5573,10 +5560,19 @@ gc_and_save(char *filename, boolean prepend_runtime,
      */
     conservative_stack = 0;
     gencgc_oldest_gen_to_gc = 0;
+    // Avoid tenuring of otherwise-dead objects referenced by
+    // dynamic bindings which disappear on image restart.
+    struct thread *thread = get_sb_vm_thread();
+    char *start = (char*)&thread->lisp_thread;
+    char *end = (char*)thread + dynamic_values_bytes;
+    memset(start, 0, end-start);
+    // After zeroing, make sure PINNED_OBJECTS is a list again.
+    write_TLS(PINNED_OBJECTS, NIL, thread);
     // From here on until exit, there is no chance of continuing
     // in Lisp if something goes wrong during GC.
     pre_verify_gen_0 = 1;
-    prepare_for_final_gc();
+    prepare_immobile_space_for_final_gc(); // once is enough
+    prepare_dynamic_space_for_final_gc();
     unwind_binding_stack();
     gencgc_alloc_start_page = next_free_page;
     collect_garbage(0);
@@ -5599,7 +5595,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     /* FIXME: now that relocate_heap() works, can we just memmove() everything
      * down and perform a relocation instead of a collection? */
     if (verbose) { printf("[performing final GC..."); fflush(stdout); }
-    prepare_for_final_gc();
+    prepare_dynamic_space_for_final_gc();
     gencgc_alloc_start_page = 0;
     collect_garbage(0);
     /* All global allocation regions should be empty */
