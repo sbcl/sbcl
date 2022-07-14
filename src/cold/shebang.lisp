@@ -31,6 +31,16 @@
           ((> (length arch) 1) (error "More than one architecture selected")))
     (car arch)))
 
+(defun compatible-vector-raw-bits () ; T if the host and target match on word size and endianness
+  (flet ((endianness (features)
+           (let ((result (intersection '(:little-endian :big-endian) features)))
+             (assert (and result (not (cdr result))))
+             (car result)))
+         (wordsize (features)
+           (if (member :64-bit features) 64 32)))
+    (and (eq (endianness sb-xc:*features*) (endianness cl:*features*))
+         (= (wordsize sb-xc:*features*) (wordsize cl:*features*)))))
+
 ;;; Not necessarily the logical place to define BACKEND-ASM-PACKAGE-NAME,
 ;;; but a convenient one.
 (defun backend-assembler-target-name ()

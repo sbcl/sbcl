@@ -162,11 +162,41 @@
   (setf (bvref-32 bv index) (ldb (byte 32 0) (the (signed-byte 32) newval)))
   newval)
 
+#+host-quirks-sbcl
+(progn
+  (declaim (inline native-bvref-word (setf native-bvref-word)))
+  (defun native-bvref-word (bigvec byte-index)
+    (multiple-value-bind (outer-index inner-index) (floor byte-index +smallvec-length+)
+      (host-sb-kernel:%vector-raw-bits
+       (the smallvec (svref (bigvec-outer-vector bigvec) outer-index))
+       (ash inner-index (- sb-vm:word-shift)))))
+  (defun (setf native-bvref-word) (newval bigvec byte-index)
+    (multiple-value-bind (outer-index inner-index) (floor byte-index +smallvec-length+)
+      (setf (host-sb-kernel:%vector-raw-bits
+             (the smallvec (svref (bigvec-outer-vector bigvec) outer-index))
+             (ash inner-index (- sb-vm:word-shift)))
+            newval))))
+
 ;; lispobj-sized word, whatever that may be
 ;; hopefully nobody ever wants a 128-bit SBCL...
-(macrolet ((acc (bv index) `(#+64-bit bvref-64 #-64-bit bvref-32 ,bv ,index)))
-  (defun (setf bvref-word) (new-val bytes index) (setf (acc bytes index) new-val))
-  (defun bvref-word (bytes index) (acc bytes index)))
+(macrolet ((access (bv index &optional alignedp)
+             (cond ((and alignedp
+                         (and (member :sbcl cl:*features*)
+                              (sb-cold::compatible-vector-raw-bits)))
+                    `(native-bvref-word ,bv ,index))
+                   (t
+                    `(#+64-bit bvref-64 #-64-bit bvref-32 ,bv ,index)))))
+  (defun (setf bvref-word-unaligned) (new-val bytes index)
+    (declare (type sb-xc:fixnum index))
+    (setf (access bytes index) new-val))
+  (defun (setf bvref-word) (new-val bytes index)
+    (declare (type sb-xc:fixnum index))
+    (aver (not (logtest index (ash sb-vm:lowtag-mask -1))))
+    (setf (access bytes index t) new-val))
+  (defun bvref-word (bytes index)
+    (declare (type sb-xc:fixnum index))
+    (aver (not (logtest index (ash sb-vm:lowtag-mask -1))))
+    (access bytes index t)))
 
 ;;;; representation of spaces in the core
 
@@ -3639,7 +3669,7 @@ III. initially undefined function references (alphabetically):
                               (:list  (incf n-cons)  #b101)
                               (:mixed (incf n-mixed) #b011))
                             0)))
-        (setf (bvref-word ptes pte-offset) (logior sso type-bits))
+        (setf (bvref-word-unaligned ptes pte-offset) (logior sso type-bits))
         (macrolet ((setter ()
                      ;; KLUDGE to avoid compiler note about one or the other
                      ;; branch of this IF being unreachable.
