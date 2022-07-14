@@ -66,6 +66,7 @@
   (let ((vars (make-gensym-list (length slot-specs))))
     (values (compile nil
                      `(lambda (,@vars)
+                        (declare (optimize (sb-c:store-source-form 0)))
                         (%make-structure-instance-macro ,dd ',slot-specs ,@vars))))))
 
 (defun %make-funcallable-structure-instance-allocator (dd slot-specs)
@@ -73,6 +74,7 @@
     (bug "funcallable-structure-instance allocation with slots unimplemented"))
   (values
      (compile nil `(lambda ()
+                     (declare (optimize (sb-c:store-source-form 0)))
                      (let ((object (%make-funcallable-instance ,(dd-length dd))))
                        (setf (%fun-wrapper object) ,(find-layout (dd-name dd)))
                        object)))))
