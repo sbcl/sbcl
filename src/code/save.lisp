@@ -339,9 +339,13 @@ sufficiently motivated to do lengthy fixes."
   (profile-deinit)
   (foreign-deinit)
   ;; To have any hope of making pathname interning actually work,
-  ;; this CLRHASH would need to be removed. But removing it causes excess
-  ;; garbage retention because weakness doesn't work. It's a catch-22.
-  (clrhash *pathnames*)
+  ;; this MAKE-PATHNAME-TABLE (formerly CLRHASH) would need to be removed.
+  ;; But removing this step causes excess garbage retention because the
+  ;; table's weakness isn't actually working (not sure why).
+  ;; And CLRHASH doesn't do as much as it should, because if the table
+  ;; is actually empty, but at some point held 20,000 pathnames,
+  ;; then we'd write out an enormous vector full of nothing.
+  (make-pathname-intern-table)
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))

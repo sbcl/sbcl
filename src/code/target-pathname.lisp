@@ -298,7 +298,7 @@
 ;;; *around* the get and put operations. It makes no sense to lock the table around
 ;;; individual operations, hence the unsynchronized table.
 
-(define-load-time-global *pathnames*
+(defun make-pathname-intern-table ()
     (let ((h (%make-hash-table (logior (pack-ht-flags-weakness +ht-weak-value+)
                                        (pack-ht-flags-kind 3)
                                        hash-table-userfun-flag)
@@ -310,6 +310,8 @@
                                $1.0)))
       (install-hash-table-lock h)
       h))
+(define-load-time-global *pathnames* (make-pathname-intern-table))
+
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
 ;;; from parsed arguments.
