@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(defun load-immediate-word (y val)
+(defun load-immediate-word (y val &optional single-instruction)
   (let (single-mov)
     (flet ((single-mov ()
              (setf single-mov
@@ -25,15 +25,20 @@
                                 count (plusp part))
                           1)))))
       (cond ((typep val '(unsigned-byte 16))
-             (inst movz y val))
+             (inst movz y val)
+             y)
             ((typep val '(and (signed-byte 16) (integer * -1)))
-             (inst movn y (lognot val)))
+             (inst movn y (lognot val))
+             y)
             ((typep (ldb (byte 64 0) (lognot val)) '(unsigned-byte 16))
-             (inst movn y (ldb (byte 64 0) (lognot val))))
+             (inst movn y (ldb (byte 64 0) (lognot val)))
+             y)
             ((encode-logical-immediate val)
-             (inst orr y zr-tn val))
+             (inst orr y zr-tn val)
+             y)
             ((and
               (not (single-mov))
+              (not single-instruction)
               (let ((descriptorp (memq (tn-offset y) descriptor-regs)))
                 (flet ((try (i part fill)
                          (let ((filled (dpb fill (byte 16 i) val)))
@@ -49,8 +54,10 @@
                                     (try i part 0)
                                     (try i part
                                          (ldb (byte 16 (mod (+ i 16) 64))
-                                              val))))))))
+                                              val)))))))
+             y)
             ((and (not single-mov)
+                  (not single-instruction)
                   (let ((a (ldb (byte 16 0) val))
                         (b (ldb (byte 16 16) val))
                         (c (ldb (byte 16 32) val))
@@ -77,8 +84,11 @@
                               ((= b d)
                                (try b a 0 c 32))
                               ((= c d)
-                               (try c a 0 b 16))))))))
-            ((minusp val)
+                               (try c a 0 b 16)))))))
+             y)
+            ((and (minusp val)
+                  (or single-mov
+                      (not single-instruction)))
              (loop with first = t
                    for i below 64 by 16
                    for part = (ldb (byte 16 i) val)
@@ -86,8 +96,10 @@
                    do
                    (if (shiftf first nil)
                        (inst movn y (ldb (byte 16 0) (lognot part)) i)
-                       (inst movk y part i))))
-            (t
+                       (inst movk y part i)))
+             y)
+            ((or single-mov
+                 (not single-instruction))
              (loop with first = t
                    for i below 64 by 16
                    for part = (ldb (byte 16 i) val)
@@ -95,8 +107,8 @@
                    do
                    (if (shiftf first nil)
                        (inst movz y part i)
-                       (inst movk y part i)))))))
-  y)
+                       (inst movk y part i)))
+             y)))))
 
 (defun add-sub-immediate (x &optional (temp tmp-tn))
   (cond ((not (integerp x))

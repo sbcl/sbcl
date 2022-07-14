@@ -38,6 +38,11 @@
            (inst fmov y zr-tn))
           ((encode-fp-immediate  x)
            (inst fmov y x))
+          ((load-immediate-word tmp-tn (if (double-float-p x)
+                                           (double-float-bits x)
+                                           (single-float-bits x))
+                                t)
+           (inst fmov y tmp-tn))
           (t
            (load-inline-constant y x)))))
 
