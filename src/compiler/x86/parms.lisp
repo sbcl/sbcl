@@ -163,7 +163,7 @@
 ;;; table: "In CMUCL: 0xB0000000->0xB1000000"
 
 (defmacro space-setup (arg &rest more)
-  `(!gencgc-space-setup ,arg #-win32 :read-only-space-size #-win32 0 ,@more))
+  `(!gencgc-space-setup ,arg ,@more))
 
 #+win32     (space-setup #x22000000)
 #+linux     (space-setup #x01000000 :dynamic-space-start #x09000000)

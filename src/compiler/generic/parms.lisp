@@ -66,7 +66,9 @@
                ((:varyobj-space-start  varyobj-space-start*))
                ((:varyobj-space-size   varyobj-space-size*) (* 104 1024 1024))
                (small-space-size #x100000)
-               ((:read-only-space-size ro-space-size) small-space-size))
+               ((:read-only-space-size ro-space-size)
+                #+darwin-jit small-size-size
+                #-darwin-jit 0))
   (declare (ignorable dynamic-space-start*)) ; might be unused in make-host-2
   (flet ((defconstantish (relocatable symbol value)
            (if (not relocatable) ; easy case
