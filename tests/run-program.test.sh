@@ -44,6 +44,12 @@ run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'
     (assert (equal string "FEEFIE=foefum
 ")))
 
+(when (fboundp (find-symbol "UNIX-POLL" "SB-UNIX"))
+  (let ((f (open "/dev/null")))
+    (with-alien ((dup (function int int) :extern))
+      (dotimes (i 1025) (alien-funcall dup (sb-impl::fd-stream-fd f)))
+      (assert (> (alien-funcall dup (sb-impl::fd-stream-fd f)) 1024)))))
+
  ;; Unicode strings
  (flet ((try (sb-impl::*default-external-format* x y)
          (let* ((process (run-program

@@ -1041,19 +1041,8 @@ Users Manual for details about the PROCESS structure.
              (loop
                 (unless handler
                   (return))
-                (multiple-value-bind
-                      (result readable/errno)
-                    (sb-unix:unix-select (1+ descriptor)
-                                         (ash 1 descriptor)
-                                         0 0 0)
-                  (cond ((null result)
-                         (if (eql sb-unix:eintr readable/errno)
-                             (return)
-                             (error "~@<Couldn't select on sub-process: ~
-                                        ~2I~_~A~:>"
-                                    (strerror readable/errno))))
-                        ((zerop result)
-                         (return))))
+                (unless (sb-unix:unix-simple-poll descriptor :input 0)
+                  (return))
                 (multiple-value-bind (count errno)
                     (with-pinned-objects (buf)
                       (sb-unix:unix-read descriptor

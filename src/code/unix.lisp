@@ -745,7 +745,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                  nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
                  (if to-secs (alien-sap (addr tv)) (int-sap 0)))))))
 
-;;; Lisp-side implmentations of FD_FOO macros.
+;;; Lisp-side implementations of FD_FOO macros.
 (declaim (inline fd-set fd-clr fd-isset fd-zero))
 (defun fd-set (offset fd-set)
   (multiple-value-bind (word bit) (floor offset
