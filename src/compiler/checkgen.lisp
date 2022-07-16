@@ -312,6 +312,9 @@
   (let* ((lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar))))
     (and (combination-p dest)
+         (or (not (combination-fun-info dest))
+             ;; fixed-args functions do not check their arguments.
+             (not (ir1-attributep (fun-info-attributes (combination-fun-info dest)) fixed-args)))
          ;; The theory is that the type assertion is from a declaration on the
          ;; callee, so the callee should be able to do the check. We want to
          ;; let the callee do the check, because it is possible that by the
