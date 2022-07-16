@@ -40,6 +40,9 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 
 #include "align.h"
 
+// Distinguish penultimate GC (iteration 1) from ultimate GC (iteration 2) in save-lisp
+extern int save_lisp_gc_iteration;
+
 // Offset from an fdefn raw address to the underlying simple-fun,
 // if and only if it points to a simple-fun.
 // For those of us who are too memory-impaired to know how to use the value:

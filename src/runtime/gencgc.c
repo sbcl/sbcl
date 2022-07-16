@@ -153,6 +153,7 @@ boolean gc_active_p = 0;
 /* should the GC be conservative on stack. If false (only right before
  * saving a core), don't scan the stack / mark pages pinned. */
 static boolean conservative_stack = 1;
+int save_lisp_gc_iteration;
 
 /* An array of page structures is allocated on gc initialization.
  * This helps to quickly map between an address and its page structure.
@@ -205,59 +206,6 @@ static inline void *
 page_scan_start(page_index_t page_index)
 {
     return page_address(page_index)-page_scan_start_offset(page_index);
-}
-
-/* True if the page starts a contiguous block. */
-static inline boolean
-page_starts_contiguous_block_p(page_index_t page_index)
-{
-    // Don't use the preprocessor macro: 0 means 0.
-    return page_table[page_index].scan_start_offset_ == 0;
-}
-
-/* True if the page is the last page in a contiguous block. */
-static inline boolean
-page_ends_contiguous_block_p(page_index_t page_index,
-                             generation_index_t __attribute__((unused)) gen)
-{
-    /* Re. this next test: git rev c769dd53 said that there was a bug when we don't
-     * test page_bytes_used, but I fail to see how 'page_starts_contiguous_block_p'
-     * on the next page is not a STRONGER condition, i.e. it should imply that
-     * 'page_index' ends a block without regard for the number of bytes used.
-     * Apparently at some point I understood this and now I don't again.
-     * That's what comments are for, damnit.
-     * Anyway, I *think* the issue was, at some point, as follows:
-     * |   page             |     page   |
-     *        pinned-obj
-     *     <------------------- scan-start
-     * where the first of the two pages had a small object pinned. This used to
-     * adjust the bytes used to account _only_ for the pins.  That was wrong -
-     * the page has to be counted as if it is completely full.
-     * So _maybe_ both these conditions do not need to be present now ?
-     */
-    // There is *always* a next page in the page table.
-    boolean answer = page_words_used(page_index) < GENCGC_PAGE_WORDS
-                  || page_starts_contiguous_block_p(page_index+1);
-#ifdef DEBUG
-    boolean safe_answer =
-           (/* page doesn't fill block */
-            (page_words_used(page_index) < GENCGC_PAGE_WORDS)
-            /* page is last allocated page */
-            || ((page_index + 1) >= next_free_page)
-            /* next page contains no data */
-            || !page_words_used(page_index + 1)
-            /* next page is in different generation */
-            || (page_table[page_index + 1].gen != gen)
-            /* next page starts its own contiguous block */
-            || (page_starts_contiguous_block_p(page_index + 1)));
-    gc_assert(answer == safe_answer);
-#endif
-    return answer;
-}
-page_index_t contiguous_block_final_page(page_index_t first) {
-    page_index_t last = first;
-    while (!page_ends_contiguous_block_p(last, page_table[first].gen)) ++last;
-    return last;
 }
 
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
@@ -5574,6 +5522,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     prepare_immobile_space_for_final_gc(); // once is enough
     prepare_dynamic_space_for_final_gc();
     unwind_binding_stack();
+    save_lisp_gc_iteration = 1;
     gencgc_alloc_start_page = next_free_page;
     collect_garbage(0);
     verify_heap(0, VERIFY_POST_GC);
@@ -5596,6 +5545,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
      * down and perform a relocation instead of a collection? */
     if (verbose) { printf("[performing final GC..."); fflush(stdout); }
     prepare_dynamic_space_for_final_gc();
+    save_lisp_gc_iteration = 2;
     gencgc_alloc_start_page = 0;
     collect_garbage(0);
     /* All global allocation regions should be empty */

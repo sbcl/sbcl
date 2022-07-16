@@ -575,4 +575,8 @@ static inline boolean plausible_tag_p(lispobj addr)
 # define filler_total_nwords(header) ((header)>>N_WIDETAG_BITS)
 #endif
 
+static inline boolean readonly_space_p(lispobj ptr) {
+    return ptr >= READ_ONLY_SPACE_START && (lispobj*)ptr < read_only_space_free_pointer;
+}
+
 #endif /* _GC_PRIVATE_H_ */

@@ -210,7 +210,6 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     return (header & MARK_BIT) != 0;
 }
 
-extern page_index_t contiguous_block_final_page(page_index_t);
 void dump_marked_objects() {
     fprintf(stderr, "Marked objects:\n");
     page_index_t first = 0;
