@@ -218,13 +218,12 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 }
 #endif
 
-#define DYNAMIC_SPACE_ADJ_INDEX 0
+#define MAX_SPACE_RELOCATION_RANGES 4
 struct heap_adjust {
-    /* range[0] is dynamic space, ranges[1] and [2] are immobile spaces */
     struct range {
         lispobj start, end;
         sword_t delta;
-    } range[3];
+    } range[MAX_SPACE_RELOCATION_RANGES];
     int n_ranges;
     int n_relocs_abs; // absolute
     int n_relocs_rel; // relative
@@ -238,15 +237,22 @@ struct heap_adjust {
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {
-    if (adj->range[0].start <= x && x < adj->range[0].end)
-        return adj->range[0].delta;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (adj->range[1].start <= x && x < adj->range[1].end)
-        return adj->range[1].delta;
-    if (adj->range[2].start <= x && x < adj->range[2].end)
-        return adj->range[2].delta;
-#endif
+    int j;
+    for (j = adj->n_ranges - 1 ; j >= 0 ; --j)
+        if (adj->range[j].start <= x && x < adj->range[j].end) return adj->range[j].delta;
     return 0;
+}
+
+// Given a post-relocation object 'x', compute the address at which
+// it was originally expected to have been placed as per the core file.
+static inline lispobj inverse_adjust(struct heap_adjust* adj, lispobj x)
+{
+    int j;
+    for (j = adj->n_ranges - 1 ; j >= 0 ; --j)
+        if (adj->range[j].start + adj->range[j].delta <= x &&
+            x < adj->range[j].end + adj->range[j].delta)
+            return x - adj->range[j].delta;
+    return x;
 }
 
 // Return the adjusted value of 'word' without testing whether it looks
@@ -255,16 +261,20 @@ static inline lispobj adjust_word(struct heap_adjust* adj, lispobj word) {
     return word + calc_adjustment(adj, word);
 }
 
-// Given a post-relocation object 'x', compute the address at which
-// it was originally expected to have been placed as per the core file.
-static inline lispobj inverse_adjust(struct heap_adjust* adj, lispobj x)
+static void
+set_adjustment(struct heap_adjust* adj,
+               uword_t actual_addr,
+               uword_t desired_addr,
+               uword_t len)
 {
-    int j;
-    for (j=0; j<3; ++j)
-        if (adj->range[j].start + adj->range[j].delta <= x &&
-            x < adj->range[j].end + adj->range[j].delta)
-            return x - adj->range[j].delta;
-    return x;
+    sword_t delta = len ? actual_addr - desired_addr : 0;
+    if (!delta) return;
+    int j = adj->n_ranges;
+    gc_assert(j < MAX_SPACE_RELOCATION_RANGES);
+    adj->range[j].start = (lispobj)desired_addr;
+    adj->range[j].end   = (lispobj)desired_addr + len;
+    adj->range[j].delta = delta;
+    adj->n_ranges = j+1;
 }
 
 #define SHOW_SPACE_RELOCATION 0
@@ -415,7 +425,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             lispobj name = decode_symbol_name(s->name);
             lispobj adjusted_name = adjust_word(adj, name);
             // writeback the name if it changed
-            if (adjusted_name != name) set_symbol_name(s, adjusted_name);
+            if (adjusted_name != name) FIXUP(set_symbol_name(s, adjusted_name), &s->name);
             int indicated_nwords = (*where>>N_WIDETAG_BITS) & 0xFF;
             adjust_pointers(&s->fdefn, indicated_nwords - 4, adj);
             }
@@ -431,6 +441,8 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         case CODE_HEADER_WIDETAG:
             if (filler_obj_p(where)) {
                 // OMGWTF! Why does a filler code object merit adjustment?
+                // (Probably for when holes were chained through debug-info?
+                // But we don't save holes any more, because of defrag)
                 if (where[2]) adjust_word_at(where+2, adj);
                 continue;
             }
@@ -604,20 +616,6 @@ static void relocate_heap(struct heap_adjust* adj)
     }
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
-}
-
-static void
-set_adjustment(struct heap_adjust* adj,
-               uword_t actual_addr,
-               uword_t desired_addr,
-               uword_t len)
-{
-    int j = adj->n_ranges;
-    gc_assert(j <= 2);
-    adj->range[j].start = (lispobj)desired_addr;
-    adj->range[j].end   = (lispobj)desired_addr + len;
-    adj->range[j].delta = len ? actual_addr - desired_addr : 0;
-    adj->n_ranges = j+1;
 }
 
 #if defined(LISP_FEATURE_ELF) && defined(LISP_FEATURE_IMMOBILE_SPACE)
@@ -805,14 +803,10 @@ process_directory(int count, struct ndir_entry *entry,
         if (id < 1 || id > MAX_CORE_SPACE_ID)
             lose("unknown space ID %ld addr %p", id, (void*)addr);
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        // Enforce address of readonly, static, immobile varyobj
-        int enforce_address = id != DYNAMIC_CORE_SPACE_ID
-          && id != IMMOBILE_FIXEDOBJ_CORE_SPACE_ID
-          && id != IMMOBILE_VARYOBJ_CORE_SPACE_ID;
+#ifdef LISP_FEATURE_DARWIN_JIT
+        int enforce_address = (id == STATIC_CORE_SPACE_ID) || (id == READ_ONLY_CORE_SPACE_ID);
 #else
-        // Enforce address of readonly and static spaces.
-        int enforce_address = id != DYNAMIC_CORE_SPACE_ID;
+        int enforce_address = id == STATIC_CORE_SPACE_ID;
 #endif
 
         // We'd like to enforce proper alignment of 'addr' but there's
@@ -968,11 +962,16 @@ process_directory(int count, struct ndir_entry *entry,
     }
 
     calc_asm_routine_bounds();
-#  ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_GENCGC
     set_adjustment(adj, DYNAMIC_SPACE_START, // actual
                    spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
-#    ifdef LISP_FEATURE_IMMOBILE_SPACE
+#else
+    set_adjustment(adj, DYNAMIC_0_SPACE_START, // actual
+                   spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
+                   spaces[DYNAMIC_CORE_SPACE_ID].len);
+#endif // LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
     set_adjustment(adj, FIXEDOBJ_SPACE_START, // actual
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base, // expected
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len);
@@ -983,21 +982,14 @@ process_directory(int count, struct ndir_entry *entry,
         set_adjustment(adj, VARYOBJ_SPACE_START, // actual
                        spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base, // expected
                        spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
-#    endif
-#  else
-    set_adjustment(adj, DYNAMIC_0_SPACE_START, // actual
-                   spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
-                   spaces[DYNAMIC_CORE_SPACE_ID].len);
-#  endif // LISP_FEATURE_GENCGC
-    if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta) {
-        relocate_heap(adj);
-    }
+#endif
+    if (adj->n_ranges) relocate_heap(adj);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    /* Now determine page characteristics (such as object spacing)
-     * after relocation, because we need to know which objects are layouts
-     * based on knowing layout-of-layout.  The test for that is dependent
-     * on what it's address should be, not what it was in the file */
+    /* Now determine page characteristics such as object spacing
+     * (tbh it would be better to output the immobile-space page tables to the core file).
+     * This used to depend critically on space relocation already having been performed.
+     * It doesn't any more, but this is an OK time to do it */
     immobile_space_coreparse(spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len,
                              spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
     calc_immobile_space_bounds();
