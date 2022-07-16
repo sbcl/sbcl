@@ -656,8 +656,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
      (declare (type (integer 0 #.fd-setsize) ,n))
      ,@body))
 
-;;;; FIXME: Why have both UNIX-SELECT and UNIX-FAST-SELECT?
-
 ;;; Perform the UNIX select(2) system call.
 (declaim (inline unix-fast-select))
 (defun unix-fast-select (num-descriptors
@@ -682,68 +680,6 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
              (unless *interrupts-enabled*
                (note-dangerous-wait "select(2)"))
              (select (int-sap 0)))))))
-
-;;; UNIX-SELECT accepts sets of file descriptors and waits for an event
-;;; to happen on one of them or to time out.
-(declaim (inline num-to-fd-set fd-set-to-num))
-(defun num-to-fd-set (fdset num)
-  (typecase num
-    (fixnum
-     (setf (deref (slot fdset 'fds-bits) 0) num)
-     (loop for index from 1 below (/ fd-setsize
-                                     sb-vm:n-machine-word-bits)
-           do (setf (deref (slot fdset 'fds-bits) index) 0)))
-    (t
-     (loop for index from 0 below (/ fd-setsize
-                                     sb-vm:n-machine-word-bits)
-           do (setf (deref (slot fdset 'fds-bits) index)
-                    (ldb (byte sb-vm:n-machine-word-bits
-                               (* index sb-vm:n-machine-word-bits))
-                         num))))))
-
-(defun fd-set-to-num (nfds fdset)
-  (if (<= nfds sb-vm:n-machine-word-bits)
-      (deref (slot fdset 'fds-bits) 0)
-      (loop for index below (/ fd-setsize
-                               sb-vm:n-machine-word-bits)
-            sum (ash (deref (slot fdset 'fds-bits) index)
-                     (* index sb-vm:n-machine-word-bits)))))
-
-;;; Examine the sets of descriptors passed as arguments to see whether
-;;; they are ready for reading and writing. See the UNIX Programmer's
-;;; Manual for more information.
-(defun unix-select (nfds rdfds wrfds xpfds to-secs &optional (to-usecs 0))
-  (declare (muffle-conditions compiler-note))
-  (declare (type integer nfds)
-           (type unsigned-byte rdfds wrfds xpfds)
-           (type (or (unsigned-byte 31) null) to-secs)
-           (type (unsigned-byte 31) to-usecs)
-           (optimize (speed 3) (safety 0)))
-  (with-fd-setsize (nfds)
-    (with-alien ((tv (struct timeval))
-                 (rdf (struct fd-set))
-                 (wrf (struct fd-set))
-                 (xpf (struct fd-set)))
-      (cond (to-secs
-             (setf (slot tv 'tv-sec) to-secs
-                   (slot tv 'tv-usec) to-usecs))
-            ((not *interrupts-enabled*)
-             (note-dangerous-wait "select(2)")))
-      (num-to-fd-set rdf rdfds)
-      (num-to-fd-set wrf wrfds)
-      (num-to-fd-set xpf xpfds)
-      (macrolet ((frob (lispvar alienvar)
-                   `(if (zerop ,lispvar)
-                        (int-sap 0)
-                        (alien-sap (addr ,alienvar)))))
-        (syscall ("sb_select" int (* (struct fd-set)) (* (struct fd-set))
-                           (* (struct fd-set)) (* (struct timeval)))
-                 (values result
-                         (fd-set-to-num nfds rdf)
-                         (fd-set-to-num nfds wrf)
-                         (fd-set-to-num nfds xpf))
-                 nfds (frob rdfds rdf) (frob wrfds wrf) (frob xpfds xpf)
-                 (if to-secs (alien-sap (addr tv)) (int-sap 0)))))))
 
 ;;; Lisp-side implementations of FD_FOO macros.
 (declaim (inline fd-set fd-clr fd-isset fd-zero))

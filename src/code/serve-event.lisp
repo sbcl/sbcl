@@ -321,7 +321,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
     (let ((count 0))
       (declare (type index count))
 
-      ;; Initialize the fd-sets for UNIX-SELECT and return the active
+      ;; Initialize the fd-sets for UNIX-FAST-SELECT and return the active
       ;; descriptor count.
       (map-descriptor-handlers
        (lambda (handler)
