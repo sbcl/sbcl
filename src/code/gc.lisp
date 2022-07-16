@@ -25,7 +25,14 @@
   (declaim (inline dynamic-space-free-pointer))
   (defun dynamic-space-free-pointer ()
     (sap+ (int-sap (current-dynamic-space-start))
-          (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
+          ;; not sure why next_free_page is 'sword_t' instead of 'uword_t' !
+          (truly-the (signed-byte 64)
+            (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes)))))
+
+(defun dynamic-space-obj-p (x) ; X must not be an immediate object
+  (with-pinned-objects (x)
+    (let ((addr (get-lisp-obj-address x)))
+      (< (current-dynamic-space-start) addr (sap-int (dynamic-space-free-pointer))))))
 
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()
@@ -598,18 +605,14 @@ Experimental: interface subject to change."
                      :static))))
 ;;; Return true if X is in any non-stack GC-managed space.
 ;;; (Non-stack implies not TLS nor binding stack)
-;;; This assumes a single contiguous dynamic space, which is of course a
-;;; bad assumption, but nonetheless one that has been true for, say, ~20 years.
-;;; Also note, we don't have to pin X - an object can not move between spaces,
-;;; so a non-nil answer is the definite answer. As to whether the object could
-;;; have moved, or worse, died - by say reusing the same register as held X for
-;;; the value that is (get-lisp-obj-address X), with no surrounding pin or even
-;;; reference to X - then that's your problem.
-;;; If you wanted the object not to die or move, you should have held on tighter!
+;;; There's a microscopic window of time in which next_free_page for dynamic space
+;;; could _decrease_ after calculating the address of X, so we'll pin X
+;;; to ensure that can't happen.
 (defun heap-allocated-p (x)
-  (let ((addr (get-lisp-obj-address x)))
-    (and (sb-vm:is-lisp-pointer addr)
-         (cases))))
+  (with-pinned-objects (x)
+    (let ((addr (get-lisp-obj-address x)))
+      (and (sb-vm:is-lisp-pointer addr)
+           (cases)))))
 
 ;;; Internal use only. FIXME: I think this duplicates code that exists
 ;;; somewhere else which I could not find.

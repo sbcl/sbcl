@@ -359,7 +359,10 @@ distinct from the global value. Can also be SETF."
 
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
-  (logior-array-flags name sb-vm:+vector-shareable+) ; Set "logically read-only" bit
+  ;; Avoid writing to the string header if it's already flagged as readonly, or off-heap.
+  (when (and (not (logtest (ash sb-vm:+vector-shareable+ 8) (get-header-data name)))
+             (sb-kernel::dynamic-space-obj-p name))
+    (logior-array-flags name sb-vm:+vector-shareable+)) ; Set "logically read-only" bit
   (let ((symbol
          (truly-the symbol
           #+immobile-symbols (sb-vm::make-immobile-symbol name)
