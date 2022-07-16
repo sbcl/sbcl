@@ -607,13 +607,6 @@ static void relocate_heap(struct heap_adjust* adj)
                    adj);
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    // Pointers within varyobj space to varyobj space do not need adjustment
-    // so remove any delta before performing the relocation pass on this space.
-    // FIXME: this was probably for PIE mode, which doesn't work.
-    if (lisp_code_in_elf() && adj->range[2].delta != 0) {
-        lose("code-in-elf + PIE not supported yet\n");
-        adj->range[2].delta = 0; // FIXME: isn't this this already the case?
-    }
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
 }
@@ -972,6 +965,9 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
 #endif // LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (lisp_code_in_elf() && VARYOBJ_SPACE_START != spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base) {
+        lose("code-in-elf + PIE not supported");
+    }
     set_adjustment(adj, FIXEDOBJ_SPACE_START, // actual
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base, // expected
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len);
