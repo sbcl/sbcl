@@ -12,23 +12,22 @@
 (in-package "SB-VM")
 
 (defun load-immediate-word (y val &optional single-instruction)
-  (let (single-mov)
+  (let (single-mov
+        ffff-count
+        zero-count
+        (val (ldb (byte 64 0) val)))
     (flet ((single-mov ()
-             (setf single-mov
-                   (or (= (loop for i below 64 by 16
-                                for part = (ldb (byte 16 i) val)
-                                unless (= part #xFFFF)
-                                count t)
-                          1)
-                       (= (loop for i below 64 by 16
-                                for part = (ldb (byte 16 i) val)
-                                count (plusp part))
-                          1)))))
+             (loop for i below 64 by 16
+                   for part = (ldb (byte 16 i) val)
+                   count (/= part #xFFFF) into ffff
+                   count (plusp part) into zero
+                   finally
+                   (setf ffff-count ffff
+                         zero-count zero
+                         single-mov (or (= ffff 1)
+                                        (= zero 1))))))
       (cond ((typep val '(unsigned-byte 16))
              (inst movz y val)
-             y)
-            ((typep val '(and (signed-byte 16) (integer * -1)))
-             (inst movn y (lognot val))
              y)
             ((typep (ldb (byte 64 0) (lognot val)) '(unsigned-byte 16))
              (inst movn y (ldb (byte 64 0) (lognot val)))
@@ -86,7 +85,7 @@
                               ((= c d)
                                (try c a 0 b 16)))))))
              y)
-            ((and (minusp val)
+            ((and (< ffff-count zero-count)
                   (or single-mov
                       (not single-instruction)))
              (loop with first = t
