@@ -841,6 +841,7 @@
     `(handler-bind
          ((format-error
            (lambda (condition)
+             (declare (optimize (sb-c:store-source-form 0)))
              (error 'format-error
                     :complaint
                     "~A~%while processing indirect format string:"
@@ -1039,6 +1040,7 @@
                    `((handler-bind
                          ((format-error
                            (lambda (condition)
+                             (declare (optimize (sb-c:store-source-form 0)))
                              (format-error-at*
                               ,string ,(1- end)
                               "~A~%while processing indirect format string:"

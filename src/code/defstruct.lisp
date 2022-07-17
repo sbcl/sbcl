@@ -451,7 +451,7 @@
           comparators)
     ;; use a string for the name since it's not a global function
     `(named-lambda ,(format nil "~A-EQUALP" (dd-name dd)) (a b)
-       (declare (optimize (safety 0)) (type ,(dd-name dd) a b)
+       (declare (optimize (sb-c:store-source-form 0) (safety 0)) (type ,(dd-name dd) a b)
                 (ignorable a b)) ; if zero slots
        (and ,@(group1) ,@(group2) ,@(group3)))))
 
