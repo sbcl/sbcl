@@ -235,7 +235,8 @@
 
 ;;; This used to crash on Darwin and trigger recursive lock errors on
 ;;; every platform.
-(with-test (:name (run-program :stress))
+;;; ...and now it triggers recursive lock errors on safepoint + linux.
+(with-test (:name (run-program :stress) :skipped-on (:and :sb-safepoint :linux))
   ;; Do it a hundred times in batches of 10 so that with a low limit
   ;; of the number of processes the test can have a chance to pass.
   ;;

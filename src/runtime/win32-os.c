@@ -66,6 +66,7 @@
 #include <wincrypt.h>
 #include <stdarg.h>
 #include <string.h>
+#include "print.h"
 
 /* missing definitions for modern mingws */
 #ifndef EH_UNWINDING

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #ifndef LISP_FEATURE_WIN32
 #include <sched.h>
 #endif
@@ -39,6 +40,7 @@
 #include "gc-internal.h"
 #include "interrupt.h"
 #include "lispregs.h"
+#include "print.h"
 
 const char* gc_phase_names[GC_NPHASES] = {
     "GC_NONE",
@@ -1074,5 +1076,53 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
     return 0;
 }
 #endif /* LISP_FEATURE_WIN32 */
+
+void
+vodxprint_fun(const char *fmt, va_list args)
+{
+#ifdef LISP_FEATURE_WIN32
+    DWORD lastError = GetLastError();
+#endif
+    int original_errno = errno;
+
+    char buf[1024];
+    int n = 0;
+
+    snprintf(buf, sizeof(buf), "["THREAD_ID_LABEL"] ", THREAD_ID_VALUE);
+    n = strlen(buf);
+
+    vsnprintf(buf + n, sizeof(buf) - n - 1, fmt, args);
+    /* buf is now zero-terminated (even in case of overflow).
+     * Our caller took care of the newline (if any) through `fmt'. */
+
+    /* A sufficiently POSIXy implementation of stdio will provide
+     * per-FILE locking, as defined in the spec for flockfile.  At least
+     * glibc complies with this.  Hence we do not need to perform
+     * locking ourselves here.  (Should it turn out, of course, that
+     * other libraries opt for speed rather than safety, we need to
+     * revisit this decision.) */
+    fputs(buf, stderr);
+
+#ifdef LISP_FEATURE_WIN32
+    /* stdio's stderr is line-bufferred, i.e. \n ought to flush it.
+     * Unfortunately, MinGW does not behave the way I would expect it
+     * to.  Let's be safe: */
+    fflush(stderr);
+#endif
+
+#ifdef LISP_FEATURE_WIN32
+    SetLastError(lastError);
+#endif
+    errno = original_errno;
+}
+
+void
+odxprint_fun(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vodxprint_fun(fmt, args);
+    va_end(args);
+}
 
 #endif /* LISP_FEATURE_SB_SAFEPOINT -- entire file */

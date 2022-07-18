@@ -99,14 +99,6 @@ void gc_state_unlock();
  * generally need customization.
  */
 
-#define odxprint(topic, fmt, ...)                       \
-    do                                                  \
-        if (dyndebug_config.dyndebug_##topic)           \
-            odxprint_fun(fmt "\n", ##__VA_ARGS__);      \
-    while (0)
-
-void odxprint_fun(const char *fmt, ...);
-
 /* Flags defined in a structure to avoid code duplication between
  * declaration and definition. */
 extern struct dyndebug_config {

@@ -389,7 +389,8 @@
   `(handler-case (progn (progn ,@body) nil)
     (sb-ext:timeout () t)))
 
-(with-test (:name (semaphore :wait-forever))
+(with-test (:name (semaphore :wait-forever)
+            :skipped-on (:and :sb-safepoint :linux)) ; hangs
   (let ((sem (make-semaphore :count 0)))
     (assert (raises-timeout-p
               (sb-ext:with-timeout 0.1

@@ -219,6 +219,7 @@
       ,(maybe "SB-VM" "*STORE-BARRIERS-POTENTIALLY-EMITTED*")
       ,(maybe "SB-VM" "*STORE-BARRIERS-EMITTED*")
       ,(maybe "SB-INTERPRETER" "*LAST-TOPLEVEL-ENV*")
+      ,(maybe "SB-SYS" "*THRUPTION-PENDING*")
       sb-pcl::*dfun-constructors*
       #+win32 sb-impl::*waitable-timer-handle*
       #+win32 sb-impl::*timer-thread*)))
