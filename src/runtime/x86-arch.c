@@ -326,56 +326,42 @@ arch_install_interrupt_handlers()
 void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
-    char* code_start_addr = code_text_start(new_code);
-    os_vm_size_t displacement = (char*)new_code - (char*)old_code;
     lispobj fixups = new_code->fixups;
     /* It will be a nonzero integer if valid, or 0 if there are no fixups */
-    if (fixups == 0)
-        return;
+    if (!fixups) return;
 
     /* Could be pointing to a forwarding pointer. */
     /* This is extremely unlikely, because the only referent of the fixups
-       is usually the code itself; so scavenging the vector won't occur
+       is usually the code itself; so scavenging a bignum of fixups won't occur
        until after the code object is known to be live. As we're just now
        enlivening the code, the fixups shouldn't have been forwarded.
-       Maybe the vector is on the special binding stack though ... */
-    if (is_lisp_pointer(fixups) &&
-        forwarding_pointer_p(native_pointer(fixups)))  {
-        /* If so, then follow it. */
-        /*SHOW("following pointer to a forwarding pointer");*/
+       Maybe the bignum is otherwise referenced though ... */
+    if (is_lisp_pointer(fixups) && forwarding_pointer_p(native_pointer(fixups)))
         fixups = forwarding_pointer_value(native_pointer(fixups));
-    }
 
-    if (fixnump(fixups) ||
-        (lowtag_of(fixups) == OTHER_POINTER_LOWTAG
-         && widetag_of(native_pointer(fixups)) == BIGNUM_WIDETAG)) {
-        /* Got the fixups for the code block. Now work through them
-           in order, first the absolute ones, then the relative.
-           Locations are sorted and delta-encoded for compactness. */
-        struct varint_unpacker unpacker;
-        varint_unpacker_init(&unpacker, fixups);
-        int prev_offset = 0, offset;
-        // Absolute fixups all refer to this object itself (the code
-        // boxed constants). Add this object's displacement to the
-        // value that currently exists at the fixup location.
-        while (varint_unpack(&unpacker, &offset) && offset != 0) {
-            offset += prev_offset;
-            prev_offset = offset;
-            *(char**)(code_start_addr + offset) += displacement;
-        }
-        prev_offset = 0;
-        // Relative fixups: assembly and foreign routines. Subtract this
-        // object's displacement from the value that currently exists.
-        while (varint_unpack(&unpacker, &offset) && offset != 0) {
-            offset += prev_offset;
-            prev_offset = offset;
-            *(char**)(code_start_addr + offset) -= displacement;
-        }
-    } else {
-        /* This used to just print a note to stderr, but bogus fixups seem to
-         * indicate real heap corruption, so a hard failure is in order. */
-        lose("fixup vector %x has a bad widetag: %#x",
-             fixups, widetag_of(native_pointer(fixups)));
+    char* code_start_addr = code_text_start(new_code);
+    os_vm_size_t displacement = (char*)new_code - (char*)old_code;
+    /* Got the fixups for the code block. Now work through them
+       in order, first the absolute ones, then the relative.
+       Locations are sorted and delta-encoded for compactness. */
+    struct varint_unpacker unpacker;
+    varint_unpacker_init(&unpacker, fixups);
+    int prev_offset = 0, offset;
+    // Absolute fixups all refer to this object itself (the code
+    // boxed constants). Add this object's displacement to the
+    // value that currently exists at the fixup location.
+    while (varint_unpack(&unpacker, &offset) && offset != 0) {
+        offset += prev_offset;
+        prev_offset = offset;
+        *(char**)(code_start_addr + offset) += displacement;
+    }
+    prev_offset = 0;
+    // Relative fixups: assembly and foreign routines. Subtract this
+    // object's displacement from the value that currently exists.
+    while (varint_unpack(&unpacker, &offset) && offset != 0) {
+        offset += prev_offset;
+        prev_offset = offset;
+        *(char**)(code_start_addr + offset) -= displacement;
     }
 }
 

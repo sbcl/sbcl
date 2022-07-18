@@ -48,6 +48,8 @@ void varint_unpacker_init(struct varint_unpacker* unpacker, lispobj integer)
       unpacker->limit = N_WORD_BYTES;
       unpacker->data  = (char*)&unpacker->word;
   } else {
+      gc_assert(lowtag_of(integer) == OTHER_POINTER_LOWTAG
+                && widetag_of(native_pointer(integer)) == BIGNUM_WIDETAG);
       struct bignum* bignum = (struct bignum*)(integer - OTHER_POINTER_LOWTAG);
       unpacker->word  = 0;
       unpacker->limit = HeaderValue(bignum->header) * N_WORD_BYTES;
