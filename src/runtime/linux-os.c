@@ -197,7 +197,6 @@ futex_init()
         futex_private_supported_p = 1;
     } else {
         futex_private_supported_p = 0;
-        SHOW("No futex private suppport\n");
     }
 }
 

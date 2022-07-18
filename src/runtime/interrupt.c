@@ -1029,13 +1029,11 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
     }
 #endif
 
-    SHOW("in interrupt_internal_error");
-#if QSHOW == 2
     /* Display some rudimentary debugging information about the
      * error, so that even if the Lisp error handler gets badly
      * confused, we have a chance to determine what's going on. */
-    describe_internal_error(context);
-#endif
+    // describe_internal_error(context); // uncomment me for debugging
+
     funcall2(StaticSymbolFunction(INTERNAL_ERROR), context_sap,
              continuable ? T : NIL);
 
@@ -2026,7 +2024,6 @@ interrupt_init(void)
     ll_install_handler(SIGINFO, sigdump_eventlog);
 #endif
     int __attribute__((unused)) i;
-    SHOW("entering interrupt_init()");
     sigemptyset(&deferrable_sigset);
     sigemptyset(&blockable_sigset);
     sigemptyset(&gc_sigset);

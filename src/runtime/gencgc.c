@@ -3303,10 +3303,6 @@ scavenge_newspace(generation_index_t generation)
             /* New areas of objects allocated have been lost so need to do a
              * full scan to be sure! If this becomes a problem try
              * increasing NUM_NEW_AREAS. */
-            if (gencgc_verbose) {
-                SHOW("new_areas overflow, doing full scavenge");
-            }
-
             newspace_full_scavenge(generation);
 
         } else {
@@ -4725,7 +4721,6 @@ collect_garbage(generation_index_t last_gen)
 #endif
 
     log_generation_stats(gc_logfile, "=== GC End ===");
-    SHOW("returning from collect_garbage");
     // Increment the finalizer runflag.  This acts as a count of the number
     // of GCs as well as a notification to wake the finalizer thread.
     if (finalizer_thread_runflag != 0) {

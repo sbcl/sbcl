@@ -138,10 +138,8 @@ void dyndebug_init(void);
 #if QSHOW
 # define FSHOW(args) \
     do if (dyndebug_config.dyndebug_fshow) fshow_fun args; while (0)
-# define SHOW(string) FSHOW((stderr, "/%s\n", string))
 #else
 # define FSHOW(args)
-# define SHOW(string)
 #endif
 
 #ifdef _WIN64

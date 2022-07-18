@@ -495,8 +495,6 @@ sigfpe_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 void
 arch_install_interrupt_handlers()
 {
-    SHOW("entering arch_install_interrupt_handlers()");
-
     /* Note: The old CMU CL code here used sigtrap_handler() to handle
      * SIGILL as well as SIGTRAP. I couldn't see any reason to do
      * things that way. So, I changed to separate handlers when
@@ -515,8 +513,6 @@ arch_install_interrupt_handlers()
 #if defined(X86_64_SIGFPE_FIXUP) && !defined(LISP_FEATURE_WIN32)
     ll_install_handler(SIGFPE, sigfpe_handler);
 #endif
-
-    SHOW("returning from arch_install_interrupt_handlers()");
 }
 
 void

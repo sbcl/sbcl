@@ -290,7 +290,6 @@ mach_error_memory_fault_handler(int signal, siginfo_t *siginfo,
 void
 os_install_interrupt_handlers(void)
 {
-    SHOW("os_install_interrupt_handlers()/bsd-os/defined(GENCGC)");
     if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
 #if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
     ll_install_handler(SIG_MEMORY_FAULT, mach_error_memory_fault_handler);
