@@ -41,9 +41,6 @@
  * If enabled at all, environment variables control whether calls of the
  * form odxprint(name, ...) are enabled at run-time, e.g. using
  * SBCL_DYNDEBUG="fshow safepoints".
- *
- * In the case of FSHOW, old-style code from runtime.h
- * can also be used to enable or disable these more aggressively.
  */
 
 struct dyndebug_config dyndebug_config = {
@@ -185,24 +182,6 @@ vodxprint_fun(const char *fmt, va_list args)
     SetLastError(lastError);
 #endif
     errno = original_errno;
-}
-
-/* Translate the rather awkward syntax
- *   FSHOW((stderr, "xyz"))
- * into the new and cleaner
- *   odxprint("xyz").
- * If we were willing to clean up all existing call sites, we could remove
- * this wrapper function.  (This is a function, because I don't know how to
- * strip the extra parens in a macro.) */
-void
-fshow_fun(void __attribute__((__unused__)) *ignored,
-          const char *fmt,
-          ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    vodxprint_fun(fmt, args);
-    va_end(args);
 }
 
 #include "monitor.h"

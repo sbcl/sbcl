@@ -106,7 +106,6 @@ void gc_state_unlock();
     while (0)
 
 void odxprint_fun(const char *fmt, ...);
-void fshow_fun(void *ignored, const char *fmt, ...);
 
 /* Flags defined in a structure to avoid code duplication between
  * declaration and definition. */
@@ -129,15 +128,11 @@ extern int gencgc_verbose;
 
 void dyndebug_init(void);
 
-/* The following macros duplicate the expansion of odxprint, because the
- * extra level of parentheses around `args' prevents us from
- * implementing FSHOW in terms of odxprint directly.  (They also differ
- * in a newline.)
- */
-
-#if QSHOW
-# define FSHOW(args) \
-    do if (dyndebug_config.dyndebug_fshow) fshow_fun args; while (0)
+#if 0
+/* To see output from FSHOW - which is almost certainly a bad idea because it's
+ * quite likely to hinder your progress by causing deadlock in stdio - then change
+ * the preceding line to "#if 1" */
+# define FSHOW(args) fprintf args
 #else
 # define FSHOW(args)
 #endif
