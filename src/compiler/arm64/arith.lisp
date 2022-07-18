@@ -1067,12 +1067,27 @@
   (:policy :fast-safe)
   (:conditional :ne)
   (:generator 2
-    (let ((y (if (sc-is x any-reg)
-                 (fixnumize y)
-                 y)))
-      (if (encode-logical-immediate y)
-          (inst tst x y)
-          (inst tst x (load-immediate-word tmp-tn y))))))
+    (block nil
+      (if (= y most-positive-word)
+          (inst cmp x 0)
+          (let ((y (if (sc-is x any-reg)
+                       (cond ((fixnump y)
+                              (fixnumize y))
+                             ((let ((y (ldb (byte 64 0) y)))
+                                ;; Only a negative fixnum will match that bit,
+                                ;; so if the next bit is also 1 it can be shifted left.
+                                (when (and (= (ldb (byte 1 62) y) 1)
+                                           (encode-logical-immediate
+                                            (ldb (byte 64 0) (ash y 1))))
+                                  (return (inst tst x (ldb (byte 64 0) (ash y 1)))))))
+                             (t
+                              (return
+                                (inst tst (load-immediate-word tmp-tn y)
+                                      (asr x n-fixnum-tag-bits)))))
+                       y)))
+            (if (encode-logical-immediate y)
+                (inst tst x y)
+                (inst tst x (load-immediate-word tmp-tn y))))))))
 
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))

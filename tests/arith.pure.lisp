@@ -1090,3 +1090,11 @@
                (eval
                 (values 1 2))))))
    ((1 2) -2)))
+
+(with-test (:name :logtest-immediate)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (logtest (- (expt 2 63) 3) (the fixnum x)))
+    ((1) t)
+    ((2) nil)))
