@@ -170,11 +170,9 @@ static long write_bytes(FILE *file, char *addr, size_t bytes,
     ftell_type here, data;
 
 #ifdef LISP_FEATURE_WIN32
-    size_t count;
-    /* touch every single page in the space to force it to be mapped. */
-    for (count = 0; count < bytes; count += 0x1000) {
-        volatile int temp = addr[count];
-    }
+    // I can't see how we'd ever attempt writing from uncommitted memory,
+    // but this is better than was was previously here (a "touch" loop over all pages)
+    os_commit_memory(addr, bytes);
 #endif
 
     fflush(file);
