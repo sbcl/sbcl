@@ -146,9 +146,7 @@
     (minus-one x y)
     (minus-one y x))
   (multiple-value-bind (x-len x-pos x-neg) (integer-type-length x)
-    (declare (ignore x-pos))
     (multiple-value-bind (y-len y-pos y-neg) (integer-type-length y)
-      (declare (ignore y-pos))
       (if (not x-neg)
           ;; X must be positive.
           (if (not y-neg)
@@ -177,9 +175,15 @@
               ;; Either might be negative.
               (if (and x-len y-len)
                   ;; The result is bounded.
-                  (specifier-type `(signed-byte ,(1+ (max x-len y-len))))
-                  ;; We can't tell squat about the result.
-                  (specifier-type 'integer)))))))
+                  (if (and (not y-pos)
+                           (not x-pos))
+                      (specifier-type `(and (signed-byte ,(1+ (max x-len y-len)))
+                                            (integer * -1)))
+                      (specifier-type `(signed-byte ,(1+ (max x-len y-len)))))
+                  (if (and (not y-pos)
+                           (not x-pos))
+                      (specifier-type '(integer * -1))
+                      (specifier-type 'integer))))))))
 
 (defun logior-derive-unsigned-bounds (x y)
   (let* ((a (numeric-type-low x))
