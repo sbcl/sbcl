@@ -5436,6 +5436,8 @@ static void prepare_dynamic_space_for_final_gc()
  * plus literal strings in code compiled to memory. */
 char gc_coalesce_string_literals = 0;
 
+extern void move_rospace_to_dynamic(int), prepare_readonly_space(int);
+
 /* Do a non-conservative GC, and then save a core with the initial
  * function being set to the value of 'lisp_init_function' */
 void
@@ -5513,6 +5515,10 @@ gc_and_save(char *filename, boolean prepend_runtime,
     write_TLS(PINNED_OBJECTS, NIL, thread);
     // From here on until exit, there is no chance of continuing
     // in Lisp if something goes wrong during GC.
+    // Flush regions to ensure heap scan in copy_rospace doesn't miss anything
+    gc_close_thread_regions(thread);
+    gc_close_collector_regions(0);
+    move_rospace_to_dynamic(0);
     pre_verify_gen_0 = 1;
     prepare_immobile_space_for_final_gc(); // once is enough
     prepare_dynamic_space_for_final_gc();
@@ -5530,14 +5536,15 @@ gc_and_save(char *filename, boolean prepend_runtime,
         printf("[coalescing similar vectors... ");
         fflush(stdout);
     }
-    /* FIXME: add comment explaining why coalescing is deferred until
-     * after the penultimate GC. Must it wait ? */
+    // Now that we've GC'd to eliminate as much junk as possible...
     coalesce_similar_objects();
     if (gc_coalesce_string_literals && verbose)
         printf("done]\n");
 
-    /* FIXME: now that relocate_heap() works, can we just memmove() everything
-     * down and perform a relocation instead of a collection? */
+    // Do a non-moving collection so that orphaned strings that result
+    // from coalescing STRING= symbol names do not consume read-only space.
+    collect_garbage(1+PSEUDO_STATIC_GENERATION);
+    prepare_readonly_space(0);
     if (verbose) { printf("[performing final GC..."); fflush(stdout); }
     prepare_dynamic_space_for_final_gc();
     save_lisp_gc_iteration = 2;

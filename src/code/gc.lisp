@@ -13,6 +13,8 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
+#-darwin-jit
+(define-alien-variable ("READ_ONLY_SPACE_START" sb-vm:read-only-space-start) os-vm-size-t)
 #+gencgc
 (define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) os-vm-size-t)
 (declaim (inline current-dynamic-space-start))

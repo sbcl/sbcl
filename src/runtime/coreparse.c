@@ -823,6 +823,14 @@ process_directory(int count, struct ndir_entry *entry,
                  (unsigned long)len >> 10,
                  (unsigned long)dynamic_space_size >> 10);
         }
+#ifndef LISP_FEATURE_DARWIN_JIT
+        if (id == READ_ONLY_CORE_SPACE_ID) {
+            if (len) // There is no "nominal" size of readonly space, so give it a size
+                spaces[id].desired_size = len;
+            else // Assign some address, so free_pointer does enclose [0 .. addr+0]
+                READ_ONLY_SPACE_START = READ_ONLY_SPACE_END = addr;
+        }
+#endif
         if (len != 0) {
             spaces[id].len = len;
             // Try to map at address requested by the core file.
@@ -856,6 +864,12 @@ process_directory(int count, struct ndir_entry *entry,
                 }
             }
             switch (id) {
+#ifndef LISP_FEATURE_DARWIN_JIT
+            case READ_ONLY_CORE_SPACE_ID:
+                READ_ONLY_SPACE_START = addr;
+                READ_ONLY_SPACE_END = addr + len;
+                break;
+#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
             case IMMOBILE_VARYOBJ_CORE_SPACE_ID:
@@ -955,6 +969,11 @@ process_directory(int count, struct ndir_entry *entry,
     }
 
     calc_asm_routine_bounds();
+#ifndef LISP_FEATURE_DARWIN_JIT
+    set_adjustment(adj, READ_ONLY_SPACE_START, // actual
+                   spaces[READ_ONLY_CORE_SPACE_ID].base, // expected
+                   spaces[READ_ONLY_CORE_SPACE_ID].len);
+#endif
 #ifdef LISP_FEATURE_GENCGC
     set_adjustment(adj, DYNAMIC_SPACE_START, // actual
                    spaces[DYNAMIC_CORE_SPACE_ID].base, // expected

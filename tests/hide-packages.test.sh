@@ -7,6 +7,8 @@ set -e
 # +INTERNAL-FEATURES+ is a constant, so use a roundabout way of
 # clobbering it that avoids a compiler warning and a runtime error.
 CLOBBER_INTERNAL_FEATURES="(handler-bind ((simple-error #'continue))
+  (sb-vm::close-thread-alloc-region)
+  (alien-funcall (extern-alien \"move_rospace_to_dynamic\" (function void int)) 1)
   (sb-kernel:set-symbol-global-value (eval ''sb-impl:+internal-features+) nil))"
 
 ### Test 1: assert that no package name string has a reference from any

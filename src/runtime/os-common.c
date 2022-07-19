@@ -236,7 +236,7 @@ gc_managed_heap_space_p(lispobj addr)
 /* Remap a part of an already existing memory mapping from a file,
  * and/or create a new mapping as need be */
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
-                      int __attribute__((unused)) execute)
+                      int is_readonly_space)
 {
 #if defined LISP_FEATURE_MIPS
     /* Of the few MIPS machines I have access to, one definitely exhibits a
@@ -266,28 +266,34 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
 #endif
     int fail = 0;
     os_vm_address_t actual;
+    int protection = 0, sharing = MAP_PRIVATE;
+
+#ifdef LISP_FEATURE_DARWIN_JIT
+    protection = OS_VM_PROT_READ | (is_readonly_space ?  OS_VM_PROT_EXECUTE : OS_VM_PROT_WRITE);
+#else
+    /* If mapping to an OS-chosen address, then the assumption is that we're not going to
+     * execute nor write at the mapped address. (Because why would we ? The spaces from
+     * the core have a chosen address at this point) However, the addr=0 case is for
+     * 'editcore' which unfortunately _does_ write the memory. I'd prefer that it not,
+     * but that's not the concern here. */
+    protection = (addr ? (is_readonly_space ? OS_VM_PROT_READ : OS_VM_PROT_ALL)
+                  : OS_VM_PROT_READ | OS_VM_PROT_WRITE);
+    if (is_readonly_space) sharing = MAP_SHARED;
+#endif
+
 #ifdef LISP_FEATURE_64_BIT
-    actual = sbcl_mmap(addr, len,
+    actual = sbcl_mmap(
 #else
     /* FIXME: why does using sbcl_mmap cause failure here? I would guess that it can't
      * pass 'offset' correctly if LARGEFILE is mandatory, which it isn't on 64-bit.
      * Deadlock should be impossible this early in core loading, I suppose, hence
      * on one hand I don't care; but on the other, it would be nice to not to see
      * any use of a potentially hooked mmap() API within this file. */
-    actual = mmap(addr, len,
+     actual = mmap(
 #endif
-                  // If mapping to a random address, then the assumption is
-                  // that we're not going to execute the core; nor should we write to it.
-                  // However, the addr=0 case is for 'editcore' which unfortunately _does_
-                  // write the memory. I'd prefer that it not,
-                  // but that's not the concern here.
-#ifdef LISP_FEATURE_DARWIN_JIT
-                  OS_VM_PROT_READ | (execute ?  OS_VM_PROT_EXECUTE : OS_VM_PROT_WRITE),
-#else
-                  addr ? OS_VM_PROT_ALL : OS_VM_PROT_READ | OS_VM_PROT_WRITE,
-#endif
+                  addr, len, protection,
                   // Do not pass MAP_FIXED with addr of 0, because most OSes disallow that.
-                  MAP_PRIVATE | (addr ? MAP_FIXED : 0),
+                  sharing | (addr ? MAP_FIXED : 0),
                   fd, (off_t) offset);
     if (actual == MAP_FAILED) {
         if (errno == ENOMEM)

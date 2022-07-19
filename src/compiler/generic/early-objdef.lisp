@@ -235,6 +235,7 @@
 
   ;; IF YOU CHANGE THIS ORDER, THEN MANUALLY VERIFY CORRECTNESS OF:
   ;; - leaf_obj_widetag_p()
+  ;; - readonly_unboxed_obj_p()
   ;; - conservative_root_p()
   ;; - anything else I forgot to mention
   simple-vector-widetag                           ;  8A

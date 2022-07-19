@@ -74,8 +74,8 @@ COMMON_SRC = alloc.c backtrace.c breakpoint.c coalesce.c coreparse.c    \
 	dynbind.c funcall.c gc-common.c globals.c hopscotch.c           \
 	interr.c interrupt.c largefile.c main.c                         \
 	monitor.c murmur_hash.c os-common.c parse.c print.c             \
-	purify.c regnames.c runtime.c			                \
-	safepoint.c save.c sc-offset.c search.c thread.c time.c \
+	purify.c regnames.c runtime.c safepoint.c save.c                \
+	sc-offset.c search.c stringspace.c thread.c time.c              \
 	validate.c var-io.c vars.c wrap.c
 
 ifndef LISP_FEATURE_WIN32

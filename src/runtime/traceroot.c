@@ -688,7 +688,8 @@ static boolean record_ptr(lispobj* source, lispobj target,
     return 1;
 }
 
-#define relevant_ptr_p(x) (find_page_index((void*)(x))>=0||immobile_space_p((lispobj)(x)))
+#define relevant_ptr_p(x) \
+ (find_page_index((void*)(x))>=0||immobile_space_p((lispobj)(x))||readonly_space_p(x))
 
 #define COUNT_POINTER(x) { ++n_scanned_words; \
       if (!is_lisp_pointer(x)) ++n_immediates; \

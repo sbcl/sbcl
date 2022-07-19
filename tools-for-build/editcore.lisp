@@ -1680,12 +1680,12 @@
                              (alien-funcall
                               (extern-alien "load_core_bytes"
                                             (function system-area-pointer
-                                                      int int unsigned unsigned))
+                                                      int int unsigned unsigned int))
                               (sb-sys:fd-stream-fd ,stream)
-                              ;; Skip the core header
-                              (+ ,start +backend-page-bytes+)
+                              (+ ,start +backend-page-bytes+) ; Skip the core header
                               0 ; place it anywhere
-                              (* ,npages +backend-page-bytes+)))
+                              (* ,npages +backend-page-bytes+) ; len
+                              0))
                        ,@body)
                   (when ,sap-var
                     (alien-funcall

@@ -29,6 +29,9 @@ uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
 #else
 uword_t DYNAMIC_SPACE_START;
 #endif
+#ifndef LISP_FEATURE_DARWIN_JIT
+uword_t READ_ONLY_SPACE_START, READ_ONLY_SPACE_END;
+#endif
 
 uword_t asm_routines_start, asm_routines_end;
 

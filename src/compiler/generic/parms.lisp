@@ -98,10 +98,12 @@
            (loop for (space size var-name) in spaces
                  appending
                  (let* ((relocatable
+                          ;; READONLY is usually movable now.
                           ;; TODO: linkage-table could move with code, if the CPU
                           ;; prefers PC-relative jumps, and we emit better code
                           ;; (which we don't- for x86 we jmp via RBX always)
-                          (member space '(fixedobj varyobj)))
+                          (member space '(fixedobj varyobj
+                                          #-darwin-jit read-only)))
                         (start ptr)
                         (end (+ ptr size)))
                    (setf ptr end)
@@ -134,6 +136,9 @@
                (ecase n-word-bits
                  (32 (expt 2 29))
                  (64 (expt 2 30)))))
+         ;; an arbitrary value to avoid kludging genesis
+         #+(and sb-xc-host (not darwin-jit))
+         (defparameter read-only-space-end read-only-space-start)
          #-soft-card-marks (defconstant cards-per-page 1)
          (defconstant gencgc-card-bytes (/ gencgc-page-bytes cards-per-page))
          (defconstant gencgc-card-shift
