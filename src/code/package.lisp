@@ -58,6 +58,7 @@
                   (:copier nil))
   ;; The general-vector of symbols
   (cells (missing-arg) :type simple-vector)
+  (modified nil :type boolean)
   ;; The total number of entries allowed before resizing.
   ;;
   ;; FIXME: CAPACITY would be a more descriptive name. (This is

@@ -637,12 +637,20 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
 (defun apropos-list (string-designator
                      &optional
                      package-designator
-                     external-only)
+                     external-only
+                     &aux (string (the simple-string
+                                   (stringify-string-designator string-designator))))
   "Like APROPOS, except that it returns a list of the symbols found instead
   of describing them."
-  (if package-designator
+  (if package-designator ; rare to supply this, I suspect
+    ;; This loop is extremely inefficient because both DO-SYMBOLS and FIND-SYMBOL
+    ;; check for inheritance, which we shouldn't if EXTERNAL-ONLY was given.
+    ;; Technically the external-p test could use FIND-EXTERNAL-SYMBOL but portable code
+    ;; can't care.  Somebody did, and noticed that it wasn't working, so it got fixed
+    ;; in rev e92a2f8844d9 which is ironic because it came from CMUCL, which implemented
+    ;; APROPOS differently but then removed the nonstandard option in
+    ;; https://gitlab.common-lisp.net/cmucl/cmucl/-/commit/9f652c0515f90b1fc8166d5099a0cee37e76e07c
       (let ((package (find-undeleted-package-or-lose package-designator))
-            (string (stringify-string-designator string-designator))
             (result nil))
         (do-symbols (symbol package)
           (when (and (or (not external-only)
@@ -652,11 +660,53 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                                   :external)))
                      (search string (symbol-name symbol) :test #'char-equal))
             (pushnew symbol result)))
-        (sort result #'string-lessp))
-      (delete-duplicates
-       (mapcan (lambda (package)
-                 (apropos-list string-designator package external-only))
-               (sort (list-all-packages) #'string-lessp :key #'package-name)))))
+        (return-from apropos-list (sort result #'string-lessp))))
+  ;; Since we're going to scan all packages, there are two admissible optimizations:
+  ;; * only scan directly present symbols, because each symbol returned has to
+  ;;   be in some package.
+  ;; * if the table was not modified since core save, as is often the case,
+  ;;   then compare by EQ to set of possibly matching strings. This has to be
+  ;;   an improvement, because it compares STRING at most once to any symbol-name.
+  ;;
+  ;; Comparison of (TIME (APROPOS-LIST "str")) in a core with over 300,000 symbols:
+  ;;   .840 seconds = baseline
+  ;;   .140 seconds = inlining WITH-SYMBOL
+  ;;   .104 seconds = MODIFIED check then R/O scan or else WITH-SYMBOL
+  (let (candidates)
+    (block done
+      (sb-vm:map-allocated-objects
+       (lambda (obj widetag size)
+         (declare (ignore size))
+         (cond ((or (= widetag sb-vm:simple-base-string-widetag)
+                    (= widetag sb-vm:simple-character-string-widetag))
+                (when (search string obj :test #'char-equal)
+                  (push (cons (compute-symbol-hash obj (length obj)) obj) candidates)))
+               (t
+                (return-from done))))
+       :read-only))
+    (let ((result (make-hash-table :test 'eq)))
+      (flet ((find-all-in-table (table)
+               (if (package-hashtable-modified table)
+                   (dovector (entry (package-hashtable-cells table))
+                     ;; I would have guessed that GETHASH is faster than SEARCH, but if
+                     ;; interposed between SYMBOLP and SEARCH, it slows down this loop.
+                     ;; That's because almost always the symbol is NOT yet in the result,
+                     ;; so an extra GETHASH is a strict increase in the number of
+                     ;; instructions executed, for no net reduction in time.
+                     (when (and (symbolp entry)
+                                (search string (symbol-name entry) :test #'char-equal))
+                       (setf (gethash entry result) t)))
+                   (dolist (candidate candidates)
+                     (let* ((hash (the hash-code (car candidate)))
+                            (string (the simple-string (cdr candidate)))
+                            (length (length string)))
+                       (with-symbol ((symbol) table string length hash)
+                         (setf (gethash symbol result) t)))))))
+        (dolist (package (list-all-packages))
+          (find-all-in-table (package-external-symbols package))
+          (unless external-only
+            (find-all-in-table (package-internal-symbols package)))))
+      (sort (loop for k being each hash-key of result collect k) #'string-lessp))))
 
 (defun apropos (string-designator &optional package external-only)
   "Briefly describe all symbols which contain the specified STRING.

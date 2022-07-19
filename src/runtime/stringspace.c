@@ -178,7 +178,7 @@ static void insert_filler(lispobj* obj, __attribute__((unused)) uword_t arg) {
 void prepare_readonly_space(int print)
 {
     gc_assert((uword_t)read_only_space_free_pointer == READ_ONLY_SPACE_START);
-    int sum_sizes = 0;
+    int sum_sizes = 2;
     // 1. Sum of the sizes of immutable objects, which can only be in dynamic space
     if (print) fprintf(stderr, "purify: calculating size ... ");
     page_index_t first, last;
@@ -202,7 +202,6 @@ void prepare_readonly_space(int print)
     READ_ONLY_SPACE_END = READ_ONLY_SPACE_START + string_space_size;
     read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;
 
-
     // 2. Forward all symbol names so that they're placed contiguously
     // Could be even more clever and sort lexicographically for determistic core
     if (print) fprintf(stderr, "purify: forwarding symbol names\n");
@@ -224,6 +223,10 @@ void prepare_readonly_space(int print)
             if (widetag_of(where) == SYMBOL_WIDETAG)
                 ensure_forwarded(symbol_name_native_ptr((struct symbol*)where));
     }
+    // Add a random delimiter object between symbol-names and everything else.
+    // APROPOS-LIST uses this to detect the end of the strings.
+    *read_only_space_free_pointer = SIMPLE_VECTOR_WIDETAG; // length 0
+    read_only_space_free_pointer += 2;
 
     // 3. Forward everything else
     if (print) fprintf(stderr, "purify: forwarding other data\n");

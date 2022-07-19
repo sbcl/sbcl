@@ -805,6 +805,7 @@ Experimental: interface subject to change."
 
 ;;; Add a symbol to a package hashtable. The symbol MUST NOT be present.
 (defun add-symbol (table symbol)
+  (setf (package-hashtable-modified table) t)
   (when (zerop (package-hashtable-free table))
     ;; The hashtable is full. Resize it to be able to hold twice the
     ;; amount of symbols than it currently contains. The actual new size
@@ -894,6 +895,8 @@ Experimental: interface subject to change."
     (when (plusp (info-env-tombstones table))
       (%rebuild-package-names table)))
   (flet ((tune-table-size (table)
+           ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
+           #-darwin-jit (setf (package-hashtable-modified table) nil)
            (resize-package-hashtable
             table
             (round (* (/ +package-rehash-threshold+
