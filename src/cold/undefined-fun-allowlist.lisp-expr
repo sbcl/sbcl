@@ -167,9 +167,6 @@
   sb-impl::get-processes-status-changes
   sb-impl::step-form
   sb-impl::step-values
-  sb-impl::stringify-package-designator
-  sb-impl::stringify-string-designator
-  sb-impl::stringify-string-designators
   sb-impl::unencapsulate-generic-function)
  ;; The following functions are in fact defined during make-host-2
  ;; but they are non-toplevel so they appear to be undefined.

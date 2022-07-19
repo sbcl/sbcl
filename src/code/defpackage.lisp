@@ -11,6 +11,230 @@
 
 (in-package "SB-IMPL")
 
+;;; ANSI specifies that:
+;;;  (1) MAKE-PACKAGE and DEFPACKAGE use the same default package-use-list
+;;;  (2) that it (as an implementation-defined value) should be documented,
+;;;      which we do in the doc string.
+;;; For OAOO reasons we give a name to this value and then use #. readmacro
+;;; to splice it in as a constant. Anyone who actually wants a random value
+;;; is free to :USE (PACKAGE-USE-LIST :CL-USER) or whatever.
+(defglobal *!default-package-use-list* nil)
+
+(defun make-package (name &key
+                          (use '#.*!default-package-use-list*)
+                          nicknames
+                          (internal-symbols 10)
+                          (external-symbols 10))
+  #.(format nil
+     "Make a new package having the specified NAME, NICKNAMES, and USE
+list. :INTERNAL-SYMBOLS and :EXTERNAL-SYMBOLS are estimates for the number of
+internal and external symbols which will ultimately be present in the package.
+The default value of USE is implementation-dependent, and in this
+implementation it is ~S." *!default-package-use-list*)
+  (prog ((name (stringify-string-designator name))
+         (nicks (stringify-string-designators nicknames))
+         (package
+          (or (resolve-deferred-package name)
+              (resolve-rehoming-package name)
+              (%make-package (make-package-hashtable internal-symbols)
+                             (make-package-hashtable external-symbols))))
+         clobber)
+   :restart
+     (when (find-package name)
+       ;; ANSI specifies that this error is correctable.
+       (signal-package-cerror
+        name
+        "Clobber existing package."
+        "A package named ~S already exists" name)
+       (setf clobber t))
+     (with-package-graph ()
+         ;; Check for race, signal the error outside the lock.
+         (when (and (not clobber) (find-package name))
+           (go :restart))
+         (setf (package-%name package) name)
+         ;; Do a USE-PACKAGE for each thing in the USE list so that checking for
+         ;; conflicting exports among used packages is done.
+         (use-package use package)
+         ;; FIXME: ENTER-NEW-NICKNAMES can fail (ERROR) if nicknames are illegal,
+         ;; which would leave us with possibly-bad side effects from the earlier
+         ;; USE-PACKAGE (e.g. this package on the used-by lists of other packages,
+         ;; but not in *PACKAGE-NAMES*, and possibly import side effects too?).
+         ;; Perhaps this can be solved by just moving ENTER-NEW-NICKNAMES before
+         ;; USE-PACKAGE, but I need to check what kinds of errors can be caused by
+         ;; USE-PACKAGE, too.
+         (%enter-new-nicknames package nicks)
+         ;; The name table is actually multi-writer concurrent, but due to
+         ;; lazy removal of :DELETED entries we want to enforce a single-writer.
+         ;; We're inside WITH-PACKAGE-GRAPH so this is already synchronized with
+         ;; other MAKE-PACKAGE operations, but we need the additional lock
+         ;; so that it synchronizes with RENAME-PACKAGE.
+         (with-package-names (table)
+           (%register-package table name package))
+         (atomic-incf *package-names-cookie*)
+         (when (boundp 'sb-c::*compilation*)
+           (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
+         (return package))
+     (bug "never")))
+
+(flet ((remove-names (package name-table keep-primary-name)
+         ;; An INFO-HASHTABLE does not support REMHASH. We can simulate it
+         ;; by changing the value to :DELETED.
+         ;; (NIL would be preferable, but INFO-GETHASH does not return
+         ;; a secondary value indicating whether the NIL was by default
+         ;; or found, not does it take a different default to return).
+         ;; At some point the table might contain more deleted values than
+         ;; useful values. We call %REBUILD-PACKAGE-NAMES to rectify that.
+         (dx-let ((names (cons (package-name package)
+                               (package-nicknames package)))
+                  (i 0))
+           (when keep-primary-name (pop names))
+           (dolist (name names)
+             ;; Aver that the following SETF doesn't insert a new <k,v> pair.
+             (aver (info-gethash name name-table))
+             (setf (info-gethash name name-table) :deleted)
+             (incf i))
+           (incf (info-env-tombstones name-table) i))
+         nil))
+
+;;; Change the name if we can, blast any old nicknames and then
+;;; add in any new ones.
+;;;
+;;; The spec says that NAME is a package designator (not just a string designator)
+;;; which is weird, but potentially meaningful if assigning new global nicknames.
+;;; If not called for that purpose, then it's largely pointless, because you can't
+;;; rename to any package-designator other than itself without causing a conflict.
+;;; A survey of some other implementations suggests that we're in the minority
+;;; as to the legality of (RENAME-PACKAGE "A" (FIND-PACKAGE "A") '("A-NICK")).
+;;;
+;;; ABCL:
+;;;   The value #<PACKAGE A> is not of type (OR STRING SYMBOL CHARACTER).
+;;; CCL:
+;;;   Error: The value #<Package "A"> is not of the expected type (OR STRING SYMBOL CHARACTER).
+;;; CMUCL:
+;;;   #<The A package, 0/9 internal, 0/9 external> cannot be coerced to a string.
+;;; ECL:
+;;;   In function STRING, the value of the first argument is #<"A" package>
+;;;   which is not of the expected type STRING
+;;;
+;;; CLISP agrees with us that this usage is permitted. If the new "name" is a
+;;; different package, it is merely the same error as if any already-existing name
+;;; was given. I see no reason to be more strict than the spec would have it be.
+(defun rename-package (package-designator name &optional (nicknames ()))
+  "Changes the name and nicknames for a package."
+  (prog ((nicks (stringify-string-designators nicknames)))
+   :restart
+     (let ((package (find-undeleted-package-or-lose package-designator))
+           ;; This is the "weirdness" alluded to. Do it in the loop in case
+           ;; the stringified value changes on restart when NAME is a package.
+           (name (stringify-package-designator name))
+           (found (find-package name)))
+       (unless (or (not found) (eq found package))
+         (signal-package-error name
+                               "A package named ~S already exists." name))
+       (with-single-package-locked-error ()
+         (unless (and (string= name (package-name package))
+                      (null (set-difference nicks (package-nicknames package)
+                                            :test #'string=)))
+           (assert-package-unlocked
+            package "renaming as ~A~@[ with nickname~*~P ~1@*~{~A~^, ~}~]"
+            name nicks (length nicks)))
+         (with-package-names (table)
+           ;; Check for race conditions now that we have the lock.
+           (unless (eq package (find-package package-designator))
+             (go :restart))
+           ;; Do the renaming.
+           ;; As a special case, do not allow the package to transiently disappear
+           ;; if PACKAGE-NAME is unchanged. This avoids glitches with build systems
+           ;; which try to operate on subcomponents in parallel, where one of the
+           ;; built subcomponents needs to add nicknames to an existing package.
+           ;; We could be clever here as well by not removing nicknames that
+           ;; will ultimately be re-added, but that didn't seem as critical.
+           (let ((keep-primary-name (string= name (package-%name package))))
+             (remove-names package table keep-primary-name)
+             (unless keep-primary-name
+               (%register-package table name package)))
+           (setf (package-%name package) name
+                 (package-%nicknames package) ()))
+         ;; Adding each nickname acquires and releases the table lock,
+         ;; because it's potentially interactive (on failure) and therefore
+         ;; not ideal to hold the lock for the entire duration.
+         (%enter-new-nicknames package nicks))
+       (atomic-incf *package-names-cookie*)
+       (when (boundp 'sb-c::*compilation*)
+         (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
+       (return package))))
+
+(defun delete-package (package-designator)
+  "Delete the package designated by PACKAGE-DESIGNATOR from the package
+  system data structures."
+  (tagbody :restart
+     (let ((package (find-package package-designator)))
+       (cond ((not package)
+              ;; This continuable error is required by ANSI.
+              (signal-package-cerror
+               package-designator
+               "Ignore."
+               "There is no package named ~S." package-designator)
+              (return-from delete-package nil))
+             ((not (package-name package)) ; already deleted
+              (return-from delete-package nil))
+             (t
+              (with-single-package-locked-error
+                  (:package package "deleting package ~A" package)
+                (let ((use-list (package-used-by-list package)))
+                  (when use-list
+                    ;; This continuable error is specified by ANSI.
+                    (signal-package-cerror
+                     package
+                     "Remove dependency in other packages."
+                     "~@<Package ~S is used by package~P:~2I~_~S~@:>"
+                     (package-name package)
+                     (length use-list)
+                     (mapcar #'package-name use-list))
+                    (dolist (p use-list)
+                      (unuse-package package p))))
+                (dolist (p (package-implements-list package))
+                  (remove-implementation-package package p))
+                (with-package-graph ()
+                  ;; Check for races, restart if necessary.
+                  (let ((package2 (find-package package-designator)))
+                    (when (or (neq package package2) (package-used-by-list package2))
+                      (go :restart)))
+                  (dolist (used (package-use-list package))
+                    (unuse-package used package))
+                  (setf (package-%local-nicknames package) nil)
+                  (let ((rehoming-package (make-rehoming-package package)))
+                    (flet ((nullify-home (symbols)
+                             (dovector (x (package-hashtable-cells symbols))
+                               (when (and (symbolp x)
+                                          (eq (symbol-package x) package))
+                                 (%set-symbol-package x rehoming-package)))))
+                      (nullify-home (package-internal-symbols package))
+                      (nullify-home (package-external-symbols package))))
+                  (with-package-names (table)
+                    (awhen (package-id package)
+                      (setf (aref *id->package* it) nil (package-id package) nil))
+                    (remove-names package table nil)
+                    (setf (package-%name package) nil
+                          ;; Setting PACKAGE-%NAME to NIL is required in order to
+                          ;; make PACKAGE-NAME return NIL for a deleted package as
+                          ;; ANSI requires. Setting the other slots to NIL
+                          ;; and blowing away the PACKAGE-HASHTABLES is just done
+                          ;; for tidiness and to help the GC.
+                          (package-%nicknames package) nil))
+                  (atomic-incf *package-names-cookie*)
+                  (when (boundp 'sb-c::*compilation*)
+                    (setf (sb-c::package-environment-changed sb-c::*compilation*) t))
+                  (setf (package-%use-list package) nil
+                        (package-tables package) #()
+                        (package-%shadowing-symbols package) nil
+                        (package-internal-symbols package)
+                        (make-package-hashtable 0)
+                        (package-external-symbols package)
+                        (make-package-hashtable 0)))
+                (return-from delete-package t)))))))
+) ; end FLET
+
 (defmacro defpackage (package &rest options)
   #.(format nil
      "Defines a new package called PACKAGE. Each of OPTIONS should be one of the
@@ -396,3 +620,53 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                     :format-control "no symbol named ~S in ~S"
                     :format-arguments (list name (package-name package))))
            (intern name package)))))
+
+;;;; APROPOS and APROPOS-LIST
+
+(defun briefly-describe-symbol (symbol)
+  (fresh-line)
+  (prin1 symbol)
+  (when (boundp symbol)
+    (let ((value (symbol-value symbol)))
+      (if (typep value '(or fixnum symbol hash-table))
+          (format t " = ~S" value)
+          (format t " (bound, ~S)" (type-of value)))))
+  (when (fboundp symbol)
+    (write-string " (fbound)")))
+
+(defun apropos-list (string-designator
+                     &optional
+                     package-designator
+                     external-only)
+  "Like APROPOS, except that it returns a list of the symbols found instead
+  of describing them."
+  (if package-designator
+      (let ((package (find-undeleted-package-or-lose package-designator))
+            (string (stringify-string-designator string-designator))
+            (result nil))
+        (do-symbols (symbol package)
+          (when (and (or (not external-only)
+                         (and (eq (symbol-package symbol) package)
+                              (eq (nth-value 1 (find-symbol (symbol-name symbol)
+                                                            package))
+                                  :external)))
+                     (search string (symbol-name symbol) :test #'char-equal))
+            (pushnew symbol result)))
+        (sort result #'string-lessp))
+      (delete-duplicates
+       (mapcan (lambda (package)
+                 (apropos-list string-designator package external-only))
+               (sort (list-all-packages) #'string-lessp :key #'package-name)))))
+
+(defun apropos (string-designator &optional package external-only)
+  "Briefly describe all symbols which contain the specified STRING.
+  If PACKAGE is supplied then only describe symbols present in
+  that package. If EXTERNAL-ONLY then only describe
+  external symbols in the specified package."
+  ;; Implementing this in terms of APROPOS-LIST keeps things simple at the cost
+  ;; of some unnecessary consing; and the unnecessary consing shouldn't be an
+  ;; issue, since this function is is only useful interactively anyway, and
+  ;; we can cons and GC a lot faster than the typical user can read..
+  (dolist (symbol (apropos-list string-designator package external-only))
+    (briefly-describe-symbol symbol))
+  (values))
