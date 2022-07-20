@@ -678,6 +678,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
        (lambda (obj widetag size)
          (declare (ignore size))
          (cond ((or (= widetag sb-vm:simple-base-string-widetag)
+                    #+sb-unicode
                     (= widetag sb-vm:simple-character-string-widetag))
                 (when (search string obj :test #'char-equal)
                   (push (cons (compute-symbol-hash obj (length obj)) obj) candidates)))
