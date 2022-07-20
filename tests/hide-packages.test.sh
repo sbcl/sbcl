@@ -48,8 +48,8 @@ run_sbcl <<EOF
   (sb-impl::%rebuild-package-names sb-kernel::*package-names*))
 
 (gc :gen 7)
-(setq *weak-ptrs*
-      (remove-if (lambda (x) (not (weak-pointer-value x))) *weak-ptrs*))
+(setq *weak-ptrs* (remove-if-not #'weak-pointer-value *weak-ptrs*))
+(when *weak-ptrs* (search-roots *weak-ptrs* :print :verbose :criterion :static))
 (assert (null *weak-ptrs*))
 (format t "Package hiding test 1: PASS~%")
 EOF
