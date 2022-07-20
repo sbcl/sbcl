@@ -130,7 +130,7 @@ lispobj symbol_package(struct symbol* s)
     // End-users should never see this failure.
     if (!lisp_package_vector) {
         if (!warned) {
-          fprintf(stderr, "Warning: package vector has not been initialized yet\n");
+          fprintf(stderr, "Warning: lisp package array is not initialized for C\n");
           warned = 1;
         }
         return NIL;

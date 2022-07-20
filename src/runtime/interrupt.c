@@ -1324,6 +1324,25 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
     sigaddset_deferrable(os_context_sigmask_addr(context));
 }
 
+/* What's going on ?
+ *
+ *  0: fp=0x7fa86423e7a0 pc=0x27608c Foreign function (null)
+ *  1: fp=0x7fa86423e7b0 pc=0x2767aa Foreign function (null)
+ *  2: fp=0x7fa86423e890 pc=0x2761af Foreign function (null)
+ *  3: fp=0x7fa86423e970 pc=0x27882f Foreign function (null)       ; maybe_now_maybe_later
+ *  4: fp=0x7fa86423f5c0 pc=0x7fa8646bc750 Foreign function (null) ; WHICH SIGNAL ?
+ *  5: fp=0x7fa86423f630 pc=0x2713ce Foreign function (null)       ; verify_range
+ *  6: fp=0x7fa86423f6c0 pc=0x2703d3 Foreign function (null)       ; verify_heap
+ *  7: fp=0x7fa86423f780 pc=0x26e168 Foreign function collect_garbage
+ *  8: fp=0x7fa86423f7f0 pc=0x270298 Foreign function gc_and_save
+ *  9: fp=0x7fa86423f848 pc=0x52f93bf2 <??? type 45>::GC-AND-SAVE
+ * 10: fp=0x7fa86423f950 pc=0x52d32a7b <??? type 45>::SAVE-LISP-AND-DIE
+ * 11: fp=0x7fa86423fa00 pc=0x52a34179 <??? type 45>::SAVE-LISP-AND-DIE
+ *
+ * fatal error encountered in SBCL pid 9436 tid 9436:
+ * interrupt already pending
+ */
+
 static boolean
 can_handle_now(void *handler, struct interrupt_data *data,
                int signal, siginfo_t *info, os_context_t *context)
@@ -1337,7 +1356,8 @@ can_handle_now(void *handler, struct interrupt_data *data,
     struct thread *thread = get_sb_vm_thread();
 
     if (read_TLS(INTERRUPT_PENDING,thread) != NIL)
-        lose("interrupt already pending");
+        lose("interrupt already pending when sig%d received, pc=%p", signal,
+             (void*)os_context_pc(context));
     if (thread_interrupt_data(thread).pending_handler)
         lose("there is a pending handler already (PA)");
     if (data->gc_blocked_deferrables)
