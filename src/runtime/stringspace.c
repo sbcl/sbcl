@@ -20,7 +20,8 @@
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 
-void prepare_readonly_space(__attribute__((unused)) int print) {}
+void prepare_readonly_space(__attribute__((unused)) int purify,
+                            __attribute__((unused)) int print) {}
 void move_rospace_to_dynamic(__attribute__((unused)) int print) {}
 
 #else
@@ -176,9 +177,21 @@ static void insert_filler(lispobj* obj, __attribute__((unused)) uword_t arg) {
     }
 }
 
-void prepare_readonly_space(int print)
+void prepare_readonly_space(int purify, int print)
 {
     gc_assert((uword_t)read_only_space_free_pointer == READ_ONLY_SPACE_START);
+    if (!purify) {
+        // I guess some of the architectures need a readonly page now because reasons,
+        // even though we're somewhat more careful in coreparse to avoid reading memory
+        // at READ_ONLY_SPACE_START if the free_pointer isn't higher than the start.
+        int string_space_size = BACKEND_PAGE_BYTES;
+        READ_ONLY_SPACE_START =
+            (uword_t)os_validate(MOVABLE, (char*)DYNAMIC_SPACE_START - string_space_size,
+                                 string_space_size, 0, 0);
+        READ_ONLY_SPACE_END = READ_ONLY_SPACE_START + string_space_size;
+        read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;
+        return;
+    }
     int sum_sizes = 2;
     // 1. Sum of the sizes of immutable objects, which can only be in dynamic space
     if (print) fprintf(stderr, "purify: calculating size ... ");

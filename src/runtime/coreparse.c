@@ -628,7 +628,8 @@ void calc_asm_routine_bounds()
 #elif defined LISP_FEATURE_IMMOBILE_CODE
     asm_routines_start = VARYOBJ_SPACE_START;
 #else
-    if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
+    if ((uword_t)read_only_space_free_pointer > READ_ONLY_SPACE_START &&
+        widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
         asm_routines_start = READ_ONLY_SPACE_START;
     } else {
         lispobj *where = (lispobj*)STATIC_SPACE_OBJECTS_START;

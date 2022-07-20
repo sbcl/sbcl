@@ -5435,7 +5435,7 @@ static void prepare_dynamic_space_for_final_gc()
  * plus literal strings in code compiled to memory. */
 char gc_coalesce_string_literals = 0;
 
-extern void move_rospace_to_dynamic(int), prepare_readonly_space(int);
+extern void move_rospace_to_dynamic(int), prepare_readonly_space(int,int);
 
 /* Do a non-conservative GC, and then save a core with the initial
  * function being set to the value of 'lisp_init_function' */
@@ -5543,7 +5543,7 @@ gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
     // Do a non-moving collection so that orphaned strings that result
     // from coalescing STRING= symbol names do not consume read-only space.
     collect_garbage(1+PSEUDO_STATIC_GENERATION);
-    if (purify) prepare_readonly_space(0);
+    prepare_readonly_space(purify, 0);
     if (verbose) { printf("[performing final GC..."); fflush(stdout); }
     prepare_dynamic_space_for_final_gc();
     save_lisp_gc_iteration = 2;
