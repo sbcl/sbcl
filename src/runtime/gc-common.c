@@ -1006,7 +1006,7 @@ static lispobj trans_bignum(lispobj object)
 }
 
 #ifndef LISP_FEATURE_X86_64
-lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
+lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
     lispobj raw_addr = (lispobj)fdefn->raw_addr;
     if (!raw_addr || points_to_asm_code_p(raw_addr))
         // technically this should return the address of the code object
@@ -1021,7 +1021,7 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
 {
     struct fdefn *fdefn = (struct fdefn *)where;
     scavenge(where + 1, 2); // 'name' and 'fun'
-    lispobj obj = fdefn_callee_lispobj(fdefn);
+    lispobj obj = decode_fdefn_rawfun(fdefn);
     lispobj new = obj;
     scavenge(&new, 1);
     if (new != obj) fdefn->raw_addr += (sword_t)(new - obj);

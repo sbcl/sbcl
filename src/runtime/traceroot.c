@@ -184,7 +184,7 @@ static int find_ref(lispobj* source, lispobj target)
         scan_limit = code_header_words((struct code*)source);
         break;
     case FDEFN_WIDETAG:
-        check_ptr(3, fdefn_callee_lispobj((struct fdefn*)source));
+        check_ptr(3, decode_fdefn_rawfun((struct fdefn*)source));
         scan_limit = 3;
         break;
     }
@@ -645,7 +645,7 @@ static lispobj trace1(lispobj object,
         case 3:
             if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
                 widetag_of(&FDEFN(ptr)->header) == FDEFN_WIDETAG)
-                target = fdefn_callee_lispobj((struct fdefn*)native_pointer(ptr));
+                target = decode_fdefn_rawfun((struct fdefn*)native_pointer(ptr));
             break;
         }
         target = canonical_obj(target);
@@ -756,7 +756,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             scan_limit = code_header_words((struct code*)where);
             break;
         case FDEFN_WIDETAG:
-            check_ptr(fdefn_callee_lispobj((struct fdefn*)where));
+            check_ptr(decode_fdefn_rawfun((struct fdefn*)where));
             scan_limit = 3;
             break;
         case SIMPLE_VECTOR_WIDETAG:

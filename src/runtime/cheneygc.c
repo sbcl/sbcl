@@ -562,7 +562,7 @@ verify_range(int purified, lispobj *base, lispobj *end)
           case FDEFN_WIDETAG:
             CHECK_PTR(where+1, where[1]);
             CHECK_PTR(where+2, where[2]);
-            CHECK_PTR(where+3, fdefn_callee_lispobj((struct fdefn*)where));
+            CHECK_PTR(where+3, decode_fdefn_rawfun((struct fdefn*)where));
             break;
           case CLOSURE_WIDETAG:
           case FUNCALLABLE_INSTANCE_WIDETAG:

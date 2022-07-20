@@ -592,7 +592,7 @@ arch_set_fp_modes(unsigned int mxcsr)
 /// (3) a code-component with no simple-fun within it, that makes
 ///     closures and other funcallable-instances look like simple-funs.
 /// If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
-lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
+lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
     lispobj* raw_addr = (lispobj*)fdefn->raw_addr;
     if (!raw_addr || points_to_asm_code_p((lispobj)raw_addr))
         // technically this should return the address of the code object

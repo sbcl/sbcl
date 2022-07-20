@@ -724,7 +724,7 @@ static void print_fun_or_otherptr(lispobj obj)
 
     case FDEFN_WIDETAG:
         print_slots(fdefn_slots, 2, ptr);
-        print_obj("entry: ", fdefn_callee_lispobj((struct fdefn*)(ptr-1)));
+        print_obj("entry: ", decode_fdefn_rawfun((struct fdefn*)(ptr-1)));
         break;
 
     // Make some vectors printable from C, for when all hell breaks lose

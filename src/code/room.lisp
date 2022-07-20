@@ -990,7 +990,7 @@ We could try a few things to mitigate this:
                ;; to enliven any object other than code.
                #+immobile-code
                `(%make-lisp-obj
-                 (alien-funcall (extern-alien "fdefn_callee_lispobj" (function unsigned unsigned))
+                 (alien-funcall (extern-alien "decode_fdefn_rawfun" (function unsigned unsigned))
                                 (logandc2 (get-lisp-obj-address ,obj) lowtag-mask))))
             ,.(make-case* 'code-component
                `(loop for .i. from 2 below (code-header-words ,obj)

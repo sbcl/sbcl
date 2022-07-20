@@ -421,7 +421,7 @@ static void trace_object(lispobj* where)
         return;
 #endif
     case FDEFN_WIDETAG:
-        gc_mark_obj(fdefn_callee_lispobj((struct fdefn*)where));
+        gc_mark_obj(decode_fdefn_rawfun((struct fdefn*)where));
         scan_to = 3;
         break;
     case WEAK_POINTER_WIDETAG:

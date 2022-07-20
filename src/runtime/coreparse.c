@@ -1236,7 +1236,7 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
         case FDEFN_WIDETAG:
             RECURSE(obj[1]);
             RECURSE(obj[2]);
-            RECURSE(fdefn_callee_lispobj((struct fdefn*)obj));
+            RECURSE(decode_fdefn_rawfun((struct fdefn*)obj));
             break;
         default:
             if (!leaf_obj_widetag_p(widetag_of(obj))) {

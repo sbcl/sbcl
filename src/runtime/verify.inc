@@ -275,7 +275,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         struct fdefn* f = (void*)object;
         CHECK(f->name, &f->name);
         CHECK(f->fun, &f->fun);
-        CHECK(fdefn_callee_lispobj(f), (lispobj*)&f->raw_addr);
+        CHECK(decode_fdefn_rawfun(f), (lispobj*)&f->raw_addr);
         return 0;
     }
     for (i=1; i<nwords; ++i) CHECK(object[i], object+i);
