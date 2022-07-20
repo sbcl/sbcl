@@ -178,3 +178,14 @@
 (with-test (:name :name-char-short-string)
   (name-char "")
   (name-char "A"))
+
+(with-test (:name :char-case-latin-1-base-strings)
+  (let ((string (map-into (make-array 10 :element-type 'character :adjustable t)
+                          #'code-char
+                          '(192 193 194 195 196 197 198 199 200 201))))
+   (assert (equal
+            (map 'list #'char-code (nstring-downcase string))
+            '(224 225 226 227 228 229 230 231 232 233)))
+   (assert (equal
+            (map 'list #'char-code (string-upcase string))
+            '(192 193 194 195 196 197 198 199 200 201))) ))

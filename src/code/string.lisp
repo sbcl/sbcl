@@ -657,7 +657,8 @@ new string COUNT long filled with the fill character."
          (t
           (with-one-string (string start end)
             (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-            (cond ((simple-base-string-p string)
+            (cond #+sb-unicode
+                  ((simple-base-string-p string)
                    (do ((index start (1+ index)))
                        ((>= index end))
                      (let ((char (char-code (schar string index))))
