@@ -498,14 +498,7 @@
 
 (with-test (:name :rospace-strings
                   :fails-on :darwin-jit)
-  ;; This is a subtle point, but even though NSTRING-UPCASE does not
-  ;; actually _need_ to change any character in the argument string,
-  ;; it tries to, and fails. You could make the feeble claim that the values being
-  ;; stored are not "new" as used in CLHS 3.7.1
-  ;;   "Storing a new value into some element of the array,".
-  ;; But what's the difference between storing a new value and a non-new value?
-  ;; Why is the word "new" even in that sentence?
-  (let ((err  (handler-case (nstring-upcase (opaque-identity (symbol-name '*readtable*)))
-                (sb-sys:memory-fault-error (c)
-                  (write-to-string c :escape nil)))))
+  (let ((err (handler-case (setf (char (opaque-identity (symbol-name '*readtable*)) 0) #\*)
+               (sb-sys:memory-fault-error (c)
+                 (write-to-string c :escape nil)))))
     (assert (search "modify a read-only object" err))))
