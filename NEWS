@@ -10,6 +10,8 @@ changes relative to sbcl-2.2.6:
   * minor incompatible change: literal objects (strings, in particular)
     in compiled code may at the discretion of the runtime be placed in
     read-only memory. Violations of CLHS 3.7.1 could produce memory faults.
+    If ":PURIFY NIL" is given to SAVE-LISP-AND-DIE then no read-only memory
+    will be used.
   * enhancement: Unicode support has been updated to support version 10.0.0 of
     the Unicode standard, including addition of characters and refinements to
     breaking and collation algorithms.

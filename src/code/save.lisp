@@ -31,6 +31,7 @@
 (define-alien-routine "gc_and_save" void
   (file c-string)
   (prepend-runtime int)
+  (purify int)
   (save-runtime-options int)
   (compressed int)
   (compression-level int)
@@ -139,13 +140,10 @@ The following &KEY arguments are defined:
      :TOPLEVEL argument cannot be supplied.
 
   :PURIFY
-     If true (the default on cheneygc), do a purifying GC which moves all
-     dynamically allocated objects into static space. This takes
-     somewhat longer than the normal GC which is otherwise done, but
-     it's only done once, and subsequent GC's will be done less often
-     and will take less time in the resulting core file. See the PURIFY
-     function. This parameter has no effect on platforms using the
-     generational garbage collector.
+     If true (the default), then some objects in the restarted core will
+     be memory-mapped as read-only. Among those objects are numeric vectors
+     that were determined to be compile-time constants, and any immutable
+     values according to the language specification such as symbol names.
 
   :ROOT-STRUCTURES
      This should be a list of the main entry points in any newly loaded
@@ -206,7 +204,7 @@ seem to be good quick fixes for either limitation and no one has been
 sufficiently motivated to do lengthy fixes."
   (declare (ignore environment-name))
   #+gencgc
-  (declare (ignore purify) (ignorable root-structures))
+  (declare (ignorable root-structures))
   (when (and callable-exports toplevel-supplied)
     (error ":TOPLEVEL cannot be supplied when there are callable exports."))
   ;; If the toplevel function is not defined, this will signal an
@@ -234,10 +232,6 @@ sufficiently motivated to do lengthy fixes."
                                      :as-file t))
             (startfun (start-lisp toplevel callable-exports)))
         (deinit)
-        ;; FIXME: Would it be possible to unmix the PURIFY logic from this
-        ;; function, and just do a GC :FULL T here? (Then if the user wanted
-        ;; a PURIFYed image, he'd just run PURIFY immediately before calling
-        ;; SAVE-LISP-AND-DIE.)
         #+gencgc
         (progn
           ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
@@ -260,6 +254,7 @@ sufficiently motivated to do lengthy fixes."
           ;; since the GC will invalidate the stack.
           (gc-and-save name
                        (foreign-bool executable)
+                       (foreign-bool purify)
                        (foreign-bool save-runtime-options)
                        (foreign-bool compression)
                        (or compression 0)

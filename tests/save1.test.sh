@@ -32,4 +32,14 @@ run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint \
 EOF
 check_status_maybe_lose "Basic SAVE-LISP-AND-DIE" $? 21 "(saved core ran)"
 
+run_sbcl <<EOF
+  (save-lisp-and-die "$tmpcore" :purify nil)
+EOF
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint <<EOF
+  #-darwin-jit
+  (unless (zerop (- (sb-sys:sap-int sb-vm:*read-only-space-free-pointer*) sb-vm:read-only-space-start))
+    (exit :code 1))
+EOF
+check_status_maybe_lose "SAVE-LISP-AND-DIE NOPURIFY" $? 0 "(unpurified core ran)"
+
 exit $EXIT_TEST_WIN

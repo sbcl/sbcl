@@ -5399,8 +5399,7 @@ zero_all_free_ranges() /* called only by gc_and_save() */
 #endif
 }
 
-/* Things to do before doing a final GC before saving a core (without
- * purify).
+/* Things to do before doing a final GC before saving a core.
  *
  * + Single-object pages aren't moved by the GC, so we need to
  *   unset that flag from all pages.
@@ -5441,7 +5440,7 @@ extern void move_rospace_to_dynamic(int), prepare_readonly_space(int);
 /* Do a non-conservative GC, and then save a core with the initial
  * function being set to the value of 'lisp_init_function' */
 void
-gc_and_save(char *filename, boolean prepend_runtime,
+gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
             boolean save_runtime_options, boolean compressed,
             int compression_level, int application_type)
 {
@@ -5544,7 +5543,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     // Do a non-moving collection so that orphaned strings that result
     // from coalescing STRING= symbol names do not consume read-only space.
     collect_garbage(1+PSEUDO_STATIC_GENERATION);
-    prepare_readonly_space(0);
+    if (purify) prepare_readonly_space(0);
     if (verbose) { printf("[performing final GC..."); fflush(stdout); }
     prepare_dynamic_space_for_final_gc();
     save_lisp_gc_iteration = 2;
