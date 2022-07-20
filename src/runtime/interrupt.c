@@ -2063,6 +2063,10 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     /* If we lose on corruption, provide LDB with debugging information. */
     fake_foreign_function_call(context);
 
+    /* If it's a store to read-only space, it's not "corruption", so don't say that.
+     * Lisp will change its wording of the memory-fault-error string */
+
+    if (!readonly_space_p((uword_t)addr)) {
     /* To allow debugging memory faults in signal handlers and such. */
 #ifdef ARCH_HAS_STACK_POINTER
     char* pc = (char*)os_context_pc(context);
@@ -2083,6 +2087,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p)",
                                       addr, (void*)os_context_pc(context));
 #endif
+    }
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     /* Holy hell is this more obfuscated than necessary when using

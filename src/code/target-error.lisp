@@ -2373,12 +2373,6 @@ you did not expect to see this message, please report it."
   ((address :initarg :address :reader system-condition-address :initform nil)
    (context :initarg :context :reader system-condition-context :initform nil)))
 
-(define-condition memory-fault-error (system-condition error) ()
-  (:report
-   (lambda (condition stream)
-     (format stream "Unhandled memory fault at #x~X."
-             (system-condition-address condition)))))
-
 (define-condition breakpoint-error (system-condition error) ()
   (:report
    (lambda (condition stream)

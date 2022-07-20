@@ -620,3 +620,14 @@ Experimental: interface subject to change."
 ;;; somewhere else which I could not find.
 (defun lisp-space-p (sap &aux (addr (sap-int sap))) (cases))
 ) ; end MACROLET
+
+(define-condition memory-fault-error (system-condition error) ()
+  (:report
+   (lambda (condition stream)
+     (let* ((faultaddr (system-condition-address condition))
+            (string (if (<= sb-vm:read-only-space-start
+                            faultaddr
+                            (sap-int (sap+ sb-vm:*read-only-space-free-pointer* -1)))
+                        "Attempt to modify a read-only object at #x~X."
+                        "Unhandled memory fault at #x~X.")))
+       (format stream string faultaddr)))))

@@ -90,6 +90,10 @@ extern lispobj *current_binding_stack_pointer;
 extern lispobj *read_only_space_free_pointer;
 extern lispobj *static_space_free_pointer;
 
+static inline boolean readonly_space_p(lispobj ptr) {
+    return ptr >= READ_ONLY_SPACE_START && (lispobj*)ptr < read_only_space_free_pointer;
+}
+
 #ifdef LISP_FEATURE_DARWIN_JIT
 lispobj *static_code_space_free_pointer;
 #endif
