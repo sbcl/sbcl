@@ -380,8 +380,8 @@
            (symbol :scs (descriptor-reg)
                    :load-if (not (and (sc-is symbol constant)
                                       (or (symbol-always-has-tls-value-p (tn-value symbol))
-                                          (symbol-always-has-tls-index-p (tn-value symbol)))))))
-    (:temporary (:sc descriptor-reg) value-temp)
+                                          (symbol-always-has-tls-index-p (tn-value symbol)))))
+                   :target alloc-tls-symbol))
     (:temporary (:sc descriptor-reg :offset r8-offset :from (:argument 1)) alloc-tls-symbol)
     (:temporary (:sc non-descriptor-reg :offset nl0-offset) tls-index)
     (:temporary (:sc non-descriptor-reg :offset nl1-offset) free-tls-index)
@@ -408,8 +408,8 @@
                  (load-inline-constant lr '(:fixup alloc-tls-index :assembly-routine))
                  (inst blr lr)))
           TLS-INDEX-VALID
-          (inst ldr value-temp (@ thread-tn tls-index))
-          (inst stp value-temp tls-index-reg
+          (inst ldr alloc-tls-symbol (@ thread-tn tls-index))
+          (inst stp alloc-tls-symbol tls-index-reg
                 (@ bsp (* (- binding-value-slot binding-size)
                           n-word-bytes)))
           (inst str value (@ thread-tn tls-index))))))
