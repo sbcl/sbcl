@@ -36,7 +36,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :purify nil)
 EOF
 run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint <<EOF
-  #-darwin-jit
+  #-(and darwin arm64) ;; darwin-jit
   (unless (zerop (- (sb-sys:sap-int sb-vm:*read-only-space-free-pointer*) sb-vm:read-only-space-start))
     (exit :code 1))
 EOF
