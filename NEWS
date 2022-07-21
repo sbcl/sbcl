@@ -15,7 +15,17 @@ changes relative to sbcl-2.2.6:
   * enhancement: Unicode support has been updated to support version 10.0.0 of
     the Unicode standard, including addition of characters and refinements to
     breaking and collation algorithms.
+  * bug fix: AVX is no longer used for loading simd-pack-256 constants.
+    (lp#1928097)
+  * bug fix: fix building the manual when some contribs are blocked or
+    otherwise disabled.  (lp#1979821, thanks to Robert Schiele)
+  * bug fix: fix type derivation of sequence functions with highly-specific
+    declared argument types.  (lp#1980292, reported by James Kalenius)
+  * bug fix: internal error when optimizing chains of conditionals in local
+    functions.  (lp#1981607, reported by Pasha K)
   * optimization: faster TRUNCATE with float arguments.
+  * optimization: SXHASH on large floating point values should generate less
+    garbage.
 
 changes in sbcl-2.2.6 relative to sbcl-2.2.5:
   * minor incompatible change: support for 32-bit x86 on macOS has been
