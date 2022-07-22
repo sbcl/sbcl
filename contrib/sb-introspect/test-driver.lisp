@@ -440,30 +440,39 @@
          (= (getf props :page) page)
          (= (getf props :generation) gen)
          (eq (getf props :boxed :missing) boxedp))))
+
+(defun alloc-large-code ()
+  ;; large objets have to have to be at least 4 GC pages
+  (let ((bytes (* 4 sb-vm:gencgc-page-bytes)))
+    ;; For 32-bit in order to force allocation into a large-object page, the currently
+    ;; open code region has to be closed. Otherwise the allocation might fit in the region.
+    #-64-bit
+    (sb-alien:alien-funcall
+     (sb-alien:extern-alien "gc_close_region"
+                            (function sb-alien:void sb-alien:unsigned sb-alien:unsigned))
+     (+ (* 3 3 sb-vm:n-word-bytes) ; KLUDGE: a region is 3 words, and code_region
+                                        ; is the third in the array of regions
+        (sb-sys:find-dynamic-foreign-symbol-address "gc_alloc_region"))
+     7) ; KLUDGE: PAGE_TYPE_CODE
+    ;; A legal code object needs >= 4 boxed words. Let's use 8
+    (let ((object (sb-c:allocate-code-object nil 8 (- bytes (* 8 sb-vm:n-word-bytes)))))
+      (setq *large-obj* object)
+      ;; assert that it's large, otherwise the entire test is bogus
+      (let ((props (nth-value 1 (allocation-information object))))
+        (assert (getf props :large)))
+      object)))
+(compile 'alloc-large-code)
+
 #+gencgc
-(deftest* (allocation-information.6 :fails-on :sbcl)
+(deftest* (allocation-information.6)
     ;; Remember, all tests run after all toplevel forms have executed,
     ;; so if this were (DEFGLOBAL *LARGE-CODE* ... ) or something,
     ;; the garbage collection explicitly requested for ALLOCATION-INFORMATION.5
     ;; would have already happened, and thus affected this test as well.
     ;; So we need to make the objects within each test,
     ;; while avoiding use of lexical vars that would cause conservative pinning.
-    (multiple-value-bind (page gen)
-        (page-and-gen
-         (setq *large-obj*
-               ;; To get a large-object page, a code object has to exceed
-               ;; LARGE_OBJECT_SIZE and not fit within an open region.
-               ;; (This is a minor bug, because one should be able to
-               ;; create regions as large as desired without affecting
-               ;; determination of whether an object is large.
-               ;; Practically it means is that a small object region
-               ;; is limited to at most 3 pages)
-               ;; 32-bit machines use 64K for code allocation regions,
-               ;; but the large object size can be as small as 16K.
-               ;; 16K might fit in the free space of an open region,
-               ;; and by accident would not go on a large object page.
-               (sb-c:allocate-code-object nil 0
-                (max (* 4 sb-vm:gencgc-page-bytes) #-64-bit 65536))))
+    (multiple-value-bind (page gen) (page-and-gen (alloc-large-code))
+      (declare (ignorable gen))
       (declare (notinline format))
       (format (make-string-output-stream) "~%")
       (loop for i from 1 to sb-vm:+highest-normal-generation+
@@ -479,7 +488,7 @@
 (deftest allocation-information.7
     (locally
       (declare (notinline format))
-      ;; Create a bignum using 4 GC cards
+      ;; Create a bignum using 4 GC pages
       (setq *b* (ash 1 (* sb-vm:gencgc-page-bytes sb-vm:n-byte-bits 4)))
       (setq *negb* (- *b*))
       (and (let ((props (get-small-bignum-allocation-information)))
