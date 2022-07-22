@@ -773,18 +773,24 @@ void gc_start_the_world() { } // do nothing
 struct lisp_startup_options lisp_startup_options;
 
 void unwind_binding_stack() { lose("Can't unwind binding stack"); }
-FILE *prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
-                      size_t *runtime_size) {
+FILE *prepare_to_save(__attribute__((unused)) char *filename,
+                      __attribute__((unused)) boolean prepend_runtime,
+                      __attribute__((unused)) void **runtime_bytes,
+                      __attribute__((unused)) size_t *runtime_size) {
     lose("Can't prepare_to_save");
 }
-boolean save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size,
-                                   int application_type) {
+boolean save_runtime_to_filehandle(__attribute__((unused)) FILE *output,
+                                   __attribute__((unused)) void *runtime,
+                                   __attribute__((unused)) size_t runtime_size,
+                                   __attribute__((unused)) int application_type) {
     lose("Can't save_runtime_to_filehandle");
 }
-boolean save_to_filehandle(FILE *file, char *filename, lispobj init_function,
-                           boolean make_executable,
-                           boolean save_runtime_options,
-                           int core_compression_level) {
+boolean save_to_filehandle(__attribute__((unused)) FILE *file,
+                           __attribute__((unused)) char *filename,
+                           __attribute__((unused)) lispobj init_function,
+                           __attribute__((unused)) boolean make_executable,
+                           __attribute__((unused)) boolean save_runtime_options,
+                           __attribute__((unused)) int core_compression_level) {
     lose("Can't save_to_filehandle");
 }
 
