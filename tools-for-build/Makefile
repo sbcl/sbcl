@@ -11,7 +11,7 @@
 -include Config
 
 # Do not append to CFLAGS otherwise -I can override the -I below.
-CFLAGS:=-I../src/runtime
+CFLAGS:=-I../src/runtime $(CFLAGS)
 LDFLAGS:=$(LDFLAGS)
 LDLIBS:=$(OS_LIBS)
 
