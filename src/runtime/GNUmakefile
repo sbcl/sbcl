@@ -94,8 +94,8 @@ targets: $(TARGET) $(OBJTARGET) sbcl.mk
 
 LDB_OBJS = $(filter-out main.o runtime.o monitor.o save.o thread.o,$(OBJS))
 ldb: $(LIBSBCL)
-	$(CC) -g $(CFLAGS) -DSTANDALONE_LDB -I. -c -o standalone-monitor.o monitor.c
-	$(CC) -g $(CFLAGS) -DSTANDALONE_LDB -I. -c -o standalone-thread.o thread.c
+	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-monitor.o monitor.c
+	$(CC) -g $(CPPFLAGS) $(CFLAGS) -DSTANDALONE_LDB -c -o standalone-thread.o thread.c
 	$(CC) $(LINKFLAGS) -o ldb standalone-monitor.o standalone-thread.o $(LDB_OBJS) $(LIBS)
 
 $(TARGET): $(LIBSBCL)
