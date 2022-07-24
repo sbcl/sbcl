@@ -169,12 +169,12 @@
 
 (defvar *previous-cpu-routines* nil)
 
-(defmacro setup-cpu-specific-routines ()
+(defmacro !setup-cpu-specific-routines ()
   `(progn
      ,@(loop for (feature detect) on *cpu-features* by #'cddr
              collect
              `(when ,detect
-                (loop for (fdefn definition) on ,(package-symbolicate :sb-vm '+ feature '-routines+)
+                (loop for (fdefn definition) on ,(package-symbolicate "SB-VM" '+ feature '-routines+)
                       by #'cddr
                       do
                       (push (cons fdefn (fdefn-fun fdefn))

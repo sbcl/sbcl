@@ -409,7 +409,7 @@ process to continue normally."
     (sb-debug::disable-debugger))
   (call-hooks "initialization" *init-hooks*)
   #+sb-thread (finalizer-thread-start)
-  (sb-vm::setup-cpu-specific-routines))
+  (sb-vm::!setup-cpu-specific-routines))
 
 ;;;; some support for any hapless wretches who end up debugging cold
 ;;;; init code
