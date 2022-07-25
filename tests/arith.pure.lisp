@@ -1098,3 +1098,12 @@
       (logtest (- (expt 2 63) 3) (the fixnum x)))
     ((1) t)
     ((2) nil)))
+
+(with-test (:name :logand-negative-derive)
+  (assert
+   (subtypep (second (third (sb-kernel:%simple-fun-type
+                             (checked-compile
+                              `(lambda (a b)
+                                 (declare ((not unsigned-byte) a b))
+                                 (logand a b))))))
+             '(integer * -1))))
