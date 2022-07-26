@@ -383,7 +383,7 @@ extern void fpu_restore(void *);
 
 #define PAGE_INDEX_FMT PRIdPTR
 
-int count_immobile_objects(int gen, int res[5])
+int count_immobile_objects(__attribute__((unused)) int gen, int res[5])
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     lispobj* where = (lispobj*)FIXEDOBJ_SPACE_START;
