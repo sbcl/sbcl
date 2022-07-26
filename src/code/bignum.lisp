@@ -2024,6 +2024,7 @@
 ;;;; hashing
 
 ;;; the bignum case of the SXHASH function
+;;; Needs to be synchronized with sxhash-bignum-double-float
 (defun sxhash-bignum (x)
   (let ((result 316495330))
     (declare (type fixnum result))
