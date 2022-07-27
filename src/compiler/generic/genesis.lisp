@@ -373,7 +373,7 @@
 ;;; at a lower address.
 #+metaspace
 (defun allocate-metaspace-layout (gspace nbytes)
-  (assert (= nbytes (* 8 sb-vm:n-word-bytes)))
+  (aver (= nbytes (* 8 sb-vm:n-word-bytes)))
   (let ((slab (gspace-current-slab gspace)))
     (flet ((init (slab)
              (let ((bytes-avail (- sb-vm:metaspace-slab-size
@@ -455,7 +455,7 @@
                      for pte = (pte page-index)
                      do (if (null (page-type pte))
                             (setf (page-type pte) page-type)
-                            (assert (eq (page-type pte) page-type))))))
+                            (aver (eq (page-type pte) page-type))))))
            (note-words-used (start-word-index)
              (let* ((start-page (page-index start-word-index))
                     (end-word-index (+ start-word-index n-words))
@@ -701,7 +701,7 @@
   ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
   (let* ((gen (or #+immobile-space
                   (let ((gspace (descriptor-intuit-gspace des)))
-                    (assert gspace)
+                    (aver gspace)
                     (when (or (eq gspace *immobile-fixedobj*)
                               (eq gspace *immobile-varyobj*))
                       sb-vm:+pseudo-static-generation+))
@@ -904,7 +904,7 @@ core and return a descriptor to it."
             (write-wordindexed/raw handle 0 (logior (ash words 8) sb-vm:bignum-widetag))
             handle)))
     (integer-bits-to-core n handle sb-vm:bignum-digits-offset words)
-    (assert (= (bignum-from-core handle) n))
+    (aver (= (bignum-from-core handle) n))
     handle))
 
 (defun bignum-from-core (descriptor)
@@ -1434,8 +1434,7 @@ core and return a descriptor to it."
            ;; Check that the number of specified INHERITS matches
            ;; the length of the layout's inherits in the cross-compiler.
            (let ((wrapper (info :type :compiler-layout name)))
-             (assert (eql (length (wrapper-inherits wrapper))
-                          (length inherits)))
+             (aver (eql (length (wrapper-inherits wrapper)) (length inherits)))
              (->wrapper
               (make-cold-layout name
                                 (wrapper-depthoid wrapper)
@@ -2900,8 +2899,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
       #+immobile-space
       ;; Must be a multiple of 32 because it makes the math a nicer
       ;; when computing word and bit index into the 'touched' bitmap.
-      (assert (zerop (rem sb-vm:fixedobj-space-size
-                          (* 32 sb-vm:immobile-card-bytes))))
+      (aver (zerop (rem sb-vm:fixedobj-space-size (* 32 sb-vm:immobile-card-bytes))))
       #-gencgc
       (check sb-vm:dynamic-0-space-start sb-vm:dynamic-0-space-end :dynamic-0)
       (check sb-vm:linkage-table-space-start sb-vm:linkage-table-space-end :linkage-table))))
@@ -3881,7 +3879,7 @@ III. initially undefined function references (alphabetically):
         (let ((files (remove-if-not #'assembler-file-p object-file-names)))
           ;; There should be exactly 1 assembler file, and 1 code object in it.
           (when files ; But it's present only in 2nd genesis.
-            (assert (singleton-p files))
+            (aver (singleton-p files))
             (cold-load (car files) verbose)))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
       (mapc 'funcall *deferred-undefined-tramp-refs*)
