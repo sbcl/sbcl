@@ -497,7 +497,7 @@
            (assert (= (sb-sys:sap-ref-word sap (ash i sb-vm:word-shift)))))))))
 
 (with-test (:name :rospace-strings
-                  :fails-on (or :darwin-jit :win32))
+                  :fails-on :darwin-jit)
   (let ((err (handler-case (setf (char (opaque-identity (symbol-name '*readtable*)) 0) #\*)
                (sb-sys:memory-fault-error (c)
                  (write-to-string c :escape nil)))))

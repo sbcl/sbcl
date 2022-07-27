@@ -838,10 +838,12 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
  * a lazy read (demand page) setup, but that would mean keeping an
  * open file pointer for the core indefinately (and be one more
  * thing to maintain).
+ * FIXME: I would bet that we can use PAGE_EXECUTE_WRITECOPY for this,
+ * but I'll leave it to someone who actually cares.
  */
 
 void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm_size_t len,
-                      int __attribute__((unused)) execute)
+                      int is_readonly_space)
 {
     os_commit_memory(addr, len);
 #ifdef LISP_FEATURE_64_BIT
@@ -852,6 +854,8 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
     gc_assert(res == offset);
     size_t count;
 
+    os_vm_address_t original_addr = addr;
+    os_vm_size_t original_len = len;
     while (len) {
         unsigned to_read = len > INT_MAX ? INT_MAX : len;
         count = read(fd, addr, to_read);
@@ -859,6 +863,8 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
         len -= count;
         gc_assert(count == to_read);
     }
+    DWORD old;
+    if (is_readonly_space) VirtualProtect(original_addr, original_len, PAGE_READONLY, &old);
     return (void*)0;
 }
 static DWORD os_protect_modes[8] = {
