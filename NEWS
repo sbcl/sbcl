@@ -24,8 +24,8 @@ changes relative to sbcl-2.2.6:
   * bug fix: internal error when optimizing chains of conditionals in local
     functions.  (lp#1981607, reported by Pasha K)
   * optimization: faster TRUNCATE with float arguments.
-  * optimization: SXHASH on large floating point values should generate less
-    garbage.
+  * optimization: EQUALP hashing of large floating point values should
+    generate less garbage.
 
 changes in sbcl-2.2.6 relative to sbcl-2.2.5:
   * minor incompatible change: support for 32-bit x86 on macOS has been
