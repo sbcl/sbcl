@@ -960,9 +960,6 @@
           (pp-state (cons (make-hash-table :test 'equal) nil))
           (prev-namestring "")
           (n-linker-relocs 0)
-          (seen-fdefns nil)
-          (seen-trampolines nil)
-          (seen-gfs nil)
           (temp-output (make-string-output-stream :element-type 'base-char))
           end-loc)
   (labels ((dumpwords (sap count stream &optional (exceptions #()) logical-addr)
@@ -1122,66 +1119,10 @@
                   (dumpwords (int-sap code-physaddr)
                              (code-header-words code) output header-exceptions code-addr)
                   (write-string (get-output-stream-string temp-output) output))))
-             ((functionp (%code-debug-info code))
-              (unless seen-trampolines
-                (setq seen-trampolines t)
-                (format output "lisp_trampolines:~%"))
-              (let* ((sap (int-sap (translate-ptr code-addr spaces)))
-                     (tramp-fun (sap-ref-word sap (ash 2 word-shift))))
-                (aver (not (in-bounds-p tramp-fun code-bounds)))
-                (format output " .quad ~{0x~x~^,~}~%"
-                        (loop for i from 0 by n-word-bytes repeat 6
-                              collect (sap-ref-word sap i)))))
              (t
               (error "Strange code component: ~S" code)))
            (incf code-addr objsize)))
-        (#.fdefn-widetag
-         (unless seen-fdefns
-           (format output "~%# FDEFNs~%")
-           (setq seen-fdefns t))
-         (let* ((ptr (translate-ptr code-addr spaces))
-                (fdefn (%make-lisp-obj (logior ptr other-pointer-lowtag)))
-                (name (fun-name-from-core (fdefn-name fdefn) core))
-                (c-name (c-name name core pp-state "F")))
-           (format output "~a: # ~x~% .size ~0@*~a, 32~%"
-                     (c-symbol-quote c-name)
-                     (logior code-addr other-pointer-lowtag))
-           (flet ((relativize (slot &aux (x (sap-ref-word (int-sap ptr) (ash slot word-shift))))
-                    (if (in-bounds-p x code-bounds)
-                        (format nil "CS+0x~x" (- x (bounds-low code-bounds)))
-                        (format nil "0x~x" x))))
-             (format output " .quad 0x~x, 0x~x, ~a, ~a~%"
-                     (sap-ref-word (int-sap ptr) 0)
-                     (sap-ref-word (int-sap ptr) 8)
-                     (relativize fdefn-fun-slot)
-                     (relativize fdefn-raw-addr-slot)))
-           (incf code-addr (* 4 n-word-bytes))))
-        (#.funcallable-instance-widetag
-         (unless seen-gfs
-           (setq seen-gfs t)
-           (when seen-trampolines
-             (format output " .size lisp_trampolines, .-lisp_trampolines~%")))
-         (let* ((sap (int-sap (translate-ptr code-addr spaces)))
-                (fin-fun (sap-ref-word sap (ash 2 word-shift)))
-                (code-space-p (in-bounds-p fin-fun code-bounds))
-                (slots (translate (sap-ref-lispobj sap (ash 3 word-shift)) spaces))
-                (name (and (> (length (the simple-vector slots)) +gf-name-slot+)
-                           (svref slots +gf-name-slot+)))
-                (c-name
-                 (c-name
-                  (if (or (not name)
-                          (eql (get-lisp-obj-address name) unbound-marker-widetag))
-                      "unnamed"
-                      (fun-name-from-core name core))
-                  core pp-state "G")))
-           (format output "~a:~% .size ~0@*~a, 48~%" (c-symbol-quote c-name))
-           (format output " .quad 0x~x, .+24, ~:[~;CS+~]0x~x~{, 0x~x~}~%"
-                   (sap-ref-word sap 0)
-                   code-space-p
-                   (if code-space-p (- fin-fun (bounds-low code-bounds)) fin-fun)
-                   (loop for i from (ash 3 word-shift) by n-word-bytes repeat 3
-                         collect (sap-ref-word sap i))))
-         (incf code-addr (* 6 n-word-bytes))))))
+        )))
 
   ;; coreparse uses the 'lisp_jit_code' symbol to set varyobj_free_pointer
   ;; The intent is that compilation to memory can use this reserved area
