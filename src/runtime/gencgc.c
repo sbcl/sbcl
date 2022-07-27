@@ -785,6 +785,20 @@ void zeroize_pages_if_needed(page_index_t start, page_index_t end, int page_type
         zero_pages(start, end);
         for (i = start; i <= end; i++) set_page_need_to_zero(i, 0);
     }
+#elif defined LISP_FEATURE_MIPS
+    /* Technically this case is for "if BACKEND_PAGE_BYTES > GENCGC_CARD_BYTES"
+     * but #+win32 has that, and works fine because we don't map the core to memory
+     * from the file directly. The issue is that load_core_bytes() has a larger
+     * granularity than saving thinks it used, so loading picks up junk from pages
+     * that are supposedly zeroed. Until I fix it better, just zeroize always.
+     * Basically we want to decouple the allocator's quantum of GENCGC_PAGE_BYTES
+     * from the OS's requirement on file mappings. I don't know why rev 2faf4b79a7
+     * exposed the bug, but it seems that the older  strategy for gc_and_save left
+     * zeroed pages in exactly the right places either by accident or by design */
+    for (i = start; i <= end; i++) {
+        zero_pages(i, i);
+        set_page_need_to_zero(i, 0);
+    }
 #else
     boolean usable_by_lisp =
         gc_alloc_generation == 0 || (gc_alloc_generation == SCRATCH_GENERATION

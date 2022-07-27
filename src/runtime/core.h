@@ -52,19 +52,10 @@ extern unsigned char build_id[];
 
 char* get_asm_routine_by_name(const char* name, int*);
 
-// Oddly enough, MIPS stopped working with pseudo-static pages after the speedup to
-// gc_and_save.  I spent a day trying to figure out why, and gave up.
-// I surmise that it exposed a bug in the soft card marking implementation
-// on MIPS, which considering that we have no evidence that users of SBCL on MIPS exist,
-// does not seem important enough to demand a fix.
-#ifdef LISP_FEATURE_MIPS
-#define CORE_PAGE_GENERATION 0
-#else
 // By setting this to 0, all objects begin life in the nursery, and nothing
 // is pseudo-static. As such, any bugs due to code movement are likely to
 // occur sooner. Or set it to 1 to make things sort of not move immediately.
 // Either way, use this only for debugging, and at your own risk.
 //#define CORE_PAGE_GENERATION 0
 #define CORE_PAGE_GENERATION PSEUDO_STATIC_GENERATION
-#endif
 #endif
