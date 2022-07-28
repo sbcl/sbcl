@@ -99,69 +99,68 @@
 
 (defun simd-nreverse8 (result vector start end)
   (declare (optimize speed (safety 0)))
-  (let ((sap (vector-sap vector)))
-    (with-pinned-objects-in-registers (vector)
-      (inline-vop (((left sap-reg t) sap)
-                   ((start any-reg tagged-num) start)
-                   ((end) end)
-                   ((right signed-reg signed-num))
-                   ((gl))
-                   ((gr))
-                   ((vl complex-double-reg complex-double-float))
-                   ((vr)))
-          ()
-        (inst add right left (lsr end 1))
-        (inst add left left (lsr start 1))
-        (inst sub gl right left)
-        (inst cmp gl 32)
-        (inst b :lt WORD)
-        (inst sub right right 16)
+  (with-pinned-objects-in-registers (vector)
+    (inline-vop (((left sap-reg t) (vector-sap vector))
+                 ((start any-reg tagged-num) start)
+                 ((end) end)
+                 ((right signed-reg signed-num))
+                 ((gl))
+                 ((gr))
+                 ((vl complex-double-reg complex-double-float))
+                 ((vr)))
+        ()
+      (inst add right left (lsr end 1))
+      (inst add left left (lsr start 1))
+      (inst sub gl right left)
+      (inst cmp gl 32)
+      (inst b :lt WORD)
+      (inst sub right right 16)
 
-        LOOP
-        (inst ldr vl (@ left))
-        (inst ldr vr (@ right))
+      LOOP
+      (inst ldr vl (@ left))
+      (inst ldr vr (@ right))
 
-        (inst rev64 vl vl)
-        (inst ext vl vl vl 8)
-        (inst rev64 vr vr)
-        (inst ext vr vr vr 8)
+      (inst rev64 vl vl)
+      (inst ext vl vl vl 8)
+      (inst rev64 vr vr)
+      (inst ext vr vr vr 8)
 
-        (inst str vr (@ left 16 :post-index))
-        (inst str vl (@ right -16 :post-index))
-        (inst cmp left right)
-        (inst b :lt loop)
+      (inst str vr (@ left 16 :post-index))
+      (inst str vl (@ right -16 :post-index))
+      (inst cmp left right)
+      (inst b :lt loop)
 
-        (inst add right right 16)
+      (inst add right right 16)
 
-        (inst sub gl right left)
-        WORD
-        (inst cmp gl 16)
-        (inst b :lt BYTE)
+      (inst sub gl right left)
+      WORD
+      (inst cmp gl 16)
+      (inst b :lt BYTE)
 
-        (inst ldr gl (@ left))
-        (inst ldr gr (@ right -8 :pre-index))
-        (inst rev gl gl)
-        (inst rev gr gr)
-        (inst str gr (@ left 8 :post-index))
-        (inst str gl (@ right))
+      (inst ldr gl (@ left))
+      (inst ldr gr (@ right -8 :pre-index))
+      (inst rev gl gl)
+      (inst rev gr gr)
+      (inst str gr (@ left 8 :post-index))
+      (inst str gl (@ right))
 
-        BYTE
-        (inst sub right right 1)
-        (inst cmp right left)
-        (inst b :lt DONE)
+      BYTE
+      (inst sub right right 1)
+      (inst cmp right left)
+      (inst b :lt DONE)
 
-        ;; After the 16-element copy above there are at most 15
-        ;; elements, have to swap 14 elements with one staying in the
-        ;; middle.
-        (loop repeat 7
-              do
-              (inst ldrb gl (@ left))
-              (inst ldrb gr (@ right))
-              (inst strb gr (@ left 1 :post-index))
-              (inst strb gl (@ right -1 :post-index))
-              (inst cmp left right)
-              (inst b :ge DONE))
-        DONE)))
+      ;; After the 16-element copy above there are at most 15
+      ;; elements, have to swap 14 elements with one staying in the
+      ;; middle.
+      (loop repeat 7
+            do
+            (inst ldrb gl (@ left))
+            (inst ldrb gr (@ right))
+            (inst strb gr (@ left 1 :post-index))
+            (inst strb gl (@ right -1 :post-index))
+            (inst cmp left right)
+            (inst b :ge DONE))
+      DONE))
   result)
 
 (defun simd-nreverse32 (result vector start end)
@@ -219,10 +218,9 @@
 
 (defun simd-reverse8 (target source start length)
   (declare (optimize speed (safety 0)))
-  (let ((source (vector-sap source))
-        (target (vector-sap target)))
-    (inline-vop (((source sap-reg t) source)
-                 ((target sap-reg t) target)
+  (with-pinned-objects-in-registers (target source)
+    (inline-vop (((source sap-reg t) (vector-sap source))
+                 ((target sap-reg t) (vector-sap target))
                  ((start any-reg tagged-num) start)
                  ((length) length)
                  ((s-i signed-reg signed-num))
@@ -274,10 +272,9 @@
 
 (defun simd-reverse32 (target source start length)
   (declare (optimize speed (safety 0)))
-  (let ((source (vector-sap source))
-        (target (vector-sap target)))
-    (inline-vop (((source sap-reg t) source)
-                 ((target sap-reg t) target)
+  (with-pinned-objects-in-registers (target source)
+    (inline-vop (((source sap-reg t) (vector-sap source))
+                 ((target sap-reg t) (vector-sap target))
                  ((start any-reg tagged-num) start)
                  ((length) length)
                  ((s-i signed-reg signed-num))
