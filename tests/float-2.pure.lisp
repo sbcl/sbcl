@@ -373,3 +373,15 @@ fractional bits."
                        4.2766818550391727d188
                        1.635888515419299d28))
           (test op val))))))
+
+(with-test (:name :truncate-bignum-type-derivation)
+  (checked-compile `(lambda (x)
+                      (declare ((or (integer 1208925819614629174706175)
+                                    (integer * -1208925819614629174706175))
+                                x))
+                      (truncate (float x 4d0))))
+  (checked-compile `(lambda (x)
+                      (declare ((or (integer 1208925819614629174706175)
+                                    (integer * -1208925819614629174706175))
+                                x))
+                      (truncate (float x 1d0) 4d0))))
