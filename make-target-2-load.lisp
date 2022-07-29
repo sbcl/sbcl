@@ -425,7 +425,6 @@ Please check that all strings which were not recognizable to the compiler
         #.(find-package "SB-ASSEM")
         #.(find-package "SB-DISASSEM")
         #.(find-package "SB-IMPL")
-        #.(find-package "SB-LOOP")
         #.(find-package "SB-FORMAT")
         #.(find-package "SB-UNIX")
         #.(find-package "SB-PCL")
@@ -438,6 +437,11 @@ Please check that all strings which were not recognizable to the compiler
         #.(find-package "SB-KERNEL"))
        ;; Assume all and only external symbols must be retained
        (eq accessibility :external))
+      (#.(find-package "SB-LOOP")
+       (or (eq accessibility :external)
+           ;; Retain some internals to keep CLSQL working.
+           (member symbol '(sb-loop::*loop-epilogue*
+                            sb-loop::add-loop-path))))
       (#.(find-package "SB-THREAD")
        (or (eq accessibility :external)
            ;; for some reason a recent change caused the tree-shaker to drop MAKE-SPINLOCK
