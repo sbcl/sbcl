@@ -340,7 +340,11 @@ sufficiently motivated to do lengthy fixes."
   ;; And CLRHASH doesn't do as much as it should, because if the table
   ;; is actually empty, but at some point held 20,000 pathnames,
   ;; then we'd write out an enormous vector full of nothing.
-  (make-pathname-intern-table)
+  (setq sb-impl::*pathnames* (make-pathname-intern-table))
+  (when (zerop (hash-table-count sb-kernel::*forward-referenced-wrappers*))
+    ;; I think this table should always be empty but I'm not sure. If it is,
+    ;; recreate it so that we don't preserve an empty vector taking up 16KB
+    (setq sb-kernel::*forward-referenced-wrappers* (make-hash-table :test 'equal)))
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))

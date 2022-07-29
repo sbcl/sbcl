@@ -17,6 +17,15 @@
 
 ;;;; Pathname accessors
 
+(with-test (:name :pathname-table-clobbered-on-save)
+  (let ((kvv (sb-impl::hash-table-pairs sb-impl::*pathnames*)))
+    (sb-int:dovector (element kvv)
+      (when (and (eq (heap-allocated-p element) :dynamic)
+                 (pathnamep element)
+                 (not (equal element #P"")))
+        (assert (/= (sb-kernel:generation-of element)
+                    sb-vm:+pseudo-static-generation+))))))
+
 (with-test (:name (pathname :accessors :stream-not-associated-to-file type-error))
   (let ((*stream* (make-string-output-stream)))
     (declare (special *stream*))
