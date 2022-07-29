@@ -771,7 +771,7 @@
            nil
            (let ((int (if (minusp float) (- bits) bits)))
              (and (= (truly-the bignum-length (bignum-integer-length bignum))
-                     (+ (integer-length bits) exp))
+                     (+ (integer-length int) exp))
                   (sb-bignum::bignum-lower-bits-zero-p bignum exp)
                   (= int
                      (truly-the fixnum
@@ -786,9 +786,9 @@
        (if (or (eql bits 0)
                (minusp exp))
            (bignum-plus-p bignum)
-           (let ((int (if (minusp float) (- bits) bits))
-                 (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
-                                 (+ (integer-length bits) exp))))
+           (let* ((int (if (minusp float) (- bits) bits))
+                  (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
+                                  (+ (integer-length int) exp))))
              (cond
                ((plusp length-diff) (bignum-plus-p bignum))
                ((minusp length-diff) (minusp float))
@@ -810,9 +810,9 @@
        (if (or (eql bits 0)
                (minusp exp))
            (not (bignum-plus-p bignum))
-           (let ((int (if (minusp float) (- bits) bits))
-                 (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
-                                 (+ (integer-length bits) exp))))
+           (let* ((int (if (minusp float) (- bits) bits))
+                  (length-diff (- (truly-the bignum-length (bignum-integer-length bignum))
+                                  (+ (integer-length int) exp))))
              (cond
                ((plusp length-diff) (not (bignum-plus-p bignum)))
                ((minusp length-diff) (not (minusp float)))

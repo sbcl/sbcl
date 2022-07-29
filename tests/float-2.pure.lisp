@@ -385,3 +385,15 @@ fractional bits."
                                     (integer * -1208925819614629174706175))
                                 x))
                       (truncate (float x 1d0) 4d0))))
+
+(with-test (:name :bignum-float-compare)
+  (flet ((test (integer)
+           (assert (= (float integer 1d0)
+                      (truncate (float integer 1d0))))
+           (assert (= (float integer)
+                      (truncate (float integer))))))
+    (loop for i from 80 to 100 by 4
+          do (test (expt 2 i))
+             (test (- (expt 2 i)))
+             (test (1+ (expt 2 i)))
+             (test (- (expt 2 i))))))

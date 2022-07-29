@@ -23,6 +23,7 @@ changes relative to sbcl-2.2.6:
     declared argument types.  (lp#1980292, reported by James Kalenius)
   * bug fix: internal error when optimizing chains of conditionals in local
     functions.  (lp#1981607, reported by Pasha K)
+  * bug fix: fix comparison of negative floats with bignums.
   * optimization: faster TRUNCATE with float arguments.
   * optimization: EQUALP hashing of large floating point values should
     generate less garbage.
