@@ -147,6 +147,16 @@ static inline sword_t dword_index(uword_t ptr, uword_t base) {
     return (ptr - base) >> (1+WORD_SHIFT);
 }
 
+static inline lispobj canonical_ptr(lispobj pointer)
+{
+#ifdef RETURN_PC_WIDETAG
+    if (lowtag_of(pointer)==OTHER_POINTER_LOWTAG && widetag_of(native_pointer(pointer))
+          == RETURN_PC_WIDETAG)
+        return fun_code_tagged(native_pointer(pointer));
+#endif
+    return pointer;
+}
+
 sword_t fixedobj_index_bit_bias, varyobj_index_bit_bias;
 uword_t *fullcgcmarks;
 static size_t markbits_size;
@@ -167,7 +177,7 @@ static inline sword_t ptr_to_bit_index(lispobj pointer) {
 /* Return true if OBJ has already survived the current GC. */
 static inline int pointer_survived_gc_yet(lispobj pointer)
 {
-    sword_t mark_index = ptr_to_bit_index(pointer);
+    sword_t mark_index = ptr_to_bit_index(canonical_ptr(pointer));
     if (mark_index < 0) return 1; // "uninteresting" objects always survive GC
     return (fullcgcmarks[mark_index / N_WORD_BITS] >> (mark_index % N_WORD_BITS)) & 1;
 }
@@ -197,6 +207,7 @@ static void __mark_obj(lispobj pointer)
 {
     lispobj* base;
 
+    pointer = canonical_ptr(pointer);
     sword_t mark_index = ptr_to_bit_index(pointer);
     if (mark_index < 0) return; // uninteresting pointer
     uword_t wordindex = mark_index / N_WORD_BITS;
