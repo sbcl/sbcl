@@ -1,0 +1,17 @@
+*~
+*.o
+*.i
+*.s
+*.P
+*.elf
+*.bin
+*.hex
+*.map
+*.swp
+*.fuse*
+*.pyc
+*.swo
+*.out
+build/
+tags
+core

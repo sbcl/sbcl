@@ -35,7 +35,7 @@ include ../../output/prefix.def
 
 CFLAGS += -g -Wall -Wundef -Wsign-compare -Wpointer-arith -O3
 ASFLAGS += $(CFLAGS)
-CPPFLAGS += -I.
+CPPFLAGS += -I. -I../../
 
 # Give make access to the target Lisp features.
 include genesis/Makefile.features
@@ -86,7 +86,7 @@ C_SRC = $(COMMON_SRC) ${ARCH_SRC} ${OS_SRC} ${GC_SRC}
 
 SRCS = $(C_SRC) ${ASSEM_SRC}
 
-OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
+OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o) ../../tlsf-bsd/tlsf/tlsf.o
 
 LIBS = ${OS_LIBS} $(LDLIBS) -lm
 
