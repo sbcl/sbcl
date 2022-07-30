@@ -479,9 +479,15 @@ void gc_show_pte(lispobj obj)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     page = find_text_page_index((void*)obj);
     if (page>=0) {
-        printf("page %ld (v) ss=%p gens %x%s\n", page,
+        lispobj* text_page_scan_start(low_page_index_t page);
+        int gens = text_pages[page].generations;
+        char genstring[9];
+        int i;
+        for (i=0;i<8;++i) genstring[i] = (gens & (1<<i)) ? '0'+i : '-';
+        genstring[8] = 0;
+        printf("page %ld (v) base %p gens %s ss=%p%s\n",
+               page, text_page_address(page), genstring,
                text_page_scan_start(page),
-               text_pages[page].generations,
                card_markedp((void*)obj)?"":" WP");
         return;
     }
