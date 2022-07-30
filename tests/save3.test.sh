@@ -15,7 +15,7 @@ run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit \
 check_status_maybe_lose "SAVE-LISP-AND-DIE" $? 0 "(saved core ran)"
 
 # Verify that for funcallable instances which were moved into the
-# immobile varyobj space by SAVE-LISP-AND-DIE, setting the layout
+# immobile text space by SAVE-LISP-AND-DIE, setting the layout
 # updates the GC card touched bit.
 # Going through instance-obsolescence stuff makes things mostly work
 # by accident, because (SETF %FUNCALLABLE-INSTANCE-INFO) touches

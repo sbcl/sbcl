@@ -135,7 +135,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
  *
  * (1) gc-common's table-based mechanism
  * (2) gencgc's verify_range()
- * (3) immobile space {fixedobj,varyobj}_points_to_younger_p()
+ * (3) immobile space {fixedobj,text}_points_to_younger_p()
  *     and fixup_space() for defrag. [and the table-based thing is used too]
  * (4) fullcgc's trace_object()
  * (5) coreparse's relocate_space()
@@ -214,7 +214,7 @@ void coalesce_similar_objects()
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, arg);
-    coalesce_range((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, arg);
+    coalesce_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, arg);
 #endif
 #ifdef LISP_FEATURE_GENCGC
     walk_generation(coalesce_range, -1, arg);

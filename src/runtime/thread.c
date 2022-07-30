@@ -934,11 +934,11 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #ifdef LAYOUT_OF_FUNCTION
     tls[THREAD_FUNCTION_LAYOUT_SLOT] = LAYOUT_OF_FUNCTION << 32;
 #endif
-#ifdef THREAD_VARYOBJ_CARD_MARKS_SLOT
-    extern unsigned int* varyobj_page_touched_bits;
-    tls[THREAD_VARYOBJ_SPACE_ADDR_SLOT] = VARYOBJ_SPACE_START;
-    tls[THREAD_VARYOBJ_CARD_COUNT_SLOT] = varyobj_space_size / IMMOBILE_CARD_BYTES;
-    tls[THREAD_VARYOBJ_CARD_MARKS_SLOT] = (lispobj)varyobj_page_touched_bits;
+#ifdef THREAD_TEXT_CARD_MARKS_SLOT
+    extern unsigned int* text_page_touched_bits;
+    tls[THREAD_TEXT_SPACE_ADDR_SLOT] = TEXT_SPACE_START;
+    tls[THREAD_TEXT_CARD_COUNT_SLOT] = text_space_size / IMMOBILE_CARD_BYTES;
+    tls[THREAD_TEXT_CARD_MARKS_SLOT] = (lispobj)text_page_touched_bits;
 #endif
 
     th->os_address = spaces;

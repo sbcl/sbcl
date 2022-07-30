@@ -125,8 +125,8 @@
                (sap-int *fixedobj-space-free-pointer*)))
       #+immobile-space
       (:variable
-       (bounds varyobj-space-start
-               (sap-int *varyobj-space-free-pointer*)))
+       (bounds text-space-start
+               (sap-int *text-space-free-pointer*)))
       (:dynamic
        (bounds (current-dynamic-space-start)
                (sap-int (dynamic-space-free-pointer)))))))
@@ -325,7 +325,7 @@ We could try a few things to mitigate this:
             (:immobile
              ;; Filter out filler objects. These either look like cons cells
              ;; in fixedobj subspace, or code without enough header words
-             ;; in varyobj subspace. (cf 'filler_obj_p' in gc-internal.h)
+             ;; in text subspace. (cf 'filler_obj_p' in gc-internal.h)
              (dx-flet ((filter (obj type size)
                          (unless (= type list-pointer-lowtag)
                            (funcall fun obj type size))))
@@ -1180,10 +1180,10 @@ We could try a few things to mitigate this:
         (%make-lisp-obj fixedobj-space-start)
         (%make-lisp-obj (sap-int *fixedobj-space-free-pointer*))))
     (when (or (eq which :variable) (eq which :both))
-      (format t "Varyobj space~%=============~%")
+      (format t "Text space~%=============~%")
       (map-objects-in-range #'show
-        (%make-lisp-obj varyobj-space-start)
-        (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))))
+        (%make-lisp-obj text-space-start)
+        (%make-lisp-obj (sap-int *text-space-free-pointer*))))))
 
 ;;; Show objects in a much simpler way than print-allocated-objects.
 ;;; Probably don't use this for generation 0 of dynamic space. Other spaces are ok.
@@ -1307,8 +1307,8 @@ We could try a few things to mitigate this:
     (without-gcing
       #+immobile-code
       (map-objects-in-range #'nofilter
-                            (ash varyobj-space-start (- n-fixnum-tag-bits))
-                            (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))
+                            (ash text-space-start (- n-fixnum-tag-bits))
+                            (%make-lisp-obj (sap-int *text-space-free-pointer*)))
       (alien-funcall (extern-alien "close_code_region" (function void)))
       (walk-dynamic-space #'nofilter
                           #b1111111 ; all generations

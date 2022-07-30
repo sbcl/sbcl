@@ -211,7 +211,7 @@
 #+immobile-space
 (progn
   (defvar *immobile-fixedobj*)
-  (defvar *immobile-varyobj*)
+  (defvar *immobile-text*)
   (defvar *immobile-space-map* nil))
 
 (defconstant max-core-space-id (+ 3 #+immobile-space 2
@@ -599,7 +599,7 @@
 
         (dolist (gspace (list *dynamic* *static* *read-only*
                               #+immobile-space *immobile-fixedobj*
-                              #+immobile-space *immobile-varyobj*)
+                              #+immobile-space *immobile-text*)
                  (error "couldn't find a GSPACE for ~S" des))
           ;; Bounds-check the descriptor against the allocated area
           ;; within each gspace.
@@ -703,7 +703,7 @@
                   (let ((gspace (descriptor-intuit-gspace des)))
                     (aver gspace)
                     (when (or (eq gspace *immobile-fixedobj*)
-                              (eq gspace *immobile-varyobj*))
+                              (eq gspace *immobile-text*))
                       sb-vm:+pseudo-static-generation+))
                   0))
          (widetag (logand header-word sb-vm:widetag-mask))
@@ -2685,7 +2685,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (stack (%fasl-input-stack (fasl-input)))
          (stack-index (fop-stack-pop-n stack stack-elts-consumed))
          (des (allocate-cold-descriptor
-                  (or #+immobile-code (and immobile *immobile-varyobj*)
+                  (or #+immobile-code (and immobile *immobile-text*)
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) n-code-bytes)
                   sb-vm:other-pointer-lowtag :code)))
@@ -2772,7 +2772,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (n-fixup-elts (read-word-arg (fasl-input-stream)))
          (rounded-length (round-up length (* 2 sb-vm:n-word-bytes)))
          (header-n-words (sb-c::asm-routines-boxed-header-nwords))
-         (space (or #+(and immobile-code (not metaspace)) *immobile-varyobj*
+         (space (or #+(and immobile-code (not metaspace)) *immobile-text*
                     ;; If there is a read-only space, use it, else use static space.
                     (if (> sb-vm:read-only-space-end sb-vm:read-only-space-start)
                         *read-only*
@@ -3736,7 +3736,7 @@ III. initially undefined function references (alphabetically):
       (write-word directory-core-entry-type-code)
       (let ((spaces (nconc (list *read-only* *static*)
                            #+immobile-space
-                           (list *immobile-fixedobj* *immobile-varyobj*)
+                           (list *immobile-fixedobj* *immobile-text*)
                            (list *dynamic*))))
         ;; length = (5 words/space) * N spaces + 2 for header.
         (write-word (+ (* (length spaces) 5) 2))
@@ -3839,9 +3839,9 @@ III. initially undefined function references (alphabetically):
                                              immobile-fixedobj-core-space-id
                                              sb-vm:fixedobj-space-start))
            #+immobile-space
-           (*immobile-varyobj* (make-gspace :immobile-varyobj
-                                            immobile-varyobj-core-space-id
-                                            sb-vm:varyobj-space-start))
+           (*immobile-text* (make-gspace :immobile-text
+                                         immobile-text-core-space-id
+                                         sb-vm:text-space-start))
            (*dynamic*   (make-gspace :dynamic
                                      dynamic-core-space-id
                                      #+gencgc sb-vm:dynamic-space-start
@@ -3894,7 +3894,7 @@ III. initially undefined function references (alphabetically):
            (cold-cons z z (ecase (gspace-name
                                   (descriptor-gspace *cold-assembler-obj*))
                             ((:read-only :static) *static*)
-                            (:immobile-varyobj *dynamic*)))))
+                            (:immobile-text *dynamic*)))))
         (init-runtime-routines))
 
       ;; Initialize the *COLD-SYMBOLS* system with the information

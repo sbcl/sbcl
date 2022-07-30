@@ -15,7 +15,7 @@
            #:static-code-core-space-id
            #:dynamic-core-space-id
            #:immobile-fixedobj-core-space-id
-           #:immobile-varyobj-core-space-id
+           #:immobile-text-core-space-id
            #:deflated-core-space-id-flag))
 
 (in-package "SB-COREFILE")
@@ -49,6 +49,6 @@
 (defconstant static-core-space-id 2)
 (defconstant read-only-core-space-id 3)
 (defconstant immobile-fixedobj-core-space-id 4)
-(defconstant immobile-varyobj-core-space-id 5)
+(defconstant immobile-text-core-space-id 5)
 (defconstant static-code-core-space-id 4)
 (defconstant deflated-core-space-id-flag 8)

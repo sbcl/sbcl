@@ -639,7 +639,7 @@ sb-c::
             (callees (cdr item)))
         (dolist (callee callees)
           (push caller (gethash callee reverse-graph)))))
-    ;; Compute popularity of each code component in varyobj space
+    ;; Compute popularity of each code component in text space
     (map-allocated-objects
      (lambda (obj type size)
        (declare (ignore size))

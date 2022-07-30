@@ -271,7 +271,7 @@
   (assert (not (sb-kernel:immobile-space-addr-p
                 (+ sb-vm:fixedobj-space-start
                    sb-vm:fixedobj-space-size
-                   sb-vm:varyobj-space-size)))))
+                   sb-vm:text-space-size)))))
 
 (with-test (:name :unique-code-serialno :skipped-on :interpreter)
   (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))

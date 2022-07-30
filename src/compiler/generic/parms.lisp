@@ -63,8 +63,8 @@
                ;; And of course, don't use them if unsupported.
                ((:fixedobj-space-start fixedobj-space-start*))
                ((:fixedobj-space-size  fixedobj-space-size*) (* 24 1024 1024))
-               ((:varyobj-space-start  varyobj-space-start*))
-               ((:varyobj-space-size   varyobj-space-size*) (* 104 1024 1024))
+               ((:text-space-start text-space-start*))
+               ((:text-space-size  text-space-size*) (* 104 1024 1024))
                (small-space-size #x100000)
                ((:read-only-space-size ro-space-size)
                 #+darwin-jit small-space-size
@@ -92,7 +92,7 @@
                            (static-code ,small-space-size))
                          #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
-                           (varyobj ,varyobj-space-size*))))
+                           (text ,text-space-size*))))
          (ptr small-spaces-start)
          (small-space-forms
            (loop for (space size var-name) in spaces
@@ -102,7 +102,7 @@
                           ;; TODO: linkage-table could move with code, if the CPU
                           ;; prefers PC-relative jumps, and we emit better code
                           ;; (which we don't- for x86 we jmp via RBX always)
-                          (member space '(fixedobj varyobj
+                          (member space '(fixedobj text
                                           #-darwin-jit read-only)))
                         (start ptr)
                         (end (+ ptr size)))
@@ -113,14 +113,14 @@
                          ;; Allow expressly given addresses / sizes for immobile space.
                          ;; The addresses are for testing only - you should not need them.
                          (case space
-                           (varyobj  (setq start (or varyobj-space-start* start)
-                                           end (+ start varyobj-space-size*)))
+                           (text (setq start (or text-space-start* start)
+                                       end (+ start text-space-size*)))
                            (fixedobj (setq start (or fixedobj-space-start* start)
                                            end (+ start fixedobj-space-size*))))
                          `(,(defconstantish relocatable start-sym start)
                            ,(cond ((not relocatable)
                                    `(defconstant ,(symbolicate space "-SPACE-END") ,end))
-                                  #-sb-xc-host ((eq space 'varyobj)) ; don't emit anything
+                                  #-sb-xc-host ((eq space 'text)) ; don't emit anything
                                   (t
                                    `(defconstant ,(symbolicate space "-SPACE-SIZE")
                                       ,(- end start)))))))))))

@@ -65,8 +65,8 @@ struct crash_preamble {
     int card_table_nbits;
     // fixedobj data dumped: pages, page table
     uword_t fixedobj_start, fixedobj_size, fixedobj_free_pointer;
-    // varyobj data dumped: pages, touched_bits, page table
-    uword_t varyobj_start, varyobj_size, varyobj_free_pointer;
+    // text data dumped: pages, touched_bits, page table
+    uword_t text_start, text_size, text_space_highwatermark;
     int nthreads;
     int tls_size;
     lispobj lisp_package_vector;
@@ -127,9 +127,9 @@ void save_gc_crashdump(char *pathname,
     preamble.fixedobj_start = FIXEDOBJ_SPACE_START;
     preamble.fixedobj_size = FIXEDOBJ_SPACE_SIZE;
     preamble.fixedobj_free_pointer = (uword_t)fixedobj_free_pointer;
-    preamble.varyobj_start = VARYOBJ_SPACE_START;
-    preamble.varyobj_size = VARYOBJ_SPACE_SIZE;
-    preamble.varyobj_free_pointer = (uword_t)varyobj_free_pointer;
+    preamble.text_start = TEXT_SPACE_START;
+    preamble.text_size = TEXT_SPACE_SIZE;
+    preamble.text_space_highwatermark = (uword_t)text_space_highwatermark;
 #endif
     // write the preamble and static space
     checked_write(fd, &preamble, sizeof preamble);
@@ -145,12 +145,12 @@ void save_gc_crashdump(char *pathname,
     checked_write(fd, (char*)FIXEDOBJ_SPACE_START, usage);
     int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     checked_write(fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
-    usage = (uword_t)varyobj_free_pointer - VARYOBJ_SPACE_START;
-    checked_write(fd, (char*)VARYOBJ_SPACE_START, usage);
-    total_npages = VARYOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
+    checked_write(fd, (char*)TEXT_SPACE_START, usage);
+    total_npages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
-    checked_write(fd, varyobj_page_touched_bits, n_bitmap_elts * sizeof (int));
-    checked_write(fd, varyobj_pages, total_npages * sizeof (int));
+    checked_write(fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));
+    checked_write(fd, text_pages, total_npages * sizeof (int));
 #endif
     struct crash_thread_preamble thread_preamble;
     for_each_thread(th) {
@@ -870,13 +870,13 @@ int load_gc_crashdump(char* pathname)
                 calc_immobile_space_bounds(),
                 write_protect_immobile_space();
     gc_assert(preamble.fixedobj_size == FIXEDOBJ_SPACE_SIZE);
-    gc_assert(preamble.varyobj_size == VARYOBJ_SPACE_SIZE);
+    gc_assert(preamble.text_size == TEXT_SPACE_SIZE);
     FIXEDOBJ_SPACE_START = preamble.fixedobj_start;
-    VARYOBJ_SPACE_START = preamble.varyobj_start;
+    TEXT_SPACE_START = preamble.text_start;
     fixedobj_free_pointer = (lispobj*)preamble.fixedobj_free_pointer;
-    varyobj_free_pointer = (lispobj*)preamble.varyobj_free_pointer;
+    text_space_highwatermark = (lispobj*)preamble.text_space_highwatermark;
     os_validate(0, (char*)FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_SIZE, 0, 0);
-    os_validate(0, (char*)VARYOBJ_SPACE_START, VARYOBJ_SPACE_SIZE, 0, 0);
+    os_validate(0, (char*)TEXT_SPACE_START, TEXT_SPACE_SIZE, 0, 0);
     gc_init_immobile(); // allocate the page tables
     calc_immobile_space_bounds();
     // Read fixedobj space
@@ -885,13 +885,13 @@ int load_gc_crashdump(char* pathname)
     // Always read the whole page table regardless of the current space usage
     int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     checked_read(fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
-    // Read varyobj space
-    usage = (uword_t)varyobj_free_pointer - VARYOBJ_SPACE_START;
-    checked_read(fd, (char*)VARYOBJ_SPACE_START, usage);
-    total_npages = VARYOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    // Read text space
+    usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
+    checked_read(fd, (char*)TEXT_SPACE_START, usage);
+    total_npages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
-    checked_read(fd, varyobj_page_touched_bits, n_bitmap_elts * sizeof (int));
-    checked_read(fd, varyobj_pages, total_npages * sizeof (int));
+    checked_read(fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));
+    checked_read(fd, text_pages, total_npages * sizeof (int));
     write_protect_immobile_space();
 #endif
     fprintf(stderr, "%d threads:\n", (int)preamble.nthreads);

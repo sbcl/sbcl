@@ -410,16 +410,16 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
 #  ifdef __linux__
     // Try this verification if immobile-space was compiled with extra debugging.
     // But weak symbols don't work on macOS.
-    extern void __attribute__((weak)) check_varyobj_pages();
-    if (&check_varyobj_pages) check_varyobj_pages();
+    extern void __attribute__((weak)) check_text_pages();
+    if (&check_text_pages) check_text_pages();
 #  endif
     if (verbose)
         fprintf(stderr, " [immobile]");
     if (verify(FIXEDOBJ_SPACE_START,
                fixedobj_free_pointer, &state,
                flags | VERIFYING_GENERATIONAL)) goto out;
-    if (verify(VARYOBJ_SPACE_START,
-               varyobj_free_pointer, &state,
+    if (verify(TEXT_SPACE_START,
+               text_space_highwatermark, &state,
                flags | VERIFYING_GENERATIONAL)) goto out;
 #endif
     struct thread *th;
@@ -477,11 +477,11 @@ void gc_show_pte(lispobj obj)
         return;
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    page = find_varyobj_page_index((void*)obj);
+    page = find_text_page_index((void*)obj);
     if (page>=0) {
         printf("page %ld (v) ss=%p gens %x%s\n", page,
-               varyobj_scan_start(page),
-               varyobj_pages[page].generations,
+               text_page_scan_start(page),
+               text_pages[page].generations,
                card_markedp((void*)obj)?"":" WP");
         return;
     }
@@ -574,8 +574,8 @@ void hexdump_spaces(struct verify_state* state, char *reason)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     fprintf(f, "Fixedobj space:\n");
     dump_immobile((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, f);
-    fprintf(f, "Varyobj space:\n");
-    dump_immobile((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, f);
+    fprintf(f, "Text space:\n");
+    dump_immobile((lispobj*)TEXT_SPACE_START, text_space_highwatermark, f);
 #endif
 
     fprintf(f, "Dynamic space:\n");

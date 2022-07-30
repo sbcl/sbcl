@@ -54,10 +54,10 @@ extern uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
 extern uword_t DYNAMIC_SPACE_START;
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-extern uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
+extern uword_t FIXEDOBJ_SPACE_START, TEXT_SPACE_START;
 extern uword_t immobile_space_lower_bound, immobile_space_max_offset;
 extern uword_t immobile_range_1_max_offset, immobile_range_2_min_offset;
-extern unsigned int varyobj_space_size;
+extern unsigned int text_space_size;
 #endif
 extern uword_t asm_routines_start, asm_routines_end;
 extern int gc_card_table_nbits;
@@ -99,7 +99,7 @@ lispobj *static_code_space_free_pointer;
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-extern lispobj *varyobj_free_pointer;
+extern lispobj *text_space_highwatermark;
 extern lispobj *fixedobj_free_pointer;
 #endif
 extern os_vm_address_t anon_dynamic_space_start;

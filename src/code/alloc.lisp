@@ -75,10 +75,10 @@
 #+immobile-space
 (progn
 
-(define-alien-variable varyobj-space-size (unsigned 32))
+(define-alien-variable text-space-size (unsigned 32))
 (define-alien-variable ("FIXEDOBJ_SPACE_START" fixedobj-space-start) unsigned-long)
-(define-alien-variable ("VARYOBJ_SPACE_START" varyobj-space-start) unsigned-long)
-(define-alien-variable ("varyobj_free_pointer" *varyobj-space-free-pointer*)
+(define-alien-variable ("TEXT_SPACE_START" text-space-start) unsigned-long)
+(define-alien-variable ("text_space_highwatermark" *text-space-free-pointer*)
   system-area-pointer)
 (define-alien-variable ("fixedobj_free_pointer" *fixedobj-space-free-pointer*)
   system-area-pointer)
@@ -87,9 +87,9 @@
   (assert (eql code-boxed-size-slot 1))
   (assert (eql code-debug-info-slot 2)))
 
-(define-alien-variable "varyobj_holes" long)
-(define-alien-variable "varyobj_page_touched_bits" (* (unsigned 32)))
-(define-alien-variable "varyobj_pages" (* (unsigned 32)))
+(define-alien-variable "text_holes" long)
+(define-alien-variable "text_page_touched_bits" (* (unsigned 32)))
+(define-alien-variable "text_pages" (* (unsigned 32)))
 (define-alien-routine "find_preceding_object" long (where long))
 
 ;;; Lazily created freelist, used only when unallocate is called:
@@ -101,30 +101,30 @@
 ;;; some bytes in the storage itself rather than through cons cells.
 (define-load-time-global *immobile-freelist* nil)
 
-;;; Return the zero-based index within the varyobj subspace of immobile space.
-(defun varyobj-page-index (address)
+;;; Return the zero-based index within the text subspace of immobile space.
+(defun text-page-index (address)
   (declare (type (and fixnum unsigned-byte) address))
-  (values (floor (- address varyobj-space-start) immobile-card-bytes)))
+  (values (floor (- address text-space-start) immobile-card-bytes)))
 
-(defun varyobj-page-address (index)
-  (+ varyobj-space-start (* index immobile-card-bytes)))
+(defun text-page-address (index)
+  (+ text-space-start (* index immobile-card-bytes)))
 
-(declaim (inline (setf varyobj-page-scan-start-offset)))
-(defun (setf varyobj-page-scan-start-offset) (newval index)
+(declaim (inline (setf text-page-scan-start-offset)))
+(defun (setf text-page-scan-start-offset) (newval index)
   ;; NEWVAL is passed in as a byte count but we want to store it as doublewords
   ;; so it needs right-shifting by 1+ word-shift. However because it is a field
   ;; of a packed word, it needs left-shifting by 8. We can shift by the net amount
   ;; provided that no zero bits would be right-shifted out.
   (aver (zerop (logand newval lowtag-mask)))
-  (setf (deref varyobj-pages index)
+  (setf (deref text-pages index)
         (logior (ash newval (- 8 (1+ word-shift)))
-                (logand (deref varyobj-pages index) #xFF)))
+                (logand (deref text-pages index) #xFF)))
   newval)
 
-;;; Convert a zero-based varyobj page index into a scan start address.
-(defun varyobj-page-scan-start (index)
-  (- (+ varyobj-space-start (* (1+ index) immobile-card-bytes))
-     (* 2 n-word-bytes (ash (deref varyobj-pages index) -8))))
+;;; Convert a zero-based text page index into a scan start address.
+(defun text-page-scan-start (index)
+  (- (+ text-space-start (* (1+ index) immobile-card-bytes))
+     (* 2 n-word-bytes (ash (deref text-pages index) -8))))
 
 (declaim (inline hole-p))
 (defun hole-p (raw-address)
@@ -212,9 +212,9 @@
       (remove-from-freelist found))
     found))
 
-(defun set-varyobj-space-free-pointer (free-ptr)
+(defun set-text-space-free-pointer (free-ptr)
   (declare (type (and fixnum unsigned-byte) free-ptr))
-  (setq *varyobj-space-free-pointer* (int-sap free-ptr))
+  (setq *text-space-free-pointer* (int-sap free-ptr))
   ;; When the free pointer is not page-aligned - it usually won't be -
   ;; then we create an unboxed array from the pointer to the page end
   ;; so that it appears as one contiguous object when scavenging.
@@ -232,7 +232,7 @@
   #+immobile-space-debug
   (awhen *in-use-bits* (mark-range it hole (hole-size hole) nil))
   (let* ((hole-end (hole-end-address hole))
-         (end-is-free-ptr (eql hole-end (sap-int *varyobj-space-free-pointer*))))
+         (end-is-free-ptr (eql hole-end (sap-int *text-space-free-pointer*))))
     ;; First, ensure that no page's scan-start points to this hole.
     ;; For smaller-than-page objects, this will do nothing if the hole
     ;; was not the scan-start. For larger-than-page, we have to update
@@ -245,26 +245,26 @@
     ;; Pages (1+ first-page) through (1- last-page) inclusive
     ;; must become empty. last-page may or may not be depending
     ;; on whether another object can be found on it.
-    (let ((first-page (varyobj-page-index hole))
-          (last-page (varyobj-page-index (1- hole-end))))
-      (when (and (eql (varyobj-page-scan-start first-page) hole)
+    (let ((first-page (text-page-index hole))
+          (last-page (text-page-index (1- hole-end))))
+      (when (and (eql (text-page-scan-start first-page) hole)
                  (< first-page last-page))
-        (setf (varyobj-page-scan-start-offset first-page) 0))
+        (setf (text-page-scan-start-offset first-page) 0))
       (loop for page from (1+ first-page) below last-page
-            do (setf (varyobj-page-scan-start-offset page) 0))
+            do (setf (text-page-scan-start-offset page) 0))
       ;; Only touch the offset for the last page if it pointed to this hole.
       ;; If the following object is a hole that is in the pending free list,
       ;; it's ok, but if it's a hole that is already in the freelist,
       ;; it's not OK, so look beyond that object. We don't have to iterate,
       ;; since there can't be two consecutive holes - so it's either the
       ;; object after this hole, or the one after that.
-      (when (eql (varyobj-page-scan-start last-page) hole)
-        (let* ((page-end (varyobj-page-address (1+ last-page)))
+      (when (eql (text-page-scan-start last-page) hole)
+        (let* ((page-end (text-page-address (1+ last-page)))
                (new-scan-start (cond (end-is-free-ptr page-end)
                                      ((freed-hole-p hole-end)
                                       (hole-end-address hole-end))
                                      (t hole-end))))
-          (setf (varyobj-page-scan-start-offset last-page)
+          (setf (text-page-scan-start-offset last-page)
                 (if (< new-scan-start page-end)
                     ;; Compute new offset backwards relative to the page end.
                     (- page-end new-scan-start)
@@ -288,7 +288,7 @@
         ;; the free pointer diminishes the opportunity to use the frontier
         ;; to later allocate a larger object that would not have fit
         ;; into any existing hole.
-        (set-varyobj-space-free-pointer hole)
+        (set-text-space-free-pointer hole)
         (return-from unallocate))
       (let* ((successor hole-end)
              (succ-is-free (freed-hole-p successor)))
@@ -306,13 +306,13 @@
   ;; Can't allocate fewer than 4 words due to min hole size.
   (aver (>= n-bytes (* 4 n-word-bytes)))
   (with-system-mutex (*allocator-mutex* :without-gcing t)
-   (unless (zerop varyobj-holes)
+   (unless (zerop text-holes)
      ;; If deferred sweep needs to happen, do so now.
      ;; Concurrency could potentially be improved here: at most one thread
      ;; should do this step, but it doesn't need to be exclusive with GC
      ;; as long as we can atomically pop items off the list of holes.
-     (let ((hole-addr varyobj-holes))
-       (setf varyobj-holes 0)
+     (let ((hole-addr text-holes))
+       (setf text-holes 0)
        (loop
         (let ((next (sap-ref-word (int-sap hole-addr)
                                   (ash code-debug-info-slot word-shift))))
@@ -337,9 +337,9 @@
                                     shrunk-size remaining)
                               (+ found remaining)))))) ; Consume the upper piece
                ;; 3. Extend the frontier.
-               (let* ((addr (sap-int *varyobj-space-free-pointer*))
+               (let* ((addr (sap-int *text-space-free-pointer*))
                       (free-ptr (+ addr n-bytes))
-                      (limit (+ varyobj-space-start varyobj-space-size)))
+                      (limit (+ text-space-start text-space-size)))
                  (when (> free-ptr limit)
                    (cond (errorp
                           (format t "~&Immobile space exhausted~%")
@@ -347,23 +347,23 @@
                           (sb-impl::%halt))
                          (t
                           (return-from alloc-immobile-code nil))))
-                 (set-varyobj-space-free-pointer free-ptr)
+                 (set-text-space-free-pointer free-ptr)
                  addr))))
      (aver (not (logtest addr lowtag-mask))) ; Assert proper alignment
      ;; Compute the start and end of the first page consumed.
      (let* ((page-start (logandc2 addr (1- immobile-card-bytes)))
             (page-end (+ page-start immobile-card-bytes))
-            (index (varyobj-page-index addr))
+            (index (text-page-index addr))
             (obj-end (+ addr n-bytes)))
        ;; Mark the page as being used by a nursery object.
-       (setf (deref varyobj-pages index) (logior (deref varyobj-pages index) 1))
+       (setf (deref text-pages index) (logior (deref text-pages index) 1))
        ;; On the object's first page, set the scan start only if addr
        ;; is lower than the current page-scan-start object.
        ;; Note that offsets are expressed in doublewords backwards from
        ;; page end, so that we can direct the scan start to any doubleword
        ;; on the page or in the preceding 256MiB (approximately).
-       (when (< addr (varyobj-page-scan-start index))
-         (setf (varyobj-page-scan-start-offset index) (- page-end addr)))
+       (when (< addr (text-page-scan-start index))
+         (setf (text-page-scan-start-offset index) (- page-end addr)))
        ;; On subsequent pages, always set the scan start, since there can not
        ;; be a lower-addressed object touching those pages.
        (loop
@@ -371,7 +371,7 @@
         (incf page-end immobile-card-bytes)
         (incf index)
         (when (>= page-start obj-end) (return))
-        (setf (varyobj-page-scan-start-offset index) (- page-end addr))))
+        (setf (text-page-scan-start-offset index) (- page-end addr))))
      #+immobile-space-debug ; "address sanitizer"
      (awhen *in-use-bits* (mark-range it addr n-bytes t))
      (setf (sap-ref-word (int-sap addr) 0) word0
@@ -444,8 +444,8 @@
   #+immobile-space
   (or (let ((start fixedobj-space-start))
         (<= start addr (truly-the word (+ start (1- fixedobj-space-size)))))
-      (let ((start varyobj-space-start))
-        (<= start addr (truly-the word (+ start (1- varyobj-space-size)))))))
+      (let ((start text-space-start))
+        (<= start addr (truly-the word (+ start (1- text-space-size)))))))
 
 (defun immobile-space-obj-p (obj)
   (immobile-space-addr-p (get-lisp-obj-address obj)))

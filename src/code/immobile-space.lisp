@@ -39,8 +39,8 @@
           (when (= obj-type code-header-widetag) ,@body))
         ;; Slowness here is bothersome, especially for SB-VM::REMOVE-STATIC-LINKS,
         ;; so skip right over all fixedobj pages.
-        (ash varyobj-space-start (- n-fixnum-tag-bits))
-        (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))))))
+        (ash text-space-start (- n-fixnum-tag-bits))
+        (%make-lisp-obj (sap-int *text-space-free-pointer*)))))))
 
 (defun sb-vm::collect-immobile-code-relocs ()
   (let ((code-components

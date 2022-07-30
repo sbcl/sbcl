@@ -136,7 +136,7 @@ static void walk_all_spaces(void (*fun)(lispobj*,uword_t), uword_t arg)
     walk_range((lispobj*)STATIC_SPACE_OBJECTS_START, static_space_free_pointer, fun, arg);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     walk_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, fun, arg);
-    walk_range((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, fun, arg);
+    walk_range((lispobj*)TEXT_SPACE_START, text_space_highwatermark, fun, arg);
 #endif
     page_index_t first, last;
     for ( first = 0 ; first < next_free_page ; first = 1+last ) {

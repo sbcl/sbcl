@@ -399,8 +399,8 @@ int count_immobile_objects(__attribute__((unused)) int gen, int res[5])
         }
         where += object_size(where);
     }
-    where = (lispobj*)VARYOBJ_SPACE_START;
-    end = varyobj_free_pointer;
+    where = (lispobj*)TEXT_SPACE_START;
+    end = text_space_highwatermark;
     while (where < end) {
         if (immobile_obj_generation(where) == gen
             && widetag_of(where) == CODE_HEADER_WIDETAG
@@ -4870,7 +4870,7 @@ void gc_allocate_ptes()
         gcbarrier_patch_code_range(STATIC_SPACE_START, static_space_free_pointer);
         gcbarrier_patch_code_range(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark());
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        gcbarrier_patch_code_range(VARYOBJ_SPACE_START, varyobj_free_pointer);
+        gcbarrier_patch_code_range(TEXT_SPACE_START, text_space_highwatermark);
 #endif
 #endif
     }

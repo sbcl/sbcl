@@ -413,11 +413,11 @@
       #+immobile-space
       (progn
         (inst mov rax object)
-        (inst sub rax (thread-slot-ea thread-varyobj-space-addr-slot))
+        (inst sub rax (thread-slot-ea thread-text-space-addr-slot))
         (inst shr rax (1- (integer-length immobile-card-bytes)))
-        (inst cmp rax (thread-slot-ea thread-varyobj-card-count-slot))
+        (inst cmp rax (thread-slot-ea thread-text-card-count-slot))
         (inst jmp :ae try-dynamic-space)
-        (inst mov rdi (thread-slot-ea thread-varyobj-card-marks-slot))
+        (inst mov rdi (thread-slot-ea thread-text-card-marks-slot))
         (inst bts :dword :lock (ea rdi-tn) rax)
         (inst jmp store))
       TRY-DYNAMIC-SPACE

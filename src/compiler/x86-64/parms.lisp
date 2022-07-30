@@ -96,7 +96,7 @@
                      :read-only-space-size #+metaspace #.(* 2 1024 1024)
                                            #-metaspace 0
                      :fixedobj-space-size #.(* 40 1024 1024)
-                     :varyobj-space-size #.(* 130 1024 1024)
+                     :text-space-size #.(* 130 1024 1024)
                      :dynamic-space-start #x1000000000)
 
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to

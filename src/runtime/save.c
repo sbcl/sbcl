@@ -358,9 +358,9 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     // i.e. if code resided between dynamic and fixedobj space, then dynamic
     // space would need to have it pages renumbered when code is pulled out.
     output_space(file,
-                 IMMOBILE_VARYOBJ_CORE_SPACE_ID,
-                 (lispobj *)VARYOBJ_SPACE_START,
-                 varyobj_free_pointer,
+                 IMMOBILE_TEXT_CORE_SPACE_ID,
+                 (lispobj *)TEXT_SPACE_START,
+                 text_space_highwatermark,
                  core_start_pos,
                  core_compression_level);
 #endif

@@ -948,11 +948,11 @@
           (member :darwin *features*)
           label-prefix label-prefix label-prefix label-prefix))
 
-;;; Convert immobile varyobj space to an assembly file in OUTPUT.
+;;; Convert immobile text space to an assembly file in OUTPUT.
 (defun write-assembler-text
     (spaces output
      &optional enable-pie (emit-cfi t)
-     &aux (code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
+     &aux (code-bounds (space-bounds immobile-text-core-space-id spaces))
           (fixedobj-bounds (space-bounds immobile-fixedobj-core-space-id spaces))
           (core (make-core spaces code-bounds fixedobj-bounds enable-pie))
           (code-addr (bounds-low code-bounds))
@@ -1124,7 +1124,7 @@
            (incf code-addr objsize)))
         )))
 
-  ;; coreparse uses the 'lisp_jit_code' symbol to set varyobj_free_pointer
+  ;; coreparse uses the 'lisp_jit_code' symbol to set text_space_highwatermark
   ;; The intent is that compilation to memory can use this reserved area
   ;; (if space remains) so that profilers can associate a C symbol with the
   ;; program counter range. It's better than nothing.
@@ -1404,7 +1404,7 @@
 ;;; that need to be applied on startup of a position-independent executable.
 ;;;
 (defun collect-relocations (spaces fixups pie &key (verbose nil) (print nil))
-  (let* ((code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
+  (let* ((code-bounds (space-bounds immobile-text-core-space-id spaces))
          (code-start (bounds-low code-bounds))
          (n-abs 0)
          (n-rel 0)
@@ -1452,7 +1452,7 @@
                     (id (space-id space))
                     (npages (ceiling nwords (/ +backend-page-bytes+ n-word-bytes))))
                (when (and (<= page0 page (+ page0 (1- npages)))
-                          (/= id immobile-varyobj-core-space-id))
+                          (/= id immobile-text-core-space-id))
                  (return (+ (space-addr space)
                             (* (- page page0) +backend-page-bytes+)
                             (logand core-offs (1- +backend-page-bytes+))))))))
@@ -1545,7 +1545,7 @@
               (return-from scan-obj)))
            (scanptrs vaddr obj 1 (1- nwords))))
       (dolist (space (cdr spaces))
-        (unless (= (space-id space) immobile-varyobj-core-space-id)
+        (unless (= (space-id space) immobile-text-core-space-id)
           (let* ((logical-addr (space-addr space))
                  (size (space-size space))
                  (physical-addr (space-physaddr space spaces))
@@ -1685,8 +1685,8 @@
                (when verbose
                  (format t "id=~d page=~5x + ~5x addr=~10x words=~8x~:[~; (drop)~]~%"
                          id data-page npages addr nwords
-                         (= id immobile-varyobj-core-space-id)))
-               (cond ((= id immobile-varyobj-core-space-id)
+                         (= id immobile-text-core-space-id)))
+               (cond ((= id immobile-text-core-space-id)
                       (setq code-start-fixup-ofs (+ index 3))
                       ;; Keep this entry but delete the page count. We need to know
                       ;; where the space was supposed to be mapped and at what size.
@@ -1762,7 +1762,7 @@
       ;; Map the original core file to memory
       (with-mapped-core (sap core-offset original-total-npages input)
         (let* ((data-spaces
-                (delete immobile-varyobj-core-space-id (reverse spaces)
+                (delete immobile-text-core-space-id (reverse spaces)
                         :key #'space-id))
                (map (cons sap (sort (copy-list spaces) #'> :key #'space-addr)))
                (pte-nbytes (cdar copy-actions)))
@@ -1863,7 +1863,7 @@
         (with-mapped-core (sap core-offset total-npages input)
           (let* ((spaces (cons sap (sort (copy-list spaces) #'> :key #'space-addr)))
                  (core (make-core spaces
-                                  (space-bounds immobile-varyobj-core-space-id spaces)
+                                  (space-bounds immobile-text-core-space-id spaces)
                                   (space-bounds immobile-fixedobj-core-space-id spaces)))
                  (c-symbols (map 'list (lambda (x) (if (consp x) (car x) x))
                                  (core-linkage-symbols core)))

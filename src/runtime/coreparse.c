@@ -607,7 +607,7 @@ static void relocate_heap(struct heap_adjust* adj)
                    adj);
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
+    relocate_space(TEXT_SPACE_START, text_space_highwatermark, adj);
 #endif
 }
 
@@ -626,7 +626,7 @@ void calc_asm_routine_bounds()
     else
         asm_routines_start = READ_ONLY_SPACE_START + (256+2)*N_WORD_BYTES;
 #elif defined LISP_FEATURE_IMMOBILE_CODE
-    asm_routines_start = VARYOBJ_SPACE_START;
+    asm_routines_start = TEXT_SPACE_START;
 #else
     if ((uword_t)read_only_space_free_pointer > READ_ONLY_SPACE_START &&
         widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
@@ -650,7 +650,7 @@ void calc_immobile_space_bounds()
 {
     /* Suppose we have:
      *   A               B                             C                D
-     *   | varyobj space | .... other random stuff ... | fixedobj space | ...
+     *   | text space    | .... other random stuff ... | fixedobj space | ...
      * then the lower bound is A, the upper bound is D,
      * the max_offset is the distance from A to D,
      * and the excluded middle is the range spanned by B to C.
@@ -661,7 +661,7 @@ void calc_immobile_space_bounds()
     struct range range1 =
         {FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE};
     struct range range2 =
-        {VARYOBJ_SPACE_START, VARYOBJ_SPACE_START + varyobj_space_size};
+        {TEXT_SPACE_START, TEXT_SPACE_START + text_space_size};
     if (range2.start < range1.start) { // swap
         struct range temp = range1;
         range1 = range2;
@@ -732,23 +732,23 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         {FIXEDOBJ_SPACE_SIZE | 1, 0,
             FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
-        {1, 0, VARYOBJ_SPACE_START, &varyobj_free_pointer}
+        {1, 0, TEXT_SPACE_START, &text_space_highwatermark}
 #endif
     };
 
 #if ELFCORE
     if (&lisp_code_start) {
-        VARYOBJ_SPACE_START = (uword_t)&lisp_code_start;
-        varyobj_free_pointer = &lisp_jit_code;
-        varyobj_space_size = (uword_t)&lisp_code_end - VARYOBJ_SPACE_START;
-        spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len = varyobj_space_size;
-        if (varyobj_free_pointer < (lispobj*)VARYOBJ_SPACE_START
+        TEXT_SPACE_START = (uword_t)&lisp_code_start;
+        text_space_highwatermark = &lisp_jit_code;
+        text_space_size = (uword_t)&lisp_code_end - TEXT_SPACE_START;
+        spaces[IMMOBILE_TEXT_CORE_SPACE_ID].len = text_space_size;
+        if (text_space_highwatermark < (lispobj*)TEXT_SPACE_START
             || !PTR_IS_ALIGNED(&lisp_code_end, 4096))
             lose("ELF core alignment bug. Check for proper padding in 'editcore'");
 #ifdef DEBUG_COREPARSE
         printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
                (uword_t)&lisp_code_start, (uword_t)&lisp_code_end,
-               varyobj_free_pointer);
+               text_space_highwatermark);
 #endif
         // Prefill the Lisp linkage table so that shrinkwrapped executables which link in
         // all their C library dependencies can avoid linking with -ldl.
@@ -775,12 +775,12 @@ process_directory(int count, struct ndir_entry *entry,
         }
 
         // unprotect the pages
-        os_protect((void*)VARYOBJ_SPACE_START, varyobj_space_size, OS_VM_PROT_ALL);
+        os_protect((void*)TEXT_SPACE_START, text_space_size, OS_VM_PROT_ALL);
     } else
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     {
-        spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size += VARYOBJ_SPACE_SIZE;
+        spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size += TEXT_SPACE_SIZE;
     }
 #endif
 
@@ -839,7 +839,7 @@ process_directory(int count, struct ndir_entry *entry,
             int sub_2gb_flag = (request & 1);
             request &= ~(size_t)1;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-            if (id == IMMOBILE_VARYOBJ_CORE_SPACE_ID)
+            if (id == IMMOBILE_TEXT_CORE_SPACE_ID)
                 // Pretend an os_validate() happened based on the address that
                 // would be obtained by a constant offset from fixedobj space
                 addr = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
@@ -873,13 +873,13 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
-            case IMMOBILE_VARYOBJ_CORE_SPACE_ID:
+            case IMMOBILE_TEXT_CORE_SPACE_ID:
                 if (addr + request > 0x80000000)
                     lose("Won't map immobile space above 2GB");
                 if (id == IMMOBILE_FIXEDOBJ_CORE_SPACE_ID)
                     FIXEDOBJ_SPACE_START = addr;
                 else
-                    VARYOBJ_SPACE_START = addr;
+                    TEXT_SPACE_START = addr;
                 break;
 #endif
             case DYNAMIC_CORE_SPACE_ID:
@@ -950,7 +950,7 @@ process_directory(int count, struct ndir_entry *entry,
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
         switch (id) {
         default:
-            // varyobj free ptr is already nonzero if Lisp code in executable
+            // text free ptr is already nonzero if Lisp code in executable
             if (!*spaces[id].pfree_pointer)
                 *spaces[id].pfree_pointer = free_pointer;
             break;
@@ -985,19 +985,19 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
 #endif // LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (lisp_code_in_elf() && VARYOBJ_SPACE_START != spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base) {
+    if (lisp_code_in_elf() && TEXT_SPACE_START != spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base) {
         lose("code-in-elf + PIE not supported");
     }
     set_adjustment(adj, FIXEDOBJ_SPACE_START, // actual
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base, // expected
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len);
-    if (!apply_pie_relocs(VARYOBJ_SPACE_START
-                          - spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base,
+    if (!apply_pie_relocs(TEXT_SPACE_START
+                          - spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base,
                           DYNAMIC_SPACE_START - spaces[DYNAMIC_CORE_SPACE_ID].base,
                           fd))
-        set_adjustment(adj, VARYOBJ_SPACE_START, // actual
-                       spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base, // expected
-                       spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
+        set_adjustment(adj, TEXT_SPACE_START, // actual
+                       spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base, // expected
+                       spaces[IMMOBILE_TEXT_CORE_SPACE_ID].len);
 #endif
     if (adj->n_ranges) relocate_heap(adj);
 
@@ -1007,7 +1007,7 @@ process_directory(int count, struct ndir_entry *entry,
      * This used to depend critically on space relocation already having been performed.
      * It doesn't any more, but this is an OK time to do it */
     immobile_space_coreparse(spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len,
-                             spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
+                             spaces[IMMOBILE_TEXT_CORE_SPACE_ID].len);
     calc_immobile_space_bounds();
 #endif
 #ifdef LISP_FEATURE_X86_64

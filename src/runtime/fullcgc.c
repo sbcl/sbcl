@@ -157,7 +157,7 @@ static inline lispobj canonical_ptr(lispobj pointer)
     return pointer;
 }
 
-sword_t fixedobj_index_bit_bias, varyobj_index_bit_bias;
+sword_t fixedobj_index_bit_bias, text_index_bit_bias;
 uword_t *fullcgcmarks;
 static size_t markbits_size;
 static inline sword_t ptr_to_bit_index(lispobj pointer) {
@@ -167,8 +167,8 @@ static inline sword_t ptr_to_bit_index(lispobj pointer) {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     p = find_fixedobj_page_index((void*)pointer);
     if (p >= 0) return dword_index(pointer, FIXEDOBJ_SPACE_START) + fixedobj_index_bit_bias;
-    p = find_varyobj_page_index((void*)pointer);
-    if (p >= 0) return dword_index(pointer, VARYOBJ_SPACE_START) + varyobj_index_bit_bias;
+    p = find_text_page_index((void*)pointer);
+    if (p >= 0) return dword_index(pointer, TEXT_SPACE_START) + text_index_bit_bias;
 #endif
     return -1;
 }
@@ -402,10 +402,10 @@ void prepare_for_full_mark_phase()
     sword_t nbits_dynamic = (next_free_page*GENCGC_PAGE_BYTES) / (2*N_WORD_BYTES);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     sword_t nbits_fixedobj = FIXEDOBJ_SPACE_SIZE / (2*N_WORD_BYTES);
-    sword_t nbits_varyobj = VARYOBJ_SPACE_SIZE / (2*N_WORD_BYTES);
+    sword_t nbits_text = TEXT_SPACE_SIZE / (2*N_WORD_BYTES);
     fixedobj_index_bit_bias = nbits_dynamic;
-    varyobj_index_bit_bias = fixedobj_index_bit_bias + nbits_fixedobj;
-    sword_t nbytes = (nbits_dynamic + nbits_fixedobj + nbits_varyobj) / 8;
+    text_index_bit_bias = fixedobj_index_bit_bias + nbits_fixedobj;
+    sword_t nbytes = (nbits_dynamic + nbits_fixedobj + nbits_text) / 8;
 #else
     sword_t nbytes = nbits_dynamic / 8;
 #endif
@@ -572,9 +572,9 @@ static uword_t sweep(lispobj* where, lispobj* end,
     sword_t bitmap_index_bias = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (find_page_index(where) < 0) {
-        gc_assert(find_varyobj_page_index(where) >= 0);
-        space_base = VARYOBJ_SPACE_START;
-        bitmap_index_bias = varyobj_index_bit_bias;
+        gc_assert(find_text_page_index(where) >= 0);
+        space_base = TEXT_SPACE_START;
+        bitmap_index_bias = text_index_bit_bias;
     }
 #endif
     for ( ; where < end ; where += nwords ) {
@@ -623,8 +623,8 @@ void execute_full_sweep_phase()
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (sweeplog) fprintf(sweeplog, "-- fixedobj space --\n");
     sweep_fixedobj_pages();
-    if (sweeplog) fprintf(sweeplog, "-- varyobj space --\n");
-    sweep((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer,
+    if (sweeplog) fprintf(sweeplog, "-- text space --\n");
+    sweep((lispobj*)TEXT_SPACE_START, text_space_highwatermark,
           (uword_t)words_zeroed);
 #endif
     if (sweeplog) fprintf(sweeplog, "-- dynamic space --\n");

@@ -58,7 +58,7 @@ lispobj *static_code_space_free_pointer;
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-lispobj *varyobj_free_pointer;
+lispobj *text_space_highwatermark;
 lispobj *fixedobj_free_pointer;
 #endif
 os_vm_address_t anon_dynamic_space_start;

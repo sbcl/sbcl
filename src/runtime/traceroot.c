@@ -400,12 +400,12 @@ static inline uint32_t encode_pointer(lispobj pointer)
         return (encoding<<1) | 1;
     } else
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (find_varyobj_page_index((void*)pointer) >= 0) {
-        // A varyobj space pointer is stored as a count in doublewords
+    if (find_text_page_index((void*)pointer) >= 0) {
+        // A text space pointer is stored as a count in doublewords
         // from the base address.
-        encoding = (pointer - VARYOBJ_SPACE_START) / (2*N_WORD_BYTES);
+        encoding = (pointer - TEXT_SPACE_START) / (2*N_WORD_BYTES);
         gc_assert(encoding <= 0x3FFFFFFF);
-        // bit pattern #b10 signifies varyobj space compressed ptr.
+        // bit pattern #b10 signifies text space compressed ptr.
         return (encoding<<2) | 2;
     } else
 #endif
@@ -421,8 +421,8 @@ static inline lispobj decode_pointer(uint32_t encoding)
     if (encoding & 1)  // Compressed ptr to dynamic space
         return (encoding>>1)*(2*N_WORD_BYTES) + DYNAMIC_SPACE_START;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    else if ((encoding & 3) == 2) // Compressed ptr to varyobj space
-        return (encoding>>2)*(2*N_WORD_BYTES) + VARYOBJ_SPACE_START;
+    else if ((encoding & 3) == 2) // Compressed ptr to text space
+        return (encoding>>2)*(2*N_WORD_BYTES) + TEXT_SPACE_START;
 #endif
     else
         return encoding; // Literal pointer
@@ -841,7 +841,7 @@ static void scan_spaces(struct scan_state* ss)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     old = *ss; build_refs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, ss);
     show_tally(old, ss);
-    old = *ss; build_refs((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, ss);
+    old = *ss; build_refs((lispobj*)TEXT_SPACE_START, text_space_highwatermark, ss);
     show_tally(old, ss);
 #endif
     old = *ss;

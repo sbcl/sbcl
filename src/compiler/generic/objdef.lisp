@@ -470,9 +470,9 @@ during backtrace.
             ;; The following slot's existence must NOT be conditional on #+msan
             msan-param-tls) ; = &__msan_param_tls
           #+immobile-space '(function-layout
-                             varyobj-space-addr
-                             varyobj-card-count
-                             varyobj-card-marks)))
+                             text-space-addr
+                             text-card-count
+                             text-card-marks)))
 
 (macrolet ((assign-header-slot-indices ()
              (let ((i 0))

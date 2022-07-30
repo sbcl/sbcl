@@ -30,7 +30,7 @@ extern void write_protect_immobile_space(void);
 extern unsigned int immobile_scav_queue_count;
 typedef int low_page_index_t;
 
-extern unsigned int* varyobj_page_touched_bits;
+extern unsigned int* text_page_touched_bits;
 extern uword_t asm_routines_start, asm_routines_end;
 
 static inline void *
@@ -39,12 +39,12 @@ fixedobj_page_address(low_page_index_t page_num)
     return (void*)(FIXEDOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
 }
 static inline void *
-varyobj_page_address(low_page_index_t page_num)
+text_page_address(low_page_index_t page_num)
 {
-    return (void*)(VARYOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
+    return (void*)(TEXT_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
 }
 
-struct varyobj_page {
+struct text_page {
     // Generation mask for objects which start on this page.
     // An object which ends on but does not start on this page
     // does not set the respective bit.
@@ -58,13 +58,13 @@ struct varyobj_page {
                  scan_start_offset: 24;
 };
 
-extern struct varyobj_page *varyobj_pages;
+extern struct text_page *text_pages;
 /* Calculate the address where the first object touching this page starts. */
 static inline lispobj*
-varyobj_scan_start(low_page_index_t page_index)
+text_page_scan_start(low_page_index_t page_index)
 {
-    return (lispobj*)((char*)varyobj_page_address(page_index+1)
-                      - varyobj_pages[page_index].scan_start_offset * (2 * N_WORD_BYTES));
+    return (lispobj*)((char*)text_page_address(page_index+1)
+                      - text_pages[page_index].scan_start_offset * (2 * N_WORD_BYTES));
 }
 
 static inline low_page_index_t find_fixedobj_page_index(void *addr)
@@ -79,13 +79,13 @@ static inline low_page_index_t find_fixedobj_page_index(void *addr)
   }
   return -1;
 }
-static inline low_page_index_t find_varyobj_page_index(void *addr)
+static inline low_page_index_t find_text_page_index(void *addr)
 {
-  if (addr >= (void*)VARYOBJ_SPACE_START) {
+  if (addr >= (void*)TEXT_SPACE_START) {
       // Must use full register size here to avoid truncation of quotient
       // and bogus result!
-      size_t offset = (uintptr_t)addr - (uintptr_t)VARYOBJ_SPACE_START;
-      if (offset >= varyobj_space_size)
+      size_t offset = (uintptr_t)addr - (uintptr_t)TEXT_SPACE_START;
+      if (offset >= text_space_size)
           return -1;
       return offset / IMMOBILE_CARD_BYTES;
   }
