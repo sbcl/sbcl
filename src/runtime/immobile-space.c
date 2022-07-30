@@ -1823,7 +1823,6 @@ static boolean executable_object_p(lispobj* obj)
 
 static void defrag_immobile_space(boolean verbose)
 {
-    lispobj* addr;
     int i;
 
     int *components = code_component_order;
@@ -1936,7 +1935,7 @@ static void defrag_immobile_space(boolean verbose)
 #else
         for (i=0 ; components[i*2] ; ++i) {
 #endif
-            addr = (lispobj*)(long)components[i*2];
+            lispobj* addr = (lispobj*)(long)components[i*2];
             gc_assert(lowtag_of((lispobj)addr) == OTHER_POINTER_LOWTAG);
             addr = native_pointer((lispobj)addr);
             int widetag = widetag_of(addr);
@@ -1975,40 +1974,30 @@ static void defrag_immobile_space(boolean verbose)
         // Permute text space into tempspace and deposit forwarding pointers.
         lispobj new_vaddr;
         for (i=0 ; components[i*2] ; ++i) {
-            if ((new_vaddr = components[i*2+1]) != 0) {
-                addr = native_pointer(components[i*2]);
-                memcpy(tempspace_addr((void*)new_vaddr), addr,
-                       headerobj_size(addr) << WORD_SHIFT);
-                int displacement = new_vaddr - (lispobj)addr;
-                switch (widetag_of(addr)) {
-                default:
-                    lose("What is object type %x doing here?", widetag_of(addr));
-                case CODE_HEADER_WIDETAG:
-                    for_each_simple_fun(index, fun, (struct code*)addr, 1, {
-                        struct simple_fun *new_fun =
-                            (struct simple_fun*)((char*)fun + displacement);
-                        // Fix the 'self' slot for the new logical address,
-                        // storing via the current (temporary) address.
-                        ((struct simple_fun*)tempspace_addr(new_fun))->self =
-                            fun_self_from_baseptr(new_fun);
-                        set_forwarding_pointer((lispobj*)fun,
-                                               make_lispobj(new_fun, FUN_POINTER_LOWTAG));
-                    });
-                    {
-                    // Fix any absolute jump tables
-                    lispobj* jump_table =
-                        code_jumptable_start((struct code*)tempspace_addr((void*)new_vaddr));
-                    int count = jumptable_count(jump_table);
-                    int i;
-                    for (i = 1; i < count; ++i)
-                        if (jump_table[i]) jump_table[i] += displacement;
-                    }
-                    break;
-                }
-                set_forwarding_pointer(addr,
-                                       make_lispobj((void*)new_vaddr,
-                                                    OTHER_POINTER_LOWTAG));
-            }
+            if ((new_vaddr = components[i*2+1]) == 0) continue;
+            lispobj* addr = native_pointer(components[i*2]);
+            gc_assert(widetag_of(addr) == CODE_HEADER_WIDETAG);
+            memcpy(tempspace_addr((void*)new_vaddr), addr,
+                   headerobj_size(addr) << WORD_SHIFT);
+            int displacement = new_vaddr - (lispobj)addr;
+            for_each_simple_fun(index, fun, (struct code*)addr, 1, {
+                struct simple_fun *new_fun =
+                    (struct simple_fun*)((char*)fun + displacement);
+                // Fix the 'self' slot for the new logical address,
+                // storing via the current (temporary) address.
+                ((struct simple_fun*)tempspace_addr(new_fun))->self =
+                    fun_self_from_baseptr(new_fun);
+                set_forwarding_pointer((lispobj*)fun,
+                                       make_lispobj(new_fun, FUN_POINTER_LOWTAG));
+            });
+            // Fix any absolute jump tables
+            lispobj* jump_table =
+                code_jumptable_start((struct code*)tempspace_addr((void*)new_vaddr));
+            int count = jumptable_count(jump_table);
+            int i;
+            for (i = 1; i < count; ++i) if (jump_table[i]) jump_table[i] += displacement;
+            set_forwarding_pointer(addr, make_lispobj((void*)new_vaddr,
+                                                      OTHER_POINTER_LOWTAG));
         }
         if (aligned_nbytes > n_code_bytes)
             make_filler(tempspace_addr((char*)TEXT_SPACE_START + n_code_bytes),
