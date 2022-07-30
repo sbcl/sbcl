@@ -1122,7 +1122,12 @@
              (t
               (error "Strange code component: ~S" code)))
            (incf code-addr objsize)))
-        )))
+        (#.filler-widetag
+         (let* ((word (sap-ref-word (int-sap (translate-ptr code-addr spaces)) 0))
+                (nwords (ash word -32))
+                (nbytes (* nwords sb-vm:n-word-bytes)))
+           (format output " .quad 0x~x~% .fill ~d~%" word (- nbytes n-word-bytes))
+           (incf code-addr nbytes))))))
 
   ;; coreparse uses the 'lisp_jit_code' symbol to set text_space_highwatermark
   ;; The intent is that compilation to memory can use this reserved area
