@@ -134,9 +134,7 @@ verify_pointer(lispobj thing, lispobj *where, struct verify_state *state)
                 "unallocated space");
     } else {
         // The object pointed to must not have been discarded as garbage.
-        FAIL_IF(!other_immediate_lowtag_p(*native_pointer(thing)) ||
-                filler_obj_p(native_pointer(thing)),
-                "trashed object");
+        FAIL_IF(!other_immediate_lowtag_p(*native_pointer(thing)), "trashed object");
     }
     // Must not point to a forwarding pointer
     FAIL_IF(*native_pointer(thing) == FORWARDING_HEADER, "forwarding ptr");
@@ -321,10 +319,7 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                 continue;
             }
 #endif
-            // FIXME: should not have code acting as filler
-            if (widetag != FILLER_WIDETAG && !filler_obj_p(where)) {
-                // Any page can have a filler on it
-                if (pg >= 0) {
+            if (widetag != FILLER_WIDETAG && pg >= 0) {
                     // Assert proper page type
                     if (state->object_header) // is not a cons
                         gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
@@ -342,7 +337,6 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                         if (is_code(page_table[pg].type))
                             lose("object @ %p is non-code on code page", where);
                     }
-                }
             }
         }
         if (!state->object_header) {
@@ -480,7 +474,7 @@ void gc_show_pte(lispobj obj)
     page = find_text_page_index((void*)obj);
     if (page>=0) {
         lispobj* text_page_scan_start(low_page_index_t page);
-        int gens = text_pages[page].generations;
+        int gens = text_page_genmask[page];
         char genstring[9];
         int i;
         for (i=0;i<8;++i) genstring[i] = (gens & (1<<i)) ? '0'+i : '-';

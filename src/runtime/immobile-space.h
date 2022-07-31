@@ -44,28 +44,8 @@ text_page_address(low_page_index_t page_num)
     return (void*)(TEXT_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
 }
 
-struct text_page {
-    // Generation mask for objects which start on this page.
-    // An object which ends on but does not start on this page
-    // does not set the respective bit.
-    unsigned int generations: 8,
-    // Offset backwards in double-lispwords from the page end to the
-    // lowest-addressed object touching the page. This offset can point to
-    // a hole, but we prefer that it not. If the offset is zero, the page
-    // has no object other than possibly a hole resulting from a freed object.
-    // The entire space size defaults to just over 100MiB,
-    // so 24 bits is more than adequate to point back to any word.
-                 scan_start_offset: 24;
-};
-
-extern struct text_page *text_pages;
-/* Calculate the address where the first object touching this page starts. */
-static inline lispobj*
-text_page_scan_start(low_page_index_t page_index)
-{
-    return (lispobj*)((char*)text_page_address(page_index+1)
-                      - text_pages[page_index].scan_start_offset * (2 * N_WORD_BYTES));
-}
+extern unsigned char* text_page_genmask;
+extern unsigned short int* tlsf_page_sso;
 
 static inline low_page_index_t find_fixedobj_page_index(void *addr)
 {

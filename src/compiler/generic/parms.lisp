@@ -215,8 +215,10 @@
     ,@'(*current-catch-block*
         *current-unwind-protect-block*)
 
-    #+immobile-space *immobile-freelist* ; not per-thread (yet...)
     #+metaspace *metaspace-tracts*
+    *immobile-codeblob-tree* ; for generations 0 through 5 inclusive
+    *immobile-codeblob-vector* ; for pseudo-static-generation
+    *dynspace-codeblob-tree*
 
     ;; stack pointers
     #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread
@@ -227,7 +229,6 @@
 
     ;; threading support
     #+sb-thread ,@'(sb-thread::*starting-threads* *free-tls-index*)
-    *codeblob-tree*
 
     ;; runtime linking of lisp->C calls (regardless of whether
     ;; the C function is in a dynamic shared object or not)

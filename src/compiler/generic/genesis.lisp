@@ -259,7 +259,7 @@
   (print-unreadable-object (gspace stream :type t)
     (format stream "@#x~X ~S" (gspace-byte-address gspace) (gspace-name gspace))))
 
-(defun make-gspace (name identifier byte-address)
+(defun make-gspace (name identifier byte-address &rest rest)
   ;; Genesis should be agnostic of space alignment except in so far as it must
   ;; be a multiple of the backend page size. We used to care more, in that
   ;; descriptor-bits were composed of a high half and low half for the
@@ -272,7 +272,7 @@
     (unless (zerop (rem byte-address target-space-alignment))
       (error "The byte address #X~X is not aligned on a #X~X-byte boundary."
              byte-address target-space-alignment)))
-  (%make-gspace :name name
+  (apply #'%make-gspace :name name
                 :identifier identifier
                 ;; Track page usage
                 :page-table (if (= identifier dynamic-core-space-id)
@@ -282,7 +282,8 @@
                                        ((= identifier immobile-fixedobj-core-space-id)
                                         (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes))
                                        (t
-                                        0))))
+                                        0))
+                rest))
 
 (defstruct (model-sap (:constructor make-model-sap (address gspace)))
   (address 0 :type sb-vm:word)
@@ -1904,9 +1905,35 @@ core and return a descriptor to it."
 
   ;; Put the C-callable fdefns into the static-fdefn vector if #+immobile-code.
   #+immobile-code
-  (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
-        do (cold-svset *c-callable-fdefn-vector* i
-                       (ensure-cold-fdefn sym)))
+  (let* ((space *immobile-text*)
+         (wordindex (gspace-free-word-index space))
+         (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
+    (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
+          do (cold-svset *c-callable-fdefn-vector* i
+                         (ensure-cold-fdefn sym)))
+    (let* ((objects (gspace-objects space))
+           (count (length objects)))
+      (let ((remainder (rem wordindex words-per-page)))
+        (unless (zerop remainder)
+          (let* ((fill-nwords (- words-per-page remainder))
+                 (des
+                  ;; technically FILLER_WIDETAG has no valid lowtag because it's not an object
+                  ;; that lisp can address. But WRITE-WORDINDEXED requires a pointer descriptor
+                  (allocate-cold-descriptor space (* fill-nwords sb-vm:n-word-bytes)
+                                            sb-vm:other-pointer-lowtag)))
+            (aver (zerop (rem (gspace-free-word-index space) words-per-page)))
+            (write-header-word des (logior (ash fill-nwords 32) sb-vm:filler-widetag)))))
+      ;; Construct a ub32 array of object offsets.
+      (let* ((n-data-words (ceiling count 2)) ; lispword = 2 ub32s
+             (vect (allocate-vector sb-vm:simple-array-unsigned-byte-32-widetag
+                                    count n-data-words))
+             (data-ptr (+ (descriptor-byte-offset vect)
+                          (ash sb-vm:vector-data-offset sb-vm:word-shift))))
+        (dotimes (i count)
+          (setf (bvref-32 (descriptor-mem vect) data-ptr)
+                (descriptor-byte-offset (aref objects i)))
+          (incf data-ptr 4))
+        (cold-set 'sb-vm::*immobile-codeblob-vector* vect))))
 
   ;; Symbols for which no call to COLD-INTERN would occur - due to not being
   ;; referenced until warm init - must be artificially cold-interned.
@@ -3841,7 +3868,8 @@ III. initially undefined function references (alphabetically):
            #+immobile-space
            (*immobile-text* (make-gspace :immobile-text
                                          immobile-text-core-space-id
-                                         sb-vm:text-space-start))
+                                         sb-vm:text-space-start
+                                         :objects (make-array 20000 :fill-pointer 0 :adjustable t)))
            (*dynamic*   (make-gspace :dynamic
                                      dynamic-core-space-id
                                      #+gencgc sb-vm:dynamic-space-start

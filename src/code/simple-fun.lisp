@@ -391,12 +391,6 @@
   (code-header-set code sb-vm::code-fixups-slot newval)
   newval)
 
-(declaim (inline code-obj-is-filler-p))
-(defun code-obj-is-filler-p (code-obj)
-  ;; See also HOLE-P in the allocator (same thing but using SAPs)
-  ;; and filler_obj_p() in the C code
-  (eql (sb-vm::%code-boxed-size code-obj) 0))
-
 #+(or sparc ppc64)
 (defun code-trailer-ref (code offset)
   (with-pinned-objects (code)
@@ -404,15 +398,12 @@
                 (+ (code-object-size code) offset (- sb-vm:other-pointer-lowtag)))))
 
 ;;; The last 'uint16' in the object holds the trailer length (see 'src/runtime/code.h')
-;;; but do not attempt to read it if the object is a filler.
 (declaim (inline code-trailer-len))
 (defun code-trailer-len (code-obj)
-  (if (code-obj-is-filler-p code-obj)
-      0
-      (let ((word (code-trailer-ref code-obj -4)))
-        ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
-        #+little-endian (ldb (byte 16 16) word)
-        #+big-endian    (ldb (byte 16  0) word))))
+  (let ((word (code-trailer-ref code-obj -4)))
+    ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
+    #+little-endian (ldb (byte 16 16) word)
+    #+big-endian    (ldb (byte 16  0) word)))
 
 ;;; The fun-table-count is a uint16_t immediately preceding the trailer length
 ;;; containing two subfields:

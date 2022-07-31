@@ -323,18 +323,13 @@ We could try a few things to mitigate this:
                                   (map-objects-in-range fun start end)))
             #+immobile-space
             (:immobile
-             ;; Filter out filler objects. These either look like cons cells
-             ;; in fixedobj subspace, or code without enough header words
-             ;; in text subspace. (cf 'filler_obj_p' in gc-internal.h)
+             (with-system-mutex (*allocator-mutex*)
+               (map-immobile-objects fun :variable))
+             ;; Filter out padding words
              (dx-flet ((filter (obj type size)
                          (unless (= type list-pointer-lowtag)
                            (funcall fun obj type size))))
-               (map-immobile-objects #'filter :fixed))
-             (dx-flet ((filter (obj type size)
-                         (unless (and (code-component-p obj)
-                                      (code-obj-is-filler-p obj))
-                           (funcall fun obj type size))))
-               (map-immobile-objects #'filter :variable))))))
+               (map-immobile-objects #'filter :fixed))))))
     (do-rest-arg ((space) spaces)
       (if (eq space :dynamic)
           (without-gcing #+cheneygc (do-1-space space)
@@ -445,15 +440,20 @@ We could try a few things to mitigate this:
              (used-bytes (ash (- free-pointer start) n-fixnum-tag-bits))
              (holes '())
              (hole-bytes 0))
-    (map-immobile-objects
-     (lambda (obj type size)
-       (let ((address (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
-         (when (case subspace
-                 (:fixed (= type list-pointer-lowtag))
-                 (:variable (hole-p address)))
-           (push (cons address size) holes)
-           (incf hole-bytes size))))
-     subspace)
+    (if (eq subspace :fixed)
+        (map-immobile-objects
+         (lambda (obj type size)
+           (let ((address (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
+             (when (= type list-pointer-lowtag)
+               (incf hole-bytes size))))
+         subspace)
+        (let ((sum-sizes 0))
+          (map-immobile-objects
+           (lambda (obj type size)
+             (declare (ignore obj type))
+             (incf sum-sizes size))
+           subspace)
+          (setq hole-bytes (- used-bytes sum-sizes))))
     (values holes hole-bytes used-bytes)))
 
 (defun show-fragmentation (&key (subspaces '(:fixed :variable))

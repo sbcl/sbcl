@@ -402,10 +402,7 @@ int count_immobile_objects(__attribute__((unused)) int gen, int res[5])
     where = (lispobj*)TEXT_SPACE_START;
     end = text_space_highwatermark;
     while (where < end) {
-        if (immobile_obj_generation(where) == gen
-            && widetag_of(where) == CODE_HEADER_WIDETAG
-            // don't count filler code
-            && ((struct code*)where)->boxed_size)
+        if (widetag_of(where) != FILLER_WIDETAG && immobile_obj_generation(where) == gen)
             ++res[4];
         where += object_size(where);
     }
@@ -1884,7 +1881,7 @@ lispobj *search_dynamic_space(void *pointer)
     // in generation 0 following a non-promotion cycle.
     if (type == PAGE_TYPE_CODE && page_table[page_index].gen == 0) {
         lispobj node = brothertree_find_lesseql((uword_t)pointer,
-                                                SYMBOL(CODEBLOB_TREE)->value);
+                                                SYMBOL(DYNSPACE_CODEBLOB_TREE)->value);
         if (node != NIL) {
             lispobj *codeblob = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
             if (widetag_of(codeblob) != CODE_HEADER_WIDETAG)
@@ -2812,9 +2809,8 @@ static lispobj* range_dirty_p(lispobj* where, lispobj* limit, generation_index_t
         if (leaf_obj_widetag_p(widetag)) {
             // Do nothing
         } else if (widetag == CODE_HEADER_WIDETAG) {
-            // This function will never be called on a page of code, hence if we
-            // see genuine (non-filler) code, that's a bug. */
-            if (!filler_obj_p(where)) lose("code @ %p on non-code page", where);
+            // This function will never be called on a page of code
+            lose("code @ %p on non-code page", where);
         } else {
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
             if (instanceoid_widetag_p(widetag)) {
@@ -4382,7 +4378,7 @@ maybe_verify:
      * so just erase the tree now.
      * This is WRONG for immobile code, but not worse than status quo
      * in terms of inability to find objects in the SIGPROF handler etc */
-    SYMBOL(CODEBLOB_TREE)->value = NIL;
+    SYMBOL(DYNSPACE_CODEBLOB_TREE)->value = NIL;
     if (generation >= verify_gens)
         hexdump_and_verify_heap(cur_thread_approx_stackptr, VERIFY_POST_GC | (generation<<16));
 
@@ -5791,7 +5787,8 @@ static inline boolean obj_gen_lessp(lispobj obj, generation_index_t b)
 sword_t scav_code_blob(lispobj *object, lispobj header)
 {
     struct code* code = (struct code*)object;
-    if (filler_obj_p(object)) goto done; /* it's not code at all */
+    int nboxed = code_header_words(code);
+    if (!nboxed) goto done;
 
     ++n_scav_calls[CODE_HEADER_WIDETAG/4];
 
@@ -5850,7 +5847,7 @@ sword_t scav_code_blob(lispobj *object, lispobj header)
          * the object, then scavenge all entry points. Otherwise there is no need,
          * as trans_code() made necessary adjustments to internal entry points.
          * This test is just an optimization to avoid some work */
-        if (((*object >> 8) & 0xff) == CODE_IS_TRACED) {
+        if (((*object >> 16) & 0xff) == CODE_IS_TRACED) {
 #else
         { /* Not enough spare bits in the header to hold random flags.
            * Just do the extra work always */

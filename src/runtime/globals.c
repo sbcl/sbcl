@@ -62,6 +62,7 @@ lispobj *text_space_highwatermark;
 lispobj *fixedobj_free_pointer;
 #endif
 os_vm_address_t anon_dynamic_space_start;
+lispobj* tlsf_mem_start; // meaningful only if immobile space
 
 #ifndef LISP_FEATURE_GENCGC /* GENCGC has its own way to record trigger */
 lispobj *current_auto_gc_trigger;

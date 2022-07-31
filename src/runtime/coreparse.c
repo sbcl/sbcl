@@ -439,13 +439,6 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             adjust_word_at(where+3, adj);
             continue;
         case CODE_HEADER_WIDETAG:
-            if (filler_obj_p(where)) {
-                // OMGWTF! Why does a filler code object merit adjustment?
-                // (Probably for when holes were chained through debug-info?
-                // But we don't save holes any more, because of defrag)
-                if (where[2]) adjust_word_at(where+2, adj);
-                continue;
-            }
             // Fixup the constant pool. The word at where+1 is a fixnum.
             code = (struct code*)where;
             adjust_pointers(where+2, code_header_words(code)-2, adj);

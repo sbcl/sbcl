@@ -203,7 +203,8 @@
       sb-impl::*token-buf-pool*
       sb-impl::*user-hash-table-tests*
       sb-impl::**finalizer-store**
-      sb-vm::*codeblob-tree*
+      sb-vm::*immobile-codeblob-tree*
+      sb-vm::*dynspace-codeblob-tree*
       ,(maybe "SB-KERNEL" "*EVAL-CALLS*")
       sb-kernel::*type-cache-nonce*
       sb-ext:*gc-run-time*

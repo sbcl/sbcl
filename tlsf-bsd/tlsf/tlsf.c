@@ -11,9 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "tlsf.h"
+#include "tlsf-bsd/tlsf/tlsf.h"
 
-#include "tlsf_utils.h"
+#include "tlsf-bsd/tlsf/tlsf_utils.h"
 
 #if __GNUC__ || __INTEL_COMPILER
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -29,6 +29,9 @@
 #else
 #define tlsf_assert(expr) (void)(0)
 #endif
+
+#include "genesis/config.h"
+#include "genesis/constants.h"
 
 /* Public constants: may be modified. */
 enum tlsf_public {
@@ -61,11 +64,7 @@ enum tlsf_private {
  * blocks below that size into the 0th first-level list.
  */
 
-#if defined(TLSF_64BIT)
-    FL_INDEX_MAX = 40, /* 1 TB */
-#else
     FL_INDEX_MAX = 30,
-#endif
     SL_INDEX_COUNT = (1 << SL_INDEX_COUNT_LOG2),
     FL_INDEX_SHIFT = (SL_INDEX_COUNT_LOG2 + ALIGN_SIZE_LOG2),
     FL_INDEX_COUNT = (FL_INDEX_MAX - FL_INDEX_SHIFT + 1),
@@ -117,8 +116,17 @@ typedef struct block_header_t {
     /* Points to the previous physical block. */
     struct block_header_t *prev_phys_block;
 
-    /* The size of this block, excluding the block header. */
-    size_t size;
+#ifdef LISP_FEATURE_BIG_ENDIAN
+    // For this word to read as an object header, the size and widetag
+    // are flipped relative to little-endian.
+#error "not done"
+#else
+    unsigned char widetag;
+    unsigned char _flags; // must have at most bits 0, 1, 2 on
+    unsigned char unused; // must be zero
+    unsigned char gen; // low 4 must be 0..5 and bit 0x4 can be on
+    uint32_t _nwords; // including the header
+#endif
 
     /* Next and previous free blocks. */
     struct block_header_t *next_free;
@@ -126,13 +134,11 @@ typedef struct block_header_t {
 } block_header_t;
 
 /*
- * Since block sizes are always at least a multiple of 4, the two least
- * significant bits of the size field are used to store the block status:
- * - bit 0: whether block is busy or free
- * - bit 1: whether previous block is busy or free
+ * - byte 1 bit 0: whether block is busy (0) or free (1)
+ * - byte 1 bit 1: whether previous block is busy (0) or free (1)
  */
-static const size_t block_header_free_bit = 1 << 0;
-static const size_t block_header_prev_free_bit = 1 << 1;
+static const unsigned char block_header_free_bit = 1 << 0;
+static const unsigned char block_header_prev_free_bit = 1 << 1;
 
 /*
  * The size of the block header exposed to used blocks is the size field.
@@ -147,8 +153,7 @@ static const size_t block_header_overhead = sizeof(size_t);
 static const size_t block_header_overlap = sizeof(block_header_t *);
 
 /* User data starts directly after the size field in a used block. */
-static const size_t block_start_offset =
-    offsetof(block_header_t, size) + sizeof(size_t);
+static const size_t block_start_offset = offsetof(block_header_t, next_free);
 
 /*
  * A free block must be large enough to store its header minus the size of
@@ -178,49 +183,49 @@ typedef struct control_t {
 
 static size_t block_size(const block_header_t *block)
 {
-    return block->size & ~(block_header_free_bit | block_header_prev_free_bit);
+    return (block->_nwords - 1) << WORD_SHIFT; // nbytes excluding the lispobj header
 }
 
 static void block_set_size(block_header_t *block, size_t size)
 {
-    const size_t oldsize = block->size;
-    block->size =
-        size | (oldsize & (block_header_free_bit | block_header_prev_free_bit));
+    // convert to words inclusive of the header, as codeblobs require
+    block->_nwords = (size >> WORD_SHIFT) + 1;
 }
 
 __attribute__((unused)) static int block_is_last(const block_header_t *block)
 {
-    return block_size(block) == 0;
+    return block->_nwords <= 2;
 }
 
 static int block_is_free(const block_header_t *block)
 {
-    return tlsf_cast(int, block->size &block_header_free_bit);
+    return tlsf_cast(int, block->_flags & block_header_free_bit);
 }
 
 static void block_set_free(block_header_t *block)
 {
-    block->size |= block_header_free_bit;
+    tlsf_assert(block->widetag == FILLER_WIDETAG);
+    block->_flags |= block_header_free_bit;
 }
 
 static void block_set_used(block_header_t *block)
 {
-    block->size &= ~block_header_free_bit;
+    block->_flags &= ~block_header_free_bit;
 }
 
 static int block_is_prev_free(const block_header_t *block)
 {
-    return tlsf_cast(int, block->size &block_header_prev_free_bit);
+    return tlsf_cast(int, block->_flags & block_header_prev_free_bit);
 }
 
 static void block_set_prev_free(block_header_t *block)
 {
-    block->size |= block_header_prev_free_bit;
+    block->_flags |= block_header_prev_free_bit;
 }
 
 static void block_set_prev_used(block_header_t *block)
 {
-    block->size &= ~block_header_prev_free_bit;
+    block->_flags &= ~block_header_prev_free_bit;
 }
 
 static block_header_t *block_from_ptr(const void *ptr)
@@ -365,7 +370,7 @@ static block_header_t *search_suitable_block(control_t *control,
      */
     unsigned int sl_map = control->sl_bitmap[fl] & (((unsigned int)~0) << sl);
     if (!sl_map) {
-        /* No block exists. Search in the next largest first-level list. */
+        /* No block exists. Search in the next first-level list. */
         const unsigned int fl_map =
             control->fl_bitmap & (((unsigned int)~0) << (fl + 1));
         if (!fl_map) {
@@ -475,6 +480,8 @@ static block_header_t *block_split(block_header_t *block, size_t size)
 
     tlsf_assert(block_size(block) ==
                 remain_size + size + block_header_overhead);
+    // Clear the block header word to 0 but stuff in a valid widetag.
+    *(1 + (uintptr_t*)remaining) = FILLER_WIDETAG;
     block_set_size(remaining, remain_size);
     tlsf_assert(block_size(remaining) >= block_size_min &&
                 "block split with invalid size");
@@ -490,7 +497,7 @@ static block_header_t *block_absorb(block_header_t *prev, block_header_t *block)
 {
     tlsf_assert(!block_is_last(prev) && "previous block can't be last");
     /* Note: Leaves flags untouched. */
-    prev->size += block_size(block) + block_header_overhead;
+    prev->_nwords += block->_nwords;
     block_link_next(prev);
     return prev;
 }
@@ -602,8 +609,11 @@ static block_header_t *block_locate_free(control_t *control, size_t size)
         remove_free_block(control, block, fl, sl);
     }
 
-    if (unlikely(block && !block->size))
-        block = NULL;
+   // Not sure what this is trying to guard against. If there is a block,
+   // it was just asserted that block->size equals or exceeds 'size',
+   // and block can be non-NULL only if size was nonzero.
+   // if (unlikely(block && !block->size)
+   //     block = NULL;
 
     return block;
 }
@@ -815,7 +825,10 @@ pool_t tlsf_add_pool(tlsf_t tlsf, void *mem, size_t bytes)
     block_header_t *next;
 
     const size_t pool_overhead = tlsf_pool_overhead();
-    const size_t pool_bytes = align_down(bytes - pool_overhead, ALIGN_SIZE);
+    // subtract another word so that the end sentinel consumes 2 words
+    // (including its header)
+    const size_t pool_bytes = align_down(bytes - pool_overhead, ALIGN_SIZE)
+                               - N_WORD_BYTES;
 
     if (((ptrdiff_t)mem % ALIGN_SIZE) != 0) {
         printf("tlsf_add_pool: Memory must be aligned by %u bytes.\n",
@@ -836,6 +849,7 @@ pool_t tlsf_add_pool(tlsf_t tlsf, void *mem, size_t bytes)
      * it will never be used.
     */
     block = offset_to_block(mem, 0);
+    block->widetag = FILLER_WIDETAG;
     block_set_size(block, pool_bytes);
     block_set_free(block);
     block_set_prev_used(block);
@@ -843,7 +857,8 @@ pool_t tlsf_add_pool(tlsf_t tlsf, void *mem, size_t bytes)
 
     /* Split the block to create a zero-size sentinel block. */
     next = block_link_next(block);
-    block_set_size(next, 0);
+    next->widetag = FILLER_WIDETAG;
+    block_set_size(next, N_WORD_BYTES);
     block_set_used(next);
     block_set_prev_free(next);
 
@@ -1042,4 +1057,48 @@ void *tlsf_realloc(tlsf_t tlsf, void *ptr, size_t size)
     }
 
     return p;
+}
+
+void tlsf_dump_freelists(tlsf_t tlsf, FILE *f)
+{
+    control_t *control = tlsf_cast(control_t *, tlsf);
+    fprintf(f, "Freelists:\n");
+    int i,j;
+    for (i=0; i<FL_INDEX_COUNT; ++i)
+        for (j=0; j<SL_INDEX_COUNT; ++j) {
+            block_header_t *l = control->blocks[i][j];
+            if (l != &control->block_null) {
+                fprintf(f, "[%2d,%2d]=", i, j);
+                do {
+                    fprintf(f, "%p (%x) ", l, l->_nwords);
+                    l = l->next_free;
+                } while (l != &control->block_null);
+                putc('\n', f);
+          }
+      }
+}
+
+void tlsf_dump_pool(tlsf_t tlsf, pool_t pool, char *pathname)
+{
+    FILE* f = fopen(pathname, "w");
+    if (tlsf) tlsf_dump_freelists(tlsf, f);
+    fprintf(f, "  Free     &header         header        nbytes     &prev_header\n");
+    fprintf(f, "                                       (incl hdr)\n");
+    fprintf(f, " -----  ----------   ---------------  -----------  -------------\n");
+    block_header_t *block = offset_to_block(pool, 0);
+    while (block) {
+        unsigned long* header = (unsigned long*)block + 1, word = *header;
+        fprintf(f, " %s %12lx   %7x:%08x %10lx",
+                block_is_free(block) ? "free":"    ",
+                (long)header,
+                (int)(word>>32), (int)(word & 0xFFFFFFFF),
+                block_size(block)+N_WORD_BYTES);
+        if (block_is_prev_free(block))
+            fprintf(f, "  %12lx", (long)block->prev_phys_block+N_WORD_BYTES);
+        putc('\n', f);
+        if (block_is_last(block)) break; // include the sentinel in the display
+        block = block_next(block);
+    }
+    fprintf(f, "-- end --\n");
+    fclose(f);
 }

@@ -547,13 +547,21 @@ static void clobber_headered_object(lispobj* addr, sword_t nwords)
     // FIXME: clobbering an object on single-object pages should free entire pages
     page_index_t page = find_page_index(addr);
     if (page < 0) { // code space
-        struct code* code  = (struct code*)addr;
-        if (!filler_obj_p((lispobj*)code)) {
-            code->boxed_size = 0;
-            code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
-                           | CODE_HEADER_WIDETAG;
-            memset(addr+2, 0, (nwords - 2) * N_WORD_BYTES);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        extern lispobj codeblob_freelist;
+        if (widetag_of(addr) == CODE_HEADER_WIDETAG) {
+            // OAOO violation - like sweep_immobile_text()
+            assign_widetag(addr, FILLER_WIDETAG);
+            ((char*)addr)[2] = 0; // clear the TRACED flag
+            ((char*)addr)[3] = 0; // clear the WRITTEN flag and the generation
+            // add to list only if it is above tlsf_mem_start
+            // (below it will never by utilized by the TLSF allocator)
+            if (addr >= tlsf_mem_start) {
+                addr[1] = codeblob_freelist; // push into to-be-freed list
+                codeblob_freelist = (lispobj)addr;
+            }
         }
+#endif
     } else if ((SINGLE_OBJECT_FLAG|page_table[page].type) == (SINGLE_OBJECT_FLAG|PAGE_TYPE_CODE)) {
         // Code pages don't want (0 . 0) fillers, otherwise heap checking
         // gets an error: "object @ 0x..... is non-code on code page"
@@ -584,7 +592,8 @@ static uword_t sweep(lispobj* where, lispobj* end,
             fullcgcmarks[index / N_WORD_BITS] & ((uword_t)1 << (index % N_WORD_BITS));
         if (is_header(word)) {
             nwords = headerobj_size2(where, word);
-            if (!livep) clobber_headered_object(where, nwords);
+            if (!livep && header_widetag(word) != FILLER_WIDETAG)
+                clobber_headered_object(where, nwords);
         } else {
             nwords = 2;
             if (!livep) where[0] = where[1] = (uword_t)-1;
@@ -626,6 +635,15 @@ void execute_full_sweep_phase()
     if (sweeplog) fprintf(sweeplog, "-- text space --\n");
     sweep((lispobj*)TEXT_SPACE_START, text_space_highwatermark,
           (uword_t)words_zeroed);
+    // Recompute generation masks for text space
+    int npages = (ALIGN_UP((uword_t)text_space_highwatermark, IMMOBILE_CARD_BYTES)
+                  - TEXT_SPACE_START) / IMMOBILE_CARD_BYTES;
+    memset(text_page_genmask, 0, npages);
+    lispobj* where = (lispobj*)TEXT_SPACE_START;
+    for ( ; where < text_space_highwatermark ; where += object_size(where) )
+        if (widetag_of(where) == CODE_HEADER_WIDETAG)
+            text_page_genmask[find_text_page_index(where)]
+                |= (1 << immobile_obj_gen_bits(where));
 #endif
     if (sweeplog) fprintf(sweeplog, "-- dynamic space --\n");
     walk_generation(sweep, -1, (uword_t)words_zeroed);

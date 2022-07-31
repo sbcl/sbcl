@@ -103,6 +103,7 @@ extern lispobj *text_space_highwatermark;
 extern lispobj *fixedobj_free_pointer;
 #endif
 extern os_vm_address_t anon_dynamic_space_start;
+extern lispobj* tlsf_mem_start; // meaningful only if immobile space
 
 # ifndef LISP_FEATURE_GENCGC
 extern lispobj *current_auto_gc_trigger;

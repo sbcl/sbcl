@@ -152,10 +152,6 @@ static inline int header_rememberedp(lispobj header) {
   return (header & (OBJ_WRITTEN_FLAG << 24)) != 0;
 }
 
-static inline boolean filler_obj_p(lispobj* obj) {
-    return widetag_of(obj) == CODE_HEADER_WIDETAG && obj[1] == 0;
-}
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 
 extern void enliven_immobile_obj(lispobj*,int);
@@ -573,6 +569,12 @@ static inline boolean plausible_tag_p(lispobj addr)
 #else
 # define make_filler_header(n) (((n)<<N_WIDETAG_BITS)|FILLER_WIDETAG)
 # define filler_total_nwords(header) ((header)>>N_WIDETAG_BITS)
+#endif
+
+#ifdef LISP_FEATURE_BIG_ENDIAN
+# define assign_widetag(addr, byte) ((unsigned char*)addr)[N_WORD_BYTES-1] = byte
+#else
+# define assign_widetag(addr, byte) *(unsigned char*)addr = byte
 #endif
 
 #endif /* _GC_PRIVATE_H_ */

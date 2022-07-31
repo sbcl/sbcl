@@ -754,10 +754,10 @@ functions when called with no arguments."
     (let ((sap (int-sap (get-lisp-obj-address code))))
       ;; NB: This is not threadsafe on machines that don't promise that
       ;; stores to single bytes are atomic.
-      (setf (sap-ref-8 sap #+little-endian (- 1 sb-vm:other-pointer-lowtag)
-                           #+big-endian (- 6 sb-vm:other-pointer-lowtag))
+      (setf (sap-ref-8 sap #+little-endian (- 2 sb-vm:other-pointer-lowtag)
+                           #+big-endian (- 5 sb-vm:other-pointer-lowtag))
             bit)
-      ;; touch the card mark
+      ;; touch the card mark - WHY???
       (setf (code-header-ref code 1) (code-header-ref code 1)))))
 
 ;;; FIXME: Symbol is lost by accident

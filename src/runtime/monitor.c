@@ -38,7 +38,8 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/gc-tables.h"
 #include "gc-internal.h"
-
+#include "tlsf-bsd/tlsf/tlsf.h"
+extern void* tlsf_control;
 
 /* When we need to do command input, we use this stream, which is not
  * in general stdin, so that things will "work" (as well as being
@@ -69,13 +70,16 @@ struct crash_preamble {
     uword_t fixedobj_start, fixedobj_size, fixedobj_free_pointer;
     // text data dumped: pages, touched_bits, page table
     uword_t text_start, text_size;
-    lispobj *text_space_highwatermark;
+    lispobj *tlsf_mem_start, *text_space_highwatermark;
+    lispobj sentinel_block[3];
+    void* tlsf_control_address;
     int nthreads;
     int tls_size;
     lispobj lisp_package_vector;
+    int sizeof_context;
+    int tlsf_control_size;
     char sprof_enabled;
     char pin_dynspace_code;
-    int sizeof_context;
 };
 struct crash_thread_preamble {
     uword_t address;
@@ -130,12 +134,17 @@ void save_gc_crashdump(char *pathname,
     preamble.pin_dynspace_code = pin_all_dynamic_space_code;
     preamble.sizeof_context = sizeof (os_context_t);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+    char *tlsf_memory_end = (char*)TEXT_SPACE_START + TEXT_SPACE_SIZE;
     preamble.fixedobj_start = FIXEDOBJ_SPACE_START;
     preamble.fixedobj_size = FIXEDOBJ_SPACE_SIZE;
     preamble.fixedobj_free_pointer = (uword_t)fixedobj_free_pointer;
     preamble.text_start = TEXT_SPACE_START;
     preamble.text_size = TEXT_SPACE_SIZE;
     preamble.text_space_highwatermark = text_space_highwatermark;
+    preamble.tlsf_mem_start = tlsf_mem_start;
+    preamble.tlsf_control_address = tlsf_control;
+    preamble.tlsf_control_size = tlsf_size();
+    memcpy(preamble.sentinel_block, tlsf_memory_end-3*N_WORD_BYTES, 3*N_WORD_BYTES);
 #endif
     // write the preamble and static + readonly spaces
     checked_write("preamble", fd, &preamble, sizeof preamble);
@@ -152,11 +161,16 @@ void save_gc_crashdump(char *pathname,
     int total_npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     checked_write("fixedobj_PTE", fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
     usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
-    checked_write("text", fd, (char*)TEXT_SPACE_START, usage);
+    // write the block_header_t that is just beyond the high water mark
+    checked_write("text", fd, (char*)TEXT_SPACE_START, usage+3*N_WORD_BYTES);
     total_npages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
+    checked_write("text_gen", fd, text_page_genmask, total_npages); // 1 byte per page
     checked_write("text_WP", fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));
-    checked_write("text_PTE", fd, text_pages, total_npages * sizeof (int));
+    checked_write("TLSF_control", fd, tlsf_control, preamble.tlsf_control_size);
+    int tlsf_memory_size = tlsf_memory_end - (char*)tlsf_mem_start;
+    int n_tlsf_pages = tlsf_memory_size / IMMOBILE_CARD_BYTES;
+    checked_write("TLSF_sso", fd, tlsf_page_sso, n_tlsf_pages * sizeof (short));
 #endif
     struct crash_thread_preamble thread_preamble;
     for_each_thread(th) {
@@ -205,7 +219,7 @@ void save_gc_crashdump(char *pathname,
         // write the preamble
         checked_write("thread", fd, &thread_preamble, sizeof thread_preamble);
         // write 0 or 1 contexts, control-stack, binding-stack, TLS
-        if (ici) write(fd, threadcontext, preamble.sizeof_context);
+        if (ici) checked_write(" ctxt", fd, threadcontext, preamble.sizeof_context);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         checked_write(" stack", fd, (char*)sp, nbytes_control_stack);
 #else
@@ -289,6 +303,13 @@ static int gc_cmd(char **ptr) {
     return 0;
 }
 
+static int tlsf_cmd(__attribute__((unused)) char **ptr) {
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    tlsf_dump_pool(tlsf_control, tlsf_mem_start, "/dev/tty");
+#endif
+    return 0;
+}
+
 static struct cmd {
     char *cmd, *help;
     int (*fn)(char **ptr);
@@ -311,6 +332,7 @@ static struct cmd {
     {"search", "Search heap for object.", search_cmd},
     {"save", "Produce crashdump", save_cmd},
     {"threads", "List threads", threads_cmd},
+    {"tlsfdump", "Dump TLSF structures", tlsf_cmd},
     {"verify", "Check heap invariants", verify_cmd},
     {"gc", "Collect garbage", gc_cmd},
     {NULL, NULL, NULL}
@@ -903,11 +925,23 @@ int load_gc_crashdump(char* pathname)
     checked_read("fixedobj_PTE", fd, fixedobj_pages, total_npages * sizeof sizeof(struct fixedobj_page));
     // Read text space
     usage = (uword_t)text_space_highwatermark - TEXT_SPACE_START;
-    checked_read("text", fd, (char*)TEXT_SPACE_START, usage);
+    char *tlsf_memory_end = (char*)TEXT_SPACE_START + TEXT_SPACE_SIZE;
+    tlsf_mem_start = preamble.tlsf_mem_start;
+    fprintf(stderr, "tlsf_mem_start=%p\n", tlsf_mem_start);
+    int tlsf_memory_size = tlsf_memory_end - (char*)tlsf_mem_start;
+    checked_read("text", fd, (char*)TEXT_SPACE_START, usage+3*N_WORD_BYTES);
+    memcpy(tlsf_memory_end-3*N_WORD_BYTES, preamble.sentinel_block, 3*N_WORD_BYTES);
     total_npages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
     int n_bitmap_elts = ALIGN_UP(total_npages, 32) / 32;
+    checked_read("text_gen", fd, text_page_genmask, total_npages); // 1 byte per page
     checked_read("text_WP", fd, text_page_touched_bits, n_bitmap_elts * sizeof (int));
-    checked_read("text_PTE", fd, text_pages, total_npages * sizeof (int));
+    tlsf_control = preamble.tlsf_control_address; // already mapped at a fixed address
+    // TLSF control was mapped in gc_init_immobile()
+    checked_read("TLSF_control", fd, tlsf_control, preamble.tlsf_control_size);
+    int n_tlsf_pages = tlsf_memory_size / IMMOBILE_CARD_BYTES;
+    fprintf(stderr, "%d TLSF pages\n", n_tlsf_pages);
+    tlsf_page_sso = malloc(n_tlsf_pages * sizeof (short));
+    checked_read("TLSF_sso", fd, tlsf_page_sso, n_tlsf_pages * sizeof (short));
     write_protect_immobile_space();
 #endif
     fprintf(stderr, "%d threads:\n", (int)preamble.nthreads);
