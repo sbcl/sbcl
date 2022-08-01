@@ -304,3 +304,18 @@ claim that any particular result from these edge cases constitutes a bug.
                     (the (simple-base-string 2) y)) null)
     (check (string= (the (simple-array character (1)) x)
                     (the (simple-array character (2)) y)) null)))
+
+(with-test (:name :string/=-derive-type)
+  (macrolet
+      ((check (fun expected)
+         `(assert
+           (equal (second
+                   (third
+                    (sb-kernel:%simple-fun-type
+                     (checked-compile '(lambda (x y)
+                                        (declare (ignorable x y))
+                                        ,fun)))))
+                  ',expected))))
+    (check (string/= (the (simple-string 4) x)
+                     (the (simple-string 1) y)
+                     :start1 1 :end1 * :end2 0) (or (integer 1 1) null))))

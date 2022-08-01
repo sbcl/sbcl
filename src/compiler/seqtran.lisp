@@ -1118,10 +1118,11 @@
                                 0)
                                ((constant-lvar-p start)
                                 (lvar-value start))))
-                  (end (or (if (and end
-                                    (constant-lvar-p end))
-                               (lvar-value end))
-                           length)))
+                  (end (cond ((not end)
+                              length)
+                             ((constant-lvar-p end)
+                              (or (lvar-value end)
+                                  length)))))
              (values
               start
               end
