@@ -76,6 +76,7 @@ static void visit_pointer_words(lispobj* object, lispobj (*func)(lispobj, uword_
                widetag == RATIO_WIDETAG || widetag == COMPLEX_WIDETAG ||
                widetag == SIMPLE_ARRAY_WIDETAG ||
                (widetag >= COMPLEX_BASE_STRING_WIDETAG && widetag <= COMPLEX_ARRAY_WIDETAG) ||
+               widetag == VALUE_CELL_WIDETAG ||
                widetag == WEAK_POINTER_WIDETAG) {
         int len = object_size(object), i;
         for (i=1; i<len; ++i) FIX(object[i]);

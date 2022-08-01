@@ -23,6 +23,11 @@ run_sbcl <<EOF
   ;; but maybe someone changed it :immobile, so bind it to be certain.
   (let (#+immobile-code (sb-c::*compile-to-memory-space* :dynamic))
      (defvar *afun* (compile nil '(lambda (x) (- (length x))))))
+  ;; test for lp#1983218 - a VALUE-CELL holding a readonly string could crash
+  (defun mkcell (x) (sb-sys:%primitive sb-vm::make-value-cell x nil))
+  (compile 'mkcell)
+  (defvar *cell* (mkcell (symbol-name '*print-base*)))
+  ;;
   (save-lisp-and-die "$tmpcore")
 EOF
 run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint \
