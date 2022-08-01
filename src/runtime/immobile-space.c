@@ -1314,11 +1314,14 @@ void prepare_immobile_space_for_save(boolean verbose)
                                         PAGE_TYPE_UNBOXED);
     v->header = SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG;
     v->length_ = make_fixnum(codeblob_count);
-    gc_close_region(unboxed_region, PAGE_TYPE_UNBOXED);
-    // Zero-fill the end of dynamic space since we aready performed zero_all_free_ranges().
-    uword_t vector_end = (uword_t)((lispobj*)v + vector_nwords),
-            aligned_end = ALIGN_UP(vector_end, BACKEND_PAGE_BYTES);
-    memset((char*)vector_end, 0, aligned_end-vector_end);
+    // might have used large-object pages, no region
+    if (unboxed_region->start_addr) {
+        gc_close_region(unboxed_region, PAGE_TYPE_UNBOXED);
+        // Zero-fill the end of dynamic space since we aready performed zero_all_free_ranges().
+        uword_t vector_end = (uword_t)((lispobj*)v + vector_nwords),
+                aligned_end = ALIGN_UP(vector_end, BACKEND_PAGE_BYTES);
+        memset((char*)vector_end, 0, aligned_end-vector_end);
+    }
     uint32_t* data = (uint32_t*)v->data;
     int i = 0;
     for ( obj = (lispobj*)TEXT_SPACE_START ; obj < text_space_highwatermark ; obj += headerobj_size(obj) ) {
