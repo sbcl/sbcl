@@ -291,8 +291,6 @@
           (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)
           (push :compact-symbol sb-xc:*features*))
-        (when (target-featurep '(:and :sb-thread (:not :win32)))
-          (push :pauseless-threadstart sb-xc:*features*))
         (when (target-featurep '(:and :sb-thread (:or :darwin :openbsd)))
           (push :os-thread-stack sb-xc:*features*))
         (when (target-featurep '(:and :x86 :int4-breakpoints))
@@ -335,8 +333,6 @@
 (let ((feature-compatibility-tests
        '(("(and sb-thread (not gencgc))"
           ":SB-THREAD requires :GENCGC")
-         ("(and pauseless-threadstart (not sb-thread))"
-          ":PAUSELESS-THREADSTART requires :SB-THREAD")
          ("(and sb-safepoint (not sb-thread))" ":SB-SAFEPOINT requires :SB-THREAD")
          ("(and sb-thread (not (or riscv ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")

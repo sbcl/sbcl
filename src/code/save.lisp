@@ -313,7 +313,7 @@ sufficiently motivated to do lengthy fixes."
   (let (error)
     (with-system-mutex (sb-thread::*make-thread-lock*)
       (finalizer-thread-stop)
-      #+pauseless-threadstart (sb-thread::join-pthread-joinables #'identity)
+      (sb-thread::%dispose-thread-structs)
       (let ((threads (sb-thread:list-all-threads))
             (starting
              (setq sb-thread::*starting-threads* ; ordinarily pruned in MAKE-THREAD

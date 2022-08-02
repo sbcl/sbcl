@@ -845,7 +845,7 @@ char *pagetypedesc(int type)
 extern void gc_allocate_ptes();
 extern void recompute_gen_bytes_allocated();
 extern void print_generation_stats();
-extern struct thread *alloc_thread_struct(void*,lispobj);
+extern struct thread *alloc_thread_struct(void*);
 
 int load_gc_crashdump(char* pathname)
 {
@@ -947,7 +947,7 @@ int load_gc_crashdump(char* pathname)
     fprintf(stderr, "%d threads:\n", (int)preamble.nthreads);
     int i;
     for(i=0; i<(int)preamble.nthreads; ++i) {
-        struct thread* th = alloc_thread_struct(0, 0);
+        struct thread* th = alloc_thread_struct(0);
         // Push it on the front
         th->prev = 0;
         th->next = threads;

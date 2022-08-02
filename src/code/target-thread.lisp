@@ -299,7 +299,7 @@ created and old ones may exit at any time."
 
 (sb-ext:define-load-time-global *initial-thread* nil)
 
-;;; *JOINABLE-THREADS* is a list of THREAD instances used only if #+pauseless-threadstart
+;;; *JOINABLE-THREADS* is a list of THREAD instances.
 ;;; I had attempted to construct the list using the thread's memory to create cons
 ;;; cells but that turned out to be flawed- the cells must be freshly heap-allocated,
 ;;; because ATOMIC-POP is vulnerable to the A/B/A problem if cells are reused.
@@ -1486,7 +1486,7 @@ on this semaphore, then N of them is woken up."
       ;; This AVER failed when I messed up deletion from *STARTING-THREADS*.
       ;; That in turn caused a failure in GC because a fixnum is not a legal value
       ;; for the startup info when observed by GC.
-      #+pauseless-threadstart (aver (not (memq thread *starting-threads*)))
+      (aver (not (memq thread *starting-threads*)))
       ;; If collecting allocator metrics, transfer them to the global list
       ;; so that we can summarize over exited threads.
       #+allocator-metrics
@@ -1529,7 +1529,9 @@ on this semaphore, then N of them is woken up."
       (when *session*
         (%delete-thread-from-session thread))
       (cond
-        #+pauseless-threadstart ; If possible, logically remove from *ALL-THREADS*
+        ;; If possible, logically remove from *ALL-THREADS* by flipping a bit.
+        ;; Foreign threads remove themselves. They don't have an exit semaphore,
+        ;; so that's how we know which is which.
         (sem
          ;; Tree pruning is the responsibility of thread creators, not dying threads.
          ;; Creators have to manipulate the tree anyway, and they need access to the old
@@ -1539,8 +1541,7 @@ on this semaphore, then N of them is woken up."
            (aver (eql old 1)))
          (sb-ext:atomic-push thread *joinable-threads*))
         (t ; otherwise, physically remove from *ALL-THREADS*
-         ;; With #+pauseless-threadstart, this occurs for FOREIGN-THREAD because
-         ;; the memory allocation/deallocation is handled in C.
+         ;; The memory allocation/deallocation is handled in C.
          ;; I would like to combine the recycle bin for foreign and lisp threads though.
          (delete-from-all-threads (get-lisp-obj-address c-thread))))
       (when sem
@@ -1756,19 +1757,22 @@ session."
 
 ;;;; The beef
 
-#+pauseless-threadstart ; new way
-(progn
 ;;; Return T if the thread was created
-(defun pthread-create (thread thread-sap)
+(defun os-thread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
   #+(or arm mips)
   (bug "This and many other things will crash on MIPS/ARM either
   until they do linkage tables like everyone else, or until all those
   things can deal with either way of doing linkage.")
+  #+win32
+  (/= 0 (alien-funcall (extern-alien "create_thread"
+                                     (function unsigned system-area-pointer))
+                       thread-sap))
+  #-win32
   (let ((attr (foreign-symbol-sap "new_lisp_thread_attr" t))
         (c-tramp
-         (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
-                             #-os-thread-stack "new_thread_trampoline")))
+          (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
+                              #-os-thread-stack "new_thread_trampoline")))
     (and (= 0 #+os-thread-stack
               (alien-funcall (extern-alien "pthread_attr_setstacksize"
                                            (function int system-area-pointer unsigned))
@@ -1811,10 +1815,18 @@ session."
     (setf (thread-startup-info thread) 0)
     ;; Clean up *ALL-THREADS*
     (delete-from-all-threads (sap-int c-thread))
-    ;; Free the pthread resources
-    (alien-funcall (extern-alien "pthread_join" (function int unsigned unsigned))
-                   (thread-os-thread thread) 0) ; no result pointer
-    (setf (thread-os-thread thread) 0)
+    ;; Release the OS and/or pthread resources
+    #+win32
+    (with-alien ((wait (function unsigned unsigned unsigned) :extern "WaitForSingleObject")
+                 (close (function int unsigned) :extern "CloseHandle"))
+      (let ((os-thread (sap-ref-word c-thread
+                                     (ash sb-vm::thread-os-thread-slot sb-vm::word-shift))))
+        (alien-funcall wait os-thread #xffffffff)
+        (alien-funcall close os-thread)))
+    #-win32
+    (with-alien ((join (function int unsigned unsigned) :extern "pthread_join"))
+      (alien-funcall join (thread-os-thread thread) 0) ; no result pointer
+      (setf (thread-os-thread thread) 0))
     (cond (dispose
            (free-thread-struct c-thread)
            nil)
@@ -1828,9 +1840,9 @@ session."
 ;;; Heuristic decides when to stop trying to free. Passing in #'IDENTITY means that
 ;;; all joinables should be processed. Passing in #'CDR or #'CDDR returns early if there
 ;;; are not at least 1 or 2 threads respectively that could be joined.
-(export 'join-pthread-joinables)
-(defun join-pthread-joinables (heuristic)
-  (loop (unless (funcall heuristic *joinable-threads*) (return))
+(export '%dispose-thread-structs)
+(defun %dispose-thread-structs (&key (retain 0))
+  (loop (unless (nthcdr retain *joinable-threads*) (return))
         (let ((item (sb-ext:atomic-pop *joinable-threads*)))
           (if item (primitive-join item t) (return)))))
 
@@ -1854,12 +1866,11 @@ session."
     ;; If there is more than 1 more joinable, join all but 1.
     ;; Two threads could both find > 1 thread to join, and both do
     ;; a join, leaving 0 to join. That's ok.
-    (join-pthread-joinables #'cdr)
+    (%dispose-thread-structs :retain 1)
     (let ((thread-sap (alien-funcall (extern-alien "alloc_thread_struct"
                                                    (function system-area-pointer
-                                                             system-area-pointer unsigned))
-                                     (or reuse (int-sap 0))
-                                     sb-vm:no-tls-value-marker)))
+                                                             system-area-pointer))
+                                     (or reuse (int-sap 0)))))
       (when (and (not reuse) (/= (sap-int thread-sap) 0))
         ;; these would have been done already if reusing the memory
         ;; of a completed thread.
@@ -1876,8 +1887,8 @@ session."
   `(defun run ()
      (macrolet ((apply-real-function ()
                   '(apply (svref (thread-startup-info *current-thread*) 2)
-                          (prog1 (svref (thread-startup-info *current-thread*) 3)
-                            (setf (thread-startup-info *current-thread*) 0)))))
+                    (prog1 (svref (thread-startup-info *current-thread*) 3)
+                      (setf (thread-startup-info *current-thread*) 0)))))
        (flet ((unmask-signals ()
                 (let ((mask (svref (thread-startup-info *current-thread*) 4)))
                   (if mask
@@ -1894,22 +1905,6 @@ session."
          ;; Signals other than stop-for-GC  are masked. The WITH/WITHOUT noise is
          ;; pure cargo-cultism.
          (without-interrupts (with-local-interrupts ,@body))))))
-) ; end PROGN
-
-#-pauseless-threadstart
-(defmacro thread-trampoline-defining-macro (&body body) ; OLD WAY
-  `(defun run (thread setup-sem function arguments)
-     (macrolet ((unmask-signals () '(sb-unix::unblock-deferrable-signals))
-                (apply-real-function () '(apply function arguments)))
-       (copy-primitive-thread-fields thread)
-       (update-all-threads (thread-primitive-thread thread) thread)
-       (sb-ext:atomic-push thread (session-new-enrollees *session*))
-       (when setup-sem
-         (signal-semaphore setup-sem)
-         ;; setup-sem was dx-allocated, set it to NIL so that the
-         ;; backtrace doesn't get confused
-         (setf setup-sem nil))
-       ,@body)))
 
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
@@ -2002,7 +1997,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 ;;; This is the faster variant of RUN-THREAD that does not wait for the new
 ;;; thread to start executing before returning.
-#+pauseless-threadstart
 (defun start-thread (thread function arguments)
   (let* ((trampoline
           (lambda (arg)
@@ -2096,7 +2090,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
           (setf (sap-ref-lispobj thread-sap (ash sb-vm::thread-lisp-thread-slot
                                                  sb-vm:word-shift))
                 thread)
-          (setq created (pthread-create thread thread-sap))
+          (setq created (os-thread-create thread thread-sap))
           (cond (created
                  ;; Still holding the MAKE-THREAD-LOCK, expose the thread in *all-threads*.
                  ;; In this manner, anyone who acquires the MAKE-THREAD-LOCK can be sure that
@@ -2118,49 +2112,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
     (with-pinned-objects (saved-sigmask)
       (sb-unix::pthread-sigmask sb-unix::SIG_SETMASK saved-sigmask nil))
     (if created thread (error "Could not create new OS thread."))))
-
-#+(and sb-thread (not pauseless-threadstart))
-(defun start-thread (thread function arguments)
-  (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
-         #+(or win32 darwin freebsd)
-         (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
-                        (sb-vm:floating-point-modes))))
-    (declare (dynamic-extent setup-sem))
-    (dx-flet ((start-routine ()
-                  ;; Inherit parent thread's FP modes
-                  #+(or win32 darwin)
-                  (setf (sb-vm:floating-point-modes) fp-modes)
-                  ;; As it is, this lambda must not cons until we are
-                  ;; ready to run GC. Be careful.
-                  (init-thread-local-storage thread)
-                  ;; I literally don't know what these WITH/WITHOUT wrappings are for,
-                  ;; but tests fail when removed.
-                  ;; It's the body of CALL-WITH-MUTEX omitting the grab and release.
-                  (without-interrupts
-                      (with-local-interrupts
-                          (run thread setup-sem function arguments)))))
-        ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
-      (aver (not *gc-inhibit*))
-        ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
-        ;; thread is initialized properly. Wrap the whole thing in
-        ;; WITHOUT-INTERRUPTS (via WITH-SYSTEM-MUTEX) because we pass
-        ;; INITIAL-FUNCTION to another thread.
-        ;; (Does WITHOUT-INTERRUPTS really matter now that it's DXed?)
-      (dx-flet ((thunk ()
-          (with-alien ((create-thread (function unsigned unsigned unsigned)
-                                      :extern "create_thread"))
-            (with-pinned-objects (thread #'start-routine)
-              (if (eql (alien-funcall create-thread
-                                      (- (get-lisp-obj-address thread)
-                                         sb-vm:instance-pointer-lowtag)
-                                      (get-lisp-obj-address #'start-routine))
-                       0)
-                  (setq thread nil)
-                  (wait-on-semaphore setup-sem))))))
-        (if (thread-ephemeral-p thread)
-            (thunk)
-            (sb-thread::call-with-system-mutex #'thunk *make-thread-lock*)))))
-    (or thread (error "Could not create a new thread.")))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   "Suspend current thread until THREAD exits. Return the result values
@@ -2195,9 +2146,8 @@ subject to change."
 
   ;; First, free up the pthread resources of any thread(s), not necessarily
   ;; one we're tryinng to join.
-  #+pauseless-threadstart
   (when (cddr *joinable-threads*) ; if strictly > 2 are joinable,
-    (without-interrupts (join-pthread-joinables #'cddr)))
+    (without-interrupts (%dispose-thread-structs :retain 2)))
   ;; No result semaphore indicates that there's nothing to wait for-
   ;; the thread is either a foreign-thread, or finished running.
   (let* ((semaphore (thread-semaphore thread))

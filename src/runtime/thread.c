@@ -234,15 +234,15 @@ static int get_nonzero_tid()
     return tid;
 }
 
-// Only a single 'attributes' object is used if #+pauseless-threadstart.
-// This is ok because creation is synchronized by *MAKE-THREAD-LOCK*.
+// Because creation is synchronized by *MAKE-THREAD-LOCK*
+// we only need a single 'attributes' object.
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_WIN32
 pthread_attr_t new_lisp_thread_attr;
 #define init_shared_attr_object() (pthread_attr_init(&new_lisp_thread_attr)==0)
 #else
 #define init_shared_attr_object() (1)
 #endif
-struct thread *alloc_thread_struct(void*,lispobj);
+struct thread *alloc_thread_struct(void*);
 
 #ifdef LISP_FEATURE_WIN32
 #define ASSOCIATE_OS_THREAD(thread) \
@@ -330,7 +330,7 @@ void create_main_lisp_thread(lispobj function) {
     InitializeCriticalSection(&recyclebin_lock);
     InitializeCriticalSection(&in_gc_lock);
 #endif
-    struct thread *th = alloc_thread_struct(0, NO_TLS_VALUE_MARKER);
+    struct thread *th = alloc_thread_struct(0);
     if (!th || arch_os_thread_init(th)==0 || !init_shared_attr_object())
         lose("can't create initial thread");
     th->state_word.sprof_enable = 1;
@@ -487,7 +487,6 @@ unregister_thread(struct thread *th,
 #endif
 
 #if defined(LISP_FEATURE_WIN32)
-    CloseHandle((HANDLE)th->os_thread);
     int i;
     for (i = 0; i<NUM_PRIVATE_EVENTS; ++i)
         CloseHandle(thread_private_events(th,i));
@@ -519,7 +518,6 @@ void* new_thread_trampoline(void* arg)
     struct thread* th = arg;
     ASSOCIATE_OS_THREAD(th);
 
-#ifdef LISP_FEATURE_PAUSELESS_THREADSTART
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     init_thread_data scribble;
     // This "scribble" thing is really quite pointless because the original sigset_t
@@ -615,20 +613,6 @@ void* new_thread_trampoline(void* arg)
     // Close the GC region and unlink from all_threads
     unregister_thread(th, SCRIBBLE);
 
-#else // !PAUSELESS_THREADSTART
-
-    th->os_kernel_tid = get_nonzero_tid();
-    init_thread_data scribble;
-
-    lispobj function = th->no_tls_value_marker;
-    th->no_tls_value_marker = NO_TLS_VALUE_MARKER;
-    init_new_thread(th, &scribble,
-                    GUARD_CONTROL_STACK|GUARD_BINDING_STACK|GUARD_ALIEN_STACK);
-    funcall0(function);
-    unregister_thread(th, &scribble);
-    free_thread_struct(th); // no recycling of 'struct thread'
-
-#endif
     return 0;
 }
 
@@ -688,7 +672,7 @@ static void attach_os_thread(init_thread_data *scribble)
     block_deferrable_signals(&scribble->oldset);
 #endif
     void* recycled_memory = get_recyclebin_item();
-    struct thread *th = alloc_thread_struct(recycled_memory, NO_TLS_VALUE_MARKER);
+    struct thread *th = alloc_thread_struct(recycled_memory);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
@@ -752,6 +736,11 @@ static void attach_os_thread(init_thread_data *scribble)
 static void detach_os_thread(init_thread_data *scribble)
 {
     struct thread *th = get_sb_vm_thread();
+
+#if defined(LISP_FEATURE_WIN32)
+    CloseHandle((HANDLE)th->os_thread);
+#endif
+
 #ifdef LISP_FEATURE_DARWIN
     pthread_setspecific(foreign_thread_ever_lispified, (void*)1);
 #endif
@@ -879,7 +868,7 @@ callback_wrapper_trampoline(
  */
 
 struct thread *
-alloc_thread_struct(void* spaces, lispobj start_routine) {
+alloc_thread_struct(void* spaces) {
     /* May as well allocate all the spaces at once: it saves us from
      * having to decide what to do if only some of the allocations
      * succeed. SPACES must be appropriately aligned, since the GC
@@ -1086,7 +1075,7 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 #  define INITIALIZE_TLS(sym,val) SYMBOL(sym)->value = val
 #endif
 #include "genesis/thread-init.inc"
-    th->no_tls_value_marker = start_routine;
+    th->no_tls_value_marker = NO_TLS_VALUE_MARKER;
 
 #if defined(LISP_FEATURE_WIN32)
     int i;
@@ -1099,54 +1088,20 @@ alloc_thread_struct(void* spaces, lispobj start_routine) {
 }
 #ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_WIN32
-/* Allocate a thread structure, call CreateThread(),
- * and return 1 for success, 0 for failure */
-uword_t create_thread(struct thread_instance* instance, lispobj start_routine)
+uword_t create_thread(struct thread* th)
 {
-    struct thread *th;
-
-    /* Must defend against async unwinds. */
-    if (read_TLS(INTERRUPTS_ENABLED, get_sb_vm_thread()) != NIL)
-        lose("create_thread is not safe when interrupts are enabled.");
-
-    /* Assuming that a fresh thread struct has no lisp objects in it,
-     * linking it to all_threads can be left to the thread itself
-     * without fear of gc lossage. 'start_routine' violates this
-     * assumption and must stay pinned until the child starts up. */
-    th = alloc_thread_struct(0, start_routine);
-    if (!th) return 0;
-
-    /* The new thread inherits the restrictive signal mask set here,
-     * and enables signals again when it is set up properly. */
-    sigset_t oldset;
-
-    /* Blocking deferrable signals is enough, no need to block
-     * SIG_STOP_FOR_GC because the child process is not linked onto
-     * all_threads until it's ready. */
-    block_deferrable_signals(&oldset);
     unsigned int tid;
-    // Theoretically you should tell the new thread a signal mask to restore
-    // after it finishes any uninterruptable setup code, but the way this worked
-    // on windows is that we passed the mask of blocked signals in the parent
-    // *after* blocking deferrables. It's immaterial what mask is passed
-    // because the thread will unblock all deferrables,
-    // and we don't really have posix signals anyway.
     struct extra_thread_data *data = thread_extra_data(th);
     data->blocked_signal_set = deferrable_sigset;
-    data->pending_signal_set = 0;
     // It's somewhat customary in the win32 API to start threads as suspended.
     th->os_thread =
       _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, th,
                      CREATE_SUSPENDED, &tid);
     boolean success = th->os_thread != 0;
     if (success) {
-        instance->uw_primitive_thread = (lispobj)th;
         th->os_kernel_tid = tid;
         ResumeThread((HANDLE)th->os_thread);
-    } else {
-        free_thread_struct(th);
     }
-    thread_sigmask(SIG_SETMASK,&oldset,0);
     return success;
 }
 #endif

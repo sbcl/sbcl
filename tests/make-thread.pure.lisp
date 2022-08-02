@@ -7,10 +7,10 @@
 (import 'sb-int::(binding* descriptor-sap))
 
 ;;; Test out-of-memory (or something) that goes wrong in pthread_create
-#+pauseless-threadstart ; no SB-THREAD::PTHREAD-CREATE symbol if not
+#+sb-thread ; no SB-THREAD::OS-THREAD-CREATE symbol if not
 (test-util:with-test (:name :failed-thread-creation)
   ;; This test needs to ensure that nothing is in *ALL-THREADS* to begin with.
-  (sb-thread::join-pthread-joinables #'identity)
+  (sb-thread::%dispose-thread-structs)
   (let ((encapsulation
           (compile nil
                    '(lambda (realfun thread stack-base)
@@ -18,12 +18,12 @@
                          (funcall realfun thread stack-base)
                          nil))))
         (success))
-    (sb-int:encapsulate 'sb-thread::pthread-create 'test encapsulation)
+    (sb-int:encapsulate 'sb-thread::os-thread-create 'test encapsulation)
     (unwind-protect
          (handler-case (make-thread #'list :name "thisfails")
            (error (e)
              (setq success (search "Could not create new OS thread" (write-to-string e)))))
-      (sb-int:unencapsulate 'sb-thread::pthread-create 'test))
+      (sb-int:unencapsulate 'sb-thread::os-thread-create 'test))
     (assert success))
   (let ((threads sb-thread::*starting-threads*))
     (when (find-if-not #'thread-ephemeral-p threads)
@@ -137,7 +137,7 @@
 ;;; In fact, assert something stronger: there are no young objects
 ;;; between the current SP and end of stack.
 (test-util:with-test (:name :expected-gc-roots
-                      :skipped-on (or :interpreter (not :pauseless-threadstart)))
+                      :skipped-on :interpreter)
   (let ((list
           (delete-if (lambda (x)
                        (or (eq x #'actually-get-stack-roots)
@@ -155,7 +155,7 @@
 
 ;; lp#1595699
 (test-util:with-test (:name :start-thread-in-without-gcing
-                      :skipped-on (not :pauseless-threadstart))
+                      :skipped-on (not :sb-thread))
   (assert (eq (join-thread
                (without-gcing
                    (make-thread (lambda () 'hi))))

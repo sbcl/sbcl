@@ -360,7 +360,7 @@ not supported."
                  ;; Dead threads aren't pruned from *ALL-THREADS* until the Pthread join.
                  ;; Do that now so that the forked process has only the main thread
                  ;; in *ALL-THREADS* and nothing in *JOINABLE-THREADS*.
-                 (sb-thread::join-pthread-joinables #'identity)
+                 (sb-thread::%dispose-thread-structs)
                  ;; Threads are added to ALL-THREADS before they have an OS thread,
                  ;; but newborn threads are not exposed in SB-THREAD:LIST-ALL-THREADS.
                  ;; So we need to go lower-level to sense whether any exist.
