@@ -128,7 +128,7 @@
 
 #+sb-xc-host
 (defun write-gc-tables (stream)
-  (format stream "#include \"lispobj.h\"~%")
+  (format stream "#include ~S~%" (sb-fasl::lispobj-dot-h))
   ;; Compute a bitmask of all specialized vector types,
   ;; not including array headers, for maybe_adjust_large_object().
   (let ((min #xff) (bits 0))

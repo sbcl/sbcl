@@ -28,6 +28,24 @@
 
 (in-package "SB-FASL")
 
+;;; Some build systems frown upon excessive use (or any use) of "-I" options
+;;; on the C compiler invocation. So depending on the current working directory
+;;; when generating headers and when building, the pathname where we produce
+;;; headers may differ from the string specified in #include lines.
+;;; The :C-HEADER-DIR-NAME keyword to genesis specifies the output path,
+;;; and this symbol (which is normally unbound) specifies the #include prefix.
+;;; The normal build is done within src/runtime and does not need
+;;; anything done to set this.
+(defun genesis-header-prefix ()
+  (if (boundp 'cl-user::*genesis-header-prefix*)
+      (symbol-value 'cl-user::*genesis-header-prefix*)
+      "genesis"))
+;;; By the same reasoning as above, lispobj.h is either in "." or a relative path.
+(defun lispobj-dot-h ()
+  (if (boundp 'cl-user::*lispobj-h-namestring*)
+      (symbol-value 'cl-user::*lispobj-h-namestring*)
+      "lispobj.h"))
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (use-package "SB-COREFILE"))
 
@@ -3263,9 +3281,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
   (when (eq operator-name 'symbol)
     (format stream "
 lispobj symbol_function(struct symbol* symbol);
-#include \"genesis/vector.h\"
+#include \"~A/vector.h\"
 struct vector *symbol_name(struct symbol*);~%
-lispobj symbol_package(struct symbol*);~%")
+lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
     (format stream "static inline int symbol_package_id(struct symbol* s) { return ~A; }~%"
             #+compact-symbol (format nil "s->name >> ~D" sb-impl::symbol-name-bits)
             #-compact-symbol "fixnum_value(s->package_id)")
@@ -3344,14 +3362,14 @@ lispobj symbol_package(struct symbol*);~%")
       (format t "#ifdef __ASSEMBLER__~2%")
       (output-asm)
       (format t "~%#else /* __ASSEMBLER__ */~2%")
-      (format t "#include \"lispobj.h\"~%")
+      (format t "#include ~S~%" (lispobj-dot-h))
       (output-c)
       (format t "~%#endif /* __ASSEMBLER__ */~%"))))
 
 (defun write-structure-object (dd *standard-output* &optional structname)
   (flet ((cstring (designator) (c-name (string-downcase designator))))
     (format t "#ifndef __ASSEMBLER__~2%")
-    (format t "#include \"lispobj.h\"~%")
+    (format t "#include ~S~%" (lispobj-dot-h))
     (format t "struct ~A {~%" (or structname (cstring (dd-name dd))))
     (format t "    lispobj header; // = word_0_~%")
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
