@@ -17,6 +17,7 @@
 #include "gc-private.h"
 #include "gencgc-private.h"
 #include "forwarding-ptr.h"
+#include "genesis/gc-tables.h"
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 
@@ -41,6 +42,7 @@ static void visit_pointer_words(lispobj* object, lispobj (*func)(lispobj, uword_
         return;
     }
     int widetag = widetag_of(object);
+    if (leaf_obj_widetag_p(widetag)) return;
     if (instanceoid_widetag_p(widetag)) {
         lispobj layout = layout_of(object);
         if (layout) {
@@ -72,12 +74,7 @@ static void visit_pointer_words(lispobj* object, lispobj (*func)(lispobj, uword_
         int boxedlen = code_header_words((struct code*)object), i;
         // first 4 slots are header, boxedlen, fixups, debuginfo
         for (i=2; i<boxedlen; ++i) FIX(object[i]);
-    } else if (widetag == CLOSURE_WIDETAG ||
-               widetag == RATIO_WIDETAG || widetag == COMPLEX_WIDETAG ||
-               widetag == SIMPLE_ARRAY_WIDETAG ||
-               (widetag >= COMPLEX_BASE_STRING_WIDETAG && widetag <= COMPLEX_ARRAY_WIDETAG) ||
-               widetag == VALUE_CELL_WIDETAG ||
-               widetag == WEAK_POINTER_WIDETAG) {
+    } else {
         int len = object_size(object), i;
         for (i=1; i<len; ++i) FIX(object[i]);
     }

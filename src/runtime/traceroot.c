@@ -733,6 +733,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
         }
         nwords = scan_limit = headerobj_size2(where, word);
         int widetag = header_widetag(word);
+        if (leaf_obj_widetag_p(widetag)) continue;
         switch (widetag) {
         case INSTANCE_WIDETAG:
         case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -790,8 +791,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             if (!(other_immediate_lowtag_p(widetag) && LOWTAG_FOR_WIDETAG(widetag)))
               lose("Unknown widetag %x", widetag);
             // Skip irrelevant objects.
-            if (leaf_obj_widetag_p(widetag) ||
-                (widetag == WEAK_POINTER_WIDETAG) || /* do not follow! */
+            if ((widetag == WEAK_POINTER_WIDETAG) || /* do not follow! */
                 // These numeric types contain pointers, but are uninteresting.
                 (widetag == COMPLEX_WIDETAG) ||
                 (widetag == RATIO_WIDETAG))

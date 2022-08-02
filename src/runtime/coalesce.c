@@ -153,15 +153,15 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
 {
     struct hopscotch_table* ht = (struct hopscotch_table*)arg;
-    lispobj *next;
     sword_t nwords, i;
 
-    for ( ; where < limit ; where = next ) {
+    for ( ; where < limit ; where += nwords ) {
         lispobj word = *where;
         if (is_header(word)) {
             int widetag = header_widetag(word);
             nwords = sizetab[widetag](where);
-            next = where + nwords;
+            if (leaf_obj_widetag_p(widetag)) continue; // Ignore this object.
+            sword_t coalesce_nwords = nwords;
             if (instanceoid_widetag_p(widetag)) {
                 lispobj layout = layout_of(where);
                 struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
@@ -181,18 +181,15 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             }
 #endif
             case CODE_HEADER_WIDETAG:
-                nwords = code_header_words((struct code*)where);
+                coalesce_nwords = code_header_words((struct code*)where);
                 break;
-            default:
-                if (leaf_obj_widetag_p(widetag))
-                    continue; // Ignore this object.
             }
-            for(i=1; i<nwords; ++i)
+            for(i=1; i<coalesce_nwords; ++i)
                 coalesce_obj(where+i, ht);
         } else {
+            nwords = 2;
             coalesce_obj(where+0, ht);
             coalesce_obj(where+1, ht);
-            next = where + 2;
         }
     }
     return 0;
