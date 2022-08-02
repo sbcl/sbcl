@@ -15,7 +15,8 @@ include Config.x86-64-bsd
 # worked fine for most things, but LOAD-FOREIGN & friends require
 # dlopen() etc., which in turn depend on dynamic linking of the
 # runtime.
-OS_LIBS += -lutil
+OS_LIBS += -lutil -L/usr/local/lib
+CPPFLAGS += -isystem/usr/local/include
 
 # use libthr (1:1 threading).  libpthread (m:n threading) does not work.
 ifdef LISP_FEATURE_SB_THREAD
