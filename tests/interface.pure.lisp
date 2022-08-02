@@ -36,6 +36,10 @@
                    (search "is not"
                            (write-to-string err :escape nil)))))))
 
+;; Regression from R/O space change
+(with-test (:name (apropos-list :smoke-test))
+  (assert (plusp (length (apropos-list "required-foreign")))))
+
 ;;; APROPOS should accept a package designator, not just a package, and
 ;;; furthermore do the right thing when it gets a package designator.
 ;;; (bug reported and fixed by Alexey Dejneka sbcl-devel 2001-10-17)

@@ -119,6 +119,9 @@ static int readonly_unboxed_obj_p(lispobj* obj)
     return 0;
 }
 
+// CAUTION: don't think you can use this generally. It can only compute sizes
+// of objects that do not change when forwarded. Instances can grow when forwarded
+// by gencgc due to adding a stable hash slot.
 static sword_t careful_object_size(lispobj* obj) {
     return object_size(forwarding_pointer_p(obj)
                        ? native_pointer(forwarding_pointer_value(obj))
@@ -159,8 +162,14 @@ static void ensure_forwarded(lispobj* obj)
     set_forwarding_pointer(obj, make_lispobj(copy, OTHER_POINTER_LOWTAG));
 }
 
-static inline lispobj* symbol_name_native_ptr(struct symbol* symbol) {
-    return native_pointer(decode_symbol_name(symbol->name));
+// We have to take the unused arg for function signature compatibility.
+// Lambdas in C are so crappy.
+static void ensure_symbol_name_forwarded(lispobj* obj,
+                                         __attribute__((unused)) uword_t arg) {
+    if (widetag_of(obj) == SYMBOL_WIDETAG) {
+        struct symbol* s = (void*)obj;
+        ensure_forwarded(native_pointer(decode_symbol_name(s->name)));
+    }
 }
 
 static lispobj follow_ro_fp(lispobj ptr, __attribute__((unused)) uword_t arg) {
@@ -220,24 +229,8 @@ void prepare_readonly_space(int purify, int print)
     // 2. Forward all symbol names so that they're placed contiguously
     // Could be even more clever and sort lexicographically for determistic core
     if (print) fprintf(stderr, "purify: forwarding symbol names\n");
-    ensure_forwarded(symbol_name_native_ptr((void*)NIL_SYMBOL_SLOTS_START));
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    {
-        lispobj* where = (lispobj*)FIXEDOBJ_SPACE_START;
-        lispobj* limit = fixedobj_free_pointer;
-        for ( ; where < limit ; where += object_size(where) )
-            if (widetag_of(where) == SYMBOL_WIDETAG)
-                ensure_forwarded(symbol_name_native_ptr((struct symbol*)where));
-        }
-#endif
-    for ( first = 0; first < next_free_page; first = 1+last ) {
-        last = contiguous_block_final_page(first);
-        lispobj* where = (lispobj*)page_address(first);
-        lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
-        for ( ; where < limit ; where += careful_object_size(where) )
-            if (widetag_of(where) == SYMBOL_WIDETAG)
-                ensure_forwarded(symbol_name_native_ptr((struct symbol*)where));
-    }
+    walk_all_spaces(ensure_symbol_name_forwarded, 0);
+
     // Add a random delimiter object between symbol-names and everything else.
     // APROPOS-LIST uses this to detect the end of the strings.
     *read_only_space_free_pointer = SIMPLE_VECTOR_WIDETAG; // length 0
