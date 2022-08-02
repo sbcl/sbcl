@@ -122,6 +122,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int executab
     int protection;
     int flags = 0;
 
+    // FIXME: This probaby needs to use MAP_TRYFIXED
     if (attributes & IS_GUARD_PAGE)
         protection = OS_VM_PROT_NONE;
     else

@@ -321,12 +321,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
           * entry type code, plus this count itself) */
          (5 * MAX_CORE_SPACE_ID) + 2, file);
     output_space(file,
-                 READ_ONLY_CORE_SPACE_ID,
-                 (lispobj *)READ_ONLY_SPACE_START,
-                 read_only_space_free_pointer,
-                 core_start_pos,
-                 core_compression_level);
-    output_space(file,
                  STATIC_CORE_SPACE_ID,
                  (lispobj *)STATIC_SPACE_START,
                  static_space_free_pointer,
@@ -344,6 +338,15 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  DYNAMIC_CORE_SPACE_ID,
                  (void*)DYNAMIC_SPACE_START,
                  (void*)dynamic_space_highwatermark(),
+                 core_start_pos,
+                 core_compression_level);
+    /* FreeBSD really doesn't like to give you the address you asked for
+     * on dynamic space. We have a better chance at satisfying the request
+     * if we haven't already mapped R/O space below it. */
+    output_space(file,
+                 READ_ONLY_CORE_SPACE_ID,
+                 (lispobj *)READ_ONLY_SPACE_START,
+                 read_only_space_free_pointer,
                  core_start_pos,
                  core_compression_level);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

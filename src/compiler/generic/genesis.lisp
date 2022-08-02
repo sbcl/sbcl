@@ -3761,10 +3761,9 @@ III. initially undefined function references (alphabetically):
 
       ;; Write the Directory entry header.
       (write-word directory-core-entry-type-code)
-      (let ((spaces (nconc (list *read-only* *static*)
-                           #+immobile-space
-                           (list *immobile-fixedobj* *immobile-text*)
-                           (list *dynamic*))))
+      (let ((spaces `(,*static*
+                      #+immobile-space ,@`(,*immobile-fixedobj* ,*immobile-text*)
+                      ,*dynamic* ,*read-only*)))
         ;; length = (5 words/space) * N spaces + 2 for header.
         (write-word (+ (* (length spaces) 5) 2))
         (dolist (space spaces)
