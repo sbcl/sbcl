@@ -1198,16 +1198,14 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t text_len)
         page_attributes_valid = 1; // make search_immobile_space() work right
         return;
     }
-    uword_t address = TEXT_SPACE_START;
-    gc_assert(PTR_ALIGN_UP(text_space_highwatermark, IMMOBILE_CARD_BYTES) == text_space_highwatermark);
-    // Don't use text_len because that measures backend pages (32k),
-    // but we're willing to start in the middle of such a page
-    // with new code allocation.
-    n_pages = ((uword_t)text_space_highwatermark-TEXT_SPACE_START) / IMMOBILE_CARD_BYTES;
-    for (page = 0; page < n_pages ; ++page) text_page_genmask[page] |= 1<<gen;
     // coreparse() already set text_space_highwatermark
     gc_assert(text_space_highwatermark != 0 /* would be zero if not mmapped yet */
-              && text_space_highwatermark <= (lispobj*)(address + text_len));
+              && text_space_highwatermark <= (lispobj*)(TEXT_SPACE_START + text_len));
+    gc_assert(PTR_ALIGN_UP(text_space_highwatermark, IMMOBILE_CARD_BYTES) == text_space_highwatermark);
+    // Don't use text_len to compute n_pages because that measures backend pages (32k),
+    // but we're trying to compute _allocator_ pages.
+    n_pages = ((uword_t)text_space_highwatermark-TEXT_SPACE_START) / IMMOBILE_CARD_BYTES;
+    for (page = 0; page < n_pages ; ++page) text_page_genmask[page] |= 1<<gen;
     tlsf_mem_start = text_space_highwatermark;
     struct vector* v = VECTOR(SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value);
     gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
