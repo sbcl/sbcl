@@ -368,24 +368,25 @@ implementation it is ~S." *!default-package-use-list*)
                                  but have common elements ~%   ~S"
                                 (car x) (car y) z))))
 
-(flet ((designator-to-string (kind designator)
-         (cond ((and (eq kind 'package) (packagep designator))
-                (package-name designator)) ; already simple and basic if possible
-               (t
-                (possibly-base-stringize
-                 (cond ((stringp designator) designator)
-                       ((symbolp designator) (symbol-name designator))
-                       ((characterp designator) (string designator))
-                       (t (error 'simple-type-error
-                                 :datum designator
-                                 :expected-type
-                                 (if (eq kind 'package) 'package-designator 'string-designator)
-                                 :format-control "~S does not designate a ~(~A~)"
-                                 :format-arguments (list designator kind)))))))))
+(flet ((designator-to-string (designator type format-control)
+         (possibly-base-stringize
+          (typecase designator
+            (string designator)
+            (symbol (symbol-name designator))
+            (character (string designator))
+            (t (error 'simple-type-error
+                      :datum designator
+                      :expected-type type
+                      :format-control format-control
+                      :format-arguments (list designator)))))))
   (defun stringify-string-designator (string-designator)
-    (designator-to-string 'string string-designator))
+    (designator-to-string string-designator 'string-designator
+                          "~S does not designate a string"))
   (defun stringify-package-designator (package-designator)
-    (designator-to-string 'package package-designator)))
+    (if (packagep package-designator)
+        (package-name package-designator) ; already simple, and base-string when possible
+        (designator-to-string package-designator 'package-designator
+                              "~S does not designate a package"))))
 
 (defun stringify-string-designators (string-designators)
   (mapcar #'stringify-string-designator string-designators))
@@ -634,6 +635,27 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
   (when (fboundp symbol)
     (write-string " (fbound)")))
 
+(flet ((add-to-bag-if-found (table string length hash result)
+         (with-symbol ((symbol) table string length hash)
+           ;; HASH-TABLE degenerates to a list when used by FIND-ALL-SYMBOLS
+           ;; since homographs have the same SXHASH, so handle either
+           ;; a hash-table or a cons containing a list.
+           (if (hash-table-p result)
+               (setf (gethash symbol result) t)
+               (pushnew symbol (car result))))))
+
+(defun find-all-symbols (string-designator)
+  "Return a list of all symbols in the system having the specified name."
+  (let* ((string (truly-the simple-string
+                            (stringify-string-designator string-designator)))
+         (length (length string))
+         (hash (compute-symbol-hash string length))
+         (result (list nil)))
+    (do-packages (p) ; FIXME: should not acquire package-names lock
+      (add-to-bag-if-found (package-internal-symbols p) string length hash result)
+      (add-to-bag-if-found (package-external-symbols p) string length hash result))
+    (car result)))
+
 (defun apropos-list (string-designator
                      &optional
                      package-designator
@@ -701,13 +723,13 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                      (let* ((hash (the hash-code (car candidate)))
                             (string (the simple-string (cdr candidate)))
                             (length (length string)))
-                       (with-symbol ((symbol) table string length hash)
-                         (setf (gethash symbol result) t)))))))
-        (dolist (package (list-all-packages))
+                       (add-to-bag-if-found table string length hash result))))))
+        (do-packages (package) ; FIXME: should not acquire package-names lock
           (find-all-in-table (package-external-symbols package))
           (unless external-only
             (find-all-in-table (package-internal-symbols package)))))
       (sort (loop for k being each hash-key of result collect k) #'string-lessp))))
+) ; end FLET
 
 (defun apropos (string-designator &optional package external-only)
   "Briefly describe all symbols which contain the specified STRING.

@@ -1587,15 +1587,6 @@ PACKAGE."
           (setf (package-%used-by-list p)
                 (remove package (the list (package-%used-by-list p))))))
       t)))
-
-(defun find-all-symbols (string-or-symbol)
-  "Return a list of all symbols in the system having the specified name."
-  (let ((string (string string-or-symbol))
-        (result ()))
-    (do-packages (package)
-      (multiple-value-bind (symbol found) (find-symbol string package)
-        (when found (pushnew symbol result))))
-    result))
 
 ;;;; final initialization
 
