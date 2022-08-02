@@ -921,6 +921,11 @@ Users Manual for details about the PROCESS structure.
                                             (sort (coerce-or-copy preserve-fds
                                                                   '(simple-array (signed-byte #.(alien-size int)) (*)))
                                                   #'<))))
+                                 (multiple-value-bind (readfd writefd) (sb-unix:unix-pipe)
+                                   (if (null readfd) ; writefd = errno when it fails
+                                       (file-perror nil writefd "Error creating pipe")
+                                       (setf (deref channel 0) readfd
+                                             (deref channel 1) writefd)))
                                  (with-pinned-objects (preserve-fds)
                                    (with-args (args-vec args)
                                      (with-system-mutex (*spawn-lock*)

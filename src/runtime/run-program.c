@@ -241,11 +241,6 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
     sigset_t sset;
     int failure_code = 2;
 
-    channel[0] = -1;
-    channel[1] = -1;
-    // Surely we can do better than to lose()
-    if (pipe(channel)) lose("can't run-program");
-
     pid = fork();
     if (pid) {
         return pid;
