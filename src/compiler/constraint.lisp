@@ -1080,7 +1080,7 @@
                  (if (member-type-p other)
                      (mapc-member-type-members #'note-not other)
                      (setq not-res (type-union not-res other)))
-                 (setq res (type-approx-intersection2 res other))))
+                 (setq res (type-intersection res other))))
             (array-in-bounds-p
              (unless (eq (ref-constraints ref)
                          (pushnew con (ref-constraints ref)))
@@ -1109,8 +1109,7 @@
                         (change-ref-leaf ref other)
                         (when (constant-p other) (return)))
                        (t
-                        (setq res (type-approx-intersection2
-                                   res other-type))))))))
+                        (setq res (type-intersection res other-type))))))))
             ((< >)
              (let* ((greater (eq kind '>))
                     (greater (if not-p (not greater) greater)))
@@ -1125,17 +1124,17 @@
                   (let ((type (constrain-real-to-integer y greater not-p)))
                     (when type
                       (setf res
-                            (type-approx-intersection2 res type))))))))
+                            (type-intersection res type))))))))
             (=
              (when (and (numeric-type-p y)
                         (not not-p))
                (setf res
-                     (type-approx-intersection2 res
-                                                (type-union (make-numeric-type :low (numeric-type-low y)
-                                                                               :high (numeric-type-high y))
-                                                            (make-numeric-type :complexp :complex
-                                                                               :low (numeric-type-low y)
-                                                                               :high (numeric-type-high y)))))))))))
+                     (type-intersection res
+                                        (type-union (make-numeric-type :low (numeric-type-low y)
+                                                                       :high (numeric-type-high y))
+                                                    (make-numeric-type :complexp :complex
+                                                                       :low (numeric-type-low y)
+                                                                       :high (numeric-type-high y)))))))))))
     (cond ((and (if-p (node-dest ref))
                 (or (xset-member-p nil not-set)
                     (csubtypep (specifier-type 'null) not-res)))
