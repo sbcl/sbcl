@@ -858,7 +858,7 @@
 (macrolet ((vector-data (vector-descriptor)
              `(+ (descriptor-byte-offset ,vector-descriptor)
                  (* sb-vm:vector-data-offset sb-vm:n-word-bytes))))
-(defun base-string-to-core (string &optional (gspace *dynamic*))
+(defun base-string-to-core (string)
   "Copy STRING (which must only contain STANDARD-CHARs) into the cold
 core and return a descriptor to it."
   ;; (Remember that the system convention for storage of strings leaves an
@@ -867,7 +867,7 @@ core and return a descriptor to it."
          (des (allocate-vector sb-vm:simple-base-string-widetag
                                ;; add SAETP-N-PAD-ELEMENT
                                length (ceiling (1+ length) sb-vm:n-word-bytes)
-                               gspace))
+                               *dynamic*))
          (mem (descriptor-mem des))
          (byte-base (vector-data des)))
     (dotimes (i length des) ; was prezeroed, so automatically null-terminated
@@ -896,6 +896,9 @@ core and return a descriptor to it."
       (when (/= 0 (rem length 8))
         (setf (bvref mem (+ base (floor length 8))) byte))
       des))))
+
+;;; I would think that all strings we dump are readonly. Maybe not?
+(defun string-literal-to-core (s) (set-readonly (base-string-to-core s)))
 
 ;;; Write the bits of INT to core as if a bignum, i.e. words are ordered from
 ;;; least to most significant regardless of machine endianness.
@@ -1122,7 +1125,7 @@ core and return a descriptor to it."
   (declare (simple-string name))
   (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag)))
     (when core-file-name
-      (let* ((cold-name (set-readonly (base-string-to-core name *dynamic*)))
+      (let* ((cold-name (string-literal-to-core name))
              (pkg-id (if cold-package
                          (descriptor-fixnum (read-slot cold-package :id))
                          sb-impl::+package-id-none+))
@@ -1537,17 +1540,15 @@ core and return a descriptor to it."
                            (package-use-list package))))))
     (write-slots cold-package
                  :id (make-fixnum-descriptor id)
-                 :%name (set-readonly
-                         (base-string-to-core name))
+                 :%name (string-literal-to-core name)
                  :%nicknames (list-to-core
-                              (mapcar #'base-string-to-core nicknames))
+                              (mapcar #'string-literal-to-core nicknames))
                  :%bits (make-fixnum-descriptor
                          (if (system-package-p name)
                              sb-impl::+initial-package-bits+
                              0))
                  :doc-string (if (and docstring #-sb-doc nil)
-                                 (set-readonly
-                                  (base-string-to-core docstring))
+                                 (string-literal-to-core docstring)
                                  *nil-descriptor*)
                  :%use-list (list-to-core
                              (mapcar (lambda (use)
@@ -1759,7 +1760,7 @@ core and return a descriptor to it."
     ;; Those points aside, gencgc correctly calls scav_symbol() on NIL.
 
     (when core-file-name
-      (let ((name (set-readonly (base-string-to-core "NIL"))))
+      (let ((name (string-literal-to-core "NIL")))
         (write-wordindexed des 0 (make-fixnum-descriptor 0))
         ;; The header-word for NIL "as a symbol" contains a length + widetag.
         (write-wordindexed des 1 (make-other-immediate-descriptor (1- sb-vm:symbol-size)
@@ -2339,8 +2340,8 @@ Legal values for OFFSET are -4, -8, -12, ..."
     ;; Sort by index into linkage table
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'< :key #'cdr)
              (lambda (pair &aux (key (car pair))
-                                (sym (set-readonly (base-string-to-core
-                                                    (if (listp key) (car key) key)))))
+                                (sym (string-literal-to-core
+                                      (if (listp key) (car key) key))))
                (if (listp key) (cold-list sym) sym))
              'sb-vm::+required-foreign-symbols+)
     (cold-set (cold-intern '*assembler-routines*) *cold-assembler-obj*)
@@ -2534,7 +2535,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (define-cold-fop (fop-base-string (len))
   (let ((string (make-string len)))
     (read-string-as-bytes (fasl-input-stream) string)
-    (set-readonly (base-string-to-core string))))
+    (string-literal-to-core string)))
 
 #+sb-unicode
 (define-cold-fop (fop-character-string (len))
@@ -3954,7 +3955,7 @@ III. initially undefined function references (alphabetically):
 
       ;; Cold load.
       (dolist (file-name object-file-names)
-        (push (cold-cons :begin-file (base-string-to-core file-name))
+        (push (cold-cons :begin-file (string-literal-to-core file-name))
               *!cold-toplevels*)
         (cold-load file-name verbose))
 
