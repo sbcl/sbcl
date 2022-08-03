@@ -137,7 +137,7 @@
 ;;; In fact, assert something stronger: there are no young objects
 ;;; between the current SP and end of stack.
 (test-util:with-test (:name :expected-gc-roots
-                      :skipped-on :interpreter)
+                      :skipped-on (or :interpreter (not :sb-thread)))
   (let ((list
           (delete-if (lambda (x)
                        (or (eq x #'actually-get-stack-roots)
