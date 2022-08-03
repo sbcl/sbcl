@@ -1756,7 +1756,8 @@ session."
 
 
 ;;;; The beef
-
+#+sb-thread
+(progn
 ;;; Return T if the thread was created
 (defun os-thread-create (thread thread-sap)
   (aver (memq thread *starting-threads*))
@@ -1905,7 +1906,7 @@ session."
          ;; Signals other than stop-for-GC  are masked. The WITH/WITHOUT noise is
          ;; pure cargo-cultism.
          (without-interrupts (with-local-interrupts ,@body))))))
-
+) ; end PROGN
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (thread-trampoline-defining-macro
@@ -1997,6 +1998,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
 
 ;;; This is the faster variant of RUN-THREAD that does not wait for the new
 ;;; thread to start executing before returning.
+#+sb-thread
 (defun start-thread (thread function arguments)
   (let* ((trampoline
           (lambda (arg)
@@ -2113,6 +2115,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       (sb-unix::pthread-sigmask sb-unix::SIG_SETMASK saved-sigmask nil))
     (if created thread (error "Could not create new OS thread."))))
 
+
 (defun join-thread (thread &key (default nil defaultp) timeout)
   "Suspend current thread until THREAD exits. Return the result values
 of the thread function.
@@ -2146,7 +2149,8 @@ subject to change."
 
   ;; First, free up the pthread resources of any thread(s), not necessarily
   ;; one we're tryinng to join.
-  (when (cddr *joinable-threads*) ; if strictly > 2 are joinable,
+  #+sb-thread
+  (when (cddr *joinable-threads*)      ; if strictly > 2 are joinable,
     (without-interrupts (%dispose-thread-structs :retain 2)))
   ;; No result semaphore indicates that there's nothing to wait for-
   ;; the thread is either a foreign-thread, or finished running.
