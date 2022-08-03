@@ -1595,13 +1595,12 @@
             ;; COMPUTE-DISCRIMINATING-FUNCTION, then (at least for the
             ;; special cases implemented as of 2006-05-09) any information
             ;; in the cache is misplaced.
-            (aver (null dfun-state)))
-          (typecase dfun-state
-            (null
-             (when (eq gf (load-time-value #'compute-applicable-methods t))
-               (update-all-c-a-m-gf-info gf))
-             (cond
-               ((eq gf (load-time-value #'slot-value-using-class t))
+        (aver (null dfun-state)))
+      (typecase dfun-state
+        (null
+         (when (eq gf (load-time-value #'compute-applicable-methods t))
+           (update-all-c-a-m-gf-info gf))
+         (cond ((eq gf (load-time-value #'slot-value-using-class t))
                 (update-slot-value-gf-info gf 'reader)
                 #'slot-value-using-class-dfun)
                ((eq gf (load-time-value #'(setf slot-value-using-class) t))
@@ -1649,8 +1648,8 @@
                 (make-final-dfun gf))
                (t
                 (make-initial-dfun gf))))
-            (function dfun-state)
-            (cons (car dfun-state))))))
+        (function dfun-state)
+        (cons (car dfun-state))))))
 
 ;;; in general we need to support SBCL's encapsulation for generic
 ;;; functions: the default implementation of encapsulation changes the
