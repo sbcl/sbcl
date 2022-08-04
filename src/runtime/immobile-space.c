@@ -1138,7 +1138,7 @@ void gc_init_immobile()
     text_page_genmask = calloc(n_text_pages, 1);
     // Scav queue is arbitrarily located.
     immobile_scav_queue = malloc(QCAPACITY * sizeof(lispobj));
-    tlsf_control = os_validate(0, (char*)0x90000000, ALIGN_UP(tlsf_size(), 4096), 0, 0);
+    tlsf_control = malloc(tlsf_size());
     tlsf_create(tlsf_control);
 }
 
