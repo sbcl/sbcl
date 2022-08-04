@@ -45,25 +45,27 @@
 #define _FORTIFY_SOURCE 0
 #endif
 
+#include "brothertree.h"
+#include "code.h"
+#include "forwarding-ptr.h"
 #include "gc.h"
 #include "gc-internal.h"
 #include "gc-private.h"
-#include "genesis/gc-tables.h"
 #include "genesis/cons.h"
-#include "genesis/vector.h"
+#include "genesis/gc-tables.h"
+#include "genesis/hash-table.h"
 #include "genesis/layout.h"
-#include "forwarding-ptr.h"
-#include "pseudo-atomic.h"
-#include "var-io.h"
+#include "genesis/package.h"
+#include "genesis/vector.h"
 #include "immobile-space.h"
-#include "unaligned.h"
-#include "code.h"
 #include "lispstring.h"
-#include "tlsf-bsd/tlsf/tlsf.h"
+#include "pseudo-atomic.h"
 #include "search.h"
-#include "brothertree.h"
+#include "unaligned.h"
+#include "var-io.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "tlsf-bsd/tlsf/tlsf.h"
 
 #define WORDS_PER_PAGE ((int)IMMOBILE_CARD_BYTES/N_WORD_BYTES)
 #define DOUBLEWORDS_PER_PAGE (WORDS_PER_PAGE/2)
@@ -159,7 +161,13 @@ void* tlsf_control;
 // word as a whole.
 static const unsigned block_header_free_bit = 1 << 8;
 static const unsigned block_header_prev_free_bit = 1 << 9;
+/* Indicates oversized allocation in a header bit so that we can eliminate
+ * 2 words of padding when saving a core (not done yet)
+ * This seems to occur for fewer than .5% of all allocations,
+ * accounting for under .01% addditional total space used.
+ * So there's really no need to do anything about it.
 static const unsigned block_header_oversized = 1 << 10;
+*/
 
 #define IMMOBILE_CARD_SHIFT 12
 void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords)
@@ -174,9 +182,6 @@ void *tlsf_alloc_codeblob(tlsf_t tlsf, int requested_nwords)
     assign_widetag(c, CODE_HEADER_WIDETAG);
     c->boxed_size = c->debug_info = c->fixups = 0;
     int nwords = code_total_nwords(c);
-    // Indicate oversized allocation in a header bit so that we can eliminate
-    // 2 words of padding when saving a core (not done yet)
-    if (nwords > requested_nwords) c->header |= block_header_oversized;
     ((lispobj*)c)[nwords-1] = 0; // trailer word with the simple-fun table
     lispobj* end = (lispobj*)c + nwords;
     if (end > text_space_highwatermark) text_space_highwatermark = end;
@@ -483,8 +488,6 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
     ++immobile_scav_queue_count;
 }
 
-// The end of immobile text mapped from disk, equivalently the starting address
-// of new objects handed out by the code allocator.
 static uint32_t* loaded_codeblob_offsets;
 static int loaded_codeblob_offsets_len;
 
@@ -1211,7 +1214,8 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t text_len)
     tlsf_mem_start = text_space_highwatermark;
     struct vector* v = VECTOR(SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value);
     gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
-    // The vector itself is pseudo-static in dynamic space
+    // The vector itself is either in R/O space, or pseudo-static in dynamic space
+    // depending on :PURIFY
     if(gencgc_verbose) fprintf(stderr, "pseudostatic codeblob vector is %p\n", v);
     loaded_codeblob_offsets = (void*)v->data;
     loaded_codeblob_offsets_len = vector_len(v);
@@ -1239,6 +1243,18 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t text_len)
             text_page_touched_bits[page/32] &= ~(1U<<(page & 31));
     }
     page_attributes_valid = 1;
+}
+
+void deport_codeblob_offsets_from_heap()
+{
+    /* This vector is needed for the final GC to compute page scan starts
+     * but we don't want to preserve it in a lisp space (dynamic or R/O)
+     * during that GC.
+     * So replicate it off-heap; it'll get made anew after defrag. */
+    int nbytes = sizeof (uint32_t) * loaded_codeblob_offsets_len;
+    lispobj* vector_copy = malloc(nbytes);
+    loaded_codeblob_offsets = memcpy(vector_copy, loaded_codeblob_offsets, nbytes);
+    SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value = NIL;
 }
 
 // Change all objects to generation 0
@@ -1275,17 +1291,20 @@ void prepare_immobile_space_for_final_gc()
             text_page_genmask[find_text_page_index(obj)] = 1;
         }
     }
-    // The object offset vector needs to be copied out of the heap
-    // so that it can be freed by GC.
-    int nbytes = sizeof (uint32_t) * loaded_codeblob_offsets_len;
-    lispobj* vector_copy = malloc(nbytes);
-    loaded_codeblob_offsets = memcpy(vector_copy, loaded_codeblob_offsets, nbytes);
-
-    SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value = NIL;
     SYMBOL(IMMOBILE_CODEBLOB_TREE)->value = NIL;
 }
 
 int* code_component_order;
+
+int compute_codeblob_offsets_nwords(int* pcount)
+{
+    int count = 0;
+    lispobj* obj = (lispobj*)TEXT_SPACE_START;
+    for ( ;  obj < text_space_highwatermark ; obj += headerobj_size(obj) ) ++count;
+    if (pcount) *pcount = count;
+    int n_data_words = ALIGN_UP(count, 2) >> 1;
+    return 2 + ALIGN_UP(n_data_words, 2);
+}
 
 /* Defragment the immobile space, and then promote all objects to gen6.
  * 'coreparse' causes all pages in dynamic space to be pseudo-static, but
@@ -1307,27 +1326,33 @@ void prepare_immobile_space_for_save(boolean verbose)
         obj += object_size(obj);
     }
 
-    int codeblob_count = 0;
     for ( obj = (lispobj*)TEXT_SPACE_START ;  obj < text_space_highwatermark ; obj += headerobj_size(obj) ) {
-      //      *obj &= ~(uword_t)block_header_prev_free_bit;
+        *obj &= ~(uword_t)block_header_prev_free_bit;
         assign_generation(obj, PSEUDO_STATIC_GENERATION);
-        ++codeblob_count;
     }
     // Create a vector of code offsets
-    int n_data_words = ALIGN_UP(codeblob_count, 2) >> 1;
-    int vector_nwords = 2 + ALIGN_UP(n_data_words, 2);
-    // FIXME: need to reorder some things so that this gets moved to R/O space
-    struct vector* v = gc_general_alloc(unboxed_region, vector_nwords<<WORD_SHIFT,
-                                        PAGE_TYPE_UNBOXED);
+    int codeblob_count;
+    int vector_nwords = compute_codeblob_offsets_nwords(&codeblob_count);
+    struct vector* v;
+    if (read_only_space_free_pointer > (lispobj*)READ_ONLY_SPACE_START) {
+        v = (void*)read_only_space_free_pointer;
+        read_only_space_free_pointer += vector_nwords;
+        if (read_only_space_free_pointer > (lispobj*)READ_ONLY_SPACE_END)
+            lose("Didn't reserve enough R/O space?");
+    } else {
+        v = gc_general_alloc(unboxed_region, vector_nwords<<WORD_SHIFT,
+                             PAGE_TYPE_UNBOXED);
+        // might have used large-object pages, no region
+        ensure_region_closed(unboxed_region, PAGE_TYPE_UNBOXED);
+        // gc_general_alloc generally avoids pre-zeroizing, so ensure zero-fill to the end
+        // of dynamic space as we've aready performed zero_all_free_ranges().
+        uword_t vector_end = (uword_t)((lispobj*)v + vector_nwords),
+                aligned_end = ALIGN_UP(vector_end, BACKEND_PAGE_BYTES);
+        memset((char*)vector_end, 0, aligned_end-vector_end);
+    }
     v->header = SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG;
     v->length_ = make_fixnum(codeblob_count);
-    // might have used large-object pages, no region
-    if (unboxed_region->start_addr) gc_close_region(unboxed_region, PAGE_TYPE_UNBOXED);
-    // Zero-fill the end of dynamic space since we aready performed zero_all_free_ranges().
-    // This has to be done whether the vector is on large-object or ordinary pages.
-    uword_t vector_end = (uword_t)((lispobj*)v + vector_nwords),
-            aligned_end = ALIGN_UP(vector_end, BACKEND_PAGE_BYTES);
-    memset((char*)vector_end, 0, aligned_end-vector_end);
+    SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value = make_lispobj(v, OTHER_POINTER_LOWTAG);
     uint32_t* data = (uint32_t*)v->data;
     int i = 0;
     for ( obj = (lispobj*)TEXT_SPACE_START ; obj < text_space_highwatermark ; obj += headerobj_size(obj) ) {
@@ -1339,7 +1364,6 @@ void prepare_immobile_space_for_save(boolean verbose)
         *text_space_highwatermark = make_filler_header(aligned_hwm - text_space_highwatermark);
         text_space_highwatermark = aligned_hwm;
     }
-    SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value = make_lispobj(v, OTHER_POINTER_LOWTAG);
     if (verbose) printf("done]\n");
 }
 
@@ -1544,7 +1568,6 @@ static void apply_absolute_fixups(lispobj, struct code*);
 /// It's tricky to try to use the scavtab[] functions for fixing up moved
 /// objects, because scavenger functions might invoke transport functions.
 /// The best approach is to do an explicit switch over all object types.
-#include "genesis/hash-table.h"
 static void fixup_space(lispobj* where, size_t n_words)
 {
     lispobj* end = where + n_words;
@@ -1667,7 +1690,6 @@ static lispobj* get_load_address(lispobj* old)
 }
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
-#include "genesis/package.h"
 #define N_SYMBOL_KINDS 5
 
 // Return an integer 0..4 telling which block of symbols to relocate 'sym' into.
@@ -2098,7 +2120,6 @@ static void defrag_immobile_space(boolean verbose)
 
 // Fixup immediate values that encode Lisp object addresses
 // in immobile space. Process only the absolute fixups.
-#include "forwarding-ptr.h"
 #ifdef LISP_FEATURE_X86_64
 static void apply_absolute_fixups(lispobj fixups, struct code* code)
 {

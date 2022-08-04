@@ -9,15 +9,14 @@
  * files for more information.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "sbcl.h"
-#include "globals.h"
 #include "gc-internal.h"
 #include "gc-private.h"
 #include "gencgc-private.h"
-#include "forwarding-ptr.h"
 #include "genesis/gc-tables.h"
+#include "globals.h"
+#include "forwarding-ptr.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef LISP_FEATURE_DARWIN_JIT
 
@@ -213,6 +212,10 @@ void prepare_readonly_space(int purify, int print)
             if ( readonly_unboxed_obj_p(where) ) sum_sizes += nwords;
         }
     }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    extern int compute_codeblob_offsets_nwords(int*);
+    sum_sizes += compute_codeblob_offsets_nwords(NULL);
+#endif
     sum_sizes <<= WORD_SHIFT;
     if (print) fprintf(stderr, "%d bytes\n", sum_sizes);
     int string_space_size = ALIGN_UP(sum_sizes, BACKEND_PAGE_BYTES);
@@ -267,6 +270,10 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
 {
     int space_usage = (uword_t)read_only_space_free_pointer - READ_ONLY_SPACE_START;
     if (!space_usage) return;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    extern void deport_codeblob_offsets_from_heap();
+    deport_codeblob_offsets_from_heap();
+#endif
     lispobj* shadow_base = calloc(space_usage, 1);
     gc_assert(shadow_base);
     lispobj* shadow_cursor = shadow_base;

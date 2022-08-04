@@ -62,6 +62,8 @@ lispobj *text_space_highwatermark;
 lispobj *fixedobj_free_pointer;
 #endif
 os_vm_address_t anon_dynamic_space_start;
+// The end of immobile text mapped from disk, equivalently the starting address
+// of new objects handed out by the code allocator.
 lispobj* tlsf_mem_start; // meaningful only if immobile space
 
 #ifndef LISP_FEATURE_GENCGC /* GENCGC has its own way to record trigger */
