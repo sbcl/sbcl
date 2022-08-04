@@ -707,9 +707,20 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                (t
                 (return-from done))))
        :read-only))
-    (let ((result (make-hash-table :test 'eq)))
+    (let ((result (make-hash-table :test 'eq))
+          ;; darwin-jit will never take the purified branch. Readonly space exists,
+          ;; but contains no symbol names. TUNE-HASHTABLE-SIZES-OF-ALL-PACKAGES knows that
+          ;; and will never reset a table's MODIFIED flag. However, for all other platforms,
+          ;; we need to detect if purification happened.
+          (core-purified-p (sap> sb-vm:*read-only-space-free-pointer*
+                                 (sb-sys:int-sap sb-vm:read-only-space-start))))
       (flet ((find-all-in-table (table)
-               (if (package-hashtable-modified table)
+               (if (and core-purified-p (not (package-hashtable-modified table)))
+                   (dolist (candidate candidates)
+                     (let* ((hash (the hash-code (car candidate)))
+                            (string (the simple-string (cdr candidate)))
+                            (length (length string)))
+                       (add-to-bag-if-found table string length hash result)))
                    (dovector (entry (package-hashtable-cells table))
                      ;; I would have guessed that GETHASH is faster than SEARCH, but if
                      ;; interposed between SYMBOLP and SEARCH, it slows down this loop.
@@ -718,12 +729,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                      ;; instructions executed, for no net reduction in time.
                      (when (and (symbolp entry)
                                 (search string (symbol-name entry) :test #'char-equal))
-                       (setf (gethash entry result) t)))
-                   (dolist (candidate candidates)
-                     (let* ((hash (the hash-code (car candidate)))
-                            (string (the simple-string (cdr candidate)))
-                            (length (length string)))
-                       (add-to-bag-if-found table string length hash result))))))
+                       (setf (gethash entry result) t))))))
         (do-packages (package) ; FIXME: should not acquire package-names lock
           (find-all-in-table (package-external-symbols package))
           (unless external-only
