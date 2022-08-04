@@ -222,16 +222,21 @@ void tlsf_unalloc_codeblob(tlsf_t tlsf, struct code* code)
     low_page_index_t tlsf_page = ((char*)code - (char*)tlsf_mem_start) >> IMMOBILE_CARD_SHIFT;
     int offset = (uword_t)code & (IMMOBILE_CARD_BYTES-1);
     if (offset == tlsf_page_sso[tlsf_page]) {
-        lispobj* next = (lispobj*)code + code_total_nwords((struct code*)code);
+        lispobj* next = end;
         if (*next & block_header_free_bit) {
             next += code_total_nwords((struct code*)next);
             gc_assert(!(*next & block_header_free_bit)); // adjacent free blocks can't occur
         }
         // If the next used block is on the same page, then it becomes the page scan start
         // even if it the ending sentinel block (which counts as "used").
-        tlsf_page_sso[tlsf_page] =
-            (((uword_t)next ^ (uword_t)code) >> IMMOBILE_CARD_SHIFT) == 0
-            ? (uword_t)next & (IMMOBILE_CARD_BYTES-1) : USHRT_MAX;
+        if ((((uword_t)next ^ (uword_t)code) >> IMMOBILE_CARD_SHIFT) == 0) {
+            tlsf_page_sso[tlsf_page] = (uword_t)next & (IMMOBILE_CARD_BYTES-1);
+        } else {
+            tlsf_page_sso[tlsf_page] = USHRT_MAX;
+            // the tlsf_page index is based on tlsf_mem_start, but gemmask[] is based on TEXT_SPACE_START
+            int text_page = find_text_page_index(code);
+            text_page_genmask[text_page] = 0;
+        }
     }
     // point to the user data, not the header, when calling free
     tlsf_free(tlsf, (lispobj*)code + 1);
@@ -429,6 +434,7 @@ void
 enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
 {
     gc_assert(widetag_of(ptr) != SIMPLE_FUN_WIDETAG); // can't enliven interior pointer
+    gc_assert(widetag_of(ptr) != FILLER_WIDETAG);
     gc_assert(immobile_obj_gen_bits(ptr) == from_space);
     int pointerish = !leaf_obj_widetag_p(widetag_of(ptr));
     int bits = (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG);
@@ -1202,10 +1208,6 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t text_len)
     gc_assert(text_space_highwatermark != 0 /* would be zero if not mmapped yet */
               && text_space_highwatermark <= (lispobj*)(TEXT_SPACE_START + text_len));
     gc_assert(PTR_ALIGN_UP(text_space_highwatermark, IMMOBILE_CARD_BYTES) == text_space_highwatermark);
-    // Don't use text_len to compute n_pages because that measures backend pages (32k),
-    // but we're trying to compute _allocator_ pages.
-    n_pages = ((uword_t)text_space_highwatermark-TEXT_SPACE_START) / IMMOBILE_CARD_BYTES;
-    for (page = 0; page < n_pages ; ++page) text_page_genmask[page] |= 1<<gen;
     tlsf_mem_start = text_space_highwatermark;
     struct vector* v = VECTOR(SYMBOL(IMMOBILE_CODEBLOB_VECTOR)->value);
     gc_assert(widetag_of((lispobj*)v) == SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG);
@@ -1213,6 +1215,13 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t text_len)
     if(gencgc_verbose) fprintf(stderr, "pseudostatic codeblob vector is %p\n", v);
     loaded_codeblob_offsets = (void*)v->data;
     loaded_codeblob_offsets_len = vector_len(v);
+    // Don't use text_len to compute n_pages because that measures backend pages (32k),
+    // but we're trying to compute _allocator_ pages.
+    n_pages = ((uword_t)text_space_highwatermark-TEXT_SPACE_START) / IMMOBILE_CARD_BYTES;
+    // Set the generation mask only on pages that contain some object header
+    // (not merely the interior of an object)
+    for (page = 0; page < n_pages ; ++page)
+        if (text_page_scan_start(page)) text_page_genmask[page] |= 1<<gen;
 
     // Create a TLSF pool
     char *tlsf_memory_end = (char*)TEXT_SPACE_START + text_space_size;
@@ -1313,13 +1322,12 @@ void prepare_immobile_space_for_save(boolean verbose)
     v->header = SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG;
     v->length_ = make_fixnum(codeblob_count);
     // might have used large-object pages, no region
-    if (unboxed_region->start_addr) {
-        gc_close_region(unboxed_region, PAGE_TYPE_UNBOXED);
-        // Zero-fill the end of dynamic space since we aready performed zero_all_free_ranges().
-        uword_t vector_end = (uword_t)((lispobj*)v + vector_nwords),
-                aligned_end = ALIGN_UP(vector_end, BACKEND_PAGE_BYTES);
-        memset((char*)vector_end, 0, aligned_end-vector_end);
-    }
+    if (unboxed_region->start_addr) gc_close_region(unboxed_region, PAGE_TYPE_UNBOXED);
+    // Zero-fill the end of dynamic space since we aready performed zero_all_free_ranges().
+    // This has to be done whether the vector is on large-object or ordinary pages.
+    uword_t vector_end = (uword_t)((lispobj*)v + vector_nwords),
+            aligned_end = ALIGN_UP(vector_end, BACKEND_PAGE_BYTES);
+    memset((char*)vector_end, 0, aligned_end-vector_end);
     uint32_t* data = (uint32_t*)v->data;
     int i = 0;
     for ( obj = (lispobj*)TEXT_SPACE_START ; obj < text_space_highwatermark ; obj += headerobj_size(obj) ) {
@@ -2165,5 +2173,64 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
   fix:  UNALIGNED_STORE32(fixup_where,
                           ptr - (lispobj)header_addr + (lispobj)native_pointer(fpval));
     }
+}
+#endif
+
+void dump_immobile_fixedobjs(lispobj* where, lispobj* end, FILE*f)
+{
+    uword_t prev_page_base = 0;
+    for ( ; where < end ; where += object_size(where) ) {
+        if (ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES) != prev_page_base) {
+            low_page_index_t page = find_fixedobj_page_index(where);
+            fprintf(f, "page @ %p: gens=%x free=%x%s\n",
+                    (void*)ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES),
+                    fixedobj_pages[page].attr.parts.gens_,
+                    fixedobj_pages[page].free_index,
+                    (fixedobj_pages[page].attr.parts.flags & 0x80)?" WP":"");
+            prev_page_base = ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES);
+        }
+        fprintf(f, "%"OBJ_FMTX": %"OBJ_FMTX"\n", (uword_t)where, *where);
+    }
+}
+
+void dump_immobile_text(lispobj* where, lispobj* end, FILE*f)
+{
+    int prevpage = -1;
+    for ( ; where < end ; where += object_size(where) ) {
+        int page = find_text_page_index(where);
+        if (page!=prevpage) {
+            fprintf(f, "page %d @ %p ss=%p%s\n",
+                    page, text_page_address(page),
+                    text_page_scan_start(page),
+                    text_page_touched(page)?"":" WP");
+            prevpage = page;
+        }
+        fprintf(f, "%p: %lx\n", where, *where);
+    }
+}
+
+#if 0
+ void verify_text_scan_starts()
+{
+    lispobj* where = (lispobj*)TEXT_SPACE_START;
+    lispobj* limit = text_space_highwatermark;
+    int prevpage = -1;
+    for ( ; where < limit ; where += object_size(where) ) {
+        if (*where & block_header_free_bit) continue;
+        int page = find_text_page_index(where);
+        if (page > prevpage) { // this object had better be the scan start
+            gc_assert(where == text_page_scan_start(page));
+            prevpage = page;
+        }
+    }
+    int page, max;
+    max = find_text_page_index(text_space_highwatermark);
+    for (page=0;page<=max;++page)
+      if (text_page_scan_start(page)==0) {
+        if (text_page_genmask[page]) {
+          fprintf(stderr, "wrong genmask on page %d\n", page);
+        }
+        gc_assert(text_page_genmask[page]==0);
+      }
 }
 #endif

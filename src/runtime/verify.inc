@@ -501,26 +501,8 @@ void gc_show_pte(lispobj obj)
 
 static int hexdump_counter;
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-__attribute__((unused)) static void dump_immobile(lispobj* where, lispobj* end, FILE*f)
-{
-    uword_t prev_page = 0;
-    while (where < end) {
-        if (ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES) != prev_page) {
-            low_page_index_t page = find_fixedobj_page_index(where);
-            fprintf(f, " page @ %p: gens=%x free=%x%s\n",
-                    (void*)ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES),
-                    fixedobj_pages[page].attr.parts.gens_,
-                    fixedobj_pages[page].free_index,
-                    (fixedobj_pages[page].attr.parts.flags & 0x80)?" WP":"");
-            prev_page = ALIGN_DOWN((uword_t)where, IMMOBILE_CARD_BYTES);
-        }
-        fprintf(f, "%"OBJ_FMTX": %"OBJ_FMTX"\n", (uword_t)where, *where);
-        where += object_size(where);
-    }
-}
-#endif
-
+extern void dump_immobile_fixedobjs(lispobj* where, lispobj* end, FILE*f);
+extern void dump_immobile_text(lispobj* where, lispobj* end, FILE*f);
 static int dump_completely_p(lispobj* obj, struct verify_state* state)
 {
     int i;
@@ -573,9 +555,9 @@ void hexdump_spaces(struct verify_state* state, char *reason)
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     fprintf(f, "Fixedobj space:\n");
-    dump_immobile((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, f);
-    fprintf(f, "Text space:\n");
-    dump_immobile((lispobj*)TEXT_SPACE_START, text_space_highwatermark, f);
+    dump_immobile_fixedobjs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, f);
+    fprintf(f, "Text space (tlsf mem @ %p):\n", tlsf_mem_start);
+    dump_immobile_text((lispobj*)TEXT_SPACE_START, text_space_highwatermark, f);
 #endif
 
     fprintf(f, "Dynamic space:\n");

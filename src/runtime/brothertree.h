@@ -1,4 +1,5 @@
 #include "lispobj.h"
+#include "genesis/config.h"
 
 struct binary_node {
     lispobj header;
