@@ -116,16 +116,21 @@ typedef struct block_header_t {
     /* Points to the previous physical block. */
     struct block_header_t *prev_phys_block;
 
-#ifdef LISP_FEATURE_BIG_ENDIAN
-    // For this word to read as an object header, the size and widetag
-    // are flipped relative to little-endian.
-#error "not done"
-#else
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
     unsigned char widetag;
     unsigned char _flags; // must have at most bits 0, 1, 2 on
     unsigned char unused; // must be zero
     unsigned char gen; // low 4 must be 0..5 and bit 0x4 can be on
     uint32_t _nwords; // including the header
+#else
+    // For this word to read as an object header, the size and widetag
+    // are flipped relative to little-endian.
+    // I did not actually test this - I am merely guessing that it's right.
+    uint32_t _nwords; // including the header
+    unsigned char gen; // low 4 must be 0..5 and bit 0x4 can be on
+    unsigned char unused; // must be zero
+    unsigned char _flags; // must have at most bits 0, 1, 2 on
+    unsigned char widetag;
 #endif
 
     /* Next and previous free blocks. */
