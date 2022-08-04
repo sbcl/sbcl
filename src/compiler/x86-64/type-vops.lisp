@@ -115,7 +115,8 @@
 (defun %test-headers (value temp target not-p function-p headers
                       &key except
                            (drop-through (gen-label))
-                           (compute-temp t)
+                           (load-widetag t)
+                           (compute-temp load-widetag)
                            value-tn-ref)
   (let* ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag))
          ;; It is preferable (smaller and faster code) to directly
@@ -123,7 +124,8 @@
          ;; a register first. Find out if this is possible and set
          ;; WIDETAG-TN accordingly. If impossible, generate the
          ;; register load.
-         (widetag-tn (if (and (null (cdr headers))
+         (widetag-tn (if (and load-widetag
+                              (null (cdr headers))
                               (not except)
                               (or (atom (car headers))
                                   (= (caar headers) bignum-widetag)
@@ -144,7 +146,8 @@
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
 
-      (cond ((and value-tn-ref
+      (cond ((not load-widetag))
+            ((and value-tn-ref
                   (eq lowtag other-pointer-lowtag)
                   (other-pointer-tn-ref-p value-tn-ref))) ; best case: lowtag is right
             ((and value-tn-ref
@@ -171,7 +174,8 @@
              (inst test :byte temp lowtag-mask)
              (inst jmp :nz when-false)))
 
-      (when (eq widetag-tn temp)
+      (when (and load-widetag
+                 (eq widetag-tn temp))
         (inst mov :dword temp (or untagged (ea (- lowtag) value))))
       (dolist (widetag except)
         (inst cmp :byte temp widetag)
@@ -885,3 +889,27 @@
 (define-vop (>=-fixnum-integer <-fixnum-integer)
   (:translate)
   (:variant :le))
+
+(define-vop (load-other-pointer-widetag)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:args-var args)
+  (:info not-other-pointer-label)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:generator 1
+    (cond ((other-pointer-tn-ref-p args)
+           (inst mov :byte r (ea (- other-pointer-lowtag) value)))
+          (t
+           (%lea-for-lowtag-test r value other-pointer-lowtag :qword)
+           (inst test :byte r lowtag-mask)
+           (inst jmp :nz not-other-pointer-label)
+           (inst mov :byte r (ea r))))))
+
+(define-vop (test-widetag)
+  (:args (value :scs (unsigned-reg) :target temp))
+  (:temporary (:sc unsigned-reg :from (:argument 1)) temp)
+  (:info target not-p type-codes)
+  (:generator 1
+    (move temp value :dword)
+    (%test-headers nil temp target not-p nil type-codes
+      :load-widetag nil)))
