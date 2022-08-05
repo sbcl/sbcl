@@ -25,7 +25,8 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   --no-userinit --no-sysinit --noprint --disable-debugger $* << EOF
 (pop *posix-argv*)
 (require :sb-posix)
-(require :sb-sprof)
+#-sparc (push :test-sprof *features*)
+#+test-sprof (require :sb-sprof)
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
 #+(and x86-64 linux sb-thread)
@@ -182,7 +183,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                    ;; if exec fails, just exit with a wrong (not 104) status
                    (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                   (t
-                   (sb-sprof:start-profiling :sample-interval .001)
+                   #+test-sprof (sb-sprof:start-profiling :sample-interval .001)
                    (setq sb-c::*static-vop-usage-counts* (make-hash-table :synchronized t))
                    (let ((*features* (cons :parallel-test-runner *features*)))
                      (pure-runner (list (concatenate 'string file ".lisp"))
@@ -196,12 +197,12 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                        (let ((*print-pretty* nil))
                          (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
                            (format output "~7d \"~s\"~%" count name)))))
-                   (sb-sprof:stop-profiling)
+                   #+test-sprof (sb-sprof:stop-profiling)
                    #+test-aprof (progn (sb-aprof::aprof-stop) (sb-aprof:aprof-show))
                    (when (member :allocator-metrics sb-impl:+internal-features+)
                      (format t "~2&Allocator histogram:~%")
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
-                   (sb-sprof:report :type :flat)
+                   #+test-sprof (sb-sprof:report :type :flat)
                    (gc :gen  7)
                    (when (and (not (unexpected-failures)) *delete-logs*) (delete-file mylog))
                    (exit :code (if (unexpected-failures) 1 104))))))
