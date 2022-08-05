@@ -220,7 +220,6 @@ static inline void reset_page_flags(page_index_t page) {
     if (page_table[page].type == PAGE_TYPE_CODE) set_page_need_to_zero(page, 1);
 #endif
     page_table[page].type = 0;
-    page_table[page].dontuse = 0;
     gc_page_pins[page] = 0;
     // Why can't the 'gen' get cleared? It caused failures. THIS MAKES NO SENSE!!!
     //    page_table[page].gen = 0;
@@ -955,18 +954,8 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
         && page_table[index].gen == gen
         && !gc_page_pins[index];
 #else
-    /* Test the three conditions above as a single comparison.
-     *
-     *      pin -\
-     *            v vvvvvv -- type
-     * #b11111111_10111111
-     *             ^
-     *              need_zerofill (ignored)
-     *
-     * The flags reside at 1 byte prior to 'gen' in the page structure.
-     */
     int attributes_match =
-        (*(int16_t*)(&page_table[index].gen-1) & 0xFFBF) == ((gen<<8)|type);
+        *(int16_t*)&page_table[index].type == ((gen<<8)|type);
 #endif
 #ifdef LISP_FEATURE_SOFT_CARD_MARKS
     return attributes_match && page_cards_all_marked_nonsticky(index);

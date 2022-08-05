@@ -483,14 +483,9 @@ statistics are appended to it."
             ;; but if 64-bit then we have to scale the value. Additionally
             ;; there is a fallback for when even the scaled value is too big.
             (sb-vm::start #+64-bit (unsigned 32) #-64-bit signed)
-            ;; On platforms with small enough GC pages, this field
-            ;; will be a short. On platforms with larger ones, it'll
-            ;; be an int. It should probably never be an int.
-            (sb-vm::words-used (unsigned
-                                #.(if (typep sb-vm::gencgc-page-words '(unsigned-byte 16))
-                                      16
-                                      32)))
-            (sb-vm::flags (unsigned 8)) ; in C this is {type, need_zerofill, pinned}
+            ;; Caution: The low bit of WORDS-USED* is a flag bit
+            (sb-vm::words-used* (unsigned 16)) ; (* in the name is a memory aid)
+            (sb-vm::flags (unsigned 8)) ; this named 'type' in C
             (sb-vm::gen (signed 8))))
 (define-alien-variable ("page_table" sb-vm:page-table) (* (struct sb-vm::page)))
 (declaim (inline sb-vm:find-page-index))

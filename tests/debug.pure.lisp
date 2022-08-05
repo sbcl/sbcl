@@ -41,9 +41,8 @@
        (declare (ignore widetag))
        (let* ((index
                (sb-vm::find-page-index (sb-kernel:get-lisp-obj-address obj)))
-              (type (ldb (byte 6 (+ #+big-endian 2))
-                         (sb-alien:slot (sb-alien:deref sb-vm::page-table index)
-                                        'sb-vm::flags))))
+              (type (sb-alien:slot (sb-alien:deref sb-vm::page-table index)
+                                   'sb-vm::flags)))
          ;; mask off the SINGLE_OBJECT and OPEN_REGION bits
          (when (and (eq (logand type 7) 2) ; PAGE_TYPE_BOXED
                     ;; Cons cells on boxed pags are page filler

@@ -48,15 +48,16 @@ int gencgc_handle_wp_violation(void*, void*);
 # define CONDENSED_PAGE_TABLE 0
 #endif
 
-#if GENCGC_PAGE_WORDS > USHRT_MAX
-# if GENCGC_PAGE_WORDS > UINT_MAX
+/* One bit of page_words_t is the need_zerofill flag.
+ * That leaves 15 bits to store page_words_used. This can represent
+ * a page size of up to 64KiB on 32-bit and 128KiB on 64-bit.
+ * Note that since the allocation quantum is actually 2 words
+ * the words_used is always an even number, and so technically
+ * we could store as "dualwords used" to achieve double the range */
+#if GENCGC_PAGE_WORDS > 32767
 #   error "GENCGC_PAGE_WORDS unexpectedly large."
-# else
-    typedef unsigned int page_words_t;
-# endif
-#else
-  typedef unsigned short page_words_t;
 #endif
+typedef unsigned short page_words_t;
 
 /* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
 /* If you change these constants, then possibly also change the following
@@ -114,14 +115,22 @@ struct page {
 
     /* the number of lispwords of this page that are used. This may be less
      * than the usage at an instant in time for pages within the current
-     * allocation regions. MUST be 0 for unallocated pages.
-     */
-    page_words_t words_used_;
+     * allocation regions. The 0th bit of the physical uint16 indicates
+     * that the page needs to be zero-filled for the next use.
+     * Let the C compiler figure it out, so we can't get it wrong in C.
+     * But we need to reverse the order of the packed fields depending on
+     * endianness so that the Lisp side is easier to understand */
+#ifdef LISP_FEATURE_BIG_ENDIAN
+    page_words_t words_used_   : 15;
+    page_words_t need_zerofill :  1;
+#else
+    page_words_t need_zerofill :  1;
+    page_words_t words_used_   : 15;
+#endif
 
     // !!! If bit positions are changed, be sure to reflect the changes into
     // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
     // and WALK-DYNAMIC-SPACE.
-    unsigned char
         /*
          * The 4 low bits of 'type' are defined by PAGE_TYPE_x constants.
          *  0000 free
@@ -129,12 +138,12 @@ struct page {
          *  ?010 strictly unboxed data
          *  ?011 mixed boxed/unboxed non-code objects
          *  ?111 code
-         * The next two bits are SINGLE_OBJECT and OPEN_REGION */
-        type :6,
-        /* Whether the page was used at all. This is the only bit that can
-         * be 1 on a free page */
-        need_zerofill :1,
-        dontuse :1;
+         * The next two bits are SINGLE_OBJECT and OPEN_REGION.
+         * The top two can be used for segregating objects by widetag
+         * which will important once we have "destructors" to run for a
+         * for a category of object, such as SYMBOL, hypothetically for
+         * recycling TLS indices or something like that. */
+    unsigned char type;
 
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
