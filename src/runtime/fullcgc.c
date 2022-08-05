@@ -150,8 +150,12 @@ static inline sword_t dword_index(uword_t ptr, uword_t base) {
 static inline lispobj canonical_ptr(lispobj pointer)
 {
 #ifdef RETURN_PC_WIDETAG
-    if (lowtag_of(pointer)==OTHER_POINTER_LOWTAG && widetag_of(native_pointer(pointer))
-          == RETURN_PC_WIDETAG)
+  /* NO_TLS_VALUE is all 1s, and so it might look like it has OTHER_POINTER_LOWTAG
+   * depending on the architecture (the word size, etc), but there is no memory
+   * at 0xff...ff so definitely don't call widetag_of - that won't fly! */
+    if (lowtag_of(pointer)==OTHER_POINTER_LOWTAG
+        && pointer != NO_TLS_VALUE_MARKER
+        && widetag_of(native_pointer(pointer)) == RETURN_PC_WIDETAG)
         return fun_code_tagged(native_pointer(pointer));
 #endif
     return pointer;
