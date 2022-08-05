@@ -3709,3 +3709,17 @@
            (f a)))
     ((() 1) 1)
     (('(2) 1) 2)))
+
+(with-test (:name :duplicate-more-local-tn-overflow)
+  (let ((vars (loop repeat 200 collect (gensym)))
+        (args (loop repeat 201 for i from (random 30000)
+                    collect i)))
+    (assert
+     (equal
+      (apply
+       (compile
+        ()
+        `(lambda (a ,@vars)
+           (list a a ,@vars)))
+       args)
+      (cons (car args) args)))))
