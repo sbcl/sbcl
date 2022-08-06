@@ -2127,24 +2127,32 @@ core and return a descriptor to it."
      (- sb-vm:fun-pointer-lowtag)
      (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
 
-(defun cold-fset (name defn)
-  (aver (= (logand (read-bits-wordindexed defn 0) sb-vm:widetag-mask)
+(defun cold-fset (name function)
+  (aver (= (logand (read-bits-wordindexed function 0) sb-vm:widetag-mask)
            sb-vm:simple-fun-widetag))
   (let ((fdefn (ensure-cold-fdefn
                 ;; (SETF f) was descriptorized when dumped, symbols were not.
                 (if (symbolp name)
                     (cold-intern name)
                     name))))
-    (write-wordindexed fdefn sb-vm:fdefn-fun-slot defn)
+    (let ((existing (read-wordindexed fdefn sb-vm:fdefn-fun-slot)))
+      (unless (or (cold-null existing) (descriptor= existing function))
+        (funcall (if (eq name 'sb-impl::equal-hash) ; KLUDGE
+                     'warn
+                     'error)
+                 "Function multiply defined: ~S. Was ~x is ~x" name
+                 (descriptor-bits existing)
+                 (descriptor-bits function))))
+    (write-wordindexed fdefn sb-vm:fdefn-fun-slot function)
     #+x86-64
     (write-wordindexed/raw ; write a JMP instruction into the header
      fdefn 0 (dpb #x1025FF (byte 24 16) (read-bits-wordindexed fdefn 0)))
     (write-wordindexed/raw
      fdefn sb-vm:fdefn-raw-addr-slot
      (or #+(or sparc arm riscv) ; raw addr is the function descriptor
-         (descriptor-bits defn)
+         (descriptor-bits function)
          ;; For all others raw addr is the starting address
-         (+ (logandc2 (descriptor-bits defn) sb-vm:lowtag-mask)
+         (+ (logandc2 (descriptor-bits function) sb-vm:lowtag-mask)
             (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
     fdefn))
 
