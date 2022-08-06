@@ -799,17 +799,11 @@ process_directory(int count, struct ndir_entry *entry,
         // We'd like to enforce proper alignment of 'addr' but there's
         // a problem: dynamic space has a stricter requirement (usually 32K)
         // than code space (4K). So don't assert the alignment.
-        if (enforce_address) {
-            int fail;
-            if ((fail = (addr != spaces[id].base)) != 0)
-                fprintf(stderr, "in core: %p; in runtime: %p\n",
-                        (void*)addr, (void*)spaces[id].base);
-            char *names[] = {
-              "DYNAMIC", "STATIC", "READ_ONLY", "IMMOBILE", "IMMOBILE"
-            };
-            if (fail)
-                lose("core/runtime address mismatch: %s_SPACE_START", names[id-1]);
-        }
+        if (enforce_address && addr != spaces[id].base)
+            lose("core address mismatch: %s_SPACE_START=%p but runtime expects %p\n",
+                 id==READ_ONLY_CORE_SPACE_ID?"READ_ONLY":"STATIC",
+                 (void*)addr, (void*)spaces[id].base);
+
         spaces[id].base = addr;
         uword_t len = os_vm_page_size * entry->page_count;
         if (id == DYNAMIC_CORE_SPACE_ID && len > dynamic_space_size) {
