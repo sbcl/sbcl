@@ -209,7 +209,9 @@
 (progn
 (defconstant trampoline-entry-offset n-word-bytes)
 (defun make-simplifying-trampoline (fun)
-  (let ((code (truly-the (values code-component &optional)
+  ;; 'alloc' is compiled after this file so we don't see the derived type.
+  ;; But slam found a conflict on recompile.
+  (let ((code (truly-the (values code-component (integer 0) &optional)
                          (allocate-code-object :dynamic 3 24)))) ; KLUDGE
     (setf (%code-debug-info code) fun)
     (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
