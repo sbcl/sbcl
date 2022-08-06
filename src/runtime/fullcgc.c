@@ -403,7 +403,17 @@ void prepare_for_full_mark_phase()
     scav_queue.recycler   = 0;
     block->next = 0;
     block->tail = block->count = 0;
-    sword_t nbits_dynamic = (next_free_page*GENCGC_PAGE_BYTES) / (2*N_WORD_BYTES);
+    /* Consume as many bits as cover the entire dynamic space regardless
+     * of its current usage.  Same for the other spaces.
+     * This previously tried to be clever about using only as many bits for
+     * dynamic space as correspond to the current high water mark, which was
+     * an ill-conceived idea, because cull_weak_hash_tables() can consume
+     * dynamic space when processing finalizers. So it marks an object live,
+     * but that object's mark bit could be past the reserved range of dynamic
+     * space mark bits, thus accidentally marking some _other_ thing live.
+     * And heaven forbid that other object isn't supposed to be live,
+     * you're in for a heap of trouble (pun intended) */
+    sword_t nbits_dynamic = dynamic_space_size / (2*N_WORD_BYTES);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     sword_t nbits_fixedobj = FIXEDOBJ_SPACE_SIZE / (2*N_WORD_BYTES);
     sword_t nbits_text = TEXT_SPACE_SIZE / (2*N_WORD_BYTES);
