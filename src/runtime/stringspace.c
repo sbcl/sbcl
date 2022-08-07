@@ -268,12 +268,12 @@ static void undo_rospace_ptrs(lispobj* obj, uword_t arg) {
 
 void move_rospace_to_dynamic(__attribute__((unused)) int print)
 {
-    int space_usage = (uword_t)read_only_space_free_pointer - READ_ONLY_SPACE_START;
-    if (!space_usage) return;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     extern void deport_codeblob_offsets_from_heap();
     deport_codeblob_offsets_from_heap();
 #endif
+    int space_usage = (uword_t)read_only_space_free_pointer - READ_ONLY_SPACE_START;
+    if (!space_usage) return;
     lispobj* shadow_base = calloc(space_usage, 1);
     gc_assert(shadow_base);
     lispobj* shadow_cursor = shadow_base;

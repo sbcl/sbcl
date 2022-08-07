@@ -1264,6 +1264,7 @@ void prepare_immobile_space_for_final_gc()
     char* page_base;
     char* page_end = (char*)fixedobj_free_pointer;
 
+    gc_assert(!gc_managed_heap_space_p((lispobj)loaded_codeblob_offsets));
     for (page = 0, page_base = fixedobj_page_address(page) ;
          page_base < page_end ;
          page_base += IMMOBILE_CARD_BYTES, ++page) {
