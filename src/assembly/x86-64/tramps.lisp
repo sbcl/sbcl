@@ -142,7 +142,8 @@
 ;;; installed as a globally named function. The fdefn contains a jump opcode
 ;;; to a tiny code component specific to the particular closure.
 ;;; The trampoline is responsible for loading RAX, since named calls don't.
-#-immobile-code
+;;; However, #+immobile-code might still need CLOSURE-TRAMP for any fdefn
+;;; for which the compiler chooses not to use "direct" call convention.
 (define-assembly-routine
     (closure-tramp (:return-style :none))
     ()

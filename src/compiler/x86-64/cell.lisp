@@ -533,10 +533,9 @@
       (inst jmp :e err-lab))
     RETRY))
 
-#-immobile-code
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
-  (:translate (setf fdefn-fun))
+  #-immobile-code (:translate (setf fdefn-fun))
   (:args (function :scs (descriptor-reg) :target result)
          (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
@@ -553,7 +552,7 @@
     (move result function)))
 #+immobile-code
 (progn
-(define-vop (set-fdefn-fun)
+(define-vop (set-direct-callable-fdefn-fun)
   (:args (fdefn :scs (descriptor-reg))
          (function :scs (descriptor-reg))
          (raw-word :scs (unsigned-reg)))

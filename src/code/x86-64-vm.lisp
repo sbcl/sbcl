@@ -314,9 +314,17 @@
       (%primitive set-fdefn-has-static-callers fdefn))
   fdefn)
 
-(defun %set-fdefn-fun (fdefn fun)
+(defun %set-fdefn-fun (fdefn fun &aux (name (fdefn-name fdefn)))
   (declare (type fdefn fdefn) (type function fun)
            (values function))
+  (unless (or (symbolp name) (eq 'setf (car name)))
+    ;; Ue the #-immobile-code call convention for this name.
+    ;; So we'll not compile a trampoline for things that can probably
+    ;; never be called directly anyway. i.e you _won't_ see things like:
+    ;;   #<trampoline #<%METHOD-FUNCTION (LAMBDA (SB-PCL::METHOD-ARGS SB-PCL::NEXT-METHODS) ...
+    ;; in the core any more
+    (%primitive sb-vm::set-fdefn-fun fun fdefn)
+    (return-from %set-fdefn-fun fun))
   (when (fdefn-has-static-callers fdefn)
     (remove-static-links fdefn))
   (let ((trampoline (when (fun-requires-simplifying-trampoline-p fun)
@@ -332,7 +340,7 @@
                   ;; But the result is shifted by N-FIXNUM-TAG-BITS because
                   ;; CELL-REF yields a descriptor-reg, not an unsigned-reg.
                   (get-lisp-obj-address (%closure-callee fun)))))
-        (%primitive set-fdefn-fun fdefn fun jmp-target))))
+        (%primitive sb-vm::set-direct-callable-fdefn-fun fdefn fun jmp-target))))
   fun)
 
 ) ; end PROGN
