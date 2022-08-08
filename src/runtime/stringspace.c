@@ -294,4 +294,34 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
     read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;
 }
 
+/* This kludge is only for the hide-packages test after it invokes move_rospace_to_dynamic().
+ * I wish there were a better way to write that test than to hack up the GC
+ * so badly that it can't run with its heap verifications enabled. */
+void test_dirty_all_gc_cards()
+{
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    int n_text_pages = TEXT_SPACE_SIZE / IMMOBILE_CARD_BYTES;
+    int n_bitmap_elts = ALIGN_UP(n_text_pages, 32) / 32;
+    memset(text_page_touched_bits, 0xFF, sizeof (int)*n_bitmap_elts);
+    lispobj* where = (lispobj*)TEXT_SPACE_START;
+    // OBJ_WRITTEN_FLAG is confusing. The '<<24' puts it in the generation byte.
+    for ( ; where < text_space_highwatermark ; where += object_size(where) )
+        if (widetag_of(where) == CODE_HEADER_WIDETAG) *where |= (OBJ_WRITTEN_FLAG << 24);
+#endif
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+    memset(gc_card_mark, 0, 1<<gc_card_table_nbits);
+    page_index_t first = 0;
+    while (first < next_free_page) {
+        page_index_t last = contiguous_block_final_page(first);
+        lispobj* where = (lispobj*)page_address(first);
+        lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
+        for ( ; where < limit ; where += object_size(where) )
+            if (widetag_of(where) == CODE_HEADER_WIDETAG) *where |= (OBJ_WRITTEN_FLAG << 24);
+        first = 1+last;
+    }
+#endif
+    extern boolean pre_verify_gen_0;
+    pre_verify_gen_0 = 1;
+}
+
 #endif
