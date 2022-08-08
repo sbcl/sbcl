@@ -585,6 +585,12 @@
                    (setf block (ir2-block-next block)))))
 
 (defun branch-destination (branch &optional (true t))
+  (unless (vop-codegen-info branch)
+    (let ((next (vop-next branch)))
+      (if (and next
+               (eq (vop-name next) 'branch-if))
+          (setf branch next)
+          (return-from branch-destination))))
   (destructuring-bind (label not-p &rest rest) (vop-codegen-info branch)
     (declare (ignore rest))
     (if (eq not-p true)
@@ -1170,13 +1176,18 @@
                                      (third info)
                                      (getf sb-vm::*other-pointer-type-vops* (vop-name vop)))
                       do
-                      (emit-and-insert-vop (vop-node vop)
-                                           (vop-block vop)
-                                           test-vop
-                                           (reference-tn widetag nil)
-                                           nil
-                                           vop
-                                           (list (first info) (second info) tags))
+                      (let ((next (vop-next vop)))
+                        (when (and next
+                                   (eq (vop-name next) 'branch-if))
+                          (setf info (vop-codegen-info next))
+                          (delete-vop next))
+                        (emit-and-insert-vop (vop-node vop)
+                                             (vop-block vop)
+                                             test-vop
+                                             (reference-tn widetag nil)
+                                             nil
+                                             vop
+                                             (list (first info) (second info) tags)))
                       (delete-vop vop))))))))
     nil)
 

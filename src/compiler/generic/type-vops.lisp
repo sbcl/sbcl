@@ -21,25 +21,24 @@
 ;;; from its default definition, so that's gotta be allowed, or else make-host-2
 ;;; would produce a null expansion for every type-vop.
 (defmacro define-type-vop (pred-name type-codes)
-  (awhen (gethash pred-name sb-c::*backend-parsed-vops*)
-    (unless (string= (sb-c::vop-parse-note it) "defaulted")
-      (return-from define-type-vop)))
   (let ((cost (if (> (reduce #'max type-codes :key #'eval) lowtag-limit)
                   7
                   4)))
     `(progn
-       (define-vop (,pred-name type-predicate)
-         (:translate ,pred-name)
-         (:note "defaulted")
-         (:generator ,cost
-           (test-type value temp target not-p ,type-codes :value-tn-ref args)))
        (let ((type-codes (list ,@type-codes)))
          (when (loop for type in type-codes
                      never (or (< type lowtag-limit)
                                (memq type +immediate-types+)
                                (memq type +function-widetags+)))
            (setf (getf *other-pointer-type-vops* ',pred-name)
-                 (canonicalize-widetags type-codes)))))))
+                 (canonicalize-widetags type-codes))))
+       ,(unless (awhen (gethash pred-name sb-c::*backend-parsed-vops*)
+                  (string/= (sb-c::vop-parse-note it) "defaulted"))
+          `(define-vop (,pred-name type-predicate)
+             (:translate ,pred-name)
+             (:note "defaulted")
+             (:generator ,cost
+               (test-type value temp target not-p ,type-codes :value-tn-ref args)))))))
 
 (define-type-vop unbound-marker-p (unbound-marker-widetag))
 
