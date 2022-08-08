@@ -63,6 +63,12 @@
     (inst call (make-fixup "alloc_list" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
+(define-assembly-routine (alloc-funinstance) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc_funinstance" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn)))
+
 (define-assembly-routine (listify-&rest (:return-style :none)) ()
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg

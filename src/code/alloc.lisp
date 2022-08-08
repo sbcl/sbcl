@@ -169,6 +169,18 @@
 (declaim (ftype (sfunction (t (unsigned-byte 22) (unsigned-byte 25))
                            (values code-component (integer 0)))
                 allocate-code-object))
+
+(defun update-dynamic-space-code-tree (obj)
+  (with-pinned-objects (obj)
+    (let ((addr (logandc2 (get-lisp-obj-address obj) other-pointer-lowtag))
+          (tree *dynspace-codeblob-tree*))
+      (loop (let ((newtree (sb-brothertree:insert addr tree)))
+              ;; check that it hasn't been promoted from gen0 -> gen1 already
+              ;; (very unlikely, but certainly possible).
+              (unless (eq (generation-of obj) 0) (return))
+              (let ((oldval (cas *dynspace-codeblob-tree* tree newtree)))
+                (if (eq oldval tree) (return) (setq tree oldval))))))))
+
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
 ;;; BOXED must be the exact count of boxed words desired. No adjustments
@@ -217,16 +229,7 @@
                 (alien-funcall (extern-alien "alloc_code_object"
                                              (function unsigned (unsigned 32) (unsigned 32)))
                                total-words boxed)))))
-      (with-pinned-objects (code)
-        (let ((addr (logandc2 (get-lisp-obj-address code) other-pointer-lowtag))
-              (tree *dynspace-codeblob-tree*))
-          (loop (let ((newtree (sb-brothertree:insert addr tree)))
-                  ;; check that it hasn't been promoted from gen0 -> gen1 already
-                  ;; (very unlikely, but certainly possible).
-                  (unless (eq (generation-of code) 0) (return))
-                  (let ((oldval (cas *dynspace-codeblob-tree* tree newtree)))
-                    (if (eq oldval tree) (return) (setq tree oldval)))))))
-
+      (update-dynamic-space-code-tree code)
     ;; FIXME: there may be random values in the unboxed payload and it's not obvious
     ;; that all callers of ALLOCATE-CODE-OBJECT always write all raw bytes.
     ;; LOAD-CODE and MAKE-CORE-COMPONENT certainly do because the representation

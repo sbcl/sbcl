@@ -199,6 +199,21 @@
            (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number)))))
 
 
+(defun write-funinstance-prologue (fin)
+  ;; Encode: MOV RAX,[RIP+9] / JMP [RAX-3] / 6-byte NOP
+  (declare (ignorable fin))
+  #-immobile-space (return-from write-funinstance-prologue)
+  (with-pinned-objects (fin)
+    (let* ((sap (sap+ (int-sap (get-lisp-obj-address fin))
+                      (- (ash 2 word-shift) fun-pointer-lowtag))))
+      ;; Scavenging these words when you shouldn't is actually harmless
+      ;; because by a stroke of luck, they all look fixnum-tagged.
+      (setf (sap-ref-sap sap -8) sap
+            (sap-ref-word sap 0) #xFF00000009058B48
+            (sap-ref-word sap 8) #x0000441F0F66FD60)))
+  (update-dynamic-space-code-tree fin)
+  fin)
+
 #+immobile-space
 (defun alloc-immobile-fdefn ()
   (alloc-immobile-fixedobj fdefn-size
@@ -208,6 +223,8 @@
 #+immobile-code
 (progn
 (defconstant trampoline-entry-offset n-word-bytes)
+;;; TODO: a simplifying trampoline should be a funcallable-instance,
+;;; and not a simple-fun-less piece of code.
 (defun make-simplifying-trampoline (fun)
   ;; 'alloc' is compiled after this file so we don't see the derived type.
   ;; But slam found a conflict on recompile.
@@ -217,25 +234,9 @@
     (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
           (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
                  (ash code-debug-info-slot word-shift))))
-      ;; For a funcallable-instance, the instruction sequence is:
-      ;;    MOV RAX, [RIP-n] ; load the function
-      ;;    MOV RAX, [RAX+5] ; load the funcallable-instance-fun
-      ;;    JMP [RAX-3]
-      ;; Otherwise just instructions 1 and 3 will do.
-      ;; We could use the #xA1 opcode to save a byte, but that would
-      ;; be another headache do deal with when relocating this code.
-      ;; There's precedent for this style of hand-assembly,
-      ;; in arch_write_linkage_table_entry() and arch_do_displaced_inst().
       (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
-            (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7))) ; disp
-      (let ((i (if (/= (%fun-pointer-widetag fun) funcallable-instance-widetag)
-                   7
-                   (let ((disp8 (- (ash funcallable-instance-function-slot
-                                        word-shift)
-                                   fun-pointer-lowtag))) ; = 5
-                     (setf (sap-ref-32 sap 7) (logior (ash disp8 24) #x408B48))
-                     11))))
-        (setf (sap-ref-32 sap i) #xFD60FF))) ; JMP [RAX-3]
+            (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7)); disp
+            (sap-ref-32 sap 7) #xFD60FF)) ; JMP [RAX-3]
     ;; Verify that the jump table size reads as  0.
     (aver (zerop (code-jump-table-words code)))
     ;; It is critical that there be a trailing 'uint16' of 0 in this object
@@ -246,60 +247,8 @@
     code))
 
 ;;; Return T if FUN can't be called without loading RAX with its descriptor.
-;;; This is true of any funcallable instance which is not a GF, and closures.
 (defun fun-requires-simplifying-trampoline-p (fun)
-  (case (%fun-pointer-widetag fun)
-    (#.sb-vm:closure-widetag t)
-    (#.sb-vm:funcallable-instance-widetag
-     ;; if the FIN has no raw words then it has no internal trampoline
-     (sb-kernel::bitmap-all-taggedp (%fun-layout fun)))))
-
-;; TODO: put a trampoline in all fins and allocate them anywhere.
-;; Revision e7cd2bd40f5b9988 caused some FINs to go in dynamic space
-;; which is fine, but those fins need to have a default bitmap of -1 instead
-;; of a special bitmap because we examine the bitmap when deciding whether
-;; the FIN can be installed into an FDEFN without needing an external trampoline.
-;; The easiest way to achieve this intent is to default all bitmaps to -1,
-;; then change it in the layout when writing raw words. A better fix would
-;; try to allocate all FINs in immobile space until it is exhausted, then fallback
-;; to dynamic space. The address of the fin is no longer an issue, since fdefns
-;; can point to the entire address space, but the fixed-size immobile object
-;; allocator doesn't returns 0 - it calls the monitor if it fails.
-
-;; So ideally, all funcallable instances would resemble simple-funs for a
-;; small added cost of 2 words per object. It will be necessary to have the GC
-;; treat ambiguous interior pointers to the unboxed words in the same way as
-;; any code pointer. Placing FINs on pages marked as containing code will allow
-;; the conservative root check to be skipped for obviously non-code objects.
-
-;; Also we will need to write the embedded trampoline either in a word index
-;; that differs based on length of the FIN, or place the boxed slots after
-;; the trampoline. As of now, this can only deal with standard GFs.
-;; The primitive object has 2 descriptor slots (fin-fun and CLOS slot vector)
-;; and 2 non-descriptor slots containing machine instructions, after the
-;; self-pointer (trampoline) slot. Scavenging the self-pointer is unnecessary
-;; though harmless. This intricate and/or obfuscated calculation of #b110
-;; is insensitive to the index of the trampoline slot, probably.
-(defun make-immobile-funinstance (layout slot-vector)
-  (let ((gf (truly-the funcallable-instance
-             (alloc-immobile-fixedobj 6 ; KLUDGE
-                                      (logior (ash 5 n-widetag-bits)
-                                              funcallable-instance-widetag)))))
-    ;; Assert that raw bytes will not cause GC invariant lossage
-    (aver (not (sb-kernel::bitmap-all-taggedp layout)))
-    ;; Set layout prior to writing raw slots
-    (setf (%fun-wrapper gf) layout)
-    ;; just being pedantic - liveness is preserved by the stack reference.
-    (with-pinned-objects (gf)
-      (let* ((addr (logandc2 (get-lisp-obj-address gf) lowtag-mask))
-             (sap (int-sap addr))
-             (insts-offs (ash (1+ funcallable-instance-info-offset) word-shift)))
-        (setf (sap-ref-word sap (ash funcallable-instance-trampoline-slot word-shift))
-              (truly-the word (+ addr insts-offs))
-              (sap-ref-word sap insts-offs) #xFFFFFFE9058B48  ; MOV RAX,[RIP-23]
-              (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF))) ; JMP [RAX-3]
-    (setf (%funcallable-instance-info gf 0) slot-vector)
-    gf))
+  (= (%fun-pointer-widetag fun) closure-widetag))
 
 (defun fdefn-has-static-callers (fdefn)
   (declare (type fdefn fdefn))

@@ -1872,12 +1872,13 @@ lispobj *search_dynamic_space(void *pointer)
         lispobj node = brothertree_find_lesseql((uword_t)pointer,
                                                 SYMBOL(DYNSPACE_CODEBLOB_TREE)->value);
         if (node != NIL) {
-            lispobj *codeblob = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
-            if (widetag_of(codeblob) != CODE_HEADER_WIDETAG)
-                lose("widetag @ %p is not code? %"OBJ_FMTX"\n", codeblob, *codeblob);
-            int nwords = code_total_nwords((struct code*)codeblob);
-            lispobj *upper_bound = codeblob + nwords;
-            if (pointer < (void*)upper_bound) return codeblob;
+            lispobj *found = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
+            int widetag = widetag_of(found);
+            if (widetag != CODE_HEADER_WIDETAG && widetag != FUNCALLABLE_INSTANCE_WIDETAG)
+                lose("header not OK for code page: @ %p = %"OBJ_FMTX"\n", found, *found);
+            int nwords = object_size(found);
+            lispobj *upper_bound = found + nwords;
+            if (pointer < (void*)upper_bound) return found;
         }
     }
     lispobj *start;
@@ -2019,11 +2020,22 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         /* This search must not fail. We've already verified that the
          * pointer is within range for its page. */
         gc_assert(object_start);
-        // If 'addr' points anywhere beyond the boxed words, it's valid
-        if (widetag_of(object_start) != FILLER_WIDETAG
-            && (instruction_ptr_p((void*)addr, object_start)
-                || addr == make_lispobj(object_start, OTHER_POINTER_LOWTAG)))
-            return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
+        switch (widetag_of(object_start)) {
+        case CODE_HEADER_WIDETAG:
+            // If 'addr' points anywhere beyond the boxed words, it's valid
+            // (i.e. allow it even if an incorrectly tagged pointer to a simple-fun header)
+            if (instruction_ptr_p((void*)addr, object_start)
+                || addr == make_lispobj(object_start, OTHER_POINTER_LOWTAG))
+                return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
+            return 0;
+#ifdef LISP_FEATURE_X86_64
+        case FUNCALLABLE_INSTANCE_WIDETAG:
+            if ((addr >= (uword_t)(object_start+2) && addr < (uword_t)(object_start+4))
+                || addr == make_lispobj(object_start, FUN_POINTER_LOWTAG))
+                return make_lispobj(object_start, FUN_POINTER_LOWTAG);
+            return 0;
+#endif
+        }
         return 0;
     }
 
@@ -2903,7 +2915,7 @@ update_writeprotection(page_index_t first_page, page_index_t last_page,
     /* Now we attempt to find any 1 "witness" that the pages should NOT be protected.
      * If such witness is found, then return without doing anything, otherwise
      * apply protection to the range. */
-    lispobj* witness = range_dirty_p(where,  limit, page_table[first_page].gen);
+    lispobj* witness = range_dirty_p(where, limit, page_table[first_page].gen);
     if (witness) return witness;
 
     for (page = first_page; page <= last_page; ++page) {
@@ -2957,6 +2969,10 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
         switch (widetag_of(where)) {
         case CODE_HEADER_WIDETAG:
             if (header_rememberedp(*where)) return;
+            break;
+        case FUNCALLABLE_INSTANCE_WIDETAG:
+            if (range_dirty_p(where, where+headerobj_size(where), page_table[first_page].gen))
+                return;
             break;
         }
     }
@@ -5106,6 +5122,18 @@ lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
 }
 
 #ifdef LISP_FEATURE_X86_64
+NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI alloc_funinstance(sword_t nbytes)
+{
+    struct thread *th = get_sb_vm_thread();
+    int result = mutex_acquire(&code_allocator_lock);
+    gc_assert(result);
+    void* mem = lisp_alloc(0, code_region, nbytes, PAGE_TYPE_CODE, th);
+    result = mutex_release(&code_allocator_lock);
+    gc_assert(result);
+    memset(mem, 0, nbytes);
+    return (lispobj)mem;
+}
+
 /* Make a list that couldn't be inline-allocated. Break it up into contiguous
  * blocks of conses not to exceed one GC page each. */
 NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nbytes) {

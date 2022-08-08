@@ -70,19 +70,9 @@
                     (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
                     most-positive-fixnum)))
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+))
-         (fin (cond #+(and immobile-code)
-                    ((not (sb-kernel::bitmap-all-taggedp (wrapper-friend wrapper)))
-                     (let ((f (truly-the funcallable-instance
-                                         (sb-vm::make-immobile-funinstance wrapper slots))))
-                       ;; set the upper 4 bytes of wordindex 5
-                       (sb-sys:with-pinned-objects (f)
-                         (setf (sb-impl::fsc-instance-trailer-hash f) (ldb (byte 32 0) hash)))
-                       f))
-                    (t
-                     (let ((f (truly-the funcallable-instance
-                                         (%make-standard-funcallable-instance slots hash))))
-                       (setf (%fun-wrapper f) wrapper)
-                       f)))))
+         (fin (truly-the funcallable-instance
+                         (%make-standard-funcallable-instance slots hash))))
+    (setf (%fun-wrapper fin) wrapper)
     (setf (%funcallable-instance-fun fin)
           (lambda (&rest args)
             (declare (ignore args))
@@ -183,15 +173,11 @@
           (multiple-value-bind (slots cpl default-initargs direct-subclasses)
               (!early-collect-inheritance name)
             (let* ((class (find-class name))
-                   ;; With #+compact-instance-header there are two possible bitmaps
-                   ;; for funcallable instances - for self-contained trampoline
-                   ;; instructions and external trampoline instructions.
-                   ;; With #-compact-instance-header all funcallable layouts
-                   ;; need the same bitmap, which is that of standard-GF.
-                   ;; These requirements are checked in verify_range() of gencgc.
+                   ;; All funcallable objects get the bitmap of standard-GF.
+                   ;; This is checked in verify_range() of gencgc.
                    (bitmap (if (memq name '(standard-generic-function
-                                            #-compact-instance-header funcallable-standard-object
-                                            #-compact-instance-header generic-function))
+                                            funcallable-standard-object
+                                            generic-function))
                                sb-kernel::standard-gf-primitive-obj-layout-bitmap
                                +layout-all-tagged+))
                    (wrapper (cond ((eq class slot-class)

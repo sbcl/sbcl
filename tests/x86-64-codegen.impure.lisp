@@ -814,11 +814,6 @@
                          lines)
                1))))
 
-#+compact-instance-header
-(with-test (:name :gf-self-contained-trampoline)
-  (let ((l (sb-kernel:find-layout 'standard-generic-function)))
-    (assert (/= (sb-kernel:wrapper-bitmap l) sb-kernel:+layout-all-tagged+))))
-
 (with-test (:name :known-array-rank)
   (flet ((try (type)
            (let ((lines

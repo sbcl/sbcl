@@ -873,8 +873,9 @@
 
 (flet
   ((alloc (name words type lowtag stack-allocate-p result
-                    &optional alloc-temp node
+                    &optional alloc-temp node vop
                     &aux (bytes (pad-data-block words)))
+    (declare (ignorable vop))
     #+bignum-assertions
     (when (eq type bignum-widetag) (setq bytes (* bytes 2))) ; use 2x the space
     (progn name) ; possibly not used
@@ -883,9 +884,15 @@
     (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
       ;; If storing a header word, defer ORing in the lowtag until after
       ;; the header is written so that displacement can be 0.
-      (if stack-allocate-p
-          (stack-allocation bytes (if type 0 lowtag) result)
-          (allocation nil bytes (if type 0 lowtag) result node alloc-temp thread-tn))
+      (cond (stack-allocate-p
+             (stack-allocation bytes (if type 0 lowtag) result))
+            #+immobile-space
+            ((eql type funcallable-instance-widetag)
+             (inst push bytes)
+             (invoke-asm-routine 'call 'alloc-funinstance vop)
+             (inst pop result))
+            (t
+             (allocation nil bytes (if type 0 lowtag) result node alloc-temp thread-tn)))
       (let ((header (compute-object-header words type)))
         (cond #+compact-instance-header
               ((and (eq name '%make-structure-instance) stack-allocate-p)
@@ -909,8 +916,9 @@
     (:results (result :scs (descriptor-reg)))
     (:temporary (:sc unsigned-reg) alloc-temp)
     #+gs-seg (:temporary (:sc unsigned-reg :offset 15) thread-tn)
+    (:vop-var vop)
     (:node-var node)
-    (:generator 50 (alloc name words type lowtag dx result alloc-temp node)))
+    (:generator 50 (alloc name words type lowtag dx result alloc-temp node vop)))
   (define-vop (sb-c::fixed-alloc-to-stack)
     (:info name words type lowtag dx)
     (:results (result :scs (descriptor-reg)))

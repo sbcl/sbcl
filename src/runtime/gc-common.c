@@ -446,9 +446,13 @@ scav_fun_pointer(lispobj *where, lispobj object)
             /* funcallable-instance might have all descriptor slots
              * except for the trampoline, which points to an asm routine.
              * This is not true for self-contained trampoline GFs though. */
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+            page_type = PAGE_TYPE_CODE, region = code_region;
+#else
             struct layout* layout = (void*)native_pointer(funinstance_layout(FUNCTION(object)));
             if (layout && (layout_flags(layout) & STRICTLY_BOXED_FLAG))
                 page_type = PAGE_TYPE_BOXED, region = boxed_region;
+#endif
         } else {
             /* Closures can always go on strictly boxed pages even though the
              * underlying function is (possibly) an untagged pointer.
@@ -462,6 +466,14 @@ scav_fun_pointer(lispobj *where, lispobj object)
         }
         copy = gc_copy_object(object, 1+SHORT_BOXED_NWORDS(*fun), region, page_type);
         gc_assert(copy != object);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
+            struct funcallable_instance* old = (void*)native_pointer(object);
+            struct funcallable_instance* new = (void*)native_pointer(copy);
+            if (old->trampoline == (lispobj)&old->instword1)
+                new->trampoline = (lispobj)&new->instword1;
+        }
+#endif
         set_forwarding_pointer(fun, copy);
     }
     if (copy != object) *where = copy;
@@ -959,15 +971,14 @@ scav_funinstance(lispobj *where, lispobj header)
     scav1(&layoutptr, layoutptr);
     if (layoutptr != old) funinstance_layout(where) = layoutptr;
 #endif
-    // Do a similar thing as scav_instance but without any special cases.
-    struct bitmap bitmap = get_layout_bitmap(LAYOUT(layoutptr));
-    gc_assert(bitmap.nwords == 1);
-    sword_t mask = bitmap.bits[0];
-    ++where;
-    lispobj* limit = where + nslots;
-    lispobj obj;
-    for ( ; where < limit ; mask >>= 1, ++where )
-        if ((mask & 1) && is_lisp_pointer(obj = *where)) scav1(where, obj);
+    struct funcallable_instance* fin = (void*)where;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // payload: entry addr, 2 raw words, implementation function
+    scavenge(&fin->function, nslots-3);
+#else
+    // payload: trampoline entry addr, layout, implementation function, ...
+    scavenge(&fin->function, nslots-2);
+#endif
     return 1 + (nslots | 1);
 }
 

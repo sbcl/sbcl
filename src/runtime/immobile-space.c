@@ -549,8 +549,7 @@ boolean immobile_space_preserve_pointer(void* addr)
         char* page_start_addr = PTR_ALIGN_DOWN(addr, IMMOBILE_CARD_BYTES);
         object_start = (lispobj*)(page_start_addr + obj_index * obj_spacing);
         valid = !fixnump(*object_start)
-            && (widetag_of(object_start) == FUNCALLABLE_INSTANCE_WIDETAG ||
-                widetag_of(object_start) == FDEFN_WIDETAG ||
+            && (widetag_of(object_start) == FDEFN_WIDETAG ||
                 properly_tagged_descriptor_p(addr, object_start));
     } else if (compacting_p() && (lispobj*)addr < tlsf_mem_start) {
         // Can ignore this pointer if it's point to pseudostatic text
@@ -837,13 +836,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
   case FDEFN_WIDETAG:
     if (younger_p(decode_fdefn_rawfun((struct fdefn*)obj), gen, keep_gen, new_gen)) return 1;
     break; // proceed to other slots as usual (harmlessly revisiting 'raw_addr')
-  case CODE_HEADER_WIDETAG:
-    // This is a simplifying trampoline around a closure or FIN.
-    // The only pointerish slot is debug_info (the called function).
-    // The size slot is a descriptor, though a non-pointer.
-    return younger_p(((struct code*)obj)->debug_info, gen, keep_gen, new_gen);
   case INSTANCE_WIDETAG:
-  case FUNCALLABLE_INSTANCE_WIDETAG:
     layout = instance_layout(obj);
     if (!layout) return 0; // object can't have pointers in it yet
     if (younger_p(layout, gen, keep_gen, new_gen))
@@ -1435,10 +1428,6 @@ search_immobile_space(void *pointer)
     return NULL;
 }
 
-// FIXME: Figure out not to hardcode
-#define FUN_TRAMP_SIZE 6
-#define GF_SIZE 6
-
 //// Defragmentation
 
 // Given an address in the target core, return the equivalent
@@ -1609,11 +1598,6 @@ static void fixup_space(lispobj* where, size_t n_words)
           break;
         case CLOSURE_WIDETAG:
           where[1] = adjust_fun_entrypoint(where[1]);
-          // FALLTHROUGH_INTENDED
-#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        case FUNCALLABLE_INSTANCE_WIDETAG:
-#endif
-          // skip the trampoline word at where[1]
           adjust_words(where+2, size-2);
           break;
         case FDEFN_WIDETAG:
@@ -1750,8 +1734,6 @@ static void place_fixedobj(lispobj* obj, int size_in_bytes,
       gc_assert(!*tempspace_addr(new)); // better not clobber some other object
       memcpy(tempspace_addr(new), obj, size_in_bytes);
       set_forwarding_pointer(obj, make_lispobj(new, LOWTAG_FOR_WIDETAG(widetag)));
-      if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) // fix the self-pointer
-          tempspace_addr(new)[1] = (lispobj)(new + 4*N_WORD_BYTES);
       *alloc_ptr = new + size_in_bytes;
 }
 
@@ -1808,19 +1790,6 @@ static void place_layout(lispobj* obj,
         layout_size_class_nwords(size_class_index) << WORD_SHIFT;
 }
 
-static boolean executable_object_p(lispobj* obj)
-{
-    int widetag = widetag_of(obj);
-    int answer = widetag == FDEFN_WIDETAG ||
-        (widetag == CODE_HEADER_WIDETAG && code_header_words((struct code*)obj) >= 3
-         /* The debug_info slot of a "simplifying trampoline" contains a pointer
-          * to the original closure or funcallable instance */
-         && lowtag_of(((struct code*)obj)->debug_info) == FUN_POINTER_LOWTAG)
-        || widetag == FUNCALLABLE_INSTANCE_WIDETAG;
-    gc_assert(!answer);
-    return answer;
-}
-
 static void defrag_immobile_space(boolean verbose)
 {
     int i;
@@ -1834,17 +1803,6 @@ static void defrag_immobile_space(boolean verbose)
     bzero(sym_kind_histo, sizeof sym_kind_histo);
     struct size_class layout_size_class[MAX_LAYOUT_DEFRAG_SIZE_CLASSES];
     bzero(layout_size_class, sizeof layout_size_class);
-
-    // Count the fdefns, trampolines, and GFs already in text sapace.
-    // There are 3 kinds of code objects we might see -
-    // (1) ordinary code, (2) trampolines, (3) filler
-    // Make sure only to count the trampolines on this pass.
-    lispobj* obj = (lispobj*)TEXT_SPACE_START;
-    while (obj < text_space_highwatermark) {
-        int widetag = widetag_of(obj);
-        if (executable_object_p(obj)) ++obj_type_histo[widetag/4];
-        obj += sizetab[widetag](obj);
-    }
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     // Find the starting address of fixed-size objects that will undergo defrag.
@@ -1908,13 +1866,9 @@ static void defrag_immobile_space(boolean verbose)
           symbol_alloc_ptrs[i] + calc_n_fixedobj_pages(
               sym_kind_histo[i].count, sym_kind_histo[i].size) * IMMOBILE_CARD_BYTES;
     int n_fdefn_pages = calc_n_fixedobj_pages(obj_type_histo[FDEFN_WIDETAG/4], FDEFN_SIZE);
-    int n_tramp_pages = calc_n_fixedobj_pages(obj_type_histo[CODE_HEADER_WIDETAG/4], FUN_TRAMP_SIZE);
-    int n_gf_pages    = calc_n_fixedobj_pages(obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4], GF_SIZE);
     char* fdefn_alloc_ptr  = symbol_alloc_ptrs[N_SYMBOL_KINDS];
-    char* tramp_alloc_ptr  = fdefn_alloc_ptr + n_fdefn_pages * IMMOBILE_CARD_BYTES;
-    char* gf_alloc_ptr     = tramp_alloc_ptr + n_tramp_pages * IMMOBILE_CARD_BYTES;
     fixedobj_tempspace.n_bytes =
-      gf_alloc_ptr + n_gf_pages * IMMOBILE_CARD_BYTES - (char*)FIXEDOBJ_SPACE_START;
+      fdefn_alloc_ptr + n_fdefn_pages * IMMOBILE_CARD_BYTES - (char*)FIXEDOBJ_SPACE_START;
     fixedobj_tempspace.start = calloc(fixedobj_tempspace.n_bytes, 1);
 
     // Copy pages below the defrag base into the temporary copy.
@@ -1956,8 +1910,7 @@ static void defrag_immobile_space(boolean verbose)
     text_tempspace.start = calloc(text_tempspace.n_bytes, 1);
 
     if (verbose)
-        printf("(fin,inst,fdefn,code,sym)=%d+%d+%d+%d+%d... ",
-               obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
+        printf("(inst,fdefn,code,sym)=%d+%d+%d+%d... ",
                obj_type_histo[INSTANCE_WIDETAG/4],
                obj_type_histo[FDEFN_WIDETAG/4],
                obj_type_histo[CODE_HEADER_WIDETAG/4] +  n_code_components,
@@ -1999,8 +1952,6 @@ static void defrag_immobile_space(boolean verbose)
     bzero(alloc_ptrs, sizeof alloc_ptrs);
     alloc_ptrs[INSTANCE_WIDETAG/4] = layout_alloc_ptr;
     alloc_ptrs[FDEFN_WIDETAG/4] = fdefn_alloc_ptr;
-    alloc_ptrs[CODE_HEADER_WIDETAG/4] = tramp_alloc_ptr;
-    alloc_ptrs[FUNCALLABLE_INSTANCE_WIDETAG/4] = gf_alloc_ptr;
 
     // Permute fixed-sized object pages and deposit forwarding pointers.
     for ( page_index = find_fixedobj_page_index(defrag_base) ;

@@ -1608,26 +1608,17 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;       word2: (u) layout
 ;;;       word3: (t) implementation-fun
 ;;;       word4: (t) tagged slots ...
-;;;   Compact header:
-;;;     External trampoline:             #b...1111        -1
+;;;   Compact header:                    #b...1000        -7
 ;;;       word0:     header/layout
 ;;;       word1: (*) entry address
-;;;       word2: (t) implementation-fun
-;;;       word3: (t) tagged slots ...
-;;;     Internal trampoline:             #b..00110         6
-;;;       word0:     header/layout
-;;;       word1: (*) entry address [= word 4]
-;;;       word2: (t) implementation-fun
-;;;       word3: (t) tagged slot
-;;;       word4: (u) machine code
-;;;       word5: (u) machine code
+;;;       word2: (u) machine instructions
+;;;       word3: (u) machine instructions
+;;;       word4: (t) implementation-fun
+;;;       word5: (t) tagged slots ...
 ;;; (*) entry address can be treated as either tagged or raw.
 ;;;     For some architectures it has a lowtag, but points to
 ;;;     read-only space. For others it is a fixnum.
 ;;;     In either case the GC need not observe the value.
-;;;     Compact-header with external trampoline can indicate
-;;;     all slots as tagged. The other two cases above have at
-;;;     least one slot which must be marked raw.
 ;;;
 ;;; Ordinary instance with only tagged slots:
 ;;;   Non-compact header:                #b...1110        -2
@@ -2236,6 +2227,11 @@ or they must be declared locally notinline at each call site.~@:>"
                               (setf (%fun-wrapper object) (the-layout)))))))
              `((defun ,constructor (,@slot-names &aux (object ,allocate))
                  ,@set-layout
+                 #+x86-64
+                 ,@(when (and (eq dd-type 'funcallable-structure)
+                              ;; fmt-control is not an executable function
+                              (neq class-name 'sb-format::fmt-control))
+                     '((sb-vm::write-funinstance-prologue object)))
                  ,@(mapcar (lambda (dsd)
                              `(setf (,(dsd-accessor-name dsd) object) ,(dsd-name dsd)))
                            (dd-slots dd))

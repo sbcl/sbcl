@@ -267,8 +267,6 @@
   ;; We decide only at class finalization time whether it is funcallable.
   ;; Picking the right bitmap could probably be done sooner given the metaclass,
   ;; but this approach avoids changing how PCL uses MAKE-LAYOUT.
-  ;; The big comment above MAKE-IMMOBILE-FUNINSTANCE in src/code/x86-64-vm
-  ;; explains why we differentiate between SGF and everything else.
   ;; FIXME: we should assert that this is not a STRUCTURE-OBJECT,
   ;; because there must not be additional ID words preceding the bitmap.
   ;; STANDARD-OBJECT can't generally use a fixed number of ID slots
@@ -277,13 +275,9 @@
   ;; to superclasses, so maybe it's possible.
   (dovector (ancestor inherits)
     (when (eq ancestor #.(find-layout 'function))
-      (%raw-instance-set/signed-word layout (sb-kernel::type-dd-length sb-vm:layout)
-            #+immobile-code ; there are two possible bitmaps
-            (if (or (find *sgf-wrapper* inherits) (eq wrapper *sgf-wrapper*))
-                sb-kernel::standard-gf-primitive-obj-layout-bitmap
-                +layout-all-tagged+)
-            ;; there is only one possible bitmap otherwise
-            #-immobile-code sb-kernel::standard-gf-primitive-obj-layout-bitmap))
+      (%raw-instance-set/signed-word
+       layout (sb-kernel::type-dd-length sb-vm:layout)
+       sb-kernel::standard-gf-primitive-obj-layout-bitmap))
     (setq flags (logior (logand (logior +sequence-layout-flag+
                                         +stream-layout-flag+
                                         +simple-stream-layout-flag+

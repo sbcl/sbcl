@@ -235,7 +235,9 @@
        (declare ((and fixnum (integer 1)) size))
        ;; M-A-O disables GC, therefore GET-LISP-OBJ-ADDRESS is safe
        (let ((obj-addr (sb-kernel:get-lisp-obj-address obj))
-             (array (cond ((= type sb-vm:code-header-widetag)
+             (array (cond ((member type `(,sb-vm:code-header-widetag
+                                          #+compact-instance-header
+                                          ,sb-vm:funcallable-instance-widetag))
                            (incf total-code-size size)
                            code-bits)
                           (t

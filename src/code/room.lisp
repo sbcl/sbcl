@@ -1208,7 +1208,8 @@ We could try a few things to mitigate this:
          (total-code-size 0))
     (map-allocated-objects
      (lambda (obj type size)
-       (declare ((and fixnum (integer 1)) size))
+      (declare ((and fixnum (integer 1)) size))
+      (unless (= type funcallable-instance-widetag)
        ;; M-A-O disables GC, therefore GET-LISP-OBJ-ADDRESS is safe
        (let ((obj-addr (get-lisp-obj-address obj))
              (array (cond ((= type code-header-widetag)
@@ -1246,7 +1247,7 @@ We could try a few things to mitigate this:
                                  (+ dynamic-space-start (* index gencgc-page-bytes)))
                          (alien-funcall (extern-alien "ldb_monitor" (function void))))
                         (t
-                         (setf (sbit array index) 1))))))
+                         (setf (sbit array index) 1)))))))
      :dynamic)))
 ;;; Because pseudo-static objects can not move nor be freed,
 ;;; this is a valid test that genesis separated code and data.
@@ -1295,19 +1296,14 @@ We could try a few things to mitigate this:
   (dx-flet ((filter (obj type size)
               (declare (ignore size))
               (when (= type code-header-widetag)
-                (funcall fun obj)))
-            (nofilter (obj type size)
-              (declare (ignore type size))
-              (funcall fun obj)))
-    #+cheneygc (map-allocated-objects #'filter :all)
-    #+gencgc
+                (funcall fun obj))))
     (without-gcing
       #+immobile-code
-      (map-objects-in-range #'nofilter
+      (map-objects-in-range #'filter
                             (ash text-space-start (- n-fixnum-tag-bits))
                             (%make-lisp-obj (sap-int *text-space-free-pointer*)))
       (alien-funcall (extern-alien "close_code_region" (function void)))
-      (walk-dynamic-space #'nofilter
+      (walk-dynamic-space #'filter
                           #b1111111 ; all generations
                           #b111 #b111)))) ; type mask and constraint
 

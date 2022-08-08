@@ -52,10 +52,6 @@
 ;;; function creation there is no danger of having the system get
 ;;; confused.
 
-;;; FIXME: these all go in dynamic space and then allocate a trampoline when
-;;; assigned into an FDEFN. Figure out how to put them in immobile space,
-;;; or can we allocate them _anywhere_ with embedded code now? I think so!
-;;; And why do we assign these info FDEFNs? What calls them via their names?
 #-sb-xc-host ; host doesn't need
 (progn
 (!defstruct-with-alternate-metaclass %method-function
@@ -65,10 +61,6 @@
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
-;;; Note: for x8-64 with #+immobile-code there are 2 additional raw slots which
-;;; hold machine instructions to load the funcallable-instance-fun and jump to
-;;; it, so that funcallable-instances can act like simple-funs, in as much as
-;;; there's an address you can jump to without loading a register.
 (sb-kernel:!defstruct-with-alternate-metaclass standard-funcallable-instance
   :slot-names (clos-slots hash-code)
   :constructor %make-standard-funcallable-instance

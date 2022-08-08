@@ -198,9 +198,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
             CHECK(layout, object);
             struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
             if (widetag_of(object) == FUNCALLABLE_INSTANCE_WIDETAG) {
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                gc_assert(bitmap.bits[0] == (sword_t)-1 || bitmap.bits[0] == (sword_t)6);
-#else
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                 gc_assert(bitmap.bits[0] == (sword_t)-4);
 #endif
             }
@@ -333,6 +331,8 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                     if (widetag == CODE_HEADER_WIDETAG) {
                         if (!is_code(page_table[pg].type))
                             lose("object @ %p is code on non-code page", where);
+                    } else if (widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
+                        // where these reside depends on the architecture
                     } else {
                         if (is_code(page_table[pg].type))
                             lose("object @ %p is non-code on code page", where);

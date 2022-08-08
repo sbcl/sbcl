@@ -277,12 +277,8 @@ during backtrace.
                           :alloc-trans %make-funcallable-instance)
   (trampoline :init :funcallable-instance-tramp)
   #-compact-instance-header (layout :set-trans %set-fun-layout :ref-trans %fun-layout)
-  ;; TODO: if we can switch places of 'function' and 'fsc-instance-slots'
-  ;; (at least for the builds with compact-instance-header)
-  ;; then for both funcallable and non-funcallable instances,
-  ;; the CLOS slot vector will be in the word 5 bytes past the tagged pointer.
-  ;; This shouldn't be too hard to arrange, since nothing needs to know where
-  ;; the tagged function lives except the funcallable instance trampoline.
+  #+compact-instance-header (instword1)
+  #+compact-instance-header (instword2)
   (function :type function
             :ref-known (flushable) :ref-trans %funcallable-instance-fun
             :set-known () :set-trans (setf %funcallable-instance-fun))
