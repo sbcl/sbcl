@@ -111,7 +111,7 @@ heap-reloc-test: ../../tests/heap-reloc/fake-mman.c $(OBJS)
 # data collection, with COMPILING_TESTS. Not really used yet.
 gc-unit-tests.o: CFLAGS=-g -DCOMPILING_TESTS
 unit-tests: gc-unit-tests.o libsbcl.a
-	cc -g -no-pie -o $@ $^ -ldl -lpthread -lm
+	$(CC) -g -no-pie -o $@ $^ -ldl -lpthread -lm
 
 # ld -r -o sbcl.o works on Linux, but not on other platforms.
 # On macOS, it fails to keep debug sections.
@@ -124,7 +124,7 @@ libsbcl.a: $(OBJS)
 
 PIC_OBJS = $(subst .o,.pic.o,$(OBJS))
 libsbcl.so: $(PIC_OBJS)
-	cc -shared -o $@ $^ $(LIBS)
+	$(CC) -shared -o $@ $^ $(LIBS)
 # for this to work, you must have with-gcc-tls in your build features already.
 # can't define it here because then it conflicts if you have it in both places.
 %.pic.o: %.c
