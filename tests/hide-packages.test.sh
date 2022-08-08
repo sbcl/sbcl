@@ -9,7 +9,8 @@ set -e
 CLOBBER_INTERNAL_FEATURES="(handler-bind ((simple-error #'continue))
   (sb-vm::close-thread-alloc-region)
   (alien-funcall (extern-alien \"move_rospace_to_dynamic\" (function void int)) 1)
-  (alien-funcall (extern-alien \"test_dirty_all_gc_cards\" (function void)))
+  (when (sb-sys:find-foreign-symbol-address \"test_dirty_all_gc_cards\")
+    (alien-funcall (extern-alien \"test_dirty_all_gc_cards\" (function void))))
   (sb-kernel:set-symbol-global-value (eval ''sb-impl:+internal-features+) nil))"
 
 ### Apparently the finalizer thread must be stopped before running these tests or else

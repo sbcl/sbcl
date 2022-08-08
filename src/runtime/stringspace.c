@@ -308,18 +308,23 @@ void test_dirty_all_gc_cards()
     for ( ; where < text_space_highwatermark ; where += object_size(where) )
         if (widetag_of(where) == CODE_HEADER_WIDETAG) *where |= (OBJ_WRITTEN_FLAG << 24);
 #endif
-#ifdef LISP_FEATURE_SOFT_CARD_MARKS
+#ifdef LISP_FEATURE_SOFT_CARD_MARKS // just touch all mark bits, no harm done
     memset(gc_card_mark, 0, 1<<gc_card_table_nbits);
+#endif
     page_index_t first = 0;
     while (first < next_free_page) {
         page_index_t last = contiguous_block_final_page(first);
         lispobj* where = (lispobj*)page_address(first);
         lispobj* limit = (lispobj*)page_address(last) + page_words_used(last);
         for ( ; where < limit ; where += object_size(where) )
-            if (widetag_of(where) == CODE_HEADER_WIDETAG) *where |= (OBJ_WRITTEN_FLAG << 24);
+            if (widetag_of(where) == CODE_HEADER_WIDETAG) {
+#ifndef LISP_FEATURE_SOFT_CARD_MARKS // only touch code pages, others got WP faults
+                gc_card_mark[addr_to_card_index(where)] = 1;
+#endif
+                *where |= (OBJ_WRITTEN_FLAG << 24);
+            }
         first = 1+last;
     }
-#endif
     extern boolean pre_verify_gen_0;
     pre_verify_gen_0 = 1;
 }
