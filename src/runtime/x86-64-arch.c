@@ -584,39 +584,69 @@ arch_set_fp_modes(unsigned int mxcsr)
     asm ("ldmxcsr %0" : : "m" (temp));
 }
 
-/// Return the Lisp object that fdefn's raw_addr slot jumps to.
-/// This will either be:
-/// (1) a simple-fun,
-/// (2) a funcallable-instance with an embedded trampoline that makes
-///     it resemble a simple-fun in terms of call convention, or
-/// (3) a code-component with no simple-fun within it, that makes
-///     closures and other funcallable-instances look like simple-funs.
-/// If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
+static __attribute__((unused)) boolean codeblob_p(lispobj ptr) {
+    return lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
+           widetag_of((lispobj*)(ptr-OTHER_POINTER_LOWTAG)) == CODE_HEADER_WIDETAG;
+}
+
+/* Return the tagged pointer for which 'entrypoint' is the starting address.
+ * This will be one of the following:
+ * 1. a fun-pointer which is either
+ *   - a simple-fun header located 2 words before the entrypoint.
+ *     N.B.: This returns the SIMPLE-FUN, and _not_ its containing codeblob.
+ *   - a funcallable-instance with an embedded trampoline that make it
+ *     equivalent to a simple-fun
+ * 2. a code-component with no simple-fun within it, that makes closures
+ *    callable like simple-funs. The code header is at entrypoint minus 4 words.
+ *
+ * By first reading at (entrypoint - 2*N_WORD_BYTES) this does the right thing
+ * when 'entrypoint' is actually type 2, because the word accessed will not be
+ * an object header or forwarding marker (it will be whatever %CODE-DEBUG-INFO is).
+ * Whereis if this were type 1, but we read at (entrypoint - 4*N_WORD_BYTES) first,
+ * then we could perceive random uninitialized bytes of the preceding object.
+ */
+static lispobj entrypoint_to_taggedptr(lispobj* entrypoint) {
+    if (!entrypoint || points_to_asm_code_p((lispobj)entrypoint)) return 0;
+    // First try
+    lispobj* phdr = entrypoint -  2;
+    if (forwarding_pointer_p(phdr)) {
+        gc_assert(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
+        return make_lispobj(phdr, FUN_POINTER_LOWTAG);
+    }
+    int widetag = widetag_of(phdr);
+    if (widetag == FUNCALLABLE_INSTANCE_WIDETAG || widetag == SIMPLE_FUN_WIDETAG) {
+        return make_lispobj(phdr, FUN_POINTER_LOWTAG);
+    }
+    // Second try
+    phdr = entrypoint - 4;
+    /* It is nearly impossible for forwarding to arise, by this reasoning:
+     * Case A: if some thread references the codeblob that wraps a closure,
+     *  then the codeblob is pinned; hence not forwarded.
+     * Case B: if not executing (or otherwise referenced from stack/registers),
+     *  there can exist no other tagged reference to the codeblob.
+     * Aside from the FDEFN that owns it, the only other untagged reference would
+     * be from the search tree, which isn't scavenged. (The entire tree dies after GC.)
+     * It's conceivable the debugger could store a tagged pointer to this entrypoint
+     * in something, but I tried to make it do so, and couldn't. I was, however, able
+     * to artificially cause forwarding by putting closure trampolines in symbols */
+    if (forwarding_pointer_p(phdr))
+        gc_assert(codeblob_p(forwarding_pointer_value(phdr)));
+    else
+        gc_assert(widetag_of(phdr) == CODE_HEADER_WIDETAG);
+    return make_lispobj(phdr, OTHER_POINTER_LOWTAG);
+}
+/* Return the lisp object that fdefn's raw_addr slot jumps to.
+ * In the event that the referenced object was forwarded, this returns the un-forwarded
+ * object (the forwarded value is used to assert some invariants though).
+ * If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
+ *
+ * Some legacy baggage is evident: in the first implementation of immobile fdefns,
+ * an fdefn used a 'jmp rel32' (relative to itself), and so you could decode the
+ * jump target only given the address of the fdefn. That is no longer true; fdefns use
+ * absolute jumps. Therefore it is possible to call entrypoint_to_taggedptr() with any
+ * raw_addr, whether or not you know the fdefn whence the raw_addr was obtained. */
 lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
-    lispobj* raw_addr = (lispobj*)fdefn->raw_addr;
-    if (!raw_addr || points_to_asm_code_p((lispobj)raw_addr))
-        // technically this should return the address of the code object
-        // containing asm routines, but it's fine to return 0.
-        return 0;
-    // If the object to which raw_addr points was already forwarded,
-    // this returns the "old" pointer, prior to forwarding, so that
-    // scavenging that pointer alters it. Otherwise scav_fdefn would not
-    // decide to rewrite the raw_addr slot of the fdefn.
-    // This logic is rather nasty, but I don't know what else to do.
-    lispobj word;
-    int widetag;
-    if (header_widetag(word = raw_addr[-2]) == SIMPLE_FUN_WIDETAG
-        || header_widetag(word) == FUNCALLABLE_INSTANCE_WIDETAG
-        || (word == FORWARDING_HEADER &&
-            ((widetag=widetag_of(native_pointer(forwarding_pointer_value(raw_addr-2))))
-             == SIMPLE_FUN_WIDETAG || widetag == FUNCALLABLE_INSTANCE_WIDETAG)))
-        return make_lispobj(raw_addr - 2, FUN_POINTER_LOWTAG);
-    if ((widetag = header_widetag(word = raw_addr[-4])) == CODE_HEADER_WIDETAG
-        || (word == FORWARDING_HEADER &&
-            widetag_of(native_pointer(forwarding_pointer_value(raw_addr-4)))
-            == CODE_HEADER_WIDETAG))
-        return make_lispobj(raw_addr - 4, OTHER_POINTER_LOWTAG);
-    lose("Unknown object in fdefn raw addr: %p", raw_addr);
+    return entrypoint_to_taggedptr((lispobj*)fdefn->raw_addr);
 }
 
 #include "genesis/vector.h"
