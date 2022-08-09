@@ -1065,13 +1065,6 @@
                 (objsize (code-object-size code)))
            (incf total-code-size objsize)
            (cond
-             ((< (code-header-words code) 3) ; filler object
-              (let ((sap (int-sap (- (get-lisp-obj-address code) other-pointer-lowtag))))
-                (format output " .quad 0x~x, 0x~x~% .fill 0x~x~%# ~x:~%"
-                        (sap-ref-word sap 0)
-                        (sap-ref-word sap n-word-bytes)
-                        (- objsize (* 2 n-word-bytes))
-                        (+ code-addr objsize))))
              ((%instancep (%code-debug-info code)) ; assume it's a COMPILED-DEBUG-INFO
               (aver (plusp (code-n-entries code)))
               (let* ((source

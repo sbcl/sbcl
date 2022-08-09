@@ -2513,7 +2513,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%CODE-FUN-OFFSET"
            "CODE-N-ENTRIES"
            "CODE-N-NAMED-CALLS"
-           "CODE-OBJ-IS-FILLER-P"
            "%DENOMINATOR"
            "%OTHER-POINTER-P"
            "%OTHER-POINTER-SUBTYPE-P"
