@@ -893,13 +893,16 @@
 (define-vop (load-other-pointer-widetag)
   (:args (value :scs (any-reg descriptor-reg)))
   (:args-var args)
-  (:info not-other-pointer-label)
+  (:info not-other-pointer-label null-label)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
     (cond ((other-pointer-tn-ref-p args)
            (inst mov :byte r (ea (- other-pointer-lowtag) value)))
           (t
+           (when null-label
+             (inst cmp value nil-value)
+             (inst jmp :e null-label))
            (%lea-for-lowtag-test r value other-pointer-lowtag :qword)
            (inst test :byte r lowtag-mask)
            (inst jmp :nz not-other-pointer-label)

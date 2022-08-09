@@ -1140,11 +1140,15 @@
     (when (boundp '*2block-info*)
       (let (vops
             stop
+            null
             (value (tn-ref-tn (vop-args vop))))
         ;; CHECK for loops
         (labels ((chain (vop)
                    (let ((next (branch-destination vop nil)))
-                     (cond (next
+                     (cond ((and next
+                                 (or (neq (vop-name vop) 'symbolp)
+                                     (and (not null)
+                                          (setf null (branch-destination vop)))))
                             (push vop vops)
                             (if (and (singleton-p (ir2block-predecessors (vop-block next)))
                                      (or (getf sb-vm::*other-pointer-type-vops* (vop-name next))
@@ -1153,7 +1157,10 @@
                                 (chain next)
                                 (setf stop (vop-block next))))
                            (t
-                            (setf stop (vop-block vop)))))))
+                            (setf stop (vop-block vop))))))
+                 (ir2-block-label (block)
+                   (or (ir2-block-%label block)
+                       (setf (ir2-block-%label block) (gen-label)))))
           (chain vop)
           (when (> (length vops) 1)
             (let ((widetag (make-normal-tn (primitive-type-or-lose 'sb-vm::unsigned-byte-64)))
@@ -1164,8 +1171,9 @@
                                    (reference-tn value nil)
                                    (reference-tn widetag t)
                                    vop
-                                   (list (or (ir2-block-%label stop)
-                                             (setf (ir2-block-%label stop) (gen-label)))))
+                                   (list (ir2-block-label stop)
+                                         (and null
+                                              (ir2-block-label (vop-block null)))))
               (update-block-succ block
                                  (cons stop
                                        (ir2block-successors block)))

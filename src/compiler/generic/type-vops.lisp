@@ -11,7 +11,9 @@
 (in-package "SB-VM")
 
 
-(defvar *other-pointer-type-vops* nil)
+(defvar *other-pointer-type-vops*
+  ;; A special case due to NIL
+  `(symbolp (,symbol-widetag)))
 
 ;;; We use a default definition of the vop for PRED-NAME only if it was not
 ;;; already defined by the backend in {arch}/type-vops.  DEFINE-VOP has a compile-time
