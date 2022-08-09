@@ -1848,9 +1848,13 @@ copy_unboxed_object(lispobj object, sword_t nwords)
     return gc_copy_object(object, nwords, unboxed_region, PAGE_TYPE_UNBOXED);
 }
 
-/* This will NOT reliably work for objects in a currently open allocation region,
- * because page_words_used() is not sync'ed to the free pointer until closing */
+/* This may not reliably work for objects in a currently open allocation region,
+ * because page_words_used() is not sync'ed to the free pointer until closing.
+ * However it will work reliably for codeblobs, because if you can hold
+ * a reference to the codeblob, then either you'll find it in the generation 0
+ * tree, or else can linearly scan for it in an older generation */
 #include "brothertree.h"
+static lispobj dynspace_codeblob_tree_snapshot; // valid only during GC
 lispobj *search_dynamic_space(void *pointer)
 {
     page_index_t page_index = find_page_index(pointer);
@@ -1869,8 +1873,9 @@ lispobj *search_dynamic_space(void *pointer)
     // Generation 0 code is in the tree usually - it isn't for objects
     // in generation 0 following a non-promotion cycle.
     if (type == PAGE_TYPE_CODE && page_table[page_index].gen == 0) {
-        lispobj node = brothertree_find_lesseql((uword_t)pointer,
-                                                SYMBOL(DYNSPACE_CODEBLOB_TREE)->value);
+        lispobj tree = dynspace_codeblob_tree_snapshot ? dynspace_codeblob_tree_snapshot :
+                       SYMBOL(DYNSPACE_CODEBLOB_TREE)->value;
+        lispobj node = brothertree_find_lesseql((uword_t)pointer, tree);
         if (node != NIL) {
             lispobj *found = (lispobj*)((struct binary_node*)INSTANCE(node))->key;
             int widetag = widetag_of(found);
@@ -2022,8 +2027,11 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
         gc_assert(object_start);
         switch (widetag_of(object_start)) {
         case CODE_HEADER_WIDETAG:
-            // If 'addr' points anywhere beyond the boxed words, it's valid
-            // (i.e. allow it even if an incorrectly tagged pointer to a simple-fun header)
+            /* If 'addr' points anywhere beyond the boxed words, it's valid
+             * (i.e. allow it even if an incorrectly tagged pointer to a simple-fun header)
+             * FIXME: Do we want to allow pointing at the untagged base address too?
+             * It'll find a key in the codeblob tree, but why would Lisp have the
+             * untagged pointer and expect it to be a strong reference? */
             if (instruction_ptr_p((void*)addr, object_start)
                 || addr == make_lispobj(object_start, OTHER_POINTER_LOWTAG))
                 return make_lispobj(object_start, OTHER_POINTER_LOWTAG);
@@ -4377,15 +4385,9 @@ garbage_collect_generation(generation_index_t generation, int raise,
     g->num_gc = raise ? 0 : (1 + g->num_gc);
 
 maybe_verify:
-    /* After a GC, pages of code are safe to linearly scan because
-     * there won't be random junk on them below page_bytes_used.
-     * But generation 0 pages are _not_ safe to linearly scan because they aren't
-     * pre-zeroed. The SIGPROF handler could have a bad time if were to misread
-     * the header of an object mid-creation. Therefore, codeblobs newly made by Lisp
-     * are kept in a lock-free and threadsafe datastructure.
-     * Immobile space has its own tree, for other purposes (among them being to find
-     * page scan start offsets) which is pruned as needed by a finalizer */
-    SYMBOL(DYNSPACE_CODEBLOB_TREE)->value = NIL;
+    // Have to kill this structure from its root, because any of the nodes would have
+    // been on pages that got freed by free_oldspace.
+    dynspace_codeblob_tree_snapshot = 0;
     if (generation >= verify_gens)
         hexdump_and_verify_heap(cur_thread_approx_stackptr, VERIFY_POST_GC | (generation<<16));
 
@@ -4570,6 +4572,21 @@ collect_garbage(generation_index_t last_gen)
         fprintf(stderr, "Pre-GC:\n");
         print_generation_stats();
     }
+
+    /* After a GC, pages of code are safe to linearly scan because
+     * there won't be random junk on them below page_bytes_used.
+     * But generation 0 pages are _not_ safe to linearly scan because they aren't
+     * pre-zeroed. The SIGPROF handler could have a bad time if were to misread
+     * the header of an object mid-creation. Therefore, codeblobs newly made by Lisp
+     * are kept in a lock-free and threadsafe datastructure. But we don't want to
+     * enliven nodes of that structure for Lisp to see (absent any other references)
+     * because the whole thing becomes garbage after this GC. So capture the tree
+     * for GC's benefit, and delete the view of it from Lisp.
+     * Incidentally, immobile text pages have their own tree, for other purposes
+     * (among them being to find page scan start offsets) which is pruned as
+     * needed by a finalizer. */
+    dynspace_codeblob_tree_snapshot = SYMBOL(DYNSPACE_CODEBLOB_TREE)->value;
+    SYMBOL(DYNSPACE_CODEBLOB_TREE)->value = NIL;
 
     page_index_t initial_nfp = next_free_page;
     if (gc_mark_only) {
