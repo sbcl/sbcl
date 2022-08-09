@@ -4379,10 +4379,12 @@ garbage_collect_generation(generation_index_t generation, int raise,
 maybe_verify:
     /* After a GC, pages of code are safe to linearly scan because
      * there won't be random junk on them below page_bytes_used.
-     * And we don't want to see forwarding pointers on objects in the tree,
-     * so just erase the tree now.
-     * This is WRONG for immobile code, but not worse than status quo
-     * in terms of inability to find objects in the SIGPROF handler etc */
+     * But generation 0 pages are _not_ safe to linearly scan because they aren't
+     * pre-zeroed. The SIGPROF handler could have a bad time if were to misread
+     * the header of an object mid-creation. Therefore, codeblobs newly made by Lisp
+     * are kept in a lock-free and threadsafe datastructure.
+     * Immobile space has its own tree, for other purposes (among them being to find
+     * page scan start offsets) which is pruned as needed by a finalizer */
     SYMBOL(DYNSPACE_CODEBLOB_TREE)->value = NIL;
     if (generation >= verify_gens)
         hexdump_and_verify_heap(cur_thread_approx_stackptr, VERIFY_POST_GC | (generation<<16));
