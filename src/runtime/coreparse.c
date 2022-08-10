@@ -1073,6 +1073,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                               merge_core_pages, &adj);
             break;
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
+            // elements = gencgc-card-table-index-nbits, n-ptes, nbytes, data-page
             gc_load_corefile_ptes(ptr[0], ptr[1], ptr[2],
                                   file_offset + (ptr[3] + 1) * os_vm_page_size, fd);
             break;

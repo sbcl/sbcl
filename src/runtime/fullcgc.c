@@ -23,6 +23,7 @@
 #include "code.h"
 #include "immobile-space.h"
 #include "queue.h"
+#include "os.h"
 
 #include <stdio.h>
 #ifndef LISP_FEATURE_WIN32
@@ -423,7 +424,7 @@ void prepare_for_full_mark_phase()
 #else
     sword_t nbytes = nbits_dynamic / 8;
 #endif
-    markbits_size = ALIGN_UP(nbytes, getpagesize());
+    markbits_size = ALIGN_UP(nbytes, GETPAGESIZE);
     fullcgcmarks = (void*)os_allocate(markbits_size);
 }
 

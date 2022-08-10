@@ -792,7 +792,8 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
     return actual;
 }
 
-/* Used to allocate the dynamic space, as it may be very large. Dynamically comitted by os_commit_memory in handle_access_violation */
+/* Used to allocate the dynamic space, as it may be very large.
+ * Dynamically comitted by gc_alloc_new_region() or gc_alloc_large() */
 os_vm_address_t
 os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {

@@ -154,16 +154,6 @@ write_bytes_to_file(FILE * file, char *addr, size_t bytes, int compression)
     }
 };
 
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_64_BIT)
-#define FTELL _ftelli64
-#define FSEEK _fseeki64
-typedef __int64 ftell_type;
-#else
-#define FTELL ftell
-#define FSEEK fseek
-typedef long ftell_type;
-#endif
-
 static long write_bytes(FILE *file, char *addr, size_t bytes,
                         os_vm_offset_t file_offset, int compression)
 {

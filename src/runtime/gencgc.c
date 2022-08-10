@@ -5676,14 +5676,7 @@ void gc_load_corefile_ptes(int card_table_nbits,
     gc_card_table_nbits = card_table_nbits;
     gc_allocate_ptes();
 
-    if (
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_64_BIT)
-        _lseeki64
-#else
-        lseek
-#endif
-        (fd, offset, SEEK_SET) != offset)
-        lose("failed seek");
+    if (LSEEK(fd, offset, SEEK_SET) != offset) lose("failed seek");
 
     char data[8192];
     // Process an integral number of ptes on each read.

@@ -123,7 +123,7 @@
       (setf (bvref-word bigvec offset) (the sb-vm:word word))
       (incf offset sb-vm:n-word-bytes))
     (write-sequence (elt (bigvec-outer-vector bigvec) 0) stream :end offset)))
-    
+
 ;;; analogous to WRITE-SEQUENCE, but for a BIGVEC
 (defun write-bigvec-as-sequence (bigvec stream &key end pad-with-zeros)
   (binding* ((bvlength (bvlength bigvec))

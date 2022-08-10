@@ -241,4 +241,21 @@ extern int os_reported_page_size;
 // Opaque context accessor
 uword_t os_context_pc(os_context_t*);
 void set_os_context_pc(os_context_t*, uword_t);
+
+#ifdef LISP_FEATURE_WIN32
+#define GETPAGESIZE 4096
+#ifdef LISP_FEATURE_64_BIT
+#  define FTELL _ftelli64
+#  define FSEEK _fseeki64
+#  define LSEEK _lseeki64
+typedef __int64 ftell_type;
+#endif
+#else
+#define GETPAGESIZE getpagesize()
+#define FTELL ftell
+#define FSEEK fseek
+#define LSEEK lseek
+typedef long ftell_type;
+#endif
+
 #endif
