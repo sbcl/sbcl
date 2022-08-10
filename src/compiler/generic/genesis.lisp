@@ -3698,9 +3698,7 @@ III. initially undefined function references (alphabetically):
   ;; A corefile PTE is { uword_t scan_start_offset; page_words_t words_used; }
   (let* ((data-bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
          (n-ptes (ceiling data-bytes sb-vm:gencgc-page-bytes))
-         (sizeof-usage ; see similar expression in 'src/code/room'
-          (if (typep sb-vm::gencgc-page-words '(unsigned-byte 16)) 2 4))
-         (sizeof-corefile-pte (+ sb-vm:n-word-bytes sizeof-usage))
+         (sizeof-corefile-pte (+ sb-vm:n-word-bytes 2))
          (pte-bytes (round-up (* sizeof-corefile-pte n-ptes) sb-vm:n-word-bytes))
          (n-code 0)
          (n-cons 0)
@@ -3722,14 +3720,7 @@ III. initially undefined function references (alphabetically):
                               (:mixed (incf n-mixed) #b011))
                             0)))
         (setf (bvref-word-unaligned ptes pte-offset) (logior sso type-bits))
-        (macrolet ((setter ()
-                     ;; KLUDGE to avoid compiler note about one or the other
-                     ;; branch of this IF being unreachable.
-                     (declare (notinline typep))
-                     (if (typep sb-vm::gencgc-page-words '(unsigned-byte 16))
-                         '#'(setf bvref-16)
-                         '#'(setf bvref-32))))
-          (funcall (setter) usage ptes (+ pte-offset sb-vm:n-word-bytes)))))
+        (setf (bvref-32 ptes (+ pte-offset sb-vm:n-word-bytes)) usage)))
     (when verbose
       (format t "movable dynamic space: ~d + ~d + ~d cons/code/mixed pages~%"
               n-cons n-code n-mixed))
