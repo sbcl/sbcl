@@ -116,13 +116,35 @@
   (* (length (bigvec-outer-vector bigvec))
      +smallvec-length+))
 
+(defun write-words (stream &rest words)
+  (let ((bigvec (load-time-value (%make-bigvec)))
+        (offset 0))
+    (dolist (word words)
+      (setf (bvref-word bigvec offset) (the sb-vm:word word))
+      (incf offset sb-vm:n-word-bytes))
+    (write-sequence (elt (bigvec-outer-vector bigvec) 0) stream :end offset)))
+    
 ;;; analogous to WRITE-SEQUENCE, but for a BIGVEC
-(defun write-bigvec-as-sequence (bigvec stream &key (start 0) end pad-with-zeros)
-  (let* ((bvlength (bvlength bigvec))
-         (data-length (min (or end bvlength) bvlength)))
-    (loop for i of-type index from start below data-length do
-      (write-byte (bvref bigvec i)
-                  stream))
+(defun write-bigvec-as-sequence (bigvec stream &key end pad-with-zeros)
+  (binding* ((bvlength (bvlength bigvec))
+             (data-length (min (or end bvlength) bvlength))
+             ;; Compute the coordinates of the final byte to be written
+             ((outer-index inner-index)
+              (if (zerop data-length)
+                  (values 0 -1)
+                  (floor (1- data-length) +smallvec-length+))))
+    ;; Each SMALLVEC prior to the one indexed by outer-index is written in its entirety
+    (dotimes (i outer-index)
+      (write-sequence (elt (bigvec-outer-vector bigvec) i) stream))
+    ;; The SMALLVEC at OUTER-INDEX is written up to and including INNER-INDEX
+    (write-sequence (elt (bigvec-outer-vector bigvec) outer-index) stream
+                    :end (1+ inner-index))
+    ;; FIXME: This logic from rev 243d0f6f59 says it's needed if +SMALLVEC-LENGTH+ is
+    ;; less than backend page bytes, but if that were true (which it never is)
+    ;; we should just increase +SMALLVEC-LENGTH+. And how can could it be right even in
+    ;; that case? DATA-LENGTH is not larger than BVLENGTH, because it it were,
+    ;; you asked to write more than the vector holds. Istm this is garbage
+    ;; but I'm afraid to remove it.
     (when (and pad-with-zeros (< bvlength data-length))
       (loop repeat (- data-length bvlength) do (write-byte 0 stream)))))
 
@@ -3648,7 +3670,7 @@ III. initially undefined function references (alphabetically):
 
 ;;;; writing core file
 
-(defun output-gspace (gspace data-page core-file write-word verbose)
+(defun output-gspace (gspace data-page core-file verbose)
   (force-output core-file)
   (let* ((posn (file-position core-file))
          (bytes (cond
@@ -3657,13 +3679,13 @@ III. initially undefined function references (alphabetically):
                    (- sb-vm:read-only-space-end sb-vm:read-only-space-start))
                   (t
                    (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))))
-         (pages (ceiling bytes sb-c:+backend-page-bytes+))
-         (total-bytes (* pages sb-c:+backend-page-bytes+)))
+         (page-count (ceiling bytes sb-c:+backend-page-bytes+))
+         (total-bytes (* page-count sb-c:+backend-page-bytes+)))
 
     (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
     (when verbose
       (format t "writing ~S byte~:P [~S page~:P] from ~S~%"
-              total-bytes pages gspace))
+              total-bytes page-count gspace))
 
     ;; Note: It is assumed that the GSPACE allocation routines always
     ;; allocate whole pages (of size +backend-page-bytes+) and that any
@@ -3678,22 +3700,14 @@ III. initially undefined function references (alphabetically):
     (force-output core-file)
     (file-position core-file posn)
 
-    ;; Write part of a (new) directory entry which looks like this:
-    ;;   GSPACE IDENTIFIER
-    ;;   WORD COUNT
-    ;;   DATA PAGE
-    ;;   ADDRESS
-    ;;   PAGE COUNT
-    (funcall write-word (gspace-identifier gspace))
-    (funcall write-word (gspace-free-word-index gspace))
-    (funcall write-word data-page)
-    (funcall write-word (gspace-byte-address gspace))
-    (funcall write-word pages)
+    ;; Write the directory entry.
+    (write-words core-file (gspace-identifier gspace) (gspace-free-word-index gspace)
+                 data-page (gspace-byte-address gspace) page-count)
 
-    (+ data-page pages)))
+    (+ data-page page-count)))
 
 #+gencgc
-(defun output-page-table (gspace data-page core-file write-word verbose)
+(defun output-page-table (gspace data-page core-file verbose)
   ;; Write as many PTEs as there are pages used.
   ;; A corefile PTE is { uword_t scan_start_offset; page_words_t words_used; }
   (let* ((data-bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
@@ -3720,7 +3734,7 @@ III. initially undefined function references (alphabetically):
                               (:mixed (incf n-mixed) #b011))
                             0)))
         (setf (bvref-word-unaligned ptes pte-offset) (logior sso type-bits))
-        (setf (bvref-32 ptes (+ pte-offset sb-vm:n-word-bytes)) usage)))
+        (setf (bvref-16 ptes (+ pte-offset sb-vm:n-word-bytes)) usage)))
     (when verbose
       (format t "movable dynamic space: ~d + ~d + ~d cons/code/mixed pages~%"
               n-cons n-code n-mixed))
@@ -3730,35 +3744,29 @@ III. initially undefined function references (alphabetically):
       (write-bigvec-as-sequence ptes core-file :end pte-bytes)
       (force-output core-file)
       (file-position core-file posn))
-    (mapc write-word
-          `(,page-table-core-entry-type-code
-            6 ; = number of words in this core header entry
-            ,sb-vm::gencgc-card-table-index-nbits ,n-ptes ,pte-bytes ,data-page))))
+    (write-words core-file
+                 page-table-core-entry-type-code
+                 6 ; = number of words in this core header entry
+                 sb-vm::gencgc-card-table-index-nbits
+                 n-ptes pte-bytes data-page)))
 
 ;;; Create a core file created from the cold loaded image. (This is
 ;;; the "initial core file" because core files could be created later
-;;; by executing SAVE-LISP in a running system, perhaps after we've
+;;; by executing SAVE-LISP-AND-DIE in a running system, perhaps after we've
 ;;; added some functionality to the system.)
 (defun write-initial-core-file (filename build-id verbose)
-
   (when verbose
     (let ((*print-length* nil)
           (*print-level* nil))
     (format t "~&SB-XC:*FEATURES* =~&~S~%" sb-xc:*features*))
     (format t "[building initial core file in ~S: ~%" filename))
 
-  (with-open-file (core-file (namestring filename) ; why NAMESTRING? dunno
-                             :direction :output
-                             :element-type '(unsigned-byte 8)
-                             :if-exists :rename-and-delete)
-   (let ((bv (%make-bigvec))
-         (data-page 0))
-    (flet ((write-word (word)
-             (setf (bvref-word bv 0) (the sb-vm:word word))
-             (write-sequence (elt (bigvec-outer-vector bv) 0) core-file
-                             :start 0 :end sb-vm:n-word-bytes)))
+  (with-open-file (core-file filename :direction :output
+                                      :element-type '(unsigned-byte 8)
+                                      :if-exists :rename-and-delete)
+   (let ((data-page 0))
       ;; Write the magic number.
-      (write-word core-magic)
+      (write-words core-file core-magic)
 
       ;; Write the build ID, which contains a generated string
       ;; plus a suffix identifying a certain configuration of the C compiler.
@@ -3771,36 +3779,30 @@ III. initially undefined function references (alphabetically):
         (declare (type simple-string build-id))
         ;; Write BUILD-ID-CORE-ENTRY-TYPE-CODE, the length of the header,
         ;; length of the string, then base string chars + maybe padding.
-        (write-word build-id-core-entry-type-code)
-        (write-word (+ 3 nwords)) ; 3 = fixed overhead including this word
-        (write-word (length build-id))
+        (write-words core-file build-id-core-entry-type-code
+                     (+ 3 nwords) ; 3 = fixed overhead including this word
+                     (length build-id))
         (dovector (char build-id) (write-byte (char-code char) core-file))
         (dotimes (j (- padding)) (write-byte #xff core-file)))
 
       ;; Write the Directory entry header.
-      (write-word directory-core-entry-type-code)
+      (write-words core-file directory-core-entry-type-code)
       (let ((spaces `(,*static*
                       #+immobile-space ,@`(,*immobile-fixedobj* ,*immobile-text*)
                       ,*dynamic* ,*read-only*)))
         ;; length = (5 words/space) * N spaces + 2 for header.
-        (write-word (+ (* (length spaces) 5) 2))
+        (write-words core-file (+ (* (length spaces) 5) 2))
         (dolist (space spaces)
-          (setq data-page (output-gspace space data-page
-                                         core-file #'write-word verbose))))
-      #+gencgc (output-page-table *dynamic* data-page
-                                   core-file #'write-word verbose)
+          (setq data-page (output-gspace space data-page core-file verbose))))
+      #+gencgc (output-page-table *dynamic* data-page core-file verbose)
 
       ;; Write the initial function.
-      (write-word initial-fun-core-entry-type-code)
-      (write-word 3)
       (let ((initial-fun (descriptor-bits (cold-symbol-function '!cold-init))))
-        (when verbose
-          (format t "~&/INITIAL-FUN=#X~X~%" initial-fun))
-        (write-word initial-fun))
+        (when verbose (format t "~&/INITIAL-FUN=#X~X~%" initial-fun))
+        (write-words core-file initial-fun-core-entry-type-code 3 initial-fun))
 
       ;; Write the End entry.
-      (write-word end-core-entry-type-code)
-      (write-word 2))))
+      (write-words core-file end-core-entry-type-code 2)))
 
   (when verbose
     (format t "done]~%")
