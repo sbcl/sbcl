@@ -263,17 +263,9 @@
       (%primitive set-fdefn-has-static-callers fdefn))
   fdefn)
 
-(defun %set-fdefn-fun (fdefn fun &aux (name (fdefn-name fdefn)))
+(defun %set-fdefn-fun (fdefn fun)
   (declare (type fdefn fdefn) (type function fun)
            (values function))
-  (unless (or (symbolp name) (eq 'setf (car name)))
-    ;; Ue the #-immobile-code call convention for this name.
-    ;; So we'll not compile a trampoline for things that can probably
-    ;; never be called directly anyway. i.e you _won't_ see things like:
-    ;;   #<trampoline #<%METHOD-FUNCTION (LAMBDA (SB-PCL::METHOD-ARGS SB-PCL::NEXT-METHODS) ...
-    ;; in the core any more
-    (%primitive sb-vm::set-fdefn-fun fun fdefn)
-    (return-from %set-fdefn-fun fun))
   (when (fdefn-has-static-callers fdefn)
     (remove-static-links fdefn))
   (let ((trampoline (when (fun-requires-simplifying-trampoline-p fun)

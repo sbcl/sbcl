@@ -861,6 +861,7 @@
 
 ;;;; automatic allocators for primitive objects
 
+;;; FIXME: figure out how not to need this?
 (define-vop (make-funcallable-instance-tramp)
   (:args)
   (:results (result :scs (any-reg)))

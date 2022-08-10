@@ -839,38 +839,14 @@
   (define-full-call fixed-tail-call-named t :tail nil :fixed))
 
 ;;; Call NAME "directly" meaning in a single JMP or CALL instruction,
-;;; if possible
+;;; if possible (without loading RAX)
 (defun emit-direct-call (name instruction node step-instrumenting)
-  (if (and (listp name) (neq (car name) 'setf))
-      ;; always call through the fdefn for (SB-PCL::SLOT-ACCESSOR :GLOBAL ...)
-      ;; and anything else with a nonstandard name, so we can avoid compiling
-      ;; a thousand little custom trampolines.
-      ;; The main reason for that is it avoids compiling custom trampolines
-      ;; for functions that are never in practice called, such as
-      ;;  (SB-PCL::{FAST,SLOW}-METHOD mumble (thing t) ...)
-      ;; but which nonetheless have FDEFNs.
-      ;; We still make the custom trampoline for closures such as
-      ;; (SB-KERNEL::CONDITION-SLOT-READER SB-INTERPRETER::TYPE-ERROR-SYMBOL).
-      ;; Even though that has a nonstandard name, that lambda is installed
-      ;; as #'TYPE-ERROR-SYMBOL, which is an ordinary name.
-      (let* ((constants
-              (sb-c::ir2-component-constants
-               (sb-c::component-info sb-c::*component-being-compiled*)))
-             (constant
-              (find-if (lambda (x)
-                         (and (listp x) (eq (car x) :named-call) (equal (cadr x) name)))
-                       constants)))
-        (aver constant)
-        (inst mov rax-tn (third constant))
-        ;;(loadw rax-tn rax-tn fdefn-fun-slot other-pointer-lowtag)
-        (inst* instruction (object-slot-ea rax-tn fdefn-raw-addr-slot other-pointer-lowtag)))
-      ;; call without loading RAX
       ;; a :STATIC-CALL fixup is the address of the entry point of
       ;; the function itself, and a :NAMED-CALL fixup is the address
       ;; of the JMP instruction embedded in the header for the named FDEFN.
-      (let* ((fixup (make-fixup name
-                     (if (static-fdefn-offset name) :static-call :named-call)))
-             (target
+  (let* ((fixup (make-fixup name
+                 (if (static-fdefn-offset name) :static-call :named-call)))
+         (target
               (if (and (sb-c::code-immobile-p node)
                        (not step-instrumenting))
                   fixup
@@ -883,7 +859,7 @@
                     ;; RAX will get loaded regardless.
                     (inst mov rax-tn fixup)
                     rax-tn))))
-        (inst* instruction target))))
+    (inst* instruction target)))
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)
