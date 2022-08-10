@@ -1030,7 +1030,7 @@
               (delete-vop vop)
               (delete-vop next))))))))
 
-(when (vop-existsp :named sb-vm::<-integer-fixnum)
+(when-vop-existsp (:named sb-vm::<-integer-fixnum)
   ;; The <-integer-fixnum VOPs already perform dispatch for fixnum/bignum,
   ;; and load the header byte.
   ;; Replace the preceding INTEGERP VOP with an appropriate
@@ -1135,14 +1135,13 @@
       (delete-vop vop))))
 
 ;;; Load the WIDETAG once for a series of type tests.
-(when (vop-existsp :named sb-vm::load-other-pointer-widetag)
+(when-vop-existsp (:named sb-vm::load-other-pointer-widetag)
   (defoptimizer (vop-optimize %other-pointer-subtype-p) (vop)
     (when (boundp '*2block-info*)
       (let (vops
             stop
             null
             (value (tn-ref-tn (vop-args vop))))
-        ;; CHECK for loops
         (labels ((chain (vop)
                    (let ((next (branch-destination vop nil)))
                      (cond ((and next
@@ -1203,6 +1202,54 @@
         do
         (set-vop-optimizer (template-or-lose vop)
                            #'vop-optimize-%other-pointer-subtype-p-optimizer)))
+
+(when-vop-existsp (:translate structure-typep)
+  (defoptimizer (vop-optimize structure-typep) (vop)
+    (when (boundp '*2block-info*)
+      (let (vops
+            stop
+            (value (tn-ref-tn (vop-args vop))))
+        (labels ((chain (vop)
+                   (let ((next (branch-destination vop nil)))
+                     (cond (next
+                            (push vop vops)
+                            (if (and (singleton-p (ir2block-predecessors (vop-block next)))
+                                     (eq (vop-name next) 'structure-typep)
+                                     (eq (tn-ref-tn (vop-args next)) value))
+                                (chain next)
+                                (setf stop (vop-block next))))
+                           (t
+                            (setf stop (vop-block vop))))))
+                 (ir2-block-label (block)
+                   (or (ir2-block-%label block)
+                       (setf (ir2-block-%label block) (gen-label)))))
+          (chain vop)
+          (when (> (length vops) 1)
+            (let ((layout (make-normal-tn *backend-t-primitive-type*))
+                  (block (vop-block vop)))
+              (emit-and-insert-vop (vop-node vop)
+                                   block
+                                   (template-or-lose 'sb-vm::load-instance-layout)
+                                   (reference-tn value nil)
+                                   (reference-tn layout t)
+                                   vop
+                                   (list (ir2-block-label stop)))
+              (update-block-succ block
+                                 (cons stop
+                                       (ir2block-successors block)))
+              (let ((test-vop (template-or-lose 'sb-vm::structure-typep*)))
+                (loop for vop in vops
+                      for info = (vop-codegen-info vop)
+                      do
+                      (emit-and-insert-vop (vop-node vop)
+                                           (vop-block vop)
+                                           test-vop
+                                           (reference-tn layout nil)
+                                           nil
+                                           vop
+                                           info)
+                      (delete-vop vop))))))))
+    nil))
 
 (defun very-temporary-p (tn)
   (let ((writes (tn-writes tn))

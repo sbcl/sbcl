@@ -582,3 +582,81 @@
   (:info target not-p type-codes)
   (:generator 1
     (%test-headers value nil target not-p nil type-codes)))
+
+(define-vop (load-instance-layout)
+  (:args (object :scs (any-reg descriptor-reg)))
+  (:args-var args)
+  (:info not-instance)
+  (:results (r :scs (descriptor-reg)))
+  (:generator 1
+    (unless (instance-tn-ref-p args)
+      (inst and tmp-tn object lowtag-mask)
+      (inst cmp tmp-tn instance-pointer-lowtag)
+      (inst b :ne not-instance))
+    (loadw r object instance-slots-offset instance-pointer-lowtag)))
+
+(defun structure-is-a (layout temp this-id test-layout)
+  (let ((test-id (layout-id test-layout))
+        (offset (+ (id-bits-offset)
+                   (ash (- (wrapper-depthoid test-layout) 2) 2)
+                   (- instance-pointer-lowtag))))
+
+    (inst ldr (32-bit-reg this-id) (@ layout offset))
+    ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
+    (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
+           (if (minusp test-id)
+               (inst cmn (32-bit-reg this-id) (- test-id))
+               (inst cmp (32-bit-reg this-id) test-id)))
+          (t
+           (destructuring-bind (size . label)
+               ;; This uses the bogus definition of :dword, the one which
+               ;; emits 4 bytes. _technically_ dword should be 8 bytes.
+               (register-inline-constant :dword `(:layout-id ,test-layout))
+             (declare (ignore size))
+             (inst load-from-label (32-bit-reg temp) label))
+           (inst cmp (32-bit-reg this-id) (32-bit-reg temp))))))
+
+;;; This could be split into two vops to avoid wasting an allocation for 'temp'
+;;; when the immediate form is used.
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional :eq)
+  (:info test-layout)
+  (:temporary (:sc unsigned-reg) this-id temp)
+  (:generator 4
+    (structure-is-a x temp this-id test-layout)))
+
+(define-vop ()
+  (:translate sb-c::structure-typep)
+  (:args (object :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:args-var args)
+  (:policy :fast-safe)
+  (:conditional)
+  (:info target not-p test-layout)
+  (:temporary (:sc descriptor-reg) layout)
+  (:temporary (:sc unsigned-reg) this-id temp)
+  (:generator 4
+    (unless (instance-tn-ref-p args)
+      (inst and temp object lowtag-mask)
+      (inst cmp temp instance-pointer-lowtag)
+      (inst b :ne (if not-p target done)))
+    (loadw layout object instance-slots-offset instance-pointer-lowtag)
+    (structure-is-a layout temp this-id test-layout)
+    (inst b (if not-p :ne :eq) target)
+    done))
+
+(define-vop (structure-typep*)
+  (:args (layout :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional)
+  (:info target not-p test-layout)
+  (:temporary (:sc unsigned-reg) this-id temp)
+  (:generator 4
+    (structure-is-a layout temp this-id test-layout)
+    (inst b (if not-p :ne :eq) target)
+    done))

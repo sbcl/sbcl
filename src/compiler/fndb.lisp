@@ -103,6 +103,7 @@
 #+64-bit (defknown layout-depthoid (sb-vm:layout) layout-depthoid (flushable always-translatable))
 #+(or x86 x86-64) (defknown (layout-depthoid-ge) (sb-vm:layout integer) boolean (flushable))
 (defknown %structure-is-a (instance t) boolean (foldable flushable))
+(defknown structure-typep (t t) boolean (foldable flushable))
 (defknown copy-structure (structure-object) structure-object
   (flushable)
   :derive-type #'result-type-first-arg)

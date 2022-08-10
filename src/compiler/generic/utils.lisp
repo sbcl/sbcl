@@ -273,6 +273,9 @@
   (not (types-equal-or-intersect (tn-ref-type tn-ref)
                                  (specifier-type '(eql nil)))))
 
+(defun instance-tn-ref-p (tn-ref)
+  (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
+       (csubtypep (tn-ref-type tn-ref) (specifier-type 'instance))))
 (defun stack-consed-p (object)
   (let ((write (sb-c::tn-writes object))) ; list of write refs
     (when (or (not write) ; grrrr, the only write is from a LOAD tn
