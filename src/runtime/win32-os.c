@@ -770,7 +770,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
 {
     // Reserving the dynamic space doesn't commit it.
     if (space_id == DYNAMIC_CORE_SPACE_ID && (attributes & MOVABLE))
-        return os_validate_nocommit(attributes, addr, request);
+        return os_validate_nocommit(attributes, addr, len);
 
     if (!addr) {
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
