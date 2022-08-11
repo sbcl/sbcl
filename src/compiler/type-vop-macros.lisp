@@ -120,10 +120,9 @@
                      &key &allow-other-keys)
   ;; Determine what interesting combinations we need to test for.
   (let* ((type-codes (mapcar #'eval type-codes))
-         (fixnump (and (every (lambda (lowtag)
-                                (member lowtag type-codes))
-                              '#.(mapcar #'symbol-value fixnum-lowtags))
-                       t))
+         ;; FIXNUMP is true if every one of the fixnum lowtags is present
+         ;; in your specified list of type-codes (NOT the other way 'round)
+         (fixnump (subsetp fixnum-lowtags type-codes))
          ;; On 64-bit, UNBOUND-MARKER-WIDETAG may be smaller than LOWTAG-LIMIT
          ;; but it is not a lowtag.
          (lowtags (remove unbound-marker-widetag
@@ -161,9 +160,7 @@
       (remf other-args :value-tn-ref))
     (cond
       (fixnump
-       (when (remove-if (lambda (x)
-                          (member x '#.(mapcar #'symbol-value fixnum-lowtags)))
-                        lowtags)
+       (when (set-difference lowtags fixnum-lowtags)
          (error "can't mix fixnum testing with other lowtags"))
        (when function-p
          (error "can't mix fixnum testing with function subtype testing"))

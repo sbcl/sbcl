@@ -1119,7 +1119,7 @@ between the ~A definition and the ~A definition"
          (fixnum
           :translation (integer ,most-negative-fixnum ,most-positive-fixnum)
           :inherits (integer rational real number)
-          :codes ,(mapcar #'symbol-value sb-vm::fixnum-lowtags)
+          :codes ,sb-vm::fixnum-lowtags
           :prototype-form 42)
          (bignum
           :translation (and integer (not fixnum))

@@ -23,6 +23,8 @@
 ;;; from its default definition, so that's gotta be allowed, or else make-host-2
 ;;; would produce a null expansion for every type-vop.
 (defmacro define-type-vop (pred-name type-codes)
+  ;; This EVAL is a bit sloppy but it (somewhat surprisingly) serves a real purpose
+  ;; in that you can gives the set of types code as symbols and/or integers.
   (let ((cost (if (> (reduce #'max type-codes :key #'eval) lowtag-limit)
                   7
                   4)))

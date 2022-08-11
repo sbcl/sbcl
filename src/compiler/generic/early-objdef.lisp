@@ -97,17 +97,8 @@
     other-pointer-lowtag))
 
 (defconstant-eqx fixnum-lowtags
-    #.(let ((fixtags nil))
-        (do-external-symbols (sym "SB-VM")
-          (let* ((name (symbol-name sym))
-                 (len (length name)))
-            (when (and (boundp sym)
-                       (integerp (symbol-value sym))
-                       (> len 7)
-                       (string= name "-LOWTAG" :start1 (- len 7))
-                       (zerop (logand (symbol-value sym) fixnum-tag-mask)))
-              (push sym fixtags))))
-        `',(sort fixtags #'string< :key #'symbol-name))
+    '#.(loop for i from 0 to lowtag-mask
+             when (zerop (logand i fixnum-tag-mask)) collect i)
   #'equal)
 
 ;;; the heap types, stored in 8 bits of the header of an object on the
