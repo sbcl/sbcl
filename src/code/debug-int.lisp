@@ -512,7 +512,7 @@
   ;; (unexported) To see SB-C::LOCATION-KIND, do
   ;; (SB-KERNEL:TYPEXPAND 'SB-C::LOCATION-KIND).
   (kind :unparsed :type (or (member :unparsed) sb-c::location-kind))
-  (step-info :unparsed :type (or (member :unparsed :foo) simple-string))
+  (step-info :unparsed :type (or (member :unparsed) simple-string))
   (context :unparsed))
 
 ;;;; frames
