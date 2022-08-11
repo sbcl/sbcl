@@ -2162,10 +2162,7 @@ core and return a descriptor to it."
                     name))))
     (let ((existing (read-wordindexed fdefn sb-vm:fdefn-fun-slot)))
       (unless (or (cold-null existing) (descriptor= existing function))
-        (funcall (if (eq name 'sb-impl::equal-hash) ; KLUDGE
-                     'warn
-                     'error)
-                 "Function multiply defined: ~S. Was ~x is ~x" name
+        (error "Function multiply defined: ~S. Was ~x is ~x" name
                  (descriptor-bits existing)
                  (descriptor-bits function))))
     (write-wordindexed fdefn sb-vm:fdefn-fun-slot function)

@@ -102,6 +102,16 @@
   boolean
   (foldable flushable no-verify-arg-count))
 
+(defknown (sb-impl::instance-sxhash sb-impl::%instance-sxhash)
+    (instance) hash-code (flushable))
+;;; SXHASH values on numbers and strings are predictable, therefore the next batch
+;;; of functions are flushable. Perhaps not entirely obviously, symbol hashes are
+;;; predictable because we hash by name. And while ENSURE-SYMBOL-HASH is not
+;;; - strictly speaking - a side-effectless operation, it has no effect as far as
+;;; user-written code is concerned. i.e. nothing portably expressed can discern
+;;; whether memoization of the hash occurred. (I feel like we would have a cleaner
+;;; implementation if we just eagerly compute the hash anyway. Practically all
+;;; symbols eventually get hashed)
 (defknown sb-impl::number-sxhash (number) hash-code (foldable flushable))
 (defknown %sxhash-string (string) hash-code (foldable flushable))
 (defknown %sxhash-simple-string (simple-string) hash-code (foldable flushable))

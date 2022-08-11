@@ -52,6 +52,11 @@
   (and (hash-table-weak-p ht)
        (decode-hash-table-weakness (ht-flags-weakness (hash-table-flags ht)))))
 
+;;; Hash table hash functions can return any FIXNUM, because POINTER-HASH can.
+;;; This is less restrictive than SXHASH which says it has to be positive.
+(declaim (ftype (sfunction (t) (values fixnum boolean))
+                eq-hash eql-hash equal-hash equalp-hash))
+
 (declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values fixnum (member t nil)))
@@ -109,7 +114,12 @@
   ;; is not n.
   (define-eql-hash eql-hash-no-memoize symbol-hash))
 
-(declaim (inline equal-hash))
+;;; As a consequence of change 3bdd4d28ed, the compiler started to emit multiple
+;;; definitions of certain INLINE global functions.
+;;; Genesis is so fraught with other pitfalls and traps that I want no chance
+;;; of seeing duplicate definitions.  So no INLINE here. Tail wagging the dog?
+;;; Perhaps, but that was an dangerous thing to sneakily allow.
+;; (declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values fixnum (member t nil)))
   (typecase key

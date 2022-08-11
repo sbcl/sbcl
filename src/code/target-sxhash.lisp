@@ -119,7 +119,7 @@
                (instance-header-word (truly-the instance instance)))
       ;; easy case: 1 word beyond the apparent length is a word added
       ;; by GC (which may have resized the object, but we don't need to know).
-      (%instance-ref instance (%instance-length instance))
+      (truly-the hash-code (%instance-ref instance (%instance-length instance)))
       (%instance-sxhash instance)))
 
 ;;; Return a pseudorandom number that was assigned on allocation.
