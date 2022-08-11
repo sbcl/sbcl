@@ -116,8 +116,9 @@
   (* (length (bigvec-outer-vector bigvec))
      +smallvec-length+))
 
+(defparameter *bigvec-for-write-words* (%make-bigvec))
 (defun write-words (stream &rest words)
-  (let ((bigvec (load-time-value (%make-bigvec)))
+  (let ((bigvec *bigvec-for-write-words*)
         (offset 0))
     (dolist (word words)
       (setf (bvref-word bigvec offset) (the sb-vm:word word))
