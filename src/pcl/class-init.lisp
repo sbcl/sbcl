@@ -65,14 +65,24 @@
 (defun allocate-standard-funcallable-instance (wrapper name)
   (declare (wrapper wrapper))
   (let* ((hash (if name
+                   ;; Named functions have a predictable hash
                    (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
                    (sb-impl::quasi-random-address-based-hash
                     (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte)))
                     most-positive-fixnum)))
          (slots (make-array (wrapper-length wrapper) :initial-element +slot-unbound+))
          (fin (truly-the funcallable-instance
-                         (%make-standard-funcallable-instance slots hash))))
+                         (%make-standard-funcallable-instance
+                          slots #-compact-instance-header hash))))
     (setf (%fun-wrapper fin) wrapper)
+    #+compact-instance-header
+    (let ((32-bit-hash
+           ;; don't know how good our hash is, so use all N-FIXNUM-BITS of it
+           ;; as input to murmur-hash, which should definitely affect all bits,
+           ;; and then take 32 bits of that result.
+           (ldb (byte 32 0) (sb-impl:murmur-fmix-word hash))))
+      (sb-sys:with-pinned-objects (fin)
+        (setf (sb-vm::compact-fsc-instance-hash fin) 32-bit-hash)))
     (setf (%funcallable-instance-fun fin)
           (lambda (&rest args)
             (declare (ignore args))

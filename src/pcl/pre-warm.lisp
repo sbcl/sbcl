@@ -61,8 +61,11 @@
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
+;; for x86-64 with compact-instance-header, generic functions are 6 words:
+;;  header, entrypoint, raw (x2), implementation function, slot vector
+;; and the hash goes in 4 unused bytes of the second raw slot.
 (sb-kernel:!defstruct-with-alternate-metaclass standard-funcallable-instance
-  :slot-names (clos-slots hash-code)
+  :slot-names (clos-slots #-compact-instance-header hash-code)
   :constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name static-classoid

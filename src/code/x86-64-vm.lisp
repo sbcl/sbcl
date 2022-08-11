@@ -200,7 +200,8 @@
 
 
 (defun write-funinstance-prologue (fin)
-  ;; Encode: MOV RAX,[RIP+9] / JMP [RAX-3] / 6-byte NOP
+  ;; Encode: MOV RAX,[RIP+9] / JMP [RAX-3] / NOP / MOV EBX, #x0
+  ;; and the #x0 is replaced with a hash code.
   (declare (ignorable fin))
   #-immobile-space (return-from write-funinstance-prologue)
   (with-pinned-objects (fin)
@@ -210,7 +211,7 @@
       ;; because by a stroke of luck, they all look fixnum-tagged.
       (setf (sap-ref-sap sap -8) sap
             (sap-ref-word sap 0) #xFF00000009058B48
-            (sap-ref-word sap 8) #x0000441F0F66FD60)))
+            (sap-ref-word sap 8) #x00000000BB90FD60)))
   (update-dynamic-space-code-tree fin)
   fin)
 

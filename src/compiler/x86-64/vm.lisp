@@ -622,3 +622,11 @@
 
 (defmacro unbound-marker-bits ()
   (logior (+ sb-vm:static-space-start #x100) unbound-marker-widetag))
+
+;;; See WRITE-FUNINSTANCE-PROLOGUE in x86-64-vm.
+;;; There are 4 bytes available in the imm32 operand of a dummy MOV instruction.
+;;; (It's a valid instruction on the theory that illegal opcodes might cause
+;;; the decode stage in the CPU to behave suboptimally)
+(defmacro compact-fsc-instance-hash (fin)
+  `(sap-ref-32 (int-sap (get-lisp-obj-address ,fin))
+               (+ (ash 3 word-shift) 4 (- fun-pointer-lowtag))))
