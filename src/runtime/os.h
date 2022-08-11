@@ -106,13 +106,11 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
 #define IS_THREAD_STRUCT 4
 #define MOVABLE_LOW      (MOVABLE|ALLOCATE_LOW)
 #define IS_GUARD_PAGE    8
-extern os_vm_address_t os_validate(int movable,
-                                   os_vm_address_t addr,
-                                   os_vm_size_t len, int execute, int jit);
+extern os_vm_address_t os_validate(int movable, os_vm_address_t addr,
+                                   os_vm_size_t len, int space_id);
 
 #ifdef LISP_FEATURE_WIN32
 void os_commit_memory(os_vm_address_t addr, os_vm_size_t len);
-os_vm_address_t os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len);
 #endif
 
 /* This function seems to undo the effect of os_validate(..). */

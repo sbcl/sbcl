@@ -763,10 +763,15 @@ uword_t get_monotonic_time()
 }
 #endif
 
+static os_vm_address_t os_validate_nocommit(int,os_vm_address_t,os_vm_size_t);
+
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
-            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id)
 {
+    // Reserving the dynamic space doesn't commit it.
+    if (space_id == DYNAMIC_CORE_SPACE_ID && (attributes & MOVABLE))
+        return os_validate_nocommit(attributes, addr, request);
+
     if (!addr) {
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
         os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection);
@@ -794,7 +799,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
 
 /* Used to allocate the dynamic space, as it may be very large.
  * Dynamically comitted by gc_alloc_new_region() or gc_alloc_large() */
-os_vm_address_t
+static os_vm_address_t
 os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE);

@@ -193,7 +193,7 @@ void prepare_readonly_space(int purify, int print)
         int string_space_size = BACKEND_PAGE_BYTES;
         READ_ONLY_SPACE_START =
             (uword_t)os_validate(MOVABLE, (char*)DYNAMIC_SPACE_START - string_space_size,
-                                 string_space_size, 0, 0);
+                                 string_space_size, 0);
         READ_ONLY_SPACE_END = READ_ONLY_SPACE_START + string_space_size;
         read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;
         return;
@@ -222,7 +222,7 @@ void prepare_readonly_space(int purify, int print)
     // Try to place readonly just below dynamic space, but it doesn't really matter where
     READ_ONLY_SPACE_START =
         (uword_t)os_validate(MOVABLE, (char*)DYNAMIC_SPACE_START - string_space_size,
-                             string_space_size, 0, 0);
+                             string_space_size, 0);
     READ_ONLY_SPACE_END = READ_ONLY_SPACE_START + string_space_size;
     read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;
 

@@ -117,8 +117,15 @@ os_context_sigmask_addr(os_context_t *context)
 }
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int executable, int jit)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id)
 {
+    int __attribute((unused))
+      executable = (space_id == READ_ONLY_CORE_SPACE_ID) ||
+                   (space_id == LINKAGE_TABLE_CORE_SPACE_ID) ||
+                   (space_id == STATIC_CODE_CORE_SPACE_ID),
+      jit = (space_id == STATIC_CODE_CORE_SPACE_ID) || (space_id == DYNAMIC_CORE_SPACE_ID)
+            ? 1 : (space_id == LINKAGE_TABLE_CORE_SPACE_ID) ? 2 : 0;
+
     int protection;
     int flags = 0;
 

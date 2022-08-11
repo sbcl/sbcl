@@ -255,6 +255,8 @@
   (defvar *immobile-text*)
   (defvar *immobile-space-map* nil))
 
+;;; This ignores linkage-table-core-space-id
+;;; which is never present in the core file.
 (defconstant max-core-space-id (+ 3 #+immobile-space 2
                                     #+darwin-jit 1))
 

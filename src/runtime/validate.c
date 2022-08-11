@@ -52,19 +52,6 @@ static const int should_allocate_low =
     0;
 #endif
 
-static void
-ensure_space(int attributes, uword_t start, uword_t size, int execute, int jit)
-{
-    if (os_validate(attributes, (os_vm_address_t)start, (os_vm_size_t)size, execute, jit)==NULL) {
-        fprintf(stderr,
-                "ensure_space: failed to allocate %lu bytes at %p\n",
-                (long unsigned)size, (void*)start);
-        fprintf(stderr,
-                "(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
-        exit(1);
-    }
-}
-
 os_vm_address_t undefined_alien_address = 0;
 /* As contrasted with the useless os_vm_page_size which is identical to
  * the constant BACKEND_PAGE_BYTES that we define for various other purposes
@@ -85,7 +72,7 @@ ensure_undefined_alien(void) {
 #else
     os_reported_page_size = getpagesize();
 #endif
-    os_vm_address_t start = os_validate(MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size, 0, 0);
+    os_vm_address_t start = os_validate(MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size, 0);
     if (start) {
         undefined_alien_address = start;
     } else {
@@ -95,47 +82,35 @@ ensure_undefined_alien(void) {
 
 boolean allocate_hardwired_spaces(boolean hard_failp)
 {
-#ifdef PRINTNOISE
-    printf("allocating memory ...");
-    fflush(stdout);
-#endif
     struct {
         uword_t start;
         unsigned size;
-        int execute;
-        int jit;
+        int id;
     } preinit_spaces[] = {
-        { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE, 1, 0},
-        { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE, 1, 2},
-        { STATIC_SPACE_START, STATIC_SPACE_SIZE, 0, 0},
+        { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE, READ_ONLY_CORE_SPACE_ID },
+        { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE, LINKAGE_TABLE_CORE_SPACE_ID },
+        { STATIC_SPACE_START, STATIC_SPACE_SIZE, STATIC_CORE_SPACE_ID },
 #ifdef LISP_FEATURE_DARWIN_JIT
-        { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, 1, 1},
+        { STATIC_CODE_SPACE_START, STATIC_CODE_SPACE_SIZE, STATIC_CODE_CORE_SPACE_ID },
 #endif
     };
     int i;
     int n_spaces = sizeof preinit_spaces / sizeof preinit_spaces[0];
-    boolean success = 1;
     for (i = 0; i< n_spaces; ++i) {
         if (!preinit_spaces[i].size) continue;
-        if (hard_failp)
-            ensure_space(NOT_MOVABLE | should_allocate_low,
-                         preinit_spaces[i].start,
-                         preinit_spaces[i].size,
-                         preinit_spaces[i].execute,
-                         preinit_spaces[i].jit);
-        else if (!os_validate(NOT_MOVABLE | should_allocate_low,
-                              (os_vm_address_t)preinit_spaces[i].start,
-                              preinit_spaces[i].size,
-                              preinit_spaces[i].execute,
-                              preinit_spaces[i].jit)) {
-            success = 0;
-            break;
-        }
+        if (os_validate(NOT_MOVABLE | should_allocate_low,
+                        (os_vm_address_t)preinit_spaces[i].start,
+                        preinit_spaces[i].size,
+                        preinit_spaces[i].id)) continue;
+        if (!hard_failp) return 0; // soft fail. Try again after disabling ASLR
+        fprintf(stderr,
+                "failed to allocate %lu bytes at %p\n",
+                (long unsigned)preinit_spaces[i].size, (void*)preinit_spaces[i].start);
+        fprintf(stderr,
+                "(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
+        exit(1);
     }
-#ifdef PRINTNOISE
-    printf(" done.\n");
-#endif
-    return success;
+    return 1;
 }
 
 void

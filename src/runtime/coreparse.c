@@ -833,19 +833,8 @@ process_directory(int count, struct ndir_entry *entry,
             else
 #endif
             if (request) {
-#ifdef LISP_FEATURE_WIN32
-                if (id == DYNAMIC_CORE_SPACE_ID) {
-                    addr = (uword_t)os_validate_nocommit(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
-                                                         (os_vm_address_t)addr, request);
-                }
-                else
-#endif
-                {
-                    addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
-                                                (os_vm_address_t)addr, request,
-                                                id == READ_ONLY_CORE_SPACE_ID,
-                                                id == DYNAMIC_CORE_SPACE_ID);
-                }
+                addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                                            (os_vm_address_t)addr, request, id);
                 if (!addr) {
                     lose("Can't allocate %#"OBJ_FMTX" bytes for space %ld",
                          (lispobj)request, id);

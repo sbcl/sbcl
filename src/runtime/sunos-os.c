@@ -29,7 +29,7 @@
 void os_init() {}
 
 os_vm_address_t os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
-            int __attribute__((unused)) execute, int __attribute__((unused)) jit)
+                            int __attribute__((unused)) space_id)
 {
     int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
     attributes &= ~IS_GUARD_PAGE;
