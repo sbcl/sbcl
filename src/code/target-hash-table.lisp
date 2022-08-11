@@ -114,6 +114,45 @@
   ;; is not n.
   (define-eql-hash eql-hash-no-memoize symbol-hash))
 
+;;; Decide if WIDETAG (an OTHER-POINTER) should use SXHASH in EQUAL-HASH
+(defmacro equal-hash-sxhash-widetag-p (widetag)
+  (let ((list `(,sb-vm:simple-base-string-widetag
+                ,sb-vm:simple-character-string-widetag
+                ,sb-vm:complex-base-string-widetag
+                ,sb-vm:complex-character-string-widetag
+                ,sb-vm:bignum-widetag
+                ,sb-vm:ratio-widetag
+                ,sb-vm:double-float-widetag
+                ,sb-vm:complex-widetag
+                ,sb-vm:complex-single-float-widetag
+                ,sb-vm:complex-double-float-widetag
+                ,sb-vm:simple-bit-vector-widetag
+                ,sb-vm:complex-bit-vector-widetag)))
+    (let ((mask 0))
+      (dolist (i list mask)
+        (setf mask (logior mask (ash 1  (ash i -2)))))
+      #+64-bit `(logbitp (ash ,widetag -2) ,mask)
+      #-64-bit `(let ((bit (ash ,widetag -2)))
+                  (if (<= bit 31)
+                      (logbitp bit ,(ldb (byte 32 0) mask))
+                      (logbitp (- bit 32) ,(ash mask -32)))))))
+
+;;; this macro has not been tested on 32-bit
+;;; (quite obviously the OTHER-IMMEDIATE case is wrong) and
+;;; probably doesn't work on ppc64 due the alternate lowtag assignments.
+(defmacro lowtag-case (x &rest clauses)
+  `(case (lowtag-of ,x)
+     ,@(mapcar (lambda (clause)
+                 `(,(case (car clause)
+                      (instance sb-vm:instance-pointer-lowtag)
+                      (list sb-vm:list-pointer-lowtag)
+                      (function sb-vm:fun-pointer-lowtag)
+                      (other-immediate '(1 5 9 13))
+                      (fixnum sb-vm::fixnum-lowtags)
+                      (other-pointer sb-vm:other-pointer-lowtag))
+                    ,@(cdr clause)))
+               clauses)))
+
 ;;; As a consequence of change 3bdd4d28ed, the compiler started to emit multiple
 ;;; definitions of certain INLINE global functions.
 ;;; Genesis is so fraught with other pitfalls and traps that I want no chance
@@ -122,6 +161,27 @@
 ;; (declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values fixnum (member t nil)))
+  ;; Ultimately we just need to choose between SXHASH or EQ-HASH. As to using
+  ;; INSTANCE-SXHASH, it doesn't matter, and in fact it's quicker to use EQ-HASH.
+  ;; If the outermost object passed as a key is LIST, then it descends using SXASH,
+  ;; you will in fact get stable hashes for nested objects.
+  ;; Same for symbols- hash-tables don't care whether we use SYMBOL-HASH.
+  ;; It's mainly for users who call SXHASH directly that stable hashes are important.
+  ;; I have not benchmarked this for other than x86-64.
+  #+x86-64
+  (if (lowtag-case key
+        ;; pathnames require SXHASH, all other instances are indifferent.
+        (instance (pathnamep (truly-the instance key)))
+        (list t)
+        (other-pointer (equal-hash-sxhash-widetag-p (%other-pointer-widetag key)))
+        (function nil)
+        (fixnum nil)
+        ;; EQUAL on numbers is the same as EQL on numbers, so single-float
+        ;; does *not* need to be picked off here.
+        (other-immediate nil))
+      (values (sxhash key) nil)
+      (eq-hash key))
+  #-x86-64
   (typecase key
     ;; For some types the definition of EQUAL implies a special hash
     ((or string cons number bit-vector pathname)
@@ -131,27 +191,12 @@
     ;; And wow, typecase isn't enough to get use to use the transform
     ;; for (sxhash symbol) without an explicit THE form.
     (symbol (values (sxhash (the symbol key)) nil)) ; transformed
-    (instance (values (instance-sxhash key) nil))
     ;; Otherwise use an EQ hash, rather than SXHASH, since the values
     ;; of SXHASH will be extremely badly distributed due to the
     ;; requirements of the spec fitting badly with our implementation
     ;; strategy.
     (t
      (eq-hash key))))
-
-;;; Basically the same as EQUAL hash, but do not use the stable hash on instances
-;;; so that we do not cause all structures (in the worst case) to grow a new slot.
-;;; This is not for user consumption. I thought it might be needed for internals,
-;;; but EQUAL hashing of structures turned out to stem from a compiler bug in our dumping
-;;; of structure constants: we should never look in the similar constants table,
-;;; because either there is an EQ one or there isn't.
-;;; But maybe there are other use-cases where it is beneficial to store structures
-;;; in an EQUAL table without causing them to be extended by one slot.
-(defun equal-hash/unstable (key)
-  (declare (values fixnum (member t nil)))
-  (if (typep key '(or string cons number bit-vector pathname symbol))
-      (values (sxhash key) nil)
-      (eq-hash key)))
 
 (defun equalp-hash (key)
   (declare (values fixnum (member t nil)))
@@ -440,18 +485,7 @@ Examples:
             ((or (eq test #'eql) (eq test 'eql))
              (values 1 'eql #'eql #'eql-hash))
             ((or (eq test #'equal) (eq test 'equal))
-             ;; As an unadvertised feature, you can pick whether instances should receive
-             ;; stable or address-based hashes. A use-case for address-based would be for
-             ;; in system code so as not to incur memory growth by causing user structures
-             ;; to accrete a stable hash slot due to key movement by GC.
-             ;; USERFUNP must remain NIL in that case to permit address-based hashing.
-             (values 2 'equal #'equal
-                     (let ((instance-addr-hashing
-                            (or (eq hash-function #'equal-hash/unstable)
-                                (eq hash-function 'equal-hash/unstable))))
-                       (when instance-addr-hashing
-                         (setq user-hashfun-p nil))
-                       (if instance-addr-hashing #'equal-hash/unstable #'equal-hash))))
+             (values 2 'equal #'equal #'equal-hash))
             ((or (eq test #'equalp) (eq test 'equalp))
              (values 3 'equalp #'equalp #'equalp-hash))
             (t
