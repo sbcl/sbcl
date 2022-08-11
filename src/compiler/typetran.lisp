@@ -942,16 +942,15 @@
             ;; wrong; it's unnecessary because structure classes can't be redefined, and it's wrong
             ;; because it is quite legitimate to pass an object with an invalid layout
             ;; to a structure type test.
-           (if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
-               (if (vop-existsp :translate structure-typep)
-                   ;; A single VOP is easier to optimize later in ir2opt.
-                   `(structure-typep object ,wrapper)
-                   `(and (%instancep object)
-                         (%structure-is-a (%instance-layout object) ,wrapper)))
+           (if (vop-existsp :translate structure-typep)
+               ;; A single VOP is easier to optimize later in ir2opt.
+               `(structure-typep object ,wrapper)
                `(and (%instancep object)
-                     (let ((,type (%instance-layout object)))
-                       (and (layout-depthoid-ge ,type ,depthoid)
-                            (%structure-is-a ,type ,wrapper))))))
+                     ,(if (<= depthoid sb-kernel::layout-id-vector-fixed-capacity)
+                          `(%structure-is-a (%instance-layout object) ,wrapper)
+                          `(let ((,type (%instance-layout object)))
+                             (and (layout-depthoid-ge ,type ,depthoid)
+                                  (%structure-is-a ,type ,wrapper)))))))
 
           ((> depthoid 0)
            ;; fixed-depth ancestors of non-structure types:

@@ -207,6 +207,15 @@
         (and (> (length inherits) depthoid)
              (eq (svref inherits depthoid) test-layout)))))
 
+(defun sb-c::structure-typep (object test-layout)
+  (and (%instancep object)
+       (let ((object-layout (%instance-layout object)))
+        (or (eq object-layout test-layout)
+            (let ((depthoid (wrapper-depthoid test-layout))
+                  (inherits (wrapper-inherits object-layout)))
+              (and (> (length inherits) depthoid)
+                   (eq (svref inherits depthoid) test-layout)))))))
+
 (defun %other-pointer-subtype-p (x choices)
   (and (%other-pointer-p x)
        (member (%other-pointer-widetag x) choices)
