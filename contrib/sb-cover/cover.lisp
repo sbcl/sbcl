@@ -357,6 +357,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
 (defun report-file (file html-stream external-format)
   "Print a code coverage report of FILE into the stream HTML-STREAM."
   (format html-stream "<html><head>")
+  (format html-stream "<meta http-equiv='Content-Type' content='text/html;charset=utf-8' />")
   (write-styles html-stream)
   (format html-stream "</head><body>")
   (let* ((source (detabify (read-file file external-format)))
