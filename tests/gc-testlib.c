@@ -71,6 +71,16 @@ static void perform_gc(lispobj* stackptr)
     gc_active_p = 1;
     gc_close_collector_regions(0); // TODO: should be THREAD_PAGE_FLAG
     close_current_thread_tlab();
+
+    /* We have to clobber the dynamic space codeblob tree because ordinarily
+     * it gets smashed at the start of collect_garbage(), and since this test
+     * bypasses collect_garbage(), the GC might have problems later.
+     * (Not exactly sure how, but "header not OK for code page" was triggering)
+     * So, handily, since there are no concurrency issues in this test,
+     * it doesn't matter that the GC can't utilize the tree. It falls back
+     * to scanning code pages linearly in preserve_pointer which is fine. */
+    SYMBOL(DYNSPACE_CODEBLOB_TREE)->value = NIL;
+
     verify_heap(stackptr, VERIFY_PRE_GC);
     garbage_collect_generation(0, 0, stackptr);
     gc_active_p = 0;
