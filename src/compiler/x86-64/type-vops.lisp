@@ -985,7 +985,10 @@
   (:generator 4
     (unless (instance-tn-ref-p args)
       (%test-lowtag object layout (if not-p target done) t instance-pointer-lowtag))
+    #+compact-instance-header
     (inst mov :dword layout (ea (- 4 instance-pointer-lowtag) object))
+    #-compact-instance-header
+    (loadw layout object instance-slots-offset instance-pointer-lowtag)
     (structure-is-a layout test-layout target not-p done)
     (inst jmp (if not-p :ne :e) target)
     done))
@@ -1010,4 +1013,7 @@
   (:generator 1
     (unless (instance-tn-ref-p args)
       (%test-lowtag object temp not-instance t instance-pointer-lowtag))
-    (inst mov :dword r (ea (- 4 instance-pointer-lowtag) object))))
+    #+compact-instance-header
+    (inst mov :dword r (ea (- 4 instance-pointer-lowtag) object))
+    #-compact-instance-header
+    (loadw r object instance-slots-offset instance-pointer-lowtag)))
