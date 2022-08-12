@@ -117,9 +117,9 @@
 ;;; Decide if WIDETAG (an OTHER-POINTER) should use SXHASH in EQUAL-HASH
 (defmacro equal-hash-sxhash-widetag-p (widetag)
   (let ((list `(,sb-vm:simple-base-string-widetag
-                ,sb-vm:simple-character-string-widetag
+                #+sb-unicode ,sb-vm:simple-character-string-widetag
                 ,sb-vm:complex-base-string-widetag
-                ,sb-vm:complex-character-string-widetag
+                #+sb-unicode ,sb-vm:complex-character-string-widetag
                 ,sb-vm:bignum-widetag
                 ,sb-vm:ratio-widetag
                 ,sb-vm:double-float-widetag
