@@ -1084,7 +1084,7 @@ variable: an unreadable object representing the error is printed instead.")
                         (write-char char stream)))))))
     (with-array-data ((data string) (start) (end)
                       :check-fill-pointer t)
-      (if (= (%other-pointer-widetag data) sb-vm:simple-base-string-widetag)
+      (if (simple-base-string-p data)
           (scan simple-base-string)
           #+sb-unicode (scan simple-character-string)))
     ;; If no escaping needed, WRITE-STRING is way faster, up to 2x in my testing,
