@@ -1061,22 +1061,35 @@ variable: an unreadable object representing the error is printed instead.")
             (t
              (output-unreadable-array-readably vector stream))))))
 
-;;; This function outputs a string quoting characters sufficiently
-;;; so that someone can read it in again. Basically, put a slash in
-;;; front of an character satisfying NEEDS-SLASH-P.
+;;; Output a string, quoting characters to be readable by putting a slash in front
+;;; of any character satisfying NEEDS-SLASH-P.
 (defun quote-string (string stream)
   (macrolet ((needs-slash-p (char)
                ;; KLUDGE: We probably should look at the readtable, but just do
                ;; this for now. [noted by anonymous long ago] -- WHN 19991130
-               `(or (char= ,char #\\)
-                 (char= ,char #\"))))
+               `(let ((c ,char)) (or (char= c #\\) (char= c #\"))))
+             (scan (type)
+               ;; Pre-test for any escaping, and if needed, do char-at-a-time output.
+               ;; For 1 or 0 characters, always take the WRITE-CHAR branch.
+               `(let ((data (truly-the ,type data)))
+                  (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+                  (when (or (<= (- end start) 1)
+                            (do ((index start (1+ index)))
+                                ((>= index end))
+                              (when (needs-slash-p (schar data index)) (return t))))
+                    (do ((index start (1+ index)))
+                        ((>= index end) (return-from quote-string))
+                      (let ((char (schar data index)))
+                        (when (needs-slash-p char) (write-char #\\ stream))
+                        (write-char char stream)))))))
     (with-array-data ((data string) (start) (end)
                       :check-fill-pointer t)
-      (do ((index start (1+ index)))
-          ((>= index end))
-        (let ((char (schar data index)))
-          (when (needs-slash-p char) (write-char #\\ stream))
-          (write-char char stream))))))
+      (if (= (%other-pointer-widetag data) sb-vm:simple-base-string-widetag)
+          (scan simple-base-string)
+          #+sb-unicode (scan simple-character-string)))
+    ;; If no escaping needed, WRITE-STRING is way faster, up to 2x in my testing,
+    ;; than WRITE-CHAR because the stream layer will get so many fewer calls.
+    (write-string string stream)))
 
 (defun array-readably-printable-p (array)
   (and (eq (array-element-type array) t)
