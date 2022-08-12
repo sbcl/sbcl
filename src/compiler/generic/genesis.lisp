@@ -150,10 +150,19 @@
       (loop repeat (- data-length bvlength) do (write-byte 0 stream)))))
 
 ;;; analogous to READ-SEQUENCE-OR-DIE, but for a BIGVEC
-(defun read-bigvec-as-sequence-or-die (bigvec stream &key (start 0) end)
-  (loop for i of-type index from start below (or end (bvlength bigvec)) do
-        (setf (bvref bigvec i)
-              (read-byte stream))))
+;;; FIXME: should signal error on EOF
+(defun read-into-bigvec (bigvec stream start nbytes)
+  ;; compute the coordinates of the start and end
+  (binding* (((start-outer start-inner) (floor start +smallvec-length+))
+             ;; this the INCLUSIVE bound on the ending element
+             (end-outer (floor (+ start nbytes -1) +smallvec-length+)))
+    ;; if it's all into a single outer vector, take the quick route
+    (if (= start-outer end-outer)
+        (read-sequence (elt (bigvec-outer-vector bigvec) start-outer) stream
+                       :start start-inner :end (+ start-inner nbytes))
+        ;;  KISS - use the slow algorithm rather than any "partial read" cleverness
+        (loop for i of-type index from start repeat nbytes
+              do (setf (bvref bigvec i) (read-byte stream))))))
 
 ;;; Grow BIGVEC (exponentially, so that large increases in size have
 ;;; asymptotic logarithmic cost per byte).
@@ -2770,11 +2779,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (write-wordindexed des sb-vm:code-debug-info-slot
                        (svref stack (+ stack-index n-constants)))
 
-    (let* ((start (+ (descriptor-byte-offset des)
-                     (ash aligned-n-boxed-words sb-vm:word-shift)))
-           (end (+ start n-code-bytes)))
-      (read-bigvec-as-sequence-or-die (descriptor-mem des) (fasl-input-stream)
-                                      :start start :end end)
+    (let ((start (+ (descriptor-byte-offset des)
+                    (ash aligned-n-boxed-words sb-vm:word-shift))))
+      (read-into-bigvec (descriptor-mem des) (fasl-input-stream) start n-code-bytes)
       (aver (= (code-n-entries des) n-simple-funs))
       (let ((jumptable-word (read-bits-wordindexed des aligned-n-boxed-words)))
         (aver (zerop (ash jumptable-word -14)))
@@ -2787,8 +2794,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
         (format *trace-output*
                 "~&LOAD-CODE: ~d header words, ~d code bytes.~%"
                 n-boxed-words n-code-bytes)
-        (do ((i start (+ i sb-vm:n-word-bytes)))
-            ((>= i end))
+        (do ((i start (+ i sb-vm:n-word-bytes))
+             (count (floor n-code-bytes sb-vm:n-word-bytes) (1- count)))
+            ((zerop count))
           (format *trace-output*
                   " ~X: ~V,'.X~%"
                   (+ i (gspace-byte-address (descriptor-gspace des)))
@@ -2862,10 +2870,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (write-code-header-words asm-code header-n-words rounded-length 0)
     (let ((start (+ (descriptor-byte-offset asm-code)
                     (ash header-n-words sb-vm:word-shift))))
-      (read-bigvec-as-sequence-or-die (descriptor-mem asm-code)
-                                      (fasl-input-stream)
-                                      :start start
-                                      :end (+ start length)))
+      (read-into-bigvec (descriptor-mem asm-code) (fasl-input-stream) start length))
     ;; Write a bignum reference into the boxed constants.
     ;; All the backends should do this, as its avoids consing in GENERIC-NEGATE
     ;; when the argument is MOST-NEGATIVE-FIXNUM.
@@ -4177,10 +4182,9 @@ III. initially undefined function references (alphabetically):
             (double-float-from-core x))
            (#.sb-vm:bignum-widetag (bignum-from-core x))))))))
 
-(defun read-n-bytes (stream vector start end)
+;;; This is for FOP-SPEC-VECTOR which always supplies 0 for the start
+(defun read-n-bytes (stream vector start nbytes)
   (aver (zerop start))
-  (let* ((start (+ (descriptor-byte-offset vector)
-                   (ash sb-vm:vector-data-offset sb-vm:word-shift)))
-         (end (+ start end)))
-    (read-bigvec-as-sequence-or-die (descriptor-mem vector)
-                                    stream :start start :end end)))
+  (let ((start (+ (descriptor-byte-offset vector)
+                  (ash sb-vm:vector-data-offset sb-vm:word-shift))))
+    (read-into-bigvec (descriptor-mem vector) stream start nbytes)))
