@@ -1,4 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-2.2.6:
+  * optimization: adjacent type tests on the same value are more compact
+    (arm64, x86-64).
 
 changes in sbcl-2.2.7 relative to sbcl-2.2.6:
   * minor incompatible change: the compiler emits full WARNINGs for undefined

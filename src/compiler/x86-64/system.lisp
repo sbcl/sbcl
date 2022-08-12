@@ -46,52 +46,6 @@
     (inst movzx '(:byte :dword) result object)
     DONE))
 
-(macrolet ((read-depthoid ()
-             `(ea (- (+ 4 (ash (+ instance-slots-offset
-                                  (get-dsd-index layout sb-kernel::flags))
-                               word-shift))
-                     instance-pointer-lowtag)
-                  layout)))
-  (define-vop ()
-    (:translate layout-depthoid)
-    (:policy :fast-safe)
-    (:args (layout :scs (descriptor-reg)))
-    (:results (res :scs (any-reg)))
-    (:result-types fixnum)
-    (:generator 1 (inst movsx '(:dword :qword) res (read-depthoid))))
-  (define-vop ()
-    (:translate sb-c::layout-depthoid-ge)
-    (:policy :fast-safe)
-    (:args (layout :scs (descriptor-reg)))
-    (:info k)
-    (:arg-types * (:constant (unsigned-byte 16)))
-    (:conditional :ge)
-    (:generator 1 (inst cmp :dword (read-depthoid) (fixnumize k)))))
-
-(define-vop ()
-  (:translate sb-c::%structure-is-a)
-  (:args (x :scs (descriptor-reg)))
-  (:arg-types * (:constant t))
-  (:info test)
-  (:policy :fast-safe)
-  (:conditional :e)
-  (:generator 1
-    (inst cmp :dword
-          (ea (+ (id-bits-offset)
-                 (ash (- (wrapper-depthoid test) 2) 2)
-                 (- instance-pointer-lowtag))
-              x)
-          ;; Small layout-ids can only occur for layouts made in genesis.
-          ;; Therefore if the compile-time value of the ID is small,
-          ;; it is permanently assigned to that type.
-          ;; Otherwise, we allow for the possibility that the compile-time ID
-          ;; is not the same as the load-time ID.
-          ;; I don't think layout-id 0 can get here, but be sure to exclude it.
-          (if (or (typep (layout-id test) '(and (signed-byte 8) (not (eql 0))))
-                  (not (sb-c::producing-fasl-file)))
-              (layout-id test)
-              (make-fixup test :layout-id)))))
-
 #+compact-instance-header
 (progn
 ;; ~17 instructions vs. 35

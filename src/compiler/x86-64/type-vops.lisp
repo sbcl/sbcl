@@ -916,3 +916,98 @@
     (move temp value :dword)
     (%test-headers nil temp target not-p nil type-codes
       :load-widetag nil)))
+
+(macrolet ((read-depthoid ()
+             `(ea (- (+ 4 (ash (+ instance-slots-offset
+                                  (get-dsd-index layout sb-kernel::flags))
+                               word-shift))
+                     instance-pointer-lowtag)
+                  layout)))
+  (define-vop ()
+    (:translate layout-depthoid)
+    (:policy :fast-safe)
+    (:args (layout :scs (descriptor-reg)))
+    (:results (res :scs (any-reg)))
+    (:result-types fixnum)
+    (:generator 1
+      (inst movsx '(:dword :qword) res (read-depthoid))))
+  (define-vop ()
+    (:translate sb-c::layout-depthoid-ge)
+    (:policy :fast-safe)
+    (:args (layout :scs (descriptor-reg)))
+    (:info k)
+    (:arg-types * (:constant (unsigned-byte 16)))
+    (:conditional :ge)
+    (:generator 1
+      (inst cmp :dword (read-depthoid) (fixnumize k))))
+
+  (defun structure-is-a (layout test-layout &optional target not-p done)
+    (let* ((depthoid (wrapper-depthoid test-layout))
+           (offset (+ (id-bits-offset)
+                      (ash (- depthoid 2) 2)
+                      (- instance-pointer-lowtag))))
+      (when (and target
+                 (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
+        (inst cmp :dword (read-depthoid) (fixnumize depthoid))
+        (inst jmp :l (if not-p target done)))
+      (inst cmp :dword
+            (ea offset layout)
+            ;; Small layout-ids can only occur for layouts made in genesis.
+            ;; Therefore if the compile-time value of the ID is small,
+            ;; it is permanently assigned to that type.
+            ;; Otherwise, we allow for the possibility that the compile-time ID
+            ;; is not the same as the load-time ID.
+            ;; I don't think layout-id 0 can get here, but be sure to exclude it.
+            (if (or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
+                    (not (sb-c::producing-fasl-file)))
+                (layout-id test-layout)
+                (make-fixup test-layout :layout-id))))))
+
+(define-vop ()
+  (:translate sb-c::%structure-is-a)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:info test)
+  (:policy :fast-safe)
+  (:conditional :e)
+  (:generator 1
+    (structure-is-a x test)))
+
+(define-vop ()
+  (:translate sb-c::structure-typep)
+  (:args (object :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:args-var args)
+  (:policy :fast-safe)
+  (:conditional)
+  (:info target not-p test-layout)
+  (:temporary (:sc descriptor-reg) layout)
+  (:generator 4
+    (unless (instance-tn-ref-p args)
+      (%test-lowtag object layout (if not-p target done) t instance-pointer-lowtag))
+    (inst mov :dword layout (ea (- 4 instance-pointer-lowtag) object))
+    (structure-is-a layout test-layout target not-p done)
+    (inst jmp (if not-p :ne :e) target)
+    done))
+
+(define-vop (structure-typep*)
+  (:args (layout :scs (descriptor-reg)))
+  (:arg-types * (:constant t))
+  (:policy :fast-safe)
+  (:conditional)
+  (:info target not-p test-layout)
+  (:generator 4
+    (structure-is-a layout test-layout target not-p done)
+    (inst jmp (if not-p :ne :e) target)
+    done))
+
+(define-vop (load-instance-layout)
+  (:args (object :scs (any-reg descriptor-reg)))
+  (:args-var args)
+  (:info not-instance)
+  (:temporary (:sc unsigned-reg) temp)
+  (:results (r :scs (descriptor-reg)))
+  (:generator 1
+    (unless (instance-tn-ref-p args)
+      (%test-lowtag object temp not-instance t instance-pointer-lowtag))
+    (inst mov :dword r (ea (- 4 instance-pointer-lowtag) object))))

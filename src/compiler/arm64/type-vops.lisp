@@ -611,7 +611,7 @@
                               (get-dsd-index layout sb-kernel::flags))
                            word-shift))
                    instance-pointer-lowtag))))
-      (inst cmp temp (add-sub-immediate depthoid))
+      (inst cmp temp (add-sub-immediate (fixnumize depthoid)))
       (inst b :lt (if not-p target done)))
     (inst ldr (32-bit-reg this-id) (@ layout offset))
     ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.

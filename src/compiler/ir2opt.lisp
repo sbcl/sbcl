@@ -1203,7 +1203,7 @@
         (set-vop-optimizer (template-or-lose vop)
                            #'vop-optimize-%other-pointer-subtype-p-optimizer)))
 
-(when-vop-existsp (:translate structure-typep)
+(when-vop-existsp (:named sb-vm::load-instance-layout)
   (defoptimizer (vop-optimize structure-typep) (vop)
     (when (boundp '*2block-info*)
       (let (vops
