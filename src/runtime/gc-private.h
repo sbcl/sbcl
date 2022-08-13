@@ -246,7 +246,7 @@ static inline lispobj encode_weakptr_next(void* x) {
 
 static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
     // Better already be fixed in position or we're in trouble
-    gc_assert(!from_space_p(make_lispobj(wp,OTHER_POINTER_LOWTAG)));
+    gc_dcheck(!compacting_p() || !from_space_p(make_lispobj(wp,OTHER_POINTER_LOWTAG)));
     /* Link 'wp' into weak_pointer_chain using its 'next' field.
      * We ensure that 'next' is always NULL when the weak pointer isn't
      * in the chain, and not NULL otherwise. The end of the chain

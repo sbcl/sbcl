@@ -32,6 +32,13 @@ extern struct alloc_region  gc_alloc_region[6];
 #define code_region    (&gc_alloc_region[3])
 #define boxed_region   (&gc_alloc_region[4])
 #define cons_region    (&gc_alloc_region[5])
+#define ASSERT_REGIONS_CLOSED() \
+    gc_assert(!((uintptr_t)gc_alloc_region[0].start_addr \
+               |(uintptr_t)gc_alloc_region[1].start_addr \
+               |(uintptr_t)gc_alloc_region[2].start_addr \
+               |(uintptr_t)gc_alloc_region[3].start_addr \
+               |(uintptr_t)gc_alloc_region[4].start_addr \
+               |(uintptr_t)gc_alloc_region[5].start_addr))
 
 extern generation_index_t from_space, new_space;
 extern int gencgc_alloc_profiler;

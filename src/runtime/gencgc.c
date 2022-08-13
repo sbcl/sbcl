@@ -903,11 +903,7 @@ set_alloc_start_page(unsigned int page_type, page_index_t page)
 static inline boolean __attribute__((unused)) region_closed_p(struct alloc_region* region) {
     return !region->start_addr;
 }
-#define ASSERT_REGIONS_CLOSED() \
-    gc_assert(!((uintptr_t)gc_alloc_region[0].start_addr \
-               |(uintptr_t)gc_alloc_region[1].start_addr \
-               |(uintptr_t)gc_alloc_region[2].start_addr \
-               |(uintptr_t)gc_alloc_region[3].start_addr))
+
 
 /* Find a new region with room for at least the given number of bytes.
  *
@@ -3455,7 +3451,7 @@ static void free_oldspace(void)
     for (page = 0; page < next_free_page; ++page) {
         if (page_table[page].gen == from_space) {
             /* Should already be unprotected by unprotect_oldspace(). */
-            gc_dcheck(page_cards_all_marked_nonsticky(last_page));
+            gc_dcheck(page_cards_all_marked_nonsticky(page));
             /* Free the page. */
             int used = page_words_used(page);
             if (used) set_page_need_to_zero(page, 1);
