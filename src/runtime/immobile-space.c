@@ -1503,27 +1503,6 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     return fun_self_from_taggedptr(simple_fun);
 }
 
-static void adjust_fdefn_raw_addr(struct fdefn* fdefn)
-{
-  if (!fdefn->raw_addr || points_to_asm_code_p((lispobj)fdefn->raw_addr))
-      return;
-  lispobj* raw_addr = (lispobj*)fdefn->raw_addr;
-  lispobj* obj_base = 0;
-  lispobj header;
-  int i;
-  for (i=1; i<=4; ++i)
-      if ((header = raw_addr[-i]) == FORWARDING_HEADER || other_immediate_lowtag_p(header)) {
-          obj_base = raw_addr-i;
-          break;
-      }
-  gc_assert(obj_base);
-  int offset = (char*)raw_addr - (char*)obj_base;
-  if (header == FORWARDING_HEADER) {
-      char* new = (char*)native_pointer(forwarding_pointer_value(obj_base));
-      fdefn->raw_addr = new + offset;
-  }
-}
-
 /* Fix the layout of OBJ, storing it back to the object,
  * and return the layout's address in tempspace. */
 static struct layout* fix_object_layout(lispobj* obj)
@@ -1602,7 +1581,14 @@ static void fixup_space(lispobj* where, size_t n_words)
           break;
         case FDEFN_WIDETAG:
           adjust_words(where+1, 2);
-          adjust_fdefn_raw_addr((struct fdefn*)where);
+          struct fdefn *fdefn = (void*)where;
+          lispobj entrypoint = (lispobj)fdefn->raw_addr;
+          lispobj taggedptr = decode_fdefn_rawfun(fdefn);
+          if (taggedptr) {
+              int disp = entrypoint - taggedptr;
+              adjust_words(&taggedptr, 1);
+              fdefn->raw_addr = (char*)taggedptr + disp;
+          }
           break;
         case SYMBOL_WIDETAG:
           // - info, name, package can not point to an immobile object
