@@ -273,6 +273,9 @@
              (%sxhash-simple-bit-vector (copy-seq bit-vector))))))))
 
 ;;; To avoid "note: Return type not fixed values ..."
+;;; PATHNAME-SXHASH can't easily be placed in pathname.lisp because that file
+;;; depends on LOGICAL-HOST but the definition of LOGICAL-HOST is complicated
+;;; and seems to belong where it is, in target-pathname.lisp, though maybe not.
 (declaim (ftype (sfunction (t) hash-code) pathname-sxhash))
 
 (defun sap-hash (x)

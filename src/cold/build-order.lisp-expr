@@ -254,6 +254,7 @@
  ("src/pcl/pre-warm")
  ("src/code/number-dispatch" :not-host)
  ("src/code/float-inf-nan"   :not-host)
+ ("src/code/pathname" :not-host)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/debug-info" :c-headers)
@@ -306,7 +307,6 @@
  ("src/code/random")
  ("src/code/hash-table" :c-headers)
  ("src/code/readtable")
- ("src/code/pathname" :not-host)
  ("src/code/host-pprint")
 
  ("src/compiler/knownfun")
