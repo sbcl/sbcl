@@ -246,6 +246,10 @@
   (result-specs nil :type list)
   type)
 
+(defstruct (lvar-sequence-bounds-annotation
+            (:include lvar-dependent-annotation)
+            (:copier nil)))
+
 (defstruct (lvar-type-annotation
             (:include lvar-annotation)
             (:copier nil))

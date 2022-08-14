@@ -779,7 +779,9 @@
                     :node node)
   (fill-transform 'fill node seq item start end))
 (defun fill-transform (fun-name node seq item start end)
-  (declare (ignorable end))
+  (add-annotation seq
+                  (make-lvar-sequence-bounds-annotation :deps (list start end)
+                                                        :source-path (node-source-path node)))
   (let* ((type (lvar-type seq))
          (element-ctype (array-type-upgraded-element-type type))
          (element-type (type-specifier element-ctype))
@@ -1026,37 +1028,46 @@
 
 (defun check-sequence-ranges (string start end node &optional (suffix "") sequence-name)
   (let* ((type (lvar-type string))
-         (length (vector-type-length type)))
-    (when length
-      (flet ((check (index name length-type)
-               (when index
-                 (let ((index-type (lvar-type index)))
-                   (unless (types-equal-or-intersect index-type
-                                                     (specifier-type length-type))
-                     (let ((*compiler-error-context* node))
-                       (compiler-warn "Bad :~a~a ~a for~a ~a"
-                                      name suffix
-                                      (type-specifier index-type)
-                                      (if sequence-name
-                                          (format nil " for ~a of type" sequence-name)
-                                          suffix)
-                                      (type-specifier type))))))))
-        (check start "start" `(integer 0 ,length))
-        (check end "end" `(or null (integer 0 ,length)))))
-    (when (and start end)
-      (let* ((start-type (lvar-type start))
-             (start-interval (type-approximate-interval start-type))
-             (end-type (lvar-type end))
-             (end-interval (type-approximate-interval end-type)))
-        (when (and (interval-p start-interval)
-                   (interval-p end-interval)
-                   (interval-< end-interval start-interval))
-          (let ((*compiler-error-context* node))
-            (compiler-warn ":start~a ~a is greater than :end~a ~a"
-                           suffix
-                           (type-specifier start-type)
-                           suffix
-                           (type-specifier end-type))))))))
+         (length (vector-type-length type))
+         (annotation (find-if #'lvar-sequence-bounds-annotation-p (lvar-annotations string))))
+    (when annotation
+      (when (shiftf (lvar-annotation-fired annotation) t)
+        (return-from check-sequence-ranges)))
+    (flet ((arg-type (x)
+             (typecase x
+               (constant (ctype-of (constant-value x)))
+               (lvar (lvar-type x))
+               (t (leaf-type x)))))
+      (when length
+        (flet ((check (index name length-type)
+                 (when index
+                   (let ((index-type (arg-type index)))
+                     (unless (types-equal-or-intersect index-type
+                                                       (specifier-type length-type))
+                       (let ((*compiler-error-context* node))
+                         (compiler-warn "Bad :~a~a ~a for~a ~a"
+                                        name suffix
+                                        (type-specifier index-type)
+                                        (if sequence-name
+                                            (format nil " for ~a of type" sequence-name)
+                                            suffix)
+                                        (type-specifier type))))))))
+          (check start "start" `(integer 0 ,length))
+          (check end "end" `(or null (integer 0 ,length)))))
+      (when (and start end)
+        (let* ((start-type (arg-type start))
+               (start-interval (type-approximate-interval start-type))
+               (end-type (arg-type end))
+               (end-interval (type-approximate-interval end-type)))
+          (when (and (interval-p start-interval)
+                     (interval-p end-interval)
+                     (interval-< end-interval start-interval))
+            (let ((*compiler-error-context* node))
+              (compiler-warn ":start~a ~a is greater than :end~a ~a"
+                             suffix
+                             (type-specifier start-type)
+                             suffix
+                             (type-specifier end-type)))))))))
 (defoptimizers ir2-hook
     (string=* string<* string>* string<=* string>=*
      %sp-string-compare simple-base-string=

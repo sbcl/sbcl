@@ -31,8 +31,6 @@
                           :deps deps
                           :type type)))
         (when (add-annotation lvar annotation)
-          (loop for lvar in deps
-                do (push annotation (lvar-dependent-annotations lvar)))
           (assert-lvar-type lvar
                             (specifier-type 'function-designator)
                             policy))))))

@@ -787,3 +787,10 @@
                    ',expected))))
     (check (sort (the (cons (eql 0)) x) y)
            cons)))
+
+(with-test (:name :range-error-fill-transform)
+  (assert
+   (nth-value 2 (checked-compile `(lambda (x y)
+                                    (declare ((simple-base-string 10) x))
+                                    (fill x y :start 12))
+                                 :allow-warnings t))))

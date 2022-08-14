@@ -3041,7 +3041,7 @@ is :ANY, the function name is not checked."
 (defun propagate-lvar-annotations (new old &optional (propagate-dependencies t))
   (when propagate-dependencies
     (loop for dep in (lvar-dependent-annotations old)
-          do (nsubst new old (lvar-function-designator-annotation-deps dep))
+          do (nsubst new old (lvar-dependent-annotation-deps dep))
           when (lvar-p new)
           do
           (pushnew dep (lvar-dependent-annotations new) :test #'eq))
@@ -3231,6 +3231,10 @@ is :ANY, the function name is not checked."
                                                      (list (node-source-form use))
                                                      :condition condition)))))))
 
+(defun process-lvar-sequence-bounds-annotation (lvar annotation)
+  (destructuring-bind (start end) (lvar-dependent-annotation-deps annotation)
+    (check-sequence-ranges lvar start end annotation)))
+
 (defun process-annotations (lvar)
   (unless (and (combination-p (lvar-dest lvar))
                (lvar-fun-is
@@ -3256,13 +3260,19 @@ is :ANY, the function name is not checked."
                     (lvar-function-annotation
                      (check-function-lvar lvar annot))
                     (lvar-type-annotation
-                     (process-lvar-type-annotation lvar annot)))
+                     (process-lvar-type-annotation lvar annot))
+                    (lvar-sequence-bounds-annotation
+                     (process-lvar-sequence-bounds-annotation lvar annot)))
               (setf (lvar-annotation-fired annot) t))))))
 
 (defun add-annotation (lvar annotation)
   (unless (eq (lvar-annotations lvar)
               (pushnew annotation (lvar-annotations lvar)
                        :key #'type-of))
+    (when (typep annotation 'lvar-dependent-annotation)
+      (loop for lvar in (lvar-dependent-annotation-deps annotation)
+            when (lvar-p lvar)
+            do (push annotation (lvar-dependent-annotations lvar))))
     (unless (lvar-annotation-source-path annotation)
       (setf (lvar-annotation-source-path annotation)
             (if (boundp '*current-path*)
