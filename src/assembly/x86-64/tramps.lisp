@@ -52,17 +52,16 @@
     (do-fprs pop :xmm)))
 
 (macrolet ((def-routine-pair (name&options vars &body code)
-             (let ((base-name (car name&options)))
-               `(progn
-                  (symbol-macrolet ((system-tlab-p 0))
-                    (define-assembly-routine ,name&options ,vars ,@code))
-                  ;; In absence of this feature, don't define extra routines.
-                  ;; (Don't want to have a way to mess things up)
-                  #+system-tlabs
-                  (symbol-macrolet ((system-tlab-p 2))
-                    (define-assembly-routine
-                        (,(symbolicate "SYS-" (car name&options)) . ,(cdr name&options))
-                        ,vars ,@code))))))
+             `(progn
+                (symbol-macrolet ((system-tlab-p 0))
+                  (define-assembly-routine ,name&options ,vars ,@code))
+                ;; In absence of this feature, don't define extra routines.
+                ;; (Don't want to have a way to mess things up)
+                #+system-tlabs
+                (symbol-macrolet ((system-tlab-p 2))
+                  (define-assembly-routine
+                      (,(symbolicate "SYS-" (car name&options)) . ,(cdr name&options))
+                    ,vars ,@code)))))
 
 (def-routine-pair (alloc-tramp) ()
   (with-registers-preserved (c)
