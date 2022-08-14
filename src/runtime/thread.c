@@ -452,7 +452,7 @@ unregister_thread(struct thread *th,
     int lock_ret;
 
     block_blockable_signals(0);
-    gc_close_thread_regions(th, LOCK_PAGE_TABLE);
+    gc_close_thread_regions(th);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);
 #else
@@ -1015,7 +1015,10 @@ alloc_thread_struct(void* spaces) {
     clear_pseudo_atomic_interrupted(th);
 #endif
 
-    INIT_THREAD_REGIONS(th);
+#ifdef LISP_FEATURE_GENCGC
+    gc_init_region(&th->mixed_tlab);
+    gc_init_region(&th->cons_tlab);
+#endif
 #ifdef LISP_FEATURE_SB_THREAD
     /* This parallels the same logic in globals.c for the
      * single-threaded foreign_function_call_active, KLUDGE and
