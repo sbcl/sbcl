@@ -1245,6 +1245,14 @@ gc_close_region(struct alloc_region *alloc_region, int page_type)
     char *page_base = page_address(first_page);
     char *free_pointer = alloc_region->free_pointer;
 
+#if defined LISP_FEATURE_SYSTEM_TLABS && defined DEBUG
+    if (alloc_region == &get_sb_vm_thread()->sys_mixed_tlab ||
+        alloc_region == &get_sb_vm_thread()->sys_cons_tlab) {
+        char msg[] = "NOTE: closing a system allocation region\n";
+        write(2, msg, sizeof msg-1); // signal-safe
+    }
+#endif
+
     // page_bytes_used() can be done without holding a lock. Nothing else
     // affects the usage on the first page of a region owned by this thread.
     page_bytes_t orig_first_page_bytes_used = page_bytes_used(first_page);
@@ -4945,7 +4953,7 @@ void gc_allocate_ptes()
 
 int gencgc_alloc_profiler;
 static NO_SANITIZE_MEMORY lispobj*
-lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
+lisp_alloc(int flags, struct alloc_region *region, sword_t nbytes,
            int page_type, struct thread *thread)
 {
     os_vm_size_t trigger_bytes = 0;
@@ -5043,7 +5051,7 @@ lisp_alloc(int largep, struct alloc_region *region, sword_t nbytes,
         allocator_record_backtrace(__builtin_frame_address(0), thread);
 #endif
 
-    if (largep) return gc_alloc_large(nbytes, page_type);
+    if (flags & 1) return gc_alloc_large(nbytes, page_type);
 
     int __attribute__((unused)) ret = mutex_acquire(&free_pages_lock);
     gc_assert(ret);
@@ -5081,6 +5089,22 @@ CRITICAL_SECTION code_allocator_lock; // threads are mandatory for win32
 static pthread_mutex_t code_allocator_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
+#ifdef LISP_FEATURE_X86_64
+
+// The asm routines have been modified so that alloc() and alloc_list()
+// each receive the size an a single-bit flag affecting locality of the result.
+#define DEFINE_LISP_ENTRYPOINT(name, largep, TLAB, page_type) \
+NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes, int systemp) { \
+    struct thread *self = get_sb_vm_thread(); \
+    return lisp_alloc(largep | systemp,                               \
+                      systemp ? &self->sys_##TLAB##_tlab : THREAD_ALLOC_REGION(self,TLAB), \
+                      nbytes, page_type, self); }
+
+DEFINE_LISP_ENTRYPOINT(alloc, (nbytes >= LARGE_OBJECT_SIZE), mixed, PAGE_TYPE_MIXED)
+DEFINE_LISP_ENTRYPOINT(alloc_list, 0, cons, PAGE_TYPE_CONS)
+
+#else
+
 #define DEFINE_LISP_ENTRYPOINT(name, largep, tlab, page_type) \
 NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = get_sb_vm_thread(); \
@@ -5095,6 +5119,8 @@ DEFINE_LISP_ENTRYPOINT(alloc_list, 0, cons, PAGE_TYPE_CONS)
 #else
 // Lists will get moved to CONS pages when copied.
 DEFINE_LISP_ENTRYPOINT(alloc_list, 0, mixed, PAGE_TYPE_MIXED)
+#endif
+
 #endif
 
 lispobj AMD64_SYSV_ABI alloc_code_object(unsigned total_words, unsigned boxed)
@@ -5149,11 +5175,16 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI alloc_funinstance(sword_t nbytes)
 
 /* Make a list that couldn't be inline-allocated. Break it up into contiguous
  * blocks of conses not to exceed one GC page each. */
-NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nbytes) {
+NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI
+make_list(lispobj element, sword_t nbytes, __attribute__((unused)) int sys) {
     // Technically this overflow handler could permit garbage collection
     // between separate allocation. For now the entire thing is pseudo-atomic.
     struct thread *self = get_sb_vm_thread();
+#ifdef LISP_FEATURE_SYSTEM_TLABS
+    struct alloc_region *region = sys ? &self->sys_cons_tlab : &self->cons_tlab;
+#else
     struct alloc_region *region = THREAD_ALLOC_REGION(self, cons);
+#endif
     int partial_request = (char*)region->end_addr - (char*)region->free_pointer;
     gc_assert(nbytes > (sword_t)partial_request);
     // We might be even cleverer by accepting however few bytes are actually available
@@ -5181,10 +5212,15 @@ NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI make_list(lispobj element, sword_t nby
 
 /* Convert a &MORE context to a list. Split it up like make_list if we have to */
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI listify_rest_arg(lispobj* context, sword_t nbytes) {
+NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI
+listify_rest_arg(lispobj* context, sword_t nbytes, __attribute__((unused)) int sys) {
     // same comment as above in make_list() applies about the scope of pseudo-atomic
     struct thread *self = get_sb_vm_thread();
+#ifdef LISP_FEATURE_SYSTEM_TLABS
+    struct alloc_region *region = sys ? &self->sys_cons_tlab : &self->cons_tlab;
+#else
     struct alloc_region *region = THREAD_ALLOC_REGION(self, cons);
+#endif
     int partial_request = (char*)region->end_addr - (char*)region->free_pointer;
     gc_assert(nbytes > (sword_t)partial_request);
     if (partial_request == 0) partial_request = CONS_PAGE_USABLE_BYTES;

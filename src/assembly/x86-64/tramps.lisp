@@ -51,39 +51,57 @@
     fpr-restore ; KLUDGE: this is element 6 of the entry point vector
     (do-fprs pop :xmm)))
 
-(define-assembly-routine (alloc-tramp) ()
+(macrolet ((def-routine-pair (name&options vars &body code)
+             (let ((base-name (car name&options)))
+               `(progn
+                  (symbol-macrolet ((system-tlab-p 0))
+                    (define-assembly-routine ,name&options ,vars ,@code))
+                  ;; In absence of this feature, don't define extra routines.
+                  ;; (Don't want to have a way to mess things up)
+                  #+system-tlabs
+                  (symbol-macrolet ((system-tlab-p 2))
+                    (define-assembly-routine
+                        (,(symbolicate "SYS-" (car name&options)) . ,(cdr name&options))
+                        ,vars ,@code))))))
+
+(def-routine-pair (alloc-tramp) ()
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst mov rsi-tn system-tlab-p)
     (inst call (make-fixup "alloc" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(define-assembly-routine (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
+(def-routine-pair (list-alloc-tramp) () ; CONS, ACONS, LIST, LIST*
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst mov rsi-tn system-tlab-p)
     (inst call (make-fixup "alloc_list" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
+
+(def-routine-pair (listify-&rest (:return-style :none)) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst mov rdx-tn system-tlab-p)
+    (inst call (make-fixup "listify_rest_arg" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+
+(def-routine-pair (make-list (:return-style :none)) ()
+  (with-registers-preserved (c)
+    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
+    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
+    (inst mov rdx-tn system-tlab-p)
+    (inst call (make-fixup "make_list" :foreign))
+    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
+  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
+)
 
 (define-assembly-routine (alloc-funinstance) ()
   (with-registers-preserved (c)
     (inst mov rdi-tn (ea 16 rbp-tn))
     (inst call (make-fixup "alloc_funinstance" :foreign))
     (inst mov (ea 16 rbp-tn) rax-tn)))
-
-(define-assembly-routine (listify-&rest (:return-style :none)) ()
-  (with-registers-preserved (c)
-    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
-    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
-    (inst call (make-fixup "listify_rest_arg" :foreign))
-    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
-  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
-
-(define-assembly-routine (make-list (:return-style :none)) ()
-  (with-registers-preserved (c)
-    (inst mov rdi-tn (ea 16 rbp-tn)) ; 1st C call arg
-    (inst mov rsi-tn (ea 24 rbp-tn)) ; 2nd C call arg
-    (inst call (make-fixup "make_list" :foreign))
-    (inst mov (ea 24 rbp-tn) rax-tn)) ; result
-  (inst ret 8)) ; pop one argument; the unpopped word now holds the result
 
 ;;; These routines are for the deterministic consing profiler.
 ;;; The C support routine's argument is the return PC.

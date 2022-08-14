@@ -1282,3 +1282,10 @@
              (let ((neg (- val))) (make-point neg))))))
     (assert-has-gc-barrier "SET-SLOT" lines
                            #-compact-instance-header 1)))
+
+(with-test (:name :system-tlabs)
+  (when (find-symbol "SYS-ALLOC-TRAMP" "SB-VM")
+    (assert (loop for line in (disassembly-lines 'sb-impl:test-make-packed-info)
+                  thereis (search "SYS-ALLOC-TRAMP" line)))
+    (assert (loop for line in (disassembly-lines 'sb-impl:test-copy-packed-info)
+                  thereis (search "SYS-ALLOC-TRAMP" line)))))

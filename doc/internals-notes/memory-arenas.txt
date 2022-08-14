@@ -1,0 +1,70 @@
+
+The use-case for arenas is to allow for an allocator that consumes
+space using a stack-like discpline, often called "Mark/Release"
+(see e.g. https://wiki.dlang.org/Memory_Management#Mark.2FRelease)
+Multiple threads can each create their own arena of memory, mark their current usage,
+do some work, and very quickly unwind the mark all before GC notices anything.
+
+Obviously there are complications involved when dynamic space points to the arenas
+and vice-versa. Most of those are surmountable, but for for CLOS dispatch being a
+particularly intense pain point. PCL has a tendency to pseudo-randomly create persistent
+state when you least expect it, so that you end up with FUNCALLABLE-INSTANCE-FUNCTION
+of a GENERIC-FUNCTION pointing to memory that was just released via mark/release.
+Discovering enough about where the PCL implementation creates state changes was
+counterproductive to the overall mission of changing a minimal amount of source code.
+
+The starting point for exploration was a pair of macros named WITH-ARENA and
+WITHOUT-ARENA that do as their names imply. They are scoped dynamically, not lexically,
+which means that they control behavior of allocator at runtime, and can be thought
+of as akin to binding a special variable.
+Bearing in mind that the desired goal is not to have all "user" code know that it should
+do something special to allocate, it seems preferable to force all system code to know
+when not to use an arena. So if we assume that the toplevel of all user code has a single
+WITH-ARENA placed around it, the objective becomes to strategically place WITHOUT-ARENA
+throughout the internals of the PCL implementation.
+(A WITHOUT-ARENA at the entry point to COMPILE takes care of the general issue of making
+new code, per se. But it doesn't help the situation with PCL in general)
+
+PCL relies on such a significant amount of mutable state and action-at-a-distance
+that even after after weeks of study of the PCL source code, it was not apparent where
+to inject appropriate allocator control macros. And users have extremly little choice
+over when, if ever, PCL decides to allocate anything in the first place.
+
+This troubles stem from two patterns prevalent in PCL.
+1. lambdas that return lambdas
+   to decorate them would imply writing
+    (without-arena () (lambda () ... (without-arena () (lambda ...))))
+
+2. lambdas that end up tail-calling the user's "actual" code
+    (lambda (args) (reoptimize-myself-for-current-state (apply actual-user-code actual-args)))
+   which would have to be recast as something like
+    (lambda (args)
+      (without-arena (reoptimize-myself-for-current-state
+                      (with-arena (apply actual-user-code actual-args)))))
+
+It became apparent that we need a variety of techniques that entail more cooperation
+between the compiler and the VM than just these 2 macros, to minimize changes in source.
+
+* Dynamically scoped control, as the starting point.
+
+* Choose based on object type at runtime- so SB-PCL::CACHE would always go "somewhere else"
+  than dictated by the dynamic control. i.e. we decide _statically_ that certain objects
+  go to either the TLAB or the arena.
+  This unfortunately precludes using %MAKE-INSTANCE to make variable-length structures
+  such as SB-INT:PACKED-INFO because there is no allocation vop which takes the length
+  as a variable, but a particular instance type as a constant.
+
+* Based on the name of the file being compiled- any allocation code could be
+  emitted differently at compile-time. So for example while compiling src/pcl/*.lisp
+  the ALLOCATION function could do something different.
+  This can be achieved with a compile-time DEFVAR that says that the alternative
+  TLABs should be used.
+
+* Based on a lexical scope- any allocation occurring while that declaration
+  is visible would go "somewhere else". This changes the scoping from dynamic
+  to static, but it is not apprpriate for things like a HASH-TABLE constructor, because
+  a HASH-TABLE could be made by user code, or PCL.
+  However it seems well-suited to something like SB-INT:PACKED-INFO because those
+  objects always imply a (relatively) permanent state change.
+  And that if we do see an occurence of MAKE-HASH-TABLE in the PCL source code,
+  we can easily wrap that in WITHOUT-ARENA.

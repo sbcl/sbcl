@@ -90,7 +90,7 @@
 ;;;;; Some stuff moved from 'globaldb.lisp':
 
 ;;; The structure constructor is never called
-(sb-xc:defstruct (packed-info (:predicate nil) (:constructor nil))
+(sb-xc:defstruct (packed-info (:copier %copy-packed-info) (:predicate nil) (:constructor nil))
   cells)
 (declaim (freeze-type packed-info))
 #-sb-xc-host
@@ -99,7 +99,11 @@
     (setf (dd-flags dd) (logior (dd-flags dd) +dd-varylen+))))
 (eval-when (#-sb-xc-host :compile-toplevel)
   (sb-xc:defmacro make-packed-info (n)
-    `(%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start))))
+    `(locally (declare (sb-c::tlab :system)) ; will be ignored if #-system-tlabs
+       (%new-instance ,(find-layout 'packed-info) (+ ,n ,sb-vm:instance-data-start))))
+  (sb-xc:defmacro copy-packed-info (x)
+    `(locally (declare (sb-c::tlab :system))
+       (%copy-packed-info ,x))))
 
 (defconstant info-num-mask (ldb (byte info-number-bits 0) -1)) ; #b111111
 
@@ -891,3 +895,8 @@ This is interpreted as
                         old-info)))
           (info-puthash *info-environment* name #'hairy-name))))
     result))
+
+;;; Disassembling these proves that SYS-ALLOC-TRAMP gets called
+(export '(test-make-packed-info test-copy-packed-info))
+(defun test-make-packed-info (x) (make-packed-info (the (mod 100) x)))
+(defun test-copy-packed-info (x) (copy-packed-info x))

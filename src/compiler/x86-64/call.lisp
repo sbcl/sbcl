@@ -1307,12 +1307,15 @@
        (if stack-allocate-p
            (stack-allocation rcx 0 dst)
            (allocation +cons-primtype+ rcx 0 dst node value thread-tn
-                       :overflow (lambda ()
-                                   (inst push rcx)
-                                   (inst push context)
-                                   (invoke-asm-routine 'call 'listify-&rest node)
-                                   (inst pop result)
-                                   (inst jmp leave-pa))))
+                       :overflow
+                       (lambda ()
+                         (inst push rcx)
+                         (inst push context)
+                         (invoke-asm-routine
+                          'call (if (system-tlab-p node) 'sys-listify-&rest 'listify-&rest)
+                          node)
+                         (inst pop result)
+                         (inst jmp leave-pa))))
        ;; Recalculate DST as a tagged pointer to the last cons
        (inst lea dst (ea (- list-pointer-lowtag (* cons-size n-word-bytes)) dst rcx))
        (inst shr :dword rcx (1+ word-shift)) ; convert bytes to number of cells

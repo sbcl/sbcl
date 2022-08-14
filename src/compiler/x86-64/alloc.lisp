@@ -182,7 +182,23 @@
 ;;; 1. what to allocate: type, size, lowtag describe the object
 ;;; 2. where to put the result
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
-(defun allocation (type size lowtag alloc-tn node temp thread-temp &key overflow)
+(defvar *use-system-tlab* nil)
+(defun system-tlab-p (node)
+  #-system-tlabs (declare (ignore node))
+  #+system-tlabs
+  (or *use-system-tlab*
+      (and node
+           (named-let search-env ((env (sb-c::node-lexenv node)))
+             (dolist (data (sb-c::lexenv-user-data env)
+                           (and (sb-c::lexenv-parent env)
+                                (search-env (sb-c::lexenv-parent env))))
+               (when (and (eq (first data) :declare)
+                          (eq (second data) 'sb-c::tlab))
+                 (return (eq (third data) :system))))))))
+
+(defun allocation (type size lowtag alloc-tn node temp thread-temp
+                   &key overflow
+                   &aux (systemp (system-tlab-p node)))
   (declare (ignorable thread-temp))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
@@ -194,16 +210,24 @@
                   (inst push alloc-tn))
                  (t
                   (inst push size)))
-           (invoke-asm-routine 'call
-                               (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp)
-                               node t)
+           (invoke-asm-routine
+            'call
+            (if systemp
+                (if (eql type +cons-primtype+) 'sys-list-alloc-tramp 'sys-alloc-tramp)
+                (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp))
+            node t)
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
            (DONE (gen-label))
-           (free-pointer #+sb-thread (thread-slot-ea (if (eql type +cons-primtype+)
-                                                         thread-cons-tlab-slot
-                                                         thread-mixed-tlab-slot)
-                                                     #+gs-seg thread-temp)
+           (free-pointer #+sb-thread
+                         (let ((slot (if systemp
+                                         (if (eql type +cons-primtype+)
+                                             thread-sys-cons-tlab-slot
+                                             thread-sys-mixed-tlab-slot)
+                                         (if (eql type +cons-primtype+)
+                                             thread-cons-tlab-slot
+                                             thread-mixed-tlab-slot))))
+                           (thread-slot-ea slot #+gs-seg thread-temp))
                          #-sb-thread (ea (if (eql type +cons-primtype+)
                                              cons-region mixed-region)))
            (end-addr (ea (sb-x86-64-asm::ea-segment free-pointer)
@@ -766,13 +790,15 @@
         (instrument-alloc +cons-primtype+ size node (list next limit) thread-tn)
         (pseudo-atomic (:thread-tn thread-tn)
          (allocation +cons-primtype+ size list-pointer-lowtag result node limit thread-tn
-                     :overflow (lambda ()
-                                 ;; Push C call args right-to-left
-                                 (inst push (if (integerp size) (constantize size) size))
-                                 (inst push (if (sc-is element immediate) (tn-value element) element))
-                                 (invoke-asm-routine 'call 'make-list node)
-                                 (inst pop result)
-                                 (inst jmp leave-pa)))
+                     :overflow
+                     (lambda ()
+                       ;; Push C call args right-to-left
+                       (inst push (if (integerp size) (constantize size) size))
+                       (inst push (if (sc-is element immediate) (tn-value element) element))
+                       (invoke-asm-routine
+                        'call (if (system-tlab-p node) 'sys-make-list 'make-list) node)
+                       (inst pop result)
+                       (inst jmp leave-pa)))
          (compute-end)
          (inst mov next result)
          (inst jmp entry)
