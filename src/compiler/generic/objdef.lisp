@@ -578,6 +578,11 @@ during backtrace.
   (mach-port-name :c-type "mach_port_name_t")
   #+ppc64 (card-table)
 
+  ;; A few extra thread-local allocation buffers for special purposes
+  ;; #-sb-thread probably won't use these, to be determined...
+  (symbol-tlab :c-type "struct alloc_region" :length 3)
+  (sys-mixed-tlab :c-type "struct alloc_region" :length 3)
+  (sys-cons-tlab :c-type "struct alloc_region" :length 3)
   ;; allocation instrumenting
   (tot-bytes-alloc-boxed)
   (tot-bytes-alloc-unboxed)

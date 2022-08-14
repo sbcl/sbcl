@@ -21,6 +21,9 @@ struct alloc_region {
     void  *start_addr;
 };
 
+// Macro to statically initialize instead of using set_region_empty()
+#define ALLOC_REGION_INITIALIZER {(void*)0x1000, (void*)1000, 0}
+
 // One region for each of page type.
 // These indices have no correlation to PAGE_TYPE constants.
 // MIXED has to always be at array index 0 because lisp accesses

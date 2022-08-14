@@ -4543,10 +4543,7 @@ collect_garbage(generation_index_t last_gen)
      * So we need to close them for those two cases.
      */
     struct thread *th;
-    for_each_thread(th) {
-        ensure_region_closed(THREAD_ALLOC_REGION(th,mixed), PAGE_TYPE_MIXED);
-        ensure_region_closed(THREAD_ALLOC_REGION(th,cons), PAGE_TYPE_CONS);
-    }
+    for_each_thread(th) gc_close_thread_regions(th, 0);
     ensure_region_closed(code_region, PAGE_TYPE_CODE);
     if (gencgc_verbose > 2) fprintf(stderr, "[%d] BEGIN gc(%d)\n", n_gcs, last_gen);
 
@@ -5264,30 +5261,37 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
 }
 #endif
 
-void sync_close_regions(int block_signals,
-                        struct alloc_region *region_1, int page_type_1,
-                        struct alloc_region *region_2, int page_type_2)
+typedef struct { struct alloc_region* r; int type; } close_region_arg;
+
+static void sync_close_regions(int block_signals, int locking,
+                               close_region_arg* a, int count)
 {
     sigset_t savedmask;
-    int result;
-    int need_code_lock = (page_type_1 == PAGE_TYPE_CODE || page_type_2 == PAGE_TYPE_CODE);
+    __attribute__((unused)) int result;
     if (block_signals) block_blockable_signals(&savedmask);
-    if (need_code_lock) {
+    if (locking & LOCK_CODE_ALLOCATOR) {
         result = mutex_acquire(&code_allocator_lock);
-        gc_assert(result);
+        gc_dcheck(result);
     }
-    result = mutex_acquire(&free_pages_lock);
-    gc_assert(result);
-    if (region_1) ensure_region_closed(region_1, page_type_1);
-    if (region_2) ensure_region_closed(region_2, page_type_2);
-    result = mutex_release(&free_pages_lock);
-    gc_assert(result);
-    if (need_code_lock) {
+    if (locking & LOCK_PAGE_TABLE) {
+        result = mutex_acquire(&free_pages_lock);
+        gc_dcheck(result);
+    }
+    int i;
+    for(i=0; i<count; ++i) ensure_region_closed(a[i].r, a[i].type);
+    if (locking & LOCK_PAGE_TABLE) {
+        result = mutex_release(&free_pages_lock);
+        gc_dcheck(result);
+    }
+    if (locking & LOCK_CODE_ALLOCATOR) {
         result = mutex_release(&code_allocator_lock);
-        gc_assert(result);
+        gc_dcheck(result);
     }
     if (block_signals) thread_sigmask(SIG_SETMASK, &savedmask, 0);
 }
+
+#define N_THREAD_TLABS(array) sizeof array / sizeof (close_region_arg)
+
 /* These two exported "close_x" functions are called from Lisp prior to
  * heap-walking. They must never get interrupted by STOP_FOR_GC while holding
  * either the free page lock or code allocation lock.
@@ -5295,16 +5299,41 @@ void sync_close_regions(int block_signals,
  * these are plain foreign calls without aid of a vop. */
 void close_current_thread_tlab() {
     __attribute__((unused)) struct thread *self = get_sb_vm_thread();
-    sync_close_regions(1, THREAD_ALLOC_REGION(self,mixed), PAGE_TYPE_MIXED,
-                          THREAD_ALLOC_REGION(self,cons), PAGE_TYPE_CONS);
+    /* If the compiler doesn't use the cons region, neither will alloc_list().
+     * i.e. we'll never see the cons region used with PAGE_TYPE_MIXED.
+     * Thus the invariants about page type correctness hold when closing */
+    close_region_arg argv[] = {
+      { THREAD_ALLOC_REGION(self,mixed), PAGE_TYPE_MIXED },
+      { THREAD_ALLOC_REGION(self,cons), PAGE_TYPE_CONS },
+#ifdef LISP_FEATURE_SB_THREAD_
+      { THREAD_ALLOC_REGION(self,sys_mixed), PAGE_TYPE_MIXED },
+      { THREAD_ALLOC_REGION(self,sys_cons), PAGE_TYPE_CONS }
+#endif
+    };
+    sync_close_regions(1, LOCK_PAGE_TABLE, argv, N_THREAD_TLABS(argv));
 }
 void close_code_region() {
-    sync_close_regions(1, code_region, PAGE_TYPE_CODE, 0, 0);
+    close_region_arg argv = { code_region, PAGE_TYPE_CODE };
+    sync_close_regions(1, LOCK_PAGE_TABLE|LOCK_CODE_ALLOCATOR, &argv, 1);
 }
-/* This is called by unregister_thread() with STOP_FOR_GC blocked */
-void gc_close_thread_regions(struct thread* th) {
-    sync_close_regions(0, &th->mixed_tlab, PAGE_TYPE_MIXED,
-                          &th->cons_tlab, PAGE_TYPE_CONS);
+/* When this is called by unregister_thread() with STOP_FOR_GC blocked,
+ * it needs to aquire the page table lock but not the code allocator lock.
+ * It is also called at the start of GC to close each non-dead thread's regions,
+ * in which case no locks are needed since all other lisp threads are stopped. */
+void gc_close_thread_regions(__attribute__((unused)) struct thread* th,
+                             int locking) {
+    close_region_arg argv[] = {
+#ifdef LISP_FEATURE_SB_THREAD
+      { &th->mixed_tlab, PAGE_TYPE_MIXED },
+      { &th->cons_tlab, PAGE_TYPE_CONS },
+      { &th->sys_mixed_tlab, PAGE_TYPE_MIXED },
+      { &th->sys_cons_tlab, PAGE_TYPE_CONS }
+#else
+      { main_thread_mixed_region, PAGE_TYPE_MIXED },
+      { main_thread_cons_region, PAGE_TYPE_CONS },
+#endif
+    };
+    sync_close_regions(0, locking, argv, N_THREAD_TLABS(argv));
 }
 
 #ifdef LISP_FEATURE_SPARC
@@ -5568,7 +5597,7 @@ gc_and_save(char *filename, boolean prepend_runtime, boolean purify,
     // From here on until exit, there is no chance of continuing
     // in Lisp if something goes wrong during GC.
     // Flush regions to ensure heap scan in copy_rospace doesn't miss anything
-    gc_close_thread_regions(thread);
+    gc_close_thread_regions(thread, 0);
     gc_close_collector_regions(0);
     move_rospace_to_dynamic(0);
     pre_verify_gen_0 = 1;

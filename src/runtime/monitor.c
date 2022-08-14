@@ -247,7 +247,7 @@ static void suspend_other_threads() {
     // It might make sense for each thread's stop-for-gc handler to close its region
     // versus doing this loop
     struct thread *th;
-    for_each_thread(th) { gc_close_thread_regions(th); }
+    for_each_thread(th) { gc_close_thread_regions(th, 0); }
     gc_close_collector_regions(0);
 }
 static void unsuspend_other_threads() {
