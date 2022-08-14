@@ -297,7 +297,7 @@ void* load_core_bytes(int fd, os_vm_offset_t offset, os_vm_address_t addr, os_vm
                   fd, (off_t) offset);
     if (actual == MAP_FAILED) {
         if (errno == ENOMEM)
-            fprintf(stderr, "load_core_bytes: mmap(%p,%lx,...) failed with ENOMEM\n", addr, len);
+            fprintf(stderr, "load_core_bytes: mmap(%p,%zu,...) failed with ENOMEM\n", addr, len);
         else
             perror("mmap");
         fail = 1;

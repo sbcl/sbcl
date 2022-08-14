@@ -1083,6 +1083,7 @@ void tlsf_dump_freelists(tlsf_t tlsf, FILE *f)
       }
 }
 
+#ifdef LISP_FEATURE_64_BIT
 void tlsf_dump_pool(tlsf_t tlsf, pool_t pool, char *pathname)
 {
     FILE* f = fopen(pathname, "w");
@@ -1107,3 +1108,4 @@ void tlsf_dump_pool(tlsf_t tlsf, pool_t pool, char *pathname)
     fprintf(f, "-- end --\n");
     fclose(f);
 }
+#endif

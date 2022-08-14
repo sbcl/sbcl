@@ -950,6 +950,7 @@ page_extensible_p(page_index_t index, generation_index_t gen, int type) {
         && page_table[index].gen == gen
         && !gc_page_pins[index];
 #else
+    // FIXME: "warning: dereferencing type-punned pointer will break strict-aliasing rules"
     int attributes_match =
         *(int16_t*)&page_table[index].type == ((gen<<8)|type);
 #endif
