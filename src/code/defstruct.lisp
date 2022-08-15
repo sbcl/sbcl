@@ -50,13 +50,16 @@
 
 (sb-xc:defmacro %new-instance (layout size)
   `(let* ((l ,layout)
-          (i (%make-instance ,size)))
+          (i (truly-the ,(if (constantp layout) (wrapper-classoid layout) 'instance)
+                        (%make-instance ,size))))
      (%set-instance-layout i l)
      i))
 (sb-xc:defmacro %new-instance* (layout len)
-  `(let ((i (if (logtest (layout-flags ,layout) sb-vm::+strictly-boxed-flag+)
-                (%make-instance ,len)
-                (%make-instance/mixed ,len))))
+  `(let ((i (truly-the
+             ,(if (constantp layout) (wrapper-classoid layout) 'instance)
+             (if (logtest (layout-flags ,layout) sb-vm::+strictly-boxed-flag+)
+                 (%make-instance ,len)
+                 (%make-instance/mixed ,len)))))
      (%set-instance-layout i ,layout)
      i))
 

@@ -448,6 +448,7 @@
 ;; a unit test of this logic against the complete logic.
 ;;
 (defun quick-packed-info-insert (input info-number value)
+  (declare (type info-number info-number))
   ;; Because INPUT contains 1 descriptor and its corresponding values,
   ;; the current length is exactly NEW-N, the new number of fields.
   (let* ((descriptor (%info-ref input 0))
