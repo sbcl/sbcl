@@ -455,18 +455,9 @@
          (output (make-packed-info (1+ new-n))))
     ;; Two cases: we're either inserting info for the fdefn, or not.
     (cond ((eq info-number +fdefn-info-num+)
-           ;; fdefn, if present, must remain the first packed field.
-           ;; Replace the lowest field (the count) with +fdefn-info-num+,
-           ;; shift everything left 6 bits, then OR in the new count.
-           (setf (%info-ref output 0)
-                 (logior (make-info-descriptor
-                          (dpb +fdefn-info-num+ (byte info-number-bits 0)
-                               descriptor) info-number-bits) new-n)
-                 ;; Packed vectors are indexed "backwards". The first
-                 ;; field's info is in the highest numbered cell.
-                 (%info-ref output new-n) value)
-           (loop for i from 1 below new-n
-                 do (setf (%info-ref output i) (%info-ref input i))))
+           ;; FDEFNs are not stored in a packed-info except for non-symbol function names
+           ;; in which case we don't use quick-packed-info-insert.
+           (bug "incorrect call to quick-packed-info-insert"))
           (t
            ;; Add a field on the high end and increment the count.
            (setf (%info-ref output 0)

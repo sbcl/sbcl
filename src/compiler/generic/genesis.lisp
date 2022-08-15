@@ -2145,6 +2145,8 @@ core and return a descriptor to it."
                            (read-bits-wordindexed fdefn 0)))
           (write-wordindexed fdefn sb-vm:fdefn-name-slot cold-name)
           (when core-file-name
+            (when (symbolp warm-name)
+              (write-wordindexed (cold-intern warm-name) sb-vm:symbol-fdefn-slot fdefn))
             (if *cold-assembler-obj*
                 (fdefn-makunbound fdefn)
                 (push (lambda ()
@@ -2217,18 +2219,19 @@ core and return a descriptor to it."
 ;; Create pointer from SYMBOL and/or (SETF SYMBOL) to respective fdefinition
 ;;
 (defun attach-fdefinitions-to-symbols (hashtable)
-    ;; Collect fdefinitions that go with one symbol, e.g. CAR and (SETF CAR),
-    ;; using the host's code for manipulating a packed-info.
-    (maphash (lambda (warm-name cold-fdefn)
+  ;; Collect fdefinitions that go with one symbol, e.g. (SETF CAR) and (CAS CAR)
+  ;; using the host's code for manipulating a packed-info.
+  ;; Do not add fdefns for symbols to the info. It goes in a slot.
+  (maphash (lambda (warm-name cold-fdefn)
+             (unless (symbolp warm-name)
                (with-globaldb-name (key1 key2) warm-name
                  :hairy (error "Hairy fdefn name in genesis: ~S" warm-name)
-                 :simple
-                 (setf (gethash key1 hashtable)
-                       (packed-info-insert
-                        (gethash key1 hashtable +nil-packed-infos+)
-                        key2 +fdefn-info-num+ cold-fdefn))))
-              *cold-fdefn-objects*)
-    hashtable)
+                 :simple (setf (gethash key1 hashtable)
+                               (packed-info-insert
+                                (gethash key1 hashtable +nil-packed-infos+)
+                                key2 +fdefn-info-num+ cold-fdefn)))))
+           *cold-fdefn-objects*)
+  hashtable)
 
 (defun dump-packed-info (list)
   ;; Payload length is the element count + LAYOUT slot if necessary.
@@ -2246,35 +2249,20 @@ core and return a descriptor to it."
   (loop for (warm-sym . info)
         in (sort (%hash-table-alist hashtable) #'<
                  :key (lambda (x) (descriptor-bits (cold-intern (car x)))))
-     do
-       (aver warm-sym) ; enforce that NIL was specially dealt with already
-       (let* ((cold-sym (cold-intern warm-sym))
-              (fdefn))
-         (declare (ignorable fdefn))
-         (let ((word (%info-ref info 0)))
-           (when (and (>= (ldb (byte info-number-bits 0) word) 1)
-                      (= (ldb (byte info-number-bits info-number-bits) word)
-                         +fdefn-info-num+))
-             (setf fdefn (%info-ref info (1- (sb-impl::packed-info-len info))))
-             (aver (= (logand (read-bits-wordindexed fdefn 0) sb-vm:widetag-mask)
-                      sb-vm:fdefn-widetag))
-             ;; Remove the cold fdefn from the packed-info
-             (setq info (sb-impl::packed-info-remove
-                         info sb-impl::+no-auxiliary-key+
-                         `(,+fdefn-info-num+)))))
-         (let ((pack
-                (when (> (sb-impl::packed-info-len info) 1)
-                  (dump-packed-info
-                   ;; Each packed-info will have one fixnum, possibly the symbol SETF,
-                   ;; and zero, one, or two #<fdefn>, and/or a classoid-cell.
-                   (map 'list (lambda (elt)
-                                (etypecase elt
-                                  (symbol (cold-intern elt))
-                                  (sb-xc:fixnum (make-fixnum-descriptor elt))
-                                  (descriptor elt)))
-                        (sb-impl::packed-info-cells info))))))
-           (when pack (write-wordindexed cold-sym sb-vm:symbol-info-slot pack))
-           (when fdefn (write-wordindexed cold-sym sb-vm:symbol-fdefn-slot fdefn))))))
+     do (aver warm-sym) ; enforce that NIL was specially dealt with already
+        (aver (> (sb-impl::packed-info-len info) 1))
+        (write-wordindexed
+         (cold-intern warm-sym)
+         sb-vm:symbol-info-slot
+         (dump-packed-info
+          ;; Each packed-info will have one fixnum, possibly the symbol SETF,
+          ;; and zero, one, or two #<fdefn>, and/or a classoid-cell.
+          (map 'list (lambda (elt)
+                       (etypecase elt
+                         (symbol (cold-intern elt))
+                         (sb-xc:fixnum (make-fixnum-descriptor elt))
+                         (descriptor elt)))
+               (sb-impl::packed-info-cells info))))))
 
 ;;;; fixups and related stuff
 
