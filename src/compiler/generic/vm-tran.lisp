@@ -155,6 +155,15 @@
         (dd-length (wrapper-dd (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
         (give-up-ir1-transform))))
 
+;;; This doesn't help a whole lot, but it does fire during compilation of 'info-vector'
+;;; which uses variable-length instances of PACKED-INFO, having no slot transforms.
+(define-source-transform (setf %instance-ref) (newval instance index)
+  `(let ((.newval. ,newval)
+         (.instance. ,instance)
+         (.index. ,index))
+     (%instance-set .instance. .index. .newval.)
+     .newval.))
+
 (define-source-transform %instance-wrapper (x) `(layout-friend (%instance-layout ,x)))
 (define-source-transform %fun-wrapper (x) `(layout-friend (%fun-layout ,x)))
 

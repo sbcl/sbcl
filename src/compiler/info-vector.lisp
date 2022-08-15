@@ -454,7 +454,8 @@
          (new-n (truly-the info-number (packed-info-len input)))
          (output (make-packed-info (1+ new-n))))
     ;; Two cases: we're either inserting info for the fdefn, or not.
-    (cond ((eq info-number +fdefn-info-num+)
+    (cond #+nil
+          ((eq info-number +fdefn-info-num+)
            ;; FDEFNs are not stored in a packed-info except for non-symbol function names
            ;; in which case we don't use quick-packed-info-insert.
            (bug "incorrect call to quick-packed-info-insert"))
