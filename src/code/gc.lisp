@@ -13,28 +13,10 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-#-darwin-jit
-(define-alien-variable ("READ_ONLY_SPACE_START" sb-vm:read-only-space-start) os-vm-size-t)
-#+gencgc
-(define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) os-vm-size-t)
-(declaim (inline current-dynamic-space-start))
-(defun current-dynamic-space-start ()
-  #+gencgc sb-vm:dynamic-space-start
-  #-gencgc (extern-alien "current_dynamic_space" unsigned-long))
-
-#+gencgc
-(progn
-  (declaim (inline dynamic-space-free-pointer))
-  (defun dynamic-space-free-pointer ()
-    (sap+ (int-sap (current-dynamic-space-start))
-          ;; not sure why next_free_page is 'sword_t' instead of 'uword_t' !
-          (truly-the (signed-byte 64)
-            (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes)))))
-
 (defun dynamic-space-obj-p (x) ; X must not be an immediate object
   (with-pinned-objects (x)
     (let ((addr (get-lisp-obj-address x)))
-      (< (current-dynamic-space-start) addr (sap-int (dynamic-space-free-pointer))))))
+      (< sb-vm:dynamic-space-start addr (sap-int (dynamic-space-free-pointer))))))
 
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()
@@ -43,7 +25,7 @@
   #-gencgc
   (truly-the word
              (- (sap-int (sb-c::dynamic-space-free-pointer))
-                (current-dynamic-space-start))))
+                sb-vm:dynamic-space-start)))
 
 (defun static-space-usage ()
   (- (sap-int sb-vm:*static-space-free-pointer*) sb-vm:static-space-start))
@@ -430,10 +412,6 @@ Note: currently changes to this value are lost when saving core."
 
 ;;;; GENCGC specifics
 ;;;;
-(define-symbol-macro sb-vm:dynamic-space-end
-    ;; FIXME: what uses this? Nothing? If so, remove it.
-    (+ (dynamic-space-size) sb-vm:dynamic-space-start))
-
 (define-alien-variable ("gc_logfile" %gc-logfile) (* char))
 
 (defun (setf gc-logfile) (pathname)
@@ -590,7 +568,7 @@ Experimental: interface subject to change."
                    generation)))
 
 (macrolet ((cases ()
-             `(cond ((< (current-dynamic-space-start) addr
+             `(cond ((< sb-vm:dynamic-space-start addr
                         (sap-int (dynamic-space-free-pointer)))
                      :dynamic)
                     ((immobile-space-addr-p addr) :immobile)

@@ -12,11 +12,26 @@
 (in-package "SB-IMPL")
 
 ;;; Declare each of the free space pointers (except dynamic) as an alien var
+;;; with darwin-jit, READ-ONLY-SPACE-START is a constant from genesis
+;;; Maybe this whole file should go in sb-kernel to avoid sb-kernel::
+#-darwin-jit
+(define-alien-variable ("READ_ONLY_SPACE_START" sb-vm:read-only-space-start) sb-kernel::os-vm-size-t)
 (define-alien-variable ("read_only_space_free_pointer"
                         sb-vm:*read-only-space-free-pointer*)
     system-area-pointer)
+
+;;; STATIC-SPACE-START is a constant from genesis
 (define-alien-variable ("static_space_free_pointer" sb-vm:*static-space-free-pointer*)
   system-area-pointer)
+
+(define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) sb-kernel::os-vm-size-t)
+;;; Dynamic doesn't really have a "free pointer" but it's the upper bound on space usage.
+(declaim (inline dynamic-space-free-pointer))
+(defun dynamic-space-free-pointer ()
+  (sap+ (int-sap sb-vm:dynamic-space-start)
+        ;; not sure why next_free_page is 'sword_t' instead of 'uword_t' !
+        (truly-the (signed-byte 64)
+                   (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
 
 #+darwin-jit
 (define-alien-variable ("static_code_space_free_pointer" sb-vm:*static-code-space-free-pointer*)

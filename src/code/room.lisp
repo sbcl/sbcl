@@ -128,7 +128,7 @@
        (bounds text-space-start
                (sap-int *text-space-free-pointer*)))
       (:dynamic
-       (bounds (current-dynamic-space-start)
+       (bounds dynamic-space-start
                (sap-int (dynamic-space-free-pointer)))))))
 
 ;;; Return the total number of bytes used in SPACE.
@@ -375,7 +375,7 @@ We could try a few things to mitigate this:
        ;; in a single-threaded system.
   (close-thread-alloc-region)
   (do ((initial-next-free-page next-free-page)
-       (base (int-sap (current-dynamic-space-start)))
+       (base (int-sap dynamic-space-start))
        (start-page 0)
        (end-page 0)
        (end-page-bytes-used 0))
@@ -1287,7 +1287,7 @@ We could try a few things to mitigate this:
 ;;; to fail.
 (defun print-page-contents (page)
   (let* ((start
-          (+ (current-dynamic-space-start) (* gencgc-page-bytes page)))
+          (+ dynamic-space-start (* gencgc-page-bytes page)))
          (end
           (+ start gencgc-page-bytes)))
     (map-objects-in-range #'print-it (%make-lisp-obj start) (%make-lisp-obj end)))))
