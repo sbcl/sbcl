@@ -596,37 +596,45 @@
     (loadw r object instance-slots-offset instance-pointer-lowtag)))
 
 (defun structure-is-a (layout temp this-id test-layout &optional target not-p done)
-  (let* ((test-id (layout-id test-layout))
-         (depthoid (wrapper-depthoid test-layout))
-         (offset (+ (id-bits-offset)
-                    (ash (- depthoid 2) 2)
-                    (- instance-pointer-lowtag))))
-    (when (and target
-               (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
-      (inst ldrsw temp
-            (@ layout
-               (load-store-offset
-                (- (+ #+little-endian 4
-                      (ash (+ instance-slots-offset
-                              (get-dsd-index layout sb-kernel::flags))
-                           word-shift))
-                   instance-pointer-lowtag))))
-      (inst cmp temp (add-sub-immediate (fixnumize depthoid)))
-      (inst b :lt (if not-p target done)))
-    (inst ldr (32-bit-reg this-id) (@ layout offset))
-    ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
-    (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
-           (if (minusp test-id)
-               (inst cmn (32-bit-reg this-id) (- test-id))
-               (inst cmp (32-bit-reg this-id) test-id)))
-          (t
-           (destructuring-bind (size . label)
-               ;; This uses the bogus definition of :dword, the one which
-               ;; emits 4 bytes. _technically_ dword should be 8 bytes.
-               (register-inline-constant :dword `(:layout-id ,test-layout))
-             (declare (ignore size))
-             (inst load-from-label (32-bit-reg temp) label))
-           (inst cmp (32-bit-reg this-id) (32-bit-reg temp))))))
+  (cond ((integerp test-layout)
+         (inst ldrsw temp
+               (@ layout
+                  (- (ash (+ instance-slots-offset
+                             (get-dsd-index layout sb-kernel::flags))
+                          word-shift)
+                     instance-pointer-lowtag)))
+         (inst tst temp test-layout))
+        (t
+         (let* ((test-id (layout-id test-layout))
+                (depthoid (wrapper-depthoid test-layout))
+                (offset (+ (id-bits-offset)
+                           (ash (- depthoid 2) 2)
+                           (- instance-pointer-lowtag))))
+           (when (and target
+                      (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
+             (inst ldrsw temp
+                   (@ layout
+                      (- (+ #+little-endian 4
+                            (ash (+ instance-slots-offset
+                                    (get-dsd-index layout sb-kernel::flags))
+                                 word-shift))
+                         instance-pointer-lowtag)))
+             (inst cmp temp (add-sub-immediate (fixnumize depthoid)))
+             (inst b :lt (if not-p target done)))
+           (inst ldr (32-bit-reg this-id) (@ layout offset))
+           ;; 8-bit IDs are permanently assigned, so no fixup ever needed for those.
+           (cond ((typep test-id '(and (signed-byte 8) (not (eql 0))))
+                  (if (minusp test-id)
+                      (inst cmn (32-bit-reg this-id) (- test-id))
+                      (inst cmp (32-bit-reg this-id) test-id)))
+                 (t
+                  (destructuring-bind (size . label)
+                      ;; This uses the bogus definition of :dword, the one which
+                      ;; emits 4 bytes. _technically_ dword should be 8 bytes.
+                      (register-inline-constant :dword `(:layout-id ,test-layout))
+                    (declare (ignore size))
+                    (inst load-from-label (32-bit-reg temp) label))
+                  (inst cmp (32-bit-reg this-id) (32-bit-reg temp))))))))
 
 ;;; This could be split into two vops to avoid wasting an allocation for 'temp'
 ;;; when the immediate form is used.
@@ -658,7 +666,10 @@
       (inst b :ne (if not-p target done)))
     (loadw layout object instance-slots-offset instance-pointer-lowtag)
     (structure-is-a layout temp this-id test-layout target not-p done)
-    (inst b (if not-p :ne :eq) target)
+    (inst b (if (if (integerp test-layout)
+                    (not not-p)
+                    not-p)
+                :ne :eq) target)
     done))
 
 (define-vop (structure-typep*)
@@ -670,5 +681,8 @@
   (:temporary (:sc unsigned-reg) this-id temp)
   (:generator 4
     (structure-is-a layout temp this-id test-layout target not-p done)
-    (inst b (if not-p :ne :eq) target)
+    (inst b (if (if (integerp test-layout)
+                    (not not-p)
+                    not-p)
+                :ne :eq) target)
     done))

@@ -897,12 +897,14 @@
 
     ;; Easiest case first: single bit test.
     (cond ((member name '(condition pathname structure-object))
-           `(and (%instancep object)
-                 (logtest (,get-flags (%instance-layout object))
-                          ,(case name
-                             (condition +condition-layout-flag+)
-                             (pathname  +pathname-layout-flag+)
-                             (t         +structure-layout-flag+)))))
+           (let ((flag (case name
+                         (condition +condition-layout-flag+)
+                         (pathname  +pathname-layout-flag+)
+                         (t         +structure-layout-flag+))))
+            (if (vop-existsp :translate structure-typep)
+                `(structure-typep object ,flag)
+                `(and (%instancep object)
+                      (logtest (,get-flags (%instance-layout object)) ,flag)))))
 
           ;; TODO: remove after April 2021 release.
           ((eq name 'sb-kernel::random-class)

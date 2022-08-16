@@ -942,26 +942,37 @@
       (inst cmp :dword (read-depthoid) (fixnumize k))))
 
   (defun structure-is-a (layout test-layout &optional target not-p done)
-    (let* ((depthoid (wrapper-depthoid test-layout))
-           (offset (+ (id-bits-offset)
-                      (ash (- depthoid 2) 2)
-                      (- instance-pointer-lowtag))))
-      (when (and target
-                 (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
-        (inst cmp :dword (read-depthoid) (fixnumize depthoid))
-        (inst jmp :l (if not-p target done)))
-      (inst cmp :dword
-            (ea offset layout)
-            ;; Small layout-ids can only occur for layouts made in genesis.
-            ;; Therefore if the compile-time value of the ID is small,
-            ;; it is permanently assigned to that type.
-            ;; Otherwise, we allow for the possibility that the compile-time ID
-            ;; is not the same as the load-time ID.
-            ;; I don't think layout-id 0 can get here, but be sure to exclude it.
-            (if (or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
-                    (not (sb-c::producing-fasl-file)))
-                (layout-id test-layout)
-                (make-fixup test-layout :layout-id))))))
+    (if (integerp test-layout)
+        (inst test
+              (if (typep test-layout '(unsigned-byte 8))
+                  :byte
+                  :dword)
+              (ea (- (ash (+ instance-slots-offset
+                             (get-dsd-index layout sb-kernel::flags))
+                          word-shift)
+                     instance-pointer-lowtag)
+                  layout)
+              test-layout)
+        (let* ((depthoid (wrapper-depthoid test-layout))
+               (offset (+ (id-bits-offset)
+                          (ash (- depthoid 2) 2)
+                          (- instance-pointer-lowtag))))
+          (when (and target
+                     (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
+            (inst cmp :dword (read-depthoid) (fixnumize depthoid))
+            (inst jmp :l (if not-p target done)))
+          (inst cmp :dword
+                (ea offset layout)
+                ;; Small layout-ids can only occur for layouts made in genesis.
+                ;; Therefore if the compile-time value of the ID is small,
+                ;; it is permanently assigned to that type.
+                ;; Otherwise, we allow for the possibility that the compile-time ID
+                ;; is not the same as the load-time ID.
+                ;; I don't think layout-id 0 can get here, but be sure to exclude it.
+                (if (or (typep (layout-id test-layout) '(and (signed-byte 8) (not (eql 0))))
+                        (not (sb-c::producing-fasl-file)))
+                    (layout-id test-layout)
+                    (make-fixup test-layout :layout-id)))))))
 
 (define-vop ()
   (:translate sb-c::%structure-is-a)
@@ -990,7 +1001,10 @@
     #-compact-instance-header
     (loadw layout object instance-slots-offset instance-pointer-lowtag)
     (structure-is-a layout test-layout target not-p done)
-    (inst jmp (if not-p :ne :e) target)
+    (inst jmp (if (if (integerp test-layout)
+                      (not not-p)
+                      not-p)
+                  :ne :e) target)
     done))
 
 (define-vop (structure-typep*)
@@ -1001,7 +1015,10 @@
   (:info target not-p test-layout)
   (:generator 4
     (structure-is-a layout test-layout target not-p done)
-    (inst jmp (if not-p :ne :e) target)
+    (inst jmp (if (if (integerp test-layout)
+                      (not not-p)
+                      not-p)
+                  :ne :e) target)
     done))
 
 (define-vop (load-instance-layout)
