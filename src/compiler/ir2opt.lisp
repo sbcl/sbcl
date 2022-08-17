@@ -342,7 +342,9 @@
     (initialize-ir2-blocks-flow-info component)
     (flet ((start-vop (block)
              (do ((block block (ir2-block-next block)))
-                 ((null block) nil)
+                 ((or
+                   (null block)
+                   (not (singleton-p (ir2block-predecessors block)))) nil)
                (let ((vop (ir2-block-start-vop block)))
                  (when vop
                    (if (eq (vop-name vop) 'sb-c:note-environment-start)
