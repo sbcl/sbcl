@@ -276,7 +276,8 @@
   ;; this operand is allowed into. If NIL, there is no restriction.
   (scs nil :type (or symbol list) :read-only t)
   ;; If non-null, we are a temp wired to this offset in SC.
-  (offset nil :type (or unsigned-byte null) :read-only t))
+  (offset nil :type (or unsigned-byte null) :read-only t)
+  (unused-if nil))
 (declaim (freeze-type operand-parse))
 
 (defun operand-parse-sc (parse) ; Enforce a single symbol
@@ -789,46 +790,60 @@
            ,@(saves))))))
 
 (defun make-after-sc-function (parse)
-  (when (typep (vop-parse-conditional-p parse) '(cons (eql :after-sc-selection)))
-    (let* ((n-vop (vop-parse-vop-var parse))
-           (n-args (vop-parse-args-var parse))
-           (n-results (vop-parse-results-var parse))
-           (n-info (gensym))
-           (n-variant (gensym))
-           (bindings
-             `((,n-args (vop-args ,n-vop))
-               (,n-results (vop-results ,n-vop))
-               ,@(access-operands (vop-parse-args parse)
-                                  (vop-parse-more-args parse)
-                                  n-args)
-               ,@(access-operands (vop-parse-results parse)
-                                  (vop-parse-more-results parse)
-                                  n-results)
-               ,@(when (vop-parse-info-args parse)
-                   `((,n-info (vop-codegen-info ,n-vop))
-                     ,@(mapcar (lambda (x) `(,x (pop ,n-info)))
-                               (vop-parse-info-args parse))))
-               ,@(when (vop-parse-variant-vars parse)
-                   `((,n-variant (vop-info-variant (vop-info ,n-vop)))
-                     ,@(mapcar (lambda (x) `(,x (pop ,n-variant)))
-                               (vop-parse-variant-vars parse))))
-               ,@(loop for op in (vop-parse-operands parse)
-                       when
-                       (ecase (operand-parse-kind op)
-                         ((:argument :result)
-                          `(,(operand-parse-name op)
-                            (tn-ref-tn ,(operand-parse-temp op))))
-                         (:temporary)
-                         ((:more-argument :more-result)))
-                       collect it)))
-           (body (cdr (vop-parse-conditional-p parse))))
-      `(lambda (,n-vop)
-         (let* ,bindings
-           (declare (ignorable ,@(mapcar #'car bindings)))
-           (setf (car (last (vop-codegen-info ,n-vop)))
-                 (progn ,@body))
-           (setf (vop-codegen-info ,n-vop)
-                 (butlast (vop-codegen-info ,n-vop))))))))
+  (let ((unused-temps
+          (remove-if-not #'operand-parse-unused-if
+                         (vop-parse-temps parse)))
+        (conditional (typep (vop-parse-conditional-p parse) '(cons (eql :after-sc-selection)))))
+    (when (or unused-temps
+              conditional)
+      (let* ((n-vop (vop-parse-vop-var parse))
+             (n-args (vop-parse-args-var parse))
+             (n-results (vop-parse-results-var parse))
+             (n-info (gensym))
+             (n-variant (gensym))
+             (bindings
+               `((,n-args (vop-args ,n-vop))
+                 (,n-results (vop-results ,n-vop))
+                 ,@(access-operands (vop-parse-args parse)
+                                    (vop-parse-more-args parse)
+                                    n-args)
+                 ,@(access-operands (vop-parse-results parse)
+                                    (vop-parse-more-results parse)
+                                    n-results)
+                 ,@(and unused-temps
+                        (access-operands (vop-parse-temps parse) nil
+                                         `(vop-temps ,n-vop)))
+                 ,@(when (vop-parse-info-args parse)
+                     `((,n-info (vop-codegen-info ,n-vop))
+                       ,@(mapcar (lambda (x) `(,x (pop ,n-info)))
+                                 (vop-parse-info-args parse))))
+                 ,@(when (vop-parse-variant-vars parse)
+                     `((,n-variant (vop-info-variant (vop-info ,n-vop)))
+                       ,@(mapcar (lambda (x) `(,x (pop ,n-variant)))
+                                 (vop-parse-variant-vars parse))))
+                 ,@(loop for op in (vop-parse-operands parse)
+                         when
+                         (ecase (operand-parse-kind op)
+                           ((:argument :result)
+                            `(,(operand-parse-name op)
+                              (tn-ref-tn ,(operand-parse-temp op))))
+                           (:temporary
+                            (and (operand-parse-unused-if op)
+                                 `(,(operand-parse-name op)
+                                   (tn-ref-tn ,(operand-parse-temp op)))))
+                           ((:more-argument :more-result)))
+                         collect it))))
+        `(lambda (,n-vop)
+           (let* ,bindings
+             (declare (ignorable ,@(mapcar #'car bindings)))
+             ,@(when conditional
+                 `((setf (car (last (vop-codegen-info ,n-vop)))
+                         (progn ,@(cdr (vop-parse-conditional-p parse))))
+                   (setf (vop-codegen-info ,n-vop)
+                         (butlast (vop-codegen-info ,n-vop)))))
+             ,@(loop for op in unused-temps
+                     collect `(when ,(operand-parse-unused-if op)
+                                (setf (tn-kind ,(operand-parse-name op)) :unused)))))))))
 
 (defvar *parse-vop-operand-count*)
 (defun make-operand-parse-temp ()
@@ -975,6 +990,7 @@
                (unless (= (length scs) 1)
                  (error "must specify exactly one SC for a temporary"))
                (setf value (first scs))))
+            (:unused-if)
             (t
              (error "unknown temporary option: ~S" opt)))
           (setf (getf res key) value)))

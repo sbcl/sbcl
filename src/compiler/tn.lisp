@@ -70,9 +70,10 @@
                     (t
                      (delete-1 tn prev setter))))))
              (used-p (tn)
-               (or (tn-reads tn) (tn-writes tn)
-                   (member (tn-kind tn) '(:component :environment))
-                   (not (zerop (sbit aliases (tn-number tn))))))
+               (and (neq (tn-kind tn) :unused)
+                    (or (tn-reads tn) (tn-writes tn)
+                        (member (tn-kind tn) '(:component :environment))
+                        (not (zerop (sbit aliases (tn-number tn)))))))
              (delete-1 (tn prev setter)
                (if prev
                    (setf (tn-next prev) (tn-next tn))

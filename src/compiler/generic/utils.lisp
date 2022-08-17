@@ -274,16 +274,16 @@
                                  (specifier-type '(eql nil)))))
 
 (defun instance-tn-ref-p (tn-ref)
-  (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
-       (csubtypep (tn-ref-type tn-ref) (specifier-type 'instance))))
+  (csubtypep (tn-ref-type tn-ref) (specifier-type 'instance)))
+
 (defun stack-consed-p (object)
   (let ((write (sb-c::tn-writes object))) ; list of write refs
-    (when (or (not write) ; grrrr, the only write is from a LOAD tn
-                          ; and we don't know the corresponding normal TN?
-              (tn-ref-next write)) ; can't determine if > 1 write
+    (when (or (not write)    ; grrrr, the only write is from a LOAD tn
+                                        ; and we don't know the corresponding normal TN?
+              (tn-ref-next write))      ; can't determine if > 1 write
       (return-from stack-consed-p nil))
     (let ((vop (tn-ref-vop write)))
-      (when (not vop) ; wat?
+      (when (not vop)                   ; wat?
         (return-from stack-consed-p nil))
       (when (eq (vop-name vop) 'allocate-vector-on-stack)
         (return-from stack-consed-p t))
@@ -297,7 +297,7 @@
         (return-from stack-consed-p nil))
       (let* ((splat-input (vop-args vop))
              (splat-input-source
-              (tn-ref-vop (sb-c::tn-writes (tn-ref-tn splat-input)))))
+               (tn-ref-vop (sb-c::tn-writes (tn-ref-tn splat-input)))))
         ;; How in the heck can there NOT be a vop??? Well, sometimes there isn't.
         (when (and splat-input-source
                    (eq (vop-name splat-input-source)
