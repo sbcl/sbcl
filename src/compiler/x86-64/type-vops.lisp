@@ -957,8 +957,11 @@
              (and (eq (classoid-state classoid) :sealed)
                   (not (classoid-subclasses classoid))))
            (emit-constant test-layout)
-           (inst cmp #+compact-instance-header :dword
-                     layout (make-fixup test-layout :layout)))
+           #+compact-instance-header
+           (inst cmp :dword
+                 layout (make-fixup test-layout :layout))
+           #-compact-instance-header
+           (inst cmp (emit-constant test-layout) layout))
 
           (t
            (let* ((depthoid (wrapper-depthoid test-layout))
@@ -969,7 +972,7 @@
                         (> depthoid sb-kernel::layout-id-vector-fixed-capacity))
                (inst cmp :dword (read-depthoid) (fixnumize depthoid))
                (inst jmp :l (if not-p target done)))
-             (inst cmp #+compact-instance-header :dword
+             (inst cmp :dword
                        (ea offset layout)
                        ;; Small layout-ids can only occur for layouts made in genesis.
                        ;; Therefore if the compile-time value of the ID is small,
@@ -1015,8 +1018,10 @@
            (inst cmp :dword (ea (- 4 instance-pointer-lowtag) object)
                  (make-fixup test-layout :layout))
            #-compact-instance-header
-           (inst cmp (object-slot-ea layout instance-slots-offset instance-pointer-lowtag)
-                 (make-fixup test-layout :layout)))
+           (progn
+             (inst mov layout (emit-constant test-layout))
+             (inst cmp (object-slot-ea object instance-slots-offset instance-pointer-lowtag)
+                   layout)))
           (t
            #+compact-instance-header
            (inst mov :dword layout (ea (- 4 instance-pointer-lowtag) object))
