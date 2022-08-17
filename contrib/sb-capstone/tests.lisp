@@ -58,6 +58,10 @@
           (every #'(lambda (instruction) (search instruction instructions))
                                instructions-to-check))))))
 
+#|
+;;; Someone needs to fix these.
+;;; See https://groups.google.com/g/sbcl-help-archive/c/FxDjTHaPnik/m/mIFJTe9-AQAJ
+
 (deftest x86-64 (capstone-check '(#x8F #x45 #x08 #x48 #x8B #xF0)
                                 '(:x86-64 :little-endian)
                                 '("MOV RSI, RAX"
@@ -75,3 +79,4 @@
                                         '(:ppc64 :big-endian)
                                         '("MFLR R0"))
                         t)
+|#
