@@ -87,6 +87,18 @@
                          sb-vm:bignum-digits-offset
                          index offset))
 
+;;; When copying a structure, try to make the best decision possible
+;;; as to placement. This matters in a few circumstances:
+;;; - when the "system" mixed TLAB is different from the "user" mixed TLAB.
+;;; - when we distinguish boxed from mixed allocation to generation 0.
+;;; GIVE-UP-IR1-TRANSFORM might put the allocation in the wrong TLAB,
+;;; as the general fallback doesn't make the same distinctions.
+;;; Unfortunately the DEFSTRUCT-defined copiers were not inlining even when
+;;; explicitly requested, because COPY-SOMESTRUCT always transforms into
+;;; COPY-STRUCTURE, so we've lost any declared inline-ness of COPY-SOMESTRUCT.
+;;; Therefore we just try to infer it based on whether this transform is
+;;; "acting as" COPY-SOMESTRUCT for a particular struct whose copier
+;;; was requested to be inline.
 (deftransform copy-structure ((instance) * * :result result :node node)
   (let* ((classoid (lvar-type instance))
          (name (and (structure-classoid-p classoid) (classoid-name classoid)))
@@ -99,6 +111,7 @@
                         (eq (classoid-state classoid) :sealed)
                         (not (classoid-subclasses classoid))))
          (dd (and class-eq (wrapper-info layout)))
+         (dd-copier (and dd (sb-kernel::dd-copier-name dd)))
          (max-inlined-words 5))
     (unless (and result ; could be unused result (but entire call wasn't flushed?)
                  layout
@@ -111,6 +124,8 @@
                  ;; Definitely do this if copying to stack
                  ;; (Allocation has to be inlined, otherwise there's no way to DX it)
                  (or (lvar-dynamic-extent result)
+                     (and dd-copier
+                          (eq (sb-int:info :function :inlinep dd-copier) 'inline))
                      ;; Or if it's a small fixed number of words
                      ;; and speed at least as important as size.
                      (and class-eq

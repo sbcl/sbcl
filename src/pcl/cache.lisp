@@ -64,6 +64,7 @@
 ;;;; Subsequences of the cache vector are called cache lines.
 ;;;;
 
+(declaim (inline %copy-cache))
 (defstruct (cache (:constructor %make-cache)
                   (:copier %copy-cache))
   ;; Number of keys the cache uses.
@@ -90,6 +91,15 @@
   (depth 0 :type index)
   ;; Maximum allowed probe-depth before the cache needs to expand.
   (limit 0 :type index))
+;;; There is no syntax to freeze a type before the copier function
+;;; is defined. That's sad, because it means that the global defun
+;;; for %COPY-CACHE does *not* inline its allocator, for two different reasons:
+;;; 1. the DEFSTRUCT-DESCRIPTION doesn't exist yet
+;;; 2. the classoid isn't in sealed state when the DEFUN occurs
+;;; (i.e. those are generally true of any defstruct form)
+;;; However, all other uses of %COPY-CACHE aside from the global one
+;;; _are_ inlined. So we're ok- we get the desired result, unless
+;;; somebody funcalls #'%copy-cache, which nobody does.
 (declaim (freeze-type cache))
 
 (defun compute-cache-mask (vector-length line-size)
