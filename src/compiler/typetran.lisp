@@ -922,19 +922,23 @@
           ((and wrapper
                 (eq (classoid-state classoid) :sealed)
                 (not (classoid-subclasses classoid)))
-           (if lowtag-test
-               `(and ,lowtag-test
-                     ,(if (vop-existsp :translate layout-eq)
-                          `(layout-eq object ,wrapper ,lowtag)
-                          `(eq ,slot-reader ,layout)))
-               ;; `(eq ,layout
-               ;;      (if-vop-existsp (:translate %instanceoid-layout)
-               ;;        (%instanceoid-layout object)
-               ;;        ;; Slightly quicker than LAYOUT-OF. See also %PCL-INSTANCE-P
-               ;;        (cond ((%instancep object) (%instance-layout object))
-               ;;              ((funcallable-instance-p object) (%fun-layout object))
-               ;;              (t ,(find-layout 't)))))
-               (bug "Unexpected metatype for ~S" wrapper)))
+           (cond ((and (eq lowtag sb-vm:instance-pointer-lowtag)
+                       (vop-existsp :translate structure-typep))
+                  `(structure-typep object ,wrapper))
+                 (lowtag-test
+                  `(and ,lowtag-test
+                        ,(if (vop-existsp :translate layout-eq)
+                             `(layout-eq object ,wrapper ,lowtag)
+                             `(eq ,slot-reader ,layout))))
+                 (t
+                  ;; `(eq ,layout
+                  ;;      (if-vop-existsp (:translate %instanceoid-layout)
+                  ;;        (%instanceoid-layout object)
+                  ;;        ;; Slightly quicker than LAYOUT-OF. See also %PCL-INSTANCE-P
+                  ;;        (cond ((%instancep object) (%instance-layout object))
+                  ;;              ((funcallable-instance-p object) (%fun-layout object))
+                  ;;              (t ,(find-layout 't)))))
+                  (bug "Unexpected metatype for ~S" wrapper))))
 
           ;; All other structure types
           ((and (typep classoid 'structure-classoid) wrapper)

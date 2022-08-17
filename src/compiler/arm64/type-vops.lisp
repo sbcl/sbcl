@@ -595,7 +595,7 @@
       (inst b :ne not-instance))
     (loadw r object instance-slots-offset instance-pointer-lowtag)))
 
-(defun structure-is-a (layout temp this-id test-layout &optional target not-p done)
+(defun structure-is-a (layout temp this-id test-layout &optional desc-temp target not-p done)
   (cond ((integerp test-layout)
          (inst ldrsw temp
                (@ layout
@@ -604,6 +604,11 @@
                           word-shift)
                      instance-pointer-lowtag)))
          (inst tst temp test-layout))
+        ((and desc-temp
+              (neq (tn-kind desc-temp) :unused))
+         (inst load-constant desc-temp
+               (tn-byte-offset (emit-constant test-layout)))
+         (inst cmp layout desc-temp))
         (t
          (let* ((test-id (layout-id test-layout))
                 (depthoid (wrapper-depthoid test-layout))
@@ -658,14 +663,28 @@
   (:conditional)
   (:info target not-p test-layout)
   (:temporary (:sc descriptor-reg) layout)
-  (:temporary (:sc unsigned-reg) this-id temp)
+  (:temporary (:sc unsigned-reg
+               :unused-if
+               (and (instance-tn-ref-p args)
+                    #1=(and (not (integerp test-layout))
+                            (let ((classoid (wrapper-classoid test-layout)))
+                              (and (eq (classoid-state classoid) :sealed)
+                                   (not (classoid-subclasses classoid)))))))
+              temp)
+  (:temporary (:sc unsigned-reg
+               :unused-if (or (integerp test-layout)
+                              #1#))
+              this-id)
+  (:temporary (:sc descriptor-reg
+               :unused-if (not #1#))
+              desc-temp)
   (:generator 4
     (unless (instance-tn-ref-p args)
       (inst and temp object lowtag-mask)
       (inst cmp temp instance-pointer-lowtag)
       (inst b :ne (if not-p target done)))
     (loadw layout object instance-slots-offset instance-pointer-lowtag)
-    (structure-is-a layout temp this-id test-layout target not-p done)
+    (structure-is-a layout temp this-id test-layout desc-temp target not-p done)
     (inst b (if (if (integerp test-layout)
                     (not not-p)
                     not-p)
@@ -678,9 +697,22 @@
   (:policy :fast-safe)
   (:conditional)
   (:info target not-p test-layout)
-  (:temporary (:sc unsigned-reg) this-id temp)
+  (:temporary (:sc unsigned-reg
+               :unused-if
+               #1=(and (not (integerp test-layout))
+                       (let ((classoid (wrapper-classoid test-layout)))
+                         (and (eq (classoid-state classoid) :sealed)
+                              (not (classoid-subclasses classoid))))))
+              temp)
+  (:temporary (:sc unsigned-reg
+               :unused-if (or (integerp test-layout)
+                              #1#))
+              this-id)
+  (:temporary (:sc descriptor-reg
+               :unused-if (not #1#))
+              desc-temp)
   (:generator 4
-    (structure-is-a layout temp this-id test-layout target not-p done)
+    (structure-is-a layout temp this-id test-layout desc-temp target not-p done)
     (inst b (if (if (integerp test-layout)
                     (not not-p)
                     not-p)
