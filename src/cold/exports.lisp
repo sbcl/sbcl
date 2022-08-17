@@ -458,6 +458,7 @@ structure representations")
            "IS-LISP-POINTER"
            #+gencgc "LARGE-OBJECT-SIZE"
            "LAYOUT"
+           "LDB-MONITOR"
            "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-LOWTAG"
            ;; FIXME: Possibly these other parameters (see
            ;; compiler/{x86,sparc}/parms.lisp) should be defined

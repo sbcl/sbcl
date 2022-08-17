@@ -170,7 +170,7 @@
   (alien-funcall (extern-alien "printf" (function void system-area-pointer unsigned unsigned))
                  (vector-sap #.(format nil "Element %d of bignum %p was never written~%"))
                  i (get-lisp-obj-address bignum))
-  (alien-funcall (extern-alien "ldb_monitor" (function void)))
+  (sb-vm:ldb-monitor)
   0)
 
 (declaim (inline %bignum-ref))
@@ -202,7 +202,7 @@
                                               (function void system-area-pointer unsigned unsigned))
                                 (vector-sap #.(format nil "set-length %p,%d not properly zeroed~%"))
                                 (get-lisp-obj-address bignum) index)
-                 (alien-funcall (extern-alien "ldb_monitor" (function void))))
+                 (sb-vm:ldb-monitor))
                (setq word-ptr (sap+ word-ptr 8))))))
 )
 

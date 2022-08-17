@@ -272,13 +272,29 @@ static int save_cmd(char **ptr) {
     return 0;
 }
 
-static int threads_cmd(char __attribute__((unused)) **ptr) {
+static int threads_cmd(char **ptr) {
+    int regions = 0;
     struct thread* th;
-    fprintf(stderr, "(thread*,pthread,sb-vm:thread)\n");
+    if (more_p(ptr) && !strncmp(*ptr, "-r", 2)) regions = 1;
+    fprintf(stderr, "(thread*,pthread,sb-vm:thread,name)\n");
     void* pthread;
     for_each_thread(th) {
         memcpy(&pthread, &th->os_thread, N_WORD_BYTES);
-        fprintf(stderr, "%p %p %p\n", th, pthread, (void*)th->lisp_thread);
+        struct thread_instance* i = (void*)(th->lisp_thread - INSTANCE_POINTER_LOWTAG);
+        char* name = NULL;
+        if (i->name != NIL &&
+            widetag_of(native_pointer(i->name)) == SIMPLE_BASE_STRING_WIDETAG)
+            name = (char*)VECTOR(i->name)->data;
+        fprintf(stderr, "%p %p %p \"%s\"\n", th, pthread, (void*)i, name);
+        if (regions) {
+#define show_tlab(label, r) fprintf(stderr, "  %s @ %p: %p %p %p\n", label, \
+         &th->r, th->r.start_addr, th->r.end_addr, th->r.free_pointer)
+            show_tlab("usr cons ", cons_tlab);
+            show_tlab("usr mix  ", mixed_tlab);
+            show_tlab("sys cons ", sys_cons_tlab);
+            show_tlab("sys mix  ", sys_mixed_tlab);
+#undef show_tlab
+        }
     }
     return 0;
 }
@@ -884,7 +900,7 @@ int load_gc_crashdump(char* pathname)
     if (preamble.readonly_nbytes) {
       // READ_ONLY_SPACE_START = preamble.readonly_start;
       os_validate(0, (char*)preamble.readonly_start,
-                  ALIGN_UP(preamble.readonly_nbytes, 4096), 0, 0);
+                  ALIGN_UP(preamble.readonly_nbytes, 4096), 0);
       checked_read("R/O", fd, (char*)preamble.readonly_start, preamble.readonly_nbytes);
     }
     read_only_space_free_pointer = (lispobj*)(READ_ONLY_SPACE_START + preamble.readonly_nbytes);
@@ -892,7 +908,7 @@ int load_gc_crashdump(char* pathname)
     DYNAMIC_SPACE_START = preamble.dynspace_start;
     long dynspace_nbytes = preamble.dynspace_npages * GENCGC_PAGE_BYTES;
     char* dynspace = os_validate(0, (char*)preamble.dynspace_start,
-                                 DEFAULT_DYNAMIC_SPACE_SIZE, 0, 0);
+                                 DEFAULT_DYNAMIC_SPACE_SIZE, 0);
     if (dynspace != (char*)preamble.dynspace_start)
         lose("Didn't map dynamic space where expected: %p vs %p",
              dynspace, (char*)preamble.dynspace_start);
@@ -913,8 +929,8 @@ int load_gc_crashdump(char* pathname)
     TEXT_SPACE_START = preamble.text_start;
     fixedobj_free_pointer = (lispobj*)preamble.fixedobj_free_pointer;
     text_space_highwatermark = (lispobj*)preamble.text_space_highwatermark;
-    os_validate(0, (char*)FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_SIZE, 0, 0);
-    os_validate(0, (char*)TEXT_SPACE_START, TEXT_SPACE_SIZE, 0, 0);
+    os_validate(0, (char*)FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_SIZE, 0);
+    os_validate(0, (char*)TEXT_SPACE_START, TEXT_SPACE_SIZE, 0);
     gc_init_immobile(); // allocate the page tables
     calc_immobile_space_bounds();
     // Read fixedobj space

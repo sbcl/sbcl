@@ -69,3 +69,16 @@
 #+win32
 (defun strerror (&optional (errno (sb-win32:get-last-error)))
   (sb-win32:format-system-message errno))
+
+;;; This gives you a way to call the low-level debugger in situations
+;;; where something is broken, though the REPL works. One example is that
+;;; when the cold core first starts up, you can't compile alien accessors,
+;;; so an alien-funcall at the REPL would fail thusly:
+;;; 0: ("undefined function" ...) ; EVAL-IN-NATIVE-ENVIRONMENT
+;;; 1: (EVAL (LAMBDA (SB-ALIEN::SAP SB-ALIEN::OFFSET IGNORE) ...))
+;;; 2: (SB-ALIEN::COERCE-TO-INTERPRETED-FUNCTION (LAMBDA (...)))
+;;; 3: (SB-ALIEN-INTERNALS:%ALIEN-VALUE #.(SB-SYS:INT-SAP #X50000BB0) ...)
+;;;
+;;; or more generally, the compiler could be messed up for whatever reason.
+(defun sb-vm:ldb-monitor ()
+  (alien-funcall (extern-alien "ldb_monitor" (function void))))

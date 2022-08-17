@@ -219,7 +219,7 @@
        ;; don't make things go more wrong than they already are.
        (alien-funcall (extern-alien "printf" (function void system-area-pointer))
                       (vector-sap #.(format nil "map-objects-in-range failure~%")))
-       (alien-funcall (extern-alien "ldb_monitor" (function void))))
+       (ldb-monitor))
      #-sb-devel
      (aver (sap= start end)))))
 
