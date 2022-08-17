@@ -106,7 +106,7 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
 #define IS_THREAD_STRUCT 4
 #define MOVABLE_LOW      (MOVABLE|ALLOCATE_LOW)
 #define IS_GUARD_PAGE    8
-extern os_vm_address_t os_validate(int movable, os_vm_address_t addr,
+extern os_vm_address_t os_validate(int attributes, os_vm_address_t addr,
                                    os_vm_size_t len, int space_id);
 
 #ifdef LISP_FEATURE_WIN32
