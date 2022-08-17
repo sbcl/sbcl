@@ -187,7 +187,7 @@
                          ,form)))))
     (values (if *precompiling-lap*
                 `#',lambda
-                (pcl-compile lambda))
+                (pcl-compile lambda :safe))
             nil)))
 
 ;;; note on implementation for CMU 17 and later (including SBCL):

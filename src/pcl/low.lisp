@@ -220,22 +220,6 @@
   ;; (once in the test of PCL-INSTANCE-P and once in GET-SLOTS).
   (cond ((std-instance-p instance) (std-instance-slots instance))
         ((fsc-instance-p instance) (fsc-instance-slots instance))))
-
-(defun pcl-compile (expr &optional unsafe-policy)
-  (let* ((base-policy sb-c::*policy*)
-         (lexenv
-          (sb-c::make-almost-null-lexenv
-           (if unsafe-policy
-               (sb-c::process-optimize-decl
-                '((space 1) (compilation-speed 1)
-                  (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))
-                base-policy)
-               base-policy)
-           ;; I suspect that INHIBIT-WARNINGS precludes them from happening
-           (list (cons (sb-kernel:find-classoid 'style-warning) 'muffle-warning)
-                 (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))
-           nil nil nil)))
-    (sb-c:compile-in-lexenv expr lexenv nil nil nil nil nil)))
 
 ;;; This is here, moved from src/pcl/boot so that it gets a 1-byte layout ID
 (defstruct (fast-method-call (:copier nil))

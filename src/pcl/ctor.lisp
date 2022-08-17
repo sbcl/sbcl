@@ -592,7 +592,7 @@
           (constructor-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
               (apply (let ((*compiling-optimized-constructor* t))
-                       (pcl-compile `(lambda ,names ,form) t))
+                       (pcl-compile `(lambda ,names ,form) :unsafe))
                      locations)
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 
@@ -616,7 +616,8 @@
       (multiple-value-bind (form optimizedp)
           (allocator-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
-              (let ((*compiling-optimized-constructor* t)) (pcl-compile form t))
+              (let ((*compiling-optimized-constructor* t))
+                (pcl-compile form :unsafe))
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
 
 (defun allocator-function-form (ctor)

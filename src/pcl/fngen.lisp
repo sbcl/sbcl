@@ -22,6 +22,23 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
+
+(defun pcl-compile (expr safety)
+  (let* ((base-policy sb-c::*policy*)
+         (lexenv
+          (sb-c::make-almost-null-lexenv
+           (ecase safety
+             (:safe base-policy)
+             (:unsafe (sb-c::process-optimize-decl
+                       '((space 1) (compilation-speed 1)
+                         (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0))
+                       base-policy)))
+           ;; I suspect that INHIBIT-WARNINGS precludes them from happening
+           (list (cons (sb-kernel:find-classoid 'style-warning) 'muffle-warning)
+                 (cons (sb-kernel:find-classoid 'compiler-note) 'muffle-warning))
+           nil nil nil
+           '((:declare sb-c::tlab :system)))))
+    (sb-c:compile-in-lexenv expr lexenv nil nil nil nil nil)))
 
 ;;; GET-FUN is the main user interface to this code. It is like
 ;;; COMPILE, only more efficient. It achieves this efficiency by
@@ -113,7 +130,7 @@
     (let ((generator-lambda `(lambda ,gensyms
                                (declare (optimize (sb-c:store-source-form 0)))
                                (function ,code))))
-      (let ((generator (pcl-compile generator-lambda)))
+      (let ((generator (pcl-compile generator-lambda :safe)))
         (ensure-fgen test gensyms generator generator-lambda nil)
         generator))))
 
