@@ -1306,7 +1306,7 @@
                   `("lisp.rel"        ,+sht-progbits+ 0 0 0 8 8)
                   `(".relalisp.core"  ,+sht-rela+     0 2 1 8 ,reloc-entry-size)))
                                       ; symbol table -- ^ ^ -- for which section
-             (:note ".note.GNU-stack" ,+sht-null+     0 0 0 1  0)))
+             (:note ".note.GNU-stack" ,+sht-progbits+ 0 0 0 1  0)))
          (string-table
           (string-table (append '("lisp_code_start") (map 'list #'second sections))))
          (strings (cdr string-table))
@@ -1869,7 +1869,7 @@
                               (:sym  ".symtab"         ,+sht-symtab+   0 1 1 8 ,sym-entry-size)
                               ;;             section with the strings -- ^ ^ -- 1+ highest local symbol
                               (:core "lisp.core"       ,+sht-progbits+ 0 0 0 ,core-align 0)
-                              (:note ".note.GNU-stack" ,+sht-null+     0 0 0 1  0)))
+                              (:note ".note.GNU-stack" ,+sht-progbits+ 0 0 0 1  0)))
                  (string-table (string-table (append (map 'list #'second sections)
                                                      c-symbols)))
                  (packed-strings (cdr string-table))
