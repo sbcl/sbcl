@@ -601,7 +601,9 @@
             (let ((next (next-vop branch)))
               (and (eq (vop-name next) 'branch)
                    (next-start-vop (gethash (car (vop-codegen-info next)) *2block-info*)))))
-        (next-start-vop (gethash label *2block-info*)))))
+        (let ((dest (gethash label *2block-info*)))
+          (when dest
+            (next-start-vop dest))))))
 
 ;;; Replace (BOUNDP X) + (BRANCH-IF) + {(SYMBOL-VALUE X) | anything}
 ;;; by (FAST-SYMBOL-VALUE X) + (UNBOUND-MARKER-P) + BRANCH-IF
@@ -1144,21 +1146,30 @@
             stop
             null
             (value (tn-ref-tn (vop-args vop))))
-        (labels ((chain (vop)
+        (labels ((good-vop-p (vop)
+                   (and (singleton-p (ir2block-predecessors (vop-block vop)))
+                        (or (getf sb-vm::*other-pointer-type-vops* (vop-name vop))
+                            (eq (vop-name vop) '%other-pointer-subtype-p))
+                        (eq (tn-ref-tn (vop-args vop)) value)))
+                 (chain (vop &optional (collect t))
                    (let ((next (branch-destination vop nil)))
                      (cond ((and next
                                  (or (neq (vop-name vop) 'symbolp)
                                      (and (not null)
                                           (setf null (branch-destination vop)))))
-                            (push vop vops)
-                            (if (and (singleton-p (ir2block-predecessors (vop-block next)))
-                                     (or (getf sb-vm::*other-pointer-type-vops* (vop-name next))
-                                         (eq (vop-name next) '%other-pointer-subtype-p))
-                                     (eq (tn-ref-tn (vop-args next)) value))
-                                (chain next)
-                                (setf stop (vop-block next))))
-                           (t
-                            (setf stop (vop-block vop))))))
+                            (when collect
+                              (push vop vops))
+                            (cond ((good-vop-p next)
+                                   (chain next))
+                                  ((not stop)
+                                   (setf stop (vop-block next)))))
+                           ((not stop)
+                            (setf stop (vop-block vop)))))
+                   (let ((true (branch-destination vop)))
+                     (when (and true
+                                (good-vop-p true))
+                       (push true vops)
+                       (chain true nil))))
                  (ir2-block-label (block)
                    (or (ir2-block-%label block)
                        (setf (ir2-block-%label block) (gen-label)))))
@@ -1166,6 +1177,8 @@
           (when (> (length vops) 1)
             (let ((widetag (make-normal-tn (primitive-type-or-lose 'sb-vm::unsigned-byte-64)))
                   (block (vop-block vop)))
+              (setf (tn-type value)
+                    (tn-ref-type (vop-args vop)))
               (emit-and-insert-vop (vop-node vop)
                                    block
                                    (template-or-lose 'sb-vm::load-other-pointer-widetag)
@@ -1178,6 +1191,7 @@
               (update-block-succ block
                                  (cons stop
                                        (ir2block-successors block)))
+
               (let ((test-vop (template-or-lose 'sb-vm::test-widetag)))
                 (loop for vop in vops
                       for info = (vop-codegen-info vop)
@@ -1229,6 +1243,8 @@
           (when (> (length vops) 1)
             (let ((layout (make-normal-tn *backend-t-primitive-type*))
                   (block (vop-block vop)))
+              (setf (tn-type value)
+                    (tn-ref-type (vop-args vop)))
               (emit-and-insert-vop (vop-node vop)
                                    block
                                    (template-or-lose 'sb-vm::load-instance-layout)
