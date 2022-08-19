@@ -372,6 +372,15 @@ during backtrace.
          :set-trans %set-symbol-global-value
          :set-known ())
 
+  ;; This slot holds an FDEFN. It's almost unnecessary to have FDEFNs at all
+  ;; for symbols. If we ensured that any function bound to a symbol had a
+  ;; call convention rendering it callable in the manner of a SIMPLE-FUN,
+  ;; then we would only need to store that function's raw entry address here,
+  ;; thereby removing the FDEFN for any global symbol. Any closure assigned
+  ;; to a symbol would need a tiny trampoline, which is already the case
+  ;; for #+immobile-code.
+  (fdefn :ref-trans %symbol-fdefn :ref-known ()
+         :cas-trans cas-symbol-fdefn)
   ;; The private accessor for INFO reads the slot verbatim.
   ;; In contrast, the SYMBOL-INFO function always returns a PACKED-INFO
   ;; instance (see info-vector.lisp) or NIL. The slot itself may hold a cons
@@ -386,15 +395,6 @@ during backtrace.
         :type (or instance list)
         :init :null)
   (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
-  ;; This slot holds an FDEFN. It's almost unnecessary to have FDEFNs at all
-  ;; for symbols. If we ensured that any function bound to a symbol had a
-  ;; call convention rendering it callable in the manner of a SIMPLE-FUN,
-  ;; then we would only need to store that function's raw entry address here,
-  ;; thereby removing the FDEFN for any global symbol. Any closure assigned
-  ;; to a symbol would need a tiny trampoline, which is already the case
-  ;; for #+immobile-code.
-  (fdefn :ref-trans %symbol-fdefn :ref-known ()
-         :cas-trans cas-symbol-fdefn)
   #-compact-symbol
   (package-id :type index ; actually 16 bits. (Could go in the header)
               :ref-trans sb-impl::symbol-package-id

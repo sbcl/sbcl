@@ -421,13 +421,11 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
           case SYMBOL_WIDETAG:
             { // Copied from scav_symbol() in gc-common
             struct symbol* s = (void*)where;
-            adjust_pointers(&s->value, 2, adj);
+            adjust_pointers(&s->value, 3, adj); // value, function, info
             lispobj name = decode_symbol_name(s->name);
             lispobj adjusted_name = adjust_word(adj, name);
             // writeback the name if it changed
             if (adjusted_name != name) FIXUP(set_symbol_name(s, adjusted_name), &s->name);
-            int indicated_nwords = (*where>>N_WIDETAG_BITS) & 0xFF;
-            adjust_pointers(&s->fdefn, indicated_nwords - 4, adj);
             }
             continue;
 #endif
@@ -1229,9 +1227,6 @@ static void trace_sym(lispobj ptr, struct symbol* sym, struct hopscotch_table* s
     RECURSE(sym->value);
     RECURSE(sym->info);
     RECURSE(sym->fdefn);
-    int indicated_nwords = HeaderValue(sym->header) & 0xFF;
-    if (indicated_nwords + 1 > SYMBOL_SIZE) // has one more slot with no name
-        RECURSE(1[&sym->fdefn]); // ASSUMPTION: slot order
 }
 
 static void tally(lispobj ptr, struct visitor* v)

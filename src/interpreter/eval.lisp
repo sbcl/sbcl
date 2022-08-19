@@ -66,6 +66,22 @@
 (defparameter *eval-level* -1)
 (defparameter *eval-verbose* nil)
 
+(defun special-form-handler (fname)
+  ;; Returns a cons of the deferred processor and immediate processor.
+  ;; The CDR can be NIL if there is no immediate handler.
+  (binding* ((info (symbol-dbinfo fname) :exit-if-null)
+             ;; This is safe: PACKED-INFO invariant requires that it have length >= 1.
+             (word (the fixnum (%info-ref info 0))))
+    ;; Test that the first info-number is +fdefn-info-num+ and its n-infos
+    ;; field is nonzero. These conditions can be tested simultaneously
+    ;; using a SIMD-in-a-register idea. The low 6 bits must be nonzero
+    ;; and the next 6 must be exactly #b111111, so considered together
+    ;; as a 12-bit unsigned integer it must be >= #b111111000001
+    (when (>= (ldb (byte (* info-number-bits 2) 0) word)
+              (1+ (ash +fdefn-info-num+ info-number-bits)))
+      (%info-ref info (1- (truly-the (integer 1 *)
+                                     (sb-impl::packed-info-len info)))))))
+
 (defun %eval (exp env)
   (labels
       ((%%eval (&aux fname)
@@ -100,12 +116,10 @@
           ((logtest (get-header-data fname) +special-op-symbol+)
            (cond ((or (logtest (get-header-data fname) +simple-special-op+)
                       (eq sb-ext:*evaluator-mode* :interpret))
-                  (cond ((and (symbol-extra-slot-p fname)
-                              (functionp (symbol-extra fname)))
-                         (funcall (truly-the function (symbol-extra fname))
-                                  (cdr exp) env))
-                        (t
-                         (dispatch (%sexpr exp) env))))
+                  (let ((handler (cdr (special-form-handler fname)))) ; immediate handler
+                    (if (functionp handler)
+                        (funcall handler (cdr exp) env)
+                        (dispatch (%sexpr exp) env))))
                  (t
                   (compile-it))))
           (t ; Everything else: macros and functions.
@@ -168,7 +182,7 @@
            (%program-error "Invalid function name: ~S" fname)))
     ;; CLHS 3.1.2.1.2.1 Special Forms.
     (when (logtest (get-header-data fname) +special-op-symbol+)
-      (let ((processor (info :function :interpreter fname)))
+      (let ((processor (car (special-form-handler fname)))) ; deferred handler
         (when (functionp processor)
           (return-from digest-form
             (let ((digested-form (funcall processor (cdr form) env)))

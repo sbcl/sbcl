@@ -1155,6 +1155,9 @@ core and return a descriptor to it."
   (logior (ash package-id sb-impl::symbol-name-bits) (descriptor-bits name)))
 
 ;;; Allocate (and initialize) a symbol.
+;;; Even though all symbols are the same size now, I still envision the possibility
+;;; of reducing gensyms to 4 words, though I'm not sure what to do if information
+;;; is later attached (function, value, plist)
 (defun allocate-symbol (size cold-package name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
   (let ((symbol (allocate-otherptr gspace size sb-vm:symbol-widetag)))
@@ -1710,11 +1713,7 @@ core and return a descriptor to it."
       ;; and not an immediate processor.
       (let* ((pkg-info
               (when core-file-name (cold-find-package-info (sb-xc:package-name package))))
-             (handle (allocate-symbol
-                      (if (or (eq (info :function :kind symbol) :special-form)
-                              (member symbol '(sb-sys:with-pinned-objects)))
-                          sb-vm:augmented-symbol-size
-                          sb-vm:symbol-size)
+             (handle (allocate-symbol sb-vm:symbol-size
                       (cdr pkg-info) name :gspace gspace)))
         (when pkg-info
           (aver (not (zerop (descriptor-fixnum (read-slot (cdr pkg-info) :id))))))

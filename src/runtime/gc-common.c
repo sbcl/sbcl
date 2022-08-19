@@ -826,20 +826,12 @@ static lispobj trans_tiny_mixed(lispobj object) {
 static sword_t scav_symbol(lispobj *where, lispobj header) {
 #ifdef LISP_FEATURE_COMPACT_SYMBOL
     struct symbol* s = (void*)where;
-    scavenge(&s->value, 2); // picks up the value and info slots
+    scavenge(&s->value, 3); // value, function, info
     lispobj name = decode_symbol_name(s->name);
     lispobj new = name;
     scavenge(&new, 1);
     if (new != name) set_symbol_name(s, new);
-    // The normal length indicated in the header would be (SYMBOL_SIZE-1) since
-    // SYMBOL_SIZE counts the header as 1 word. If the indicated size is SYMBOL_SIZE,
-    // then there's an extra slot.  (The extra slot provides quick access to
-    // the special-operator handler function in the fast evaluator.)
     int indicated_nwords = (header>>N_WIDETAG_BITS) & 0xFF;
-    // We've already processed the {hash, value, info, name}, so subtract 4 words.
-    // In truth, the hash was ignored, though it might be a good place to store
-    // some pointer data. 64 bits of hash is way more than enough.
-    scavenge(&s->fdefn, indicated_nwords - 4);
     return 1 + (indicated_nwords|1); // round to odd, then add 1 for the header
 #else
     return scav_tiny_boxed(where, header);

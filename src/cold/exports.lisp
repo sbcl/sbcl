@@ -307,7 +307,6 @@ be submitted as a CDR")
                 "PARSE-EVAL-WHEN-SITUATIONS"
                 "MAKE-GLOBAL-VAR" "MAKE-LAMBDA-VAR"
                 "*LEXENV*")
-  (:import-from "SB-VM" "SYMBOL-EXTRA-SLOT-P" "SYMBOL-EXTRA")
   (:import-from "SB-ALIEN" "%HEAP-ALIEN" "ALIEN-VALUE")
   (:import-from "SB-KERNEL" "%%TYPEP")
   (:export "BASIC-ENV"
@@ -581,7 +580,6 @@ structure representations")
            "SYMBOL-HASH-SLOT" "SYMBOL-WIDETAG" "SYMBOL-NAME-SLOT"
            "SYMBOL-PACKAGE-ID-SLOT" "SYMBOL-INFO-SLOT" "SYMBOL-FDEFN-SLOT"
            "SYMBOL-SIZE" "SYMBOL-VALUE-SLOT" "SYMBOL-TLS-INDEX-SLOT"
-           "AUGMENTED-SYMBOL-SIZE"
            "*BINDING-STACK-START*"
            "*CONTROL-STACK-START*" "*CONTROL-STACK-END*"
            "CONTROL-STACK-POINTER-VALID-P"

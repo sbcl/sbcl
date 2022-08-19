@@ -107,9 +107,9 @@
           '#'identity
           `(named-lambda "check-type" (x) (the ,type-spec x)))
      ,validate-function ,default
-     ;; Rationale for hardcoding here is explained at PACKED-INFO-FDEFN.
-     ,(or (and (eq category :function) (eq kind :definition)
-               +fdefn-info-num+)
+     ,(or (and (eq category :function)
+               (case kind
+                 (:definition +fdefn-info-num+)))
           #+sb-xc (meta-info-number (meta-info category kind))))))
 ;; It's an external symbol of SB-INT so wouldn't be removed automatically
 (push '("SB-INT" define-info-type) *!removable-symbols*)
@@ -228,7 +228,13 @@
 
 (!begin-collecting-cold-init-forms)
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
-(define-info-type (:function :definition) :type-spec #-sb-xc-host (or fdefn null) #+sb-xc-host t)
+;;; As a special case, this info stores the interpreter's handler for sb-fasteval.
+;;; There is no ambiguity, because a symbol naming a function will never store
+;;; its fdefn in packed-info. Therefore if :function :definition is present
+;;; for a symbol, it must be the special-form handler. In that case it is a cons
+;;; of the deferred and immediate handlers (in that order)
+(define-info-type (:function :definition) :type-spec #-sb-xc-host (or fdefn list)
+                                                     #+sb-xc-host t)
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.
@@ -246,11 +252,6 @@
                  (if (or (fboundp name) (pcl-methodfn-name-p name))
                      :function
                      nil)))
-
-;;; The deferred mode processor for fasteval special operators.
-;;; Immediate processors are hung directly off symbols in a dedicated slot.
-#+sb-fasteval
-(define-info-type (:function :interpreter) :type-spec (or function null))
 
 ;;; Indicates whether the function is deprecated.
 (define-info-type (:function :deprecated)

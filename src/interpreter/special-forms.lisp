@@ -803,7 +803,7 @@
           ,@(when (eq operator 'let*)
               `((when (singleton-p bindings)
                   (return-from let*
-                    (funcall (info :function :interpreter 'let)
+                    (funcall (car (special-form-handler 'let))
                              `(,bindings ,@body) env)))))
           ;; FIXME: aren't MAKE-LET*-FRAME and MAKE-LET-FRAME essentially
           ;; the same now?

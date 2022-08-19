@@ -257,13 +257,10 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 #ifdef LISP_FEATURE_COMPACT_SYMBOL
     if (widetag == SYMBOL_WIDETAG) {
         struct symbol* s = (void*)object;
-        CHECK(s->hash, &s->hash);
         CHECK(s->value, &s->value);
+        CHECK(s->fdefn, &s->fdefn);
         CHECK(s->info, &s->info);
         CHECK(decode_symbol_name(s->name), &s->name);
-        CHECK(s->fdefn, &s->fdefn);
-        // augmented symbol?
-        if (nwords > ALIGN_UP(SYMBOL_SIZE,2)) CHECK(1[&s->fdefn], 1+&s->fdefn);
         return 0;
     }
 #endif

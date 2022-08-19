@@ -369,11 +369,7 @@ static void trace_object(lispobj* where)
         {
         struct symbol* s = (void*)where;
         gc_mark_obj(decode_symbol_name(s->name));
-        gc_mark_obj(s->value);
-        gc_mark_obj(s->info);
-        gc_mark_obj(s->fdefn);
-        // process the unnamed slot of augmented symbols
-        if ((s->header & 0xFF00) == (SYMBOL_SIZE<<8)) gc_mark_obj(*(1+&s->fdefn));
+        gc_mark_range(&s->value, 3);
         }
         return;
 #endif

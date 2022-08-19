@@ -141,9 +141,12 @@
         (setf (get symbol :sb-xc-globaldb-info) newval))
       (values))))
 
-;; FDEFINITIONs have an info-number that admits slightly clever logic
-;; for PACKED-INFO-FDEFN. Do not change this constant without
-;; careful examination of that function.
+;;; :DEFINITION has an info-number that admits slightly clever logic.
+;;; * SB-INTERPRETER:SPECIAL-FORM-HANDLER only needs to decode the first
+;;;   info-number in a packed-info to test if :DEFINITION is present.
+;;; * FIND-FDEFN only needs to extract one info-number after finding
+;;;   the proper auxiliary key {SETF, CAS, etc} in the data portion.
+;;; Do not change this without careful examination of those functions.
 (defconstant +fdefn-info-num+ info-num-mask)
 
 ;; Extract a field from a packed info descriptor.
@@ -418,9 +421,7 @@
                                 aux-key new old-size)))
                ;; it had better be found - it was in the packed vector
                (aver data-start)
-               ;; fdefn must be the first piece of info for any name.
-               ;; This facilitates implementing SYMBOL-FUNCTION without
-               ;; without completely decoding the vector.
+               ;; :DEFINITION must be the first piece of info for any name.
                (insert-at (+ data-start (if (eql info-number +fdefn-info-num+)
                                             1 (svref new data-start)))
                           info-number value)
@@ -454,27 +455,20 @@
   (let* ((descriptor (%info-ref input 0))
          (new-n (truly-the info-number (packed-info-len input)))
          (output (make-packed-info (1+ new-n))))
-    ;; Two cases: we're either inserting info for the fdefn, or not.
-    (cond #+nil
-          ((eq info-number +fdefn-info-num+)
-           ;; FDEFNs are not stored in a packed-info except for non-symbol function names
-           ;; in which case we don't use quick-packed-info-insert.
-           (bug "incorrect call to quick-packed-info-insert"))
-          (t
-           ;; Add a field on the high end and increment the count.
-           (setf (%info-ref output 0)
-                 (logior (make-info-descriptor
-                          info-number (* info-number-bits new-n))
-                         (1+ descriptor))
-                 (%info-ref output 1) value)
-           ;; Slide the old data up 1 cell.
-           (loop for i from 2 to new-n
-                 do (setf (%info-ref output i) (%info-ref input (1- i))))))
+    ;; Add a field on the high end and increment the count.
+    (setf (%info-ref output 0)
+          (logior (make-info-descriptor info-number (* info-number-bits new-n))
+                  (1+ descriptor))
+          (%info-ref output 1) value)
+    ;; Slide the old data up 1 cell.
+    (loop for i from 2 to new-n
+          do (setf (%info-ref output i) (%info-ref input (1- i))))
     output))
 
 (declaim (maybe-inline packed-info-insert))
 (defun packed-info-insert (packed-info aux-key info-number newval)
   (if (and (eql aux-key +no-auxiliary-key+)
+           (not (eql info-number +fdefn-info-num+))
            (info-quickly-insertable-p packed-info))
       (quick-packed-info-insert packed-info info-number newval)
       (%packed-info-insert packed-info aux-key info-number newval)))

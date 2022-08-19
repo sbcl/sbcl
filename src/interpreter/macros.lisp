@@ -79,10 +79,8 @@
                         (with-subforms ,macro-lambda-list ,form-var
                                        ,@body)))))))
         `((lambda (name simple immediate deferred)
-            (setf (info :function :interpreter name) deferred)
-            (when immediate
-              (aver (symbol-extra-slot-p name))
-              (setf (symbol-extra name) immediate))
+            (aver (not (info :function :definition name)))
+            (setf (info :function :definition name) (cons deferred immediate))
             (logior-header-bits
              name (logior +special-op-symbol+
                           (if simple +simple-special-op+ 0))))

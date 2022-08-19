@@ -14,13 +14,7 @@
 #-c-headers-only
 (macrolet ((frob ()
              `(progn ,@*!late-primitive-object-forms*)))
-  (frob)
-  (defknown symbol-extra (t) t (flushable))
-  (def-reffer 'symbol-extra symbol-size other-pointer-lowtag)
-  (defknown (setf symbol-extra) (t t) t ())
-  (def-setter '(setf symbol-extra) symbol-size other-pointer-lowtag))
-
-(defconstant augmented-symbol-size (1+ symbol-size))
+  (frob))
 
 #+sb-thread
 (dovector (slot (primitive-object-slots (primitive-object 'thread)))
