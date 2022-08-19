@@ -815,13 +815,18 @@
 (defun wrap-in-allocate-forms (ctor body early-unbound-markers-p)
   (let* ((class (ctor-class ctor))
          (wrapper (class-wrapper class)))
+    ;; Prefer to allocate slots first so that potentially we can make this construct
+    ;; the primitive instance and assign its layout and slots while pseudo-atomic.
+    ;; Even if we can't do that, this order of operations can avoid a GC store barrier
+    ;; - it doesn't currently, but it should - because the pointer store is young->old.
+    ;; Best-case we'd allocate two things in one allocation request,
+    ;; but there aren't allocation vops that do that.
     (etypecase class
       (standard-class
-        `(let ((.instance. (%new-instance ,wrapper (1+ sb-vm:instance-data-start)))
-               (.slots. (make-array
-                         ,(wrapper-length wrapper)
-                         ,@(when early-unbound-markers-p
-                                 '(:initial-element +slot-unbound+)))))
+        `(let ((.slots. (make-array ,(wrapper-length wrapper)
+                                    ,@(when early-unbound-markers-p
+                                        '(:initial-element +slot-unbound+))))
+               (.instance. (%new-instance ,wrapper (1+ sb-vm:instance-data-start))))
            (%instance-set .instance. sb-vm:instance-data-start .slots.)
            ,body
            .instance.))
