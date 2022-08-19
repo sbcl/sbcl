@@ -1225,17 +1225,26 @@
       (let (vops
             stop
             (value (tn-ref-tn (vop-args vop))))
-        (labels ((chain (vop)
+        (labels ((good-vop-p (vop)
+                   (and (singleton-p (ir2block-predecessors (vop-block vop)))
+                        (eq (vop-name vop) 'structure-typep)
+                        (eq (tn-ref-tn (vop-args vop)) value)))
+                 (chain (vop &optional (collect t))
                    (let ((next (branch-destination vop nil)))
                      (cond (next
-                            (push vop vops)
-                            (if (and (singleton-p (ir2block-predecessors (vop-block next)))
-                                     (eq (vop-name next) 'structure-typep)
-                                     (eq (tn-ref-tn (vop-args next)) value))
-                                (chain next)
-                                (setf stop (vop-block next))))
-                           (t
-                            (setf stop (vop-block vop))))))
+                            (when collect
+                              (push vop vops))
+                            (cond ((good-vop-p next)
+                                   (chain next))
+                                  ((not stop)
+                                   (setf stop (vop-block next)))))
+                           ((not stop)
+                            (setf stop (vop-block vop)))))
+                   (let ((true (branch-destination vop)))
+                     (when (and true
+                                (good-vop-p true))
+                       (push true vops)
+                       (chain true nil))))
                  (ir2-block-label (block)
                    (or (ir2-block-%label block)
                        (setf (ir2-block-%label block) (gen-label)))))
