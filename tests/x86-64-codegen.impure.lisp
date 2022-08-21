@@ -866,12 +866,8 @@
   (check-arrayp-cmp-opcodes 1 'simple-base-string)
   #+sb-unicode
   (check-arrayp-cmp-opcodes 1 'sb-kernel::simple-character-string)
-  ;; FIXME: (AND STRING (NOT SIMPLE-STRING)) executs 4 tests
-  ;; but it denotes the same set of objects as (AND STRING (NOT SIMPLE-ARRAY)).
-  ;; The problem is with type algebra, not in the backend.
-
-  ;; FIXME: this should be 1 comparison: widetag >= start-of-complex-widetags
-  (check-arrayp-cmp-opcodes 2 '(and array (not simple-array)))
+  (check-arrayp-cmp-opcodes 1 '(and string (not simple-array)))
+  (check-arrayp-cmp-opcodes 1 '(and array (not simple-array)))
 
   ;; some other interesting pairs
   ;; This was passing just by random coincidence.

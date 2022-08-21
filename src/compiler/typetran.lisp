@@ -787,7 +787,9 @@
                     (simple-array-header-p
                       (and (null (array-type-complexp stype))
                            (listp dims)
-                           (cdr dims))))
+                           (cdr dims)))
+                    (complexp (and (eql (array-type-complexp stype) :maybe)
+                                   (eql (array-type-complexp type) t))))
                 (if complex-tag
                     `(and (%other-pointer-p ,object)
                           (eq (%other-pointer-widetag ,object) ,complex-tag)
@@ -796,20 +798,31 @@
                     (multiple-value-bind (tests headerp)
                         (test-array-dimensions object type stype
                                                simple-array-header-p)
-                      `(and ,@(unless (or (and headerp (eql pred 'arrayp))
-                                          simple-array-header-p)
-                                ;; ARRAY-HEADER-P from TESTS will test for that
-                                `((,pred ,object)))
-                            ,@(when (and (eql (array-type-complexp stype) :maybe)
-                                         (eql (array-type-complexp type) t))
-                                ;; KLUDGE: this is a bit lame; if we get here,
-                                ;; we already know that OBJECT is an array, but
-                                ;; (NOT SIMPLE-ARRAY) doesn't know that.  On the
-                                ;; other hand, this should get compiled down to
-                                ;; two widetag tests, so it's only a bit lame.
-                                `((typep ,object '(not simple-array))))
-                            ,@tests
-                            ,@(test-array-element-type object type stype headerp)))))
+                      `(and
+                        ,@(cond ((and (eql pred 'vectorp)
+                                      complexp)
+                                 `((%other-pointer-subtype-p ,object
+                                                             ',(list sb-vm:complex-base-string-widetag
+                                                                     #+sb-unicode sb-vm:complex-character-string-widetag
+                                                                     sb-vm:complex-bit-vector-widetag
+                                                                     sb-vm:complex-vector-widetag))))
+                                ((and (eql pred 'arrayp)
+                                      complexp)
+                                 `((%other-pointer-subtype-p ,object
+                                                             ',(list sb-vm:complex-base-string-widetag
+                                                                     #+sb-unicode sb-vm:complex-character-string-widetag
+                                                                     sb-vm:complex-bit-vector-widetag
+                                                                     sb-vm:complex-vector-widetag
+                                                                     sb-vm:complex-array-widetag))))
+                                (t
+                                 `(,@(unless (or (and headerp (eql pred 'arrayp))
+                                                 simple-array-header-p)
+                                       ;; ARRAY-HEADER-P from TESTS will test for that
+                                       `((,pred ,object)))
+                                   ,@(when complexp
+                                       `((typep ,object '(not simple-array)))))))
+                        ,@tests
+                        ,@(test-array-element-type object type stype headerp)))))
               `(%typep ,object ',(type-specifier type)))))))
 
 ;;; Transform a type test against some instance type. The type test is
