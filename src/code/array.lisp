@@ -756,7 +756,8 @@ of specialized arrays is supported."
                                      (safety 0)))
                   (%ref ,accessor-getter ,extra-params))
                 (defun ,slow-accessor-name (array index ,@extra-params)
-                  (declare (optimize speed (safety 0)))
+                  (declare (optimize speed (safety 0))
+                           (array array))
                   (if (not (%array-displaced-p array))
                       ;; The reasonably quick path of non-displaced complex
                       ;; arrays.
@@ -764,14 +765,14 @@ of specialized arrays is supported."
                         (%ref ,accessor-getter ,extra-params))
                       ;; The real slow path.
                       (with-array-data
-                          ((vector array)
+                          ((array array)
                            (index (locally
                                       (declare (optimize (speed 1) (safety 1)))
                                     (,@check-bounds index)))
                            (end)
                            :force-inline t)
                         (declare (ignore end))
-                        (,accessor-name vector index ,@extra-params)))))))
+                        (%ref ,accessor-getter ,extra-params)))))))
   (define hairy-data-vector-ref slow-hairy-data-vector-ref
     %find-data-vector-reffer
     nil (progn))
