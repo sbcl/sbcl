@@ -337,8 +337,19 @@
          ;; deemed unreachable?
          (and
           (almost-immediately-used-p lvar cast)
-          (values (values-subtypep (lvar-externally-checkable-type lvar)
-                                   (cast-type-to-check cast)))))))
+          (if (and (lvar-fun-is (combination-fun dest)
+                                '(hairy-data-vector-set/check-bounds
+                                  hairy-data-vector-ref/check-bounds
+                                  hairy-data-vector-ref
+                                  hairy-data-vector-set))
+                   (eql (car (combination-args dest))
+                        lvar))
+              ;; These functions work on all arrays, but the error
+              ;; message is about vectors, which is used more frequently.
+              (csubtypep (specifier-type 'vector)
+                         (cast-type-to-check cast))
+              (values-subtypep (lvar-externally-checkable-type lvar)
+                               (cast-type-to-check cast)))))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
 ;; trivial enough to have an internal error number assigned to them that can be
