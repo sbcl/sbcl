@@ -934,7 +934,7 @@
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 64) comparison"))
 
-(defmacro define-conditional-vop (tran signed unsigned)
+(defmacro define-conditional-vop (tran signed unsigned &optional addend addend-signed addend-unsigned)
   `(progn
      ,@(loop for (suffix cost signed-p) in
              '((/fixnum 4 t)
@@ -954,14 +954,31 @@
        (:arg-types (:or tagged-num signed-num unsigned-num)
                    (:constant (or signed-word word)))
        (:info y)
+       (:vop-var vop)
        (:policy :fast-safe)
        ,(if (eq signed unsigned)
             `(:conditional ,signed)
             `(:conditional
               :after-sc-selection
-              (if (sc-is x unsigned-reg)
-                  ,unsigned
-                  ,signed)))
+              (flet ((try (y)
+                       (let ((y (if (sc-is x any-reg)
+                                    (fixnumize y)
+                                    y)))
+                         (flet ((try (constant)
+                                  (add-sub-immediate-p constant)))
+                           (or (try y)
+                               (try (ldb (byte 64 0) (- y))))))))
+                (cond ((and (not (try y))
+                            (try (+ y ,addend)))
+                       (setf (car (vop-codegen-info vop))
+                             (+ y ,addend))
+                       (if (sc-is x unsigned-reg)
+                           ,addend-unsigned
+                           ,addend-signed))
+                      (t
+                       (if (sc-is x unsigned-reg)
+                           ,unsigned
+                           ,signed))))))
        (:generator 2
          (let ((y (if (sc-is x any-reg)
                       (fixnumize y)
@@ -976,8 +993,8 @@
                  (try (ldb (byte 64 0) (- y)) t)
                  (inst cmp x (load-immediate-word tmp-tn y)))))))))
 
-(define-conditional-vop < :lt :lo)
-(define-conditional-vop > :gt :hi)
+(define-conditional-vop < :lt :lo -1 :le :ls)
+(define-conditional-vop > :gt :hi 1 :ge :hs)
 (define-conditional-vop eql :eq :eq)
 
 (define-vop (<-unsigned-signed)
