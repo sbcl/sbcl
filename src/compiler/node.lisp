@@ -1563,7 +1563,8 @@
 ;;; an MV-COMBINATION isn't COMBINATION-P.
 (defstruct (combination (:include basic-combination)
                         (:constructor make-combination (fun))
-                        (:copier nil)))
+                        (:copier nil))
+  (pass-nargs t :type boolean))
 (defprinter (combination :identity t)
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar (lambda (x)

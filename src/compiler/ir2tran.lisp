@@ -1100,13 +1100,15 @@
 
 (defun pass-nargs-p (combination)
   (let ((fun-info (combination-fun-info combination)))
-    (not (and (eq (combination-kind combination) :known)
-              fun-info
-              (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)
-              (let ((type (info :function :type (combination-fun-source-name combination))))
-                (and (not (fun-type-keyp type))
-                     (not (fun-type-rest type))
-                     (not (fun-type-optional type))))))))
+    (and #+(or arm64 x86-64)
+         (combination-pass-nargs combination)
+         (not (and (eq (combination-kind combination) :known)
+                   fun-info
+                   (ir1-attributep (fun-info-attributes fun-info) no-verify-arg-count)
+                   (let ((type (info :function :type (combination-fun-source-name combination))))
+                     (and (not (fun-type-keyp type))
+                          (not (fun-type-rest type))
+                          (not (fun-type-optional type)))))))))
 
 ;;; Move the arguments into the passing locations and do a (possibly
 ;;; named) tail call.

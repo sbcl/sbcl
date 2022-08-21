@@ -740,7 +740,7 @@ of specialized arrays is supported."
                (tagbody ,@forms))))))))
 
 (macrolet ((%ref (accessor-getter extra-params)
-             `(funcall (,accessor-getter array) array index ,@extra-params))
+             `(sb-c::%funcall-no-nargs (,accessor-getter array) array index ,@extra-params))
            (define (accessor-name slow-accessor-name accessor-getter
                                   extra-params check-bounds)
              `(progn
@@ -789,7 +789,8 @@ of specialized arrays is supported."
     (new-value) (check-bound array (%array-dimension array 0))))
 
 (defun hairy-ref-error (array index &optional new-value)
-  (declare (ignore index new-value))
+  (declare (ignore index new-value)
+           (optimize (sb-c:verify-arg-count 0)))
   (error 'type-error
          :datum array
          :expected-type 'vector))

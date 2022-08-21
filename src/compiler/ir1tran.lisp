@@ -969,12 +969,15 @@
 ;;; node. FUN-LVAR yields the function to call. ARGS is the list of
 ;;; arguments for the call, which defaults to the cdr of source. We
 ;;; return the COMBINATION node.
-(defun ir1-convert-combination-args (fun-lvar start next result args)
+(defun ir1-convert-combination-args (fun-lvar start next result args
+                                     &optional (pass-nargs t))
   (declare (type ctran start next)
            (type lvar fun-lvar)
            (type (or lvar null) result)
            (type list args))
   (let ((node (make-combination fun-lvar)))
+    (unless pass-nargs
+      (setf (combination-pass-nargs node) nil))
     (setf (lvar-dest fun-lvar) node)
     (collect ((arg-lvars))
       (let ((this-start start)
