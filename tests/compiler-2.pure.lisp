@@ -3723,3 +3723,10 @@
            (list a a ,@vars)))
        args)
       (cons (car args) args)))))
+
+(with-test (:name :aref-single-value-type)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (aref (the (values (and (not simple-array) vector)) x) 0))
+   (((make-array 10 :adjustable t :initial-element 3)) 3)))

@@ -347,7 +347,7 @@
               ;; These functions work on all arrays, but the error
               ;; message is about vectors, which is used more frequently.
               (csubtypep (specifier-type 'vector)
-                         (cast-type-to-check cast))
+                         (single-value-type (cast-type-to-check cast)))
               (values-subtypep (lvar-externally-checkable-type lvar)
                                (cast-type-to-check cast)))))))
 
