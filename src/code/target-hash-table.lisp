@@ -974,8 +974,7 @@ multiple threads accessing the same hash-table without locking."
              (hwm (kv-vector-high-water-mark old-kv-vector)))
 
     (declare (type simple-vector new-kv-vector)
-             (type (simple-array hash-table-index (*)) new-next-vector new-index-vector)
-             (type (or null (simple-array hash-table-index (*))) new-hash-vector))
+             (type (simple-array hash-table-index (*)) new-next-vector new-index-vector))
 
     ;; Rehash + resize only occurs when:
     ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
@@ -990,7 +989,8 @@ multiple threads accessing the same hash-table without locking."
     ;; This is done early because when GC scans the new vector, it needs to see
     ;; each hash to know which keys were hashed address-sensitively.
     (awhen (hash-table-hash-vector table)
-      (replace new-hash-vector it :start1 1 :start2 1)) ; 1st element not used
+      (replace (the (simple-array hash-table-index (*)) new-hash-vector)
+               it :start1 1 :start2 1)) ; 1st element not used
 
     ;; Preserve only the 'hashing' bit on the OLD-KV-VECTOR so that
     ;; its high-water-mark can meaningfully be reduced to 0 when done.
