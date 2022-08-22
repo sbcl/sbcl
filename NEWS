@@ -1,8 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-2.2.7:
   * minor incompatible change: support for 32-bit x86/Darwin has been removed.
-  * bug fix: fix miscompilation related to loops preceded by conditional
-    expressions.  (lp#1986810, reported by Artyom Bologov)
+  * bug fix: fix miscompilation related to empty infinite loops preceded by
+    conditional expressions. (lp#1986810, reported by Artyom Bologov)
   * bug fix: fix gc invariant violations.  (lp#1983218, reported by Marius
     Gerbershagen; lp#1983248, reported by Vasily Postnicov)
   * bug fix: use CC to compile SBCL as a shared library.  (lp#1976148,
