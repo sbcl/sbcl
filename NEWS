@@ -1,7 +1,25 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-2.2.6:
+changes relative to sbcl-2.2.7:
+  * minor incompatible change: support for 32-bit x86/Darwin has been removed.
+  * bug fix: fix miscompilation related to loops preceded by conditional
+    expressions.  (lp#1986810, reported by Artyom Bologov)
+  * bug fix: fix gc invariant violations.  (lp#1983218, reported by Marius
+    Gerbershagen; lp#1983248, reported by Vasily Postnicov)
+  * bug fix: use CC to compile SBCL as a shared library.  (lp#1976148,
+    reported by Pierre Neidhardt)
+  * bug fix: don't crash the system completely if RUN-PROGRAM fails to create
+    a pipe.  (lp#1979841, reported by Thor Kristofferson)
+  * bug fix: be more disciplined about use of C system includes.  (lp#1981799,
+    reported by Mark Evenson)
+  * bug fix: STRING/= returning wrong results for some cases when :END1/:END2
+    were not compile-time constants.  (lp#1983284)
+  * bug fix: compile-time checking of :START and :END keyword arguments to
+    FILL is more complete.
   * optimization: adjacent type tests on the same value are more compact
     (arm64, x86-64).
+  * optimization: the compiler can inline COPY-STRUCTURE in more cases.
+  * optimization: type checks for non-simple arrays are shorter.
+  * optimization: printing strings (as Lisp data) is faster.
 
 changes in sbcl-2.2.7 relative to sbcl-2.2.6:
   * minor incompatible change: the compiler emits full WARNINGs for undefined
