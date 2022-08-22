@@ -375,13 +375,13 @@
 (defun make-discriminating-function-arglist (number-required-arguments restp)
   (nconc (let ((args nil))
            (dotimes (i number-required-arguments)
-             (push (format-symbol *package* ;; ! is this right?
+             (push (pkg-format-symbol *package* ;; ! is this right?
                                   "Discriminating Function Arg ~D"
                                   i)
                    args))
            (nreverse args))
          (when restp
-               `(&rest ,(format-symbol *package*
+               `(&rest ,(pkg-format-symbol *package*
                                        "Discriminating Function &rest Arg")))))
 
 (defmethod generic-function-argument-precedence-order

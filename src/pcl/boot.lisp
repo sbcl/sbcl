@@ -2250,9 +2250,10 @@ bootstrapping.
                             *internal-pcl-generalized-fun-name-symbols*))
                nil)
               (t (let* ((symbol (fun-name-block-name name))
-                        (package (symbol-package symbol)))
-                   (and (or (eq package *pcl-package*)
-                            (memq package (package-use-list *pcl-package*)))
+                        (package (symbol-package symbol))
+                        (pcl-package #.(find-package "SB-PCL")))
+                   (and (or (eq package pcl-package)
+                            (memq package (package-use-list pcl-package)))
                         (not (eq package *cl-package*))
                         ;; FIXME: this test will eventually be
                         ;; superseded by the *internal-pcl...* test,

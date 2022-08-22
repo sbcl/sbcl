@@ -688,8 +688,8 @@
     (error "Structure slots must have :INSTANCE allocation.")))
 
 (defun make-structure-class-defstruct-form (name direct-slots include)
-  (let* ((conc-name (format-symbol *package* "~S structure class " name))
-         (constructor (format-symbol *package* "~Aconstructor" conc-name))
+  (let* ((conc-name (pkg-format-symbol *package* "~S structure class " name))
+         (constructor (pkg-format-symbol *package* "~Aconstructor" conc-name))
          (included-name (class-name include))
          (included-slots
           (when include
@@ -804,7 +804,7 @@
                               (when defstruct-p
                                 (let* ((slot-name (getf pl :name))
                                        (accessor
-                                        (format-symbol *package*
+                                        (pkg-format-symbol *package*
                                                        "~S structure class ~A"
                                                        name slot-name)))
                                   (setq pl (list* :defstruct-accessor-symbol

@@ -37,10 +37,6 @@
 
 (in-package "SB-PCL")
 
-;;; The PCL package is internal and is used by code in potential
-;;; bottlenecks. And since it's internal, no one should be
-;;; doing things like deleting and recreating it in a running target Lisp.
-(define-symbol-macro *pcl-package* #.(find-package "SB-PCL"))
 
 (declaim (inline defstruct-classoid-p))
 (defun defstruct-classoid-p (classoid)
@@ -64,11 +60,22 @@
               (defstruct-classoid-p classoid)))))
 
 ;;; Symbol contruction utilities
-(defun format-symbol (package format-string &rest format-arguments)
+(defun pkg-format-symbol (package format-string &rest format-arguments)
   (without-package-locks
    (intern (possibly-base-stringize
             (apply #'format nil format-string format-arguments))
            package)))
+;; Like the preceding, but always use PCL package, and override the package lock
+;; in a more elegant way than using WITHOUT-PACKAGE-LOCKS.
+(defun pcl-format-symbol (format-string &rest format-arguments)
+  (let ((string (possibly-base-stringize
+                 (let ((*package* *keyword-package*))
+                   (apply #'format nil format-string format-arguments)))))
+    ;; Is there any way this can actually NOT be of type base-char?
+    (sb-impl::%intern string (length string) #.(find-package "SB-PCL")
+                      (if (simple-base-string-p string) 'base-char 'character)
+                      t ; ignore lock
+                      nil))) ; no inheritance. Does it matter?
 
 (defun condition-type-p (type)
   (and (symbolp type)
