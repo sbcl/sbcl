@@ -867,7 +867,9 @@
   #+sb-unicode
   (check-arrayp-cmp-opcodes 1 'sb-kernel::simple-character-string)
   (check-arrayp-cmp-opcodes 1 '(and string (not simple-array)))
-  (check-arrayp-cmp-opcodes 1 '(and array (not simple-array)))
+  (check-arrayp-cmp-opcodes #+sb-unicode 1
+                            #-sb-unicode 2
+                            '(and array (not simple-array)))
 
   ;; some other interesting pairs
   ;; This was passing just by random coincidence.
