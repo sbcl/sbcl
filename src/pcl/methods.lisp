@@ -371,18 +371,6 @@
             (or restp
                 (and number-of-requireds (/= number-of-requireds requireds)))
             specialized-argument-positions)))
-
-(defun make-discriminating-function-arglist (number-required-arguments restp)
-  (nconc (let ((args nil))
-           (dotimes (i number-required-arguments)
-             (push (pkg-format-symbol *package* ;; ! is this right?
-                                  "Discriminating Function Arg ~D"
-                                  i)
-                   args))
-           (nreverse args))
-         (when restp
-               `(&rest ,(pkg-format-symbol *package*
-                                       "Discriminating Function &rest Arg")))))
 
 (defmethod generic-function-argument-precedence-order
     ((gf standard-generic-function))
@@ -1118,9 +1106,6 @@
 
 (defmacro class-eq-test (arg class)
   `(eq (class-of ,arg) ',class))
-
-(defmacro eql-test (arg object)
-  `(eql ,arg ',object))
 
 (defun dnet-methods-p (form)
   (and (consp form)
