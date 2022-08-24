@@ -84,7 +84,17 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
       ;; in case there is more than one set of floating-point formats.
       (assert (eq (read stream) :default))
       (sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
-        (let ((*package* (find-package "SB-KERNEL")))
+        (let ((*readtable* (copy-readtable))
+              (*package* (find-package "SB-KERNEL")))
+          (set-dispatch-macro-character
+           #\# #\. (lambda (stream subchar arg)
+                     (declare (igore subchar arg))
+                     (let ((expr (read stream t nil t)))
+                       (ecase (car expr)
+                         (sb-kernel:make-single-float
+                          (sb-kernel:make-single-float (second expr)))
+                         (sb-kernel:make-double-float
+                          (sb-kernel:make-double-float (second expr) (third expr)))))))
           (dolist (expr (read stream))
             (destructuring-bind (fun args . result) expr
               (let ((result (if (eq (first result) 'sb-kernel::&values)
