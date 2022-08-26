@@ -551,14 +551,26 @@
 ;;; appropriate. This is also called by SPILL-AND-PACK-LOAD-TN.
 (defun basic-save-tn (tn vop)
   (declare (type tn tn) (type vop vop))
-  (let ((save (tn-save-tn tn)))
-    (cond ((and save (eq (tn-kind save) :save-once))
-           (restore-single-writer-tn tn vop))
-          ((save-single-writer-tn tn)
-           (restore-single-writer-tn tn vop))
-          (t
-           (save-complex-writer-tn tn vop))))
-  (values))
+  (let* ((save (tn-save-tn tn))
+         (node (vop-node vop)))
+    (flet ((restore ()
+             (not
+              (and (sb-c::combination-p node)
+                   ;; Don't restore if the function doesn't return.
+                   (let ((type (sb-c::lvar-fun-type (sb-c::combination-fun node))))
+                     (and (fun-type-p type)
+                          (eq (sb-kernel:fun-type-returns type) *empty-type*)))
+                   (or
+                    (sb-c::combination-fun-info node)
+                    (policy node (zerop safety)))))))
+      (cond ((and save (eq (tn-kind save) :save-once))
+             (when (restore)
+               (restore-single-writer-tn tn vop)))
+            ((save-single-writer-tn tn)
+             (when (restore)
+               (restore-single-writer-tn tn vop)))
+            (t
+             (save-complex-writer-tn tn vop))))))
 
 ;;; Scan over the VOPs in BLOCK, emiting saving code for TNs noted in
 ;;; the codegen info that are packed into saved SCs.
