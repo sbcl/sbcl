@@ -1559,6 +1559,14 @@
                `(logtest (get-header-data array)
                          (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position)))))))
 
+(define-source-transform fill-pointer (vector)
+  (let ((vector-sym (gensym "VECTOR")))
+    `(let ((,vector-sym ,vector))
+       (if (and (array-header-p ,vector-sym)
+                (array-has-fill-pointer-p ,vector-sym))
+           (%array-fill-pointer ,vector-sym)
+           (sb-vm::fill-pointer-error ,vector-sym)))))
+
 (deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
   (let ((array-ref (lvar-uses array))
         (index-ref (lvar-uses index)))

@@ -1124,13 +1124,11 @@ of specialized arrays is supported."
          :format-control "~S is not an array with a fill pointer."
          :format-arguments (list vector)))
 
-(declaim (inline fill-pointer))
+
 (defun fill-pointer (vector)
   "Return the FILL-POINTER of the given VECTOR."
   (declare (explicit-check))
-  (if (array-has-fill-pointer-p vector)
-      (%array-fill-pointer vector)
-      (fill-pointer-error vector)))
+  (fill-pointer vector))
 
 (defun %set-fill-pointer (vector new)
   (declare (explicit-check))
