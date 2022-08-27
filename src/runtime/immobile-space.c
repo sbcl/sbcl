@@ -1827,9 +1827,7 @@ static void defrag_immobile_space(boolean verbose)
 #endif
 
     // Calculate space needed for fixedobj pages after defrag.
-    // page order is: layouts, symbols, fdefns, trampolines, GFs
-    // If the text segment is writable, then the last 3 of those are
-    // moved into text space.
+    // page order is: layouts, symbols, fdefns.
     int n_layout_pages = 0;
     int class_index;
     for (class_index = 0; class_index < MAX_LAYOUT_DEFRAG_SIZE_CLASSES; ++class_index) {
