@@ -23,11 +23,6 @@ use_test_subdirectory
 
 echo //entering foreign.test.sh
 
-# simple way to make sure we're not punting by accident:
-# setting PUNT to anything other than 104 will make non-dlopen
-# and non-linkage-table platforms fail this
-PUNT=$EXIT_TEST_WIN
-
 ## Make some shared object files to test with.
 
 build_so() (
