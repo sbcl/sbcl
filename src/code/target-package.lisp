@@ -897,13 +897,23 @@ Experimental: interface subject to change."
   (flet ((tune-table-size (table)
            ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
            #-darwin-jit (setf (package-hashtable-modified table) nil)
-           (resize-package-hashtable
-            table
-            (round (* (/ +package-rehash-threshold+
-                         +package-hashtable-image-load-factor+)
-                      (- (package-hashtable-size table)
-                         (package-hashtable-free table)
-                         (package-hashtable-deleted table)))))))
+           ;; This is some cringeworthy logic but it solves a problem that has baffled
+           ;; me so many times that I can't even. See the test 'unintern.impure.lisp'
+           (let ((ct (- (package-hashtable-size table)
+                        (package-hashtable-free table)
+                        (package-hashtable-deleted table))))
+             (cond ((zerop ct)
+                    (aver (notany #'symbolp (package-hashtable-cells table)))
+                    (setf (package-hashtable-cells table) #(0 0 0) ; literal is OK !
+                          ;; the secret to reconstructing on next use: it has 0 free cells
+                          (package-hashtable-free table) 0
+                          (package-hashtable-size table) 2
+                          (package-hashtable-deleted table) 0))
+                   (t
+                    (resize-package-hashtable
+                     table
+                     (round (* (/ +package-rehash-threshold+
+                                  +package-hashtable-image-load-factor+) ct))))))))
     (dolist (package (list-all-packages))
       (tune-table-size (package-internal-symbols package))
       (tune-table-size (package-external-symbols package)))))
