@@ -118,6 +118,21 @@
        (inst orr t1 t1 (logical-mask (ash (tn-value data) n-widetag-bits)))))
     (storew t1 x 0 other-pointer-lowtag)))
 
+(define-vop ()
+  (:translate test-header-data-bit)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg)))
+  (:info mask)
+  (:arg-types t (:constant t))
+  (:conditional :ne)
+  (:generator 1
+    (let ((byte 1))
+      (when (> mask #xff)
+        (setf mask (ash mask -8))
+        (setf byte 2))
+      (inst ldrb tmp-tn (@ array (- byte other-pointer-lowtag)))
+      (inst tst tmp-tn mask))))
+
 (define-vop (pointer-hash)
   (:translate pointer-hash)
   (:args (ptr :scs (any-reg descriptor-reg)))
