@@ -482,8 +482,9 @@ sufficiently motivated to do lengthy fixes."
             (sb-vm:do-referenced-object (obj examine)
               (simple-vector
                :extend
-               (when (and written (logtest sb-vm:vector-addr-hashing-flag
-                                           (get-header-data obj)))
+               (when (and written (test-header-data-bit obj
+                                                        (ash sb-vm:vector-addr-hashing-flag
+                                                             sb-vm:array-flags-data-position)))
                  (setf (svref obj 1) 1)))))))))) ; set need-to-rehash
 
 sb-c::

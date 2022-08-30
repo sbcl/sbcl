@@ -85,8 +85,9 @@
          (do-referenced-object (object rewrite)
            (simple-vector
             :extend
-            (when (and (logtest (get-header-data object) vector-addr-hashing-flag)
-                       touchedp)
+            (when (and touchedp
+                       (test-header-data-bit object (ash vector-addr-hashing-flag
+                                                         array-flags-data-position)))
               (setf (svref object 1) 1)))
            (code-component
             :override

@@ -1532,6 +1532,10 @@
           (t
            `(%array-available-elements array)))))
 
+(unless-vop-existsp (:translate test-header-data-bit)
+  (define-source-transform test-header-data-bit (array mask)
+    `(logtest (get-header-data ,array) ,mask)))
+
 ;;; Any array can be tested for a fill-pointer now, using the header bit.
 ;;; Only a non-simple vector could possibly return true.
 ;;; If the input is known simple, we have to avoid doing the logtest because there's
@@ -1553,11 +1557,8 @@
              ;; the CONSTRAINT-PROPAGATE-IF optimizer have the most
              ;; chances to run.
              (delay-ir1-transform node :ir1-phases))
-           (if (vop-existsp :named test-header-data-bit)
-               `(test-header-data-bit array
-                                 (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position))
-               `(logtest (get-header-data array)
-                         (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position)))))))
+           `(test-header-data-bit array
+                                  (ash sb-vm:+array-fill-pointer-p+ sb-vm:array-flags-data-position))))))
 
 (define-source-transform fill-pointer (vector)
   (let ((vector-sym (gensym "VECTOR")))

@@ -113,8 +113,8 @@
           ;; CLHS 3.1.2.1.2.1 Special Forms
           ;; Pick off special forms first for speed. Special operators
           ;; can't be shadowed by local defs.
-          ((logtest (get-header-data fname) +special-op-symbol+)
-           (cond ((or (logtest (get-header-data fname) +simple-special-op+)
+          ((test-header-data-bit fname +special-op-symbol+)
+           (cond ((or (test-header-data-bit fname +simple-special-op+)
                       (eq sb-ext:*evaluator-mode* :interpret))
                   (let ((handler (cdr (special-form-handler fname)))) ; immediate handler
                     (if (functionp handler)

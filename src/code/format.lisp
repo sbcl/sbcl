@@ -31,11 +31,11 @@
                `(combine-directives
                  (%tokenize-control-string string 0 (length string) nil)
                  t)))
-    (if (logtest (get-header-data string)
-                 ;; shareable = readonly
-                 (ash (logior sb-vm:+vector-shareable+
-                              sb-vm:+vector-shareable-nonstd+)
-                      sb-vm:array-flags-data-position))
+    (if (test-header-data-bit string
+                              ;; shareable = readonly
+                              (ash (logior sb-vm:+vector-shareable+
+                                           sb-vm:+vector-shareable-nonstd+)
+                                   sb-vm:array-flags-data-position))
         (memoize (compute-it))
         (compute-it))))
 

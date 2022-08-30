@@ -128,8 +128,9 @@
   (:generator 1
     (let ((byte 1))
       (when (> mask #xff)
-        (setf mask (ash mask -8))
-        (setf byte 2))
+        (aver (zerop (ldb (byte 8 0) mask)))
+        (setf mask (ash mask -8)
+              byte 2))
       (inst ldrb tmp-tn (@ array (- byte other-pointer-lowtag)))
       (inst tst tmp-tn mask))))
 
