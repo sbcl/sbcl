@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-2.2.7:
+changes in sbcl-2.2.8 relative to sbcl-2.2.7:
   * minor incompatible change: support for 32-bit x86/Darwin has been removed.
   * bug fix: fix miscompilation related to empty infinite loops preceded by
     conditional expressions. (lp#1986810, reported by Artyom Bologov)
