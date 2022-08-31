@@ -283,8 +283,7 @@
     (move r x)
     (inst or r y)))
 
-(defun prepare-alu-operands (op x y vop const-tn-xform commutative)
-  (declare (ignore op))
+(defun prepare-alu-operands (x y vop const-tn-xform commutative)
   (let ((arg (vop-args vop)))
     (when (tn-ref-load-tn arg)
       (bug "Shouldn't have a load TN for arg0"))
@@ -307,7 +306,7 @@
 
 (defun emit-inline-smul (op x y result temp vop dummy taggedp) ; signed multiply
   (declare (ignore op dummy))
-  (multiple-value-setq (x y) (prepare-alu-operands 'mul x y vop 'identity t))
+  (multiple-value-setq (x y) (prepare-alu-operands x y vop 'identity t))
   (aver (not (integerp x)))
   (let ((constant-y (integerp y))) ; don't need to unscale Y if true
     (when (and constant-y (not (typep y '(signed-byte 32))))
@@ -340,9 +339,9 @@
 ;;; MUL is also a bit different due to asymmetry of the instruction.
 (defun emit-inline-add-sub (op x y result temp vop const-tn-xform)
   (declare (type (member add sub) op))
-  (multiple-value-setq (x y)
-    (prepare-alu-operands op x y vop const-tn-xform (eq op 'add)))
+  (multiple-value-setq (x y) (prepare-alu-operands x y vop const-tn-xform (eq op 'add)))
 
+  ;; FIXME: What is (ash -1 63) for ? this comment within doesn't match the test.
   (when (and (eq op 'sub) (and (integerp y) (not (eql y (ash -1 63)))))
     ;; If Y is -2147483648 then the negation is not (signed-byte 32).
     ;; How likely is someone to subtract that?
@@ -355,6 +354,8 @@
   (let* ((y-is-reg-or-imm32 (or (gpr-tn-p y) (typep y '(signed-byte 32))))
          (commutative (eq op 'add)))
       (when (alias-p result x)
+        ;; the first two clauses are correct because if the instruction was SUB with
+        ;; an immediate then it got turned into ADD with the negation of the immediate.
         (cond ((eql y -1) (inst dec x))
               ((eql y +1) (inst inc x))
               ((or (gpr-tn-p x) y-is-reg-or-imm32)
@@ -387,7 +388,9 @@
                ;; If non-commutative, then RESULT could be Y, in which case REG is
                ;; TEMP so that we don't trash Y by moving X into it.
                (inst mov reg x)
-               (inst* op reg y)))
+               (cond ((and (eq op 'add) (eql y 1)) (inst inc reg))
+                     ((and (eq op 'add) (eql y -1)) (inst dec reg))
+                     (t (inst* op reg y)))))
         (move result reg))))
 
 ;;; FIXME: we shouldn't need 12 variants, plus the modular variants, for what should
@@ -2108,8 +2111,28 @@
 ;;;; Modular functions
 
 (defmacro define-mod-binop ((name prototype) function)
-  (unless (search "FAST-*" (string prototype)) ; fast-* doesn't accept stack locations yet
-    (return-from define-mod-binop
+  (if (search "FAST-*" (string prototype)) ; fast-* doesn't accept stack locations yet
+      `(define-vop (,name ,prototype)
+           (:args (x :target r :scs (unsigned-reg signed-reg)
+                     :load-if (not (and (or (sc-is x unsigned-stack)
+                                            (sc-is x signed-stack))
+                                        (or (sc-is y unsigned-reg)
+                                            (sc-is y signed-reg))
+                                        (or (sc-is r unsigned-stack)
+                                            (sc-is r signed-stack))
+                                        (location= x r))))
+                  (y :scs (unsigned-reg signed-reg unsigned-stack signed-stack)))
+         (:arg-types untagged-num untagged-num)
+         (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)
+                      :load-if (not (and (or (sc-is x unsigned-stack)
+                                             (sc-is x signed-stack))
+                                         (or (sc-is y unsigned-reg)
+                                             (sc-is y unsigned-reg))
+                                         (or (sc-is r unsigned-stack)
+                                             (sc-is r unsigned-stack))
+                                         (location= x r)))))
+         (:result-types unsigned-num)
+         (:translate ,function))
       `(define-vop (,name ,prototype)
          (:args (x :scs (unsigned-reg signed-reg unsigned-stack signed-stack immediate)
                    :load-if nil :target r)
@@ -2120,30 +2143,16 @@
                       :load-if nil))
          (:result-types unsigned-num)
          (:translate ,function))))
-  `(define-vop (,name ,prototype)
-       (:args (x :target r :scs (unsigned-reg signed-reg)
-                 :load-if (not (and (or (sc-is x unsigned-stack)
-                                        (sc-is x signed-stack))
-                                    (or (sc-is y unsigned-reg)
-                                        (sc-is y signed-reg))
-                                    (or (sc-is r unsigned-stack)
-                                        (sc-is r signed-stack))
-                                    (location= x r))))
-              (y :scs (unsigned-reg signed-reg unsigned-stack signed-stack)))
-     (:arg-types untagged-num untagged-num)
-     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)
-                  :load-if (not (and (or (sc-is x unsigned-stack)
-                                         (sc-is x signed-stack))
-                                     (or (sc-is y unsigned-reg)
-                                         (sc-is y unsigned-reg))
-                                     (or (sc-is r unsigned-stack)
-                                         (sc-is r unsigned-stack))
-                                     (location= x r)))))
-     (:result-types unsigned-num)
-     (:translate ,function)))
+
 (defmacro define-mod-binop-c ((name prototype) function)
-  (unless (search "FAST-*" (string prototype)) ; fast-* doesn't accept stack locations yet
-    (return-from define-mod-binop-c
+  (if (search "FAST-*" (string prototype)) ; fast-* doesn't accept stack locations yet
+      `(define-vop (,name ,prototype)
+         (:args (x :target r :scs (unsigned-reg signed-reg) :load-if t))
+         (:info y)
+         (:arg-types untagged-num (:constant (or (unsigned-byte 64) (signed-byte 64))))
+         (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0) :load-if t))
+         (:result-types unsigned-num)
+         (:translate ,function))
       `(define-vop (,name ,prototype)
          (:args (x :target r :scs (unsigned-reg signed-reg unsigned-stack signed-stack) :load-if nil))
          (:info y)
@@ -2151,23 +2160,14 @@
          (:results (r :scs (unsigned-reg signed-reg unsigned-stack signed-stack) :load-if nil))
          (:result-types unsigned-num)
          (:translate ,function))))
-  `(define-vop (,name ,prototype)
-       (:args (x :target r :scs (unsigned-reg signed-reg)
-                 :load-if t))
-     (:info y)
-     (:arg-types untagged-num (:constant (or (unsigned-byte 64) (signed-byte 64))))
-     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)
-                  :load-if t))
-     (:result-types unsigned-num)
-     (:translate ,function)))
 
-(macrolet ((def (name -c-p &aux (inherit name))
+(macrolet ((def (name)
              (let ((fun64   (symbolicate name "-MOD64"))
                    (funfx   (symbolicate name "-MODFX"))
-                   (vopu    (symbolicate "FAST-" inherit "/UNSIGNED=>UNSIGNED"))
-                   (vopcu   (symbolicate "FAST-" inherit "-C/UNSIGNED=>UNSIGNED"))
-                   (vopf    (symbolicate "FAST-" inherit "/FIXNUM=>FIXNUM"))
-                   (vopcf   (symbolicate "FAST-" inherit "-C/FIXNUM=>FIXNUM"))
+                   (vopu    (symbolicate "FAST-" name "/UNSIGNED=>UNSIGNED"))
+                   (vopcu   (symbolicate "FAST-" name "-C/UNSIGNED=>UNSIGNED"))
+                   (vopf    (symbolicate "FAST-" name "/FIXNUM=>FIXNUM"))
+                   (vopcf   (symbolicate "FAST-" name "-C/FIXNUM=>FIXNUM"))
                    (vop64u  (symbolicate "FAST-" name "-MOD64/WORD=>UNSIGNED"))
                    (vop64f  (symbolicate "FAST-" name "-MOD64/FIXNUM=>FIXNUM"))
                    (vop64cu (symbolicate "FAST-" name "-MOD64-C/WORD=>UNSIGNED"))
@@ -2184,12 +2184,11 @@
                   ;; and which translates the normal function and the modular function?
                   (define-vop (,vop64f ,vopf) (:translate ,fun64))
                   (define-vop (,vopfxf ,vopf) (:translate ,funfx))
-                  ,@(when -c-p
-                      `((define-mod-binop-c (,vop64cu ,vopcu) ,fun64)
-                        (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))))
-  (def + t)
-  (def - t)
-  (def * t))
+                  (define-mod-binop-c (,vop64cu ,vopcu) ,fun64)
+                  (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))
+  (def +)
+  (def -)
+  (def *))
 
 (define-modular-fun %negate-mod64 (x) %negate :untagged nil 64)
 (define-vop (%negate-mod64)
