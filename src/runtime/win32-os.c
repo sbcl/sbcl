@@ -2045,30 +2045,7 @@ int sb_pthr_kill(struct thread* thread, int signum)
     return 0;
 }
 
-int sigpending(sigset_t *set)
-{
-    struct extra_thread_data* data = thread_extra_data(get_sb_vm_thread());
-    *set = InterlockedCompareExchange((volatile LONG*)&data->pending_signal_set,
-                                      0, 0);
-    return 0;
-}
-
 /* Signals */
-struct sigaction signal_handlers[NSIG];
-
-/* Never called for now */
-int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact)
-{
-  struct sigaction newact = *act;
-  if (oldact)
-    *oldact = signal_handlers[signum];
-  if (!(newact.sa_flags & SA_SIGINFO)) {
-      newact.sa_sigaction = (typeof(newact.sa_sigaction))newact.sa_handler;
-  }
-  signal_handlers[signum] = newact;
-  return 0;
-}
-
 int sched_yield()
 {
   /* http://stackoverflow.com/questions/1383943/switchtothread-vs-sleep1

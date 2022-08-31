@@ -548,7 +548,9 @@ check_deferrables_blocked_or_lose(sigset_t *sigset)
         lose("deferrables unblocked");
 }
 
+#ifdef LISP_FEATURE_RISCV
 int sigaction_does_not_mask;
+#endif
 static void assert_blockables_blocked()
 {
 #ifdef LISP_FEATURE_RISCV
