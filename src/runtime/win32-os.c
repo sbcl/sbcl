@@ -238,15 +238,6 @@ void unmap_gc_page()
  * ``global quiesce point'' that is generally required for this kind
  * of worldwide revolution -- around collect_garbage.
  *
- * What's almost unnoticeable from the C side (where you are now, dear
- * reader): using the same style for all linking is beautiful. I tried
- * to leave old-style linking code in place for the sake of
- * _non-linkage-table_ platforms (they probably don't have -ldl or its
- * equivalent, like LL/GPA, at all) -- but i did it usually by moving
- * the entire `old style' code under #-linkage-table and
- * refactoring the `new style' branch, instead of cutting the tail
- * piecemeal and increasing #+-ifdeffery amount & the world enthropy.
- *
  * If we look at the majority of the ``new style'' code units, it's a
  * common thing to observe how #+-ifdeffery _vanishes_ instead of
  * multiplying: #-sb-xc, #+sb-xc-host and #-sb-xc-host end up

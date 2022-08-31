@@ -19,8 +19,7 @@ symbol in the linkage table, and never returns an address in the linkage-table."
 ;;; Note that much conditionalization is for nothing at this point, because all
 ;;; platforms that we care about implement dlopen(). But if one did not, only
 ;;; supporting static linking, we could still implement the entirety of the feature
-;;; known as :linkage-table and the feature formerly known as "dynamic core"
-;;; (folded into :linkage-table now) by mocking out dlsym() within the SBCL runtime
+;;; formerly known as "dynamic core" by mocking out dlsym() within the SBCL runtime
 ;;; as a lookup table translating strings to functions needed in our runtime.
 ;;; It's not our problem that shared objects aren't loadable, but we get the
 ;;; flexibility of recompiling C without recompiling Lisp.

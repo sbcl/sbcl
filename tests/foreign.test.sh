@@ -206,10 +206,6 @@ cat > $TEST_FILESTEM.base.lisp <<EOF
   (define-alien-routine return-int-test int (p int :copy))
   (define-alien-routine return-uint-test unsigned-int (p unsigned-int :copy))
 
-  ;; compiling this gets us the FOP-FOREIGN-DATAREF-FIXUP on
-  ;; linkage-table ports
-  (defvar *extern* (extern-alien "negative_short" short))
-
   ;; Test that loading an object file didn't screw up our records
   ;; of variables visible in runtime. (This was a bug until
   ;; Nikodemus Siivola's patch in sbcl-0.8.5.50.)
