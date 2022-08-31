@@ -1107,3 +1107,13 @@
                                  (declare ((not unsigned-byte) a b))
                                  (logand a b))))))
              '(integer * -1))))
+
+(with-test (:name :ash-mod64-constant-folding)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a d)
+         (declare (fixnum a)
+                  ((unsigned-byte 64) d))
+         (setq a -64)
+         (logand d (ash -1 a)))
+    ((0 3) 3)))
