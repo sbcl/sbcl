@@ -119,7 +119,7 @@
       (inst add right 8)
 
       BYTE
-      (inst sub right 1)
+      (inst dec right)
       (inst cmp right left)
       (inst jmp :b DONE)
 
@@ -132,8 +132,8 @@
             (inst mov :byte r (ea right))
             (inst mov :byte (ea left) r)
             (inst mov :byte (ea right) l)
-            (inst add left 1)
-            (inst sub right 1)
+            (inst inc left)
+            (inst dec right)
             (inst cmp left right)
             (inst jmp :ge DONE))
       DONE))
@@ -231,7 +231,7 @@
           (inst add left 8)
 
           BYTE
-          (inst sub right 1)
+          (inst dec right)
           (inst cmp right left)
           (inst jmp :b DONE)
 
@@ -241,8 +241,8 @@
                 (inst mov :byte r (ea right))
                 (inst mov :byte (ea left) r)
                 (inst mov :byte (ea right) l)
-                (inst add left 1)
-                (inst sub right 1)
+                (inst inc left)
+                (inst dec right)
                 (inst cmp left right)
                 (inst jmp :ge DONE))
 
@@ -417,7 +417,7 @@
             do
             (inst mov :byte g (ea source s-i))
             (inst mov :byte (ea target t-i) g)
-            (inst add t-i 1)
+            (inst inc t-i)
             (inst sub s-i 1)
             (inst jmp :b DONE))
       DONE))
@@ -490,7 +490,7 @@
                 do
                 (inst mov :byte g (ea source s-i))
                 (inst mov :byte (ea target t-i) g)
-                (inst add t-i 1)
+                (inst inc t-i)
                 (inst sub s-i 1)
                 (inst jmp :b DONE))
           DONE))))
