@@ -806,9 +806,9 @@ of specialized arrays is supported."
                            (ignorable index))
                   ,(if type
                        `(data-vector-ref (the ,atype vector)
-                                         (locally
-                                             (declare (optimize (safety 1)))
-                                           (the index
+                                         (the index
+                                              (locally
+                                                  (declare (optimize (safety 1)))
                                                 (,@check-form index))))
                        `(data-nil-vector-ref (the ,atype vector) index)))))
            (define-setter (saetp check-form)
