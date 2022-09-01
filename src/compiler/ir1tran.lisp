@@ -970,7 +970,8 @@
 ;;; arguments for the call, which defaults to the cdr of source. We
 ;;; return the COMBINATION node.
 (defun ir1-convert-combination-args (fun-lvar start next result args
-                                     &optional (pass-nargs t))
+                                     &key (pass-nargs t)
+                                          arg-source-forms)
   (declare (type ctran start next)
            (type lvar fun-lvar)
            (type (or lvar null) result)
@@ -991,7 +992,9 @@
                  (setf this-start
                        (maybe-instrument-progn-like this-start forms arg))
                  (let ((this-ctran (make-ctran))
-                       (this-lvar (make-lvar node)))
+                       (this-lvar (make-lvar node))
+                       (*current-path* (or (get-source-path (pop arg-source-forms))
+                                           *current-path*)))
                    (ir1-convert this-start this-ctran this-lvar arg)
                    (setq this-start this-ctran)
                    (arg-lvars this-lvar))))

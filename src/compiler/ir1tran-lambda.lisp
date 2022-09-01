@@ -116,7 +116,7 @@
 ;;; SOURCE-NAME and DEBUG-NAME. But I (WHN) don't use &AUX bindings,
 ;;; so I'm not motivated. Patches will be accepted...
 (defun ir1-convert-aux-bindings (start next result body aux-vars aux-vals
-                                 post-binding-lexenv)
+                                 post-binding-lexenv &key value-source-forms)
   (declare (type ctran start next) (type (or lvar null) result)
            (list body aux-vars aux-vals))
   (if (null aux-vars)
@@ -131,10 +131,12 @@
                                           :post-binding-lexenv post-binding-lexenv
                                           :debug-name (debug-name
                                                        '&aux-bindings
-                                                       aux-vars))))
+                                                       aux-vars)
+                                          :value-source-forms (rest value-source-forms))))
         (reference-leaf start ctran fun-lvar fun)
         (ir1-convert-combination-args fun-lvar ctran next result
-                                      (list (first aux-vals)))))
+                                      (list (first aux-vals))
+                                      :arg-source-forms (list (first value-source-forms)))))
   (values))
 
 ;;; This is similar to IR1-CONVERT-PROGN-BODY except that code to bind
@@ -149,13 +151,15 @@
 ;;; to start a block outside of this cleanup, causing cleanup code to
 ;;; be emitted when the scope is exited.
 (defun ir1-convert-special-bindings
-    (start next result body aux-vars aux-vals svars post-binding-lexenv)
+    (start next result body aux-vars aux-vals svars post-binding-lexenv
+     &key value-source-forms)
   (declare (type ctran start next) (type (or lvar null) result)
            (list body aux-vars aux-vals svars))
   (cond
    ((null svars)
     (ir1-convert-aux-bindings start next result body aux-vars aux-vals
-                              post-binding-lexenv))
+                              post-binding-lexenv
+                              :value-source-forms value-source-forms))
    (t
     (ctran-starts-block next)
     (let ((cleanup (make-cleanup :kind :special-bind))
@@ -170,7 +174,8 @@
         (ir1-convert-special-bindings cleanup-ctran next result
                                       body aux-vars aux-vals
                                       (rest svars)
-                                      post-binding-lexenv)))))
+                                      post-binding-lexenv
+                                      :value-source-forms value-source-forms)))))
   (values))
 
 ;;; Create a lambda node out of some code, returning the result. The
@@ -200,7 +205,8 @@
                                 (note-lexical-bindings t)
                                 post-binding-lexenv
                                 system-lambda
-                                local-policy)
+                                local-policy
+                                value-source-forms)
   (declare (list body vars aux-vars aux-vals))
 
   ;; We're about to try to put new blocks into *CURRENT-COMPONENT*.
@@ -269,7 +275,8 @@
             (ir1-convert-special-bindings postbind-ctran result-ctran
                                           result-lvar body
                                           aux-vars aux-vals (svars)
-                                          post-binding-lexenv)))))
+                                          post-binding-lexenv
+                                          :value-source-forms value-source-forms)))))
 
     (link-blocks (component-head *current-component*) (node-block bind))
     (push lambda (component-new-functionals *current-component*))

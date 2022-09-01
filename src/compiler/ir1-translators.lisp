@@ -746,7 +746,7 @@ be a lambda expression."
   (let ((ctran (make-ctran))
         (fun-lvar (make-lvar)))
     (ir1-convert start ctran fun-lvar `(the function ,function))
-    (ir1-convert-combination-args fun-lvar ctran next result args nil)))
+    (ir1-convert-combination-args fun-lvar ctran next result args :pass-nargs nil)))
 
 ;;; This source transform exists to reduce the amount of work for the
 ;;; compiler. If the called function is a FUNCTION form, then convert
@@ -850,7 +850,8 @@ have been evaluated."
                                    :debug-name (debug-name 'let bindings))))
                          (reference-leaf start ctran fun-lvar fun))
                        (values next result))))
-           (ir1-convert-combination-args fun-lvar ctran next result values)))))
+           (ir1-convert-combination-args fun-lvar ctran next result values
+                                         :arg-source-forms bindings)))))
 
 (def-ir1-translator let* ((bindings &body body)
                           start next result)
@@ -861,7 +862,8 @@ form to reference any of the previous VARS."
   (multiple-value-bind (vars values forms decls) (parse-letish bindings body 'let*)
     (processing-decls (decls vars nil next result post-binding-lexenv)
       (ir1-convert-aux-bindings
-       start next result forms vars values post-binding-lexenv))))
+       start next result forms vars values post-binding-lexenv
+       :value-source-forms bindings))))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
