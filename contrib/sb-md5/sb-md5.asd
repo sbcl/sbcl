@@ -24,14 +24,4 @@
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-MD5;"
   :components ((:file "md5"))
-  :perform (load-op :after (o c) (provide 'sb-md5))
-  :in-order-to ((test-op (test-op "sb-md5/tests"))))
-
-(defsystem "sb-md5/tests"
-  :depends-on ("sb-md5" "sb-rt")
-  :version "2.0.4"
-  :components ((:file "md5-tests")))
-
-(defmethod perform ((o test-op) (c (eql (find-system "sb-md5/tests"))))
-  (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
-      (error "test-op failed")))
+  :perform (load-op :after (o c) (provide 'sb-md5)))

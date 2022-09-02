@@ -13,13 +13,4 @@
                (:file "report")
                (:file "interface")
                (:file "disassemble"))
-  :perform (load-op :after (o c) (provide 'sb-sprof))
-  :in-order-to ((test-op (test-op "sb-sprof/tests"))))
-
-(defsystem "sb-sprof/tests"
-  :depends-on ("sb-sprof")
-  :components ((:file "test"))
-  :perform (test-op (o c)
-             #-(or win32) ;not yet
-             (or (funcall (find-symbol "RUN-TESTS" "SB-SPROF-TEST"))
-                 (error "test-op failed"))))
+  :perform (load-op :after (o c) (provide 'sb-sprof)))

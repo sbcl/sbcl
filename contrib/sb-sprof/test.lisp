@@ -49,7 +49,7 @@
 ;; but the less fuss about Sparc, the better.
 #+sparc (defun run-tests () t)
 
-(defvar *compiler-input* "graph")
+(defvar *compiler-input* "../contrib/sb-sprof/graph.lisp")
 (defvar *compiler-output* "./foo.fasl")
 (defvar *sprof-loop-test-max-samples* 50)
 

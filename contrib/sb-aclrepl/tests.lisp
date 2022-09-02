@@ -1,15 +1,12 @@
 ;; Tests for sb-aclrepl
 
 (defpackage #:aclrepl-tests
-  (:use #:sb-aclrepl #:cl #:sb-rt))
+  (:import-from #:test-util #:deftest)
+  (:use #:sb-aclrepl #:cl))
 (in-package #:aclrepl-tests)
 
 (declaim (special sb-aclrepl::*skip-address-display*
                   sb-aclrepl::*inspect-unbound-object-marker*))
-
-(setf sb-rt::*catch-errors* nil)
-
-(rem-all-tests)
 
 (deftest hook.1 (boundp 'sb-impl::*inspect-fun*) t)
 (deftest hook.2 (boundp 'sb-int:*repl-prompt-fun*) t)

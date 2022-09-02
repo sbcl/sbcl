@@ -72,7 +72,6 @@
   ;; once the gate is closed.
   (deftest gate.2
       (let* ((gate (make-gate))
-             (cont (make-gate))
              (marks (make-array (if (> *cpus* 1) 100 50) :initial-element nil))
              (threads (loop for i from 0 below (length marks)
                             collect (make-thread (lambda (n)
@@ -109,6 +108,7 @@
                                     (block nil
                                       (handler-bind ((sb-sys:deadline-timeout
                                                        #'(lambda (c)
+                                                           (declare (ignore c))
                                                            (return :deadline))))
                                         (sb-sys:with-deadline (:seconds 0.1)
                                           (wait-on-gate gate))))))))

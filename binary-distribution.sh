@@ -23,9 +23,9 @@ tar -cf $b-binary.tar \
     `for contrib in $(cd $b/contrib && echo *); do
          src_dir=$b/contrib/$contrib
          cache_dir=$b/obj/asdf-cache/$contrib
-         if test -d $src_dir && test -f $cache_dir/test-passed.test-report; then
+         if test -d $src_dir && test -f $cache_dir/build-passed.test-report; then
              echo $src_dir/Makefile
-             echo $cache_dir/test-passed.test-report
+             echo $cache_dir/build-passed.test-report
          fi
      done` \
     $b/obj/sbcl-home

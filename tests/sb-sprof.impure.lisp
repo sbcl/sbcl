@@ -5,7 +5,7 @@
 ;;; but I need to try to see it behaving badly (if it does),
 ;;; and there's really no other way than to watch for bad output.
 
-#+win32 (invoke-restart 'run-tests::skip-file)
+#+(or win32 sparc) (invoke-restart 'run-tests::skip-file)
 
 (require :sb-sprof)
 (load "../contrib/sb-sprof/test.lisp")
@@ -17,4 +17,4 @@
           ;; It was supposed to be 100 before I decreased it.
           ;; surely more samples is better, right?
           sb-sprof-test::*sprof-loop-test-max-samples* 100)
-    (sb-sprof-test::run-tests)))
+    (sb-sprof-test:run-tests)))

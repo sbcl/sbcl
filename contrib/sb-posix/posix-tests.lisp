@@ -1,5 +1,6 @@
 (defpackage "SB-POSIX-TESTS"
-  (:use "COMMON-LISP" "SB-RT"))
+  (:import-from #:test-util #:deftest)
+  (:use "COMMON-LISP"))
 
 (in-package "SB-POSIX-TESTS")
 
@@ -13,7 +14,7 @@
 
 (defvar *this-file* *load-truename*)
 
-(eval-when (:compile-toplevel :load-toplevel)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +mode-rwx-all+
     (logior sb-posix::s-irusr sb-posix::s-iwusr sb-posix::s-ixusr
             #-win32
@@ -390,6 +391,7 @@
   (let ((file (format nil "~A/[foo].txt" (namestring *test-directory*))))
     ;; creat() with a string as argument
     (let ((fd (sb-posix:creat file sb-posix:s-iwrite)))
+      (declare (ignorable fd))
       #+win32
       (sb-posix:close fd))
     ;; if this test fails, it will probably be with
@@ -590,7 +592,7 @@
     ;; make sure that we get something sensible, not an error
     (handler-case (progn (sb-posix:getpwnam "almost-certainly-does-not-exist")
                          nil)
-      (t (cond) t))
+      (t (cond) (declare (ignore cond)) t))
   nil)
 
 #-(or android win32)
@@ -613,7 +615,7 @@
     ;; make sure that we get something sensible, not an error
     (handler-case (progn (sb-posix:getgrnam "almost-certainly-does-not-exist")
                          nil)
-      (t (cond) t))
+      (t (cond) (declare (ignore cond)) t))
   nil)
 
 #+nil

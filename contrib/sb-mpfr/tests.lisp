@@ -1,7 +1,4 @@
-(defpackage "SB-MPFR-TESTS"
-  (:use "COMMON-LISP" "SB-RT"))
-
-(in-package "SB-MPFR-TESTS")
+;;; FIXME: how are these testing anything???
 
 (defun sample ()
   (let ((sb-mpfr:*mpfr-rnd* :MPFR_RNDD))
@@ -41,14 +38,12 @@
 (macrolet ((%write-out-idempotence-tests (&rest rationals)
              `(progn
                 ,@(loop :for rat :in rationals
-                        :collect `(deftest
-                                      ;; name
-                                      ,(intern (format nil "TEST-RATIONALIZE-~A" rat))
-                                      ;; form to test
-                                      (<= (abs (- ,rat (rational-roundtrip ,rat)))
-                                          (expt 2 (- *roundtrip-precision*)))
-                                    ;; result
-                                    t)))))
+                        :collect
+                        `(test-util:with-test
+                             (:name ,(sb-int:keywordicate (format nil "TEST-RATIONALIZE-~A" rat)))
+                           (assert    (<= (abs (- ,rat (rational-roundtrip ,rat)))
+                                          (expt 2 (- *roundtrip-precision*)))))))))
+
   (%write-out-idempotence-tests
    1/2
    1/4

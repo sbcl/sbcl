@@ -1,0 +1,6 @@
+(setq run-tests::*allowed-inputs* :any)
+(require :sb-cover)
+(defparameter *source-directory* (truename #P"../contrib/sb-cover/"))
+(test-util:with-test-directory (coveragedir)
+  (defvar cl-user::*coverage-report-directory* coveragedir)
+  (load (merge-pathnames "tests.lisp" *source-directory*)))

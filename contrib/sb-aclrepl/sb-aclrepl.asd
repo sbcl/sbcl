@@ -12,13 +12,4 @@
                  (:file "repl" :depends-on ("toplevel"))
                  (:file "inspect" :depends-on ("repl"))
                  (:file "debug" :depends-on ("repl")))
-    :perform (load-op :after (o c) (provide 'sb-aclrepl))
-    :in-order-to ((test-op (test-op "sb-aclrepl/tests"))))
-
-(defsystem "sb-aclrepl/tests"
-    :depends-on ("sb-rt")
-    :components ((:file "tests")))
-
-(defmethod perform ((o test-op) (c (eql (find-system "sb-aclrepl/tests"))))
-  (or (funcall (intern "DO-TESTS" (find-package "SB-RT")))
-      (error "test-op failed")))
+    :perform (load-op :after (o c) (provide 'sb-aclrepl)))

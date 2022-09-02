@@ -1,13 +1,8 @@
 (defpackage "SB-BSD-SOCKETS-TEST"
-  (:use "CL" "SB-BSD-SOCKETS" "SB-RT"))
+  (:import-from #:test-util #:deftest)
+  (:use "CL" "SB-BSD-SOCKETS"))
 
 (in-package :sb-bsd-sockets-test)
-
-(defmacro deftest* ((name &key fails-on) form &rest results)
-  `(progn
-     (when (sb-impl::featurep ',fails-on)
-       (pushnew ',name sb-rt::*expected-failures*))
-     (deftest ,name ,form ,@results)))
 
 ;;; a real address
 (deftest make-inet-address
@@ -56,6 +51,7 @@
                                      :protocol (get-protocol-by-name "tcp"))
           (error nil)
           (:no-error (x) x))
+    (format t "~&Will test IPv4~%")
     (push :ipv4-support *features*)))
 
 #+ipv4-support
@@ -73,7 +69,7 @@
   t)
 
 #+ipv4-support
-(deftest* (make-inet-socket-wrong)
+(deftest make-inet-socket-wrong
     ;; fail to make a socket: check correct error return.  There's no nice
     ;; way to check the condition stuff on its own, which is a shame
     (handler-case
@@ -91,7 +87,7 @@
   t)
 
 #+ipv4-support
-(deftest* (make-inet-socket-keyword-wrong)
+(deftest make-inet-socket-keyword-wrong
     ;; same again with keywords
     (handler-case
         (make-instance 'inet-socket :type :stream :protocol :udp)
@@ -123,7 +119,7 @@
   t)
 
 #+ipv4-support
-(deftest* (non-block-socket)
+(deftest non-block-socket
   (let ((s (make-instance 'inet-socket :type :stream :protocol :tcp)))
     (setf (non-blocking-mode s) t)
     (non-blocking-mode s))
@@ -179,7 +175,7 @@
   t)
 
 #+ipv4-support
-(deftest* (simple-sockopt-test)
+(deftest simple-sockopt-test
   ;; test we can set SO_REUSEADDR on a socket and retrieve it, and in
   ;; the process that all the weird macros in sockopt happened right.
   (let ((s (make-instance 'inet-socket :type :stream :protocol (get-protocol-by-name "tcp"))))
@@ -367,6 +363,7 @@
                      (lambda ()
                        (socket-connect client-sock #(127 0 0 1) port)
                        (socket-close client-sock)))))
+               (declare (ignorable client-connect-thread)) ; wtf ???
                (setf server-sock (socket-accept listen-sock)))
 
              ;; Wait for input. This should return when we get EOF

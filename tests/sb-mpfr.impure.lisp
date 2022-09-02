@@ -1,0 +1,5 @@
+(handler-case (require :sb-mpfr)
+  (warning (c)
+    (when (search "not loaded" (princ-to-string c))
+      (invoke-restart 'run-tests::skip-file))))
+(load "../contrib/sb-mpfr/tests.lisp")

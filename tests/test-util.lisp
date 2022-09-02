@@ -247,7 +247,7 @@
                            (eql package (find-package "KEYWORD")))))
              (integer t))))
     (unless (tree-equal name name :test #'name-ok)
-      (error "test name must be all-keywords: ~S" name)))
+      (error "test name must be all-keywords: ~S" name))) ; WHY????
   (cond
     ((broken-p broken-on)
      `(progn
@@ -964,3 +964,8 @@
   (when (find-package "SB-SPROF")
     (format t "INFO: disabling SB-SPROF~%")
     (funcall (intern "STOP-PROFILING" "SB-SPROF"))))
+
+;;; This unexported symbol emulates SB-RT. Please don't use it in new tests
+(defmacro deftest (name form &rest results) ; use SB-RT syntax
+  `(test-util:with-test (:name ,(sb-int:keywordicate name))
+     (assert (equalp (multiple-value-list ,form) ',results))))

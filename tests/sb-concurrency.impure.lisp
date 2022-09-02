@@ -1,0 +1,7 @@
+(require :sb-concurrency)
+(load "../contrib/sb-concurrency/tests/package.lisp")
+(load "../contrib/sb-concurrency/tests/test-utils.lisp")
+(load "../contrib/sb-concurrency/tests/test-frlock.lisp")
+(load "../contrib/sb-concurrency/tests/test-queue.lisp")
+(load "../contrib/sb-concurrency/tests/test-mailbox.lisp")
+(load "../contrib/sb-concurrency/tests/test-gate.lisp")

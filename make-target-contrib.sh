@@ -74,12 +74,12 @@ fi
 # Otherwise report expected failures:
 HEADER_HAS_BEEN_PRINTED=false
 for dir in `cd ./obj/asdf-cache/ ; echo *`; do
-  f="obj/asdf-cache/$dir/test-passed.test-report"
+  f="obj/asdf-cache/$dir/build-passed.test-report"
   if test -f "$f" && grep -i fail "$f" >/dev/null; then
       if ! $HEADER_HAS_BEEN_PRINTED; then
           cat <<EOF
 
-Note: Test suite failures which are expected for this combination of
+Note: Build failures which are expected for this combination of
 platform and features have been ignored:
 EOF
           HEADER_HAS_BEEN_PRINTED=true
@@ -114,14 +114,13 @@ done
 HEADER_HAS_BEEN_PRINTED=false
 for dir in $contrib_dirs
 do
-  if [ ! -f "obj/asdf-cache/$dir/test-passed.test-report" ]; then
+  if [ ! -f "obj/asdf-cache/$dir/build-passed.test-report" ]; then
       if $HEADER_HAS_BEEN_PRINTED; then
           echo > /dev/null
       else
           cat <<EOF
 
-WARNING! Some of the contrib modules did not build successfully or pass
-their self-tests. Failed contribs:"
+WARNING! Some of the contrib modules did not build successfully. Failed contribs:"
 EOF
           HEADER_HAS_BEEN_PRINTED=true
       fi

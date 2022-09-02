@@ -17,6 +17,8 @@ $(ASDF_FASL):: asdf.lisp ../../output/sbcl.core $(UIOP_FASL)
 install::
 	cp $(FASL) "$(BUILD_ROOT)$(INSTALL_DIR)"
 
+build:: $(FASL)
+	true
 test:: $(FASL)
 	true
 

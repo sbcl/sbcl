@@ -87,7 +87,7 @@ maybetime sh make-target-contrib.sh
 # "find contrib/{sb-*,asdf}/Makefile" could work,
 # but as long as we only have 1 directory level, 'ls' should be adequate.
 NCONTRIBS=`ls -1 contrib/*/Makefile | wc -l`
-NPASSED=`find obj/asdf-cache -name test-passed.test-report -print | wc -l`
+NPASSED=`find obj/asdf-cache -name build-passed.test-report -print | wc -l`
 echo
 echo "The build seems to have finished successfully, including $NPASSED (out of $NCONTRIBS)"
 echo "contributed modules. If you would like to run more extensive tests on"

@@ -1,5 +1,6 @@
 (defpackage #:sb-md5-tests
-  (:use #:sb-md5 #:cl #:sb-rt))
+  (:import-from #:test-util #:deftest)
+  (:use #:sb-md5 #:cl))
 (in-package #:sb-md5-tests)
 
 (defun byte-array-to-hex-string (bytevec)

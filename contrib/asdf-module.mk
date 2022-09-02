@@ -37,6 +37,9 @@ $(FASL)::
 $(ASD)::
 	echo "(defsystem :$(SYSTEM) :class require-system)" > $@
 
+build: $(FASL) $(ASD)
+	true
+
 test: $(FASL) $(ASD)
 	$(SBCL) --load ../asdf-stub.lisp \
 		--eval '(asdf::test-asdf-contrib "$(SYSTEM)")'

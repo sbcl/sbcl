@@ -3,8 +3,6 @@
   :author "Marco Heisig <marco.heisig@fau.de>"
   :license "MIT"
 
-  :in-order-to ((test-op (test-op "sb-simd-test-suite")))
-
   :serial t
   :components
   ((:file "packages")

@@ -80,7 +80,9 @@
     (let* ((source (find-definition-source #'cl-user::one))
            (plist (definition-source-plist source))
            (pathname (definition-source-pathname source)))
-      (values (equalp pathname #p"SYS:CONTRIB;SB-INTROSPECT;TEST.LISP.NEWEST")
+      (declare (ignore source))
+      ;; the full pathname isn't important
+      (values (equalp (pathname-name pathname) "TEST")
               (= (definition-source-file-write-date source)
                  (file-write-date pathname))
               (or (equal (getf plist :test-outer)
@@ -250,7 +252,7 @@
     (matchp-name :function 'cl-user::compile-time-too-fun 28)
   t)
 
-(load "load-test.lisp")
+(load "../contrib/sb-introspect/load-test.lisp")
 (deftest find-source-stuff.32
     (matchp-name :function 'cl-user::loaded-as-source-fun 3)
   t)
@@ -744,7 +746,7 @@
         (predicate (find-definition-source #'cl-user::three-p)))
     (values (and (equalp copier accessor)
                  (equalp copier predicate))
-            (equal "TEST.LISP.NEWEST"
+            (equal "test.lisp"
                    (file-namestring (definition-source-pathname copier)))
             (equal '(5)
                    (definition-source-form-path copier))))
@@ -758,7 +760,7 @@
         (predicate (car (find-definition-sources-by-name 'cl-user::three-p :function))))
     (values (and (equalp copier accessor)
                  (equalp copier predicate))
-            (equal "TEST.LISP.NEWEST"
+            (equal "test.lisp"
                    (file-namestring (definition-source-pathname copier)))
             (equal '(5)
                    (definition-source-form-path copier))))
