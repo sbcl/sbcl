@@ -84,8 +84,7 @@
   "../contrib/sb-aclrepl/tests.lisp")
  ("sb-bsd-sockets.impure.lisp" "contrib/sb-bsd-sockets.fasl"
   "../contrib/sb-bsd-sockets/tests.lisp")
- ; not working as a .impure test yet
- ; ("sb-cltl2.impure.lisp" "contrib/sb-cltl2.fasl" "../contrib/sb-cltl2/tests.lisp")
+ ("sb-cltl2.impure.lisp" "contrib/sb-cltl2.fasl" "../contrib/sb-cltl2/tests.lisp")
  ("sb-concurrency.impure.lisp" "contrib/sb-concurrency.fasl"
   "../contrib/sb-concurrency/tests/package.lisp"
   "../contrib/sb-concurrency/tests/test-utils.lisp"
