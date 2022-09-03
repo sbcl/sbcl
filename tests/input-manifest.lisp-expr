@@ -95,6 +95,10 @@
  ("sb-cover.impure.lisp" "contrib/sb-cover.fasl")
  ("sb-gmp.impure.lisp" "contrib/sb-gmp.fasl" "../contrib/sb-gmp/tests.lisp")
  ("sb-graph.impure.lisp" "contrib/sb-graph.fasl" "contrib/uiop.fasl")
+ ("sb-introspect.impure.lisp" "contrib/sb-introspect.fasl"
+  "../contrib/sb-introspect/xref-test-data.lisp" "../contrib/sb-introspect/xref-test.lisp"
+  "../contrib/sb-introspect/test.lisp" "../contrib/sb-introspect/test-driver.lisp"
+  "../contrib/sb-introspect/load-test.lisp")
  ("sb-md5.impure.lisp" "contrib/sb-md5.fasl" "contrib/sb-rotate-byte.fasl"
   "../contrib/sb-md5/md5-tests.lisp")
  ("sb-mpfr.impure.lisp" "contrib/sb-gmp.fasl" "contrib/sb-mpfr.fasl"
