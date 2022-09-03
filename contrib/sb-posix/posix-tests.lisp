@@ -175,17 +175,11 @@
     (sb-posix:syscall-error (c)
       (typep
        (sb-posix:syscall-errno c)
-       '(member
-         #+(or darwin openbsd)
-         #.sb-posix:eisdir
-         #+win32
-         #.sb-posix::eacces
-         #+win32
-         #.sb-posix::enotempty
-         #+sunos
-         #.sb-posix::einval
-         #-(or darwin openbsd win32 sunos)
-         #.sb-posix::ebusy)))) t)
+       `(member #+(or darwin openbsd freebsd) ,sb-posix:eisdir
+                #+win32 ,sb-posix::eacces #+win32 ,sb-posix::enotempty
+                #+sunos ,sb-posix::einval
+                #-(or darwin openbsd freebsd win32 sunos) ,sb-posix::ebusy))))
+  t)
 
 (deftest rmdir.error.4
   (let* ((dir (ensure-directories-exist
