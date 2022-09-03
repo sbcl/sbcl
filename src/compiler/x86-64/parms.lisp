@@ -108,8 +108,8 @@
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
 
-(defconstant linkage-table-growth-direction :up)
-(defconstant linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :up)
+(defconstant alien-linkage-table-entry-size 16)
 
 
 (defenum (:start 8)

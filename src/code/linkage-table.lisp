@@ -61,9 +61,9 @@
     (or (awhen (with-system-mutex ((hash-table-lock ht))
                  (or (gethash key ht)
                      (let* ((index (hash-table-count ht))
-                            (capacity (floor (- sb-vm:linkage-table-space-end
-                                                sb-vm:linkage-table-space-start)
-                                             sb-vm:linkage-table-entry-size)))
+                            (capacity (floor (- sb-vm:alien-linkage-table-space-end
+                                                sb-vm:alien-linkage-table-space-start)
+                                             sb-vm:alien-linkage-table-entry-size)))
                        (when (< index capacity)
                          (multiple-value-bind (defined real-address) (dlsym-wrapper t)
                            (unless defined (push key (cdr info)))
@@ -71,7 +71,7 @@
                                                            (if datap 1 0))
                            (logically-readonlyize name)
                            (setf (gethash key ht) index))))))
-               (sb-vm::linkage-table-entry-address it))
+               (sb-vm::alien-alien-linkage-table-entry-address it))
         (error "Linkage-table full (~D entries): cannot link ~S."
                (hash-table-count ht) name))))
 
@@ -86,9 +86,9 @@
 ;;; If the shared-object-handle in which each symbol was originally found were
 ;;; stored in linkage-info, we could know which will become undefined on unload.
 ;;; The only "problem" is my lack of motivation to change this further.
-(defun update-linkage-table (full-scan)
+(defun update-alien-linkage-table (full-scan)
   ;; This symbol is of course itself a prelinked symbol.
-  (let* ((n-prelinked (extern-alien "lisp_linkage_table_n_prelinked" int))
+  (let* ((n-prelinked (extern-alien "alien_linkage_table_n_prelinked" int))
          (info *linkage-info*)
          (ht (car info))
          ;; for computing anew the list of undefined symbols

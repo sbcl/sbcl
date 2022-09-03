@@ -92,7 +92,7 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
           ;; If OLD is non-NIL, then we're passing "true" which causes all foreign
           ;; symbols to get looked up again. Otherwise we're passing "false"
           ;; which only tries to find symbols that aren't already found.
-          (update-linkage-table old))))
+          (update-alien-linkage-table old))))
     pathname))
 
 (defun unload-shared-object (pathname)
@@ -108,7 +108,7 @@ Experimental."
         (when old
           (dlclose-or-lose old)
           (setf *shared-objects* (remove old *shared-objects*))
-          (update-linkage-table t)
+          (update-alien-linkage-table t)
           ;; Return T for unloaded, vs whatever update-linkage-info returns
           t)))))
 

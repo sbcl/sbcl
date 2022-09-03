@@ -208,7 +208,7 @@ void unmap_gc_page()
  * bundle'' that rolls up your patch, redumps and -- presto -- 100MiB
  * program is fixed by sending and loading a 50KiB thingie.
  *
- * However, until LISP_FEATURE_LINKAGE_TABLE, if your bug were fixed
+ * However, until LISP_FEATURE_ALIEN_LINKAGE_TABLE, if your bug were fixed
  * by modifying two lines of _C_ sources, a customer described above
  * had to be ready to receive and reinstall a new 100MiB
  * executable. With the aid of code below, deploying such a fix

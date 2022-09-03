@@ -83,10 +83,10 @@
 
 (!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
 
-;; Size of one linkage-table entry in bytes. See comment in
+;; Size of one alien-linkage-table entry in bytes. See comment in
 ;; src/runtime/sparc-arch.c
-(defconstant linkage-table-entry-size 16)
-(defconstant linkage-table-growth-direction :up)
+(defconstant alien-linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :up)
 
 
 (defenum (:start 8)

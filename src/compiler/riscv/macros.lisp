@@ -93,7 +93,7 @@
   (define-tls-accessors load-stepping store-stepping
     thread-stepping-slot sb-impl::*stepping*))
 
-;;; TODO: these two macros would benefit from linkage-table space being
+;;; TODO: these two macros would benefit from alien-linkage-table space being
 ;;; located below static space with linkage entries allocated downward
 ;;; from the end. Then the sequence would reduce to 2 instructions:
 ;;;    lw temp (k)$NULL

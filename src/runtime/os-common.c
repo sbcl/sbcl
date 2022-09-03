@@ -168,7 +168,7 @@ os_dlsym_default(char *name)
 }
 #endif
 
-int lisp_linkage_table_n_prelinked;
+int alien_linkage_table_n_prelinked;
 void os_link_runtime()
 {
     int entry_index = 0;
@@ -178,12 +178,12 @@ void os_link_runtime()
     void* result;
     int j;
 
-    if (lisp_linkage_table_n_prelinked)
+    if (alien_linkage_table_n_prelinked)
         return; // Linkage was already performed by coreparse
 
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
-    lisp_linkage_table_n_prelinked = vector_len(symbols);
-    for (j = 0 ; j < lisp_linkage_table_n_prelinked ; ++j)
+    alien_linkage_table_n_prelinked = vector_len(symbols);
+    for (j = 0 ; j < alien_linkage_table_n_prelinked ; ++j)
     {
         lispobj item = symbols->data[j];
         datap = listp(item);

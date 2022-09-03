@@ -174,9 +174,9 @@
 #+netbsd    (space-setup #x20000000 :dynamic-space-start #x60000000)
 #+darwin    (space-setup #x04000000 :dynamic-space-start #x10000000)
 
-;;; Size of one linkage-table entry in bytes.
-(defconstant linkage-table-entry-size 8)
-(defconstant linkage-table-growth-direction :up)
+;;; Size of one alien-linkage-table entry in bytes.
+(defconstant alien-linkage-table-entry-size 8)
+(defconstant alien-linkage-table-growth-direction :up)
 
 
 (defenum (:start 8)

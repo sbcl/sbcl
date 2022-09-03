@@ -50,7 +50,7 @@ if the symbol isn't found."
 
 (defun foreign-reinit ()
   #+os-provides-dlopen (reopen-shared-objects)
-  (update-linkage-table t))
+  (update-alien-linkage-table t))
 
 ;;; Cleanups before saving a core
 (defun foreign-deinit ()
@@ -64,10 +64,10 @@ if the symbol isn't found."
   (declare (ignorable sap))
   (let ((addr (sap-int sap)))
     (declare (ignorable addr))
-    (when (<= sb-vm:linkage-table-space-start
+    (when (<= sb-vm:alien-linkage-table-space-start
               addr
-              sb-vm:linkage-table-space-end)
-      (let ((table-index (sb-vm::linkage-table-index-from-address addr)))
+              sb-vm:alien-linkage-table-space-end)
+      (let ((table-index (sb-vm::alien-linkage-table-index-from-address addr)))
         (dohash ((key value) (car *linkage-info*) :locked t)
           (when (= value table-index)
             (return-from sap-foreign-symbol (if (listp key) (car key) key))))))

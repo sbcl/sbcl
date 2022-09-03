@@ -209,7 +209,7 @@
                      (ash 1 (tn-offset lr-tn))))
   ;; select the C function index as per *LINKAGE-SPACE-PREDEFINED-ENTRIES*
   (let ((index (if (eq type 'list) 1 0)))
-    (inst ldr alloc-tn (@ null-tn (- (linkage-table-entry-address index)
+    (inst ldr alloc-tn (@ null-tn (- (alien-alien-linkage-table-entry-address index)
                                      nil-value))))
   (inst blx alloc-tn)
   (inst word (logior #xe8bd0000 ; POP {rN, lr}

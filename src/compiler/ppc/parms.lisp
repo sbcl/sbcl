@@ -93,8 +93,8 @@
   (defconstant static-space-start    #x08000000)
   (defconstant static-space-end      #x097fff00)
 
-  (defconstant linkage-table-space-start #x0a000000)
-  (defconstant linkage-table-space-end   #x0b000000))
+  (defconstant alien-linkage-table-space-start #x0a000000)
+  (defconstant alien-linkage-table-space-end   #x0b000000))
 
 ;;; While on gencgc we don't.
 #+gencgc
@@ -105,8 +105,8 @@
                      #+netbsd  #x4f000000
                      #+openbsd #x4f000000)
 
-(defconstant linkage-table-growth-direction :up)
-(defconstant linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :up)
+(defconstant alien-linkage-table-entry-size 16)
 
 #+linux
 (progn

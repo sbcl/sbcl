@@ -454,12 +454,12 @@
   (let* ((linkage-bounds
           (make-bounds
            (symbol-global-value
-            (find-target-symbol (package-id "SB-VM") "LINKAGE-TABLE-SPACE-START" spaces :physical))
+            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-SPACE-START" spaces :physical))
            (symbol-global-value
-            (find-target-symbol (package-id "SB-VM") "LINKAGE-TABLE-SPACE-END" spaces :physical))))
+            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-SPACE-END" spaces :physical))))
          (linkage-entry-size
           (symbol-global-value
-           (find-target-symbol (package-id "SB-VM") "LINKAGE-TABLE-ENTRY-SIZE"
+           (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"
                                spaces :physical)))
          (linkage-symbols (compute-linkage-symbols spaces))
          (nil-object (compute-nil-object spaces))
@@ -1815,7 +1815,7 @@
                                  "~% .section .rodata~%"))
             (format asm-file " .globl ~A~%~:*~A:
  .quad ~d # ct~%"
-                    (labelize "lisp_linkage_values")
+                    (labelize "alien_linkage_values")
                     (length (core-linkage-symbols core)))
             ;; -1 (not a plausible function address) signifies that word
             ;; following it is a data, not text, reference.

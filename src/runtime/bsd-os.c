@@ -121,10 +121,10 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
 {
     int __attribute((unused))
       executable = (space_id == READ_ONLY_CORE_SPACE_ID) ||
-                   (space_id == LINKAGE_TABLE_CORE_SPACE_ID) ||
+                   (space_id == ALIEN_LINKAGE_TABLE_CORE_SPACE_ID) ||
                    (space_id == STATIC_CODE_CORE_SPACE_ID),
       jit = (space_id == STATIC_CODE_CORE_SPACE_ID) || (space_id == DYNAMIC_CORE_SPACE_ID)
-            ? 1 : (space_id == LINKAGE_TABLE_CORE_SPACE_ID) ? 2 : 0;
+            ? 1 : (space_id == ALIEN_LINKAGE_TABLE_CORE_SPACE_ID) ? 2 : 0;
 
     int protection;
     int flags = 0;
@@ -602,7 +602,7 @@ The system may fail to start.\n",
      */
     getrlimit (RLIMIT_DATA, &rl);
     if (dynamic_space_size + READ_ONLY_SPACE_SIZE + STATIC_SPACE_SIZE +
-        LINKAGE_TABLE_SPACE_SIZE + wantfree > rl.rlim_cur)
+        ALIEN_LINKAGE_TABLE_SPACE_SIZE + wantfree > rl.rlim_cur)
         fprintf (stderr,
                  "RUNTIME WARNING: data size resource limit may be too low,\n"
                  "  try decreasing the dynamic space size with --dynamic-space-size\n"

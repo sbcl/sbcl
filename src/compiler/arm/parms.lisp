@@ -78,8 +78,8 @@
   (defconstant static-space-start    #x08000000)
   (defconstant static-space-end      #x097fff00)
 
-  (defconstant linkage-table-space-start #x0a000000)
-  (defconstant linkage-table-space-end   #x0b000000))
+  (defconstant alien-linkage-table-space-start #x0a000000)
+  (defconstant alien-linkage-table-space-end   #x0b000000))
 
 #+gencgc
 (progn
@@ -88,8 +88,8 @@
   #+openbsd
   (!gencgc-space-setup #x04000000 :dynamic-space-start #x10000000))
 
-(defconstant linkage-table-growth-direction :down)
-(defconstant linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :down)
+(defconstant alien-linkage-table-entry-size 16)
 ;;; Link these as data entries so that we store only the address of the
 ;;; handwritten assembly code in the linkage able, and not a trampoline
 ;;; to the trampoline. The ALLOCATION macro just wants an address.

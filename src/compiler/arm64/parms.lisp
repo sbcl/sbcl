@@ -72,8 +72,8 @@
   (defconstant static-space-start    #x08000000)
   (defconstant static-space-end      #x097fff00)
 
-  (defconstant linkage-table-space-start #x0a000000)
-  (defconstant linkage-table-space-end   #x0b000000)
+  (defconstant alien-linkage-table-space-start #x0a000000)
+  (defconstant alien-linkage-table-space-end   #x0b000000)
   #+(or linux openbsd)
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
@@ -87,8 +87,8 @@
                      #-darwin #x1000000000
                      #+darwin #x7003000000)
 
-(defconstant linkage-table-growth-direction :up)
-(defconstant linkage-table-entry-size 16)
+(defconstant alien-linkage-table-growth-direction :up)
+(defconstant alien-linkage-table-entry-size 16)
 
 ;;;; other miscellaneous constants
 
