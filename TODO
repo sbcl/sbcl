@@ -70,11 +70,6 @@ ADVICE/FWRAP
   latter returns the underlying definition, whereas the first returns
   the encapsulation.
 
-GENERIC FUNCTION TRACING
-
-  This sucks currently. It would also be good to be able to trace
-  individual methods.
-
 POLICY MADNESS
 
   The interactions between various optimization policies are far from
@@ -92,7 +87,6 @@ WINDOWS
 DARWIN
 
   Needs love, particularly threads and exceptions/signals.
-  also broken there.
 
 DRAGONFLY
   Multithreading does not work. Possibly because of bug in mmap/munmap.
