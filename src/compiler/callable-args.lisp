@@ -191,6 +191,7 @@
                            (functional-type entry-fun))
                           ((and (not (fun-type-p lvar-type))
                                 (lambda-p entry-fun)
+                                (null (lambda-kind entry-fun))
                                 (lambda-tail-set entry-fun))
                            (make-fun-type :wild-args t
                                           :returns

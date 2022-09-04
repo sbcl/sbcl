@@ -3727,3 +3727,16 @@
    `(lambda (x)
       (aref (the (values (and (not simple-array) vector)) x) 0))
    (((make-array 10 :adjustable t :initial-element 3)) 3)))
+
+(with-test (:name :restoring-tns-after-cleanups)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (declare (notinline values))
+         (unwind-protect 1
+           (let ((a (list 'list)))
+             (declare (dynamic-extent a))
+             (unwind-protect 1 (eval a)))
+           (eval 1)
+           (eval 2)))
+    (() 1)))
