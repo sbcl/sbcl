@@ -50,7 +50,7 @@
       0))
 
 ;;; the address of the linkage table entry for table index I.
-(defun alien-alien-linkage-table-entry-address (i)
+(defun alien-linkage-table-entry-address (i)
   (ecase alien-linkage-table-growth-direction
     (:up   (+ (* i alien-linkage-table-entry-size) alien-linkage-table-space-start))
     (:down (- alien-linkage-table-space-end (* (1+ i) alien-linkage-table-entry-size)))))

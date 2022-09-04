@@ -2362,7 +2362,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (defun alien-linkage-table-note-symbol (symbol-name datap)
   "Register a symbol and return its address in proto-linkage-table."
-  (sb-vm::alien-alien-linkage-table-entry-address
+  (sb-vm::alien-linkage-table-entry-address
    (ensure-gethash (if datap (list symbol-name) symbol-name)
                    *cold-foreign-symbol-table*
                    (hash-table-count *cold-foreign-symbol-table*))))
@@ -3667,7 +3667,7 @@ III. initially undefined function references (alphabetically):
     (let ((name (car entry)))
       (format t " ~:[   ~;(D)~] ~8x = ~a~%"
               (listp name)
-              (sb-vm::alien-alien-linkage-table-entry-address (cdr entry))
+              (sb-vm::alien-linkage-table-entry-address (cdr entry))
               (car (ensure-list name)))))
 
   #+sb-thread

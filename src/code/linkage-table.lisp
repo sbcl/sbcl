@@ -71,7 +71,7 @@
                                                            (if datap 1 0))
                            (logically-readonlyize name)
                            (setf (gethash key ht) index))))))
-               (sb-vm::alien-alien-linkage-table-entry-address it))
+               (sb-vm::alien-linkage-table-entry-address it))
         (error "Linkage-table full (~D entries): cannot link ~S."
                (hash-table-count ht) name))))
 
