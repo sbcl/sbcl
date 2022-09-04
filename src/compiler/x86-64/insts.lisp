@@ -3376,7 +3376,7 @@
              (flavor (fixup-flavor fixup)))
         (cond ((eq flavor :gc-barrier) (push offset imm-fixups))
               ((and (memq flavor
-                          '(:named-call :layout :immobile-symbol :symbol-value ; -> fixedobj subspace
+                          '(:fdefn-call :layout :immobile-symbol :symbol-value ; -> fixedobj subspace
                             :assembly-routine :assembly-routine* :static-call)) ; -> text subspace
                     (eq kind :abs32))
                #+immobile-space (push offset abs32-fixups))

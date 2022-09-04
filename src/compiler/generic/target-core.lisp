@@ -100,7 +100,7 @@
                    ;; (whose address we don't want to wire in).
                    (:symbol-value (get-lisp-obj-address (symbol-global-value name)))
                    #+immobile-code
-                   (:named-call
+                   (:fdefn-call
                     (prog1 (sb-vm::fdefn-entry-address name) ; creates if didn't exist
                       (when statically-link-p
                         (push (cons offset (find-fdefn name)) (elt preserved-lists 0)))))
@@ -180,7 +180,7 @@
   #+x86-64
   (aver (not (nth-value
               1 (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))))
-  (aver (zerop (code-n-named-calls code)))
+  (aver (zerop (nth-value 1 (sb-vm::code-header-fdefn-range code))))
   (let* ((nbytes (code-object-size code))
          (boxed (code-header-words code)) ; word count
          (unboxed (- nbytes (ash boxed sb-vm:word-shift))) ; byte count
@@ -296,18 +296,17 @@
          (const-patch-start-index
           (+ sb-vm:code-constants-offset (* (length (ir2-component-entries 2comp))
                                             sb-vm:code-slots-per-simple-fun)))
-         (n-named-calls
-          ;; Pre-scan for fdefinitions to ensure their existence.
-          ;; Doing so guarantees that storing them into the boxed header now
-          ;; can't create any old->young pointer, which is important since gencgc
-          ;; does not deal with untagged pointers when looking for old->young.
+         ;; Pre-scan for all fdefinitions to ensure their existence, which guarantees that
+         ;; storing them into the boxed words can't can't create an old->young pointer.
+         ;; This is essential since gencgc will miss them when scanning the code header
+         ;; for such tagged pointers.
+         (n-fdefns
           (do ((count 0)
                (index const-patch-start-index (1+ index)))
               ((>= index n-boxed-words) count)
             (let ((const (aref constants index)))
-              (when (and (listp const) (case (car const)
-                                         (:named-call (incf count))
-                                         (:fdefinition t)))
+              (when (typep const '(cons (eql :fdefinition)))
+                (incf count)
                 (setf (second const) (find-or-create-fdefn (second const)))))))
          (retained-fixups (pack-retained-fixups fixup-notes))
          ((code-obj total-nwords)
@@ -321,7 +320,7 @@
          (real-code-obj code-obj))
     (declare (ignorable boxed-data))
     (sb-fasl::with-writable-code-instructions
-        (code-obj total-nwords debug-info n-named-calls n-simple-funs)
+        (code-obj total-nwords debug-info n-fdefns n-simple-funs)
       :copy (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes))
       :fixup (setq named-call-fixups
                    (apply-core-fixups code-obj fixup-notes retained-fixups real-code-obj)))
@@ -371,10 +370,10 @@
              ((eql :entry)
               (the function (gethash (leaf-info (cadr const))
                                      (core-object-entry-table object))))
-             ((member :named-call :fdefinition) (cadr const))
+             ((eql :fdefinition) (cadr const))
              ((eql :known-fun) (%coerce-name-to-fun (cadr const)))
              (constant (constant-value const)))
-           (eq kind :named-call))))
+           (eq kind :fdefinition))))
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 

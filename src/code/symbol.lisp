@@ -597,3 +597,5 @@ distinct from the global value. Can also be SETF."
                        :datum new-value
                        :expected-type spec)))))))
     nil))
+
+#+sb-thread (defun symbol-tls-index (x) (symbol-tls-index x)) ; necessary stub

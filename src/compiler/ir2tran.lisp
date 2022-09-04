@@ -125,6 +125,8 @@
              (vop fast-symbol-global-value node block name-tn res)
              (vop symbol-global-value node block name-tn res))))
       (:global-function
+       ;; A :GLOBAL-FUNCTION refers to #'NAME for some purpose _other_ _than_
+       ;; NAME being a symbol at the CAR of a form (and referenced in FUN-LVAR-TN).
        ;; In cross-compilation, testing (INFO :function :definition) is not
        ;; sensible (or possible) but we can assume that things with fun-info
        ;; will eventually be defined. If that's untrue, e.g. if we referred
@@ -145,25 +147,27 @@
                                        (eq pkg *cl-package*))))
                                 (t t))))
                      (internal-name-p name))
-                   #-sb-xc-host (find-fdefn name)
                    (info :function :info name)
+                   ;; Known functions can be dumped without going through fdefns.
+                   ;; But if NOTINLINEd, don't early-bind to the functional value
+                   ;; because that disallows redefinition, including but not limited
+                   ;; to encapsulations, which in turn makes TRACE not work, which
+                   ;; leads to extreme frustration when debugging.
                    (let ((*lexenv* (node-lexenv node)))
-                     (not (fun-lexically-notinline-p name))))
-              ;; Known functions can be dumped without going through fdefns.
-              ;; But if NOTINLINEd, don't early-bind to the functional value
-              ;; because that disallows redefinition, including but not limited
-              ;; to encapsulations, which in turn makes TRACE not work, which
-              ;; leads to extreme frustration when debugging.
+                     (not (fun-lexically-notinline-p name)))
+                   ;; If NOT compiling to a file, then the function had better exist now.
+                   ;; If to a file, then it better exist at some point, but its existence
+                   ;; in the compilation lisp doesn't really imply that it will.
+                   #-sb-xc-host (if (producing-fasl-file) t (find-fdefn name)))
               (emit-move node block (make-load-time-constant-tn :known-fun name)
                          res))
              (t
-              #+untagged-fdefns
-              (let ((fdefn-tn (make-load-time-constant-tn :named-call name)))
+              (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
+                #+untagged-fdefns
                 (if unsafe
                     (vop sb-vm::untagged-fdefn-fun node block fdefn-tn res)
-                    (vop sb-vm::safe-untagged-fdefn-fun node block fdefn-tn res)))
-              #-untagged-fdefns
-              (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
+                    (vop sb-vm::safe-untagged-fdefn-fun node block fdefn-tn res))
+                #-untagged-fdefns
                 (if unsafe
                     (vop fdefn-fun node block fdefn-tn res)
                     (vop safe-fdefn-fun node block fdefn-tn res)))))))))
@@ -1057,11 +1061,11 @@
            ;; and CL:GENSYM, in case a piece of code mentions both.
            (let ((name (uncross (lvar-fun-name lvar t))))
              ;; Static fdefns never need a code header constant.
+             ;; Calls to immobile space fdefns won't use the constant,
+             ;; but it needs to exist for GC's pointer tracing.
              (values (if (sb-vm::static-fdefn-offset name)
                          name
-                         ;; Calls to immobile space fdefns won't use this constant,
-                         ;; but it needs to exist for GC's pointer tracing.
-                         (make-load-time-constant-tn :named-call name))
+                         (make-load-time-constant-tn :fdefinition name))
                      name)))
           (t
            (values (lvar-tn node block lvar) nil)))))

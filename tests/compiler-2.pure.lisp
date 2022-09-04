@@ -2634,13 +2634,10 @@
                             (push name names)))))
              (assert (not dup-fdefns)))))
     (dolist (c (sb-vm::list-allocated-objects :all :type sb-vm:code-header-widetag))
-      (let* ((start (+ sb-vm:code-constants-offset
-                       (* (sb-kernel:code-n-entries c)
-                          sb-vm:code-slots-per-simple-fun)))
-             (end (+ start (sb-kernel:code-n-named-calls c))))
+      (sb-int:binding* (((start count) (sb-vm::code-header-fdefn-range c))
+                        (end (+ start count)))
         ;; Within each subset of FDEFNs there should be no duplicates
-        ;; by name. But there could be an fdefn that is in the union of
-        ;; the ranges twice, if used for named call and a global ref.
+        ;; by name. But there could be an fdefn that is in the union of the two sets.
         (scan-range c start end)
         (scan-range c end (sb-kernel:code-header-words c))))))
 

@@ -2944,9 +2944,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
               ;; but an uninterned symbol is a descriptor.
               (descriptor-bits (if (symbolp name) (cold-intern name) name)))
              (:symbol-value (descriptor-bits (cold-symbol-value name)))
-             (:named-call
+             (:fdefn-call ; x86-64 only
               (+ (descriptor-bits (ensure-cold-fdefn name))
-                 (- 2 sb-vm:other-pointer-lowtag)))) ; wtf?
+                 ;; this jumps to the jump instruction embedded within an fdefn.
+                 ;; (It's a terrible technique which I plan to remove.)
+                 (- 2 sb-vm:other-pointer-lowtag))))
            kind flavor))))
   code-obj)
 

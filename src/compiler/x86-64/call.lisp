@@ -842,10 +842,10 @@
 ;;; if possible (without loading RAX)
 (defun emit-direct-call (name instruction node step-instrumenting)
       ;; a :STATIC-CALL fixup is the address of the entry point of
-      ;; the function itself, and a :NAMED-CALL fixup is the address
+      ;; the function itself, and a :FDEFN-CALL fixup is the address
       ;; of the JMP instruction embedded in the header for the named FDEFN.
   (let* ((fixup (make-fixup name
-                 (if (static-fdefn-offset name) :static-call :named-call)))
+                 (if (static-fdefn-offset name) :static-call :fdefn-call)))
          (target
               (if (and (sb-c::code-immobile-p node)
                        (not step-instrumenting))

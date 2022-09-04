@@ -810,11 +810,11 @@
              (dovector (constant unsorted)
                (incf old-offset)
                (when (eql pass (cond ((constant-p constant) 2)
-                                     ((eq (car constant) :named-call) 1)
+                                     ((eq (car constant) :fdefinition) 1)
                                      (t 3)))
                  (let ((new-offset (vector-push-extend constant sorted)))
                    (push (cons old-offset new-offset) renumbering))))))
-      (scan 1)  ; first all the called fdefinitions
+      (scan 1)  ; first all the fdefinitions use for call or global function ref (as in #'FUN)
       (scan 2)  ; then IR1 constants
       (scan 3)) ; then various flavors of load-time magic
     ;; Update the TN-OFFSET slot.

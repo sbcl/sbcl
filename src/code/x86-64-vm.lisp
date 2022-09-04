@@ -355,13 +355,11 @@
   (unless (immobile-space-obj-p code)
     (return-from statically-link-code-obj code))
   #+immobile-code
-  (let* ((fdefns-start (+ code-constants-offset
-                          (* code-slots-per-simple-fun (code-n-entries code))))
-         (fdefns-count (the index (code-n-named-calls code)))
-         (replacements (make-array fdefns-count :initial-element nil))
-         (ambiguous (make-array fdefns-count :initial-element 0 :element-type 'bit))
-         (any-replacements)
-         (any-ambiguous))
+  (binding* (((fdefns-start fdefns-count) (code-header-fdefn-range code))
+             (replacements (make-array fdefns-count :initial-element nil))
+             (ambiguous (make-array fdefns-count :initial-element 0 :element-type 'bit))
+             (any-replacements nil)
+             (any-ambiguous nil))
     ;; For each fdefn, decide two things:
     ;; * whether the fdefn can be replaced by its function - possible only when
     ;;   that function is in immobile space and needs no trampoline.

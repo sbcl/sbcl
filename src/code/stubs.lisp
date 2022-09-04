@@ -160,7 +160,6 @@
   (def stack-ref (s n))
   (def fun-code-header)
   (def symbol-hash)
-  #+sb-thread (def symbol-tls-index)
   (def symbol-%info) ; primitive reader always needs a stub
   ;; but the "wrapped" reader might not need a stub.
   ;; If it's already a proper function, then it doesn't.

@@ -1036,7 +1036,7 @@
   #(:assembly-routine :assembly-routine* :asm-routine-nil-offset
     :gc-barrier :symbol-tls-index
     :foreign :foreign-dataref :code-object
-    :layout :immobile-symbol :named-call :static-call
+    :layout :immobile-symbol :fdefn-call :static-call
     :symbol-value
     :layout-id)
   #'equalp)
@@ -1119,7 +1119,7 @@
                :immobile-symbol :symbol-value)
                (the symbol name))
               ((:foreign :foreign-dataref) (the string name))
-              ((:named-call :static-call) name))))
+              ((:fdefn-call :static-call) name))))
       (dump-object info fasl-output)
       (incf nelements (cond (named (dump-object operand fasl-output) 2)
                             (t 1))))))
@@ -1143,7 +1143,7 @@
   (let* ((2comp (component-info component))
          (constants (sb-c:ir2-component-constants 2comp))
          (header-length (length constants))
-         (n-named-calls 0))
+         (n-fdefns 0))
     (collect ((patches)
               (named-constants))
       ;; Dump the constants, noting any :ENTRY constants that have to
@@ -1175,8 +1175,12 @@
                     (dump-fop 'fop-misc-trap fasl-output)))))
                (:load-time-value
                 (dump-push (cadr entry) fasl-output))
-               ((:named-call :fdefinition)
-                (when (eq (car entry) :named-call) (incf n-named-calls))
+               (:fdefinition
+                ;; It's possible for other fdefns to be found in the header, but they can't
+                ;; have resulted from IR2 conversion. They would have had to come from
+                ;; something like (load-time-value (find-or-create-fdefn ...))
+                ;; which is fine, but they don't count for this purpose.
+                (incf n-fdefns)
                 (dump-object (cadr entry) fasl-output)
                 (dump-fop 'fop-fdefn fasl-output))
                (:known-fun
@@ -1209,7 +1213,7 @@
       (dump-integer-as-n-bytes (length (sb-c::ir2-component-entries 2comp))
                                4 ; output 4 bytes
                                fasl-output)
-      (dump-integer-as-n-bytes (the (unsigned-byte 22) n-named-calls)
+      (dump-integer-as-n-bytes (the (unsigned-byte 22) n-fdefns)
                                4 ; output 4 bytes
                                fasl-output)
       (dump-segment code-segment code-length fasl-output)

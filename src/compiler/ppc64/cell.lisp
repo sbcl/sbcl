@@ -540,13 +540,11 @@
 #-sb-xc-host
 (defun code-header-ref (code index)
   (declare (index index))
-  (let ((fdefns-start (sb-impl::code-fdefns-start-index code))
-        (count (code-n-named-calls code)))
-    (declare ((unsigned-byte 16) fdefns-start count))
-    (values
-    (if (and (>= index fdefns-start) (< index (+ fdefns-start count)))
-        (%primitive code-header-ref+tag code index other-pointer-lowtag)
-        (%primitive code-header-ref+tag code index 0)))))
+  (binding* (((start count) (sb-vm::code-header-fdefn-range code))
+             (end (+ start count)))
+    (values (if (and (>= index start) (< index end))
+                (%primitive code-header-ref+tag code index other-pointer-lowtag)
+                (%primitive code-header-ref+tag code index 0)))))
 
 (define-vop (code-header-set)
   (:translate code-header-set)
