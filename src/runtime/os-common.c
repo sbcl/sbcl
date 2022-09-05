@@ -171,33 +171,25 @@ os_dlsym_default(char *name)
 int alien_linkage_table_n_prelinked;
 void os_link_runtime()
 {
-    int entry_index = 0;
-    lispobj symbol_name;
-    char *namechars;
-    boolean datap;
-    void* result;
-    int j;
-
     if (alien_linkage_table_n_prelinked)
         return; // Linkage was already performed by coreparse
 
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
     alien_linkage_table_n_prelinked = vector_len(symbols);
+    int j;
     for (j = 0 ; j < alien_linkage_table_n_prelinked ; ++j)
     {
         lispobj item = symbols->data[j];
-        datap = listp(item);
-        symbol_name = datap ? CONS(item)->car : item;
-        namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
-        result = os_dlsym_default(namechars);
+        boolean datap = listp(item);
+        lispobj symbol_name = datap ? CONS(item)->car : item;
+        char *namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
+        void* result = os_dlsym_default(namechars);
 
         if (result) {
-            arch_write_linkage_table_entry(entry_index, result, datap);
+            arch_write_linkage_table_entry(j, result, datap);
         } else { // startup might or might not work. ymmv
             fprintf(stderr, "Missing required foreign symbol '%s'\n", namechars);
         }
-
-        ++entry_index;
     }
 }
 
