@@ -136,6 +136,12 @@
                  (memq symbol
                        '(sb-c::sb-pcl sb-c::sb-impl sb-c::sb-kernel
                          sb-c::sb-c sb-c::sb-int))))))
+    ;; Delete bootstrap-only vops
+    (flet ((drop-keys (table)
+             (loop for symbol being each hash-key of table
+                   when (uninternable-p symbol) do (remhash symbol table))))
+      (drop-keys sb-c::*backend-parsed-vops*)
+      (drop-keys sb-c::*backend-template-names*))
     ;; A structure constructor name, in particular !MAKE-SAETP,
     ;; can't be uninterned if referenced by a defstruct-description.
     ;; So loop over all structure classoids and clobber any

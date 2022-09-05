@@ -88,14 +88,12 @@
   (assert (eql code-debug-info-slot 2)))
 
 ;;; Size-class segregation (implying which page we try to allocate to)
-;;; is done from lisp now, not C. There are 4 objects types we'll see,
+;;; is done from lisp now, not C. There are 3 objects types we'll see,
 ;;; each in its own size class (even if some are coincidentally the same size).
 ;;;  - Symbols
 ;;;  - FDEFNs
 ;;;  - Layouts
-;;;  - Funcallable instances
-;;; The first two are truly fixed in size. The latter two could occur in several
-;;; sizes, each occupying a different size-class. This isn't implemented yet.
+;;; The first two are truly fixed in size. Layouts occur in varying sizes.
 (defun alloc-immobile-fixedobj (nwords header)
   (let* ((widetag (logand (truly-the fixnum header) widetag-mask))
          (aligned-nwords (truly-the fixnum (align-up nwords 2)))
@@ -111,17 +109,15 @@
                    ((<= aligned-nwords 24) (setq aligned-nwords 24) 5)
                    ((<= aligned-nwords 32) (setq aligned-nwords 32) 6)
                    ((<= aligned-nwords 48) (setq aligned-nwords 48) 7)
-                   (t (error "Oversized layout"))))
-            ;; TODO: allow different sizes of funcallable-instance
-            (#.funcallable-instance-widetag 8))))
-    (values (%primitive alloc-immobile-fixedobj
+                   (t (error "Oversized layout")))))))
+    (values (%primitive !alloc-immobile-fixedobj
                         size-class
                         aligned-nwords
                         header))))
 
 (defun make-immobile-symbol (name)
   (let ((symbol (truly-the symbol
-                 (or (%primitive fast-alloc-immobile-symbol)
+                 (or (%primitive !fast-alloc-immobile-symbol)
                      (alloc-immobile-fixedobj
                       symbol-size
                       (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))))))

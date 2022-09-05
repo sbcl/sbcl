@@ -1002,7 +1002,7 @@
              `(let ((c-fun (make-fixup ,name :foreign)))
                 (inst call (cond ((sb-c::code-immobile-p node) c-fun)
                                  (t (progn (inst mov rax c-fun) rax)))))))
-(define-vop (alloc-immobile-fixedobj)
+(define-vop (!alloc-immobile-fixedobj)
   (:args (size-class :scs (any-reg) :target c-arg1)
          (nwords :scs (any-reg) :target c-arg2)
          (header :scs (any-reg) :target c-arg3))
@@ -1036,7 +1036,7 @@
 (eval-when (:compile-toplevel)
   (aver (evenp symbol-size))) ; assumptions in the code below
 
-(define-vop (fast-alloc-immobile-symbol)
+(define-vop (!fast-alloc-immobile-symbol)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset rax-offset) rax)
   (:temporary (:sc unsigned-reg :offset rbx-offset) rbx)

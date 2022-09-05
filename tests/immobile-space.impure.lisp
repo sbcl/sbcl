@@ -5,9 +5,7 @@
 ;;; it could crash
 (defun alloc-layoutless-instances ()
   (list (sb-vm::alloc-immobile-fixedobj
-         6 (logior (ash 5 sb-vm:instance-length-shift) sb-vm:instance-widetag))
-        (sb-vm::alloc-immobile-fixedobj
-         6 (logior (ash 5 sb-vm:n-widetag-bits) sb-vm:funcallable-instance-widetag))))
+         6 (logior (ash 5 sb-vm:instance-length-shift) sb-vm:instance-widetag))))
 (compile 'alloc-layoutless-instances)
 ;;; the first GC should WP some pages but might not crash
 (dotimes (i 1000 (gc)) (alloc-layoutless-instances))
@@ -27,12 +25,8 @@
 (defun ll-alloc ()
   ;; This must be in its own function because the vop preserves no registers
   ;; when calling to C.
-  (values(sb-sys:%primitive
-            sb-vm::alloc-immobile-fixedobj
-            8 ; an unused sized class
-            2 ; physical words
-            (logior (ash 1 sb-vm:instance-length-shift)
-                    sb-vm:instance-widetag))))
+  (sb-vm::alloc-immobile-fixedobj 8 (logior (ash 7 sb-vm:instance-length-shift)
+                                            sb-vm:instance-widetag)))
 (compile 'll-alloc) ; low level allocator
 (defun make ()
   (let ((inst (ll-alloc)))
