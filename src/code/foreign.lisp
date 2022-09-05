@@ -23,6 +23,15 @@ symbol in the linkage table, and never returns an address in the linkage-table."
 ;;; as a lookup table translating strings to functions needed in our runtime.
 ;;; It's not our problem that shared objects aren't loadable, but we get the
 ;;; flexibility of recompiling C without recompiling Lisp.
+;;;
+;;; This function is somewhat badly named, because when DATAP is true,
+;;; the answer is not really the address of NAME, but rather the address
+;;; of the word in the alien-linkage-table holding the address of NAME.
+;;; (This would be better off named ALIEN-LINKAGE-ADDRESS)
+;;; Unfortunately we can not rename it, because CFFI uses it, which is weird
+;;; because the use is from a function named %FOREIGN-SYMBOL-POINTER which is
+;;; documented to return "a pointer to a foreign symbol NAME."
+;;; which it certainly does not do in all cases.
 (defun foreign-symbol-address (name &optional datap)
   "Returns the address of the foreign symbol NAME. DATAP must be true if the
 symbol designates a variable.
@@ -35,17 +44,10 @@ Symbols are entered into the linkage-table if they aren't there already."
 
 (defun foreign-symbol-sap (symbol &optional datap)
   "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the
-symbol designates a variable (used only on linkage-table platforms). May enter
-the symbol into the linkage-table. On non-linkage-table ports signals an error
-if the symbol isn't found."
-  (declare (ignorable datap))
-  (multiple-value-bind (addr sharedp)
-      (foreign-symbol-address symbol datap)
-    ;; If the address is from linkage-table and refers to data
-    ;; we need to do a bit of juggling. It is not the address of the
-    ;; variable, but the address where the real address is stored.
-    (if (and sharedp datap)
-        (int-sap (sap-ref-word (int-sap addr) 0))
+symbol designates a variable. May enter the symbol into the linkage-table."
+  (let ((addr (foreign-symbol-address symbol datap)))
+    (if datap ; return the real answer, not an address in the linkage table
+        (sap-ref-sap (int-sap addr) 0)
         (int-sap addr))))
 
 (defun foreign-reinit ()
