@@ -82,15 +82,15 @@
        sb-kernel::*gc-epoch*))
 
 (defun start-lisp (toplevel callable-exports)
-  (named-lambda %start-lisp ()
-    (cond (callable-exports
+  (if callable-exports
+      (named-lambda %start-lisp ()
            (reinit t)
            (dolist (export callable-exports)
              (sb-alien::initialize-alien-callable-symbol export)))
-          (t
+      (named-lambda %start-lisp ()
            (handling-end-of-the-world
             (reinit t)
-            (funcall toplevel))))))
+            (funcall toplevel)))))
 
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init toplevel-supplied)
