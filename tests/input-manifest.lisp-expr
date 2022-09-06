@@ -82,7 +82,7 @@
  ("run-program.impure.lisp" "contrib/sb-posix.fasl")
  ("sb-aclrepl.impure.lisp" "contrib/sb-aclrepl.fasl"
   "../contrib/sb-aclrepl/tests.lisp")
- ("sb-bsd-sockets.impure.lisp" "contrib/sb-bsd-sockets.fasl"
+ ("sb-bsd-sockets.impure.lisp" "contrib/sb-bsd-sockets.fasl" "contrib/sb-posix.fasl"
   "../contrib/sb-bsd-sockets/tests.lisp")
  ("sb-cltl2.impure.lisp" "contrib/sb-cltl2.fasl" "../contrib/sb-cltl2/tests.lisp")
  ("sb-concurrency.impure.lisp" "contrib/sb-concurrency.fasl"
