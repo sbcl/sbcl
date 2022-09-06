@@ -127,7 +127,7 @@
     ;; The macro expansion of an instruction set is a very large expression
     ;; that is evaluated exactly once, so compiling it would be a waste of
     ;; resources.  Instead, we use SBCL's built-in interpreter.
-    `(let ((sb-ext:*evaluator-mode* :interpret))
+    `(let (#+(or sb-eval sb-fasteval)(sb-ext:*evaluator-mode* :interpret))
        (eval
         '(let ((*instruction-set*
                 (make-instance 'instruction-set
