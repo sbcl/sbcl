@@ -95,7 +95,7 @@ static inline boolean readonly_space_p(lispobj ptr) {
 }
 
 #ifdef LISP_FEATURE_DARWIN_JIT
-lispobj *static_code_space_free_pointer;
+extern lispobj *static_code_space_free_pointer;
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
