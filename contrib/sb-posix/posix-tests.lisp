@@ -696,6 +696,7 @@
     #.(concatenate 'string "/" (make-string 255 :initial-element #\a)))
 
   ;; The error tests are in the order of exposition from SUSv3.
+  #-freebsd
   (deftest readlink.error.1
       (let* ((subdir-pathname (merge-pathnames
                                (make-pathname
@@ -711,9 +712,9 @@
                (sb-posix:syscall-error (c)
                  (sb-posix:syscall-errno c)))
           (ignore-errors
-            (sb-posix:chmod subdir-pathname #o777)
-            (sb-posix:unlink link-pathname)
-            (sb-posix:rmdir subdir-pathname))))
+           (sb-posix:chmod subdir-pathname #o777)
+           (sb-posix:unlink link-pathname)
+           (sb-posix:rmdir subdir-pathname))))
     #.sb-posix:eacces)
   (deftest readlink.error.2
       (let* ((non-link-pathname (make-pathname :name "readlink.error.2"
