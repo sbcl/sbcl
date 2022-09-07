@@ -377,7 +377,7 @@
 
       #+darwin-jit (assign-code-constants code-obj boxed-data))
 
-    (when named-call-fixups
+    (when (and named-call-fixups (immobile-space-obj-p code-obj))
       (sb-vm::statically-link-code-obj code-obj named-call-fixups))
     (when sb-fasl::*show-new-code*
       (let ((*print-pretty* nil))
