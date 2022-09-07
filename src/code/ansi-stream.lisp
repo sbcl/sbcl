@@ -152,7 +152,7 @@
   ;; Absolute character position, acting also as a generalized boolean
   ;; in lieu of testing FORM-TRACKING-STREAM-P to see if we must
   ;; maintain correctness of the slot in ANSI-STREAM-UNREAD-CHAR.
-  (input-char-pos nil))
+  (input-char-pos nil :type (or null index)))
 
 ;;; SYNONYM-STREAM type is needed by ANSI-STREAM-{INPUT,OUTPUT}-STREAM-P
 ;;; and also needed by OPEN (though not obviously), which is compiled
