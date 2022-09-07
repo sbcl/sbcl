@@ -363,7 +363,7 @@
                      (lambda ()
                        (socket-connect client-sock #(127 0 0 1) port)
                        (socket-close client-sock)))))
-               (declare (ignorable client-connect-thread)) ; wtf ???
+               (sb-thread:join-thread client-connect-thread :timeout 20) 
                (setf server-sock (socket-accept listen-sock)))
 
              ;; Wait for input. This should return when we get EOF
