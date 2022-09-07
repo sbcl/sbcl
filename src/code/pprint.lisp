@@ -1352,21 +1352,24 @@ line break."
 ;;; by looking for &BODY. A dotted list is indented as it it had &BODY.
 ;;; ANSI says that a dotted tail is like &REST, but the pretty-printer
 ;;; can do whatever it likes anyway. I happen to think this makes sense.
-(defun macro-indentation (name)
+(defun macro-indentation (macro-function)
   (do ((n 0)
-       (list (%fun-lambda-list (macro-function name)) (cdr list)))
+       (list (%fun-lambda-list macro-function) (cdr list)))
       ((or (atom list) (eq (car list) '&body))
        (if (null list) nil n))
     (unless (eq (car list) '&optional)
       (incf n))))
 
 ;;; Pretty-Print macros by looking where &BODY appears in a macro's
-;;; lambda-list.
-(defun pprint-macro-call (stream list &rest noise)
+;;; lambda-list. If LIST is not macro invocation, or a macro without a &BODY arg
+;;; then print it as a function.
+(defun pprint-call-form (stream list &rest noise)
   (declare (ignore noise))
-  (let ((indentation (and (car list) (macro-indentation (car list)))))
+  (let ((indentation (binding* ((car (car list) :exit-if-null)
+                                (mf (macro-function car) :exit-if-null))
+                       (macro-indentation mf))))
     (unless indentation
-      (return-from pprint-macro-call
+      (return-from pprint-call-form
         (pprint-fun-call stream list)))
     (pprint-logical-block (stream list :prefix "(" :suffix ")")
       (output-object (pprint-pop) stream)
@@ -1528,13 +1531,10 @@ line break."
            ;; fewer type tests when dispatching.
            (initial-entry (and array (not (or string bit-vector)))
                           pprint-array -1)
-           ;; MACRO-FUNCTION must have effectively higher priority than FBOUNDP.
            ;; The implementation happens to check identical priorities in the order added,
-           ;; but that's unspecified behavior.  Both must be _strictly_ lower than the
-           ;; default cons entries though.
-           (initial-entry (cons (and symbol (satisfies macro-function)))
-                          pprint-macro-call -1)
-           (initial-entry (cons (and symbol (satisfies fboundp))) pprint-fun-call -1)
+           ;; but that's unspecified behavior. (SATISFIES FBOUNDP) must be _strictly_
+           ;; lower than the default cons entries though.
+           (initial-entry (cons (and symbol (satisfies fboundp))) pprint-call-form -1)
            (initial-entry (cons symbol) pprint-data-list -2)
            (initial-entry cons pprint-fill -2 #'consp)
            (initial-entry sb-impl::comma pprint-unquoting-comma -3 #'comma-p)))
