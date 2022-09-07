@@ -640,13 +640,21 @@
 (eval-when (:compile-toplevel) (aver (= sb-impl::package-id-bits 16)))
 (define-vop (keywordp symbolp)
   (:translate keywordp)
+  (:args-var args-ref)
   (:generator 3
-    (inst lea temp (ea (- other-pointer-lowtag) value))
-    (inst test :byte temp lowtag-mask)
-    (inst jmp :ne out)
-    (inst cmp :byte (ea temp) symbol-widetag)
-    (inst jmp :ne out)
-    (inst cmp :word (ea (+ (ash symbol-name-slot word-shift) 6) temp) sb-impl::+package-id-keyword+)
+    (cond ((csubtypep (tn-ref-type args-ref) (specifier-type 'symbol))
+           (inst cmp :word (ea (+ (ash symbol-name-slot word-shift) 6
+                                  (- other-pointer-lowtag))
+                               value)
+                 sb-impl::+package-id-keyword+))
+          (t
+           (inst lea temp (ea (- other-pointer-lowtag) value))
+           (inst test :byte temp lowtag-mask)
+           (inst jmp :ne out)
+           (inst cmp :byte (ea temp) symbol-widetag)
+           (inst jmp :ne out)
+           (inst cmp :word (ea (+ (ash symbol-name-slot word-shift) 6) temp)
+                 sb-impl::+package-id-keyword+)))
     out))
 
 (define-vop (consp type-predicate)
