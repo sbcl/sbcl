@@ -80,13 +80,14 @@
 (defun check-consing (yes/no form thunk times)
   (multiple-value-bind (before after)
       (collect-consing-stats thunk times)
-    (let ((consed-bytes (- after before)))
+    (let* ((consed-bytes (- after before))
+           (bytes-per-iteration (float (/ consed-bytes times))))
       (assert (funcall (if yes/no #'not #'identity)
-                       ;; I do not know why we do this comparasion,
-                       ;; the original code did, so I let it
-                       ;; in. Perhaps to prevent losage on GC
-                       ;; fluctuations, or something. --TCR.
-                       (< consed-bytes times))
+                       ;; If allocation really happened, it can't have been less than one cons cell
+                       ;; per iteration (unless the test is nondeterministic - but in that case
+                       ;; we can't really use this strategy anyway). So consider it to have consed
+                       ;; nothing if the fraction is too small.
+                       (< bytes-per-iteration (* 2 sb-vm:n-word-bytes)))
               ()
               "~@<Expected the form ~
                       ~4I~@:_~A ~0I~@:_~
@@ -94,7 +95,7 @@
                   ~D times resulted in the allocation of ~
                   ~D bytes~:[ (~,3F per run)~;~].~@:>"
               form yes/no times consed-bytes
-              (zerop consed-bytes) (float (/ consed-bytes times))))
+              (zerop consed-bytes) bytes-per-iteration))
     (values before after)))
 
 (defparameter +times+ 10000)
