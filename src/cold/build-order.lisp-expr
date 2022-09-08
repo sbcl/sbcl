@@ -320,7 +320,6 @@
 
  ("src/compiler/bit-util")
 
- ("src/code/linkage-table"   :not-host)
  ("src/code/foreign"         :not-host)
  ("src/code/unix"            :not-host)
  ("src/code/symbol"          :not-host)
