@@ -39,7 +39,8 @@ garbage collection."
            ;; unfathomable reason decides to allocate value-cells
            ;; for them -- since we have DX value-cells on x86oid
            ;; platforms this still forces them on the stack.
-           (dx-let ,(mapcar #'list pins objects)
+           (dx-let ,(mapcar (lambda (n v)
+                              (list n `(touch-object-identity ,v))) pins objects)
              (multiple-value-prog1 (,wpo)
                ;; TOUCH-OBJECT has a VOP with an empty body: compiler
                ;; thinks we're using the argument and doesn't flush

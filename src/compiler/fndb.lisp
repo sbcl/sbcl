@@ -2055,6 +2055,8 @@
 (defknown sb-vm::touch-object (t) (values)
   (always-translatable))
 
+(defknown sb-vm::touch-object-identity (t) t
+  (always-translatable))
 (defknown foreign-symbol-dataref-sap (simple-string)
   system-area-pointer
   (movable flushable))

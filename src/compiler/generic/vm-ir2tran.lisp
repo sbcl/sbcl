@@ -486,3 +486,14 @@
   (:policy :fast-safe)
   (:arg-types t)
   (:generator 0))
+
+#+(or x86 x86-64)
+(define-vop ()
+  (:translate touch-object-identity)
+  (:args (object :scs (descriptor-reg any-reg sap-reg
+                       signed-reg unsigned-reg)
+                 :target res))
+  (:policy :fast-safe)
+  (:results (res :scs (descriptor-reg)))
+  (:generator 0
+    (move res object)))
