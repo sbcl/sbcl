@@ -462,6 +462,7 @@ during backtrace.
 (defglobal *thread-header-slot-names*
   (append #+x86-64
           '(t-nil-constants
+            alien-linkage-table-base
             msan-xor-constant
             ;; The following slot's existence must NOT be conditional on #+msan
             msan-param-tls) ; = &__msan_param_tls

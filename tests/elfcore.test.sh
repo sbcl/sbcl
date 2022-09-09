@@ -46,6 +46,7 @@ run_sbcl <<EOF
 EOF
 
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
+(sb-vm::make-immobile-symbol "junk") ; crashed 'cause I forgot to use rip-relative-EA
 ;; I think this tests immobile space exhaustion
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
 

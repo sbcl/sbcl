@@ -741,17 +741,11 @@ process_directory(int count, struct ndir_entry *entry,
                (uword_t)&lisp_code_start, (uword_t)&lisp_code_end,
                text_space_highwatermark);
 #endif
+        ALIEN_LINKAGE_TABLE_SPACE_START = (uword_t)
+            os_validate(0, 0, ALIEN_LINKAGE_TABLE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID);
         // Prefill the alien linkage table so that shrinkwrapped executables which link in
-        // all their C library dependencies can avoid linking with -ldl.
-        // All data references are potentially needed because aliencomp doesn't emit
-        // SAP-REF-n in a way that admits elision of the linkage entry. e.g.
-        //     MOV RAX, [#x20200AA0] ; some_c_symbol
-        //     MOV RAX, [RAX]
-        // might be rendered as
-        //     MOV RAX, some_c_symbol(%rip)
-        // but that's more of a change to the asm instructions than I'm comfortable making;
-        // whereas "CALL linkage_entry_for_f" -> "CALL f" is quite straightforward.
-        // (Rarely would a jmp indirection be used; maybe for newly compiled code?)
+        // all their C library dependencies can avoid linking with -ldl
+        // but extern-alien stil works for newly compiled code.
         lispobj* ptr = &alien_linkage_values;
         gc_assert(ptr);
         int entry_index = 0;
@@ -771,7 +765,8 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     {
-        spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size += TEXT_SPACE_SIZE;
+        spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size +=
+            TEXT_SPACE_SIZE + ALIEN_LINKAGE_TABLE_SPACE_SIZE;
     }
 #endif
 
@@ -824,10 +819,12 @@ process_directory(int count, struct ndir_entry *entry,
             int sub_2gb_flag = (request & 1);
             request &= ~(size_t)1;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-            if (id == IMMOBILE_TEXT_CORE_SPACE_ID)
+            if (id == IMMOBILE_TEXT_CORE_SPACE_ID) {
                 // Pretend an os_validate() happened based on the address that
-                // would be obtained by a constant offset from fixedobj space
-                addr = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
+                // would be obtained by a constant offset from fixedobj space.
+                ALIEN_LINKAGE_TABLE_SPACE_START = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
+                addr = ALIEN_LINKAGE_TABLE_SPACE_START + ALIEN_LINKAGE_TABLE_SPACE_SIZE;
+            }
             else
 #endif
             if (request) {

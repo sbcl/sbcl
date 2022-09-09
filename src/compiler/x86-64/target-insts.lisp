@@ -602,6 +602,7 @@
          (jmp-inst (find-inst #xE9 inst-space))
          (cond-jmp-inst (find-inst #x800f inst-space))
          (lea-inst (find-inst #x8D inst-space))
+         (mov-inst (find-inst #x8B inst-space))
          (address (get-lisp-obj-address code))
          (text-start (sap-int (code-instructions code)))
          (text-end (+ text-start (%code-text-size code)))
@@ -610,7 +611,7 @@
           (seg-length segment) length
           (seg-sap-maker segment) (lambda () sap))
     (map-segment-instructions
-     (lambda (dchunk inst)
+     (lambda (dchunk inst &aux (opcode (sap-ref-8 sap (dstate-cur-offs dstate))))
        (flet ((includep (target)
                 ;; Self-relative (to the code object) operands are ignored.
                 (and (or (< target address) (>= target text-end))
@@ -629,10 +630,11 @@
                   (when (includep operand)
                     (funcall function (+ (dstate-cur-offs dstate) 2)
                              operand inst))))
-               ((eq inst lea-inst)
+               ((or (eq inst lea-inst)
+                    (and (eq inst mov-inst) (eql opcode #x8B)))
                 ;; Computing the address of UNDEFINED-FDEFN and
                 ;; FUNCALLABLE-INSTANCE-TRAMP is done with LEA.
-                (aver (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8D))
+                ;; Load from the alien linkage table can be done with MOV Rnn,[RIP-k].
                 (let ((modrm (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
                   (when (= (logand modrm #b11000111) #b00000101) ; RIP-relative mode
                     (let ((operand (+ (signed-sap-ref-32

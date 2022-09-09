@@ -131,27 +131,39 @@
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
+  ;; This routine computes into RBX the address of the linkage table entry that was called,
+  ;; corresponding to the undefined alien function.
   (inst push rax-tn) ; save registers in case we want to see the old values
   (inst push rbx-tn)
   ;; load RAX with the PC after the call site
   (inst mov rax-tn (ea 16 rsp-tn))
   ;; load RBX with the signed 32-bit immediate from the call instruction
   (inst movsx '(:dword :qword) rbx-tn (ea -4 rax-tn))
+  ;; The decoding seems scary, but it's actually not. Any C call-out instruction has
+  ;; a 4-byte trailing operand, with the preceding byte being unique.
   ;; if at [PC-5] we see #x25 then it was a call with 32-bit mem addr
   ;; if ...              #xE8 then ...                32-bit offset
-  (inst cmp :byte (ea -5 rax-tn) #x25)
-  (inst jmp :e ABSOLUTE)
-  (inst cmp :byte (ea -5 rax-tn) #xE8)
-  (inst jmp :e RELATIVE)
+  ;; if ...              #x92 then it was "call *DISP(%r10)" where r10 is the table base
+  #-immobile-space ; only non-relocatable alien linkage table can use "CALL [ABS]" form
+  (progn (inst cmp :byte (ea -5 rax-tn) #x25)
+         (inst jmp :e ABSOLUTE))
+  #+immobile-space ; only relocatable alien linkage table can use "CALL rel32" form
+  (progn (inst cmp :byte (ea -5 rax-tn) #xE8)
+         (inst jmp :e RELATIVE)
+         (inst cmp :byte (ea -5 rax-tn) #x92)
+         (inst jmp :e ABSOLUTE))
   ;; failing those, assume RBX was valid. ("can't happen")
   (inst mov rbx-tn (ea rsp-tn)) ; restore pushed value of RBX
   (inst jmp trap)
   ABSOLUTE
-  (inst lea rbx-tn (ea -8 rbx-tn))
+  #-immobile-space (inst sub rbx-tn 8)
+  #+immobile-space (inst lea rbx-tn (ea -8 r10-tn rbx-tn))
   (inst jmp TRAP)
   RELATIVE
   (inst add rbx-tn rax-tn)
   TRAP
+  ;; XXX: why aren't we adding something to the stack pointer to balance the two pushes?
+  ;; (I guess we can only THROW at this point, so it doesn't matter)
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
 ;;; the closure trampoline - entered when a global function is a closure

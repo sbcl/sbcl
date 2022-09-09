@@ -86,6 +86,8 @@
                     (- (or (get-asm-routine name (eq flavor :assembly-routine*))
                            (error "undefined assembler routine: ~S" name))
                        (if (eq flavor :asm-routine-nil-offset) sb-vm:nil-value 0)))
+                   (:alien-code-linkage-index (sb-impl::ensure-alien-linkage-index name nil))
+                   (:alien-data-linkage-index (sb-impl::ensure-alien-linkage-index name t))
                    (:foreign (foreign-symbol-address name))
                    (:foreign-dataref (foreign-symbol-address name t))
                    (:code-object (get-lisp-obj-address real-code-obj))

@@ -1035,7 +1035,9 @@
 (defconstant-eqx +fixup-flavors+
   #(:assembly-routine :assembly-routine* :asm-routine-nil-offset
     :gc-barrier :symbol-tls-index
-    :foreign :foreign-dataref :code-object
+    :alien-code-linkage-index :alien-data-linkage-index
+    :foreign :foreign-dataref
+    :code-object
     :layout :immobile-symbol :fdefn-call :static-call
     :symbol-value
     :layout-id)
@@ -1118,7 +1120,8 @@
                ;; but its global value must be an immobile object.
                :immobile-symbol :symbol-value)
                (the symbol name))
-              ((:foreign :foreign-dataref) (the string name))
+              ((:alien-code-linkage-index :alien-data-linkage-index
+                :foreign :foreign-dataref) (the string name))
               ((:fdefn-call :static-call) name))))
       (dump-object info fasl-output)
       (incf nelements (cond (named (dump-object operand fasl-output) 2)

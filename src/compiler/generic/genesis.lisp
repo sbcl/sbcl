@@ -2961,7 +2961,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (when (= start end) ; 0 size is allowed
                (return-from check))
              (unless (< start end)
-               (error "Bogus space: ~A" space))
+               (error "Space bounds look bad: ~A = ~X..~X" space start end))
              (let ((type (specifier-type `(integer ,start (,end)))))
                (dolist (other types)
                  (unless (eq *empty-type* (type-intersection (cdr other) type))
@@ -2979,6 +2979,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (aver (zerop (rem sb-vm:fixedobj-space-size (* 32 sb-vm:immobile-card-bytes))))
       #-gencgc
       (check sb-vm:dynamic-0-space-start sb-vm:dynamic-0-space-end :dynamic-0)
+      #-immobile-space
       (let ((end (+ sb-vm:alien-linkage-table-space-start sb-vm:alien-linkage-table-space-size)))
         (check sb-vm:alien-linkage-table-space-start end :linkage-table)))))
 

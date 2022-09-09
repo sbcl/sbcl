@@ -377,12 +377,13 @@
 #+sb-assembling
 (defun ensure-thread-base-tn-loaded ()
   #-sb-thread
-  (progn
+  (let ((fixup (make-fixup "all_threads" :foreign-dataref)))
     ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
     ;; to stack, because we do do not give the register allocator access to it.
     ;; And call_into_lisp saves it as per convention, not that it matters,
     ;; because there's no way to get back into C code anyhow.
-    (inst mov thread-tn (ea (make-fixup "all_threads" :foreign-dataref)))
+    #-immobile-space (inst mov thread-tn (ea fixup))
+    #+immobile-space (inst mov thread-tn (rip-relative-ea fixup))
     (inst mov thread-tn (ea thread-tn))))
 
 ;;; Perform a store to code, updating the GC card mark bit.

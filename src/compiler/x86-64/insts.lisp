@@ -3327,65 +3327,59 @@
 (defun fixup-code-object (code offset value kind flavor)
   (declare (type index offset))
   (let ((sap (code-instructions code)))
-    (when (eq flavor :gc-barrier)
-      ;; the VALUE is nbits, so convert it to an AND mask
-      (setf (sap-ref-32 sap offset) (1- (ash 1 value)))
-      (return-from fixup-code-object))
-    ;; All x86-64 fixup locations contain an implicit addend at the location
-    ;; to be fixed up. The addend is always zero for certain <KIND,FLAVOR> pairs,
-    ;; but we don't need to assert that.
-    (incf value (if (eq kind :absolute)
-                    (signed-sap-ref-64 sap offset)
-                    (signed-sap-ref-32 sap offset)))
-    (ecase kind
-     (:abs32 ; 32 bits. most are unsigned, except :layout-id which is signed
-      (if (eq flavor :layout-id)
-          (setf (signed-sap-ref-32 sap offset) value)
-          (setf (sap-ref-32 sap offset) value)))
-     (:rel32
-      ;; Replace word with the difference between VALUE and current pc.
-      ;; JMP/CALL are relative to the next instruction,
-      ;; so add 4 bytes for the size of the displacement itself.
-      ;; Relative fixups don't exist with movable code,
-      ;; so in the #-immobile-code case, there's nothing to assert.
-      #+(and immobile-code (not sb-xc-host))
-      (unless (immobile-space-obj-p code)
-        (error "Can't compute fixup relative to movable object ~S" code))
-      (setf (signed-sap-ref-32 sap offset) (- value (+ (sap-int sap) offset 4))))
-     (:absolute
-      ;; These are used for jump tables and are not recorded in %code-fixups.
-      ;; GC knows to adjust the values if code is moved.
-      (setf (sap-ref-64 sap offset) value))))
+    (case flavor
+      (:gc-barrier ; the VALUE is nbits, so convert it to an AND mask
+       (setf (sap-ref-32 sap offset) (1- (ash 1 value))))
+      (:layout-id ; layout IDs are signed quantities on x86-64
+       (setf (signed-sap-ref-32 sap offset) value))
+      (:alien-data-linkage-index
+       (setf (sap-ref-32 sap offset) (* value alien-linkage-table-entry-size)))
+      (:alien-code-linkage-index
+       (let ((addend (sap-ref-32 sap offset)))
+         (setf (sap-ref-32 sap offset) (+ (* value alien-linkage-table-entry-size) addend))))
+      (t
+       ;; All x86-64 fixup locations contain an implicit addend at the location
+       ;; to be fixed up. The addend is always zero for certain <KIND,FLAVOR> pairs,
+       ;; but we don't need to assert that.
+       (incf value (if (eq kind :absolute)
+                       (signed-sap-ref-64 sap offset)
+                       (signed-sap-ref-32 sap offset)))
+       (ecase kind
+         (:abs32 ; 32 unsigned bits
+          (setf (sap-ref-32 sap offset) value))
+         (:rel32
+          ;; Replace word with the difference between VALUE and current pc.
+          ;; JMP/CALL are relative to the next instruction,
+          ;; so add 4 bytes for the size of the displacement itself.
+          ;; Relative fixups don't exist with movable code,
+          ;; so in the #-immobile-code case, there's nothing to assert.
+          #+(and immobile-code (not sb-xc-host))
+          (unless (immobile-space-obj-p code)
+            (error "Can't compute fixup relative to movable object ~S" code))
+          (setf (signed-sap-ref-32 sap offset) (- value (+ (sap-int sap) offset 4))))
+         (:absolute
+          ;; These are used for jump tables and are not recorded in %code-fixups.
+          ;; GC knows to adjust the values if code is moved.
+          (setf (sap-ref-64 sap offset) value))))))
   nil)
 
-(defun sb-c::pack-retained-fixups (fixup-notes)
-  (let (abs32-fixups rel32-fixups imm-fixups)
+(defun sb-c::pack-retained-fixups (fixup-notes &aux abs32-fixups imm-fixups)
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
   ;; Note that:
-  ;;  (1) Call fixups occur in both :REL32 and :ABS32 kinds.
-  ;;      We can ignore the :REL32 kind, except for foreign call,
-  ;;      as those point to the linkage table which has an absolute address
-  ;;      and therefore might change in displacement from the call site
-  ;;      if the immobile code space is relocated on startup.
-  ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
-    (dolist (note fixup-notes (sb-c:pack-code-fixup-locs abs32-fixups rel32-fixups imm-fixups))
-      (let* ((fixup (fixup-note-fixup note))
-             (offset (fixup-note-position note))
-             (kind (fixup-note-kind note))
-             (flavor (fixup-flavor fixup)))
-        (cond ((eq flavor :gc-barrier) (push offset imm-fixups))
-              ((and (memq flavor
-                          '(:fdefn-call :layout :immobile-symbol :symbol-value ; -> fixedobj subspace
-                            :assembly-routine :assembly-routine* :static-call)) ; -> text subspace
-                    (eq kind :abs32))
-               #+immobile-space (push offset abs32-fixups))
-              ((and (eq flavor :foreign) (eq kind :rel32))
-       ;; linkage-table calls using the "CALL rel32" format need to be saved,
-       ;; because the linkage table resides at a fixed address.
-       ;; Space defragmentation can handle the fixup automatically,
-       ;; but core relocation can't - it can't find all the call sites.
-               #+immobile-space (push offset rel32-fixups)))))))
+  ;;  (1) Call fixups occur in both :REL32 and :ABS32 kinds. We can ignore the :REL32 kind.
+  ;;  (2) :STATIC-CALL fixups point to immobile text space, not static space.
+  (dolist (note fixup-notes (sb-c:pack-code-fixup-locs abs32-fixups nil imm-fixups))
+    (let* ((fixup (fixup-note-fixup note))
+           (offset (fixup-note-position note))
+           (flavor (fixup-flavor fixup)))
+      (cond ((eq flavor :gc-barrier) (push offset imm-fixups))
+            #+immobile-space
+            ((and (eq (fixup-note-kind note) :abs32)
+                  (memq flavor
+                        '(:fdefn-call :layout :immobile-symbol :symbol-value ; -> fixedobj space
+                          :assembly-routine :assembly-routine* :static-call))) ; -> text space
+             (push offset abs32-fixups))))))
 
 ;;; Coverage support
 

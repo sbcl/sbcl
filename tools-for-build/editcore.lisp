@@ -449,13 +449,13 @@
 (defconstant inst-jmp (find-inst #b11101001 (get-inst-space)))
 (defconstant inst-jmpz (find-inst #x840f (get-inst-space)))
 (defconstant inst-pop (find-inst #x5d (get-inst-space)))
+(defconstant inst-mov (find-inst #x8B (get-inst-space)))
+(defconstant inst-lea (find-inst #x8D (get-inst-space)))
 
 (defun make-core (spaces code-bounds fixedobj-bounds &optional enable-pie)
   (let* ((linkage-bounds
-          (let ((base (symbol-global-value
-                       (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-SPACE-START"
-                                           spaces :physical))))
-            (make-bounds base (+ base sb-vm:alien-linkage-table-space-size))))
+          (let ((text (space-addr (get-space immobile-text-core-space-id spaces))))
+            (make-bounds (- text sb-vm:alien-linkage-table-space-size) text)))
          (linkage-entry-size
           (symbol-global-value
            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"
@@ -629,6 +629,23 @@
             (when (in-bounds-p target-addr (core-linkage-bounds core))
               (push (list* (dstate-cur-offs dstate) 6 "je" target-addr)
                     list))))
+         ((and (or (and (eq inst inst-mov)
+                        (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8B))
+                   (eq inst inst-lea))
+                (let ((modrm (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
+                  (= (logand modrm #b11000111) #b00000101)) ; RIP-relative mode
+                (in-bounds-p (+ (signed-sap-ref-32 sap (+ (dstate-cur-offs dstate) 2))
+                                (dstate-next-addr dstate))
+                             (core-linkage-bounds core)))
+          (let* ((abs-addr (+ (signed-sap-ref-32 sap (+ (dstate-cur-offs dstate) 2))
+                              (dstate-next-addr dstate)))
+                 (reg (logior (ldb (byte 3 3) (sap-ref-8 sap (1+ (dstate-cur-offs dstate))))
+                              (if (logtest (sb-disassem::dstate-inst-properties dstate)
+                                           #b0100) ; REX.r
+                                  8 0)))
+                 (op (if (eq inst inst-lea) "lea" "mov-gotpcrel"))
+                 (args (list abs-addr (reg-name (get-gpr :qword reg)))))
+            (push (list* (1- (dstate-cur-offs dstate)) 7 op args) list)))
          ((and (eq inst inst-pop) (eq (logand dchunk #xFF) #x5D))
           (push (list* (dstate-cur-offs dstate) 1 "pop" "%rbp") list))))
      seg
@@ -738,6 +755,20 @@
                            (format stream " ~A ~:[0x~X~;~a~:[~;@PLT~]~]~%"
                                    opcode (stringp operand) operand
                                    (core-enable-pie core)))
+                          ((string= opcode "mov-gotpcrel")
+                           (let* ((entry-index
+                                   (/ (- (car operand) (bounds-low (core-linkage-bounds core)))
+                                      (core-linkage-entry-size core)))
+                                  (c-symbol (car (aref (core-linkage-symbols core) entry-index))))
+                             (setf (bit (core-linkage-symbol-usedp core) entry-index) 1)
+                             (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand))))
+                          ((string= opcode "lea") ; lea becomes "mov" with gotpcrel as src, which becomes lea
+                           (let* ((entry-index
+                                   (/ (- (car operand) (bounds-low (core-linkage-bounds core)))
+                                      (core-linkage-entry-size core)))
+                                  (c-symbol (aref (core-linkage-symbols core) entry-index)))
+                             (setf (bit (core-linkage-symbol-usedp core) entry-index) 1)
+                             (format stream " mov ~A@GOTPCREL(%rip), %~(~A~)~%" c-symbol (cadr operand))))
                           ((string= opcode "pop")
                            (format stream " ~A ~A~%" opcode operand)
                            (cond ((string= operand "8(%rbp)")
@@ -1782,6 +1813,12 @@
                   (if enable-pie +code-space-nominal-address+ 0))
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
+            ;; os_link_runtime() doesn't need to process the "required" symbols now
+            (let* ((sym (find-target-symbol (package-id "SB-VM")
+                                            "+REQUIRED-FOREIGN-SYMBOLS+" map :physical))
+                   (vector (translate (symbol-global-value sym) map)))
+              (fill vector 0)
+              (setf (%array-fill-pointer vector) 0))
             ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC
             ;; and SB-C::*COMPILE-TO-MEMORY-SPACE* to :AUTO
             ;; in case the resulting executable needs to compile anything.
@@ -1803,8 +1840,7 @@
               (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
                       pte-nbytes pte-nbytes (floor pte-nbytes 10)))
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
-          (let ((core (write-assembler-text map asm-file enable-pie))
-                (emit-all-c-symbols t))
+          (let ((core (write-assembler-text map asm-file enable-pie)))
             (format asm-file " .section .rodata~% .p2align 4~%lisp_fixups:~%")
             ;; Sort the hash-table in emit order.
             (dolist (x (sort (%hash-table-alist (core-new-fixups core)) #'< :key #'cdr))
@@ -1819,8 +1855,6 @@
             ;; -1 (not a plausible function address) signifies that word
             ;; following it is a data, not text, reference.
             (loop for s across (core-linkage-symbols core)
-                  for bit across (core-linkage-symbol-usedp core)
-                  when (or emit-all-c-symbols (eql bit 0))
                   do (format asm-file " .quad ~:[~;-1, ~]~a~%"
                              (consp s)
                              (if (consp s) (car s) s))))))

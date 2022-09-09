@@ -34,7 +34,10 @@
                    (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
 
 #+immobile-space
-(define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) unsigned-long)
+(progn
+(define-symbol-macro sb-vm:alien-linkage-table-space-start
+    (extern-alien "ALIEN_LINKAGE_TABLE_SPACE_START" unsigned))
+(define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) unsigned-long))
 
 #+darwin-jit
 (define-alien-variable ("static_code_space_free_pointer" sb-vm:*static-code-space-free-pointer*)

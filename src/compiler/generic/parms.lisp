@@ -86,7 +86,7 @@
         ((spaces (append `((read-only ,ro-space-size)
                            #+(and win32 x86-64)
                            (seh-data ,(symbol-value '+backend-page-bytes+) win64-seh-data-addr)
-                           (alien-linkage-table ,alien-linkage-table-space-size)
+                           #-immobile-space (alien-linkage-table ,alien-linkage-table-space-size)
                            #+sb-safepoint
                            ;; Must be just before NIL.
                            (safepoint ,(symbol-value '+backend-page-bytes+) gc-safepoint-page-addr)
@@ -95,6 +95,7 @@
                            (static-code ,small-space-size))
                          #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
+                           (alien-linkage-table ,alien-linkage-table-space-size)
                            (text ,text-space-size*))))
          (ptr small-spaces-start)
          (small-space-forms
@@ -102,10 +103,8 @@
                  appending
                  (let* ((relocatable
                           ;; READONLY is usually movable now.
-                          ;; TODO: alien-linkage-table could move with code, if the CPU
-                          ;; prefers PC-relative jumps, and we emit better code
-                          ;; (which we don't- for x86 we jmp via RBX always)
                           (member space '(fixedobj text
+                                          #+immobile-space alien-linkage-table
                                           #-darwin-jit read-only)))
                         (start ptr)
                         (end (+ ptr size)))
