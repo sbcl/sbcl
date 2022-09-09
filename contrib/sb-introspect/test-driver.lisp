@@ -380,28 +380,13 @@
     (tai 42s0 :immediate nil)
   t)
 
-;;; -- It appears that this test can also fail due to systematic issues
-;;; (possibly with the C compiler used) which we cannot detect based on
-;;; *features*.  Until this issue has been fixed, I am marking this test
-;;; as failing on Windows to allow installation of the contrib on
-;;; affected builds, even if the underlying issue is (possibly?) not even
-;;; strictly related to windows.  C.f. lp1057631.  --DFL
-;;;
 (test-util:with-test (:name :allocation-information.4
            ;; Ignored as per the comment above, even though it seems
            ;; unlikely that this is the right condition.
-           :fails-on (or :win32 :ppc64 (and :sparc :gencgc)))
-    #+gencgc
+           :fails-on (or :ppc64 (and :sparc :gencgc)))
     (tai (make-list 1) :heap
          `(:space :dynamic :boxed t :large nil)
-         :ignore (list :page :pinned :generation :write-protected))
-    #-gencgc
-    (tai :cons :heap
-         ;; FIXME: Figure out what's the right cheney-result. SPARC at least
-         ;; has exhibited both :READ-ONLY and :DYNAMIC, which seems wrong.
-         '()
-         :ignore '(:space))
-  t)
+         :ignore (list :page :pinned :generation :write-protected)))
 
 (setq sb-ext:*evaluator-mode* :compile)
 (sb-ext:defglobal *large-obj* nil)
