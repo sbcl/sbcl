@@ -452,11 +452,10 @@
 
 (defun make-core (spaces code-bounds fixedobj-bounds &optional enable-pie)
   (let* ((linkage-bounds
-          (make-bounds
-           (symbol-global-value
-            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-SPACE-START" spaces :physical))
-           (symbol-global-value
-            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-SPACE-END" spaces :physical))))
+          (let ((base (symbol-global-value
+                       (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-SPACE-START"
+                                           spaces :physical))))
+            (make-bounds base (+ base sb-vm:alien-linkage-table-space-size))))
          (linkage-entry-size
           (symbol-global-value
            (find-target-symbol (package-id "SB-VM") "ALIEN-LINKAGE-TABLE-ENTRY-SIZE"

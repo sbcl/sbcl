@@ -49,18 +49,22 @@
            (- list-pointer-lowtag)))
       0))
 
+(symbol-macrolet ((alien-linkage-table-space-end
+                   (+ alien-linkage-table-space-start alien-linkage-table-space-size)))
 ;;; the address of the linkage table entry for table index I.
 (defun alien-linkage-table-entry-address (i)
   (ecase alien-linkage-table-growth-direction
     (:up   (+ (* i alien-linkage-table-entry-size) alien-linkage-table-space-start))
     (:down (- alien-linkage-table-space-end (* (1+ i) alien-linkage-table-entry-size)))))
 
+#-sb-xc-host
 (defun alien-linkage-table-index-from-address (addr)
   (ecase alien-linkage-table-growth-direction
     (:up
      (floor (- addr alien-linkage-table-space-start) alien-linkage-table-entry-size))
     (:down
      (1- (floor (- alien-linkage-table-space-end addr) alien-linkage-table-space-end)))))
+)
 
 (defconstant-eqx +all-static-fdefns+
     #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+) #'equalp)

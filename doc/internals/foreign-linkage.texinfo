@@ -72,8 +72,7 @@ is used by SB-POSIX.)
 
 Find a memory area for the linkage-table, and add it for the OS in
 @file{src/compiler/target/parms.lisp} by defining
-@code{SB-VM:ALIEN-LINKAGE-TABLE-SPACE-START} and
-@code{SB-VM:ALIEN-LINKAGE-TABLE-SPACE-END}. See existing ports and CMUCL for
+@code{SB-VM:ALIEN-LINKAGE-TABLE-SPACE-START}. See existing ports and CMUCL for
 examples.
 
 @subsubsection Porting to new architectures

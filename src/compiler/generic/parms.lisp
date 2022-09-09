@@ -37,6 +37,9 @@
               (* number mult))))))
   #-sb-xc-host (symbol-value 'default-dynamic-space-size))
 
+;; By happenstance this is the same as small-space-size.
+(defconstant alien-linkage-table-space-size #x100000)
+
 #+gencgc
 ;; Define START/END constants for GENCGC spaces.
 ;; Assumptions:
@@ -83,7 +86,7 @@
         ((spaces (append `((read-only ,ro-space-size)
                            #+(and win32 x86-64)
                            (seh-data ,(symbol-value '+backend-page-bytes+) win64-seh-data-addr)
-                           (alien-linkage-table ,small-space-size)
+                           (alien-linkage-table ,alien-linkage-table-space-size)
                            #+sb-safepoint
                            ;; Must be just before NIL.
                            (safepoint ,(symbol-value '+backend-page-bytes+) gc-safepoint-page-addr)
@@ -118,7 +121,8 @@
                            (fixedobj (setq start (or fixedobj-space-start* start)
                                            end (+ start fixedobj-space-size*))))
                          `(,(defconstantish relocatable start-sym start)
-                           ,(cond ((not relocatable)
+                           ,(cond ((eq space 'alien-linkage-table)) ; nothing for the -END
+                                  ((not relocatable)
                                    `(defconstant ,(symbolicate space "-SPACE-END") ,end))
                                   #-sb-xc-host ((eq space 'text)) ; don't emit anything
                                   (t

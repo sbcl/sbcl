@@ -51,8 +51,7 @@
     (or (with-system-mutex ((hash-table-lock ht))
           (or (gethash key ht)
               (let* ((index (hash-table-count ht))
-                     (capacity (floor (- sb-vm:alien-linkage-table-space-end
-                                         sb-vm:alien-linkage-table-space-start)
+                     (capacity (floor sb-vm:alien-linkage-table-space-size
                                       sb-vm:alien-linkage-table-entry-size)))
                 (when (< index capacity)
                   (multiple-value-bind (defined real-address) (dlsym-wrapper t)
@@ -161,7 +160,7 @@ symbol designates a variable. May enter the symbol into the linkage-table."
     (declare (ignorable addr))
     (when (<= sb-vm:alien-linkage-table-space-start
               addr
-              sb-vm:alien-linkage-table-space-end)
+              (+ sb-vm:alien-linkage-table-space-start sb-vm:alien-linkage-table-space-size))
       (let ((table-index (sb-vm::alien-linkage-table-index-from-address addr)))
         (dohash ((key value) (car *linkage-info*) :locked t)
           (when (= value table-index)
