@@ -77,7 +77,6 @@
 
 (define-alien-variable text-space-size (unsigned 32))
 (define-alien-variable ("FIXEDOBJ_SPACE_START" fixedobj-space-start) unsigned-long)
-(define-alien-variable ("TEXT_SPACE_START" text-space-start) unsigned-long)
 (define-alien-variable ("text_space_highwatermark" *text-space-free-pointer*)
   system-area-pointer)
 (define-alien-variable ("fixedobj_free_pointer" *fixedobj-space-free-pointer*)

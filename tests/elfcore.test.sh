@@ -48,6 +48,14 @@ EOF
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --no-sysinit --no-userinit --noprint <<EOF
 ;; I think this tests immobile space exhaustion
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
+
+;; Test that the link step did not use --export-dynamic
+(assert (gethash '("TEXT_SPACE_START") (car sb-sys:*linkage-info*))) ; C symbol exists
+; but dlsym() can't see it
+(assert (not (sb-sys:find-dynamic-foreign-symbol-address "TEXT_SPACE_START")))
+; but we can read the value
+(assert (funcall (compile nil '(lambda () sb-vm:text-space-start))))
+
 ;; Test that CODE-SERIAL# is never 0 except for simple-fun-less objects
 (sb-vm:map-allocated-objects
  (lambda (obj type size)

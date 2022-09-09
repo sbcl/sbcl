@@ -33,6 +33,9 @@
         (truly-the (signed-byte 64)
                    (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
 
+#+immobile-space
+(define-alien-variable ("TEXT_SPACE_START" sb-vm:text-space-start) unsigned-long)
+
 #+darwin-jit
 (define-alien-variable ("static_code_space_free_pointer" sb-vm:*static-code-space-free-pointer*)
   system-area-pointer)
