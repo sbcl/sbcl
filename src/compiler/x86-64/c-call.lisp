@@ -540,8 +540,9 @@
           #+win32 (inst sub rsp #x20)
           #+win32 (inst and rsp #x-20)
           ;; Call
-          (inst mov rax (foreign-symbol-address "callback_wrapper_trampoline"))
-          (inst call rax)
+          ;; do this without MAKE-FIXUP because fixup'ing does not happen when
+          ;; assembling callbacks (probably could, but ...)
+          (inst call (ea (+ (foreign-symbol-address "callback_wrapper_trampoline") 8)))
           ;; Back! Restore frame
           (inst mov rsp rbp)
           (inst pop rbp))
