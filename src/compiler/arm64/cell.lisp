@@ -228,8 +228,9 @@
   (:result-types positive-fixnum)
   (:translate sb-impl::symbol-package-id)
   (:policy :fast-safe)
-  (:generator 1 ; ASSUMPTION: symbol-package-bits = 16
-   (inst ldrh result (@ symbol (+ (ash symbol-name-slot word-shift)
+  (:generator 1
+    #.(assert (= sb-impl::package-id-bits 16))
+    (inst ldrh result (@ symbol (+ (ash symbol-name-slot word-shift)
                                   (- other-pointer-lowtag)
                                   6))))) ; little-endian
 (define-vop ()
