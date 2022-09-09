@@ -527,23 +527,31 @@
 
 (with-test (:name :undefined-alien-name
             :skipped-on (not (or :x86-64 :arm :arm64)))
-  (handler-case (funcall (checked-compile `(lambda ()
-                                             (alien-funcall (extern-alien "bar" (function (values)))))
-                                          :allow-style-warnings t))
-    (t (c)
-      (assert (typep c 'sb-kernel::undefined-alien-function-error))
-      (assert (equal (cell-error-name c) "bar")))))
+  (dolist (memspace '(:dynamic #+immobile-space :immobile))
+    (let ((lispfun
+           (let ((sb-c::*compile-to-memory-space* memspace))
+             (checked-compile `(lambda ()
+                                 (alien-funcall (extern-alien "bar" (function (values)))))
+                              :allow-style-warnings t))))
+      (handler-case (funcall lispfun)
+        (t (c)
+          (assert (typep c 'sb-kernel::undefined-alien-function-error))
+          (assert (equal (cell-error-name c) "bar")))))))
 
 (with-test (:name :undefined-alien-name-via-linkage-table-trampoline
             :skipped-on (not (or :x86-64 :arm :arm64)))
-  (handler-case (funcall (checked-compile
-                          `(lambda ()
-                             (with-alien ((fn (* (function (values)))
-                                              (sb-sys:int-sap (sb-sys:foreign-symbol-address "baz"))))
-                               (alien-funcall fn)))))
-    (t (c)
-      (assert (typep c 'sb-kernel::undefined-alien-function-error))
-      (assert (equal (cell-error-name c) "baz")))))
+  (dolist (memspace '(:dynamic #+immobile-space :immobile))
+    (let ((lispfun
+           (let ((sb-c::*compile-to-memory-space* memspace))
+             (checked-compile
+              `(lambda ()
+                 (with-alien ((fn (* (function (values)))
+                                  (sb-sys:int-sap (sb-sys:foreign-symbol-address "baz"))))
+                   (alien-funcall fn)))))))
+      (handler-case (funcall lispfun)
+        (t (c)
+          (assert (typep c 'sb-kernel::undefined-alien-function-error))
+          (assert (equal (cell-error-name c) "baz")))))))
 
 (defconstant fleem 3)
 ;; We used to expand into
