@@ -61,32 +61,13 @@
 
 ;;;; Where to put the different spaces.
 
-;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#-gencgc
-(progn
-  (defconstant read-only-space-start #x04000000)
-  (defconstant read-only-space-end   #x07ff8000)
-  (defconstant static-space-start    #x08000000)
-  (defconstant static-space-end      #x097fff00)
-
-  (defconstant alien-linkage-table-space-start #x0a000000)
-  (defconstant alien-linkage-table-space-end   #x0b000000))
-
-;;; While on gencgc we don't.
-#+gencgc
 (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
 (defconstant alien-linkage-table-entry-size #-64-bit 8 #+64-bit 24)
 (defconstant alien-linkage-table-growth-direction :down)
-(setq *linkage-space-predefined-entries* '(#+gencgc("alloc" nil)
-                                           #+gencgc("alloc_list" nil)))
+(setq *linkage-space-predefined-entries* '(("alloc" nil)
+                                           ("alloc_list" nil)))
 
-#+(or linux netbsd)
-(progn
-  #-gencgc
-  (progn
-    (defparameter dynamic-0-space-start #x4f000000)
-    (defparameter dynamic-0-space-end   #x66fff000)))
 
 ;;;; other miscellaneous constants
 

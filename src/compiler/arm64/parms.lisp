@@ -64,22 +64,6 @@
 
 ;;;; Where to put the different spaces.
 
-;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#-gencgc
-(progn
-  (defconstant read-only-space-start #x04000000)
-  (defconstant read-only-space-end   #x07ff8000)
-  (defconstant static-space-start    #x08000000)
-  (defconstant static-space-end      #x097fff00)
-
-  (defconstant alien-linkage-table-space-start #x0a000000)
-  (defconstant alien-linkage-table-space-end   #x0b000000)
-  #+(or linux openbsd)
-  (progn
-    (defparameter dynamic-0-space-start #x4f000000)
-    (defparameter dynamic-0-space-end   #x66fff000)))
-
-#+gencgc
 (!gencgc-space-setup #+(or linux openbsd freebsd) #xF0000000
                      #+darwin #x300000000
                      #+netbsd #x2F0000000
