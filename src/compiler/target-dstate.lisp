@@ -98,6 +98,7 @@
                 :type (member :beginning
                               :block-boundary
                               nil))
+  (known-register-contents)
 
   ;; alist of (address . label-number)
   (labels nil :type list)

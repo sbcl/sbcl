@@ -174,7 +174,10 @@
    value (inst-operand-size-default-qword dstate) t stream dstate))
 
 (defun print-jmp-ea (value stream dstate)
-  (print-sized-reg/mem-default-qword value stream dstate))
+  (cond ((typep value 'machine-ea)
+         (print-mem-ref :compute value :qword stream dstate))
+        ((null stream) (operand value dstate))
+        (t (write value :stream stream))))
 
 (defun print-sized-byte-reg/mem (value stream dstate)
   (print-reg/mem-with-width value :byte t stream dstate))
@@ -440,7 +443,13 @@
          ;; compilation to memory says it is all associated with
          ;; the symbol "lisp_jit_code" which is not useful.
          (when (plusp addr)
-           (or (unless (sb-kernel:immobile-space-addr-p addr)
+           (or (when (<= sb-vm:alien-linkage-table-space-start addr
+                         (+ sb-vm:alien-linkage-table-space-start
+                            (1- sb-vm:alien-linkage-table-space-size)))
+                 (let* ((index (sb-vm::alien-linkage-table-index-from-address addr))
+                        (name (sb-impl::alien-linkage-index-to-name index)))
+                   (note (lambda (s) (format s "&~A" name)) dstate)))
+               (unless (sb-kernel:immobile-space-addr-p addr)
                  (maybe-note-assembler-routine addr nil dstate))
                ;; Show the absolute address and maybe the contents.
                (note (format nil "[#x~x]~@[ = #x~x~]"
@@ -448,6 +457,20 @@
                              (case width
                               (:qword (unboxed-constant-ref dstate addr disp))))
                      dstate))))))
+
+    ;; Recognize "[Rbase+disp]" as an alien linkage table reference if Rbase was
+    ;; just loaded with the base address in the prior instruction.
+    (when (and (eql (machine-ea-base value)
+                    (car (sb-disassem::dstate-known-register-contents dstate)))
+               (eq (cdr (sb-disassem::dstate-known-register-contents dstate))
+                   'alien-linkage)
+               (not (machine-ea-index value))
+               (integerp (machine-ea-disp value)))
+      (let* ((index (sb-vm::alien-linkage-table-index-from-address
+                     (+ sb-vm:alien-linkage-table-space-start (machine-ea-disp value))))
+             (name (sb-impl::alien-linkage-index-to-name index)))
+        (note (lambda (s) (format s "&~A" name)) dstate)))
+    (setf (sb-disassem::dstate-known-register-contents dstate) nil)
 
     (flet ((guess-symbol (predicate)
              (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
@@ -481,14 +504,22 @@
                   #+gs-seg (dstate-getprop dstate +gs-segment+)
                   #-gs-seg (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
-                  (typep disp '(integer 0 *)) ; positive displacement
+                  (typep disp '(integer -128 *)) ; valid displacement
                   (zerop (logand disp 7))) ; lispword-aligned
-             (let ((index (ash disp -3)))
-               (when (< index (length thread-slot-names))
-                 (awhen (aref thread-slot-names index)
-                   (return-from print-mem-ref
-                     (note (lambda (stream) (format stream "thread.~(~A~)" it))
-                           dstate)))))
+             (let* ((index (ash disp -3))
+                    (symbol (cond ((minusp index)
+                                   (aref sb-vm::+thread-header-slot-names+ (1- (- index))))
+                                  ((< index (length thread-slot-names))
+                                   (aref thread-slot-names index)))))
+               (when symbol
+                 (when (and (eq symbol 'sb-vm::alien-linkage-table-base)
+                            (eql (logandc2 (sb-disassem::dstate-inst-properties dstate) +rex-r+)
+                                 (logior +rex+ +rex-w+ +rex-b+)))
+                   (setf (sb-disassem::dstate-known-register-contents dstate)
+                         `(,(reg-num (regrm-inst-reg dchunk-zero dstate)) . alien-linkage)))
+                 (return-from print-mem-ref
+                   (note (lambda (stream) (format stream "thread.~(~A~)" symbol))
+                         dstate))))
              (let ((symbol (or (guess-symbol
                                 (lambda (s) (= (symbol-tls-index s) disp)))
                                ;; static symbols aren't in the code header

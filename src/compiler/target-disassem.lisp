@@ -424,6 +424,7 @@
            (type segment segment))
   (setf (dstate-segment dstate) segment)
   (setf (dstate-inst-properties dstate) 0)
+  (setf (dstate-known-register-contents dstate) nil)
   (setf (dstate-cur-offs-hooks dstate)
         (stable-sort (nreverse (copy-list (seg-hooks segment)))
                      (lambda (oh1 oh2)

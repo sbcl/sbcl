@@ -482,7 +482,7 @@
   (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
            :type 'reg/mem :reader regrm-inst-r/m)
-  (reg     :field (byte 3 11)   :type 'reg)
+  (reg     :field (byte 3 11)   :type 'reg :reader regrm-inst-reg)
   ;; optional fields
   (imm))
 

@@ -153,6 +153,11 @@ symbol designates a variable. May enter the symbol into the linkage-table."
   #+os-provides-dlopen
   (close-shared-objects))
 
+(defun alien-linkage-index-to-name (index)
+  (dohash ((key value) (car *linkage-info*) :locked t)
+    (when (= value index)
+      (return (if (listp key) (car key) key)))))
+
 (declaim (maybe-inline sap-foreign-symbol))
 (defun sap-foreign-symbol (sap)
   (declare (ignorable sap))
@@ -161,10 +166,9 @@ symbol designates a variable. May enter the symbol into the linkage-table."
     (when (<= sb-vm:alien-linkage-table-space-start
               addr
               (+ sb-vm:alien-linkage-table-space-start sb-vm:alien-linkage-table-space-size))
-      (let ((table-index (sb-vm::alien-linkage-table-index-from-address addr)))
-        (dohash ((key value) (car *linkage-info*) :locked t)
-          (when (= value table-index)
-            (return-from sap-foreign-symbol (if (listp key) (car key) key))))))
+      (return-from sap-foreign-symbol
+        (alien-linkage-index-to-name
+         (sb-vm::alien-linkage-table-index-from-address addr))))
     #+os-provides-dladdr
     (with-alien ((info (struct dl-info
                                (filename c-string)

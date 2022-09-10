@@ -1259,3 +1259,24 @@
                             (sb-pcl::%copy-cache x)))))
       (assert (loop for line in (disassembly-lines f)
                     thereis (search "SYS-ALLOC-TRAMP" line))))))
+
+(defun find-in-disassembly (string lambda-expression)
+  (let ((disassembly
+         (with-output-to-string (s)
+           (disassemble (compile nil lambda-expression) :stream s))))
+    (loop for line in (split-string disassembly #\Newline)
+          thereis (search string line))))
+
+#+immobile-space
+(with-test (:name :disassemble-alien-linkage-table-ref)
+  (dolist (memspace '(:dynamic :immobile))
+    (let ((sb-c::*compile-to-memory-space* memspace))
+      (assert (find-in-disassembly
+               (if (eq sb-c::*compile-to-memory-space* :immobile) "lose" "&lose")
+               '(lambda ()
+                 (declare (optimize (sb-c::alien-funcall-saves-fp-and-pc 0)))
+                 (alien-funcall (extern-alien "lose" (function void))))))
+      (assert (find-in-disassembly
+               "&verify_gens"
+               '(lambda ()
+                 (extern-alien "verify_gens" char)))))))

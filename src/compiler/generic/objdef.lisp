@@ -459,24 +459,26 @@ during backtrace.
 ;;; These slots hold frequently-referenced constants.
 ;;; If we can't do that for some reason - like, say, the safepoint page
 ;;; is located prior to 'struct thread', then these just become ordinary slots.
-(defglobal *thread-header-slot-names*
-  (append #+x86-64
-          '(t-nil-constants
-            alien-linkage-table-base
-            msan-xor-constant
-            ;; The following slot's existence must NOT be conditional on #+msan
-            msan-param-tls) ; = &__msan_param_tls
-          #+immobile-space '(function-layout
-                             text-space-addr
-                             text-card-count
-                             text-card-marks)))
+(defconstant-eqx +thread-header-slot-names+
+    `#(#+x86-64
+       ,@'(t-nil-constants
+          alien-linkage-table-base
+          msan-xor-constant
+          ;; The following slot's existence must NOT be conditional on #+msan
+          msan-param-tls) ; = &__msan_param_tls
+       #+immobile-space
+       ,@'(function-layout
+           text-space-addr
+           text-card-count
+           text-card-marks))
+  #'equalp)
 
 (macrolet ((assign-header-slot-indices ()
              (let ((i 0))
                `(progn
-                  ,@(mapcar (lambda (x)
-                              `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
-                            *thread-header-slot-names*)))))
+                  ,@(map 'list (lambda (x)
+                                 `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
+                            +thread-header-slot-names+)))))
   (assign-header-slot-indices))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
