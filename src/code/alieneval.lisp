@@ -1319,11 +1319,6 @@
     (error ()
       (error "invalid external alien name: ~S" name))))
 
-(declaim (ftype (sfunction (string hash-table) (or integer null))
-                find-foreign-symbol-in-table))
-(defun find-foreign-symbol-in-table (name table)
-  (values (gethash (extern-alien-name name) table)))
-
 (in-package "SB-ALIEN")
 
 #+sb-xc
