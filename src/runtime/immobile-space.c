@@ -2077,9 +2077,7 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
         }
         // Call to asm routine or linkage table entry using "CALL [#xNNNN]" form.
         // This fixup is only for whole-heap relocation on startup.
-        if (((lispobj)ALIEN_LINKAGE_TABLE_SPACE_START <= ptr &&
-             ptr < TEXT_SPACE_START)
-            || (asm_routines_start <= ptr && ptr < asm_routines_end)) {
+        if (asm_routines_start <= ptr && ptr < asm_routines_end) {
             continue;
         }
 #ifdef LISP_FEATURE_METASPACE
