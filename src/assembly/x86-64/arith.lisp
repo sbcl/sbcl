@@ -156,7 +156,7 @@
   (move res x)
   (inst neg res)                        ; (- most-negative-fixnum) is BIGNUM
   ;; This constant isn't really a fixup, but it's easiest for me to think about it
-  ;; that way for now. It should reall do whatever EMIT-EA does for a CONSTANT.
+  ;; that way for now. It should really do whatever EMIT-EA does for a CONSTANT.
   (inst cmov :o res (ea (make-fixup nil :code-object
                                     (+ (ash code-constants-offset word-shift)
                                        (- other-pointer-lowtag)))

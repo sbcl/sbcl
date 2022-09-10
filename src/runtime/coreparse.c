@@ -745,7 +745,7 @@ process_directory(int count, struct ndir_entry *entry,
             os_validate(0, 0, ALIEN_LINKAGE_TABLE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID);
         // Prefill the alien linkage table so that shrinkwrapped executables which link in
         // all their C library dependencies can avoid linking with -ldl
-        // but extern-alien stil works for newly compiled code.
+        // but extern-alien still works for newly compiled code.
         lispobj* ptr = &alien_linkage_values;
         gc_assert(ptr);
         int entry_index = 0;
