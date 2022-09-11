@@ -594,10 +594,10 @@ static inline lispobj copy_instance(lispobj object)
         /* If odd, add 1 (making even). Rounding that to odd and then
          * adding 1 for the header will effectively add 2 words.
          * Otherwise, don't add anything because a padding slot exists */
+        int old_nwords = 1 + (original_length|1);
         int new_length = original_length + (original_length & 1);
         copy = gc_copy_object_resizing(object, 1 + (new_length|1),
-                                       region, page_type,
-                                       1 + (original_length|1));
+                                       region, page_type, old_nwords);
         lispobj *base = native_pointer(copy);
         /* store the old address as the hash value */
 #ifdef LISP_FEATURE_64_BIT
@@ -617,11 +617,12 @@ static inline lispobj copy_instance(lispobj object)
                (void*)object, original_length, (void*)copy, new_length,
                instance_length(*base));
 #endif
+        set_forwarding_pointer_resized(native_pointer(object), copy, old_nwords);
     } else {
         int nwords = 1 + (original_length|1);
         copy = gc_copy_object(object, nwords, region, page_type);
+        set_forwarding_pointer(native_pointer(object), copy);
     }
-    set_forwarding_pointer(native_pointer(object), copy);
     return copy;
 }
 
