@@ -8,8 +8,7 @@
                                                (sb-vm:find-page-index
                                                 (sb-kernel:get-lisp-obj-address x)))
                                'sb-vm::flags))))
-         (logbitp 4 ; SINGLE_OBJECT_FLAG
-                  (ldb (byte 6 (+ #+big-endian 2)) flags)))))
+         (logbitp 4 flags)))) ; SINGLE_OBJECT_FLAG
 (compile 'on-large-page-p)
 
 ;;; Pseudo-static large objects should retain the single-object flag
