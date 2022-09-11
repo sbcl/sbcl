@@ -381,10 +381,7 @@
 
     (when (and named-call-fixups (immobile-space-obj-p code-obj))
       (sb-vm::statically-link-code-obj code-obj named-call-fixups))
-    (when sb-fasl::*show-new-code*
-      (let ((*print-pretty* nil))
-        (format t "~&New code(~Db,core): ~A~%" (code-object-size code-obj) code-obj)))
-    code-obj))
+    (sb-fasl::possibly-log-new-code code-obj "core")))
 
 (defun set-code-fdefn (code index fdefn)
   #+untagged-fdefns

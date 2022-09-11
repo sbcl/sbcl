@@ -1139,6 +1139,24 @@
     `(with-pinned-objects (,code-var) ,@body)))
 
 (define-load-time-global *show-new-code* nil)
+#+sb-xc-host
+(defun possibly-log-new-code (object reason)
+  (declare (ignore reason))
+  object)
+#-sb-xc-host
+(defun possibly-log-new-code (object reason &aux (show *show-new-code*))
+  (when show
+    (let ((*print-pretty* nil))
+      ;; DISASSEMBLE is for limited debugging only.
+      ;; It may write garbled output if multiple threads
+      (when (eq show 'disassemble)
+        (with-open-file (f "jit-code.txt" :direction :output
+                                          :if-exists :append :if-does-not-exist :create)
+          (disassemble object :stream f)
+          (terpri f)))
+      (format t "~&New code(~Db,~A): ~A~%" (code-object-size object) reason object)))
+  object)
+
 (define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixup-elts)))
   ;; The stack looks like:
   ;; ... | constant0 constant1 ... constantN | DEBUG-INFO | FIXUPS-ITEMS ....   ||
@@ -1191,14 +1209,11 @@
               (setf (code-header-ref code header-index) (svref stack stack-index))
               (incf header-index)
               (incf stack-index))))
-        (when *show-new-code*
-          (let ((*print-pretty* nil))
-            (format t "~&New code(~Db,load): ~A~%" (code-object-size code) code)))
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
           (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
-        code))))
+        (possibly-log-new-code code "load")))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.
