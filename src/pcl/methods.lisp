@@ -520,7 +520,7 @@
            ;; don't, however this branch should never be reached because the
            ;; info only stores :GENERIC-FUNCTION when methods are loaded.
            ;; Maybe AVER that it does not happen?
-           (sb-impl::ftype-from-fdefn name)))))
+           (sb-c::ftype-from-definition name)))))
 
 (defun real-add-method (generic-function method &optional skip-dfun-update-p)
   (flet ((similar-lambda-lists-p (old-method new-lambda-list)

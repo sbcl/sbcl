@@ -272,7 +272,7 @@
   :default (lambda (name)
              (declare (ignorable name))
              #+sb-xc-host (specifier-type 'function)
-             #-sb-xc-host (sb-impl::ftype-from-fdefn name)))
+             #-sb-xc-host (sb-c::ftype-from-definition name)))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition

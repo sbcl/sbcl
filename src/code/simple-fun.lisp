@@ -311,11 +311,17 @@
     (interpreted-function (sb-interpreter:%fun-ftype function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-(defun ftype-from-fdefn (name)
-  (declare (ignorable name))
-  (let ((function (awhen (find-fdefn name) (fdefn-fun it))))
-    (if (not function)
-        (specifier-type 'function)
+(defun sb-c::ftype-from-definition (name)
+  (let ((function (fboundp name)))
+    (cond
+      ((not function)
+       (specifier-type 'function))
+      ((and (symbolp name) (macro-function name))
+       ;; this seems to be called often on macros
+       ;; what's the right answer ???
+       ;; (warn "ftype-from-fdefn called on macro ~s" name)
+       (specifier-type '(function (t t) t)))
+      (t
         ;; Never signal the PARSE-UNKNOWN-TYPE condition.
         ;; This affects 2 regression tests, both very contrived:
         ;;  - in defstruct.impure ASSERT-ERROR (BUG127--FOO (MAKE-BUG127-E :FOO 3))
@@ -325,7 +331,7 @@
                 (sb-kernel::make-type-context
                  ftype nil sb-kernel::+type-parse-signal-inhibit+)))
           (declare (truly-dynamic-extent context))
-          (values (sb-kernel::basic-parse-typespec ftype context))))))
+          (values (sb-kernel::basic-parse-typespec ftype context)))))))
 
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory
 ;;; and rentention of forms was enabled via the EVAL-STORE-SOURCE-FORM policy
