@@ -100,10 +100,8 @@
                         (dummy-forms `(sb-c:safe-fdefn-fun
                                        (load-time-value
                                         (find-or-create-fdefn ',name) t))))
-                      ;; Resolve to an fdefn at load-time.
                       `(load-time-value
-                        (cons ,test (find-or-create-fdefn
-                                     (the (function-designator (condition)) ',name)))
+                        (cons ,test (the (function-designator (condition)) ',name))
                         t)))))
 
            (const-list (items)
@@ -132,7 +130,7 @@
                        ;; whether you wrote T or CONDITION, this is
                        ;; always an eligible handler.
                        '#'constantly-t)
-                      ((typep type '(cons (eql satisfies) (cons t null)))
+                      ((typep type '(cons (eql satisfies) (cons symbol null)))
                        ;; (SATISFIES F) => #'F but never a local
                        ;; definition of F.  The predicate is used only
                        ;; if needed - it's not an error if not fboundp
@@ -149,7 +147,7 @@
                        (let ((name (second type)))
                          (when (typep env 'lexenv)
                            (dummy-forms `#',name))
-                         `(find-or-create-fdefn ',name)))
+                         `',name))
                       ((and (symbolp type)
                             (condition-classoid-p (find-classoid type nil)))
                        ;; It's debatable whether we need to go through
