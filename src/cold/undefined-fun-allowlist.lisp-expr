@@ -19,8 +19,7 @@
   make-load-form-saving-slots
   sb-vm:map-allocated-objects
   sb-ext:primitive-object-size
-  sb-vm::remove-static-links
-  sb-vm::blt-copier-for-widetag)
+  sb-vm::remove-static-links)
  ;; CLOS implementation
  (sb-mop:class-finalized-p
   sb-mop:class-prototype

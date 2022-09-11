@@ -852,7 +852,6 @@ of specialized arrays is supported."
                         collect `(setf (svref ,symbol ,widetag)
                                        (,deffer ,saetp ,check-form))))))
   (defun !hairy-data-vector-reffer-init ()
-    (!blt-copiers-cold-init)
     (define-reffers %%data-vector-reffers%% define-reffer
       (progn)
       #'slow-hairy-data-vector-ref)
@@ -1163,21 +1162,20 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
-(defun !blt-copiers-cold-init ()
-  (let ((array (make-array 32 :initial-element nil)))
-    (macrolet ((init ()
-                 `(progn
-                    ,@(loop for saetp across *specialized-array-element-type-properties*
-                            when (and (not (member (saetp-specifier saetp) '(t nil)))
-                                      (<= (saetp-n-bits saetp) n-word-bits))
-                              collect `(setf (svref array ,(ash (- (saetp-typecode saetp) 128) -2))
-                                             #',(intern (format nil "UB~D-BASH-COPY"
-                                                                (saetp-n-bits saetp))
-                                                        "SB-KERNEL"))))))
-      (init))
-    (setf (fdefinition 'blt-copier-for-widetag)
-          (lambda (x)
-            (aref array (ash (- x 128) -2))))))
+(defun blt-copier-for-widetag (x)
+  (declare ((mod 256) x))
+  (aref (load-time-value
+         (map-into (make-array 32)
+                   (lambda (x) (if x (symbol-function x) 0))
+                   '#.(let ((a (make-array 32 :initial-element nil)))
+                        (dovector (saetp *specialized-array-element-type-properties* a)
+                          (when (and (not (member (saetp-specifier saetp) '(t nil)))
+                                     (<= (saetp-n-bits saetp) n-word-bits))
+                            (setf (svref a (ash (- (saetp-typecode saetp) 128) -2))
+                                  (intern (format nil "UB~D-BASH-COPY" (saetp-n-bits saetp))
+                                          "SB-KERNEL"))))))
+         t)
+        (ash (logand x #x7f) -2)))
 
 (defun extend-vector (vector min-extension)
   (declare (optimize speed)
