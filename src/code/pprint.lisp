@@ -738,11 +738,9 @@ line break."
   ;; either (LAMBDA (OBJ) (TYPEP OBJECT TYPE)) or a builtin predicate.
   ;; We don't bother computing this for entries in the CONS
   ;; hash table, because we don't need it.
-  (test-fn nil :type (or function null))
+  (test-fn #'bug :type function)
   ;; the priority for this guy
   (priority 0 :type real :read-only t)
-  ;; T iff one of the original entries.
-  (initial-p (null *initial-pprint-dispatch-table*) :type boolean :read-only t)
   ;; and the associated function
   (fun nil :type function-designator :read-only t))
 
@@ -750,26 +748,19 @@ line break."
 
 (defmethod print-object ((entry pprint-dispatch-entry) stream)
   (print-unreadable-object (entry stream :type t)
-    (format stream "type=~S, priority=~S~@[ [initial]~]"
+    (format stream "type=~S, priority=~S]"
             (pprint-dispatch-entry-type entry)
-            (pprint-dispatch-entry-priority entry)
-            (pprint-dispatch-entry-initial-p entry))))
+            (pprint-dispatch-entry-priority entry))))
 
 (defmethod print-object ((table pprint-dispatch-table) stream)
   (print-unreadable-object (table stream :type t :identity t)))
 
 ;; Return T iff E1 is strictly less preferable than E2.
+(declaim (inline entry<))
 (defun entry< (e1 e2)
   (declare (type pprint-dispatch-entry e1 e2))
-  (if (pprint-dispatch-entry-initial-p e1)
-      (if (pprint-dispatch-entry-initial-p e2)
-          (< (pprint-dispatch-entry-priority e1)
-             (pprint-dispatch-entry-priority e2))
-          t)
-      (if (pprint-dispatch-entry-initial-p e2)
-          nil
-          (< (pprint-dispatch-entry-priority e1)
-             (pprint-dispatch-entry-priority e2)))))
+  (< (pprint-dispatch-entry-priority (truly-the pprint-dispatch-entry e1))
+     (pprint-dispatch-entry-priority (truly-the pprint-dispatch-entry e2))))
 
 ;; Return the predicate for CTYPE, equivalently TYPE-SPEC.
 ;; This used to involve rewriting into a sexpr if CONS was involved,
@@ -840,13 +831,17 @@ line break."
             (let ((cons-entry
                    (and (consp object)
                         (sb-impl::gethash/eql (car object) (pp-dispatch-cons-entries table) nil))))
-              (cond ((not cons-entry)
+              (cond ((not cons-entry) ; impossible, unless you've removed all initial cons entries
                      (dovector (entry (pp-dispatch-entries table) nil)
-                       (when (funcall (pprint-dispatch-entry-test-fn entry) object)
+                       (when (funcall (pprint-dispatch-entry-test-fn
+                                       (truly-the pprint-dispatch-entry entry))
+                              object)
                          (return entry))))
                     ((pp-dispatch-only-initial-entries table)
                      cons-entry)
                     (t
+                     ;; This gives cons entries precedence over non-cons entries that have
+                     ;; the same numerical priority.
                      (dovector (entry (pp-dispatch-entries table) cons-entry)
                        (when (entry< entry cons-entry)
                          (return cons-entry))
@@ -906,8 +901,9 @@ line break."
          (entry (if function
                     (make-pprint-dispatch-entry
                      type priority function
-                     (unless (or consp disabled-p)
-                       (compute-test-fn ctype type function))))))
+                     (if (or consp disabled-p)
+                         #'bug
+                         (compute-test-fn ctype type function))))))
     (when (and function disabled-p)
       ;; a DISABLED-P test function has to close over the ENTRY
       (setf (pprint-dispatch-entry-test-fn entry) (defer-type-checker entry)))
@@ -932,6 +928,7 @@ line break."
                     (merge 'vector old (list entry) (lambda (a b) (entry< b a)))
                     old)))))
   nil)
+(clear-info :function :inlining-data 'entry<) ; can be removed
 
 ;;;; standard pretty-printing routines
 
@@ -1494,9 +1491,10 @@ line break."
 ;;; -> (sb-kernel::parse-args-types ...)
 ;;; -> (sb-kernel::%parse-type CLASS)
 ;;; where the type specifier for CLASS is as yet unknown
-(defmacro initial-entry (specifier handler priority &optional predicate)
+(defmacro initial-entry (specifier handler &optional predicate)
+  ;; Assign the lowest possible priority
   `(make-pprint-dispatch-entry
-    ',specifier ,priority #',handler
+    ',specifier single-float-negative-infinity #',handler
     ,(or predicate
          `(named-lambda ,(format nil "~A-P" handler) (x)
             ,(sb-c::source-transform-typep 'x specifier)))))
@@ -1523,16 +1521,12 @@ line break."
            ;; * PLEASE NOTE : If you change these definitions, then you may need to adjust
            ;; the computation of POSSIBLY-MATCHABLE in PPRINT-DISPATCH.
            ;;
-           ;; Assign a lower priority than for the cons entries below, making
-           ;; fewer type tests when dispatching.
-           (initial-entry (and array (not (or string bit-vector)))
-                          pprint-array -1)
            ;; The implementation happens to check identical priorities in the order added,
-           ;; but that's unspecified behavior. (SATISFIES FBOUNDP) must be _strictly_
-           ;; lower than the default cons entries though.
-           (initial-entry (cons (and symbol (satisfies fboundp))) pprint-call-form -1)
-           (initial-entry cons pprint-fill -2 #'consp)
-           (initial-entry sb-impl::comma pprint-unquoting-comma -3 #'comma-p)))
+           ;; but that's unspecified behavior.
+           (initial-entry (and array (not (or string bit-vector))) pprint-array)
+           (initial-entry (cons (and symbol (satisfies fboundp))) pprint-call-form)
+           (initial-entry cons pprint-fill #'consp)
+           (initial-entry sb-impl::comma pprint-unquoting-comma #'comma-p)))
          (*print-pprint-dispatch*
           (make-pprint-dispatch-table initial-entries nil nil)))
     ;; cons cells with interesting things for the car
@@ -1587,7 +1581,8 @@ line break."
       ;; Grouping some symbols together in the above list looks pretty.
       ;; The sharing of dispatch entries is inconsequential.
       (set-pprint-dispatch `(cons (member ,@(ensure-list (first magic-form))))
-                           (second magic-form)))
+                           (second magic-form)
+                           most-negative-single-float))
     (setf (pp-dispatch-only-initial-entries *print-pprint-dispatch*) t
           *initial-pprint-dispatch-table* *print-pprint-dispatch*))
 
