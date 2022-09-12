@@ -113,8 +113,8 @@ distinct from the global value. Can also be SETF."
 
 (defun symbol-function (symbol)
   "Return SYMBOL's current function definition. Settable with SETF."
-  (or (%symbol-function symbol) ; fast way
-      (%coerce-name-to-fun symbol))) ; fallback with restart
+  (truly-the function (or (%symbol-function symbol) ; fast way
+                          (%coerce-name-to-fun symbol)))) ; fallback w/restart
 
 ;; I think there are two bugs here.
 ;; Per CLHS "SETF may be used with symbol-function to replace a global

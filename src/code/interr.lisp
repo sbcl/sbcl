@@ -53,18 +53,14 @@
     (labels ((retry-value (value)
                (or (typecase value
                      (fdefn (fdefn-fun value))
-                     (symbol
-                      (let ((fdefn (symbol-fdefn value)))
-                        (and fdefn
-                             (fdefn-fun fdefn))))
+                     (symbol (sb-impl::%symbol-function value))
                      (function value)
-                     (t
-                      (if (valid-function-name-p value)
-                          (let ((fdefn (find-fdefn value)))
-                            (and fdefn
-                                 (fdefn-fun fdefn)))
+                     ((satisfies legal-fun-name-p)
+                      (let ((fdefn (find-fdefn value)))
+                        (and fdefn (fdefn-fun fdefn))))
+                      (t
                           (still-bad "Bad value when restarting ~s: ~s"
-                                     name value))))
+                                     name value)))
                    (still-bad (if (fdefn-p value)
                                   "~S is still undefined"
                                   "Can't replace ~s with ~s because it is undefined")

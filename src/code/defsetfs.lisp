@@ -171,9 +171,6 @@
 (defsetf subseq (sequence start &optional end) (v)
   `(progn (replace ,sequence ,v :start1 ,start :end1 ,end) ,v))
 
-;;; from fdefinition.lisp
-(defsetf fdefinition %set-fdefinition)
-
 ;;; from kernel.lisp
 #-darwin-jit
 (progn

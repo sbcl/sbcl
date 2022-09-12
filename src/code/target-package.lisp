@@ -495,7 +495,7 @@ error if any of PACKAGES is not a valid package designator."
 ;;; WITH-SINGLE-PACKAGE-LOCKED-ERROR.
 ;;;
 ;;; FIXME: Maybe we should establish such contours for he toplevel
-;;; and others, so that %set-fdefinition and others could just use
+;;; and others, so that (setf fdefinition) and others could just use
 ;;; this.
 (defun assert-symbol-home-package-unlocked (name &optional format-control
                                             &rest format-arguments)

@@ -33,16 +33,6 @@
   #+immobile-code (sb-vm::%set-fdefn-fun fdefn fun)
   #-immobile-code (setf (fdefn-fun fdefn) fun))
 
-;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
-;; have been verified to be a symbol by the caller.
-(defun symbol-fdefn (symbol)
-  (declare (optimize (safety 0)))
-  (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
-    ;; The slot default is 0, not NIL, because I'm thinking that it might also
-    ;; be used to store the property list if there is no FDEFN,
-    ;; or a cons of an FDEFN and list, so 0 is unambiguously "no value"
-    (if (eql fdefn 0) nil fdefn)))
-
 ;;; Return the FDEFN object for NAME, or NIL if there is no fdefn.
 ;;; Signal an error if name isn't valid.
 ;;; Assume that exists-p implies LEGAL-FUN-NAME-P.
@@ -50,7 +40,8 @@
 (defun find-fdefn (name)
   (declare (explicit-check))
   (when (symbolp name) ; Don't need LEGAL-FUN-NAME-P check
-    (return-from find-fdefn (symbol-fdefn name)))
+    (let ((fdefn (sb-vm::%symbol-fdefn name))) ; slot default is 0, not NIL
+      (return-from find-fdefn (if (eql fdefn 0) nil fdefn))))
   ;; Technically the ALLOW-ATOM argument of NIL isn't needed, but
   ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
   (with-globaldb-name (key1 key2 nil) name
@@ -374,7 +365,7 @@
            :format-control "~S is not acceptable to ~S."
            :format-arguments (list object setter))))
 
-(defun %set-fdefinition (name new-value)
+(defun (setf fdefinition) (new-value name)
   "Set NAME's global function definition."
   (declare (type function new-value) (optimize (safety 1)))
   (declare (explicit-check))

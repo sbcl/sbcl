@@ -2976,7 +2976,6 @@ possibly temporarily, because it might be used internally.")
            "CLEAR-INFO-VALUES"
            "DEFINE-INFO-TYPE"
            "FIND-FDEFN"
-           "SYMBOL-FDEFN"
            "GET-INFO-VALUE-INITIALIZING"
            "GLOBALDB-SXHASHOID"
            "GLOBAL-FTYPE"
