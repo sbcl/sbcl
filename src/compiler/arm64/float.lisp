@@ -481,7 +481,9 @@
     single-reg single-float double-reg double-float))
 
 (macrolet ((frob (trans from-sc from-type inst)
-             `(define-vop (,(symbolicate trans "/" from-type))
+             `(define-vop (,(if (find #\/ (string trans))
+                                trans
+                                (symbolicate trans "/" from-type)))
                 (:args (x :scs (,from-sc)))
                 (:results (y :scs (signed-reg)))
                 (:arg-types ,from-type)
