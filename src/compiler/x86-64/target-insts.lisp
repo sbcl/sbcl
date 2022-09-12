@@ -277,18 +277,6 @@
               (sb-disassem::find-code-constant-from-interior-pointer value dstate))
     (note (lambda (stream) (princ it stream)) dstate)))
 
-;;; Immobile symbols are heuristically detected with MAYBE-NOTE-STATIC-LISPOBJ
-;;; so that moving the tagged pointer to a symbol is shown thusly:
-;;; ";  BACF003C50       MOV EDX, #x503C00CF             ; '*MYVAR*"
-;;;
-(defun print-imm/asm-routine (value stream dstate)
-  (cond ((not stream) (operand value dstate))
-        ((or (maybe-note-assembler-routine value nil dstate)
-             (maybe-note-static-lispobj value dstate t))
-         (princ16 value stream))
-        (t
-         (princ value stream))))
-
 ;;; Return an instance of REG or MACHINE-EA.
 ;;; MOD and R/M are the extracted bits from the instruction's ModRM byte.
 ;;; Depending on MOD and R/M, a SIB byte and/or displacement may be read.

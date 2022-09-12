@@ -255,10 +255,6 @@
                        (princ16 value stream)
                        (princ value stream))))))
 
-(define-arg-type signed-imm-data/asm-routine
-  :type 'signed-imm-data
-  :printer #'print-imm/asm-routine)
-
 ;;; Used by those instructions that have a default operand size of
 ;;; :qword. Nevertheless the immediate is at most of size :dword.
 ;;; The only instruction of this kind having a variant with an immediate
@@ -520,13 +516,6 @@
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
   (imm     :type 'signed-imm-data))
-
-(define-instruction-format (reg/mem-imm/asm-routine 16
-                                        :include reg/mem-imm
-                                        :default-printer
-                                        '(:name :tab reg/mem ", " imm))
-  (reg/mem :type 'sized-reg/mem)
-  (imm     :type 'signed-imm-data/asm-routine))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (define-instruction-format
@@ -1403,12 +1392,12 @@
   (:printer reg ((op #b1011 :prefilter (lambda (dstate value)
                                          (dstate-setprop dstate +allow-qword-imm+)
                                          value))
-                 (imm nil :type 'signed-imm-data/asm-routine))
+                 (imm nil :type 'signed-imm-data))
             '(:name :tab reg ", " imm))
   ;; register to/from register/memory
   (:printer reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
-  (:printer reg/mem-imm/asm-routine ((op '(#b1100011 #b000))))
+  (:printer reg/mem-imm ((op '(#b1100011 #b000))))
   (:emitter
    (let ((size (pick-operand-size prefix dst src)))
      (emit-mov segment size (sized-thing dst size) (sized-thing src size)))))
