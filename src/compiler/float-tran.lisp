@@ -1646,6 +1646,7 @@
                         ,(symbol-value (package-symbolicate :sb-kernel 'most-negative-fixnum- type))
                         ,(symbol-value (package-symbolicate :sb-kernel 'most-positive-fixnum- type))))
                   (let ((truncated (truly-the fixnum (%unary-truncate number))))
+                    (declare (flushable ,(symbolicate "%" type)))
                     (values truncated
                             (- number
                                (coerce truncated ',type))))
