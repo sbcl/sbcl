@@ -4,11 +4,7 @@
 
 (in-package "SB-POSIX-TESTS")
 
-(defvar *test-directory*
-  (ensure-directories-exist
-   (merge-pathnames (make-pathname :directory '(:relative "test-output"))
-                    (make-pathname :directory
-                                   (pathname-directory *load-truename*)))))
+(defvar *test-directory* test-util:*test-directory*)
 
 (defvar *current-directory* *default-pathname-defaults*)
 
@@ -431,7 +427,7 @@
                       :type sb-posix:f-wrlck
                       :whence sb-posix:seek-set
                       :start 0 :len 10))
-            (pathname "fcntl.flock.1")
+            (pathname (merge-pathnames #P"fcntl.flock.1" *test-directory*))
             kid-status)
         (catch 'test
           (with-open-file (f pathname :direction :output)
@@ -466,7 +462,7 @@
                       :type sb-posix:f-wrlck
                       :whence sb-posix:seek-set
                       :start 0 :len 10))
-            (pathname "fcntl.flock.2")
+            (pathname (merge-pathnames #P"fcntl.flock.2" *test-directory*))
             kid-status)
         (catch 'test
           (with-open-file (f pathname :direction :output)
@@ -530,28 +526,25 @@
   t)
 
 #-darwin
-(deftest readdir/dirent-name
-    (let ((dir (sb-posix:opendir *current-directory*)))
-      (unwind-protect
-           (equal (sort (loop for entry = (sb-posix:readdir dir)
-                           until (sb-alien:null-alien entry)
-                           collect (sb-posix:dirent-name entry))
-                        #'string<)
-                  (sort (append '("." "..")
-                                (mapcar (lambda (p)
-                                          (let ((string (enough-namestring p *current-directory*)))
-                                            (if (pathname-name p)
-                                                string
-                                                (subseq string 0 (1- (length string))))))
-                                        (directory (make-pathname
-                                                    :name :wild
+(test-util:with-test (:name :readdir/dirent-name)
+  (let* ((dir (sb-posix:opendir *current-directory*))
+         (posix-readdir (loop for entry = (sb-posix:readdir dir)
+                              until (sb-alien:null-alien entry)
+                              collect (sb-posix:dirent-name entry)))
+         (cl-directory
+          (append '("." "..")
+                  (mapcar (lambda (p)
+                            (let ((string (enough-namestring p *current-directory*)))
+                              (if (pathname-name p)
+                                  string
+                                  (subseq string 0 (1- (length string))))))
+                          (directory (make-pathname :name :wild
                                                     :type :wild
                                                     :defaults *current-directory*)
-                                                   :resolve-symlinks nil)))
-                        #'string<))
-        (sb-posix:closedir dir)))
-  t)
-
+                                     :resolve-symlinks nil)))))
+    (sb-posix:closedir dir)
+    (assert (equal (sort posix-readdir #'string<)
+                   (sort cl-directory #'string<)))))
 
 (deftest write.1
     (progn

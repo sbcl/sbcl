@@ -2,6 +2,7 @@
 
 logdir=${SBCL_PAREXEC_TMP:-$HOME}/sbcl-test-logs-$$
 echo ==== Writing logs to $logdir ====
+# FIXME: junkdir isn't getting removed
 junkdir=${SBCL_PAREXEC_TMP:-/tmp}/junk
 mkdir -p $junkdir $logdir
 
