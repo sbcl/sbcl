@@ -154,9 +154,22 @@ symbol designates a variable. May enter the symbol into the linkage-table."
   (close-shared-objects))
 
 (defun alien-linkage-index-to-name (index)
-  (dohash ((key value) (car *linkage-info*) :locked t)
-    (when (= value index)
-      (return (if (listp key) (car key) key)))))
+  ;; Entries are never removed from the linkage-table, so we can take advantage
+  ;; of the fact that indices are inserted in order, and hash-table growth
+  ;; preserves order. So we know where the entry is.
+  ;; INDEX should be of type HASH-TABLE-INDEX but this might be called
+  ;; on an arbitrary (bogus) value which exceeds that.
+  (declare (fixnum index))
+  (let* ((table (car *linkage-info*))
+         (pairs (sb-impl::hash-table-pairs table))
+         (pair-index (+ (* index 2) 2))
+         (key
+          (cond ((>= index (hash-table-count table)) nil)
+                ((eql (aref pairs (1+ pair-index)) index) (aref pairs pair-index))
+                (t (block found ; "shouldn't happen"
+                     (dohash ((key value) table) ; no lock necessary
+                       (when (= value index) (return-from found key))))))))
+    (if (listp key) (car key) key)))
 
 (declaim (maybe-inline sap-foreign-symbol))
 (defun sap-foreign-symbol (sap)
