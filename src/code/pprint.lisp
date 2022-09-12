@@ -1344,10 +1344,6 @@ line break."
            stream
            list))
 
-(defun pprint-data-list (stream list &rest noise)
-  (declare (ignore noise))
-  (pprint-fill stream list))
-
 ;;; Return the number of positional arguments that macro NAME accepts
 ;;; by looking for &BODY. A dotted list is indented as it it had &BODY.
 ;;; ANSI says that a dotted tail is like &REST, but the pretty-printer
@@ -1535,7 +1531,6 @@ line break."
            ;; but that's unspecified behavior. (SATISFIES FBOUNDP) must be _strictly_
            ;; lower than the default cons entries though.
            (initial-entry (cons (and symbol (satisfies fboundp))) pprint-call-form -1)
-           (initial-entry (cons symbol) pprint-data-list -2)
            (initial-entry cons pprint-fill -2 #'consp)
            (initial-entry sb-impl::comma pprint-unquoting-comma -3 #'comma-p)))
          (*print-pprint-dispatch*
