@@ -343,13 +343,14 @@
   (declare (explicit-check))
   ;; %COERCE-NAME-TO-FUN signals an error for macros and special operators,
   ;; but FDEFINITION should not, so pick off symbols using %SYMBOL-FUNCTION.
-  (let ((fun (or (and (symbolp name) (%symbol-function name))
-                 (%coerce-name-to-fun name))))
+  (strip-encapsulation (or (and (symbolp name) (%symbol-function name))
+                           (%coerce-name-to-fun name))))
+(defun strip-encapsulation (fun)
     (loop
      (let ((encap-info (encapsulation-info fun)))
        (if encap-info
            (setf fun (encapsulation-info-definition encap-info))
-           (return fun))))))
+           (return fun)))))
 
 (defvar *setf-fdefinition-hook* nil
   "A list of functions that (SETF FDEFINITION) invokes before storing the
@@ -370,6 +371,7 @@
   (declare (type function new-value) (optimize (safety 1)))
   (declare (explicit-check))
   (err-if-unacceptable-function new-value '(setf fdefinition))
+  (setq new-value (strip-encapsulation new-value))
   (with-single-package-locked-error (:symbol name "setting fdefinition of ~A")
     (maybe-clobber-ftype name new-value)
 
