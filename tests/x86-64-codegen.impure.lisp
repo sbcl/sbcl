@@ -1268,7 +1268,8 @@
           thereis (search string line))))
 
 #+immobile-space
-(with-test (:name :disassemble-alien-linkage-table-ref)
+(with-test (:name :disassemble-alien-linkage-table-ref
+                  :fails-on (not :sb-thread))
   (dolist (memspace '(:dynamic :immobile))
     (let ((sb-c::*compile-to-memory-space* memspace))
       (assert (find-in-disassembly
