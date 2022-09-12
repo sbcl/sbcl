@@ -5175,6 +5175,12 @@
           (t
            (give-up-ir1-transform)))))
 
+;;; Add transforms in reverse of the order you want them tried
+;;; (because of stupid semantics)
+(deftransform fboundp ((symbol) (symbol))
+  `(let ((fdefn (sb-vm::%symbol-fdefn symbol)))
+     (and (not (eq fdefn 0))
+          (fdefn-fun (truly-the fdefn fdefn)))))
 ;;; Normally we don't create fdefns by side-effect of calling FBOUNDP,
 ;;; but this transform is neutral in terms of the sum of code and data size.
 ;;; So for the cost of an FDEFN that might never store a function, the code
