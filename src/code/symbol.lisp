@@ -105,9 +105,16 @@ distinct from the global value. Can also be SETF."
           (%set-symbol-hash symbol (compute-symbol-hash name (length name))))
       hash)))
 
+;;; Return the function binding of SYMBOL or NIL if not fboundp.
+;;; Don't strip encapsulations.
+(defmacro %symbol-function (symbol)
+  `(let ((fdefn (sb-vm::%symbol-fdefn ,symbol)))
+     (if (eql fdefn 0) nil (fdefn-fun (truly-the fdefn fdefn)))))
+
 (defun symbol-function (symbol)
   "Return SYMBOL's current function definition. Settable with SETF."
-  (%coerce-name-to-fun symbol (symbol-fdefn symbol)))
+  (or (%symbol-function symbol) ; fast way
+      (%coerce-name-to-fun symbol))) ; fallback with restart
 
 ;; I think there are two bugs here.
 ;; Per CLHS "SETF may be used with symbol-function to replace a global
@@ -118,6 +125,10 @@ distinct from the global value. Can also be SETF."
 ;;    * (setf (symbol-function 'if) #'cons) => #<FUNCTION CONS>
 ;; 2. (SETF (SYMBOL-FUNCTION 'I-ONCE-WAS-A-MACRO) #'CONS)
 ;;    should _probably_ make I-ONCE-WAS-A-MACRO not a macro
+;; Possible FIXME: if SYM1's fun -> encapsulation1 -> realfun1 and then you do:
+;;  * (setf (symbol-function 'sym2) (symbol-function 'sym1)) ; assigns the encapsulation
+;;  * (setf (fdefinition 'sym1) #'baz) ; assigns into the encapsulation
+;; it redefines both symbols. Maybe encapsulations should be copy-on-write.
 (defun (setf symbol-function) (new-value symbol)
   (declare (type symbol symbol) (type function new-value))
   ;; (SYMBOL-FUNCTION symbol) == (FDEFINITION symbol) according to the writeup

@@ -173,6 +173,9 @@
   ;; And now *CURRENT-THREAD*
   (sb-thread::init-main-thread)
 
+  ;; not sure why this is needed on some architectures. Dark magic.
+  (setf (fdefn-fun (find-or-create-fdefn '%coerce-callable-for-call))
+        #'%coerce-callable-to-fun)
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
   ;; And be extra paranoid - ensure that it really gets called.
