@@ -405,7 +405,7 @@ Please check that all strings which were not recognizable to the compiler
    (lambda (symbol accessibility)
      (declare (ignore accessibility))
      (or (sb-kernel:symbol-%info symbol)
-         (sb-kernel:find-fdefn symbol) ; might be redundant with existence of %info, but ok
+         (sb-int:find-fdefn symbol) ; might be redundant with existence of %info, but ok
          (and (boundp symbol) (not (keywordp symbol)))))
    ;; Release mode: retain all symbols satisfying this intricate test
    #-sb-devel
