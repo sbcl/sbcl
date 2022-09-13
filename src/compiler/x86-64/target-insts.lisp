@@ -496,7 +496,9 @@
                   (zerop (logand disp 7))) ; lispword-aligned
              (let* ((index (ash disp -3))
                     (symbol (cond ((minusp index)
-                                   (aref sb-vm::+thread-header-slot-names+ (1- (- index))))
+                                   (let ((index (1- (- index))))
+                                     (when (array-in-bounds-p sb-vm::+thread-header-slot-names+ index)
+                                       (aref sb-vm::+thread-header-slot-names+ index))))
                                   ((< index (length thread-slot-names))
                                    (aref thread-slot-names index)))))
                (when symbol
