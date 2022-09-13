@@ -119,6 +119,7 @@ lispobj debug_print(lispobj string)
 {
     print_string(VECTOR(string), stderr);
     putc('\n', stderr);
+    fflush(stderr);
     return 0;
 }
 
