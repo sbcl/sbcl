@@ -85,18 +85,15 @@
                      ((info :function :info name) ; known
                       ;; This takes care of CONTINUE,ABORT,MUFFLE-WARNING.
                       ;; #' will be evaluated in the null environment.
-                      `(load-time-value
-                        (cons ,test (the (function-designator (condition)) #',name))
-                        t))
+                      `(load-time-value (cons ,test (the (function (condition)) #',name))
+                                        t))
                      (t
-                      ;; For each handler specified as #'F we must verify
-                      ;; that F is fboundp upon entering the binding scope.
-                      ;; Referencing #'F is enough to ensure a warning if the
-                      ;; function isn't defined at compile-time, but the
-                      ;; compiler considers it elidable unless something forces
-                      ;; an apparent use of the form at runtime,
-                      ;; so instead use SAFE-FDEFN-FUN on the fdefn.
-                      (when (eq (car handler) 'function)
+                      ;; The CLHS writeup of HANDLER-BIND says "Exceptional Situations: None."
+                      ;; which might suggest that it's not an error if #'HANDLER is un-fboundp
+                      ;; on entering the body, but we should check in safe code.
+                      (when (and (eq (car handler) 'function) (sb-c:policy env (= safety 3)))
+                        ;; Referencing #'F is enough to get a compile-time warning about unknown
+                        ;; functions, but the use itself is flushable, so employ SAFE-FDEFN-FUN.
                         (dummy-forms `(sb-c:safe-fdefn-fun
                                        (load-time-value
                                         (find-or-create-fdefn ',name) t))))
@@ -131,22 +128,17 @@
                        ;; always an eligible handler.
                        '#'constantly-t)
                       ((typep type '(cons (eql satisfies) (cons symbol null)))
-                       ;; (SATISFIES F) => #'F but never a local
-                       ;; definition of F.  The predicate is used only
-                       ;; if needed - it's not an error if not fboundp
-                       ;; (though dangerously stupid) - so just
-                       ;; reference #'F for the compiler to see the
-                       ;; use of the name.  But (KLUDGE): since the
-                       ;; ref is to force a compile-time effect, the
-                       ;; interpreter should not see that form,
-                       ;; because there is no way for it to perform an
-                       ;; unsafe ref, (and it wouldn't signal a
-                       ;; style-warning anyway), and so it would
-                       ;; actually fail immediately if predicate were
-                       ;; not defined.
+                       ;; (SATISFIES F) => #'F but never a local definition of F.
+                       ;; The predicate is used only if needed - it's not an error if not
+                       ;; fboundp (though dangerously stupid) - so reference #'F for the
+                       ;; compiler to see the use of the name.  But (KLUDGE): since the
+                       ;; ref is to force a compile-time effect, the interpreter should not
+                       ;; see that form, because there is no way for it to perform an
+                       ;; unsafe ref, and it wouldn't signal a style-warning anyway.
                        (let ((name (second type)))
-                         (when (typep env 'lexenv)
-                           (dummy-forms `#',name))
+                         ;; FIXME: if you've locally flet NAME (why would you do that?)
+                         ;; then this does not notice the use of the global function.
+                         (when (typep env 'lexenv) (dummy-forms `#',name))
                          `',name))
                       ((and (symbolp type)
                             (condition-classoid-p (find-classoid type nil)))

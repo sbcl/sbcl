@@ -497,6 +497,7 @@
 ;; the real handler function.
 (defun this-should-fail ()
   (declare (muffle-conditions style-warning))
+  (declare (optimize safety))
   (handler-bind ((condition #'some-nonexistent-handler))
     (random 100)))
 
