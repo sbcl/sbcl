@@ -171,7 +171,8 @@
        (sb-vm:map-allocated-objects #'f :dynamic)
        5))))
 
-(with-test (:name :pack-varints-as-bignum)
+(with-test (:name :pack-varints-as-bignum
+                  :skipped-on :interpreter) ; too slow
   (dotimes (i 500) ; do some random testing this many times
     (let* ((random-numbers (loop repeat (+ (random 20) 3)
                                  collect (1+ (random 4000))))
@@ -3740,3 +3741,12 @@
            (eval 1)
            (eval 2)))
     (() 1)))
+
+(defun noflush-symbol-function ()
+  (declare (optimize safety))
+  (if (functionp (symbol-function '#:notathing)) 1))
+(defun flush-symbol-function ()
+  (if (functionp (symbol-function '#:notathing)) 1))
+(with-test (:name :flush-symbol-function :skipped-on :interpreter)
+  (assert (ctu:find-code-constants #'noflush-symbol-function))
+  (assert (not (ctu:find-code-constants #'flush-symbol-function))))

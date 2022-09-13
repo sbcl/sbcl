@@ -122,7 +122,7 @@
 ;;; either a macro or a special operator, and if the symbol is fbound,
 ;;; a function object is returned".  Our objects of
 ;;; implementation-dependent nature happen to be functions.
-(defknown (symbol-function) (symbol) function ())
+(defknown (symbol-function) (symbol) function (unsafely-flushable))
 
 (defknown boundp (symbol) boolean (flushable))
 (defknown fboundp ((or symbol cons)) (or null function) (unsafely-flushable))
@@ -911,7 +911,7 @@
 
 ;; Correct argument type restrictions for these functions are
 ;; complicated, so we just declare them to accept LISTs and suppress
-;; flushing is safe code.
+;; flushing in safe code.
 (defknown (caar cadr cdar cddr
                 caaar caadr cadar caddr cdaar cdadr cddar cdddr
                 caaaar caaadr caadar caaddr cadaar cadadr caddar cadddr
