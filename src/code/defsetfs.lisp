@@ -358,3 +358,21 @@ with bits from the corresponding position in the new value."
 (defun 1-arg-t   (a) (declare (ignore a)) t)
 (defun 2-arg-nil (a b) (declare (ignore a b)) nil)
 (defun 3-arg-nil (a b c) (declare (ignore a b c)) nil)
+
+(in-package "SB-VM")
+
+(defun blt-copier-for-widetag (x)
+  (declare ((mod 256) x))
+  (aref (load-time-value
+         (map-into (make-array 32)
+                   (lambda (x) (and x
+                                    (symbol-function x)))
+                   '#.(let ((a (make-array 32 :initial-element nil)))
+                        (dovector (saetp *specialized-array-element-type-properties* a)
+                          (when (and (not (member (saetp-specifier saetp) '(t nil)))
+                                     (<= (saetp-n-bits saetp) n-word-bits))
+                            (setf (svref a (ash (- (saetp-typecode saetp) 128) -2))
+                                  (intern (format nil "UB~D-BASH-COPY" (saetp-n-bits saetp))
+                                          "SB-KERNEL"))))))
+         t)
+        (ash (logand x #x7f) -2)))

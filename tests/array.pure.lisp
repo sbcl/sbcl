@@ -693,7 +693,7 @@
     (loop for saetp across sb-vm:*specialized-array-element-type-properties*
           for type = (sb-vm:saetp-specifier saetp)
           when type
-          do 
+          do
           (let* ((value (sb-vm:saetp-initial-element-default saetp))
                  (value (if (characterp value)
                             (code-char (1+ (char-code value)))
@@ -702,5 +702,4 @@
                                                                    :adjustable t
                                                                    :fill-pointer t))
                                1)
-                         value))
-            ))))
+                         value))))))

@@ -1162,22 +1162,6 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
-(defun blt-copier-for-widetag (x)
-  (declare ((mod 256) x))
-  (aref (load-time-value
-         (map-into (make-array 32)
-                   (lambda (x) (and x
-                                    (symbol-function x)))
-                   '#.(let ((a (make-array 32 :initial-element nil)))
-                        (dovector (saetp *specialized-array-element-type-properties* a)
-                          (when (and (not (member (saetp-specifier saetp) '(t nil)))
-                                     (<= (saetp-n-bits saetp) n-word-bits))
-                            (setf (svref a (ash (- (saetp-typecode saetp) 128) -2))
-                                  (intern (format nil "UB~D-BASH-COPY" (saetp-n-bits saetp))
-                                          "SB-KERNEL"))))))
-         t)
-        (ash (logand x #x7f) -2)))
-
 (defun extend-vector (vector min-extension)
   (declare (optimize speed)
            (vector vector))
