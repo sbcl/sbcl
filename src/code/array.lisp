@@ -1166,7 +1166,8 @@ of specialized arrays is supported."
   (declare ((mod 256) x))
   (aref (load-time-value
          (map-into (make-array 32)
-                   (lambda (x) (if x (symbol-function x) 0))
+                   (lambda (x) (and x
+                                    (symbol-function x)))
                    '#.(let ((a (make-array 32 :initial-element nil)))
                         (dovector (saetp *specialized-array-element-type-properties* a)
                           (when (and (not (member (saetp-specifier saetp) '(t nil)))

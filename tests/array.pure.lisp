@@ -685,3 +685,22 @@
       `(lambda ()
          (typep "abcd" '(simple-array t 2)))
     (() nil)))
+
+(with-test (:name :vector-push-extend-specialized)
+  (let ((extend (checked-compile `(lambda (e a)
+                                    (vector-push-extend e a)
+                                    a))))
+    (loop for saetp across sb-vm:*specialized-array-element-type-properties*
+          for type = (sb-vm:saetp-specifier saetp)
+          when type
+          do 
+          (let* ((value (sb-vm:saetp-initial-element-default saetp))
+                 (value (if (characterp value)
+                            (code-char (1+ (char-code value)))
+                            (1+ value))))
+            (assert (eql (aref (funcall extend value (make-array 1 :element-type type
+                                                                   :adjustable t
+                                                                   :fill-pointer t))
+                               1)
+                         value))
+            ))))
