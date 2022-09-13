@@ -41,7 +41,7 @@ rm -fr sandbox/scratch
  "SHIFTF.7"
  "SUBTYPEP-COMPLEX.8"
  "SUBTYPEP.EQL.1" "SUBTYPEP.EQL.2" "SUBTYPEP.MEMBER.17" "SUBTYPEP.MEMBER.18"
- "SXHASH.17" "SXHASH.18" "SXHASH.19" "PRINT-STRUCTURE.1" #-sb-fasteval "SYMBOL-FUNCTION.ERROR.5"
+ "SXHASH.17" "SXHASH.18" "SXHASH.19" "PRINT-STRUCTURE.1"
  (append #+win32 (list "EXP.ERROR.7"
                        "EXPT.ERROR.4" "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7"
                        "PROBE-FILE.4")
@@ -52,7 +52,7 @@ rm -fr sandbox/scratch
              (list "INTERSECTION.FOLD.1" "UNION.FOLD.1" "SET-DIFFERENCE.FOLD.1"
                    "SET-EXCLUSIVE-OR.FOLD.1" "ASH.ERROR.5"
                    "ALL-STRUCTURE-CLASSES-ARE-SUBTYPES-OF-STRUCTURE-OBJECT.2" "TRACE.8")
-             (list "MAP.48"))
+             (list "MAP.48" "SYMBOL-FUNCTION.ERROR.5"))
 
          #+sb-unicode (list "BOTH-CASE-P.2" "CHAR-DOWNCASE.2" "CHAR-UPCASE.2"))))
                          (failing (remove "FORMAT.E.26"
