@@ -1146,15 +1146,31 @@
 #-sb-xc-host
 (defun possibly-log-new-code (object reason &aux (show *show-new-code*))
   (when show
-    (let ((*print-pretty* nil))
+    (let ((size (code-object-size object))
+          (fmt "~&New code(~Db,~A): ~A~%")
+          (file "jit-code.txt")
+          (*print-pretty* nil))
       ;; DISASSEMBLE is for limited debugging only.
       ;; It may write garbled output if multiple threads
-      (when (eq show 'disassemble)
-        (with-open-file (f "jit-code.txt" :direction :output
-                                          :if-exists :append :if-does-not-exist :create)
-          (disassemble object :stream f)
-          (terpri f)))
-      (format t "~&New code(~Db,~A): ~A~%" (code-object-size object) reason object)))
+      ;; I tried WITH-OPEN-STREAM during cold-init and got:
+      ;;   "vicious metacircle:  The computation of an effective method of
+      ;;    #<STREAM-FUNCTION COMMON-LISP:CLOSE (2)> for arguments of types
+      ;;    (#<STRUCTURE-CLASS SB-SYS:FD-STREAM>) uses the effective method
+      ;; being computed."
+      ;; so just leave the stream open. Or we could call the fd-stream misc routine.
+      (if (or (eq show 'disassemble) (streamp show))
+          (let ((f (if (streamp show)
+                       show
+                       (prog1
+                           (setq *show-new-code*
+                                 (open file :direction :output
+                                       :if-exists :append :if-does-not-exist :create))
+                         (format t "~&; Logging code allocation to ~S~%" file)))))
+            (format f fmt size reason object)
+            (disassemble object :stream f)
+            (terpri f)
+            (force-output f))
+          (format *trace-output* fmt (code-object-size object) reason object))))
   object)
 
 (define-fop 17 :not-host (fop-load-code ((:operands header n-code-bytes n-fixup-elts)))

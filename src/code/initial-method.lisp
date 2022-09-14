@@ -32,7 +32,7 @@
 ;;; combination, allowing exactly one primary method. Initial methods
 ;;; are sorted most-specific-first, so we can stop looking as soon as
 ;;; a match is found.
-(defun initial-call-a-method (gf-name specialized-arg &rest rest)
+(defun initial-call-a-method (gf-name emergency-fallback specialized-arg &rest rest)
   (let* ((methods (the simple-vector
                        (cdr (or (assoc gf-name *!initial-methods*)
                                 (error "No methods on ~S" gf-name)))))
@@ -60,24 +60,32 @@
                                   (or (find test-wrapper (wrapper-inherits arg-wrapper))
                                       (eq arg-wrapper test-wrapper)))))))
                    methods)))
-    (if applicable-method
-        ;; Call using no permutation-vector / no precomputed next method.
-        (apply (svref applicable-method 2) nil nil specialized-arg rest)
-        (error "No applicable method for ~S on ~S~%" gf-name
-               (type-of specialized-arg)))))
+    (cond (applicable-method
+           ;; Call using no permutation-vector / no precomputed next method.
+           (apply (svref applicable-method 2) nil nil specialized-arg rest))
+          (emergency-fallback
+           (apply emergency-fallback specialized-arg rest))
+          (t
+           (error "No applicable method for ~S on ~S~%" gf-name
+                  (type-of specialized-arg))))))
 
 (defun make-load-form (object &optional environment)
-  (initial-call-a-method 'make-load-form object environment))
+  (initial-call-a-method 'make-load-form nil object environment))
 (defun print-object (object stream)
-  (initial-call-a-method 'print-object object stream))
+  (flet ((last-ditch-effort (object stream)
+           ;; Depending on what you're poking at in cold-init it was possible to see
+           ;;  "No applicable method for PRINT-OBJECT on SB-KERNEL::RANDOM-CLASS"
+           ;; so just print the address and carry on.
+           (format stream "#<UNPRINTABLE @ #x~X>" (get-lisp-obj-address object))))
+    (initial-call-a-method 'print-object #'last-ditch-effort object stream)))
 
 (macrolet ((ensure-gfs (names)
              `(progn ,@(mapcar (lambda (name)
-                                 `(defun ,name (x) (initial-call-a-method ',name x)))
+                                 `(defun ,name (x) (initial-call-a-method ',name nil x)))
                                names))))
   (ensure-gfs (open-stream-p interactive-stream-p input-stream-p output-stream-p
                stream-element-type)))
-(defun close (x &key abort) (initial-call-a-method 'close x :abort abort))
+(defun close (x &key abort) (initial-call-a-method 'close nil x :abort abort))
 
 ;;; FIXME: this no longer holds methods, but it seems to have an effect
 ;;; on the caching of a discriminating function for PRINT-OBJECT
