@@ -1374,6 +1374,7 @@
   (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
+  (:temporary (:sc unsigned-reg :offset rbx-offset) temp)
   (:info min max)
   (:vop-var vop)
   (:save-p :compute-only)
@@ -1381,24 +1382,24 @@
     ;; NOTE: copy-more-arg expects this to issue a CMP for min > 1
     (let ((err-lab
             (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (flet ((check-min ()
-               (cond ((= min 1)
-                      (inst test nargs nargs)
-                      (inst jmp :e err-lab))
-                     ((plusp min)
-                      (inst cmp nargs (fixnumize min))
-                      (inst jmp :b err-lab)))))
-        (cond ((not min)
-               (if (zerop max)
-                   (inst test nargs nargs)
-                   (inst cmp nargs (fixnumize max)))
-               (inst jmp :ne err-lab))
-              (max
-               (check-min)
-               (inst cmp nargs (fixnumize max))
-               (inst jmp :a err-lab))
-              (t
-               (check-min)))))))
+      (cond ((not min)
+             (if (zerop max)
+                 (inst test nargs nargs)
+                 (inst cmp nargs (fixnumize max)))
+             (inst jmp :ne err-lab))
+            (max
+             (if (zerop min)
+                 (setf temp nargs)
+                 (inst lea temp (ea (fixnumize (- min)) nargs)))
+             (inst cmp temp (fixnumize (- max min)))
+             (inst jmp :a err-lab))
+            (t
+             (cond ((= min 1)
+                    (inst test nargs nargs)
+                    (inst jmp :e err-lab))
+                   ((plusp min)
+                    (inst cmp nargs (fixnumize min))
+                    (inst jmp :b err-lab))))))))
 
 ;; Signal an error about an untagged number.
 ;; These are pretty much boilerplate and could be generic except:
