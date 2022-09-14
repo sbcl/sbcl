@@ -107,9 +107,13 @@ distinct from the global value. Can also be SETF."
 
 ;;; Return the function binding of SYMBOL or NIL if not fboundp.
 ;;; Don't strip encapsulations.
-(defmacro %symbol-function (symbol)
-  `(let ((fdefn (sb-vm::%symbol-fdefn ,symbol)))
-     (if (eql fdefn 0) nil (fdefn-fun (truly-the fdefn fdefn)))))
+(declaim (inline %symbol-function))
+(defun %symbol-function (symbol)
+  (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
+    (if (eql fdefn 0) nil (fdefn-fun (truly-the fdefn fdefn)))))
+(defun (setf %symbol-function) (newval symbol) ; OK to use only if fdefn exists
+  (let ((fdefn (sb-vm::%symbol-fdefn symbol)))
+    (setf (fdefn-fun (truly-the fdefn fdefn)) newval)))
 
 (defun symbol-function (symbol)
   "Return SYMBOL's current function definition. Settable with SETF."

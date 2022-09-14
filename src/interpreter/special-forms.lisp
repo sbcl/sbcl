@@ -1148,22 +1148,23 @@
                  (make-proto-fn name))
         (multiple-value-bind (kind definition frame-ptr)
             (find-lexical-fun env name)
-          (if definition
-              (if (eq kind :macro)
-                  (not-a-function name)
-                  (hlambda FUNCTION (frame-ptr) (env)
-                    (local-fdefinition frame-ptr env)))
+          (cond (definition ; lexical function
+                 (if (eq kind :macro)
+                     (not-a-function name)
+                     (hlambda FUNCTION (frame-ptr) (env)
+                       (local-fdefinition frame-ptr env))))
               ;; Consider (DEFUN GET-THING () #'THING) - it shouldn't return
               ;; THING's error trampoline if THING is redefined after
               ;; GET-THING was called once.
-              (let ((fdefn (find-or-create-fdefn name)))
-                (if (symbolp name) ; could be a macro
-                    (hlambda FUNCTION (fdefn) (env)
-                      (declare (ignore env))
-                      (let ((fun (sb-c:safe-fdefn-fun fdefn)))
-                        (if (sb-impl::macro/special-guard-fun-p fun)
-                            (not-a-function (fdefn-name fdefn))
-                            fun)))
+                ((symbolp name) ; could be a macro
+                     (hlambda FUNCTION (name) (env)
+                       (declare (ignore env))
+                       (let ((fun (%symbol-function name)))
+                         (if (or (not fun) (sb-impl::macro/special-guard-fun-p fun))
+                             (not-a-function name)
+                             fun))))
+                (t
+                  (let ((fdefn (find-or-create-fdefn name)))
                     (hlambda FUNCTION (fdefn) (env) ; could not be a macro
                       (declare (ignore env))
                       (sb-c:safe-fdefn-fun fdefn)))))))))

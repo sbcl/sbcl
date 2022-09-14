@@ -2541,6 +2541,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%MAKE-SYMBOL"
            "%FUNCALLABLE-INSTANCE-FUN" "SYMBOL-HASH" "SYMBOL-HASH*"
            "SYMBOL-%INFO" "SYMBOL-DBINFO" "%INFO-REF"
+           "%SYMBOL-FUNCTION"
 
            "EXTENDED-SEQUENCE" "*EXTENDED-SEQUENCE-TYPE*"
            "EXTENDED-SEQUENCE-P"

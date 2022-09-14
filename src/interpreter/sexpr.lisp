@@ -1176,7 +1176,7 @@ Test case.
             ;; to get to the point where fdefns do not store "both" representations
             ;; of one function pointer, because we can't assume that multi-word CAS
             ;; is a thing.  Or use a mutex (horrible).
-            (setf (fdefn-fun (find-fdefn fname)) compiled-fun)))))
+            (setf (%symbol-function fname) compiled-fun)))))
 
     (when (fluid-def-p fname)
       ;; Return a handler that calls FNAME very carefully

@@ -160,12 +160,11 @@
          ,@body)
        ;; Avoid STATICALLY-LINK-CORE from making it harder to redefine.
        (proclaim '(notinline ,name))
-       (let ((fdefn (find-fdefn ',name))
-             (fun (fdefinition ',variant)))
-         (setf (getf ,(symbolicate '+ cpu-feature '-routines+) fdefn) fun)
-         ;; Redifinition at run-time.
-         (when (eq (%fun-name (fdefn-fun fdefn)) ',variant)
-           (setf (fdefn-fun fdefn) fun))))))
+       (let ((fun #',variant))
+         (setf (getf ,(symbolicate '+ cpu-feature '-routines+) ',name) fun)
+         ;; Redefinition at run-time.
+         (when (eq (%fun-name #',name) ',variant)
+           (setf (%symbol-function ',name) fun))))))
 
 (defvar *previous-cpu-routines* nil)
 
@@ -174,14 +173,14 @@
      ,@(loop for (feature detect) on *cpu-features* by #'cddr
              collect
              `(when ,detect
-                (loop for (fdefn definition) on ,(package-symbolicate "SB-VM" '+ feature '-routines+)
+                (loop for (symbol definition) on ,(package-symbolicate "SB-VM" '+ feature '-routines+)
                       by #'cddr
                       do
-                      (push (cons fdefn (fdefn-fun fdefn))
+                      (push (cons symbol (%symbol-function symbol))
                             *previous-cpu-routines*)
-                      (setf (fdefn-fun fdefn) definition))))))
+                      (setf (%symbol-function symbol) definition))))))
 
 (defun restore-cpu-specific-routines ()
-  (loop for (fdefn . fun) in *previous-cpu-routines*
-        do (setf (fdefn-fun fdefn) fun))
+  (loop for (symbol . fun) in *previous-cpu-routines*
+        do (setf (%symbol-function symbol) fun))
   (setf *previous-cpu-routines* nil))
