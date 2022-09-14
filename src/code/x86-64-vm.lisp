@@ -224,20 +224,19 @@
 #+immobile-code
 (progn
 (defconstant trampoline-entry-offset n-word-bytes)
-;;; TODO: a simplifying trampoline should be a funcallable-instance,
-;;; and not a simple-fun-less piece of code.
 (defun make-simplifying-trampoline (fun)
   ;; 'alloc' is compiled after this file so we don't see the derived type.
   ;; But slam found a conflict on recompile.
   (let ((code (truly-the (values code-component (integer 0) &optional)
                          (allocate-code-object :dynamic 3 24)))) ; KLUDGE
     (setf (%code-debug-info code) fun)
-    (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
-          (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
-                 (ash code-debug-info-slot word-shift))))
-      (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
-            (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7)); disp
-            (sap-ref-32 sap 7) #xFD60FF)) ; JMP [RAX-3]
+    (with-pinned-objects (code)
+      (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
+            (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
+                   (ash code-debug-info-slot word-shift))))
+        (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
+              (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7)); disp
+              (sap-ref-32 sap 7) #xFD60FF))) ; JMP [RAX-3]
     ;; Verify that the jump table size reads as  0.
     (aver (zerop (code-jump-table-words code)))
     ;; It is critical that there be a trailing 'uint16' of 0 in this object
@@ -246,10 +245,6 @@
     ;; by 2 words if it became necessary. The assertions makes sure we stay ok.
     (aver (zerop (code-n-entries code)))
     code))
-
-;;; Return T if FUN can't be called without loading RAX with its descriptor.
-(defun fun-requires-simplifying-trampoline-p (fun)
-  (= (%fun-pointer-widetag fun) closure-widetag))
 
 (defun fdefn-has-static-callers (fdefn)
   (declare (type fdefn fdefn))
@@ -269,7 +264,7 @@
            (values function))
   (when (fdefn-has-static-callers fdefn)
     (remove-static-links fdefn))
-  (let ((trampoline (when (fun-requires-simplifying-trampoline-p fun)
+  (let ((trampoline (when (closurep fun)
                       (make-simplifying-trampoline fun)))) ; a newly made CODE object
     (with-pinned-objects (fdefn trampoline fun)
       (let* ((jmp-target
@@ -368,7 +363,7 @@
       (let* ((fdefn (code-header-ref code (+ fdefns-start i)))
              (fun (when (fdefn-p fdefn) (fdefn-fun fdefn))))
         (when (and (immobile-space-obj-p fun)
-                   (not (fun-requires-simplifying-trampoline-p fun))
+                   (not (closurep fun))
                    (not (member (fdefn-name fdefn) *never-statically-link* :test 'equal))
                    (neq (info :function :inlinep (fdefn-name fdefn)) 'notinline))
           (setf any-replacements t (aref replacements i) fun))))

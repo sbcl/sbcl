@@ -605,12 +605,12 @@ static __attribute__((unused)) boolean codeblob_p(lispobj ptr) {
  * Whereis if this were type 1, but we read at (entrypoint - 4*N_WORD_BYTES) first,
  * then we could perceive random uninitialized bytes of the preceding object.
  */
-static lispobj entrypoint_to_taggedptr(lispobj* entrypoint) {
-    if (!entrypoint || points_to_asm_code_p((lispobj)entrypoint)) return 0;
+lispobj entrypoint_taggedptr(uword_t entrypoint) {
+    if (!entrypoint || points_to_asm_code_p(entrypoint)) return 0;
     // First try
-    lispobj* phdr = entrypoint -  2;
+    lispobj* phdr = (lispobj*)(entrypoint -  2*N_WORD_BYTES);
     if (forwarding_pointer_p(phdr)) {
-        gc_assert(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
+        gc_dcheck(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
         return make_lispobj(phdr, FUN_POINTER_LOWTAG);
     }
     int widetag = widetag_of(phdr);
@@ -618,7 +618,7 @@ static lispobj entrypoint_to_taggedptr(lispobj* entrypoint) {
         return make_lispobj(phdr, FUN_POINTER_LOWTAG);
     }
     // Second try
-    phdr = entrypoint - 4;
+    phdr = (lispobj*)(entrypoint - 4*N_WORD_BYTES);
     /* It is nearly impossible for forwarding to arise, by this reasoning:
      * Case A: if some thread references the codeblob that wraps a closure,
      *  then the codeblob is pinned; hence not forwarded.
@@ -630,9 +630,9 @@ static lispobj entrypoint_to_taggedptr(lispobj* entrypoint) {
      * in something, but I tried to make it do so, and couldn't. I was, however, able
      * to artificially cause forwarding by putting closure trampolines in symbols */
     if (forwarding_pointer_p(phdr))
-        gc_assert(codeblob_p(forwarding_pointer_value(phdr)));
+        gc_dcheck(codeblob_p(forwarding_pointer_value(phdr)));
     else
-        gc_assert(widetag_of(phdr) == CODE_HEADER_WIDETAG);
+        gc_dcheck(widetag_of(phdr) == CODE_HEADER_WIDETAG);
     return make_lispobj(phdr, OTHER_POINTER_LOWTAG);
 }
 /* Return the lisp object that fdefn's raw_addr slot jumps to.
@@ -643,10 +643,10 @@ static lispobj entrypoint_to_taggedptr(lispobj* entrypoint) {
  * Some legacy baggage is evident: in the first implementation of immobile fdefns,
  * an fdefn used a 'jmp rel32' (relative to itself), and so you could decode the
  * jump target only given the address of the fdefn. That is no longer true; fdefns use
- * absolute jumps. Therefore it is possible to call entrypoint_to_taggedptr() with any
+ * absolute jumps. Therefore it is possible to call entrypoint_taggedptr() with any
  * raw_addr, whether or not you know the fdefn whence the raw_addr was obtained. */
 lispobj decode_fdefn_rawfun(struct fdefn* fdefn) {
-    return entrypoint_to_taggedptr((lispobj*)fdefn->raw_addr);
+    return entrypoint_taggedptr((uword_t)fdefn->raw_addr);
 }
 
 #include "genesis/vector.h"
