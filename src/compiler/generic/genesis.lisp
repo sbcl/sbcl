@@ -764,17 +764,15 @@
          (gen-shift (if (= widetag sb-vm:fdefn-widetag) 8 24)))
     (write-wordindexed/raw des 0 (logior (ash gen gen-shift) header-word))))
 
-(defun write-code-header-words (descriptor boxed unboxed n-named-calls)
-  (declare (ignorable n-named-calls))
+(defun write-code-header-words (descriptor boxed unboxed n-fdefns)
+  (declare (ignorable n-fdefns))
   (let ((total-words (align-up (+ boxed (ceiling unboxed sb-vm:n-word-bytes)) 2)))
     (write-header-word descriptor
                        (logior (ash total-words sb-vm:code-header-size-shift)
                                sb-vm:code-header-widetag)))
   (write-wordindexed/raw
-   descriptor
-   1
-   (logior #+64-bit (ash n-named-calls 32)
-           (* boxed sb-vm:n-word-bytes))))
+   descriptor 1
+   (logior #+64-bit (ash n-fdefns 32) (* boxed sb-vm:n-word-bytes))))
 
 (defun write-header-data+tag (des header-data widetag)
   (write-header-word des (logior (ash header-data sb-vm:n-widetag-bits)
@@ -2753,7 +2751,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (define-cold-fop (fop-load-code (header n-code-bytes n-fixup-elts))
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
-         (n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+         (n-fdefns (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
          (n-constants (- n-boxed-words sb-vm:code-constants-offset))
          (stack-elts-consumed (+ n-constants 1 n-fixup-elts))
@@ -2769,7 +2767,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) n-code-bytes)
                   sb-vm:other-pointer-lowtag :code)))
     (declare (ignorable immobile))
-    (write-code-header-words des aligned-n-boxed-words n-code-bytes n-named-calls)
+    (write-code-header-words des aligned-n-boxed-words n-code-bytes n-fdefns)
     (write-wordindexed des sb-vm:code-debug-info-slot
                        (svref stack (+ stack-index n-constants)))
 
@@ -2816,7 +2814,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (write-wordindexed des header-index (svref stack stack-index))
           (incf header-index)
           (incf stack-index)))
-      (dotimes (i n-named-calls)
+      (dotimes (i n-fdefns)
         (store-named-call-fdefn des header-index (svref stack stack-index))
         (incf header-index)
         (incf stack-index))

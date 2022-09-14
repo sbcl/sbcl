@@ -1162,17 +1162,16 @@
   ;; ... | constant0 constant1 ... constantN | DEBUG-INFO | FIXUPS-ITEMS ....   ||
   ;;     | <--------- n-constants ---------> |            | <-- n-fixup-elts -> ||
   (let* ((n-simple-funs (read-unsigned-byte-32-arg (fasl-input-stream)))
-         (n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+         (n-fdefns (read-unsigned-byte-32-arg (fasl-input-stream)))
          (n-boxed-words (ash header -1))
          (n-constants (- n-boxed-words sb-vm:code-constants-offset))
          (stack-elts-consumed (+ n-constants 1 n-fixup-elts)))
     (with-fop-stack ((stack (operand-stack)) ptr stack-elts-consumed)
       ;; We've already ensured that all FDEFNs the code uses exist.
       ;; This happened by virtue of calling fop-fdefn for each.
-      (let ((stack-index (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))))
-        (dotimes (i n-named-calls)
-          (aver (typep (svref stack stack-index) 'fdefn))
-          (incf stack-index)))
+      (loop for stack-index from (+ ptr (* n-simple-funs sb-vm:code-slots-per-simple-fun))
+            repeat n-fdefns
+            do (aver (typep (svref stack stack-index) 'fdefn)))
       (binding* (((code total-nwords)
                   (sb-c:allocate-code-object
                    (if (oddp header) :immobile :dynamic)
@@ -1181,34 +1180,32 @@
                  (real-code code)
                  (debug-info (svref stack (+ ptr n-constants))))
         (with-writable-code-instructions
-            (code total-nwords debug-info n-named-calls n-simple-funs)
+            (code total-nwords debug-info n-fdefns n-simple-funs)
           :copy (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
           :fixup (sb-c::apply-fasl-fixups code stack (+ ptr (1+ n-constants)) n-fixup-elts real-code))
         ;; Don't need the code pinned from here on
-        (progn
-          (setf (sb-c::debug-info-source (%code-debug-info code))
-                (%fasl-input-partial-source-info (fasl-input)))
-          ;; Boxed constants can be assigned only after figuring out where the range
-          ;; of implicitly tagged words is, which requires knowing how many functions
-          ;; are in the code component, which requires reading the code trailer.
-          #+darwin-jit (sb-c::assign-code-constants
-                        code (subseq stack ptr (+ ptr n-constants)))
-          #-darwin-jit
-          (let* ((header-index sb-vm:code-constants-offset)
-                 (stack-index ptr))
+        (setf (sb-c::debug-info-source (%code-debug-info code))
+              (%fasl-input-partial-source-info (fasl-input)))
+        ;; Boxed constants can be assigned only after figuring out where the range
+        ;; of implicitly tagged words is, which requires knowing how many functions
+        ;; are in the code component, which requires reading the code trailer.
+        #+darwin-jit (sb-c::assign-code-constants code (subseq stack ptr (+ ptr n-constants)))
+        #-darwin-jit
+        (let* ((header-index sb-vm:code-constants-offset)
+               (stack-index ptr))
             (declare (type index header-index stack-index))
             (dotimes (n (* n-simple-funs sb-vm:code-slots-per-simple-fun))
               (setf (code-header-ref code header-index) (svref stack stack-index))
               (incf header-index)
               (incf stack-index))
-            (dotimes (i n-named-calls)
+            (dotimes (i n-fdefns)
               (sb-c::set-code-fdefn code header-index (svref stack stack-index))
               (incf header-index)
               (incf stack-index))
             (do () ((>= header-index n-boxed-words))
               (setf (code-header-ref code header-index) (svref stack stack-index))
               (incf header-index)
-              (incf stack-index))))
+              (incf stack-index)))
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
