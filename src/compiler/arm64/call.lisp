@@ -658,29 +658,30 @@
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:info min max)
   (:vop-var vop)
+  (:temporary (:sc unsigned-reg :offset nl0-offset) temp)
   (:save-p :compute-only)
   (:generator 3
     (let ((err-lab
            (generate-error-code vop 'invalid-arg-count-error)))
       (labels ((load-immediate (x)
-                 (add-sub-immediate (fixnumize x)))
-               (check-min ()
-                 (cond ((= min 1)
-                        (inst cbz nargs err-lab))
-                       ((plusp min)
-                        (inst cmp nargs (load-immediate min))
-                        (inst b :lo err-lab)))))
+                 (add-sub-immediate (fixnumize x))))
         (cond ((eql max 0)
                (inst cbnz nargs err-lab))
               ((not min)
                (inst cmp nargs (load-immediate max))
                (inst b :ne err-lab))
               (max
-               (check-min)
-               (inst cmp nargs (load-immediate max))
+               (if (zerop min)
+                   (setf temp nargs)
+                   (inst sub temp nargs (load-immediate min)))
+               (inst cmp temp (load-immediate (- max min)))
                (inst b :hi err-lab))
               (t
-               (check-min)))))))
+               (cond ((= min 1)
+                      (inst cbz nargs err-lab))
+                     ((plusp min)
+                      (inst cmp nargs (load-immediate min))
+                      (inst b :lo err-lab)))))))))
 
 ;;;; Local call with unknown values convention return:
 
