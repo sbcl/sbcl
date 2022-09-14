@@ -608,7 +608,7 @@ static __attribute__((unused)) boolean codeblob_p(lispobj ptr) {
 lispobj entrypoint_taggedptr(uword_t entrypoint) {
     if (!entrypoint || points_to_asm_code_p(entrypoint)) return 0;
     // First try
-    lispobj* phdr = (lispobj*)(entrypoint -  2*N_WORD_BYTES);
+    lispobj* phdr = (lispobj*)(entrypoint - 2*N_WORD_BYTES);
     if (forwarding_pointer_p(phdr)) {
         gc_dcheck(lowtag_of(forwarding_pointer_value(phdr)) == FUN_POINTER_LOWTAG);
         return make_lispobj(phdr, FUN_POINTER_LOWTAG);
@@ -759,7 +759,14 @@ allocation_tracker_counted(uword_t* sp)
         if (index == 0)
             index = 2; // reserved overflow counter for fixed-size alloc
         uword_t disp = index * 8;
-        int base_reg = word_at_pc >> 56;
+        int base_reg = -1;
+        if ((word_at_pc & 0xff) == 0xE8) {
+            // following is a 1-byte NOP and a dummy "TEST imm8" where the imm8
+            // encodes a register number.
+            base_reg = word_at_pc >> 56;
+        } else {
+            lose("Unexpected instruction format @ %p", pc);
+        }
         // rewrite call into: LOCK INC QWORD PTR, [Rbase+n] ; opcode = 0xFF / 0
         uword_t new_inst = 0xF0 | ((0x48|(base_reg>>3)) << 8) // w + possibly 'b'
             | (0xFF << 16) | ((0x80L+(base_reg&7)) << 24) | (disp << 32);

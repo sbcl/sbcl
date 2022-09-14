@@ -3367,7 +3367,7 @@
             ((and (eq (fixup-note-kind note) :abs32)
                   (memq flavor
                         '(:fdefn-call :layout :immobile-symbol :symbol-value ; -> fixedobj space
-                          :assembly-routine :assembly-routine* :static-call))) ; -> text space
+                          :static-call))) ; -> text space
              (push offset abs32-fixups))))))
 
 ;;; Coverage support

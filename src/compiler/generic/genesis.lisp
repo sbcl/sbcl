@@ -693,6 +693,7 @@
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
 (defvar *c-callable-fdefn-vector*)
+(defvar *asm-routine-vector*)
 
 ;;; the head of a list of TOPLEVEL-THINGs describing stuff to be done
 ;;; when the target Lisp starts up
@@ -1892,10 +1893,13 @@ core and return a descriptor to it."
   ;; and code resides above 4GB. But as the Fundamental Theorem says:
   ;;   any problem can be solved by adding another indirection.
   #+immobile-code
+  (progn
   (setf *c-callable-fdefn-vector*
         (vector-in-core (make-list (length sb-vm::+c-callable-fdefns+)
                                    :initial-element *nil-descriptor*)
                         *static*))
+  (setf *asm-routine-vector* (word-vector (make-list 70 :initial-element 0)
+                                          *static*)))
 
   #-immobile-code
   (dolist (sym sb-vm::+c-callable-fdefns+)
@@ -1965,6 +1969,7 @@ core and return a descriptor to it."
   (let* ((space *immobile-text*)
          (wordindex (gspace-free-word-index space))
          (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
+    (cold-set 'sb-fasl::*asm-routine-vector* *asm-routine-vector*)
     (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
           do (cold-svset *c-callable-fdefn-vector* i
                          (ensure-cold-fdefn sym)))
@@ -2324,17 +2329,18 @@ Legal values for OFFSET are -4, -8, -12, ..."
 (defun lookup-assembler-reference (symbol &optional (mode :direct))
   (let* ((code-component *cold-assembler-obj*)
          (list *cold-assembler-routines*)
+         (insts (+ (logandc2 (descriptor-bits code-component) sb-vm:lowtag-mask)
+                   (code-header-bytes code-component)))
          (offset (or (cdr (assq symbol list))
                      (error "Assembler routine ~S not defined." symbol))))
-    (+ (logandc2 (descriptor-bits code-component) sb-vm:lowtag-mask)
-       (code-header-bytes code-component)
-       (ecase mode
-         (:direct
-            offset)
-         (:indirect
-            ;; add 1 for the prefix word that counts the absolute fixups
-            (ash (1+ (count-if (lambda (x) (< (cdr x) offset)) list))
-                 sb-vm:word-shift))))))
+    (ecase mode
+      (:direct (+ insts offset))
+      #+(or x86 x86-64)
+      (:indirect
+       (let ((index (count-if (lambda (x) (< (cdr x) offset)) list)))
+         #+x86 (+ insts (ash (1+ index) sb-vm:word-shift)) ; add 1 for the jump table count
+         #+x86-64 (+ (logandc2 (descriptor-bits *asm-routine-vector*) sb-vm:lowtag-mask)
+                     (ash (+ sb-vm:vector-data-offset index) sb-vm:word-shift)))))))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
@@ -2882,12 +2888,20 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (let ((stack (%fasl-input-stack (fasl-input))))
       (apply-fixups asm-code stack (fop-stack-pop-n stack n-fixup-elts) n-fixup-elts))
     #+(or x86 x86-64) ; fill in the indirect call table
-    (let ((index (code-header-words asm-code)))
+    (let ((base (code-header-words asm-code))
+          (index 0))
       (dolist (item *cold-assembler-routines*)
-        ;; Preincrement because we skip 1 word for the word containing
-        ;; the number of absolute fixups that follow.
-        (write-wordindexed/raw asm-code (incf index)
-                               (lookup-assembler-reference (car item)))))))
+        ;; Word 0 of code-instructions is the jump table count (the asm routine entrypoints
+        ;; look to GC exactly like a jump table in any other codeblob)
+        (let ((entrypoint (lookup-assembler-reference (car item))))
+          (write-wordindexed/raw asm-code (+ base index 1) entrypoint)
+          #+x86-64
+          (unless (member (car item) ; these can't be called from compiled Lisp
+                          '(sb-vm::fpr-save sb-vm::save-xmm sb-vm::save-ymm
+                            sb-vm::fpr-restore sb-vm::restore-xmm sb-vm::restore-ymm))
+            (write-wordindexed/raw *asm-routine-vector*
+                                   (+ sb-vm:vector-data-offset index) entrypoint)))
+        (incf index)))))
 
 ;; The partial source info is not needed during the cold load, since
 ;; it can't be interrupted.

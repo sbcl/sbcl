@@ -363,13 +363,26 @@
 (defvar *!initial-assembler-routines*)
 
 (defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
+  ;; INDIRECT means we want the address of a word containing the address
+  ;; of the routine. Only 2 of our architectures use that form.
+  #-(or x86 x86-64) (aver (not indirect))
   (awhen (the list (gethash (the symbol name) (%code-debug-info code)))
-    (sap-int (sap+ (code-instructions code)
-                   (if indirect
-                       ;; Return the address containing the routine address
-                       (ash (cddr it) sb-vm:word-shift)
-                       ;; Return the routine address itself
-                       (car it))))))
+    (destructuring-bind (start end . index) it
+      (declare (ignore end))
+      (let ((insts (code-instructions code)))
+        (if indirect
+            (let ((offset (ash index sb-vm:word-shift)))
+              (declare (ignorable offset))
+              ;; the address is in the "external" static-space jump table
+              #+x86-64 (+ (get-lisp-obj-address *asm-routine-vector*)
+                          (ash sb-vm:vector-data-offset sb-vm:word-shift)
+                          ;; offset is biased by 1 word, accounting for the jump-table-count
+                          ;; at the first word in code-instructions. So unbias it.
+                          (- offset sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
+              #+x86 ; the address is in the "internal" jump table
+              (sap-int (sap+ insts offset)))
+            ;; Return the direct address
+            (sap-int (sap+ insts start)))))))
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)
@@ -387,6 +400,21 @@
           (aver (>= next-offset offset))
           ;; store inclusive bounds on PC offset range and the function index
           (setf (gethash name ht) (list* offset (1- next-offset) (1+ i))))))))
+
+#+x86-64
+(defun validate-asm-routine-vector ()
+  ;; If the jump table in static space does not match the jump table
+  ;; in *assembler-routines*, fix the one one in static space.
+  ;; It's OK that this is delayed until startup, because code pertinent to
+  ;; core restart always uses relative jumps to asm code.
+  (let* ((code *assembler-routines*)
+         (external-table *asm-routine-vector*)
+         (insts (code-instructions code))
+         (n (hash-table-count (%code-debug-info code))))
+    (dotimes (i n)
+      (unless (= (aref external-table i) 0)
+        (setf (aref external-table i)
+              (sap-ref-word insts (ash (1+ i) sb-vm:word-shift)))))))
 
 (defun !warm-load (file)
   (restart-case (let ((sb-c::*source-namestring*

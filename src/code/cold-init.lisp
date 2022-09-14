@@ -210,6 +210,8 @@
   (show-and-call !type-cold-init)
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
+  (show-and-call !loader-cold-init)
+  #+x86-64 (sb-fasl::validate-asm-routine-vector)
 
   ;; Must be done before toplevel forms are invoked
   ;; because a toplevel defstruct will need to add itself
@@ -271,7 +273,6 @@
   (mapcar #'proclaim sb-c::*queued-proclaims*)
   (makunbound 'sb-c::*queued-proclaims*)
 
-  (show-and-call !loader-cold-init)
   (show-and-call os-cold-init-or-reinit)
   (show-and-call !pathname-cold-init)
 
@@ -394,6 +395,7 @@ process to continue normally."
     ;; can be called, as pretty much anything can assume that it is set.
     (when total ; newly started process, and not a failed save attempt
       (sb-thread::init-main-thread)
+      #+x86-64 (sb-fasl::validate-asm-routine-vector)
       (rebuild-package-vector))
     ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
     (finalizers-reinit)

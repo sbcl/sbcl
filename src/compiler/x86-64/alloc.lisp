@@ -146,9 +146,8 @@
       (push patch-loc (sb-assem::asmstream-alloc-points sb-assem:*asmstream*))
       (inst jmp skip-instrumentation)
       (emit-alignment 3 :long-nop)
-      (let ((helper (if (integerp size)
-                        'enable-alloc-counter
-                        'enable-sized-alloc-counter)))
+      (let ((helper
+             (if (integerp size) 'enable-alloc-counter 'enable-sized-alloc-counter)))
         ;; This jump is always encoded as 5 bytes
         (inst call (if (or (not node) ; assembly routine
                            (sb-c::code-immobile-p node))
@@ -215,7 +214,7 @@
             (if systemp
                 (if (eql type +cons-primtype+) 'sys-list-alloc-tramp 'sys-alloc-tramp)
                 (if (eql type +cons-primtype+) 'list-alloc-tramp 'alloc-tramp))
-            node t)
+            node)
            (inst pop alloc-tn)))
     (let* ((NOT-INLINE (gen-label))
            (DONE (gen-label))

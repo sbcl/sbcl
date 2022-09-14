@@ -431,9 +431,7 @@
     ;; Expect an increment of the allocation point hit counter
     (let* ((inst (get-instruction iterator))
            (ea (third inst))) ; (INC :qword EA)
-      (when (and (eq (car inst) 'inc)
-                 (machine-ea-base ea)
-                 (null (machine-ea-index ea)))
+      (when (and (eq (car inst) 'inc) (machine-ea-base ea) (null (machine-ea-index ea)))
         (incf (car iterator))
         (let ((profiler-base (machine-ea-base ea))
               (profiler-index (machine-ea-disp ea)))

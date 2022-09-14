@@ -175,7 +175,14 @@
 
 (defun print-jmp-ea (value stream dstate)
   (cond ((typep value 'machine-ea)
-         (print-mem-ref :compute value :qword stream dstate))
+         (print-mem-ref :ref value :qword stream dstate)
+         (when (and (null (machine-ea-base value))
+                    (null (machine-ea-index value))
+                    (let* ((v sb-fasl::*asm-routine-vector*)
+                           (a (logandc2 (get-lisp-obj-address v) sb-vm:lowtag-mask)))
+                      (<= a (machine-ea-disp value) (1- (+ a (primitive-object-size v))))))
+           (let ((target (sap-ref-word (int-sap (machine-ea-disp value)) 0)))
+             (maybe-note-assembler-routine target t dstate))))
         ((null stream) (operand value dstate))
         (t (write value :stream stream))))
 

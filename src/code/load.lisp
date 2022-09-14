@@ -139,6 +139,7 @@
 ;;; Lisp assembler routines are named by Lisp symbols, not strings,
 ;;; and so can be compared by EQ.
 (define-load-time-global *assembler-routines* nil)
+(define-load-time-global *asm-routine-vector* nil)
 #-sb-xc-host (declaim (code-component *assembler-routines*))
 
 ;;; Output the current number of semicolons after a fresh-line.
