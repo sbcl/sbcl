@@ -894,7 +894,7 @@ unless :NAMED is also specified.")))
       (typecase spec
         (symbol
          (typecase spec
-           ((or null (member :conc-name :constructor :copier :predicate :named))
+           ((member nil :conc-name :constructor :copier :predicate :named)
             (warn "slot name of ~S indicates probable syntax error in DEFSTRUCT" spec))
            (keyword
             (style-warn "slot name of ~S indicates possible syntax error in DEFSTRUCT" spec)))
@@ -1041,6 +1041,12 @@ unless :NAMED is also specified.")))
       ;; unless the storage is a specialized numeric vector.
       (when (or rsd-index (neq (dd-type defstruct) 'structure))
         (setf always-boundp t safe-p nil))) ; "demote" to unsafe.
+
+    ;; Check for writable slots in pure structures
+    #+nil
+    (when (dd-pure defstruct)
+      (unless read-only
+        (format t "~&structure ~s slot ~s is writable" defstruct name)))
 
     (let* ((gc-ignorable
             (csubtypep ctype

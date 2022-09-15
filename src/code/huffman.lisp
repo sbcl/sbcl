@@ -14,7 +14,8 @@
 
 (defstruct (huffman-node (:constructor make-huffman-node (key weight))
                          (:copier nil))
-  key weight)
+  (key nil :read-only t)
+  (weight nil :read-only t))
 
 (defstruct (huffman-pair
              (:include huffman-node)
@@ -26,7 +27,8 @@
                                                      (huffman-node-key right)))
                                  (weight (+ (huffman-node-weight left)
                                             (huffman-node-weight right))))))
-  left right)
+  (left nil :read-only t)
+  (right nil :read-only t))
 (declaim (freeze-type huffman-node))
 
 (defun huffman-weights (corpus)

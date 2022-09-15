@@ -83,6 +83,9 @@
 (defun reg-imm-data (dchunk dstate) dchunk
   (aref (sb-disassem::dstate-filtered-values dstate) 4))
 
+;;; This structure is logically immutable, except for one problem:
+;;; the disassembler recycles instances of it (re-uses the same
+;;; one for each successive instruction). See DECODE-MOD-R/M.
 (defstruct (machine-ea (:copier nil)
                        (:constructor %make-machine-ea))
   ;; possible TODO: base,index,scale could be packed thusly in 13 bits:

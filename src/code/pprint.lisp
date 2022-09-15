@@ -13,20 +13,21 @@
 
 ;;; Ancestral types
 (defstruct (queued-op (:constructor nil) (:copier nil))
-  (posn 0 :type posn))
+  (posn 0 :type posn :read-only t))
 
 (defstruct (block-end (:include queued-op) (:copier nil))
-  (suffix nil :type (or null simple-string)))
+  (suffix nil :type (or null simple-string) :read-only t))
 
 (declaim (start-block))
 (defstruct (section-start (:include queued-op)
                           (:constructor nil)
                           (:copier nil))
-  (depth 0 :type index)
+  (depth 0 :type index :read-only t)
   (section-end nil :type (or null newline block-end)))
 
 (defstruct (newline (:include section-start) (:copier nil))
   (kind (missing-arg)
+        :read-only t
         :type (member :linear :fill :miser :literal :mandatory)))
 (declaim (freeze-type newline)
          (end-block))

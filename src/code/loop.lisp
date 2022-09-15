@@ -290,10 +290,10 @@ code to be loaded.
              (:constructor !make-loop-universe)
              (:copier nil)
              (:predicate nil))
-  keywords             ; hash table, value = (fn-name . extra-data)
-  iteration-keywords   ; hash table, value = (fn-name . extra-data)
-  for-keywords         ; hash table, value = (fn-name . extra-data)
-  path-keywords)       ; hash table, value = (fn-name . extra-data)
+  (keywords nil :read-only t)             ; hash table, value = (fn-name . extra-data)
+  (iteration-keywords nil :read-only t)   ; hash table, value = (fn-name . extra-data)
+  (for-keywords nil :read-only t)         ; hash table, value = (fn-name . extra-data)
+  (path-keywords nil :read-only t))       ; hash table, value = (fn-name . extra-data)
 (declaim (sb-ext:freeze-type loop-universe))
 (defmethod print-object ((u loop-universe) stream)
   (print-unreadable-object (u stream :type t :identity t)))
@@ -1073,11 +1073,11 @@ code to be loaded.
 (defstruct (loop-collector
             (:copier nil)
             (:predicate nil))
-  name
-  class
+  (name nil :read-only t)
+  (class nil :read-only t)
   (history nil)
   (tempvars nil)
-  specified-type
+  (specified-type nil :read-only t)
   dtype
   (data nil)) ;collector-specific data
 (declaim (sb-ext:freeze-type loop-collector))

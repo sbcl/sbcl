@@ -257,13 +257,13 @@
   ;; (second) instruction.
   ;;
   ;; instructions whose writes this instruction tries to read
-  (read-dependencies (make-sset) :type sset)
+  (read-dependencies (make-sset) :type sset :read-only t)
   ;; instructions whose writes or reads are overwritten by this instruction
-  (write-dependencies (make-sset) :type sset)
+  (write-dependencies (make-sset) :type sset :read-only t)
   ;; instructions which write what we read or write
-  (write-dependents (make-sset) :type sset)
+  (write-dependents (make-sset) :type sset :read-only t)
   ;; instructions which read what we write
-  (read-dependents (make-sset) :type sset))
+  (read-dependents (make-sset) :type sset :read-only t))
 (declaim (freeze-type instruction))
 #+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
 #+sb-show-assem (defvar *next-inst-id* 0)

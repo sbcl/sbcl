@@ -2573,8 +2573,8 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 (defstruct (stub-stream
             (:include ansi-stream)
             (:constructor %make-stub-stream (direction string)))
-  direction
-  string) ; string or nil
+  (direction nil :read-only t)
+  (string nil :read-only t)) ; string or nil
 
 (defun make-stub-stream (underlying-stream)
   (multiple-value-bind (direction string)
