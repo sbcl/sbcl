@@ -2332,9 +2332,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (insts (+ (logandc2 (descriptor-bits code-component) sb-vm:lowtag-mask)
                    (code-header-bytes code-component)))
          (offset (or (cdr (assq symbol list))
-                     (error "Assembler routine ~S not defined." symbol))))
+                     (error "Assembler routine ~S not defined." symbol)))
+         (addr (+ insts offset)))
     (ecase mode
-      (:direct (+ insts offset))
+      (:direct addr)
+      #+(or ppc ppc64) (:indirect (- addr sb-vm:nil-value))
       #+(or x86 x86-64)
       (:indirect
        (let ((index (count-if (lambda (x) (< (cdr x) offset)) list)))
@@ -2940,8 +2942,6 @@ Legal values for OFFSET are -4, -8, -12, ..."
            (ecase flavor
              (:assembly-routine (lookup-assembler-reference name))
              (:assembly-routine* (lookup-assembler-reference name :indirect))
-             (:asm-routine-nil-offset
-              (- (lookup-assembler-reference name) sb-vm:nil-value))
              (:foreign (alien-linkage-table-note-symbol string nil))
              (:foreign-dataref (alien-linkage-table-note-symbol string t))
              (:code-object (descriptor-bits code-obj))

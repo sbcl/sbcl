@@ -363,26 +363,27 @@
 (defvar *!initial-assembler-routines*)
 
 (defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
-  ;; INDIRECT means we want the address of a word containing the address
-  ;; of the routine. Only 2 of our architectures use that form.
-  #-(or x86 x86-64) (aver (not indirect))
+  ;; Each architecture can define an "indirect" value in its own peculiar way.
+  ;; Only some of our architectures use that option.
   (awhen (the list (gethash (the symbol name) (%code-debug-info code)))
     (destructuring-bind (start end . index) it
-      (declare (ignore end))
-      (let ((insts (code-instructions code)))
-        (if indirect
-            (let ((offset (ash index sb-vm:word-shift)))
-              (declare (ignorable offset))
-              ;; the address is in the "external" static-space jump table
-              #+immobile-space (+ (get-lisp-obj-address *asm-routine-vector*)
-                                  (ash sb-vm:vector-data-offset sb-vm:word-shift)
+      (declare (ignore end) (ignorable index))
+      (let* ((insts (code-instructions code))
+             (addr (sap-int (sap+ insts start))))
+        (unless indirect
+          (return-from get-asm-routine addr))
+        #-(or ppc ppc64 x86 x86-64) (bug "Indirect asm-routine lookup")
+        #+(or ppc ppc64) (- addr sb-vm:nil-value)
+        #+(or x86 x86-64) ; return the address of a word containing 'addr'
+        (let ((offset (ash index sb-vm:word-shift)))
+          ;; the address is in the "external" static-space jump table
+          #+immobile-space (+ (get-lisp-obj-address *asm-routine-vector*)
+                              (ash sb-vm:vector-data-offset sb-vm:word-shift)
                           ;; offset is biased by 1 word, accounting for the jump-table-count
                           ;; at the first word in code-instructions. So unbias it.
-                                  (- offset sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
-              #-immobile-space ; the address is in the "internal" jump table
-              (sap-int (sap+ insts offset)))
-            ;; Return the direct address
-            (sap-int (sap+ insts start)))))))
+                              (- offset sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
+          #-immobile-space ; the address is in the "internal" jump table
+          (sap-int (sap+ insts offset)))))))
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)

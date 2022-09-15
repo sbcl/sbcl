@@ -82,10 +82,9 @@
          (sb-vm:fixup-code-object
                  code-obj offset
                  (ecase flavor
-                   ((:assembly-routine :assembly-routine* :asm-routine-nil-offset)
-                    (- (or (get-asm-routine name (eq flavor :assembly-routine*))
-                           (error "undefined assembler routine: ~S" name))
-                       (if (eq flavor :asm-routine-nil-offset) sb-vm:nil-value 0)))
+                   ((:assembly-routine :assembly-routine*)
+                    (or (get-asm-routine name (eq flavor :assembly-routine*))
+                        (error "undefined assembler routine: ~S" name)))
                    (:alien-code-linkage-index (sb-impl::ensure-alien-linkage-index name nil))
                    (:alien-data-linkage-index (sb-impl::ensure-alien-linkage-index name t))
                    (:foreign (foreign-symbol-address name))

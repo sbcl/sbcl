@@ -81,8 +81,7 @@
       (inst movzx '(:byte :dword) rax object)
       LOAD-FROM-VECTOR
       (inst mov :dword result
-            (ea (make-fixup '**primitive-object-layouts**
-                           :symbol-value
+            (ea (make-fixup '**primitive-object-layouts** :symbol-value
                            (- (ash vector-data-offset word-shift)
                               other-pointer-lowtag))
                 nil rax 8)) ; no base register
