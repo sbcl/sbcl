@@ -586,7 +586,7 @@ write_heap_exhaustion_report(FILE *file, long available, long requested,
     fprintf(file, "GC control variables:\n");
     fprintf(file, "   *GC-INHIBIT* = %s\n   *GC-PENDING* = %s\n",
             read_TLS(GC_INHIBIT,thread)==NIL ? "false" : "true",
-            (read_TLS(GC_PENDING, thread) == T) ?
+            (read_TLS(GC_PENDING, thread) == LISP_T) ?
             "true" : ((read_TLS(GC_PENDING, thread) == NIL) ?
                       "false" : "in progress"));
 #ifdef LISP_FEATURE_SB_THREAD
@@ -5015,7 +5015,7 @@ lisp_alloc(int flags, struct alloc_region *region, sword_t nbytes,
         if (read_TLS(GC_PENDING,thread) == NIL) {
             /* set things up so that GC happens when we finish the PA
              * section */
-            write_TLS(GC_PENDING,T,thread);
+            write_TLS(GC_PENDING, LISP_T, thread);
             if (read_TLS(GC_INHIBIT,thread) == NIL) {
 #ifdef LISP_FEATURE_SB_SAFEPOINT
                 thread_register_gc_trigger();

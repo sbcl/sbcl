@@ -734,7 +734,7 @@ initialize_lisp(int argc, char *argv[], char *envp[])
 #endif
 
     define_var("nil", NIL, 1);
-    define_var("t", T, 1);
+    define_var("t", LISP_T, 1);
 
     if (!options.disable_lossage_handler_p)
         enable_lossage_handler();

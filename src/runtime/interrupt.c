@@ -767,7 +767,7 @@ check_interrupt_context_or_lose(os_context_t *context)
 #if defined(LISP_FEATURE_GENCGC) && !GENCGC_IS_PRECISE
     int interrupts_enabled = (read_TLS(INTERRUPTS_ENABLED,thread) != NIL);
     int gc_inhibit = (read_TLS(GC_INHIBIT,thread) != NIL);
-    int gc_pending = (read_TLS(GC_PENDING,thread) == T);
+    int gc_pending = (read_TLS(GC_PENDING,thread) == LISP_T);
     int pseudo_atomic_interrupted = get_pseudo_atomic_interrupted(thread);
     int in_race_p = in_leaving_without_gcing_race_p(thread);
     int safepoint_active = 0;
@@ -1037,7 +1037,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
     // describe_internal_error(context); // uncomment me for debugging
 
     funcall2(StaticSymbolFunction(INTERNAL_ERROR), context_sap,
-             continuable ? T : NIL);
+             continuable ? LISP_T : NIL);
 
     undo_fake_foreign_function_call(context); /* blocks signals again */
     if (continuable)
@@ -1135,7 +1135,7 @@ interrupt_handle_pending(os_context_t *context)
          /* Test for T and not for != NIL since the value :IN-PROGRESS
           * used to be used in SUB-GC as part of the mechanism to
           * supress recursive gcs.*/
-        if (read_TLS(GC_PENDING,thread) == T) {
+        if (read_TLS(GC_PENDING,thread) == LISP_T) {
 
             /* Two reasons for doing this. First, if there is a
              * pending handler we don't want to run. Second, we are
@@ -1379,7 +1379,7 @@ can_handle_now(void *handler, struct interrupt_data *data,
         event3("can_handle_now(%p,%d): deferred (RACE=%d)", handler, signal,
                in_leaving_without_gcing_race_p(thread));
         store_signal_data_for_later(data,handler,signal,info,context);
-        write_TLS(INTERRUPT_PENDING, T,thread);
+        write_TLS(INTERRUPT_PENDING, LISP_T, thread);
         answer = 0;
     }
     /* a slightly confusing test. arch_pseudo_atomic_atomic() doesn't
@@ -1429,11 +1429,11 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
      * pseudo atomic until gc is finally allowed. */
     if (read_TLS(GC_INHIBIT,thread) != NIL) {
         event0("stop_for_gc deferred for *GC-INHIBIT*");
-        write_TLS(STOP_FOR_GC_PENDING,T,thread);
+        write_TLS(STOP_FOR_GC_PENDING, LISP_T, thread);
         return;
     } else if (arch_pseudo_atomic_atomic(context)) {
         event0("stop_for_gc deferred for PA");
-        write_TLS(STOP_FOR_GC_PENDING,T,thread);
+        write_TLS(STOP_FOR_GC_PENDING, LISP_T, thread);
         arch_set_pseudo_atomic_interrupted(context);
         maybe_save_gc_mask_and_block_deferrables
             (os_context_sigmask_addr(context));

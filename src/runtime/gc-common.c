@@ -1569,7 +1569,7 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
         struct hash_table* ht = (struct hash_table*)native_pointer(kv_supplement);
         eql_hashing = hashtable_kind(ht) == 1;
         kv_supplement = ht->hash_vector;
-    } else if (kv_supplement == T) { // EQL hashing on a non-weak table
+    } else if (kv_supplement == LISP_T) { // EQL hashing on a non-weak table
         eql_hashing = 1;
         kv_supplement = NIL;
     }
@@ -2226,11 +2226,7 @@ maybe_gc(os_context_t *context)
      * we may even be in a WITHOUT-INTERRUPTS. */
     gc_happened = funcall1(StaticSymbolFunction(SUB_GC), 0);
     FSHOW((stderr, "/maybe_gc: gc_happened=%s\n",
-           (gc_happened == NIL)
-           ? "NIL"
-           : ((gc_happened == T)
-              ? "T"
-              : "0")));
+           gc_happened == NIL ? "NIL" : gc_happened == LISP_T ? "T" : "0"));
     /* gc_happened can take three values: T, NIL, 0.
      *
      * T means that the thread managed to trigger a GC, and post-gc
@@ -2243,7 +2239,7 @@ maybe_gc(os_context_t *context)
      * triggered by this thread; success, but post-gc doesn't have
      * to be called.
      */
-    if ((gc_happened == T) &&
+    if ((gc_happened == LISP_T) &&
         /* See if interrupts are enabled or it's possible to enable
          * them. POST-GC has a similar check, but we don't want to
          * unlock deferrables in that case and get a pending interrupt

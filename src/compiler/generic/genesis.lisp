@@ -3458,16 +3458,15 @@ lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
   (dolist (binding sb-vm::per-thread-c-interface-symbols)
     (format stream "INITIALIZE_TLS(~A, ~A);~%"
             (c-symbol-name (if (listp binding) (car binding) binding) "*")
-            (if (listp binding) (second binding)))))
+            (let ((val (if (listp binding) (second binding))))
+              (if (eq val 't) "LISP_T" val)))))
 
 (defun write-static-symbols (stream)
   (dolist (symbol (cons nil (coerce sb-vm:+static-symbols+ 'list)))
-    ;; FIXME: It would be nice to use longer names than NIL and
-    ;; (particularly) T in #define statements.
     (format stream "#define ~A LISPOBJ(0x~X)~%"
             ;; FIXME: It would be nice not to need to strip anything
             ;; that doesn't get stripped always by C-SYMBOL-NAME.
-            (c-symbol-name symbol "%*.!")
+            (if (eq symbol 't) "LISP_T" (c-symbol-name symbol "%*.!"))
             (if *static*                ; if we ran GENESIS
               ;; We actually ran GENESIS, use the real value.
               (descriptor-bits (cold-intern symbol))

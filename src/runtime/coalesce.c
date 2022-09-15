@@ -207,7 +207,7 @@ void coalesce_similar_objects()
     coalesce_range((lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer, arg);
     lispobj* the_symbol_nil = (lispobj*)(NIL - LIST_POINTER_LOWTAG - N_WORD_BYTES);
     coalesce_range(the_symbol_nil, ALIGN_UP(SYMBOL_SIZE,2) + the_symbol_nil, arg);
-    coalesce_range((lispobj*)(T - OTHER_POINTER_LOWTAG), static_space_free_pointer, arg);
+    coalesce_range(STATIC_SPACE_OBJECTS_START, static_space_free_pointer, arg);
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, arg);

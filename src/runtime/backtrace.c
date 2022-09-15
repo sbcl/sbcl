@@ -517,11 +517,13 @@ describe_thread_state(void)
     if (string[0]) printf("Signal mask: %s\n", string);
 #endif
     printf("Specials:\n");
-    printf(" *GC-INHIBIT* = %s\n", (read_TLS(GC_INHIBIT, thread) == T) ? "T" : "NIL");
-    printf(" *GC-PENDING* = %s\n", (read_TLS(GC_PENDING, thread) == T) ? "T" : "NIL");
-    printf(" *INTERRUPTS-ENABLED* = %s\n", (read_TLS(INTERRUPTS_ENABLED, thread) == T) ? "T" : "NIL");
+    printf(" *GC-INHIBIT* = %s\n", read_TLS(GC_INHIBIT, thread) == LISP_T ? "T" : "NIL");
+    printf(" *GC-PENDING* = %s\n", read_TLS(GC_PENDING, thread) == LISP_T ? "T" : "NIL");
+    printf(" *INTERRUPTS-ENABLED* = %s\n",
+           read_TLS(INTERRUPTS_ENABLED, thread) == LISP_T ? "T" : "NIL");
 #ifdef STOP_FOR_GC_PENDING
-    printf(" *STOP-FOR-GC-PENDING* = %s\n", (read_TLS(STOP_FOR_GC_PENDING, thread) == T) ? "T" : "NIL");
+    printf(" *STOP-FOR-GC-PENDING* = %s\n",
+           read_TLS(STOP_FOR_GC_PENDING, thread) == LISP_T ? "T" : "NIL");
 #endif
     printf("Pending handler = %p\n", data->pending_handler);
 }

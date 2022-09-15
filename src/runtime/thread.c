@@ -532,7 +532,7 @@ void* new_thread_trampoline(void* arg)
     // 'th->lisp_thread' remains valid despite not being in all_threads
     // due to the pinning via *STARTING-THREADS*.
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
-    if (lispthread->_ephemeral_p == T) th->state_word.user_thread_p = 0;
+    if (lispthread->_ephemeral_p == LISP_T) th->state_word.user_thread_p = 0;
 
     /* Potentially set the externally-visible name of this thread,
      * and for a whole pile of crazy, look at get_max_thread_name_length_impl() in
@@ -915,7 +915,7 @@ alloc_thread_struct(void* spaces) {
 
     __attribute((unused)) lispobj* tls = (lispobj*)th;
 #ifdef THREAD_T_NIL_CONSTANTS_SLOT
-    tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | T;
+    tls[THREAD_T_NIL_CONSTANTS_SLOT] = (NIL << 32) | LISP_T;
 #endif
 #ifdef THREAD_ALIEN_LINKAGE_TABLE_BASE_SLOT
     tls[THREAD_ALIEN_LINKAGE_TABLE_BASE_SLOT] = (lispobj)ALIEN_LINKAGE_TABLE_SPACE_START;
