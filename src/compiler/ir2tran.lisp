@@ -158,7 +158,7 @@
                    ;; If NOT compiling to a file, then the function had better exist now.
                    ;; If to a file, then it better exist at some point, but its existence
                    ;; in the compilation lisp doesn't really imply that it will.
-                   #-sb-xc-host (if (producing-fasl-file) t (find-fdefn name)))
+                   #-sb-xc-host (if (producing-fasl-file) t (fboundp name)))
               (emit-move node block (make-load-time-constant-tn :known-fun name)
                          res))
              (t
