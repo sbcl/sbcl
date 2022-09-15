@@ -176,6 +176,7 @@
 (defun print-jmp-ea (value stream dstate)
   (cond ((typep value 'machine-ea)
          (print-mem-ref :ref value :qword stream dstate)
+         #+immobile-space
          (when (and (null (machine-ea-base value))
                     (null (machine-ea-index value))
                     (let* ((v sb-fasl::*asm-routine-vector*)

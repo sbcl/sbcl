@@ -374,12 +374,12 @@
             (let ((offset (ash index sb-vm:word-shift)))
               (declare (ignorable offset))
               ;; the address is in the "external" static-space jump table
-              #+x86-64 (+ (get-lisp-obj-address *asm-routine-vector*)
-                          (ash sb-vm:vector-data-offset sb-vm:word-shift)
+              #+immobile-space (+ (get-lisp-obj-address *asm-routine-vector*)
+                                  (ash sb-vm:vector-data-offset sb-vm:word-shift)
                           ;; offset is biased by 1 word, accounting for the jump-table-count
                           ;; at the first word in code-instructions. So unbias it.
-                          (- offset sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
-              #+x86 ; the address is in the "internal" jump table
+                                  (- offset sb-vm:n-word-bytes sb-vm:other-pointer-lowtag))
+              #-immobile-space ; the address is in the "internal" jump table
               (sap-int (sap+ insts offset)))
             ;; Return the direct address
             (sap-int (sap+ insts start)))))))
@@ -407,6 +407,7 @@
   ;; in *assembler-routines*, fix the one one in static space.
   ;; It's OK that this is delayed until startup, because code pertinent to
   ;; core restart always uses relative jumps to asm code.
+  #+immobile-space
   (let* ((code *assembler-routines*)
          (external-table *asm-routine-vector*)
          (insts (code-instructions code))

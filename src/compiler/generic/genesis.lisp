@@ -260,6 +260,7 @@
 
 #+immobile-space
 (progn
+  (defvar *asm-routine-vector*)
   (defvar *immobile-fixedobj*)
   (defvar *immobile-text*)
   (defvar *immobile-space-map* nil))
@@ -693,7 +694,6 @@
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
 (defvar *c-callable-fdefn-vector*)
-(defvar *asm-routine-vector*)
 
 ;;; the head of a list of TOPLEVEL-THINGs describing stuff to be done
 ;;; when the target Lisp starts up
@@ -2338,9 +2338,11 @@ Legal values for OFFSET are -4, -8, -12, ..."
       #+(or x86 x86-64)
       (:indirect
        (let ((index (count-if (lambda (x) (< (cdr x) offset)) list)))
-         #+x86 (+ insts (ash (1+ index) sb-vm:word-shift)) ; add 1 for the jump table count
-         #+x86-64 (+ (logandc2 (descriptor-bits *asm-routine-vector*) sb-vm:lowtag-mask)
-                     (ash (+ sb-vm:vector-data-offset index) sb-vm:word-shift)))))))
+         #-immobile-space
+         (+ insts (ash (1+ index) sb-vm:word-shift)) ; add 1 for the jump table count
+         #+immobile-space
+         (+ (logandc2 (descriptor-bits *asm-routine-vector*) sb-vm:lowtag-mask)
+            (ash (+ sb-vm:vector-data-offset index) sb-vm:word-shift)))))))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
@@ -2895,7 +2897,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
         ;; look to GC exactly like a jump table in any other codeblob)
         (let ((entrypoint (lookup-assembler-reference (car item))))
           (write-wordindexed/raw asm-code (+ base index 1) entrypoint)
-          #+x86-64
+          #+immobile-space
           (unless (member (car item) ; these can't be called from compiled Lisp
                           '(sb-vm::fpr-save sb-vm::save-xmm sb-vm::save-ymm
                             sb-vm::fpr-restore sb-vm::restore-xmm sb-vm::restore-ymm))
