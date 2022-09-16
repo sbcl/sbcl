@@ -3326,27 +3326,32 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ~{~% ~a, ~a, ~a, ~a~^,~}~%};~%" flavor (coerce a 'list)))))
 
 (defun write-cast-operator (operator-name c-name lowtag stream)
-  (when (eq operator-name 'symbol)
-    (format stream "
+  (format stream "static inline struct ~A* ~A(lispobj obj) {
+  return (struct ~A*)(obj - ~D);~%}~%" c-name operator-name c-name lowtag)
+  (case operator-name
+    (fdefn
+     (format stream "#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
+/* Return 'fun' given a tagged pointer to an fdefn. */
+static inline lispobj FdefnFun(lispobj fdefn) { return FDEFN(fdefn)->fun; }~%"))
+    (symbol
+     (format stream "
 lispobj symbol_function(struct symbol* symbol);
 #include \"~A/vector.h\"
 struct vector *symbol_name(struct symbol*);~%
 lispobj symbol_package(struct symbol*);~%" (genesis-header-prefix))
-    (format stream "static inline int symbol_package_id(struct symbol* s) { return ~A; }~%"
+     (format stream "static inline int symbol_package_id(struct symbol* s) { return ~A; }~%"
             #+compact-symbol (format nil "s->name >> ~D" sb-impl::symbol-name-bits)
             #-compact-symbol "fixnum_value(s->package_id)")
-    #+compact-symbol
-    (progn (format stream "#define decode_symbol_name(ptr) (ptr & (uword_t)0x~X)~%"
-                   (mask-field (byte sb-impl::symbol-name-bits 0) -1))
-           (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
+     #+compact-symbol
+     (progn (format stream "#define decode_symbol_name(ptr) (ptr & (uword_t)0x~X)~%"
+                    (mask-field (byte sb-impl::symbol-name-bits 0) -1))
+            (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
   s->name = (s->name & (uword_t)0x~X) | name;~%}~%"
-                   (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits) -1)))
-    #-compact-symbol
-    (progn (format stream "#define decode_symbol_name(ptr) ptr~%")
-           (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
-  s->name = name;~%}~%")))
-  (format stream "static inline struct ~A* ~A(lispobj obj) {
-  return (struct ~A*)(obj - ~D);~%}~%" c-name operator-name c-name lowtag))
+                    (mask-field (byte sb-impl::package-id-bits sb-impl::symbol-name-bits) -1)))
+     #-compact-symbol
+     (progn (format stream "#define decode_symbol_name(ptr) ptr~%")
+            (format stream "static inline void set_symbol_name(struct symbol*s, lispobj name) {
+  s->name = name;~%}~%")))))
 
 (defun mangle-c-slot-name (obj-name slot-name)
   ;; For data hiding purposes, change the name of vector->length to vector->length_.

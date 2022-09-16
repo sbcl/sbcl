@@ -197,7 +197,7 @@ x:
 	mr reg_A2, reg_NL2
 
 	/* Call out to obtain our TLS block. */
-	load(reg_NL0,CSYMBOL(specials))
+	load(reg_NL0,CSYMBOL(current_thread))
 	lis reg_CFUNC,CSYMBOL(pthread_getspecific)@h
 	ori reg_CFUNC,reg_CFUNC,CSYMBOL(pthread_getspecific)@l
 	mtctr reg_CFUNC

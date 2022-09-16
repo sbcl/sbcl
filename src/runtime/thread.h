@@ -196,14 +196,6 @@ SetSymbolValue(lispobj tagged_symbol_pointer,lispobj val, void *thread)
 # define read_TLS(sym, thread) SYMBOL(sym)->value
 #endif
 
-// FIXME: very random that this is defined in 'thread.h'
-#define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
-/* Return 'fun' given a tagged pointer to an fdefn. */
-static inline lispobj FdefnFun(lispobj fdefn)
-{
-    return FDEFN(fdefn)->fun;
-}
-
 /* These are for use during GC, on the current thread, or on prenatal
  * threads only. */
 #if defined(LISP_FEATURE_SB_THREAD)
@@ -238,11 +230,10 @@ static inline lispobj FdefnFun(lispobj fdefn)
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-// FIXME: these names should be consistent with one another
 # ifdef LISP_FEATURE_GCC_TLS
 extern __thread struct thread *current_thread;
 # elif !defined LISP_FEATURE_WIN32
-extern pthread_key_t specials;
+extern pthread_key_t current_thread;
 #endif
 #endif
 
@@ -325,7 +316,7 @@ static inline struct thread *get_sb_vm_thread(void)
 # ifdef LISP_FEATURE_GCC_TLS
     th = current_thread;
 # else
-    th = pthread_getspecific(specials);
+    th = pthread_getspecific(current_thread);
 # endif
 
 # if defined LISP_FEATURE_X86 && (defined LISP_FEATURE_DARWIN || defined LISP_FEATURE_FREEBSD)
@@ -348,7 +339,7 @@ inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
 # elif defined LISP_FEATURE_WIN32
     return TlsGetValue(OUR_TLS_INDEX) != 0;
 # else
-    return pthread_getspecific(specials) != NULL;
+    return pthread_getspecific(current_thread) != NULL;
 # endif
 #elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     char *csp = (char *)*os_context_sp_addr(context);

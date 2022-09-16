@@ -73,7 +73,7 @@ struct thread *all_threads;
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
 #elif !defined LISP_FEATURE_WIN32
-pthread_key_t specials = 0;
+pthread_key_t current_thread = 0;
 #endif
 
 #ifdef LISP_FEATURE_WIN32
@@ -264,7 +264,7 @@ extern int arch_prctl(int code, unsigned long *addr);
 #elif defined LISP_FEATURE_GCC_TLS
 # define ASSIGN_CURRENT_THREAD(x) current_thread = x
 #elif !defined LISP_FEATURE_WIN32
-# define ASSIGN_CURRENT_THREAD(x) pthread_setspecific(specials, x)
+# define ASSIGN_CURRENT_THREAD(x) pthread_setspecific(current_thread, x)
 #else
 # define ASSIGN_CURRENT_THREAD(x) TlsSetValue(OUR_TLS_INDEX, x)
 #endif
@@ -335,7 +335,7 @@ void create_main_lisp_thread(lispobj function) {
         lose("can't create initial thread");
     th->state_word.sprof_enable = 1;
 #if defined LISP_FEATURE_SB_THREAD && !defined LISP_FEATURE_GCC_TLS && !defined LISP_FEATURE_WIN32
-    pthread_key_create(&specials, 0);
+    pthread_key_create(&current_thread, 0);
 #endif
 #if defined LISP_FEATURE_DARWIN && defined LISP_FEATURE_SB_THREAD
     pthread_key_create(&foreign_thread_ever_lispified, 0);
