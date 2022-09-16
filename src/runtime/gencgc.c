@@ -2801,6 +2801,8 @@ static inline void protect_page(void* page_addr)
 }
 #endif
 
+#define LOCKFREE_LIST_NEXT(x) ((struct instance*)x)->slots[INSTANCE_DATA_START]
+
 /* Helper function for update_writeprotection.
  * If the [where,limit) contain an old->young pointer, then return
  * the address - or approximate address - containing such pointer.
@@ -2808,58 +2810,50 @@ static inline void protect_page(void* page_addr)
  * want to see the address */
 static lispobj* range_dirty_p(lispobj* where, lispobj* limit, generation_index_t gen)
 {
-    while ( where < limit ) {
+    sword_t nwords;
+    for ( ; where < limit ; where += nwords ) {
         lispobj word = *where;
         if (is_cons_half(word)) {
             if (is_lisp_pointer(word) && !ptr_ok_to_writeprotect(word, gen)) return where;
             word = where[1];
             if (is_lisp_pointer(word) && !ptr_ok_to_writeprotect(word, gen)) return where;
-            where += 2;
+            nwords = 2;
             continue;
         }
         int widetag = widetag_of(where);
-        sword_t nwords = sizetab[widetag](where);
-        sword_t index;
-        if (leaf_obj_widetag_p(widetag)) {
-            // Do nothing
-        } else if (widetag == CODE_HEADER_WIDETAG) {
-            // This function will never be called on a page of code
-            lose("code @ %p on non-code page", where);
-        } else {
+        gc_dcheck(widetag !== CODE_HEADER_WIDETAG); // This can't be called on a code page
+        nwords = sizetab[widetag](where);
+        if (leaf_obj_widetag_p(widetag)) continue; // Do nothing
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-            if (instanceoid_widetag_p(widetag)) {
-                // instance_layout works on funcallable or regular instances
-                // and we have to specially check it because it's in the upper
-                // bytes of the 0th word.
-                lispobj layout = instance_layout(where);
-                if (layout) {
-                    if (!ptr_ok_to_writeprotect(layout, gen)) return where;
-                    if (lockfree_list_node_layout_p(LAYOUT(layout)) &&
-                        !ptr_ok_to_writeprotect(((struct instance*)where)
-                                                ->slots[INSTANCE_DATA_START], gen))
-                        return where;
-                }
-            }
-#else
-            if (widetag == INSTANCE_WIDETAG) {
-                // instance_layout works only on regular instances,
-                // we don't have to treat it specially but we do have to
-                // check for lockfree list nodes.
-                lispobj layout = instance_layout(where);
-                if (layout && lockfree_list_node_layout_p(LAYOUT(layout)) &&
-                    !ptr_ok_to_writeprotect(((struct instance*)where)
-                                            ->slots[INSTANCE_DATA_START], gen))
-                    return where;
-            }
-#endif
-            // Scan all the rest of the words even if some of them are raw bits.
-            // At worst this overestimates the set of pointer words.
-            for (index=1; index<nwords; ++index) {
-                if (is_lisp_pointer(where[index]) && !ptr_ok_to_writeprotect(where[index], gen))
+        if (instanceoid_widetag_p(widetag)) {
+            // instance_layout works on funcallable or regular instances
+            // and we have to specially check it because it's in the upper
+            // bytes of the 0th word.
+            lispobj layout = instance_layout(where);
+            if (layout) {
+                if (!ptr_ok_to_writeprotect(layout, gen)) return where;
+                if (lockfree_list_node_layout_p(LAYOUT(layout)) &&
+                    !ptr_ok_to_writeprotect(LOCKFREE_LIST_NEXT(where), gen))
                     return where;
             }
         }
-        where += nwords;
+#else
+        if (widetag == INSTANCE_WIDETAG) {
+            // instance_layout works only on regular instances,
+            // we don't have to treat it specially but we do have to
+            // check for lockfree list nodes.
+            lispobj layout = instance_layout(where);
+            if (layout && lockfree_list_node_layout_p(LAYOUT(layout)) &&
+                !ptr_ok_to_writeprotect(LOCKFREE_LIST_NEXT(where), gen))
+                return where;
+        }
+#endif
+        // Scan all the rest of the words even if some of them are raw bits.
+        // At worst this overestimates the set of pointer words.
+        sword_t index;
+        for (index=1; index<nwords; ++index)
+            if (is_lisp_pointer(where[index]) && !ptr_ok_to_writeprotect(where[index], gen))
+                return where;
     }
     return 0;
 }
