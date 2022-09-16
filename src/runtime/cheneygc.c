@@ -394,7 +394,7 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
     if (((uword_t)addr >= DYNAMIC_0_SPACE_START && end < semispace_0_end) ||
         ((uword_t)addr >= DYNAMIC_1_SPACE_START && end < semispace_1_end)) {
 #if defined(SUNOS) || defined(SOLARIS)
-        os_invalidate(addr, length);
+        os_deallocate(addr, length);
 #else
         os_protect(addr, length, 0);
 #endif

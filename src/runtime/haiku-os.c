@@ -37,14 +37,6 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len,
     return actual;
 }
 
-void
-os_invalidate(os_vm_address_t addr, os_vm_size_t len)
-{
-    if (munmap(addr,len) == -1) {
-        perror("munmap");
-    }
-}
-
 char *os_get_runtime_executable_path()
 {
     int cookie = 0;

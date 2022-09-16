@@ -1658,7 +1658,7 @@
                        ,@body)
                   (when ,sap-var
                     (alien-funcall
-                     (extern-alien "os_invalidate"
+                     (extern-alien "os_deallocate"
                                    (function void system-area-pointer unsigned))
                      ,sap-var (* ,npages +backend-page-bytes+)))))))
 

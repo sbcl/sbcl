@@ -288,7 +288,7 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print)
         *shadow_cursor = make_lispobj(new, OTHER_POINTER_LOWTAG);
     }
     ensure_region_closed(unboxed_region, PAGE_TYPE_BOXED);
-    os_invalidate((void*)READ_ONLY_SPACE_START, READ_ONLY_SPACE_END - READ_ONLY_SPACE_START);
+    os_deallocate((void*)READ_ONLY_SPACE_START, READ_ONLY_SPACE_END - READ_ONLY_SPACE_START);
     walk_all_spaces(undo_rospace_ptrs, (uword_t)shadow_base);
     // Set it empty
     read_only_space_free_pointer = (lispobj*)READ_ONLY_SPACE_START;

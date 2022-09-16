@@ -53,12 +53,6 @@ os_vm_address_t os_validate(int attributes, os_vm_address_t addr, os_vm_size_t l
     return addr;
 }
 
-void os_invalidate(os_vm_address_t addr, os_vm_size_t len)
-{
-    if(munmap((void*) addr, len) == -1)
-        perror("munmap");
-}
-
 #if defined LISP_FEATURE_GENCGC
 
 void

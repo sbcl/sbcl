@@ -90,8 +90,6 @@ DARWIN
 
 DRAGONFLY
   Multithreading does not work. Possibly because of bug in mmap/munmap.
-  Hint: Comment out call to os_invalidate in perform_thread_post_mortem
-  and threads will work, but space will not be freed, of course.
 
 MISC CLEANUPS
 

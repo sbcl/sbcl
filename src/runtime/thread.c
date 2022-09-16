@@ -388,7 +388,7 @@ void create_main_lisp_thread(lispobj function) {
 
 void free_thread_struct(struct thread *th)
 {
-    os_invalidate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
+    os_deallocate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
 }
 
 /* Note: scribble must be stack-allocated */

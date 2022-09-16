@@ -247,13 +247,6 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
 
     return addr;
 }
-
-void
-os_invalidate(os_vm_address_t addr, os_vm_size_t len)
-{
-    if (munmap(addr, len) == -1)
-        perror("munmap");
-}
 
 /*
  * any OS-dependent special low-level handling for signals

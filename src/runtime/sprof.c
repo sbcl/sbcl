@@ -376,7 +376,7 @@ static struct sprof_data* enlarge_buffer(struct sprof_data* current,
 {
     char * new_buffer = os_allocate(new_capacity * ELEMENT_SIZE);
     memcpy(new_buffer, current, current->free_pointer * ELEMENT_SIZE);
-    os_invalidate((void*)current, current->capacity * ELEMENT_SIZE);
+    os_deallocate((void*)current, current->capacity * ELEMENT_SIZE);
     current = (struct sprof_data*)new_buffer;
     current->capacity = new_capacity;
     return current;

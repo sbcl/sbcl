@@ -113,9 +113,6 @@ extern os_vm_address_t os_validate(int attributes, os_vm_address_t addr,
 void os_commit_memory(os_vm_address_t addr, os_vm_size_t len);
 #endif
 
-/* This function seems to undo the effect of os_validate(..). */
-extern void os_invalidate(os_vm_address_t addr, os_vm_size_t len);
-
 /* This maps a file into memory, or calls lose(..) for various
  * failures. */
 extern void* load_core_bytes(int fd,
@@ -189,7 +186,7 @@ sigset_t *os_context_sigmask_addr(os_context_t *context);
 
 /* These are not architecture-specific functions, but are instead
  * general utilities defined in terms of the architecture-specific
- * function os_validate(..) and os_invalidate(..).
+ * function os_validate(..) and os_deallocate(..).
  */
 extern os_vm_address_t os_allocate(os_vm_size_t len);
 extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);

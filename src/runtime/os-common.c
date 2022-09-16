@@ -74,7 +74,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
         /* Now deallocate and allocate the block so that it faults in
          * zero-filled. */
 
-        os_invalidate(block_start, block_size);
+        os_deallocate(block_start, block_size);
         addr = os_validate(NOT_MOVABLE, block_start, block_size, 0);
 
         if (addr == NULL || addr != block_start)
@@ -103,7 +103,11 @@ os_allocate(os_vm_size_t len)
 void
 os_deallocate(os_vm_address_t addr, os_vm_size_t len)
 {
-    os_invalidate(addr,len);
+#ifdef LISP_FEATURE_WIN32
+    gc_assert(VirtualFree(addr, 0, MEM_RELEASE));
+#else
+    if (munmap(addr, len) == -1) perror("munmap");
+#endif
 }
 #endif
 

@@ -820,12 +820,6 @@ void os_decommit_mem(os_vm_address_t addr,  os_vm_size_t len) {
     gc_assert(VirtualFree(addr, len, MEM_DECOMMIT));
 }
 
-void
-os_invalidate(os_vm_address_t addr, os_vm_size_t len)
-{
-    gc_assert(VirtualFree(addr, 0, MEM_RELEASE));
-}
-
 /*
  * load_core_bytes() is called to load a chunk of the core file into memory.
  *

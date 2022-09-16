@@ -35,7 +35,7 @@ In light of the postmortem dump of /proc/self/maps not being an atomic snapshot,
 one of two things must have happened:
 - the kernel randomly decided to be adversarial and not give back
   an address that was just a moment ago unmapped by this thread
-- some other thread intruded between os_invalidate() and os_validate().
+- some other thread intruded between os_deallocate() and os_validate().
 
 As a matter of fact there were about 20 non-lisp threads in the lisp process
 which did not participate in the stop-for-GC protocol.

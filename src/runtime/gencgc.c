@@ -667,7 +667,7 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
     }
 #else
     void *new_addr;
-    os_invalidate(addr, length);
+    os_deallocate(addr, length);
     new_addr = os_validate(NOT_MOVABLE, addr, length, DYNAMIC_CORE_SPACE_ID);
     if (new_addr == NULL || new_addr != addr) {
         lose("remap_free_pages: page moved, %p ==> %p",
@@ -1117,7 +1117,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_re
         int remap_from = first_page + (page_words_used(first_page)?1:0);
         if (last_page >= remap_from) {
             long len = npage_bytes(1+last_page-remap_from);
-            os_invalidate(page_address(remap_from), len);
+            os_deallocate(page_address(remap_from), len);
             mmap(page_address(remap_from), len,
                  OS_VM_PROT_ALL, MAP_ANON|MAP_PRIVATE|MAP_JIT, -1, 0);
             page_index_t p;
