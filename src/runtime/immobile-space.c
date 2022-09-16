@@ -2041,7 +2041,7 @@ static void defrag_immobile_space(boolean verbose)
 #if 0
     // It's easy to mess things up, so assert correctness before saving a core.
     printf("verifying defrag\n");
-    verify_heap(1);
+    verify_heap(&verbose, VERIFY_POST_GC|VERIFY_AGGRESSIVE);
 #endif
     free(fixedobj_tempspace.start);
     free(text_tempspace.start);
