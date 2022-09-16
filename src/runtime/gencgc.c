@@ -3775,7 +3775,8 @@ static void pin_call_chain_and_boxed_registers(struct thread* th) {
 static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 conservative_stack_scan(struct thread* th,
                         __attribute__((unused)) generation_index_t gen,
-                        lispobj* cur_thread_approx_stackptr)
+                        // #+sb-safepoint uses os_get_csp() and not this arg
+                        __attribute__((unused)) lispobj* cur_thread_approx_stackptr)
 {
     /* there are potentially two stacks for each thread: the main
      * stack, which may contain Lisp pointers, and the alternate stack.

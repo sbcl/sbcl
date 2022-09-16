@@ -178,7 +178,7 @@ void safepoint_init()
         InitializeConditionVariable(&gc_state.phase_cond[i]);
     InitializeCriticalSection(&gc_state.lock);
 #else
-    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES, 0, 0);
+    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES, 0);
 #endif
     gc_state.phase = GC_NONE;
 }
@@ -947,7 +947,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
     /* Must not and need not attempt to signal ourselves while we're the
      * STW initiator. */
     if (thread == self) {
-        write_TLS(THRUPTION_PENDING,T,self);
+        write_TLS(THRUPTION_PENDING,LISP_T,self);
         while (check_pending_thruptions(0 /* ignore the sigmask */))
             ;
         return;
@@ -972,9 +972,9 @@ void wake_thread_impl(struct thread_instance *lispthread)
                 WITH_ALL_THREADS_LOCK {
                     do {
                             odxprint(safepoints, "wake_thread_posix: found");
-                            write_TLS(THRUPTION_PENDING,T,thread);
-                            if (read_TLS(GC_PENDING,thread) == T
-                                || THREAD_STOP_PENDING(thread) == T)
+                            write_TLS(THRUPTION_PENDING,LISP_T,thread);
+                            if (read_TLS(GC_PENDING,thread) == LISP_T
+                                || THREAD_STOP_PENDING(thread) == LISP_T)
                                 break;
 
                             if (os_get_csp(thread)) {
@@ -992,7 +992,7 @@ void wake_thread_impl(struct thread_instance *lispthread)
             gc_advance(GC_NONE,GC_INVOKED);
         } else {
             odxprint(safepoints, "wake_thread_posix: passive");
-            write_TLS(THRUPTION_PENDING, T, thread);
+            write_TLS(THRUPTION_PENDING, LISP_T, thread);
         }
     }
     thread_sigmask(SIG_SETMASK, &oldset, 0);

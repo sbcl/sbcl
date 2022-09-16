@@ -1211,7 +1211,7 @@ interrupt_handle_pending(os_context_t *context)
         run_deferred_handler(data, context);
     }
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    if (read_TLS(THRUPTION_PENDING,thread)==T)
+    if (read_TLS(THRUPTION_PENDING,thread)==LISP_T)
         /* Special case for the following situation: There is a
          * thruption pending, but a signal had been deferred.  The
          * pitstop at the top of this function could only take care
