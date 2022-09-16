@@ -240,7 +240,6 @@ sword_t scavenge(lispobj *start, sword_t n_words)
  *
  * In case of card-spanning objects, the 'start' and 'end' parameters might not
  * exactly delimit objects boundaries. */
-#ifdef LISP_FEATURE_GENCGC
 int descriptors_scavenge(lispobj *start, lispobj* end,
                          generation_index_t gen, int dirty)
 {
@@ -295,7 +294,6 @@ int descriptors_scavenge(lispobj *start, lispobj* end,
     }
     return dirty;
 }
-#endif
 
 /* If 'fun' is provided, then call it on each livened object,
  * otherwise use scav1() */
@@ -354,9 +352,7 @@ extern int pin_all_dynamic_space_code;
 static struct code *
 trans_code(struct code *code)
 {
-#ifdef LISP_FEATURE_GENCGC
     gc_dcheck(!pin_all_dynamic_space_code);
-#endif
     /* if object has already been transported, just return pointer */
     if (forwarding_pointer_p((lispobj *)code)) {
         return (struct code *)native_pointer(forwarding_pointer_value((lispobj*)code));
@@ -411,11 +407,7 @@ trans_code(struct code *code)
         }
     })
     gencgc_apply_code_fixups(code, new_code);
-#ifdef LISP_FEATURE_GENCGC
-    /* Cheneygc doesn't need this os_flush_icache, it flushes the whole
-       spaces once when all copying is done. */
     os_flush_icache(code_text_start(new_code), code_text_size(new_code));
-#endif
     return new_code;
 }
 
@@ -560,7 +552,6 @@ static inline lispobj copy_instance(lispobj object)
     void* region = small_mixed_region;
     int page_type = PAGE_TYPE_SMALL_MIXED;
 
-#ifdef LISP_FEATURE_GENCGC
     struct layout* layout = (void*)native_pointer(instance_layout(INSTANCE(object)));
     struct bitmap bitmap;
     const int words_per_card = GENCGC_CARD_BYTES>>WORD_SHIFT;
@@ -581,7 +572,6 @@ static inline lispobj copy_instance(lispobj object)
                  (layout_flags(layout) & STRICTLY_BOXED_FLAG))
             page_type = PAGE_TYPE_BOXED, region = boxed_region;
     }
-#endif
 
     lispobj copy;
     // KLUDGE: reading both flags at once doesn't really work
@@ -1244,11 +1234,9 @@ void smash_weak_pointers(void)
          * it has been, the weak pointer is still good and needs to be
          * updated. Otherwise, the weak pointer needs to be broken. */
         TEST_WEAK_CELL(wp->value, val, UNBOUND_MARKER_WIDETAG)
-#ifdef LISP_FEATURE_GENCGC
         // Large objects are "moved" by touching the page table gen field.
         // Do nothing if the target of this weak pointer had that happen.
         else if (new_space_p(val)) { }
-#endif
         else
             lose("unbreakable pointer %p", wp);
     }
@@ -1903,10 +1891,8 @@ void cull_weak_hash_tables(int (*alivep[4])(lispobj,lispobj))
      * which is what an extra reset would do if it saw no inserts. */
     if (weak_objects.count)
         hopscotch_reset(&weak_objects);
-#ifdef LISP_FEATURE_GENCGC
     // Close the region used when pushing items to the finalizer queue
     ensure_region_closed(cons_region, PAGE_TYPE_CONS);
-#endif
 }
 
 
@@ -2134,7 +2120,6 @@ valid_lisp_pointer_p(lispobj pointer)
      * cases when we could answer the question more simply.
      * So unfortunately this generic interface has to know something about
      * which GC is in use. */
-#ifdef LISP_FEATURE_GENCGC
     page_index_t page = find_page_index((void*)pointer);
     if (page >= 0 &&
         (page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_BOXED) {
@@ -2146,7 +2131,6 @@ valid_lisp_pointer_p(lispobj pointer)
                             LOWTAG_FOR_WIDETAG(*native_pointer(pointer) & WIDETAG_MASK))
                == pointer;
     }
-#endif
     lispobj *start = search_all_gc_spaces((void*)pointer);
     if (start != NULL)
         return properly_tagged_descriptor_p((void*)pointer, start);

@@ -591,12 +591,8 @@ static void relocate_heap(struct heap_adjust* adj)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
 #endif
-#ifdef LISP_FEATURE_CHENEYGC
-    relocate_space(DYNAMIC_0_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
-#else
     relocate_space(DYNAMIC_SPACE_START, (lispobj*)dynamic_space_highwatermark(),
                    adj);
-#endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     relocate_space(TEXT_SPACE_START, text_space_highwatermark, adj);
 #endif
@@ -703,14 +699,7 @@ process_directory(int count, struct ndir_entry *entry,
         lispobj** pfree_pointer; // pointer to x_free_pointer
     } spaces[MAX_CORE_SPACE_ID+1] = {
         {0, 0, 0, 0}, // blank for space ID 0
-#ifdef LISP_FEATURE_GENCGC
         {dynamic_space_size, 0, DYNAMIC_SPACE_START, 0},
-#else
-        // Whatever address the core's dynamic space has
-        // becomes subspace 0. The other is subspace 1.
-        // It makes no difference which has the lower address.
-        {dynamic_space_size, 0, DYNAMIC_0_SPACE_START, 0},
-#endif
         // This order is determined by constants in compiler/generic/genesis
         {0, 0, STATIC_SPACE_START, &static_space_free_pointer},
 
@@ -854,25 +843,6 @@ process_directory(int count, struct ndir_entry *entry,
                 break;
 #endif
             case DYNAMIC_CORE_SPACE_ID:
-#ifdef LISP_FEATURE_CHENEYGC
-                {
-                  uword_t semispace_0_start = ALIGN_UP(addr, BACKEND_PAGE_BYTES);
-                  uword_t semispace_0_end = ALIGN_DOWN(addr + request, BACKEND_PAGE_BYTES);
-                  // assign to 'addr' too, because that's where we load the core file
-                  DYNAMIC_0_SPACE_START = addr = semispace_0_start;
-                  current_dynamic_space = (lispobj*)addr;
-                  // Request that much again now
-                  uword_t addr1 = (uword_t)os_validate(MOVABLE, 0, request, 1, 0);
-                  uword_t semispace_1_start = ALIGN_UP(addr1, BACKEND_PAGE_BYTES);
-                  uword_t semispace_1_end = ALIGN_DOWN(addr1 + request, BACKEND_PAGE_BYTES);
-
-                  DYNAMIC_1_SPACE_START = semispace_1_start;
-                  uword_t semispace_0_size = semispace_0_end - semispace_0_start;
-                  uword_t semispace_1_size = semispace_1_end - semispace_1_start;
-                  dynamic_space_size =
-                      semispace_0_size < semispace_1_size ? semispace_0_size : semispace_1_size;
-                }
-#else /* gencgc */
                 {
                 uword_t aligned_start = ALIGN_UP(addr, GENCGC_PAGE_BYTES);
                 /* Misalignment can happen only if card size exceeds OS page.
@@ -882,7 +852,6 @@ process_directory(int count, struct ndir_entry *entry,
                 DYNAMIC_SPACE_START = addr = aligned_start;
                 check_dynamic_space_addr_ok(addr, dynamic_space_size);
                 }
-#endif
                 break;
             }
 
@@ -926,16 +895,8 @@ process_directory(int count, struct ndir_entry *entry,
                 *spaces[id].pfree_pointer = free_pointer;
             break;
         case DYNAMIC_CORE_SPACE_ID:
-#ifdef LISP_FEATURE_CHENEYGC
-            /* 'addr' is the actual address if relocatable.
-             * For cheneygc, this will be whatever the GC was using
-             * at the time the core was saved.
-             * For gencgc this is #defined as DYNAMIC_SPACE_START */
-            current_dynamic_space = (lispobj *)addr;
-#else
             next_free_page = ALIGN_UP(entry->nwords<<WORD_SHIFT, GENCGC_PAGE_BYTES)
               / GENCGC_PAGE_BYTES;
-#endif
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
         }
     }
@@ -946,15 +907,9 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[READ_ONLY_CORE_SPACE_ID].base, // expected
                    spaces[READ_ONLY_CORE_SPACE_ID].len);
 #endif
-#ifdef LISP_FEATURE_GENCGC
     set_adjustment(adj, DYNAMIC_SPACE_START, // actual
                    spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
-#else
-    set_adjustment(adj, DYNAMIC_0_SPACE_START, // actual
-                   spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
-                   spaces[DYNAMIC_CORE_SPACE_ID].len);
-#endif // LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (lisp_code_in_elf() && TEXT_SPACE_START != spaces[IMMOBILE_TEXT_CORE_SPACE_ID].base) {
         lose("code-in-elf + PIE not supported");
@@ -990,12 +945,8 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 }
 
-#ifdef LISP_FEATURE_GENCGC
 extern void gc_load_corefile_ptes(int, core_entry_elt_t, core_entry_elt_t,
                                   os_vm_offset_t offset, int fd);
-#else
-#define gc_load_corefile_ptes(dummy1,dummy2,dummy3,dummy4,dummy5)
-#endif
 
 static void sanity_check_loaded_core(lispobj);
 
@@ -1073,14 +1024,13 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
             }
 #endif
-#ifdef LISP_FEATURE_GENCGC
+            // simple-fun implies cold-init, not a warm core (it would be a closure then)
             if (widetag_of(native_pointer(initial_function)) == SIMPLE_FUN_WIDETAG
                 && !lisp_startup_options.noinform) {
                 fprintf(stderr, "Initial page table:\n");
                 extern void print_generation_stats(void);
                 print_generation_stats();
             }
-#endif
             sanity_check_loaded_core(initial_function);
             return initial_function;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed
@@ -1278,12 +1228,7 @@ static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
     return 0;
 }
 
-#ifdef LISP_FEATURE_GENCGC
 #define count_this_pointer_p(ptr) (find_page_index((void*)ptr) >= 0)
-#endif
-#ifdef LISP_FEATURE_CHENEYGC
-#define count_this_pointer_p(ptr) (1)
-#endif
 
 static void sanity_check_loaded_core(lispobj initial_function)
 {
@@ -1312,13 +1257,7 @@ static void sanity_check_loaded_core(lispobj initial_function)
         if (count_this_pointer_p(ptr)) tally(ptr, &v[0]);
     // Pass 2: Count all heap objects
     v[1].reached = &reached;
-#ifdef LISP_FEATURE_GENCGC
     walk_generation(visit, -1, (uword_t)&v[1]);
-#endif
-#ifdef LISP_FEATURE_CHENEYGC
-    visit((lispobj*)READ_ONLY_SPACE_START, read_only_space_free_pointer, (uword_t)&v[1]);
-    visit((lispobj*)STATIC_SPACE_START, static_space_free_pointer, (uword_t)&v[1]);
-#endif
 
     // Pass 3: Compare
     // Start with the conses
