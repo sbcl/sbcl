@@ -1816,3 +1816,23 @@
           (complex single-float-negative-infinity single-float-positive-infinity)
           (complex single-float-negative-infinity single-float-negative-infinity)
           (complex single-float-positive-infinity single-float-negative-infinity)))
+
+#+round-float
+(deftransform fround ((number &optional divisor) (double-float t))
+  (if (or (not divisor)
+          (and (constant-lvar-p divisor)
+               (= (lvar-value divisor) 1)))
+      `(let ((res (round-double number :round)))
+         (values res (- number res)))
+      `(let ((res (round-double (/ number (%double-float divisor)) :round)))
+         (values res (- number (* res divisor))))))
+
+#+round-float
+(deftransform fround ((number &optional divisor) (single-float (or null single-float rational)))
+  (if (or (not divisor)
+          (and (constant-lvar-p divisor)
+               (= (lvar-value divisor) 1)))
+      `(let ((res (round-single number :round)))
+         (values res (- number res)))
+      `(let ((res (round-single (/ number (%single-float divisor)) :round)))
+         (values res (- number (* res divisor))))))

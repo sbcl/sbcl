@@ -309,9 +309,6 @@
 (define-source-transform oddp (x) `(logtest ,x 1))
 (define-source-transform evenp (x) `(not (logtest ,x 1)))
 
-;;; Note that all the integer division functions are available for
-;;; inline expansion.
-
 (macrolet ((deffrob (fun)
              `(define-source-transform ,fun (x &optional (y nil y-p))
                 (declare (ignore y))
