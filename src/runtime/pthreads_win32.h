@@ -13,13 +13,6 @@ typedef int sigset_t;
 
 /* 0 - Misc */
 
-#ifndef SIG_IGN
-#define SIG_IGN ((void (*)(int, siginfo_t, void*))-1)
-#endif
-#ifndef SIG_DFL
-#define SIG_DFL ((void (*)(int, siginfo_t, void*))-2)
-#endif
-
 #define SIGHUP    1
 #define SIGINT    2 /* Interactive attention */
 #define SIGQUIT   3
@@ -41,8 +34,6 @@ typedef int sigset_t;
 #define SIGBREAK  21 /* Control-break */
 #define SIGABRT   22 /* Abnormal termination (abort) */
 
-#define SIGRTMIN  23
-
 #ifndef NSIG
 #define NSIG 32     /* maximum signal number + 1 */
 #endif
@@ -60,31 +51,11 @@ typedef struct timespec {
 } timespec;
 #endif
 
-/* some MinGWs seem to include it, others not: */
-#ifndef ETIMEDOUT
-# define ETIMEDOUT 123 //Something
-#endif
-
 int sched_yield();
 
 typedef struct {
   int bogus;
 } siginfo_t;
-
-#define SA_SIGINFO (1u<<1)
-#define SA_NODEFER (1u<<2)
-#define SA_RESTART (1u<<3)
-#define SA_ONSTACK (1u<<4)
-
-struct sigaction {
-  void (*sa_handler)(int);
-  void (*sa_sigaction)(int, siginfo_t*, void*);
-  sigset_t sa_mask;
-  int sa_flags;
-};
-int sigaction(int signum, const struct sigaction* act, struct sigaction* oldact);
-
-int sigpending(sigset_t *set);
 
 int sigemptyset(sigset_t *set);
 int sigfillset(sigset_t *set);
