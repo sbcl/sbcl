@@ -371,7 +371,12 @@ struct lisp_startup_options lisp_startup_options;
 
 struct cmdline_options {
     char *core;
-    char **argv;
+#ifdef LISP_FEATURE_WIN32
+    wchar_t
+#else
+    char
+#endif
+     **argv;
     boolean disable_lossage_handler_p;
     int merge_core_pages;
 };
