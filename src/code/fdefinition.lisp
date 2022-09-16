@@ -352,7 +352,7 @@
            (setf fun (encapsulation-info-definition encap-info))
            (return fun)))))
 
-(defvar *setf-fdefinition-hook* nil
+(define-load-time-global *setf-fdefinition-hook* nil
   "A list of functions that (SETF FDEFINITION) invokes before storing the
    new value. The functions take the function name and the new value.")
 
@@ -377,27 +377,20 @@
 
     ;; Check for hash-table stuff. Woe onto him that mixes encapsulation
     ;; with this.
-    (when (and (symbolp name) (fboundp name))
-      (let ((old (symbol-function name)))
-        (when (boundp '*setf-fdefinition-hook*)
-          (dolist (spec *user-hash-table-tests*)
+    (when (symbolp name)
+      (let ((old (%symbol-function name)))
+        (dolist (spec *user-hash-table-tests*)
             (cond ((eq old (second spec))
                    ;; test-function
                    (setf (second spec) new-value))
                   ((eq old (third spec))
                    ;; hash-function
-                   (setf (third spec) new-value)))))))
+                   (setf (third spec) new-value))))))
 
-    ;; FIXME: This is a good hook to have, but we should probably
-    ;; reserve it for users.
     (let ((fdefn (find-or-create-fdefn name)))
-      ;; *SETF-FDEFINITION-HOOK* won't be bound when initially running
-      ;; top level forms in the kernel core startup.
-      (when (boundp '*setf-fdefinition-hook*)
-        (dolist (f *setf-fdefinition-hook*)
-          (declare (type function f))
-          (funcall f name new-value)))
-
+      (dolist (f *setf-fdefinition-hook*)
+        (declare (type function f))
+        (funcall f name new-value))
       (let ((encap-info (encapsulation-info (fdefn-fun fdefn))))
         (cond (encap-info
                (loop
@@ -406,9 +399,8 @@
                         (encapsulation-info-definition encap-info))))
                   (if more-info
                       (setf encap-info more-info)
-                      (return
-                        (setf (encapsulation-info-definition encap-info)
-                              new-value))))))
+                      (return (setf (encapsulation-info-definition encap-info)
+                                    new-value))))))
               (t
                (setf (fdefn-fun fdefn) new-value)))))))
 

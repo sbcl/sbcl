@@ -1964,6 +1964,9 @@ core and return a descriptor to it."
 
   (cold-set 'sb-c::*code-serialno* (make-fixnum-descriptor (1+ sb-c::*code-serialno*)))
 
+  (cold-set 'sb-impl::*setf-fdefinition-hook* *nil-descriptor*)
+  (cold-set 'sb-impl::*user-hash-table-tests* *nil-descriptor*)
+
   ;; Put the C-callable fdefns into the static-fdefn vector if #+immobile-code.
   #+immobile-code
   (let* ((space *immobile-text*)
