@@ -287,27 +287,15 @@ memory_fault_handler(int signal, siginfo_t *siginfo, os_context_t *context)
             lisp_memory_fault_error(context, fault_addr);
 }
 
-#if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-void
-mach_error_memory_fault_handler(int signal, siginfo_t *siginfo,
-                                os_context_t *context) {
-    lose("Unhandled memory fault. Exiting.");
-}
-#endif
-
 void
 os_install_interrupt_handlers(void)
 {
     if (INSTALL_SIG_MEMORY_FAULT_HANDLER) {
-#if defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
-    ll_install_handler(SIG_MEMORY_FAULT, mach_error_memory_fault_handler);
-#else
     ll_install_handler(SIG_MEMORY_FAULT,
 #if defined(LISP_FEATURE_FREEBSD) && !defined(__GLIBC__)
                                                  (__siginfohandler_t *)
 #endif
                                                  memory_fault_handler);
-#endif
 
 #ifdef LISP_FEATURE_DARWIN
     /* Unmapped pages get this and not SIGBUS. */

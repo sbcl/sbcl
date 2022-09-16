@@ -577,8 +577,6 @@ during backtrace.
   ;; print an approximation of the CSP as needed.
   #+sb-thread
   (control-stack-pointer :c-type "lispobj *")
-  #+mach-exception-handler
-  (mach-port-name :c-type "mach_port_name_t")
   #+ppc64 (card-table)
 
   ;; A few extra thread-local allocation buffers for special purposes

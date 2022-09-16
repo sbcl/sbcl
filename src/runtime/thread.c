@@ -27,12 +27,6 @@
 #include <sys/wait.h>
 #endif
 
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-#include <mach/mach.h>
-#include <mach/mach_error.h>
-#include <mach/mach_types.h>
-#endif
-
 #include "runtime.h"
 #include "validate.h"           /* for BINDING_STACK_SIZE etc */
 #include "thread.h"
@@ -480,10 +474,6 @@ unregister_thread(struct thread *th,
     os_sem_destroy(&semaphores->state_sem);
     os_sem_destroy(&semaphores->state_not_running_sem);
     os_sem_destroy(&semaphores->state_not_stopped_sem);
-#endif
-
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-    mach_lisp_thread_destroy(th);
 #endif
 
 #if defined(LISP_FEATURE_WIN32)

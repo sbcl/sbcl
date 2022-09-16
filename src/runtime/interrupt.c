@@ -1562,7 +1562,6 @@ extern int *os_context_flags_addr(os_context_t *context);
 
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
 extern void post_signal_tramp(void);
-extern void call_into_lisp_tramp(void);
 
 void
 arrange_return_to_c_function(os_context_t *context,
