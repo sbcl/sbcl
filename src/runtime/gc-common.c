@@ -2088,15 +2088,6 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
     return 0; // no good
 }
 
-/* META: Note the ambiguous word "validate" in the comment below.
- * This means "Decide whether <x> is valid".
- * But when you see os_validate() elsewhere, that doesn't mean to ask
- * whether something is valid, it says to *make* it valid.
- * I think it would be nice if we could avoid using the word in the
- * sense in which os_validate() uses it, which would entail renaming
- * a bunch of stuff, which is harder than just explaining why
- * the comments can be deceptive */
-
 /* Used by the debugger to validate possibly bogus pointers before
  * calling MAKE-LISP-OBJ on them.
  *

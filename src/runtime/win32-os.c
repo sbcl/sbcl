@@ -754,15 +754,9 @@ uword_t get_monotonic_time()
 }
 #endif
 
-static os_vm_address_t os_validate_nocommit(int,os_vm_address_t,os_vm_size_t);
-
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id)
+os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
-    // Reserving the dynamic space doesn't commit it.
-    if (space_id == DYNAMIC_CORE_SPACE_ID && (attributes & MOVABLE))
-        return os_validate_nocommit(attributes, addr, len);
-
     if (!addr) {
         int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
         os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection);
@@ -770,7 +764,10 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
         return actual;
     }
 
-    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    // Reserving the dynamic space doesn't commit it.
+    DWORD commit =
+      (space_id == DYNAMIC_CORE_SPACE_ID && (attributes & MOVABLE)) ? 0 : MEM_COMMIT;
+    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE|commit, PAGE_EXECUTE_READWRITE);
 
     if (!actual) {
         if (!(attributes & MOVABLE)) {
@@ -781,29 +778,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
             return 0;
         }
 
-        actual = VirtualAlloc(NULL, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-        gc_assert(actual);
-    }
-
-    return actual;
-}
-
-/* Used to allocate the dynamic space, as it may be very large.
- * Dynamically comitted by gc_alloc_new_region() or gc_alloc_large() */
-static os_vm_address_t
-os_validate_nocommit(int attributes, os_vm_address_t addr, os_vm_size_t len)
-{
-    os_vm_address_t actual = VirtualAlloc(addr, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-
-    if (!actual) {
-        if (!(attributes & MOVABLE)) {
-            fprintf(stderr,
-                    "VirtualAlloc: wanted %lu bytes at %p, actually mapped at %p\n",
-                    (unsigned long) len, addr, actual);
-            fflush(stderr);
-            return 0;
-        }
-        actual = VirtualAlloc(NULL, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        actual = VirtualAlloc(NULL, len, MEM_RESERVE|commit, PAGE_EXECUTE_READWRITE);
         gc_assert(actual);
     }
 

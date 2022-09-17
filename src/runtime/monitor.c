@@ -899,16 +899,16 @@ int load_gc_crashdump(char* pathname)
     static_space_free_pointer = (lispobj*)(STATIC_SPACE_START + preamble.static_nbytes);
     if (preamble.readonly_nbytes) {
       // READ_ONLY_SPACE_START = preamble.readonly_start;
-      os_validate(0, (char*)preamble.readonly_start,
-                  ALIGN_UP(preamble.readonly_nbytes, 4096), 0);
+      os_alloc_gc_space(READ_ONLY_CORE_SPACE_ID, 0, (char*)preamble.readonly_start,
+                        ALIGN_UP(preamble.readonly_nbytes, 4096));
       checked_read("R/O", fd, (char*)preamble.readonly_start, preamble.readonly_nbytes);
     }
     read_only_space_free_pointer = (lispobj*)(READ_ONLY_SPACE_START + preamble.readonly_nbytes);
     //
     DYNAMIC_SPACE_START = preamble.dynspace_start;
     long dynspace_nbytes = preamble.dynspace_npages * GENCGC_PAGE_BYTES;
-    char* dynspace = os_validate(0, (char*)preamble.dynspace_start,
-                                 DEFAULT_DYNAMIC_SPACE_SIZE, 0);
+    char* dynspace = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, 0, (char*)preamble.dynspace_start,
+                                       DEFAULT_DYNAMIC_SPACE_SIZE);
     if (dynspace != (char*)preamble.dynspace_start)
         lose("Didn't map dynamic space where expected: %p vs %p",
              dynspace, (char*)preamble.dynspace_start);
@@ -929,8 +929,10 @@ int load_gc_crashdump(char* pathname)
     TEXT_SPACE_START = preamble.text_start;
     fixedobj_free_pointer = (lispobj*)preamble.fixedobj_free_pointer;
     text_space_highwatermark = (lispobj*)preamble.text_space_highwatermark;
-    os_validate(0, (char*)FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_SIZE, 0);
-    os_validate(0, (char*)TEXT_SPACE_START, TEXT_SPACE_SIZE, 0);
+    os_alloc_gc_space(IMMOBILE_FIXEDOBJ_CORE_SPACE_ID, 0, (char*)FIXEDOBJ_SPACE_START,
+                      FIXEDOBJ_SPACE_SIZE);
+    os_alloc_gc_space(IMMOBILE_TEXT_CORE_SPACE_ID, 0, (char*)TEXT_SPACE_START,
+                      TEXT_SPACE_SIZE);
     gc_init_immobile(); // allocate the page tables
     calc_immobile_space_bounds();
     // Read fixedobj space

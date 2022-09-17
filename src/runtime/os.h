@@ -106,8 +106,8 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
 #define IS_THREAD_STRUCT 4
 #define MOVABLE_LOW      (MOVABLE|ALLOCATE_LOW)
 #define IS_GUARD_PAGE    8
-extern os_vm_address_t os_validate(int attributes, os_vm_address_t addr,
-                                   os_vm_size_t len, int space_id);
+extern os_vm_address_t os_alloc_gc_space(int space_id, int attributes,
+                                         os_vm_address_t addr, os_vm_size_t len);
 
 #ifdef LISP_FEATURE_WIN32
 void os_commit_memory(os_vm_address_t addr, os_vm_size_t len);
@@ -186,7 +186,7 @@ sigset_t *os_context_sigmask_addr(os_context_t *context);
 
 /* These are not architecture-specific functions, but are instead
  * general utilities defined in terms of the architecture-specific
- * function os_validate(..) and os_deallocate(..).
+ * function os_alloc_gc_space(..) and os_deallocate(..).
  */
 extern os_vm_address_t os_allocate(os_vm_size_t len);
 extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);

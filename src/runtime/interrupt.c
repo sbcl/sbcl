@@ -1624,7 +1624,7 @@ arrange_return_to_c_function(os_context_t *context,
 #if defined(LISP_FEATURE_DARWIN)
     uint32_t *register_save_area = (uint32_t *)os_allocate(0x40);
 
-    /* 1. os_validate (malloc/mmap) register_save_block
+    /* 1. allocate (malloc/mmap) register_save_block
      * 2. copy register state into register_save_block
      * 3. put a pointer to register_save_block in a register in the context
      * 4. set the context's EIP to point to a trampoline which:

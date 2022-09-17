@@ -668,7 +668,7 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
 #else
     void *new_addr;
     os_deallocate(addr, length);
-    new_addr = os_validate(NOT_MOVABLE, addr, length, DYNAMIC_CORE_SPACE_ID);
+    new_addr = os_alloc_gc_space(DYNAMIC_CORE_SPACE_ID, NOT_MOVABLE, addr, length);
     if (new_addr == NULL || new_addr != addr) {
         lose("remap_free_pages: page moved, %p ==> %p",
              addr, new_addr);

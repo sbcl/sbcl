@@ -55,6 +55,6 @@
 (defconstant static-code-core-space-id 4)
 (defconstant deflated-core-space-id-flag 8)
 ;;; These space-IDs are not present in a core file, but
-;;; we need unique values for supplying to os_validate
+;;; we need unique values for supplying to os_alloc_gc_space
 (defconstant alien-linkage-table-core-space-id 101)
 (defconstant thread-struct-core-space-id 102)

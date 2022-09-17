@@ -872,8 +872,8 @@ alloc_thread_struct(void* spaces) {
         // if any newly started thread could refer a dead thread's heap objects.
         zeroize_stack = 1;
     } else {
-        spaces = os_validate(MOVABLE, NULL, THREAD_STRUCT_SIZE,
-                             THREAD_STRUCT_CORE_SPACE_ID);
+        spaces = os_alloc_gc_space(THREAD_STRUCT_CORE_SPACE_ID, MOVABLE,
+                                   NULL, THREAD_STRUCT_SIZE);
         if (!spaces) return NULL;
     }
     /* Aligning up is safe as THREAD_STRUCT_SIZE has

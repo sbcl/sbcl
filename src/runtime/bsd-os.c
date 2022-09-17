@@ -117,7 +117,7 @@ os_context_sigmask_addr(os_context_t *context)
 }
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id)
+os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     int __attribute((unused))
       executable = (space_id == READ_ONLY_CORE_SPACE_ID) ||

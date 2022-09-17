@@ -72,7 +72,8 @@ ensure_undefined_alien(void) {
 #else
     os_reported_page_size = getpagesize();
 #endif
-    os_vm_address_t start = os_validate(MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size, 0);
+    os_vm_address_t start =
+        os_alloc_gc_space(0, MOVABLE|IS_GUARD_PAGE, NULL, os_reported_page_size);
     if (start) {
         undefined_alien_address = start;
     } else {
@@ -100,10 +101,10 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
     int n_spaces = sizeof preinit_spaces / sizeof preinit_spaces[0];
     for (i = 0; i< n_spaces; ++i) {
         if (!preinit_spaces[i].size) continue;
-        if (os_validate(NOT_MOVABLE | should_allocate_low,
-                        (os_vm_address_t)preinit_spaces[i].start,
-                        preinit_spaces[i].size,
-                        preinit_spaces[i].id)) continue;
+        if (os_alloc_gc_space(preinit_spaces[i].id,
+                              NOT_MOVABLE | should_allocate_low,
+                              (os_vm_address_t)preinit_spaces[i].start,
+                              preinit_spaces[i].size)) continue;
         if (!hard_failp) return 0; // soft fail. Try again after disabling ASLR
         fprintf(stderr,
                 "failed to allocate %lu bytes at %p\n",

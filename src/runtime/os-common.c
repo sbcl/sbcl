@@ -75,7 +75,7 @@ os_zero(os_vm_address_t addr, os_vm_size_t length)
          * zero-filled. */
 
         os_deallocate(block_start, block_size);
-        addr = os_validate(NOT_MOVABLE, block_start, block_size, 0);
+        addr = os_alloc_gc_space(0, NOT_MOVABLE, block_start, block_size);
 
         if (addr == NULL || addr != block_start)
             lose("os_zero: block moved! %p ==> %p", block_start, addr);
@@ -97,7 +97,7 @@ void os_deallocate(os_vm_address_t addr, os_vm_size_t len) {
 os_vm_address_t
 os_allocate(os_vm_size_t len)
 {
-    return os_validate(MOVABLE, (os_vm_address_t)NULL, len, 0);
+    return os_alloc_gc_space(0, MOVABLE, (os_vm_address_t)NULL, len);
 }
 
 void

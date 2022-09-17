@@ -7,7 +7,7 @@ Instead it gets something way up high where there are all sorts of other
 memory mappings (from malloc and shared libraries, etc).
 
 At the time of failure, the lisp heap was "almost" covered by 6 lines
-from /proc/self/maps which we output to stderr in os_validate on failure.
+from /proc/self/maps which we output to stderr in os_alloc_gc_space on failure.
 (Excerpt below)
 In this lisp process, unmap/remap had already happened several times
 as evident from the multiple lines. The kernel hadn't re-combined those
@@ -35,7 +35,7 @@ In light of the postmortem dump of /proc/self/maps not being an atomic snapshot,
 one of two things must have happened:
 - the kernel randomly decided to be adversarial and not give back
   an address that was just a moment ago unmapped by this thread
-- some other thread intruded between os_deallocate() and os_validate().
+- some other thread intruded between os_deallocate() and os_alloc_gc_space().
 
 As a matter of fact there were about 20 non-lisp threads in the lisp process
 which did not participate in the stop-for-GC protocol.

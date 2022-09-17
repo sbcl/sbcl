@@ -41,7 +41,7 @@ void pick_fuzzed_addresses(void** addr1, void** addr2, void** addr3)
 }
 
 os_vm_address_t
-os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id)
+os_alloc_gc_space(int space_id, int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     void *fuzzed = addr;

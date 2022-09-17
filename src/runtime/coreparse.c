@@ -676,6 +676,23 @@ __attribute__((unused)) static void check_dynamic_space_addr_ok(uword_t start, u
 #endif
 }
 
+static os_vm_address_t reserve_space(int space_id, int attr,
+                                     os_vm_address_t addr, os_vm_size_t size)
+{
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (space_id == IMMOBILE_TEXT_CORE_SPACE_ID) {
+        // Carve out the text space from the earlier request that was made
+        // for the fixedobj space.
+        ALIEN_LINKAGE_TABLE_SPACE_START = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
+        return (os_vm_address_t)(ALIEN_LINKAGE_TABLE_SPACE_START + ALIEN_LINKAGE_TABLE_SPACE_SIZE);
+    }
+#endif
+    if (size == 0) return addr;
+    addr = os_alloc_gc_space(space_id, attr, addr, size);
+    if (!addr) lose("Can't allocate %#"OBJ_FMTX" bytes for space %d", size, space_id);
+    return addr;
+}
+
 /* TODO: If static + readonly were mapped as desired without disabling ASLR
  * but one of the large spaces couldn't be mapped as desired, start over from
  * the top, disabling ASLR. This should help to avoid relocating the heap
@@ -730,8 +747,9 @@ process_directory(int count, struct ndir_entry *entry,
                (uword_t)&lisp_code_start, (uword_t)&lisp_code_end,
                text_space_highwatermark);
 #endif
-        ALIEN_LINKAGE_TABLE_SPACE_START = (uword_t)
-            os_validate(0, 0, ALIEN_LINKAGE_TABLE_SPACE_SIZE, ALIEN_LINKAGE_TABLE_CORE_SPACE_ID);
+        ALIEN_LINKAGE_TABLE_SPACE_START =
+            (uword_t)os_alloc_gc_space(ALIEN_LINKAGE_TABLE_CORE_SPACE_ID, 0, 0,
+                                       ALIEN_LINKAGE_TABLE_SPACE_SIZE);
         // Prefill the alien linkage table so that shrinkwrapped executables which link in
         // all their C library dependencies can avoid linking with -ldl
         // but extern-alien still works for newly compiled code.
@@ -807,23 +825,8 @@ process_directory(int count, struct ndir_entry *entry,
             size_t request = spaces[id].desired_size;
             int sub_2gb_flag = (request & 1);
             request &= ~(size_t)1;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-            if (id == IMMOBILE_TEXT_CORE_SPACE_ID) {
-                // Pretend an os_validate() happened based on the address that
-                // would be obtained by a constant offset from fixedobj space.
-                ALIEN_LINKAGE_TABLE_SPACE_START = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
-                addr = ALIEN_LINKAGE_TABLE_SPACE_START + ALIEN_LINKAGE_TABLE_SPACE_SIZE;
-            }
-            else
-#endif
-            if (request) {
-                addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
-                                            (os_vm_address_t)addr, request, id);
-                if (!addr) {
-                    lose("Can't allocate %#"OBJ_FMTX" bytes for space %ld",
-                         (lispobj)request, id);
-                }
-            }
+            addr = (uword_t)reserve_space(id, sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                                          (os_vm_address_t)addr, request);
             switch (id) {
 #ifndef LISP_FEATURE_DARWIN_JIT
             case READ_ONLY_CORE_SPACE_ID:
@@ -845,8 +848,8 @@ process_directory(int count, struct ndir_entry *entry,
             case DYNAMIC_CORE_SPACE_ID:
                 {
                 uword_t aligned_start = ALIGN_UP(addr, GENCGC_PAGE_BYTES);
-                /* Misalignment can happen only if card size exceeds OS page.
-                 * Drop one card to avoid overrunning the allocated space */
+                /* Misalignment can happen only if GC page size exceeds OS page.
+                 * Drop one GC page to avoid overrunning the allocated space */
                 if (aligned_start > addr) // not card-aligned
                     dynamic_space_size -= GENCGC_PAGE_BYTES;
                 DYNAMIC_SPACE_START = addr = aligned_start;
