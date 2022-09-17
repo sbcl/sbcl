@@ -859,14 +859,10 @@ callback_wrapper_trampoline(
 
 struct thread *
 alloc_thread_struct(void* spaces) {
-    /* May as well allocate all the spaces at once: it saves us from
-     * having to decide what to do if only some of the allocations
-     * succeed. SPACES must be appropriately aligned, since the GC
-     * expects the control stack to start at a page boundary -- and
-     * the OS may have even more rigorous requirements. We can't rely
-     * on the alignment passed from os_validate, since that might
-     * assume the current (e.g. 4k) pagesize, while we calculate with
-     * the biggest (e.g. 64k) pagesize allowed by the ABI. */
+    /* Allocate the thread structure in one fell swoop as there is no way to recover
+     * from failing to obtain contiguous memory. Note that the OS may have a smaller
+     * alignment granularity than BACKEND_PAGE_BYTES so we may have to adjust the
+     * result to make it conform to our guard page alignment requirement. */
     boolean zeroize_stack = 0;
     if (spaces) {
         // If reusing memory from a previously exited thread, start by removing
@@ -876,7 +872,8 @@ alloc_thread_struct(void* spaces) {
         // if any newly started thread could refer a dead thread's heap objects.
         zeroize_stack = 1;
     } else {
-        spaces = os_validate(MOVABLE|IS_THREAD_STRUCT, NULL, THREAD_STRUCT_SIZE, 0);
+        spaces = os_validate(MOVABLE, NULL, THREAD_STRUCT_SIZE,
+                             THREAD_STRUCT_CORE_SPACE_ID);
         if (!spaces) return NULL;
     }
     /* Aligning up is safe as THREAD_STRUCT_SIZE has

@@ -129,6 +129,12 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
     int protection;
     int flags = 0;
 
+#if defined(LISP_FEATURE_OPENBSD) && defined(MAP_STACK)
+        /* OpenBSD requires MAP_STACK for pages used as stack.
+         * Note that FreeBSD has a MAP_STACK with different behavior. */
+    if (space_id == THREAD_STRUCT_CORE_SPACE_ID) flags = MAP_STACK;
+#endif
+
     // FIXME: This probaby needs to use MAP_TRYFIXED
     if (attributes & IS_GUARD_PAGE)
         protection = OS_VM_PROT_NONE;
@@ -154,7 +160,6 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
     attributes &= ~IS_GUARD_PAGE;
 
 #ifndef LISP_FEATURE_DARWIN // Do not use MAP_FIXED, because the OS is sane.
-
     /* The *BSD family of OSes seem to ignore 'addr' when it is outside
      * of some range which I could not figure out.  Sometimes it seems like the
      * condition is that any address below 4GB can't be requested without MAP_FIXED,
@@ -182,16 +187,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len, int space_id
        Except for MAP_FIXED mappings, the system will never replace existing mappings. */
 
     // ALLOCATE_LOW seems never to get what we want
-    if (!(attributes & MOVABLE) || (attributes & ALLOCATE_LOW)) {
-        flags = MAP_FIXED;
-    }
-    if (attributes & IS_THREAD_STRUCT) {
-#if defined(LISP_FEATURE_OPENBSD) && defined(MAP_STACK)
-        /* OpenBSD requires MAP_STACK for pages used as stack.
-         * Note that FreeBSD has a MAP_STACK with different behavior. */
-        flags = MAP_STACK;
-#endif
-    }
+    if (!(attributes & MOVABLE) || (attributes & ALLOCATE_LOW)) flags = MAP_FIXED;
 #endif
 
 #ifdef MAP_EXCL // not defined in OpenBSD, NetBSD, DragonFlyBSD

@@ -17,6 +17,7 @@
            #:immobile-fixedobj-core-space-id
            #:immobile-text-core-space-id
            #:alien-linkage-table-core-space-id
+           #:thread-struct-core-space-id
            #:deflated-core-space-id-flag))
 
 (in-package "SB-COREFILE")
@@ -53,6 +54,7 @@
 (defconstant immobile-text-core-space-id 5)
 (defconstant static-code-core-space-id 4)
 (defconstant deflated-core-space-id-flag 8)
-;;; this space-id is not present in the core file
-;;; but we need a unique ID to pass to os_validate
+;;; These space-IDs are not present in a core file, but
+;;; we need unique values for supplying to os_validate
 (defconstant alien-linkage-table-core-space-id 101)
+(defconstant thread-struct-core-space-id 102)
