@@ -1563,7 +1563,7 @@
 (define-source-transform fill-pointer (vector)
   (let ((vector-sym (gensym "VECTOR")))
     `(let ((,vector-sym ,vector))
-       (if (and (array-header-p ,vector-sym)
+       (if (and (arrayp ,vector-sym)
                 (array-has-fill-pointer-p ,vector-sym))
            (%array-fill-pointer ,vector-sym)
            (sb-vm::fill-pointer-error ,vector-sym)))))

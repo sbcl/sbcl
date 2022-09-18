@@ -1131,16 +1131,18 @@ of specialized arrays is supported."
 
 (defun %set-fill-pointer (vector new)
   (declare (explicit-check))
-  (cond ((not (array-has-fill-pointer-p vector)) (fill-pointer-error vector))
-        ((> (the index new) (%array-available-elements vector))
-         (let ((max (%array-available-elements vector)))
-           (error 'simple-type-error
-                  :datum new
-                  :expected-type (list 'integer 0 max)
-                  :format-control "The new fill pointer, ~S, is larger than the length of the vector (~S.)"
-                  :format-arguments (list new max))))
+  (cond ((not (and (arrayp vector)
+                   (array-has-fill-pointer-p vector)))
+         (fill-pointer-error vector))
         (t
-         (setf (%array-fill-pointer vector) new))))
+         (let ((max (%array-available-elements vector)))
+           (when (> (the fixnum new) max)
+             (error 'simple-type-error
+                    :datum new
+                    :expected-type (list 'integer 0 max)
+                    :format-control "The new fill pointer, ~S, is larger than the length of the vector (~S.)"
+                    :format-arguments (list new max)))
+           (setf (%array-fill-pointer vector) (truly-the index new))))))
 
 ;;; FIXME: It'd probably make sense to use a MACROLET to share the
 ;;; guts of VECTOR-PUSH between VECTOR-PUSH-EXTEND. Such a macro
