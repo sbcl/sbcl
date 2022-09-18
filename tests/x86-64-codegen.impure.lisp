@@ -182,22 +182,6 @@
       (assert (search "; #<SB-KERNEL:WRAPPER " line))
       (assert (search " SB-ASSEM:LABEL" line)))))
 
-#+immobile-code
-(with-test (:name :reference-assembly-tramp)
-  (dolist (testcase '(("FUNCALLABLE-INSTANCE-TRAMP"
-                       sb-kernel:%make-funcallable-instance)))
-    (let ((lines
-           (split-string
-            (with-output-to-string (stream)
-              (let ((sb-disassem:*disassem-location-column-width* 0))
-                (disassemble (cadr testcase) :stream stream)))
-            #\newline)))
-      (assert (loop for line in lines
-                    thereis (and (search "LEA" line)
-                                 (search "RIP" line) ; require RIP-relative mode
-                                 ;; and verify disassembly
-                                 (search (car testcase) line)))))))
-
 #+immobile-code ; uses SB-C::*COMPILE-TO-MEMORY-SPACE*
 (with-test (:name :static-link-compile-to-memory)
   (let* ((string
@@ -224,7 +208,7 @@
          (c-call (find "os_deallocate" lines :test #'search)))
     ;; Depending on #+immobile-code it's either direct or memory indirect.
     #+immobile-code (assert (search "CALL #x" c-call))
-    #-immobile-code (assert (search "CALL QWORD PTR [#x" c-call))))
+    #-immobile-code (assert (search "CALL [#x" c-call))))
 
 (with-test (:name :set-symbol-value-imm)
   (let (success)
@@ -1281,3 +1265,21 @@
                "&verify_gens"
                '(lambda ()
                  (extern-alien "verify_gens" char)))))))
+
+;;; This tests that the x86-64 disasembler does not crash
+;;; on LEA with a rip-relative operand and no label.
+(with-test (:name (disassemble :no-labels)
+                  :skipped-on (not :x86-64))
+  (let* ((lines
+          (split-string
+           (with-output-to-string (stream)
+             ;; A smallish function whose code happens to contain
+             ;; the thing under test.
+             (disassemble 'sb-impl::inspector :stream stream))
+          #\Newline))
+         (line (find "; = L0" lines :test 'search)))
+    (assert (search "LEA " line)) ; verify our test precondition
+    ;; Now just disassemble without labels and see that we don't crash
+    (disassemble 'sb-impl::inspector
+                 :use-labels nil
+                 :stream (make-broadcast-stream))))

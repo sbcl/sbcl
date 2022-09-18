@@ -465,9 +465,8 @@
                    'alien-linkage)
                (not (machine-ea-index value))
                (integerp (machine-ea-disp value)))
-      (let* ((index (sb-vm::alien-linkage-table-index-from-address
-                     (+ sb-vm:alien-linkage-table-space-start (machine-ea-disp value))))
-             (name (sb-impl::alien-linkage-index-to-name index)))
+      (let ((name (sb-impl::alien-linkage-index-to-name
+                   (floor (machine-ea-disp value) sb-vm:alien-linkage-table-entry-size))))
         (note (lambda (s) (format s "&~A" name)) dstate)))
     (setf (sb-disassem::dstate-known-register-contents dstate) nil)
 
@@ -543,41 +542,42 @@
 ;; Figure out whether LEA should print its EA with just the stuff in brackets,
 ;; or additionally show the EA as either a label or a hex literal.
 (defun lea-print-ea (value stream dstate)
-  (let* ((width (inst-operand-size dstate))
-         (addr
-          (etypecase value
-           (machine-ea
-            ;; Indicate to PRINT-MEM-REF that this is not a memory access.
-            (print-mem-ref :compute value width stream dstate)
-            (when (eq (machine-ea-base value) :rip)
-              (+ (dstate-next-addr dstate) (machine-ea-disp value))))
+  (let*
+      ((width (inst-operand-size dstate))
+       (addr
+        (etypecase value
+          (machine-ea
+           ;; Indicate to PRINT-MEM-REF that this is not a memory access.
+           (print-mem-ref :compute value width stream dstate)
+           (when (eq (machine-ea-base value) :rip)
+             (+ (dstate-next-addr dstate) (machine-ea-disp value))))
 
-           ((or string integer)
-            ;; A label for the EA should not print as itself, but as the decomposed
-            ;; addressing mode so that [ADDR] and [RIP+disp] are unmistakable.
-            ;; We can see an INTEGER here because LEA-COMPUTE-LABEL is always called
-            ;; on the operand to LEA, and it will compute an absolute address based
-            ;; off RIP when possible. If :use-labels NIL was specified, there is
-            ;; no hashtable of address to string, so we get the address.
-            ;; But ordinarily we get the string. Either way, the r/m arg reveals the
-            ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
-            ;; because the EA was computed in a prefilter.
-            ;; (the instruction format is known because LEA has exactly one format)
-            (print-mem-ref :compute (regrm-inst-r/m dchunk-zero dstate)
-                           width stream dstate)
-            value)
+          ((or string integer)
+           ;; A label for the EA should not print as itself, but as the decomposed
+           ;; addressing mode so that [ADDR] and [RIP+disp] are unmistakable.
+           ;; We can see an INTEGER here because LEA-COMPUTE-LABEL is always called
+           ;; on the operand to LEA, and it will compute an absolute address based
+           ;; off RIP when possible. If :use-labels NIL was specified, there is
+           ;; no hashtable of address to string, so we get the address.
+           ;; But ordinarily we get the string. Either way, the r/m arg reveals the
+           ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
+           ;; because the EA was computed in a prefilter.
+           ;; (the instruction format is known because LEA has exactly one format)
+           (print-mem-ref :compute (regrm-inst-r/m dchunk-zero dstate)
+                          width stream dstate)
+           value)
 
-           ;; LEA Rx,Ry is an illegal encoding, but we'll show it as-is.
-           ;; When we used integers instead of REG to represent registers, this case
-           ;; overlapped with the preceding. It's nice that it no longer does.
-           (reg
-            (print-reg-with-width value width stream dstate)
-            nil))))
-
-    (when (and addr stream) ; no end-of-line comments if storing into dstate
-      (unless (maybe-note-assembler-routine addr nil dstate)
-        (note (lambda (s) (format s (if (stringp addr) "= ~A" "= #x~x") addr))
-              dstate)))))
+         ;; LEA Rx,Ry is an illegal encoding, but we'll show it as-is.
+         ;; When we used integers instead of REG to represent registers, this case
+         ;; overlapped with the preceding. It's nice that it no longer does.
+         (reg
+          (print-reg-with-width value width stream dstate)
+          nil))))
+    (when stream
+      (cond ((stringp addr) ; label
+             (note (lambda (s) (format s "= ~A" addr)) dstate))
+            (addr
+             (note (lambda (s) (format s "= #x~x" addr)) dstate))))))
 
 ;;;; interrupt instructions
 

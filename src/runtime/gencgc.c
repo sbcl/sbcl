@@ -2043,7 +2043,12 @@ static lispobj conservative_root_p(lispobj addr, page_index_t addr_page_index)
             return 0;
 #ifdef LISP_FEATURE_X86_64
         case FUNCALLABLE_INSTANCE_WIDETAG:
+            // Allow any of these to pin a funcallable instance:
+            //  - pointer to embedded machine instructions
+            //  - untagged pointer to trampoline word
+            //  - correctly tagged pointer
             if ((addr >= (uword_t)(object_start+2) && addr < (uword_t)(object_start+4))
+                || addr == (lispobj)(object_start+1)
                 || addr == make_lispobj(object_start, FUN_POINTER_LOWTAG))
                 return make_lispobj(object_start, FUN_POINTER_LOWTAG);
             return 0;

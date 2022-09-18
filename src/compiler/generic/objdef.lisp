@@ -275,7 +275,8 @@ during backtrace.
                           :lowtag fun-pointer-lowtag
                           :widetag funcallable-instance-widetag
                           :alloc-trans %make-funcallable-instance)
-  (trampoline :init :funcallable-instance-tramp)
+  (trampoline #-compact-instance-header :init
+              #-compact-instance-header :funcallable-instance-tramp)
   #-compact-instance-header (layout :set-trans %set-fun-layout :ref-trans %fun-layout)
   #+compact-instance-header (instword1)
   #+compact-instance-header (instword2)
@@ -462,10 +463,10 @@ during backtrace.
 (defconstant-eqx +thread-header-slot-names+
     `#(#+x86-64
        ,@'(t-nil-constants
-          alien-linkage-table-base
-          msan-xor-constant
-          ;; The following slot's existence must NOT be conditional on #+msan
-          msan-param-tls) ; = &__msan_param_tls
+           alien-linkage-table-base
+           msan-xor-constant
+           ;; The following slot's existence must NOT be conditional on #+msan
+           msan-param-tls) ; = &__msan_param_tls
        #+immobile-space
        ,@'(function-layout
            text-space-addr

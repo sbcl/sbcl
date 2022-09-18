@@ -233,24 +233,6 @@
 (with-test (:name :disassemble-assembly-routine)
   (disassemble sb-fasl:*assembler-routines* :stream (make-broadcast-stream)))
 
-;;; This tests that the x86-64 disasembler does not crash
-;;; on LEA with a rip-relative operand and no label.
-(with-test (:name (disassemble :no-labels)
-                  :skipped-on (not :x86-64))
-  (let* ((lines
-          (split-string
-           (with-output-to-string (stream)
-             ;; A smallish function whose code happens to contain
-             ;; the thing under test.
-             (disassemble 'sb-impl::inspector :stream stream))
-          #\Newline))
-         (line (find "; = L0" lines :test 'search)))
-    (assert (search "LEA " line)) ; verify our test precondition
-    ;; Now just disassemble without labels and see that we don't crash
-    (disassemble 'sb-impl::inspector
-                 :use-labels nil
-                 :stream (make-broadcast-stream))))
-
 ;;; Check that SLEEP called with ratios (with no common factors with
 ;;; 1000000000, and smaller than 1/1000000000) works more or less as
 ;;; expected.

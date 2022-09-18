@@ -886,16 +886,14 @@
 
 ;;;; automatic allocators for primitive objects
 
-;;; FIXME: figure out how not to need this?
 (define-vop (make-funcallable-instance-tramp)
   (:args)
   (:results (result :scs (any-reg)))
   (:vop-var vop)
   (:generator 1
-    (let ((tramp (make-fixup 'funcallable-instance-tramp :assembly-routine)))
-      (if (sb-c::code-immobile-p vop)
-          (inst lea result (ea tramp rip-tn))
-          (inst mov result tramp)))))
+    ;; gets "... is not the name of a defined VOP." if not defined at all
+    #+compact-instance-header (bug "Shouldn't get here")
+    (inst mov result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
 
 (flet
   ((alloc (name words type lowtag stack-allocate-p result
