@@ -185,6 +185,7 @@
   (loadw rax-tn rax-tn fdefn-fun-slot other-pointer-lowtag)
   (inst jmp (object-slot-ea rax-tn closure-fun-slot fun-pointer-lowtag)))
 
+#-compact-instance-header
 (define-assembly-routine
     (funcallable-instance-tramp (:return-style :none))
     ()
