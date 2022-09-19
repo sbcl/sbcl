@@ -64,8 +64,7 @@
     (return-pc "return_pc_header" "return_pc_header" "lose")
 
     (value-cell "boxed")
-    (symbol "symbol"
-            "tiny_mixed" "tiny_boxed") ; trans and size respectively
+    (symbol "symbol")
     ;; Can't transport characters as "other" pointer objects.
     ;; It should be a cons cell half which would go through trans_list()
     (character "immediate")

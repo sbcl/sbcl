@@ -170,7 +170,6 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
                 continue;
             }
             switch (widetag) {
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
             case SYMBOL_WIDETAG:
             {
                 struct symbol* symbol = (void*)where;
@@ -179,7 +178,6 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
                 set_symbol_name(symbol, name);
                 continue;
             }
-#endif
             case CODE_HEADER_WIDETAG:
                 coalesce_nwords = code_header_words((struct code*)where);
                 break;

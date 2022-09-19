@@ -803,30 +803,32 @@ static sword_t size_consfiller(lispobj *where)
 
 DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
 DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
-DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
 static lispobj trans_boxed(lispobj object) {
     return gc_copy_object(object, 1 + BOXED_NWORDS(*native_pointer(object)),
                           boxed_region, PAGE_TYPE_BOXED);
 }
-static lispobj trans_tiny_mixed(lispobj object) {
-    return gc_copy_object(object, 1 + TINY_BOXED_NWORDS(*native_pointer(object)),
-                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
-}
 
+/* Symbol */
 static sword_t scav_symbol(lispobj *where, lispobj header) {
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
     struct symbol* s = (void*)where;
-    scavenge(&s->value, 3); // value, function, info
+#ifdef LISP_FEATURE_COMPACT_SYMBOL
+    scavenge(&s->value, 3); // value, fdefn, info
     lispobj name = decode_symbol_name(s->name);
     lispobj new = name;
     scavenge(&new, 1);
     if (new != name) set_symbol_name(s, new);
-    int indicated_nwords = (header>>N_WIDETAG_BITS) & 0xFF;
-    return 1 + (indicated_nwords|1); // round to odd, then add 1 for the header
 #else
-    return scav_tiny_boxed(where, header);
+    scavenge(&s->value, 4); // value, fdefn, info, name
 #endif
+    return ALIGN_UP(SYMBOL_SIZE, 2);
+}
+static lispobj trans_symbol(lispobj object) {
+    return gc_copy_object(object, ALIGN_UP(SYMBOL_SIZE,2),
+                          small_mixed_region, PAGE_TYPE_SMALL_MIXED);
+}
+static sword_t size_symbol(lispobj __attribute__((unused)) *where) {
+    return ALIGN_UP(SYMBOL_SIZE,2);
 }
 
 static inline int array_header_nwords(lispobj header) {

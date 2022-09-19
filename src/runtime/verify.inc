@@ -254,7 +254,6 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
 #endif
         return 0;
     }
-#ifdef LISP_FEATURE_COMPACT_SYMBOL
     if (widetag == SYMBOL_WIDETAG) {
         struct symbol* s = (void*)object;
         CHECK(s->value, &s->value);
@@ -263,7 +262,6 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
         CHECK(decode_symbol_name(s->name), &s->name);
         return 0;
     }
-#endif
     if (widetag == FDEFN_WIDETAG) {
         struct fdefn* f = (void*)object;
         CHECK(f->name, &f->name);
