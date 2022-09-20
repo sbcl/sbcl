@@ -382,7 +382,7 @@ extern void fpu_restore(void *);
 
 #define PAGE_INDEX_FMT PRIdPTR
 
-int count_immobile_objects(__attribute__((unused)) int gen, int res[5])
+int count_immobile_objects(__attribute__((unused)) int gen, int res[4])
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     lispobj* where = (lispobj*)FIXEDOBJ_SPACE_START;
@@ -390,10 +390,9 @@ int count_immobile_objects(__attribute__((unused)) int gen, int res[5])
     while (where < end) {
         if (immobile_obj_generation(where) == gen) {
             switch (widetag_of(where)) {
-            case FUNCALLABLE_INSTANCE_WIDETAG: ++res[0]; break;
-            case INSTANCE_WIDETAG: ++res[1]; break;
-            case FDEFN_WIDETAG: ++res[2]; break;
-            case SYMBOL_WIDETAG: ++res[3]; break;
+            case INSTANCE_WIDETAG: ++res[0]; break;
+            case FDEFN_WIDETAG: ++res[1]; break;
+            case SYMBOL_WIDETAG: ++res[2]; break;
             }
         }
         where += object_size(where);
@@ -402,11 +401,11 @@ int count_immobile_objects(__attribute__((unused)) int gen, int res[5])
     end = text_space_highwatermark;
     while (where < end) {
         if (widetag_of(where) != FILLER_WIDETAG && immobile_obj_generation(where) == gen)
-            ++res[4];
+            ++res[3];
         where += object_size(where);
     }
 #endif
-    return (res[0] | res[1] | res[2] | res[3] | res[4]) != 0;
+    return (res[0] | res[1] | res[2] | res[3]) != 0;
 }
 
 // You can call this with 0 and NULL to perform its assertions silently
@@ -428,13 +427,13 @@ void gc_gen_report_to_file(int filedes, FILE *file)
             "        Immobile Object Counts\n";
     OUTPUT(header1, sizeof header1-1);
     char header2[] =
-            " Gen   GF type  fdefn symbol   code  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
+            " Gen layout fdefn symbol   code  Boxed   Cons    Raw   Code  SmMix  Mixed  LgRaw LgCode  LgMix"
             " Waste%       Alloc        Trig   Dirty GCs Mem-age\n";
     OUTPUT(header2, sizeof header2-1);
 
     generation_index_t gen_num, begin, end;
-    int immobile_matrix[8][5], have_immobile_obj = 0;
-    int immobile_totals[5];
+    int immobile_matrix[8][4], have_immobile_obj = 0;
+    int immobile_totals[4];
     memset(immobile_matrix, 0, sizeof immobile_matrix);
     memset(immobile_totals, 0, sizeof immobile_totals);
     for (gen_num = 0; gen_num <= 6; ++gen_num) {
@@ -444,7 +443,6 @@ void gc_gen_report_to_file(int filedes, FILE *file)
         immobile_totals[1] += immobile_matrix[gen_num][1];
         immobile_totals[2] += immobile_matrix[gen_num][2];
         immobile_totals[3] += immobile_matrix[gen_num][3];
-        immobile_totals[4] += immobile_matrix[gen_num][4];
     }
     // Print from the lowest gen that has any allocated pages.
     for (begin = 0; begin <= PSEUDO_STATIC_GENERATION; ++begin)
@@ -484,10 +482,10 @@ void gc_gen_report_to_file(int filedes, FILE *file)
                                (double)waste / (double)npage_bytes(eden_pages) * 100 : 0.0;
             if (eden_pages) {
                 int linelen = snprintf(linebuf, sizeof linebuf,
-                        "  E %5d %4d %6d %6d %6d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%14"PAGE_INDEX_FMT
+                        "  E %6d %6d %6d %6d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%14"PAGE_INDEX_FMT
                         "%14"PAGE_INDEX_FMT
                         "%28.1f %11"OS_VM_SIZE_FMT"\n",
-                        objct[0], objct[1], objct[2], objct[3], objct[4],
+                        objct[0], objct[1], objct[2], objct[3],
                         pagect[0], pagect[1], pagect[3], pagect[5],
                         pct_waste, eden_words_allocated<<WORD_SHIFT);
                 OUTPUT(linebuf, linelen);
@@ -531,11 +529,11 @@ void gc_gen_report_to_file(int filedes, FILE *file)
           (double)waste / (double)npage_bytes(tot_pages) * 100 : 0.0;
         int linelen =
             snprintf(linebuf, sizeof linebuf,
-                "  %d %5d %4d %6d %6d %6d"
+                "  %d %6d %6d %6d %6d"
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
                 "%7"PAGE_INDEX_FMT" %6.1f %11"OS_VM_SIZE_FMT" %11"OS_VM_SIZE_FMT,
-                gen_num, objct[0], objct[1], objct[2], objct[3], objct[4],
+                gen_num, objct[0], objct[1], objct[2], objct[3],
                 pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
                 pagect[6], pagect[7], pagect[8],
                 pct_waste, words_allocated<<WORD_SHIFT,
@@ -555,12 +553,12 @@ void gc_gen_report_to_file(int filedes, FILE *file)
     int *objct = immobile_totals;
     int linelen =
         snprintf(linebuf, sizeof linebuf,
-            "Tot %5d %4d %6d %6d %6d"
+            "Tot %6d %6d %6d %6d"
             "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
             "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
             "%7"PAGE_INDEX_FMT" %6.1f%12"OS_VM_SIZE_FMT
             " [%.1f%% of %"OS_VM_SIZE_FMT" max]\n",
-            objct[0], objct[1], objct[2], objct[3], objct[4],
+            objct[0], objct[1], objct[2], objct[3],
             coltot[0], coltot[1], coltot[2], coltot[3], coltot[4], coltot[5], coltot[6],
             coltot[7], coltot[8], pct_waste,
             (uintptr_t)bytes_allocated, heap_use_frac, (uintptr_t)dynamic_space_size);
