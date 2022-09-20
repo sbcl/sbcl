@@ -27,7 +27,7 @@ for d in tools-for-build; do
     # I hope the -s option is standard. At least GNU make and BSD make
     # support it. It silences make, since otherwise the output from
     # this script is just the operations done by these make's, which
-    # is misleading when this script does lotso other operations too.
+    # is misleading when this script does lots of other operations too.
     # -- WHN
     $GNUMAKE -I ../src/runtime -s clean
     cd "$original_pwd" > /dev/null
