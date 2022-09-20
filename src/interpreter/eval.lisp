@@ -66,12 +66,15 @@
 (defparameter *eval-level* -1)
 (defparameter *eval-verbose* nil)
 
+;;; It looks as if at one point I thought the interpreter would allow
+;;; a special operator which reimplements a macro to decline to run,
+;;; or punt to the macro. I don't see that it does that....
 (defun special-form-handler (fname)
   ;; Returns a cons of the deferred processor and immediate processor.
   ;; The CDR can be NIL if there is no immediate handler.
-  (binding* ((info (symbol-dbinfo fname) :exit-if-null)
+  (binding* ((info (symbol-dbinfo (truly-the symbol fname)) :exit-if-null)
              ;; This is safe: PACKED-INFO invariant requires that it have length >= 1.
-             (word (the fixnum (%info-ref info 0))))
+             (word (truly-the fixnum (%info-ref info 0))))
     ;; Test that the first info-number is +fdefn-info-num+ and its n-infos
     ;; field is nonzero. These conditions can be tested simultaneously
     ;; using a SIMD-in-a-register idea. The low 6 bits must be nonzero
@@ -84,7 +87,7 @@
 
 (defun %eval (exp env)
   (labels
-      ((%%eval (&aux fname)
+      ((%%eval (&aux fname special)
          (cond
           ((symbolp exp)
            ;; CLHS 3.1.2.1.1 Symbols as Forms
@@ -120,12 +123,11 @@
           ;; can be invoked in the equivalent environment. In terms of speed, it scarcely
           ;; matters that we have to search in a list of 8 things here.
           ;; maybe SPECIAL-OPERATOR-P is actually redundant here?
-          ((or (special-operator-p fname) ; standard (or extension)
-               (special-form-handler fname)) ; a special-form handler for a macro
+          ((setq special (special-form-handler fname))
            (cond ((or (eq sb-ext:*evaluator-mode* :interpret)
                       (member fname '(quote eval-when if progn setq
                                       locally macrolet symbol-macrolet)))
-                  (let ((handler (cdr (special-form-handler fname)))) ; immediate handler
+                  (let ((handler (cdr special))) ; immediate handler
                     (if (functionp handler)
                         (funcall handler (cdr exp) env)
                         (dispatch (%sexpr exp) env))))
@@ -190,20 +192,14 @@
           ((not (symbolp fname))
            (%program-error "Invalid function name: ~S" fname)))
     ;; CLHS 3.1.2.1.2.1 Special Forms.
-    (when (or (special-operator-p  fname)
-              (special-form-handler fname))
+    ;; Also a macro that has a special operator.
+    (when (special-form-handler fname)
       (let ((processor (car (special-form-handler fname)))) ; deferred handler
         (when (functionp processor)
           (return-from digest-form
             (let ((digested-form (funcall processor (cdr form) env)))
               (setf (sexpr-handler sexpr) digested-form)
-              (%dispatch sexpr env)))))
-      (unless (macro-function fname)
-        ;; Special operators that reimplement macros can decline,
-        ;; falling back upon the macro. This allows faster
-        ;; implementations of things like AND,OR,COND,INCF
-        ;; without having to deal with their full generality.
-        (error "Operator ~S mustn't decline to handle ~S" fname form)))
+              (%dispatch sexpr env))))))
     (let ((frame-ptr (local-fn-frame-ptr fname env)))
       (if (eq frame-ptr :macro)
           ;; CLHS 3.1.2.1.2.2 Macro Forms
