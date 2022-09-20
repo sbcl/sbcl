@@ -1024,10 +1024,11 @@
 ;;; we special-case the macro.
 (defun eval-with-pinned-objects (args env)
   (program-destructuring-bind (values &body body) args
-    (if (null values)
-        (eval-progn body env)
-        (sb-sys:with-pinned-objects ((%eval (car values) env))
-          (eval-with-pinned-objects (cons (cdr values) body) env)))))
+    (let ((sb-vm::*pinned-objects*
+           ;; NCONC is ok because MAPCAR makes a fresh list
+           (nconc (mapcar (lambda (x) (%eval x env)) values)
+                  sb-vm::*pinned-objects*)))
+      (eval-progn body env))))
 
 (defparameter *eval-level* -1)
 (defparameter *eval-verbose* nil)

@@ -675,13 +675,10 @@
   :deferred ()
   (let ((objects (mapcar #'%sexpr objects)) (forms (%progn forms)))
     (hlambda sb-sys:with-pinned-objects (objects forms) (env)
-      (labels ((recurse (list forms)
-                 (if (not list)
-                     (dispatch forms env)
-                     (let ((obj (dispatch (car list) env)))
-                       (sb-sys:with-pinned-objects (obj)
-                         (recurse (cdr list) forms))))))
-        (recurse objects forms)))))
+      (let ((sb-vm::*pinned-objects*
+             (nconc (mapcar (lambda (x) (dispatch x env)) objects)
+                    sb-vm::*pinned-objects*)))
+        (dispatch forms env)))))
 
 ;;; Now for the complicated stuff, starting with the simplest
 ;;; of the complicated ...

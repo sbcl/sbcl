@@ -119,7 +119,9 @@
           ;; so that if a subform is reached having a non-simple operator, the compiler
           ;; can be invoked in the equivalent environment. In terms of speed, it scarcely
           ;; matters that we have to search in a list of 8 things here.
-          ((special-operator-p fname)
+          ;; maybe SPECIAL-OPERATOR-P is actually redundant here?
+          ((or (special-operator-p fname) ; standard (or extension)
+               (special-form-handler fname)) ; a special-form handler for a macro
            (cond ((or (eq sb-ext:*evaluator-mode* :interpret)
                       (member fname '(quote eval-when if progn setq
                                       locally macrolet symbol-macrolet)))
@@ -188,7 +190,8 @@
           ((not (symbolp fname))
            (%program-error "Invalid function name: ~S" fname)))
     ;; CLHS 3.1.2.1.2.1 Special Forms.
-    (when (special-operator-p  fname)
+    (when (or (special-operator-p  fname)
+              (special-form-handler fname))
       (let ((processor (car (special-form-handler fname)))) ; deferred handler
         (when (functionp processor)
           (return-from digest-form
