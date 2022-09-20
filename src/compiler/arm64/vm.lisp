@@ -359,6 +359,11 @@
              (values :transform '(lambda (newbyte size posn integer)
                                   (%%dpb newbyte size posn integer)))
              (values :default nil))))
+      (signum
+       (if (or (valid-funtype '(signed-word) '*)
+               (valid-funtype '(word) '*))
+           (values :direct nil)
+           (values :default nil)))
       (t (values :default nil)))))
 
 (defun primitive-type-indirect-cell-type (ptype)

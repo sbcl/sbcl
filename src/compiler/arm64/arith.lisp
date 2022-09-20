@@ -1868,3 +1868,18 @@
             (inst subs r x y)
             (inst b :cc error)
             done)))))
+
+(define-vop (signum-signed signed-unop)
+  (:args (x :scs (signed-reg any-reg) :target res))
+  (:translate signum)
+  (:generator 4
+    (inst cmp x 0)
+    (inst cset tmp-tn :ne)
+    (inst csinv res tmp-tn zr-tn :ge)))
+
+(define-vop (signum-unsigned unsigned-unop)
+  (:args (x :scs (unsigned-reg any-reg) :target res))
+  (:translate signum)
+  (:generator 3
+    (inst cmp x 0)
+    (inst cset res :ne)))
