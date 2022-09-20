@@ -9,17 +9,6 @@
 
 (in-package "SB-INTERPRETER")
 
-;;; True if the symbol is a special operator, indicating that it MAY
-;;; have an extra slot in the payload. Special operators defined after
-;;; initial build will set this bit, but not have an extra slot.
-(defconstant +special-op-symbol+  (ash 1 11))
-;;; True if the interpreter should handle this special operator even when
-;;; SB-EXT:*EVALUATOR-MODE* is :COMPILE. If true, the operator must preserve
-;;; a perfect correspondence between interpreter ENV instances and compiler
-;;; LEXENV instances so that if a subform is reached having a non-simple
-;;; operator, the compiler can be invoked in the equivalent environment.
-(defconstant +simple-special-op+  (ash 1 10))
-
 ;;; DEFSPECIAL name (destructuring-lambda-list)
 ;;;    [FORMS]*
 ;;;    :IMMEDIATE (ENV) FORMS+
@@ -42,8 +31,6 @@
   (let* ((specialized-code
           (member-if (lambda (form) (member form '(:immediate :deferred)))
                      body))
-         (simple-p (member name '(quote eval-when if progn setq
-                                  locally macrolet symbol-macrolet)))
          (common-code (ldiff body specialized-code))
          (immediate-code)
          (deferred-code))
@@ -78,14 +65,10 @@
                                       ,@body)))
                         (with-subforms ,macro-lambda-list ,form-var
                                        ,@body)))))))
-        `((lambda (name simple immediate deferred)
+        `((lambda (name immediate deferred)
             (aver (not (info :function :definition name)))
-            (setf (info :function :definition name) (cons deferred immediate))
-            (logior-header-bits
-             name (logior +special-op-symbol+
-                          (if simple +simple-special-op+ 0))))
+            (setf (info :function :definition name) (cons deferred immediate)))
           ',name
-          ',simple-p
           ,(when immediate-code
              (gen-code :immediate immediate-code))
           ,(gen-code :deferred deferred-code))))))

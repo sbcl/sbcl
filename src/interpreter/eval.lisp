@@ -113,9 +113,16 @@
           ;; CLHS 3.1.2.1.2.1 Special Forms
           ;; Pick off special forms first for speed. Special operators
           ;; can't be shadowed by local defs.
-          ((test-header-data-bit fname +special-op-symbol+)
-           (cond ((or (test-header-data-bit fname +simple-special-op+)
-                      (eq sb-ext:*evaluator-mode* :interpret))
+          ;; Even if *evaluator-mode* = :COMPILE, some easy-to-handle operators get
+          ;; interpreted. For this to work, the operator must preserve an exact
+          ;; correspondence between interpreter ENV and compiler LEXENV instances,
+          ;; so that if a subform is reached having a non-simple operator, the compiler
+          ;; can be invoked in the equivalent environment. In terms of speed, it scarcely
+          ;; matters that we have to search in a list of 8 things here.
+          ((special-operator-p fname)
+           (cond ((or (eq sb-ext:*evaluator-mode* :interpret)
+                      (member fname '(quote eval-when if progn setq
+                                      locally macrolet symbol-macrolet)))
                   (let ((handler (cdr (special-form-handler fname)))) ; immediate handler
                     (if (functionp handler)
                         (funcall handler (cdr exp) env)
@@ -181,14 +188,14 @@
           ((not (symbolp fname))
            (%program-error "Invalid function name: ~S" fname)))
     ;; CLHS 3.1.2.1.2.1 Special Forms.
-    (when (logtest (get-header-data fname) +special-op-symbol+)
+    (when (special-operator-p  fname)
       (let ((processor (car (special-form-handler fname)))) ; deferred handler
         (when (functionp processor)
           (return-from digest-form
             (let ((digested-form (funcall processor (cdr form) env)))
               (setf (sexpr-handler sexpr) digested-form)
               (%dispatch sexpr env)))))
-      (when (eq (info :function :kind fname) :special-form)
+      (unless (macro-function fname)
         ;; Special operators that reimplement macros can decline,
         ;; falling back upon the macro. This allows faster
         ;; implementations of things like AND,OR,COND,INCF

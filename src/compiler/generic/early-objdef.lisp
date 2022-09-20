@@ -424,7 +424,6 @@
 ;;; The backend may emit different code when referencing such symbols.
 ;;; For x86-64, symbols with this bit set may be assumed to have been
 ;;; allocated in immobile space.
-;;; Note also that sb-fasteval uses 2 bits of the symbol header.
 (defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
 
 ;;; Bit indices of the status bits in an INSTANCE header

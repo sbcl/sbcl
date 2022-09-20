@@ -788,9 +788,10 @@
 (deftest map-root-closure-unnamed
     (count-pointees (funcall (compile nil `(lambda (x) (lambda () x))) t) nil)
   2)
-;;; (SYMBOL-FUNCTION 'AND) is a named closure over 1 value.
-;;; The closed-over value is AND, and the name of the closure is (:MACRO AND).
-(deftest map-root-closure-named (count-pointees (symbol-function 'and) nil) 3)
+;;; (SYMBOL-FUNCTION 'IF) is a named closure over 1 value.
+;;; The closed-over value is (:SPECIAL IF), and the name of the closure is
+;;; identical, but it also has a docstring.
+(deftest map-root-closure-named (count-pointees (symbol-function 'if) nil) 3)
 
 ;;; GFs point to their layout, implementation function, and slot vector.
 ;;; There's also a hash-code which is stored is one of two different ways.

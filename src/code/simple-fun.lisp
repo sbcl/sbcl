@@ -571,13 +571,15 @@
          (set-closure-name
           (lambda (&rest args)
            (declare (ignore args))
+           ;; don't capture the SYMBOL argument of INSTALL-GUARD-FUNCTION.
+           ;; It's redundant with FUN-NAME, which provides more information.
+           ;; No need to use SPECIAL-OPERATOR-P to see what it is.
+           (let ((kind (first fun-name)))
            ;; ANSI specification of FUNCALL says that this should be
            ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.
            ;; SPECIAL-FORM-FUNCTION is a subtype of UNDEFINED-FUNCTION.
-           (error (if (special-operator-p symbol)
-                      'special-form-function
-                      'undefined-function)
-                  :name symbol))
+             (error (if (eq kind :special) 'special-form-function 'undefined-function)
+                    :name  (second fun-name))))
           t
           fun-name))
         (fdefn (find-or-create-fdefn symbol)))

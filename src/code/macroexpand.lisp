@@ -16,7 +16,18 @@
 (defun special-operator-p (symbol)
   "If the symbol globally names a special form, return T, otherwise NIL."
   (declare (symbol symbol))
-  (eq (info :function :kind symbol) :special-form))
+  #+sb-xc-host (eq (info :function :kind symbol) :special-form)
+  ;; special operators will always have a function definition, and that definition
+  ;; will be a closure with a specific shape that we can recognize.
+  #-sb-xc-host
+  (let ((f (%symbol-function (the symbol symbol))))
+    (and (closurep f) ; it's ok to call CLOSUREP on NIL
+         ;; Underlying function must be the same as any chosen special operator.
+         ;; This will also be true of macros though.
+         (eq (load-time-value (%closure-fun (symbol-function 'if)) t)
+             (%closure-fun f))
+         ;; Closure's captured value is (:SPECIAL sym)
+         (typep (%closure-index-ref f 0) '(cons (eql :special))))))
 
 (defvar *macroexpand-hook* 'funcall
   "The value of this variable must be a designator for a function that can
