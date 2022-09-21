@@ -8,7 +8,4 @@
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-RT;"
   :components ((:file "rt"))
-  :perform (load-op :after (o c) (provide 'sb-rt))
-  :perform (test-op (o c)
-             ;; FIXME: Maybe also import rt-tests.lisp?
-             t))
+  :perform (load-op :after (o c) (provide 'sb-rt)))

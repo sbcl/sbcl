@@ -15,5 +15,4 @@
 (defsystem "sb-queue"
   :depends-on ("sb-concurrency")
   :components ((:file "package"))
-  :perform (load-op :after (o c) (provide 'sb-queue))
-  :perform (test-op (o c) :pass))
+  :perform (load-op :after (o c) (provide 'sb-queue)))

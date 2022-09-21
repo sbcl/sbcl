@@ -11,5 +11,4 @@
   :components ((:file "defpackage")
                (:file "def-to-lisp" :depends-on ("defpackage"))
                (:file "foreign-glue" :depends-on ("defpackage")))
-  :perform (load-op :after (o c) (provide 'sb-grovel))
-  :perform (test-op (o c) t))
+  :perform (load-op :after (o c) (provide 'sb-grovel)))
