@@ -734,11 +734,20 @@
   (checked-compile-and-assert
       ()
       `(lambda (x y)
-         (declare ((OR (INTEGER 0 0) (DOUBLE-FLOAT 0.0d0 0.0d0)) x)
-                  ((OR (RATIONAL -10 0) (DOUBLE-FLOAT -10.0d0 -0.0d0)) y))
+         (declare ((or (integer 0 0) (double-float 0.0d0 0.0d0)) x)
+                  ((or (rational -10 0) (double-float -10.0d0 -0.0d0)) y))
          (= x y))
   ((0 0) t)
   ((0 0d0) t)
   ((0 -0d0) t)
   ((0d0 -0d0) t)
   ((0 -1d0) nil)))
+
+(with-test (:name :unary-truncate-float-derive-type)
+  (assert
+   (subtypep (second (third (sb-kernel:%simple-fun-type
+                             (checked-compile
+                              `(lambda (f)
+                                 (declare ((double-float 10d0 30d0) f))
+                                 (values (truncate f)))))))
+             '(integer 10 30))))
