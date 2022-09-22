@@ -69,9 +69,3 @@ sb-ext::(declaim (unmuffle-conditions sb-kernel:redefinition-warning))
     (let ((s (find-symbol "DUMP/RESTORE-INTERESTING-TYPES" "SB-C")))
       (when s (funcall s 'write)))
     (concatenate-files input-fasls module.fasl)))
-
-(defun test-asdf-contrib (system)
-  (setq *features*
-        (append '(:sb-testing-contrib) sb-impl:+internal-features+ *features*))
-  (setup-asdf-contrib)
-  (asdf:test-system system))

@@ -6,7 +6,8 @@
 # ones as dependencies.
 
 UNAME:=$(shell uname -s)
-DEST=$(SBCL_TOP)/obj/sbcl-home/contrib/
+# no trailing slash on DEST. Don't want a "//" in FASL and ASD
+DEST=$(SBCL_TOP)/obj/sbcl-home/contrib
 FASL=$(DEST)/$(SYSTEM).fasl
 ASD=$(DEST)/$(SYSTEM).asd
 
@@ -39,10 +40,6 @@ $(ASD)::
 
 build: $(FASL) $(ASD)
 	true
-
-test: $(FASL) $(ASD)
-	$(SBCL) --load ../asdf-stub.lisp \
-		--eval '(asdf::test-asdf-contrib "$(SYSTEM)")'
 
 # KLUDGE: There seems to be no portable way to tell tar to not to
 # preserve owner, so chown after installing for the current user.
