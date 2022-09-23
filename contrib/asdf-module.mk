@@ -41,7 +41,5 @@ $(ASD)::
 build: $(FASL) $(ASD)
 	true
 
-# KLUDGE: There seems to be no portable way to tell tar to not to
-# preserve owner, so chown after installing for the current user.
 install:
 	cp $(FASL) $(ASD) "$(BUILD_ROOT)$(INSTALL_DIR)"
