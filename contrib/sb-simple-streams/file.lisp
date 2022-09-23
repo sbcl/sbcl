@@ -205,7 +205,7 @@
                            (if output sb-posix::PROT-WRITE 0)))
              (fd (or (sm input-handle stream) (sm output-handle stream))))
         ;; FIXME: MapViewOfFile has dwDesiredAccess but we're not passing it
-        #-unix (declare (ignore input output prot))
+        #-unix (declare (ignorable input output prot))
         (unless (integerp fd)
           (error "Can't memory-map an encapsulated stream."))
         (multiple-value-bind (okay dev ino mode nlink uid gid rdev size)
