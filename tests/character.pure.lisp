@@ -183,9 +183,25 @@
   (let ((string (map-into (make-array 10 :element-type 'character :adjustable t)
                           #'code-char
                           '(192 193 194 195 196 197 198 199 200 201))))
-   (assert (equal
-            (map 'list #'char-code (nstring-downcase string))
-            '(224 225 226 227 228 229 230 231 232 233)))
-   (assert (equal
-            (map 'list #'char-code (string-upcase string))
-            '(192 193 194 195 196 197 198 199 200 201))) ))
+    (assert (equal
+             (map 'list #'char-code (nstring-downcase string))
+             '(224 225 226 227 228 229 230 231 232 233)))
+    (assert (equal
+             (map 'list #'char-code (string-upcase string))
+             '(192 193 194 195 196 197 198 199 200 201)))))
+
+(with-test (:name :char-equal-transform)
+  (let ((fun (checked-compile
+              `(lambda (x y)
+                 (declare (base-char x y)
+                          (optimize speed))
+                 (char-equal x y)))))
+    (loop for a below sb-int:base-char-code-limit
+          for char-a = (code-char a)
+          do
+          (loop for b below sb-int:base-char-code-limit
+                for char-b = (code-char b)
+                for equal = (char= (char-downcase char-a)
+                                   (char-downcase char-b))
+                do (assert (eql (funcall fun char-a char-b)
+                                equal))))))
