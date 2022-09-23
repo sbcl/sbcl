@@ -74,11 +74,14 @@ The following keyword args are recognized:
   #-sb-thread (unless (eq threads :all) (warn ":THREADS is ignored"))
   (when alloc-interval (warn "ALLOC-INTERVAL is ignored"))
   (when max-depth (warn "MAX-DEPTH is ignored"))
-  (let ((message "~@<No sampling progress; run too short, sampling frequency too low, ~
+  (let ((last-index '#:index)
+        (values '#:values)
+        (message "~@<No sampling progress; run too short, sampling frequency too low, ~
 inappropriate set of sampled threads, or possibly a profiler bug.~:@>"))
-    (with-unique-names (values last-index)
-      `(let ((*show-progress* ,show-progress))
-         ,@(when reset '((reset)))
+    `(let ((*show-progress* ,show-progress))
+       ,@(when reset '((reset)))
+       ;; Produce report only if body returns normally
+       (multiple-value-prog1
          (unwind-protect
               (progn
                 (start-profiling :mode ,mode :max-samples ,max-samples

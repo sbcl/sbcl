@@ -6,54 +6,10 @@
 
 ;#+sb-fasteval (setq sb-ext:*evaluator-mode* :compile)
 
-;;; silly examples
-
-(defun test-0 (n &optional (depth 0))
-  (declare (optimize (debug 3)))
-  (when (< depth n)
-    (dotimes (i n)
-      (test-0 n (1+ depth))
-      (test-0 n (1+ depth)))))
-
-(defun test ()
-  (with-profiling (:reset t :max-samples 1000 :report :graph)
-    (test-0 7)))
-
-(defun consalot ()
-  (let ((junk '()))
-    (loop repeat 10000 do
-         (push (make-array 10) junk))
-    junk))
-
-(defun consing-test ()
-  ;; 0.0001 chosen so that it breaks rather reliably when sprof does not
-  ;; respect pseudo atomic.
-  (with-profiling (:reset t
-                          ;; setitimer with small intervals
-                          ;; is broken on FreeBSD 10.0
-                          ;; And ARM targets are not fast in
-                          ;; general, causing the profiling signal
-                          ;; to be constantly delivered without
-                          ;; making any progress.
-                          #-(or freebsd arm) :sample-interval
-                          #-(or freebsd arm) 0.0001
-                          #+arm :sample-interval #+arm 0.1
-                          :report :graph)
-    (loop with target = (+ (get-universal-time) 3)
-          while (< (get-universal-time) target)
-          do (consalot))))
-
-;; This has been failing on Sparc/SunOS for a while,
-;; having nothing to do with the rewrite of sprof's
-;; data collector into C. Maybe it works on Linux
-;; but the less fuss about Sparc, the better.
-#+sparc (defun run-tests () t)
-
 (defvar *compiler-input* "../contrib/sb-sprof/graph.lisp")
 (defvar *compiler-output* "./foo.fasl")
 (defvar *sprof-loop-test-max-samples* 50)
 
-#-sparc
 (defun run-tests ()
   (proclaim '(sb-ext:muffle-conditions style-warning))
   (sb-sprof:with-profiling (:max-samples *sprof-loop-test-max-samples*
@@ -73,8 +29,6 @@
     (compile-file *compiler-input* :output-file *compiler-output* :print nil))
   (delete-file *compiler-output*)
   (let ((*standard-output* (make-broadcast-stream)))
-    (test)
-    (consing-test)
     ;; This test shows that STOP-SAMPLING and START-SAMPLING on a thread do something.
     ;; Based on rev b6bf65d9 it would seem that the API got broken a little.
     ;; The thread doesn't do a whole lot, which is fine for what it is.
@@ -86,9 +40,5 @@
       (sb-sprof:start-sampling some-thread)
       (sb-thread:signal-semaphore sem)
       ;; Join because when run by run-tests.sh, it's an error to have random leftover threads
-      (sb-thread:join-thread some-thread))
-    ;; For debugging purposes, print output for visual inspection to see where
-    ;; the allocation sequence gets hit.
-    ;; It can be interrupted even inside pseudo-atomic now.
-    (disassemble #'consalot :stream *error-output*))
+      (sb-thread:join-thread some-thread)))
   t)
