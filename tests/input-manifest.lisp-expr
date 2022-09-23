@@ -116,7 +116,8 @@
   "../contrib/sb-simd/test-suite/test-horizontal-functions.lisp"
   "../contrib/sb-simd/test-suite/test-hairy-simd-functions.lisp"
   "../contrib/sb-simd/test-suite/test-packages.lisp")
- ("sb-simple-streams.impure.lisp" "contrib/sb-simple-streams.fasl" "contrib/sb-bsd-sockets.fasl")
+ ("sb-simple-streams.impure.lisp" "contrib/sb-simple-streams.fasl" "contrib/sb-bsd-sockets.fasl"
+  "../contrib/sb-simple-streams/simple-stream-tests.lisp")
  ("sb-rotate-byte.impure.lisp" "contrib/sb-rotate-byte.fasl"
   "../contrib/sb-rotate-byte/rotate-byte-tests.lisp")
  ("sb-sprof.impure.lisp" "contrib/sb-sprof.fasl"

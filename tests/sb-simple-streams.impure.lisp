@@ -1,3 +1,6 @@
 (require :sb-simple-streams)
-(setq run-tests::*allowed-inputs* :any)
+;; impure tests don't use the input manifest under run-tests.sh
+;; but do under parallel-exec, which runs each test as if pure,
+;; but in a forked child.
+#+parallel-test-runner (setq run-tests::*allowed-inputs* :any)
 (load "../contrib/sb-simple-streams/simple-stream-tests.lisp")
