@@ -134,6 +134,7 @@
 
 (defclass padding (value-slot)
   ())
+(defgeneric slot-end (slot))
 
 (defmethod print-object ((o value-slot) s)
   (print-unreadable-object (o s :type t)
@@ -152,7 +153,6 @@
                               (children slot))
                 :initial-value 0))))
 
-(defgeneric slot-end (slot))
 (defmethod slot-end ((slot slot))
   (+ (offset slot) (size slot)))
 
