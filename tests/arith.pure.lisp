@@ -1117,3 +1117,18 @@
          (setq a -64)
          (logand d (ash -1 a)))
     ((0 3) 3)))
+
+(with-test (:name :signed-unsigned-cmp-elision)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (fixnum a)
+                  ((or (integer -1 0)
+                       (unsigned-byte 64)) b))
+         (let ((v2 (abs b)))
+           (if (> a v2)
+               a
+               (>= a v2))))
+      ((1 2) nil)
+      ((1 1) t)
+      ((3 0) 3)))

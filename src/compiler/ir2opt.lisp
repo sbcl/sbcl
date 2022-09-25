@@ -492,47 +492,50 @@
               ((ir2-block-last-vop prev)
                (return (ir2-block-last-vop prev)))))))
 
-(defun immediate-templates (fun &optional (constants t))
-  (let ((primitive-types (list (primitive-type-or-lose 'character)
-                               (primitive-type-or-lose 'fixnum)
-                               (primitive-type-or-lose 'sb-vm::positive-fixnum)
-                               #-x86 ;; i387 is weird
-                               (primitive-type-or-lose 'double-float)
-                               #-x86
-                               (primitive-type-or-lose 'single-float)
-                               .
-                               #+(or 64-bit 64-bit-registers)
-                               ((primitive-type-or-lose 'sb-vm::unsigned-byte-63)
-                                (primitive-type-or-lose 'sb-vm::unsigned-byte-64)
-                                (primitive-type-or-lose 'sb-vm::signed-byte-64))
-                               #-(or 64-bit 64-bit-registers)
-                               ((primitive-type-or-lose 'sb-vm::unsigned-byte-31)
-                                (primitive-type-or-lose 'sb-vm::unsigned-byte-32)
-                                (primitive-type-or-lose 'sb-vm::signed-byte-32)))))
+(defun immediate-cmp-templates (fun &optional (constants t))
+  (let* ((signed (mapcar #'primitive-type-or-lose
+                         (cddr (assoc 'sb-vm::signed-num *backend-primitive-type-aliases*))))
+         (unsigned (mapcar #'primitive-type-or-lose
+                           (cddr (assoc 'sb-vm::unsigned-num *backend-primitive-type-aliases*))))
+         (primitive-types (list* (primitive-type-or-lose 'character)
+                                 #-x86 ;; i387 is weird
+                                 (primitive-type-or-lose 'double-float)
+                                 #-x86
+                                 (primitive-type-or-lose 'single-float)
+                                 (append signed unsigned))))
     (loop for template in (fun-info-templates (fun-info-or-lose fun))
+          for types = (template-arg-types template)
           when (and (typep (template-result-types template) '(cons (eql :conditional)))
-                    (loop for type in (template-arg-types template)
+                    (loop for type in types
                           always (and (consp type)
                                       (case (car type)
                                         (:or
                                          (loop for type in (cdr type)
                                                always (memq type primitive-types)))
-                                        (:constant constants)))))
+                                        (:constant constants))))
+                    ;; signed-unsigned VOPs have more than just a single CMP instruction
+                    (not (and (= (length types) 2)
+                              (typep (first types) '(cons (eql :or)))
+                              (typep (second types) '(cons (eql :or)))
+                              (or (and (equal (cdr (first types)) signed)
+                                       (equal (cdr (second types)) unsigned))
+                                  (and (equal (cdr (first types)) unsigned)
+                                       (equal (cdr (second types)) signed))))))
           collect (template-name template))))
 
 (define-load-time-global *comparison-vops*
-    (append (immediate-templates 'eq)
-            (immediate-templates '=)
-            (immediate-templates '>)
-            (immediate-templates '<)
-            (immediate-templates 'char<)
-            (immediate-templates 'char>)
-            (immediate-templates 'char=)))
+    (append (immediate-cmp-templates 'eq)
+            (immediate-cmp-templates '=)
+            (immediate-cmp-templates '>)
+            (immediate-cmp-templates '<)
+            (immediate-cmp-templates 'char<)
+            (immediate-cmp-templates 'char>)
+            (immediate-cmp-templates 'char=)))
 
 (define-load-time-global *commutative-comparison-vops*
-    (append (immediate-templates 'eq nil)
-            (immediate-templates 'char= nil)
-            (immediate-templates '= nil)))
+    (append (immediate-cmp-templates 'eq nil)
+            (immediate-cmp-templates 'char= nil)
+            (immediate-cmp-templates '= nil)))
 
 (defun vop-arg-list (vop)
   (let ((args (loop for arg = (vop-args vop) then (tn-ref-across arg)
