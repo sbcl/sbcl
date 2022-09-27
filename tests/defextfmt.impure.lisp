@@ -8,7 +8,7 @@
                               :if-exists :supersede
                               :if-does-not-exist :create
                               :external-format ef-name)
-        (format stream "(defvar s \"what? ~A\"~%)" #\grinning_face)
+        (format stream "(defvar s \"what? ~A\"~%)" (name-char "GRINNING_FACE"))
         (format stream "(sb-sys:os-exit
  (if (and (string= (subseq s 0 6) \"what? \") (char= (char s 6) #\\grinning_face)) 0 1))~%"))
       (let ((code
