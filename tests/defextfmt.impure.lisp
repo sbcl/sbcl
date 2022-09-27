@@ -1,6 +1,7 @@
 
 ;; test for lp#659107
-(with-test (:name :cmdline-setq-external-format)
+(with-test (:name :cmdline-setq-external-format
+                  :skipped-on (not :sb-unicode))
   (with-scratch-file (script "lisp")
     (dolist (ef-name '(:utf8 :utf16le :utf16be :utf32le :utf32be))
       (with-open-file (stream script :direction :output
