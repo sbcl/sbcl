@@ -1031,3 +1031,12 @@
     (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'float) unk))
     (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'pathname) unk))
     (assert-tri-eq nil nil (sb-kernel:type= (sb-kernel:specifier-type 'sequence) unk))))
+
+(with-test (:name :lp-308938) ; got silently fixed in git rev ef8c95377a55
+  (multiple-value-bind (answer certain)
+      (subtypep '(or (satisfies x) string)
+                '(or (satisfies x) integer))
+    (assert (and (not answer) (not certain))))
+  (multiple-value-bind (answer certain)
+      (subtypep 'string '(or (satisfies x) integer))
+    (assert (and (not answer) (not certain)))))
