@@ -1772,7 +1772,7 @@ expansion happened."
 ;;; shared logic for unions and intersections: Return a list of
 ;;; types representing the same types as INPUT-TYPES, but with
 ;;; COMPOUND-TYPEs satisfying %COMPOUND-TYPE-P broken up into their
-;;; component types, and with any SIMPLY2 simplifications applied.
+;;; component types, and with any SIMPLIFY2 simplifications applied.
 (macrolet
     ((def (name compound-type-p simplify2)
          `(defun ,name (types)
@@ -5379,7 +5379,7 @@ used for a COMPLEX component.~:@>"
 ;;; This messy case of CTYPE for NUMBER is shared between the
 ;;; cross-compiler and the target system.
 ;;; I'm not sure whether NaNs should be numeric types versus MEMBER (like
-;;; sigleton signed zero without the "other" sign), but it may not matter.
+;;; singleton signed zero without the "other" sign), but it may not matter.
 ;;; At a bare minimum this prevents crashing in min/max.
 (defun ctype-of-number (x)
   (let ((num (if (complexp x) (realpart x) x)))
