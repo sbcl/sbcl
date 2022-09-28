@@ -405,7 +405,7 @@ any non-negative real number."
 
 (defconstant-eqx +runtime-options+
   #("--noinform" "--core" "--help" "--version" "--dynamic-space-size"
-    "--control-stack-size" "--tls"
+    "--control-stack-size" "--tls-limit"
     "--debug-environment" "--disable-ldb" "--lose-on-corruption"
     "--end-runtime-options" "--merge-core-pages" "--no-merge-core-pages")
   #'equalp)
