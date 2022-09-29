@@ -632,7 +632,8 @@
     (not (and (global-var-p leaf)
               (member (global-var-kind leaf)
                       '(:special :global :unknown))
-              (not (always-boundp (leaf-source-name leaf)))))))
+              (not (or (always-boundp (leaf-source-name leaf))
+                       (policy node (< safety 3))))))))
 
 (defun flushable-callable-arg-p (name arg-count)
   (typecase name
