@@ -810,7 +810,8 @@ static lispobj trans_boxed(lispobj object) {
 }
 
 /* Symbol */
-static sword_t scav_symbol(lispobj *where, lispobj header) {
+static sword_t scav_symbol(lispobj *where,
+                           __attribute__((unused)) lispobj header) {
     struct symbol* s = (void*)where;
 #ifdef LISP_FEATURE_COMPACT_SYMBOL
     scavenge(&s->value, 3); // value, fdefn, info
