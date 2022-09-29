@@ -2465,7 +2465,7 @@
 
 ;;; Dead unbound variable (bug 412)
 (with-test (:name (compile :dead-unbound :bug-412))
-  (checked-compile-and-assert (:optimize :safe :allow-warnings t)
+  (checked-compile-and-assert (:optimize '(:safety 3) :allow-warnings t)
       '(lambda ()
         #:unbound
         42)
@@ -4070,7 +4070,7 @@
                                         :allow-warnings t)))))
 
 (with-test (:name (compile :bug-722734))
-  (checked-compile-and-assert (:allow-warnings t :optimize :safe)
+  (checked-compile-and-assert (:allow-warnings t :optimize '(:safety 3))
       '(lambda ()
          (eql (make-array 6)
               (list unbound-variable-1 unbound-variable-2)))

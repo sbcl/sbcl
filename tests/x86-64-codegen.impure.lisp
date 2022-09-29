@@ -714,6 +714,7 @@
                           (search "CMP DWORD PTR" line)))))
 
 (with-test (:name :thread-local-unbound)
+  (declare (optimize safety))
   (let ((c (nth-value 1 (ignore-errors sb-c::*compilation*))))
     (assert (eq (cell-error-name c) 'sb-c::*compilation*))))
 
@@ -976,6 +977,7 @@
   ;; Previously there would have been one from BOUNDP and one from SYMBOL-VALUE.
   (let ((lines (disassembly-lines
                 '(lambda ()
+                  (declare (optimize safety))
                   (if (boundp 'sb-c::*compilation*) sb-c::*compilation*) '(hi)))))
     (dolist (line lines)
       (assert (not (search "ERROR" line))))

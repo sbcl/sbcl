@@ -122,6 +122,7 @@
 (declaim (global this-is-unbound))
 (with-test (:name :dead-unbound-global)
   (let ((fun (checked-compile '(lambda ()
+                                (declare (optimize safety))
                                 this-is-unbound
                                 42))))
     (assert-error (funcall fun) unbound-variable)))

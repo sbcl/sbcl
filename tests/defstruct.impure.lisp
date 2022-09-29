@@ -607,8 +607,6 @@
   (slot *bug210*))
 ;;; Because of bug 210, this assertion used to fail.
 (assert (typep (nth-value 1 (ignore-errors (bug210a))) 'unbound-variable))
-;;; Even with bug 210, these assertions succeeded.
-(assert (typep (nth-value 1 (ignore-errors *bug210*)) 'unbound-variable))
 (assert (typep (nth-value 1 (ignore-errors (make-bug210b))) 'unbound-variable))
 
 ;;; In sbcl-0.7.8.53, DEFSTRUCT blew up in non-toplevel contexts
