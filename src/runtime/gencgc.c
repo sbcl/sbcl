@@ -5339,7 +5339,7 @@ void close_current_thread_tlab() {
     close_region_arg argv[] = {
       { THREAD_ALLOC_REGION(self,mixed), PAGE_TYPE_MIXED },
       { THREAD_ALLOC_REGION(self,cons), PAGE_TYPE_CONS },
-#ifdef LISP_FEATURE_SB_THREAD_
+#ifdef LISP_FEATURE_SB_THREAD
       { THREAD_ALLOC_REGION(self,sys_mixed), PAGE_TYPE_MIXED },
       { THREAD_ALLOC_REGION(self,sys_cons), PAGE_TYPE_CONS }
 #endif

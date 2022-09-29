@@ -272,9 +272,13 @@
                   ;; Figure out if we're looking at an allocation buffer
                   (let ((disp (ash (machine-ea-disp ea) (- sb-vm:word-shift))))
                     (awhen (case disp
-                            ((#.sb-vm::thread-mixed-tlab-slot
+                            ((#.sb-vm::thread-sys-mixed-tlab-slot
+                              #.sb-vm::thread-sys-cons-tlab-slot
+                              #.sb-vm::thread-mixed-tlab-slot
                               #.sb-vm::thread-cons-tlab-slot) :tlab-freeptr)
-                            ((#.(1+ sb-vm::thread-mixed-tlab-slot)
+                            ((#.(1+ sb-vm::thread-sys-mixed-tlab-slot)
+                              #.(1+ sb-vm::thread-sys-cons-tlab-slot)
+                              #.(1+ sb-vm::thread-mixed-tlab-slot)
                               #.(1+ sb-vm::thread-cons-tlab-slot)) :tlab-limit))
                       (setq ea it))))
                 (setf (car tail) ea)) ; change the EA

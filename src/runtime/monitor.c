@@ -271,11 +271,8 @@ static int save_cmd(char **ptr) {
 #endif
     return 0;
 }
-
-static int threads_cmd(char **ptr) {
-    int regions = 0;
+void list_lisp_threads(int regions) {
     struct thread* th;
-    if (more_p(ptr) && !strncmp(*ptr, "-r", 2)) regions = 1;
     fprintf(stderr, "(thread*,pthread,sb-vm:thread,name)\n");
     void* pthread;
     for_each_thread(th) {
@@ -296,6 +293,9 @@ static int threads_cmd(char **ptr) {
 #undef show_tlab
         }
     }
+}
+static int threads_cmd(char **ptr) {
+    list_lisp_threads(more_p(ptr) && !strncmp(*ptr, "-r", 2));
     return 0;
 }
 static int verify_cmd(char __attribute__((unused)) **ptr) {
