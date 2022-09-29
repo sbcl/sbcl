@@ -127,7 +127,7 @@
 (defun file-id (pathname)
   (id (format nil "File_~A" (enough-namestring pathname *sbcl-source-root*))))
 
-(defparameter *ignored-directories* '("CVS" ".svn" "test-output"))
+(defparameter *ignored-directories* '("CVS" ".svn"))
 
 (defparameter *pathname-type-abbrevs*
   '(("lisp" . "lsp")

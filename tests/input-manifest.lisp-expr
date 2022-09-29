@@ -104,8 +104,7 @@
  ("sb-mpfr.impure.lisp" "contrib/sb-gmp.fasl" "contrib/sb-mpfr.fasl"
   "../contrib/sb-mpfr/tests.lisp")
  ("sb-posix.impure.lisp" "contrib/sb-posix.fasl"
-  "../contrib/sb-posix/posix-tests.lisp" "../contrib/sb-posix/libc-tests.lisp"
-  "test-output/write-test.txt")
+  "../contrib/sb-posix/posix-tests.lisp" "../contrib/sb-posix/libc-tests.lisp")
  ("sb-simd.impure.lisp" "contrib/sb-simd.fasl"
   "../contrib/sb-simd/test-suite/packages.lisp"
   "../contrib/sb-simd/test-suite/numbers.lisp"

@@ -546,9 +546,10 @@
     (assert (equal (sort posix-readdir #'string<)
                    (sort cl-directory #'string<)))))
 
-(deftest write.1
-    (progn
-      (let ((fd (sb-posix:open (merge-pathnames "write-test.txt" *test-directory*)
+(test-util:with-test (:name :write.1)
+  (multiple-value-bind (n str)
+     (test-util:with-scratch-file (tmpname)
+      (let ((fd (sb-posix:open tmpname
                                (logior sb-posix:o-creat sb-posix:o-wronly)
                                (logior sb-posix:s-irusr sb-posix:s-iwusr)))
             (retval nil))
@@ -557,10 +558,8 @@
                (setf retval (sb-posix:write fd (sb-sys:vector-sap buf) 3)))
           (sb-posix:close fd))
 
-        (with-open-file (inf (merge-pathnames "write-test.txt" *test-directory*)
-                             :direction :input)
-          (values retval (read-line inf)))))
-  3 "foo")
+        (with-open-file (inf tmpname) (values retval (read-line inf)))))
+    (assert (and (eql n 3) (equal str "foo")))))
 
 #-(or android win32)
 (deftest pwent.1
