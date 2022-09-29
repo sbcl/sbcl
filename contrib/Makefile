@@ -19,7 +19,7 @@ sb-rt.fasl: asdf.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-posix.fasl: asdf.fasl sb-grovel.fasl
 	sh ./build-contrib $(basename $(@F))
-sb-bsd-sockets.fasl: asdf.fasl sb-grovel.fasl sb-posix.fasl
+sb-bsd-sockets.fasl: asdf.fasl sb-grovel.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-cltl2.fasl: asdf.fasl
 	sh ./build-contrib $(basename $(@F))
