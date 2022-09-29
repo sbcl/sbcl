@@ -1921,7 +1921,7 @@
 (defknown data-vector-set (array index t) (values) (dx-safe always-translatable))
 (defknown data-vector-set-with-offset (array fixnum fixnum t) (values)
   (dx-safe always-translatable))
-(defknown hairy-data-vector-ref (array index) t (foldable no-verify-arg-count))
+(defknown hairy-data-vector-ref (array index) t (foldable flushable no-verify-arg-count))
 (defknown hairy-data-vector-set (array index t) t (no-verify-arg-count))
 (defknown hairy-data-vector-ref/check-bounds (array index) t (foldable no-verify-arg-count))
 (defknown hairy-data-vector-set/check-bounds (array index t) t (no-verify-arg-count))
