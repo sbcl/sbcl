@@ -14,7 +14,7 @@
       (let ((code
              (process-exit-code
               (run-program
-               (first *posix-argv*)
+               sb-ext:*runtime-pathname*
                (list "--core" sb-int:*core-string*
                      "--noinform" "--no-sysinit" "--no-userinit" "--noprint"
                      "--disable-debugger"
