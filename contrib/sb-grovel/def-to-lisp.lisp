@@ -181,6 +181,36 @@ code:
     (as-c "return 0;")
     (as-c "}")))
 
+(defun run-c-compiler (sourcefile exefile)
+  (let ((cc (or (and (string/= (sb-ext:posix-getenv "CC") "")
+                     (sb-ext:posix-getenv "CC"))
+                (if (member :sb-building-contrib *features*)
+                    (error "~@<The CC environment variable not set during ~
+                            SB-GROVEL build.~:@>")
+                    (sb-int:style-warn
+                     "CC environment variable not set, SB-GROVEL falling back to \"cc\"."))
+                "cc")))
+    (sb-ext:process-exit-code
+     (sb-ext:run-program
+      cc
+      (append
+       (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
+       #+(and linux largefile)
+       '("-D_LARGEFILE_SOURCE" "-D_LARGEFILE64_SOURCE" "-D_FILE_OFFSET_BITS=64")
+       #+(and (or x86 ppc sparc) (or linux freebsd)) '("-m32")
+       #+(and x86-64 darwin inode64)
+       `("-arch" "x86_64" ,(format nil "-mmacosx-version-min=~A"
+                                   (or (sb-ext:posix-getenv "SBCL_MACOSX_VERSION_MIN")
+                                       "10.6"))
+                 "-D_DARWIN_USE_64_BIT_INODE")
+       #+(and x86-64 darwin (not inode64))
+       '("-arch" "x86_64" "-mmacosx-version-min=10.4")
+       #+(and x86-64 sunos) '("-m64")
+       (list "-o" (namestring exefile) (namestring sourcefile)))
+      :search t
+      :input nil
+      :output *trace-output*))))
+
 ;;; Extract constants as specified from INPUT, creating file OUTPUT.
 ;;; Very important: This OUTPUT formal parameter should ** literally ** be
 ;;; be named OUTPUT, and not OUTPUT-FILE.  WAT ???
@@ -203,6 +233,8 @@ code:
 ;;;
 ;;; TLDR: this stupid restriction on a variable's name makes
 ;;; something work that didn't used to work. And victory is ours!
+#+asdf
+(progn
 (defun c-constants-extract  (input output package)
   (with-open-file (f output :direction :output :if-exists :supersede)
     (with-open-file (i input :direction :input)
@@ -210,8 +242,6 @@ code:
              (definitions (read i)))
         (print-c-source  f headers definitions package)))))
 
-#+asdf
-(progn
 (defclass grovel-constants-file (cl-source-file)
   ((package :accessor constants-package :initarg :package)
    (do-not-grovel :accessor do-not-grovel
@@ -246,48 +276,9 @@ code:
                                          real-output-file))
          (tmp-constants (merge-pathnames #p"constants.lisp-temp"
                                          real-output-file)))
-    (funcall (intern "C-CONSTANTS-EXTRACT" (find-package "SB-GROVEL"))
-             filename tmp-c-source (constants-package component))
+    (c-constants-extract filename tmp-c-source (constants-package component))
     (unless (do-not-grovel component)
-      (let* ((cc (or (and (string/= (sb-ext:posix-getenv "CC") "")
-                          (sb-ext:posix-getenv "CC"))
-                     (if (member :sb-building-contrib *features*)
-                         (error "~@<The CC environment variable not set during ~
-                                 SB-GROVEL build.~:@>")
-                         (sb-int:style-warn
-                          "CC environment variable not set, SB-GROVEL falling back to \"cc\"."))
-                     "cc"))
-             (code (sb-ext:process-exit-code
-                    (sb-ext:run-program
-                     cc
-                     (append
-                      (split-cflags (sb-ext:posix-getenv "EXTRA_CFLAGS"))
-                      #+(and linux largefile)
-                      '("-D_LARGEFILE_SOURCE"
-                        "-D_LARGEFILE64_SOURCE"
-                        "-D_FILE_OFFSET_BITS=64")
-                      #+(and (or x86 ppc sparc) (or linux freebsd)) '("-m32")
-                      #+(and x86-64 darwin inode64)
-                      `("-arch" "x86_64"
-                        ,(format nil "-mmacosx-version-min=~A"
-                                 (or (sb-ext:posix-getenv "SBCL_MACOSX_VERSION_MIN")
-                                     "10.6"))
-                        "-D_DARWIN_USE_64_BIT_INODE")
-                      #+(and x86-64 darwin (not inode64))
-                      '("-arch" "x86_64"
-                        "-mmacosx-version-min=10.4")
-                      #+(and x86 darwin)
-                      `("-arch" "i386"
-                       ,(format nil "-mmacosx-version-min=~A"
-                                (or (sb-ext:posix-getenv "SBCL_MACOSX_VERSION_MIN")
-                                     "10.4")))
-                      #+(and x86-64 sunos) '("-m64")
-                      (list "-o"
-                            (namestring tmp-a-dot-out)
-                            (namestring tmp-c-source)))
-                     :search t
-                     :input nil
-                     :output *trace-output*))))
+      (let ((code (run-c-compiler tmp-c-source tmp-a-dot-out)))
         (unless (= code 0)
           (apply 'error 'c-compile-failed condition-arguments)))
       (let ((code (sb-ext:process-exit-code
