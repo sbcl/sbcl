@@ -295,6 +295,9 @@
                                  ;; Can't rely on REOPTIMIZE-NODE, as it may neve get reoptimized.
                                  ;; But the outer functions don't want the type to get
                                  ;; widened and their VOPs may never be applied.
+                                 (setf (node-derived-type node)
+                                       (fun-type-returns (global-ftype name)))
+                                 (setf (lvar-%derived-type (node-lvar node)) nil)
                                  (ir1-optimize-combination node))
                                (values t did-something over-wide)))))))))
              (cut-lvar (lvar &key head
