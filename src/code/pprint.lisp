@@ -1482,24 +1482,6 @@ line break."
           (t
            (incf (car state))))))
 
-;;; Warm bootup is slightly less brittle if we can avoid first having to run
-;;; the compiler to make some predicates for the initial PPD type specifiers.
-;;; In particular I'm trying to eradicate a bunch of PARSE-UNKNOWN conditions
-;;; that occur, e.g. installing (AND ARRAY (NOT (OR STRING BIT-VECTOR)))
-;;; entails (compile nil '(typep sb-pretty::object <that-type>))
-;;; -> (sb-c::find-free-fun typep)
-;;; -> (sb-kernel:specifier-type (function (t (or cons symbol sb-kernel:classoid class) ...)))
-;;; -> (sb-kernel::parse-args-types ...)
-;;; -> (sb-kernel::%parse-type CLASS)
-;;; where the type specifier for CLASS is as yet unknown
-(defmacro initial-entry (specifier handler &optional predicate)
-  ;; Assign the lowest possible priority
-  `(make-pprint-dispatch-entry
-    ',specifier single-float-negative-infinity #',handler
-    ,(or predicate
-         `(named-lambda ,(format nil "~A-P" handler) (x)
-            ,(sb-c::source-transform-typep 'x specifier)))))
-
 
 ;;;; Interface seen by regular (ugly) printer.
 
@@ -1509,6 +1491,32 @@ line break."
   (with-pretty-stream (stream)
     (funcall fun stream object)))
 
+;;; Warm bootup is slightly less brittle if we can avoid first having to run
+;;; the compiler to make the predicates for the initial PPD type specifiers.
+;;; Factoring this out avoids retaining excess junk as part of the codeblob
+;;; that would also hold the anonymous predicates were it done that way.
+(macrolet
+    ((define-initial-entries ()
+       (collect ((defuns) (constructors))
+         (flet ((entry (specifier print &optional test)
+                  (unless test ; define a global function
+                    (setq test (symbolicate print "-P"))
+                    (defuns `(defun ,test (x) (typep x ',specifier))))
+                  (constructors ; Assign the lowest possible priority
+                   `(make-pprint-dispatch-entry
+                     ',specifier single-float-negative-infinity #',print #',test))))
+           ;; * PLEASE NOTE : If you change these definitions, then you may need to
+           ;; adjust the computation of POSSIBLY-MATCHABLE in PPRINT-DISPATCH.
+           ;; For identical priorities, we pick the first match, but that's technically
+           ;; unspecified behavior because insertion isn't necessarily stable,
+           ;; thought it is in this implementation.
+           (entry '(and array (not (or string bit-vector))) 'pprint-array)
+           (entry '(cons (and symbol (satisfies fboundp))) 'pprint-call-form)
+           (entry 'cons 'pprint-fill 'consp)
+           (entry 'sb-impl::comma 'pprint-unquoting-comma 'comma-p)
+           `(progn (defun get-initial-ppd-entries () (vector ,@(constructors)))
+                   ,@(defuns))))))
+  (define-initial-entries))
 (defun !pprint-cold-init ()
   (/show0 "entering !PPRINT-COLD-INIT")
   ;; Kludge: We set *STANDARD-PP-D-TABLE* to a new table even though
@@ -1517,17 +1525,7 @@ line break."
   ;; possibly performed in the following extent may use W-S-IO-SYNTAX.
   (setf *standard-pprint-dispatch-table* (make-pprint-dispatch-table #() nil nil))
   (setf *initial-pprint-dispatch-table* nil)
-  (let* ((initial-entries
-          (vector
-           ;; * PLEASE NOTE : If you change these definitions, then you may need to adjust
-           ;; the computation of POSSIBLY-MATCHABLE in PPRINT-DISPATCH.
-           ;;
-           ;; The implementation happens to check identical priorities in the order added,
-           ;; but that's unspecified behavior.
-           (initial-entry (and array (not (or string bit-vector))) pprint-array)
-           (initial-entry (cons (and symbol (satisfies fboundp))) pprint-call-form)
-           (initial-entry cons pprint-fill #'consp)
-           (initial-entry sb-impl::comma pprint-unquoting-comma #'comma-p)))
+  (let* ((initial-entries (get-initial-ppd-entries))
          (*print-pprint-dispatch*
           (make-pprint-dispatch-table initial-entries nil nil)))
     ;; cons cells with interesting things for the car

@@ -154,9 +154,12 @@
                                       (and (consp x) (uninternable-p (car x))))
                                     (dd-constructors dd))))))
              (classoid-subclasses (find-classoid t)))
+    ;; PATHNAME is not a structure-classoid
+    (setf (sb-kernel:dd-constructors (sb-kernel:find-defstruct-description 'pathname))
+          nil)
     ;; Todo: perform one pass, then a full GC, then a final pass to confirm
     ;; it worked. It should be an error if any uninternable symbols remain,
-    ;; but at present there are about 13 other "!" symbols with referrers.
+    ;; but at present there are about 9 symbols with referrers.
     (with-package-iterator (iter (list-all-packages) :internal :external)
       (loop (multiple-value-bind (winp symbol accessibility package) (iter)
               (declare (ignore accessibility))

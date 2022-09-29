@@ -180,16 +180,13 @@
      (pop args)))
 
 (defmacro def-complex-format-interpreter (char lambda-list &body body)
+  (aver (not (lower-case-p char)))
   (let ((defun-name
-            (intern (format nil
-                            "~:@(~:C~)-FORMAT-DIRECTIVE-INTERPRETER"
-                            char)))
+            (intern (format nil "~:C-INTERPRETER" char)))
         (directive '.directive) ; expose this var to the lambda. it's easiest
         (directives (if lambda-list (car (last lambda-list)) (gensym "DIRECTIVES"))))
-    `(!cold-init-forms
-      (setf
-       (aref *format-directive-interpreters* ,(char-code (char-upcase char)))
-       (named-lambda ,defun-name (stream ,directive ,directives orig-args args)
+    `(progn
+       (defun ,defun-name (stream ,directive ,directives orig-args args)
          (declare (ignorable stream orig-args args))
          ,@(if lambda-list
                `((let ,(mapcar (lambda (var)
@@ -198,7 +195,10 @@
                                (butlast lambda-list))
                    (values (progn ,@body) args)))
                `((declare (ignore ,directive ,directives))
-                 ,@body)))))))
+                 ,@body)))
+       (!cold-init-forms
+        (setf (aref *format-directive-interpreters* (char-code ,char))
+              #',defun-name)))))
 
 (defmacro def-format-interpreter (char lambda-list &body body)
   (let ((directives (gensym "DIRECTIVES")))
