@@ -2,7 +2,7 @@
 
 mkdir -p ../obj/asdf-cache/$@/
 
-if $GNUMAKE -j1 -C $@ build < /dev/null 2>&1 && touch ../obj/asdf-cache/$@/build-passed.test-report ; then
+if $GNUMAKE -j1 -C $@ build < /dev/null 2>&1 ; then
 	:
 else
 	exit $?
