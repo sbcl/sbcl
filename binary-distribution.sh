@@ -25,7 +25,6 @@ tar -cf $b-binary.tar \
     $b/contrib/asdf-module.mk \
     `for contrib in $(cd $b/contrib && echo *); do
          src_dir=$b/contrib/$contrib
-         cache_dir=$b/obj/asdf-cache/$contrib
          if test -d $src_dir && test -f $b/obj/sbcl-home/contrib/$contrib.fasl; then
              echo $src_dir/Makefile
          fi

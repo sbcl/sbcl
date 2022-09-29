@@ -19,8 +19,6 @@ install::
 
 build:: $(FASL)
 	true
-test:: $(FASL)
-	true
 
 UPSTREAM=../../obj/asdf-upstream
 up::

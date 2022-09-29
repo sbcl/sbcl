@@ -9,8 +9,6 @@
 
 (defvar *contrib-directory* #P"../../contrib/")
 
-(defvar *asdf-object-cache-directory* #P"../../obj/asdf-cache/")
-
 (defvar *documented-packages*
   '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-MOP"
     "SB-PCL" "SB-SYS" "SB-SEQUENCE" "SB-UNICODE" "SB-PROFILE"
