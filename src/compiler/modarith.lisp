@@ -175,15 +175,7 @@
                                        ((nil) 'unsigned-byte)
                                        ((t) 'signed-byte))
                                      ,width)))))
-    (labels ((reoptimize-node (node name)
-               (setf (node-derived-type node)
-                     (fun-type-returns
-                      (global-ftype name)))
-               (setf (lvar-%derived-type (node-lvar node)) nil)
-               (setf (node-reoptimize node) t)
-               (setf (block-reoptimize (node-block node)) t)
-               (reoptimize-component (node-component node) :maybe))
-             (insert-lvar-cut (lvar)
+    (labels ((insert-lvar-cut (lvar)
                "Insert a LOGAND/MASK-SIGNED-FIELD to cut the value of LVAR
                 to the required bit width. Returns T if any change was made.
 
@@ -300,7 +292,10 @@
                                      (setf did-something (or did-something change)
                                            over-wide (or over-wide wide)))))
                                (when did-something
-                                 (reoptimize-node node name))
+                                 ;; Can't rely on REOPTIMIZE-NODE, as it may neve get reoptimized.
+                                 ;; But the outer functions don't want the type to get
+                                 ;; widened and their VOPs may never be applied.
+                                 (ir1-optimize-combination node))
                                (values t did-something over-wide)))))))))
              (cut-lvar (lvar &key head
                         &aux did-something must-insert over-wide)
