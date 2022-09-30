@@ -43,7 +43,9 @@
 (defparameter +genfile+ "generated-constants")
 (defun perform (defsystem)
   (let* ((specified-sources (getf defsystem :components))
-         (objdir (format nil "../../obj/from-xc/contrib/~A/" *system*))
+         ;; This path is basically arbitrary. I wanted to avoid creating
+         ;; another directory under "obj/" but alas ...
+         (objdir (format nil "../../obj/from-self/contrib/~A/" *system*))
          (*features* (append '(:sb-building-contrib) *features*
                              sb-impl:+internal-features+)))
     (ensure-directories-exist objdir)
