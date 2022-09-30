@@ -273,6 +273,23 @@ deduce_thread(void (*context_scanner)(), uword_t pointer, char** pc)
 }
 #endif
 
+static int non_nil_symbolp(lispobj x) {
+    return lowtag_of(x) == OTHER_POINTER_LOWTAG
+      && widetag_of((lispobj*)(x-OTHER_POINTER_LOWTAG)) == SYMBOL_WIDETAG;
+}
+
+static int tls_index_ok(lispobj tlsindex, struct vector* ignored_objects)
+{
+    if (ignored_objects) {
+        int i;
+        for (i = vector_len(ignored_objects)-1; i >= 0; --i) {
+            lispobj x = ignored_objects->data[i];
+            if (non_nil_symbolp(x) && tls_index_of(SYMBOL(x)) == tlsindex) return 0;
+        }
+    }
+    return 1; // is OK
+}
+
 /* KNOWN BUG: stack reference to pinned large object or immobile object
  * won't be found in pins hashtable */
 /* Also: should take 'struct lisp_thread**' instead of 'struct thread**' */
@@ -282,6 +299,7 @@ static lispobj examine_threads(struct hopscotch_table* targets,
                                enum ref_kind *root_kind,
                                struct thread** root_thread,
                                char** thread_pc,
+                               struct vector* ignored_objects,
                                lispobj *tls_index)
 {
     struct thread *th;
@@ -293,8 +311,9 @@ static lispobj examine_threads(struct hopscotch_table* targets,
         *root_kind = TLS;
         where = &th->lisp_thread;
         end   = (lispobj*)((char*)th + SymbolValue(FREE_TLS_INDEX,0));
-        for( ; where < end ; ++where)
-            if (interestingp(*where, targets)) {
+        for ( ; where < end ; ++where)
+            if (interestingp(*where, targets)
+                && tls_index_ok((char*)where - (char*)th, ignored_objects)) {
                 *root_thread = th;
                 *tls_index = (char*)where - (char*)th;
                 return *where;
@@ -487,6 +506,7 @@ static lispobj trace1(lispobj object,
                       struct hopscotch_table* visited,
                       inverted_heap_t graph,
                       struct scratchpad* scratchpad,
+                      struct vector* ignored_objects,
                       int n_pins, lispobj* pins, void (*context_scanner)(),
                       int criterion)
 {
@@ -505,7 +525,7 @@ static lispobj trace1(lispobj object,
     hopscotch_put(targets, object, 1);
     while ((thread_ref = examine_threads(targets, context_scanner, n_pins, pins,
                                          &root_kind, &root_thread, &thread_pc,
-                                         &tls_index)) == 0) {
+                                         ignored_objects, &tls_index)) == 0) {
         // TODO: preallocate layers to avoid possibility of malloc deadlock
         struct layer* layer = (struct layer*)malloc(sizeof (struct layer));
         layer->nodes   = 0;
@@ -943,7 +963,7 @@ static boolean finding_leaf_p(lispobj weak_pointers)
 static int trace_paths(void (*context_scanner)(),
                        lispobj weak_pointers, // list of inputs
                        lispobj paths, // vector of outputs
-                       lispobj ignore, // vector of ignored objects
+                       lispobj ignored_objects, // tagged pointer to vector
                        int n_pins, lispobj* pins,
                        int criterion)
 {
@@ -963,7 +983,7 @@ static int trace_paths(void (*context_scanner)(),
                   ((i%8)==7||i==n_pins-1)?"\n":"");
     }
     inverted_heap = compute_heap_inverse(finding_leaf_p(weak_pointers),
-                                         ignore, &scratchpad);
+                                         ignored_objects, &scratchpad);
     hopscotch_create(&visited, HASH_FUNCTION, 0, 32, 0);
     hopscotch_create(&targets, HASH_FUNCTION, 0, 32, 0);
     i = 0;
@@ -981,6 +1001,7 @@ static int trace_paths(void (*context_scanner)(),
             lispobj path = trace1(canonical_obj(value),
                                   &targets, &visited,
                                   inverted_heap, &scratchpad,
+                                  (struct vector*)native_pointer(ignored_objects),
                                   n_pins, pins, context_scanner, criterion);
             lispobj* elt = VECTOR(paths)->data + i;
             notice_pointer_store(elt);

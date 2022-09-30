@@ -169,7 +169,8 @@
                            (:print (or boolean (eql :verbose)))))
                 search-roots))
 (defun search-roots (weak-pointers &key (criterion :oldest) (gc nil)
-                                        (ignore nil) (print t))
+                                        (ignore '(* ** *** / // ///))
+                                        (print t))
   "Find roots keeping the targets of WEAK-POINTERS alive.
 
 WEAK-POINTERS must be a single SB-EXT:WEAK-POINTER or a list of those,
@@ -261,7 +262,7 @@ Experimental: subject to change without prior notice."
                             (:static 2))))
     (cond (gc
            (setf gc-traceroot-criterion criterion-value)
-           (sb-sys:with-pinned-objects (param)
+           (sb-sys:with-pinned-objects (param (elt param 1))
              (setf gc-object-watcher (sb-kernel:get-lisp-obj-address param)))
            (gc :full t)
            (setf gc-object-watcher 0))
