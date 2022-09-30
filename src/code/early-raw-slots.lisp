@@ -68,7 +68,6 @@
   #-sb-xc-host (comparator (missing-arg) :type function :read-only t)
   ;; the type specifier, which must specify a numeric type.
   (raw-type (missing-arg) :type symbol :read-only t)
-  (init-vop (missing-arg) :type symbol :read-only t) ; FIXME: remove
   ;; How many words are each value of this type?
   (n-words (missing-arg) :type (and index (integer 1)) :read-only t)
   ;; Necessary alignment in units of words.  Note that instances
@@ -126,15 +125,12 @@
       (vector
        (make-raw-slot-data :raw-type 'sb-vm:word
                            :accessor-name '%raw-instance-ref/word
-                           :init-vop 'sb-vm::raw-instance-init/word
                            :n-words 1)
        (make-raw-slot-data :raw-type 'sb-vm:signed-word
                            :accessor-name '%raw-instance-ref/signed-word
-                           :init-vop 'sb-vm::raw-instance-init/signed-word
                            :n-words 1)
        (make-raw-slot-data :raw-type 'single-float
                            :accessor-name '%raw-instance-ref/single
-                           :init-vop 'sb-vm::raw-instance-init/single
                            ;; KLUDGE: On 64 bit architectures, we
                            ;; could pack two SINGLE-FLOATs into the
                            ;; same word if raw slots were indexed
@@ -148,27 +144,22 @@
                            :n-words 1)
        (make-raw-slot-data :raw-type 'double-float
                            :accessor-name '%raw-instance-ref/double
-                           :init-vop 'sb-vm::raw-instance-init/double
                            :alignment double-float-alignment
                            :n-words (/ 8 sb-vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-single-float
                            :accessor-name '%raw-instance-ref/complex-single
-                           :init-vop 'sb-vm::raw-instance-init/complex-single
                            :n-words (/ 8 sb-vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-double-float
                            :accessor-name '%raw-instance-ref/complex-double
-                           :init-vop 'sb-vm::raw-instance-init/complex-double
                            :alignment double-float-alignment
                            :n-words (/ 16 sb-vm:n-word-bytes))
        #+long-float
        (make-raw-slot-data :raw-type long-float
                            :accessor-name '%raw-instance-ref/long
-                           :init-vop 'sb-vm::raw-instance-init/long
                            :n-words #+x86 3 #+sparc 4)
        #+long-float
        (make-raw-slot-data :raw-type complex-long-float
                            :accessor-name '%raw-instance-ref/complex-long
-                           :init-vop 'sb-vm::raw-instance-init/complex-long
                            :n-words #+x86 6 #+sparc 8))))))
 
 #+sb-xc-host (!raw-slot-data-init)
