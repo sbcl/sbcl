@@ -202,3 +202,13 @@
   (multiple-value-bind (ok tested) (make-array-fill-nil)
     ;; should not inhibit stack allocation, should check that NIL is OK
     (assert (and ok (eql tested 1)))))
+
+(defun push-values-constants (k)
+  (let (*)
+    (if k
+        (eval k)
+        (load-time-value t))))
+
+(with-test (:name :push-values-constants)
+  (assert (eql (push-values-constants 1) 1))
+  (assert (eql (push-values-constants nil) t)))

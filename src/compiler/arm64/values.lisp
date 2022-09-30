@@ -75,7 +75,10 @@
                    ((descriptor-reg any-reg)
                     tn)
                    ((immediate constant)
-                    (cond ((eql (tn-value tn) 0)
+                    (cond ((not (constant-tn-p tn))
+                           (load-constant vop tn temp)
+                           temp)
+                          ((eql (tn-value tn) 0)
                            zr-tn)
                           ((or (eql prev-constant (tn-value tn))
                                (progn
