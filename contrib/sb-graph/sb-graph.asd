@@ -1,5 +1,4 @@
 ;;; -*-  Lisp -*-
-#-(or sb-testing-contrib sb-building-contrib)
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-graph"
@@ -10,5 +9,4 @@
             :components
             ((:file "package")
              (:file "graphing")
-             (:file "hooking"))))
-  :perform (load-op :after (o c) (provide 'sb-graph)))
+             (:file "hooking")))))

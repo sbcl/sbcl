@@ -9,7 +9,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-#-(or sb-testing-contrib sb-building-contrib)
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-concurrency"
@@ -17,5 +16,4 @@
                (:file "frlock"   :depends-on ("package"))
                (:file "queue"    :depends-on ("package"))
                (:file "mailbox"  :depends-on ("package" "queue"))
-               (:file "gate"     :depends-on ("package")))
-  :perform (load-op :after (o c) (provide 'sb-concurrency)))
+               (:file "gate"     :depends-on ("package"))))

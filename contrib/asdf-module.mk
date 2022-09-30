@@ -27,19 +27,10 @@ endif
 
 export CC SBCL EXTRA_CFLAGS
 
-all: $(FASL) $(ASD)
+all: $(FASL)
 
-$(FASL)::
-	$(SBCL) --eval '(setf (sb-ext:readtable-base-char-preference *readtable*) :both)' \
-		--eval '(declaim (muffle-conditions (and compiler-note (not sb-c::unknown-typep-note))))' \
-		--load ../asdf-stub.lisp \
-		--eval '(asdf::build-asdf-contrib "$(SYSTEM)")'
-
-$(ASD)::
-	echo "(defsystem :$(SYSTEM) :class require-system)" > $@
-
-build: $(FASL) $(ASD)
-	true
+$(FASL):: # this produces $(ASD) as a side-effect
+	$(SBCL)	--load ../make-contrib.lisp "$(SYSTEM)" $(MODULE_REQUIRES)
 
 install:
 	cp $(FASL) $(ASD) "$(BUILD_ROOT)$(INSTALL_DIR)"

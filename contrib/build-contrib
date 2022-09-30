@@ -1,9 +1,0 @@
-#!/bin/sh
-
-mkdir -p ../obj/asdf-cache/$@/
-
-if $GNUMAKE -j1 -C $@ build < /dev/null 2>&1 ; then
-	:
-else
-	exit $?
-fi | tee ../output/building-contrib.$@

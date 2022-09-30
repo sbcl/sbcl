@@ -7,7 +7,6 @@
 ;;;; facility.
 ;;;;
 
-#-(or sb-testing-contrib sb-building-contrib)
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-md5"
@@ -21,7 +20,4 @@
                      (and :lispworks (not :lispworks4))
                      :ccl :allegro)
                "flexi-streams")
-  #+sb-building-contrib :pathname
-  #+sb-building-contrib #p"SYS:CONTRIB;SB-MD5;"
-  :components ((:file "md5"))
-  :perform (load-op :after (o c) (provide 'sb-md5)))
+  :components ((:file "md5")))

@@ -56,6 +56,7 @@ export SBCL SBCL_BUILDING_CONTRIB
 # as SB-RT and SB-GROVEL, but FIXME: there's probably a better
 # solution.  -- CSR, 2003-05-30
 if [ -z "$DONT_CLEAN_SBCL_CONTRIB" ] ; then
+  rm -rf obj/from-xc/contrib/
   rm -fr obj/sbcl-home/contrib/
   rm -fr obj/asdf-cache/
 fi
@@ -65,7 +66,7 @@ find output -name 'building-contrib.*' -print | xargs rm -f
 set -e # exit with failure if any $GNUMAKE fails
 # Ignore all source registries.
 if [ -z "$*" ]; then
-    $GNUMAKE $SBCL_MAKE_JOBS -C contrib
+    $GNUMAKE $SBCL_MAKE_JOBS -k -C contrib
 else
     for x in "$@"; do
         $GNUMAKE -C contrib $x.fasl

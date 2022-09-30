@@ -9,11 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-#-(or sb-testing-contrib sb-building-contrib)
 (error "Can't build contribs with ASDF")
 
 (defsystem "sb-introspect"
-  :components ((:file "introspect"))
-  #+sb-building-contrib :pathname
-  #+sb-building-contrib #p"SYS:CONTRIB;SB-INTROSPECT;"
-  :perform (load-op :after (o c) (provide 'sb-introspect)))
+  :components ((:file "introspect")))
