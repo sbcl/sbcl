@@ -795,13 +795,6 @@
             (invoke-emf emf args))
           (call-no-applicable-method generic-function args)))))
 
-(defun list-eq (x y)
-  (loop (when (atom x) (return (eq x y)))
-        (when (atom y) (return nil))
-        (unless (eq (car x) (car y)) (return nil))
-        (setq x (cdr x)
-              y (cdr y))))
-
 (define-load-time-global *std-cam-methods* nil)
 
 (defun compute-applicable-methods-emf (generic-function)
@@ -810,7 +803,7 @@
              (cam-methods (compute-applicable-methods-using-types
                            cam (list `(eql ,generic-function) t))))
         (values (get-effective-method-function cam cam-methods)
-                (list-eq cam-methods
+                (list-elts-eq cam-methods
                          (or *std-cam-methods*
                              (setq *std-cam-methods*
                                    (compute-applicable-methods-using-types

@@ -293,8 +293,8 @@
                           (if allowp
                               194
                               11))))
-    ((required equal-but-no-car-recursion)
-     (optional equal-but-no-car-recursion)
+    ((required list-elts-eq) ; always compare ctype instances by EQ
+     (optional list-elts-eq)
      (rest eq)
      (allowp eq))
   (%make-values-type :required required
@@ -1391,9 +1391,13 @@
 ;;; This cache is sized extremely generously, which has payoff
 ;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
 ;;; since EQ types are an immediate win.
+;;; EQL isn't the best comparator, but EQUAL would be wrong
+;;; because EQL specifiers must not use a weaker comparison.
+;;; This means that we won't match things like (INTEGER (0) 4) to an existing
+;;; entry unless it is EQ.  This is probably not a disaster.
 #-sb-xc-host
 (sb-impl::!define-hash-cache values-specifier-type
-  ((orig equal-but-no-car-recursion)) ()
+  ((orig list-elements-eql)) ()
    :hash-function #'sxhash :hash-bits 10)
 
 (declaim (inline make-type-context))
@@ -2130,7 +2134,7 @@ expansion happened."
 (define-type-method (hairy :simple-subtypep) (type1 type2)
   (let ((hairy-spec1 (hairy-type-specifier type1))
         (hairy-spec2 (hairy-type-specifier type2)))
-    (cond ((equal-but-no-car-recursion hairy-spec1 hairy-spec2)
+    (cond ((list-elements-eql hairy-spec1 hairy-spec2)
            (values t t))
           ((maybe-reparse-specifier! type1)
            (csubtypep type1 type2))
@@ -2198,8 +2202,10 @@ expansion happened."
       nil))
 
 (define-type-method (hairy :simple-=) (type1 type2)
-  (if (equal-but-no-car-recursion (hairy-type-specifier type1)
-                                  (hairy-type-specifier type2))
+  ;; Specifiers really want to be compared by something that is more liberal than EQL
+  ;; but it doesn't really matter too much because the containing objects would probably
+  ;; be EQ if there was a cache hit on parsing.
+  (if (list-elements-eql (hairy-type-specifier type1) (hairy-type-specifier type2))
       (values t t)
       (values nil nil)))
 

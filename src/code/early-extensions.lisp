@@ -707,27 +707,18 @@ NOTE: This interface is experimental and subject to change."
                    forms
                    `((,memoizer ,@forms))))))))
 
-;;; FIXME: maybe not the best place
-;;;
-;;; FIXME: think of a better name -- not only does this not have the
-;;; CAR recursion of EQUAL, it also doesn't have the special treatment
-;;; of pathnames, bit-vectors and strings.
-;;;
-;;; KLUDGE: This means that we will no longer cache specifiers of the
-;;; form '(INTEGER (0) 4).  This is probably not a disaster.
-;;;
-;;; A helper function for the type system, which is the main user of
-;;; these caches: we must be more conservative than EQUAL for some of
-;;; our equality tests, because MEMBER and friends refer to EQLity.
-;;; So:
-(defun equal-but-no-car-recursion (x y)
-  (do () (())
-    (cond ((eql x y) (return t))
-          ((and (consp x)
-                (consp y)
-                (eql (pop x) (pop y))))
-          (t
-           (return)))))
+(defun list-elts-eq (x y)
+  (loop (when (eq x y) (return t))
+        (when (or (atom x) (atom y)) (return nil))
+        (unless (eq (car x) (car y)) (return nil))
+        (setq x (cdr x)
+              y (cdr y))))
+(defun list-elements-eql (x y)
+  (loop (when (eql x y) (return t))
+        (when (or (atom x) (atom y)) (return nil))
+        (unless (eq (car x) (car y)) (return nil))
+        (setq x (cdr x)
+              y (cdr y))))
 
 ;;;; various operations on names
 

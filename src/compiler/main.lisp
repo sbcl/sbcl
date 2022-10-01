@@ -378,7 +378,7 @@ Examples:
                     ;; We don't want to walk into default values,
                     ;; e.g. (&optional (b #<insane-struct))
                     ;; because #<insane-struct> might be circular.
-                    (equal-but-no-car-recursion entry-args args)))))
+                    (list-elts-eq entry-args args)))))
       (unless (and file-compiling-p
                    (find-if #'match-p
                             (file-info-style-warning-tracker file-info)))
