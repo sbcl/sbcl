@@ -506,3 +506,12 @@
       (csubtypep (find-classoid type) (specifier-type 'funcallable-instance))
     (assert (and (not answer) certain)))
   (aver (csubtypep (find-classoid type) (specifier-type 'instance))))
+
+(assert (sb-int:list-elts-eq '(a b 1) '(a b 1)))
+(assert (not (sb-int:list-elts-eq '(foo) '(foo bar))))
+(assert (not (sb-int:list-elts-eq '(foo bar) '(foo))))
+
+(assert (sb-int:list-elements-eql '(a b 1) '(a b 1)))
+(assert (sb-int:list-elements-eql '($1.0d0 x y) '($1.0d0 x y)))
+(assert (not (sb-int:list-elements-eql '(foo) '(foo bar))))
+(assert (not (sb-int:list-elements-eql '(foo bar) '(foo))))

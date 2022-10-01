@@ -714,9 +714,9 @@ NOTE: This interface is experimental and subject to change."
         (setq x (cdr x)
               y (cdr y))))
 (defun list-elements-eql (x y)
-  (loop (when (eql x y) (return t))
+  (loop (when (eq x y) (return t))
         (when (or (atom x) (atom y)) (return nil))
-        (unless (eq (car x) (car y)) (return nil))
+        (unless (eql (car x) (car y)) (return nil))
         (setq x (cdr x)
               y (cdr y))))
 
