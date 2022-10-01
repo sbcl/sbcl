@@ -321,18 +321,6 @@ Please check that all strings which were not recognizable to the compiler
   ;; SAVE-LISP-AND-DIE.
   #-sb-devel (!unintern-init-only-stuff)
 
-  ;; Mark interned immobile symbols so that COMPILE-FILE knows
-  ;; which symbols will always be physically in immobile space.
-  ;; Due to the possibility of interning a symbol that was allocated in dynamic
-  ;; space, it's not the case that all interned symbols are immobile.
-  ;; And we can't promise anything across reload, which makes it impossible
-  ;; for x86-64 codegen to know which symbols are immediate constants.
-  ;; Except that symbols which existed at SBCL build time must be.
-  (do-all-symbols (symbol)
-    (when (sb-kernel:immobile-space-obj-p symbol)
-      (sb-kernel:logior-header-bits
-       symbol (ash 1 sb-vm::+initial-core-symbol-bit+))))
-
   ;; A symbol whose INFO slot underwent any kind of manipulation
   ;; such that it now has neither properties nor globaldb info,
   ;; can have the slot set back to NIL if it wasn't already.

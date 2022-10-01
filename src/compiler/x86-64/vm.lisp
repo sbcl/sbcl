@@ -464,6 +464,11 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
+#-sb-xc-host
+(defun pseudostatic-immobile-symbol-p (symbol)
+  (and (immobile-space-obj-p symbol)
+       (= (generation-of symbol) +pseudo-static-generation+)))
+
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
@@ -476,16 +481,11 @@
                ;; And the cross-compiler always uses immobile-space if enabled.
                #+(or immobile-symbols (and immobile-space sb-xc-host)) t
 
-               ;; Otherwise, if #-immobile-symbols, and the symbol was present
-               ;; in the initial core image as indicated by the symbol header, then
-               ;; it's in immobile-space. There is a way in which the bit can be wrong,
-               ;; but it's highly unlikely - the symbol would have to be uninterned from
-               ;; the loading SBCL, reallocated in dynamic space and re-interned into its
-               ;; initial package. All without breaking anything. Hence, unlikely.
-               ;; Also note that if compiling to memory, the symbol's current address
-               ;; is used to determine whether it's immediate.
+               ;; Otherwise, if #-immobile-symbols, and the symbol is pseudostatic
+               ;; in immobile space, it is an immediate value.
+               ;; If compiling to memory, the symbol's address alone suffices.
                #+(and (not sb-xc-host) immobile-space (not immobile-symbols))
-               (or (logbitp +initial-core-symbol-bit+ (get-header-data value))
+               (or (pseudostatic-immobile-symbol-p value)
                    (locally (declare (notinline sb-c::producing-fasl-file))
                      (and (not (sb-c::producing-fasl-file))
                           (immobile-space-obj-p value))))
