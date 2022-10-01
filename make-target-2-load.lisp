@@ -159,7 +159,7 @@
           nil)
     ;; Todo: perform one pass, then a full GC, then a final pass to confirm
     ;; it worked. It should be an error if any uninternable symbols remain,
-    ;; but at present there are about 9 symbols with referrers.
+    ;; but at present there are about 7 symbols with referrers.
     (with-package-iterator (iter (list-all-packages) :internal :external)
       (loop (multiple-value-bind (winp symbol accessibility package) (iter)
               (declare (ignore accessibility))

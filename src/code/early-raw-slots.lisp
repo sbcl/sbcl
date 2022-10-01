@@ -96,20 +96,14 @@
 ;; By making this a cold-init function, it is possible to use raw slots
 ;; in cold toplevel forms.
 (defun !raw-slot-data-init ()
-  (macrolet ((make-raw-slot-data (&rest args &key accessor-name &allow-other-keys)
-               (declare (ignorable accessor-name))
-               #+sb-xc-host
-               `(!make-raw-slot-data ,@args)
-               #-sb-xc-host
-               (let ((access (cadr accessor-name)))
+  (macrolet ((make-raw-slot-data (&rest args)
+               #+sb-xc-host `(!make-raw-slot-data ,@args)
+               #-sb-xc-host ; unwrap the QUOTE from the args (this is a macro)
+               (let ((access (cadr (getf args :accessor-name)))
+                     (type (cadr (getf args :raw-type))))
                  `(!make-raw-slot-data
                    :accessor-fun #',access
-                   :comparator
-                   ;; Not a symbol, because there aren't any so-named functions.
-                   (named-lambda ,(string (symbolicate access "="))
-                       (index x y)
-                     (declare (optimize speed (safety 0)))
-                     (= (,access x index) (,access y index)))
+                   :comparator #',(symbolicate "RAW-" type "SLOT=")
                    ;; Ignore the :ACCESSOR-NAME initarg
                    ,@args :allow-other-keys t))))
     (let ((double-float-alignment
@@ -163,6 +157,19 @@
                            :n-words #+x86 6 #+sparc 8))))))
 
 #+sb-xc-host (!raw-slot-data-init)
+#-sb-xc-host
+(macrolet ((define-rs= ()
+             ;; Expand by using the host's vector of RSD instances
+             `(progn
+                ,@(loop for rsd across *raw-slot-data*
+                        collect
+                        (let ((type (raw-slot-data-raw-type rsd))
+                              (reader (raw-slot-data-accessor-name rsd)))
+                          `(defun  ,(symbolicate "RAW-" type "SLOT=") (index x y)
+                             (declare (optimize speed (safety 0)))
+                             (= (,reader x index) (,reader y index))))))))
+  (define-rs=))
+
 #+sb-xc
 (declaim (type (simple-vector #.(length *raw-slot-data*)) *raw-slot-data*))
 
