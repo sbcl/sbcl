@@ -4925,6 +4925,7 @@ This can help you produce more deterministic output for FASLs."))
     (defun sb-grovel-unknown-constant-condition-p (c)
       "Detect SB-GROVEL unknown-constant conditions on older versions of SBCL"
       (and (typep c 'sb-int:simple-style-warning)
+           (stringp (simple-condition-format-control c))
            (string-enclosed-p
             "Couldn't grovel for "
             (simple-condition-format-control c)
