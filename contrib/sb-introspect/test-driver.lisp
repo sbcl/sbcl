@@ -43,7 +43,7 @@
 
 (deftest macro-lambda-list.1
     (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x b)
-                                   `(x b)))
+                                   `(,x ,b)))
            '(x b))
   t)
 
@@ -60,26 +60,24 @@
 
 (deftest macro-lambda-list.3
     (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x &optional (b "abc"))
-                                   `(x b)))
+                                   `(,x ,b)))
            '(x &optional (b "abc")))
   t)
 
 (deftest macro-lambda-list.4
     (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x &key (b "abc"))
-                                   `(x b)))
+                                   `(,x ,b)))
            '(x &key (b "abc")))
   t)
 
-(deftest definition-source.1
-    (values (consp (find-definition-sources-by-name 'vectorp :vop))
-            (consp (find-definition-sources-by-name 'check-type :macro)))
-  t t)
+(test-util:with-test (:name definition-source.1 :skipped-on :no-source-locs)
+  (assert (consp (find-definition-sources-by-name 'vectorp :vop)))
+  (assert (consp (find-definition-sources-by-name 'check-type :macro))))
 
 (deftest definition-source-plist.1
     (let* ((source (find-definition-source #'cl-user::one))
            (plist (definition-source-plist source))
            (pathname (definition-source-pathname source)))
-      (declare (ignore source))
       ;; the full pathname isn't important
       (values (equalp (pathname-name pathname) "TEST")
               (= (definition-source-file-write-date source)
@@ -121,33 +119,26 @@
     (matchp #'cl-user::one 2)
   t)
 
-(deftest find-source-stuff.3
-    (matchp-name :generic-function 'cl-user::two 3)
-  t)
+(test-util:with-test (:name find-source-stuff.3 :skipped-on :no-source-locs)
+  (assert (matchp-name :generic-function 'cl-user::two 3)))
 
-(deftest find-source-stuff.4
-    (matchp (car (sb-mop:generic-function-methods #'cl-user::two)) 4)
-  t)
+(test-util:with-test (:name find-source-stuff.4 :skipped-on :no-source-locs)
+  (assert (matchp (car (sb-mop:generic-function-methods #'cl-user::two)) 4)))
 
-(deftest find-source-stuff.5
-    (matchp-name :variable 'cl-user::*a* 8)
-  t)
+(test-util:with-test (:name find-source-stuff.5 :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::*a* 8)))
 
-(deftest find-source-stuff.6
-    (matchp-name :variable 'cl-user::*b* 9)
-  t)
+(test-util:with-test (:name find-source-stuff.6 :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::*b* 9)))
 
-(deftest find-source-stuff.7
-    (matchp-name :class 'cl-user::a 10)
-  t)
+(test-util:with-test (:name find-source-stuff.7 :skipped-on :no-source-locs)
+  (assert (matchp-name :class 'cl-user::a 10)))
 
-(deftest find-source-stuff.8
-    (matchp-name :condition 'cl-user::b 11)
-  t)
+(test-util:with-test (:name find-source-stuff.8 :skipped-on :no-source-locs)
+  (assert (matchp-name :condition 'cl-user::b 11)))
 
-(deftest find-source-stuff.9
-    (matchp-name :structure 'cl-user::c 12)
-  t)
+(test-util:with-test (:name find-source-stuff.9 :skipped-on :no-source-locs)
+  (assert (matchp-name :structure 'cl-user::c 12)))
 
 (deftest find-source-stuff.10
     (matchp-name :function 'cl-user::make-c 12)
@@ -157,9 +148,8 @@
     (matchp-name :function 'cl-user::c-e 12)
   t)
 
-(deftest find-source-stuff.12
-    (matchp-name :structure 'cl-user::d 13)
-  t)
+(test-util:with-test (:name find-source-stuff.12 :skipped-on :no-source-locs)
+  (assert (matchp-name :structure 'cl-user::d 13)))
 
 (deftest find-source-stuff.13
     (matchp-name :function 'cl-user::make-d 13)
@@ -169,21 +159,17 @@
     (matchp-name :function 'cl-user::d-e 13)
   t)
 
-(deftest find-source-stuff.15
-    (matchp-name :package 'cl-user::e 14)
-  t)
+(test-util:with-test (:name find-source-stuff.15 :skipped-on :no-source-locs)
+  (assert (matchp-name :package 'cl-user::e 14)))
 
-(deftest find-source-stuff.16
-    (matchp-name :symbol-macro 'cl-user::f 15)
-  t)
+(test-util:with-test (:name find-source-stuff.16 :skipped-on :no-source-locs)
+  (assert (matchp-name :symbol-macro 'cl-user::f 15)))
 
-(deftest find-source-stuff.17
-    (matchp-name :type 'cl-user::g 16)
-  t)
+(test-util:with-test (:name find-source-stuff.17 :skipped-on :no-source-locs)
+  (assert (matchp-name :type 'cl-user::g 16)))
 
-(deftest find-source-stuff.18
-    (matchp-name :constant 'cl-user::+h+ 17)
-  t)
+(test-util:with-test (:name find-source-stuff.18 :skipped-on :no-source-locs)
+  (assert (matchp-name :constant 'cl-user::+h+ 17)))
 
 (deftest find-source-stuff.19
     (matchp-length :method 'cl-user::j 2)
@@ -202,21 +188,19 @@
   t)
 
 (deftest find-source-stuff.23
-    (matchp-name :function  '(setf cl-user::o) 23)
+    (matchp-name :function '(setf cl-user::o) 23)
   t)
 
-(deftest find-source-stuff.24
-    (matchp-name :method  '(setf cl-user::p) 24)
-  t)
+(test-util:with-test (:name find-source-stuff.24 :skipped-on :no-source-locs)
+  (assert (matchp-name :method '(setf cl-user::p) 24)))
 
 (deftest find-source-stuff.25
     (matchp-name :macro  'cl-user::q 25)
   t)
 
 
-(deftest find-source-stuff.26
-    (matchp-name :method-combination 'cl-user::r 26)
-  t)
+(test-util:with-test (:name find-source-stuff.26 :skipped-on :no-source-locs)
+  (assert (matchp-name :method-combination 'cl-user::r 26)))
 
 
 (deftest find-source-stuff.27
@@ -251,9 +235,8 @@
     (matchp-name :function 'cl-user::loaded-as-source-fun 3)
   t)
 
-(deftest find-source-stuff.33
-    (matchp-name :variable 'cl-user::**global** 29)
-  t)
+(test-util:with-test (:name find-source-stuff.33 :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::**global** 29)))
 
 ;;; Check wrt. interplay of generic functions and their methods.
 
@@ -743,25 +726,20 @@
   t
   t)
 
-(deftest alien-type.1
-  (matchp-name :alien-type 'cl-user::test-alien-type 30)
-  t)
+(test-util:with-test (:name alien-type.1 :skipped-on :no-source-locs)
+  (assert (matchp-name :alien-type 'cl-user::test-alien-type 30)))
 
-(deftest alien-type.2
-  (matchp-name :alien-type 'cl-user::test-alien-struct 31)
-  t)
+(test-util:with-test (:name alien-type.2 :skipped-on :no-source-locs)
+  (assert (matchp-name :alien-type 'cl-user::test-alien-struct 31)))
 
-(deftest alien-variable
-  (matchp-name :variable 'cl-user::test-alien-var 32)
-  t)
+(test-util:with-test (:name alien-variable :skipped-on :no-source-locs)
+  (assert (matchp-name :variable 'cl-user::test-alien-var 32)))
 
-(deftest condition-slot-reader
-  (matchp-name :method 'cl-user::condition-slot-reader 33)
-  t)
+(test-util:with-test (:name condition-slot-reader :skipped-on :no-source-locs)
+  (matchp-name :method 'cl-user::condition-slot-reader 33))
 
-(deftest condition-slot-writer
-  (matchp-name :method 'cl-user::condition-slot-writer 33)
-  t)
+(test-util:with-test (:name condition-slot-writer :skipped-on :no-source-locs)
+  (matchp-name :method 'cl-user::condition-slot-writer 33))
 
 (deftest function-with-a-local-function
     (sb-introspect:definition-source-form-number

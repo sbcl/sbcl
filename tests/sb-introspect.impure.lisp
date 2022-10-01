@@ -1,4 +1,5 @@
 (require :sb-introspect)
+(unless (sb-c:source-location) (push :no-source-locs *features*))
 (test-util:with-scratch-file (f "fasl")
   (load (compile-file "../contrib/sb-introspect/xref-test-data.lisp" :output-file f))
   (load "../contrib/sb-introspect/xref-test.lisp")

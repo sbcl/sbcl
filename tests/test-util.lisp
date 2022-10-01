@@ -238,17 +238,18 @@
 ;;; but the nice side effect is that the tests finish quicker.
 (defmacro with-test ((&key fails-on broken-on skipped-on name serial slow)
                      &body body)
-  (flet ((name-ok (x y)
-           (declare (ignore y))
-           (typecase x
-             (symbol (let ((package (symbol-package x)))
-                       (or (null package)
-                           (sb-int:system-package-p package)
-                           (eql package (find-package "CL"))
-                           (eql package (find-package "KEYWORD")))))
-             (integer t))))
-    (unless (tree-equal name name :test #'name-ok)
-      (error "test name must be all-keywords: ~S" name))) ; WHY????
+  ;; Failing and skipped tests are written into a summary file which is later read back.
+  ;; To guarantee readability there can't be symbols in random packages.
+  (setq name (sb-int:named-let ensure-ok ((x name))
+               (etypecase x
+                 (cons (cons (ensure-ok (car x)) (ensure-ok (cdr x))))
+                 (symbol (let ((package (symbol-package x)))
+                           (if (or (null package)
+                                   (sb-int:system-package-p package)
+                                   (eql package (find-package "CL"))
+                                   (eql package (find-package "KEYWORD")))
+                               x (copy-symbol x))))
+                 (integer x))))
   (cond
     ((broken-p broken-on)
      `(progn
