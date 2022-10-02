@@ -239,8 +239,9 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg)))
   (:generator 5
-    (loadw tmp-tn symbol symbol-name-slot other-pointer-lowtag)
-    (inst and result tmp-tn (1- (ash 1 sb-impl::symbol-name-bits)))))
+    (pseudo-atomic (tmp-tn :sync nil)
+      (loadw tmp-tn symbol symbol-name-slot other-pointer-lowtag)
+      (inst and result tmp-tn (1- (ash 1 sb-impl::symbol-name-bits))))))
 
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
