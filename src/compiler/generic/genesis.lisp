@@ -395,10 +395,12 @@
 (defun make-random-descriptor (bits)
   (make-descriptor (logand bits sb-ext:most-positive-word)))
 
-(declaim (inline descriptor-lowtag))
+(declaim (inline descriptor-lowtag descriptor-widetag))
 (defun descriptor-lowtag (des)
   "the lowtag bits for DES"
   (logand (descriptor-bits des) sb-vm:lowtag-mask))
+(defun descriptor-widetag (des)
+  (logand (read-bits-wordindexed des 0) sb-vm:widetag-mask))
 
 (defun descriptor-base-address (des)
   (logandc2 (descriptor-bits des) sb-vm:lowtag-mask))
@@ -624,8 +626,7 @@
 (defun descriptor-integer (des)
   (cond ((is-fixnum-lowtag (descriptor-lowtag des))
          (descriptor-fixnum des))
-        ((= (logand (read-bits-wordindexed des 0) sb-vm:widetag-mask)
-            sb-vm:bignum-widetag)
+        ((= (descriptor-widetag des) sb-vm:bignum-widetag)
          (bignum-from-core des))))
 
 ;;; common idioms
@@ -728,8 +729,7 @@
     "Write VALUE displaced INDEX words from ADDRESS."
     (write-bits
      (cond ((ltv-patch-p value)
-            (if (= (logand (read-bits-wordindexed address 0) sb-vm:widetag-mask)
-                   sb-vm:code-header-widetag)
+            (if (= (descriptor-widetag address) sb-vm:code-header-widetag)
                 (push (cold-list (cold-intern :load-time-value-fixup)
                                  address
                                  (number-to-core index)
@@ -880,8 +880,7 @@
 
 (defun cold-simple-vector-p (obj)
   (and (= (descriptor-lowtag obj) sb-vm:other-pointer-lowtag)
-       (= (logand (read-bits-wordindexed obj 0) sb-vm:widetag-mask)
-          sb-vm:simple-vector-widetag)))
+       (= (descriptor-widetag obj) sb-vm:simple-vector-widetag)))
 
 (declaim (inline cold-vector-len))
 (defun cold-vector-len (vector)
@@ -2176,8 +2175,7 @@ core and return a descriptor to it."
      (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
 
 (defun cold-fset (name function)
-  (aver (= (logand (read-bits-wordindexed function 0) sb-vm:widetag-mask)
-           sb-vm:simple-fun-widetag))
+  (aver (= (descriptor-widetag function) sb-vm:simple-fun-widetag))
   (let ((fdefn (ensure-cold-fdefn
                 ;; (SETF f) was descriptorized when dumped, symbols were not.
                 (if (symbolp name)
@@ -2934,10 +2932,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
                (name (cond ((member flavor '(:code-object :gc-barrier)) nil)
                            (t (svref fixups (incf index)))))
                (string
-                (when (descriptor-p name)
-                  (let ((widetag (logand (read-bits-wordindexed name 0) sb-vm:widetag-mask)))
-                    (when (= widetag sb-vm:simple-base-string-widetag)
-                      (base-string-from-core name))))))
+                (when (and (descriptor-p name)
+                           (= (descriptor-widetag name) sb-vm:simple-base-string-widetag))
+                  (base-string-from-core name))))
       (if (eq flavor :static-call)
           (push (list name kind code-obj offset) *cold-static-call-fixups*)
           (cold-fixup
@@ -4192,7 +4189,7 @@ III. initially undefined function references (alphabetically):
            (let ((name (read-wordindexed x sb-vm:simple-fun-name-slot)))
              `(function ,(recurse name)))))
       (#.sb-vm:other-pointer-lowtag
-       (let ((widetag (logand (read-bits-wordindexed x 0) sb-vm:widetag-mask)))
+       (let ((widetag (descriptor-widetag x)))
          (ecase widetag
            (#.sb-vm:symbol-widetag
             (if strictp
