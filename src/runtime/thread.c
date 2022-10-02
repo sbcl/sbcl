@@ -772,6 +772,11 @@ extern void funcall_alien_callback(lispobj arg1, lispobj arg2, lispobj arg0,
 #endif
 
 void
+#ifdef LISP_FEATURE_DARWIN
+/* This function's address is assigned into a static symbol's value slot,
+ * so it has to look like a fixnum. lp#1991485 */
+__attribute__((aligned(8)))
+#endif
 callback_wrapper_trampoline(
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     /* On the x86oid backends, the assembly wrapper happens to not pass
