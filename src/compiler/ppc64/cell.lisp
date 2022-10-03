@@ -540,7 +540,7 @@
 #-sb-xc-host
 (defun code-header-ref (code index)
   (declare (index index))
-  (binding* (((start count) (sb-vm::code-header-fdefn-range code))
+  (binding* (((start count) (code-header-fdefn-range code))
              (end (+ start count)))
     (values (if (and (>= index start) (< index end))
                 (%primitive code-header-ref+tag code index other-pointer-lowtag)

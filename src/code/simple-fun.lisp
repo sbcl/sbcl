@@ -433,8 +433,17 @@
 
 ;;; Start and count of fdefns used in #'F synax or normal named call
 ;;; (i.e. at the head of an expression)
-(export 'sb-vm::code-header-fdefn-range 'sb-vm) ; protect from tree-shaker
-(defun sb-vm::code-header-fdefn-range (code-obj)
+(defun code-header-fdefn-range (code-obj)
+  #-64-bit ; inefficient
+  (let ((start (+ sb-vm:code-constants-offset
+                  (* (code-n-entries code-obj) sb-vm:code-slots-per-simple-fun)))
+        (count 0))
+    (do ((i start (1+ i))
+         (limit (code-header-words code-obj)))
+        ((= i limit))
+      (if (fdefn-p (code-header-ref code-obj i)) (incf count) (return)))
+    (values start count))
+  #+64-bit
   (values (+ sb-vm:code-constants-offset
              (* (code-n-entries code-obj) sb-vm:code-slots-per-simple-fun))
           (ash (sb-vm::%code-boxed-size code-obj)

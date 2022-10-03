@@ -2623,7 +2623,7 @@
                (rem x 10)))))
         (assert (not (ctu:find-code-constants f :type 'bignum)))))
 
-(with-test (:name :deduplicated-fdefns :fails-on (not :64-bit))
+(with-test (:name :deduplicated-fdefns)
   (flet ((scan-range (c start end)
            (let (dup-fdefns names)
              (loop for i from start below end
@@ -2634,8 +2634,8 @@
                               (push obj dup-fdefns))
                             (push name names)))))
              (assert (not dup-fdefns)))))
-    (dolist (c (sb-vm::list-allocated-objects :all :type sb-vm:code-header-widetag))
-      (sb-int:binding* (((start count) (sb-vm::code-header-fdefn-range c))
+    (dolist (c (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
+      (sb-int:binding* (((start count) (sb-kernel:code-header-fdefn-range c))
                         (end (+ start count)))
         ;; Within each subset of FDEFNs there should be no duplicates
         ;; by name. But there could be an fdefn that is in the union of the two sets.

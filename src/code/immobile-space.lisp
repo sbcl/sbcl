@@ -200,7 +200,7 @@
     (let ((fun-entry (sb-vm::fdefn-raw-addr fdefn))
           (fdefn-entry (sb-vm::fdefn-entry-address fdefn)))
       (flet ((code-statically-links-fdefn-p (code)
-               (multiple-value-bind (fdefns-start count) (sb-vm::code-header-fdefn-range code)
+               (multiple-value-bind (fdefns-start count) (code-header-fdefn-range code)
                  (dotimes (i count)
                    (let ((constant (code-header-ref code (+ fdefns-start i))))
                      (when (or (eq constant fdefn)

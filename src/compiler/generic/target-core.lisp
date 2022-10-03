@@ -181,7 +181,7 @@
   #+x86-64
   (aver (not (nth-value
               1 (sb-c:unpack-code-fixup-locs (sb-vm::%code-fixups code)))))
-  (aver (zerop (nth-value 1 (sb-vm::code-header-fdefn-range code))))
+  (aver (zerop (nth-value 1 (code-header-fdefn-range code))))
   (let* ((nbytes (code-object-size code))
          (boxed (code-header-words code)) ; word count
          (unboxed (- nbytes (ash boxed sb-vm:word-shift))) ; byte count
