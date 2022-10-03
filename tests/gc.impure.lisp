@@ -367,27 +367,19 @@
     (setq working nil)
     (sb-thread:join-thread gc-thread)))
 
-;;; This loop doesn't work for #+use-cons-region (it will run forever)
-;;; because you can't hit the end of a page. Also, it's not clear that it should
-;;; ever have worked, because the check at the bottom of lisp_alloc() for whether
-;;; we're near the end of a page will discard the last few objects in favor of
-;;; returning a brand new region.  I guess as long as the inline allocator is
-;;; always used, it's fine. But the inline code wasn't always used on x86.
-;;; So how did that work?
 (defun use-up-thread-region ()
   ;; cons until the thread-local allocation buffer uses up a page
   (loop
-   (let* ((c (cons 1 2))
+   (let* ((c (make-array 0))
           (end (+ (sb-kernel:get-lisp-obj-address c)
-                  (- sb-vm:list-pointer-lowtag)
+                  (- sb-vm:other-pointer-lowtag)
                   (* 2 sb-vm:n-word-bytes))))
      (when (zerop (logand end (1- sb-vm:gencgc-page-bytes)))
        (return)))))
 (defglobal *go* nil)
 
 #+sb-thread
-(with-test (:name :c-call-save-p :skipped-on (or :interpreter
-                                                 :use-cons-region))
+(with-test (:name :c-call-save-p :skipped-on :interpreter)
   ;; Surely there's a better way to assert that registers get onto the stack
   ;; (so they can be seen by GC) than by random hammering on (LIST (LIST ...)).
   ;; This should probably be in gc-testlib.c. Or better yet: get rid of #+sb-safepoint
