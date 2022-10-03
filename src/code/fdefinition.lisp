@@ -248,8 +248,9 @@
 
 ;;; Find the encapsulation info that has been closed over.
 (defun encapsulation-info (fun)
-  (when (closurep fun)
-    (find-if-in-closure #'encapsulation-info-p fun)))
+  (truly-the (or encapsulation-info null)
+    (when (closurep fun)
+      (find-if-in-closure #'encapsulation-info-p fun))))
 
 ;;; When removing an encapsulation, we must remember that
 ;;; encapsulating definitions close over a reference to the
@@ -263,10 +264,9 @@
 ;;; info structure, we do something conceptually equal, but
 ;;; mechanically it is different.
 (defun unencapsulate (name type)
-  "Removes NAME's most recent encapsulation of the specified TYPE."
+  "Removes NAME's outermost encapsulation of the specified TYPE."
   (let* ((fdefn (find-fdefn name))
          (encap-info (encapsulation-info (fdefn-fun fdefn))))
-    (declare (type (or encapsulation-info null) encap-info))
     (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
       (return-from unencapsulate
         (unencapsulate-generic-function (fdefn-fun fdefn) type)))
@@ -293,19 +293,6 @@
                (setf encap-info next-info))))))
   t)
 
-;;; Does NAME have an encapsulation of the given TYPE?
-(defun encapsulated-p (name type)
-  (let ((fdefn (find-fdefn name)))
-    (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
-      (return-from encapsulated-p
-        (encapsulated-generic-function-p (fdefn-fun fdefn) type)))
-    (do ((encap-info (encapsulation-info (fdefn-fun fdefn))
-                     (encapsulation-info
-                      (encapsulation-info-definition encap-info))))
-        ((null encap-info) nil)
-      (declare (type (or encapsulation-info null) encap-info))
-      (when (eq (encapsulation-info-type encap-info) type)
-        (return t)))))
 
 ;;;; FDEFINITION
 

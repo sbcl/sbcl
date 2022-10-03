@@ -3239,7 +3239,7 @@ possibly temporarily, because it might be used internally.")
 
             ;; encapsulation
 
-           "ENCAPSULATE" "ENCAPSULATED-P"
+           "ENCAPSULATE"
            "UNENCAPSULATE"
            "ENCAPSULATE-FUNOBJ"
 
