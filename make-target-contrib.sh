@@ -47,6 +47,7 @@ export SBCL_HOME SBCL_TOP
 
 SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
 --lose-on-corruption --disable-debugger --no-sysinit --no-userinit"
+export SBCL
 
 # deleting things here lets us not worry about interaction with stale
 # fasls.  This is not good, but is better than :FORCE on each asdf
