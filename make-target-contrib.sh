@@ -56,10 +56,7 @@ SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
 if [ -z "$DONT_CLEAN_SBCL_CONTRIB" ] ; then
   rm -rf obj/from-xc/contrib/
   rm -fr obj/sbcl-home/contrib/
-  rm -fr obj/asdf-cache/
 fi
-
-find output -name 'building-contrib.*' -print | xargs rm -f
 
 set -e # exit with failure if any $GNUMAKE fails
 # Ignore all source registries.

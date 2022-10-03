@@ -31,6 +31,3 @@ all: $(FASL)
 
 $(FASL):: # this produces $(ASD) as a side-effect
 	$(SBCL)	--load ../make-contrib.lisp "$(SYSTEM)" $(MODULE_REQUIRES)
-
-install:
-	cp $(FASL) $(ASD) "$(BUILD_ROOT)$(INSTALL_DIR)"
