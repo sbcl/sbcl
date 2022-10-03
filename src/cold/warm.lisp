@@ -84,7 +84,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
               (*package* (find-package "SB-KERNEL")))
           (set-dispatch-macro-character
            #\# #\. (lambda (stream subchar arg)
-                     (declare (igore subchar arg))
+                     (declare (ignore subchar arg))
                      (let ((expr (read stream t nil t)))
                        (ecase (car expr)
                          (sb-kernel:make-single-float

@@ -441,9 +441,8 @@ We could try a few things to mitigate this:
     (if (eq subspace :fixed)
         (map-immobile-objects
          (lambda (obj type size)
-           (let ((address (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
-             (when (= type list-pointer-lowtag)
-               (incf hole-bytes size))))
+           (declare (ignore obj))
+           (when (= type list-pointer-lowtag) (incf hole-bytes size)))
          subspace)
         (let ((sum-sizes 0))
           (map-immobile-objects
