@@ -218,19 +218,42 @@
   (definition nil :type function))
 (declaim (freeze-type encapsulation-info))
 
+;;; Find the encapsulation info that has been closed over.
+(defun encapsulation-info (fun)
+  (truly-the (or encapsulation-info null)
+    (when (closurep fun)
+      (find-if-in-closure #'encapsulation-info-p fun))))
+
+(flet ((name->fun (name)
+         (typecase name
+           (symbol (%symbol-function name))
+           (t (binding* ((fdefn (find-fdefn name) :exit-if-null))
+                (fdefn-fun fdefn))))))
+
+;;; Does NAME have an encapsulation of the given TYPE?
+(defun encapsulated-p (name type)
+  (let ((fun (name->fun name)))
+    (when (typep fun 'generic-function)
+      (return-from encapsulated-p (encapsulated-generic-function-p fun type)))
+    (do ((encap-info (encapsulation-info fun)
+                     (encapsulation-info
+                      (encapsulation-info-definition encap-info))))
+        ((null encap-info) nil)
+      (declare (type (or encapsulation-info null) encap-info))
+      (when (eq (encapsulation-info-type encap-info) type)
+        (return t)))))
+
 ;;; Replace the definition of NAME with a function that calls FUNCTION
 ;;; with the original function and its arguments.
 ;;; TYPE is whatever you would like to associate with this
 ;;; encapsulation for identification in case you need multiple
 ;;; encapsulations of the same name.
 (defun encapsulate (name type function)
-  (let* ((fdefn (find-fdefn name))
-         (underlying-fun (sb-c:safe-fdefn-fun fdefn)))
+  (let ((underlying-fun (name->fun name)))
     (when (macro/special-guard-fun-p underlying-fun)
       (error "~S can not be encapsulated" name))
-    (when (typep underlying-fun 'generic-function)
-      (return-from encapsulate
-        (encapsulate-generic-function underlying-fun type function)))
+    (if (typep underlying-fun 'generic-function)
+        (encapsulate-generic-function underlying-fun type function)
     ;; We must bind and close over INFO. Consider the case where we
     ;; encapsulate (the second) an encapsulated (the first)
     ;; definition, and later someone unencapsulates the encapsulated
@@ -240,17 +263,11 @@
     ;; clobber the appropriate INFO structure to allow
     ;; basic-definition to be bound to the next definition instead of
     ;; an encapsulation that no longer exists.
-    (let ((info (make-encapsulation-info type underlying-fun)))
-      (setf (fdefn-fun fdefn)
+        (let ((info (make-encapsulation-info type underlying-fun)))
+          (setf (fdefn-fun (find-fdefn name))
             (named-lambda encapsulation (&rest args)
               (apply function (encapsulation-info-definition info)
-                     args))))))
-
-;;; Find the encapsulation info that has been closed over.
-(defun encapsulation-info (fun)
-  (truly-the (or encapsulation-info null)
-    (when (closurep fun)
-      (find-if-in-closure #'encapsulation-info-p fun))))
+                     args)))))))
 
 ;;; When removing an encapsulation, we must remember that
 ;;; encapsulating definitions close over a reference to the
@@ -265,17 +282,16 @@
 ;;; mechanically it is different.
 (defun unencapsulate (name type)
   "Removes NAME's outermost encapsulation of the specified TYPE."
-  (let* ((fdefn (find-fdefn name))
-         (encap-info (encapsulation-info (fdefn-fun fdefn))))
-    (when (and fdefn (typep (fdefn-fun fdefn) 'generic-function))
-      (return-from unencapsulate
-        (unencapsulate-generic-function (fdefn-fun fdefn) type)))
-    (cond ((not encap-info)
+  (let* ((fun (name->fun name))
+         (encap-info (encapsulation-info fun)))
+    (cond ((typep fun 'generic-function)
+           (unencapsulate-generic-function fun type))
+          ((not encap-info)
            ;; It disappeared on us, so don't worry about it.
            )
           ((eq (encapsulation-info-type encap-info) type)
            ;; It's the first one, so change the fdefn object.
-           (setf (fdefn-fun fdefn)
+           (setf (fdefn-fun (find-fdefn name))
                  (encapsulation-info-definition encap-info)))
           (t
            ;; It must be an interior one, so find it.
@@ -291,7 +307,7 @@
                        (encapsulation-info-definition next-info))
                  (return))
                (setf encap-info next-info))))))
-  t)
+  t))
 
 
 ;;;; FDEFINITION
