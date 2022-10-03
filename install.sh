@@ -127,8 +127,7 @@ done
 SBCL_TOP="../../"
 
 SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core --no-userinit --no-sysinit --disable-debugger"
-SBCL_BUILDING_CONTRIB=1
-export SBCL SBCL_BUILDING_CONTRIB SBCL_TOP
+export SBCL SBCL_TOP
 
 . ./find-gnumake.sh
 find_gnumake

@@ -22,7 +22,6 @@ if [ -z "$1" ] ; then
     then
         SBCLRUNTIME="$sbclsystem --core $sbclcore"
         SBCL_HOME=$SBCL_TOP/obj/sbcl-home/; export SBCL_HOME
-        SBCL_BUILDING_CONTRIB="please asdf install your hook"; export SBCL_BUILDING_CONTRIB
     else
         SBCLRUNTIME="`command -v sbcl`"
     fi
