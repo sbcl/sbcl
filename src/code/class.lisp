@@ -1044,7 +1044,7 @@ between the ~A definition and the ~A definition"
               :prototype-form sb-pcl:+slot-unbound+)
          (fdefn :codes (,sb-vm:fdefn-widetag)
                 :predicate fdefn-p
-                :prototype-form (find-or-create-fdefn 'sb-mop:class-prototype))
+                :prototype-form (find-or-create-fdefn '(setf car)))
          (random-class             ; used for unknown type codes
           ;; Make the PROTOTYPE slot unbound.
           :prototype-form sb-pcl:+slot-unbound+)

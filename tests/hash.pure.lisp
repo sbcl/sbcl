@@ -344,12 +344,12 @@
   (test-this-object 'equal (find-class 'class)))
 
 (with-test (:name :remhash-eq-comparable-in-equalp-table)
-  ;; EQUALP tables worked a little better, because more objects have
-  ;; are hashed non-address-sensitively by EQUALP-HASH relative to EQUAL-HASH,
+  ;; EQUALP tables worked a little better, because more objects are
+  ;; hashed non-address-sensitively by EQUALP-HASH relative to EQUAL-HASH,
   ;; and those objects have comparators that descend.
   ;; However, there are still some things hashed by address:
   (test-this-object 'equalp (make-weak-pointer "bleep"))
-  (test-this-object 'equalp (sb-int:find-fdefn 'cons))
+  (test-this-object 'equalp (sb-int:find-fdefn '(setf car)))
   (test-this-object 'equalp #'car)
   (test-this-object 'equalp (constantly 5))
   (test-this-object 'equal (sb-sys:int-sap 0)))

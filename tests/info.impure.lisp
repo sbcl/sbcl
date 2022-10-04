@@ -498,11 +498,9 @@
 
 (test-util:with-test (:name :get-info-value-initializing
                       :skipped-on (not :sb-thread))
-  ;; Precompute random generalized function names for testing, some of which
-  ;; are "simple" (per the taxonomy of globaldb) and some hairy.
+  ;; Precompute random generalized function names for testing
   (let ((work (coerce (loop repeat 10000
-                            nconc (list `(setf ,(gensym)) ; simple name
-                                         (gensym))) ; very simple name
+                            nconc (list `(setf ,(gensym)) `(cas ,(gensym))))
                       'vector))
         (n-threads 10) readers writers fdefn-results random-results)
     (dotimes (i (ash n-threads -1))
