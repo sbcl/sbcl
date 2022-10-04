@@ -527,13 +527,13 @@
 (defun testme (a b) (values "nice" (+ a b)))
 (compile 'testme)
 (defparameter trace-this-f1 #'testme)
-(sb-int:encapsulate-funobj trace-this-f1 (sb-int:find-fdefn 'testme))
+(sb-int:encapsulate-funobj trace-this-f1 'testme)
 
 (defun funky (a b c) (lambda (z) (values "nice" a b (+ (incf a) (decf c) z))))
 (compile 'funky)
 (defparameter trace-this-f2 (funky 10 'wat 19))
 (setf (symbol-function 'funky-closure) trace-this-f2)
-(sb-int:encapsulate-funobj trace-this-f2 (sb-int:find-fdefn 'trace-this-f2))
+(sb-int:encapsulate-funobj trace-this-f2 'trace-this-f2)
 
 (with-test (:name :trace-funobj-encapsulation)
   (assert (search "returned \"nice\""

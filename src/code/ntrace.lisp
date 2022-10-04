@@ -824,7 +824,7 @@ functions when called with no arguments."
 ;;; In contrast, ENCAPSULATE-FUNOBJ encapsulates TRACED-FUN by changing the
 ;;; entry point of the function to redirect to a tracing wrapper which then
 ;;; calls back to the correct entry point.
-(defun encapsulate-funobj (traced-fun &optional fdefn)
+(defun encapsulate-funobj (traced-fun &optional (name nil namep))
   (declare (type (or simple-fun closure) traced-fun))
   (let* ((proxy-fun
            (typecase traced-fun
@@ -842,8 +842,7 @@ functions when called with no arguments."
               ;; to the tracing wraper, which will invoke a new closure that is
               ;; behaviorally identical to the original closure.
               (sb-impl::copy-closure traced-fun))))
-         (info (make-trace-info :what (cond (fdefn (fdefn-name fdefn))
-                                            (t (%fun-name traced-fun)))
+         (info (make-trace-info :what (if namep name (%fun-name traced-fun))
                                 :encapsulated t
                                 :report 'trace))
          (tracing-wrapper
@@ -881,7 +880,7 @@ functions when called with no arguments."
              (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address traced-fun))
                                     (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
                    tracing-wrapper))))))
-    ;; Update fdefn's raw-addr slot to point to the tracing wrapper
-    (when (and fdefn (eq (fdefn-fun fdefn) traced-fun))
-      (setf (fdefn-fun fdefn) tracing-wrapper))
+    ;; Possibly update #'NAME to point to the tracing wrapper
+    (when (and namep (eq (fboundp name) traced-fun))
+      (setf (fdefn-fun (find-fdefn name)) tracing-wrapper))
     tracing-wrapper))
