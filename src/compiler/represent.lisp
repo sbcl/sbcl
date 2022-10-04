@@ -894,13 +894,19 @@
                             (svref *backend-sc-numbers* sc)))
                      ;; Translate primitive type scs into constant scs
                      ((= sc sb-vm:descriptor-reg-sc-number)
-                      (setf (tn-sc tn)
-                            (svref *backend-sc-numbers* sb-vm:constant-sc-number)
-                            (tn-offset tn)
-                            (or (position (tn-leaf tn)
-                                          (ir2-component-constants 2comp))
-                                (vector-push-extend (tn-leaf tn)
-                                                    (ir2-component-constants 2comp)))))
+                      (cond #+(or arm64 x86-64)
+                            ((eql (tn-value tn) $0f0)
+                             ;; Can be loaded using just SINGLE-FLOAT-WIDETAG.
+                             (setf (tn-sc tn)
+                                   (svref *backend-sc-numbers* sb-vm:immediate-sc-number)))
+                            (t
+                             (setf (tn-sc tn)
+                                   (svref *backend-sc-numbers* sb-vm:constant-sc-number)
+                                   (tn-offset tn)
+                                   (or (position (tn-leaf tn)
+                                                 (ir2-component-constants 2comp))
+                                       (vector-push-extend (tn-leaf tn)
+                                                           (ir2-component-constants 2comp)))))))
                      (t
                       (setf (tn-sc tn)
                             (svref *backend-sc-numbers*

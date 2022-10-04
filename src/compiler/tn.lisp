@@ -255,7 +255,9 @@
                              #+immobile-space
                              (let ((val (constant-value constant)))
                                (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
-                                   (typep val 'wrapper)))))
+                                   (typep val 'wrapper))))
+                         #+(or arm64 x86-64)
+                         (not (eql (constant-value constant) $0f0)))
                 (let ((constants (ir2-component-constants component)))
                   (setf (tn-offset res)
                         (vector-push-extend constant constants))))

@@ -536,7 +536,12 @@
           (character (if tag
                          (logior (ash (char-code val) n-widetag-bits)
                                  character-widetag)
-                         (char-code val)))))
+                         (char-code val)))
+          (single-float
+           (let ((bits (single-float-bits val)))
+             (if tag
+                 (dpb bits (byte 32 32) single-float-widetag)
+                 bits)))))
       tn))
 
 ;;;; miscellaneous function call parameters
