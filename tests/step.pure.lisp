@@ -318,10 +318,16 @@
 (with-test (:name :step-out/2)
   (test-step-out/2))
 
+;;; This ironically-named test asserts that we do NOT step-instrument
+;;; a call to TWO-ARG-/ (because it doesn't work). I guess it used to crash on x86.
+;;; But I sure as heck don't understand whether it's actually testing that,
+;;; because it doesn't seem to offer to step into the division function on_any platform.
+;;; It shows that it steps into CHECKED-COMPILE which returns 6 values.
 (with-test (:name :static-fun-step)
   (handler-bind ((step-form-condition
                    (lambda (c)
                      c
+                     ; (format t "~&~A~%" c)
                      (invoke-restart 'step-into))))
     (assert (= (step (funcall (checked-compile
                                `(lambda (x) (declare (optimize debug)) (/ 1 x)))

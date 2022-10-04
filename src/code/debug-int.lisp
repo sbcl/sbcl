@@ -3887,7 +3887,7 @@ register."
                             (call)))))))
            (new-callee (etypecase callee
                          (fdefn
-                          (let ((fdefn (make-fdefn (gensym))))
+                          (let ((fdefn (make-fdefn '(#:dummy))))
                             (setf (fdefn-fun fdefn) fun)
                             fdefn))
                          (function fun))))
