@@ -238,8 +238,10 @@
           (case (vop-name vop)
             ((move sb-vm::move-arg)
              (let* ((args (vop-args vop))
+                    (results (vop-results vop))
                     (x (tn-ref-tn args))
-                    (y (tn-ref-tn (vop-results vop)))
+                    (x-load-tn (tn-ref-load-tn args))
+                    (y (tn-ref-tn results))
                     constant)
                (cond ((or (eq (sc-name (tn-sc x)) 'null)
                           (not (eq (tn-kind x) :constant)))
@@ -258,6 +260,12 @@
                      ((register-p y)
                       (setf (svref loaded-constants (tn-offset y))
                             (cons x y)))
+                     ((and x-load-tn
+                           (or (not (tn-ref-load-tn results))
+                               (location= (tn-ref-load-tn results)
+                                          x-load-tn)))
+                      (setf (svref loaded-constants (tn-offset x-load-tn))
+                            (cons x x-load-tn)))
                      (t
                       (remove-written-tns)))))
             (t
