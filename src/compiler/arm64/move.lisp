@@ -184,23 +184,19 @@
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
-            :scs (any-reg descriptor-reg)
-            :load-if (not (or (location= x y)
-                              (and (sc-is x immediate)
-                                   (sc-is y control-stack)
-                                   (eql (tn-value x) 0))))))
+            :scs (any-reg descriptor-reg zero)
+            :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
   (:generator 0
-    (let ((x (if (and (sc-is x immediate)
-                      (eql (tn-value x) 0))
-                 zr-tn
-                 x)))
-      (cond ((location= x y))
-            ((sc-is y control-stack)
-             (store-stack-tn y x))
-            (t
-             (move y x))))))
+    (cond ((location= x y))
+          ((sc-is y control-stack)
+           (store-stack-tn y x))
+          ((and (sc-is x any-reg)
+                (eql (tn-offset x) zr-offset))
+           (inst mov y 0))
+          (t
+           (move y x)))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg)
@@ -210,23 +206,19 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-            :scs (any-reg descriptor-reg)
-            :load-if (not (and (sc-is x immediate)
-                               (sc-is y control-stack)
-                               (eql (tn-value x) 0))))
+            :scs (any-reg descriptor-reg zero))
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
     (sc-case y
       ((any-reg descriptor-reg)
-       (move y x))
+       (if (and (sc-is x any-reg)
+                (eql (tn-offset x) zr-offset))
+           (inst mov y 0)
+           (move y x)))
       (control-stack
-       (store-stack-offset (if (and (sc-is x immediate)
-                                    (eql (tn-value x) 0))
-                               zr-tn
-                               x)
-                           fp y)))))
+       (store-stack-offset x fp y)))))
 ;;;
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
