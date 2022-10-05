@@ -327,14 +327,20 @@
              ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here,
              ;; but other other GC strategies might.
              `(let ((reg
-                     ;; FIXME: single-float gets placed in the boxed header
-                     ;; rather than just doing an immediate store.
-                     (sc-case ,tn
-                      ((control-stack constant)
-                       (move temp ,tn)
-                       temp)
-                      (t
-                       (encode-value-if-immediate ,tn)))))
+                      (sc-case ,tn
+                        (constant
+                         (unless (and (constant-tn-p ,tn)
+                                      (eql prev-constant (tn-value ,tn)))
+                           (setf prev-constant (and (constant-tn-p ,tn)
+                                                    (tn-value ,tn)))
+                           (move temp ,tn))
+                         temp)
+                        (control-stack
+                         (setf prev-constant nil)
+                         (move temp ,tn)
+                         temp)
+                        (t
+                         (encode-value-if-immediate ,tn)))))
                 (storew reg ,list ,slot ,lowtag temp))))
 
 (define-vop (cons)
@@ -347,7 +353,8 @@
   (:node-var node)
   (:generator 10
     (let ((stack-allocate-p (node-stack-allocate-p node))
-          (nbytes (* cons-size n-word-bytes)))
+          (nbytes (* cons-size n-word-bytes))
+          prev-constant)
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
@@ -372,13 +379,15 @@
   (:translate acons)
   (:policy :fast-safe)
   (:generator 10
-    (let ((nbytes (* cons-size 2 n-word-bytes)))
+    (let ((nbytes (* cons-size 2 n-word-bytes))
+          prev-constant)
       (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
       (pseudo-atomic (:thread-tn thread-tn)
         (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
         (store-slot tail alloc cons-cdr-slot 0)
         (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
         (store-slot temp alloc cons-car-slot 0)
+        (setf prev-constant nil)
         (let ((pair temp) (temp alloc)) ; give STORE-SLOT the ALLOC as its TEMP
           (store-slot key pair)
           (store-slot val pair cons-cdr-slot))
@@ -401,7 +410,8 @@
   (:node-var node)
   (:generator 10
     (let ((stack-allocate-p (node-stack-allocate-p node))
-          (nbytes (* cons-size 2 n-word-bytes)))
+          (nbytes (* cons-size 2 n-word-bytes))
+          prev-constant)
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
@@ -428,7 +438,8 @@
   (:generator 0
     (aver (>= cons-cells 3)) ; prevent regressions in ir2tran's vop selection
     (let ((stack-allocate-p (node-stack-allocate-p node))
-          (size (* (pad-data-block cons-size) cons-cells)))
+          (size (* (pad-data-block cons-size) cons-cells))
+          prev-constant)
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
