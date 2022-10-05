@@ -596,7 +596,9 @@
                        (ir2-block-start-vop block)))))
           (coerce-some-operands (vop-args new) pass-tn
                                 (vop-info-arg-load-scs res)
-                                after)))))
+                                after)
+          (when (vop-info-after-sc-selection (vop-info new))
+            (funcall (vop-info-after-sc-selection (vop-info new)) new))))))
   (values))
 
 (defun maybe-move-from-fixnum+-1 (x y &optional x-tn-ref)
