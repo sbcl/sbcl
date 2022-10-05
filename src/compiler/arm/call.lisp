@@ -801,7 +801,7 @@
           '((old-fp)
             (return-pc)))
 
-      ,@(unless variable '((args :more t :scs (descriptor-reg)))))
+      ,@(unless variable '((args :more t))))
 
      ,@(when (eq return :fixed)
          '((:results (values :more t))))
