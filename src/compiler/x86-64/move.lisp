@@ -60,15 +60,16 @@
 (define-vop (move)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
             :load-if (not (location= x y))))
-  (:results (y :scs (any-reg descriptor-reg)
+  (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if
-               (not (or (location= x y)
-                        (and (sc-is x any-reg descriptor-reg immediate)
-                             (sc-is y control-stack))))))
-  (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)) temp)
+               (not (location= x y))))
+  (:temporary (:sc any-reg :from (:argument 0) :to (:result 0)
+               :unused-if (or (not (sc-is x immediate))
+                              (typep (encode-value-if-immediate x)
+                                     '(or (signed-byte 32) #+immobile-space fixup))))
+              temp)
   (:generator 0
-    (if (and (sc-is x immediate)
-             (sc-is y any-reg descriptor-reg control-stack))
+    (if (sc-is x immediate)
         (move-immediate y (encode-value-if-immediate x) temp)
         (move y x))))
 
