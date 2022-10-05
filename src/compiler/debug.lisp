@@ -971,6 +971,7 @@
                    (lvar-dynamic-extent lvar) (cont-num lvar) rest)))
 
 (defvar *debug-print-types* nil)
+(defvar *debug-print-vop-temps* nil)
 
 ;;; Print out the nodes in BLOCK in a format oriented toward
 ;;; representing what the code does.
@@ -1133,6 +1134,11 @@
     (princ #\space)
     (pprint-indent :current 0)
     (print-operands (vop-args vop))
+    (when *debug-print-vop-temps*
+      (pprint-newline :linear)
+      (write-string "{temp: ")
+      (print-operands (vop-temps vop))
+      (princ #\}))
     (pprint-newline :linear)
     (when (vop-codegen-info vop)
       (case (vop-name vop)
