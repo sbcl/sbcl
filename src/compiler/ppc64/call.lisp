@@ -587,7 +587,7 @@ default-value-8
           '((old-fp :target old-fp-pass)
             (return-pc :target return-pc-pass)))
 
-      ,@(unless variable '((args :more t))))
+      ,@(unless variable '((args :more t :scs (descriptor-reg control-stack)))))
 
      ,@(when (eq return :fixed)
          '((:results (values :more t))))
