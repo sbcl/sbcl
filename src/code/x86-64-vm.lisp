@@ -425,6 +425,75 @@
                       (cons (code-header-ref code wordindex) locs)))))))))
   code)
 
+(defmacro static-call-entrypoint-vector ()
+  '(- (get-lisp-obj-address sb-fasl::*asm-routine-vector*)
+      (ash (+ vector-data-offset (align-up (length +static-fdefns+) 2)) word-shift)))
+
+;;; Return either the address to jump to when calling NAME, or the address
+;;; containing the address, depending on FIXUP-KIND.
+;;; Use FDEFINITION because it strips encapsulations - whether that's
+;;; the right behavior for it or not is a separate concern.
+;;; If somebody tries (TRACE LENGTH) for example, it should not cause
+;;; compilations to fail on account of LENGTH becoming a closure.
+(defun function-raw-address (name fixup-kind &aux (fun (fdefinition name)))
+  (declare (type (member :abs32 :rel32) fixup-kind))
+  (cond ((not (immobile-space-obj-p fun))
+         (error "Can't statically link to ~S: code is movable" name))
+        ((neq (%fun-pointer-widetag fun) simple-fun-widetag)
+         (error "Can't statically link to ~S: non-simple function" name))
+        ((eq fixup-kind :rel32)
+         ;; if performing a relative fixup, return where the function really is,
+         ;; given that calling from anywhere in immobile space to immobile space
+         ;; needs only a signed imm32 operand.
+         (sap-ref-word (int-sap (get-lisp-obj-address fun))
+                       (- (ash simple-fun-self-slot word-shift) fun-pointer-lowtag)))
+        #+immobile-space
+        (t
+         ;; if calling from dynamic space, it is emitted as "call [abs]" where the
+         ;; absolute address is in static space. Return the address of the element
+         ;; in the entrypoint vector, not the address of the function.
+         (let ((vector-data (sap+ (vector-sap sb-fasl::*asm-routine-vector*)
+                                  (- (ash (+ vector-data-offset
+                                             (align-up (length +static-fdefns+) 2))
+                                          word-shift))))
+               (index (the (not null) (position name +static-fdefns+))))
+           (the (signed-byte 32)
+                (sap-int (sap+ vector-data (ash index word-shift))))))))
+
+;; Return the address to which to jump when calling FDEFN,
+;; which is either an fdefn or the name of an fdefn.
+(defun fdefn-entry-address (fdefn)
+  (let ((fdefn (if (fdefn-p fdefn) fdefn (find-or-create-fdefn fdefn))))
+    (+ (get-lisp-obj-address fdefn)
+       (- 2 sb-vm:other-pointer-lowtag))))
+
+(defun validate-asm-routine-vector ()
+  ;; If the jump table in static space does not match the jump table
+  ;; in *assembler-routines*, fix the one one in static space.
+  ;; It's OK that this is delayed until startup, because code pertinent to
+  ;; core restart always uses relative jumps to asm code.
+  #+immobile-space
+  (let* ((code sb-fasl:*assembler-routines*)
+         (external-table (truly-the (simple-array word (*))
+                                    sb-fasl::*asm-routine-vector*))
+         (insts (code-instructions code))
+         (n (sb-impl::hash-table-%count (car (%%code-debug-info code)))))
+    (declare (optimize (insert-array-bounds-checks 0)))
+    (dotimes (i n)
+      (unless (= (aref external-table i) 0)
+        (setf (aref external-table i)
+              (sap-ref-word insts (truly-the index (ash (1+ i) word-shift))))))
+    ;; Preceding the asm routine vector is the vector of addresses of static-fdefns [sic].
+    ;; These are functions deemed particularly important, so they can be called using 1 instruction
+    ;; from any address in dynamic space. The fdefns aren't actually in static space.
+    (let ((vector (truly-the (simple-array word (*))
+                             (%make-lisp-obj (static-call-entrypoint-vector)))))
+      (dotimes (i (length sb-vm:+static-fdefns+))
+        (setf (aref vector i)
+              (let ((fun (%symbol-function (truly-the symbol (aref +static-fdefns+ i)))))
+                (sap-ref-word (int-sap (get-lisp-obj-address fun))
+                              (- (ash simple-fun-self-slot word-shift) fun-pointer-lowtag))))))))
+
 (sb-c::when-vop-existsp (:translate sb-c::unsigned+)
   (defconstant cf-bit 0)
   (defconstant sf-bit 7)

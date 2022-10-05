@@ -26,31 +26,6 @@
 (defun sb-vm::statically-link-code-obj (code fixups)
   (declare (ignore code fixups))))
 
-#+immobile-code
-(progn
-  ;; Use FDEFINITION because it strips encapsulations - whether that's
-  ;; the right behavior for it or not is a separate concern.
-  ;; If somebody tries (TRACE LENGTH) for example, it should not cause
-  ;; compilations to fail on account of LENGTH becoming a closure.
-  (defun sb-vm::function-raw-address (name &aux (fun (fdefinition name)))
-    (cond ((not (immobile-space-obj-p fun))
-           (error "Can't statically link to ~S: code is movable" name))
-          ((neq (%fun-pointer-widetag fun) sb-vm:simple-fun-widetag)
-           (error "Can't statically link to ~S: non-simple function" name))
-          (t
-           (let ((addr (get-lisp-obj-address fun)))
-             (sap-ref-word (int-sap addr)
-                           (- (ash sb-vm:simple-fun-self-slot sb-vm:word-shift)
-                              sb-vm:fun-pointer-lowtag))))))
-
-  ;; Return the address to which to jump when calling FDEFN,
-  ;; which is either an fdefn or the name of an fdefn.
-  ;; FIXME: Shouldn't this go in x86-64-vm ?
-  (defun sb-vm::fdefn-entry-address (fdefn)
-    (let ((fdefn (if (fdefn-p fdefn) fdefn (find-or-create-fdefn fdefn))))
-      (+ (get-lisp-obj-address fdefn)
-         (- 2 sb-vm:other-pointer-lowtag)))))
-
 ;;; Point FUN's 'self' slot to FUN.
 ;;; FUN must be pinned when calling this.
 #-darwin-jit ; done entirely by C for #+darwin-jit
@@ -105,7 +80,7 @@
                     (prog1 (sb-vm::fdefn-entry-address name) ; creates if didn't exist
                       (when statically-link-p
                         (push (cons offset (find-fdefn name)) (elt preserved-lists 0)))))
-                   #+immobile-code (:static-call (sb-vm::function-raw-address name)))
+                   #+immobile-code (:static-call (sb-vm::function-raw-address name kind)))
                  kind flavor))
 
        (finish-fixups (code-obj preserved-lists)

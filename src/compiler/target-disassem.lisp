@@ -2222,7 +2222,7 @@
       ;; is compiled, so don't fail in function-raw-address.
       (when (fboundp name)
         (let ((address
-               #+immobile-code (sb-vm::function-raw-address name)
+               #+immobile-code (sb-vm::function-raw-address name :rel32)
                #-immobile-code (+ sb-vm:nil-value (sb-vm:static-fun-offset name))))
           (setf (gethash address addr->name) name))))
     ;; Not really a routine, but it uses the similar logic for annotations

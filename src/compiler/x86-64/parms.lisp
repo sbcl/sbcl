@@ -176,7 +176,7 @@
     two-arg->
     two-arg-=
     eql
-    %negate
+    %negate ; I don't think %NEGATE can actually be called. it has many vop translators
     two-arg-and
     two-arg-ior
     two-arg-xor

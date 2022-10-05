@@ -3355,9 +3355,7 @@
 (defun sb-c::pack-retained-fixups (fixup-notes &aux abs32-fixups imm-fixups)
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
-  ;; Note that:
-  ;;  (1) Call fixups occur in both :REL32 and :ABS32 kinds. We can ignore the :REL32 kind.
-  ;;  (2) :STATIC-CALL fixups point to immobile text space, not static space.
+  ;; Note that call fixups occur in both :REL32 and :ABS32 kinds. We can ignore the :REL32 kind.
   (dolist (note fixup-notes (sb-c:pack-code-fixup-locs abs32-fixups nil imm-fixups))
     (let* ((fixup (fixup-note-fixup note))
            (offset (fixup-note-position note))
@@ -3365,9 +3363,8 @@
       (cond ((eq flavor :gc-barrier) (push offset imm-fixups))
             #+immobile-space
             ((and (eq (fixup-note-kind note) :abs32)
-                  (memq flavor
-                        '(:fdefn-call :layout :immobile-symbol :symbol-value ; -> fixedobj space
-                          :static-call))) ; -> text space
+                  (memq flavor ; these all point to fixedobj space
+                        '(:fdefn-call :layout :immobile-symbol :symbol-value)))
              (push offset abs32-fixups))))))
 
 ;;; Coverage support

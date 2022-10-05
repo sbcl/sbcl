@@ -1897,6 +1897,8 @@ core and return a descriptor to it."
         (vector-in-core (make-list (length sb-vm::+c-callable-fdefns+)
                                    :initial-element *nil-descriptor*)
                         *static*))
+  ;; static-call entrypoint vector must be immediately adjacent to *asm-routine-vector*
+  (word-vector (make-list (length sb-vm:+static-fdefns+) :initial-element 0) *static*)
   (setf *asm-routine-vector* (word-vector (make-list 70 :initial-element 0)
                                           *static*)))
 
@@ -1966,15 +1968,14 @@ core and return a descriptor to it."
   (cold-set 'sb-impl::*setf-fdefinition-hook* *nil-descriptor*)
   (cold-set 'sb-impl::*user-hash-table-tests* *nil-descriptor*)
 
-  ;; Put the C-callable fdefns into the static-fdefn vector if #+immobile-code.
   #+immobile-code
   (let* ((space *immobile-text*)
          (wordindex (gspace-free-word-index space))
          (words-per-page (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)))
-    (cold-set 'sb-fasl::*asm-routine-vector* *asm-routine-vector*)
+    ;; Put the C-callable fdefns into the static-space vector of fdefns
     (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
-          do (cold-svset *c-callable-fdefn-vector* i
-                         (ensure-cold-fdefn sym)))
+          do (cold-svset *c-callable-fdefn-vector* i (ensure-cold-fdefn sym)))
+    (cold-set 'sb-fasl::*asm-routine-vector* *asm-routine-vector*)
     (let* ((objects (gspace-objects space))
            (count (length objects)))
       (let ((remainder (rem wordindex words-per-page)))

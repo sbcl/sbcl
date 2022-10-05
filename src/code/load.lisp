@@ -139,6 +139,7 @@
 ;;; Lisp assembler routines are named by Lisp symbols, not strings,
 ;;; and so can be compared by EQ.
 (define-load-time-global *assembler-routines* nil)
+;;; word vector in static space of addresses of asm routines
 #+immobile-space (define-load-time-global *asm-routine-vector* nil)
 #-sb-xc-host (declaim (code-component *assembler-routines*))
 

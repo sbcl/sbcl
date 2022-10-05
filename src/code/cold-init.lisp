@@ -176,10 +176,13 @@
   ;; not sure why this is needed on some architectures. Dark magic.
   (setf (fdefn-fun (find-or-create-fdefn '%coerce-callable-for-call))
         #'%coerce-callable-to-fun)
+  (show-and-call !loader-cold-init)
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
   ;; And be extra paranoid - ensure that it really gets called.
-  (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
+  (locally
+      (declare (notinline fboundp) (optimize safety)) ; is unsafely flushable
+    (fboundp '(setf !zzzzzz)))
 
   ;; Printing of symbols requires that packages be filled in, because
   ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility. Also
@@ -210,8 +213,6 @@
   (show-and-call !type-cold-init)
   (show-and-call !policy-cold-init-or-resanify)
   (/show0 "back from !POLICY-COLD-INIT-OR-RESANIFY")
-  (show-and-call !loader-cold-init)
-  #+x86-64 (sb-fasl::validate-asm-routine-vector)
 
   ;; Must be done before toplevel forms are invoked
   ;; because a toplevel defstruct will need to add itself
@@ -252,6 +253,12 @@
   (unless (!c-runtime-noinform-p) (terpri))
 
   (makunbound '*!cold-toplevels*) ; so it gets GC'd
+
+  ;; Need the static-space replica of the assembly routine jump vector
+  ;; filled in, and the static space vector of static fdefns.
+  ;; This matters only for code that gets compiled to dynamic space,
+  ;; so it's OK that it occurs somewhat late in cold-init.
+  #+x86-64 (sb-vm::validate-asm-routine-vector)
 
   #+win32 (show-and-call reinit-internal-real-time)
 
@@ -395,7 +402,7 @@ process to continue normally."
     ;; can be called, as pretty much anything can assume that it is set.
     (when total ; newly started process, and not a failed save attempt
       (sb-thread::init-main-thread)
-      #+x86-64 (sb-fasl::validate-asm-routine-vector)
+      #+x86-64 (sb-vm::validate-asm-routine-vector)
       (rebuild-package-vector))
     ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
     (finalizers-reinit)

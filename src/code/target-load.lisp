@@ -402,22 +402,6 @@
           ;; store inclusive bounds on PC offset range and the function index
           (setf (gethash name ht) (list* offset (1- next-offset) (1+ i))))))))
 
-#+x86-64
-(defun validate-asm-routine-vector ()
-  ;; If the jump table in static space does not match the jump table
-  ;; in *assembler-routines*, fix the one one in static space.
-  ;; It's OK that this is delayed until startup, because code pertinent to
-  ;; core restart always uses relative jumps to asm code.
-  #+immobile-space
-  (let* ((code *assembler-routines*)
-         (external-table *asm-routine-vector*)
-         (insts (code-instructions code))
-         (n (hash-table-count (%code-debug-info code))))
-    (dotimes (i n)
-      (unless (= (aref external-table i) 0)
-        (setf (aref external-table i)
-              (sap-ref-word insts (ash (1+ i) sb-vm:word-shift)))))))
-
 (defun !warm-load (file)
   (restart-case (let ((sb-c::*source-namestring*
                        (format nil "SYS:~A" (substitute #\; #\/ file))))
