@@ -5,7 +5,7 @@
 ;; unadorned fasl name, or containing the 'vpath' in it already.
 (defvar *deps*
   (mapcar 'string-upcase (mapcar 'pathname-name (cddr sb-ext:*posix-argv*))))
- (format t "; Note: Building ~S~@[, deps=~S~]~%" *system* *deps*)
+(format t "; Note: Building ~S~@[, deps=~S~]~%" *system* *deps*)
 (mapc 'require *deps*)
 
 (declaim (muffle-conditions (and compiler-note (not sb-c::unknown-typep-note))))

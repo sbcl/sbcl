@@ -25,5 +25,13 @@ sb-grovel.fasl: asdf.fasl # for building the module, not for our build
 # 2. This could be made to 'tee' into output/{something} as it used to,
 #    but it would be more Lispy if not elegant to have 'make-contrib.lisp' bind
 #    *ERROR-OUTPUT* to a broadcast stream of SYS:*STDERR* and a file stream.
-%.fasl:
-	$(MAKE) MODULE_REQUIRES="$^" -C $(basename $(@F)) </dev/null 2>&1
+# 3. The massively overapproximates the set of inputs needed to compile any given contrib
+#    which avoids using per-target lists of files, or any power-user tricks such
+#    as .SECONDEXPANSION and $(wildcard) in this makefile.
+#    I tried all kinds of variations on "%/*.lisp" and nothing worked easily.
+#    I suspect the right solution involves eliminating the other level of Makefile.
+#    Also: a motivated person might be able to figure out how to express a dependence
+#    on src/runtime/sbcl or src/runtime/sbcl.exe depending on the OS.
+#    I'm going to assume that the depending on the core is enough.
+%.fasl: */*.lisp */*/*.lisp ../output/sbcl.core
+	$(MAKE) MODULE_REQUIRES="$(filter %.fasl, $^)" -C $*

@@ -49,18 +49,7 @@ SBCL="$SBCL_TOP/src/runtime/sbcl --noinform --core $SBCL_TOP/output/sbcl.core \
 --lose-on-corruption --disable-debugger --no-sysinit --no-userinit"
 export SBCL
 
-# deleting things here lets us not worry about interaction with stale
-# fasls.  This is not good, but is better than :FORCE on each asdf
-# operation, because that causes multiple builds of base systems such
-# as SB-RT and SB-GROVEL, but FIXME: there's probably a better
-# solution.  -- CSR, 2003-05-30
-if [ -z "$DONT_CLEAN_SBCL_CONTRIB" ] ; then
-  rm -rf obj/from-xc/contrib/
-  rm -fr obj/sbcl-home/contrib/
-fi
-
 set -e # exit with failure if any $GNUMAKE fails
-# Ignore all source registries.
 if [ -z "$*" ]; then
     $GNUMAKE $SBCL_MAKE_JOBS -k -C contrib
 else

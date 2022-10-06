@@ -29,5 +29,13 @@ export CC SBCL EXTRA_CFLAGS
 
 all: $(FASL)
 
-$(FASL):: # this produces $(ASD) as a side-effect
-	$(SBCL)	--load ../make-contrib.lisp "$(SYSTEM)" $(MODULE_REQUIRES)
+# The explicit use of $wildcard is necessary here. While rules do expand
+# wildcards implicitly (so that just "$(FASL): *.lisp" mostly works),
+# that specification would fail on the contribs which have no .lisp file
+# in the current directory.
+# The prerequisite of sb-grovel might be spurious, but I don't want to detect
+# whether sb-grovel is actually needed.
+# This produces $(ASD) as a side-effect.
+$(FASL): $(SBCL_TOP)/output/sbcl.core $(wildcard *.lisp) $(wildcard */*.lisp) \
+ ../sb-grovel/*.lisp
+	$(SBCL)	--load ../make-contrib.lisp "$(SYSTEM)" $(MODULE_REQUIRES) </dev/null
