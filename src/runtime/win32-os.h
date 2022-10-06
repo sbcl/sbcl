@@ -44,6 +44,9 @@ typedef int os_vm_prot_t;
 extern int os_number_of_processors;
 #define HAVE_os_number_of_processors
 
+extern ULONG win32_stack_guarantee;
+extern DWORD win32_page_size;
+
 // 64-bit uses whatever TLS index the kernels gives us which we store in
 // 'sbcl_thread_tls_index' to hold our thread-local value of the pointer
 // to struct thread.

@@ -74,8 +74,10 @@ int arch_os_thread_init(struct thread *thread)
     SetSymbolValue(CONTROL_STACK_END,(lispobj)thread->control_stack_end,thread);
 #endif
 
-
 #endif
+
+    win32_set_stack_guarantee();
+
     return 1;
 }
 

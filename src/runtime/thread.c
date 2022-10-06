@@ -409,8 +409,10 @@ init_new_thread(struct thread *th,
 #define GUARD_BINDING_STACK 2
 #define GUARD_ALIEN_STACK   4
 
+#ifndef LISP_FEATURE_WIN32
     if (guardp & GUARD_CONTROL_STACK)
         protect_control_stack_guard_page(1, NULL);
+#endif
     if (guardp & GUARD_BINDING_STACK)
         protect_binding_stack_guard_page(1, NULL);
     if (guardp & GUARD_ALIEN_STACK)
@@ -1088,7 +1090,7 @@ uword_t create_thread(struct thread* th)
     // It's somewhat customary in the win32 API to start threads as suspended.
     th->os_thread =
       _beginthreadex(NULL, thread_control_stack_size, new_thread_trampoline, th,
-                     CREATE_SUSPENDED, &tid);
+                     CREATE_SUSPENDED | STACK_SIZE_PARAM_IS_A_RESERVATION, &tid);
     boolean success = th->os_thread != 0;
     if (success) {
         th->os_kernel_tid = tid;

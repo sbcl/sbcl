@@ -714,6 +714,65 @@ set_up_win64_seh_thunk(size_t page_size)
 
 static LARGE_INTEGER lisp_init_time;
 static double qpcMultiplier;
+DWORD win32_page_size = 0;
+ULONG win32_stack_guarantee = 0;
+
+void
+win32_set_stack_guarantee()
+{
+    /* 64 KB appears to be enough to run the SWANK debugger + (FACT 1000). 32 KB
+     * is surprisingly not enough for the debugger. */
+    ULONG request = 64*1024;
+    if (!SetThreadStackGuarantee(&request)) {
+        fprintf(stderr, "ERROR: SetThreadStackGuarantee failed: 0x%lx.\n",
+                GetLastError());
+        fflush(stderr);
+    }
+
+    /* Store stack guarantee size the first time around so that
+     * win32_reset_stack_overflow_guard_page() may restore the stack guard. */
+    if (!win32_stack_guarantee)
+        SetThreadStackGuarantee(&win32_stack_guarantee);
+}
+
+/*
+ * The usual way to do this would be to invoke _resetstkoflw(). However, it
+ * refuses to re-establish the stack overflow guard page when the stack
+ * pointer is still within the stack area reserved by SetThreadStackGuarantee().
+ *
+ * This is invoked when SB-KERNEL:HANDLE-WIN32-EXCEPTION is unwound after
+ * handling a STACK_OVERFLOW_EXCEPTION.
+ */
+void
+win32_reset_stack_overflow_guard_page() {
+    struct thread *self = get_sb_vm_thread();
+
+    /* this is similar to CONTROL_STACK_RETURN_GUARD_PAGE on other platforms,
+     * but Windows handles the page faults on its own.
+     *
+     * From experimentation, it seems that as long as set up a guard region
+     * somewhere below the stack guarantee, Windows will manage to raise a
+     * STACK_OVERFLOW_EXCEPTION appropriately next time we exhaust the stack.
+     * Furthermore, if we reprotect sufficiently far away from the stack
+     * guarantee, user code can get away with modifying the stack while
+     * unwinding from a stack overflow condition without retriggering the guard
+     * page. See test (:EXHAUST :WRITE-TO-STACK-ON-UNWIND). */
+#define WIN32_STACK_GUARD_SLACK (2*win32_stack_guarantee + win32_page_size)
+    void *stack_guard_start = CONTROL_STACK_GUARD_PAGE(self);
+    fprintf(stderr, "INFO: Reprotecting control stack guard (0x%p+0x%x)\n",
+            stack_guard_start, WIN32_STACK_GUARD_SLACK);
+    fflush(stderr);
+
+    DWORD oldprot;
+    VirtualProtect(stack_guard_start + WIN32_STACK_GUARD_SLACK,
+                   /* a single page would probably be enough, but let's cargo
+                    * cult Windows and use guarantee size + 1 page. */
+                   win32_stack_guarantee + win32_page_size,
+                   PAGE_READWRITE | PAGE_GUARD,
+                   &oldprot);
+
+    self->state_word.control_stack_guard_page_protected = 1;
+}
 
 void os_init()
 {
@@ -732,6 +791,7 @@ void os_init()
 
     SYSTEM_INFO system_info;
     GetSystemInfo(&system_info);
+    win32_page_size = system_info.dwPageSize;
     os_vm_page_size = system_info.dwPageSize > BACKEND_PAGE_BYTES?
         system_info.dwPageSize : BACKEND_PAGE_BYTES;
     os_number_of_processors = system_info.dwNumberOfProcessors;
@@ -1149,6 +1209,15 @@ handle_exception_ex(EXCEPTION_RECORD *exception_record,
     int rc;
     EXCEPTION_DISPOSITION disp = ExceptionContinueExecution;
     switch (code) {
+    case EXCEPTION_STACK_OVERFLOW:
+        void *sp = voidreg(win32_context, sp);
+        fprintf(stderr, "INFO: Caught stack overflow exception (sp=0x%p); "
+                        "proceed with caution.\n", sp);
+        fflush(stderr);
+        self->state_word.control_stack_guard_page_protected = 0;
+        rc = -1;
+        break;
+
     case EXCEPTION_ACCESS_VIOLATION:
         rc = handle_access_violation(ctx, exception_record, fault_address, self);
         if (rc && continue_search_on_unhandled_access_violation) {

@@ -410,7 +410,11 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in R8, and our hard guard
 	 * page upper bound in R9. */
 	lea	-8(%rsp), %rax
+#ifdef LISP_FEATURE_WIN32
+	LOAD_PIC_VAR(win32_page_size, %r9)
+#else
 	LOAD_PIC_VAR(os_vm_page_size, %r9)
+#endif
 	lea	(%rsi,%r9), %r8
 	lea	(%rdx,%r9), %r9
 

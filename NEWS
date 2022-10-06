@@ -11,6 +11,7 @@ changes in sbcl-2.2.9 relative to sbcl-2.2.8:
     ** arm64: better KEYWORDP, better argument count verification
     ** fix build on 32-bit Windows.  (lp#1988534, thanks to Alexis Rivera)
     ** x86-64: WITH-PINNED-OBJECTS can pin constants.  (lp#1989037)
+    ** win32: improved handling of stack overflow exceptions.
   * bug fix: make sb-simd build in compiler-only SBCL.  (thanks to Tonas
     Hlavaty)
   * bug fix: SB-SPROF:WITH-PROFILING now returns the value of its body (as was

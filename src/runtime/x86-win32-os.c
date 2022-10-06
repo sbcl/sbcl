@@ -87,6 +87,9 @@ int arch_os_thread_init(struct thread *thread)
 #ifdef LISP_FEATURE_SB_THREAD
     TlsSetValue(OUR_TLS_INDEX,thread);
 #endif
+
+    win32_set_stack_guarantee();
+
     return 1;
 }
 
