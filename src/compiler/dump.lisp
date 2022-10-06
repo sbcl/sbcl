@@ -428,9 +428,7 @@
     ;; sanity checks
     (aver (zerop (hash-table-count (fasl-output-patch-table fasl-output))))
     ;; End the group.
-    (dump-fop 'fop-verify-empty-stack fasl-output)
-    (dump-fop 'fop-verify-table-size fasl-output (fasl-output-table-free fasl-output))
-    (dump-fop 'fop-end-group fasl-output))
+    (dump-fop 'fop-end-group fasl-output (fasl-output-table-free fasl-output)))
 
   ;; That's all, folks.
   (close (fasl-output-stream fasl-output) :abort abort-p)
@@ -1267,8 +1265,6 @@
 (defun fasl-dump-component (component code-segment code-length fixups alloc-points file)
   (declare (type component component))
   (declare (type fasl-output file))
-
-  (dump-fop 'fop-verify-table-size file (fasl-output-table-free file))
 
   #+sb-dyncount
   (let ((info (sb-c::ir2-component-dyncount-info (component-info component))))

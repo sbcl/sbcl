@@ -813,15 +813,12 @@
             (setf (slot-value instance slot-name) value))))
     instance))
 
-(define-fop 64 (fop-end-group () nil)
-  (throw 'fasl-group-end t))
-
-(define-fop 62 (fop-verify-table-size ((:operands expected-index)) nil)
-  (unless (= (svref (%fasl-input-table (fasl-input)) 0) expected-index)
-    (bug "fasl table of improper size")))
-(define-fop 63 (fop-verify-empty-stack () nil)
+(define-fop 64 (fop-end-group ((:operands table-size)) nil)
+  (unless (= (svref (%fasl-input-table (fasl-input)) 0) table-size)
+    (bug "fasl table of improper size"))
   (unless (fop-stack-empty-p (operand-stack))
-    (bug "fasl stack not empty when it should be")))
+    (bug "fasl stack not empty when it should be"))
+  (throw 'fasl-group-end t))
 
 ;;;; fops for loading symbols
 
