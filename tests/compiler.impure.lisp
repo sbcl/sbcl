@@ -3127,4 +3127,11 @@
                           '(function () (values (integer 0 0) &optional))))))
     (test nil)
     (test t)
-    (assert (eql (funcall 'non-top-level-type-derive) 0))))
+    (assert (eql (funcall 'non-top-level-type-derive) 0)))
+  (ctu:file-compile
+   "(when t (defun non-top-level-type-derive () 1))"
+   :load t)
+  (assert (equal (sb-kernel:type-specifier
+                  (sb-int:info :function :type 'non-top-level-type-derive))
+                 '(function () (values (integer 1 1) &optional))))
+  (assert (eql (funcall 'non-top-level-type-derive) 1)))
