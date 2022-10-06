@@ -570,37 +570,18 @@
 (with-test (:name :optional-default-hairy-defconstant)
   (assert (eq (first (f)) foo-vector)))
 
-(eval-when (:compile-toplevel)
-  (setq sb-ext:*derive-function-types* nil))
-
-(defun type-clobbering ()
+(defun non-top-level-type-clobbering ()
   99)
 
 (when nil
-  (defun type-clobbering ()
+  (defun non-top-level-type-clobbering ()
     93))
 
-(defun uses-type-clobbering ()
-  (eq (type-clobbering) 99))
+(defun non-top-level-type-clobbering2 ()
+  (eq (non-top-level-type-clobbering) 99))
 
-(with-test (:name :type-clobbering)
-  (assert (uses-type-clobbering)))
-
-(defun type-clobbering.2 ()
-  99)
-
-(when t
-  (defun type-clobbering.2 ()
-    93))
-
-(defun uses-type-clobbering.2 ()
-  (eq (type-clobbering.2) 93))
-
-(with-test (:name :type-clobbering.2)
-  (assert (uses-type-clobbering.2)))
-
-(eval-when (:compile-toplevel)
-  (setq sb-ext:*derive-function-types* :same-file))
+(with-test (:name :non-top-level-type-clobbering)
+  (assert (non-top-level-type-clobbering2)))
 
 (macrolet ((x () '#(a b c d)))
   (defun constant-test-1 ()

@@ -112,12 +112,12 @@
                                  *current-path*))))
     (funcall thunk)))
 
-(defvar *derive-function-types* :same-file
-  "If true, argument and result type information derived from
-  compilation of DEFUNs is used when compiling calls to that
-  function. If :SAME-FILE (the default, as allowed by ANSI 3.2.2.3),
-  the information is derived only from DEFUNs in the same file. If
-  false, only information from FTYPE proclamations will be used.")
+(defvar *derive-function-types* nil
+  "Should the compiler assume that function types will never change,
+  so that it can use type information inferred from current definitions
+  to optimize code which uses those definitions? Setting this true
+  gives non-ANSI, early-CMU-CL behavior. It can be useful for improving
+  the efficiency of stable code.")
 
 ;;;; namespace management utilities
 
@@ -214,11 +214,10 @@
          :type (if (or (eq where :declared)
                        (and (not latep)
                             (not notinline)
-                            (eq *derive-function-types* t)))
+                            *derive-function-types*))
                    ftype
                    (specifier-type 'function))
-         :defined-type (if (and (not latep) (not notinline)
-                                *derive-function-types*)
+         :defined-type (if (and (not latep) (not notinline))
                            ftype
                            (specifier-type 'function))
          :where-from (if notinline
@@ -1684,6 +1683,7 @@ the stack without triggering overflow protection.")
                                       it))
                     (setq explicit-check (or (cdr spec) t)
                           allow-explicit-check nil)) ; at most one of this decl
+                   ((equal spec '(top-level-form))) ; ignore
                    ((typep spec '(cons (eql source-form)))
                     (setf source-form (cadr spec)))
                    ;; Used only for the current function.

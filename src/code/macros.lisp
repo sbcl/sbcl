@@ -121,6 +121,7 @@ tree structure resulting from the evaluation of EXPRESSION."
            (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
            (lambda `(lambda ,lambda-list ,@lambda-guts))
            (named-lambda `(named-lambda ,name ,lambda-list
+                           ,@(when *top-level-form-p* '((declare (sb-c::top-level-form))))
                            ,@(when doc (list doc)) ,@lambda-guts))
            ;; DXABLE-ARGS and SNIPPET are mutually exclusive, so we can sleazily pass
            ;; whichever exists (if either does) as one parameter to %DEFUN.

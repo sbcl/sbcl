@@ -1111,6 +1111,8 @@
   ;; True if this functional was created from an inline expansion. This
   ;; is either T, or the GLOBAL-VAR for which it is an expansion.
   (inline-expanded nil)
+  ;; Is it coming from a top-level NAMED-LAMBDA?
+  (top-level-defun-p nil)
   (ignore nil))
 
 (defun pretty-print-functional (functional stream)

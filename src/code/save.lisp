@@ -84,13 +84,13 @@
 (defun start-lisp (toplevel callable-exports)
   (if callable-exports
       (named-lambda %start-lisp ()
-           (reinit t)
-           (dolist (export callable-exports)
-             (sb-alien::initialize-alien-callable-symbol export)))
+        (reinit t)
+        (dolist (export callable-exports)
+          (sb-alien::initialize-alien-callable-symbol export)))
       (named-lambda %start-lisp ()
-           (handling-end-of-the-world
-            (reinit t)
-            (funcall toplevel)))))
+        (handling-end-of-the-world
+          (reinit t)
+          (funcall toplevel)))))
 
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init toplevel-supplied)
