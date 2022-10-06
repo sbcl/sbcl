@@ -3113,3 +3113,18 @@
   (with-scratch-file (fasl "fasl")
     (compile-file "bug-255" :output-file fasl))
   (delete-package :bug255))
+
+(with-test (:name :non-top-level-type-derive)
+  (ctu:file-compile
+   "(defun non-top-level-type-derive () 0)"
+   :load t)
+  (flet ((test (load)
+           (ctu:file-compile
+            "(when nil (defun non-top-level-type-derive () 1))"
+            :load load)
+           (assert (equal (sb-kernel:type-specifier
+                           (sb-int:info :function :type 'non-top-level-type-derive))
+                          '(function () (values (integer 0 0) &optional))))))
+    (test nil)
+    (test t)
+    (assert (eql (funcall 'non-top-level-type-derive) 0))))
