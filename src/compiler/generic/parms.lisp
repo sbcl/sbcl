@@ -251,6 +251,75 @@
      %%data-vector-setters/check-bounds%%))
   #'equalp)
 
+;;; Each backend must provide some 2-argument math routines as hand-written lisp
+;;; assembly. Those routines punt to a lisp function for anything more complicated
+;;; than fixnum inputs. To call lisp the general function, we need a fixed address
+;;; holding its entry point, namely the static-fdefn. While we do allow boxed constants
+;;; in the assembly code header now, it's not general enough for calling.
+;;;
+;;; Additionally, in the distant-but-memorable past there were things known
+;;; as "static functions" which were essentially just vops that translated a few
+;;; important functions such as LENGTH and %COERCE-CALLABLE-TO-FUN.
+;;; (Surprisingly, LCM and GCD were deemed important enough to merit special status)
+;;; The main purpose of a static function was to call it without reference to
+;;; an #<fdefn>. But those "static functions" were unusual in that they bypassed
+;;; the normal call convention. They were all deleted in the following change series:
+;;;      d65b9573423610589319889a0eeb31c5501862bf Remove define-static-fun on MIPS.
+;;;      f39d1846e90ed20cd529ce2fb701de9ad0293f59 Remove define-static-fun on SPARC.
+;;;      1c190e01a08481440c420c7bb8db5c1800775c01 Remove define-static-fun on ARM.
+;;;      87ae85c665aa1d6c710293632bee495619e5ed62 Remove define-static-fun on PPC.
+;;;      e3c05bb0b955ef41c3b920d151606f195d17d89e Remove define-static-fun on x86.
+;;;      eb210dc031710a35b0ef4f39b775e7960f710790 Remove define-static-fun on ARM64.
+;;;      a8e9e678fb8ef2777d45afb1a8cce93277d44df6 Get rid of define-static-fun on x86-64.
+;;; The corresponding static-fdefns should have been deleted with them.
+;;;
+;;; However, it is still true that some functions are of such importance
+;;; that calling them with 1 fewer instruction and 1 fewer code header constant
+;;; yields measurable space savings. e.g. TWO-ARG-LCM had almost no callers
+;;; so there's no reason to think it's important.
+#|
+(let ((table (make-hash-table)))
+  (dolist (c (sb-vm:list-allocated-objects :all :type sb-vm:code-header-widetag))
+    (multiple-value-bind (start count) (sb-kernel:code-header-fdefn-range c)
+      (loop for i from start repeat count
+            do (let ((const (sb-kernel:code-header-ref c i)))
+                 (incf (gethash const table 0))))))
+  (dolist (x (sort (sb-int:%hash-table-alist table) #'> :key #'cdr))
+    (format t "~5d ~s~%" (cdr x) (car x))))
+|#
+
+(defconstant-eqx common-static-fdefns
+    '(;; This the standard set of assembly routines that need to call into lisp.
+      ;; A few backends add TWO-ARG-/= and others to this, in their {arch}/parms
+      two-arg-+
+      two-arg--
+      two-arg-*
+      two-arg-/
+      two-arg-<
+      two-arg->
+      two-arg-=
+      eql
+      %negate
+      ;; These next ones are not called from assembly code, but from lisp.
+      length
+      error
+      format
+      equalp
+      sb-c::check-ds-list
+      sb-c::check-ds-list/&rest
+      write-string
+      write-char
+      princ
+      ;; A scientific but cursory examination of one particular application
+      ;; revealed that the most popular functions to be referenced from any other
+      ;; are the hairy vector accessors. Those two alone accounted for 18% of all
+      ;; fdefn pointers in the core. A couple others were high on the list as well.
+      hairy-data-vector-set
+      hairy-data-vector-ref
+      %ldb
+      sb-kernel:vector-unsigned-byte-8-p)
+  #'equalp)
+
 ;;; Refer to the lengthy comment in 'src/runtime/interrupt.h' about
 ;;; the choice of this number. Rather than have to two copies
 ;;; of the comment, please see that file before adjusting this.

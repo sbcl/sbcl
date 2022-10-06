@@ -113,23 +113,5 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  #(length
-    two-arg-+
-    two-arg--
-    two-arg-*
-    two-arg-/
-    two-arg-<
-    two-arg->
-    two-arg-=
-    two-arg-<=
-    two-arg->=
-    two-arg-/=
-    eql
-    %negate
-    two-arg-and
-    two-arg-ior
-    two-arg-xor
-    two-arg-eqv
-    two-arg-gcd
-    two-arg-lcm)
+    `#(two-arg-<= two-arg->= two-arg-/= ,@common-static-fdefns)
   #'equalp)

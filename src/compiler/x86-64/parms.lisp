@@ -167,25 +167,8 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  #(length
-    two-arg-+
-    two-arg--
-    two-arg-*
-    two-arg-/
-    two-arg-<
-    two-arg->
-    two-arg-=
-    eql
-    %negate ; I don't think %NEGATE can actually be called. it has many vop translators
-    two-arg-and
-    two-arg-ior
-    two-arg-xor
-    two-arg-gcd
-    two-arg-lcm
-    ensure-symbol-hash
-    sb-impl::install-hash-table-lock
-    update-object-layout
-    %coerce-callable-to-fun)
+    `#(ensure-symbol-hash sb-impl::install-hash-table-lock update-object-layout
+       ,@common-static-fdefns)
   #'equalp)
 
 #+sb-simd-pack

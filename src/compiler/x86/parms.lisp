@@ -230,24 +230,7 @@
      *fp-constant-ln2*)
   #'equalp)
 
-(defconstant-eqx +static-fdefns+
-  #(length
-    two-arg-+
-    two-arg--
-    two-arg-*
-    two-arg-/
-    two-arg-<
-    two-arg->
-    two-arg-=
-    eql
-    %negate
-    two-arg-and
-    two-arg-ior
-    two-arg-xor
-    two-arg-gcd
-    two-arg-lcm
-    %coerce-callable-to-fun)
-  #'equalp)
+(defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)
 
 #+win32
 (defconstant +win32-tib-arbitrary-field-offset+ #.(+ #xE10 (* 4 63)))

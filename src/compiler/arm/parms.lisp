@@ -118,15 +118,7 @@
      *pseudo-atomic-interrupted*)
   #'equalp)
 
-(defconstant-eqx +static-fdefns+
-  #(two-arg-gcd two-arg-lcm
-    two-arg-+ two-arg-- two-arg-* two-arg-/
-    two-arg-< two-arg-> two-arg-=
-    two-arg-and two-arg-ior two-arg-xor two-arg-eqv
-
-    eql
-    sb-kernel:%negate)
-  #'equalp)
+(defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)
 
 
 ;;;; Assembler parameters:

@@ -106,23 +106,7 @@
     ,@*runtime-asm-routines*)
   #'equalp)
 
-(defconstant-eqx +static-fdefns+
-  #(two-arg-+
-    two-arg--
-    two-arg-*
-    two-arg-/
-    two-arg-<
-    two-arg->
-    two-arg-=
-    sb-kernel:%negate
-    eql
-    two-arg-and
-    two-arg-ior
-    two-arg-xor
-    two-arg-gcd
-    two-arg-lcm
-    two-arg-eqv)
-  #'equalp)
+(defconstant-eqx +static-fdefns+ `#(,@common-static-fdefns) #'equalp)
 
 
 ;;;; Assembler parameters:
