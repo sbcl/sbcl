@@ -199,7 +199,7 @@
     (assert (find-line "CALL" "FUNCTION GENSYM"))
     (assert (find-line "JMP" "FUNCTION PRINT")))))
 
-(with-test (:name :c-call :skipped-on (and :win32 :x86-64))
+(with-test (:name :c-call :skipped-on :win32)
   (let* ((lines (split-string
                  (with-output-to-string (s)
                    (let ((sb-disassem:*disassem-location-column-width* 0))
@@ -1270,8 +1270,7 @@
 
 ;;; This tests that the x86-64 disasembler does not crash
 ;;; on LEA with a rip-relative operand and no label.
-(with-test (:name (disassemble :no-labels)
-                  :skipped-on (not :x86-64))
+(with-test (:name (disassemble :no-labels))
   (let* ((lines
           (split-string
            (with-output-to-string (stream)
@@ -1285,3 +1284,12 @@
     (disassemble 'sb-impl::inspector
                  :use-labels nil
                  :stream (make-broadcast-stream))))
+
+#+immobile-space
+(with-test (:name (disassemble :static-call))
+  (dolist (sym '(sb-kernel:two-arg-* sb-kernel:two-arg-/
+                 sb-kernel:two-arg-+ sb-kernel:two-arg--))
+    (let ((f (let ((sb-c:*compile-to-memory-space* :dynamic))
+               (compile nil `(lambda (x y) (,sym x y))))))
+      (assert (loop for line in (disassembly-lines f)
+                    thereis (search (princ-to-string sym) line))))))
