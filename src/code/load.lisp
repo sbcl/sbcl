@@ -680,6 +680,10 @@
                       nil
                       nil)))))))
 
+(defstruct fasl-group
+  (fun-names))
+
+(defvar *current-fasl-group*)
 ;;;
 ;;; a helper function for LOAD-AS-FASL
 ;;;
@@ -691,33 +695,34 @@
         (trace *show-fops-p*))
     (unless (check-fasl-header stream)
       (return-from load-fasl-group))
-    (catch 'fasl-group-end
-      (setf (svref (%fasl-input-table fasl-input) 0) 0)
-      (loop
-       (binding* ((pos (when trace (file-position stream)))
-                  ((byte function pushp n-operands arg1 arg2 arg3)
-                   (decode-fop fasl-input))
-                  (result
-                   (if (functionp function)
-                       (case n-operands
-                         (0 (funcall function fasl-input))
-                         (1 (funcall function fasl-input arg1))
-                         (2 (funcall function fasl-input arg1 arg2))
-                         (3 (funcall function fasl-input arg1 arg2 arg3)))
-                       (error "corrupt fasl file: FOP code #x~x" byte))))
-         (when pushp
-           (push-fop-stack result fasl-input))
-         (when trace
-           ;; show file pos prior to decoding the fop,
-           ;; table and stack ptrs *after* executing it
-           (format *trace-output* "~&~6x : [~D,~D] ~2,'0x~v@{ ~x~}"
-                   pos
-                   (svref (%fasl-input-table fasl-input) 0) ; table pointer
-                   (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
-                   byte
-                   n-operands arg1 arg2 arg3)
-           (when (functionp function)
-             (format *trace-output* " ~35t~(~a~)" (%fun-name function)))))))))
+    (let ((*current-fasl-group* (make-fasl-group)))
+      (catch 'fasl-group-end
+        (setf (svref (%fasl-input-table fasl-input) 0) 0)
+        (loop
+         (binding* ((pos (when trace (file-position stream)))
+                    ((byte function pushp n-operands arg1 arg2 arg3)
+                     (decode-fop fasl-input))
+                    (result
+                     (if (functionp function)
+                         (case n-operands
+                           (0 (funcall function fasl-input))
+                           (1 (funcall function fasl-input arg1))
+                           (2 (funcall function fasl-input arg1 arg2))
+                           (3 (funcall function fasl-input arg1 arg2 arg3)))
+                         (error "corrupt fasl file: FOP code #x~x" byte))))
+           (when pushp
+             (push-fop-stack result fasl-input))
+           (when trace
+             ;; show file pos prior to decoding the fop,
+             ;; table and stack ptrs *after* executing it
+             (format *trace-output* "~&~6x : [~D,~D] ~2,'0x~v@{ ~x~}"
+                     pos
+                     (svref (%fasl-input-table fasl-input) 0) ; table pointer
+                     (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
+                     byte
+                     n-operands arg1 arg2 arg3)
+             (when (functionp function)
+               (format *trace-output* " ~35t~(~a~)" (%fun-name function))))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))

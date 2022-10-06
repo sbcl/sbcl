@@ -1465,25 +1465,29 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 ;;; since those can always be reconstructed from a defstruct description.
 (defun %compiler-defun (name compile-toplevel inline-lambda extra-info)
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
-    (when compile-toplevel
-      (with-single-package-locked-error
-          (:symbol name "defining ~S as a function")
-        (setf defined-fun
-              ;; Try to pass the lambda-list to GET-DEFINED-FUN if we can.
-              (if (atom inline-lambda)
-                  (get-defined-fun name)
-                  (get-defined-fun
-                   name (ecase (car inline-lambda)
-                         (lambda-with-lexenv (third inline-lambda))
-                         (lambda (second inline-lambda)))))))
-      (when (boundp '*lexenv*)
-        (aver (producing-fasl-file))
-        (if (member name (fun-names-in-this-file *compilation*) :test #'equal)
-            (warn 'duplicate-definition :name name)
-            (push name (fun-names-in-this-file *compilation*))))
-      ;; I don't know why this is guarded by (WHEN compile-toplevel),
-      ;; because regular old %DEFUN is going to call this anyway.
-      (%set-inline-expansion name defined-fun inline-lambda extra-info))
+    (cond (compile-toplevel
+           (with-single-package-locked-error
+               (:symbol name "defining ~S as a function")
+             (setf defined-fun
+                   ;; Try to pass the lambda-list to GET-DEFINED-FUN if we can.
+                   (if (atom inline-lambda)
+                       (get-defined-fun name)
+                       (get-defined-fun
+                        name (ecase (car inline-lambda)
+                               (lambda-with-lexenv (third inline-lambda))
+                               (lambda (second inline-lambda)))))))
+           (when (boundp '*lexenv*)
+             (aver (producing-fasl-file))
+             (if (member name (fun-names-in-this-file *compilation*) :test #'equal)
+                 (warn 'duplicate-definition :name name)
+                 (push name (fun-names-in-this-file *compilation*))))
+           ;; I don't know why this is guarded by (WHEN compile-toplevel),
+           ;; because regular old %DEFUN is going to call this anyway.
+           (%set-inline-expansion name defined-fun inline-lambda extra-info))
+          ((boundp 'sb-fasl::*current-fasl-group*)
+           (if (member name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*) :test #'equal)
+               (warn 'duplicate-definition :name name)
+               (push name (sb-fasl::fasl-group-fun-names sb-fasl::*current-fasl-group*)))))
 
     (become-defined-fun-name name)
 
