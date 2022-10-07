@@ -345,7 +345,8 @@
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg immediate)))
      (:arg-types ,type tagged-num)
-     (:temporary (:scs (non-descriptor-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)
+                  :unused-if (sc-is index immediate)) lip)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
@@ -368,7 +369,8 @@
             (index :scs (any-reg immediate))
             (value :scs (,@scs zero)))
      (:arg-types ,type tagged-num ,el-type)
-     (:temporary (:scs (non-descriptor-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)
+                  :unused-if (sc-is index immediate)) lip)
      (:generator 2
        (sc-case index
          (immediate
@@ -390,7 +392,8 @@
      (:arg-types ,type tagged-num)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
-     (:temporary (:scs (non-descriptor-reg)) lip)
+     (:temporary (:scs (non-descriptor-reg)
+                  :unused-if (sc-is index immediate)) lip)
      (:generator 5
        ,@(multiple-value-bind (op shift)
              (ecase size
@@ -445,7 +448,8 @@
                   tagged-num
                   ,@(unless setf-p
                       `(,el-type)))
-      (:temporary (:scs (non-descriptor-reg)) lip)
+      (:temporary (:scs (non-descriptor-reg)
+                   :unused-if (sc-is index immediate)) lip)
       (:generator 5
         (when (sc-is value immediate)
           (setf value zr-tn))
