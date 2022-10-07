@@ -13,7 +13,6 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 run_sbcl <<EOF

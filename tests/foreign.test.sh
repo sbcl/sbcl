@@ -15,7 +15,6 @@
 # more information.
 
 run_compiler=`pwd`/run-compiler.sh
-export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./expect.sh
 . ./subr.sh
 

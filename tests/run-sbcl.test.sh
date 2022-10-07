@@ -55,7 +55,8 @@ fi
 run_sbcl_path="$test_file_directory_path/../run-sbcl.sh"
 
 # Now we're going to frob the file system, so let's do it properly.
-use_test_subdirectory
+# (for some definition of "properly?")
+use_test_subdirectory_in_source_tree
 
 # 9d5be5e953 (lp#1242643) addressed the possibility that run-sbcl.sh
 # was a symlink into the repo. Let's exercise it, 8 years later.
@@ -67,6 +68,7 @@ rm ./run-sbcl-absolute-symlink.sh
 # Test whether we can run-sbcl.sh through a symlink to a relative
 # path.
 echo "testing run-sbcl.sh when it's a symlink to a relative path"
+# good god, what does this sed command even do?
 ln -s $(pwd | sed 's|^/||; s|[^/][^/]*|..|g')/"$run_sbcl_path" ./run-sbcl-relative-symlink.sh
 test_run_sbcl ./run-sbcl-relative-symlink.sh
 rm ./run-sbcl-relative-symlink.sh

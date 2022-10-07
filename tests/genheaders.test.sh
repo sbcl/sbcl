@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -e
-export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 create_test_subdirectory
 
