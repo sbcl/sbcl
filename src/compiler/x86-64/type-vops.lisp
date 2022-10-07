@@ -149,7 +149,7 @@
       (cond ((not load-widetag))
             ((and value-tn-ref
                   (eq lowtag other-pointer-lowtag)
-                  (other-pointer-tn-ref-p value-tn-ref))) ; best case: lowtag is right
+                  (other-pointer-tn-ref-p value-tn-ref t))) ; best case: lowtag is right
             ((and value-tn-ref
                   ;; If HEADERS contains a range, then list pointers have to be
                   ;; disallowed - consider a list whose CAR has a fixnum that
@@ -535,7 +535,7 @@
   (define complex-vector-p (complex-vector-widetag)))
 
 (macrolet ((fail-if-not-otherptr ()
-             `(cond ((other-pointer-tn-ref-p value-tn-ref)
+             `(cond ((other-pointer-tn-ref-p value-tn-ref t)
                      (inst mov :byte temp (ea (- other-pointer-lowtag) value)))
                     (t
                      (inst lea temp (ea (- other-pointer-lowtag) value))
@@ -588,7 +588,7 @@
 ;;; Test whether ARG is an other-pointer to WIDETAG, setting the Z flag if so
 (defun test-other-ptr (arg arg-ref widetag temp label)
   (inst cmp :byte
-        (cond ((other-pointer-tn-ref-p arg-ref)
+        (cond ((other-pointer-tn-ref-p arg-ref t)
                (ea (- other-pointer-lowtag) arg))
               (t
                (%lea-for-lowtag-test temp arg other-pointer-lowtag :qword)
@@ -602,15 +602,16 @@
   (:info)
   (:conditional :z)
   (:generator 5
-    ;; If the VALUE were known to be an OTHER-POINTER, the the IR1 lvar type
+    ;; If the VALUE were known to be an OTHER-POINTER, the IR1 lvar type
     ;; can't intersect NULL. So the IR1 should have been transformed to NON-NULL-SYMBOL-P.
     ;; Hence this must *not* be known to be an OTHER-POINTER.
     (aver (not (other-pointer-tn-ref-p args)))
-    (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
-    (inst test :byte temp lowtag-mask)
-    (inst jmp :e compare-widetag)
-    (inst cmp value nil-value)
-    (inst jmp out)
+    (unless (other-pointer-tn-ref-p args t) ; allow NIL
+      (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
+      (inst test :byte temp lowtag-mask)
+      (inst jmp :e compare-widetag)
+      (inst cmp value nil-value)
+      (inst jmp out))
     compare-widetag
     (inst cmp :byte (ea temp) symbol-widetag)
     out))
@@ -905,6 +906,9 @@
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
+    ;; FIXME: can we pass T as the 2nd arg to OTHER-POINTER-TN-REF-P here?
+    ;; I'm confused as to the intent of NULL-LABEL.
+    ;; Must branching occur if nil, or _may_ branching occur?
     (cond ((other-pointer-tn-ref-p args)
            (inst mov :byte r (ea (- other-pointer-lowtag) value)))
           (t

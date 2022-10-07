@@ -817,3 +817,11 @@
 (with-test (:name (:lp1916233))
   (assert-tri-eq t t (subtypep '(cons (or (simple-array ratio) simple-array) nil) nil))
   (assert-tri-eq t t (subtypep '(or (array ratio) sequence) t)))
+
+(defun my-widetag-of (x)
+  (sb-sys:sap-ref-8 (sb-sys:int-sap (sb-kernel:get-lisp-obj-address x))
+                    (- sb-vm:other-pointer-lowtag)))
+;;; I'll bet that nothing anywhere tests this
+(with-test (:name :nil-has-symbol-widetag
+            :skipped-on (:or :ppc64 :big-endian))
+  (assert (= (my-widetag-of nil) (my-widetag-of t))))

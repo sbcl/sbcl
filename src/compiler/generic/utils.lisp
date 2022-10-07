@@ -251,17 +251,28 @@
        (not (types-equal-or-intersect (tn-ref-type tn-ref)
                                       (specifier-type 'list)))))
 
-;;; Does the TN definitely hold an OTHER pointer
-(defun other-pointer-tn-ref-p (tn-ref)
+;;; Does the TN definitely hold an OTHER pointer?
+;;; If the operation next to be performed on TN is a widetag test,
+;;; then NIL is ok as the input. Indicate this by specifying PERMIT-NIL.
+;;; With rare exception it should always be permitted, though not on ppc64
+;;; where it would never be. The safe default is NIL.
+(defun other-pointer-tn-ref-p (tn-ref &optional permit-nil)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
-             (specifier-type '(or fixnum
-                               #+64-bit single-float
-                               function
-                               list
-                               instance
-                               character))))))
+             (if permit-nil
+                 (specifier-type '(or fixnum
+                                   #+64-bit single-float
+                                   function
+                                   cons
+                                   instance
+                                   character))
+                 (specifier-type '(or fixnum
+                                   #+64-bit single-float
+                                   function
+                                   list
+                                   instance
+                                   character)))))))
 
 (defun fixnum-or-other-pointer-tn-ref-p (tn-ref)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)

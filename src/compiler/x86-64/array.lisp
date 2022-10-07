@@ -141,7 +141,7 @@
   (:generator 2
     (let ((c (dpb (encode-array-rank rank) (byte 8 array-rank-position)
                   simple-array-widetag)))
-      (cond ((other-pointer-tn-ref-p args)
+      (cond ((other-pointer-tn-ref-p args t)
              (inst cmp :word (ea (- other-pointer-lowtag) value) c))
             (t
              (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
