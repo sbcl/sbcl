@@ -3758,3 +3758,12 @@
          (declare ((or symbol bit-vector) x))
          (the symbol x))
     ((t) t)))
+
+(with-test (:name :list-constant-coalesce)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (list -13303942049971317088
+               -6714119381493
+               -13303942049971317088))
+    (() '(-13303942049971317088 -6714119381493 -13303942049971317088) :test #'equal)))

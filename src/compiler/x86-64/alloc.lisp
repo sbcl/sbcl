@@ -340,6 +340,7 @@
                          (move temp ,tn)
                          temp)
                         (t
+                         (setf prev-constant nil)
                          (encode-value-if-immediate ,tn)))))
                 (storew reg ,list ,slot ,lowtag temp))))
 
