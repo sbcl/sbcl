@@ -326,23 +326,29 @@
                                           (lowtag list-pointer-lowtag))
              ;; TODO: gencgc does not need EMIT-GC-STORE-BARRIER here,
              ;; but other other GC strategies might.
-             `(let ((reg
-                      (sc-case ,tn
-                        (constant
-                         (unless (and (constant-tn-p ,tn)
-                                      (eql prev-constant (tn-value ,tn)))
-                           (setf prev-constant (and (constant-tn-p ,tn)
-                                                    (tn-value ,tn)))
-                           (move temp ,tn))
-                         temp)
-                        (control-stack
-                         (setf prev-constant nil)
-                         (move temp ,tn)
-                         temp)
-                        (t
-                         (setf prev-constant nil)
-                         (encode-value-if-immediate ,tn)))))
-                (storew reg ,list ,slot ,lowtag temp))))
+             `(let* (immediate-value
+                     (reg
+                       (sc-case ,tn
+                         (constant
+                          (unless (and (constant-tn-p ,tn)
+                                       (eql prev-constant (tn-value ,tn)))
+                            (setf prev-constant (and (constant-tn-p ,tn)
+                                                     (tn-value ,tn)))
+                            (move temp ,tn))
+                          temp)
+                         (control-stack
+                          (setf prev-constant nil)
+                          (move temp ,tn)
+                          temp)
+                         (t
+                          (setf immediate-value (encode-value-if-immediate ,tn))
+                          (if (and (sc-is ,tn immediate)
+                                   (eql prev-constant immediate-value))
+                              temp
+                              immediate-value)))))
+                (when (eq (storew reg ,list ,slot ,lowtag temp)
+                          temp)
+                  (setf prev-constant immediate-value)))))
 
 (define-vop (cons)
   (:args (car :scs (any-reg descriptor-reg constant immediate))
