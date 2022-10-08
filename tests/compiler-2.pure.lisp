@@ -3750,3 +3750,11 @@
 (with-test (:name :flush-symbol-function :skipped-on :interpreter)
   (assert (ctu:find-code-constants #'noflush-symbol-function))
   (assert (not (ctu:find-code-constants #'flush-symbol-function))))
+
+(with-test (:name :symbolp-other-pointer)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (declare ((or symbol bit-vector) x))
+         (the symbol x))
+    ((t) t)))

@@ -606,14 +606,16 @@
     ;; can't intersect NULL. So the IR1 should have been transformed to NON-NULL-SYMBOL-P.
     ;; Hence this must *not* be known to be an OTHER-POINTER.
     (aver (not (other-pointer-tn-ref-p args)))
-    (unless (other-pointer-tn-ref-p args t) ; allow NIL
-      (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
-      (inst test :byte temp lowtag-mask)
-      (inst jmp :e compare-widetag)
-      (inst cmp value nil-value)
-      (inst jmp out))
-    compare-widetag
-    (inst cmp :byte (ea temp) symbol-widetag)
+    (if (other-pointer-tn-ref-p args t) ; allow NIL
+        (inst cmp :byte (ea (- other-pointer-lowtag) value) symbol-widetag)
+        (assemble ()
+          (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
+          (inst test :byte temp lowtag-mask)
+          (inst jmp :e compare-widetag)
+          (inst cmp value nil-value)
+          (inst jmp out)
+          compare-widetag
+          (inst cmp :byte (ea temp) symbol-widetag)))
     out))
 
 (define-vop (non-null-symbol-p symbolp)
