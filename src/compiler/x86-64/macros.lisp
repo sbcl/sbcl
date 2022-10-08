@@ -66,7 +66,8 @@
                 (not (typep value '(signed-byte 32))))
            (cond (temp
                   (inst mov temp value)
-                  (inst mov ea temp))
+                  (inst mov ea temp)
+                  temp)
                  (t
                   (bug "need temp reg for STOREW of oversized immediate operand"))))
           (t
