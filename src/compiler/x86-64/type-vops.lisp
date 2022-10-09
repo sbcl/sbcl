@@ -586,9 +586,9 @@
 ;;; consp (and list (not (eq nil)))
 
 ;;; Test whether ARG is an other-pointer to WIDETAG, setting the Z flag if so
-(defun test-other-ptr (arg arg-ref widetag temp label)
+(defun test-other-ptr (arg arg-ref widetag temp label &optional (permit-nil t))
   (inst cmp :byte
-        (cond ((other-pointer-tn-ref-p arg-ref t)
+        (cond ((other-pointer-tn-ref-p arg-ref permit-nil)
                (ea (- other-pointer-lowtag) arg))
               (t
                (%lea-for-lowtag-test temp arg other-pointer-lowtag :qword)
@@ -620,7 +620,9 @@
 
 (define-vop (non-null-symbol-p symbolp)
   (:translate non-null-symbol-p)
-  (:generator 3 (test-other-ptr value args symbol-widetag temp out) out))
+  (:generator 3
+    (test-other-ptr value args symbol-widetag temp out nil)
+    out))
 
 ;;; It would be far better if we could recognize the IR1 for
 ;;;  (AND (CONSP X) (EQ (CAR X) 'FOO))

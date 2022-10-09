@@ -3759,6 +3759,16 @@
          (the symbol x))
     ((t) t)))
 
+(with-test (:name :non-nil-symbolp-other-pointer)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (declare ((or bignum symbol) x))
+         (sb-kernel:non-null-symbol-p x))
+    ((t) t)
+    (((1+ most-positive-fixnum)) nil)
+    ((nil) nil)))
+
 (with-test (:name :list-constant-coalesce)
   (checked-compile-and-assert
       ()
