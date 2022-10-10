@@ -755,7 +755,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
 
    "CAS"
    "COMPARE-AND-SWAP"
-   "DEFCAS"
    "GET-CAS-EXPANSION"
 
    ;; Other atomic operations and types related to them
