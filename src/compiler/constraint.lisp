@@ -1367,36 +1367,39 @@
 ;;; Join the constraints coming from the predecessors of BLOCK on
 ;;; every constrained variable into the constraint set IN.
 (defun join-type-constraints (in block)
-  (let ((vars '()))
-    ;; Find some set of constrained variables in the predecessors.
-    (dolist (pred (block-pred block))
-      (let ((out (block-out-for-successor pred block)))
-        (when out
-          (do-conset-elements (con out)
-            (let ((kind  (constraint-kind con))
-                  (y     (constraint-y con))
-                  (not-p (constraint-not-p con)))
-              (when (or (member kind '(typep < >))
-                        (and (eq kind 'eql) (or (not not-p)
-                                                (constant-p y)))
-                        (and (eq kind '=) (and (numeric-type-p y)
-                                               (not not-p))))
-                (pushnew (constraint-x con) vars))))
-          (return))))
-    (dolist (var vars)
-      (let ((in-var-type *empty-type*))
-        (dolist (pred (block-pred block))
-          (let ((out (block-out-for-successor pred block)))
-            (when out
-              (setq in-var-type
-                    (type-union in-var-type
-                                (type-from-constraints var out *universal-type*))))))
-        (unless (eq in-var-type *universal-type*)
-          (conset-adjoin (find-or-create-constraint 'typep
-                                                    var
-                                                    in-var-type
-                                                    nil)
-                         in))))))
+  (let ((vars '())
+        (predecessors (block-pred block)))
+    (unless (singleton-p predecessors)
+      ;; Find some set of constrained variables in the predecessors.
+      (dolist (pred predecessors)
+        (let ((out (block-out-for-successor pred block)))
+          (when out
+            (do-conset-elements (con out)
+              (let ((kind  (constraint-kind con))
+                    (y     (constraint-y con))
+                    (not-p (constraint-not-p con)))
+                (when (or (member kind '(typep < >))
+                          (and (eq kind 'eql) (or (not not-p)
+                                                  (constant-p y)))
+                          (and (eq kind '=) (and (numeric-type-p y)
+                                                 (not not-p))))
+                  (pushnew (constraint-x con) vars))))
+            (return))))
+      (dolist (var vars)
+        (let ((in-var-type *empty-type*))
+          (dolist (pred (block-pred block))
+            (let ((out (block-out-for-successor pred block)))
+              (when out
+                (setq in-var-type
+                      (type-union in-var-type
+                                  (type-from-constraints var out *universal-type*))))))
+
+          (unless (eq in-var-type *universal-type*)
+            (conset-adjoin (find-or-create-constraint 'typep
+                                                      var
+                                                      in-var-type
+                                                      nil)
+                           in)))))))
 
 (defun compute-block-in (block join-types-p)
   (let ((in nil))
