@@ -159,6 +159,10 @@
   (defun fixnum-mod-p (x limit)
     (and (fixnump x)
          (<= 0 x limit))))
+
+(sb-c::when-vop-existsp (:translate car-eq-if-listp)
+  (defun car-eq-if-listp (value object)
+    (car-eq-if-listp value object)))
 
 
 ;;; Return the specifier for the type of object. This is not simply
