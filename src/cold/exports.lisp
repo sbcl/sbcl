@@ -2542,6 +2542,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "%FUNCALLABLE-INSTANCE-FUN" "SYMBOL-HASH" "SYMBOL-HASH*"
            "SYMBOL-%INFO" "SYMBOL-DBINFO" "%INFO-REF"
            "%SYMBOL-FUNCTION"
+           "SYMBOL-PACKAGE-ID" "%SYMBOL-PACKAGE"
 
            "EXTENDED-SEQUENCE" "*EXTENDED-SEQUENCE-TYPE*"
            "EXTENDED-SEQUENCE-P"

@@ -218,7 +218,7 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:translate sb-impl::symbol-package-id)
+  (:translate symbol-package-id)
   (:policy :fast-safe)
   (:generator 1 ; ASSUMPTION: symbol-package-bits = 16
    (inst lhu result symbol (+ (ash symbol-name-slot word-shift)

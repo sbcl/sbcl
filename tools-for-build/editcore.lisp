@@ -246,7 +246,7 @@
          (let ((p (position #\/ x :from-end t)))
            (if p (subseq x (1+ p)) x)))
         ((symbolp x)
-         (let ((package-id (sb-impl::symbol-package-id x))
+         (let ((package-id (symbol-package-id x))
                (name (translate (symbol-name x) spaces)))
            (when (eq package-id 0) ; uninterned
              (return-from recurse (string-downcase name)))
@@ -414,7 +414,7 @@
              (size (primitive-object-size obj)))
         (when (and (symbolp obj)
                    (string= symbol-name (translate (symbol-name obj) spaces))
-                   (= (sb-impl::symbol-package-id obj) package-id))
+                   (= (symbol-package-id obj) package-id))
           (return-from find-target-symbol
             (%make-lisp-obj
                    (logior (ecase address-mode

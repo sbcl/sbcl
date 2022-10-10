@@ -138,7 +138,7 @@
 
 ;;; SYMBOL-PACKAGE-ID for #+compact-symbol demands a vop which avoids loading
 ;;; a raw bit value in a descriptor register (the SLOT vop returns a descriptor)
-(defknown sb-impl::symbol-package-id (symbol) (unsigned-byte 16))
+(defknown symbol-package-id (symbol) (unsigned-byte 16))
 ;;; TODO: I'd like to eliminate the (OR NULL) from this return type.
 ;;; For that to happen, I probably need +nil-packed-infos+ to become
 ;;; placed in static space because assembly routines may need it.

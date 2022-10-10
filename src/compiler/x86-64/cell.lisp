@@ -492,15 +492,16 @@
     (inst mov res (ea n-word-bytes base-ptr)) ; 1 word beyond the header
     (inst and res (lognot fixnum-tag-mask))))
 
+(aver (= sb-impl::package-id-bits 16))
 (define-vop ()
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:translate sb-impl::symbol-package-id)
+  (:translate symbol-package-id)
   (:policy :fast-safe)
-  (:generator 2 ; ASSUMPTION: symbol-package-bits = 16
-   (inst mov :word result (object-slot-ea symbol symbol-name-slot (- other-pointer-lowtag 6)))
-   (inst movzx '(:word :dword) result result)))
+  (:generator 2
+   (inst movzx '(:word :dword) result
+         (object-slot-ea symbol symbol-name-slot (- other-pointer-lowtag 6)))))
 (define-vop ()
   (:args (symbol :scs (descriptor-reg)))
   (:results (result :scs (descriptor-reg) :from :load))

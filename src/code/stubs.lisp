@@ -159,6 +159,7 @@
   (def current-fp ())
   (def stack-ref (s n))
   (def fun-code-header)
+  (def symbol-package-id)
   (def symbol-hash)
   (def symbol-%info) ; primitive reader always needs a stub
   ;; but the "wrapped" reader might not need a stub.

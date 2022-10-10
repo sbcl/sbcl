@@ -215,8 +215,7 @@
                     #+compact-symbol
                     ((and (typep thing '(and symbol (not null)))
                           (= i symbol-name-slot))
-                     (values (list (sb-impl::symbol-package-id thing)
-                                   (symbol-name thing))
+                     (values (list (symbol-package-id thing) (symbol-name thing))
                              t
                              "{~{~A,~S~}}"))
                     (decode

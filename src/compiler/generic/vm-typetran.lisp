@@ -198,4 +198,4 @@
 (define-source-transform keywordp (x)
   `(let ((object ,x))
      (and (non-null-symbol-p object)
-          (= (sb-impl::symbol-package-id object) ,sb-impl::+package-id-keyword+)))))
+          (= (symbol-package-id object) ,sb-impl::+package-id-keyword+)))))

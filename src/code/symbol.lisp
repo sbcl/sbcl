@@ -310,6 +310,11 @@ distinct from the global value. Can also be SETF."
 
 (defun sb-xc:symbol-package (symbol)
   "Return SYMBOL's home package, or NIL if none."
+  (%symbol-package symbol))
+(defun %symbol-package (symbol)
+  ;; only called via transform
+  ;; don't need arg-count check, type check, or vector bounds check.
+  (declare (optimize (safety 0)))
   (let ((id (symbol-package-id symbol)))
     (truly-the (or null package)
                (if (= id +package-id-overflow+)

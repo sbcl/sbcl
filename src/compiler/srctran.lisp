@@ -5151,6 +5151,8 @@
   (deftransform set ((symbol value) ((constant-arg symbol) t))
     (xform symbol :special)))
 
+(deftransform symbol-package ((s) (symbol)) `(%symbol-package s))
+
 (deftransforms (prin1-to-string princ-to-string) ((object) (number) * :important nil)
   `(stringify-object object))
 

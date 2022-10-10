@@ -398,7 +398,7 @@ during backtrace.
   (name :init :arg #-compact-symbol :ref-trans #-compact-symbol symbol-name)
   #-compact-symbol
   (package-id :type index ; actually 16 bits. (Could go in the header)
-              :ref-trans sb-impl::symbol-package-id
+              :ref-trans symbol-package-id
               :set-trans sb-impl::set-symbol-package-id :set-known ())
   ;; 0 tls-index means no tls-index is allocated
   ;; 64-bit put the tls-index in the header word.

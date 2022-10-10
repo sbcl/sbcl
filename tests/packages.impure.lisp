@@ -16,11 +16,9 @@
 (require :sb-md5)
 #+64-bit
 (progn
-  (defun spid (x) (sb-impl::symbol-package-id (the symbol x))) ; no stub?
-  (compile 'spid)
   (let ((n 0))
     (do-all-symbols (s)
-      (when (> (spid s) 100) (incf n)))
+      (when (> (sb-kernel:symbol-package-id s) 100) (incf n)))
     (assert (= n 0))))
 
 (defun set-bad-package (x)
