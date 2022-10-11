@@ -5151,7 +5151,12 @@
   (deftransform set ((symbol value) ((constant-arg symbol) t))
     (xform symbol :special)))
 
-(deftransform symbol-package ((s) (symbol)) `(%symbol-package s))
+(deftransform symbol-package ((s) (symbol) *)
+  (if (cast-p (lvar-uses s))
+      ;; Avoid inlining a type check because %symbol-package is not
+      ;; cast-externally-checkable-p
+      (give-up-ir1-transform)
+      `(%symbol-package s)))
 
 (deftransforms (prin1-to-string princ-to-string) ((object) (number) * :important nil)
   `(stringify-object object))

@@ -192,7 +192,8 @@
 (defknown sb-vm::%%make-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
-(defknown (symbol-package %symbol-package) (symbol) (or package null) (flushable))
+(defknown symbol-package (symbol) (or package null) (flushable))
+(defknown %symbol-package (t) (or package null) (flushable)) ;; doesn't check the type.
 (defknown keywordp (t) boolean (flushable)) ; semi-foldable, see src/compiler/typetran
 
 ;;;; from the "Packages" chapter:
