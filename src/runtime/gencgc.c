@@ -28,9 +28,6 @@
 #include <string.h>
 #include <inttypes.h>
 #include "sbcl.h"
-#ifndef LISP_FEATURE_WIN32
-#include <signal.h>
-#endif
 #include "runtime.h"
 #include "os.h"
 #include "interr.h"
@@ -59,7 +56,6 @@
 #include "hopscotch.h"
 #include "genesis/cons.h"
 #include "forwarding-ptr.h"
-#include "lispregs.h"
 #include "var-io.h"
 
 /* forward declarations */
