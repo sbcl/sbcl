@@ -205,6 +205,10 @@
         (setf (conset-max conset) (1+ number))))
     conset)
 
+  (defun conset-delete (constraint conset)
+    (setf (sbit (conset-vector conset) (%constraint-number constraint)) 0)
+    conset)
+
   (defun conset= (conset1 conset2)
     (let* ((vector1 (conset-vector conset1))
            (vector2 (conset-vector conset2))
@@ -1395,6 +1399,10 @@
                                   (type-from-constraints var out *universal-type*))))))
 
           (unless (eq in-var-type *universal-type*)
+            ;; Remove the existing constraints to avoid joining them again later.
+            (do-propagatable-constraints (con (in var))
+              (when (eq (constraint-kind con) 'typep)
+                (conset-delete con in)))
             (conset-adjoin (find-or-create-constraint 'typep
                                                       var
                                                       in-var-type
