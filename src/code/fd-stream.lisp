@@ -40,7 +40,7 @@
 ;;;;  (incf (buffer-tail buffer) n))
 ;;;;
 
-(defstruct (buffer (:constructor %make-buffer (sap length))
+(defstruct (buffer (:constructor !make-buffer (sap length))
                    (:copier nil))
   (sap (missing-arg) :type system-area-pointer :read-only t)
   (length (missing-arg) :type index :read-only t)
@@ -55,10 +55,11 @@
   "Default number of bytes per buffer.")
 
 (defun alloc-buffer (&optional (size +bytes-per-buffer+))
+  (declare (sb-c::tlab :system) (inline !make-buffer))
   ;; Don't want to allocate & unwind before the finalizer is in place.
   (without-interrupts
     (let* ((sap (allocate-system-memory size))
-           (buffer (%make-buffer sap size)))
+           (buffer (!make-buffer sap size)))
       (when (zerop (sap-int sap))
         (error "Could not allocate ~D bytes for buffer." size))
       (finalize buffer (lambda ()
@@ -77,6 +78,7 @@
   buffer)
 
 (defun release-buffer (buffer)
+  (declare (sb-c::tlab :system))
   (reset-buffer buffer)
   (atomic-push buffer *available-buffers*))
 

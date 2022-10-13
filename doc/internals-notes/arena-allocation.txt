@@ -1,0 +1,166 @@
+Overview
+========
+Arenas offer a mark/release paradigm for rapid deallocation of thread-local
+lisp objects with the goal of reducing global heap usage.
+
+The implementation is built atop the existing pointer-bump allocator
+of 'gencgc' with a provision for redirecting the allocator's free-pointer
+somewhere other than dynamic space. When the C fallback is invoked,
+it notices that allocation should not occur to the main heap.
+
+It is possible for multiple threads to share one arena, or for threads
+to each get their own arena, or potentially even to have more than one
+arena controlled by a thread. The constraint is that in order to release
+all memory used by an arena without incurring a stop-the-world event
+there must be no heap-to-arena pointer reachable in a graph trace,
+supposing that the about-to-be-released memory is not a root.
+An arena has to be released in total, though in theory it could be
+possible to provide a partial release feature as well.
+It thus becomes possible to discard large portions of the
+reachability graph under user control.
+
+Design consideration
+====================
+Two possible approaches toward modifying the pointer-bump were reasonable:
+1) upon each allocation, decide whether it is to occur to the dynamic space
+   or elsewhere, and then use a pair of pointers (free-pointer and limit)
+   that are particular to either the dynamic space or the elsewhere.
+   As always, when the free-pointer and limit coincide, the slow path
+   is invoked which calls to the C runtime support for help.
+
+2) upon each allocation, assume that a _single_ pair of pointers (as before,
+   the free-pointer and limit) are always pointing to the correct "place"
+   (dynamic space or elsewhere). This introduces no branching except
+   in the case where the slow path is invoked.
+
+Option (1) entails significantly more runtime overhead, as every allocation
+would involve flag checking and lookups of the address containing the
+pointers that should be used.
+
+Option (2) entails no overhead beyond the free==limit check, which is always
+performed no matter what. By suitably initializing the pointer and limit
+to coincide on each "switch" of arena<->heap, the only overhead to be
+introduced is in the fallback code (the C runtime)
+This settles the matter: approach (2) wins.
+
+Implementation
+==============
+Each thread structure is augmented with two new thread-local
+allocation buffers ("TLABs"). One is for conses and the other
+is for everything else. These mirror the existing two TLABs.
+The distinction between cons/non-cons is that cons pages can be prefilled
+in each byte with 0xFF which is not a valid cons; whereas other objects are
+prefilled with 0s, which is similarly not valid. Thus we can recognize
+portions of memory that have not been initialized with valid objects.
+The cons of (0 . 0) is valid, and so 0 is inadequate to detect uninitialized
+memory.
+
+In total, each thread has 4 TLABs:
+  system conses
+  system "Mixed objects"
+  user conses
+  user "Mixed objects"
+
+Correct use of the distinct TLABs allows the user code to avoid
+creating heap-to-arena pointers.
+In the absence of arenas, the "user" TLABs are the ones ordinarily
+used for all allocations, including "system" allocation. i.e. There is
+no distinction between "user" and "system" code.
+In the presence of arenas, the user TLABs are directed either
+to the dynamic space, or to the arena depending the dynamic control
+which selects whether arena allocation is to occur.
+In contract, "system" TLABs can only allocate to dynamic space.
+
+Memory is claimed from the arena in small chunks, much as it is
+obtained from dynamic space in a certain granularity, currently
+32 KiB, which is SB-VM:GENCGC-PAGE-BYTES.  The arena allocation
+granularity is the same, for no particular reason.
+There is actually no restriction on the chunk size, so objects
+in excess of 32KiB can be allocated to the arena.
+When several threads share a single arena, they claim successive
+chunks using a compare-and-swap on the arena-relative free-pointer.
+
+GC interaction
+==============
+The memory in an arena is intended to be invisible to GC
+for the most part. Pointers between dynamic space and the arena
+in either direction are not traced by the collector. Therefore,
+applications making use of arenas should generally inhibit
+collection around use of the arena. Arenas do not attempt
+to emulate "thread local heaps".
+
+While debugging arena-based algorithms it is helpful to treat arenas
+as GC roots, so that if garbage-collection occurs organically due to
+dynamic-space usage, all heap objects pointed to by any arena remain live.
+Using the tools available such as SB-EXT:SEARCH-ROOTS and the new
+FIND-HEAP->ARENA, it is almost always possible to eradicate
+the "forbidden" heap->arena pointers. This is of course only for
+debugging, because any real-world scenario would expect not to need
+the extra delay that comes from hunting for pointers, as it is
+entirely contrary to the intent of using the arena in the first place.
+
+Thread interaction
+==================
+A created thread inherits the arena of its creator.
+
+At present, threads do not maintain enough state to know where
+they were allocating in both the arena and the dynamic space.
+Consequently, each "switch" from arena to dynamic space and back
+incurs a small amount of waste, as the last chunk of memory claimed
+for that thread in a particular TLAB is discarded.
+
+Control mechanisms
+==================
+SB-VM:WITH-ARENA
+   specifies that all allocations within its dynamic scope
+   (i.e. regardless of where in the program allocation occurs)
+   are to be directed to the arena, with the exception that
+   code which was compiled to use the system TLAB will only
+   allocate to the heap.
+SB-VM:WITHOUT-ARENA
+   specifies that all allocations within its dynamic scope
+   are to be directed to the dynamic space.
+SB-VM:IN-SAME-ARENA (X)
+   specifies that allocation should occur where object X
+   was allocated.
+(DECLARE (SB-C::TLAB :SYSTEM))
+   specifies that within its lexical scope, all allocations
+   should go to the heap.  This works as intended _only _if_
+   all allocations within the scope are handled as
+   "inline" allocations.  Code that is called from within
+   the scope of this declaration does not see the declaration
+   (as is to be expected per the language semantics)
+   and therefore uses the dynamic mechanism.
+
+Best practice
+=============
+Based on the preceding description of the control mechanisms
+and the limitation upon switching in terms of memory waste,
+it should be evident that code which uses the lexical declaration
+is slightly to be preferred.
+It is often possible to avoid use of the dynamic mechanism
+by replacing an allocation point with the following pattern:
+
+ (if (should-allocate-to-heap)
+     (locally (declare (sb-c::tlab :system)) (do-allocation))
+     (do-allocation))
+
+So despite the "doubling" of the allocator form, this is potentially
+more efficient. Most likely the user would wrap this idiom in a macro.
+
+In practice, all mechanisms of control are necessary. Within a
+lexically scoped usage, there might be a hidden call to a builtin
+function such as REVERSE that would cons a new list using
+the dynamic choice of heap or arena.
+
+Pending items
+=============
+* Some of the waste that comes from switching between arena and heap
+  can be avoided by adding more state to the thread structure.
+
+* Background thread pools in particular are a problem.
+  In one such implementation, a thread which requests work to be performed
+  by a worker in a pool sends as part of the work request an identifier
+  of the arena in use by the requester. The worker will switch to that
+  same arena. The implication is that worker threads will constantly be
+  switching their arena, which as per above, is inefficient.

@@ -363,6 +363,8 @@ created and old ones may exit at any time."
   "True if THREAD, defaulting to current thread, is the main thread of the process."
   (eq thread *initial-thread*))
 
+(locally (declare (sb-c::tlab :system)) (defun sys-tlab-list (&rest args) args))
+
 (defmacro return-from-thread (values-form &key allow-exit)
   "Unwinds from and terminates the current thread, with values from
 VALUES-FORM as the results visible to JOIN-THREAD.
@@ -374,7 +376,7 @@ ALLOW-EXIT is true, returning from the main thread is equivalent to
 calling SB-EXT:EXIT with :CODE 0 and :ABORT NIL.
 
 See also: ABORT-THREAD and SB-EXT:EXIT."
-  `(%return-from-thread (multiple-value-list ,values-form) ,allow-exit))
+  `(%return-from-thread (multiple-value-call #'sys-tlab-list ,values-form) ,allow-exit))
 
 (defun %return-from-thread (values allow-exit)
   (let ((self *current-thread*))
@@ -1539,7 +1541,8 @@ on this semaphore, then N of them is woken up."
          (let ((old (sb-ext:cas (thread-%visible thread) 1 -1)))
            ;; now (LIST-ALL-THREADS) won't see it
            (aver (eql old 1)))
-         (sb-ext:atomic-push thread *joinable-threads*))
+         (locally (declare (sb-c::tlab :system))
+           (sb-ext:atomic-push thread *joinable-threads*)))
         (t ; otherwise, physically remove from *ALL-THREADS*
          ;; The memory allocation/deallocation is handled in C.
          ;; I would like to combine the recycle bin for foreign and lisp threads though.
@@ -1885,6 +1888,8 @@ session."
           (prot "protect_alien_stack_guard_page")))
       (unless (= (sap-int thread-sap) 0) thread-sap))))
 
+;;; FIXME: now that #-pauseless-threadstart is gone, this macro is just silly.
+;;;        So remove it and write DEFUN like a normal human.
 (defmacro thread-trampoline-defining-macro (&body body) ; NEW WAY
   `(defun run ()
      (macrolet ((apply-real-function ()
@@ -1938,7 +1943,7 @@ session."
                              1))
                      (unmask-signals)
                      (let ((list
-                             (multiple-value-list
+                             (multiple-value-call #'sys-tlab-list
                                 (unwind-protect
                                      (catch '%return-from-thread
                                        (sb-c::inspect-unwinding

@@ -43,8 +43,7 @@
 (declaim (simple-vector **finalizer-store**))
 
 (defun finalize (object function &key dont-save
-                        &aux (function (%coerce-callable-to-fun function))
-                             (item (if dont-save (list function) function)))
+                        &aux (function (%coerce-callable-to-fun function)))
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
@@ -91,11 +90,14 @@ Examples:
     (finalize \"oops\" #'oops)
     (oops)) ; GC causes re-entry to #'oops due to the finalizer
             ; -> ERROR, caught, WARNING signalled"
+  (declare (sb-c::tlab :system))
   (unless object
     (error "Cannot finalize NIL."))
-  (with-finalizer-store (store)
-    (let ((id (gethash object (finalizer-id-map store))))
-      (cond (id ; object already has at least one finalizer
+  (let ((item (if dont-save (list function) function)))
+    (with-finalizer-store (store)
+      (let ((id (gethash object (finalizer-id-map store))))
+        (cond
+            (id ; object already has at least one finalizer
              ;; Multiple finalizers are invoked in the order added.
              (let* ((old (svref store id))
                     (new (make-array (if (simple-vector-p old)
@@ -130,7 +132,7 @@ Examples:
              ;; Clear out lingering junk from (SVREF STORE ID) before
              ;; establishing that OBJECT maps to that index.
              (setf (svref store id) item
-                   (gethash object (finalizer-id-map store)) id)))))
+                   (gethash object (finalizer-id-map store)) id))))))
   object)
 
 (defun invalidate-fd-streams ()
@@ -230,8 +232,9 @@ Examples:
          ;; Not strictly necessary to do this: the next FINALIZE claiming
          ;; the same ID would assign a fresh list anyway.
          (setf (svref store it) 0)
-         (atomic-push it (finalizer-recycle-bin store)))))
-    object))
+         (locally (declare (sb-c::tlab :system))
+           (atomic-push it (finalizer-recycle-bin store)))))))
+  object)
 
 ;;; Drain the queue of finalizers and return when empty.
 ;;; Concurrent invocations of this function in different threads are ok.
