@@ -894,11 +894,6 @@ set_alloc_start_page(unsigned int page_type, page_index_t page)
 }
 #include "private-cons.inc"
 
-static inline boolean __attribute__((unused)) region_closed_p(struct alloc_region* region) {
-    return !region->start_addr;
-}
-
-
 /* Find a new region with room for at least the given number of bytes.
  *
  * It starts looking at the current generation's alloc_start_page. So
@@ -1028,7 +1023,7 @@ static void*
 gc_alloc_new_region(sword_t nbytes, int page_type, struct alloc_region *alloc_region, int unlock)
 {
     /* Check that the region is in a reset state. */
-    gc_dcheck(region_closed_p(alloc_region));
+    gc_dcheck(!alloc_region->start_addr);
 
     if (page_type == PAGE_TYPE_CONS || page_type == PAGE_TYPE_SMALL_MIXED) {
         // No mutex release, because either this is:
