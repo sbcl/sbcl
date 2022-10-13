@@ -204,7 +204,7 @@ TEST_DIRECTORY=$junkdir SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
                      (format t "~2&Allocator histogram:~%")
                      (funcall (intern "PRINT-ALLOCATOR-HISTOGRAM" "SB-THREAD")))
                    #+test-sprof (sb-sprof:report :type :flat)
-                   (gc :gen  7)
+                   (gc :gen 7)
                    (when (and (not (unexpected-failures)) *delete-logs*) (delete-file mylog))
                    (exit :code (if (unexpected-failures) 1 104))))))
           (format t "~A: pid ~d~@[ (trial ~d)~]~%" (car file) pid (cdr file))

@@ -15,7 +15,6 @@
 #include "gencgc-private.h"
 #include "genesis/gc-tables.h"
 #include "genesis/closure.h"
-#include "genesis/cons.h"
 #include "genesis/instance.h"
 #include "genesis/vector.h"
 #include "genesis/layout.h"
@@ -33,34 +32,7 @@
 #include <sys/resource.h> // for getrusage()
 #endif
 
-
-/* Most headered objects use MARK_BIT to record liveness.
- * Bignums always use the leftmost bit regardless of word size.
- * Fdefns use 0x4000 which overlaps the 'written' bit in the generation byte,
- * but 'written' is not used except for code objects, so this is fine.
- *
- * Bit 31 of the header is the mark bit for all remaining object types.
- * This avoids clash with the layout pointer of instances and functions,
- * the TLS index of symbols, and various other bits.
- * The mark bit occupies the same byte as the generation number
- * in immobile space, but doesn't conflict with that usage.
- */
-#define MARK_BIT ((uword_t)1 << 31)
-#define FDEFN_MARK_BIT 0x4000
-#ifdef LISP_FEATURE_64_BIT
-#define BIGNUM_MARK_BIT ((uword_t)1 << 63)
-#else
-#define BIGNUM_MARK_BIT MARK_BIT
-#endif
-
 extern lispobj lisp_init_function, gc_object_watcher;
-
-#ifdef DEBUG
-#  define dprintf(arg) printf arg
-FILE * logfile;
-#else
-#  define dprintf(arg)
-#endif
 
 struct unbounded_queue {
   struct Qblock* head_block;
@@ -92,13 +64,6 @@ static void* get_free_page(boolean prezero) {
     return mem;
 }
 
-/* The suballocator doles out blocks of bits for marking conses live.
- * Example: If pages are 32768 bytes, and Lisp words are 8 bytes,
- * then one GC page can hold 2K cons cells.
- * One byte marks 8 conses (1 bit per cons), 256 bytes mark 2048 conses.
- * 128 blocks of 256 bytes fit on a 32K GC page. */
-static char *suballocator_free_ptr, *suballocator_end_ptr;
-
 static void gc_enqueue(lispobj object)
 {
     gc_dcheck(is_lisp_pointer(object));
@@ -109,10 +74,8 @@ static void gc_enqueue(lispobj object)
         next = scav_queue.recycler;
         if (next) {
             scav_queue.recycler = next->next;
-            dprintf(("Popped recycle list\n"));
         } else {
             next = (struct Qblock*)get_free_page(0);
-            dprintf(("Alloc'd new block\n"));
         }
         block = block->next = next;
         block->next = 0;
@@ -136,9 +99,6 @@ static lispobj gc_dequeue()
             scav_queue.head_block = next;
             block->next = scav_queue.recycler;
             scav_queue.recycler = block;
-            dprintf(("Qblock emptied - returned to recycle list\n"));
-        } else {
-            dprintf(("Qblock emptied - NOT returned to recycle list\n"));
         }
     }
     return object;
@@ -148,6 +108,10 @@ static inline sword_t dword_index(uword_t ptr, uword_t base) {
     return (ptr - base) >> (1+WORD_SHIFT);
 }
 
+/* The "canonical" pointer to an object is usually just the object itself.
+ * This is true even for SIMPLE-FUN- we don't need to regard only the code base
+ * as canonical. The exception is that LRAs can't be marked because they can't
+ * be discovered and marked when marking their containing code */
 static inline lispobj canonical_ptr(lispobj pointer)
 {
 #ifdef RETURN_PC_WIDETAG
@@ -390,9 +354,7 @@ static void trace_object(lispobj* where)
 void prepare_for_full_mark_phase()
 {
     free_page = page_table_pages;
-    suballocator_free_ptr = suballocator_end_ptr = 0;
     struct Qblock* block = (struct Qblock*)get_free_page(0);
-    dprintf(("Queue block holds %d objects\n", (int)QBLOCK_CAPACITY));
     scav_queue.head_block = block;
     scav_queue.tail_block = block;
     scav_queue.recycler   = 0;
@@ -504,19 +466,6 @@ static void local_smash_weak_pointers()
     weak_vectors = 0;
 }
 
-__attribute__((unused)) static char *fillerp(lispobj* where)
-{
-    page_index_t page;
-    if (where[0] | where[1])
-        return "cons";
-    if ((page = find_page_index(where)) >= 0 && page_single_obj_p(page))
-        return "cons (largeobj filler)";
-    return "cons (filler)";
-}
-
-static FILE *sweeplog;
-static int sweep_mode = 1;
-
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
 #undef immobile_obj_gen_bits
 #define immobile_obj_gen_bits(x) (lose("No page index?"),0)
@@ -547,7 +496,7 @@ static void sweep_fixedobj_pages()
 }
 #endif
 
-/* Overwrite exactly 1 object wit non-pointer words of some sort.
+/* Overwrite exactly 1 object with non-pointer words of some sort.
  * This eliminates tenured garbage in pseudo-static-generation,
  * and does NOT strive to to write as few words as possible,
  * unlike deposit_filler() which tries to be efficient */
@@ -611,24 +560,6 @@ static uword_t sweep(lispobj* where, lispobj* end,
     return 0;
 }
 
-// sweep_mode: 1 = erase, 2 = print, 3 = both
-void toggle_print_garbage(char *filename, int enable)
-{
-    if (enable) {
-        if (sweeplog) {
-          fprintf(stderr,"Erasing previous sweep log file\n");
-          fclose(sweeplog);
-        }
-        sweeplog = fopen(filename, "w");
-        sweep_mode = enable < 0 ? 2 : 3;
-        fprintf(stderr, "Set sweep mode to %d\n", sweep_mode);
-    } else {
-        fclose(sweeplog);
-        fprintf(stderr, "Sweep log closed\n");
-        sweep_mode = 1;
-    }
-}
-
 void execute_full_sweep_phase()
 {
     long words_zeroed[1+PSEUDO_STATIC_GENERATION]; // One count per generation
@@ -639,9 +570,7 @@ void execute_full_sweep_phase()
 
     memset(words_zeroed, 0, sizeof words_zeroed);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (sweeplog) fprintf(sweeplog, "-- fixedobj space --\n");
     sweep_fixedobj_pages();
-    if (sweeplog) fprintf(sweeplog, "-- text space --\n");
     sweep((lispobj*)TEXT_SPACE_START, text_space_highwatermark,
           (uword_t)words_zeroed);
     // Recompute generation masks for text space
@@ -654,7 +583,6 @@ void execute_full_sweep_phase()
             text_page_genmask[find_text_page_index(where)]
                 |= (1 << immobile_obj_gen_bits(where));
 #endif
-    if (sweeplog) fprintf(sweeplog, "-- dynamic space --\n");
     walk_generation(sweep, -1, (uword_t)words_zeroed);
     if (gencgc_verbose) {
         fprintf(stderr, "[Sweep phase: ");
@@ -666,9 +594,6 @@ void execute_full_sweep_phase()
     // deallocate the mark bits
     os_deallocate((void*)fullcgcmarks, markbits_size);
     fullcgcmarks = 0; markbits_size = 0;
-
-    if (sweeplog)
-        fflush(sweeplog);
 
     page_index_t page;
     // Give back all private-use pages and indicate need-to-zero
