@@ -274,15 +274,21 @@
                                    instance
                                    character)))))))
 
-(defun fixnum-or-other-pointer-tn-ref-p (tn-ref)
+(defun fixnum-or-other-pointer-tn-ref-p (tn-ref &optional permit-nil)
   (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
-             (specifier-type '(or #+64-bit single-float
-                               function
-                               list
-                               instance
-                               character))))))
+             (specifier-type (if permit-nil
+                                 '(or #+64-bit single-float
+                                   function
+                                   cons
+                                   instance
+                                   character)
+                                 '(or #+64-bit single-float
+                                   function
+                                   list
+                                   instance
+                                   character)))))))
 
 (defun not-nil-tn-ref-p (tn-ref)
   (not (types-equal-or-intersect (tn-ref-type tn-ref)

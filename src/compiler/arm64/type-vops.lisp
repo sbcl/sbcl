@@ -67,7 +67,8 @@
 
 (defun %test-headers (value widetag target not-p function-p headers
                       &key (drop-through (gen-label))
-                           value-tn-ref)
+                           value-tn-ref
+                           (nil-in-other-pointers t))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag))
         (temp widetag))
     (flet ((%logical-mask (x)
@@ -89,7 +90,7 @@
           (cond (widetag
                  (unless (and value-tn-ref
                               (eq lowtag other-pointer-lowtag)
-                              (other-pointer-tn-ref-p value-tn-ref))
+                              (other-pointer-tn-ref-p value-tn-ref nil-in-other-pointers))
                    (%test-lowtag value widetag when-false t lowtag))
                  (load-type widetag value (- lowtag)))
                 (t
@@ -172,7 +173,7 @@
         (assemble ()
           (when fixnum-p
             (inst tbz* value 0 yep))
-          (unless (fixnum-or-other-pointer-tn-ref-p args)
+          (unless (fixnum-or-other-pointer-tn-ref-p args t)
             (test-type value temp nope t (other-pointer-lowtag)))
           (loadw temp value 0 other-pointer-lowtag)
           (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
@@ -195,7 +196,7 @@
   (:translate unsigned-byte-64-p)
   (:generator 10
     (let ((fixnum-p (types-equal-or-intersect (tn-ref-type args) (specifier-type 'fixnum)))
-          (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args)))
+          (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t)))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
@@ -276,7 +277,7 @@
     (unless (sc-is (tn-ref-tn args) descriptor-reg control-stack)
       (setf args (tn-ref-across args)))
     (let* ((integer-p (csubtypep (tn-ref-type args) (specifier-type 'integer)))
-           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args))
+           (other-pointer-p (fixnum-or-other-pointer-tn-ref-p args t))
            negative-p
            (fixnum (if (sc-is fixnum immediate)
                        (let* ((value (fixnumize (tn-value fixnum)))
@@ -537,9 +538,20 @@
 (define-vop (symbolp type-predicate)
   (:translate symbolp)
   (:generator 12
-    (inst cmp value null-tn)
-    (inst b :eq (if not-p drop-thru target))
-    (test-type value temp target not-p (symbol-widetag))
+    (unless (other-pointer-tn-ref-p args t)
+      (inst cmp value null-tn)
+      (inst b :eq (if not-p drop-thru target)))
+    (test-type value temp target not-p (symbol-widetag)
+               :value-tn-ref args)
+    drop-thru))
+
+(define-vop (non-null-symbol-p type-predicate)
+  (:translate non-null-symbol-p)
+  (:generator 7
+    (when (types-equal-or-intersect (tn-ref-type args) (specifier-type 'null))
+      (inst cmp value null-tn)
+      (inst b :eq (if not-p target drop-thru)))
+    (test-type value temp target not-p (symbol-widetag) :value-tn-ref args)
     drop-thru))
 
 (define-vop (consp type-predicate)
