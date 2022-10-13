@@ -301,7 +301,7 @@
     (when (types-equal-or-intersect (tn-ref-type arg-ref) (specifier-type 'fixnum))
       (inst test :byte value fixnum-tag-mask)
       (inst jmp :z out)) ; good
-    (let ((ea (cond ((fixnum-or-other-pointer-tn-ref-p arg-ref)
+    (let ((ea (cond ((fixnum-or-other-pointer-tn-ref-p arg-ref t)
                      (ea (- other-pointer-lowtag) value))
                     (t
                      (%lea-for-lowtag-test temp value other-pointer-lowtag :qword)
@@ -385,7 +385,7 @@
           ;; Is it a fixnum with the sign bit clear?
           (inst test (ea non-negative-fixnum-mask-constant-wired-address) value)
           (inst jmp :z yep))
-        (cond ((fixnum-or-other-pointer-tn-ref-p args)
+        (cond ((fixnum-or-other-pointer-tn-ref-p args t)
                (when fixnum-p
                  (inst test :byte value fixnum-tag-mask)
                  (inst jmp :z nope)))
@@ -859,7 +859,7 @@
             (inst jmp comparison yep)
             (inst jmp nope))
           bignum
-          (unless (fixnum-or-other-pointer-tn-ref-p args)
+          (unless (fixnum-or-other-pointer-tn-ref-p args t)
             (test-type integer temp nope t (other-pointer-lowtag)))
           (loadw temp integer 0 other-pointer-lowtag)
           (unless integer-p
