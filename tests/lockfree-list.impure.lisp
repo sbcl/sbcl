@@ -1,5 +1,8 @@
 (in-package "SB-LOCKLESS")
 
+;; Missing runtime functions
+#+interpreter (invoke-restart 'run-tests::skip-file)
+
 (test-util:with-test (:name :layout-bits)
   (dolist (type '(list-node keyed-node))
     (assert (eq (sb-kernel::dd-%element-type
