@@ -518,3 +518,22 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
    ;; Can't convert index to a code-relative index until the boxed header length
    ;; has been determined.
    (inst store-coverage-mark index)))
+
+(define-vop ()
+  (:translate sb-lockless::get-next)
+  (:policy :fast-safe)
+  (:args (node :scs (descriptor-reg)))
+  (:results (next-tagged :scs (descriptor-reg))
+            (next-bits :scs (descriptor-reg)))
+  (:generator 10
+    ;; Read the first user-data slot and convert to a tagged pointer,
+    ;; also returning the raw value as a secondary result
+    (pseudo-atomic ()
+      (inst mov next-bits (ea (- (ash (+ instance-slots-offset instance-data-start)
+                                      word-shift)
+                                 instance-pointer-lowtag)
+                              node))
+      ;; This can'be be LEA because usually the NEXT-BITS are tagged.
+      ;; An untagged value appears only if in mid-deletion.
+      (inst mov next-tagged next-bits)
+      (inst or :byte next-tagged instance-pointer-lowtag))))

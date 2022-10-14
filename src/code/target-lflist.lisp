@@ -111,6 +111,8 @@
 (defun make-marked-ref (x)
   (%make-lisp-obj (logandc2 (get-lisp-obj-address x) sb-vm:lowtag-mask)))
 
+#-(or arm64 x86-64) ; why in hell doesn't vop-exists-p working here? wtf?
+(progn
 (declaim (inline get-next))
 (defun get-next (node)
   ;; Storing NODE in *PINNED-OBJECTS* causes its successor to become pinned.
@@ -120,7 +122,7 @@
     (values (truly-the list-node
                        (%make-lisp-obj (logior (get-lisp-obj-address %next)
                                                sb-vm:instance-pointer-lowtag)))
-            %next)))
+            %next))))
 
 (defmethod print-object ((list linked-list) stream)
   (print-unreadable-object (list stream :type t)
@@ -249,10 +251,10 @@
       (let ((succ (%node-next this)))
         (unless (fixnump succ)
           ;; Pin here because we're taking the address of the successor object.
-          ;; Instead we could use bit-test-and-set on the x86 architecture.
           ;; This is the ordinary WITH-PINNED-OBJECTS which manipulates
           ;; *PINNED-OBJECTS* only if precise GC. Compare/contrast with
-          ;; GET-NEXT which _always_ binds *PINNED-OBJECTS*.
+          ;; GET-NEXT which _always_ binds *PINNED-OBJECTS* except for
+          ;; the architectures that provide a vop employing pseudo-atomic.
           (with-pinned-objects (succ)
             ;; Step 2: logically delete 'this'
             (when (eq (cas (%node-next this) succ (make-marked-ref succ)) succ)

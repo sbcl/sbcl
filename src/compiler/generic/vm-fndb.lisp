@@ -825,3 +825,6 @@
 
 (defknown (%unary-truncate %unary-round) (real) integer
   (movable foldable flushable no-verify-arg-count))
+
+#+(or arm64 x86-64)
+(defknown sb-lockless::get-next (sb-lockless::list-node) (values sb-lockless::list-node t))
