@@ -119,8 +119,8 @@
         (gethash (char-upcase sub-char) it))))
 
 (eval-when (:compile-toplevel) ; wire in the fallbacks via :KNOWN-FUN constants
-  (sb-c:defknown read-token (stream character) *)
-  (sb-c:defknown dispatch-char-error (stream character t) *))
+  (sb-c:defknown read-token (stream character) * () :overwrite-fndb-silently t)
+  (sb-c:defknown dispatch-char-error (stream character t) * () :overwrite-fndb-silently t))
 ;;; Invoke the character macro table entry for FUN-DESIGNATOR passing it
 ;;; ARGS, but if DESIGNATOR is NIL then call FALLBACK instead.
 (defmacro invoke-cmt-entry ((fun-designator fallback) &rest args)
@@ -506,17 +506,26 @@ standard Lisp readtable when NIL."
 
 ;;;; implementation of the read buffer
 
+(defmacro inline-alloc-string-displaced-to (underlying)
+  `(let ((s (make-array-header #+sb-unicode sb-vm:complex-character-string-widetag
+                               #-sb-unicode sb-vm:complex-base-string-widetag
+                               1)))
+     (setf  (%array-displaced-p s) t
+            (%array-displaced-from s) nil
+            (%array-data s) ,underlying)
+     ;; need of TRULY-THE is understandable, unlike the one below
+     (truly-the (and (array character (*)) (not simple-array)) s)))
+
+;;; This allocator requires 5 pseudo-atomic sections (the structure, two non-simple
+;;; array headers, and two data vectors).
+;;; Too bad we don't have a way to collapse them to one.
 (defstruct (token-buf (:predicate nil) (:copier nil)
-                      (:constructor
-                       make-token-buf
-                       (&aux
-                        (initial-string (make-string 128))
-                        (string initial-string)
-                        (adjustable-string
-                         (make-array 0
-                                     :element-type 'character
-                                     :fill-pointer nil
-                                     :displaced-to string)))))
+                      (:constructor !make-token-buf
+                          (&aux (initial-string (truly-the (simple-array character (128))
+                                                           (make-string 128)))
+                                (string initial-string)
+                                (adjustable-string
+                                 (inline-alloc-string-displaced-to string)))))
   ;; The string accumulated during reading of tokens.
   ;; Always starts out EQ to 'initial-string'.
   (string nil :type (simple-array character (*)))
@@ -600,12 +609,13 @@ standard Lisp readtable when NIL."
 ;; Additionally the cleanup is on a "best effort" basis. Async unwinds
 ;; through WITH-READ-BUFFER fail to recycle token-bufs, but that's ok.
 (defun acquire-token-buf ()
+  (declare (sb-c::tlab :system) (inline !make-token-buf))
   (let ((this-buffer *token-buf-pool*))
     (cond (this-buffer
            (shiftf *token-buf-pool* (token-buf-next this-buffer) nil)
            this-buffer)
           (t
-           (make-token-buf)))))
+           (!make-token-buf)))))
 
 (defun release-token-buf (chain)
   (named-let free ((buffer chain))

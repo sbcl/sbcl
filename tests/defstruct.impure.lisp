@@ -1440,3 +1440,11 @@ redefinition."
     (assert (eq f #'sb-int:pathname=)))
   (let ((f (sb-kernel:wrapper-equalp-impl (sb-kernel:find-layout 'hash-table))))
     (assert (eq f #'sb-int:hash-table-equalp))))
+
+(defstruct (badbuf (:constructor make-badbuf ()))
+  (str (make-string 128) :type (simple-array character (128))))
+
+;; STR slot gets a type-check in the constructor. It should not
+(test-util:with-test (:name :make-string-type-inference :fails-on :sbcl)
+  (let ((things (ctu:find-code-constants #'make-badbuf :type 'list)))
+    (assert (not things))))
