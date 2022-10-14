@@ -9,6 +9,7 @@
 
 (in-package "SB-VM")
 
+#+sb-unicode
 (assert (= base-char-code-limit 128))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
