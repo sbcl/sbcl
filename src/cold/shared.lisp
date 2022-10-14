@@ -365,6 +365,8 @@
           ":IMMOBILE-SYMBOLS requires :IMMOBILE-SPACE feature")
          ("(and sb-futex (not sb-thread))"
           "Can't enable SB-FUTEX on platforms lacking thread support")
+         ("(and arm64 (not sb-unicode))"
+          "ARM64 requires sb-unicode (see src/code/arm64-simd.lisp)")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))
