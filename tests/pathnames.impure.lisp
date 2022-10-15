@@ -929,7 +929,8 @@
                    #P"a/b/srcfile.fasl"))))
 
 (load "compiler-test-util.lisp")
-(with-test (:name :intern-pathname-non-consy)
+(with-test (:name :intern-pathname-non-consy
+            :skipped-on :interpreter)
   (ctu:assert-no-consing (make-pathname :name "hi" :type "txt")))
 
 (defun pathname-peristence-test ()
