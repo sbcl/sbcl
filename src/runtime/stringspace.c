@@ -33,7 +33,7 @@ void move_rospace_to_dynamic(__attribute__((unused)) int print) {}
 static void visit_pointer_words(lispobj* object, lispobj (*func)(lispobj, uword_t), uword_t arg)
 {
 #define FIX(what) { lispobj ptr = what; \
-    if (is_lisp_pointer(ptr)) { lispobj new = func(ptr, arg); if (new != ptr) what = new; } }
+    if (is_lisp_pointer(ptr) && gc_managed_heap_space_p(ptr)) { lispobj new = func(ptr, arg); if (new != ptr) what = new; } }
 
     if (is_cons_half(*object)) {
         FIX(object[0]);
@@ -55,7 +55,7 @@ static void visit_pointer_words(lispobj* object, lispobj (*func)(lispobj, uword_
         int rehash = 0;
         for (i=0; i<len; ++i) {
             lispobj old = v->data[i];
-            if (!is_lisp_pointer(old)) continue;
+            if (!(is_lisp_pointer(old) && gc_managed_heap_space_p(old))) continue;
             lispobj new = func(old, arg);
             if (new != old) v->data[i] = new, rehash = 1;
         }
