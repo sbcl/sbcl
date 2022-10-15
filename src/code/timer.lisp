@@ -69,7 +69,9 @@
     (error "Heap underflow"))
   (prog1
       (aref heap i)
-    (setf (aref heap i) (aref heap (1- (length heap))))
+    (let ((last (1- (length heap))))
+      (setf (aref heap i) (aref heap last)
+            (aref heap last) 0))
     (decf (fill-pointer heap))
     (heapify heap i :key key :test test)))
 
