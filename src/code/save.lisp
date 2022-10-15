@@ -333,14 +333,6 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  ;; To have any hope of making pathname interning actually work,
-  ;; this MAKE-PATHNAME-TABLE (formerly CLRHASH) would need to be removed.
-  ;; But removing this step causes excess garbage retention because the
-  ;; table's weakness isn't actually working (not sure why).
-  ;; And CLRHASH doesn't do as much as it should, because if the table
-  ;; is actually empty, but at some point held 20,000 pathnames,
-  ;; then we'd write out an enormous vector full of nothing.
-  (setq sb-impl::*pathnames* (make-pathname-intern-table))
   (when (zerop (hash-table-count sb-kernel::*forward-referenced-wrappers*))
     ;; I think this table should always be empty but I'm not sure. If it is,
     ;; recreate it so that we don't preserve an empty vector taking up 16KB

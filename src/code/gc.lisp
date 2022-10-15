@@ -13,11 +13,6 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-(defun dynamic-space-obj-p (x) ; X must not be an immediate object
-  (with-pinned-objects (x)
-    (let ((addr (get-lisp-obj-address x)))
-      (< sb-vm:dynamic-space-start addr (sap-int (dynamic-space-free-pointer))))))
-
 (declaim (inline dynamic-usage))
 (defun dynamic-usage ()
   #+gencgc
@@ -230,6 +225,7 @@ run in any thread.")
 (defun post-gc ()
   (sb-impl::finalizer-thread-notify)
   (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
+  (setq sb-impl::*pn-cache-force-rehash* t)
   ;; Post-GC actions are invoked synchronously by the GCing thread,
   ;; which is an arbitrary one. If those actions aquire any locks, or are sensitive
   ;; to the state of *ALLOW-WITH-INTERRUPTS*, any deadlocks of what-have-you

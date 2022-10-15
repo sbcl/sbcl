@@ -203,6 +203,9 @@
       sb-impl::*token-buf-pool*
       sb-impl::*user-hash-table-tests*
       sb-impl::**finalizer-store**
+      sb-impl::*pn-dir-cache*
+      sb-impl::*pn-cache*
+      sb-impl::*pn-cache-force-rehash*
       sb-vm::*immobile-codeblob-tree*
       sb-vm::*dynspace-codeblob-tree*
       ,(maybe "SB-KERNEL" "*EVAL-CALLS*")

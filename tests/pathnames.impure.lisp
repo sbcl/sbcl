@@ -17,14 +17,10 @@
 
 ;;;; Pathname accessors
 
-(with-test (:name :pathname-table-clobbered-on-save)
-  (let ((kvv (sb-impl::hash-table-pairs sb-impl::*pathnames*)))
-    (sb-int:dovector (element kvv)
-      (when (and (eq (heap-allocated-p element) :dynamic)
-                 (pathnamep element)
-                 (not (equal element #P"")))
-        (assert (/= (sb-kernel:generation-of element)
-                    sb-vm:+pseudo-static-generation+))))))
+(defun nuke-pathname-cache ()
+  ;; This is dangerous because it potentially breaks our invariant
+  ;; that EQUAL pathnames are EQ. Of course, that's not actually enforced yet.
+  (fill sb-impl::*pn-cache* nil))
 
 (with-test (:name (pathname :accessors :stream-not-associated-to-file type-error))
   (let ((*stream* (make-string-output-stream)))
@@ -901,8 +897,7 @@
     (((make-pathname) (make-pathname :version :newest)) t))
   (let ((s "#p\"sys:contrib/f[1-9].txt\""))
     (let ((a (read-from-string s)))
-      ;; result shouldn't depend on the pathnames being EQ
-      (clrhash sb-impl::*pathnames*)
+      (nuke-pathname-cache) ; result shouldn't depend on the pathnames being EQ
       (let ((b (read-from-string s)))
         (assert (not (eq a b)))
         (equalp a b)))))
@@ -912,12 +907,12 @@
 ;;; PATTERN instances which can comprise the subcomponents of a pathname.
 ;;; So make sure the hash is based on the string contents of the pattern.
 ;;; Read pathnames from strings to guarantee that some magic effect of reading
-;;; pathnames doesn't coalesce them. To be especially certain, clear the
-;;; SB-IMPL::*PATHNAMES* table between the read-from-string calls.
+;;; pathnames doesn't coalesce them. To be especially certain, zap the cache
+;;; of pathnames between the read-from-string calls.
 (with-test (:name :wild-pathnames-string-based-hash)
   (let ((string "#p\"file[0-9].txt\""))
     (let ((a (read-from-string string)))
-      (clrhash (clrhash sb-impl::*pathnames*))
+      (nuke-pathname-cache)
       (let ((b (read-from-string string)))
         (assert (not (eq a b)))
         (assert (eql (sxhash a) (sxhash b)))))))
@@ -932,3 +927,18 @@
                    #P"build/bin/foo.tmp"))
     (assert (equal (compile-file-pathname "a/b/srcfile.lsp")
                    #P"a/b/srcfile.fasl"))))
+
+(load "compiler-test-util.lisp")
+(with-test (:name :intern-pathname-non-consy)
+  (ctu:assert-no-consing (make-pathname :name "hi" :type "txt")))
+
+(defun pathname-peristence-test ()
+  ;; This probably isn't something that users expect to be able to work,
+  ;; but I want (rather "need") it to.
+  (sb-int:dx-let ((s (make-string 6)))
+    (replace s "mytype")
+    (make-pathname :name "fred" :type s)))
+(compile 'pathname-peristence-test)
+
+(with-test (:name :dx-pathname-parts-dont-crash)
+  (prin1 (pathname-peristence-test)))

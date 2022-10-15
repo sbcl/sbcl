@@ -885,7 +885,7 @@ new string COUNT long filled with the fill character."
   ;; "Always" means that regardless of whether the user wanted
   ;; coalescing of strings used as literals in code compiled to memory,
   ;; the string is shareable.
-  (when (sb-kernel::dynamic-space-obj-p vector)
+  (when (dynamic-space-obj-p vector)
     ;; FIXME: did I get the condition backwards? I'm trying to remember what it meant.
     ;; "Always" should mean that the language specifies the behavior, e.g. strings used
     ;; as print names can not be modified. (edge case: if it ceases to be a print name,

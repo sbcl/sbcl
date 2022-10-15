@@ -33,6 +33,21 @@
         (truly-the (signed-byte 64)
                    (* (extern-alien "next_free_page" signed) sb-vm:gencgc-page-bytes))))
 
+(declaim (inline read-only-space-obj-p dynamic-space-obj-p))
+(defun read-only-space-obj-p (x)
+  (let ((a (get-lisp-obj-address x))
+        (rospace-start (extern-alien "READ_ONLY_SPACE_START" unsigned))
+        (rospace-end (extern-alien "read_only_space_free_pointer" unsigned)))
+    (and (< rospace-start a rospace-end))))
+
+(defun dynamic-space-obj-p (x) ; X must not be an immediate object
+  ;; The rationale for pinning: suppose X had a high address, then GC occurs,
+  ;; wherein X moves lower *and* the high water mark is below where X was.
+  ;; In that case we'd incorrectly think it was not in dynamic space.
+  (with-pinned-objects (x)
+    (let ((addr (get-lisp-obj-address x)))
+      (< sb-vm:dynamic-space-start addr (sap-int (dynamic-space-free-pointer))))))
+
 #+immobile-space
 (progn
 (define-symbol-macro sb-vm:alien-linkage-table-space-start

@@ -403,7 +403,8 @@ process to continue normally."
     (when total ; newly started process, and not a failed save attempt
       (sb-thread::init-main-thread)
       #+x86-64 (sb-vm::validate-asm-routine-vector)
-      (rebuild-package-vector))
+      (rebuild-package-vector)
+      (rebuild-pathname-cache))
     ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
     (finalizers-reinit)
     ;; Initialize streams next, so that any errors can be printed

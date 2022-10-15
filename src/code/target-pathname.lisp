@@ -256,27 +256,11 @@
                   (%pathname-type pathname)
                   (%pathname-version pathname))))))
 
-;;; Use an unsynchronized weak hash table with explicit locking to "try"
-;;; to intern pathnames. "Try" because there are several factors that preclude
-;;; ensuring uniqueness:
-;;;  - pathname is a STRUCTURE-OBJECT, so users might call COPY-STRUCTURE.
-;;;    We can make that fail by inventing a subtype of instance that is not
-;;;    a STRUCTURE-OBJECT. Whatever that metatype is could be useful for
-;;;    PATTERN (parts of the pathname) as well as THREAD, MUTEX, HASH-TABLE
-;;;    and maybe some other things that yield strange semantics if copied.
-;;;  - the load form methods use MAKE-LOAD-FORM-SAVING-SLOTS thereby
-;;;    bypassing the interning operation. That seems totally fixable.
-;;;
-;;; Additionally, it would be nice if this table would act to reduce
-;;; EQUAL to EQ on pathnames by ensuring that we never intern two distinct
-;;; pathnames that are EQUAL.
-;;; That would require performing some canonicalization immediately which may
-;;; or may not pose a problem for fixing https://bugs.launchpad.net/sbcl/+bug/1834266
-;;; which is to say, if hosts can actually be :UNSPECIFIC, then the version
-;;; collapsing that is done here would not be done.  I don't know if it's that simple.
-;;; If it isn't that simple, then the answer is that hash function and comparator
-;;; function used for the *PATHNAMES* table needs to be more fine-grained than
-;;; the hash value that SXHASH returns for a pathname.
+;;; Pathnames are stored in an open-addressing weak hash-set.
+;;; Ideally there would be only one internal representation of any pathname,
+;;; so that EQUAL on pathnames could reduce to EQ.
+;;; I'm not sure that's possible. For the time being, we use a comparator
+;;; that is stricter (I think) than EQUAL.
 ;;;
 ;;; The spec is actually extremely underspecified in regard to the meaning of
 ;;;  "pathnames that are equal should be functionally equivalent."
@@ -288,25 +272,98 @@
 ;;; Also, on case-sensitive-case-preserving filesystems it's not possible
 ;;; to know which pathnames are equivalent without asking the filesystem.
 ;;;
-;;; This table uses %MAKE-HASH-TABLE, not MAKE-HASH-TABLE, because the latter
-;;; always creates a synchronized table if :WEAKNESS is specified.
-;;; But to correctly use the "put-if-absent" operation, the locking must occur
-;;; *around* the get and put operations. It makes no sense to lock the table around
-;;; individual operations, hence the unsynchronized table.
+(define-load-time-global *pn-dir-cache* #(nil))
+(define-load-time-global *pn-cache* #(nil))
+(define-load-time-global *pn-cache-force-rehash* nil)
+(define-load-time-global *pn-cache-lock* (sb-thread:make-mutex :name "pathnames"))
 
-(defun make-pathname-intern-table ()
-    (let ((h (%make-hash-table (logior (pack-ht-flags-weakness +ht-weak-value+)
-                                       (pack-ht-flags-kind 3)
-                                       hash-table-userfun-flag)
-                               'pathname-key=
-                               #'pathname-key=
-                               #'pathname-sxhash
-                               10
-                               default-rehash-size
-                               $1.0)))
-      (install-hash-table-lock h)
-      h))
-(define-load-time-global *pathnames* (make-pathname-intern-table))
+(defmacro compare-pathname-host/dev/dir/name/type (a b)
+  `(and (eq (%pathname-host ,a) (%pathname-host ,b)) ; Interned
+        ;; dir+hash are EQ-comparable thanks to INTERN-PATHNAME
+        (eq (%pathname-dir+hash ,a) (%pathname-dir+hash ,b))
+        ;; the pathname pieces which are strings aren't interned
+        (compare-component (%pathname-device ,a) (%pathname-device ,b))
+        (compare-component (%pathname-name ,a) (%pathname-name ,b))
+        (compare-component (%pathname-type ,a) (%pathname-type ,b))))
+
+(declaim (ftype (function * *) intern-pathname rebuild-pathname-cache)) ; non-toplevel
+(labels
+    ((update (table-holder thing hash-fn comparator-fn persist-fn)
+       (let* ((table (symbol-value table-holder))
+              (result (probe table thing hash-fn comparator-fn persist-fn)))
+         (or result
+             (probe (rehash table-holder table hash-fn)
+                    thing hash-fn comparator-fn persist-fn))))
+     (probe (table thing hash-fn comparator-fn persist-fn)
+       (declare (function hash-fn comparator-fn persist-fn))
+       (let* ((hash (funcall hash-fn thing))
+              (len (length table))
+              (mask (1- len))
+              (index (logand hash mask))
+              (tombstone)
+              (n-tombstones 0)
+              (n-probes 0)
+              (interval 1))
+         ;; Due to vector weakness, we're always racing with GC but it's OK.
+         (loop
+          (let ((probed-value (aref table index)))
+            ;; Why, if we're going to return "failure" on seeing too many tombstones,
+            ;; do we not just fail when the count reaches that? Answer: We don't yet know
+            ;; if the item wasn't in the table. We can only decide that it wasn't
+            ;; _after_ hitting all the cells in the probe sequence.
+            (cond ((unbound-marker-p probed-value) ; end of probe sequence
+                   (return (if (or (> n-probes 30) ; arbitrary thresholds
+                                   (> n-tombstones 5))
+                               nil
+                               (setf (aref table (or tombstone index))
+                                     (funcall persist-fn thing)))))
+                  ((and probed-value (funcall comparator-fn probed-value thing))
+                   (return probed-value)))
+            (if (= (incf n-probes) len) (return nil))
+            (when (null probed-value) (incf n-tombstones))
+            (setq index (logand (+ index interval) mask))
+            ;; this visits every cell.
+            ;; Proof at https://fgiesen.wordpress.com/2015/02/22/triangular-numbers-mod-2n/
+            (incf interval)))))
+     (rehash (table-holder table hash-fn)
+       (declare (function hash-fn))
+       (flet ((validp (x) (and (not (unbound-marker-p x)) x)))
+         (declare (inline validp))
+         ;; up-size, aiming for 50% load
+         ;; No big deal if GC decides to cull more after the counting step.
+         (let* ((n-live (count-if #'validp table))
+                (size (max 64 (power-of-two-ceiling (* n-live 2))))
+                (new (let ((vector-type
+                            (logior (ash sb-vm:vector-weak-flag sb-vm:array-flags-position)
+                                    sb-vm:simple-vector-widetag)))
+                       (fill (allocate-vector #+ubsan nil vector-type size size)
+                             (make-unbound-marker)))))
+           ;; (format *error-output* "~&Pathname cache size: ~D -> ~D~%" (length table) size)
+           (dovector (x table)
+             (when (validp x) (probe new x hash-fn #'constantly-nil #'identity)))
+           (set table-holder new)
+           (fill table 0)
+           new)))
+     (dir-matchp (entry key)
+       (or (eq (car entry) (car key)) ; quick win if lists are EQ
+           (and (eq (cdr entry) (cdr key)) ; hashes match
+                (compare-component (car entry) (car key)))))
+     (pn-matchp (entry key)
+       (and (compare-pathname-host/dev/dir/name/type entry key)
+            (eql (%pathname-version entry) (%pathname-version key))))
+     (ensure-heap-string (part) ; return any non-string as-is
+       (declare (sb-c::tlab :system))
+       ;; FIXME: what about pattern pieces?
+       (cond ((or (not (stringp part)) (read-only-space-obj-p part)) part)
+             ((dynamic-space-obj-p part) (logically-readonlyize part))
+             ;; dynamic-extent strings and lisp strings in alien memory are acceptable.
+             ;; Copies must be made in that case, since we're holding on to them.
+             (t (let ((l (length part)))
+                  (logically-readonlyize
+                   (replace (typecase part
+                              (base-string (make-string l :element-type 'base-char))
+                              (t (make-string l)))
+                            part)))))))
 
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
@@ -323,20 +380,54 @@
               directory (mapcar #'upcase-maybe directory)
               name (upcase-maybe name)
               type (upcase-maybe type))))
-  (let ((table *pathnames*))
-    (declare (inline !allocate-pathname)) ; for DXability
-    (with-system-mutex ((hash-table-%lock table))
-      (let* ((dir+hash (when directory
-                         (ensure-gethash
-                          directory table
-                          (cons directory (pathname-sxhash directory)))))
-             (key (!allocate-pathname host device dir+hash name type version)))
-        (declare (truly-dynamic-extent key))
-        (or (gethash key table)
-            (let ((key (!allocate-pathname host device dir+hash name type version)))
-              (when (typep host 'logical-host)
-                (setf (%instance-wrapper key) #.(find-layout 'logical-pathname)))
-              (setf (gethash key table) key)))))))
+  (dx-let ((dir-key (cons directory (pathname-sxhash directory))))
+    (declare (sb-c::tlab :system))
+    (declare (inline !allocate-pathname)) ; for DX-allocation
+    (with-system-mutex (*pn-cache-lock*)
+      (when *pn-cache-force-rehash*
+        (when (> (+ (count nil *pn-dir-cache*) (count nil *pn-cache*)) 20)
+          ;; (format *error-output* "~&Pathname cache: forced rehash~%")
+          (rebuild-pathname-cache))
+        (setq *pn-cache-force-rehash* nil))
+      (let* ((dir+hash
+              (if directory ; find the interned dir-key
+                  (update '*pn-dir-cache* dir-key #'cdr #'dir-matchp
+                          (lambda (dir)
+                            (cons (mapcar #'ensure-heap-string (car dir)) (cdr dir))))))
+             (pn-key (!allocate-pathname host device dir+hash name type version)))
+        (declare (truly-dynamic-extent pn-key))
+        (update '*pn-cache* pn-key #'pathname-sxhash #'pn-matchp
+                ;; don't capture the original args, so no extra closure consing
+                (lambda (tmp &aux (host (%pathname-host tmp)))
+                  (let ((new (!allocate-pathname
+                              host (%pathname-device tmp)
+                              (%pathname-dir+hash tmp)
+                              (ensure-heap-string (%pathname-name tmp))
+                              (ensure-heap-string (%pathname-type tmp))
+                              (%pathname-version tmp))))
+                    (when (typep host 'logical-host)
+                      (setf (%instance-wrapper new) #.(find-layout 'logical-pathname)))
+                    new)))))))
+
+;;; Weak vectors don't work at all once rendered pseudo-static.
+;;; so in order to weaken the pathname cache, the vectors are copied on restart.
+;;; It may not achieve anything for saved pathnames, since the vector elements
+;;; are themselves pseudo-static, but at least newly made ones aren't immortal.
+(defun rebuild-pathname-cache ()
+  (rehash '*pn-dir-cache* *pn-dir-cache* #'cdr)
+  (rehash '*pn-cache* *pn-cache* #'pathname-sxhash))
+) ; end LABELS
+
+(defun show-pn-caches (&aux (*print-pretty* nil))
+  (dolist (symbol '(*pn-dir-cache* *pn-cache*))
+    (format t "~&~S: ~D~%" symbol (length (symbol-value symbol)))
+    (let ((v (symbol-value symbol)))
+      (dotimes (i (length v))
+        (let ((entry (aref v i)))
+          (unless (or (unbound-marker-p entry) (null entry))
+            (format t "~3d ~3d ~x ~s~%"
+                    i (generation-of entry) (get-lisp-obj-address entry)
+                    entry)))))))
 
 ;;; Vector of logical host objects, each of which contains its translations.
 ;;; The vector is never mutated- always a new vector is created when adding
@@ -485,11 +576,14 @@
               (string= this that)))
         (pattern
          ;; PATTERN instances should probably become interned objects
-         ;; so that we can use EQ on them. But that currently has the same
-         ;; problem as PATHAME= has - the cache can be bypassed.
+         ;; so that we can use EQ on them.
          (and (pattern-p that)
               (pattern= this that)))
         (cons
+         ;; Even though directory parts are now reliably interned -
+         ;; and so you might be inclined to think that the "full" comparison
+         ;; could be confined to just the interning operation, that's not so,
+         ;; because we also use COMPARE-COMPONENT in ENOUGH-NAMESTRING.
          (and (consp that)
               (compare-component (car this) (car that))
               (compare-component (cdr this) (cdr that))))
@@ -498,37 +592,15 @@
 
 ;;;; pathname functions
 
-(macrolet ((compare-most-components ()
-             `(and (eq (%pathname-host a) (%pathname-host b)) ; Interned
-                   ;; Unless the pathname cache can be made 100% reliable,
-                   ;; strength-reducing EQUAL to EQ is inadmissible here.
-                   ;; To fix that, MAKE-LOAD-FORM methods need not to bypass
-                   ;; INTERN-PATHNAME.
-                   (let ((dir-a (%pathname-dir+hash a))
-                         (dir-b (%pathname-dir+hash b)))
-                     (or (eq dir-a dir-b)
-                         (compare-component (car dir-a) (car dir-b))))
-                   (compare-component (%pathname-device a) (%pathname-device b))
-                   (compare-component (%pathname-name a) (%pathname-name b))
-                   (compare-component (%pathname-type a) (%pathname-type b)))))
-
-;;; PATHNAME-KEY= can receive two different subsets of keys:
-;;; - non-nil LIST is the directory part of a pathname
-;;; - entire PATHNAME
-(defun pathname-key= (a b)
-  (etypecase a
-    (list (and (listp b) (compare-component a b)))
-    (pathname (and (pathnamep b)
-                   (compare-most-components)
-                   (eql (pathname-version a) (pathname-version b))))))
-
 (defun pathname= (a b)
   (declare (type pathname a b))
   (or (eq a b)
-      (and (compare-most-components)
+      ;; I believe that this is actually the same as EQ on pathnames now,
+      ;; but until I prove it, I'm leaving this code in.
+      (and (compare-pathname-host/dev/dir/name/type a b)
            (or (eq (%pathname-host a) *physical-host*)
                (compare-component (pathname-version a)
-                                  (pathname-version b)))))))
+                                  (pathname-version b))))))
 
 (sb-kernel::assign-equalp-impl 'pathname #'pathname=)
 (sb-kernel::assign-equalp-impl 'logical-pathname #'pathname=)
@@ -1740,7 +1812,8 @@ unspecified elements into a completed to-pathname based on the to-wildname."
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
 ;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
 (defun make-trivial-default-logical-pathname ()
-  (intern-pathname (make-logical-host :name "") :unspecific nil nil nil nil))
+  (intern-pathname (load-time-value (make-logical-host :name "") t)
+                   :unspecific nil nil nil nil))
 
 (define-load-time-global *logical-pathname-defaults*
   (make-trivial-default-logical-pathname))
