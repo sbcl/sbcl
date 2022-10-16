@@ -1401,15 +1401,6 @@ NOTE: This interface is experimental and subject to change."
              (sorted (stable-sort wrapped comparator :key #'cdr)))
         (map-into sorted #'car sorted))))
 
-;;; Ensure basicness if possible, and simplicity always
-(defun possibly-base-stringize (s)
-  (declare (string s))
-  (cond #+(and sb-unicode (not sb-xc-host))
-        ((and (typep s '(array character (*))) (every #'base-char-p s))
-         (coerce s 'base-string))
-        (t
-         (coerce s 'simple-string))))
-
 ;;; Return T if X is an object that always evaluates to itself. Guard against:
 ;;;  (LET ((S 'XXX)) (SET S 9) (UNINTERN S) (IMPORT S 'KEYWORD) (SYMBOL-VALUE S)) => 9
 ;;; whereby :XXX satisfies KEWORDP and has value 9, or maybe even has no value

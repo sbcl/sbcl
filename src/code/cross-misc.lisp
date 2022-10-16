@@ -233,6 +233,8 @@
         *cl-package*
         p)))
 
+(defun possibly-base-stringize (s) (coerce (the string s) 'simple-base-string))
+
 ;;; printing structures
 
 (defun default-structure-print (structure stream depth)

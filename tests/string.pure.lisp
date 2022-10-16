@@ -319,3 +319,36 @@ claim that any particular result from these edge cases constitutes a bug.
     (check (string/= (the (simple-string 4) x)
                      (the (simple-string 1) y)
                      :start1 1 :end1 * :end2 0) (or (integer 1 1) null))))
+
+#+sb-unicode
+(with-test (:name :possibly-base-stringize)
+  ;;  simple-base, base non-simple
+  (let* ((str (make-string 4 :element-type 'base-char))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (eq res str)))
+  (let* ((str (make-array 4 :element-type 'base-char
+                          :displaced-to (make-string 4 :element-type 'base-char)))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'simple-base-string))))
+  ;;  simple-character w/ASCII only, non-simple character w/ASCII only
+  (let* ((str (make-string 4))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'simple-base-string))))
+  (let* ((str (make-array 4 :element-type 'character
+                          :displaced-to (make-string 4)))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'simple-base-string))))
+  ;; simple-character w/Unicode, non-simple character w/Unicode
+  (let* ((str (make-string 4 :initial-element #\u3f4))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (eq res str) (typep res 'sb-kernel:simple-character-string))))
+  (let* ((str (make-array 4 :element-type 'character
+                          :displaced-to
+                          (make-string 4 :initial-element #\u3f5)))
+         (res (sb-int:possibly-base-stringize str)))
+    (assert (and (sb-int:neq res str) (typep res 'sb-kernel:simple-character-string)))))
+(with-test (:name :possibly-base-stringize-dx :skipped-on :interpreter)
+  (let* ((str (make-string 4 :element-type 'base-char))
+         (res (sb-impl::possibly-base-stringize-to-heap str)))
+    (declare (sb-int:truly-dynamic-extent str))
+    (assert (sb-int:neq res str))))

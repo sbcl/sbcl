@@ -172,6 +172,35 @@ the file system."
   (sb-c::note-name-defined name :function)
   name)
 
+(macrolet
+    ((cast-it ()
+       #-sb-unicode
+       '(if (and (simple-base-string-p s) (ok-space)) s (copy-seq s))
+       #+sb-unicode
+       ;; whether a copy is needed depends both on contents and simplicity
+       '(let* ((base-p (base-string-p s))
+               (recast (and (not base-p) (every #'base-char-p s))))
+          (if (and (simple-string-p s) (not recast) (ok-space))
+              s
+              (let ((n (length s)))
+                ;; I think this could be done with a single allocator
+                ;; and a length calculation. I don't care to do that.
+                (replace (if (or base-p recast)
+                             (make-string n :element-type 'base-char)
+                             (make-string n))
+                         s))))))
+;;; Ensure basicness if possible, and simplicity always
+(defun possibly-base-stringize (s)
+  (declare (string s))
+  (macrolet ((ok-space () 't))
+    (cast-it)))
+;;; As above but copy dynamic-extent or other off-heap lisp strings
+(defun possibly-base-stringize-to-heap (s)
+  (declare (string s) (sb-c::tlab :system))
+  (macrolet ((ok-space () '(or (dynamic-space-obj-p s) (read-only-space-obj-p s))))
+    (cast-it)))
+) ; end MACROLET
+
 (in-package "SB-C")
 
 (defun split-version-string (string)
