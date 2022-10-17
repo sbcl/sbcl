@@ -1373,7 +1373,8 @@
 (defun join-type-constraints (in block)
   (let ((vars '())
         (predecessors (block-pred block)))
-    (unless (singleton-p predecessors)
+    (progn
+      ;;unless (singleton-p predecessors) for some reason it makes the whole thing loop infinitely
       ;; Find some set of constrained variables in the predecessors.
       (dolist (pred predecessors)
         (let ((out (block-out-for-successor pred block)))
