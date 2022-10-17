@@ -8,17 +8,12 @@
 
 ;;; If *table-under-test* is bound to a hash-table, then cause it to have
 ;;; half as many buckets as it would ordinarily get after enlarging.
-(sb-int:encapsulate
- 'sb-impl::hash-table-new-vectors
- 'test
+(sb-int:encapsulate 'sb-impl::recompute-ht-vector-sizes 'collision-inducement
  (compile nil
           '(lambda (fn tbl)
-            (if (eq tbl *table-under-test*)
-                (multiple-value-bind (kv-vect next-vect hash-vect bucket-vect)
-                    (funcall fn tbl)
-                  (values kv-vect next-vect hash-vect
-                          (subseq bucket-vect 0 (/ (length bucket-vect) 2))))
-                (funcall fn tbl)))))
+             (multiple-value-bind (new-size new-n-buckets) (funcall fn tbl)
+               (values new-size (ash new-n-buckets
+                                     (if (eq tbl *table-under-test*) -1 0)))))))
 
 ;;; Keep moving everything that can move during each GC
 #+gencgc (setf (generation-number-of-gcs-before-promotion 0) 1000000)

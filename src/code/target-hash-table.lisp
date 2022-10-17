@@ -687,64 +687,6 @@ multiple threads accessing the same hash-table without locking."
 
 ;;;; accessing functions
 
-;;; Make new vectors for the table, extending the table based on the
-;;; rehash-size.
-(defun hash-table-new-vectors (table)
-  (let* ((old-next-vector (hash-table-next-vector table))
-         (old-hash-vector (hash-table-hash-vector table))
-         ;; The NEXT vector's length is 1 greater than "size" - the number
-         ;; of k/v pairs at full capacity.
-         (old-size (1- (length old-next-vector)))
-         (rehash-size (hash-table-rehash-size table))
-         (new-size (typecase rehash-size
-                     ;; Ensure that if the user specifies a float that is so close
-                     ;; to 1.0 as to disappear in the TRUNCATE that we actually grow.
-                     ;; (TRUNCATE (* 14 1.01)) => 14
-                     (float (max (the index (truncate (* rehash-size old-size))) ; usually
-                                 (1+ old-size)))
-                     (fixnum (+ rehash-size old-size)))) ; rarely, I imagine
-         (new-n-buckets
-          (let* ((pow2ceil (power-of-two-ceiling new-size))
-                 (full-lf (/ new-size pow2ceil)))
-            ;; If the default rehash-size was employed, let's try to keep the
-            ;; load factor within a reasonable band. Otherwise don't bother.
-            ;; The motivation for this decision is twofold:
-            ;; - if using defaults, it would be ideal to attempt to be nominally
-            ;;   conscientious of the 1.5x resize amount.
-            ;; - we can't really accommodate arbitrary resize amounts, especially if small.
-            ;;   (power-of-2 sizing can't do that- doubling is the only possibility)
-            ;;   But we can produce the smallest table consistent with the request.
-            ;;   Say e.g. REHASH-SIZE was 2 using the default initial size of 14.
-            ;;   Resizing computes 16 k/v pairs which coincides exactly with
-            ;;   16 buckets (the nearest power of 2). But if we wish to avoid 100% load,
-            ;;   what can we do? Re-double the bin count to 32? Decrease the k/v pair count
-            ;;   to 15? Clearly neither of those make sense if the user is trying to say
-            ;;   that (s)he wants 2 entries more which means "don't increase by a lot".
-            ;;   Changing from 8 buckets (at the old size) to 32 buckets is a lot,
-            ;;   so why do that? Conversely, it makes no sense to reduce the k/v pair
-            ;;   limit just to keep the LF less than 100%. A similar problem occurs
-            ;;   if you specify 1.001 or other float near 1.
-            ;;   Anyway, chaining supports load factors in excess of 100%
-            (when (eql rehash-size default-rehash-size)
-              (cond ((> full-lf 9/10)   ; $.9 is unhappy in cross-float due to inexactness
-                     ;; If we're going to decrease the size, make sure we definitely
-                     ;; don't decrease below the old size.
-                     (setq new-size (floor pow2ceil 100/85)))  ; target LF = 85%
-                    ((< full-lf 55/100) ; and $.55 is similarly unhappy
-                     (setq new-size (floor pow2ceil 100/65))))) ; target LF = 65%
-            pow2ceil))
-         ;; These vector lengths are exactly analogous to those in MAKE-HASH-TABLE,
-         ;; prompting the question of whether we can share some code.
-         (new-index-vector (make-index-vector new-n-buckets))
-         (new-kv-vector (%alloc-kv-pairs new-size))
-         (new-next-vector (make-array (1+ new-size) :element-type 'hash-table-index
-                                      ;; for robustness testing, as explained in %MAKE-HASH-TABLE
-                                      #+sb-devel :initial-element #+sb-devel bad-next-value))
-         (new-hash-vector
-           (when old-hash-vector
-             (make-array (1+ new-size) :element-type 'hash-table-index))))
-    (values new-kv-vector new-next-vector new-hash-vector new-index-vector)))
-
 ;;; We don't define +-MODFX for all backends, and I can't figure out
 ;;; the rationale, nor how to detect this other than by trial and error.
 ;;; Like why does 64-bit ARM have it but 32-bit not have?
@@ -947,50 +889,116 @@ multiple threads accessing the same hash-table without locking."
        result))))
 ) ; end MACROLET
 
+(defun recompute-ht-vector-sizes (table)
+  ;; Compute new vector lengths for the table, extending the table based on the
+  ;; rehash-size.
+  (let* ((old-next-vector (hash-table-next-vector table))
+         ;; The NEXT vector's length is 1 greater than "size" - the number
+         ;; of k/v pairs at full capacity.
+         (old-size (1- (length old-next-vector)))
+         (rehash-size (hash-table-rehash-size table))
+         (new-size (typecase rehash-size
+                     ;; Ensure that if the user specifies a float that is so close
+                     ;; to 1.0 as to disappear in the TRUNCATE that we actually grow.
+                     ;; (TRUNCATE (* 14 1.01)) => 14
+                     (float (max (the index (truncate (* rehash-size old-size))) ; usually
+                                 (1+ old-size)))
+                     (fixnum (+ rehash-size old-size)))) ; rarely, I imagine
+         (new-n-buckets
+          (let* ((pow2ceil (power-of-two-ceiling new-size))
+                 (full-lf (/ new-size pow2ceil)))
+            ;; If the default rehash-size was employed, let's try to keep the
+            ;; load factor within a reasonable band. Otherwise don't bother.
+            ;; The motivation for this decision is twofold:
+            ;; - if using defaults, it would be ideal to attempt to be nominally
+            ;;   conscientious of the 1.5x resize amount.
+            ;; - we can't really accommodate arbitrary resize amounts, especially if small.
+            ;;   (power-of-2 sizing can't do that- doubling is the only possibility)
+            ;;   But we can produce the smallest table consistent with the request.
+            ;;   Say e.g. REHASH-SIZE was 2 using the default initial size of 14.
+            ;;   Resizing computes 16 k/v pairs which coincides exactly with
+            ;;   16 buckets (the nearest power of 2). But if we wish to avoid 100% load,
+            ;;   what can we do? Re-double the bin count to 32? Decrease the k/v pair count
+            ;;   to 15? Clearly neither of those make sense if the user is trying to say
+            ;;   that (s)he wants 2 entries more which means "don't increase by a lot".
+            ;;   Changing from 8 buckets (at the old size) to 32 buckets is a lot,
+            ;;   so why do that? Conversely, it makes no sense to reduce the k/v pair
+            ;;   limit just to keep the LF less than 100%. A similar problem occurs
+            ;;   if you specify 1.001 or other float near 1.
+            ;;   Anyway, chaining supports load factors in excess of 100%
+            (when (eql rehash-size default-rehash-size)
+              (cond ((> full-lf 9/10)   ; $.9 is unhappy in cross-float due to inexactness
+                     ;; If we're going to decrease the size, make sure we definitely
+                     ;; don't decrease below the old size.
+                     (setq new-size (floor pow2ceil 100/85)))  ; target LF = 85%
+                    ((< full-lf 55/100) ; and $.55 is similarly unhappy
+                     (setq new-size (floor pow2ceil 100/65))))) ; target LF = 65%
+            pow2ceil)))
+    (values new-size new-n-buckets)))
 ;;; Enlarge TABLE.  If it is weak, then both the old and new vectors are temporarily
 ;;; made non-weak so that we don't have to deal with GC-related shenanigans.
 (defun grow-hash-table (table)
   (declare (type hash-table table))
-  (when (= (hash-table-%count table) 0) ; special case for new table
-    (let* ((size (shiftf (hash-table-cache table) 0))
-           (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table))))
-           (bucket-count (power-of-two-ceiling (max scaled-size +min-hash-table-size+)))
-           (index-vector (make-index-vector bucket-count))
-           (kv-vector (%alloc-kv-pairs size))
-           (next-vector (make-array (1+ size) :element-type 'hash-table-index
-                                    #+sb-devel :initial-element #+sb-devel bad-next-value))
-           (hash-vector (when (hash-table-hash-vector table)
-                          (make-array (1+ size) :element-type 'hash-table-index))))
-      (setf (kv-vector-supplement kv-vector) (or hash-vector
-                                                 (eq (hash-table-test table) 'eql))
-            (hash-table-pairs table) kv-vector
-            (hash-table-index-vector table) index-vector
-            (hash-table-next-vector table) next-vector
-            (hash-table-hash-vector table) hash-vector)
-      (return-from grow-hash-table 1)))
-  (binding* (((new-kv-vector new-next-vector new-hash-vector new-index-vector)
-              (hash-table-new-vectors table))
-             (old-kv-vector (hash-table-pairs table))
-             (hwm (kv-vector-high-water-mark old-kv-vector)))
+  (flet
+      ((realloc (size n-buckets &aux (hash-vector-p (hash-table-hash-vector table)))
+         (declare (type (integer 0 #.(- array-dimension-limit 2)) size n-buckets))
+         (macrolet ((new-vectors ()
+                      ;; Return KV-VECTOR NEXT-VECTOR HASH-VECTOR INDEX-VECTOR)
+                      `(values (%alloc-kv-pairs size)
+                               (make-array size+1 :element-type 'hash-table-index
+                                           ;; for robustness testing, as explained in %MAKE-HASH-TABLE
+                                           #+sb-devel :initial-element #+sb-devel bad-next-value)
+                               (when hash-vector-p
+                                 (make-array size+1 :element-type 'hash-table-index))
+                               (make-index-vector n-buckets))))
+           (declare (optimize (sb-c::type-check 0)))
+           (let ((size+1 (1+ size))
+                 (old-kvv (hash-table-pairs table)))
+             (declare (ignorable old-kvv))
+             #-system-tlabs (new-vectors)
+             #+system-tlabs
+             ;; If allocation was directed off the main heap when this table was made, then we assume
+             ;; that reallocation will, by default, allocate off the heap. So therefore if the old
+             ;; vector _is_ in dynamic (or readonly) space, it should be forced to dynamic space
+             ;; even if the user TLAB currently points outside of dynamic space.
+             (if (or (dynamic-space-obj-p old-kvv) (read-only-space-obj-p old-kvv))
+                 (locally (declare (sb-c::tlab :system)) (new-vectors))
+                 (new-vectors))))))
+    (when (= (hash-table-%count table) 0) ; special case for new table
+      (binding* ((size (shiftf (hash-table-cache table) 0)) ; "cache" holds the desired size
+                 (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table))))
+                 (bucket-count (power-of-two-ceiling (max scaled-size +min-hash-table-size+)))
+                 ((kv-vector next-vector hash-vector index-vector) (realloc size bucket-count)))
+        (setf (kv-vector-supplement kv-vector) (or hash-vector (eq (hash-table-test table) 'eql))
+              (hash-table-pairs table) kv-vector
+              (hash-table-index-vector table) index-vector
+              (hash-table-next-vector table) next-vector
+              (hash-table-hash-vector table) hash-vector)
+        (return-from grow-hash-table 1)))
+    (binding* (((new-size new-n-buckets) (recompute-ht-vector-sizes table))
+               (old-kv-vector (hash-table-pairs table))
+               ((new-kv-vector new-next-vector new-hash-vector new-index-vector)
+                (realloc new-size new-n-buckets))
+               (hwm (kv-vector-high-water-mark old-kv-vector)))
 
-    (declare (type simple-vector new-kv-vector)
-             (type (simple-array hash-table-index (*)) new-next-vector new-index-vector))
+      (declare (type simple-vector new-kv-vector)
+               (type (simple-array hash-table-index (*)) new-next-vector new-index-vector))
 
     ;; Rehash + resize only occurs when:
     ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
     ;;  (2) no cells below HWM are available (so COUNT = SIZE)
-    (aver (= hwm (hash-table-size table)))
-    (when (and (not (hash-table-weak-p table)) (/= (hash-table-count table) hwm))
-      ;; If the table is not weak, then every cell pair has to be in use
-      ;; as a precondition to resizing. If weak, this might not be true.
-      (signal-corrupt-hash-table table))
+      (aver (= hwm (hash-table-size table)))
+      (when (and (not (hash-table-weak-p table)) (/= (hash-table-count table) hwm))
+        ;; If the table is not weak, then every cell pair has to be in use
+        ;; as a precondition to resizing. If weak, this might not be true.
+        (signal-corrupt-hash-table table))
 
     ;; Copy over the hash-vector,
     ;; This is done early because when GC scans the new vector, it needs to see
     ;; each hash to know which keys were hashed address-sensitively.
-    (awhen (hash-table-hash-vector table)
-      (replace (the (simple-array hash-table-index (*)) new-hash-vector)
-               it :start1 1 :start2 1)) ; 1st element not used
+      (awhen (hash-table-hash-vector table)
+        (replace (the (simple-array hash-table-index (*)) new-hash-vector)
+                 it :start1 1 :start2 1)) ; 1st element not used
 
     ;; Preserve only the 'hashing' bit on the OLD-KV-VECTOR so that
     ;; its high-water-mark can meaningfully be reduced to 0 when done.
@@ -999,13 +1007,13 @@ multiple threads accessing the same hash-table without locking."
     ;; for rehash (it's going to be zeroed out).
     ;; Clearing the weakness causes all entries to stay alive.
     ;; Furthermore, clearing both makes the trailing metadata ignorable.
-    (assign-vector-flags old-kv-vector sb-vm:vector-hashing-flag)
-    (setf (kv-vector-supplement old-kv-vector) nil)
+      (assign-vector-flags old-kv-vector sb-vm:vector-hashing-flag)
+      (setf (kv-vector-supplement old-kv-vector) nil)
 
     ;; The high-water-mark remains unchanged.
     ;; Set this before copying pairs, otherwise they would not be seen
     ;; in the new vector since GC scanning ignores elements below the HWM.
-    (setf (kv-vector-high-water-mark new-kv-vector) hwm)
+      (setf (kv-vector-high-water-mark new-kv-vector) hwm)
     ;; Reference the hash-vector from the KV vector.
     ;; Normally a weak hash-table's KV vector would reference the table
     ;; (because cull needs to examine the table bucket-by-bucket), and
@@ -1015,28 +1023,27 @@ multiple threads accessing the same hash-table without locking."
     ;; but I'd rather the table remain in a consistent state, in case we
     ;; ever devise a way to allow concurrent reads with a single writer,
     ;; for example.
-    (setf (kv-vector-supplement new-kv-vector)
-          (or new-hash-vector
-              (= (ht-flags-kind (hash-table-flags table)) hash-table-kind-eql)))
+      (setf (kv-vector-supplement new-kv-vector)
+            (or new-hash-vector (eq (hash-table-test table) 'eql)))
 
     ;; Copy the k/v pairs excluding leading and trailing metadata.
-    (replace new-kv-vector old-kv-vector
-             :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
+      (replace new-kv-vector old-kv-vector
+               :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
 
-    (let ((next-free (rehash new-kv-vector new-hash-vector
-                             new-index-vector new-next-vector table)))
-      (setf (hash-table-pairs table)        new-kv-vector
-            (hash-table-hash-vector table)  new-hash-vector
-            (hash-table-index-vector table) new-index-vector
-            (hash-table-next-vector table)  new-next-vector
-            (hash-table-next-free-kv table) next-free)
+      (let ((next-free (rehash new-kv-vector new-hash-vector
+                               new-index-vector new-next-vector table)))
+        (setf (hash-table-pairs table)        new-kv-vector
+              (hash-table-hash-vector table)  new-hash-vector
+              (hash-table-index-vector table) new-index-vector
+              (hash-table-next-vector table)  new-next-vector
+              (hash-table-next-free-kv table) next-free)
 
-      (when (hash-table-weak-p table)
-        (setf (hash-table-smashed-cells table) nil)
+        (when (hash-table-weak-p table)
+          (setf (hash-table-smashed-cells table) nil)
         ;; Now that the table points to the right hash-vector
         ;; we can set the vector's backpointer and turn it weak.
-        (setf (kv-vector-supplement new-kv-vector) table)
-        (logior-array-flags new-kv-vector sb-vm:vector-weak-flag))
+          (setf (kv-vector-supplement new-kv-vector) table)
+          (logior-array-flags new-kv-vector sb-vm:vector-weak-flag))
 
       ;; Zero-fill the old kv-vector. For weak hash-tables this removes the
       ;; strong references to each k/v. For non-weak vectors there is no technical
@@ -1053,9 +1060,9 @@ multiple threads accessing the same hash-table without locking."
       ;; if we didn't zero-fill.
       ;; Or, if we could trust people not to look at the old vector, we could just
       ;; change the widetag into simple-array-word instead of scribbling over it.
-      (fill old-kv-vector 0 :start 2 :end (* (1+ hwm) 2))
-      (setf (kv-vector-high-water-mark old-kv-vector) 0)
-      next-free)))
+        (fill old-kv-vector 0 :start 2 :end (* (1+ hwm) 2))
+        (setf (kv-vector-high-water-mark old-kv-vector) 0)
+        next-free))))
 
 (defun gethash (key hash-table &optional default)
   "Finds the entry in HASH-TABLE whose key is KEY and returns the
