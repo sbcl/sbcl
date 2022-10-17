@@ -3156,7 +3156,7 @@ possibly temporarily, because it might be used internally.")
            "PICK-BEST-SXHASH-BITS"
 
            "MAKE-UNPRINTABLE-OBJECT"
-           "POSSIBLY-BASE-STRINGIZE"
+           "POSSIBLY-BASE-STRINGIZE" "POSSIBLY-BASE-STRINGIZE-TO-HEAP"
            "POWER-OF-TWO-CEILING"
            "PRINT-NOT-READABLE-ERROR"
            "HASH-TABLE-REPLACE"

@@ -349,6 +349,6 @@ claim that any particular result from these edge cases constitutes a bug.
     (assert (and (sb-int:neq res str) (typep res 'sb-kernel:simple-character-string)))))
 (with-test (:name :possibly-base-stringize-dx :skipped-on :interpreter)
   (let* ((str (make-string 4 :element-type 'base-char))
-         (res (sb-impl::possibly-base-stringize-to-heap str)))
+         (res (sb-int:possibly-base-stringize-to-heap str)))
     (declare (sb-int:truly-dynamic-extent str))
     (assert (sb-int:neq res str))))
