@@ -148,6 +148,39 @@
           "FOO.txt"
           "SYS:%")))
 
+;; Ensure LOGICAL-PATHNAME signals the required type of error for all
+;; the stream cases enumerated in CLHS.
+(with-test (:name (logical-pathname streams))
+  (flet ((check-it (stream)
+           (assert-error (logical-pathname stream) type-error)))
+    (with-open-stream (in (make-string-input-stream ""))
+      (with-open-stream (out (make-string-output-stream))
+        (check-it in)
+        (check-it out)
+        (with-open-stream (two-way (make-two-way-stream in out))
+          (check-it two-way))
+        (with-open-stream (echo (make-echo-stream in out))
+          (check-it echo))
+        (with-open-stream (broadcast (make-broadcast-stream))
+          (check-it broadcast))
+        (with-open-stream (concatenated (make-concatenated-stream))
+          (check-it concatenated))))
+    ;; CLHS: "If PATHSPEC is a stream, it should be one for which
+    ;; PATHNAME returns a logical pathname".
+    (with-scratch-file (tmp "tmp")
+      (with-open-file (file tmp :direction :output)
+        ;; PATHNAME will return a physical pathname.
+        (check-it file)))))
+
+;; Because FD-STREAM is a subclass of FILE-STREAM (lp#310098), some
+;; file-streams have no associated pathname. In this case PATHNAME
+;; errors; let's ensure LOGICAL-PATHNAME signals the required
+;; TYPE-ERROR. (SB-SYS:*STDIN* is one such FILE-STREAM. If something
+;; changes about SB-SYS:*STDIN* but there are still FILE-STREAMs
+;; without pathnames, pick or make a different one.)
+(with-test (:name (logical-pathname anonymous-file-stream))
+  (assert-error (logical-pathname sb-sys:*stdin*) type-error))
+
 ;;; some things SBCL-0.6.9 used not to parse correctly:
 ;;;
 ;;; SBCL used to signal an error saying there's no translation.

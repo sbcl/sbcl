@@ -1014,31 +1014,24 @@ a host-structure or string."
 ;;; parse-logical-namestring through to %PARSE-NAMESTRING as a truth
 ;;; value. Yeah, this is probably a KLUDGE - CSR, 2002-04-18
 (defun parseable-logical-namestring-p (namestr start end)
-  (catch 'exit
-    (handler-bind
-        ((namestring-parse-error (lambda (c)
-                                   (declare (ignore c))
-                                   (throw 'exit nil))))
-      (let ((colon (position #\: namestr :start start :end end)))
-        (when colon
-          (let ((potential-host
-                 (logical-word-or-lose (subseq namestr start colon))))
-            ;; depending on the outcome of CSR comp.lang.lisp post
-            ;; "can PARSE-NAMESTRING create logical hosts", we may need
-            ;; to do things with potential-host (create it
-            ;; temporarily, parse the namestring and unintern the
-            ;; logical host potential-host on failure.
-            (declare (ignore potential-host))
-            (let ((result
-                   (handler-bind
-                       ((simple-type-error (lambda (c)
-                                             (declare (ignore c))
-                                             (throw 'exit nil))))
-                     (parse-logical-namestring namestr start end))))
-              ;; if we got this far, we should have an explicit host
-              ;; (first return value of parse-logical-namestring)
-              (aver result)
-              result)))))))
+  (and (parse-potential-logical-host namestr start end)
+       (handler-case
+           (let ((result (parse-logical-namestring namestr start end)))
+             ;; if we got this far, we should have an explicit host
+             ;; (first return value of parse-logical-namestring)
+             (aver result)
+             result)
+         ((or simple-type-error namestring-parse-error) ()
+           nil))))
+
+(defun parse-potential-logical-host (namestr &optional (start 0) end)
+  (handler-case
+    (let ((colon (position #\: namestr :start start :end end)))
+      (when colon
+        (let ((potential-host
+               (logical-word-or-lose (subseq namestr start colon))))
+          (values potential-host colon))))
+    (namestring-parse-error () nil)))
 
 ;;; Handle the case where PARSE-NAMESTRING is actually parsing a
 ;;; namestring. We pick off the :JUNK-ALLOWED case then find a host to
@@ -1815,9 +1808,6 @@ unspecified elements into a completed to-pathname based on the to-wildname."
   (intern-pathname (load-time-value (make-logical-host :name "") t)
                    :unspecific nil nil nil nil))
 
-(define-load-time-global *logical-pathname-defaults*
-  (make-trivial-default-logical-pathname))
-
 (defun logical-namestring-p (x)
   (and (stringp x)
        (ignore-errors
@@ -1838,13 +1828,16 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                       :expected-type 'logical-namestring
                       :format-control "~S is not a valid logical namestring:~%  ~A"
                       :format-arguments (list pathspec problem))))
-        (let ((res (handler-case
-                       (parse-namestring pathspec nil *logical-pathname-defaults*)
-                     (error (e) (oops e)))))
-          (when (eq (%pathname-host res)
-                    (%pathname-host *logical-pathname-defaults*))
-            (oops "no host specified"))
-          res))))
+        (handler-case
+            (if (streamp pathspec)
+                (pathname pathspec)
+                (let ((potential-host (parse-potential-logical-host pathspec)))
+                  (if potential-host
+                      (values (parse-namestring
+                               pathspec (find-logical-host potential-host)))
+                      (error "no host specified"))))
+          (error (e) (oops e))))))
+
 
 ;;;; logical pathname unparsing
 
