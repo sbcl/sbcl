@@ -273,6 +273,15 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
     return 0;
 }
 
+static boolean acceptable_filler_cons_p(lispobj* where)
+{
+    if (where[0] == 0 && where[1] == 0) return 1;
+    // These "conses" can result from bignum multiplication-
+    // trailing insigificant sign bits which get chopped.
+    if (where[0] == (uword_t)-1 && where[1] == (uword_t)-1) return 1;
+    if (where[0] == (uword_t)-1 && where[1] == 0) return 1;
+    return 0;
+}
 static int verify_range(lispobj* start, lispobj* end, struct verify_state* state)
 {
     lispobj* where = start;
@@ -318,9 +327,8 @@ static int verify_range(lispobj* start, lispobj* end, struct verify_state* state
                         gc_assert(page_table[pg].type != PAGE_TYPE_CONS);
 #ifdef LISP_FEATURE_USE_CONS_REGION
                     else if (page_table[pg].type != PAGE_TYPE_CONS) {
-                      if (where[0] | where[1]) // (0 . 0) cons is OK
-                            gc_assert(where[0]==(uword_t)-1 &&
-                                      (where[1]==0 || where[1]==(uword_t)-1));
+                      if (is_cons_half(where[0]))
+                          gc_assert(acceptable_filler_cons_p(where));
                     }
 #endif
                     if (widetag == CODE_HEADER_WIDETAG) {
