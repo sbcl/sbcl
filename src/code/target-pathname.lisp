@@ -302,7 +302,6 @@
               (index (logand hash mask))
               (tombstone)
               (n-tombstones 0)
-              (n-probes 0)
               (interval 1))
          ;; Due to vector weakness, we're always racing with GC but it's OK.
          (loop
@@ -311,22 +310,28 @@
             ;; do we not just fail when the count reaches that? Answer: We don't yet know
             ;; if the item wasn't in the table. We can only decide that it wasn't
             ;; _after_ hitting all the cells in the probe sequence.
-            (cond ((unbound-marker-p probed-value) ; end of probe sequence
-                   (return (if (or (> n-probes 30) ; arbitrary thresholds
-                                   (> n-tombstones 5))
-                               nil
-                               (setf (aref table (or tombstone index))
-                                     (funcall persist-fn thing)))))
-                  ((and probed-value (funcall comparator-fn probed-value thing))
-                   (return probed-value)))
-            (if (= (incf n-probes) len) (return nil))
-            (when (null probed-value) (incf n-tombstones))
-            (setq index (logand (+ index interval) mask))
+            (when (unbound-marker-p probed-value) ; end of probe sequence
+              (return (if (and (> interval 30) (not tombstone)) ; arbitrary threshold
+                          nil
+                          (setf (aref table (or tombstone index))
+                                (funcall persist-fn thing)))))
+            (when (and probed-value (funcall comparator-fn probed-value thing))
+              (when tombstone
+                ;; swap this item into the tombstone's location
+                (setf (aref table tombstone) probed-value
+                      (aref table index) (make-unbound-marker)))
+              (return probed-value))
+            (if (= interval len) (return nil))
+            (when (null probed-value)
+              (unless tombstone (setq tombstone index))
+              (incf n-tombstones))
             ;; this visits every cell.
             ;; Proof at https://fgiesen.wordpress.com/2015/02/22/triangular-numbers-mod-2n/
+            (setq index (logand (+ index interval) mask))
             (incf interval)))))
      (rehash (table-holder table hash-fn)
        (declare (function hash-fn))
+       (declare (sb-c::tlab :system))
        (flet ((validp (x) (and (not (unbound-marker-p x)) x)))
          (declare (inline validp))
          ;; up-size, aiming for 50% load
@@ -343,6 +348,11 @@
              (when (validp x) (probe new x hash-fn #'constantly-nil #'identity)))
            (set table-holder new)
            (fill table 0)
+           ;; turn old vector non-weak to eliminate some GC overhead
+           (with-pinned-objects (table)
+             (setf (sap-ref-word (int-sap (get-lisp-obj-address table))
+                                 (- sb-vm:other-pointer-lowtag))
+                   sb-vm:simple-vector-widetag))
            new)))
      (dir-matchp (entry key)
        (or (eq (car entry) (car key)) ; quick win if lists are EQ
@@ -1264,7 +1274,7 @@ system's syntax for files."
             (let ((host (pathname-host-or-no-namestring pathname)))
               (setf (%pathname-namestring pathname)
                     (logically-readonlyize
-                     (possibly-base-stringize
+                     (possibly-base-stringize-to-heap
                       (funcall (host-unparse host) pathname)))))))))
 
   (defun host-namestring (pathname)

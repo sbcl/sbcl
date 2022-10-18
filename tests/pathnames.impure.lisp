@@ -976,3 +976,77 @@
 
 (with-test (:name :dx-pathname-parts-dont-crash)
   (prin1 (pathname-peristence-test)))
+
+(import '(sb-impl::%pathname-host
+          sb-impl::%pathname-dir+hash
+          sb-impl::%pathname-device
+          sb-impl::%pathname-name
+          sb-impl::%pathname-type
+          sb-impl::%pathname-version
+          sb-impl::compare-component))
+
+;;; This is the comparator used for the cache, which is _more_ _stringent_ than
+;;; PATHNAME=. Obviously the regression test has to use the right comparator.
+;;; e.g. version :NEWEST and version NIL are the same according to PATHNAME=
+;;; but not the cache. Honestly though, should the cache distinguish entries that
+;;; are by definition supposed to behave indistinguishably?
+(defun pn-cache-line= (a b)
+  (and (eq (%pathname-host a) (%pathname-host b)) ; Interned
+       (eq (%pathname-dir+hash a) (%pathname-dir+hash b))
+       (compare-component (%pathname-device a) (%pathname-device b))
+       (compare-component (%pathname-name a) (%pathname-name b))
+       (compare-component (%pathname-type a) (%pathname-type b))
+       (eql (%pathname-version a) (%pathname-version b))))
+
+(defun probing-sequence (table pathname)
+  (let* ((mask (1- (length table)))
+         (index (logand (sb-impl::pathname-sxhash pathname) mask))
+         (interval 1)
+         (sequence))
+    (loop
+     (push index sequence)
+     (let ((probed-value (aref table index)))
+       (when (sb-int:unbound-marker-p probed-value) (error "Can't hapepn"))
+       (when (and probed-value (pn-cache-line= probed-value pathname))
+         (return (nreverse sequence)))
+       (setq index (logand (+ index interval) mask))
+       (incf interval)))))
+
+;; recall that MAKE-PATHNAME is unsafely-flushable
+(dotimes (i 20) (opaque-identity (make-pathname :name (write-to-string i) :type "testfile")))
+;; Only fake GC-nullifying an entry that was added specifically for the test
+(defun can-safely-remove-entry (table index)
+  (equal (pathname-type (aref table index)) "testfile"))
+(defun find-worst-pn-cache-entry (&optional print &aux (worst '(0)))
+  (let ((cache sb-impl::*pn-cache*))
+    (dotimes (i (length cache) (cdr worst))
+      (let ((entry (aref cache i)))
+        (when (pathnamep entry)
+          (let ((sequence (probing-sequence cache entry)))
+            (when print (format t "~s -> ~s~%" entry sequence))
+            (when (and (equal (pathname-type entry) "testfile")
+                       (> (length sequence) (car worst))
+                       (some (lambda (x) (can-safely-remove-entry cache x))
+                             (butlast sequence)))
+              (setq worst (cons (length sequence) sequence)))))))))
+
+(with-test (:name :pn-cache-hit-sequence-shorten)
+  (let ((sequence (find-worst-pn-cache-entry)))
+    (unless sequence
+      (error "Expect at least 1 pn-cache collision. Can't test"))
+    (let* ((cache sb-impl::*pn-cache*)
+           (pathname (aref cache (car (last sequence))))
+           (index-to-remove
+            (find-if (lambda (x) (can-safely-remove-entry cache x))
+                     sequence))
+           (position-of-index (position index-to-remove sequence)))
+      #+nil
+      (format t "~&Probe for ~S -> ~S, will cull index ~D (~:R position)~%"
+              pathname sequence index-to-remove (1+ position-of-index))
+      (setf (aref cache index-to-remove) nil) ; pretend GC did this
+      ;; seek PATHNAME in the cache again
+      (opaque-identity (make-pathname :name (pathname-name pathname) :type "testfile"))
+      (let ((new-sequence (probing-sequence cache pathname)))
+        ;; should have been found in fewer probes
+        (assert (equal (subseq sequence 0 (1+ position-of-index))
+                       new-sequence))))))

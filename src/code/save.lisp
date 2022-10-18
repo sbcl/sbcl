@@ -350,6 +350,8 @@ sufficiently motivated to do lengthy fixes."
   #+immobile-code (sb-vm::statically-link-core)
   (invalidate-fd-streams)
   (finalizers-deinit)
+  ;; Try to shrink the pathname cache. It might be largely nulls
+  (rebuild-pathname-cache)
   (sb-vm::restore-cpu-specific-routines)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
