@@ -581,13 +581,13 @@
 ;;     Solution: make it a slot.
 ;;; 3. We could easily remove splatted cells now rather than (or in addition to)
 ;;;    having UPDATE-CTORS do that.
-(flet ((pushnew-in-class-ctors (ctor class)
+(flet ((pushnew-in-ctors (ctor class)
          ;; Less is more: cons a weak pointer ONLY IF we need it, and not just because
          ;; we wanted ADJOIN to call weak-pointer-value on it just to discard it.
          (let ((weakptrs (plist-value class 'ctors)))
            (dolist (wp weakptrs)
              (when (eq (weak-pointer-value wp) ctor)
-               (return-from weak-list-pushnew)))
+               (return-from pushnew-in-ctors)))
            (setf (plist-value class 'ctors) (cons (make-weak-pointer ctor) weakptrs)))))
 (defun install-optimized-constructor (ctor)
   (with-world-lock ()
