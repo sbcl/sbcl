@@ -571,6 +571,24 @@
 (define-load-time-global *the-system-ii-method* nil)
 (define-load-time-global *the-system-si-method* nil)
 
+;;; FIXME:
+;;; 1. these two DEFUNs are structurally similar, even containing the same comment.
+;;;    Can't we at least macrolet-ify them somehow?
+;;; 2. there is probably a lockfree algorithm that would work with weak vectors,
+;;;    making this not require the world lock. Just keep a vector of ctors per
+;;;    class, search in it, if not found, cons a new vector as needed to replace
+;;     the old, and swap that in. Problem: plist manipulation isn't atomic.
+;;     Solution: make it a slot.
+;;; 3. We could easily remove splatted cells now rather than (or in addition to)
+;;;    having UPDATE-CTORS do that.
+(flet ((pushnew-in-class-ctors (ctor class)
+         ;; Less is more: cons a weak pointer ONLY IF we need it, and not just because
+         ;; we wanted ADJOIN to call weak-pointer-value on it just to discard it.
+         (let ((weakptrs (plist-value class 'ctors)))
+           (dolist (wp weakptrs)
+             (when (eq (weak-pointer-value wp) ctor)
+               (return-from weak-list-pushnew)))
+           (setf (plist-value class 'ctors) (cons (make-weak-pointer ctor) weakptrs)))))
 (defun install-optimized-constructor (ctor)
   (with-world-lock ()
     (let* ((class-or-name (ctor-class-or-name ctor))
@@ -586,8 +604,7 @@
       (when (eq (wrapper-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
-      (pushnew (make-weak-pointer ctor) (plist-value class 'ctors)
-               :test #'eq :key #'weak-pointer-value)
+      (pushnew-in-ctors ctor class)
       (multiple-value-bind (form locations names optimizedp)
           (constructor-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
@@ -611,14 +628,14 @@
       (when (eq (wrapper-invalid (class-wrapper class)) t)
         (%force-cache-flushes class))
       (setf (ctor-class ctor) class)
-      (pushnew (make-weak-pointer ctor) (plist-value class 'ctors)
-               :test #'eq :key #'weak-pointer-value)
+      (pushnew-in-ctors ctor class)
       (multiple-value-bind (form optimizedp)
           (allocator-function-form ctor)
         (setf (%funcallable-instance-fun ctor)
               (let ((*compiling-optimized-constructor* t))
                 (pcl-compile form :unsafe))
               (ctor-state ctor) (if optimizedp 'optimized 'fallback))))))
+) ; end FLET
 
 (defun allocator-function-form (ctor)
   (let ((class (ctor-class ctor)))
