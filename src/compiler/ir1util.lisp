@@ -3078,42 +3078,41 @@ is :ANY, the function name is not checked."
                                                           source-path)))))
                     collect annotation)))))))
 
-(defun lvar-constants (lvar &optional seen)
-  (let* ((uses (lvar-uses lvar))
-         (lvar (or (and (ref-p uses)
-                        (let ((ref (principal-lvar-ref lvar)))
-                          (and ref
-                               (or
-                                (lambda-var-ref-lvar ref)
-                                (node-lvar ref)))))
-                   lvar)))
-    (cond ((constant-lvar-p lvar)
-           (values :values (list (lvar-value lvar))))
-          ((constant-lvar-uses-p lvar)
-           (values :values (lvar-uses-values lvar)))
-          ((ref-p uses)
-           (let* ((ref (principal-lvar-ref lvar))
-                  (leaf (and ref
-                             (ref-leaf ref))))
-             (when (lambda-var-p leaf)
-               (let ((seen (or seen
-                               (make-hash-table :test #'eq)))
-                     constants)
-                 (setf (gethash lvar seen) t)
-                 (map-lambda-var-refs-from-calls
-                  (lambda (call lvar)
-                    (unless (gethash lvar seen)
-                      (setf (gethash lvar seen) t)
-                      (multiple-value-bind (type values)
-                          (lvar-constants lvar seen)
-                        (case type
-                          (:values
-                           (push (cons call values) constants))
-                          (:calls
-                           (setf constants (nconc values constants)))))))
-                  leaf)
-                 (when constants
-                   (values :calls constants)))))))))
+(defun lvar-constants (lvar)
+  (named-let recurse ((lvar lvar) (seen nil))
+    (let* ((uses (lvar-uses lvar))
+           (lvar (or (and (ref-p uses)
+                          (let ((ref (principal-lvar-ref lvar)))
+                            (and ref
+                                 (or
+                                  (lambda-var-ref-lvar ref)
+                                  (node-lvar ref)))))
+                     lvar)))
+      (cond ((constant-lvar-p lvar)
+             (values :values (list (lvar-value lvar))))
+            ((constant-lvar-uses-p lvar)
+             (values :values (lvar-uses-values lvar)))
+            ((ref-p uses)
+             (let* ((ref (principal-lvar-ref lvar))
+                    (leaf (and ref
+                               (ref-leaf ref))))
+               (when (lambda-var-p leaf)
+                 (let ((seen (or seen (alloc-xset)))
+                       constants)
+                   (add-to-xset lvar seen)
+                   (map-lambda-var-refs-from-calls
+                    (lambda (call lvar)
+                      (unless (xset-member-p lvar seen)
+                        (add-to-xset lvar seen)
+                        (multiple-value-bind (type values) (recurse lvar seen)
+                          (case type
+                            (:values
+                             (push (cons call values) constants))
+                            (:calls
+                             (setf constants (nconc values constants)))))))
+                    leaf)
+                   (when constants
+                     (values :calls constants))))))))))
 
 (defun process-lvar-modified-annotation (lvar annotation)
   (loop for annot in (lvar-annotations lvar)

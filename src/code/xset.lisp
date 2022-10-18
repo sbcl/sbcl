@@ -24,6 +24,8 @@
 ;;;;
 ;;;; XSET-LIST-SIZE is true only for XSETs whose data is stored into a
 ;;;; list -- XSET-COUNT returns the real value.
+;;;;
+;;;; Note: XSET always uses EQL as the equivalence test
 
 (in-package "SB-KERNEL")
 
