@@ -362,17 +362,22 @@
 (defclass method-combination (metaobject)
   ((%documentation :initform nil :initarg :documentation)))
 
-(defun make-gf-hash-table ()
+(defun make-gf-hashset ()
+  ;; Return what is logically a weak hashset, but physically a weak hash-table
+  ;; because we don't implement hashsets.
   (make-hash-table :test 'eq
                    :hash-function #'fsc-instance-hash ; stable hash
                    :weakness :key
                    :synchronized t))
+(defun add-to-weak-hashset (key set) (setf (gethash key set) t))
+(defun remove-from-weak-hashset (key set) (remhash key set))
+(defun weak-hashset-memberp (key set) (gethash key set))
 
 (defclass standard-method-combination (definition-source-mixin
                                        method-combination)
   ((type-name :reader method-combination-type-name :initarg :type-name)
    (options :reader method-combination-options :initarg :options)
-   (%generic-functions :initform (make-gf-hash-table)
+   (%generic-functions :initform (make-gf-hashset)
                        :reader method-combination-%generic-functions)))
 
 (defclass long-method-combination (standard-method-combination)

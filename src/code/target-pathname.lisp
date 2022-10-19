@@ -286,6 +286,10 @@
         (compare-component (%pathname-name ,a) (%pathname-name ,b))
         (compare-component (%pathname-type ,a) (%pathname-type ,b))))
 
+;;; TODO: see if the logic below can be generalized into a hashset.
+;;; We probably need to enhance the GC to count the number of smashed cells,
+;;; otherwise we lack a decent strategy for deciding to resize, in absence
+;;; of an accurate count of items actually in the set. This uses a hack.
 (declaim (ftype (function * *) intern-pathname rebuild-pathname-cache)) ; non-toplevel
 (labels
     ((update (table-holder thing hash-fn comparator-fn persist-fn)
