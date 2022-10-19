@@ -321,9 +321,13 @@
                                 (funcall persist-fn thing)))))
             (when (and probed-value (funcall comparator-fn probed-value thing))
               (when tombstone
-                ;; swap this item into the tombstone's location
+                ;; Put this item into the tombstone's location and make this a tombstone
+                ;; and *not* unbound-marker. Any other probing sequence for a different key
+                ;; might have previously tried to claim this cell and could not, so
+                ;; went to a later cell in its sequence. Therefore we can't interrupt that
+                ;; other (unknown) sequence of probes with a chain-terminating marker.
                 (setf (aref table tombstone) probed-value
-                      (aref table index) (make-unbound-marker)))
+                      (aref table index) nil))
               (return probed-value))
             (if (= interval len) (return nil))
             (when (null probed-value)

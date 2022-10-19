@@ -1035,7 +1035,8 @@
     (unless sequence
       (error "Expect at least 1 pn-cache collision. Can't test"))
     (let* ((cache sb-impl::*pn-cache*)
-           (pathname (aref cache (car (last sequence))))
+           (my-index (car (last sequence)))
+           (pathname (aref cache my-index))
            (index-to-remove
             (find-if (lambda (x) (can-safely-remove-entry cache x))
                      sequence))
@@ -1047,6 +1048,9 @@
       ;; seek PATHNAME in the cache again
       (opaque-identity (make-pathname :name (pathname-name pathname) :type "testfile"))
       (let ((new-sequence (probing-sequence cache pathname)))
+        ;; I don't know a good black-box test on the probing algorithm, so just
+        ;; assert that the old location of PATHNAME now holds a tombstone.
+        (assert (null (aref cache my-index)))
         ;; should have been found in fewer probes
         (assert (equal (subseq sequence 0 (1+ position-of-index))
                        new-sequence))))))
