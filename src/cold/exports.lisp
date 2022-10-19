@@ -730,7 +730,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*.")
            "BACKTRACE" "BACKTRACE-AS-LIST"
            ;; Replaced by
 
-           "PRINT-BACKTRACE" "LIST-BACKTRACE"))
+           "MAP-BACKTRACE" "PRINT-BACKTRACE" "LIST-BACKTRACE"))
 
 (defpackage* "SB-EXT"
   (:documentation "public: miscellaneous supported extensions to the ANSI Lisp spec")

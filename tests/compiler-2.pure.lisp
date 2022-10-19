@@ -1510,7 +1510,7 @@
 
 (with-test (:name :dxify-downward-funargs-malformed)
   (checked-compile
-      '(lambda () (sb-debug::map-backtrace))
+      '(lambda () (sb-debug:map-backtrace))
       :allow-style-warnings t))
 
 (with-test (:name :dxify-downward-funargs-casts)

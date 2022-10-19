@@ -995,7 +995,7 @@
     (block nil
       (handler-bind ((error (lambda (c)
                               (declare (ignore c))
-                              (sb-debug::map-backtrace
+                              (sb-debug:map-backtrace
                                (lambda (frame)
                                  (let ((sb-debug::*current-frame* frame)
                                        (name (sb-debug::frame-call frame)))
@@ -1025,7 +1025,7 @@
     (block nil
       (handler-bind ((error (lambda (c)
                               (declare (ignore c))
-                              (sb-debug::map-backtrace
+                              (sb-debug:map-backtrace
                                (lambda (frame)
                                  (let ((sb-debug::*current-frame* frame)
                                        (name (sb-debug::frame-call frame)))
@@ -1056,7 +1056,7 @@
     (block nil
       (handler-bind ((error (lambda (c)
                               (declare (ignore c))
-                              (sb-debug::map-backtrace
+                              (sb-debug:map-backtrace
                                (lambda (frame)
                                  (let ((sb-debug::*current-frame* frame))
                                    (multiple-value-bind (name args)
@@ -1079,7 +1079,7 @@
     (block nil
       (handler-bind ((error (lambda (c)
                               (declare (ignore c))
-                              (sb-debug::map-backtrace
+                              (sb-debug:map-backtrace
                                (lambda (frame)
                                  (let ((sb-debug::*current-frame* frame))
                                    (multiple-value-bind (name args)
@@ -1106,7 +1106,7 @@
     (block nil
       (handler-bind ((error (lambda (c)
                               (declare (ignore c))
-                              (sb-debug::map-backtrace
+                              (sb-debug:map-backtrace
                                (lambda (frame)
                                  (let ((sb-debug::*current-frame* frame))
                                    (multiple-value-bind (name)
@@ -1129,7 +1129,7 @@
     (block nil
       (handler-bind ((error (lambda (c)
                               (declare (ignore c))
-                              (sb-debug::map-backtrace
+                              (sb-debug:map-backtrace
                                (lambda (frame)
                                  (let ((sb-debug::*current-frame* frame))
                                    (multiple-value-bind (name)
