@@ -36,7 +36,8 @@
 (declaim (inline read-only-space-obj-p dynamic-space-obj-p))
 (defun read-only-space-obj-p (x)
   (let ((a (get-lisp-obj-address x))
-        (rospace-start (extern-alien "READ_ONLY_SPACE_START" unsigned))
+        (rospace-start #-darwin-jit (extern-alien "READ_ONLY_SPACE_START" unsigned)
+                       #+darwin-jit sb-vm:read-only-space-start)
         (rospace-end (extern-alien "read_only_space_free_pointer" unsigned)))
     (and (< rospace-start a rospace-end))))
 
