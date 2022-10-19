@@ -172,13 +172,21 @@ void dump_marked_objects() {
     fprintf(stderr, "Total: %d\n", n);
 }
 
+lispobj stray_pointer_source_obj;
+int (*stray_pointer_detector_fn)(lispobj);
 static void __mark_obj(lispobj pointer)
 {
     lispobj* base;
 
     pointer = canonical_ptr(pointer);
     sword_t mark_index = ptr_to_bit_index(pointer);
-    if (mark_index < 0) return; // uninteresting pointer
+    if (mark_index < 0) {
+        if (stray_pointer_detector_fn && stray_pointer_detector_fn(pointer)) {
+            fprintf(stderr, "wild pointer: %p -> %p\n",
+                    (void*)stray_pointer_source_obj, (void*)pointer);
+        }
+        return; // uninteresting pointer
+    }
     uword_t wordindex = mark_index / N_WORD_BITS;
     uword_t bit = (uword_t)1 << (mark_index % N_WORD_BITS);
     if (fullcgcmarks[wordindex] & bit) return; // already marked
@@ -210,8 +218,7 @@ static void __mark_obj(lispobj pointer)
 }
 
 inline void gc_mark_obj(lispobj thing) {
-    if (is_lisp_pointer(thing))
-        __mark_obj(thing);
+    if (is_lisp_pointer(thing)) __mark_obj(thing);
 }
 
 static inline void mark_pair(lispobj* where)
@@ -222,8 +229,7 @@ static inline void mark_pair(lispobj* where)
 
 void gc_mark_range(lispobj* where, long count) {
     long i;
-    for(i=0; i<count; ++i)
-        gc_mark_obj(where[i]);
+    for(i=0; i<count; ++i) gc_mark_obj(where[i]);
 }
 
 #define HT_ENTRY_LIVENESS_FUN_ARRAY_NAME alivep_funs
@@ -249,8 +255,7 @@ static void trace_using_layout(lispobj layout, lispobj* where, int nslots)
     int i;
     lispobj* slots = where+1;
     for (i=0; i<nslots; ++i)
-        if (bitmap_logbitp(i, bitmap) && is_lisp_pointer(slots[i]))
-            __mark_obj(slots[i]);
+        if (bitmap_logbitp(i, bitmap)) gc_mark_obj(slots[i]);
 }
 
 static void trace_object(lispobj* where)
@@ -347,8 +352,7 @@ static void trace_object(lispobj* where)
     default:
         if (leaf_obj_widetag_p(widetag)) return;
     }
-    for(i=scan_from; i<scan_to; ++i)
-        gc_mark_obj(where[i]);
+    for (i=scan_from; i<scan_to; ++i) gc_mark_obj(where[i]);
 }
 
 void prepare_for_full_mark_phase()
@@ -414,6 +418,7 @@ void execute_full_mark_phase()
     do {
         lispobj ptr = gc_dequeue();
         gc_dcheck(ptr != 0);
+        stray_pointer_source_obj = ptr;
         if (!listp(ptr))
             trace_object(native_pointer(ptr));
         else
@@ -421,6 +426,7 @@ void execute_full_mark_phase()
     } while (scav_queue.head_block->count ||
              (test_weak_triggers(pointer_survived_gc_yet, gc_mark_obj) &&
               scav_queue.head_block->count));
+    stray_pointer_source_obj = 0;
 
 #if HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
@@ -560,6 +566,19 @@ static uword_t sweep(lispobj* where, lispobj* end,
     return 0;
 }
 
+void dispose_markbits() {
+    os_deallocate((void*)fullcgcmarks, markbits_size);
+    fullcgcmarks = 0; markbits_size = 0;
+    page_index_t page;
+    // Give back all private-use pages and indicate need-to-zero
+    for (page = free_page; page < page_table_pages; ++page) {
+        gc_assert((page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED);
+        gc_assert(!page_bytes_used(page));
+        set_page_need_to_zero(page, 1);
+        page_table[page].type = FREE_PAGE_FLAG;
+      }
+}
+
 void execute_full_sweep_phase()
 {
     long words_zeroed[1+PSEUDO_STATIC_GENERATION]; // One count per generation
@@ -591,16 +610,5 @@ void execute_full_sweep_phase()
             fprintf(stderr, "%ld%s", words_zeroed[i], i?"+":"");
         fprintf(stderr, " words zeroed]\n");
     }
-    // deallocate the mark bits
-    os_deallocate((void*)fullcgcmarks, markbits_size);
-    fullcgcmarks = 0; markbits_size = 0;
-
-    page_index_t page;
-    // Give back all private-use pages and indicate need-to-zero
-    for (page = free_page; page < page_table_pages; ++page) {
-        gc_assert((page_table[page].type & PAGE_TYPE_MASK) == PAGE_TYPE_UNBOXED);
-        gc_assert(!page_bytes_used(page));
-        set_page_need_to_zero(page, 1);
-        page_table[page].type = FREE_PAGE_FLAG;
-      }
+    dispose_markbits();
 }
