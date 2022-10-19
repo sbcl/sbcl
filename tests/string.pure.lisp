@@ -351,4 +351,6 @@ claim that any particular result from these edge cases constitutes a bug.
   (let* ((str (make-string 4 :element-type 'base-char))
          (res (sb-int:possibly-base-stringize-to-heap str)))
     (declare (sb-int:truly-dynamic-extent str))
-    (assert (sb-int:neq res str))))
+    (assert (if (sb-kernel:dynamic-space-obj-p str)
+                (eq res str)
+                (not (eq res str))))))
