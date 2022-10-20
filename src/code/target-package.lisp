@@ -1037,6 +1037,23 @@ Experimental: interface subject to change."
            (if (= i start) (return)))))))
   (values nil nil))
 
+;;; When INTERN needs to make a new symbol, it always copies the argument string.
+;;; This suits the use-case for the reader, which reuses the same input buffer over and over.
+;;; It is theoretically possible to enforce immutability of symbol names,
+;;; but for now it only happens in saved cores. The way to do it for new symbols is to
+;;; keep a dually mapped memory range - one writable range for the allocator, and
+;;; the readonly range for everything else. memfd_create() on Linux supports such usage.
+;;; This is a stub for that eventual capability.
+(defun make-readonly-string (length name elt-type)
+  (declare (sb-c::tlab :system))
+  (logically-readonlyize
+   (replace (ecase elt-type
+              (base-char
+               (make-string (truly-the index length) :element-type 'base-char))
+              (character
+               (make-string (truly-the index length) :element-type 'character)))
+            name)))
+
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
 ;;; If a new symbol is created, its print name will be an array of ELT-TYPE.
@@ -1055,9 +1072,7 @@ Experimental: interface subject to change."
           (setf (values symbol where) (%find-symbol name length package))
           (if (and where (or allow-inherited (neq where :inherited)))
               (values symbol where)
-              (let* ((symbol-name
-                       (logically-readonlyize
-                        (replace (make-string length :element-type elt-type) name)))
+              (let* ((symbol-name (make-readonly-string length name elt-type))
                      ;; optimistically create the symbol
                      (symbol ; Symbol kind: 1=keyword, 2=other interned
                        (%make-symbol (if (eq package *keyword-package*) 1 2) symbol-name))

@@ -46,9 +46,11 @@
 (declaim (inline make-dfun-required-args))
 (defun make-dfun-required-args (count)
   (declare (type index count))
-  (let (result)
-    (dotimes (i count (nreverse result))
-      (push (dfun-arg-symbol i) result))))
+  ;; N.B.: don't PUSH and NREVERSE here. COLLECT will cons in the system TLAB,
+  ;; but NREVERSE won't because we don't inline NREVERSE.
+  (collect ((result))
+    (dotimes (i count (result))
+      (result (dfun-arg-symbol i)))))
 
 (defun make-dfun-lambda-list (nargs applyp)
   (let ((required (make-dfun-required-args nargs)))
@@ -71,7 +73,7 @@
     ;; of the vop operand restrictions or something that I don't understand.
     ;; Which is to say, PCL compilation reliably broke when changed to INDEX.
     (if applyp
-        (values (append required '(&more .more-context. .more-count.))
+        (values (sb-impl::sys-tlab-append required '(&more .more-context. .more-count.))
                 required
                 '((sb-c:%listify-rest-args
                    .more-context. (the (and unsigned-byte fixnum)

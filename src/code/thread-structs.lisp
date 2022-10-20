@@ -145,6 +145,7 @@ in future versions."
 
   ;; On succesful execution of the thread's lambda, a list of values.
   (result 0)
+  (arena-cookie)
   ;; The completion condition _could_ be manifested as a condition var, but a difficulty
   ;; in doing so is that condition vars can always experience a spurious wakeup.
   ;; Dealing with timeouts becomes troublesome then. But we can utilize the fact that

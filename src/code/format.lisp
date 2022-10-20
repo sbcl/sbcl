@@ -56,7 +56,7 @@
     (loop
       (let ((next-directive (or (position #\~ string :start index :end end) end)))
         (when (> next-directive index)
-          (push (possibly-base-stringize (subseq string index next-directive))
+          (push (possibly-base-stringize-to-heap (subseq string index next-directive))
                 result))
         (when (= next-directive end)
           (return))

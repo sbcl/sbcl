@@ -537,3 +537,16 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
       ;; An untagged value appears only if in mid-deletion.
       (inst mov next-tagged next-bits)
       (inst or :byte next-tagged instance-pointer-lowtag))))
+
+(define-vop (switch-to-arena)
+  (:args (x :scs (descriptor-reg immediate)))
+  (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
+  (:temporary (:sc unsigned-reg :offset rsi-offset) rsi)
+  (:vop-var vop)
+  (:ignore rsi)
+  (:generator 1
+    (inst mov rdi (if (sc-is x immediate) (tn-value x) x))
+    ;; We could have the vop declare that all C volatile regs are clobbered,
+    ;; but since this needs pseudo-atomic decoration anyway, it saves code size
+    ;; to make an assembly routine that preserves all registers.
+    (invoke-asm-routine 'call 'switch-to-arena vop)))

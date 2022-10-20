@@ -469,6 +469,7 @@ NOTE: This interface is experimental and subject to change."
 ;; Make a new hash-cache and optionally create the statistics vector.
 (defun alloc-hash-cache (size symbol)
   (declare (type index size))
+  (declare (sb-c::tlab :system))
   (let (cache)
     ;; It took me a while to figure out why infinite recursion could occur
     ;; in VALUES-SPECIFIER-TYPE. It's because SET calls VALUES-SPECIFIER-TYPE.
@@ -520,6 +521,7 @@ NOTE: This interface is experimental and subject to change."
                `(progn
                   (declaim (ftype ,ftype ,fn))
                   (defun ,fn ,args
+                    (declare (sb-c::tlab :system))
                     (declare (optimize (safety 0)))
                     ,(if (<= n 3)
                          `(list* ,@args)

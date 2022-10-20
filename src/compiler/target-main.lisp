@@ -148,7 +148,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                   (values (the cons definition) (make-null-lexenv))
                   #+(or sb-eval sb-fasteval)
                   (prepare-for-compile definition))
-            (compile-in-lexenv sexpr lexenv name nil nil nil nil)))))
+            (sb-vm:without-arena "compile" (compile-in-lexenv sexpr lexenv name nil nil nil nil))))))
     (accumulate-compiler-time '*compile-elapsed-time* clock-start)
     (values (cond (name
                    (if (and (symbolp name) (macro-function name))

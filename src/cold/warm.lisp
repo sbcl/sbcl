@@ -170,6 +170,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
                      ((t)
                       (let ((sb-c::*source-namestring* fullname)
+                            (sb-c::*force-system-tlab* (search "src/pcl" stem))
                             (sb-ext:*derive-function-types*
                               (unless (search "/pcl/" stem)
                                 t)))

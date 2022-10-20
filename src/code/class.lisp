@@ -279,10 +279,13 @@ between the ~A definition and the ~A definition"
         (if (eq oldval nil) lock oldval))))
 
 (defun add-subclassoid (super sub wrapper)
+  (declare (sb-c::tlab :system))
   (with-system-mutex ((classoid-lock super))
     (let ((table (classoid-subclasses super))
           (count 0))
       (cond ((hash-table-p table)
+             ;; If the table needs to resize, it'll stay on the heap
+             ;; even if we're using an arena.
              (setf (gethash sub table) wrapper))
             ((dolist (cell table)
                (when (eq (car cell) sub)
@@ -298,8 +301,10 @@ between the ~A definition and the ~A definition"
             (t
              ;; Upgrade to a hash-table
              (let ((new #+sb-xc-host (make-hash-table :test 'eq)
-                        #-sb-xc-host (make-hash-table :hash-function #'type-hash-value
-                                                      :test 'eq)))
+                        #-sb-xc-host
+                        (sb-vm:without-arena "add-subclassoid"
+                            (make-hash-table :hash-function #'type-hash-value
+                                             :test 'eq))))
                (loop for (key . val) in table do (setf (gethash key new) val))
                (setf (gethash sub new) wrapper)
                (setf (classoid-subclasses super) new)
@@ -474,6 +479,7 @@ between the ~A definition and the ~A definition"
 ;;; not be read as being in CPL order.
 (defun order-layout-inherits (layouts)
   (declare (simple-vector layouts))
+  (declare (sb-c::tlab :system))
   (let ((length (length layouts))
         (max-depth -1))
     (dotimes (i length)

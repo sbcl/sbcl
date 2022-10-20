@@ -1315,7 +1315,7 @@
                          (inst push rcx)
                          (inst push context)
                          (invoke-asm-routine
-                          'call (if (system-tlab-p node) 'sys-listify-&rest 'listify-&rest)
+                          'call (if (system-tlab-p 0 node) 'sys-listify-&rest 'listify-&rest)
                           node)
                          (inst pop result)
                          (inst jmp leave-pa))))

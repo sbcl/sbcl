@@ -201,6 +201,7 @@
   name)
 
 (declaim (declaration enable-package-locks disable-package-locks))
+(declaim (declaration sb-c::tlab))
 
 ;;; The XC-STRICT-CL and SB-XC packages are called COMMON-LISP in the
 ;;; target image.
@@ -234,6 +235,7 @@
         p)))
 
 (defun possibly-base-stringize (s) (coerce (the string s) 'simple-base-string))
+(defun possibly-base-stringize-to-heap (s) (coerce (the string s) 'simple-base-string))
 
 ;;; printing structures
 

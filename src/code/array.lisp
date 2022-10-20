@@ -1181,8 +1181,9 @@ of specialized arrays is supported."
              (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag))
              (new-data
               ;; FIXME: mark prefix of shadow bits assigned, suffix unassigned
-              (allocate-vector-with-widetag #+ubsan nil
-                                            widetag new-length n-bits-shift)))
+              (sb-c::maybe-with-system-tlab (old-data)
+                (allocate-vector-with-widetag #+ubsan nil
+                                              widetag new-length n-bits-shift))))
         ;; Copy the data
         (if (= widetag simple-vector-widetag) ; the most common case
             (replace (truly-the simple-vector new-data) ; transformed
@@ -1312,9 +1313,11 @@ of specialized arrays is supported."
                       ;; if total size is unchanged, and it was not a displaced array,
                       ;; then this array owns the data and can retain it.
                       old-data
-                      (let ((data (allocate-vector-with-widetag #+ubsan t
-                                                                widetag new-total-size
-                                                                n-bits-shift)))
+                      (let ((data
+                             (sb-c::maybe-with-system-tlab (old-data)
+                               (allocate-vector-with-widetag #+ubsan t
+                                                             widetag new-total-size
+                                                             n-bits-shift))))
                         (replace data old-data
                                  :start1 0 :end1 new-total-size
                                  :start2 old-start :end2 old-end)

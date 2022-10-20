@@ -1459,3 +1459,8 @@
       (funcall test x target))
   (def (test-not)
       (not (funcall test-not x target))))
+
+(defun sys-tlab-append (a b)
+  (declare (sb-c::tlab :system))
+  (named-let recurse ((a a) (b b))
+    (if a (cons (car a) (recurse (cdr a) b)) b)))

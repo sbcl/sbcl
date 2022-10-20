@@ -1419,6 +1419,7 @@ on this semaphore, then N of them is woken up."
 ;;; itself into the session, it would not and could not have any effect on any other
 ;;; thread in the session.
 (defun %enroll-new-threads (session)
+  (declare (sb-c::tlab :system))
   (loop (let ((thread (sb-ext:atomic-pop (session-new-enrollees session))))
           (cond ((not thread) (return))
                 ((thread-alive-p thread)
@@ -1777,6 +1778,9 @@ session."
         (c-tramp
           (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
                               #-os-thread-stack "new_thread_trampoline")))
+    ;; New thread's arena starts out as this thread's arena.
+    (setf (sap-ref-sap thread-sap (ash sb-vm::thread-arena-slot sb-vm:word-shift))
+          (sb-vm::current-thread-offset-sap sb-vm::thread-arena-slot))
     (and (= 0 #+os-thread-stack
               (alien-funcall (extern-alien "pthread_attr_setstacksize"
                                            (function int system-area-pointer unsigned))
@@ -1989,7 +1993,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
             (arguments)
             "Argument passed to ~S, ~S, is an improper list."
             'make-thread arguments)
-    (start-thread (%make-thread name nil (make-semaphore :name name))
+    (start-thread (sb-vm:without-arena "make-thread"
+                      (%make-thread name nil (make-semaphore :name name)))
                   (coerce function 'function)
                   (ensure-list arguments))))
 
@@ -2060,7 +2065,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
           ;; of stop-the-thread API that it shares in common with stop-the-world.
           (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigalrm))))
     (binding* ((thread-sap (allocate-thread-memory) :EXIT-IF-NULL)
-               (cell (list thread))
+               (cell (locally (declare (sb-c::tlab :system))
+                       (list thread)))
                (startup-info
                 (vector trampoline cell function arguments
                         (if (position 1 child-sigmask) ; if there are any signals masked
@@ -2078,7 +2084,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       (setf (thread-%visible thread) 0)
       (update-all-threads (sap-int thread-sap) thread)
       (when *session*
-        (sb-ext:atomic-push thread (session-new-enrollees *session*)))
+        (locally (declare (sb-c::tlab :system))
+          (sb-ext:atomic-push thread (session-new-enrollees *session*))))
       ;; Absence of the startup semaphore notwithstanding, creation is synchronized
       ;; so that we can prevent new threads from starting, typically in SB-POSIX:FORK
       ;; or SAVE-LISP-AND-DIE.

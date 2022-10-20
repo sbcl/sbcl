@@ -12,6 +12,29 @@
 
 (in-package "SB-VM")
 
+;;;; Arenas
+(defmacro thread-current-arena ()
+  `(sap-ref-lispobj (current-thread-offset-sap thread-this-slot)
+                    (ash thread-arena-slot word-shift)))
+#-sb-xc-host
+(progn
+ ;;; During evaluation of FORM use the main heap, automatically
+ ;;; switching away from, and back to, the current arena if one was in use.
+  (defmacro without-arena (reason form)
+    (declare (ignore reason))
+    #-system-tlabs form
+    #+system-tlabs
+    `(let ((arena (thread-current-arena)))
+       (when (%instancep arena) (switch-to-arena 0))
+       (unwind-protect ,form
+         (when (%instancep arena) (switch-to-arena arena)))))
+  #+system-tlabs
+  (progn
+    (defun switch-to-arena (a)
+      (sb-sys:%primitive sb-vm::switch-to-arena a))
+    (define-compiler-macro switch-to-arena (a)
+      `(sb-sys:%primitive sb-vm::switch-to-arena ,a))))
+
 ;;;; other miscellaneous stuff
 
 ;;; This returns a form that returns a dual-word aligned number of bytes when

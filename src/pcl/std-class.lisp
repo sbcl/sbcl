@@ -149,7 +149,8 @@
                 (declare (notinline allocate-instance))
                 (with-slots (prototype) class
                   (or prototype
-                      (setf prototype (allocate-instance class)))))))
+                      (setf prototype (sb-vm:without-arena "class-prototype"
+                                        (allocate-instance class))))))))
   (def std-class)
   (def condition-class)
   (def structure-class))

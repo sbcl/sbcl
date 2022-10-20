@@ -168,6 +168,10 @@
   (getf (object-plist object) name))
 
 (defun (setf plist-value) (new-value object name)
+  ;; HACK: exploit the fact we know the expansion of (SETF (GETF ...)) involves %PUTF.
+  ;; This keeps PCL plists in the system TLAB if this whole file is compiled in a global
+  ;; policy that does so. REMF is ok since it's a non-consing destructive operation.
+  (declare (inline sb-impl::%putf))
   (if new-value
       (setf (getf (object-plist object) name) new-value)
       (progn

@@ -51,13 +51,15 @@
 (macrolet ((new-closure (nvalues)
              ;; argument is the number of INFO words
              #-(or x86 x86-64 arm64)
-             `(sb-vm::%alloc-closure ,nvalues (%closure-fun closure))
+             `(sb-c::maybe-with-system-tlab (closure)
+               (sb-vm::%alloc-closure ,nvalues (%closure-fun closure)))
              #+(or x86 x86-64 arm64)
              `(with-pinned-objects ((%closure-fun closure))
                 ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                 ;; valid across GC due to %CLOSURE-FUN being pinned
                 ;; until after the new closure is made.
-                (sb-vm::%alloc-closure ,nvalues (sb-vm::%closure-callee closure))))
+                (sb-c::maybe-with-system-tlab (closure)
+                 (sb-vm::%alloc-closure ,nvalues (sb-vm::%closure-callee closure)))))
            (copy-slots (has-extra-data)
              `(do ((j 0 (1+ j)))
                   ((>= j nvalues)

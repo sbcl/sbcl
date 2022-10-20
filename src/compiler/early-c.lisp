@@ -160,6 +160,15 @@
 (declaim (always-bound *compile-time-eval*))
 
 #-immobile-code (defmacro code-immobile-p (thing) `(progn ,thing nil))
+#-sb-xc-host ; not needed for make-hlst-1
+(defmacro maybe-with-system-tlab ((source-object) allocator)
+  (declare (ignorable source-object))
+  #+system-tlabs `(if (sb-vm::force-to-heap-p ,source-object)
+                      (locally (declare (sb-c::tlab :system)) ,allocator)
+                      ,allocator)
+  #-system-tlabs allocator)
+;;; TLAB selection is an aspect of a POLICY but this sets the global choice
+(defvar *force-system-tlab* nil)
 
 ;;; The allocation quantum for boxed code header words.
 ;;; 2 implies an even length boxed header; 1 implies no restriction.

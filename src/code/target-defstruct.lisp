@@ -88,6 +88,7 @@
     (unless (built-in-classoid-p classoid)
       (let ((layout-addr (- (get-lisp-obj-address layout) sb-vm:instance-pointer-lowtag)))
         (declare (ignorable layout-addr))
+        (declare (sb-c::tlab :system))
         (finalize wrapper
                   (lambda ()
                     #+metaspace (sb-vm::unallocate-metaspace-chunk layout-addr)

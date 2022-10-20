@@ -134,6 +134,9 @@
     (let ((data temp)
           (patch-loc (gen-label))
           (skip-instrumentation (gen-label)))
+      ;; Don't count allocations to the arena
+      (inst cmp :qword (thread-slot-ea thread-arena-slot) 0)
+      (inst jmp :nz skip-instrumentation)
       (inst mov data (thread-slot-ea thread-profile-data-slot thread-temp))
       (inst test data data)
       ;; This instruction is modified to "JMP :z" when profiling is
@@ -164,6 +167,23 @@
              (inst .skip 8 :long-nop)))
       (emit-label skip-instrumentation))))
 
+(defun system-tlab-p (type node)
+  #-system-tlabs (declare (ignore type node))
+  #+system-tlabs
+  (or sb-c::*force-system-tlab*
+      (and (sb-kernel::wrapper-p type)
+           (let ((typename (classoid-name (wrapper-classoid type))))
+             (or (sb-xc:subtypep typename 'ctype)
+                 (eq typename 'sb-thread::avlnode))))
+      (and node
+           (named-let search-env ((env (sb-c::node-lexenv node)))
+             (dolist (data (sb-c::lexenv-user-data env)
+                           (and (sb-c::lexenv-parent env)
+                                (search-env (sb-c::lexenv-parent env))))
+               (when (and (eq (first data) :declare)
+                          (eq (second data) 'sb-c::tlab))
+                 (return (eq (third data) :system))))))))
+
 ;;; An arbitrary marker for the cons primitive-type, not to be confused
 ;;; with the CONS-TYPE in our type-algebraic sense. Mostly just informs
 ;;; the allocator to use cons_tlab.
@@ -181,23 +201,9 @@
 ;;; 1. what to allocate: type, size, lowtag describe the object
 ;;; 2. where to put the result
 ;;; 3. node (for determining immobile-space-p) and a scratch register or two
-(defvar *use-system-tlab* nil)
-(defun system-tlab-p (node)
-  #-system-tlabs (declare (ignore node))
-  #+system-tlabs
-  (or *use-system-tlab*
-      (and node
-           (named-let search-env ((env (sb-c::node-lexenv node)))
-             (dolist (data (sb-c::lexenv-user-data env)
-                           (and (sb-c::lexenv-parent env)
-                                (search-env (sb-c::lexenv-parent env))))
-               (when (and (eq (first data) :declare)
-                          (eq (second data) 'sb-c::tlab))
-                 (return (eq (third data) :system))))))))
-
 (defun allocation (type size lowtag alloc-tn node temp thread-temp
                    &key overflow
-                   &aux (systemp (system-tlab-p node)))
+                   &aux (systemp (system-tlab-p type node)))
   (declare (ignorable thread-temp))
   (flet ((fallback (size)
            ;; Call an allocator trampoline and get the result in the proper register.
@@ -813,7 +819,7 @@
                        (inst push (if (integerp size) (constantize size) size))
                        (inst push (if (sc-is element immediate) (tn-value element) element))
                        (invoke-asm-routine
-                        'call (if (system-tlab-p node) 'sys-make-list 'make-list) node)
+                        'call (if (system-tlab-p 0 node) 'sys-make-list 'make-list) node)
                        (inst pop result)
                        (inst jmp leave-pa)))
          (compute-end)
@@ -934,7 +940,7 @@
              (invoke-asm-routine 'call 'alloc-funinstance vop)
              (inst pop result))
             (t
-             (allocation nil bytes (if type 0 lowtag) result node alloc-temp thread-tn)))
+             (allocation type bytes (if type 0 lowtag) result node alloc-temp thread-tn)))
       (let ((header (compute-object-header words type)))
         (cond #+compact-instance-header
               ((and (eq name '%make-structure-instance) stack-allocate-p)

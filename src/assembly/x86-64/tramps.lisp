@@ -51,6 +51,13 @@
     fpr-restore ; KLUDGE: this is element 6 of the entry point vector
     (do-fprs pop :xmm)))
 
+(define-assembly-routine (switch-to-arena (:return-style :raw)) ()
+  (inst mov rsi-tn (ea rsp-tn)) ; explicitly  pass the return PC. RSI is a vop temp
+  (with-registers-preserved (c)
+    (pseudo-atomic ()
+      #-system-tlabs (inst break halt-trap)
+      #+system-tlabs (inst call (make-fixup "switch_to_arena" :foreign)))))
+
 (macrolet ((def-routine-pair (name&options vars &body code)
              `(progn
                 (symbol-macrolet ((system-tlab-p 0))

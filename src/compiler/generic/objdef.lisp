@@ -561,6 +561,9 @@ during backtrace.
   (state-word :c-type "struct thread_state_word")
   ;; Statistical CPU profiler data recording buffer
   (sprof-data)
+  ;;
+  (arena-savearea :c-type "arena_state" :length 7)
+  (arena)
 
   #+x86 (tls-cookie)                          ;  LDT index
   #+sb-thread (tls-size)
