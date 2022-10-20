@@ -273,7 +273,7 @@ static int verify_headered_object(lispobj* object, sword_t nwords,
     return 0;
 }
 
-static boolean acceptable_filler_cons_p(lispobj* where)
+static __attribute__((unused)) boolean acceptable_filler_cons_p(lispobj* where)
 {
     if (where[0] == 0 && where[1] == 0) return 1;
     // These "conses" can result from bignum multiplication-
