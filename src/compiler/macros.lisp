@@ -402,7 +402,10 @@
              ,@body)
            ,@(loop for vop-name in (ensure-list (second what))
                    collect
-                   `(set-vop-optimizer (template-or-lose ',vop-name) #',name)))
+                   `(set-vop-optimizer (template-or-lose ',vop-name)
+                                       ,(if (cddr what)
+                                            `(cons #',name ',(caddr what))
+                                            `#',name))))
         (binding* (((forms decls) (parse-body body nil))
                    ((var-decls more-decls) (extract-var-decls decls vars))
                    ((binds lambda-vars)

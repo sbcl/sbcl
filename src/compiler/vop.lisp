@@ -738,7 +738,7 @@
   ;; encodes the source ref (shifted 8, it is also encoded in
   ;; MAX-VOP-TN-REFS) and the dest ref index.
   (targets nil :type (or null (simple-array (unsigned-byte 16) 1)))
-  (optimizer nil :type (or null function))
+  (optimizer nil :type (or null function (cons function symbol)))
   (optional-results nil :type list)
   move-vop-p
   (after-sc-selection nil :type (or null function) :read-only t))

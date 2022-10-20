@@ -835,11 +835,14 @@
   (let (zero-tn)
     (flet ((zero-tn ()
              (or zero-tn
-                 (setf zero-tn
-                       (component-live-tn
-                        (make-wired-tn nil
-                                       sb-vm:any-reg-sc-number
-                                       sb-vm::zr-offset))))))
+                 (progn
+                   (setf zero-tn
+                         (component-live-tn
+                          (make-wired-tn nil
+                                         sb-vm:any-reg-sc-number
+                                         sb-vm::zr-offset))
+                         (tn-type zero-tn) (specifier-type '(eql 0)))
+                   zero-tn))))
       (do ((tn tn (tn-next tn)))
           ((null tn))
         (when (and (constant-tn-p tn)

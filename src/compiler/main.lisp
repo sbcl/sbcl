@@ -641,9 +641,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (maybe-mumble "CheckP ")
     (check-pack-consistency component))
 
-  (delete-no-op-vops component)
-  (ir2-optimize-jumps component)
-  (optimize-constant-loads component)
+  (ir2-optimize component 'after-regalloc)
+
   (when *compiler-trace-output*
     (when (memq :ir1 *compile-trace-targets*)
       (describe-component component *compiler-trace-output*))
