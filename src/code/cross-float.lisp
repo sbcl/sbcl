@@ -475,15 +475,19 @@
     (return-from coerce object))
   (with-memoized-math-op (coerce (list object type))
     (if (realp object)
-        (let ((actual-type (if (member type '(double-float long-float))
-                               'double-float
-                               'single-float))
-              (source-value (realnumify object)))
-          (make-flonum (cl:coerce source-value
-                                  (ecase actual-type
-                                    (single-float 'cl:single-float)
-                                    (double-float 'cl:double-float)))
-                       actual-type))
+        (if (and (floatp object)
+                 (eq (flonum-%value object) :minus-zero)
+                 (member type '(double-float single-float)))
+            (make-flonum :minus-zero type)
+            (let ((actual-type (if (member type '(double-float long-float))
+                                   'double-float
+                                   'single-float))
+                  (source-value (realnumify object)))
+              (make-flonum (cl:coerce source-value
+                                      (ecase actual-type
+                                        (single-float 'cl:single-float)
+                                        (double-float 'cl:double-float)))
+                           actual-type)))
         (error "Can't COERCE ~S ~S" object type))))
 
 (macrolet ((define (name)
