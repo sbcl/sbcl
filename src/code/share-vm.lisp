@@ -219,7 +219,11 @@
                              t
                              "{~{~A,~S~}}"))
                     (decode
-                     (make-lisp-obj word nil)))
+                     (cond #+system-tlabs ; fingers crossed, assume arena pointers are valid
+                           ((and (is-lisp-pointer word) (find-containing-arena word))
+                            (values (%make-lisp-obj word) t))
+                           (t
+                            (make-lisp-obj word nil)))))
             (let ((*print-lines* 1)
                   (*print-pretty* t))
               (format t "~x: ~v,'0x~:[~; = ~@?~]~%"

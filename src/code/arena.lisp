@@ -57,6 +57,7 @@
 
 ;;; Once destroyed, it is not legal to access the structure
 ;;; since the structure itself is in the arena.
+;;; BUG: must unlink from arena chain. Not safe to use this yet.
 (defun destroy-arena (arena)
   (deallocate-system-memory (arena-base-address arena) (arena-length arena))
   nil)

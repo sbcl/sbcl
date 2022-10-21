@@ -1355,6 +1355,65 @@ We could try a few things to mitigate this:
              (*print-array* nil))
         (format t "g~d ~a ~a~%" (sb-kernel:generation-of v) v code)))))
 
+#+system-tlabs
+(progn
+(export 'find-arena-ptr)
+(defun find-arena-ptr (this &optional all &aux witness (n 0))
+  (flet ((visit (that)
+           (when (find-containing-arena (get-lisp-obj-address that))
+             (incf n)
+             (setq witness that)
+             (unless all (return-from find-arena-ptr (values 1 witness))))))
+    (declare (inline visit))
+    (do-referenced-object (this visit)
+      (t
+       :extend
+       (case (widetag-of this)
+         (#.sb-vm:value-cell-widetag
+          (visit (value-cell-ref this)))))))
+  (values n witness))
+
+(defun show-heap->arena (l)
+  (dolist (x l)
+    (cond ((fixnump x) ; it's an address in TLS
+           (aver (not (zerop x)))
+           ;; x is off by N-FIXNUM-TAG-BITS because it was written as a raw address
+           ;; but accessed as a lispobj
+           (let* ((addr (ash x n-fixnum-tag-bits))
+                  (pointee (sap-ref-lispobj (int-sap addr) 0))
+                  (avlnode (the (not null)
+                                (sb-thread::avl-find<= addr sb-thread::*all-threads*)))
+                  (thread-base
+                   (sb-thread::avlnode-key avlnode))
+                  (offset (- addr thread-base))
+                  ;; FIXME: put FIND-SYMBOL-FROM-TLS-INDEX somewhere reasonable
+                  (symbol (funcall 'sb-impl::find-symbol-from-tls-index offset))
+                  (thread (sb-thread::avlnode-data avlnode)))
+             (format t "~x -> ~x ~s (TLS: ~/sb-ext:print-symbol-with-prefix/ in ~S)~%"
+                     addr
+                     (get-lisp-obj-address pointee)
+                     (type-of pointee)
+                     symbol
+                     (sb-thread:thread-name thread))))
+          (t
+           (let ((pointee (nth-value 1 (find-arena-ptr x))))
+             (format t "~x -> ~x ~s ~s~%"
+                     (get-lisp-obj-address x)
+                     (get-lisp-obj-address pointee)
+                     (type-of x)
+                     (type-of pointee)))))))
+
+(defun dump-arena-objects (arena &aux (tot-size 0))
+  (map-objects-in-range
+   (lambda (obj type size)
+     (declare (ignore type))
+     (incf tot-size size)
+     (format t "~x ~s~%" (get-lisp-obj-address obj) (type-of obj)))
+   (make-lisp-obj (arena-base-address arena))
+   (make-lisp-obj (arena-free-pointer arena)))
+  tot-size)
+)
+
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
 ;;; cold-allocation-patch-points into the weak hash-table.

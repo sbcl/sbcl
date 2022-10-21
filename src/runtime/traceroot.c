@@ -278,7 +278,7 @@ static int non_nil_symbolp(lispobj x) {
       && widetag_of((lispobj*)(x-OTHER_POINTER_LOWTAG)) == SYMBOL_WIDETAG;
 }
 
-static int tls_index_ok(lispobj tlsindex, struct vector* ignored_objects)
+static __attribute__((unused)) int tls_index_ok(lispobj tlsindex, struct vector* ignored_objects)
 {
     if (ignored_objects) {
         int i;

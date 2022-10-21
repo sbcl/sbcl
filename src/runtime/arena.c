@@ -323,7 +323,6 @@ static void scan_thread_words(lispobj* start, lispobj* end, struct result* res,
 }
 
 extern void gc_stop_the_world(), gc_start_the_world();
-
 extern void prepare_for_full_mark_phase(), execute_full_mark_phase(), dispose_markbits();
 extern int (*stray_pointer_detector_fn)(lispobj);
 extern lispobj stray_pointer_source_obj;
