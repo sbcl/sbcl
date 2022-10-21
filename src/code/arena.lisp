@@ -8,6 +8,7 @@
           switch-to-arena
           rewind-arena
           unuse-arena
+          thread-current-arena
           in-same-arena
           c-find-heap->arena
           show-heap->arena))
@@ -76,6 +77,8 @@
      (switch-to-arena a)
      (unwind-protect (progn ,@body) (switch-to-arena 0))))
 
+#+system-tlabs
+(progn
 (declaim (inline cur-thread-stack-object-p))
 (defun cur-thread-stack-object-p (x)
   (let ((a (get-lisp-obj-address x)))
@@ -86,7 +89,7 @@
 (defun force-to-heap-p (x)
   (and (not (zerop (sap-int (current-thread-offset-sap thread-arena-slot))))
        (or (dynamic-space-obj-p x)
-           (read-only-space-obj-p x))))
+           (read-only-space-obj-p x)))))
 
 (defmacro in-same-arena ((object reason) &rest forms)
   (declare (ignorable object reason))
@@ -138,6 +141,7 @@
 
 (defun c-find-heap->arena ()
   (declare (notinline coerce)) ; "Proclaiming SB-KERNEL:COERCE-TO-LIST to be INLINE, but 1 call to it was..."
+  #+system-tlabs
   (let* ((v (make-array 10000))
          (n (with-pinned-objects (v)
               (sb-alien:alien-funcall
