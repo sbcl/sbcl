@@ -29,10 +29,12 @@
   (- (arena-free-pointer a) (arena-base-address a)))
 
 (defun unuse-arena ()
+  #+system-tlabs
   (when (arena-p (thread-current-arena))
     (switch-to-arena 0)))
 
 (defun rewind-arena (a)
+  #+system-tlabs
   (setf (arena-cookie a) (cons t t)
         (arena-free-pointer a) (+ (arena-base-address a)
                                   (sb-ext:primitive-object-size a)))
@@ -42,6 +44,8 @@
 (defparameter default-arena-size (* 10 1024 1024 1024))
 
 (defun new-arena ()
+  #-system-tlabs :placeholder
+  #+system-tlabs
   (let* ((size default-arena-size)
          (mem (allocate-system-memory size))
          (layout (find-layout 'arena)))
@@ -63,6 +67,9 @@
   nil)
 
 (defmacro with-arena ((arena) &body body)
+  (declare (ignorable arena))
+  #-system-tlabs `(progn ,@body)
+  #+system-tlabs
   `(let ((a ,arena))
      (assert (typep a 'arena))
      ;; maybe allow switching from one arena to another?
@@ -82,6 +89,9 @@
            (read-only-space-obj-p x))))
 
 (defmacro in-same-arena ((object reason) &rest forms)
+  (declare (ignorable object reason))
+  #-system-tlabs `(progn ,@forms)
+  #+system-tlabs
   `(dx-flet ((thunk () ,@forms))
      (let ((allocating-in-arena-p
             (not (zerop (sap-int (current-thread-offset-sap thread-arena-slot)))))
@@ -110,6 +120,7 @@
 
 (defun maybe-show-arena-switch (direction reason)
   (declare (ignore direction reason)))
+#+system-tlabs
 (defun call-using-arena (thunk object reason)
   (if (dynamic-space-obj-p object)
       (let ((arena (thread-current-arena)))

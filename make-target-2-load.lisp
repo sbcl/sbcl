@@ -6,6 +6,10 @@
 (defvar *compile-files-p* nil)
 (load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
 
+;;; Users don't want to know if there are multiple TLABs per se, but they do want
+;;; to know if NEW-ARENA returns an arena, so give them a sensible feature name.
+#+system-tlabs (push :arena-allocator *features*)
+
 ;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
 (export 'sb-impl::+internal-features+ 'sb-impl)
 (let* ((non-target-features
@@ -59,6 +63,7 @@
            ;; I would argue that this should not be exposed,
            ;; but I would also anticipate blowback from removing it.
            :CHENEYGC :GENCGC ; GC: pick one and only one
+           :ARENA-ALLOCATOR
            ;; Can't use s-l-a-d :compression safely without it
            :SB-CORE-COMPRESSION
            ;; Features that are also in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
