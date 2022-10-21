@@ -338,7 +338,11 @@ int find_dynspace_to_arena_ptrs(lispobj result_buffer)
     res.count = 0;
 
     stray_pointer_detector_fn = points_to_arena;
+
+#ifdef LISP_FEATURE_SB_THREAD
     gc_stop_the_world();
+#endif
+
     prepare_for_full_mark_phase();
 
     fprintf(stderr, "Checking threads...\n");
@@ -370,7 +374,11 @@ int find_dynspace_to_arena_ptrs(lispobj result_buffer)
     // print heap->arena pointers as a side-effect of marking
     execute_full_mark_phase();
     dispose_markbits();
+
+#ifdef LISP_FEATURE_SB_THREAD
     gc_start_the_world();
+#endif
+
     return 0;
 }
 
@@ -381,7 +389,9 @@ int old_find_dynspace_to_arena_ptrs(lispobj result_buffer)
     res.v = VECTOR(result_buffer);
     res.count = 0;
 
+#ifdef LISP_FEATURE_SB_THREAD
     gc_stop_the_world();
+#endif
 
     fprintf(stderr, "Checking threads for arena pointers...\n");
     struct thread* th;
@@ -421,6 +431,8 @@ int old_find_dynspace_to_arena_ptrs(lispobj result_buffer)
              &res);
         first = last+1;
     }
+#ifdef LISP_FEATURE_SB_THREAD
     gc_start_the_world();
+#endif
     return res.count;
 }
