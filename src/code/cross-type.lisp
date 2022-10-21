@@ -365,4 +365,5 @@
      (error "can't handle ~S in cross CTYPE-OF" x))))
 
 (defun sb-pcl::class-has-a-forward-referenced-superclass-p (x)
-  (bug "CLASS-HAS-A-FORWARD-REFERENCED-SUPERCLASS-P reached: ~S" x))
+  (declare (ignore x))
+  nil)

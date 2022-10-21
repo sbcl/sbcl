@@ -708,105 +708,110 @@
     (let ((consequent-constraints (make-conset))
           (alternative-constraints (make-conset))
           (quick-p (policy if (> compilation-speed speed))))
-      (macrolet ((add (fun x y not-p)
-                   `(add-complement-constraints quick-p
-                                                ,fun ,x ,y ,not-p
-                                                constraints
-                                                consequent-constraints
-                                                alternative-constraints)))
-        (typecase use
-          (ref
-           (add 'typep (ok-lvar-lambda-var (ref-lvar use) constraints)
-                (specifier-type 'null) t))
-          (combination
-           (unless (eq (combination-kind use)
-                       :error)
-             (let ((name (uncross
-                          (lvar-fun-name
-                           (basic-combination-fun use))))
-                   (args (basic-combination-args use)))
-               (add-equality-constraints name args
-                                         constraints consequent-constraints alternative-constraints)
-               (case name
-                 ((%typep %instance-typep)
-                  (let ((type (second args)))
-                    (when (constant-lvar-p type)
-                      (let ((val (lvar-value type)))
-                        (add 'typep
-                             (ok-lvar-lambda-var (first args) constraints)
-                             (if (ctype-p val)
-                                 val
-                                 (let ((*compiler-error-context* use))
-                                   (specifier-type val)))
-                             nil)))))
-                 ((eq eql)
-                  (let* ((arg1 (first args))
-                         (var1 (ok-lvar-lambda-var arg1 constraints))
-                         (arg2 (second args))
-                         (var2 (ok-lvar-lambda-var arg2 constraints)))
-                    ;; The code below assumes that the constant is the
-                    ;; second argument in case of variable to constant
-                    ;; comparison which is sometimes true (see source
-                    ;; transformations for EQ, EQL and CHAR=). Fixing
-                    ;; that would result in more constant substitutions
-                    ;; which is not a universally good thing, thus the
-                    ;; unnatural asymmetry of the tests.
-                    (cond ((not var1)
-                           (when var2
-                             (add-test-constraint quick-p
-                                                  'typep var2 (lvar-type arg1)
-                                                  nil constraints
-                                                  consequent-constraints)))
-                          (var2
-                           (add 'eql var1 var2 nil))
-                          ((constant-lvar-p arg2)
-                           (add 'eql var1
-                                (nth-value 1 (lvar-value arg2))
-                                nil))
-                          (t
-                           (add-test-constraint quick-p
-                                                'typep var1 (lvar-type arg2)
-                                                nil constraints
-                                                consequent-constraints)))))
-                 ((< >)
-                  (when (= (length args) 2)
-                    (flet ((handle-array-in-bounds-p (index-arg index-var length-arg)
-                             (multiple-value-bind (kind x y)
-                                 (array-in-bounds-p-constraints constraints index-arg index-var
-                                                                length-arg)
-                               (when kind
-                                 (add-test-constraint quick-p
-                                                      kind x y
-                                                      nil constraints
-                                                      consequent-constraints)))))
-                      (let* ((arg1 (first args))
-                             (var1 (ok-lvar-lambda-var arg1 constraints))
-                             (arg2 (second args))
-                             (var2 (ok-lvar-lambda-var arg2 constraints)))
+      (labels ((add (fun x y not-p)
+                 (add-complement-constraints quick-p
+                                             fun x y not-p
+                                             constraints
+                                             consequent-constraints
+                                             alternative-constraints))
+               (process-node (node)
+                 (typecase node
+                   (ref
+                    (add 'typep (ok-lvar-lambda-var (ref-lvar node) constraints)
+                         (specifier-type 'null) t)
+                    (let ((use (principal-lvar-ref-use (ref-lvar use))))
+                      (when (and use
+                                 (not (ref-p use)))
+                        (process-node use))))
+                   (combination
+                    (unless (eq (combination-kind node) :error)
+                      (let ((name (uncross
+                                   (lvar-fun-name
+                                    (basic-combination-fun node))))
+                            (args (basic-combination-args node)))
+                        (add-equality-constraints name args
+                                                  constraints consequent-constraints alternative-constraints)
                         (case name
-                          (<
-                           (handle-array-in-bounds-p arg1 var1 arg2))
-                          (>
-                           (handle-array-in-bounds-p arg2 var2 arg1)))
-                        (when var1
-                          (add name var1 (lvar-type arg2) nil))
-                        (when var2
-                          (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))))
-                 (=
-                  (when (= (length args) 2)
-                    (let* ((arg1 (first args))
-                           (var1 (ok-lvar-lambda-var arg1 constraints))
-                           (arg2 (second args))
-                           (var2 (ok-lvar-lambda-var arg2 constraints)))
-                      (when var1
-                        (add name var1 (lvar-type arg2) nil))
-                      (when var2
-                        (add name var2 (lvar-type arg1) nil)))))
-                 (t
-                  (add-combination-test-constraints use constraints
-                                                    consequent-constraints
-                                                    alternative-constraints
-                                                    quick-p))))))))
+                          ((%typep %instance-typep)
+                           (let ((type (second args)))
+                             (when (constant-lvar-p type)
+                               (let ((val (lvar-value type)))
+                                 (add 'typep
+                                      (ok-lvar-lambda-var (first args) constraints)
+                                      (if (ctype-p val)
+                                          val
+                                          (let ((*compiler-error-context* node))
+                                            (specifier-type val)))
+                                      nil)))))
+                          ((eq eql)
+                           (let* ((arg1 (first args))
+                                  (var1 (ok-lvar-lambda-var arg1 constraints))
+                                  (arg2 (second args))
+                                  (var2 (ok-lvar-lambda-var arg2 constraints)))
+                             ;; The code below assumes that the constant is the
+                             ;; second argument in case of variable to constant
+                             ;; comparison which is sometimes true (see source
+                             ;; transformations for EQ, EQL and CHAR=). Fixing
+                             ;; that would result in more constant substitutions
+                             ;; which is not a universally good thing, thus the
+                             ;; unnatural asymmetry of the tests.
+                             (cond ((not var1)
+                                    (when var2
+                                      (add-test-constraint quick-p
+                                                           'typep var2 (lvar-type arg1)
+                                                           nil constraints
+                                                           consequent-constraints)))
+                                   (var2
+                                    (add 'eql var1 var2 nil))
+                                   ((constant-lvar-p arg2)
+                                    (add 'eql var1
+                                         (nth-value 1 (lvar-value arg2))
+                                         nil))
+                                   (t
+                                    (add-test-constraint quick-p
+                                                         'typep var1 (lvar-type arg2)
+                                                         nil constraints
+                                                         consequent-constraints)))))
+                          ((< >)
+                           (when (= (length args) 2)
+                             (flet ((handle-array-in-bounds-p (index-arg index-var length-arg)
+                                      (multiple-value-bind (kind x y)
+                                          (array-in-bounds-p-constraints constraints index-arg index-var
+                                                                         length-arg)
+                                        (when kind
+                                          (add-test-constraint quick-p
+                                                               kind x y
+                                                               nil constraints
+                                                               consequent-constraints)))))
+                               (let* ((arg1 (first args))
+                                      (var1 (ok-lvar-lambda-var arg1 constraints))
+                                      (arg2 (second args))
+                                      (var2 (ok-lvar-lambda-var arg2 constraints)))
+                                 (case name
+                                   (<
+                                    (handle-array-in-bounds-p arg1 var1 arg2))
+                                   (>
+                                    (handle-array-in-bounds-p arg2 var2 arg1)))
+                                 (when var1
+                                   (add name var1 (lvar-type arg2) nil))
+                                 (when var2
+                                   (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))))
+                          (=
+                           (when (= (length args) 2)
+                             (let* ((arg1 (first args))
+                                    (var1 (ok-lvar-lambda-var arg1 constraints))
+                                    (arg2 (second args))
+                                    (var2 (ok-lvar-lambda-var arg2 constraints)))
+                               (when var1
+                                 (add name var1 (lvar-type arg2) nil))
+                               (when var2
+                                 (add name var2 (lvar-type arg1) nil)))))
+                          (t
+                           (add-combination-test-constraints node constraints
+                                                             consequent-constraints
+                                                             alternative-constraints
+                                                             quick-p)))))))))
+        (process-node use))
       (values consequent-constraints alternative-constraints))))
 
 ;;;; Applying constraints

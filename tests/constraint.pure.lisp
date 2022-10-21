@@ -361,3 +361,16 @@
                                       ,sb-ext:double-float-positive-infinity)
                         (member nil :nan :number))
                     &optional))))
+
+(with-test (:name :debug-vars)
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (a)
+                 (declare (optimize (debug 2)))
+                 (let ((x (eq a 30)))
+                   (if x
+                       a
+                       (error "")))))))
+           `(values (integer 30 30) &optional))))
