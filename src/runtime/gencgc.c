@@ -295,6 +295,9 @@ static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 #endif
 
+void acquire_gc_page_table_lock() { ignore_value(mutex_acquire(&free_pages_lock)); }
+void release_gc_page_table_lock() { ignore_value(mutex_release(&free_pages_lock)); }
+
 extern os_vm_size_t gencgc_release_granularity;
 os_vm_size_t gencgc_release_granularity = GENCGC_RELEASE_GRANULARITY;
 

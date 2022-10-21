@@ -230,6 +230,8 @@
  ("src/code/target-alieneval" :not-host)
  ("src/code/target-c-call"    :not-host)
 
+ ("src/code/misc-aliens" :not-host)
+ #+system-tlabs ("src/code/arena" :not-host)
  ("src/code/weak"             :not-host)
  ("src/code/array"            :not-host)
 
@@ -238,7 +240,6 @@
  ("src/code/coerce" :not-host)
 
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
- ("src/code/misc-aliens" :not-host)
  ("src/code/thread" :not-host #-sb-devel :block-compile) ; provides *CURRENT-THREAD* for target-signal
 
  ;; RANDOM-LAYOUT-CLOS-HASH (in 'class') uses RANDOM, the transform for which
