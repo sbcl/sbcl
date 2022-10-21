@@ -1230,6 +1230,10 @@ void gc_start_the_world()
 }
 
 #endif /* !LISP_FEATURE_SB_SAFEPOINT */
+#else
+// no threads
+void gc_stop_the_world() {}
+void gc_start_the_world() {}
 #endif /* !LISP_FEATURE_SB_THREAD */
 
 int

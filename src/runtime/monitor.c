@@ -241,9 +241,7 @@ static cmd threads_cmd;
 
 extern void gc_stop_the_world(), gc_start_the_world();
 static void suspend_other_threads() {
-#ifdef LISP_FEATURE_SB_THREAD
     gc_stop_the_world();
-#endif
     // It might make sense for each thread's stop-for-gc handler to close its region
     // versus doing this loop
     struct thread *th;
@@ -251,9 +249,7 @@ static void suspend_other_threads() {
     gc_close_collector_regions(0);
 }
 static void unsuspend_other_threads() {
-#ifdef LISP_FEATURE_SB_THREAD
     gc_start_the_world();
-#endif
 }
 
 static int save_cmd(char **ptr) {
