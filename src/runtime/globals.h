@@ -70,6 +70,8 @@ extern boolean alloc_profiling;
 extern os_vm_address_t alloc_profile_buffer;
 extern lispobj alloc_profile_data; // Lisp SIMPLE-VECTOR
 
+extern lispobj arena_chain;
+
 #ifdef LISP_FEATURE_WIN32
 #define ENVIRON _environ
 #else

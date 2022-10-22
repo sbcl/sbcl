@@ -72,6 +72,9 @@ lispobj *current_auto_gc_trigger;
 #endif
 
 lispobj lisp_package_vector;
+// Tagged lisp pointer to a 'struct arena' (which is also a lisp DEFSTRUCT)
+// The chain terminates with NIL.
+lispobj arena_chain;
 
 void globals_init(void)
 {

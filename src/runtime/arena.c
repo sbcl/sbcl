@@ -26,10 +26,6 @@ struct arena {
   uword_t link;
 };
 
-// Tagged lisp pointer to a 'struct arena' (which is also a lisp DEFSTRUCT)
-// The chain terminates with NIL.
-lispobj arena_chain;
-
 const int TLAB_NWORDS = 3;
 
 extern void acquire_gc_page_table_lock(), release_gc_page_table_lock();
