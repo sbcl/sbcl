@@ -205,10 +205,10 @@ void gc_scavenge_arenas()
     }
 }
 
-struct result {
+static struct result {
   struct vector* v;
   int count;
-};
+} searchresult;
 
 static int points_to_arena(lispobj ptr) {
     if (!is_lisp_pointer(ptr) || !arena_chain) return 0;
@@ -220,57 +220,6 @@ static int points_to_arena(lispobj ptr) {
     } while (chain != NIL);
     return 0;
 }
-#include "genesis/gc-tables.h"
-#include "genesis/closure.h"
-// Return true if 'obj' points to an arena
-
-static int suspect_object_p(lispobj* obj) {
-    if (is_cons_half(*obj)) return points_to_arena(obj[0]) || points_to_arena(obj[1]);
-    lispobj header = *obj;
-    int widetag = header_widetag(header);
-    if (leaf_obj_widetag_p(widetag)) return 0;
-    if (instanceoid_widetag_p(widetag)) {
-        lispobj layout = layout_of(obj);
-        if (layout) {
-            struct bitmap bitmap = get_layout_bitmap(LAYOUT(layout));
-            int nslots = instanceoid_length(*obj), i;
-            for (i=0; i<nslots; ++i)
-                if (bitmap_logbitp(i, bitmap) && points_to_arena(obj[i+1])) return 1;
-        }
-        return 0;
-    }
-    sword_t scan_to = sizetab[widetag](obj);
-    sword_t i;
-    switch (widetag) {
-    case SIMPLE_VECTOR_WIDETAG:
-        {
-        struct vector* v = (void*)obj;
-        sword_t len = vector_len(v), i;
-        for (i=0; i<len; ++i) if (points_to_arena(v->data[i])) return 1;
-        }
-        return 0;
-    case SYMBOL_WIDETAG:
-        {
-        struct symbol* s = (void*)obj;
-        if (points_to_arena(decode_symbol_name(s->name))
-            || points_to_arena(s->value)
-            || points_to_arena(s->info)
-            || points_to_arena(s->fdefn)) return 1;
-        }
-        return 0;
-    case CLOSURE_WIDETAG:
-        if (points_to_arena(fun_taggedptr_from_self(((struct closure*)obj)->fun))) return 1;
-        break;
-    case CODE_HEADER_WIDETAG:
-        scan_to = code_header_words((struct code*)obj);
-        break;
-    case FDEFN_WIDETAG:
-        if (points_to_arena(decode_fdefn_rawfun((struct fdefn*)obj))) return 1;
-        break;
-    }
-    for(i=scan_to-1 ; i>0; --i) if (points_to_arena(obj[i])) return 1;
-    return 0;
-}
 
 static void add_to_result(struct result* res, lispobj val)
 {
@@ -280,13 +229,6 @@ static void add_to_result(struct result* res, lispobj val)
     }
     res->v->data[res->count] = val;
     ++res->count;
-}
-
-static void scan(lispobj* where, lispobj* limit, struct result* res)
-{
-    for ( ; where<limit ; where += object_size(where) ) {
-        if (suspect_object_p(where)) add_to_result(res, compute_lispobj(where));
-    }
 }
 
 static boolean is_arena_structure(lispobj word)
@@ -327,16 +269,25 @@ extern void prepare_for_full_mark_phase(), execute_full_mark_phase(), dispose_ma
 extern int (*stray_pointer_detector_fn)(lispobj);
 extern lispobj stray_pointer_source_obj;
 
+static int points_to_arena_interior(lispobj ptr) {
+    if (!points_to_arena(ptr) || is_arena_structure(ptr)) return 0;
+    if (searchresult.count >= vector_len(searchresult.v)) {
+        fprintf(stderr, "WARNING: out of buffer space\n");
+    } else {
+        int ct = searchresult.count;
+        searchresult.v->data[ct] = ptr;
+        searchresult.count++;
+    }
+    return 1;
+}
+      
 // This is newer heap->arena pointer-finder based on fullcgc
 // but it doesn't completely work yet.
 int find_dynspace_to_arena_ptrs(lispobj result_buffer)
 {
     // check for suspcious pointers to arena from thread roots
-    struct result res;
-    res.v = VECTOR(result_buffer);
-    res.count = 0;
-
-    stray_pointer_detector_fn = points_to_arena;
+    searchresult.v = VECTOR(result_buffer);
+    stray_pointer_detector_fn = points_to_arena_interior;
 
     gc_stop_the_world();
     prepare_for_full_mark_phase();
@@ -356,12 +307,12 @@ int find_dynspace_to_arena_ptrs(lispobj result_buffer)
           scan_thread_words((lispobj*)sp, th->control_stack_end, 0, "stack", th, &printed);
         }
         scan_thread_words((lispobj*)th->binding_stack_start,
-                          (lispobj*)get_binding_stack_pointer(th), &res,
+                          (lispobj*)get_binding_stack_pointer(th), 0,
                           "bindings", th,  &printed);
 #ifdef LISP_FEATURE_SB_THREAD
         lispobj* from = &th->lisp_thread;
         lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
-        scan_thread_words(from,to, &res, "TLS", th, &printed);
+        scan_thread_words(from,to, 0, "TLS", th, &printed);
 #endif
         stray_pointer_source_obj = 0;
     }
@@ -370,55 +321,8 @@ int find_dynspace_to_arena_ptrs(lispobj result_buffer)
     execute_full_mark_phase();
     dispose_markbits();
     gc_start_the_world();
-    return 0;
-}
-
-int old_find_dynspace_to_arena_ptrs(lispobj result_buffer)
-{
-    // check for suspcious pointers to arena from thread roots
-    struct result res;
-    res.v = VECTOR(result_buffer);
-    res.count = 0;
-
-    gc_stop_the_world();
-    fprintf(stderr, "Checking threads for arena pointers...\n");
-    struct thread* th;
-    int printed;
-    for_each_thread(th) {
-      if (th->state_word.state == STATE_DEAD) continue;
-      printed = 0;
-      if (th == get_sb_vm_thread()) {
-        scan_thread_words(&result_buffer, th->control_stack_end, 0, "stack", th, &printed);
-      } else {
-        int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
-        if (ici != 1) lose("can't find interrupt context");
-        lispobj sp = *os_context_register_addr(nth_interrupt_context(0, th), reg_SP);
-        scan_thread_words((lispobj*)sp, th->control_stack_end, 0, "stack", th, &printed);
-      }
-      scan_thread_words((lispobj*)th->binding_stack_start,
-                        (lispobj*)get_binding_stack_pointer(th), &res,
-                        "bindings", th,  &printed);
-#ifdef LISP_FEATURE_SB_THREAD
-      lispobj* from = &th->lisp_thread;
-      lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
-      scan_thread_words(from,to, &res, "TLS", th, &printed);
-#endif
-    }
-
-    //fprintf(stderr, "Scanning fixedobj space\n");
-    scan((lispobj*)FIXEDOBJ_SPACE_START, (lispobj*)fixedobj_free_pointer, &res);
-    //fprintf(stderr, "Scanning text space\n");
-    scan((lispobj*)TEXT_SPACE_START, (lispobj*)text_space_highwatermark, &res);
-    page_index_t first = 0;
-    while (first < next_free_page) {
-        page_index_t last = first;
-        while (!page_ends_contiguous_block_p(last, page_table[first].gen)) ++last;
-        //fprintf(stderr, "Scanning dynamic space pages %ld..%ld\n", first, last);
-        scan((lispobj*)page_address(first),
-             (lispobj*)((char*)page_address(last) + page_bytes_used(last)),
-             &res);
-        first = last+1;
-    }
-    gc_start_the_world();
-    return res.count;
+    searchresult.v = 0;
+    int result = searchresult.count;
+    searchresult.count = 0;
+    return result;
 }

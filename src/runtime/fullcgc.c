@@ -172,6 +172,10 @@ void dump_marked_objects() {
     fprintf(stderr, "Total: %d\n", n);
 }
 
+/* If stray pointer detection is being performed, then all weak references
+ * (weak pointers, weak hash tables) are treated as strong.
+ * This informs the consumer whether it is possible to reach an object
+ * that satisfies the test given the current heap state */
 lispobj stray_pointer_source_obj;
 int (*stray_pointer_detector_fn)(lispobj);
 static void __mark_obj(lispobj pointer)
@@ -269,7 +273,6 @@ static void trace_object(lispobj* where)
     sword_t scan_from = 1;
     sword_t scan_to = sizetab[widetag](where);
     sword_t i;
-    struct weak_pointer *weakptr;
     switch (widetag) {
     case SIMPLE_VECTOR_WIDETAG:
 #ifdef LISP_FEATURE_UBSAN
@@ -279,7 +282,7 @@ static void trace_object(lispobj* where)
         // so the table will not need rehash as a result of gc.
         // Ergo, those may be treated just like ordinary simple vectors.
         // However, weakness remains as a special case.
-        if (vector_flagp(header, VectorWeak)) {
+        if (!stray_pointer_detector_fn && vector_flagp(header, VectorWeak)) {
             if (!vector_flagp(header, VectorHashing)) {
                 add_to_weak_vector_list(where, header);
                 return;
@@ -345,9 +348,12 @@ static void trace_object(lispobj* where)
         scan_to = 3;
         break;
     case WEAK_POINTER_WIDETAG:
-        weakptr = (struct weak_pointer*)where;
-        if (is_lisp_pointer(weakptr->value) && interesting_pointer_p(weakptr->value))
+        {
+        struct weak_pointer *weakptr = (void*)where;
+        if (stray_pointer_detector_fn) gc_mark_obj(weakptr->value);
+        else if (is_lisp_pointer(weakptr->value) && interesting_pointer_p(weakptr->value))
             add_to_weak_pointer_chain(weakptr);
+        }
         return;
     default:
         if (leaf_obj_widetag_p(widetag)) return;
