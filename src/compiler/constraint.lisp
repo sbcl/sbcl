@@ -324,7 +324,6 @@
 ;;; through the intersection of such constraints and the constraints in a conset.
 ;;;
 ;;; EQL-var constraints assert that two lambda-vars are EQL.
-;;; Private constraints assert that a lambda-var is EQL or not EQL to a constant.
 ;;; Inheritable constraints are constraints that may be propagated to EQL
 ;;; lambda-vars (along with EQL-var constraints).
 ;;;
@@ -361,7 +360,7 @@
              (setf (car cons) con)))
        (typecase y
          (constant
-          (let ((vec (ensure-vec (lambda-var-private-constraints x))))
+          (let ((vec (ensure-vec (lambda-var-inheritable-constraints x))))
             (vector-push-extend con vec)))
          (lambda-var
           (let ((vec (if (or (constraint-not-p con)
@@ -489,9 +488,6 @@
     `(block nil
        (flet ((body-fun (,symbol)
                 ,@body))
-         (do-conset-constraints-intersection
-             (con (,conset (lambda-var-private-constraints ,variable)))
-           (body-fun con))
          (do-conset-constraints-intersection
              (con (,conset (lambda-var-eql-var-constraints ,variable)))
            (body-fun con))

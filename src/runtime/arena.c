@@ -276,7 +276,7 @@ static int points_to_arena_interior(lispobj ptr) {
     }
     return 1;
 }
-      
+
 // This is newer heap->arena pointer-finder based on fullcgc
 // but it doesn't completely work yet.
 int find_dynspace_to_arena_ptrs(lispobj result_buffer)

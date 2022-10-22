@@ -1431,7 +1431,6 @@
   ;; sorted sets of constraints we like to iterate over
   (eql-var-constraints     nil :type (or null (array t 1)))
   (inheritable-constraints nil :type (or null (array t 1)))
-  (private-constraints     nil :type (or null (array t 1)))
   (equality-constraints    nil :type (or null (array t 1)))
 
   source-form)
