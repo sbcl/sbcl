@@ -111,14 +111,13 @@
 ;;; TOOD: consider using balanced tree for multiple arenas
 (defun find-containing-arena (addr)
   (declare (word addr))
-  (let ((chain (sap-ref-lispobj
-                (int-sap (find-dynamic-foreign-symbol-address "arena_chain"))
-                0)))
+  (let ((chain (sap-ref-lispobj (foreign-symbol-sap "arena_chain" t) 0)))
     (unless (eql chain 0)
       (do ((arena chain (arena-next-arena arena)))
           ((not arena))
-        (when (< (arena-base-address arena) addr (+ (arena-base-address arena)
-                                                    (arena-length arena)))
+        (when (< (arena-base-address arena) addr
+                 (sap-int (sap+ (int-sap (arena-base-address arena))
+                                (arena-length arena))))
           (return arena))))))
 
 (defun maybe-show-arena-switch (direction reason)
