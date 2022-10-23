@@ -1509,6 +1509,13 @@
 ;;; BASIC-PARSE-TYPESPEC can grok some simple cases that involve turning an object
 ;;; used as a type specifier into an internalized type object (which might be
 ;;; the selfsame object, in the case of a CLASSOID).
+;;;
+;;; FIXME: nothing in the spec precludes calling TYPEP on a type specifier composed
+;;; of dynamic-extent lists. Such a specifier must be uncacheable.
+;;; Worse- the MEMBER type can have problems with the items per se, because the parse
+;;; retains the items. There is no _practical_ reason to have such a type, as the atoms
+;;; for which MEMBER tends to be used (symbol, number) can't be DX-allocated.
+;;; Nonetheless, memoizing arbitrary user-supplied data is not careful enough.
 (defun basic-parse-typespec (type-specifier context)
   (declare (type type-context context))
   (when (typep type-specifier 'instance)
