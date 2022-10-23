@@ -338,20 +338,21 @@
                          (constant
                           (unless (and (constant-tn-p ,tn)
                                        (eql prev-constant (tn-value ,tn)))
-                            (setf prev-constant (and (constant-tn-p ,tn)
-                                                     (tn-value ,tn)))
+                            (setf prev-constant (if (constant-tn-p ,tn)
+                                                    (tn-value ,tn)
+                                                    temp))
                             (move temp ,tn))
                           temp)
+                         (immediate
+                          (if (eql prev-constant (setf immediate-value (tn-value ,tn)))
+                              temp
+                              (encode-value-if-immediate ,tn)))
                          (control-stack
-                          (setf prev-constant nil)
+                          (setf prev-constant temp) ;; a non-eq initial value
                           (move temp ,tn)
                           temp)
                          (t
-                          (setf immediate-value (encode-value-if-immediate ,tn))
-                          (if (and (sc-is ,tn immediate)
-                                   (eql prev-constant immediate-value))
-                              temp
-                              immediate-value)))))
+                          ,tn))))
                 (when (eq (storew reg ,list ,slot ,lowtag temp)
                           temp)
                   (setf prev-constant immediate-value)))))
@@ -367,7 +368,7 @@
   (:generator 10
     (let ((stack-allocate-p (node-stack-allocate-p node))
           (nbytes (* cons-size n-word-bytes))
-          prev-constant)
+          (prev-constant temp)) ;; a non-eq initial value
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
@@ -393,14 +394,14 @@
   (:policy :fast-safe)
   (:generator 10
     (let ((nbytes (* cons-size 2 n-word-bytes))
-          prev-constant)
+          (prev-constant temp))
       (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn)
       (pseudo-atomic (:thread-tn thread-tn)
         (allocation +cons-primtype+ nbytes 0 alloc node temp thread-tn)
         (store-slot tail alloc cons-cdr-slot 0)
         (inst lea temp (ea (+ 16 list-pointer-lowtag) alloc))
         (store-slot temp alloc cons-car-slot 0)
-        (setf prev-constant nil)
+        (setf prev-constant temp)
         (let ((pair temp) (temp alloc)) ; give STORE-SLOT the ALLOC as its TEMP
           (store-slot key pair)
           (store-slot val pair cons-cdr-slot))
@@ -424,7 +425,7 @@
   (:generator 10
     (let ((stack-allocate-p (node-stack-allocate-p node))
           (nbytes (* cons-size 2 n-word-bytes))
-          prev-constant)
+          (prev-constant temp))
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ nbytes node (list temp alloc) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)
@@ -452,7 +453,7 @@
     (aver (>= cons-cells 3)) ; prevent regressions in ir2tran's vop selection
     (let ((stack-allocate-p (node-stack-allocate-p node))
           (size (* (pad-data-block cons-size) cons-cells))
-          prev-constant)
+          (prev-constant temp))
       (unless stack-allocate-p
         (instrument-alloc +cons-primtype+ size node (list ptr temp) thread-tn))
       (pseudo-atomic (:elide-if stack-allocate-p :thread-tn thread-tn)

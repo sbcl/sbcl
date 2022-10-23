@@ -3778,6 +3778,18 @@
                -13303942049971317088))
     (() '(-13303942049971317088 -6714119381493 -13303942049971317088) :test #'equal)))
 
+(with-test (:name :list-constant-coalesce.2)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (list -3819610816126750017 -7639221632253500034))
+    (() '(-3819610816126750017 -7639221632253500034) :test #'equal))
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (list -7639221632253500034 -3819610816126750017))
+    (() '(-7639221632253500034 -3819610816126750017) :test #'equal)))
+
 (with-test (:name :constraint-loop)
   (checked-compile-and-assert
       ()
