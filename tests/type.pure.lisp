@@ -825,3 +825,11 @@
 (with-test (:name :nil-has-symbol-widetag
             :skipped-on (:or :ppc64 :big-endian))
   (assert (= (my-widetag-of nil) (my-widetag-of t))))
+
+(with-test (:name :array-rank-deriver-negation)
+  (assert
+   (ctype= (caddr
+            (sb-kernel:%simple-fun-type
+             (checked-compile
+              `(lambda (a) (array-rank (the (not (array t)) a))))))
+           `(values array-rank &optional))))

@@ -1391,13 +1391,7 @@
                       (et (array-type-element-type x)))
                   ;; Need to check if the whole type has the same specialization and simplicity,
                   ;; otherwise it's not clear which part of the type is negated.
-                  (cond ((eql dims '*)
-                         '*)
-                        ((not (every (lambda (dim)
-                                       (eql dim '*))
-                                     dims))
-                         nil)
-                        ((not
+                  (cond ((not
                           (case (array-type-complexp x)
                             ((t)
                              (csubtypep ctype (specifier-type '(not simple-array))))
@@ -1408,6 +1402,12 @@
                         ((not (or (eq et *wild-type*)
                                   (csubtypep ctype
                                              (specifier-type `(array ,(type-specifier et))))))
+                         nil)
+                        ((eq dims '*)
+                         '*)
+                        ((not (every (lambda (dim)
+                                       (eq dim '*))
+                                     dims))
                          nil)
                         (t
                          (list (length dims))))))
