@@ -155,15 +155,12 @@
         (sb-posix:syscall-errno c))))
   #.sb-posix::enoent)
 
-(deftest rmdir.error.2
-  (handler-case
-      (sb-posix:rmdir *this-file*)
-    (sb-posix:syscall-error (c)
-      (sb-posix:syscall-errno c)))
-  #-win32
-  #.sb-posix::enotdir
-  #+win32
-  #.sb-posix::einval)
+(test-util:with-test (:name :rmdir.error.2)
+  (let ((err (handler-case (sb-posix:rmdir *this-file*)
+               (sb-posix:syscall-error (c) (sb-posix:syscall-errno c)))))
+    (assert #-unix (eql err #.sb-posix:einval)
+            ;; non-writable parent dir may return EACCES instead of ENOTDIR
+            #+unix (member err `(,sb-posix:enotdir ,sb-posix:eacces)))))
 
 (deftest rmdir.error.3
   (handler-case
