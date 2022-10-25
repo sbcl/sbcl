@@ -692,11 +692,10 @@
 ;;;
 ;;; TODO: As STRING is an especially important union type,
 ;;; it could be interned by canonicalizing its subparts into
-;;; ARRAY of {CHARACTER,BASE-CHAR,NIL} in that exact order always.
+;;; ARRAY of {CHARACTER,BASE-CHAR} in that exact order always.
 ;;; It will therefore admit quick TYPE=, but not quick failure, since
 ;;;   (type= (specifier-type '(or (simple-array (member #\a) (*))
-;;;                               (simple-array character (*))
-;;;                               (simple-array nil (*))))
+;;;                               (simple-array character (*))))
 ;;;          (specifier-type 'simple-string)) => T and T
 ;;; even though (MEMBER #\A) is not TYPE= to BASE-CHAR.
 ;;;
