@@ -1293,3 +1293,12 @@
                (compile nil `(lambda (x y) (,sym x y))))))
       (assert (loop for line in (disassembly-lines f)
                     thereis (search (princ-to-string sym) line))))))
+
+(with-test (:name :closure-gc-barrier)
+  (let ((lines
+          (compiler-trace-output-lines
+           '(lambda ()
+             (let ((c (cons 1 2)))
+               (lambda (x)
+                 (setf (car c) x)))))))
+    (assert-has-gc-barrier "SET-SLOT" lines)))
