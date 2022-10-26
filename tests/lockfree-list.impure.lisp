@@ -34,15 +34,16 @@
 
 ;;; For testing (especially the garbage collector), perform the first CAS
 ;;; operation but not the second CAS of the deletion algorithm.
-(defun logical-delete (n list)
-  (let* ((node (lfl-nth n list))
-         (succ (%node-next node)))
-    (unless (fixnump succ)
-      (with-pinned-objects (succ)
-        (cas (%node-next node) succ (make-marked-ref succ)))))
+(defun logical-delete (node &aux (succ (%node-next node)))
+  (unless (fixnump succ)
+    (with-pinned-objects (succ)
+      (cas (%node-next node) succ (make-marked-ref succ))))
+  node)
+(defun logical-delete-nth (n list)
+  (logical-delete (lfl-nth n list))
   list)
 
-(logical-delete 0 *lll2*)
+(logical-delete-nth 0 *lll2*)
 
 (defvar *lfl*)
 (defvar *l*)
@@ -66,8 +67,8 @@
     (when show (show (list-head *lfl*) #'get-next "init"))
     (gc)
     (when show (show (list-head *lfl*) #'get-next "GCed"))
-    (logical-delete 1 *lfl*)
-    (logical-delete 4 *lfl*)
+    (logical-delete-nth 1 *lfl*)
+    (logical-delete-nth 4 *lfl*)
     (gc)
     (when show (show (list-head *lfl*) #'get-next "del "))))
 
@@ -84,8 +85,8 @@
   (let ((list (make-ordered-list :key-type 'fixnum)))
     (lfl-insert list 4 "four")
     (lfl-insert list 5 "five")
-    (logical-delete 0 list)
-    (logical-delete 1 list)
+    (logical-delete-nth 0 list)
+    (logical-delete-nth 1 list)
     (finish-incomplete-deletions list)
     (let* ((node (list-head list))
            (next (get-next node)))
@@ -288,3 +289,200 @@
   (gc))
 
 (test-util:with-test (:name :lfl-hidden-pointers) (test-fixnum-as-pointer))
+
+;;; Test lists of WORD stored as tagged fixnum (since we don't have
+;;; a variant of the struct with a untagged slot for the key)
+(test-util:with-test (:name :word-list)
+  (let ((l (sb-lockless:make-ordered-list :key-type 'sb-lockless::word))
+        ;; these are in sorted order already
+        (keys `(#x1000
+                ,(ash 1 (1- sb-vm:n-word-bits))
+                ,(logandc2 sb-ext:most-positive-word sb-vm:fixnum-tag-mask))))
+    (dolist (key keys)
+      (sb-lockless:lfl-insert l (sb-kernel:%make-lisp-obj key) key))
+    (sb-lockless::do-lockfree-list (node l)
+      (assert (eql (sb-lockless::node-data node) (pop keys))))))
+
+;;; Test a custom sort
+
+(test-util:with-test (:name :custom-sort)
+  ;; ordinary case-sensitive list
+  (let ((l (sb-lockless:make-ordered-list :key-type 'string)))
+    (sb-lockless:lfl-insert l "Monkey" 1)
+    (sb-lockless:lfl-insert l "aardvark" 1)
+    (assert (equal (sb-lockless::lfl-keys l)
+                   '("Monkey" "aardvark"))))
+  (let ((l (sb-lockless:make-ordered-list :sort 'string-lessp :test 'string-equal)))
+    (sb-lockless:lfl-insert l "Monkey" 1)
+    (sb-lockless:lfl-insert l "MONKEY" 2) ; won't insert this
+    (sb-lockless:lfl-insert l "aardvark" 1)
+    (sb-lockless:lfl-insert l "Aardvark" 1) ; won't insert this
+    (assert (equal (sb-lockless::lfl-keys l)
+                   '("aardvark" "Monkey")))))
+
+;;; Test the finder which takes a node argument
+
+(defparameter *stringlist* '("ANT" "BAT" "CAT" "DOG" "EGG" "FAN"))
+
+(defun test-find-from-starting-node (lflist)
+  ;; This computes the pointer to "BAT", not "CAT", because the head node
+  ;; is a dummy node, so head->next is "ANT" and head->next->next is "BAT"
+  ;; which can be construed as the CDR and not the CDDR of the list.
+  (let ((cdr
+       (sb-lockless::get-next
+        (sb-lockless::get-next
+         (sb-lockless::list-head lflist)))))
+    (assert (sb-lockless:lfl-find lflist "BAT"))
+    ;; starting at CDR you can't find "ANT"
+    (assert (not (sb-lockless::lfl-find*/t lflist cdr "ANT")))
+    ;; perhaps somewhat surprisingly, when specifying a starting node,
+    ;; you can not find the key in exactly that node- you have pass in a node
+    ;; that is strictly to the left. It make sense in light of the need to
+    ;; assist with repair of pointers to items in mid-deletion state.
+    (assert (not (sb-lockless::lfl-find*/t lflist cdr "BAT")))
+    (assert (sb-lockless::lfl-find*/t lflist cdr "CAT"))
+    ;; You can delete "CAT" starting from "BAT", just like in a list built of conses
+    (assert (sb-lockless::lfl-delete*/t lflist cdr "CAT"))
+    (assert (sb-lockless::lfl-delete*/t lflist cdr "DOG"))
+    ;; Insert them back in, then find "CAT", logically delete it, and then
+    ;; try to find "CAT" and "DOG". Each FIND should physically delete CAT.
+    (dolist (key-to-find '("CAT" "DOG"))
+      (sb-lockless::lfl-insert*/t lflist cdr "DOG" t)
+      (sb-lockless::lfl-insert*/t lflist cdr "CAT" t)
+      (logical-delete (sb-lockless::lfl-find*/t lflist cdr "CAT"))
+      ;; "CAT" is flagged for deletion in the printed representation
+      (assert (string= (princ-to-string lflist)
+                       "#<LINKED-LIST {ANT BAT *CAT DOG EGG FAN}>"))
+      (let ((node (sb-lockless::lfl-find*/t lflist cdr key-to-find)))
+        (cond ((string= key-to-find "CAT")
+               (assert (not node))) ; didn't find CAT
+              (t
+               (assert node) ; did find DOG
+               (assert (string= (sb-lockless::node-key node) "DOG")))))
+      ;; either operation finished the deletion of "CAT"
+      (assert (string= (princ-to-string lflist)
+                       "#<LINKED-LIST {ANT BAT DOG EGG FAN}>")))))
+
+(defun traced-string< (a b)
+  (format t "~&STRING< ~S ~S~%" a b) (force-output)
+  (string< a b))
+(defun traced-string= (a b)
+  (format t "~&STRING= ~S ~S~%" a b) (force-output)
+  (string= a b))
+
+(test-util:with-test (:name :guided-find-and-deletion)
+  (let ((lf-stringlist (sb-lockless:make-ordered-list :key-type 'string)))
+    (dolist (s *stringlist*) (sb-lockless:lfl-insert lf-stringlist s 0))
+    (test-find-from-starting-node lf-stringlist))
+  #+nil
+  (let ((lf-stringlist (sb-lockless:make-ordered-list :sort 'traced-string<
+                                                      :test 'traced-string=)))
+    (dolist (s *stringlist*) (sb-lockless:lfl-insert lf-stringlist s 0))
+    (test-find-from-starting-node lf-stringlist)))
+
+;;; Some tests which should pound on the algorithms a bit more aggressively
+
+(defglobal *timestamp* 0)
+(declaim (fixnum *timestamp*))
+(defglobal *keys-to-delete* nil)
+
+(defvar *start-sem* (sb-thread:make-semaphore))
+(defvar *done-sem* (sb-thread:make-semaphore))
+
+(defun insert-and-delete-some-stuff (my-insertions lflist &aux (ndeletions 0))
+  (sb-thread:wait-on-semaphore *start-sem*)
+  (loop
+    ;; try to delete 1 thing, if there is something to delete
+    ;; and either it was not inserted by me (i.e. try to delete
+    ;; someone else's key) or else I have no other insertions
+    (let ((head (car *keys-to-delete*)))
+      (when (and head (or (not (eq (car head) sb-thread:*current-thread*))
+                          (not my-insertions)))
+        (let ((string-to-delete
+               (cdr (atomic-pop *keys-to-delete*))))
+          (when string-to-delete
+            ;; whatever we got, just delete it
+            (incf ndeletions)
+            ;; DELETE returns T if it deleted, NIL if it didn't
+            (assert (sb-lockless:lfl-delete lflist string-to-delete))))))
+   (when my-insertions
+     (let ((string-to-insert (pop my-insertions))
+           (value (atomic-incf *timestamp*)))
+       (sb-lockless:lfl-insert lflist string-to-insert value)
+       ;; Schedule for deletion any string containing the letter A
+       (when (find #\A string-to-insert)
+         (atomic-push (cons sb-thread:*current-thread* string-to-insert)
+                      *keys-to-delete*))))
+   (when (and (not my-insertions) (not *keys-to-delete*))
+     (return)))
+  ndeletions)
+
+(defun get-test-strings (package-name)
+  (map 'list #'string
+   (remove-if-not #'symbolp
+                  (sb-impl::package-hashtable-cells
+                   (sb-impl::package-internal-symbols
+                    (find-package package-name))))))
+
+(defun tester (lflist worklists &aux (nthreads (length worklists)) threads)
+  (dotimes (i nthreads)
+    (push (sb-thread:make-thread
+           #'insert-and-delete-some-stuff
+           :arguments (list (aref worklists i) lflist))
+          threads))
+  (sb-thread:signal-semaphore *start-sem* nthreads)
+  (dolist (thread threads) (sb-thread:join-thread thread))
+  ;;(format t " ~s" (sb-thread:join-thread thread)))
+  ;;(format t "; ~D more items to delete~%" (length *keys-to-delete*))
+  (dolist (k *keys-to-delete*) (sb-lockless:lfl-delete lflist (cdr k)))
+  (setq *keys-to-delete* nil)
+  (let ((result (sb-lockless::lfl-keys lflist))
+        (expected-result
+         ;; list should end up in the correct order with no lost
+         ;; insertions or deletions
+         (coerce (sort (remove-if (lambda (x) (find #\A x))
+                                  (apply #'append (coerce worklists 'list)))
+                       #'string<)
+                 'list)))
+    (assert (equal result expected-result)))
+  lflist)
+
+(defparameter nthreads 5)
+
+(test-util:with-test (:name :insert-sorted-up :skipped-on (:not :sb-thread))
+  (dotimes (i 10)
+    (let ((worklists (make-array nthreads :initial-element nil))
+          (lflist (sb-lockless:make-ordered-list :key-type 'string)))
+      ;; round-robin assign items to the worklists so that a cluster of keys
+      ;; that end up near each other will tend to get simultaneously inserted
+      ;; by all threads (no guarantee of course).
+      ;; This should tend to retry the compare-and-swap more often.
+      (let ((i 0))
+        (dolist (item (sort (get-test-strings "SB-C") #'string<))
+          (push item (elt worklists i))
+          (setf i (mod (1+ i) nthreads))))
+      (tester lflist worklists))))
+
+(test-util:with-test (:name :insert-sorted-down :skipped-on (:not :sb-thread))
+  (dotimes (i 10)
+    (let ((worklists (make-array nthreads :initial-element nil))
+          (lflist (sb-lockless:make-ordered-list :key-type 'string)))
+      (let ((i 0))
+        (dolist (item (sort (get-test-strings "SB-PCL") #'string>))
+          (push item (elt worklists i))
+          (setf i (mod (1+ i) nthreads))))
+      (tester lflist worklists))))
+
+(test-util:with-test (:name :insert-shuffled :skipped-on (:not :sb-thread))
+  (dotimes (i 100)
+    (let* ((strings (test-util:shuffle (get-test-strings "SB-LOOP")))
+           (chunk-size (floor (length strings) nthreads))
+           (chunk-start 0)
+           (lflist (sb-lockless:make-ordered-list :key-type 'string))
+           (worklists (make-array nthreads)))
+      (dotimes (i nthreads)
+        (setf (aref worklists i)
+              (subseq strings chunk-start
+                      (if (< i (1- nthreads)) (+ chunk-start chunk-size))))
+        (incf chunk-start chunk-size))
+      (tester lflist worklists))))

@@ -17,6 +17,8 @@
 
 (in-package "SB-LOCKLESS")
 
+(export '(make-ordered-list lfl-insert lfl-delete lfl-find))
+
 ;;; The changes to GC to support this code were as follows:
 ;;;
 ;;; * If an instance is flagged as being a LFlist node, then the first data slot
@@ -61,10 +63,16 @@
 
 (defmacro endp (node) `(eq ,node (load-time-value *tail-atom*)))
 
+;;; WORD< uses fixnum-valued keys to represent aligned addresses
+;;; a la DESCRIPTOR-SAP.
+(declaim (inline word<))
+(defun word< (a b) (< (get-lisp-obj-address a) (get-lisp-obj-address b)))
+
 (defconstant-eqx +predefined-key-types+
   #((fixnum  lfl-insert/fixnum  lfl-delete/fixnum  lfl-find/fixnum < =)
     (integer lfl-insert/integer lfl-delete/integer lfl-find/integer < =)
     (real    lfl-insert/real    lfl-delete/real    lfl-find/real < =)
+    (word    lfl-insert/word    lfl-delete/word    lfl-find/word word< eq)
     (string  lfl-insert/string  lfl-delete/string  lfl-find/string
              string< string=))
   #'equalp)
@@ -178,7 +186,7 @@
        ;; It's the head node if nothing else. The head can't be marked for deletion.
        ;; So if this node is marked, you're using this function wrongly.
        ;; There ought to have been some unmarked node to the left.
-       (aver (not (ptr-markedp bits)))
+       #+debug (aver (not (ptr-markedp bits)))
        (tagbody
         advance
             (setq left this left-node-next next)
@@ -244,7 +252,7 @@
   `(loop
     ;; Step 1: find
     (multiple-value-bind (this predecessor)
-        (,search ,@(if (eq type 't) '(list)) (list-head list) key)
+        (,search ,@(if (eq type 't) '(list)) head key)
       (when (or (endp this)
                 (not (,compare= key (truly-the ,type (node-key this)))))
         (return nil))
@@ -264,43 +272,58 @@
                 (,search ,@(if (eq type 't) '(list)) (list-head list) key))
               (return t))))))))
 
-(defmacro define-variation (type compare< compare=)
-  (let ((search (symbolicate "LFL-SEARCH/" type)))
+(defmacro define-variation (name type compare< compare=)
+  (let ((search (symbolicate "LFL-SEARCH/" name)))
     `(progn
        (declaim (ftype (sfunction (,@(if (eq type 't) '(linked-list)) list-node ,type)
                                   (values list-node list-node))
                        ,search))
        (defun ,search (,@(if (eq type 't) '(list)) head key)
+         (declare (explicit-check)) ; actually no check
          (declare (optimize (debug 0)))
-         (lfl-search-macro ,compare< ,type))
+         (let ((head (truly-the list-node head))
+               (key (truly-the ,type key)))
+           (lfl-search-macro ,compare< ,type)))
 
-       (defun ,(symbolicate "LFL-INSERT/"type) (list key data)
+       (defun ,(symbolicate "LFL-INSERT/" name) (list key data)
          (declare (linked-list list) (,type key))
          (let ((head (list-head list)))
            (lfl-insert-macro ,search ,compare= ,type)))
-
        ;; same as INSERT, but starting from any node
-       (defun ,(symbolicate "LFL-INSERT*/"type) (list head key data)
+       (defun ,(symbolicate "LFL-INSERT*/" name) (list head key data)
          (declare (linked-list list) (ignorable list) (,type key))
          (lfl-insert-macro ,search ,compare= ,type))
 
-       (defun ,(symbolicate "LFL-DELETE/"type) (list key)
+       (defun ,(symbolicate "LFL-DELETE/" name) (list key)
          (declare (linked-list list) (,type key))
+         (let ((head (list-head list)))
+           (lfl-delete-macro ,search ,compare= ,type)))
+       ;; same as DELETE, but starting from any node
+       (defun ,(symbolicate "LFL-DELETE*/" name) (list head key)
+         (declare (linked-list list) (ignorable list) (,type key))
          (lfl-delete-macro ,search ,compare= ,type))
 
-       (defun ,(symbolicate "LFL-FIND/"type) (list key)
+       (defun ,(symbolicate "LFL-FIND/" name) (list key)
          (declare (linked-list list) (,type key))
          (let ((node (,search ,@(if (eq type 't) '(list)) (list-head list) key)))
            (when (and (not (endp node))
                       (,compare= key (truly-the ,type (node-key node))))
+             node)))
+       ;; same as FIND, but starting from any node
+       (defun ,(symbolicate "LFL-FIND*/" name) (list head key)
+         (declare (linked-list list) (ignorable list) (,type key))
+         (let ((node (,search ,@(if (eq type 't) '(list)) head key)))
+           (when (and (not (endp node))
+                      (,compare= key (truly-the ,type (node-key node))))
              node))))))
 
-(define-variation real < =) ; uses general case of math functions
+(define-variation real real < =) ; uses general case of math functions
 ;; TODO: implement an INTEGER< assembly routine perhaps?
-(define-variation integer < =) ; comparator= reduces to INTEGER-EQL
-(define-variation fixnum < =)
-(define-variation string string< string=)
-(define-variation t
+(define-variation integer integer < =) ; comparator= reduces to INTEGER-EQL
+(define-variation fixnum fixnum < =)
+(define-variation string string string< string=)
+(define-variation word fixnum word< eq)
+(define-variation t t
   (lambda (a b) (funcall (list-inequality list) a b))
   (lambda (a b) (funcall (list-equality list) a b)))
 
