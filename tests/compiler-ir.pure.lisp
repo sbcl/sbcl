@@ -88,6 +88,15 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
 
+(with-test (:name :bounds-check-variable-svref)
+  (assert (= (count '%check-bound
+                    (ir-calls
+                     `(lambda (x i)
+                        (values (svref x i)
+                                (svref x i))))
+                    :key (lambda (x) (combination-fun-source-name x nil)))
+             1)))
+
 (with-test (:name :bounds-check-length)
   (assert (= (count '%check-bound
                     (ir-calls

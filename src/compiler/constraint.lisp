@@ -1087,8 +1087,20 @@
                      (setq not-res (type-union not-res other)))
                  (setq res (type-intersection res other))))
             (array-in-bounds-p
-             (unless (eq (ref-constraints ref)
-                         (pushnew con (ref-constraints ref)))
+             (when (let (new-p)
+                     (unless (eq (ref-constraints ref)
+                                 (pushnew con (ref-constraints ref)))
+                       (setf new-p t))
+                     (when (lambda-var-p other)
+                       ;; Help the %check-bound transform match the
+                       ;; constraint to other EQL vars.
+                       (do-eql-vars (var (other in))
+                         (unless (or (eq var other)
+                                     (eq (ref-constraints ref)
+                                         (pushnew (find-or-create-constraint 'array-in-bounds-p x var nil)
+                                                  (ref-constraints ref))))
+                           (setf new-p t))))
+                     new-p)
                (reoptimize-lvar (node-lvar ref))))
             (eql
              (let ((other-type (leaf-type other)))
