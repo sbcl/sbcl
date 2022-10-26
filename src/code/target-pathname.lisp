@@ -437,15 +437,33 @@
 ) ; end LABELS
 
 (defun show-pn-caches (&aux (*print-pretty* nil))
-  (dolist (symbol '(*pn-dir-cache* *pn-cache*))
-    (format t "~&~S: ~D~%" symbol (length (symbol-value symbol)))
-    (let ((v (symbol-value symbol)))
-      (dotimes (i (length v))
-        (let ((entry (aref v i)))
-          (unless (or (unbound-marker-p entry) (null entry))
-            (format t "~3d ~3d ~x ~s~%"
-                    i (generation-of entry) (get-lisp-obj-address entry)
-                    entry)))))))
+  (without-gcing
+   (dolist (symbol '(*pn-dir-cache* *pn-cache*))
+     (let ((v (symbol-value symbol)))
+       (format t "~&~S: size=~D tombstones=~D unused=~D~%" symbol (length v)
+               (count nil v) (count-if #'unbound-marker-p v))
+       (dotimes (i (length v))
+         (let ((entry (aref v i)))
+           (unless (or (unbound-marker-p entry) (null entry))
+             (if (eq symbol '*pn-dir-cache*)
+                 (format t "~3d ~3d ~x ~16x ~s~%" i
+                         (generation-of entry) (get-lisp-obj-address entry)
+                         (cdr entry) (car entry))
+                 (format t "~3d ~3d ~x ~16x [~A ~S ~A ~S ~S ~S]~%"
+                         i (generation-of entry) (get-lisp-obj-address entry)
+                         (pathname-sxhash entry)
+                         (let ((host (%pathname-host entry)))
+                           (cond ((logical-host-p host)
+                                  (prin1-to-string (logical-host-name host)))
+                                 ((eq host *physical-host*) "phys")
+                                 (t host)))
+                         (%pathname-device entry)
+                         (acond ((%pathname-dir+hash entry)
+                                 (format nil "@~D" (position it *pn-dir-cache*)))
+                                (t "-"))
+                         (%pathname-name entry)
+                         (%pathname-type entry)
+                         (%pathname-version entry))))))))))
 
 ;;; Vector of logical host objects, each of which contains its translations.
 ;;; The vector is never mutated- always a new vector is created when adding
