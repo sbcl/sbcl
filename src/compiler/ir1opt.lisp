@@ -675,6 +675,46 @@
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
   (let ((lambda (return-lambda node)))
+    (when (dolist (ref (leaf-refs lambda)
+                       (leaf-refs lambda))
+            (let* ((lvar (node-lvar ref))
+                   (combination (and lvar
+                                     (lvar-dest lvar))))
+              (unless (and (combination-p combination)
+                           (eq (combination-kind combination) :local)
+                           (eq (combination-fun combination) lvar)
+                           (not (or (node-lvar combination)
+                                    (node-tail-p combination))))
+                (return))))
+      ;; Delete the uses if the result is not used anywhere
+      (let* ((lvar (return-result node))
+             (combination (lvar-uses lvar)))
+        (unless (or (and (combination-p combination)
+                         (lvar-fun-is (combination-fun combination) '(values))
+                         (null (combination-args combination)))
+                    (do-uses (node lvar)
+                      (typecase node
+                        (combination
+                         ;; Don't unlink non flushable combinations
+                         ;; because they can be tail called.
+                         (unless (flushable-combination-p node)
+                           (return t))))))
+          (let ((ctran (make-ctran))
+                (new-lvar (make-lvar node)))
+            (setf (ctran-next (node-prev node)) nil)
+            (flush-dest lvar)
+            (with-ir1-environment-from-node node
+              (ir1-convert (node-prev node) ctran new-lvar  '(values)))
+            (setf (return-result node) new-lvar)
+
+            (link-node-to-previous-ctran node ctran)
+            (dolist (ref (leaf-refs lambda))
+              (let* ((lvar (node-lvar ref))
+                     (combination (lvar-dest lvar)))
+                (setf (node-derived-type combination) *wild-type*)))
+            (setf (return-result-type node) *wild-type*
+                  (tail-set-type (lambda-tail-set lambda)) *wild-type*)
+            (return-from ir1-optimize-return)))))
     (tagbody
      :restart
        (let* ((tails (lambda-tail-set lambda))
@@ -693,9 +733,7 @@
              (setf (tail-set-type tails) (res))
              (dolist (fun (tail-set-funs tails))
                (dolist (ref (leaf-refs fun))
-                 (reoptimize-lvar (node-lvar ref)))))))))
-
-  (values))
+                 (reoptimize-lvar (node-lvar ref))))))))))
 
 ;;;; IF optimization
 

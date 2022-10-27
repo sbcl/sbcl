@@ -3798,3 +3798,13 @@
            (progv '(*) (list (ceiling v 40))
              *)))
     ((3) 204)))
+
+(with-test (:name :unused-local-fun-results)
+  (let ((f (checked-compile
+            `(lambda (x)
+               (flet ((x ()
+                        (expt x x)))
+                 (x)
+                 (x)
+                 10)))))
+    (assert (not (ctu:find-named-callees f)))))
