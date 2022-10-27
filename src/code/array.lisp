@@ -1164,6 +1164,35 @@ of specialized arrays is supported."
            (setf (%array-fill-pointer array) (1+ fill-pointer))
            fill-pointer))))
 
+#-system-tlabs
+(defmacro reallocate-vector-with-widetag (old-vector &rest args)
+  (declare (ignore old-vector))
+  `(allocate-vector-with-widetag ,@args))
+
+;;; This does not try to allow for resizing (ARRAY NIL) - there's no backing storage anyway.
+;;; However, ADJUST-ARRAY apparently thinks it can resize non-simple arrays of
+;;; element type NIL, but fails in ZAP-ARRAY-DATA-AUX. e.g.:
+;;;   (adjust-array (make-array '(10 10) :element-type nil) '(20 20))
+;;; allocates a non-simple 10x10 array pointing to a (SIMPLE-ARRAY NIL 100)
+;;; and then gets "An attempt to access an array of element-type NIL was made"
+;;; because it doesn't know not to try to copy elements.
+;;; So unless we think that that is one of the most pressing issues that demands
+;;; a fix, who cares how we reallocate?
+;;; If you're manipulating such arrays, quite literally you deserve to lose.
+;;; FIXME: does not support #+ubsan, which is fairly bit-rotted, so ... meh.
+#+system-tlabs
+(defun reallocate-vector-with-widetag (old-vector widetag length n-bits-shift)
+  (declare (type (unsigned-byte 8) widetag)
+           (type index length))
+  ;; KLUDGE: add SAETP-N-PAD-ELEMENTS "by hand" since there is
+  ;; but a single case involving it now.
+  (let* ((full-length (+ length (if (= widetag simple-base-string-widetag) 1 0)))
+         (nwords (the fixnum (vector-length-in-words full-length n-bits-shift))))
+    (if (sb-vm::force-to-heap-p old-vector)
+        (locally (declare (sb-c::tlab :system))
+          (allocate-vector widetag length nwords))
+        (allocate-vector widetag length nwords))))
+
 (defun extend-vector (vector min-extension)
   (declare (optimize speed)
            (vector vector))
@@ -1181,9 +1210,8 @@ of specialized arrays is supported."
              (n-bits-shift (aref %%simple-array-n-bits-shifts%% widetag))
              (new-data
               ;; FIXME: mark prefix of shadow bits assigned, suffix unassigned
-              (sb-c::maybe-with-system-tlab (old-data)
-                (allocate-vector-with-widetag #+ubsan nil
-                                              widetag new-length n-bits-shift))))
+              (reallocate-vector-with-widetag old-data #+ubsan nil
+                                              widetag new-length n-bits-shift)))
         ;; Copy the data
         (if (= widetag simple-vector-widetag) ; the most common case
             (replace (truly-the simple-vector new-data) ; transformed
@@ -1314,10 +1342,9 @@ of specialized arrays is supported."
                       ;; then this array owns the data and can retain it.
                       old-data
                       (let ((data
-                             (sb-c::maybe-with-system-tlab (old-data)
-                               (allocate-vector-with-widetag #+ubsan t
+                             (reallocate-vector-with-widetag old-data #+ubsan t
                                                              widetag new-total-size
-                                                             n-bits-shift))))
+                                                             n-bits-shift)))
                         (replace data old-data
                                  :start1 0 :end1 new-total-size
                                  :start2 old-start :end2 old-end)

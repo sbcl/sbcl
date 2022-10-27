@@ -89,6 +89,7 @@
 (defun force-to-heap-p (x)
   (and (not (zerop (sap-int (current-thread-offset-sap thread-arena-slot))))
        (or (dynamic-space-obj-p x)
+           ;; FIXME: is checking for read-only still correct???
            (read-only-space-obj-p x)))))
 
 (defmacro in-same-arena ((object reason) &rest forms)

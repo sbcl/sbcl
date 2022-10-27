@@ -958,10 +958,15 @@ multiple threads accessing the same hash-table without locking."
              #-system-tlabs (new-vectors)
              #+system-tlabs
              ;; If allocation was directed off the main heap when this table was made, then we assume
-             ;; that reallocation will, by default, allocate off the heap. So therefore if the old
-             ;; vector _is_ in dynamic (or readonly) space, it should be forced to dynamic space
-             ;; even if the user TLAB currently points outside of dynamic space.
-             (if (or (dynamic-space-obj-p old-kvv) (read-only-space-obj-p old-kvv))
+             ;; that reallocation will allocate off the heap. If the old table is in dynamic space,
+             ;; then the new storage should be forced to dynamic space even if the user TLAB currently
+             ;; points outside of dynamic space.
+             ;; The reason for looking at TABLE here and not its storage, is that MAKE-HASH-TABLE can
+             ;; install a k/v pair vector that does not inform us where the table is:
+             ;;   * (heap-allocated-p (sb-impl::hash-table-pairs (make-hash-table))) => :READ-ONLY
+             ;; The read-only vector is an optimization reducing the size of never-used tables
+             ;; down to the absolute minimum.
+             (if (dynamic-space-obj-p table)
                  (locally (declare (sb-c::tlab :system)) (new-vectors))
                  (new-vectors))))))
     (when (= (hash-table-%count table) 0) ; special case for new table
