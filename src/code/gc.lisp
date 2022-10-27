@@ -219,7 +219,8 @@ run in any thread.")
 (defun post-gc ()
   (sb-impl::finalizer-thread-notify)
   (alien-funcall (extern-alien "empty_thread_recyclebin" (function void)))
-  (setq sb-impl::*pn-cache-force-rehash* t)
+  ;; This is probably the same as detecting a change in *GC-EPOCH*. Maybe remove?
+  (setq sb-impl::*pn-cache-force-recount* t)
   ;; Post-GC actions are invoked synchronously by the GCing thread,
   ;; which is an arbitrary one. If those actions aquire any locks, or are sensitive
   ;; to the state of *ALLOW-WITH-INTERRUPTS*, any deadlocks of what-have-you

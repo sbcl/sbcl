@@ -205,7 +205,7 @@
       sb-impl::**finalizer-store**
       sb-impl::*pn-dir-cache*
       sb-impl::*pn-cache*
-      sb-impl::*pn-cache-force-rehash*
+      sb-impl::*pn-cache-force-recount*
       sb-vm::*immobile-codeblob-tree*
       sb-vm::*dynspace-codeblob-tree*
       ,(maybe "SB-KERNEL" "*EVAL-CALLS*")

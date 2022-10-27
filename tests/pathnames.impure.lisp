@@ -999,7 +999,7 @@
        (eql (%pathname-version a) (%pathname-version b))))
 
 (defun probing-sequence (table pathname)
-  (let* ((mask (1- (length table)))
+  (let* ((mask (- (length table) 2))
          (index (logand (sb-impl::pathname-sxhash pathname) mask))
          (interval 1)
          (sequence))
