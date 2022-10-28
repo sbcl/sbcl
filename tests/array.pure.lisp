@@ -703,3 +703,12 @@
                                                                    :fill-pointer t))
                                1)
                          value))))))
+
+(with-test (:name :intersection-type-complexp)
+  (assert (equal (caddr (sb-kernel:%simple-fun-type
+                         (checked-compile `(lambda (x)
+                                             (declare ((and (simple-array * (10))
+                                                            (not simple-vector))
+                                                       x))
+                                             (length x)))))
+                 `(values (integer 10 10) &optional))))

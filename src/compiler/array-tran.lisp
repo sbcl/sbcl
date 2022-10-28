@@ -1348,7 +1348,12 @@
          (dolist (type (cdr types) result)
            (unless (eq (conservative-array-type-complexp type) result)
              (return-from conservative-array-type-complexp :maybe))))))
-    ;; FIXME: intersection type
+    (intersection-type
+     (loop for type in (intersection-type-types type)
+           do (case (conservative-array-type-complexp type)
+                ((t) (return t))
+                ((nil) (return nil)))
+           finally (return :maybe)))
     (t :maybe)))
 
 ;; Let type derivation handle constant cases. We only do easy strength
