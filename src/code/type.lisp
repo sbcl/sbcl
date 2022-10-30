@@ -4077,11 +4077,14 @@ used for a COMPLEX component.~:@>"
                (%make-member-type xset unpaired)))))
       ;; The actual member-type contains the XSET (with no FP zeroes),
       ;; and a list of unpaired zeroes.
-      (if float-types
-          (make-union-type t (if member-type
-                                 (cons member-type float-types)
-                                 float-types))
-          (or member-type *empty-type*)))))
+      (if (not float-types)
+          (or member-type *empty-type*)
+          (let ((types (if member-type
+                           (cons member-type float-types)
+                           float-types)))
+            (if (cdr types)
+                (make-union-type t types)
+                (car types)))))))
 
 (defun member-type-size (type)
   (+ (length (member-type-fp-zeroes type))

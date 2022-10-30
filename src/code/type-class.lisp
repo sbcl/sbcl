@@ -680,7 +680,10 @@
   ;; Formerly defined in every CTYPE, but now just in the ones
   ;; for which enumerability is variable.
   (enumerable nil :read-only t)
-  (types nil :type list :read-only t))
+  ;; This list must have at least 2 items in it.
+  ;; A singleton would not be a compound type.
+  ;; An empty OR is the type NIL, and an empty AND is type T.
+  (types nil :type (cons t cons) :read-only t))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which we
 ;;; couldn't canonicalize to something simpler. Canonical form:
