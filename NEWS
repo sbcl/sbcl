@@ -1,7 +1,21 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
 changes relative to sbcl-2.2.9:
   * platform support:
     ** win32: improved handling of stack overflow exceptions.  (lp#1302866)
+    ** Mac OS X: enforce stronger alignment when building the runtime.
+       (lp#1991485, reported by Yan)
+    ** arm64: building the system without the sb-unicode feature (i.e. with
+       8-bit characters) is now supported.
+  * bug fix: do not elide the GC store barrier in closures.  (lp#1982608,
+    reported by Andrew Berkley)
+  * bug fix: make sb-introspect tests pass when the system is built without
+    support for source locations.  (lp#1635349, reported by Tomas Hlavaty)
+  * bug fix: erroneous assumption that the format-control of a simple condition
+    was a string.  (lp#1803727)
+  * bug fix: compiler consistency failure in modular arithmetic widening.
+    (lp#1990715)
+  * bug fix: provide a stub for a helper function (lp#1992316)
 
 changes in sbcl-2.2.9 relative to sbcl-2.2.8:
   * platform support:
