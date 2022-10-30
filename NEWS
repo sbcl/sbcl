@@ -5,8 +5,8 @@ changes relative to sbcl-2.2.9:
     ** win32: improved handling of stack overflow exceptions.  (lp#1302866)
     ** Mac OS X: enforce stronger alignment when building the runtime.
        (lp#1991485, reported by Yan)
-    ** arm64: building the system without the sb-unicode feature (i.e. with
-       8-bit characters) is now supported.
+    ** arm64: support for building the system without the sb-unicode feature
+       (i.e. with 8-bit characters) is restored.
   * bug fix: do not elide the GC store barrier in closures.  (lp#1982608,
     reported by Andrew Berkley)
   * bug fix: make sb-introspect tests pass when the system is built without
