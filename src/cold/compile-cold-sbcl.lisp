@@ -213,6 +213,7 @@
                 (format t "~&[~3D/~3D] ~40A" (incf n) total-files (stem-remap-target stem))
                 (let ((sb-c::*force-system-tlab*
                        (or (search "src/pcl" stem)
+                           (search "src/code/arena" stem)
                            (search "src/code/debug-int" stem)
                            (search "src/code/format" stem)
                            (search "src/code/brothertree" stem)

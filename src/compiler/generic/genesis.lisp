@@ -4147,6 +4147,7 @@ III. initially undefined function references (alphabetically):
         (dolist (class '(defstruct-description defstruct-slot-description
                          classoid
                          package
+                         #+x86-64 sb-vm::arena
                          sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)

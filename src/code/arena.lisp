@@ -3,6 +3,9 @@
 (export '(arena
           arena-p
           arena-bytes-used
+          arena-bytes-wasted
+          arena-length
+          arena-userdata
           new-arena
           destroy-arena
           switch-to-arena
@@ -10,54 +13,94 @@
           unuse-arena
           thread-current-arena
           in-same-arena
+          dump-arena-objects
           c-find-heap->arena
           show-heap->arena))
 
-;;; The arena structure has to be created in the arena,
-;;; but the constructor can't do it (chicken-and-egg problem).
-(defstruct (arena (:constructor nil))
-  (base-address 0 :type word)
-  (length 0 :type word)
-  (free-pointer 0 :type word)
-  ;; an opaque value which can be used by a threads in a thread pool to detect
-  ;; that this arena was reset, by comparing to a cached value in the thread.
-  (cookie (cons t t))
-  ;; Multiple (unrelated) arenas are allowed.
-  ;; also might want an extension concept - multiple backing ranges
-  ;; of memory for a single logical arena.
-  (next-arena 0))
-(defun arena-bytes-used (a)
-  (- (arena-free-pointer a) (arena-base-address a)))
+;;; A contiguous block is described by 'struct arena_memblk' in C.
+;;; There is no corresponding lisp defstruct.
+(defmacro arena-memblk-freeptr (memblk) `(sap-ref-sap ,memblk 0))
+(defmacro arena-memblk-limit (memblk) `(sap-ref-sap ,memblk ,(ash 1 word-shift)))
+(defmacro arena-memblk-next (memblk) `(sap-ref-sap ,memblk ,(ash 2 word-shift)))
+(defmacro arena-memblk-padword (memblk) `(sap-ref-sap ,memblk ,(ash 3 word-shift)))
+
+;;; Initial block holds a memblk (4 words) plus the arena structure itself,
+;;; and so the initial free pointer is immediately after those.
+;;; ARENA length must be rounded to even after adding the header, as is tradition.
+(defconstant memblk-preamble-size
+  (ash (+ (align-up (1+ (sb-kernel::type-dd-length arena)) 2) 4) word-shift))
+
+(defmacro do-arena-blocks ((blkvar arena) &body body)
+  ;; bind BLK to a SAP pointing to successive 'struct memblk' in arena
+  `(let ((,blkvar (int-sap (arena-first-block ,arena))))
+     (loop (progn ,@body)
+           (setq ,blkvar (arena-memblk-next ,blkvar))
+           (if (zerop (sap-int ,blkvar)) (return)))))
+
+;;; Not "just" define-alien-routine because we have to GET-LISP-OBJ-ADDRESS on the arg
+(defun arena-bytes-used (arena)
+  (alien-funcall (extern-alien "arena_bytes_used" (function unsigned unsigned))
+                 (get-lisp-obj-address arena)))
 
 (defun unuse-arena ()
   #+system-tlabs
   (when (arena-p (thread-current-arena))
     (switch-to-arena 0)))
 
-(defun rewind-arena (a)
+;;; Release all memblks back to the OS, except the first one associated with this arena.
+(defun rewind-arena (arena)
   #+system-tlabs
-  (setf (arena-cookie a) (cons t t)
-        (arena-free-pointer a) (+ (arena-base-address a)
-                                  (sb-ext:primitive-object-size a)))
+  (let ((first (arena-first-block arena)))
+    (alien-funcall (extern-alien "arena_release_memblks" (function void unsigned))
+                   (get-lisp-obj-address arena))
+    (let ((blk (int-sap first)))
+      (setf (arena-memblk-next blk) (int-sap 0) ; no next
+            (arena-memblk-freeptr blk) (sap+ blk memblk-preamble-size)))
+    (setf (arena-length arena) (arena-initial-size arena)
+          (arena-cookie arena) (cons t t)))
+  arena)
 
-  a)
-
-(defparameter default-arena-size (* 10 1024 1024 1024))
-
-(defun new-arena ()
+;;; The arena structure has to be created in the arena,
+;;; but the constructor can't do it (chicken-and-egg problem).
+;;; There are one or more large blocks of memory associated with
+;;; an arena, obtained via malloc(). Allocations within a block are
+;;; contiguous but the blocks can be discontiguous.
+(defun new-arena (size &optional (growth-amount size) (max-extensions 7))
+  (declare (ignorable growth-amount max-extensions))
+  (assert (>= size 65536))
+  "Create a new arena of SIZE bytes which can be grown additively by GROWTH-AMOUNT
+one or more times, not to exceed MAX-EXTENSIONS times"
   #-system-tlabs :placeholder
   #+system-tlabs
-  (let* ((size default-arena-size)
-         (mem (allocate-system-memory size))
-         (layout (find-layout 'arena)))
-    (setf (sap-ref-word mem 0) (compute-object-header (1+ (dd-length (wrapper-dd layout)))
-                                                      instance-widetag))
-    (let ((arena (%make-lisp-obj (sap-int (sap+ mem instance-pointer-lowtag)))))
+  (let* ((memblk (sb-alien::%make-alien size)) ; use malloc()
+         (layout (find-layout 'arena))
+         ;; size of 'struct arena_memblk'
+         (struct-base (sap+ memblk (* 4 n-word-bytes))))
+    ;; This memory isn't pre-zeroed
+    (setf (sap-ref-word struct-base 0)
+          (compute-object-header (1+ (dd-length (wrapper-dd layout)))
+                                 instance-widetag))
+    (let ((arena (%make-lisp-obj (sap-int (sap+ struct-base instance-pointer-lowtag)))))
       (%set-instance-layout arena layout)
-      (setf (arena-base-address arena) (sap-int mem)
+      (setf (arena-max-extensions arena) max-extensions
+            (arena-growth-amount arena) growth-amount)
+      (setf (arena-initial-size arena) size
+            (arena-growth-amount arena) growth-amount
+            (arena-max-extensions arena) max-extensions
             (arena-length arena) size
-            (arena-free-pointer arena)
-            (sap-int (sap+ mem (primitive-object-size arena))))
+            (arena-extension-count arena) 0
+            (arena-pthr-mutex arena) 0
+            (arena-cookie arena) 0
+            (arena-link arena) 0
+            (arena-userdata arena) nil)
+      (setf (arena-memblk-freeptr memblk) (sap+ memblk memblk-preamble-size)
+            (arena-memblk-limit memblk) (sap+ memblk size)
+            (arena-memblk-next memblk) (int-sap 0)
+            (arena-memblk-padword memblk) (int-sap 0))
+      ;; Point the arena to its block
+      (setf (arena-first-block arena) (sap-int memblk)
+            (arena-current-block arena) (sap-int memblk))
+      (setf (arena-cookie arena) (cons t t)) ; any unique object
       arena)))
 
 ;;; Once destroyed, it is not legal to access the structure
@@ -109,17 +152,23 @@
          (funcall #'thunk)
          (call-using-arena #'thunk .obj. ',reason)))))
 
-;;; TOOD: consider using balanced tree for multiple arenas
+;;; backward-compatibility assuming no extension blocks. DON'T USE THIS!
+(defun arena-base-address (arena) (arena-first-block arena))
+
+;;; Possible TOOD: if this needs to be efficient, then we would need
+;;; a balanced tree which maps each 'struct memblk' to an arena.
+;;; This would be complicated by the fact that extension occurs in C code,
+;;; so C would have to maintain the balanced tree structure.
+;;; It may not be terribly important to optimize.
 (defun find-containing-arena (addr)
   (declare (word addr))
   (let ((chain (sap-ref-lispobj (foreign-symbol-sap "arena_chain" t) 0)))
     (unless (eql chain 0)
-      (do ((arena chain (arena-next-arena arena)))
+      (do ((arena chain (arena-link arena)))
           ((not arena))
-        (when (< (arena-base-address arena) addr
-                 (sap-int (sap+ (int-sap (arena-base-address arena))
-                                (arena-length arena))))
-          (return arena))))))
+        (do-arena-blocks (memblk arena)
+          (when (< (sap-int memblk) addr (sap-int (arena-memblk-freeptr memblk)))
+            (return arena)))))))
 
 (defun maybe-show-arena-switch (direction reason)
   (declare (ignore direction reason)))
@@ -139,24 +188,26 @@
         (progn (switch-to-arena usable-arena)
                (multiple-value-prog1 (funcall thunk) (switch-to-arena 0))))))
 
-(defun c-find-heap->arena ()
+#+system-tlabs
+(defun c-find-heap->arena (&optional arena)
   (declare (notinline coerce)) ; "Proclaiming SB-KERNEL:COERCE-TO-LIST to be INLINE, but 1 call to it was..."
-  #+system-tlabs
-  (let* ((v (make-array 10000))
-         (n (with-pinned-objects (v)
-              (sb-alien:alien-funcall
-               (sb-alien:extern-alien "find_dynspace_to_arena_ptrs" (function sb-alien:int sb-alien:unsigned))
-               (get-lisp-obj-address v)))))
-    (coerce (subseq v 0 n) 'list)))
+  (let* ((result (make-array 10000))
+         (n (with-pinned-objects (arena result)
+              (alien-funcall
+               (extern-alien "find_dynspace_to_arena_ptrs" (function int unsigned unsigned))
+               (if arena (get-lisp-obj-address arena) 0)
+               (get-lisp-obj-address result)))))
+    (coerce (subseq result 0 n) 'list)))
 
 ;;; This global var is just for making 1 arena for testing purposes.
 ;;; It does not indicate about anything the current thread's arena usage.
 ;;; For that you have to examine THREAD-ARENA-SLOT.
 (sb-ext:define-load-time-global *my-arena* nil)
 
+(defparameter default-arena-size (* 10 1024 1024 1024))
 (defun create-arena ()
   (cond ((null *my-arena*)
-         (setq *my-arena* (new-arena))
+         (setq *my-arena* (new-arena default-arena-size))
          (format t "Arena memory @ ~x (struct @ ~x)~%"
                  (arena-base-address *my-arena*)
                  (sb-kernel:get-lisp-obj-address *my-arena*)))

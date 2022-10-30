@@ -2,7 +2,7 @@
 
 (in-package sb-vm)
 
-(defvar *arena* (new-arena))
+(defvar *arena* (new-arena 1048576 1048576))
 
 (defun test-vpe-heap-vector (vector count &aux grown)
   (with-arena (*arena*)
@@ -82,3 +82,28 @@
 
 (test-util:with-test (:name :puthash-arena-table)
   (test-puthash-arena-table 100))
+
+(defvar arena1 (new-arena 65536))
+(defvar arena2 (new-arena 65536))
+
+(defun f (a) (with-arena (a) (make-array 1000)))
+(defun g (a) (with-arena (a) (list 'x 'y 'z)))
+
+(defvar ptr1 (cons (f arena1) 'foo))
+(defvar ptr2 (g arena2))
+
+(test-util:with-test (:name :find-ptrs-all-arenas)
+  (let ((result (c-find-heap->arena)))
+    ;; There should be a cons pointing to ARENA1,
+    ;; the cons which happens to be in PTR1
+    (assert (member ptr1 result))
+    ;; The symbol PTR2 points directly to ARENA2.
+    (assert (member 'ptr2 result))
+    ;; There should not be anything else
+    (assert (= (length result) 2))))
+
+(test-util:with-test (:name :find-ptrs-specific-arena)
+  (let ((result (c-find-heap->arena arena1)))
+    (assert (equal result (list ptr1))))
+  (let ((result (c-find-heap->arena arena2)))
+    (assert (equal result '(ptr2)))))

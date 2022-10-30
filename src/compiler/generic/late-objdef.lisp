@@ -246,6 +246,36 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
       (format stream "#undef size_unboxed~%")))
   (format stream "#endif~%"))
 
+(sb-xc:defstruct (arena (:constructor nil))
+  ;; Address of the 'struct arena_memblk' we're currently allocating to.
+  (current-block 0 :type word)
+  ;; Address of the one mandatory 'struct arena_memblk' for this arena
+  (first-block 0 :type word)
+  ;; Arena allocation parameters
+  (initial-size 0 :type word)
+  (growth-amount 0 :type word) ; additive
+  (max-extensions 0 :type word)
+  ;; Sum of sizes of currently allocated blocks
+  (length 0 :type word)
+  ;; Sum of unusable bytes resulting from discarding the tail of the
+  ;; most recently claimed chunk when switching from the arena to the heap.
+  (bytes-wasted 0 :type word)
+  ;; How may times extended since allocation or most recent rewind.
+  ;; This is for bounding the maximum extension.
+  (extension-count 0 :type word)
+  ;; A mutex needed when extending the arena.
+  (pthr-mutex 0 :type word)
+  ;; an opaque value which can be used by a threads in a thread pool to detect
+  ;; that this arena was reset, by comparing to a cached value in the thread.
+  (cookie 0)
+  userdata
+  ;; Link for global chain of all arenas, needed for GC when 'scavenge_arenas' is 1,
+  ;; so that GC can find all in-use arenas.
+  ;; This is a tagged pointer to the next arena in the chain, terminated by NIL.
+  ;; It is 0 until added to the global chain so we can tell the difference between
+  ;; an arena that was made but never used, and one that was used at some point.
+  (link 0))
+
 ;;; AVLNODE is primitive-object-like because it is needed by C code that looks up
 ;;; entries in the tree of lisp threads.  But objdef doesn't have SB-XC:DEFSTRUCT
 ;;; working, and I'm reluctant to create yet another 'something-thread' file to

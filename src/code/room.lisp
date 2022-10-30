@@ -1404,13 +1404,17 @@ We could try a few things to mitigate this:
                      (type-of pointee)))))))
 
 (defun dump-arena-objects (arena &aux (tot-size 0))
-  (map-objects-in-range
-   (lambda (obj type size)
-     (declare (ignore type))
-     (incf tot-size size)
-     (format t "~x ~s~%" (get-lisp-obj-address obj) (type-of obj)))
-   (make-lisp-obj (arena-base-address arena))
-   (make-lisp-obj (arena-free-pointer arena)))
+  (do-arena-blocks (memblk arena)
+    (let ((from (sap-int memblk) )
+          (to (sap-int (arena-memblk-freeptr memblk))))
+      (format t "~&Memory block ~X..~X~%" from to)
+      (map-objects-in-range
+       (lambda (obj type size)
+         (declare (ignore type))
+         (incf tot-size size)
+         (format t "~x ~s~%" (get-lisp-obj-address obj) (type-of obj)))
+       (make-lisp-obj from)
+       (make-lisp-obj to))))
   tot-size)
 )
 

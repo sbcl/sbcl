@@ -177,7 +177,7 @@ void dump_marked_objects() {
  * This informs the consumer whether it is possible to reach an object
  * that satisfies the test given the current heap state */
 lispobj stray_pointer_source_obj;
-int (*stray_pointer_detector_fn)(lispobj);
+int (*stray_pointer_detector_fn)(lispobj); // return value is unused
 static void __mark_obj(lispobj pointer)
 {
     lispobj* base;
@@ -185,10 +185,7 @@ static void __mark_obj(lispobj pointer)
     pointer = canonical_ptr(pointer);
     sword_t mark_index = ptr_to_bit_index(pointer);
     if (mark_index < 0) {
-        if (stray_pointer_detector_fn && stray_pointer_detector_fn(pointer)) {
-            fprintf(stderr, "wild pointer: %p -> %p\n",
-                    (void*)stray_pointer_source_obj, (void*)pointer);
-        }
+        if (stray_pointer_detector_fn) stray_pointer_detector_fn(pointer);
         return; // uninteresting pointer
     }
     uword_t wordindex = mark_index / N_WORD_BITS;
