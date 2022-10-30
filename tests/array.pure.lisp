@@ -712,3 +712,13 @@
                                                        x))
                                              (length x)))))
                  `(values (integer 10 10) &optional))))
+
+(with-test (:name :vector-length-intersection-types)
+  (assert (equal (caddr (sb-kernel:%simple-fun-type
+                         (checked-compile `(lambda (x)
+                                             (declare ((and (or (simple-array * (11))
+                                                                (simple-array * (12)))
+                                                            (not simple-vector))
+                                                       x))
+                                             (length x)))))
+                 `(values (integer 11 12) &optional))))

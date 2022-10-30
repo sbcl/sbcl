@@ -1502,22 +1502,21 @@
   (let ((array-type (lvar-conservative-type vector))
         min-length
         max-length)
-    (when (and
-           (union-type-p array-type)
-           (loop for type in (union-type-types array-type)
-                 always (and (array-type-p type)
-                             (typep (array-type-dimensions type)
-                                    '(cons integer null)))
-                 do (let ((length (car (array-type-dimensions type))))
-                      (cond ((array-type-complexp type)
-                             ;; fill-pointer can start from 0
-                             (setf min-length 0))
-                            ((or (not min-length)
-                                 (< length min-length))
-                             (setf min-length length)))
-                      (when (or (not max-length)
-                                (> length max-length))
-                        (setf max-length length)))))
+    (when (and (union-type-p array-type)
+               (loop for type in (union-type-types array-type)
+                     for dim = (catch 'give-up-ir1-transform
+                                 (array-type-dimensions-or-give-up type))
+                     always (typep dim '(cons integer null))
+                     do (let ((length (car dim)))
+                          (cond ((conservative-array-type-complexp type)
+                                 ;; fill-pointer can start from 0
+                                 (setf min-length 0))
+                                ((or (not min-length)
+                                     (< length min-length))
+                                 (setf min-length length)))
+                          (when (or (not max-length)
+                                    (> length max-length))
+                            (setf max-length length)))))
       (specifier-type `(integer ,(or min-length 0)
                                 ,max-length)))))
 
