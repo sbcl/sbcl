@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.2.9:
+changes in sbcl-2.2.10 relative to sbcl-2.2.9:
   * platform support:
     ** win32: improved handling of stack overflow exceptions.  (lp#1302866)
     ** Mac OS X: enforce stronger alignment when building the runtime.
