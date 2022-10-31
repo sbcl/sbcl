@@ -77,8 +77,13 @@ void switch_to_arena(lispobj arena_taggedptr,
             arena_chain = arena_taggedptr;
 #ifdef LISP_FEATURE_SB_THREAD
             // And ensure that this arena has a mutex for growing it
+#ifndef LISP_FEATURE_WIN32
             pthread_mutex_t* arena_mutex = malloc(sizeof (pthread_mutex_t));
             pthread_mutex_init(arena_mutex, 0);
+#else
+            CRITICAL_SECTION* arena_mutex = malloc(sizeof(CRITICAL_SECTION));
+            InitializeCriticalSection(arena_mutex);
+#endif
             arena->uw_pthr_mutex = (uword_t)arena_mutex;
 #endif
         }
