@@ -661,7 +661,7 @@ case "$sbcl_arch" in
     fi
 
     case "$sbcl_os" in
-    linux | darwin | *bsd)
+    linux | darwin | *bsd | win32)
         printf ' :immobile-space' >> $ltf
     esac
     ;;

@@ -10,7 +10,8 @@
           (sb-kernel:find-layout 'class)))
 
 (with-test (:name :compact-instance-header-layout
-            :skipped-on (:not (:and :compact-instance-header :soft-card-marks)))
+            :skipped-on (or :win32
+                            (:not (:and :compact-instance-header :soft-card-marks))))
   (unless (probe-file "gc-testlib.so")
     (sb-ext:run-program "sh"
                         `("run-compiler.sh" "-sbcl-pic" "-sbcl-shared"

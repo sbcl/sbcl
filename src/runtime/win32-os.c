@@ -990,7 +990,21 @@ handle_breakpoint_trap(os_context_t *ctx, struct thread* self)
 #if defined(LISP_FEATURE_SB_THREAD)
         block_blockable_signals(&ctx->sigmask);
 #endif
-        handle_trap(ctx, trap);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        if (trap == trap_UndefinedFunction) {
+            lispobj* fdefn = (lispobj*)(OS_CONTEXT_PC(ctx) & ~LOWTAG_MASK);
+            if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
+                // Return to undefined-tramp
+                OS_CONTEXT_PC(ctx) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
+                // with RAX containing the FDEFN
+                *os_context_register_addr(ctx,reg_RAX) =
+                    make_lispobj(fdefn, OTHER_POINTER_LOWTAG);
+            }
+        } else
+#endif
+        {
+            handle_trap(ctx, trap);
+        }
 #if defined(LISP_FEATURE_SB_THREAD)
         thread_sigmask(SIG_SETMASK,&ctx->sigmask,NULL);
 #endif
@@ -1309,6 +1323,7 @@ veh(EXCEPTION_POINTERS *ep)
     BOOL from_lisp =
         (rip >= DYNAMIC_SPACE_START && rip < DYNAMIC_SPACE_START+dynamic_space_size) ||
         (rip >= READ_ONLY_SPACE_START && rip < READ_ONLY_SPACE_END) ||
+        immobile_space_p(rip) ||
         (rip >= STATIC_SPACE_START && rip < (uword_t)static_space_free_pointer);
 
     if (code == EXCEPTION_ACCESS_VIOLATION ||
