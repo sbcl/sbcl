@@ -1442,43 +1442,29 @@ boolean test_weak_triggers(int (*predicate)(lispobj), void (*mark)(lispobj))
 
 int finalizer_thread_runflag = 1;
 #ifdef LISP_FEATURE_SB_THREAD
+
 #ifdef LISP_FEATURE_WIN32
 CRITICAL_SECTION finalizer_mutex;
 CONDITION_VARIABLE finalizer_condvar;
-void finalizer_thread_wait () {
-    EnterCriticalSection(&finalizer_mutex);
-    if (finalizer_thread_runflag)
-        SleepConditionVariableCS(&finalizer_condvar, &finalizer_mutex, INFINITE);
-    LeaveCriticalSection(&finalizer_mutex);
-}
-void finalizer_thread_wake () {
-    WakeAllConditionVariable(&finalizer_condvar);
-}
-void finalizer_thread_stop () {
-    EnterCriticalSection(&finalizer_mutex);
-    finalizer_thread_runflag = 0;
-    WakeAllConditionVariable(&finalizer_condvar);
-    LeaveCriticalSection(&finalizer_mutex);
-}
 #else
 pthread_mutex_t finalizer_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t finalizer_condvar = PTHREAD_COND_INITIALIZER;
+#endif
 void finalizer_thread_wait () {
     ignore_value(mutex_acquire(&finalizer_mutex));
     if (finalizer_thread_runflag)
-        pthread_cond_wait(&finalizer_condvar, &finalizer_mutex);
+        CONDITION_VAR_WAIT(&finalizer_condvar, &finalizer_mutex);
     ignore_value(mutex_release(&finalizer_mutex));
 }
-void finalizer_thread_wake() {
-    pthread_cond_broadcast(&finalizer_condvar);
+void finalizer_thread_wake () {
+    CONDITION_VAR_WAKE_ALL(&finalizer_condvar);
 }
-void finalizer_thread_stop() {
+void finalizer_thread_stop () {
     ignore_value(mutex_acquire(&finalizer_mutex));
     finalizer_thread_runflag = 0;
-    pthread_cond_broadcast(&finalizer_condvar);
+    CONDITION_VAR_WAKE_ALL(&finalizer_condvar);
     ignore_value(mutex_release(&finalizer_mutex));
 }
-#endif
 #endif
 
 void gc_common_init()

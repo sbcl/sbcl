@@ -228,13 +228,7 @@ gc_state_wait(gc_phase_t phase)
     gc_assert(gc_state.master == self);
     gc_state.master = NULL;
     while(gc_state.phase != phase && !(phase == GC_QUIET && (gc_state.phase > GC_QUIET))) {
-#ifdef LISP_FEATURE_WIN32
-        SleepConditionVariableCS(&gc_state.phase_cond[phase], &gc_state.lock, INFINITE);
-#elif defined LISP_FEATURE_SB_THREAD
-        pthread_cond_wait(&gc_state.phase_cond[phase],&gc_state.lock);
-#else
-        lose("gc_state_wait() blocks, but we're #-SB-THREAD");
-#endif
+        CONDITION_VAR_WAIT(&gc_state.phase_cond[phase], &gc_state.lock);
     }
     gc_assert(gc_state.master == NULL);
     gc_state.master = self;
@@ -453,11 +447,7 @@ static inline void gc_advance(gc_phase_t cur, gc_phase_t old) {
         gc_state.phase = gc_phase_next(gc_state.phase);
         odxprint(safepoints,"no blockers, direct advance to %d (%s)",gc_state.phase,gc_phase_names[gc_state.phase]);
         gc_handle_phase();
-#ifdef LISP_FEATURE_WIN32
-        WakeAllConditionVariable(&gc_state.phase_cond[gc_state.phase]);
-#elif defined LISP_FEATURE_SB_THREAD
-        pthread_cond_broadcast(&gc_state.phase_cond[gc_state.phase]);
-#endif
+        CONDITION_VAR_WAKE_ALL(&gc_state.phase_cond[gc_state.phase]);
     }
     odxprint(safepoints,"going to wait for %d threads",gc_state.phase_wait[gc_state.phase]);
     gc_state_wait(cur);
