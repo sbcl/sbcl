@@ -3,6 +3,8 @@
 (in-package sb-vm)
 
 (defvar *arena* (new-arena 1048576 1048576))
+;;; This REWIND is strictly unnecessary. It simply should not crash
+(sb-vm:rewind-arena *arena*)
 
 (defun test-vpe-heap-vector (vector count &aux grown)
   (with-arena (*arena*)

@@ -20,13 +20,12 @@
 (progn
  ;;; During evaluation of FORM use the main heap, automatically
  ;;; switching away from, and back to, the current arena if one was in use.
-  (defmacro without-arena (reason form)
-    (declare (ignore reason))
-    #-system-tlabs form
+  (defmacro without-arena (&body body)
+    #-system-tlabs `(progn ,@body)
     #+system-tlabs
     `(let ((arena (thread-current-arena)))
        (when (%instancep arena) (switch-to-arena 0))
-       (unwind-protect ,form
+       (unwind-protect (progn ,@body)
          (when (%instancep arena) (switch-to-arena arena)))))
   #+system-tlabs
   (progn

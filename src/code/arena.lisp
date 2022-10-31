@@ -51,6 +51,8 @@
 (defun rewind-arena (arena)
   #+system-tlabs
   (let ((first (arena-first-block arena)))
+    (when (eql (arena-link arena) 0) ; never used
+      (return-from rewind-arena arena))
     (alien-funcall (extern-alien "arena_release_memblks" (function void unsigned))
                    (get-lisp-obj-address arena))
     (let ((blk (int-sap first)))
