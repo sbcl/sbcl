@@ -70,23 +70,9 @@ int arch_os_thread_init(struct thread *thread)
          */
         thread->control_stack_start = cur_stack_start;
         thread->control_stack_end = top_exception_frame;
-
-#ifndef LISP_FEATURE_SB_THREAD
-        /*
-         * Theoretically, threaded SBCL binds directly against
-         * the thread structure for these values. We don't do
-         * threads yet, but we'll probably do the same. We do
-         * need to reset these, though, because they were
-         * initialized based on the wrong stack space.
-         */
-        SetSymbolValue(CONTROL_STACK_START,(lispobj)thread->control_stack_start,thread);
-        SetSymbolValue(CONTROL_STACK_END,(lispobj)thread->control_stack_end,thread);
-#endif
     }
 
-#ifdef LISP_FEATURE_SB_THREAD
     TlsSetValue(OUR_TLS_INDEX,thread);
-#endif
 
     win32_set_stack_guarantee();
 
@@ -101,12 +87,10 @@ int arch_os_thread_cleanup(struct thread *thread) {
     return 0;
 }
 
-#if defined(LISP_FEATURE_SB_THREAD)
 sigset_t *os_context_sigmask_addr(os_context_t *context)
 {
   return &context->sigmask;
 }
-#endif
 
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)

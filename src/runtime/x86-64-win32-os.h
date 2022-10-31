@@ -3,9 +3,7 @@
 
 typedef struct os_context_t {
   CONTEXT* win32_context;
-#ifdef LISP_FEATURE_SB_THREAD
   sigset_t sigmask;
-#endif
 } os_context_t;
 
 typedef intptr_t os_context_register_t;
