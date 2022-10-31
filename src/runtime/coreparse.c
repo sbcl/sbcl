@@ -1021,6 +1021,8 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 dynamic_values_bytes = (int)SymbolValue(FREE_TLS_INDEX,0) * 2;
                 // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
             }
+#else
+            SYMBOL(FREE_TLS_INDEX)->value = sizeof (struct thread);
 #endif
             // simple-fun implies cold-init, not a warm core (it would be a closure then)
             if (widetag_of(native_pointer(initial_function)) == SIMPLE_FUN_WIDETAG

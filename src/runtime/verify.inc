@@ -428,12 +428,10 @@ int verify_heap(__attribute__((unused)) lispobj* cur_thread_approx_stackptr,
         if (verify((lispobj)th->binding_stack_start,
                    (lispobj*)get_binding_stack_pointer(th), &state,
                    VERIFYING_UNFORMATTED)) goto out;
-#ifdef LISP_FEATURE_SB_THREAD
         if (verify((lispobj)&th->lisp_thread,
                    (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th), &state,
                    VERIFYING_UNFORMATTED))
             goto out;
-#endif
     }
     if (verbose)
         fprintf(stderr, " [RO]");

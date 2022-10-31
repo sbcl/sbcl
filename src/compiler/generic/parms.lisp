@@ -231,7 +231,8 @@
     #-sb-thread *stepping*
 
     ;; threading support
-    #+sb-thread ,@'(sb-thread::*starting-threads* *free-tls-index*)
+    #+sb-thread sb-thread::*starting-threads*
+    *free-tls-index* ; always exists for benefit of C runtime
 
     ;; runtime linking of lisp->C calls (regardless of whether
     ;; the C function is in a dynamic shared object or not)

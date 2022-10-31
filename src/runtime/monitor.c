@@ -113,11 +113,7 @@ void save_gc_crashdump(char *pathname,
     fprintf(stderr, "save: %d threads\n", nthreads);
     struct crash_preamble preamble;
     unsigned long nbytes_heap = next_free_page * GENCGC_PAGE_BYTES;
-#ifdef LISP_FEATURE_SB_THREAD
     int nbytes_tls = SymbolValue(FREE_TLS_INDEX,0);
-#else
-    int nbytes_tls = sizeof (struct thread);
-#endif
     preamble.signature = CRASH_PREAMBLE_SIGNATURE;
     preamble.static_start = STATIC_SPACE_START;
     preamble.static_nbytes = (uword_t)static_space_free_pointer - STATIC_SPACE_START;

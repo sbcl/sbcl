@@ -4156,7 +4156,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
             scav_binding_stack((lispobj*)th->binding_stack_start,
                                (lispobj*)get_binding_stack_pointer(th),
                                compacting_p() ? 0 : gc_mark_obj);
-#ifdef LISP_FEATURE_SB_THREAD
             /* do the tls as well */
             lispobj* from = &th->lisp_thread;
             lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
@@ -4165,7 +4164,6 @@ garbage_collect_generation(generation_index_t generation, int raise,
                 scavenge(from, nwords);
             else
                 gc_mark_range(from, nwords);
-#endif
         }
     }
 

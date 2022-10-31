@@ -306,7 +306,6 @@ static lispobj examine_threads(struct hopscotch_table* targets,
 
     for_each_thread(th) {
         lispobj *where, *end;
-#ifdef LISP_FEATURE_SB_THREAD
         // Examine thread-local storage
         *root_kind = TLS;
         where = &th->lisp_thread;
@@ -318,7 +317,6 @@ static lispobj examine_threads(struct hopscotch_table* targets,
                 *tls_index = (char*)where - (char*)th;
                 return *where;
             }
-#endif
         // Examine the binding stack
         *root_kind = BINDING_STACK;
         where = (lispobj*)th->binding_stack_start;

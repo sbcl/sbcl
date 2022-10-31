@@ -397,11 +397,9 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
         scan_thread_words((lispobj*)th->binding_stack_start,
                           (lispobj*)get_binding_stack_pointer(th), 0,
                           "bindings", th,  &printed);
-#ifdef LISP_FEATURE_SB_THREAD
         lispobj* from = &th->lisp_thread;
         lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
         scan_thread_words(from,to, 0, "TLS", th, &printed);
-#endif
         stray_pointer_source_obj = 0;
     }
     fprintf(stderr, "Checking dynamic space...\n");
