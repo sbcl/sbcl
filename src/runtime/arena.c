@@ -253,7 +253,7 @@ void gc_scavenge_arenas()
     if (chain) {
         do {
             struct arena* a = (void*)native_pointer(chain);
-            fprintf(stderr, "arena %p has cookie %lx\n", a, a->cookie);
+            fprintf(stderr, "arena %p has cookie %"OBJ_FMTX"\n", a, a->cookie);
             scavenge(&a->cookie, 1);
             chain = a->link;
         } while (chain != NIL);
@@ -386,6 +386,7 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
         if (th->state_word.state == STATE_DEAD) continue;
         stray_pointer_source_obj = (lispobj)th;
         printed = 0;
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         if (th == get_sb_vm_thread()) {
           scan_thread_words(&result_buffer, th->control_stack_end, 0, "stack", th, &printed);
         } else {
@@ -394,6 +395,7 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
           lispobj sp = *os_context_register_addr(nth_interrupt_context(0, th), reg_SP);
           scan_thread_words((lispobj*)sp, th->control_stack_end, 0, "stack", th, &printed);
         }
+#endif
         scan_thread_words((lispobj*)th->binding_stack_start,
                           (lispobj*)get_binding_stack_pointer(th), 0,
                           "bindings", th,  &printed);

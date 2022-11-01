@@ -4145,10 +4145,8 @@ III. initially undefined function references (alphabetically):
           (write-structure-object (wrapper-info (find-layout 'sb-impl::general-hash-table))
                                   stream "hash_table"))
         (dolist (class '(defstruct-description defstruct-slot-description
-                         classoid
-                         package
-                         #+x86-64 sb-vm::arena
-                         sb-thread::avlnode sb-thread::mutex
+                         classoid package
+                         sb-vm::arena sb-thread::avlnode sb-thread::mutex
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
             (write-structure-object (wrapper-info (find-layout class))
