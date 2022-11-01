@@ -21,6 +21,12 @@ struct alloc_region {
     void  *start_addr;
 };
 
+typedef struct {
+    struct alloc_region cons;
+    struct alloc_region mixed;
+    lispobj arena; // tagged pointer
+} arena_state;
+
 // Macro to statically initialize instead of using set_region_empty()
 #define ALLOC_REGION_INITIALIZER {(void*)0x1000, (void*)1000, 0}
 

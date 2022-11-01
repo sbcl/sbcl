@@ -14,8 +14,6 @@
 #include "genesis/arena.h"
 #include "thread.h" // for mutex_acquire() stub if no pthreads
 
-const int TLAB_NWORDS = 3;
-
 extern void acquire_gc_page_table_lock(), release_gc_page_table_lock();
 extern lispobj * component_ptr_from_pc(char *pc);
 
@@ -41,7 +39,7 @@ void switch_to_arena(lispobj arena_taggedptr,
             (arena ? arena : (void*)th->arena),
             (uword_t)ra, id);
 #endif
-    __attribute__((unused)) lispobj* save = th->arena_savearea;
+    arena_state* savearea = &th->arena_savearea;
     struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
     if (!arena) { // finished with the arena
         gc_assert(th->arena); // must have been an arena in use
@@ -57,11 +55,9 @@ void switch_to_arena(lispobj arena_taggedptr,
             ((struct arena*)native_pointer(th->arena))->cookie;
         // Copy the TLABs to the thread's arena save area
         // so that allocation might pick up where it left off.
-#if 0
-        *save = th->arena;
-        memcpy(save+1, &th->mixed_tlab, TLAB_NWORDS);
-        memcpy(save+4, &th->cons_tlab, TLAB_NWORDS);
-#endif
+        savearea->arena = th->arena;
+        savearea->mixed = th->mixed_tlab;
+        savearea->cons = th->cons_tlab;
         // Indicate that the tlabs have no space remaining.
         gc_set_region_empty(&th->mixed_tlab);
         gc_set_region_empty(&th->cons_tlab);
@@ -91,22 +87,17 @@ void switch_to_arena(lispobj arena_taggedptr,
         if (th->mixed_tlab.start_addr) gc_close_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
         if (th->cons_tlab.start_addr) gc_close_region(&th->cons_tlab, PAGE_TYPE_CONS);
         release_gc_page_table_lock();
-#if 0
         /* If the last arena that this thread worked with is the same as 'arena'
          * and the cookie in 'arena' matches the thread's cached copy,
          * then restore the TLABs to their prior state. This way we aren't forced to
          * discard memory every time a thread-pool worker dequeues a task.
          * It can usually pick up where it was in the arena, as long as
          * it is acting on the same arena as before */
-        if (*save == arena_taggedptr && arena->cookie == lispthread->arena_cookie) {
-            // fprintf(stderr, "thread %p: restoring previously claimed arena ptr\n", th);
-            memcpy(&th->mixed_tlab, save+1, TLAB_NWORDS);
-            memcpy(&th->cons_tlab, save+4, TLAB_NWORDS);
-        } else {
-            fprintf(stderr, "thread %p: NOT restoring arena ptr\n", th);
+        if (savearea->arena == arena_taggedptr && arena->cookie == lispthread->arena_cookie) {
+            th->mixed_tlab = savearea->mixed;
+            th->cons_tlab = savearea->cons;
         }
-        memset(save, 0, sizeof th->arena_savearea);
-#endif
+        memset(&th->arena_savearea, 0, sizeof th->arena_savearea);
     }
     th->arena = arena_taggedptr;
 }
@@ -180,13 +171,26 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
     int avail = (char*)region->end_addr - (char*)region->free_pointer;
     int min_keep = (page_type == PAGE_TYPE_CONS) ? 4*CONS_SIZE*N_WORD_BYTES : 128;
     int filler = (page_type == PAGE_TYPE_CONS) ? 255 : 0;
-    if (avail < min_keep) {
-        int request = 8192;
+    /* Precondition: free space in the TLAB was not enough to satisfy the request.
+     * We want to do exactly one claim_new_subrange operation. There are 2 cases:
+     *
+     *  1. amount remaining in the TLAB is not significant. Just toss it out.
+     *     Refill the TLAB with the default quantum plus the user's actual request.
+     *     Then carve out the new object from the beginning of the TLAB.
+     *
+     *  2. amount remaining in the TLAB is worth keeping.
+     *     Don't refill the TLAB; just make the new object as a discrete claim.
+     */
+    if (avail < min_keep) { // case 1
+        long total_request = nbytes + 8192;
         region->start_addr = claim_new_subrange((void*)native_pointer(th->arena),
-                                                request, filler);
-        region->end_addr = (char*)region->start_addr + request;
-        region->free_pointer = region->start_addr;
+                                                total_request, filler);
+        region->end_addr = (char*)region->start_addr + total_request;
+        lispobj* object = region->start_addr;
+        region->free_pointer = (char*)region->start_addr + nbytes;
+        return object;
     }
+    // case 2
     return claim_new_subrange((void*)native_pointer(th->arena), nbytes, filler);
 }
 
