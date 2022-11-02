@@ -258,3 +258,20 @@
          (slot (find 'slot2 slots :key #'sb-mop:slot-definition-name)))
     (assert (eq :dynamic (sb-mop:slot-definition-allocation slot)))
     (assert (eq 'ok! (slot-value *three* 'slot2)))))
+
+(defclass makunbound-test-class (standard-class) ())
+
+(defmethod sb-mop:validate-superclass ((class makunbound-test-class) (superclass standard-class))
+  t)
+
+(defmethod sb-mop:slot-makunbound-using-class ((class makunbound-test-class) object slotd)
+  (throw 'slot-makunbound-using-class t))
+
+(defclass test-class ()
+  ((slot :initarg :slot))
+  (:metaclass makunbound-test-class))
+
+(with-test (:name :slot-makunbound-using-class)
+  (assert (catch 'slot-makunbound-using-class
+            (slot-makunbound (make-instance 'test-class) 'slot)
+            nil)))

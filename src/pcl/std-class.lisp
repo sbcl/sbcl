@@ -87,7 +87,10 @@
               (let* ((types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
                      (types (if (eq type 'writer) `(t ,@types1) types1))
                      (methods (compute-applicable-methods-using-types gf types)))
-                (null (cdr methods))))
+                (and (null (cdr methods))
+                     (or (neq type 'boundp)
+                         (null (cdr (compute-applicable-methods-using-types
+                                     (gdefinition 'slot-makunbound-using-class) types)))))))
         (setf (slot-accessor-function slotd type)
               (lambda (&rest args)
                 (declare (dynamic-extent args))
