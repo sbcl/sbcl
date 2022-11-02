@@ -5329,7 +5329,7 @@ static void sync_close_regions(int block_signals, int options,
          * But (FIXME) - why does it _NOT_ _WORK_ to include the test of 'p<alloc_start' here?
          * With that test in, I still see heap exhaustions, but without the test
          * - so using up the remainder of the TLAB always - we do NOT get exhaustions.
-         * It can't be a race, because we're holding the mutex *
+         * It can't be a race, because we're holding the mutex */
         if ((options & CONSUME_REMAINDER) /* && p < get_alloc_start_page(a[i].type) */ ) {
             char* freeptr = a[i].r->free_pointer;
             char* new_end =
