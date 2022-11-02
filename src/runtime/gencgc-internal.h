@@ -59,8 +59,10 @@ int gencgc_handle_wp_violation(void*, void*);
 #endif
 typedef unsigned short page_words_t;
 
+// The flags control the behavior of sync_close_regions()
 #define LOCK_PAGE_TABLE 1
 #define LOCK_CODE_ALLOCATOR 2
+#define CONSUME_REMAINDER 4
 
 /* New objects are allocated to PAGE_TYPE_MIXED or PAGE_TYPE_CONS */
 /* If you change these constants, then possibly also change the following

@@ -5304,29 +5304,49 @@ NO_SANITIZE_MEMORY lispobj listify_rest_arg(lispobj* context, sword_t context_by
 
 typedef struct { struct alloc_region* r; int type; } close_region_arg;
 
-static void sync_close_regions(int block_signals, int locking,
+static void sync_close_regions(int block_signals, int options,
                                close_region_arg* a, int count)
 {
     sigset_t savedmask;
     __attribute__((unused)) int result;
     if (block_signals) block_blockable_signals(&savedmask);
-    if (locking & LOCK_CODE_ALLOCATOR) {
+    if (options & LOCK_CODE_ALLOCATOR) {
         result = mutex_acquire(&code_allocator_lock);
         gc_dcheck(result);
     }
-    if (locking & LOCK_PAGE_TABLE) {
+    if (options & LOCK_PAGE_TABLE) {
         result = mutex_acquire(&free_pages_lock);
         gc_dcheck(result);
     }
     int i;
-    for (i=0; i<count; ++i)
-        if (find_page_index(a[i].r->start_addr) >= 0)
-            ensure_region_closed(a[i].r, a[i].type);
-    if (locking & LOCK_PAGE_TABLE) {
+    for (i=0; i<count; ++i) {
+        page_index_t p = find_page_index(a[i].r->start_addr);
+        if (p < 0) continue;
+        /* Potentially use up all remaining bytes in the TLAB before closing.
+         * Pages below the alloc_start for the page type cannot possibly be used,
+         * but we didn't properly account for that space, which has a bad effect
+         * on the GC auto-trigger. Wasting but counting it works better.
+         * But (FIXME) - why does it _NOT_ _WORK_ to include the test of 'p<alloc_start' here?
+         * With that test in, I still see heap exhaustions, but without the test
+         * - so using up the remainder of the TLAB always - we do NOT get exhaustions.
+         * It can't be a race, because we're holding the mutex *
+        if ((options & CONSUME_REMAINDER) /* && p < get_alloc_start_page(a[i].type) */ ) {
+            char* freeptr = a[i].r->free_pointer;
+            char* new_end =
+                (a[i].type == PAGE_TYPE_CONS) ?
+                PTR_ALIGN_DOWN(freeptr, GENCGC_PAGE_BYTES) + CONS_PAGE_USABLE_BYTES
+                : PTR_ALIGN_UP(freeptr, GENCGC_PAGE_BYTES);
+            // fillers may not be needed. This anticipates non-zero-filed pages though.
+            deposit_filler(freeptr, new_end);
+            a[i].r->free_pointer = new_end;
+        }
+        ensure_region_closed(a[i].r, a[i].type);
+    }
+    if (options & LOCK_PAGE_TABLE) {
         result = mutex_release(&free_pages_lock);
         gc_dcheck(result);
     }
-    if (locking & LOCK_CODE_ALLOCATOR) {
+    if (options & LOCK_CODE_ALLOCATOR) {
         result = mutex_release(&code_allocator_lock);
         gc_dcheck(result);
     }

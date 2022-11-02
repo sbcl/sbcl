@@ -448,7 +448,7 @@ unregister_thread(struct thread *th,
     int lock_ret;
 
     block_blockable_signals(0);
-    gc_close_thread_regions(th, LOCK_PAGE_TABLE);
+    gc_close_thread_regions(th, LOCK_PAGE_TABLE|CONSUME_REMAINDER);
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     pop_gcing_safety(&scribble->safety);
 #else
