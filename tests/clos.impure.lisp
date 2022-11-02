@@ -1016,6 +1016,14 @@
                          &optional new-value)
   (declare (ignore new-value))
   (values op 1 2 3))
+(defmethod cwasm-sv ((o class-with-all-slots-missing))
+  (slot-value o 'baz))
+(defmethod cwasm-ssv (nv (o class-with-all-slots-missing))
+  (setf (slot-value o 'baz) nv))
+(defmethod cwasm-sbp ((o class-with-all-slots-missing))
+  (slot-boundp o 'baz))
+(defmethod cwasm-smk ((o class-with-all-slots-missing))
+  (slot-makunbound o 'baz))
 
 (with-test (:name :slot-value-missing)
   (assert (equal (multiple-value-list
@@ -1024,6 +1032,9 @@
   (assert (equal (multiple-value-list
                   (funcall (lambda (x) (slot-value x 'bar))
                            (make-instance 'class-with-all-slots-missing)))
+                 '(slot-value)))
+  (assert (equal (multiple-value-list
+                  (cwasm-sv (make-instance 'class-with-all-slots-missing)))
                  '(slot-value))))
 
 (with-test (:name :slot-boundp-missing)
@@ -1033,6 +1044,9 @@
   (assert (equal (multiple-value-list
                   (funcall (lambda (x) (slot-boundp x 'bar))
                            (make-instance 'class-with-all-slots-missing)))
+                 '(t)))
+  (assert (equal (multiple-value-list
+                  (cwasm-sbp (make-instance 'class-with-all-slots-missing)))
                  '(t))))
 
 (with-test (:name :slot-setf-missing)
@@ -1042,7 +1056,21 @@
   (assert (equal (multiple-value-list
                   (funcall (lambda (x) (setf (slot-value x 'bar) 20))
                            (make-instance 'class-with-all-slots-missing)))
-                 '(20))))
+                 '(20)))
+  (assert (equal (multiple-value-list
+                  (cwasm-ssv 30 (make-instance 'class-with-all-slots-missing)))
+                 '(30))))
+
+(with-test (:name :slot-makunbound-missing)
+  (let ((instance (make-instance 'class-with-all-slots-missing)))
+    (assert (equal (multiple-value-list (slot-makunbound instance 'foo))
+                   (list instance)))
+    (assert (equal (multiple-value-list
+                    (funcall (lambda (x) (slot-makunbound x 'bar)) instance))
+                   (list instance)))
+    (assert (equal (multiple-value-list
+                    (cwasm-smk instance))
+                   (list instance)))))
 
 (macrolet ((try (which)
              `(assert (eq ((lambda (x)
