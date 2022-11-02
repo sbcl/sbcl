@@ -117,9 +117,9 @@
           (format asd "(defsystem :~A :class require-system)~%" *system*))
         (sb-sys:os-exit
          (process-status
-          (run-program #+unix "/bin/cat" #-unix "cat" outputs
-                       ;; probably is /usr/bin/cat.exe but let's not assume that
-                       #-unix :search #-unix t
+          ;; for #+win32 it's probably /usr/bin/cat.exe,
+          ;; for #+unix it's supposed to be /bin/cat, but lp#1995224 says otherwise
+          (run-program "cat" outputs :search t
                        :output joined :if-output-exists :supersede)))))))
 
 (compile 'perform)
