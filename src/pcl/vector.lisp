@@ -382,23 +382,11 @@
        (let ((,index (svref ,pv ,pv-offset))
              (,slots (truly-the simple-vector ,slots)))
          (setq ,value (typecase ,index
-                        ;; FIXME: the line marked by KLUDGE below (and
-                        ;; the analogous spot in
-                        ;; INSTANCE-WRITE-STANDARD) is there purely to
-                        ;; suppress a type mismatch warning that
-                        ;; propagates through to user code.
-                        ;; Presumably SLOTS at this point can never
-                        ;; actually be NIL, but the compiler seems to
-                        ;; think it could, so we put this here to shut
-                        ;; it up.  (see also mail Rudi Schlatte
-                        ;; sbcl-devel 2003-09-21) -- CSR, 2003-11-30
                         ,@(when (or (null kind) (eq kind :instance))
-                                `((fixnum
-                                   (clos-slots-ref ,slots ,index))))
+                            `((fixnum (clos-slots-ref ,slots ,index))))
                         ,@(when (or (null kind) (eq kind :class))
-                                `((cons (cdr ,index))))
-                        (t
-                         +slot-unbound+)))
+                            `((cons (cdr ,index))))
+                        (t +slot-unbound+)))
          (if (unbound-marker-p ,value)
              ,default
              ,value)))))
@@ -448,14 +436,13 @@
               new-value)))
     `(locally (declare #.*optimize-speed*)
        (let ((.good-new-value. ,new-value-form)
-             (,index (svref ,pv ,pv-offset)))
+             (,index (svref ,pv ,pv-offset))
+             (,slots (truly-the simple-vector ,slots)))
          (typecase ,index
            ,@(when (or (null kind) (eq kind :instance))
-                   `((fixnum (and ,slots
-                                  (setf (clos-slots-ref ,slots ,index)
-                                        .good-new-value.)))))
+               `((fixnum (setf (clos-slots-ref ,slots ,index) .good-new-value.))))
            ,@(when (or (null kind) (eq kind :class))
-                   `((cons (setf (cdr ,index) .good-new-value.))))
+               `((cons (setf (cdr ,index) .good-new-value.))))
            (t ,default))))))
 
 (defmacro instance-write-custom (pv pv-offset parameter new-value)
@@ -485,14 +472,13 @@
     (error "illegal kind argument to ~S: ~S" 'instance-boundp-standard kind))
   (let* ((index (gensym)))
     `(locally (declare #.*optimize-speed*)
-       (let ((,index (svref ,pv ,pv-offset)))
+       (let ((,index (svref ,pv ,pv-offset))
+             (,slots (truly-the simple-vector ,slots)))
          (typecase ,index
            ,@(when (or (null kind) (eq kind :instance))
-                   `((fixnum (not (and ,slots
-                                       (unbound-marker-p
-                                        (clos-slots-ref ,slots ,index)))))))
+               `((fixnum (not (unbound-marker-p (clos-slots-ref ,slots ,index))))))
            ,@(when (or (null kind) (eq kind :class))
-                   `((cons (not (unbound-marker-p (cdr ,index))))))
+               `((cons (not (unbound-marker-p (cdr ,index))))))
            (t ,default))))))
 
 (defmacro instance-boundp-custom (pv pv-offset parameter)
