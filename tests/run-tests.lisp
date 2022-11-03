@@ -313,9 +313,9 @@
                                ignored-stream-classoids)
                 collect (sb-kernel:classoid-name key))
           (sort symbols-with-properties #'string<)
-          (sb-impl::info-env-count sb-int:*info-environment*)
-          (hash-table-count types-ht)
-          (hash-table-count setfs-ht))))
+          (loop for key being each hash-key of types-ht collect key)
+          (loop for key being each hash-key of setfs-ht collect key)
+          (list (sb-impl::info-env-count sb-int:*info-environment*)))))
 
 (defun structureish-classoid-ancestors (classoid)
   (map 'list 'sb-kernel:wrapper-classoid
