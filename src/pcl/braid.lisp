@@ -110,6 +110,7 @@
              :defstruct-accessor-symbol ,(dsd-accessor-name slotd)
              :internal-reader-function ,(name->fun reader-fn)
              :internal-writer-function ,(name->fun writer-fn)
+             :always-bound-p ,(dsd-always-boundp slotd)
              :type ,(dsd-type slotd)
              :initform ,(dsd-default slotd)
              ;; This is nuts! any DEFAULT might need its lexical environment,

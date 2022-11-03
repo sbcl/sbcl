@@ -145,7 +145,8 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                            (and (not (eq gf-name 'slot-value-using-class))
                                 (not (equal gf-name
                                             '(setf slot-value-using-class)))
-                                (not (eq gf-name 'slot-boundp-using-class)))))
+                                (not (eq gf-name 'slot-boundp-using-class))
+                                (not (eq gf-name 'slot-makunbound-using-class)))))
                 (update-dfun gf)))
             (setf (second args-entry) constructor)
             (setf (third args-entry) system)
@@ -366,7 +367,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 
 (defun accessor-miss-function (gf dfun-info)
   (ecase (dfun-info-accessor-type dfun-info)
-    ((reader boundp)
+    ((reader boundp makunbound)
      (lambda (arg)
        (accessor-miss gf nil arg dfun-info)))
     (writer
@@ -379,6 +380,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let ((emit (ecase type
                 (reader 'emit-one-class-reader)
                 (boundp 'emit-one-class-boundp)
+                (makunbound 'emit-one-class-makunbound)
                 (writer 'emit-one-class-writer)))
         (dfun-info (one-class-dfun-info type index wrapper)))
     (values
@@ -392,6 +394,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let ((emit (ecase type
                 (reader 'emit-two-class-reader)
                 (boundp 'emit-two-class-boundp)
+                (makunbound 'emit-two-class-makunbound)
                 (writer 'emit-two-class-writer)))
         (dfun-info (two-class-dfun-info type index w0 w1)))
     (values
@@ -406,6 +409,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let* ((emit (ecase type
                  (reader 'emit-one-index-readers)
                  (boundp 'emit-one-index-boundps)
+                 (makunbound 'emit-one-index-makunbounds)
                  (writer 'emit-one-index-writers)))
          (cache (or cache (make-cache :key-count 1 :value nil :size 4)))
          (dfun-info (one-index-dfun-info type index cache)))
@@ -422,6 +426,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let* ((emit (ecase type
                  (reader 'emit-n-n-readers)
                  (boundp 'emit-n-n-boundps)
+                 (makunbound 'emit-n-n-makunbounds)
                  (writer 'emit-n-n-writers)))
          (cache (or cache (make-cache :key-count 1 :value t :size 2)))
          (dfun-info (n-n-dfun-info type cache)))
@@ -717,13 +722,15 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
         ,@body))
     ,(if type
          ;; Munge the EMF so that INVOKE-EMF can do the right thing:
-         ;; BOUNDP gets a structure, WRITER the logical not of the
-         ;; index, so that READER can use the raw index.
+         ;; BOUNDP and MAKUNBOUND get a structure, WRITER the logical
+         ;; not of the index, so that READER can use the raw index.
          ;;
          ;; FIXME: could the NEMF not be a CONS (for :CLASS-allocated
          ;; slots?)
          `(if (integerp ,nemf)
               (case ,type
+                (makunbound
+                 (invoke-emf (make-fast-instance-boundp :index (lognot ,nemf)) ,args))
                 (boundp (invoke-emf (make-fast-instance-boundp :index ,nemf) ,args))
                 (reader (invoke-emf ,nemf ,args))
                 (writer (invoke-emf (lognot ,nemf) ,args)))
@@ -772,12 +779,16 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                   (let* ((class (class-of instance))
                          (class-name (!bootstrap-get-slot 'class class 'name)))
                     (not (unbound-marker-p
-                             (!bootstrap-get-slot class-name
-                                                  instance slot-name))))))
+                          (!bootstrap-get-slot class-name instance slot-name))))))
       (writer #'(lambda (new-value instance)
                   (let* ((class (class-of instance))
                          (class-name (!bootstrap-get-slot 'class class 'name)))
-                    (!bootstrap-set-slot class-name instance slot-name new-value)))))))
+                    (!bootstrap-set-slot class-name instance slot-name new-value))))
+      (makunbound #'(lambda (instance)
+                      (let* ((class (class-of instance))
+                             (class-name (!bootstrap-get-slot 'class class 'name)))
+                        (!bootstrap-set-slot class-name instance slot-name +slot-unbound+)
+                        instance))))))
 
 (defun initial-dfun (gf args)
   (dfun-miss (gf args wrappers invalidp nemf ntype nindex)
@@ -816,13 +827,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
           ((every (lambda (method)
                     (if (consp method)
                         (let ((class (early-method-class method)))
-                          (eq class *the-class-global-boundp-method*))
-                        (global-boundp-method-p method)))
-                  methods)
-           'boundp)
-          ((every (lambda (method)
-                    (if (consp method)
-                        (let ((class (early-method-class method)))
                           (or (eq class *the-class-standard-writer-method*)
                               (eq class *the-class-global-writer-method*)))
                         (and
@@ -832,7 +836,21 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                (slot-definition-class
                                 (accessor-method-slot-definition method)))))))
                   methods)
-           'writer))))
+           'writer)
+          ((every (lambda (method)
+                    (if (consp method)
+                        (let ((class (early-method-class method)))
+                          (eq class *the-class-global-boundp-method*))
+                        (global-boundp-method-p method)))
+                  methods)
+           'boundp)
+          ((every (lambda (method)
+                    (if (consp method)
+                        (let ((class (early-method-class method)))
+                          (eq class *the-class-global-makunbound-method*))
+                        (global-makunbound-method-p method)))
+                  methods)
+           'makunbound))))
 
 (defun make-final-accessor-dfun (gf type &optional classes-list new-class)
   (let ((table (make-hash-table :test #'eq)))
@@ -892,7 +910,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
          (otype (dfun-info-accessor-type dfun-info))
          oindex ow0 ow1 cache
          (args (ecase otype
-                 ((reader boundp) (list object))
+                 ((reader boundp makunbound) (list object))
                  (writer (list new object)))))
     (dfun-miss (gf args wrappers invalidp nemf ntype nindex)
       ;; The following lexical functions change the state of the
@@ -1175,14 +1193,14 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (declare (ignore gf))
   (let* ((accessor-type (gf-info-simple-accessor-type arg-info))
          (accessor-class (case accessor-type
-                           ((reader boundp) (car classes))
+                           ((reader boundp makunbound) (car classes))
                            (writer (cadr classes)))))
     (accessor-values-internal accessor-type accessor-class methods)))
 
 (defun accessor-values1 (gf accessor-type accessor-class)
   (let* ((type `(class-eq ,accessor-class))
          (types (ecase accessor-type
-                  ((reader boundp) `(,type))
+                  ((reader boundp makunbound) `(,type))
                   (writer `(t ,type))))
          (methods (compute-applicable-methods-using-types gf types)))
     (accessor-values-internal accessor-type accessor-class methods)))
@@ -1238,7 +1256,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                                (early-method-specializers method t)
                                (method-specializers method)))
              (specl (ecase type
-                      ((reader boundp) (car specializers))
+                      ((reader boundp makunbound) (car specializers))
                       (writer (cadr specializers))))
              (specl-cpl (if early-p
                             (early-class-precedence-list specl)

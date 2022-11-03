@@ -100,6 +100,7 @@
     (global-reader-method global-reader-method-p)
     (global-writer-method global-writer-method-p)
     (global-boundp-method global-boundp-method-p)
+    (global-makunbound-method global-makunbound-method-p)
     (generic-function generic-function-p)
     (standard-generic-function standard-generic-function-p)
     (method-combination method-combination-p)

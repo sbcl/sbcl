@@ -2488,7 +2488,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "NOTE-NAME-DEFINED"
            "%CODE-CODE-SIZE" "%CODE-TEXT-SIZE"
            "%CODE-SERIALNO"
-           "DD-SLOTS" "DD-HAS-RAW-SLOT-P" "DD-INCLUDE" "SLOT-SETTER-LAMBDA-FORM"
+           "DD-SLOTS" "DD-HAS-RAW-SLOT-P" "DD-INCLUDE"
            "SLOT-ACCESS-TRANSFORM"
            "%IMAGPART" "%CODE-DEBUG-INFO"
            "WRAPPER-CLASSOID" "WRAPPER-INVALID"
@@ -2583,6 +2583,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
 
            "CONDITION-SLOT-VALUE"
            "SET-CONDITION-SLOT-VALUE"
+           "CONDITION-SLOT-BOUNDP"
+           "CONDITION-SLOT-MAKUNBOUND"
 
            "CONDITION-SLOT-ALLOCATION"
            "CONDITION-SLOT-DOCUMENTATION"

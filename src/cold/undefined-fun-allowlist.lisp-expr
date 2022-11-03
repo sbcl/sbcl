@@ -38,6 +38,7 @@
   sb-mop:slot-definition-allocation
   sb-mop:slot-definition-name
   sb-pcl::slot-accessor-std-p
+  slot-missing
   slot-unbound
   sb-pcl::specializer-applicable-using-type-p
   sb-pcl::specializer-class-or-nil

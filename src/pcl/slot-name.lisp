@@ -29,9 +29,13 @@
 ;; But this naming is documented, and changing it would be incompatible.
 ;; The 4-part name can be thought of as a 2-part name because
 ;; half of it is composed of constants:
-;; (SB-PCL::SLOT-ACCESSOR :GLOBAL <foo> SB-PCL::{READER|WRITER|BOUNDP})
-;; -> ({READER|WRITER|BOUNDP} <foo>)
+;; (SB-PCL::SLOT-ACCESSOR :GLOBAL <foo> SB-PCL::{READER|WRITER|BOUNDP|MAKUNBOUND})
+;; -> ({READER|WRITER|BOUNDP|MAKUNBOUND} <foo>)
 ;;
+;; (but beware future maintainer: SB-PCL::BOUNDP/MAKUNBOUND are
+;; symbols in the CL package so should probably not be used to
+;; introduce extended function name syntax, even by SBCL the
+;; implementation)
 (defun slot-reader-name (slot-name)
   (list 'slot-accessor :global slot-name 'reader))
 
@@ -41,10 +45,13 @@
 (defun slot-boundp-name (slot-name)
   (list 'slot-accessor :global slot-name 'boundp))
 
+(defun slot-makunbound-name (slot-name)
+  (list 'slot-accessor :global slot-name 'makunbound))
+
 (define-function-name-syntax slot-accessor (list)
   (when (= (length list) 4)
     (destructuring-bind (class slot rwb) (cdr list)
-      (when (and (member rwb '(sb-pcl::reader sb-pcl::writer sb-pcl::boundp))
+      (when (and (member rwb '(reader writer boundp makunbound))
                  (symbolp slot)
                  (symbolp class))
         (values t slot)))))

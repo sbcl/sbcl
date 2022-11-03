@@ -41,6 +41,7 @@
                   *the-class-global-reader-method*
                   *the-class-global-writer-method*
                   *the-class-global-boundp-method*
+                  *the-class-global-makunbound-method*
                   *the-class-standard-generic-function*
                   *the-class-standard-direct-slot-definition*
                   *the-class-standard-effective-slot-definition*

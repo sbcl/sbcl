@@ -1588,9 +1588,12 @@ bootstrapping.
     (fast-instance-boundp
      (if (or (null args) (cdr args))
          (%program-error "invalid number of arguments")
-         (let ((slots (get-slots (car args))))
-           (not (unbound-marker-p
-                 (clos-slots-ref slots (fast-instance-boundp-index emf)))))))
+         (let ((slots (get-slots (car args)))
+               (index (fast-instance-boundp-index emf)))
+           (if (minusp index)
+               (progn (setf (clos-slots-ref slots (lognot index)) +slot-unbound+)
+                      (car args))
+               (not (unbound-marker-p (clos-slots-ref slots index)))))))
     (function
      (apply emf args))))
 
@@ -1778,12 +1781,13 @@ bootstrapping.
                 (when (equal (cdr form) '(call-next-method))
                   (setq call-next-method-p t))
                 form)
-               ((slot-value set-slot-value slot-boundp)
+               ((slot-value set-slot-value slot-boundp slot-makunbound)
                 (if (constantp (third form) env)
                     (let ((fun (ecase (car form)
                                  (slot-value #'optimize-slot-value)
                                  (set-slot-value #'optimize-set-slot-value)
-                                 (slot-boundp #'optimize-slot-boundp))))
+                                 (slot-boundp #'optimize-slot-boundp)
+                                 (slot-makunbound #'optimize-slot-makunbound))))
                       (funcall fun form slots required-parameters env))
                     form))
                (t form))))
@@ -2029,7 +2033,7 @@ bootstrapping.
                   ;(k1 k2 ..) Each method must accept these &KEY arguments.
                   ;T          must have &KEY or &REST
 
-  gf-info-simple-accessor-type ; nil, reader, writer, boundp
+  gf-info-simple-accessor-type ; nil, reader, writer, boundp, makunbound
   (gf-precompute-dfun-and-emf-p nil) ; set by set-arg-info
 
   gf-info-static-c-a-m-emf
@@ -2172,7 +2176,8 @@ bootstrapping.
            (!bootstrap-slot-index 'standard-writer-method s)
            (!bootstrap-slot-index 'global-reader-method s)
            (!bootstrap-slot-index 'global-writer-method s)
-           (!bootstrap-slot-index 'global-boundp-method s))))
+           (!bootstrap-slot-index 'global-boundp-method s)
+           (!bootstrap-slot-index 'global-makunbound-method s))))
 
 (defun safe-method-specializers (method)
   (if (member (class-of method) **standard-method-classes** :test #'eq)
@@ -2221,7 +2226,9 @@ bootstrapping.
                              (eq class *the-class-global-writer-method*))
                          'writer)
                         ((eq class *the-class-global-boundp-method*)
-                         'boundp)))))
+                         'boundp)
+                        ((eq class *the-class-global-makunbound-method*)
+                         'makunbound)))))
           (setq metatypes (mapcar #'raise-metatype metatypes specializers))
           (setq type (cond ((null type) new-type)
                            ((eq type new-type) type)

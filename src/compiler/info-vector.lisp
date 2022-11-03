@@ -571,11 +571,12 @@
 (defconstant-eqx !+pcl-reader-name+ (make-symbol "READER") (constantly t))
 (defconstant-eqx !+pcl-writer-name+ (make-symbol "WRITER") (constantly t))
 (defconstant-eqx !+pcl-boundp-name+ (make-symbol "BOUNDP") (constantly t))
+(defconstant-eqx !+pcl-makunbound-name+ (make-symbol "MAKUNBOUND") (constantly t))
 
 ;; PCL names are physically 4-lists (see "pcl/slot-name")
 ;; that get treated as 2-component names for globaldb's purposes.
 ;; Return the kind of PCL slot accessor name that NAME is, if it is one.
-;; i.e. it matches (SLOT-ACCESSOR :GLOBAL <sym> READER|WRITER|BOUNDP)
+;; i.e. it matches (SLOT-ACCESSOR :GLOBAL <sym> READER|WRITER|BOUNDP|MAKUNBOUND)
 ;; When called, NAME is already known to start with 'SLOT-ACCESSOR.
 ;; This has to be defined before building PCL.
 (defun pcl-global-accessor-name-p (name)
@@ -587,12 +588,14 @@
              (listp (setq last (cdr tail)))
              (not (cdr last))
              ;; Return symbols that can't conflict, in case somebody
-             ;; legitimates (BOUNDP <f>) via DEFINE-FUNCTION-NAME-SYNTAX.
-             ;; Especially important since BOUNDP is an external of CL.
+             ;; legitimates (BOUNDP <f>) via
+             ;; DEFINE-FUNCTION-NAME-SYNTAX.  Especially important
+             ;; since BOUNDP and MAKUNBOUND are externals of CL.
              (setq kind (case (car last)
                           (sb-pcl::reader !+pcl-reader-name+)
                           (sb-pcl::writer !+pcl-writer-name+)
-                          (sb-pcl::boundp !+pcl-boundp-name+))))
+                          (sb-pcl::boundp !+pcl-boundp-name+)
+                          (sb-pcl::makunbound !+pcl-makunbound-name+))))
         ;; The first return value is what matters to WITH-GLOBALDB-NAME
         ;; for deciding whether the name is "simple".
         ;; Return the KIND first, just in case somehow we end up with
@@ -609,6 +612,7 @@
   (cond ((eq aux-symbol !+pcl-reader-name+) (sb-pcl::slot-reader-name stem))
         ((eq aux-symbol !+pcl-writer-name+) (sb-pcl::slot-writer-name stem))
         ((eq aux-symbol !+pcl-boundp-name+) (sb-pcl::slot-boundp-name stem))
+        ((eq aux-symbol !+pcl-makunbound-name+) (sb-pcl::slot-makunbound-name stem))
         (t (list aux-symbol stem)))) ; something like (SETF frob)
 
 ;; Call FUNCTION with each piece of info in packed VECT using ROOT-SYMBOL
@@ -683,7 +687,7 @@ This is interpreted as
 ;; Given a NAME naming a globaldb object, decide whether the NAME has
 ;; an efficient or "simple" form, versus a general or "hairy" form.
 ;; The efficient form is either a symbol, a (CONS SYMBOL (CONS SYMBOL NULL)),
-;; or a PCL global slot {reader, writer, boundp} function name.
+;; or a PCL global slot {reader, writer, boundp, makunbound} function name.
 ;;
 ;; If NAME is "simple", bind KEY2 and KEY1 to the elements
 ;; in that order, and execute the SIMPLE code, otherwise execute the HAIRY code.

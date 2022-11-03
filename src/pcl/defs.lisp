@@ -360,6 +360,7 @@
 (defclass global-reader-method (accessor-method) ())
 (defclass global-writer-method (accessor-method) ())
 (defclass global-boundp-method (accessor-method) ())
+(defclass global-makunbound-method (accessor-method) ())
 
 (defclass method-combination (metaobject)
   ((%documentation :initform nil :initarg :documentation)))
@@ -451,7 +452,11 @@
    (internal-writer-function
      :initform nil
      :initarg :internal-writer-function
-     :accessor slot-definition-internal-writer-function)))
+     :accessor slot-definition-internal-writer-function)
+   (always-bound-p
+     :initform t
+     :initarg :always-bound-p
+     :accessor slot-definition-always-bound-p)))
 
 (defclass direct-slot-definition (slot-definition)
   ((readers
@@ -472,7 +477,7 @@
 (defun uninitialized-accessor-function (type slotd)
   (lambda (&rest args)
     (declare (ignore args))
-    (error "~:(~A~) function~@[ for ~S ~] not yet initialized."
+    (error "~:(~A~) function~@[ for ~S~] not yet initialized."
            type slotd)))
 ;;; We use a structure here, because fast slot-accesses to this information
 ;;; are critical to making SLOT-VALUE-USING-CLASS &co fast: places that need
@@ -482,15 +487,17 @@
             (:copier nil)
             (:constructor make-slot-info
                 (&key slotd typecheck allocation location
-                 (reader (uninitialized-accessor-function :reader slotd))
-                 (writer (uninitialized-accessor-function :writer slotd))
-                 (boundp (uninitialized-accessor-function :boundp slotd)))))
+                   (reader (uninitialized-accessor-function :reader slotd))
+                   (writer (uninitialized-accessor-function :writer slotd))
+                   (boundp (uninitialized-accessor-function :boundp slotd))
+                   (makunbound (uninitialized-accessor-function :makunbound slotd)))))
   (typecheck nil :type (or null function))
   (allocation nil)
   (location nil)
   (reader (missing-arg) :type function)
   (writer (missing-arg) :type function)
-  (boundp (missing-arg) :type function))
+  (boundp (missing-arg) :type function)
+  (makunbound (missing-arg) :type function))
 (declaim (freeze-type slot-info))
 
 (defclass standard-direct-slot-definition (standard-slot-definition

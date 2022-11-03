@@ -2175,7 +2175,7 @@
   (movable foldable flushable))
 
 ;; FIXME: should T be be (OR INSTANCE FUNCALLABLE-INSTANCE) etc?
-(defknown slot-value (t symbol) t (any))
+(defknown (slot-value slot-makunbound) (t symbol) t (any))
 (defknown (slot-boundp slot-exists-p) (t symbol) boolean)
 (defknown sb-pcl::set-slot-value (t symbol t) t (any))
 

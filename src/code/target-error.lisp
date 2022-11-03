@@ -306,9 +306,9 @@ with that condition (or with no condition) will be returned."
 
 ;;;; slots of CONDITION objects
 
-(defun find-slot-default (class slot)
-  (multiple-value-bind (value found) (find-slot-default-initarg class slot)
-    ;; When CLASS or a superclass has a default initarg for SLOT, use
+(defun find-slot-default (condition classoid slot &optional boundp)
+  (multiple-value-bind (value found) (find-slot-default-initarg classoid slot)
+    ;; When CLASSOID or a superclass has a default initarg for SLOT, use
     ;; that.
     (cond (found
            value)
@@ -317,15 +317,20 @@ with that condition (or with no condition) will be returned."
            (let ((initfun (condition-slot-initfunction slot)))
              (aver (functionp initfun))
              (funcall initfun)))
+          ;; if we're computing SLOT-BOUNDP, return an unbound marker
+          (boundp sb-pcl:+slot-unbound+)
+          ;; if we're computing SLOT-VALUE, call SLOT-UNBOUND
           (t
-           (error "Unbound condition slot: ~S" (condition-slot-name slot))))))
+           (let ((class (classoid-pcl-class classoid))
+                 (name (condition-slot-name slot)))
+             (values (slot-unbound class condition name)))))))
 
-(defun find-slot-default-initarg (class slot)
+(defun find-slot-default-initarg (classoid slot)
   (let ((initargs (condition-slot-initargs slot))
-        (cpl (condition-classoid-cpl class)))
-    (dolist (class cpl)
+        (cpl (condition-classoid-cpl classoid)))
+    (dolist (classoid cpl)
       (let ((direct-default-initargs
-              (condition-classoid-direct-default-initargs class)))
+              (condition-classoid-direct-default-initargs classoid)))
         (dolist (initarg initargs)
           (let ((initfunction (third (assoc initarg direct-default-initargs))))
             (when initfunction
@@ -351,27 +356,66 @@ with that condition (or with no condition) will be returned."
       (return (setf (car (condition-slot-cell cslot)) new-value)))))
 
 (defun condition-slot-value (condition name)
-  (let ((val (getf (condition-assigned-slots condition) name sb-pcl:+slot-unbound+)))
-    (if (unbound-marker-p val)
-        (let ((class (wrapper-classoid (%instance-wrapper condition))))
-          (dolist (cslot
-                   (condition-classoid-class-slots class)
-                   (let ((instance-length (%instance-length condition))
-                         (slot (or (find-condition-class-slot class name)
-                                   (error "missing slot ~S of ~S" name condition))))
-                     (setf (getf (condition-assigned-slots condition) name)
-                           (do ((i (+ sb-vm:instance-data-start 1) (+ i 2)))
-                               ((>= i instance-length) (find-slot-default class slot))
-                               (when (member (%instance-ref condition i)
-                                             (condition-slot-initargs slot))
-                                 (return (%instance-ref condition (1+ i))))))))
-            (when (eq (condition-slot-name cslot) name)
-              (let ((value (car (condition-slot-cell cslot))))
-                (if (unbound-marker-p value)
-                    (error "Unbound condition slot: ~S" (condition-slot-name cslot))
-                    (return value))))))
-        val)))
+  (let* ((sentinel (load-time-value (cons nil nil)))
+         (val (getf (condition-assigned-slots condition) name sentinel)))
+    (cond
+      ((unbound-marker-p val)
+       (let* ((classoid (wrapper-classoid (%instance-wrapper condition)))
+              (class (classoid-pcl-class classoid)))
+         (values (slot-unbound class condition name))))
+      ((eql val sentinel)
+       (let ((classoid (wrapper-classoid (%instance-wrapper condition))))
+         (dolist (cslot
+                  (condition-classoid-class-slots classoid)
+                  (let ((instance-length (%instance-length condition))
+                        (slot (or (find-condition-class-slot classoid name)
+                                  (return-from condition-slot-value
+                                    (let ((class (classoid-pcl-class classoid)))
+                                      (values (slot-missing class condition name 'slot-value)))))))
+                    (setf (getf (condition-assigned-slots condition) name)
+                          (do ((i (+ sb-vm:instance-data-start 1) (+ i 2)))
+                              ((>= i instance-length)
+                               (find-slot-default condition classoid slot))
+                            (when (member (%instance-ref condition i)
+                                          (condition-slot-initargs slot))
+                              (return (%instance-ref condition (1+ i))))))))
+           (when (eq (condition-slot-name cslot) name)
+             (let ((value (car (condition-slot-cell cslot))))
+               (if (unbound-marker-p value)
+                   (let ((class (classoid-pcl-class classoid)))
+                     (return (values (slot-unbound class condition name))))
+                   (return value)))))))
+      (t val))))
 
+(defun condition-slot-boundp (condition name)
+  (let* ((sentinel (load-time-value (cons nil nil)))
+         (val (getf (condition-assigned-slots condition) name sentinel)))
+    (cond
+      ((unbound-marker-p val) nil)
+      ((eql val sentinel)
+       (let ((classoid (wrapper-classoid (%instance-wrapper condition))))
+         (dolist (cslot
+                  (condition-classoid-class-slots classoid)
+                  (let ((instance-length (%instance-length condition))
+                        (slot (or (find-condition-class-slot classoid name)
+                                  (return-from condition-slot-boundp
+                                    (not (not (slot-missing (classoid-pcl-class classoid)
+                                                            condition name 'slot-boundp)))))))
+                    (let ((val (do ((i (+ sb-vm:instance-data-start 1) (+ i 2)))
+                                   ((>= i instance-length)
+                                    (find-slot-default condition classoid slot t))
+                                 (when (member (%instance-ref condition i)
+                                               (condition-slot-initargs slot))
+                                   (return (%instance-ref condition (1+ i)))))))
+                      (setf (getf (condition-assigned-slots condition) name) val)
+                      (not (unbound-marker-p val)))))
+           (when (eq (condition-slot-name cslot) name)
+             (let ((value (car (condition-slot-cell cslot))))
+               (return (not (unbound-marker-p value))))))))
+      (t t))))
+
+(defun condition-slot-makunbound (condition name)
+  (set-condition-slot-value condition sb-pcl:+slot-unbound+ name))
 
 ;;;; MAKE-CONDITION
 
@@ -398,9 +442,9 @@ with that condition (or with no condition) will be returned."
   ;; we could say that it's a supported extension.
   (let ((classoid (named-let lookup ((designator designator))
                     (typecase designator
-                     (symbol (find-classoid designator nil))
-                     (class (lookup (class-name designator)))
-                     (t designator)))))
+                      (symbol (find-classoid designator nil))
+                      (class (lookup (class-name designator)))
+                      (t designator)))))
     (unless (condition-classoid-p classoid)
       (error 'simple-type-error
              :datum designator
@@ -422,15 +466,15 @@ with that condition (or with no condition) will be returned."
                     (<= (get-lisp-obj-address sb-vm:*control-stack-start*) addr)
                     (< addr (get-lisp-obj-address sb-vm:*control-stack-end*))))))
       (let* ((any-dx
-              (loop for arg-index from 1 below (length initargs) by 2
-                    thereis (stackp (fast-&rest-nth arg-index initargs))))
+               (loop for arg-index from 1 below (length initargs) by 2
+                       thereis (stackp (fast-&rest-nth arg-index initargs))))
              (layout (classoid-wrapper classoid))
              (extra (if (and any-dx (type-err-p layout)) 2 0)) ; space for secret initarg
              (instance (%new-instance layout
-                                        (+ sb-vm:instance-data-start
-                                          1 ; ASSIGNED-SLOTS
-                                          (length initargs)
-                                          extra)))
+                                      (+ sb-vm:instance-data-start
+                                         1 ; ASSIGNED-SLOTS
+                                         (length initargs)
+                                         extra)))
              (data-index (1+ sb-vm:instance-data-start))
              (arg-index 0)
              (have-type-error-datum)
@@ -511,7 +555,7 @@ with that condition (or with no condition) will be returned."
                 (return nil)))
         (setf (getf (condition-assigned-slots condition)
                     (condition-slot-name hslot))
-              (find-slot-default classoid hslot))))
+              (find-slot-default condition classoid hslot))))
 
     condition))
 

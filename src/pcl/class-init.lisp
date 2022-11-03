@@ -34,7 +34,8 @@
   '(standard-method standard-reader-method
     standard-writer-method
     global-reader-method global-writer-method
-    global-boundp-method)
+    global-boundp-method
+    global-makunbound-method)
   #'equal)
 
 (define-load-time-global *sgf-wrapper*
@@ -494,7 +495,9 @@
           :writer
           (make-optimized-std-writer-method-function nil nil slot-name index)
           :boundp
-          (make-optimized-std-boundp-method-function nil nil slot-name index))))
+          (make-optimized-std-boundp-method-function nil nil slot-name index)
+          :makunbound
+          (make-optimized-std-makunbound-method-function nil nil slot-name index))))
       (when (and (eq name 'standard-class)
                  (eq slot-name 'slots) effective-p)
         (setq *the-eslotd-standard-class-slots* slotd))
@@ -631,6 +634,31 @@
         (declare (ignore instance))
         (instance-structure-protocol-error slotd 'slot-boundp-using-class))))
    `(boundp ,slot-name)))
+
+(defun make-optimized-std-makunbound-method-function
+    (fsc-p slotd slot-name location)
+  (set-fun-name
+   (etypecase location
+     (fixnum (if fsc-p
+                 (lambda (instance)
+                   (check-obsolete-instance instance)
+                   (setf (clos-slots-ref (fsc-instance-slots instance) location)
+                         +slot-unbound+)
+                   instance)
+                 (lambda (instance)
+                   (check-obsolete-instance instance)
+                   (setf (clos-slots-ref (std-instance-slots instance) location)
+                         +slot-unbound+)
+                   instance)))
+     (cons (lambda (instance)
+             (check-obsolete-instance instance)
+             (setf (cdr location) +slot-unbound+)
+             instance))
+     (null
+      (lambda (instance)
+        (declare (ignore instance))
+        (instance-structure-protocol-error slotd 'slot-makunbound-using-class))))
+   `(makunbound ,slot-name)))
 
 ;;;; FINDING SLOT DEFINITIONS
 ;;;

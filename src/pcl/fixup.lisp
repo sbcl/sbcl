@@ -57,6 +57,12 @@
                      (make-std-boundp-method-function 'slot-object slot-name)
                      "automatically-generated boundp method"
                      (make-fallback-boundp-method-function slot-name)
+                     fallback-reader-specializers))
+            (makunbound
+             (values '(object) reader-specializers 'global-makunbound-method
+                     (make-std-makunbound-method-function 'slot-object slot-name)
+                     "automatically-generated makunbound method"
+                     (make-fallback-makunbound-method-function slot-name)
                      fallback-reader-specializers)))
         (let ((gf (ensure-generic-function fun-name :lambda-list lambda-list)))
           (add-method gf (make-a-method method-class ()

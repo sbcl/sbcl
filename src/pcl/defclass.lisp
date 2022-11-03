@@ -68,6 +68,7 @@
                      slots)))
         (inform slots #'sb-pcl::slot-reader-name reader-function-type)
         (inform slots #'sb-pcl::slot-boundp-name reader-function-type)
+        (inform slots #'sb-pcl::slot-makunbound-name reader-function-type)
         (inform slots #'sb-pcl::slot-writer-name writer-function-type)))))
 
 (defun %%compiler-defclass (name readers writers slots)

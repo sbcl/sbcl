@@ -93,7 +93,10 @@
              (and (slot-missing class object slot-name 'slot-boundp) t))
    :writer (lambda (new-value object)
              (slot-missing class object slot-name 'setf new-value)
-             new-value)))
+             new-value)
+   :makunbound (lambda (object)
+                 (slot-missing class object slot-name 'slot-makunbound)
+                 object)))
 
 (defun compute-pv (slot-name-lists wrappers)
   (let ((wrappers (ensure-list wrappers)))
@@ -160,7 +163,8 @@
     (let ((type (ecase op
                   (slot-value 'reader)
                   (set-slot-value 'writer)
-                  (slot-boundp 'boundp)))
+                  (slot-boundp 'boundp)
+                  (slot-makunbound 'makunbound)))
           (var (extract-the var-form))
           (slot-name (constant-form-value slot-name-form env)))
       (when (and (symbolp var) (not (var-special-p var env)))
@@ -272,6 +276,22 @@
       `(accessor-slot-boundp ,@(cdr form))
       optimized-form))
 
+(defun optimize-slot-makunbound (form slots required-parameters env)
+  (multiple-value-bind (sparameter slot-name)
+      (can-optimize-access form required-parameters env)
+    (if sparameter
+        (let ((optimized-form
+                (optimize-instance-access slots :makunbound sparameter
+                                          slot-name nil)))
+          `(optimized-slot-makunbound ,form ,(car sparameter) ,optimized-form))
+        `(accessor-slot-makunbound ,@(cdr form)))))
+
+(defmacro optimized-slot-makunbound (form parameter-name optimized-form
+                                     &environment env)
+  (if (parameter-modified-p parameter-name env)
+      `(accessor-slot-makunbound ,@(cdr form))
+      optimized-form))
+
 ;;; The SLOTS argument is an alist, the CAR of each entry is the name
 ;;; of a required parameter to the function. The alist is in order, so
 ;;; the position of an entry in the alist corresponds to the
@@ -292,7 +312,10 @@
                      ,parameter)
                     ,new-value))
             (:boundp
-             t)))
+             t)
+            (:makunbound
+             ;; what should SLOT-MAKUNBOUND on a structure slot do?  Do that here.
+             )))
         (let* ((parameter-entry (assq parameter slots))
                (slot-entry      (assq slot-name (cdr parameter-entry)))
                (position (posq parameter-entry slots))
@@ -313,7 +336,10 @@
                                 ',slot-name ',class .new-value. ,safep)))
             (:boundp
              `(instance-boundp ,pv-offset-form ,parameter ,position
-                               ',slot-name ',class)))))))
+                               ',slot-name ',class))
+            (:makunbound
+             `(instance-makunbound ,pv-offset-form ,parameter ,position
+                                   ',slot-name ',class)))))))
 
 (define-walker-template pv-offset) ; These forms get munged by mutate slots.
 (defmacro pv-offset (arg) arg)
@@ -489,6 +515,45 @@
 (defmacro instance-boundp-custom (pv pv-offset parameter)
   `(locally (declare #.*optimize-speed*)
      (funcall (slot-info-boundp (svref ,pv (1+ ,pv-offset))) ,parameter)))
+
+;;;; SLOT-MAKUNBOUND
+
+(defmacro instance-makunbound (pv-offset parameter position slot-name class)
+  (ecase (slot-access-strategy (constant-value-or-nil class)
+                               (constant-value-or-nil slot-name)
+                               'makunbound)
+    (:standard
+     `(instance-makunbound-standard
+       .pv. ,(slot-vector-symbol position)
+       ,pv-offset (accessor-slot-makunbound ,parameter ,slot-name)
+       ,parameter
+       ,(if (generate-fast-class-slot-access-p class slot-name)
+            :class :instance)))
+    (:custom
+     `(instance-makunbound-custom .pv. ,pv-offset ,parameter))
+    (:accessor
+     `(accessor-slot-makunbound ,parameter ,slot-name))))
+
+(defmacro instance-makunbound-standard (pv slots pv-offset default parameter
+                                        &optional kind)
+  (unless (member kind '(nil :instance :class))
+    (error "illegal kind argument to ~S: ~S" 'instance-makunbound-standard kind))
+  (let* ((index (gensym)))
+    `(locally (declare #.*optimize-speed*)
+       (let ((,index (svref ,pv ,pv-offset))
+             (,slots (truly-the simple-vector ,slots)))
+         (typecase ,index
+           ,@(when (or (null kind) (eq kind :instance))
+               `((fixnum (setf (clos-slots-ref ,slots ,index) +slot-unbound+)
+                         ,parameter)))
+           ,@(when (or (null kind) (eq kind :class))
+               `((cons (setf (cdr ,index) +slot-unbound+)
+                       ,parameter)))
+           (t ,default))))))
+
+(defmacro instance-makunbound-custom (pv pv-offset parameter)
+  `(locally (declare #.*optimize-speed*)
+     (funcall (slot-info-makunbound (svref ,pv (1+ ,pv-offset))) ,parameter)))
 
 ;;; This magic function has quite a job to do indeed.
 ;;;

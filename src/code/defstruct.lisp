@@ -266,14 +266,17 @@
                                 ,(slot-access-transform :setf '(instance value) key))))
                         (sb-c:xdefun ,accessor-name :accessor ,source-form (instance)
                                      ,(slot-access-transform :read '(instance) key))))))
-      ;; Return fragements of code that CLOS can use.
-      ;; We don't return the toplevel DEFUNs because those generally
-      ;; perform an unneeded type-check unless in safety 0.
-      ;; These lambdas don't need to check the instance
-      ;; because it was already subject to type-based dispatch.
-      ;; FIXME: it seems like all these fragments should be packed into a single codebob
-      ;; which will have less overhead than separate blobs.
-      ;; Afaict, the only way to do that is to return one lambda that returns all the lambdas.
+      ;; Return fragements of code that CLOS can use.  We don't return
+      ;; the toplevel DEFUNs because those generally perform an
+      ;; unneeded type-check unless in safety 0.  These CLOS-related
+      ;; lambdas don't need to check the type of the instance because
+      ;; it was already subject to type-based dispatch, and must let
+      ;; unbound markers through for the CLOS machinery to handle.
+      ;;
+      ;; FIXME: it seems like all these fragments should be packed
+      ;; into a single codebob which will have less overhead than
+      ;; separate blobs.  Afaict, the only way to do that is to return
+      ;; one lambda that returns all the lambdas.
       (collect ((result))
         (dolist (dsd (dd-slots dd) (result))
           (binding* ((key (cons dd dsd))
@@ -283,25 +286,24 @@
                      ;; accessor is the global defun
                      (accessor (dsd-accessor-name dsd)))
             (declare (dynamic-extent key))
-            (result (if (dsd-read-only dsd)
+            (result (if (or (dsd-read-only dsd) (not (dsd-always-boundp dsd)))
                         `(named-lambda (setf ,name) (#1=#:v #2=#:x)
                            ,@(if (eql (dsd-type dsd) 't)
                                  ;; no typecheck
                                  `((,writer (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd) #1#) #1#)
                                  `(,(slot-access-transform :setf `(#1# (truly-the ,(dd-name dd) #2#))
-                                                           key :function))))
+                                                           key :function t))))
                         `'(setf ,accessor))
-                    (if nil ; TODO: policy-based selection perhaps?
+                    (if (not (dsd-always-boundp dsd))
                         `(named-lambda ,name (#2#)
-                           ,(if (and (dsd-always-boundp dsd) (dsd-safe-p dsd))
-                                ;; Most slots are always-boundp (don't have a BOA constructor
-                                ;; that omits slots) and safe-p (type-safe for reading),
+                           ,(if (dsd-safe-p dsd)
+                                ;; Most slots are safe-p (type-safe for reading),
                                 ;; so we can be concise rather than use SLOT-ACCESS-TRANSFORM
                                 ;; plus a rebinding of X with TRULY-THE.
                                 `(,reader (truly-the ,(dd-name dd) #2#) ,(dsd-index dsd))
                                 ;; Don't check X, but do check the the fetched value.
                                 (slot-access-transform :read `((truly-the ,(dd-name dd) #2#))
-                                                       key)))
+                                                       key :function t)))
                         `',accessor)))))))
 
 ;;; shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
@@ -1242,7 +1244,10 @@ unless :NAMED is also specified.")))
 ;;; versus
 ;;;    (setf (mystruct-myslot s) newval) ; :MACRO
 ;;; Return NIL on failure.
-(defun slot-access-transform (operation args slot-key &optional (fun-or-macro :macro))
+(defun slot-access-transform (operation args slot-key
+                              &optional
+                                (fun-or-macro :macro)
+                                (external-unbound-handling nil))
   (binding* ((dd (car slot-key))
              (dsd (cdr slot-key))
              ((reader writer) (dsd-reader dsd (neq (dd-type dd) 'structure)))
@@ -1253,45 +1258,58 @@ unless :NAMED is also specified.")))
        (when (singleton-p args)
          (let* ((instance-form `(the ,(dd-name dd) ,(car args)))
                 (place `(,reader ,instance-form ,index)))
-            ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
-            ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
-            ;; check the type on each read. Assuming that type-checks reject
-            ;; the unbound-marker, then we needn't separately check for it.
-            (cond ((not (dsd-safe-p dsd))
-                   `(the ,type-spec ,place))
-                  (t
-                   (unless (dsd-always-boundp dsd)
-                     (setf place
-                           `(the* ((not (satisfies sb-vm::unbound-marker-p))
-                                   :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
-                                  ,place)))
-                   (if (eq type-spec t) place
-                       `(the* (,type-spec :derive-type-only t) ,place)))))))
+           ;; There are 4 cases of {safe,unsafe} x {always-boundp,possibly-unbound}
+           ;; If unsafe - which implies TYPE-SPEC other than type T - then we must
+           ;; check the type on each read. Assuming that type-checks reject
+           ;; the unbound-marker, then we needn't separately check for it, but if
+           ;; we're generating code fragments for CLOS (which does its own
+           ;; EXTERNAL-UNBOUND-HANDLING) we need to let it through explicitly.
+           (cond ((not (dsd-safe-p dsd))
+                  (when (and (not (dsd-always-boundp dsd)) external-unbound-handling)
+                    (setq type-spec `(or ,type-spec (satisfies sb-vm::unbound-marker-p))))
+                  `(the ,type-spec ,place))
+                 (t
+                  ;; unless the slot is always bound, or unbound handling is external,
+                  ;; check here for unbound marker.
+                  (unless (or (dsd-always-boundp dsd) external-unbound-handling)
+                    (setf place
+                          `(the* ((not (satisfies sb-vm::unbound-marker-p))
+                                  :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
+                                 ,place)))
+                  (cond
+                    ((eq type-spec t) place)
+                    (t
+                     (when (and (not (dsd-always-boundp dsd)) external-unbound-handling)
+                       (setq type-spec `(or ,type-spec (satisfies sb-vm::unbound-marker-p))))
+                     `(the* (,type-spec :derive-type-only t) ,place))))))))
       (:setf
-        ;; The primitive object slot setting vops take newval last, which matches
-        ;; the order in which a use of SETF has them, but because the vops
-        ;; do not return anything, we have to bind both arguments.
-        (when (and (listp args) (singleton-p (cdr args)))
-          (multiple-value-bind (newval-form instance-form)
-              (ecase fun-or-macro
-                (:function (values (first args) (second args)))
-                (:macro (values (second args) (first args))))
-            (if (eq fun-or-macro :function)
-                ;; This used only for source-transforming (funcall #'(setf myslot) ...).
-                ;; (SETF x) writer functions have been defined as source-transforms instead of
-                ;; inline functions, which improved the semantics around clobbering defstruct
-                ;; writers with random DEFUNs either deliberately or accidentally.
-                ;; Since users can't define source-transforms (not portably anyway),
-                ;; we can easily discern which functions were system-generated.
-                `(let ((#2=#:val
-                        #4=,(if (eq type-spec t)
-                                newval-form
-                                `(the* (,type-spec :context (:struct ,(dd-name dd) . ,(dsd-name dsd)))
-                                       ,newval-form)))
-                       (#1=#:instance #3=(the ,(dd-name dd) ,instance-form)))
-                   (,writer #1# ,index #2#)
-                   #2#)
-                `(let ((#1# #3#) (#2# #4#)) (,writer #1# ,index #2#) #2#))))))))
+       ;; The primitive object slot setting vops take newval last, which matches
+       ;; the order in which a use of SETF has them, but because the vops
+       ;; do not return anything, we have to bind both arguments.
+       (when (and (listp args) (singleton-p (cdr args)))
+         (multiple-value-bind (newval-form instance-form)
+             (ecase fun-or-macro
+               (:function (values (first args) (second args)))
+               (:macro (values (second args) (first args))))
+           (if (eq fun-or-macro :function)
+               ;; This used only for source-transforming (funcall #'(setf myslot) ...).
+               ;; (SETF x) writer functions have been defined as source-transforms instead of
+               ;; inline functions, which improved the semantics around clobbering defstruct
+               ;; writers with random DEFUNs either deliberately or accidentally.
+               ;; Since users can't define source-transforms (not portably anyway),
+               ;; we can easily discern which functions were system-generated.
+               `(let ((#2=#:val
+                        #4=,(cond
+                              ((eq type-spec t) newval-form)
+                              (t
+                               (unless (or (dsd-always-boundp dsd) (not external-unbound-handling))
+                                 (setq type-spec `(or ,type-spec (satisfies sb-vm::unbound-marker-p))))
+                               `(the* (,type-spec :context (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                                      ,newval-form))))
+                      (#1=#:instance #3=(the ,(dd-name dd) ,instance-form)))
+                  (,writer #1# ,index #2#)
+                  #2#)
+               `(let ((#1# #3#) (#2# #4#)) (,writer #1# ,index #2#) #2#))))))))
 
 ;;; Apply TRANSFORM - a special indicator stored in :SOURCE-TRANSFORM
 ;;; for a DEFSTRUCT copier, accessor, or predicate - to SEXPR.
@@ -1315,12 +1333,6 @@ unless :NAMED is also specified.")))
                  (slot-access-transform (if (consp name) :setf :read)
                                         (cdr sexpr) transform :function)))))
     (values result (not result))))
-
-;;; Return a LAMBDA form which can be used to set a slot
-(defun slot-setter-lambda-form (dd dsd)
-  `(lambda (newval instance)
-     (declare (optimize (debug 0)))
-     ,(slot-access-transform :setf '(instance newval) (cons dd dsd))))
 
 ;;; Blow away all the compiler info for the structure CLASS. Iterate
 ;;; over this type, clearing the compiler structure type info, and

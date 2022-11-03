@@ -11,6 +11,7 @@ it still has quite a few.  @xref{Contributed Modules}.
 * Package-Local Nicknames::
 * Package Variance::
 * Garbage Collection::
+* Slot Access::
 * Metaobject Protocol::
 * Extensible Sequences::
 * Support For Unix::
@@ -279,6 +280,59 @@ The @code{:print nil} argument is a bit different:
 There is no output on @code{cl:*standard-output*} and the return value
 is a single path for the target object @t{"my string"}. As before, the
 path shows the symbol and the three cons cells.
+
+@node Slot Access
+@comment  node-name,  next,  previous,  up
+@section Slot Access
+
+@findex @cl{slot-value}
+@findex @setf{@cl{slot-value}}
+@findex @cl{slot-boundp}
+@findex @cl{slot-makunbound}
+The slot access functions @code{slot-value}, @code{(setf slot-value)},
+@code{slot-boundp} and @code{slot-makunbound} are defined to function
+as expected on conditions (of metaclass @code{condition-class}) and,
+with some limitations, on structures (of metaclass
+@code{structure-class}).
+
+For structures:
+
+@itemize
+@item
+@findex @cl{defstruct}
+The name of a slot for the purposes of the slot access functions is
+the symbol used as the slot-name in the slot-description in the
+@code{defstruct} form;
+
+@item
+@findex @cl{slot-unbound}
+@findex @cl{slot-value}
+@findex @cl{slot-boundp}
+@code{slot-value} and @code{slot-boundp} function as expected,
+including (for @code{slot-value}) calling and respecting the return
+value of @code{slot-unbound} if the slot is unbound;
+
+@item
+@findex @setf{@cl{slot-value}}
+@code{(setf slot-value)} functions as expected, including performing
+type checks to verify that the new value is of an appropriate type for
+the slot;
+
+@item
+@findex @cl{slot-makunbound}
+@code{slot-makunbound} makes the slot be unbound only when the slot
+corresponds to an @code{&aux} argument with no default in a
+by-order-of-arguments (BOA) constructor.  In all other cases calling
+@code{slot-makunbound} on a structure signals an error.
+
+@item
+@findex @cl{slot-missing}
+If any of the slot access functions is called with a structure
+instance which does not have a slot of the given name,
+@code{slot-missing} is called and the return value of the effective
+method, if any, is respected.
+
+@end itemize
 
 @node Metaobject Protocol
 @comment  node-name,  next,  previous,  up

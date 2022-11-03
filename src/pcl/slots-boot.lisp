@@ -36,16 +36,38 @@
           (ecase method
             (reader (lambda (object) (slot-value object slot-name)))
             (writer (lambda (newval object) (setf (slot-value object slot-name) newval)))
-            (boundp (lambda (object) (slot-boundp object slot-name))))))|#
+            (boundp (lambda (object) (slot-boundp object slot-name)))
+            (makunbound (lambda (object) (slot-makunbound object slot-name))))))|#
   (setf (fdefinition fun-name)
         (lambda (&rest args)
           (error "Nooooo! ~S accidentally invoked on ~S" fun-name args))))
 
+(defun make-structure-slot-value-function (slotd)
+  (if (slot-definition-always-bound-p slotd)
+      (slot-definition-internal-reader-function slotd)
+      (named-lambda checking-slot-value (object)
+        (let ((value (funcall (slot-definition-internal-reader-function slotd) object)))
+          (if (unbound-marker-p value)
+              (values (slot-unbound (class-of object) object (slot-definition-name slotd)))
+              value)))))
+
 (defun make-structure-slot-boundp-function (slotd)
-  (declare (ignore slotd))
-  (named-lambda always-bound (object)
-    (declare (ignore object))
-    t))
+  (if (slot-definition-always-bound-p slotd)
+      (named-lambda always-bound (object)
+        (declare (ignore object))
+        t)
+      (named-lambda checking-slot-boundp (object)
+        (not (unbound-marker-p
+              (funcall (slot-definition-internal-reader-function slotd) object))))))
+
+(defun make-structure-slot-makunbound-function (slotd)
+  (if (slot-definition-always-bound-p slotd)
+      (named-lambda cannot-makunbound (object)
+        (error "Cannot unbind slot ~S in structure ~S" (slot-definition-name slotd) object))
+      (named-lambda can-makunbound (object)
+        (funcall (slot-definition-internal-writer-function slotd)
+                 sb-pcl:+slot-unbound+ object)
+        object)))
 
 (define-condition instance-structure-protocol-error
     (reference-condition error)
@@ -75,15 +97,17 @@
   (cond
     ((structure-class-p class)
      (ecase name
-       (reader (slot-definition-internal-reader-function slotd))
+       (reader (make-structure-slot-value-function slotd))
        (writer (slot-definition-internal-writer-function slotd))
-       (boundp (make-structure-slot-boundp-function slotd))))
+       (boundp (make-structure-slot-boundp-function slotd))
+       (makunbound (make-structure-slot-makunbound-function slotd))))
     ((condition-class-p class)
      (let ((info (the slot-info (slot-definition-info slotd))))
        (ecase name
          (reader (slot-info-reader info))
          (writer (slot-info-writer info))
-         (boundp (slot-info-boundp info)))))
+         (boundp (slot-info-boundp info))
+         (makunbound (slot-info-makunbound info)))))
     (t
      (let* ((fsc-p (cond ((standard-class-p class) nil)
                          ((funcallable-standard-class-p class) t)
@@ -99,7 +123,8 @@
             (function (ecase name
                         (reader #'make-optimized-std-reader-method-function)
                         (writer #'make-optimized-std-writer-method-function)
-                        (boundp #'make-optimized-std-boundp-method-function)))
+                        (boundp #'make-optimized-std-boundp-method-function)
+                        (makunbound #'make-optimized-std-makunbound-method-function)))
             ;; KLUDGE: we need this slightly hacky calling convention
             ;; for these functions for bootstrapping reasons: see
             ;; !BOOTSTRAP-MAKE-SLOT-DEFINITION in braid.lisp.  -- CSR,
@@ -127,6 +152,11 @@
     (declare (ignore class object slotd))
     t))
 
+(defun make-optimized-structure-slot-makunbound-using-class-method-function ()
+  (lambda (class object slotd)
+    (declare (ignore class object slotd))
+    (error "Cannot make structure slots unbound")))
+
 (defun get-optimized-std-slot-value-using-class-method-function
     (class slotd name)
   (cond
@@ -136,7 +166,8 @@
                 (slot-definition-internal-reader-function slotd)))
        (writer (make-optimized-structure-setf-slot-value-using-class-method-function
                 (slot-definition-internal-writer-function slotd)))
-       (boundp (make-optimized-structure-slot-boundp-using-class-method-function))))
+       (boundp (make-optimized-structure-slot-boundp-using-class-method-function))
+       (makunbound (make-optimized-structure-slot-makunbound-using-class-method-function))))
     ((condition-class-p class)
      (let ((info (slot-definition-info slotd)))
        (ecase name
@@ -154,19 +185,26 @@
           (let ((fun (slot-info-boundp info)))
             (lambda (class object slotd)
               (declare (ignore class slotd))
+              (funcall fun object))))
+         (makunbound
+          (let ((fun (slot-info-makunbound info)))
+            (lambda (class object slotd)
+              (declare (ignore class slotd))
               (funcall fun object)))))))
     (t
      (let* ((fsc-p (cond ((standard-class-p class) nil)
                          ((funcallable-standard-class-p class) t)
                          (t (error "~S is not a standard-class" class))))
             (function
-             (ecase name
-               (reader
-                #'make-optimized-std-slot-value-using-class-method-function)
-               (writer
-                #'make-optimized-std-setf-slot-value-using-class-method-function)
-               (boundp
-                #'make-optimized-std-slot-boundp-using-class-method-function))))
+              (ecase name
+                (reader
+                 #'make-optimized-std-slot-value-using-class-method-function)
+                (writer
+                 #'make-optimized-std-setf-slot-value-using-class-method-function)
+                (boundp
+                 #'make-optimized-std-slot-boundp-using-class-method-function)
+                (makunbound
+                 #'make-optimized-std-slot-makunbound-using-class-method-function))))
        (declare (type function function))
        (values (funcall function fsc-p slotd)
                (slot-definition-location slotd))))))
@@ -268,6 +306,32 @@
          (instance-structure-protocol-error slotd
                                             'slot-boundp-using-class))))))
 
+(defun make-optimized-std-slot-makunbound-using-class-method-function
+    (fsc-p slotd)
+  (let ((location (slot-definition-location slotd)))
+    (etypecase location
+      (fixnum
+       (if fsc-p
+           (lambda (class instance slotd)
+             (declare (ignore class slotd))
+             (check-obsolete-instance instance)
+             (setf (clos-slots-ref (fsc-instance-slots instance) location) +slot-unbound+)
+             instance)
+           (lambda (class instance slotd)
+             (declare (ignore class slotd))
+             (check-obsolete-instance instance)
+             (setf (clos-slots-ref (std-instance-slots instance) location) +slot-unbound+)
+             instance)))
+      (cons (lambda (class instance slotd)
+              (declare (ignore class slotd))
+              (check-obsolete-instance instance)
+              (setf (cdr location) +slot-unbound+)
+              instance))
+      (null
+       (lambda (class instance slotd)
+         (declare (ignore class instance))
+         (instance-structure-protocol-error slotd 'slot-makunbound-using-class))))))
+
 (defun get-accessor-from-svuc-method-function (class slotd sdfun name)
   (macrolet ((emf-funcall (emf &rest args)
                `(invoke-effective-method-function ,emf nil
@@ -279,7 +343,9 @@
        (writer (lambda (nv instance)
                  (emf-funcall sdfun nv class instance slotd)))
        (boundp (lambda (instance)
-                 (emf-funcall sdfun class instance slotd))))
+                 (emf-funcall sdfun class instance slotd)))
+       (makunbound (lambda (instance)
+                     (emf-funcall sdfun class instance slotd))))
      `(,name ,(class-name class) ,(slot-definition-name slotd)))))
 
 (defun maybe-class (class-or-name)
@@ -293,7 +359,7 @@
                (slot-names (list slot-name)))
            (setf (getf (getf initargs 'plist) :slot-name-lists)
                  (ecase kind
-                   ((:reader :boundp) (list slot-names))
+                   ((:reader :boundp :makunbound) (list slot-names))
                    (:writer (list '() slot-names))))
            initargs)))
 
@@ -363,6 +429,26 @@
                            (instance) nil)
                (instance-boundp-custom .pv. 0 instance)))))))))
 
+  (defun make-std-makunbound-method-function (class-or-name slot-name)
+    (let ((class (maybe-class class-or-name)))
+      (make-initargs
+       slot-name :makunbound
+       (ecase (slot-access-strategy class slot-name 'makunbound t)
+         (:standard
+          (make-method-function
+           (lambda (instance)
+             (pv-binding1 ((bug "Please report this")
+                           (instance) (instance-slots))
+                          (instance-makunbound-standard
+                           .pv. instance-slots 0 instance
+                           (slot-makunbound instance slot-name))))))
+         ((:custom :accessor)
+          (make-method-function
+           (lambda (instance)
+             (pv-binding1 ((bug "Please report this")
+                           (instance) nil)
+               (instance-makunbound-custom .pv. 0 instance)))))))))
+
   (defun make-fallback-reader-method-function (slot-name)
     (make-initargs
      slot-name :reader
@@ -382,4 +468,11 @@
      slot-name :boundp
      (make-method-function
       (lambda (instance)
-        (slot-boundp instance slot-name))))))
+        (slot-boundp instance slot-name)))))
+
+  (defun make-fallback-makunbound-method-function (slot-name)
+    (make-initargs
+     slot-name :makunbound
+     (make-method-function
+      (lambda (instance)
+        (slot-makunbound instance slot-name))))))

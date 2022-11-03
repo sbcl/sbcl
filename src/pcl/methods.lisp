@@ -866,7 +866,9 @@
                                   (eq class *the-class-global-writer-method*))
                               'writer)
                              ((eq class *the-class-global-boundp-method*)
-                              'boundp)))))
+                              'boundp)
+                             ((eq class *the-class-global-makunbound-method*)
+                              'makunbound)))))
             (when (and (gf-info-c-a-m-emf-std-p arg-info)
                        type
                        (dolist (method (cdr methods) t)
@@ -881,10 +883,10 @@
 ;;; Return two values.  First value is a function to be stored in
 ;;; effective slot definition SLOTD for reading it with
 ;;; SLOT-VALUE-USING-CLASS, setting it with (SETF
-;;; SLOT-VALUE-USING-CLASS) or testing it with
-;;; SLOT-BOUNDP-USING-CLASS.  GF is one of these generic functions,
-;;; TYPE is one of the symbols READER, WRITER, BOUNDP.  CLASS is
-;;; SLOTD's class.
+;;; SLOT-VALUE-USING-CLASS), testing it with SLOT-BOUNDP-USING-CLASS,
+;;; or making it unbound with SLOT-MAKUNBOUND-USING-CLASS.  GF is one
+;;; of these generic functions, TYPE is one of the symbols READER,
+;;; WRITER, BOUNDP, MAKUNBOUND.  CLASS is SLOTD's class.
 ;;;
 ;;; Second value is true if the function returned is one of the
 ;;; optimized standard functions for the purpose, which are used
@@ -897,12 +899,7 @@
          (types1 `((eql ,class) (class-eq ,class) (eql ,slotd)))
          (types (if (eq type 'writer) `(t ,@types1) types1))
          (methods (compute-applicable-methods-using-types gf types))
-         (std-p (and (null (cdr methods))
-                     (if (eq type 'boundp)
-                         (null (cdr (compute-applicable-methods-using-types
-                                     (load-time-value #'slot-makunbound-using-class t)
-                                     types)))
-                         t))))
+         (std-p (null (cdr methods))))
     (values
      (if std-p
          (get-optimized-std-accessor-method-function class slotd type)
@@ -943,48 +940,57 @@
 (define-load-time-global *standard-slot-value-using-class-method* nil)
 (define-load-time-global *standard-setf-slot-value-using-class-method* nil)
 (define-load-time-global *standard-slot-boundp-using-class-method* nil)
+(define-load-time-global *standard-slot-makunbound-using-class-method* nil)
 (define-load-time-global *condition-slot-value-using-class-method* nil)
 (define-load-time-global *condition-setf-slot-value-using-class-method* nil)
 (define-load-time-global *condition-slot-boundp-using-class-method* nil)
+(define-load-time-global *condition-slot-makunbound-using-class-method* nil)
 (define-load-time-global *structure-slot-value-using-class-method* nil)
 (define-load-time-global *structure-setf-slot-value-using-class-method* nil)
 (define-load-time-global *structure-slot-boundp-using-class-method* nil)
+(define-load-time-global *structure-slot-makunbound-using-class-method* nil)
 
 (defun standard-svuc-method (type)
   (case type
     (reader *standard-slot-value-using-class-method*)
     (writer *standard-setf-slot-value-using-class-method*)
-    (boundp *standard-slot-boundp-using-class-method*)))
+    (boundp *standard-slot-boundp-using-class-method*)
+    (makunbound *standard-slot-makunbound-using-class-method*)))
 
 (defun set-standard-svuc-method (type method)
   (case type
     (reader (setq *standard-slot-value-using-class-method* method))
     (writer (setq *standard-setf-slot-value-using-class-method* method))
-    (boundp (setq *standard-slot-boundp-using-class-method* method))))
+    (boundp (setq *standard-slot-boundp-using-class-method* method))
+    (makunbound (setq *standard-slot-makunbound-using-class-method* method))))
 
 (defun condition-svuc-method (type)
   (case type
     (reader *condition-slot-value-using-class-method*)
     (writer *condition-setf-slot-value-using-class-method*)
-    (boundp *condition-slot-boundp-using-class-method*)))
+    (boundp *condition-slot-boundp-using-class-method*)
+    (makunbound *condition-slot-makunbound-using-class-method*)))
 
 (defun set-condition-svuc-method (type method)
   (case type
     (reader (setq *condition-slot-value-using-class-method* method))
     (writer (setq *condition-setf-slot-value-using-class-method* method))
-    (boundp (setq *condition-slot-boundp-using-class-method* method))))
+    (boundp (setq *condition-slot-boundp-using-class-method* method))
+    (makunbound (setq *condition-slot-makunbound-using-class-method* method))))
 
 (defun structure-svuc-method (type)
   (case type
     (reader *structure-slot-value-using-class-method*)
     (writer *structure-setf-slot-value-using-class-method*)
-    (boundp *structure-slot-boundp-using-class-method*)))
+    (boundp *structure-slot-boundp-using-class-method*)
+    (makunbound *standard-slot-makunbound-using-class-method*)))
 
 (defun set-structure-svuc-method (type method)
   (case type
     (reader (setq *structure-slot-value-using-class-method* method))
     (writer (setq *structure-setf-slot-value-using-class-method* method))
-    (boundp (setq *structure-slot-boundp-using-class-method* method))))
+    (boundp (setq *structure-slot-boundp-using-class-method* method))
+    (makunbound (setq *structure-slot-makunbound-using-class-method* method))))
 
 (defun update-std-or-str-methods (gf type)
   (dolist (method (generic-function-methods gf))
@@ -1561,10 +1567,15 @@
   (declare (ignore class))
   (funcall (slot-info-boundp (slot-definition-info slotd)) object))
 
+(defun slot-makunbound-using-class-dfun (class object slotd)
+  (declare (ignore class))
+  (funcall (slot-info-makunbound (slot-definition-info slotd)) object))
+
 (defun special-case-for-compute-discriminating-function-p (gf)
   (or (eq gf #'slot-value-using-class)
       (eq gf #'(setf slot-value-using-class))
-      (eq gf #'slot-boundp-using-class)))
+      (eq gf #'slot-boundp-using-class)
+      (eq gf #'slot-makunbound-using-class)))
 
 ;;; this is the normal function for computing the discriminating
 ;;; function of a standard-generic-function
@@ -1591,9 +1602,9 @@
                ((eq gf (load-time-value #'slot-boundp-using-class t))
                 (update-slot-value-gf-info gf 'boundp)
                 #'slot-boundp-using-class-dfun)
-               ((and (eq gf (load-time-value #'slot-makunbound-using-class t))
-                     (update-slot-value-gf-info (load-time-value #'slot-boundp-using-class t) 'boundp)
-                     nil))
+               ((eq gf (load-time-value #'slot-makunbound-using-class t))
+                (update-slot-value-gf-info gf 'makunbound)
+                #'slot-makunbound-using-class-dfun)
                ;; KLUDGE: PRINT-OBJECT is not a special-case in the sense
                ;; of having a desperately special discriminating function.
                ;; However, it is important that the machinery for printing

@@ -56,7 +56,8 @@
 (define-internal-pcl-function-name-syntax sb-pcl::slot-accessor (list)
   (when (= (length list) 4)
     (destructuring-bind (class slot rwb) (cdr list)
-      (when (and (member rwb '(sb-pcl::reader sb-pcl::writer sb-pcl::boundp))
+      (when (and (member rwb '(sb-pcl::reader sb-pcl::writer
+                               sb-pcl::boundp sb-pcl::makunbound))
                  (symbolp slot)
                  (symbolp class))
         (values t slot)))))
@@ -67,26 +68,35 @@
 (define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
 
-(flet ((struct-accessor-p (object slot-name)
+(flet ((always-bound-struct-accessor-p (object slot-name)
          (let ((c-slot-name (lvar-value slot-name)))
            (unless (interned-symbol-p c-slot-name)
              (give-up-ir1-transform "slot name is not an interned symbol"))
            (let* ((type (lvar-type object))
                   (dd (when (structure-classoid-p type)
                         (find-defstruct-description
-                         (sb-kernel::structure-classoid-name type)))))
-              (when dd
-                (find c-slot-name (dd-slots dd) :key #'dsd-name))))))
+                         (sb-kernel::structure-classoid-name type))))
+                  (dsd (when dd
+                         (find c-slot-name (dd-slots dd) :key #'dsd-name))))
+             (when (and dsd (dsd-always-boundp dsd))
+               dsd)))))
 
   (deftransform slot-boundp ((object slot-name) (t (constant-arg symbol)) *
                              :node node)
-    (cond ((struct-accessor-p object slot-name) t) ; always boundp
+    (cond ((always-bound-struct-accessor-p object slot-name) t)
           (t (delay-ir1-transform node :constraint)
              `(sb-pcl::accessor-slot-boundp object ',(lvar-value slot-name)))))
 
+  (deftransform slot-makunbound ((object slot-name) (t (constant-arg symbol)) *
+                                 :node node)
+    (cond ((always-bound-struct-accessor-p object slot-name)
+           `(error "Cannot make slot ~S in ~S unbound." ',object ',slot-name))
+          (t (delay-ir1-transform node :constraint)
+             `(sb-pcl::accessor-slot-makunbound object ',(lvar-value slot-name)))))
+
   (deftransform slot-value ((object slot-name) (t (constant-arg symbol)) *
                             :node node)
-    (acond ((struct-accessor-p object slot-name)
+    (acond ((always-bound-struct-accessor-p object slot-name)
             `(,(dsd-accessor-name it) object))
            (t
             (delay-ir1-transform node :constraint)
@@ -95,7 +105,7 @@
   (deftransform sb-pcl::set-slot-value ((object slot-name new-value)
                                         (t (constant-arg symbol) t)
                                         * :node node)
-    (acond ((struct-accessor-p object slot-name)
+    (acond ((always-bound-struct-accessor-p object slot-name)
             `(setf (,(dsd-accessor-name it) object) new-value))
            ((policy node (= safety 3))
             ;; Safe code wants to check the type, and the global
