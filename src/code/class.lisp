@@ -38,7 +38,6 @@
                   *the-class-standard-method*
                   *the-class-standard-reader-method*
                   *the-class-standard-writer-method*
-                  *the-class-standard-boundp-method*
                   *the-class-global-reader-method*
                   *the-class-global-writer-method*
                   *the-class-global-boundp-method*

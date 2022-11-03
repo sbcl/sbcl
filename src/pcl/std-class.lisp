@@ -1355,18 +1355,6 @@
                              :method-class-function #'writer-method-class
                              'source source-location)))
 
-(defmethod add-boundp-method ((class slot-class) generic-function slot-name slot-documentation source-location)
-  (add-method generic-function
-              (make-a-method (constantly (find-class 'standard-boundp-method))
-                             class
-                             ()
-                             (list (or (class-name class) 'object))
-                             (list class)
-                             (make-boundp-method-function class slot-name)
-                             (or slot-documentation "automatically generated boundp method")
-                             :slot-name slot-name
-                             'source source-location)))
-
 (defmethod remove-reader-method ((class slot-class) generic-function)
   (let ((method
          (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 1)
@@ -1377,12 +1365,6 @@
   (let ((method
          (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 2)
               (get-method generic-function () (list *the-class-t* class) nil))))
-    (when method (remove-method generic-function method))))
-
-(defmethod remove-boundp-method ((class slot-class) generic-function)
-  (let ((method
-         (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 1)
-              (get-method generic-function () (list class) nil))))
     (when method (remove-method generic-function method))))
 
 ;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITER-METHOD-FUNCTION
@@ -1404,9 +1386,6 @@
 
 (defmethod make-writer-method-function ((class slot-class) slot-name)
   (make-std-writer-method-function class slot-name))
-
-(defmethod make-boundp-method-function ((class slot-class) slot-name)
-  (make-std-boundp-method-function class slot-name))
 
 (defmethod compatible-meta-class-change-p (class proto-new-class)
   (eq (class-of class) (class-of proto-new-class)))

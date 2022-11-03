@@ -865,8 +865,7 @@
                              ((or (eq class *the-class-standard-writer-method*)
                                   (eq class *the-class-global-writer-method*))
                               'writer)
-                             ((or (eq class *the-class-standard-boundp-method*)
-                                  (eq class *the-class-global-boundp-method*))
+                             ((eq class *the-class-global-boundp-method*)
                               'boundp)))))
             (when (and (gf-info-c-a-m-emf-std-p arg-info)
                        type

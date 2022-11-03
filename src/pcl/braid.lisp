@@ -43,11 +43,7 @@
                     (readers (getf slotd :readers))
                     (writers (getf slotd :writers)))
                 (!bootstrap-accessor-definitions1
-                 name
-                 slot-name
-                 readers
-                 writers
-                 nil
+                 name slot-name readers writers
                  (ecd-source-location definition))))))))))
 
 (defun !bootstrap-accessor-definition (class-name accessor-name slot-name type source-location)
@@ -62,12 +58,7 @@
                         #'make-std-writer-method-function
                         (list 'new-value class-name)
                         (list t class-name)
-                        "automatically generated writer method"))
-        (boundp (values 'standard-boundp-method
-                        #'make-std-boundp-method-function
-                        (list class-name)
-                        (list class-name)
-                        "automatically generated boundp method")))
+                        "automatically generated writer method")))
     (let ((gf (ensure-generic-function accessor-name :lambda-list arglist)))
       (if (find specls (early-gf-methods gf)
                 :key #'early-method-specializers
@@ -87,34 +78,16 @@
                                      :method-class-function (constantly (find-class accessor-class))
                                      'source source-location))))))
 
-(defun !bootstrap-accessor-definitions1 (class-name
-                                         slot-name
-                                         readers
-                                         writers
-                                         boundps
-                                         source-location)
+(defun !bootstrap-accessor-definitions1
+    (class-name slot-name readers writers source-location)
   (flet ((do-reader-definition (reader)
-           (!bootstrap-accessor-definition class-name
-                                           reader
-                                           slot-name
-                                           'reader
-                                           source-location))
+           (!bootstrap-accessor-definition class-name reader slot-name
+                                           'reader source-location))
          (do-writer-definition (writer)
-           (!bootstrap-accessor-definition class-name
-                                           writer
-                                           slot-name
-                                           'writer
-                                           source-location))
-         (do-boundp-definition (boundp)
-           (!bootstrap-accessor-definition class-name
-                                           boundp
-                                           slot-name
-                                           'boundp
-                                           source-location)))
+           (!bootstrap-accessor-definition class-name writer slot-name
+                                           'writer source-location)))
     (dolist (reader readers) (do-reader-definition reader))
-    (dolist (writer writers) (do-writer-definition writer))
-    (dolist (boundp boundps) (do-boundp-definition boundp))))
-
+    (dolist (writer writers) (do-writer-definition writer))))
 
 (defun class-of (x)
   (declare (explicit-check))

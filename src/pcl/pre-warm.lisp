@@ -97,7 +97,6 @@
     (standard-accessor-method standard-accessor-method-p)
     (standard-reader-method standard-reader-method-p)
     (standard-writer-method standard-writer-method-p)
-    (standard-boundp-method standard-boundp-method-p)
     (global-reader-method global-reader-method-p)
     (global-writer-method global-writer-method-p)
     (global-boundp-method global-boundp-method-p)

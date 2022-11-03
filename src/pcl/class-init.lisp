@@ -32,7 +32,7 @@
 
 (defconstant-eqx +standard-method-class-names+
   '(standard-method standard-reader-method
-    standard-writer-method standard-boundp-method
+    standard-writer-method
     global-reader-method global-writer-method
     global-boundp-method)
   #'equal)
