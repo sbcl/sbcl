@@ -349,21 +349,24 @@
       (unless (member package initial-packages)
         (push package delete)))
     ;; Do all UNUSE-PACKAGE operations first
-    (dolist (package delete )
+    (dolist (package delete)
       (unuse-package (package-use-list package) package))
     ;; Then all deletions
     (mapc 'delete-package delete))
   (loop for x in (cdr globaldb-summary) for y in (cdr (tersely-summarize-globaldb))
         for index from 0
         unless (equal x y)
-     do (let ((diff (list (set-difference x y)
-                          (set-difference y x))))
-          (if (equal diff '((sb-gray:fundamental-character-output-stream
-                             sb-gray:fundamental-character-input-stream) nil))
-              (warn "Ignoring mystery change to gray stream classoids")
-              (let ((*print-pretty* nil))
-                (error "Mismatch on element index ~D of globaldb snapshot: diffs=~S"
-                       index diff))))))
+          do (let ((diff (list (set-difference x y)
+                               (set-difference y x))))
+               (cond
+                 ((equal diff '(nil nil))) ; reordering only, from rehash?
+                 ((equal diff '((sb-gray:fundamental-character-output-stream
+                                 sb-gray:fundamental-character-input-stream) nil))
+                  (warn "Ignoring mystery change to gray stream classoids"))
+                 (t
+                  (let ((*print-pretty* nil))
+                    (error "Mismatch on element index ~D of globaldb snapshot: diffs=~S"
+                           index diff)))))))
 
 (defun pure-runner (files test-fun log)
   (unless files
