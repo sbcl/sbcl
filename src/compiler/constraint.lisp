@@ -53,7 +53,13 @@
 (declaim (type (and (vector t) (not simple-array)) *constraint-universe*))
 (defvar *constraint-universe*)
 
-(deftype constraint-y () '(or ctype lvar lambda-var constant))
+(defstruct (vector-length-constraint
+            (:constructor make-vector-length-constraint (var))
+            (:copier nil))
+  (var nil :type lambda-var :read-only t))
+
+(deftype constraint-y () '(or ctype lvar lambda-var constant
+                           vector-length-constraint))
 
 (defstruct (constraint
             (:include sset-element)
@@ -82,7 +88,7 @@
                           array-in-bounds-p
                           equality))
   ;; The operands to the relation.
-  (x nil :type lambda-var)
+  (x nil :type (or lambda-var vector-length-constraint))
   (y nil :type constraint-y)
   ;; If true, negates the sense of the constraint, so the relation
   ;; does *not* hold.
@@ -1075,11 +1081,21 @@
             (equality
              (unless (eq (ref-constraints ref)
                          (pushnew con (ref-constraints ref)))
-               (let ((lvar (node-lvar ref))
-                     (principal-lvar (nth-value 1 (principal-lvar-dest-and-lvar (node-lvar ref)))))
-                 (reoptimize-lvar lvar)
-                 (unless (eq lvar principal-lvar)
-                   (reoptimize-lvar principal-lvar)))))
+               (labels ((reoptimize (node)
+                          (when (valued-node-p node)
+                            (let ((lvar (node-lvar node))
+                                  (principal-lvar (nth-value 1 (principal-lvar-dest-and-lvar (node-lvar ref)))))
+                              (reoptimize-lvar lvar)
+                              (unless (eq lvar principal-lvar)
+                                (reoptimize-lvar principal-lvar)))))
+                        (try (x)
+                          (when (and (vector-length-constraint-p x)
+                                     (eq (vector-length-constraint-var x) leaf))
+                            (reoptimize (node-dest ref))
+                            t)))
+                 (or (try x)
+                     (try y)
+                     (reoptimize ref)))))
             (typep
              (if not-p
                  (if (member-type-p other)

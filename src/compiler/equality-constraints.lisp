@@ -17,15 +17,26 @@
 
   (operator nil :type symbol))
 
+(defun constraint-var (thing)
+  (if (vector-length-constraint-p thing)
+      (vector-length-constraint-var thing)
+      thing))
+
 (defun find-equality-constraint (operator x y not-p)
-  (let ((constraints (lambda-var-equality-constraints x)))
-    (when constraints
-      (loop for con across constraints
-            when (and (eq (equality-constraint-operator con) operator)
-                      (eq (constraint-not-p con) not-p)
-                      (eq (constraint-x con) x)
-                      (eq (constraint-y con) y))
-            return con))))
+  (let ((constraints (lambda-var-equality-constraints (constraint-var x))))
+    (flet ((constraints-eq-p (a b)
+             (or (eq a b)
+                 (and (vector-length-constraint-p a)
+                      (vector-length-constraint-p b)
+                      (eq (vector-length-constraint-var b)
+                          (vector-length-constraint-var b))))))
+     (when constraints
+       (loop for con across constraints
+             when (and (eq (equality-constraint-operator con) operator)
+                       (eq (constraint-not-p con) not-p)
+                       (constraints-eq-p (constraint-x con) x)
+                       (constraints-eq-p (constraint-y con) y))
+             return con)))))
 
 (defun find-or-create-equality-constraint (operator x y not-p)
   (or (find-equality-constraint operator x y not-p)
@@ -40,9 +51,10 @@
                                    (setf ,place
                                          (make-array 8 :adjustable t :fill-pointer 0)))))
                    (vector-push-extend new (ensure-vec (lambda-var-equality-constraints var))))))
-          (add x)
-          (when (lambda-var-p y)
-            (add y)))
+          (add (constraint-var x))
+          (let ((y (constraint-var y)))
+            (when (lambda-var-p y)
+              (add y))))
         new)))
 
 (defun add-eq-constraint (var lvar gen)
@@ -57,49 +69,78 @@
     ((eq eql char= two-arg-char-equal
       > < =)
      (when (= (length args) 2)
-       (let* ((x (ok-lvar-lambda-var (first args) constraints))
-              (second (second args))
-              (y (if (constant-lvar-p second)
-                     (nth-value 1 (lvar-value second))
-                     (ok-lvar-lambda-var second constraints))))
-         (when (and x y)
-           ;; TODO: inherit constraints
-           (let ((con (find-or-create-equality-constraint operator x y nil))
-                 (not-con (find-or-create-equality-constraint operator x y t)))
-             (conset-adjoin con consequent-constraints)
-             (conset-adjoin not-con alternative-constraints))))))))
+       (flet ((ok-lvar-p (lvar)
+                (or (ok-lvar-lambda-var lvar constraints)
+                    (let* ((use (principal-lvar-ref-use lvar))
+                           (array-lvar
+                             (and (combination-p use)
+                                  (lvar-fun-is (combination-fun use)
+                                               '(vector-length length))
+                                  (car (combination-args use))))
+                           (array-var (and array-lvar
+                                           (ok-lvar-lambda-var array-lvar constraints))))
+                      (and array-var
+                           (make-vector-length-constraint array-var))))))
+        (let* ((x (ok-lvar-p (first args)))
+               (second (second args))
+               (y (if (constant-lvar-p second)
+                      (nth-value 1 (lvar-value second))
+                      (ok-lvar-p second))))
+          (when (and x y)
+            ;; TODO: inherit constraints
+            (let ((con (find-or-create-equality-constraint operator x y nil))
+                  (not-con (find-or-create-equality-constraint operator x y t)))
+              (conset-adjoin con consequent-constraints)
+              (conset-adjoin not-con alternative-constraints)
+              con))))))))
 
 
 (defun find-ref-equality-constraint (operator lvar1 lvar2 &optional (commutative t))
-  (let ((ref1 (principal-lvar-use lvar1))
-        (ref2 (principal-lvar-use lvar2)))
-    (when (and (ref-p ref1)
-               (ref-p ref2))
-      (let ((leaf1 (ref-leaf ref1))
-            (leaf2 (ref-leaf ref2)))
-        (flet ((find-constraint (ref)
-                 (loop for con in (ref-constraints ref)
-                       when (and (equality-constraint-p con)
-                                 (eq (equality-constraint-operator con) operator)
-                                 (or (and (eq (constraint-x con) leaf1)
-                                          (eq (constraint-y con) leaf2))
-                                     (and commutative
-                                          (eq (constraint-x con) leaf2)
-                                          (eq (constraint-y con) leaf1))))
-                       return con))
-               (has-sets (leaf)
-                 (and (lambda-var-p leaf)
-                      (lambda-var-sets leaf))))
-          (let ((ref1-con (find-constraint ref1)))
-            (when (and ref1-con
-                       ;; If the variables are set both references
-                       ;; need to have the same constraint, otherwise
-                       ;; one the references may be done before the
-                       ;; set.
-                       (or (and (not (has-sets leaf1))
-                                (not (has-sets leaf2)))
-                           (eq ref1-con (find-constraint ref2))))
-              ref1-con)))))))
+  (flet ((ref (lvar)
+           (let ((use (principal-lvar-use lvar)))
+             (cond ((ref-p use)
+                    (values use nil))
+                   ((and (combination-p use)
+                         (lvar-fun-is (combination-fun use)
+                                      '(vector-length length)))
+                    (let ((arg (car (combination-args use))))
+                      (and (csubtypep (lvar-type arg) (specifier-type 'simple-array))
+                           (values (principal-lvar-use arg)
+                                   t)))))))
+         (constraint-eq-p (leaf vector-length-p x)
+           (if vector-length-p
+               (and (vector-length-constraint-p x)
+                    (eq (vector-length-constraint-var x) leaf))
+               (eq leaf x))))
+    (multiple-value-bind (ref1 vector-length-p1) (ref lvar1)
+      (multiple-value-bind (ref2 vector-length-p2) (ref lvar2)
+        (when (and (ref-p ref1)
+                   (ref-p ref2))
+          (let ((leaf1 (ref-leaf ref1))
+                (leaf2 (ref-leaf ref2)))
+            (flet ((find-constraint (ref)
+                     (loop for con in (ref-constraints ref)
+                           when (and (equality-constraint-p con)
+                                     (eq (equality-constraint-operator con) operator)
+                                     (or (and (constraint-eq-p leaf1 vector-length-p1 (constraint-x con))
+                                              (constraint-eq-p leaf2 vector-length-p2 (constraint-y con)))
+                                         (and commutative
+                                              (constraint-eq-p leaf2 vector-length-p2 (constraint-x con))
+                                              (constraint-eq-p leaf1 vector-length-p1 (constraint-y con)))))
+                           return con))
+                   (has-sets (leaf)
+                     (and (lambda-var-p leaf)
+                          (lambda-var-sets leaf))))
+              (let ((ref1-con (find-constraint ref1)))
+                (when (and ref1-con
+                           ;; If the variables are set both references
+                           ;; need to have the same constraint, otherwise
+                           ;; one the references may be done before the
+                           ;; set.
+                           (or (and (not (has-sets leaf1))
+                                    (not (has-sets leaf2)))
+                               (eq ref1-con (find-constraint ref2))))
+                  ref1-con)))))))))
 
 (defun try-equality-constraint (call)
   (let ((constraint (fun-info-equality-constraint (basic-combination-fun-info call)))
