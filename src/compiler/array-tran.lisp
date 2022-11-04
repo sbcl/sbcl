@@ -1572,34 +1572,6 @@
            (%array-fill-pointer ,vector-sym)
            (sb-vm::fill-pointer-error ,vector-sym)))))
 
-(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
-  (let ((array-ref (lvar-uses array))
-        (index-ref (lvar-uses index)))
-    (unless (and
-             (ref-p array-ref)
-             (ref-p index-ref)
-             (or
-              (let* ((index-leaf (ref-leaf index-ref))
-                     (index-value (and (constant-p index-leaf)
-                                       (constant-value index-leaf)))
-                     (index-value (and (integerp index-value)
-                                       index-value)))
-                (loop for constraint in (ref-constraints array-ref)
-                      for y = (constraint-y constraint)
-                      thereis (and
-                               (eq (constraint-kind constraint) 'array-in-bounds-p)
-                               (if index-value
-                                   (and (constant-p y)
-                                        (<= index-value (constant-value y)))
-                                   (eq index-leaf y)))))
-              (loop for constraint in (ref-constraints index-ref)
-                    thereis (and (eq (constraint-kind constraint) 'array-in-bounds-p)
-                                 (eq (constraint-y constraint)
-                                     (ref-leaf array-ref))))))
-      (give-up-ir1-transform)))
-  ;; It's in bounds but it may be of the wrong type
-  `(the (and fixnum unsigned-byte) index))
-
 (deftransform check-bound ((array dimension index))
   ;; %CHECK-BOUND will perform both bound and type checking when
   ;; necessary, delete the cast so that it doesn't get confused by

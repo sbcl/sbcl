@@ -28,7 +28,7 @@
              (or (eq a b)
                  (and (vector-length-constraint-p a)
                       (vector-length-constraint-p b)
-                      (eq (vector-length-constraint-var b)
+                      (eq (vector-length-constraint-var a)
                           (vector-length-constraint-var b))))))
      (when constraints
        (loop for con across constraints
@@ -81,18 +81,69 @@
                                            (ok-lvar-lambda-var array-lvar constraints))))
                       (and array-var
                            (make-vector-length-constraint array-var))))))
-        (let* ((x (ok-lvar-p (first args)))
-               (second (second args))
-               (y (if (constant-lvar-p second)
-                      (nth-value 1 (lvar-value second))
-                      (ok-lvar-p second))))
-          (when (and x y)
-            ;; TODO: inherit constraints
-            (let ((con (find-or-create-equality-constraint operator x y nil))
-                  (not-con (find-or-create-equality-constraint operator x y t)))
-              (conset-adjoin con consequent-constraints)
-              (conset-adjoin not-con alternative-constraints)
-              con))))))))
+         (let* ((first (first args))
+                (second (second args))
+                (constant-x (constant-lvar-p first))
+                (constant-y (constant-lvar-p second))
+                (x (if constant-x
+                       (nth-value 1 (lvar-value first))
+                       (ok-lvar-p first)))
+                (y (if constant-y
+                       (nth-value 1 (lvar-value second))
+                       (ok-lvar-p second))))
+           (when constant-x
+             (when constant-y
+               (return-from add-equality-constraints))
+             (rotatef x y)
+             (rotatef constant-x constant-y)
+             (setf operator
+                   (case operator
+                     (< '>)
+                     (> '<)
+                     (t operator))))
+           (when (and x y)
+             ;; TODO: inherit more than just EQL constraints
+             (flet ((replace-var (var with)
+                      (cond ((eq var with)
+                             var)
+                            ((vector-length-constraint-p var)
+                             (make-vector-length-constraint with))
+                            (t
+                             with)))
+                    (add (x y)
+                      (conset-adjoin (find-or-create-equality-constraint operator x y nil)
+                                     consequent-constraints)
+                      (when alternative-constraints
+                        (conset-adjoin (find-or-create-equality-constraint operator x y t)
+                                       alternative-constraints))))
+               (do-eql-vars (eql-x ((constraint-var x) constraints))
+                 (add (replace-var x eql-x) y))
+               (if constant-y
+                   (add x y)
+                   (do-eql-vars (eql-y ((constraint-var y) constraints))
+                     (add x (replace-var y eql-y))))))))))))
+
+(defun inherit-equality-constraints (vars from-var constraints target)
+  (do-conset-constraints-intersection
+      (con (constraints (lambda-var-equality-constraints from-var)))
+    (let ((replace-x (if (eq from-var (constraint-var (constraint-x con)))
+                         t
+                         (aver (eq from-var (constraint-var (constraint-y con)))))))
+      (dolist (var vars)
+        (flet ((replace-var (var with)
+                 (if (vector-length-constraint-p var)
+                     (make-vector-length-constraint with)
+                     with)))
+         (conset-adjoin
+          (find-or-create-equality-constraint (equality-constraint-operator con)
+                                              (if replace-x
+                                                  (replace-var (constraint-x con) var)
+                                                  (constraint-x con))
+                                              (if replace-x
+                                                  (constraint-y con)
+                                                  (replace-var (constraint-y con) var))
+                                              (constraint-not-p con))
+          target))))))
 
 
 (defun find-ref-equality-constraint (operator lvar1 lvar2 &optional (commutative t))
@@ -135,7 +186,7 @@
                 (when (and ref1-con
                            ;; If the variables are set both references
                            ;; need to have the same constraint, otherwise
-                           ;; one the references may be done before the
+                           ;; one of the references may be done before the
                            ;; set.
                            (or (and (not (has-sets leaf1))
                                     (not (has-sets leaf2)))
@@ -277,3 +328,40 @@
            (derive (integer * 0))
          DONE))))
   :give-up)
+
+(deftransform %check-bound ((array dimension index) ((simple-array * (*)) t t))
+  (let ((array-ref (lvar-uses array))
+        (index-ref (lvar-uses index)))
+
+    (unless (and
+             (ref-p array-ref)
+             (ref-p index-ref)
+             (or
+              (let* ((index-leaf (ref-leaf index-ref))
+                     (index-value (and (constant-p index-leaf)
+                                       (constant-value index-leaf)))
+                     (index-value (and (integerp index-value)
+                                       index-value)))
+                (flet ((matches-p (operator constraint x-p)
+                         (and (eq (equality-constraint-operator constraint) operator)
+                              (null (equality-constraint-not-p constraint))
+                              (eq (if x-p
+                                      (constraint-x constraint)
+                                      (constraint-y constraint))
+                                  index-leaf))))
+                  (or
+                   (loop for constraint in (ref-constraints array-ref)
+                         for y = (constraint-y constraint)
+                         thereis (and
+                                  (eq (constraint-kind constraint) 'equality)
+                                  (if index-value
+                                      (and (eq (equality-constraint-operator constraint) '>)
+                                           (null (equality-constraint-not-p constraint))
+                                           (constant-p y)
+                                           (<= index-value (constant-value y)))
+                                      (or
+                                       (matches-p '< constraint t)
+                                       (matches-p '> constraint nil))))))))))
+      (give-up-ir1-transform)))
+  ;; It's in bounds but it may be of the wrong type
+  `(the (and fixnum unsigned-byte) index))

@@ -79,14 +79,9 @@
   ;;     X is a LAMBDA-VAR and Y is a LVAR, a LAMBDA-VAR or a CONSTANT.
   ;;     The relation is asserted to hold.
   ;;
-  ;; ARRAY-IN-BOUNDS-P
-  ;;     To handle (array-in-bounds-p array var) and
-  ;;     (array-in-bounds-p array 10) X can be either the lambda-var
-  ;;     of ARRAY or VAR, while Y is either the lambda-var of VAR or a
-  ;;     constant.
-  (kind nil :type (member typep < > = eql
-                          array-in-bounds-p
-                          equality))
+  ;; EQUALITY
+  ;;     Relations between two variables.
+  (kind nil :type (member typep < > = eql equality))
   ;; The operands to the relation.
   (x nil :type (or lambda-var vector-length-constraint))
   (y nil :type constraint-y)
@@ -369,8 +364,7 @@
           (let ((vec (ensure-vec (lambda-var-inheritable-constraints x))))
             (vector-push-extend con vec)))
          (lambda-var
-          (let ((vec (if (or (constraint-not-p con)
-                             (eq (constraint-kind con) 'array-in-bounds-p))
+          (let ((vec (if (constraint-not-p con)
                          (ensure-vec (lambda-var-inheritable-constraints x))
                          (ensure-vec (lambda-var-eql-var-constraints x)))))
             (vector-push-extend con vec)))))))
@@ -545,7 +539,8 @@
                                    (constraint-kind con)
                                    x
                                    y
-                                   (constraint-not-p con))))))))
+                                   (constraint-not-p con)))))))
+  (inherit-equality-constraints vars from-var constraints target))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
 ;; inherit each other's constraints.
@@ -674,30 +669,6 @@
                                         constraints)
              ptype nil)))))
 
-(defun array-in-bounds-p-constraints (constraints index-lvar index-var
-                                      length-lvar)
-  (let ((index-constant
-          (and (not index-var)
-               (let ((use (principal-lvar-use index-lvar)))
-                 (and (ref-p use)
-                      (constant-p (ref-leaf use))
-                      (ref-leaf use)))))
-        (array-lvar
-          (let ((use (principal-lvar-ref-use length-lvar)))
-            (and (combination-p use)
-                 (lvar-fun-is (combination-fun use)
-                              '(vector-length length))
-                 (car (combination-args use))))))
-    (when (and (or index-var index-constant)
-               array-lvar)
-      (let ((array-var (ok-lvar-lambda-var array-lvar constraints)))
-        (when array-var
-          (if index-constant
-              ;; Attach the constaraint to the array if
-              ;; the index is constant
-              (values 'array-in-bounds-p array-var index-constant)
-              (values 'array-in-bounds-p index-var array-var)))))))
-
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
 (defun add-test-constraints (use if constraints)
@@ -776,28 +747,14 @@
                                                          consequent-constraints)))))
                           ((< >)
                            (when (= (length args) 2)
-                             (flet ((handle-array-in-bounds-p (index-arg index-var length-arg)
-                                      (multiple-value-bind (kind x y)
-                                          (array-in-bounds-p-constraints constraints index-arg index-var
-                                                                         length-arg)
-                                        (when kind
-                                          (add-test-constraint quick-p
-                                                               kind x y
-                                                               nil constraints
-                                                               consequent-constraints)))))
-                               (let* ((arg1 (first args))
-                                      (var1 (ok-lvar-lambda-var arg1 constraints))
-                                      (arg2 (second args))
-                                      (var2 (ok-lvar-lambda-var arg2 constraints)))
-                                 (case name
-                                   (<
-                                    (handle-array-in-bounds-p arg1 var1 arg2))
-                                   (>
-                                    (handle-array-in-bounds-p arg2 var2 arg1)))
-                                 (when var1
-                                   (add name var1 (lvar-type arg2) nil))
-                                 (when var2
-                                   (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))))
+                             (let* ((arg1 (first args))
+                                    (var1 (ok-lvar-lambda-var arg1 constraints))
+                                    (arg2 (second args))
+                                    (var2 (ok-lvar-lambda-var arg2 constraints)))
+                               (when var1
+                                 (add name var1 (lvar-type arg2) nil))
+                               (when var2
+                                 (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil)))))
                           (=
                            (when (= (length args) 2)
                              (let* ((arg1 (first args))
@@ -1102,22 +1059,6 @@
                      (mapc-member-type-members #'note-not other)
                      (setq not-res (type-union not-res other)))
                  (setq res (type-intersection res other))))
-            (array-in-bounds-p
-             (when (let (new-p)
-                     (unless (eq (ref-constraints ref)
-                                 (pushnew con (ref-constraints ref)))
-                       (setf new-p t))
-                     (when (lambda-var-p other)
-                       ;; Help the %check-bound transform match the
-                       ;; constraint to other EQL vars.
-                       (do-eql-vars (var (other in))
-                         (unless (or (eq var other)
-                                     (eq (ref-constraints ref)
-                                         (pushnew (find-or-create-constraint 'array-in-bounds-p x var nil)
-                                                  (ref-constraints ref))))
-                           (setf new-p t))))
-                     new-p)
-               (reoptimize-lvar (node-lvar ref))))
             (eql
              (let ((other-type (leaf-type other)))
                (if not-p
@@ -1246,7 +1187,6 @@
          (when preprocess-refs-p
            (constrain-ref-type node gen))))
       (cast
-
        (let* ((lvar (cast-value node))
               (var (ok-lvar-lambda-var lvar gen)))
          (when var
@@ -1260,10 +1200,7 @@
              (destructuring-bind (array dim index)
                  (combination-args check-bound)
                (declare (ignore array))
-               (multiple-value-bind (kind x y)
-                   (array-in-bounds-p-constraints gen index var dim)
-                 (when kind
-                   (conset-add-constraint-to-eql gen kind x y nil))))))))
+               (add-equality-constraints '< (list index dim) gen gen nil))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
