@@ -168,7 +168,7 @@
     (let ((string (namestring filename)))
       (when (or (find #\* (stem-of filename)) ; wild
                 (starts-with-p string "/dev/") ; dev/null and dev/random
-                (starts-with-p string "/proc/self")
+                (starts-with-p string "/proc/")
                 ;; Temp files created by test-util's scratch file routine
                 (starts-with-p (stem-of string) *scratch-file-prefix*)
                 ;; These have been accepted as okay for a while.  Test
