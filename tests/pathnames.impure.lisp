@@ -17,11 +17,6 @@
 
 ;;;; Pathname accessors
 
-(defun nuke-pathname-cache ()
-  ;; This is dangerous because it potentially breaks our invariant
-  ;; that EQUAL pathnames are EQ. Of course, that's not actually enforced yet.
-  (fill sb-impl::*pn-cache* nil))
-
 (with-test (:name (pathname :accessors :stream-not-associated-to-file type-error))
   (let ((*stream* (make-string-output-stream)))
     (declare (special *stream*))
@@ -930,7 +925,9 @@
     (((make-pathname) (make-pathname :version :newest)) t))
   (let ((s "#p\"sys:contrib/f[1-9].txt\""))
     (let ((a (read-from-string s)))
-      (nuke-pathname-cache) ; result shouldn't depend on the pathnames being EQ
+      ;; FIXME: maybe this test is bogus now?
+      ;; ("result shouldn't depend on the pathnames being EQ")
+      (sb-impl:hashset-remove sb-impl::*pn-table* a)
       (let ((b (read-from-string s)))
         (assert (not (eq a b)))
         (equalp a b)))))
@@ -945,7 +942,7 @@
 (with-test (:name :wild-pathnames-string-based-hash)
   (let ((string "#p\"file[0-9].txt\""))
     (let ((a (read-from-string string)))
-      (nuke-pathname-cache)
+      (sb-impl:hashset-remove sb-impl::*pn-table* a)
       (let ((b (read-from-string string)))
         (assert (not (eq a b)))
         (assert (eql (sxhash a) (sxhash b)))))))
@@ -976,88 +973,3 @@
 
 (with-test (:name :dx-pathname-parts-dont-crash)
   (prin1 (pathname-peristence-test)))
-
-(import '(sb-impl::%pathname-host
-          sb-impl::%pathname-dir+hash
-          sb-impl::%pathname-device
-          sb-impl::%pathname-name
-          sb-impl::%pathname-type
-          sb-impl::%pathname-version
-          sb-impl::compare-component))
-
-;;; This is the comparator used for the cache, which is _more_ _stringent_ than
-;;; PATHNAME=. Obviously the regression test has to use the right comparator.
-;;; e.g. version :NEWEST and version NIL are the same according to PATHNAME=
-;;; but not the cache. Honestly though, should the cache distinguish entries that
-;;; are by definition supposed to behave indistinguishably?
-(defun pn-cache-line= (a b)
-  (and (eq (%pathname-host a) (%pathname-host b)) ; Interned
-       (eq (%pathname-dir+hash a) (%pathname-dir+hash b))
-       (compare-component (%pathname-device a) (%pathname-device b))
-       (compare-component (%pathname-name a) (%pathname-name b))
-       (compare-component (%pathname-type a) (%pathname-type b))
-       (eql (%pathname-version a) (%pathname-version b))))
-
-(defun probing-sequence (table pathname)
-  (let* ((mask (- (length table) 2))
-         (index (logand (sb-impl::pathname-sxhash pathname) mask))
-         (interval 1)
-         (sequence))
-    (loop
-     (push index sequence)
-     (let ((probed-value (aref table index)))
-       (when (sb-int:unbound-marker-p probed-value) (error "Can't hapepn"))
-       (when (and probed-value (pn-cache-line= probed-value pathname))
-         (return (nreverse sequence)))
-       (setq index (logand (+ index interval) mask))
-       (incf interval)))))
-
-;;; a GC here helps this test pass reliably in two ways:
-;;; 1. by ensuring that the PN cache is reasonably devoid of entries
-;;;    so that it doesn't size up, and thereby reduce the chance of producing
-;;;    collisions (beacuse this tests *needs* collisions)
-;;; 2. avoiding GCing just after inserting the 20 testfile pathnames
-;;;    which would blow them away, leaving nothing at all to test
-(gc)
-;; recall that MAKE-PATHNAME is unsafely-flushable
-(dotimes (i 20) (opaque-identity (make-pathname :name (write-to-string i) :type "testfile")))
-;; Only fake GC-nullifying an entry that was added specifically for the test
-(defun can-safely-remove-entry (table index)
-  (equal (pathname-type (aref table index)) "testfile"))
-(defun find-worst-pn-cache-entry (&optional print &aux (worst '(0)))
-  (let ((cache sb-impl::*pn-cache*))
-    (dotimes (i (length cache) (cdr worst))
-      (let ((entry (aref cache i)))
-        (when (pathnamep entry)
-          (let ((sequence (probing-sequence cache entry)))
-            (when print (format t "~s -> ~s~%" entry sequence))
-            (when (and (equal (pathname-type entry) "testfile")
-                       (> (length sequence) (car worst))
-                       (some (lambda (x) (can-safely-remove-entry cache x))
-                             (butlast sequence)))
-              (setq worst (cons (length sequence) sequence)))))))))
-
-(with-test (:name :pn-cache-hit-sequence-shorten)
-  (let ((sequence (find-worst-pn-cache-entry)))
-    (unless sequence
-      (error "Expect at least 1 pn-cache collision. Can't test"))
-    (let* ((cache sb-impl::*pn-cache*)
-           (my-index (car (last sequence)))
-           (pathname (aref cache my-index))
-           (index-to-remove
-            (find-if (lambda (x) (can-safely-remove-entry cache x))
-                     sequence))
-           (position-of-index (position index-to-remove sequence)))
-      #+nil
-      (format t "~&Probe for ~S -> ~S, will cull index ~D (~:R position)~%"
-              pathname sequence index-to-remove (1+ position-of-index))
-      (setf (aref cache index-to-remove) nil) ; pretend GC did this
-      ;; seek PATHNAME in the cache again
-      (opaque-identity (make-pathname :name (pathname-name pathname) :type "testfile"))
-      (let ((new-sequence (probing-sequence cache pathname)))
-        ;; I don't know a good black-box test on the probing algorithm, so just
-        ;; assert that the old location of PATHNAME now holds a tombstone.
-        (assert (null (aref cache my-index)))
-        ;; should have been found in fewer probes
-        (assert (equal (subseq sequence 0 (1+ position-of-index))
-                       new-sequence))))))

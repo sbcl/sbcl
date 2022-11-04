@@ -272,15 +272,10 @@
 ;;; Also, on case-sensitive-case-preserving filesystems it's not possible
 ;;; to know which pathnames are equivalent without asking the filesystem.
 ;;;
-;;; The storage portion of the table starts out as having 2^0 cells (a power of 2)
-;;; The last elements in each vector is not logically a storage cell.
-(define-load-time-global *pn-dir-cache* #(nil 1))
-(define-load-time-global *pn-cache* #(nil 1))
-(declaim (simple-vector *pn-dir-cache* *pn-cache*))
-(define-load-time-global *pn-cache-force-recount* nil)
-(define-load-time-global *pn-cache-lock* (sb-thread:make-mutex :name "pathnames"))
-
-(defmacro pn-cache-n-available-cells (v) `(aref ,v (1- (length ,v))))
+;;: TODO: consider similarly interning the DEVICE and TYPE parts
+(define-load-time-global *pn-dir-table* nil)
+(define-load-time-global *pn-table* nil)
+(declaim (type robinhood-hashset *pn-dir-table* *pn-table*))
 
 (defmacro compare-pathname-host/dev/dir/name/type (a b)
   `(and (eq (%pathname-host ,a) (%pathname-host ,b)) ; Interned
@@ -291,143 +286,19 @@
         (compare-component (%pathname-name ,a) (%pathname-name ,b))
         (compare-component (%pathname-type ,a) (%pathname-type ,b))))
 
-;;; pathname cache TODOs:
-;;; (1) Give up on the dream of a lockless algorithm. Weakness is hard enough as it is.
-;;; (2) Probe without acquiring the mutex. Only acquire the mutex if we see that
-;;;     insertion needs to happen. Then re-probe with the mutex, and if probing
-;;;     fails again, then first consider whether to rehash, and then insert.
-;;;     (the smashing loop on the "old" data should still be OK)
-;;; (3) Change to Hopscotch hashing to bound the max probes
-;;; (4) See if the algorithm can be made into a general-purpose hashset.
-;;;     We probably want to enhance the GC to count the number of smashed cells,
-;;;     otherwise we lack a decent strategy for deciding to resize very large tables.
-;;;     Counting while pseudo-atomic doesn't seem the best approach.
+(defun pn-table-dir= (entry key)
+  (or (eq (car entry) (car key)) ; quick win if lists are EQ
+      (and (eq (cdr entry) (cdr key)) ; hashes match
+           (compare-component (car entry) (car key)))))
+(defun pn-table-pn= (entry key)
+  (and (compare-pathname-host/dev/dir/name/type entry key)
+       (eql (%pathname-version entry) (%pathname-version key))))
 
-;;; Current resizing strategy:
-;;; - bound the load factor but not the number of probes. But do stop at the absolute
-;;;   limit of hitting every possible table cell.
-;;; - if available cells are few, then rehash. Strive for 75% load factor.
-;;; - after each GC, recompute the number of available cells.
-;;;   Delay rehash until actually inserting. Just get the available cells right.
-;;;   Available cells include those which were never claimed, as well as
-;;;   those nullfied by GC. The count can always be a little wrong because we're
-;;;   not mutually exclusive with GC while actually counting.
-;;;
-(declaim (ftype (function * *) intern-pathname rebuild-pathname-cache)) ; non-toplevel
-(labels
-    ((update (table-holder thing hash-fn comparator-fn persist-fn)
-       (let* ((table (symbol-value table-holder))
-              (result (probe table thing hash-fn comparator-fn persist-fn)))
-         (or result
-             (probe (rehash table-holder table hash-fn)
-                    thing hash-fn comparator-fn persist-fn))))
-     (probe (table thing hash-fn comparator-fn persist-fn)
-       (declare (function hash-fn comparator-fn persist-fn)
-                (simple-vector table))
-       (let* ((hash (funcall hash-fn thing))
-              ;; key storage capacity is 1 less than vector's physical length.
-              ;; The last cell holds the number of available cells.
-              (table-capacity (1- (length table)))
-              (mask (1- table-capacity))
-              (index (logand hash mask))
-              (tombstone)
-              (interval 1))
-         ;; Due to vector weakness, we're always racing with GC but it's OK.
-         (loop
-          (let ((probed-value (aref table index)))
-            ;; Open-addressing can decide that a key is absent only after hitting
-            ;; _all_ cells in its probing sequence, terminated by unbound-marker.
-            ;; Because of that we should try to ensure that there is always at least
-            ;; one unbound-marker in the table at all times. Or limit the max probes
-            ;; to the table capacity, which is done (below).
-            (when (unbound-marker-p probed-value) ; end of probe sequence
-              ;; First decide if we should rehash. We rehash when fewer than
-              ;; 25% of the table is available for use.
-              (when *pn-cache-force-recount*
-                (flet ((recount (table)
-                         (declare (simple-vector table))
-                         (let* ((capacity (1- (length table)))
-                                (n (count-if #'validp table :end capacity)))
-                           (setf (pn-cache-n-available-cells table) (- capacity n)))))
-                  (recount *pn-dir-cache*)
-                  (recount *pn-cache*))
-                (setq *pn-cache-force-recount* nil))
-              (let ((n-available-cells (pn-cache-n-available-cells table))
-                    (min-threshold (ash table-capacity -2))) ; = capacity / 4
-                (return (cond ((> n-available-cells min-threshold)
-                               ;; doesn't matter which kind of available cell we take
-                               (decf (pn-cache-n-available-cells table))
-                               (setf (aref table (or tombstone index))
-                                     (funcall persist-fn thing)))))))
-            (when (and probed-value (funcall comparator-fn probed-value thing))
-              (when tombstone
-                ;; Put this item into the tombstone's location and make this a tombstone
-                ;; and *not* unbound-marker. Any other probing sequence for a different key
-                ;; might have previously tried to claim this cell and could not, so
-                ;; went to a later cell in its sequence. Therefore we can't interrupt that
-                ;; other (unknown) sequence of probes with a chain-terminating marker.
-                (setf (aref table tombstone) probed-value
-                      (aref table index) nil))
-              (return probed-value))
-            ;; Prevent infinite loop if the next index to probe is the same modulo N.
-            ;; I'd like to remove this extra test, and instead enforce that we don't
-            ;; clobber the last remaining unbound-marker.
-            ;; Or implement a better probing strategy as suggested in the TODOs.
-            (if (= interval table-capacity) (return nil))
-            (when (and (null probed-value) (not tombstone)) (setq tombstone index))
-            ;; this visits every cell.
-            ;; Proof at https://fgiesen.wordpress.com/2015/02/22/triangular-numbers-mod-2n/
-            (setq index (logand (+ index interval) mask))
-            (incf interval)))))
-     ;; VALIDP is the same as CONSP on the vector of directories, or PATHNAMEP
-     ;; (or even just %INSTANCEP) on the vector of pathnames.
-     ;; This one predicate can work for either vector.
-     (validp (x) (and (not (unbound-marker-p x)) x))
-     (rehash (table-holder table hash-fn)
-       (declare (simple-vector table) (function hash-fn))
-       (declare (sb-c::tlab :system))
-       ;; up-size, aiming for 50% load
-       ;; No big deal if GC decides to cull more after the counting step.
-       (let* ((n-live (count-if #'validp table))
-              (logical-size (max 64 (power-of-two-ceiling (* n-live 2))))
-              (physical-size (1+ logical-size))
-              (new (let ((vector-type
-                          (logior (ash sb-vm:vector-weak-flag sb-vm:array-flags-position)
-                                  sb-vm:simple-vector-widetag)))
-                     (fill (allocate-vector #+ubsan nil vector-type physical-size physical-size)
-                           (make-unbound-marker)))))
-         (setf (pn-cache-n-available-cells new) logical-size)
-         (do ((i (- (length table) 2) (1- i)))
-             ((< i 0))
-           (declare (index-or-minus-1 i))
-           (let ((x (aref table i)))
-             (when (validp x)
-               (probe new x hash-fn #'constantly-nil #'identity))))
-         (set table-holder new)
-         (assign-vector-flags table 0) ; old vector is non-weak, eliminating some GC overhead
-         (fill table 0)
-         new))
-     (dir-matchp (entry key)
-       (or (eq (car entry) (car key)) ; quick win if lists are EQ
-           (and (eq (cdr entry) (cdr key)) ; hashes match
-                (compare-component (car entry) (car key)))))
-     (pn-matchp (entry key)
-       (and (compare-pathname-host/dev/dir/name/type entry key)
-            (eql (%pathname-version entry) (%pathname-version key))))
-     (ensure-heap-string (part) ; return any non-string as-is
-       (declare (sb-c::tlab :system))
-       ;; FIXME: what about pattern pieces?
-       (cond ((or (not (stringp part)) (read-only-space-obj-p part)) part)
-             ((dynamic-space-obj-p part) (logically-readonlyize part))
-             ;; dynamic-extent strings and lisp strings in alien memory are acceptable.
-             ;; Copies must be made in that case, since we're holding on to them.
-             (t (let ((l (length part)))
-                  (logically-readonlyize
-                   (replace (typecase part
-                              (base-string (make-string l :element-type 'base-char))
-                              (t (make-string l)))
-                            part)))))))
-  (declare (inline validp))
+(defun !pathname-cold-init ()
+  (setq *pn-dir-table* (make-hashset 3 #'pn-table-dir= #'cdr
+                                     :synchronized t :weakness t)
+        *pn-table* (make-hashset 3 #'pn-table-pn= #'pathname-sxhash
+                                 :synchronized t :weakness t)))
 
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
@@ -438,6 +309,7 @@
   ;; but the arguments given in the X3J13 cleanup issue
   ;; PATHNAME-LOGICAL:ADD seem compelling: we should canonicalize the
   ;; case, and uppercase is the ordinary way to do that.
+  (declare (sb-c::tlab :system))
   (flet ((upcase-maybe (x) (typecase x (string (logical-word-or-lose x)) (t x))))
     (when (typep host 'logical-host)
         (setq device :unspecific
@@ -445,50 +317,61 @@
               name (upcase-maybe name)
               type (upcase-maybe type))))
   (dx-let ((dir-key (cons directory (pathname-sxhash directory))))
-    (declare (sb-c::tlab :system))
     (declare (inline !allocate-pathname)) ; for DX-allocation
-    (with-system-mutex (*pn-cache-lock*)
+    (flet ((ensure-heap-string (part) ; return any non-string as-is
+             ;; FIXME: what about pattern pieces and (:HOME "user") ?
+             (cond ((or (not (stringp part)) (read-only-space-obj-p part)) part)
+                   ((dynamic-space-obj-p part) (logically-readonlyize part))
+                   ;; dynamic-extent strings and lisp strings in alien memory are acceptable.
+                   ;; Copies must be made in that case, since we're holding on to them.
+                   (t (let ((l (length part)))
+                        (logically-readonlyize
+                         (replace (typecase part
+                                    (base-string (make-string l :element-type 'base-char))
+                                    (t (make-string l)))
+                                  part)))))))
       (let* ((dir+hash
               (if directory ; find the interned dir-key
-                  (update '*pn-dir-cache* dir-key #'cdr #'dir-matchp
-                          (lambda (dir)
-                            (cons (mapcar #'ensure-heap-string (car dir)) (cdr dir))))))
+                  (hashset-insert-if-absent
+                   *pn-dir-table* dir-key
+                   (lambda (dir)
+                     (cons (mapcar #'ensure-heap-string (car dir)) (cdr dir))))))
              (pn-key (!allocate-pathname host device dir+hash name type version)))
         (declare (truly-dynamic-extent pn-key))
-        (the pathname ; assert type-correct answer
-         (update '*pn-cache* pn-key #'pathname-sxhash #'pn-matchp
-                 ;; don't capture the original args, so no extra closure consing
-                 (lambda (tmp &aux (host (%pathname-host tmp)))
-                   (let ((new (!allocate-pathname
-                               host (%pathname-device tmp)
-                               (%pathname-dir+hash tmp)
-                               (ensure-heap-string (%pathname-name tmp))
-                               (ensure-heap-string (%pathname-type tmp))
-                               (%pathname-version tmp))))
-                     (when (typep host 'logical-host)
-                       (setf (%instance-wrapper new) #.(find-layout 'logical-pathname)))
-                     new))))))))
+        (hashset-insert-if-absent
+         *pn-table* pn-key
+         (lambda (tmp &aux (host (%pathname-host tmp)))
+           (let ((new (!allocate-pathname
+                       host (%pathname-device tmp)
+                       (%pathname-dir+hash tmp)
+                       (ensure-heap-string (%pathname-name tmp))
+                       (ensure-heap-string (%pathname-type tmp))
+                       (%pathname-version tmp))))
+             (when (typep host 'logical-host)
+               (setf (%instance-wrapper new) #.(find-layout 'logical-pathname)))
+             new)))))))
 
 ;;; Weak vectors don't work at all once rendered pseudo-static.
 ;;; so in order to weaken the pathname cache, the vectors are copied on restart.
 ;;; It may not achieve anything for saved pathnames, since the vector elements
 ;;; are themselves pseudo-static, but at least newly made ones aren't immortal.
 (defun rebuild-pathname-cache ()
-  (rehash '*pn-dir-cache* *pn-dir-cache* #'cdr)
-  (rehash '*pn-cache* *pn-cache* #'pathname-sxhash))
-) ; end LABELS
+  (hashset-rehash *pn-dir-table* nil)
+  (hashset-rehash *pn-table* nil))
 
 (defun show-pn-cache (&aux (*print-pretty* nil) (*package* (find-package "CL-USER")))
   (without-gcing
-   (dolist (symbol '(*pn-dir-cache* *pn-cache*))
-     (let* ((v (symbol-value symbol))
-            (n (1- (length v))))
+   (dolist (symbol '(*pn-dir-table* *pn-table*))
+     (let* ((hashset (symbol-value symbol))
+            (dirs (hss-cells (hashset-storage *pn-dir-table*)))
+            (v (hss-cells (hashset-storage hashset)))
+            (n (hs-cells-capacity v)))
        (format t "~&~S: size=~D tombstones=~D unused=~D~%" symbol n
                (count nil v :end n) (count-if #'unbound-marker-p v :end n))
        (dotimes (i n)
          (let ((entry (aref v i)))
            (unless (or (unbound-marker-p entry) (null entry))
-             (if (eq symbol '*pn-dir-cache*)
+             (if (eq symbol '*pn-dir-table*)
                  (format t "~4d ~3d ~x ~16x ~s~%" i
                          (generation-of entry) (get-lisp-obj-address entry)
                          (cdr entry) (car entry))
@@ -502,7 +385,7 @@
                                  (t host)))
                          (%pathname-device entry)
                          (acond ((%pathname-dir+hash entry)
-                                 (format nil "@~D" (position it *pn-dir-cache*)))
+                                 (format nil "@~D" (position it dirs)))
                                 (t "-"))
                          (%pathname-name entry)
                          (%pathname-type entry)
@@ -697,6 +580,8 @@
              (symbol (sxhash piece)) ; transformed
              (pattern (pattern-hash piece))
              ((cons (eql :home) (cons string null))
+              ;; :HOME has two representations- one is just '(:absolute :home ...)
+              ;; and the other '(:absolute (:home "user") ...)
               (sxhash (second piece))))))
     (etypecase x
       (pathname
@@ -2111,7 +1996,7 @@ experimental and subject to change."
                                                   :version :newest))
                 (read lpt))))))
 
-(defun !pathname-cold-init ()
+(defun !lpn-cold-init ()
   (let* ((sys *default-pathname-defaults*)
          (src
           (merge-pathnames

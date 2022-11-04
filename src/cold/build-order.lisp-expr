@@ -547,6 +547,7 @@
 
  ("src/code/target-defstruct"  :not-host)
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
+ ("src/code/hashset" :not-host)
  ("src/code/target-pathname"   :not-host)
  #-win32 ("src/code/unix-pathname"     :not-host)
  #+win32 ("src/code/win32-pathname"    :not-host)
