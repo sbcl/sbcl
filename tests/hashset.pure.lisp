@@ -54,7 +54,8 @@
 ;; HASHSET DOES NOT ALLOW INSERTING AN EXISTING KEY.
 ;; IT WILL VIOLATE INVARIANTS, BUT IT DOES NOT CHECK FOR IT.
 (defun insert-all-into-hashset (hashset strings existsp-check)
-  (let ((n 0))
+  (let ((n 0)
+        (worst-max-probes 0))
     (dolist (string strings)
       (when (or (not existsp-check)
                 (not (hashset-find hashset string)))
@@ -67,9 +68,10 @@
             (assert (<= load-factor .75))
             (assert (< mean-psl 3))
             ;; this is a bit of a "change detector" but I hope it remains correct for a while
-            (assert (< (length histogram) 10))))))
+            (setf worst-max-probes (max worst-max-probes (length histogram)))
+            #+nil (assert (< (length histogram) 10))))))
     (hashset-check-invariants hashset)
-    hashset))
+    (values hashset worst-max-probes)))
 
 (defparameter *lottastrings*
   (let ((h (make-hash-table :test #'equal)))
@@ -93,8 +95,6 @@
 ;(defparameter *ht1* (insert-all-into-hash-table *lottastrings* :key))
 ;(defparameter *ht2* (insert-all-into-hash-table *lottastrings* :value))
 
-(defparameter *hs* (insert-all-into-hashset (make-string-hashset t) *lottastrings* nil))
-
 (defun read-all-from-hash-table (strings hash-table ntimes &aux (result 0))
   (declare (fixnum ntimes result))
   (dotimes (i ntimes result)
@@ -107,13 +107,19 @@
       (when (hashset-find hashset string) (incf result)))))
 
 (with-test (:name :string-hashset)
-  (assert (= (read-all-from-hash-table *lottastrings* *ht0* 1)
-             (read-all-from-hashset *lottastrings* *hs* 1))))
+  (sb-int:binding* (((hs worst-max-probes)
+                     (insert-all-into-hashset (make-string-hashset t) *lottastrings* nil)))
+    (format t "~&Worst max probes: ~D~%" worst-max-probes)
+    (assert (= (read-all-from-hash-table *lottastrings* *ht0* 1)
+               (read-all-from-hashset *lottastrings* hs 1)))))
 
 (with-test (:name :case-insensitive-string-hashset)
-  (let ((ht (insert-all-into-hash-table *lottastrings* nil 'equalp))
-        (hs (insert-all-into-hashset (make-string-hashset nil)
-                                     *lottastrings* t))) ; check existence before inserting
+  (sb-int:binding*
+      ((ht (insert-all-into-hash-table *lottastrings* nil 'equalp))
+       ((hs worst-max-probes)
+        (insert-all-into-hashset (make-string-hashset nil)
+                                 *lottastrings* t))) ; check existence before inserting
+    (format t "~&Worst max probes: ~D~%" worst-max-probes)
     (assert (= (read-all-from-hash-table *lottastrings* ht 1)
                (read-all-from-hashset *lottastrings* hs 1)))))
 
