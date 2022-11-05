@@ -758,16 +758,6 @@
   (enumerable nil :type boolean :read-only t)
   ;; the kind of numeric type we have, or NIL if not specified (just
   ;; NUMBER or COMPLEX)
-  ;;
-  ;; KLUDGE: A slot named CLASS for a non-CLASS value is bad.
-  ;; Especially when a CLASS value *is* stored in another slot (called
-  ;; CLASS-INFO:-). Perhaps this should be called CLASS-NAME? Also
-  ;; weird that comment above says "Numeric-Type is used to represent
-  ;; all numeric types" but this slot doesn't allow COMPLEX as an
-  ;; option.. how does this fall into "not specified" NIL case above?
-  ;; Perhaps someday we can switch to CLOS and make NUMERIC-TYPE
-  ;; be an abstract base class and INTEGER-TYPE, RATIONAL-TYPE, and
-  ;; whatnot be concrete subclasses..
   (class nil :type (member integer rational float nil) :read-only t)
   ;; "format" for a float type (i.e. type specifier for a CPU
   ;; representation of floating point, e.g. 'SINGLE-FLOAT -- nothing
@@ -777,8 +767,6 @@
   (format nil :type (or float-format null) :read-only t)
   ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
   ;;
-  ;; FIXME: I'm bewildered by FOO-P names for things not intended to
-  ;; interpreted as truth values. Perhaps rename this COMPLEXNESS?
   (complexp :real :type (member :real :complex nil) :read-only t)
   ;; The upper and lower bounds on the value, or NIL if there is no
   ;; bound. If a list of a number, the bound is exclusive. Integer
