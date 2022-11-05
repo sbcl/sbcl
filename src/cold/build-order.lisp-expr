@@ -137,6 +137,8 @@
  ("src/code/early-raw-slots" :c-headers)
 
  ("src/code/maphash" :not-host)
+ ("src/code/sysmacs" :not-host)
+ ("src/code/hashset")
  ("src/code/xset" :c-headers) ; for representation of MEMBER type
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
  ;; accessors and inline functions defined here can be compiled inline
@@ -148,7 +150,6 @@
  ("src/compiler/early-c" :c-headers)
  ("src/pcl/slot-name")
 
- ("src/code/sysmacs" :not-host)
  ("src/code/early-classoid" :c-headers)
 
  ("src/compiler/generic/pinned-objects" :not-host)
@@ -547,7 +548,6 @@
 
  ("src/code/target-defstruct"  :not-host)
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
- ("src/code/hashset" :not-host)
  ("src/code/target-pathname"   :not-host)
  #-win32 ("src/code/unix-pathname"     :not-host)
  #+win32 ("src/code/win32-pathname"    :not-host)

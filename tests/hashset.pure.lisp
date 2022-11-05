@@ -4,8 +4,7 @@
           sb-impl::hashset-test-function
           sb-impl::hss-cells
           sb-impl::hss-hash-vector
-          sb-impl::hss-psl-vector
-          sb-impl::hashset-find))
+          sb-impl::hss-psl-vector))
 
 (defun hs-cells-mask (v) (- (length v) 4))
 (defun hs-chain-terminator-p (x) (eq x 0))
@@ -48,8 +47,8 @@
 
 (defun make-string-hashset (case-sensitive-p)
   (if case-sensitive-p
-      (sb-impl::make-hashset 4 #'string= #'sb-kernel:%sxhash-simple-string)
-      (sb-impl::make-hashset 4 #'string-equal #'sb-impl::psxhash)))
+      (sb-int:make-hashset 4 #'string= #'sb-kernel:%sxhash-simple-string)
+      (sb-int:make-hashset 4 #'string-equal #'sb-impl::psxhash)))
 
 ;; HASHSET DOES NOT ALLOW INSERTING AN EXISTING KEY.
 ;; IT WILL VIOLATE INVARIANTS, BUT IT DOES NOT CHECK FOR IT.
@@ -58,8 +57,8 @@
         (worst-max-probes 0))
     (dolist (string strings)
       (when (or (not existsp-check)
-                (not (hashset-find hashset string)))
-        (sb-impl::hashset-insert hashset string)
+                (not (sb-int:hashset-find hashset string)))
+        (sb-int:hashset-insert hashset string)
         (when (zerop (mod (incf n) 1000))
           (hashset-check-invariants hashset)
           (multiple-value-bind (mean-psl histogram load-factor)
@@ -104,7 +103,7 @@
   (declare (fixnum ntimes result))
   (dotimes (i ntimes result)
     (dolist (string strings)
-      (when (hashset-find hashset string) (incf result)))))
+      (when (sb-int:hashset-find hashset string) (incf result)))))
 
 (with-test (:name :string-hashset)
   (sb-int:binding* (((hs worst-max-probes)

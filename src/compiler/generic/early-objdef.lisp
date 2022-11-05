@@ -96,6 +96,18 @@
     other-immediate-1-lowtag
     other-pointer-lowtag))
 
+#+sb-xc-host
+(defun lowtag-of (x)
+  (etypecase x
+    (symbol sb-vm:other-pointer-lowtag)
+    (structure-object sb-vm:instance-pointer-lowtag)
+    ((eql 0) 0)))
+
+#-sb-xc-host
+(progn
+(declaim (inline lowtag-of))
+(defun lowtag-of (x) (logand (get-lisp-obj-address x) sb-vm:lowtag-mask)))
+
 (defconstant-eqx fixnum-lowtags
     '#.(loop for i from 0 to lowtag-mask
              when (zerop (logand i fixnum-tag-mask)) collect i)

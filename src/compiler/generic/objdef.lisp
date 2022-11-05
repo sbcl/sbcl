@@ -728,8 +728,3 @@ during backtrace.
 ;;; size of NIL in bytes that we report for primitive-object-size.
 (defconstant static-space-objects-start
   (+ nil-symbol-slots-start (ash (1- sizeof-nil-in-words) word-shift)))
-
-#-sb-xc-host
-(progn
-(declaim (inline lowtag-of))
-(defun lowtag-of (x) (logand (get-lisp-obj-address x) sb-vm:lowtag-mask)))

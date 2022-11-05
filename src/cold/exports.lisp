@@ -2962,6 +2962,10 @@ possibly temporarily, because it might be used internally.")
            "SSET-ADJOIN" "SSET-DELETE" "SSET-EMPTY" "SSET-COUNT"
            "SSET-MEMBER"
 
+           ;; key-only hash lookup which saves space over a hash-table
+           "MAKE-HASHSET" "HASHSET-INSERT" "HASHSET-REMOVE" "HASHSET-FIND"
+           "HASHSET-INSERT-IF-ABSENT"
+
             ;; communication between the runtime and Lisp
 
            "*CORE-STRING*"

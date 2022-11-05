@@ -295,9 +295,9 @@
        (eql (%pathname-version entry) (%pathname-version key))))
 
 (defun !pathname-cold-init ()
-  (setq *pn-dir-table* (make-hashset 3 #'pn-table-dir= #'cdr
+  (setq *pn-dir-table* (make-hashset 32 #'pn-table-dir= #'cdr
                                      :synchronized t :weakness t)
-        *pn-table* (make-hashset 3 #'pn-table-pn= #'pathname-sxhash
+        *pn-table* (make-hashset 32 #'pn-table-pn= #'pathname-sxhash
                                  :synchronized t :weakness t)))
 
 ;;; A pathname is logical if the host component is a logical host.
@@ -367,10 +367,10 @@
             (v (hss-cells (hashset-storage hashset)))
             (n (hs-cells-capacity v)))
        (format t "~&~S: size=~D tombstones=~D unused=~D~%" symbol n
-               (count nil v :end n) (count-if #'unbound-marker-p v :end n))
+               (count nil v :end n) (count 0 v :end n))
        (dotimes (i n)
          (let ((entry (aref v i)))
-           (unless (or (unbound-marker-p entry) (null entry))
+           (unless (member entry '(nil 0))
              (if (eq symbol '*pn-dir-table*)
                  (format t "~4d ~3d ~x ~16x ~s~%" i
                          (generation-of entry) (get-lisp-obj-address entry)

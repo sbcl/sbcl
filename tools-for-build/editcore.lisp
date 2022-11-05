@@ -200,17 +200,10 @@
 (defun in-bounds-p (addr bounds)
   (and (>= addr (bounds-low bounds)) (< addr (bounds-high bounds))))
 
-(defun make-hashset (contents count)
-  (if (<= count 20)
-      (coerce contents 'vector)
-      (let ((ht (make-hash-table :test 'equal)))
-        (dolist (x contents ht)
-          (setf (gethash x ht) t)))))
-
-(defun hashset-find (item hashset)
-  (if (vectorp hashset)
-      (find item hashset :test 'string=)
-      (gethash item hashset)))
+(defun make-string-hashset (contents count)
+  (let ((hs (sb-int:make-hashset count #'string= #'sxhash)))
+    (dolist (string contents hs)
+      (sb-int:hashset-insert hs string))))
 
 (defun scan-package-hashtable (function table core)
   (let ((spaces (core-spaces core))
@@ -278,11 +271,11 @@
                     (push string externals))
                   (package-external-symbols package)
                   core)
-                 (setf externals (make-hashset externals n)
+                 (setf externals (make-string-hashset externals n)
                        (gethash package-name packages) externals))
                (make-core-sym package-name
                               name
-                              (hashset-find name externals))))))
+                              (sb-int:hashset-find externals name))))))
         (t "?"))))))
 
 (defun remove-name-junk (name)

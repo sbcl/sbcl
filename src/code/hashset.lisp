@@ -19,6 +19,7 @@
 
 (eval-when ()
   (pushnew :hashset-debug sb-xc:*features*))
+#+sb-xc-host (define-symbol-macro sb-kernel::*gc-epoch* 0)
 
 (define-load-time-global *hashset-print-statistics* nil)
 
@@ -54,7 +55,9 @@
   (storage (missing-arg) :type robinhood-hashset-storage)
   (hash-function #'error :type (sfunction (t) fixnum))
   (test-function #'error :type function)
-  (mutex nil :type (or null sb-thread:mutex)))
+  (count-find-hits 0 :type sb-vm:word)
+  (count-finds 0 :type sb-vm:word)
+  (mutex nil :type (or null #-sb-xc-host sb-thread:mutex)))
 
 ;;; The last few elements in the cell vector are metadata.
 (defconstant hs-storage-trailer-cells 3)
@@ -75,18 +78,22 @@
 (defmacro hs-chain-terminator-p (val) `(eq ,val 0))
 
 (defun allocate-hashset-storage (capacity weakp)
+  (declare (ignorable weakp))
   (declare (sb-c::tlab :system))
-  (let* ((vector-type (if weakp
+  (let* ((len (+ capacity hs-storage-trailer-cells))
+         (cells
+          #+sb-xc-host (make-array len :initial-element 0)
+          #-sb-xc-host
+          (let ((type (if weakp
                           (logior (ash sb-vm:vector-weak-flag sb-vm:array-flags-position)
                                   sb-vm:simple-vector-widetag)
-                          sb-vm:simple-vector-widetag))
-         (len (+ capacity hs-storage-trailer-cells))
-         (cells (fill (truly-the simple-vector
-                                 (allocate-vector #+ubsan nil vector-type len len))
-                      +hashset-unused-cell+))
+                          sb-vm:simple-vector-widetag)))
+            (sb-vm::splat (truly-the simple-vector (allocate-vector #+ubsan nil type len len))
+                          len 0)))
          (psl-vector (make-array capacity :element-type '(unsigned-byte 8)
                                           :initial-element 0))
          (hash-vector (make-array capacity :element-type '(unsigned-byte 16))))
+    (setf (hs-cells-gc-epoch cells) sb-kernel::*gc-epoch*)
     (setf (hs-cells-max-psl cells) 0)
     (setf (hs-cells-n-avail cells) capacity)
     ;; Capacity 65536 is the max for which stored hashes can represent all indices
@@ -97,17 +104,20 @@
     (make-hashset-storage cells psl-vector hash-vector (> capacity 65536))))
 
 (defun hashset-weakp (hashset)
+  #+sb-xc-host (declare (ignore hashset))
+  #-sb-xc-host
   (let* ((storage (hashset-storage hashset))
          (cells (hss-cells storage)))
     (not (zerop (get-header-data cells)))))
 
-(defun make-hashset (log2size test-function hash-function &key weakness synchronized)
+(defun make-hashset (estimated-count test-function hash-function &key weakness synchronized)
   (declare (boolean weakness synchronized))
-  (let* ((capacity (ash 1 log2size))
+  (let* ((capacity (power-of-two-ceiling (* estimated-count 2)))
          (storage (allocate-hashset-storage capacity weakness)))
     (make-robinhood-hashset :hash-function hash-function
                             :test-function test-function
-                            :mutex (if synchronized (sb-thread:make-mutex))
+                            :mutex (if synchronized #-sb-xc-host (sb-thread:make-mutex)
+                                                    #+sb-xc-host nil)
                             :storage storage)))
 
 ;;; The following terms are synonyms: "probe sequence position", "probe sequence index".
@@ -131,6 +141,7 @@
   (declare (fixnum n))
   (/ (* n (1- n)) 2))
 
+#+nil
 (defun hss-backshift (hashset storage current-index desired-psp key hash)
   ;; If we can grab the mutex, then shift this item backwards in its probe sequence.
   ;; If mutex is already owned, or if after acquiring the mutex a change is detected,
@@ -270,7 +281,8 @@
       (setf (hashset-storage hashset) new-storage)
       ;; Zap the old key vector
       (fill old-cells 0)
-      (assign-vector-flags old-cells 0) ; old vector becomes non-weak, eliminating some GC overhead
+      ;; old vector becomes non-weak, eliminating some GC overhead
+      #-sb-xc-host (assign-vector-flags old-cells 0)
       ;; (hashset-check-invariants hashset "end rehash")
       new-storage)))
 
@@ -310,7 +322,7 @@
 ;;; probes, with early termination based on the observed maximum probe sequence length
 ;;; as maintained by the insertion algorithm.
 (defun hashset-find (hashset key)
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  #-sb-xc-host (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (let* ((storage (hashset-storage hashset))
          (cells (hss-cells storage))
          (hash (funcall (hashset-hash-function hashset) key))
@@ -326,6 +338,7 @@
          (index (logand hash mask))
          (iteration 1))
     (declare (fixnum iteration))
+    #+hashset-metrics (incf (hashset-count-finds hashset))
     ;; Unroll by always fetching a pair of keys and hashes.
     ;; Theory suggests that first probing the 2nd choice location should perform better
     ;; than probing the 1st choice first, because the probability density function
@@ -341,9 +354,11 @@
              (h2 (aref hash-vector next-index)))
         (when (and (= (lowtag-of k2) lowtag) (= h2 clipped-hash) (funcall test k2 key))
           (hs-aver-probe-sequence-len storage next-index (1+ iteration))
+          #+hashset-metrics (incf (hashset-count-find-hits hashset))
           (return k2))
         (when (and (= (lowtag-of k1) lowtag) (= h1 clipped-hash) (funcall test k1 key))
           (hs-aver-probe-sequence-len storage index iteration)
+          #+hashset-metrics (incf (hashset-count-find-hits hashset))
           (return k1))
         (when (or (hs-chain-terminator-p k1)
                   (hs-chain-terminator-p k2)
@@ -362,7 +377,7 @@
 (defun hashset-remove (hashset key &aux (storage (hashset-storage hashset))
                                         (cells (hss-cells storage))
                                         (test (hashset-test-function hashset)))
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  #-sb-xc-host (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (let* ((mask (hs-cells-mask cells))
          (index (logand (funcall (hashset-hash-function hashset) key) mask))
          (max-psl (hs-cells-max-psl cells))
