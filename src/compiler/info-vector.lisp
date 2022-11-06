@@ -291,7 +291,7 @@
 ;; Equivalently, it's the number of packed fields times 2 minus 1.
 ;;
 (defun compute-unpackified-info-size (packed-info)
-  (declare (packed-info packed-info))
+  (declare (type packed-info packed-info))
   (do-packed-info-aux-key (packed-info) ()
     ;; off-by-one: the first info group's auxiliary key is imaginary
     (1- (truly-the fixnum (ash total-n-fields 1)))))

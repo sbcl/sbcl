@@ -60,7 +60,8 @@
   (mutex nil :type (or null #-sb-xc-host sb-thread:mutex)))
 
 ;;; The last few elements in the cell vector are metadata.
-(defconstant hs-storage-trailer-cells 3)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant hs-storage-trailer-cells 3))
 (defmacro hs-cells-capacity (v)
   `(truly-the index (- (length ,v) ,hs-storage-trailer-cells)))
 (defmacro hs-cells-mask (v)
@@ -268,7 +269,7 @@
            (old-hash-vector (hss-hash-vector old-storage)))
           ((< i 0)
            (decf (hs-cells-n-avail (hss-cells new-storage)) n-inserted))
-        (declare (index-or-minus-1 i) (fixnum n-inserted))
+        (declare (type index-or-minus-1 i) (fixnum n-inserted))
         (let ((key (aref old-cells i)))
           (when (validp key)
             (incf n-inserted)
