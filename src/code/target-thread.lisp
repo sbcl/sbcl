@@ -905,7 +905,8 @@ Notes:
       (when waitp
         (multiple-value-call #'%wait-for-mutex mutex timeout (decode-timeout timeout)))))
 
-(declaim (ftype (sfunction (mutex &key (:if-not-owner (member :punt :warn :error :force))) null) release-mutex))
+(declaim (ftype (sfunction (mutex &key (:if-not-owner (member :punt :warn :error :force))) null)
+                release-mutex))
 (defun release-mutex (mutex &key (if-not-owner :punt))
   "Release MUTEX by setting it to NIL. Wake up threads waiting for
 this mutex.
@@ -1892,16 +1893,10 @@ session."
           (prot "protect_alien_stack_guard_page")))
       (unless (= (sap-int thread-sap) 0) thread-sap))))
 
-;;; FIXME: now that #-pauseless-threadstart is gone, this macro is just silly.
-;;;        So remove it and write DEFUN like a normal human.
-(defmacro thread-trampoline-defining-macro (&body body) ; NEW WAY
-  `(defun run ()
-     (macrolet ((apply-real-function ()
-                  '(apply (svref (thread-startup-info *current-thread*) 2)
-                    (prog1 (svref (thread-startup-info *current-thread*) 3)
-                      (setf (thread-startup-info *current-thread*) 0)))))
-       (flet ((unmask-signals ()
-                (let ((mask (svref (thread-startup-info *current-thread*) 4)))
+(defun run (); All threads other than the initial thread start via this function.
+  (set-thread-control-stack-slots *current-thread*)
+  (flet ((unmask-signals ()
+           (let ((mask (svref (thread-startup-info *current-thread*) 4)))
                   (if mask
                       ;; If the original mask (at thread creation time) was provided,
                       ;; then restore exactly that mask.
@@ -1911,22 +1906,20 @@ session."
                       (sb-unix::pthread-sigmask sb-unix::SIG_UNBLOCK
                                                 (foreign-symbol-sap "thread_start_sigset" t)
                                                 nil)))))
-         ;; notinline keeps array off the call stack by getting it out of the curent frame
-         (declare (notinline unmask-signals))
-         ;; Signals other than stop-for-GC  are masked. The WITH/WITHOUT noise is
-         ;; pure cargo-cultism.
-         (without-interrupts (with-local-interrupts ,@body))))))
-) ; end PROGN
-;;; All threads other than the initial thread start via this function.
-#+sb-thread
-(thread-trampoline-defining-macro
-  (set-thread-control-stack-slots *current-thread*)
+    ;; notinline keeps array off the call stack by getting it out of the curent frame
+    (declare (notinline unmask-signals))
+    ;; Signals other than stop-for-GC  are masked. The WITH/WITHOUT noise is pure cargo-cultism.
+    ;; When I tried removing them, some regression test failed. I have no idea why.
+    ;; Honestly I don't think anybody knows, or certainly not anybody who cared enough to write
+    ;; down something about how having these here addresses an edge case involving interrupts.
+    (without-interrupts
+     (with-local-interrupts
     ;; Using handling-end-of-the-world would be a bit tricky
     ;; due to other catches and interrupts, so we essentially
     ;; re-implement it here. Once and only once more.
-  (catch 'sb-impl::toplevel-catcher
-      (catch 'sb-impl::%end-of-the-world
-        (catch '%abort-thread
+       (catch 'sb-impl::toplevel-catcher
+       (catch 'sb-impl::%end-of-the-world
+       (catch '%abort-thread
           (restart-bind ((abort
                            (lambda ()
                              (throw '%abort-thread nil))
@@ -1951,7 +1944,13 @@ session."
                                 (unwind-protect
                                      (catch '%return-from-thread
                                        (sb-c::inspect-unwinding
-                                        (apply-real-function)
+                                        ;; STARTUP-INFO =
+                                        ;;   #(c-trampoline starting-thread-cell func args sigmask fp-modes)
+                                        ;; Clobbering STARTUP-INFO prevents garbage retention,
+                                        ;; but is there some significance to using the value 0?
+                                        (apply (svref (thread-startup-info *current-thread*) 2)
+                                               (prog1 (svref (thread-startup-info *current-thread*) 3)
+                                                 (setf (thread-startup-info *current-thread*) 0)))
                                         #'sb-di::catch-runaway-unwind))
                                   (when (and *exit-in-progress*
                                              (not (thread-ephemeral-p *current-thread*)))
@@ -1971,9 +1970,10 @@ session."
                 (setq *interrupt-pending* nil)
                 #+sb-safepoint
                 (setq *thruption-pending* nil)
-                (handle-thread-exit)))))))
+                (handle-thread-exit))))))))))
   ;; this returns to C, so return a single value
   0)
+) ; end PROGN for #+sb-thread
 
 (defun make-thread (function &key name arguments)
   "Create a new thread of NAME that runs FUNCTION with the argument
@@ -2007,8 +2007,6 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
       (set symbol thread))
     (start-thread thread function arguments)))
 
-;;; This is the faster variant of RUN-THREAD that does not wait for the new
-;;; thread to start executing before returning.
 #+sb-thread
 (defun start-thread (thread function arguments)
   (let* ((trampoline
@@ -2065,6 +2063,8 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
           ;; of stop-the-thread API that it shares in common with stop-the-world.
           (alien-funcall sigaddset (vector-sap child-sigmask) sb-unix:sigalrm))))
     (binding* ((thread-sap (allocate-thread-memory) :EXIT-IF-NULL)
+               ;; CELL becomes the first element in the list of *STARTING-THREADS*
+               ;; I think it has to get allocated outside of the called thread.
                (cell (locally (declare (sb-c::tlab :system))
                        (list thread)))
                (startup-info
