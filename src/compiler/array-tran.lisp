@@ -1502,23 +1502,55 @@
   (let ((array-type (lvar-conservative-type vector))
         min-length
         max-length)
-    (when (and (union-type-p array-type)
-               (loop for type in (union-type-types array-type)
-                     for dim = (catch 'give-up-ir1-transform
-                                 (array-type-dimensions-or-give-up type))
-                     always (typep dim '(cons integer null))
-                     do (let ((length (car dim)))
-                          (cond ((conservative-array-type-complexp type)
-                                 ;; fill-pointer can start from 0
-                                 (setf min-length 0))
-                                ((or (not min-length)
-                                     (< length min-length))
-                                 (setf min-length length)))
-                          (when (or (not max-length)
-                                    (> length max-length))
-                            (setf max-length length)))))
-      (specifier-type `(integer ,(or min-length 0)
-                                ,max-length)))))
+    (let ((type
+            (when (and (union-type-p array-type)
+                       (loop for type in (union-type-types array-type)
+                             for dim = (catch 'give-up-ir1-transform
+                                         (array-type-dimensions-or-give-up type))
+                             always (typep dim '(cons integer null))
+                             do (let ((length (car dim)))
+                                  (cond ((conservative-array-type-complexp type)
+                                         ;; fill-pointer can start from 0
+                                         (setf min-length 0))
+                                        ((or (not min-length)
+                                             (< length min-length))
+                                         (setf min-length length)))
+                                  (when (or (not max-length)
+                                            (> length max-length))
+                                    (setf max-length length)))))
+              (specifier-type `(integer ,(or min-length 0)
+                                        ,max-length)))))
+      (when (csubtypep array-type (specifier-type 'simple-array))
+        (let ((ref (lvar-uses vector)))
+          (when (ref-p ref)
+            (loop for con in (ref-constraints ref)
+                  when (equality-constraint-p con)
+                  do (let ((constant (and (constant-p (constraint-y con))
+                                          (constant-value (constraint-y con))))
+                           (not-p (constraint-not-p con)))
+                       (when constant
+                         (case (equality-constraint-operator con)
+                           (eq
+                            (unless not-p
+                              (return-from vector-length-derive-type-optimizer
+                                (specifier-type `(eql ,constant)))))
+                           (>
+                            (let ((p (specifier-type (if not-p
+                                                         `(integer 0 ,constant)
+                                                         `(integer (,constant))))))
+                              (setf type
+                                    (if type
+                                        (type-intersection type p)
+                                        p))))
+                           (<
+                            (let ((p (specifier-type (if not-p
+                                                         `(integer ,constant)
+                                                         `(integer 0 (,constant))))))
+                              (setf type
+                                    (if type
+                                        (type-intersection type p)
+                                        p)))))))))))
+      type)))
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based
