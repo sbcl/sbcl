@@ -21,10 +21,6 @@
 ;;; compete for a mutex, the pthread code seems to do a better job at reducing
 ;;; cycles spent in the OS.
 
-;;; N.B.: If you alter this definition, then you need to verify that FOP-FUNCALL
-;;; in genesis can properly emulate MAKE-MUTEX for the altered structure,
-;;; or even better, make sure that genesis can emulate any constructor,
-;;; provided that it is sufficiently trivial.
 (sb-xc:defstruct (mutex (:constructor make-mutex (&key name))
                         (:copier nil))
   "Mutex type."
