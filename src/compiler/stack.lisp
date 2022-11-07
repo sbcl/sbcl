@@ -69,6 +69,12 @@
   (dolist (e late early)
     (pushnew e early)))
 
+;;; Return a list of all lvars pushed before LVAR in 2BLOCK.
+(defun ir2-block-pushed-before (lvar 2block)
+  (declare (lvar lvar))
+  (declare (ir2-block 2block))
+  (member lvar (reverse (ir2-block-pushed 2block))))
+
 ;; Blocks are numbered in reverse DFO order, so the "lowest common
 ;; dominator" of a set of blocks is the closest dominator of all of
 ;; the blocks.
@@ -113,7 +119,7 @@
                                            (set-difference
                                             (ir2-block-start-stack 2block)
                                             (ir2-block-popped 2block))
-                                           (member dx-lvar (reverse (ir2-block-pushed 2block))))))))
+                                           (ir2-block-pushed-before dx-lvar 2block))))))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
     (aver start-block)
@@ -233,10 +239,8 @@
                                (ir2-block-start-stack 2block)
                                (ir2-block-popped 2block))))
                (setq new-end (merge-uvl-live-sets
-                              ;; union in the lvars
-                              ;; pushed before LVAR in
-                              ;; this block.
-                              new-end (member lvar (reverse (ir2-block-pushed 2block)))))))))))
+                              new-end
+                              (ir2-block-pushed-before lvar 2block)))))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
 
@@ -245,7 +249,7 @@
     ;; their allocation sites.  We need to be clever about this
     ;; because some code paths may not allocate all of the DX LVARs.
     (do-nodes (node nil block)
-      (when (typep node 'entry)
+      (when (entry-p node)
         (let ((cleanup (entry-cleanup node)))
           (when (eq (cleanup-kind cleanup) :dynamic-extent)
             (back-propagate-dx-lvars block (cleanup-nlx-info cleanup))))))

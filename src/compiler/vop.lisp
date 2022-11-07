@@ -244,7 +244,7 @@
   (%label :test %label))
 
 ;;; An IR2-LVAR structure is used to annotate LVARs that are used as a
-;;; function result LVARs or that receive MVs.
+;;; function result LVAR or that receive MVs.
 (defstruct (ir2-lvar
             (:constructor make-ir2-lvar (primitive-type))
             (:copier nil))
