@@ -1366,7 +1366,7 @@
   (movable foldable flushable))
 (defknown open-stream-p (stream) boolean (flushable))
 (defknown close (stream &key (:abort t)) (eql t) ())
-(defknown file-string-length (ansi-stream (or string character))
+(defknown file-string-length (stream (or string character))
   (or unsigned-byte null)
   (flushable))
 
