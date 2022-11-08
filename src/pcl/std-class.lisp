@@ -258,7 +258,7 @@
     (or (cdr cell)
         (when (car cell)
           (setf (cdr cell)
-                (sb-thread:with-mutex (*specializer-lock*)
+                (with-system-mutex (*specializer-lock*)
                   (let (collect)
                     (dolist (m (car cell) (nreverse collect))
                 ;; the old PCL code used COLLECTING-ONCE which used

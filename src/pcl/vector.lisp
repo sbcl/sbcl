@@ -75,7 +75,7 @@
             snl *pv-tables*
             (make-pv-table :slot-name-lists snl
                            :pv-size (* 2 (reduce #'+ snl :key #'length))))))
-    (sb-thread:with-mutex (*pv-lock*)
+    (with-system-mutex (*pv-lock*)
       (%intern-pv-table (mapcar #'intern-slot-names slot-name-lists)))))
 
 (defun use-standard-slot-access-p (class slot-name type)

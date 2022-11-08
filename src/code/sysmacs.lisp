@@ -247,6 +247,15 @@ maintained."
 
 (in-package "SB-THREAD")
 
+;;; SBCL-internal code should prefer this variant of a mutex acquire/release.
+;;; Also I'm exploring whether WITH-MUTEX could optionally using absl::Mutex
+;;; (https://abseil.io/about/design/mutex) under user control. SBCL mutexes are
+;;; very fast, as they avoid a foreign call, but absl::Mutex provides metrics
+;;; on lock contention. Using those universally though would require solving some
+;;; problems: (1) absl::Mutex is never recursive, (2) If finalization is needed
+;;; to free the C++ object, and the finalizer table has a mutex, how to insert
+;;; the finalizer on the finalizer table mutex into the table.
+;;; System mutexes will always be our own mutex-based-on-futex (if available).
 (defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts)
                                     &body body)
   `(dx-flet ((with-system-mutex-thunk () ,@body))
