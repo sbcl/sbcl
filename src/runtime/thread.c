@@ -970,10 +970,6 @@ alloc_thread_struct(void* spaces) {
     // If present and enabled, assign into the new thread.
     th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
-# ifdef LISP_FEATURE_WIN32
-    thread_extra_data(th)->carried_base_pointer = 0;
-# endif
-
     struct extra_thread_data *extra_data = thread_extra_data(th);
     memset(extra_data, 0, sizeof *extra_data);
 
