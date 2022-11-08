@@ -12,7 +12,7 @@
 #include "gencgc-private.h"
 #include "lispregs.h"
 #include "genesis/arena.h"
-#include "thread.h" // for mutex_acquire() stub if no pthreads
+#include "thread.h"
 
 extern void acquire_gc_page_table_lock(), release_gc_page_table_lock();
 extern lispobj * component_ptr_from_pc(char *pc);
@@ -26,7 +26,36 @@ struct arena_memblk {
     uword_t padding; // always 0
 };
 
-void switch_to_arena(lispobj arena_taggedptr,
+lispobj sbcl_new_arena(size_t size)
+{
+    // First 3 objects in the arena:
+    //   Arena
+    //   Mutex
+    //   Memblk
+    struct arena* arena = malloc(size);
+    memset(arena, 0, sizeof *arena);
+    struct arena_memblk* block =
+      (void*)((char*)arena + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
+    // arenas require threads, but the header for the mutex definition
+    // might not have been included if #-sb-thread
+#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_WIN32
+    CRITICAL_SECTION *mutex = (void*)block;
+    InitializeCriticalSection(mutex);
+#else
+    pthread_mutex_t* mutex = (void*)block;
+    pthread_mutex_init(mutex, 0);
+#endif
+    block = (void*)((char*)block + ALIGN_UP(sizeof *mutex, 2*N_WORD_BYTES));
+#endif
+    block->freeptr = (char*)block + sizeof *block;
+    block->limit = (char*)arena + size;
+    arena->uw_length = size;
+    arena->uw_current_block = arena->uw_first_block = (uword_t)block;
+    return make_lispobj(arena, INSTANCE_POINTER_LOWTAG);
+}
+
+void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
                      __attribute__((unused)) lispobj* ra) // return address
 {
     struct arena* arena = (void*)native_pointer(arena_taggedptr);
@@ -39,73 +68,76 @@ void switch_to_arena(lispobj arena_taggedptr,
             (arena ? arena : (void*)th->arena),
             (uword_t)ra, id);
 #endif
-    arena_state* savearea = &th->arena_savearea;
-    struct thread_instance *lispthread = (void*)native_pointer(th->lisp_thread);
-    if (!arena) { // finished with the arena
-        gc_assert(th->arena); // must have been an arena in use
-        // Compute the number of bytes that could have been used
-        int remaining = 0;
-        if (th->mixed_tlab.start_addr)
-            remaining += (char*)th->mixed_tlab.free_pointer - (char*)th->mixed_tlab.start_addr;
-        if (th->cons_tlab.start_addr)
-            remaining += (char*)th->cons_tlab.free_pointer - (char*)th->cons_tlab.start_addr;
-        struct arena* in_use_arena = (void*)native_pointer(th->arena);
-        __sync_fetch_and_add(&in_use_arena->uw_bytes_wasted, remaining);
-        lispthread->arena_cookie = // Capture the timestamp of last use (a/k/a cookie)
-            ((struct arena*)native_pointer(th->arena))->cookie;
-        // Copy the TLABs to the thread's arena save area
-        // so that allocation might pick up where it left off.
-        savearea->arena = th->arena;
-        savearea->mixed = th->mixed_tlab;
-        savearea->cons = th->cons_tlab;
-        // Indicate that the tlabs have no space remaining.
-        gc_set_region_empty(&th->mixed_tlab);
-        gc_set_region_empty(&th->cons_tlab);
-
-    } else { // switching from the dynamic space to an arena
+    if (arena) { // switching from the dynamic space to an arena
         if (th->arena)
             lose("arena error: can't switch from %p to %p", (void*)th->arena, arena);
+        // Page table lock guards the arena chain, as well as the page table
         acquire_gc_page_table_lock();
         // See if this arena has ever been switched to,
         // and if not, then add it into 'arena_chain'.
         if (!arena->link) {
             arena->link = arena_chain ? arena_chain : NIL;
             arena_chain = arena_taggedptr;
-#ifdef LISP_FEATURE_SB_THREAD
-            // And ensure that this arena has a mutex for growing it
-#ifndef LISP_FEATURE_WIN32
-            pthread_mutex_t* arena_mutex = malloc(sizeof (pthread_mutex_t));
-            pthread_mutex_init(arena_mutex, 0);
-#else
-            CRITICAL_SECTION* arena_mutex = malloc(sizeof(CRITICAL_SECTION));
-            InitializeCriticalSection(arena_mutex);
-#endif
-            arena->uw_pthr_mutex = (uword_t)arena_mutex;
-#endif
         }
         // Close only the non-system regions
         if (th->mixed_tlab.start_addr) gc_close_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
         if (th->cons_tlab.start_addr) gc_close_region(&th->cons_tlab, PAGE_TYPE_CONS);
         release_gc_page_table_lock();
-        /* If the last arena that this thread worked with is the same as 'arena'
-         * and the cookie in 'arena' matches the thread's cached copy,
-         * then restore the TLABs to their prior state. This way we aren't forced to
-         * discard memory every time a thread-pool worker dequeues a task.
-         * It can usually pick up where it was in the arena, as long as
-         * it is acting on the same arena as before */
-        if (savearea->arena == arena_taggedptr && arena->cookie == lispthread->arena_cookie) {
-            th->mixed_tlab = savearea->mixed;
-            th->cons_tlab = savearea->cons;
+        // Ensure that this thread has enough space in its save area for the arena index.
+        // Note that indices are 1-based, so subtract 1 to get an array index.
+        int arena_index = fixnum_value(arena->index);
+        struct extra_thread_data *extra_data = thread_extra_data(th);
+        if (arena_index > extra_data->arena_count) {
+            arena_state* new = calloc(arena_index, sizeof (arena_state));
+            if (extra_data->arena_count > 0) {
+                memcpy(new, extra_data->arena_savearea,
+                       extra_data->arena_count * sizeof (arena_state));
+                free(extra_data->arena_savearea);
+            }
+            extra_data->arena_count = arena_index;
+            extra_data->arena_savearea = new;
         }
-        memset(&th->arena_savearea, 0, sizeof th->arena_savearea);
+        arena_state* state = &extra_data->arena_savearea[arena_index-1];
+        /* If the state's token matches the arena token, then the TLAB free/end pointers
+         * are valid, and this thread can resume allocating where it left off. */
+        if (state->token == arena->uw_token) { // arena was not rewound
+            th->mixed_tlab = state->mixed;
+            th->cons_tlab  = state->cons;
+        } else {
+#if 0
+            // Rewinding which causes the tail of a TLAB not to be used doesn't
+            // count as waste, but I may want to see the number anyway
+            int waste = 0;
+            if (state->mixed.start_addr)
+                waste += (char*)state->mixed.end_addr - (char*)state->mixed.free_pointer;
+            if (state->cons.start_addr)
+                waste += (char*)state->cons.end_addr - (char*)state->cons.free_pointer;
+#endif
+        }
+        memset(state, 0, sizeof (arena_state));
+    } else { // finished with the arena
+        gc_assert(th->arena); // must have been an arena in use
+        struct arena* old_arena = (void*)native_pointer(th->arena);
+        int arena_index = fixnum_value(old_arena->index);
+        struct extra_thread_data *extra_data = thread_extra_data(th);
+        arena_state* state = &extra_data->arena_savearea[arena_index-1];
+        // Copy the TLABs to the thread's arena save area
+        state->token = old_arena->uw_token;
+        state->mixed = th->mixed_tlab;
+        state->cons  = th->cons_tlab;
+        // Indicate that the tlabs have no space remaining.
+        gc_set_region_empty(&th->mixed_tlab);
+        gc_set_region_empty(&th->cons_tlab);
     }
     th->arena = arena_taggedptr;
 }
 
-/* lisp defstructs manifested as C structs have all fields as 'unsigned word'
- * but the mutex is a pthread_mutex_t* which is annoying to cast all the time */
-#define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire((void*)a->uw_pthr_mutex))
-#define ARENA_MUTEX_RELEASE(a) ignore_value(mutex_release((void*)a->uw_pthr_mutex))
+static inline void* arena_mutex(struct arena* a) {
+    return (void*)((char*)a + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
+}
+
+#define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire(arena_mutex(a)))
+#define ARENA_MUTEX_RELEASE(a) ignore_value(mutex_release(arena_mutex(a)))
 
 static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                                    sword_t nbytes, int filler)
@@ -124,12 +156,12 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
             }  else {
                 // really add an extension block
                 if (a->uw_extension_count == a->uw_max_extensions) { // can't extend further
-                    ignore_value(mutex_release((void*)a->uw_pthr_mutex));
+                    ARENA_MUTEX_RELEASE(a);
                     lose("Fatal: arena memory exhausted");
                 }
                 char* new_mem = malloc(a->uw_growth_amount);
                 if (new_mem == 0) {
-                    ignore_value(mutex_release((void*)a->uw_pthr_mutex));
+                    ARENA_MUTEX_RELEASE(a);
                     lose("Fatal: arena memory exhausted and could not obtain more memory");
                 }
                 struct arena_memblk* extension= (void*)new_mem;
@@ -138,6 +170,7 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                 extension->next = NULL;
                 extension->padding = 0;
                 a->uw_length += a->uw_growth_amount; // tally up the total length
+                a->uw_extension_count++;
                 mem->next = extension;
                 // Other threads can start using the new block already
                 a->uw_current_block = (lispobj)extension;
@@ -182,6 +215,8 @@ lispobj* handle_arena_alloc(struct thread* th, struct alloc_region* region,
      *     Don't refill the TLAB; just make the new object as a discrete claim.
      */
     if (avail < min_keep) { // case 1
+        struct arena* in_use_arena = (void*)native_pointer(th->arena);
+        __sync_fetch_and_add(&in_use_arena->uw_bytes_wasted, avail);
         long total_request = nbytes + 8192;
         region->start_addr = claim_new_subrange((void*)native_pointer(th->arena),
                                                 total_request, filler);
@@ -207,6 +242,7 @@ long arena_bytes_used(lispobj arena_taggedptr)
     return sum;
 }
 /* Release successor blocks of this arena, keeping only the first */
+/* TODO: in debug mode, assert that no threads are using the arena */
 void arena_release_memblks(lispobj arena_taggedptr)
 {
     struct arena* arena = (void*)native_pointer(arena_taggedptr);
@@ -219,7 +255,10 @@ void arena_release_memblks(lispobj arena_taggedptr)
         block = next;
     }
     arena->uw_current_block = arena->uw_first_block;
+    first->freeptr = (char*)first + sizeof (struct arena_memblk);
     first->next = NULL;
+    arena->uw_extension_count = 0;
+    arena->uw_length = first->limit - (char*)arena;
     ARENA_MUTEX_RELEASE(arena);
 }
 
@@ -250,22 +289,11 @@ void unlink_gc_arena(lispobj arena) // arena is a tagged pointer
 int scavenge_arenas = 1;
 void gc_scavenge_arenas()
 {
-    /* Always scavenge the 'cookie' in each arena since that's a heap object.
-     * It has to be, so that threads don't point to an object that can disappear.
-     * The cookie could probably be a raw word, but it'd be subject to wraparound. */
-    lispobj chain = arena_chain;
-    if (chain) {
-        do {
-            struct arena* a = (void*)native_pointer(chain);
-            fprintf(stderr, "arena %p has cookie %"OBJ_FMTX"\n", a, a->cookie);
-            scavenge(&a->cookie, 1);
-            chain = a->link;
-        } while (chain != NIL);
-    }
     if (!scavenge_arenas) {
       fprintf(stderr, "GC will NOT scavenge arena contents\n");
       return;
     }
+    lispobj chain = arena_chain;
     /*
      * If there are arenas in use, then treat them as roots.
      * TODO: devise a way to avoid scanning all of all arenas.
@@ -310,16 +338,6 @@ static lispobj find_containing_arena(lispobj ptr) {
     return 0;
 }
 
-static void add_to_result(struct result* res, lispobj val)
-{
-    if (res->count >= vector_len(res->v)) {
-      fprintf(stderr, "WARNING: out of buffer space\n");
-      return;
-    }
-    res->v->data[res->count] = val;
-    ++res->count;
-}
-
 static lispobj target_arena;
 static inline boolean interesting_arena_pointer_p(lispobj ptr)
 {
@@ -334,44 +352,36 @@ static inline boolean interesting_arena_pointer_p(lispobj ptr)
     return 1;
 }
 
-static void scan_thread_words(lispobj* start, lispobj* end, struct result* res,
-                              __attribute__((unused)) char* legend,
-                              struct thread* th, int *printed)
-{
-    gc_assert(arena_chain);
-    int precise = res != NULL;
-    lispobj* where = start;
-    for ( ; where < end ; ++where) {
-        lispobj word = *where;
-        if (interesting_arena_pointer_p(word)) {
-            if (!*printed) { // print thread identifier once only
-              fprintf(stderr, "in thread %p:\n", th);
-              *printed = 1;
-            }
-            /*
-            fprintf(stderr, "word @ %p -> %lx %s (%s)\n", where, word, precise?"precise":"ambiguous",
-            legend);*/
-            if (precise) add_to_result(res, (lispobj)where);
-        }
-    }
-}
-
 extern void gc_stop_the_world(), gc_start_the_world();
 extern void prepare_for_full_mark_phase(), execute_full_mark_phase(), dispose_markbits();
 extern int (*stray_pointer_detector_fn)(lispobj);
 extern lispobj stray_pointer_source_obj;
 
-static int points_to_arena_interior(lispobj ptr) {
-    if (!interesting_arena_pointer_p(ptr)) return 0;
-    // So this pointer points an arena of interest
+static void add_to_result(lispobj val)
+{
     if (searchresult.count >= vector_len(searchresult.v)) {
         fprintf(stderr, "WARNING: out of buffer space\n");
     } else {
         int ct = searchresult.count;
-        searchresult.v->data[ct] = stray_pointer_source_obj;
+        searchresult.v->data[ct] = val;
         searchresult.count++;
     }
+}
+
+static int record_if_points_to_arena_interior(lispobj ptr) {
+    if (!interesting_arena_pointer_p(ptr)) return 0;
+    add_to_result(stray_pointer_source_obj);
     return 0; // Returned value does nothing now.
+}
+
+static void scan_thread_words(lispobj* start, lispobj* end)
+{
+    gc_assert(arena_chain);
+    lispobj* where = start;
+    for ( ; where < end ; ++where) {
+        lispobj word = *where;
+        if (interesting_arena_pointer_p(word)) add_to_result((lispobj)where);
+    }
 }
 
 int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
@@ -379,34 +389,31 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
     target_arena = arena;
     // check for suspcious pointers to arena from thread roots
     searchresult.v = VECTOR(result_buffer);
-    stray_pointer_detector_fn = points_to_arena_interior;
+    stray_pointer_detector_fn = record_if_points_to_arena_interior;
 
     gc_stop_the_world();
     prepare_for_full_mark_phase();
     fprintf(stderr, "Checking threads...\n");
     struct thread* th;
-    int printed;
     for_each_thread(th) {
         if (th->state_word.state == STATE_DEAD) continue;
         stray_pointer_source_obj = (lispobj)th;
-        printed = 0;
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        // This produces false positives
+#if 0 /*def LISP_FEATURE_C_STACK_IS_CONTROL_STACK*/
         if (th == get_sb_vm_thread()) {
-          scan_thread_words(&result_buffer, th->control_stack_end, 0, "stack", th, &printed);
+          scan_thread_words(&result_buffer, th->control_stack_end);
         } else {
           int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
           if (ici != 1) lose("can't find interrupt context");
           lispobj sp = *os_context_register_addr(nth_interrupt_context(0, th), reg_SP);
-          scan_thread_words((lispobj*)sp, th->control_stack_end, 0, "stack", th, &printed);
+          scan_thread_words((lispobj*)sp, th->control_stack_end);
         }
 #endif
         scan_thread_words((lispobj*)th->binding_stack_start,
-                          (lispobj*)get_binding_stack_pointer(th), 0,
-                          "bindings", th,  &printed);
+                          (lispobj*)get_binding_stack_pointer(th));
         lispobj* from = &th->lisp_thread;
         lispobj* to = (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th);
-        scan_thread_words(from,to, 0, "TLS", th, &printed);
-        stray_pointer_source_obj = 0;
+        scan_thread_words(from, to);
     }
     fprintf(stderr, "Checking dynamic space...\n");
     execute_full_mark_phase();

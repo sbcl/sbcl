@@ -562,7 +562,6 @@ during backtrace.
   ;; Statistical CPU profiler data recording buffer
   (sprof-data)
   ;;
-  (arena-savearea :c-type "arena_state" :length 7)
   (arena)
 
   #+x86 (tls-cookie)                          ;  LDT index

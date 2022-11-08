@@ -252,7 +252,6 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
   ;; Address of the one mandatory 'struct arena_memblk' for this arena
   (first-block 0 :type word)
   ;; Arena allocation parameters
-  (initial-size 0 :type word)
   (growth-amount 0 :type word) ; additive
   (max-extensions 0 :type word)
   ;; Sum of sizes of currently allocated blocks
@@ -263,11 +262,11 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
   ;; How may times extended since allocation or most recent rewind.
   ;; This is for bounding the maximum extension.
   (extension-count 0 :type word)
-  ;; A mutex needed when extending the arena.
-  (pthr-mutex 0 :type word)
-  ;; an opaque value which can be used by a threads in a thread pool to detect
-  ;; that this arena was reset, by comparing to a cached value in the thread.
-  (cookie 0)
+  ;; Small integer identifier starting from 0
+  (index 0 :type fixnum)
+  ;; a counter that increments on each rewind, and which can be used by a threads
+  ;; in a pool to detect that their cached TLAB pointers are invalid
+  (token 0 :type word)
   userdata
   ;; Link for global chain of all arenas, needed for GC when 'scavenge_arenas' is 1,
   ;; so that GC can find all in-use arenas.

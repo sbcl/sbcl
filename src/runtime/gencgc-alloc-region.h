@@ -24,7 +24,7 @@ struct alloc_region {
 typedef struct {
     struct alloc_region cons;
     struct alloc_region mixed;
-    lispobj arena; // tagged pointer
+    uword_t token;
 } arena_state;
 
 // Macro to statically initialize instead of using set_region_empty()

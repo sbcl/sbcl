@@ -116,6 +116,8 @@ struct extra_thread_data
     HANDLE synchronous_io_handle_and_flag;
     void* waiting_on_address; // used only if #+sb-futex
 #endif
+    int arena_count; // number of structures in arena_saveareas
+    arena_state* arena_savearea;
 };
 #define thread_extra_data(thread) \
   ((struct extra_thread_data*)((char*)(thread) + dynamic_values_bytes))

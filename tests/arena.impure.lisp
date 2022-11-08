@@ -1,8 +1,11 @@
 #-system-tlabs (invoke-restart 'run-tests::skip-file)
-
+#+parallel-test-runner (invoke-restart 'run-tests::skip-file) ; crashes and hangs
 (in-package sb-vm)
 
-(defvar *arena* (new-arena 1048576 1048576))
+(defvar *many-arenas*
+  (coerce (loop for i below 10 collect (new-arena 1048576)) 'vector))
+
+(defvar *arena* (aref *many-arenas* 0))
 ;;; This REWIND is strictly unnecessary. It simply should not crash
 (rewind-arena *arena*)
 
@@ -59,15 +62,37 @@
       (assert (heap-allocated-p namestring))
       (assert (pathname-parts-heap-p pathname))
       (assert (not (heap-allocated-p answer)))
-      ;; FIXME: special bindings aren't found- a regression or new finder just never did it?
-      ;;    (declare (special *answerstring*))
+      ;; 1. check that a global symbol value can be found
       (unwind-protect
            (progn
-             (setq *answerstring* answer) ; simulate special binding I guess
+             (setq *answerstring* answer)
              ;; user's string went to the arena, and detector finds the source object
              (let ((finder-result (sb-vm:c-find-heap->arena)))
                (assert (equal finder-result '(*answerstring*)))))
-        (makunbound '*answerstring*)))))
+        (makunbound '*answerstring*))
+      ;; 2. check that a thread-local binding can be found
+      (let ((*answerstring* answer))
+        (let ((finder-result (sb-vm:c-find-heap->arena)))
+          (assert (and finder-result (fixnump (car finder-result))))
+          ;; Ideally the result of c-find-heap->arena would have already converted
+          ;; thread stack locations to the symbol name in that location,
+          (let* ((sap (int-sap (ash (car finder-result) n-fixnum-tag-bits)))
+                 (val (sap-ref-lispobj sap 0))
+                 (tlsindex (sap- sap
+                                (int-sap (sb-thread::thread-primitive-thread
+                                          sb-thread:*current-thread*))))
+                 (symbol (sb-impl::find-symbol-from-tls-index tlsindex)))
+            (assert (eq val answer))
+            (assert (eq symbol '*answerstring*))))
+        ;; 3. check that a shadowed binding can be found
+        (let ((*answerstring* "hi"))
+          (let ((finder-result (sb-vm:c-find-heap->arena)))
+            (assert (and finder-result (fixnump (car finder-result))))
+            (let* ((sap (sap+ (int-sap (ash (car finder-result) n-fixnum-tag-bits))
+                              (- n-word-bytes)))
+                   (tlsindex (sap-ref-word sap 0))
+                   (symbol (sb-impl::find-symbol-from-tls-index tlsindex)))
+              (assert (eq symbol '*answerstring*)))))))))
 
 ;;;
 
@@ -159,7 +184,7 @@
 (defvar ptr1 (cons (f arena1) 'foo))
 (defvar ptr2 (g arena2))
 
-(test-util:with-test (:name :find-ptrs-all-arenas)
+(test-util:with-test (:name :find-ptrs-all-arenas :skipped-on :win32)
   (let ((result (c-find-heap->arena)))
     ;; There should be a cons pointing to ARENA1,
     ;; the cons which happens to be in PTR1
@@ -169,8 +194,38 @@
     ;; There should not be anything else
     (assert (= (length result) 2))))
 
-(test-util:with-test (:name :find-ptrs-specific-arena)
+(test-util:with-test (:name :find-ptrs-specific-arena :skipped-on :win32)
   (let ((result (c-find-heap->arena arena1)))
     (assert (equal result (list ptr1))))
   (let ((result (c-find-heap->arena arena2)))
     (assert (equal result '(ptr2)))))
+
+(defun use-up-some-space (n &aux (arenas *many-arenas*)
+                                 (bytes-used (make-array (length arenas)
+                                                         :initial-element 0)))
+  (dotimes (k n)
+    (let* ((i (mod k (length arenas)))
+           (arena (aref arenas i)))
+      (sb-vm:with-arena (arena)
+        (let ((object (make-array (+ 100 (random 100)))))
+          (incf (aref bytes-used i) (primitive-object-size object)))))
+    #+nil
+    (when (zerop (random 1000))
+      (let ((i (random (length arenas))))
+        (let ((arena (aref arenas i)))
+          (format t "~&REWINDING ~D~%" (arena-index arena))
+          (sb-vm:rewind-arena arena)
+          (sb-vm:with-arena (arena)
+            (test-util:opaque-identity (make-array 5)))))))
+  bytes-used)
+(test-util:with-test (:name :allocator-resumption)
+  (map nil 'rewind-arena *many-arenas*)
+  (let ((bytes-used-per-arena (use-up-some-space 10000)))
+    (dotimes (i (length *many-arenas*))
+      (let* ((est (aref bytes-used-per-arena i))
+             (act (arena-bytes-used (aref *many-arenas* i)))
+             (delta (- act est))
+             (frac (* 100 (/ delta act))))
+      (format t "Used: estimate=~D actual=~D diff=~,2f%~%"
+              est act frac)
+      (assert (< frac 1))))))

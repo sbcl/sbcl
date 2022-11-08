@@ -24,12 +24,6 @@
 (defmacro arena-memblk-next (memblk) `(sap-ref-sap ,memblk ,(ash 2 word-shift)))
 (defmacro arena-memblk-padword (memblk) `(sap-ref-sap ,memblk ,(ash 3 word-shift)))
 
-;;; Initial block holds a memblk (4 words) plus the arena structure itself,
-;;; and so the initial free pointer is immediately after those.
-;;; ARENA length must be rounded to even after adding the header, as is tradition.
-(defconstant memblk-preamble-size
-  (ash (+ (align-up (1+ (sb-kernel::type-dd-length arena)) 2) 4) word-shift))
-
 (defmacro do-arena-blocks ((blkvar arena) &body body)
   ;; bind BLK to a SAP pointing to successive 'struct memblk' in arena
   `(let ((,blkvar (int-sap (arena-first-block ,arena))))
@@ -47,19 +41,21 @@
   (when (arena-p (thread-current-arena))
     (switch-to-arena 0)))
 
+(define-load-time-global *arena-index-generator* 0)
+(declaim (fixnum *arena-index-generator*))
+(define-load-time-global *arena-lock* (sb-thread:make-mutex))
+
 ;;; Release all memblks back to the OS, except the first one associated with this arena.
 (defun rewind-arena (arena)
   #+system-tlabs
-  (let ((first (arena-first-block arena)))
-    (when (eql (arena-link arena) 0) ; never used
-      (return-from rewind-arena arena))
-    (alien-funcall (extern-alien "arena_release_memblks" (function void unsigned))
-                   (get-lisp-obj-address arena))
-    (let ((blk (int-sap first)))
-      (setf (arena-memblk-next blk) (int-sap 0) ; no next
-            (arena-memblk-freeptr blk) (sap+ blk memblk-preamble-size)))
-    (setf (arena-length arena) (arena-initial-size arena)
-          (arena-cookie arena) (cons t t)))
+  (cond ((= (arena-token arena) most-positive-word)
+         (bug "Arena token overflow. Need to implement double-precision count"))
+        ((eql (arena-link arena) 0)) ; never used - do nothing
+        (t
+         (alien-funcall (extern-alien "arena_release_memblks" (function void unsigned))
+                        (get-lisp-obj-address arena))
+         (setf (arena-bytes-wasted arena) 0)
+         (incf (arena-token arena))))
   arena)
 
 ;;; The arena structure has to be created in the arena,
@@ -74,36 +70,19 @@
 one or more times, not to exceed MAX-EXTENSIONS times"
   #-system-tlabs :placeholder
   #+system-tlabs
-  (let* ((memblk (sb-alien::%make-alien size)) ; use malloc()
-         (layout (find-layout 'arena))
-         ;; size of 'struct arena_memblk'
-         (struct-base (sap+ memblk (* 4 n-word-bytes))))
-    ;; This memory isn't pre-zeroed
-    (setf (sap-ref-word struct-base 0)
-          (compute-object-header (1+ (dd-length (wrapper-dd layout)))
-                                 instance-widetag))
-    (let ((arena (%make-lisp-obj (sap-int (sap+ struct-base instance-pointer-lowtag)))))
-      (%set-instance-layout arena layout)
-      (setf (arena-max-extensions arena) max-extensions
-            (arena-growth-amount arena) growth-amount)
-      (setf (arena-initial-size arena) size
-            (arena-growth-amount arena) growth-amount
-            (arena-max-extensions arena) max-extensions
-            (arena-length arena) size
-            (arena-extension-count arena) 0
-            (arena-pthr-mutex arena) 0
-            (arena-cookie arena) 0
-            (arena-link arena) 0
-            (arena-userdata arena) nil)
-      (setf (arena-memblk-freeptr memblk) (sap+ memblk memblk-preamble-size)
-            (arena-memblk-limit memblk) (sap+ memblk size)
-            (arena-memblk-next memblk) (int-sap 0)
-            (arena-memblk-padword memblk) (int-sap 0))
-      ;; Point the arena to its block
-      (setf (arena-first-block arena) (sap-int memblk)
-            (arena-current-block arena) (sap-int memblk))
-      (setf (arena-cookie arena) (cons t t)) ; any unique object
-      arena)))
+  (let ((layout (find-layout 'arena))
+        (index (with-system-mutex (*arena-lock*) (incf *arena-index-generator*)))
+        (arena (%make-lisp-obj
+                (alien-funcall (extern-alien "sbcl_new_arena" (function unsigned unsigned))
+                               size))))
+    (%set-instance-layout arena layout)
+    (setf (arena-max-extensions arena) max-extensions
+          (arena-growth-amount arena) growth-amount
+          (arena-max-extensions arena) max-extensions
+          (arena-index arena) index
+          (arena-token arena) 1
+          (arena-userdata arena) nil)
+    arena))
 
 ;;; Once destroyed, it is not legal to access the structure
 ;;; since the structure itself is in the arena.
@@ -228,3 +207,10 @@ one or more times, not to exceed MAX-EXTENSIONS times"
       (dotimes (i 10) (sb-ext:atomic-push (cons 3 i) *foo*))
       (sb-thread:join-thread t1)
       (sb-thread:join-thread t2))))
+
+(defmethod print-object ((self arena) stream)
+  (print-unreadable-object (self stream :type t :identity t)
+    (format stream "id=~D used=~D waste=~D"
+            (arena-index self)
+            (arena-bytes-used self)
+            (arena-bytes-wasted self))))
