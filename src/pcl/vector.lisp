@@ -50,7 +50,7 @@
 
 ;;; Used for interning parts of SLOT-NAME-LISTS, as part of
 ;;; PV-TABLE interning -- just to save space.
-(define-load-time-global *slot-name-lists* (make-hash-table :test 'equal))
+(define-load-time-global *slot-name-lists* (make-hashset 64 #'list-elts-eq #'sxhash))
 
 ;;; Used for interning PV-TABLES, keyed by the SLOT-NAME-LISTS
 ;;; used.
@@ -64,7 +64,12 @@
 
 (defun intern-pv-table (&key slot-name-lists)
   (flet ((intern-slot-names (slot-names)
-           (ensure-gethash slot-names *slot-name-lists* slot-names))
+           ;; Hashsets don't like NIL as a key because NIL is the GC-splatted marker
+           ;; (this isn't a weak hashset, but still, don't try to store NIL because
+           ;; it causes the set to size up on every alleged failure to find)
+           (if slot-names
+               (or (hashset-find *slot-name-lists* slot-names)
+                   (hashset-insert *slot-name-lists* slot-names))))
          (%intern-pv-table (snl)
            (ensure-gethash
             snl *pv-tables*
