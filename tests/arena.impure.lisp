@@ -229,3 +229,15 @@
       (format t "Used: estimate=~D actual=~D diff=~,2f%~%"
               est act frac)
       (assert (< frac 1))))))
+
+(test-util:with-test (:name :thread-arena-inheritance)
+  (sb-vm:with-arena (*arena*)
+    (let ((thread
+           (sb-thread:make-thread
+            (lambda ()
+              (assert (arena-p (thread-current-arena)))
+              ;; Starting a new thread doesn't ensure that the arena savearea
+              ;; has enough room to save the state, so we now ensure space in the
+              ;; savearea only when switching away from the arena.
+              (unuse-arena)))))
+      (sb-thread:join-thread thread))))

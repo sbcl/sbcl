@@ -68,6 +68,7 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
             (arena ? arena : (void*)th->arena),
             (uword_t)ra, id);
 #endif
+    struct extra_thread_data *extra_data = thread_extra_data(th);
     if (arena) { // switching from the dynamic space to an arena
         if (th->arena)
             lose("arena error: can't switch from %p to %p", (void*)th->arena, arena);
@@ -83,11 +84,26 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
         if (th->mixed_tlab.start_addr) gc_close_region(&th->mixed_tlab, PAGE_TYPE_MIXED);
         if (th->cons_tlab.start_addr) gc_close_region(&th->cons_tlab, PAGE_TYPE_CONS);
         release_gc_page_table_lock();
-        // Ensure that this thread has enough space in its save area for the arena index.
-        // Note that indices are 1-based, so subtract 1 to get an array index.
         int arena_index = fixnum_value(arena->index);
-        struct extra_thread_data *extra_data = thread_extra_data(th);
+        /* If this thread has potentially used this arena previously, see if
+         * the TLAB pointers can be restored based on token validity */
+        if (arena_index <= extra_data->arena_count) {
+            // Note that arena indices start at 1 so subtract 1 to get an array index
+            arena_state* state = &extra_data->arena_savearea[arena_index-1];
+            if (state->token == arena->uw_token) { // arena was not rewound since last use
+                th->mixed_tlab = state->mixed;
+                th->cons_tlab  = state->cons;
+            }
+            memset(state, 0, sizeof (arena_state));
+        }
+    } else { // finished with the arena
+        gc_assert(th->arena); // must have been an arena in use
+        struct arena* old_arena = (void*)native_pointer(th->arena);
+        int arena_index = fixnum_value(old_arena->index);
+        // Ensure that this thread has enough space in its save area for the arena index.
         if (arena_index > extra_data->arena_count) {
+            /* Theoretically using realloc() here might work, but realloc does not zero-fill
+             * the new portion, and it has to be zero-filled to avoid seeing random tokens */
             arena_state* new = calloc(arena_index, sizeof (arena_state));
             if (extra_data->arena_count > 0) {
                 memcpy(new, extra_data->arena_savearea,
@@ -97,29 +113,6 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
             extra_data->arena_count = arena_index;
             extra_data->arena_savearea = new;
         }
-        arena_state* state = &extra_data->arena_savearea[arena_index-1];
-        /* If the state's token matches the arena token, then the TLAB free/end pointers
-         * are valid, and this thread can resume allocating where it left off. */
-        if (state->token == arena->uw_token) { // arena was not rewound
-            th->mixed_tlab = state->mixed;
-            th->cons_tlab  = state->cons;
-        } else {
-#if 0
-            // Rewinding which causes the tail of a TLAB not to be used doesn't
-            // count as waste, but I may want to see the number anyway
-            int waste = 0;
-            if (state->mixed.start_addr)
-                waste += (char*)state->mixed.end_addr - (char*)state->mixed.free_pointer;
-            if (state->cons.start_addr)
-                waste += (char*)state->cons.end_addr - (char*)state->cons.free_pointer;
-#endif
-        }
-        memset(state, 0, sizeof (arena_state));
-    } else { // finished with the arena
-        gc_assert(th->arena); // must have been an arena in use
-        struct arena* old_arena = (void*)native_pointer(th->arena);
-        int arena_index = fixnum_value(old_arena->index);
-        struct extra_thread_data *extra_data = thread_extra_data(th);
         arena_state* state = &extra_data->arena_savearea[arena_index-1];
         // Copy the TLABs to the thread's arena save area
         state->token = old_arena->uw_token;
