@@ -90,38 +90,56 @@
                        (ok-lvar-p first)))
                 (y (if constant-y
                        (nth-value 1 (lvar-value second))
-                       (ok-lvar-p second))))
-           (when constant-x
-             (when constant-y
-               (return-from add-equality-constraints))
-             (rotatef x y)
-             (rotatef constant-x constant-y)
-             (setf operator
-                   (case operator
-                     (< '>)
-                     (> '<)
-                     (t operator))))
-           (when (and x y)
-             ;; TODO: inherit more than just EQL constraints
-             (flet ((replace-var (var with)
-                      (cond ((eq var with)
-                             var)
-                            ((vector-length-constraint-p var)
-                             (make-vector-length-constraint with))
-                            (t
-                             with)))
-                    (add (x y)
-                      (conset-adjoin (find-or-create-equality-constraint operator x y nil)
-                                     consequent-constraints)
-                      (when alternative-constraints
-                        (conset-adjoin (find-or-create-equality-constraint operator x y t)
-                                       alternative-constraints))))
-               (do-eql-vars (eql-x ((constraint-var x) constraints))
-                 (add (replace-var x eql-x) y))
-               (if constant-y
-                   (add x y)
-                   (do-eql-vars (eql-y ((constraint-var y) constraints))
-                     (add x (replace-var y eql-y))))))))))))
+                       (ok-lvar-p second)))
+                (x-type (lvar-type first))
+                (y-type (lvar-type second)))
+           (flet ((invert-operator ()
+                    (case operator
+                      (< '>)
+                      (> '<)
+                      (t operator))))
+            (when constant-x
+              (when constant-y
+                (return-from add-equality-constraints))
+              (rotatef x y)
+              (rotatef x-type y-type)
+              (rotatef constant-x constant-y)
+              (setf operator (invert-operator)))
+            (when (and x y)
+              ;; TODO: inherit more than just EQL constraints
+              (flet ((replace-var (var with)
+                       (cond ((eq var with)
+                              var)
+                             ((vector-length-constraint-p var)
+                              (make-vector-length-constraint with))
+                             (t
+                              with)))
+                     (add (x y)
+                       (let ((operator operator))
+                         (when (ctype-p x)
+                           (rotatef x y)
+                           (setf operator (invert-operator)))
+                         (conset-adjoin (find-or-create-equality-constraint operator x y nil)
+                                        consequent-constraints)
+                         (when alternative-constraints
+                           (conset-adjoin (find-or-create-equality-constraint operator x y t)
+                                          alternative-constraints)))))
+                (do-eql-vars (eql-x ((constraint-var x) constraints))
+                  (let ((x (replace-var x eql-x)))
+                    (add x y)
+                    (when (and (vector-length-constraint-p x)
+                               (not constant-y)
+                               (neq y-type *universal-type*))
+                      (add x y-type))))
+                (if constant-y
+                    (add x y)
+                    (do-eql-vars (eql-y ((constraint-var y) constraints))
+                      (let ((y (replace-var y eql-y)))
+                        (add x y)
+                        (when (and (vector-length-constraint-p y)
+                                   (not constant-x)
+                                   (neq x-type *universal-type*))
+                          (add x-type y))))))))))))))
 
 (defun inherit-equality-constraints (vars from-var constraints target)
   (do-conset-constraints-intersection

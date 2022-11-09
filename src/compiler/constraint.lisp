@@ -1000,6 +1000,30 @@
           type
           (type-difference type negated)))))
 
+(defun type-after-comparison (operator not-p current-type type)
+  (case operator
+    ((= eq)
+     (when (and (numeric-type-p type)
+                (not not-p))
+       (type-intersection current-type
+                          (type-union (make-numeric-type :low (numeric-type-low type)
+                                                         :high (numeric-type-high type))
+                                      (make-numeric-type :complexp :complex
+                                                         :low (numeric-type-low type)
+                                                         :high (numeric-type-high type))))))
+    (t
+     (let* ((greater (eq operator '>))
+            (greater (if not-p (not greater) greater)))
+       (cond
+         ((and (integer-type-p current-type) (integer-type-p type))
+          (constrain-integer-type current-type type greater not-p))
+         ((and (float-type-p current-type) (float-type-p type))
+          (constrain-float-type current-type type greater not-p))
+         ((integer-type-p type)
+          (let ((type (constrain-real-to-integer type greater not-p)))
+            (when type
+              (type-intersection current-type type)))))))))
+
 ;;; Given the set of CONSTRAINTS for a variable and the current set of
 ;;; restrictions from flow analysis IN, set the type for REF
 ;;; accordingly.
@@ -1084,31 +1108,10 @@
                         (when (constant-p other) (return)))
                        (t
                         (setq res (type-intersection res other-type))))))))
-            ((< >)
-             (let* ((greater (eq kind '>))
-                    (greater (if not-p (not greater) greater)))
-               (cond
-                 ((and (integer-type-p res) (integer-type-p y))
-                  (setq res
-                        (constrain-integer-type res y greater not-p)))
-                 ((and (float-type-p res) (float-type-p y))
-                  (setq res
-                        (constrain-float-type res y greater not-p)))
-                 ((integer-type-p y)
-                  (let ((type (constrain-real-to-integer y greater not-p)))
-                    (when type
-                      (setf res
-                            (type-intersection res type))))))))
-            (=
-             (when (and (numeric-type-p y)
-                        (not not-p))
-               (setf res
-                     (type-intersection res
-                                        (type-union (make-numeric-type :low (numeric-type-low y)
-                                                                       :high (numeric-type-high y))
-                                                    (make-numeric-type :complexp :complex
-                                                                       :low (numeric-type-low y)
-                                                                       :high (numeric-type-high y)))))))))))
+            ((< > =)
+             (let ((type (type-after-comparison kind not-p res y)))
+               (when type
+                 (setf res type))))))))
     (cond ((and (if-p (node-dest ref))
                 (or (xset-member-p nil not-set)
                     (csubtypep (specifier-type 'null) not-res)))

@@ -1524,32 +1524,49 @@
         (let ((ref (lvar-uses vector)))
           (when (ref-p ref)
             (loop for con in (ref-constraints ref)
+                  for x = (constraint-x con)
+                  for y = (constraint-y con)
                   when (equality-constraint-p con)
-                  do (let ((constant (and (constant-p (constraint-y con))
-                                          (constant-value (constraint-y con))))
-                           (not-p (constraint-not-p con)))
-                       (when constant
-                         (case (equality-constraint-operator con)
-                           (eq
-                            (unless not-p
-                              (return-from vector-length-derive-type-optimizer
-                                (specifier-type `(eql ,constant)))))
-                           (>
-                            (let ((p (specifier-type (if not-p
-                                                         `(integer 0 ,constant)
-                                                         `(integer (,constant))))))
-                              (setf type
-                                    (if type
-                                        (type-intersection type p)
-                                        p))))
-                           (<
-                            (let ((p (specifier-type (if not-p
-                                                         `(integer ,constant)
-                                                         `(integer 0 (,constant))))))
-                              (setf type
-                                    (if type
-                                        (type-intersection type p)
-                                        p)))))))))))
+                  do (let ((constant (and (constant-p y)
+                                          (constant-value y)))
+                           (not-p (constraint-not-p con))
+                           (operator (equality-constraint-operator con)))
+                       (cond (constant
+                              (case operator
+                                (eq
+                                 (unless not-p
+                                   (return-from vector-length-derive-type-optimizer
+                                     (specifier-type `(eql ,constant)))))
+                                (>
+                                 (let ((p (specifier-type (if not-p
+                                                              `(integer 0 ,constant)
+                                                              `(integer (,constant))))))
+                                   (setf type
+                                         (if type
+                                             (type-intersection type p)
+                                             p))))
+                                (<
+                                 (let ((p (specifier-type (if not-p
+                                                              `(integer ,constant)
+                                                              `(integer 0 (,constant))))))
+                                   (setf type
+                                         (if type
+                                             (type-intersection type p)
+                                             p))))))
+                             (t
+                              (multiple-value-bind (operator y-type)
+                                  (if (vector-length-constraint-p x)
+                                      (values operator y)
+                                      (values (case operator
+                                                (< '>)
+                                                (> '<)
+                                                (t operator))
+                                              x))
+                                (when (ctype-p y-type)
+                                  (setf type
+                                        (type-after-comparison operator not-p (or type
+                                                                                  (specifier-type 'index))
+                                                               y-type)))))))))))
       type)))
 
 ;;; Again, if we can tell the results from the type, just use it.
