@@ -137,7 +137,15 @@
                         pathname sb-impl::host hash-table)
                     (format stream "~S~%" obj))
                    (t
-                    (format stream "a ~(~a~)" (type-of obj))
+                    ;; We want to distinguish between SB-PCL::CACHE and every other type
+                    ;; that anyone invents named CACHE (of which there are many!) but not be
+                    ;; so pedantic as to print as COMMON-LISP:CONS
+                    (let ((type (type-of obj)))
+                      (if (and (symbolp type) (eq (symbol-package type) *cl-package*))
+                          ;; Putting (FORMAT stream (IF "s1" "s2") type) here failed the post-build
+                          ;; assertion about strings containing SB- packages. (FIXME)
+                          (format stream "a ~(~a~)" type)
+                          (format stream "a ~/sb-ext:print-symbol-with-prefix/" type)))
                     (when (consp obj)
                       (write-string " = " stream)
                       (write obj :stream stream :level 1 :length 3 :pretty nil))
