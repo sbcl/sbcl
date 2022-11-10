@@ -55,6 +55,40 @@ lispobj sbcl_new_arena(size_t size)
     return make_lispobj(arena, INSTANCE_POINTER_LOWTAG);
 }
 
+static inline void* arena_mutex(struct arena* a) {
+    return (void*)((char*)a + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
+}
+
+void arena_release_memblks(lispobj arena_taggedptr);
+void AMD64_SYSV_ABI sbcl_delete_arena(lispobj arena_taggedptr)
+{
+    arena_release_memblks(arena_taggedptr);
+    struct arena* arena = (void*)native_pointer(arena_taggedptr);
+#ifdef LISP_FEATURE_WIN32
+    DeleteCriticalSection(arena_mutex(arena));
+#else
+    pthread_mutex_destroy(arena_mutex(arena));
+#endif
+    if (arena->link) {
+        acquire_gc_page_table_lock(); // Page table lock guards the arena chain
+        // The usual singly-linked-list deletion algorithm with no initial dummy node.
+        if (arena_taggedptr == arena_chain) { // was head of the chain
+            lispobj next = arena->link;
+            // Arena chain becomes 0 (not NIL) if there are no arenas.
+            arena_chain = next == NIL ? 0 : next;
+        } else {
+            struct arena* prev = (void*)native_pointer(arena_chain);
+            while (prev->link != arena_taggedptr) {
+                if (!prev->link || prev->link == NIL) lose("Arena chain corrupted");
+                prev = (void*)native_pointer(prev->link);
+            }
+            prev->link = arena->link;
+        }
+        release_gc_page_table_lock();
+    }
+    free(arena);
+}
+
 void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
                      __attribute__((unused)) lispobj* ra) // return address
 {
@@ -123,10 +157,6 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
         gc_set_region_empty(&th->cons_tlab);
     }
     th->arena = arena_taggedptr;
-}
-
-static inline void* arena_mutex(struct arena* a) {
-    return (void*)((char*)a + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
 }
 
 #define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire(arena_mutex(a)))
@@ -283,7 +313,7 @@ int scavenge_arenas = 1;
 void gc_scavenge_arenas()
 {
     if (!scavenge_arenas) {
-      fprintf(stderr, "GC will NOT scavenge arena contents\n");
+      if (gencgc_verbose) fprintf(stderr, "GC will NOT scavenge arena contents\n");
       return;
     }
     lispobj chain = arena_chain;

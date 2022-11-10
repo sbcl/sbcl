@@ -84,12 +84,31 @@ one or more times, not to exceed MAX-EXTENSIONS times"
           (arena-userdata arena) nil)
     arena))
 
-;;; Once destroyed, it is not legal to access the structure
-;;; since the structure itself is in the arena.
-;;; BUG: must unlink from arena chain. Not safe to use this yet.
+(eval-when (:compile-toplevel)
+;;; Caution: this vop potentially clobbers all registers, but it doesn't declare them.
+;;; It's safe to use only from DESTROY-ARENA which, being an ordinary full call,
+;;; is presumed not to preserve registers.
+(define-vop (delete-arena)
+  (:args (x :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
+  (:vop-var vop)
+  (:generator 1
+    (move rdi x)
+    (pseudo-atomic ()
+      (inst call (make-fixup "sbcl_delete_arena" :foreign))))))
+
+;;; Destroy memory associated with ARENA, unlinking it from the global chain.
+;;; Note that we do not recycle arena IDs. It would be dangerous to do so, because a thread
+;;; might believe it has a valid TLAB in the deleted arena if it randomly matched on the
+;;; ID and token. That's a valid argument for making arena tokens gobally unique
+;;; (the way it used to work before I made tokens arena-specific)
 (defun destroy-arena (arena)
-  (deallocate-system-memory (arena-base-address arena) (arena-length arena))
-  nil)
+  ;; C is responsible for most of the cleanup.
+  (%primitive delete-arena arena)
+  ;; It is illegal to access the structure now, since that was in the arena.
+  ;; So return an arbitrary success indicator. It might happen that you can accidentally
+  ;; refer to the structure, but technically that constitutes a use-after-free bug.
+  t)
 
 (defmacro with-arena ((arena) &body body)
   (declare (ignorable arena))

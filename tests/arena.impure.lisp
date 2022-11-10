@@ -241,3 +241,46 @@
               ;; savearea only when switching away from the arena.
               (unuse-arena)))))
       (sb-thread:join-thread thread))))
+
+(defun all-arenas ()
+  (let ((head (sb-kernel:%make-lisp-obj (extern-alien "arena_chain" unsigned))))
+    (cond ((eql head 0) nil)
+          (t
+           (assert (typep (arena-link head) '(or null arena)))
+           (collect ((output))
+             (do ((a head (arena-link a)))
+                 ((null a) (output))
+               (output (get-lisp-obj-address a))))))))
+
+(test-util:with-test (:name destroy-arena)
+  (macrolet ((exit-if-no-arenas ()
+               '(progn (incf n-deleted)
+                       (when (zerop (extern-alien "arena_chain" unsigned)) (return)))))
+    (let ((n-arenas (length (all-arenas)))
+          (n-deleted 0))
+      (loop ; until all deleted
+        ;; 1.delete the first item
+        (let* ((chain (all-arenas))
+               (item (car chain))
+               (arena (%make-lisp-obj item)))
+          (assert (typep arena 'arena))
+          (destroy-arena arena)
+          (assert (equal (all-arenas) (cdr chain))))
+        (exit-if-no-arenas)
+        ;; 2. delete something from the middle
+        (let* ((chain (all-arenas))
+               (item (nth (floor (length chain) 2) chain))
+               (arena (%make-lisp-obj item)))
+          (assert (typep arena 'arena))
+          (destroy-arena arena)
+          (assert (equal (all-arenas) (delete item chain))))
+        (exit-if-no-arenas)
+        ;; 3. delete the last item
+        (let* ((chain (all-arenas))
+               (item (car (last chain)))
+               (arena (%make-lisp-obj item)))
+          (assert (typep arena 'arena))
+          (destroy-arena arena)
+          (assert (equal (all-arenas) (butlast chain))))
+        (exit-if-no-arenas))
+      (assert (= n-deleted n-arenas)))))
