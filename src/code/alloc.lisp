@@ -133,9 +133,9 @@
   (declare (type word addr) (ignorable addr))
   #+immobile-space
   (or (let ((start fixedobj-space-start))
-        (<= start addr (truly-the word (+ start (1- fixedobj-space-size)))))
+        (and (<= start addr) (< addr (truly-the word (+ start fixedobj-space-size)))))
       (let ((start text-space-start))
-        (<= start addr (truly-the word (+ start (1- text-space-size)))))))
+        (and (<= start addr) (< addr (truly-the word (+ start text-space-size)))))))
 
 (defun immobile-space-obj-p (obj)
   (immobile-space-addr-p (get-lisp-obj-address obj)))
