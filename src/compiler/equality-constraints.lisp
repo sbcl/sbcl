@@ -190,12 +190,19 @@
             (flet ((find-constraint (ref)
                      (loop for con in (ref-constraints ref)
                            when (and (equality-constraint-p con)
-                                     (eq (equality-constraint-operator con) operator)
-                                     (or (and (constraint-eq-p leaf1 vector-length-p1 (constraint-x con))
-                                              (constraint-eq-p leaf2 vector-length-p2 (constraint-y con)))
-                                         (and commutative
-                                              (constraint-eq-p leaf2 vector-length-p2 (constraint-x con))
-                                              (constraint-eq-p leaf1 vector-length-p1 (constraint-y con)))))
+                                     (or
+                                      (and (eq (equality-constraint-operator con) operator)
+                                           (or (and (constraint-eq-p leaf1 vector-length-p1 (constraint-x con))
+                                                    (constraint-eq-p leaf2 vector-length-p2 (constraint-y con)))
+                                               (and commutative
+                                                    (constraint-eq-p leaf2 vector-length-p2 (constraint-x con))
+                                                    (constraint-eq-p leaf1 vector-length-p1 (constraint-y con)))))
+                                      (and (eq (equality-constraint-operator con)
+                                               (case operator
+                                                 (< '>)
+                                                 (> '<)))
+                                           (constraint-eq-p leaf2 vector-length-p2 (constraint-x con))
+                                           (constraint-eq-p leaf1 vector-length-p1 (constraint-y con)))))
                            return con))
                    (has-sets (leaf)
                      (and (lambda-var-p leaf)
