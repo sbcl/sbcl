@@ -66,7 +66,7 @@ void AMD64_SYSV_ABI sbcl_delete_arena(lispobj arena_taggedptr)
     struct arena* arena = (void*)native_pointer(arena_taggedptr);
 #ifdef LISP_FEATURE_WIN32
     DeleteCriticalSection(arena_mutex(arena));
-#else
+#elif defined LISP_FEATURE_SB_THREAD
     pthread_mutex_destroy(arena_mutex(arena));
 #endif
     if (arena->link) {
