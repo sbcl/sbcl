@@ -94,6 +94,8 @@ one or more times, not to exceed MAX-EXTENSIONS times"
   (:vop-var vop)
   (:generator 1
     (move rdi x)
+    #-immobile-space (inst break halt-trap)
+    #+immobile-space
     (pseudo-atomic ()
       (inst call (make-fixup "sbcl_delete_arena" :foreign))))))
 
