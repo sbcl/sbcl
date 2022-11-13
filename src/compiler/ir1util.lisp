@@ -984,13 +984,6 @@
 ;;; This needs to play nice with LVAR-GOOD-FOR-DX-P and friends.
 (defun handle-nested-dynamic-extent-lvars (dx lvar)
   (let ((uses (lvar-uses lvar)))
-    ;; DX value generators must end their blocks: see UPDATE-UVL-LIVE-SETS.
-    ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
-    ;; to process uses of single-use LVARs.
-    (when (node-p uses)
-      (when (node-to-be-deleted-p uses)
-        (return-from handle-nested-dynamic-extent-lvars))
-      (node-ends-block uses))
     ;; If this LVAR's USE is good for DX, it is either a CAST, or it
     ;; must be a regular combination whose arguments are potentially DX as well.
     (flet ((recurse (use)

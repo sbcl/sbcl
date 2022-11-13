@@ -381,9 +381,9 @@
   (declare (type component component))
   (let (*dx-combination-p-check-local*) ;; catch unconverted combinations
     (dolist (lambda (component-lambdas component))
-      ;; If this FUNCTIONAL is marked dynamic extent and also a
-      ;; closure, mark its ENCLOSE as DX by making it use an LVAR if
-      ;; it doesn't have one already.
+      ;; If this FUNCTIONAL is marked dynamic extent and also
+      ;; represents a closure, mark its ENCLOSE as DX by making it use
+      ;; an LVAR if it doesn't have one already.
       (let ((fun (if (eq (lambda-kind lambda) :optional)
                      (lambda-optional-dispatch lambda)
                      lambda)))
@@ -414,7 +414,7 @@
                          ;; results in here as well.
                          (dolist (cell (handle-nested-dynamic-extent-lvars
                                         dx lvar))
-                           (let ((real (principal-lvar (cdr cell))))
+                           (let ((real (cdr cell)))
                              (setf (lvar-dynamic-extent real) cleanup)
                              (pushnew real real-dx-lvars))))
                         (t
