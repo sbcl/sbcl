@@ -821,14 +821,24 @@
 
 (defun use-good-for-dx-p (use dx)
   (and (not (node-to-be-deleted-p use))
-       (or (dx-combination-p use dx)
-           (and (cast-p use)
-                (not (cast-type-check use))
-                (lvar-good-for-dx-p (cast-value use) dx))
-           (and (trivial-lambda-var-ref-p use)
-                (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
-                  (or (eq use uses)
-                      (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx)))))))
+       (typecase use
+         (combination
+          (and (eq (combination-kind use) :known)
+               (let ((info (combination-fun-info use)))
+                 (or (awhen (fun-info-stack-allocate-result info)
+                       (funcall it use dx))
+                     (awhen (fun-info-result-arg info)
+                       (lvar-good-for-dx-p (nth it (combination-args use))
+                                           dx))))))
+         (cast
+          (and (not (cast-type-check use))
+               (lvar-good-for-dx-p (cast-value use) dx)))
+         (ref
+          (and (trivial-lambda-var-ref-p use)
+               (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
+                 (or (eq use uses)
+                     (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use)
+                                         dx))))))))
 
 (defun lvar-good-for-dx-p (lvar dx)
   (let ((uses (lvar-uses lvar)))
@@ -842,82 +852,20 @@
       (t
        (use-good-for-dx-p uses dx)))))
 
-(defun known-dx-combination-p (use dx)
-  (and (eq (combination-kind use) :known)
-       (let ((info (combination-fun-info use)))
-         (or (awhen (fun-info-stack-allocate-result info)
-               (funcall it use dx))
-             (awhen (fun-info-result-arg info)
-               (lvar-good-for-dx-p (nth it (combination-args use))
-                                   dx))))))
-
-;;; Bound to NIL in RECHECK-DYNAMIC-EXTENT-LVARS, so that the
-;;; combinations that didn't get converted are not treated as dx-safe.
-(defvar *dx-combination-p-check-local* t)
-
-(defun dx-combination-p (use dx)
-  (let (seen)
-    (labels ((recurse (use)
-               (and (combination-p use)
-                    (not (memq use seen))
-                    (or
-                     ;; Known, and can do DX.
-                     (known-dx-combination-p use dx)
-                     ;; Possibly a not-yet-eliminated lambda which ends up returning the
-                     ;; results of an actual known DX combination.
-                     (and *dx-combination-p-check-local*
-                          (let* ((fun (combination-fun use))
-                                 (ref (principal-lvar-use fun))
-                                 (clambda (when (ref-p ref)
-                                            (ref-leaf ref)))
-                                 (creturn (when (lambda-p clambda)
-                                            (lambda-return clambda)))
-                                 (result-use (when (return-p creturn)
-                                               (principal-lvar-use (return-result creturn)))))
-                            ;; Unlikely to have enough recursive local
-                            ;; functions to warrant a hash-table
-                            (push use seen)
-                            ;; FIXME: We should be able to deal with multiple uses here as well.
-                            (and (recurse result-use)
-                                 (combination-args-flow-cleanly-p use result-use dx))))))))
-      (recurse use))))
-
-(defun combination-args-flow-cleanly-p (combination1 combination2 dx)
-  (labels ((recurse (combination)
-             (or (eq combination combination2)
-                 (if (known-dx-combination-p combination dx)
-                     (let* ((lvar (combination-lvar combination))
-                            (dest (and lvar
-                                       (lvar-dest lvar))))
-                       (and (combination-p dest)
-                            (recurse dest)))
-                     (let* ((fun1 (combination-fun combination))
-                            (ref1 (principal-lvar-use fun1))
-                            (clambda1 (when (ref-p ref1) (ref-leaf ref1))))
-                       (when (lambda-p clambda1)
-                         (dolist (var (lambda-vars clambda1) t)
-                           (dolist (var-ref (lambda-var-refs var))
-                             (let* ((lvar (ref-lvar var-ref))
-                                    (dest (and lvar (principal-lvar-dest lvar))))
-                               (unless (or (not dest)
-                                           (and (combination-p dest) (recurse dest)))
-                                 (return-from combination-args-flow-cleanly-p nil)))))))))))
-    (recurse combination1)))
-
 (defun ref-good-for-dx-p (ref)
- (let* ((lvar (ref-lvar ref))
-        (dest (when lvar (lvar-dest lvar))))
-   (and (combination-p dest)
-        (case (combination-kind dest)
-          (:known
-           (awhen (combination-fun-info dest)
-             (or (ir1-attributep (fun-info-attributes it) dx-safe)
-                 (and (not (combination-lvar dest))
-                      (awhen (fun-info-result-arg it)
-                        (eql lvar (nth it (combination-args dest))))))))
-          (:local
-           (every #'trivial-lambda-var-ref-p
-                  (lambda-var-refs (lvar-lambda-var lvar))))))))
+  (let* ((lvar (ref-lvar ref))
+         (dest (when lvar (lvar-dest lvar))))
+    (and (combination-p dest)
+         (case (combination-kind dest)
+           (:known
+            (awhen (combination-fun-info dest)
+              (or (ir1-attributep (fun-info-attributes it) dx-safe)
+                  (and (not (combination-lvar dest))
+                       (awhen (fun-info-result-arg it)
+                         (eql lvar (nth it (combination-args dest))))))))
+           (:local
+            (every #'trivial-lambda-var-ref-p
+                   (lambda-var-refs (lvar-lambda-var lvar))))))))
 
 (defvar *dx-lexenv*)
 
@@ -980,36 +928,6 @@
                 for arg in (combination-args combination)
                 when (eq v var)
                 return arg))))))
-
-;;; This needs to play nice with LVAR-GOOD-FOR-DX-P and friends.
-(defun handle-nested-dynamic-extent-lvars (dx lvar)
-  (let ((uses (lvar-uses lvar)))
-    ;; If this LVAR's USE is good for DX, it is either a CAST, or it
-    ;; must be a regular combination whose arguments are potentially DX as well.
-    (flet ((recurse (use)
-             (etypecase use
-               (cast
-                (handle-nested-dynamic-extent-lvars
-                 dx (cast-value use)))
-               (combination
-                (loop for arg in (combination-args use)
-                      ;; deleted args show up as NIL here
-                      when (and arg
-                                (lvar-good-for-dx-p arg dx))
-                      append (handle-nested-dynamic-extent-lvars
-                              dx arg)))
-               (ref
-                (let* ((other (trivial-lambda-var-ref-lvar use)))
-                  (unless (eq other lvar)
-                    (handle-nested-dynamic-extent-lvars
-                     dx other)))))))
-      (cons (cons dx lvar)
-            (if (listp uses)
-                (loop for use in uses
-                      when (use-good-for-dx-p use dx)
-                      nconc (recurse use))
-                (when (use-good-for-dx-p uses dx)
-                  (recurse uses)))))))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.

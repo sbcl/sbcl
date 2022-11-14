@@ -56,24 +56,28 @@
 
 ;;; Given a local call CALL to FUN, find the associated argument LVARs
 ;;; of CALL corresponding to declared dynamic extent LAMBDA-VARs and
-;;; note them as dynamic extent LVARs. This operation is transitive,
-;;; because dynamic extent is contagious. In particular, the arguments
-;;; of any COMBINATIONs returning a stack-allocatable object in a
-;;; dynamic extent LVAR are dynamic extent as well if the argument
-;;; LVARs contain otherwise-inaccessible stack-allocatable subobjects
-;;; themselves.
-(defun recognize-dynamic-extent-lvars (call fun)
+;;; mark them as dynamic extent, setting up the cleanup corresponding
+;;; to the dynamic extent as well. We mark them now so that
+;;; optimizations optimizing away LVARs have the chance to propagate
+;;; the dynamic extent information. Environment analysis is
+;;; responsible for actually deciding if the lvars can be
+;;; dynamic-extent allocated, dealing with transitively marking the
+;;; otherwise-inaccessible parts of these values as dynamic extent as
+;;; well. This is because environment analysis happens after qll major
+;;; changes to the dataflow in IR1 have been done and it is clear
+;;; whether an LVAR is actually used by a combination which can
+;;; dynamic-extent allocate.
+(defun recognize-potentially-dynamic-extent-lvars (call fun)
   (declare (type combination call) (type clambda fun))
   ;; The block may end up being deleted due to cast optimization
   ;; caused by USE-GOOD-FOR-DX-P
   (unless (node-to-be-deleted-p call)
-    (let* ((*dx-lexenv* (node-lexenv call))
-           (dx-lvars
+    (let* ((dx-lvars
              (loop for arg in (basic-combination-args call)
                    for var in (lambda-vars fun)
                    for dx = (leaf-dynamic-extent var)
                    when (and dx arg (not (lvar-dynamic-extent arg)))
-                   append (handle-nested-dynamic-extent-lvars dx arg))))
+                     collect (cons dx arg))))
       (when dx-lvars
         (let* ((entry (with-ir1-environment-from-node call
                         (make-entry)))
@@ -139,7 +143,7 @@
   (propagate-to-args call fun)
   (setf (basic-combination-kind call) :local)
   (sset-adjoin fun (lambda-calls-or-closes (node-home-lambda call)))
-  (recognize-dynamic-extent-lvars call fun)
+  (recognize-potentially-dynamic-extent-lvars call fun)
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
   (values))

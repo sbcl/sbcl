@@ -36,7 +36,7 @@
         (component-lambdas component))
 
   (find-non-local-exits component)
-  (recheck-dynamic-extent-lvars component)
+  (find-dynamic-extent-lvars component)
   (find-cleanup-points component)
   (tail-annotate component)
   (analyze-indirect-lambda-vars component)
@@ -376,53 +376,70 @@
             (note-non-local-exit target-env exit))))))
   (values))
 
-;;;; final decision on stack allocation of dynamic-extent structures
-(defun recheck-dynamic-extent-lvars (component)
+
+;;; Starting from the potentially (declared) dynamic extent lvars
+;;; recognized during local call analysis and the declared dynamic
+;;; extent local functions recognized during IR1tran, determine if
+;;; these are actually eligible for dynamic-extent allocation. If so,
+;;; we also transitively mark the otherwise-inaccessible parts of
+;;; these values as dynamic extent.
+(defun find-dynamic-extent-lvars (component)
   (declare (type component component))
-  (let (*dx-combination-p-check-local*) ;; catch unconverted combinations
-    (dolist (lambda (component-lambdas component))
-      ;; If this FUNCTIONAL is marked dynamic extent and also
-      ;; represents a closure, mark its ENCLOSE as DX by making it use
-      ;; an LVAR if it doesn't have one already.
-      (let ((fun (if (eq (lambda-kind lambda) :optional)
-                     (lambda-optional-dispatch lambda)
-                     lambda)))
-        (when (leaf-dynamic-extent fun)
-          (let ((xep (functional-entry-fun fun)))
-            (when (and xep (environment-closure (get-lambda-environment xep)))
-              (let ((enclose (functional-enclose fun)))
-                (when (and enclose (not (node-lvar enclose)))
-                  (let ((lvar (make-lvar)))
-                    (use-lvar enclose lvar)
-                    (let ((cleanup (node-enclosing-cleanup (ctran-next (node-next enclose)))))
-                      (aver (eq (cleanup-mess-up cleanup) enclose))
-                      (setf (lvar-dynamic-extent lvar) cleanup)
-                      (setf (cleanup-nlx-info cleanup) (list lvar)))
-                    (push lvar (component-dx-lvars component)))))))))
-      (dolist (entry (lambda-entries lambda))
-        (let* ((cleanup (entry-cleanup entry))
-               (*dx-lexenv* (node-lexenv (cleanup-mess-up cleanup))))
-          (when (eq (cleanup-kind cleanup) :dynamic-extent)
-            (let ((real-dx-lvars '()))
-              (dolist (what (cleanup-nlx-info cleanup))
-                (declare (type cons what))
-                (let ((dx (car what))
-                      (lvar (cdr what)))
-                  (cond ((lvar-good-for-dx-p lvar dx)
-                         ;; Since the above check does deep
-                         ;; checks. we need to deal with the deep
-                         ;; results in here as well.
-                         (dolist (cell (handle-nested-dynamic-extent-lvars
-                                        dx lvar))
-                           (let ((real (cdr cell)))
-                             (setf (lvar-dynamic-extent real) cleanup)
-                             (pushnew real real-dx-lvars))))
-                        (t
-                         (note-no-stack-allocation lvar)
-                         (setf (lvar-dynamic-extent lvar) nil)))))
-              (setf (cleanup-nlx-info cleanup) real-dx-lvars)
-              (setf (component-dx-lvars component)
-                    (append real-dx-lvars (component-dx-lvars component)))))))))
+  (dolist (lambda (component-lambdas component))
+    ;; Mark closures as dynamic-extent allocatable by making the
+    ;; ENCLOSE node for the closure use an LVAR.
+    (let ((fun (if (eq (lambda-kind lambda) :optional)
+                   (lambda-optional-dispatch lambda)
+                   lambda)))
+      (when (leaf-dynamic-extent fun)
+        (let ((xep (functional-entry-fun fun)))
+          ;; We need to have a closure environment to dynamic-extent
+          ;; allocate.
+          (when (and xep (environment-closure (get-lambda-environment xep)))
+            (let ((enclose (functional-enclose fun)))
+              (when (and enclose (not (node-lvar enclose)))
+                (let ((lvar (make-lvar)))
+                  (use-lvar enclose lvar)
+                  (let ((cleanup (node-enclosing-cleanup (ctran-next (node-next enclose)))))
+                    (aver (eq (cleanup-mess-up cleanup) enclose))
+                    (setf (lvar-dynamic-extent lvar) cleanup)
+                    (setf (cleanup-nlx-info cleanup) (list lvar)))
+                  (push lvar (component-dx-lvars component)))))))))
+    (dolist (entry (lambda-entries lambda))
+      (let* ((cleanup (entry-cleanup entry))
+             (lvar+extents (cleanup-nlx-info cleanup))
+             (*dx-lexenv* (node-lexenv (cleanup-mess-up cleanup))))
+        (when (eq (cleanup-kind cleanup) :dynamic-extent)
+          (setf (cleanup-nlx-info cleanup) nil)
+          (dolist (lvar+extent lvar+extents)
+            (declare (type cons lvar+extent))
+            (let ((dx (car lvar+extent))
+                  (lvar (cdr lvar+extent)))
+              (labels
+                  ((mark-dx (lvar)
+                     (setf (lvar-dynamic-extent lvar) cleanup)
+                     (push lvar (cleanup-nlx-info cleanup))
+                     (push lvar (component-dx-lvars component))
+                     ;; Now look to see if there are otherwise
+                     ;; inaccessible parts of the value in LVAR.
+                     (do-uses (use lvar)
+                       (when (use-good-for-dx-p use dx)
+                         (etypecase use
+                           (cast (mark-dx (cast-value use)))
+                           (combination
+                            (dolist (arg (combination-args use))
+                              (when (and arg
+                                         (lvar-good-for-dx-p arg dx))
+                                (mark-dx arg))))
+                           (ref
+                            (let ((other (trivial-lambda-var-ref-lvar use)))
+                              (unless (eq other lvar)
+                                (mark-dx other)))))))))
+                (cond ((lvar-good-for-dx-p lvar dx)
+                       (mark-dx lvar))
+                      (t
+                       (note-no-stack-allocation lvar)
+                       (setf (lvar-dynamic-extent lvar) nil))))))))))
   (values))
 
 ;;;; cleanup emission
