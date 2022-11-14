@@ -91,8 +91,16 @@ Examples:
     (oops)) ; GC causes re-entry to #'oops due to the finalizer
             ; -> ERROR, caught, WARNING signalled"
   (declare (sb-c::tlab :system))
-  (unless object
-    (error "Cannot finalize NIL."))
+  (let ((space (heap-allocated-p object)))
+    ;; Rule out stack, arena, readonly, and static objects.
+    ;; (Is it really an error for a readonly? Maybe a warning? I'll leave it this way unless
+    ;; users complain. Surely DX and arena are errors, and NIL was always an error.)
+    (unless (member space '(:dynamic :immobile))
+      (if (eq space :static)
+          (error "Cannot finalize ~S." object)
+          ;; silently discard finalizers on file streams in arenas I guess
+          (progn ; (warn "Will not finalize ~S." object)
+            (return-from finalize object)))))
   (let ((item (if dont-save (list function) function)))
     (with-finalizer-store (store)
       (let ((id (gethash object (finalizer-id-map store))))
