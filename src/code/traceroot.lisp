@@ -17,23 +17,6 @@
 (define-alien-variable  "gc_object_watcher" unsigned)
 (define-alien-variable  "gc_traceroot_criterion" int)
 
-#+sb-thread
-(defun find-symbol-from-tls-index (index)
-  (unless (zerop index)
-    ;; Search interned symbols first since that's probably enough
-    (do-all-symbols (symbol)
-      (when (= (sb-kernel:symbol-tls-index symbol) index)
-        (return-from find-symbol-from-tls-index symbol)))
-    ;; A specially bound uninterned symbol? how awesome
-    (sb-vm:map-allocated-objects
-     (lambda (obj type size)
-       (declare (ignore size))
-       (when (and (= type sb-vm:symbol-widetag)
-                  (= (sb-kernel:symbol-tls-index obj) index))
-         (return-from find-symbol-from-tls-index obj)))
-     :all))
-  0)
-
 ;;; Convert each path to (TARGET . NODES)
 ;;; where the first node in NODES is one of:
 ;;;
@@ -89,7 +72,7 @@
                        (symbol
                         (unless (eql root-kind 1)
                           #+sb-thread
-                          (find-symbol-from-tls-index (ash extra sb-vm:n-fixnum-tag-bits))
+                          (sb-vm::symbol-from-tls-index (ash extra sb-vm:n-fixnum-tag-bits))
                           #-sb-thread
                           extra)))
                   (awhen (and thread (sb-thread:thread-name thread))

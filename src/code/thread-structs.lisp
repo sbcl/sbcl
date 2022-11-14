@@ -11,6 +11,12 @@
 
 (in-package "SB-THREAD")
 
+;;; An AVL tree of threads keyed by 'struct thread'. NIL is the empty tree.
+(sb-ext:define-load-time-global *all-threads* ())
+;;; Next TLS index to use. This is shifted by n-fixnum-tag-bits because it holds
+;;; a word-aligned raw integer, not a fixnum (but it looks like a fixnum)
+(sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
+
 ;;; It's possible to make futex/non-futex switchable at runtime by ensuring that
 ;;; these synchronization primitive structs contain all the slots for the union
 ;;; of any kind of backing object.  Some of the #+sb-futex/#-sb-futex cases in

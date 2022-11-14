@@ -199,6 +199,41 @@ one or more times, not to exceed MAX-EXTENSIONS times"
                (extern-alien "find_dynspace_to_arena_ptrs" (function int unsigned unsigned))
                (if arena (get-lisp-obj-address arena) 0)
                (get-lisp-obj-address result)))))
+    ;; The AVL tree of threads is keyed by THREAD-PRIMITIVE-THREAD, which is the base
+    ;; of each thread's TLS and above its binding stack. Therefore we need two separate
+    ;; FIND operations, one >= and one <=. Perhaps it would make sense to key by control stack base.
+    ;; FIXME: These functions should probably acquire 'all_threads_lock'. Even so, the entire
+    ;; entire mechanism is still slightly unsafe because the finder returns raw addresses.
+    (flet ((find-tls-ref (addr)
+             (binding* ((node (sb-thread::avl-find<= addr sb-thread::*all-threads*) :exit-if-null)
+                        (thread-sap (sb-sys:int-sap
+                                     (sb-thread::thread-primitive-thread
+                                      (sb-thread::avlnode-data node)))))
+               (when (and (<= (sap-int thread-sap) addr)
+                          (< addr (sap-int (sap+ thread-sap (ash *free-tls-index* n-fixnum-tag-bits)))))
+                 (let* ((tlsindex (sap- (int-sap addr) thread-sap))
+                        (symbol (symbol-from-tls-index tlsindex)))
+                   (list (sap-ref-lispobj thread-sap (ash thread-lisp-thread-slot word-shift))
+                         :tls symbol)))))
+           (find-binding (addr)
+             (binding* ((node (sb-thread::avl-find>= addr sb-thread::*all-threads*) :exit-if-null)
+                        (thread-sap (sb-sys:int-sap
+                                     (sb-thread::thread-primitive-thread
+                                      (sb-thread::avlnode-data node))))
+                        (bindstack-base
+                         (sap-ref-word thread-sap (ash thread-binding-stack-start-slot word-shift)))
+                        (bindstack-ptr
+                         (sap-ref-word thread-sap (ash thread-binding-stack-pointer-slot word-shift))))
+               (when (and (>= addr bindstack-base) (< addr bindstack-ptr))
+                 (let* ((tlsindex (sap-ref-word (int-sap addr) (- n-word-bytes)))
+                        (symbol (symbol-from-tls-index tlsindex)))
+                   (list (sap-ref-lispobj thread-sap (ash thread-lisp-thread-slot word-shift))
+                         :binding symbol))))))
+      (dotimes (i n)
+        (let ((element (aref result i)))
+          (when (fixnump element) ; it's a thread memory address
+            (let ((word (ash element n-fixnum-tag-bits)))
+              (setf (aref result i) (or (find-tls-ref word) (find-binding word))))))))
     (coerce (subseq result 0 n) 'list)))
 
 ;;; This global var is just for making 1 arena for testing purposes.

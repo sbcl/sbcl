@@ -73,26 +73,13 @@
       ;; 2. check that a thread-local binding can be found
       (let ((*answerstring* answer))
         (let ((finder-result (sb-vm:c-find-heap->arena)))
-          (assert (and finder-result (fixnump (car finder-result))))
-          ;; Ideally the result of c-find-heap->arena would have already converted
-          ;; thread stack locations to the symbol name in that location,
-          (let* ((sap (int-sap (ash (car finder-result) n-fixnum-tag-bits)))
-                 (val (sap-ref-lispobj sap 0))
-                 (tlsindex (sap- sap
-                                (int-sap (sb-thread::thread-primitive-thread
-                                          sb-thread:*current-thread*))))
-                 (symbol (sb-impl::find-symbol-from-tls-index tlsindex)))
-            (assert (eq val answer))
-            (assert (eq symbol '*answerstring*))))
+          (assert (equal (first finder-result)
+                         `(,sb-thread:*current-thread* :tls *answerstring*))))
         ;; 3. check that a shadowed binding can be found
         (let ((*answerstring* "hi"))
           (let ((finder-result (sb-vm:c-find-heap->arena)))
-            (assert (and finder-result (fixnump (car finder-result))))
-            (let* ((sap (sap+ (int-sap (ash (car finder-result) n-fixnum-tag-bits))
-                              (- n-word-bytes)))
-                   (tlsindex (sap-ref-word sap 0))
-                   (symbol (sb-impl::find-symbol-from-tls-index tlsindex)))
-              (assert (eq symbol '*answerstring*)))))))))
+            (assert (equal (first finder-result)
+                           `(,sb-thread:*current-thread* :binding *answerstring*)))))))))
 
 ;;;
 

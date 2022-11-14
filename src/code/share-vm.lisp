@@ -10,6 +10,8 @@
 
 (in-package "SB-VM")
 
+(declaim (ftype (function (integer) (or symbol (eql 0))) symbol-from-tls-index))
+
 (defvar *current-internal-error-context*)
 
 (defmacro with-pinned-context-code-object

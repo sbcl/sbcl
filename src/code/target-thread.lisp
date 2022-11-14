@@ -231,8 +231,6 @@ to terminate this thread cleanly prior to core file saving without signalling
 an error in that case."
   (thread-%ephemeral-p thread))
 
-;;; Keep an AVL tree of threads ordered by stack base address. NIL is the empty tree.
-(sb-ext:define-load-time-global *all-threads* ())
 ;;; Ensure that THREAD is in *ALL-THREADS*.
 (defmacro update-all-threads (key thread)
   `(let ((addr ,key))
@@ -2392,8 +2390,6 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 ;;; should probably discuss with a professional psychiatrist first
 #+sb-thread
 (progn
-  (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
-
   (defun %symbol-value-in-thread (symbol thread &aux (tlsindex (symbol-tls-index symbol)))
     (with-deathlok (thread c-thread)
       (if (/= c-thread 0)
