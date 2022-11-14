@@ -702,19 +702,20 @@ multiple threads accessing the same hash-table without locking."
 ;;; need-to-rehash is indicated by a stamp of #b______01 ; "initial stamp"
 ;;; which is changed during rehash to         #b______10 ; "rehashing stamp"
 ;;;                       rolling count --------^^^^^^ (some number of bits)
-(defmacro done-rehashing (kv-vector initial-stamp)
+(defmacro done-rehashing (table kv-vector initial-stamp)
+  (declare (ignorable table))
   `(let ((rehashing-stamp (1+ ,initial-stamp))
          ;; new stamp has the "count" field bumped up by 1, and the low 2 bits are 0.
          (new-stamp (sb-vm::+-modfx ,initial-stamp 3)))
+     #+hash-table-metrics (aver (= (logand ,initial-stamp #b11) #b01))
      ;; Assigning new stamp races with GC which might set the 'rehash' (low) bit again.
      ;; At most one more attempt is needed since no other state change can occur -
      ;; we don't need to keep trying to achieve a state in which 'rehash' is clear.
      (let ((old (cas (svref ,kv-vector rehash-stamp-elt) rehashing-stamp new-stamp)))
        (unless (eq old rehashing-stamp)
-         ;; While rehashing, GC could have set the 0 bit indicating
-         ;; that the hashes are obsolete yet again.
          (aver (eq old (logior rehashing-stamp 1)))
-         ;; So bump the count field, but leave the least-significant bit on.
+         #+hash-table-metrics (atomic-incf (hash-table-n-rehash-again ,table))
+         ;; Bump the count field, but leave the least-significant bit on.
          (aver (eq old (cas (svref ,kv-vector rehash-stamp-elt) old (logior new-stamp 1))))))))
 
 (macrolet
@@ -831,7 +832,7 @@ multiple threads accessing the same hash-table without locking."
   (without-interrupts
    ;; Transitioning from #b01 to #b10 clears the 'rehash' bit and sets the
    ;; rehash-in-progress bit. It also gives this thread exclusive write access
-   ;; to the hashing vectors, since at most one thread can win this CAS.
+   ;; to the bucket chains since at most one thread can win this CAS.
    (when (eq (cas (svref kv-vector rehash-stamp-elt) epoch rehashing-state) epoch)
      ;; Remove address-sensitivity, preserving the other flags.
      (reset-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
@@ -883,7 +884,7 @@ multiple threads accessing the same hash-table without locking."
                 (push-in-chain (pointer-hash->bucket
                                 (pointer-hash pair-key) mask))
                 (when (eq pair-key key) (setq result key-index)))))))
-       (done-rehashing kv-vector epoch)
+       (done-rehashing table kv-vector epoch)
        (unless (eql result 0)
          (setf (hash-table-cache table) result))
        result))))
@@ -1358,12 +1359,13 @@ nnnn 1_    any       linear scan
                        (let ((stamp (kv-vector-rehash-stamp kv-vector)))
                          (cond ((and (evenp initial-stamp) ; valid hashes at start?
                                      (zerop (logandc2 (logxor stamp initial-stamp) 1)))
-                                ;; Provided that the stamp didn't change, the 'rehash'
-                                ;; bit can be ignored since rehash did not occur.
+                                ;; * address-based hashes were valid on entry
+                                ;; * disregarding the need-to-rehash bit, stamp is the same as on
+                                ;;   entry (rehash did not occur)
                                 (values default nil))
                                ((and (oddp initial-stamp) (= stamp initial-stamp))
-                                ;; Stamp didn't change, but address-based hashes were
-                                ;; not valid at the start of the lookup.
+                                ;; * address-based hashes were NOT valid on entry
+                                ;; * rehash did not occur
                                 ;; Stably hashed (address-insensitive) keys are ok.
                                 (if (not address-based-p)
                                     (values default nil)
@@ -1462,7 +1464,7 @@ nnnn 1_    any       linear scan
              (setf (hash-table-smashed-cells hash-table) nil)
              ;; Re-enable weakness
              (logior-array-flags kv-vector sb-vm:vector-weak-flag)
-             (done-rehashing kv-vector initial-stamp))
+             (done-rehashing hash-table kv-vector initial-stamp))
            ;; One more try gives the definitive answer even if the hashes are
            ;; obsolete again.  KEY's hash can't have changed, and there
            ;; are no concurrent readers to potentially mess up the chains.
@@ -1529,6 +1531,9 @@ nnnn 1_    any       linear scan
          (key-index
           (let ((hash-vector (hash-table-hash-vector hash-table))
                 (hwm (the index/2 (kv-vector-high-water-mark kv-vector))))
+            ;; EQ-TEST is an optimization which says that regardless of the table test,
+            ;; for the particular key being sought, the comparator should be EQ.
+            ;; This would be true of INSTANCE in an EQL or EQUAL table for example.
             (cond ((or eq-test (eq (hash-table-test hash-table) 'eq))
                    (loop for i from (* hwm 2) downto 2 by 2
                          when (eq key (aref kv-vector i)) return i))
@@ -1539,13 +1544,14 @@ nnnn 1_    any       linear scan
                    ;; EQ and EQL are fine with unbound-marker as an argument,
                    ;; but the general case checks the key for validity first.
                    (let ((test-fun (hash-table-test-fun hash-table)))
-                     (aver (= (length hash-vector) (ash (length kv-vector) -1)))
+                     (aver (= (length (truly-the (not null) hash-vector))
+                              (ash (length kv-vector) -1)))
                      (loop for i from hwm downto 1
                            when (and (= hash (aref hash-vector i))
                                      (let ((pair-key (aref kv-vector (* 2 i))))
                                        (and (not (empty-ht-slot-p pair-key))
                                             (funcall test-fun key pair-key))))
-                           return i)))))))
+                           return (* 2 i))))))))
     (cond (key-index
            (setf (hash-table-cache hash-table) key-index)
            (values (aref kv-vector (1+ key-index)) t))

@@ -67,6 +67,11 @@
       (mapc #'terminate-thread threads))))
 
 
+;;; Structures are hashed by their address for any kind of standard hash-table
+;;; other than an EQUALP. This makes them good candidates for exercising gethash-concurrency
+;;; tests, because we can force a rehash that changes their hash.
+(defstruct (teststruct (:constructor make-teststruct (val))) val)
+
 ;;; The new logic for concurrent GETHASH allows multiple threads each to decide to
 ;;; invoke a GC-provoked rehash, but since we do not want concurrent writers,
 ;;; only one thread actually rehashes and the other(s) perform linear search.
@@ -78,7 +83,9 @@
   ;; as they will not cause the table to need rehash due to GC.
   ;; Using symbols won't work either because they hash stably under EQL
   ;; (but not under EQ) so let's use a bunch of cons cells.
-  `(let* ((,array (coerce (loop for i from 0 repeat 100 collect (cons i i)) 'vector))
+  `(let* ((,array (coerce (loop for i from 0 repeat 100
+                                collect (if (oddp i) (make-teststruct i) (cons i i)))
+                          'vector))
           (,table ,constructor)
           (*table-under-test* (if shrinkp ,table nil)))
      (when shrinkp
@@ -87,8 +94,9 @@
          (setf (sb-impl::hash-table-index-vector ,table) (subseq v 0 (/ (length v) 2)))))
      ,@body
      #+hash-table-metrics
-     (format t "~&::: INFO: Rehash count = ~D~%"
-             (sb-impl::hash-table-n-rehash+find ,table))))
+     (format t "~&::: INFO: GC-forced-rehash=~D rehash-invalid=~D~%"
+             (sb-impl::hash-table-n-rehash+find ,table)
+             (sb-impl::hash-table-n-rehash-again ,table))))
 
 ;;; Do *NOT* use (gc :full) in the following tests - a full GC causes all objects
 ;;; to be promoted into the highest normal generation, which achieves nothing,
@@ -103,60 +111,56 @@
             :broken-on :win32)
   (dolist (shrinkp '(nil t))
    (with-test-setup (keys (hash (make-hash-table :synchronized t)))
-    (let*
-        ((*errors* nil)
-         (threads (list (make-join-thread
-                         (lambda ()
-                           (catch 'done
-                             (handler-bind ((serious-condition 'oops))
-                               (loop
-                                 ;;(princ "1") (force-output)
-                                 (setf (gethash (aref keys (random 100)) hash) 'h)))))
-                         :name "writer")
-                        (make-join-thread
-                         (lambda ()
-                           (catch 'done
-                             (handler-bind ((serious-condition 'oops))
-                               (loop
-                                 ;;(princ "2") (force-output)
-                                 (remhash (aref keys (random 100)) hash)))))
-                         :name "reader")
-                        (make-join-thread
-                         (lambda ()
-                           (catch 'done
-                             (handler-bind ((serious-condition 'oops))
-                               (loop
-                                 (sleep (random *sleep-delay-max*))
-                                 (sb-ext:gc)))))
-                         :name "collector"))))
+    (let* ((*errors* nil)
+           (threads
+            (list (make-join-thread
+                   (lambda () (loop (setf (gethash (aref keys (random 100)) hash) 'h)))
+                   :name "writer")
+                  (make-join-thread
+                   (lambda () (loop (remhash (aref keys (random 100)) hash)))
+                   :name "remover")
+                  (make-join-thread
+                   (lambda ()
+                     (loop (sleep (random *sleep-delay-max*))
+                           (sb-ext:gc)))
+                   :name "GC"))))
       (unwind-protect (sleep 2.5)
         (mapc #'terminate-thread threads))
       (assert (not *errors*))))))
 
-(with-test (:name (hash-table :parallel-readers)
-                  :broken-on :win32)
+(defun test-concurrent-gethash (table-kind)
   (dolist (shrinkp '(nil t))
-    (with-test-setup (keys (hash (make-hash-table)))
+    (with-test-setup (keys (table (make-hash-table :test table-kind)))
       (let ((*errors* nil)
             (expected (make-array 100 :initial-element nil))
             (actions (make-array 3 :element-type 'sb-ext:word :initial-element 0)))
         (loop repeat 50
               do (let ((i (random 100)))
-                   (setf (gethash (aref keys i) hash) i)
+                   (setf (gethash (aref keys i) table) i)
                    (setf (aref expected i) t)))
-        (flet ((reader (n)
+        (labels
+            ((reader (n random-state)
                  (catch 'done
                    (handler-bind ((serious-condition 'oops))
                      (loop
                       (let* ((i (random 100))
-                             (x (gethash (aref keys i) hash)))
+                             (x (gethash (aref keys i) table)))
                         (atomic-incf (aref actions n))
+                        (when (zerop (random 100 random-state))
+                          (let* ((kvv (sb-impl::hash-table-pairs table))
+                                 (epoch (svref kvv 1)))
+                            ;; Randomly force a rehash (as if by GC) so that we get "invalid" rehashes,
+                            ;; meaning that the ending state is still need-to-rehash.
+                            (sb-ext:cas (svref kvv 1) epoch (logior epoch 1))))
                         (cond ((aref expected i) (assert (eq x i)))
-                              (t (assert (not x))))))))))
+                              (t (assert (not x)))))))))
+             (start-reader (n)
+               (make-kill-thread #'reader :name (format nil "reader ~d" (1+ n))
+                                          :arguments (list n (make-random-state t)))))
           (let ((threads
-              (list (make-kill-thread #'reader :name "reader 1" :arguments 0)
-                    (make-kill-thread #'reader :name "reader 2" :arguments 1)
-                    (make-kill-thread #'reader :name "reader 3" :arguments 2)
+              (list (start-reader 0)
+                    (start-reader 1)
+                    (start-reader 2)
                     (make-kill-thread
                      (lambda ()
                        (catch 'done
@@ -167,14 +171,24 @@
             (unwind-protect (sleep 2.5)
               (mapc #'terminate-thread threads))
             #+hash-table-metrics
-            (format t "~&::: INFO: GETHASH count = ~D = ~D, lsearch=~d~%"
-                    actions
-                    (reduce #'+ actions)
+            (let ((n-gethash (reduce #'+ actions))
+                  (n-lsearch (sb-impl::hash-table-n-lsearch table)))
+              (format t "~&::: INFO: GETHASH count = ~D = ~D, lsearch=~d (~f%)~%"
+                      actions
+                      n-gethash
                  ;; With the GC frequency as high as it is for this test,
                  ;; we can get more than 1 lookup in 10^5 needing linear scan.
                  ;; A "normal" amount of GCing often sees this as low as 0.
-                    (sb-impl::hash-table-n-lsearch hash))
+                      n-lsearch (/ n-lsearch n-gethash)))
             (assert (not *errors*))))))))
+(compile 'test-concurrent-gethash)
+
+(with-test (:name (hash-table :parallel-readers-eq-table) :broken-on :win32)
+  (test-concurrent-gethash 'eq))
+(with-test (:name (hash-table :parallel-readers-eql-table) :broken-on :win32)
+  (test-concurrent-gethash 'eql))
+(with-test (:name (hash-table :parallel-readers-equal-table) :broken-on :win32)
+  (test-concurrent-gethash 'equal))
 
 (with-test (:name (hash-table :single-accessor :parallel-gc)
             :broken-on :win32)

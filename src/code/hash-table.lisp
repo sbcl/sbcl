@@ -162,6 +162,9 @@
   ;; disable GC during rehash as a consequence of key movement.
   #+hash-table-metrics (n-rehash+find 0 :type word)
   #+hash-table-metrics (n-lsearch     0 :type word)
+  ;; this counter is incremented if we observe that GC marked the table invalid
+  ;; while already in the midst of being rehashed due to invalidation.
+  #+hash-table-metrics (n-rehash-again 0 :type word)
 
   ;; only for debugging system bootstrap when hash-tables are completely
   ;; broken (which seems to be quite often as I optimize them)
