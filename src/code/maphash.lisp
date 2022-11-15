@@ -173,5 +173,5 @@ for."
                ,(if finalizer 'hash-table-finalizer-flag 0))
       ,@args
       ,+min-hash-table-size+
-      default-rehash-size
+      ,default-rehash-size
       $1.0)))

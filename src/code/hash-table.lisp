@@ -87,10 +87,11 @@
   ;; above the high water mark.  If you store non-immediate data past
   ;; that mark, you're sure to have problems.
   (pairs nil :type simple-vector)
-  ;; A potential index into the k/v vector. It should be checked first
-  ;; when searching. There's no reason to allow NIL here,
-  ;; because worst case there won't be a hit at this index.
-  (cache 0 :type index)
+  ;; MRU physical index of a key in the k/v vector. If < (LENGTH PAIRS)
+  ;; the cell can be examined first in GETHASH and PUTHASH. The "unknown" value
+  ;; is not 0 because that would look valid but could accidentally return a
+  ;; false match if the user's key is EQ to element 0 in the pair vector.
+  (cache (- array-dimension-limit 2) :type index)
   ;; The index vector. This may be larger than the capacity to help
   ;; reduce collisions.
   (index-vector nil :type (simple-array hash-table-index (*)))

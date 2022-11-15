@@ -716,12 +716,7 @@ multiple threads accessing the same hash-table without locking."
          (aver (eq old (cas (svref ,kv-vector rehash-stamp-elt) old (logior new-stamp 1))))))))
 
 (macrolet
-    ((with-pair ((key-var &optional val-var) &body body)
-       `(let* ((key-index (* 2 i))
-               (,key-var (aref kv-vector key-index))
-               ,@(if val-var `((,val-var (aref kv-vector (1+ key-index))))))
-          ,@body))
-     (push-in-chain (bucket-index-expr)
+    ((push-in-chain (bucket-index-expr)
        `(let ((bucket (the index ,bucket-index-expr)))
           (setf (aref next-vector i) (aref index-vector bucket)
                 (aref index-vector bucket) i))))
@@ -734,29 +729,32 @@ multiple threads accessing the same hash-table without locking."
            (type (simple-array hash-table-index (*)) next-vector index-vector)
            (type (or null (simple-array hash-table-index (*))) hash-vector))
   (declare (ignorable table))
-  (cond
-    (hash-vector
-      ;; Scan backwards so that chains are in ascending index order.
-      (do ((i hwm (1- i))) ((zerop i))
-        (declare (type index/2 i))
-        (with-pair (key val)
-         ;; It's unclear why we check for key AND value being empty - a half
-         ;; empty cell could only appear mid-insertion, but concurrent
-         ;; insert is forbidden, so how could it happen?
-         ;; i.e. I would think KEY emptiness is an adequate test.
-         (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p val))
-                ;; Slot is empty, push it onto free list.
-                (setf (aref next-vector i) next-free next-free i))
-               ((/= (aref hash-vector i) +magic-hash-vector-value+)
-                ;; Use the existing hash value (not address-based hash)
-                (push-in-chain (mask-hash (aref hash-vector i) mask)))
-               (t
-                ;; Set address-sensitivity BEFORE depending on the bits.
-                ;; Precise GC platforms can move any key except the ones which
-                ;; are explicitly pinned.
-                (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
-                (push-in-chain (pointer-hash->bucket (pointer-hash key) mask)))))))
-    ((= (ht-flags-kind (hash-table-flags table)) hash-table-kind-eql)
+  (macrolet ((with-key ((key-var) &body body)
+               ;; If KEY-VAR is empty, then push I onto the freelist, otherwise invoke BODY
+               `(let* ((key-index (* 2 i))
+                       (,key-var (aref kv-vector key-index)))
+                  (if (empty-ht-slot-p key)
+                      (setf (aref next-vector i) next-free next-free i)
+                      (progn ,@body)))))
+    (cond
+      (hash-vector
+       ;; Scan backwards so that chains are in ascending index order.
+       (do ((i hwm (1- i))) ((zerop i))
+         (declare (type index/2 i))
+         (with-key (key)
+           (let* ((stored-hash (aref hash-vector i))
+                  (bucket
+                   (cond ((/= stored-hash +magic-hash-vector-value+)
+                          ;; Use the existing hash value (not address-based hash)
+                          (mask-hash (aref hash-vector i) mask))
+                         (t
+                         ;; Set address-sensitivity BEFORE depending on the bits.
+                         ;; Precise GC platforms can move any key except the ones which
+                         ;; are explicitly pinned, and we're not explictly pinning.
+                          (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
+                          (pointer-hash->bucket (pointer-hash key) mask)))))
+             (push-in-chain bucket)))))
+      ((eq (hash-table-test table) 'eql)
      ;; There's a very tricky issue here with using EQL-HASH - you can't just
      ;; call it and then decide to set the address-sensitivity bit if the secondary
      ;; result is T. Normally we call the hash function with the key pinned,
@@ -775,28 +773,22 @@ multiple threads accessing the same hash-table without locking."
      ;; value, maybe set the vector bit, call it again. But that's not great.
      ;; Instead we use a macro that is like WITH-PINNED-OBJECTS, but cheaper
      ;; than binding a special variable once per key.
-     (sb-vm::with-pinned-object-iterator (pin-object)
-      (do ((i hwm (1- i))) ((zerop i))
-        (declare (type index/2 i))
-        (with-pair (key val)
-         (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p val))
-                (setf (aref next-vector i) next-free next-free i))
-               (t
-                (pin-object key)
-                (multiple-value-bind (hash address-based) (eql-hash-no-memoize key)
-                  (when address-based
-                    (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
-                  (push-in-chain (mask-hash (prefuzz-hash hash) mask)))))))))
-    (t
-      (do ((i hwm (1- i))) ((zerop i))
-        (declare (type index/2 i))
-        (with-pair (key val)
-         (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p val))
-                (setf (aref next-vector i) next-free next-free i))
-               (t
-                (when (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
-                  (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
-                (push-in-chain (pointer-hash->bucket (pointer-hash key) mask))))))))
+       (sb-vm::with-pinned-object-iterator (pin-object)
+         (do ((i hwm (1- i))) ((zerop i))
+           (declare (type index/2 i))
+           (with-key (key)
+             (pin-object key)
+             (multiple-value-bind (hash address-based) (eql-hash-no-memoize key)
+               (when address-based
+                 (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
+               (push-in-chain (mask-hash (prefuzz-hash hash) mask)))))))
+      (t
+       (do ((i hwm (1- i))) ((zerop i))
+         (declare (type index/2 i))
+         (with-key (key)
+           (when (sb-vm:is-lisp-pointer (get-lisp-obj-address key))
+             (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
+           (push-in-chain (pointer-hash->bucket (pointer-hash key) mask)))))))
   ;; This is identical to the calculation of next-free-kv in INSERT-AT.
   (cond ((/= next-free 0) next-free)
         ((= hwm (hash-table-pairs-capacity kv-vector)) 0)
@@ -838,49 +830,52 @@ multiple threads accessing the same hash-table without locking."
      ;; can't. No big deal. If we were willing to cons new vectors, we could
      ;; rehash into them and CAS them in, but the advantage would be minimal-
      ;; obsolete chains could only work for a possibly-empty subset of keys.
+     ;; Leave the free cell chain untouched, since rehashing
+     ;; due to key movement can not possibly affect that chain.
      (let* ((index-vector (fill (hash-table-index-vector table) 0))
             (mask (1- (length index-vector)))
             (hwm (kv-vector-high-water-mark kv-vector))
             (result 0))
        (declare (optimize (sb-c:insert-array-bounds-checks 0)))
-       (cond
-         (hash-vector
-           (do ((i hwm (1- i))) ((zerop i))
-             (declare (type index/2 i))
-             (with-pair (pair-key)
-              ;; Leave the free cell chain untouched, since rehashing
-              ;; due to key movement can not possibly affect that chain.
-              (unless (empty-ht-slot-p pair-key)
-                (cond ((/= (aref hash-vector i) +magic-hash-vector-value+)
-                       (push-in-chain (mask-hash (aref hash-vector i) mask)))
-                      (t
-                       (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
-                       (push-in-chain (pointer-hash->bucket
-                                       (pointer-hash pair-key) mask))))
-                (when (eq pair-key key) (setq result key-index))))))
-         ((= (ht-flags-kind (hash-table-flags table)) hash-table-kind-eql)
-          (sb-vm::with-pinned-object-iterator (pin-object)
-           (do ((i hwm (1- i))) ((zerop i))
-             (declare (type index/2 i))
-             (with-pair (pair-key)
-               (unless (empty-ht-slot-p pair-key)
-                 (pin-object pair-key)
-                 (multiple-value-bind (hash address-based) (eql-hash-no-memoize pair-key)
-                   (when address-based
-                     (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
-                   (push-in-chain (mask-hash (prefuzz-hash hash) mask)))
-                (when (eq pair-key key) (setq result key-index)))))))
-         (t
-           ;; No hash vector and not an EQL table, so it's an EQ table
-           (do ((i hwm (1- i))) ((zerop i))
-             (declare (type index/2 i))
-             (with-pair (pair-key)
-              (unless (empty-ht-slot-p pair-key)
+       (macrolet ((with-key ((key-var) &body body)
+                    ;; Process body only if KEY-VAR is nonempty, and also look
+                    ;; for a probed key that is EQ to KEY.
+                    `(let* ((key-index (* 2 i))
+                            (,key-var (aref kv-vector key-index)))
+                       (unless (empty-ht-slot-p ,key-var)
+                         (when (eq ,key-var key) (setq result key-index))
+                         ,@body))))
+         (cond
+           (hash-vector
+            (do ((i hwm (1- i))) ((zerop i))
+              (declare (type index/2 i))
+              (with-key (pair-key)
+                (let* ((stored-hash (aref hash-vector i))
+                       (bucket
+                        (cond ((/= stored-hash +magic-hash-vector-value+)
+                               (mask-hash stored-hash mask))
+                              (t
+                               (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag)
+                               (pointer-hash->bucket (pointer-hash pair-key) mask)))))
+                  (push-in-chain bucket)))))
+           ((eq (hash-table-test table) 'eql)
+            (sb-vm::with-pinned-object-iterator (pin-object)
+              (do ((i hwm (1- i))) ((zerop i))
+                (declare (type index/2 i))
+                (with-key (pair-key)
+                  (pin-object pair-key)
+                  (multiple-value-bind (hash address-based) (eql-hash-no-memoize pair-key)
+                    (when address-based
+                      (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
+                    (push-in-chain (mask-hash (prefuzz-hash hash) mask)))))))
+           (t
+            ;; No hash vector and not an EQL table, so it's an EQ table
+            (do ((i hwm (1- i))) ((zerop i))
+              (declare (type index/2 i))
+              (with-key (pair-key)
                 (when (sb-vm:is-lisp-pointer (get-lisp-obj-address pair-key))
                   (logior-array-flags kv-vector sb-vm:vector-addr-hashing-flag))
-                (push-in-chain (pointer-hash->bucket
-                                (pointer-hash pair-key) mask))
-                (when (eq pair-key key) (setq result key-index)))))))
+                (push-in-chain (pointer-hash->bucket (pointer-hash pair-key) mask)))))))
        (done-rehashing table kv-vector epoch)
        (unless (eql result 0)
          (setf (hash-table-cache table) result))
@@ -968,7 +963,8 @@ multiple threads accessing the same hash-table without locking."
                  (locally (declare (sb-c::tlab :system)) (new-vectors))
                  (new-vectors))))))
     (when (= (hash-table-%count table) 0) ; special case for new table
-      (binding* ((size (shiftf (hash-table-cache table) 0)) ; "cache" holds the desired size
+      ;; CACHE holds the desired initial size. Read it and then set it to a bogusly high value
+      (binding* ((size (shiftf (hash-table-cache table) (- array-dimension-limit 2)))
                  (scaled-size (truncate (/ (float size) (hash-table-rehash-threshold table))))
                  (bucket-count (power-of-two-ceiling (max scaled-size +min-hash-table-size+)))
                  ((kv-vector next-vector hash-vector index-vector) (realloc size bucket-count)))
@@ -1299,18 +1295,11 @@ nnnn 1_    any       linear scan
                      &aux (hash-table (truly-the hash-table table))
                           (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c:verify-arg-count 0)))
-     (let ((cache (hash-table-cache hash-table)))
+     (let ((index (hash-table-cache hash-table)))
+       (declare (optimize (sb-c:insert-array-bounds-checks 0)))
        ;; First check the cache using EQ, not the test fun, for speed.
-       ;; [we prefer to guard calls to the test fun by comparing hashes first,
-       ;; but we haven't computed the hash yet]
-       ;; We can test cache '/=' 0 last rather than 1st or 2nd so that a miss
-       ;; can be determined with only two comparisons, rather than all three.
-       ;; Whereas if the '/=' guarded the EQ test, then either a hit or miss
-       ;; would need all three tests. "possibly 2" beats "definitely 3" tests.
-       (when (and (< cache (length kv-vector))
-                  (eq (aref kv-vector cache) key)
-                  (/= cache 0)) ; don't falsely match the metadata cell
-         (return-from ,name (values (aref kv-vector (1+ cache)) t))))
+       (when (and (< index (length kv-vector)) (eq (aref kv-vector index) key))
+         (return-from ,name (values (aref kv-vector (1+ index)) t))))
      (with-pinned-objects (key)
        (binding* (,@(ht-hash-setup std-fn 'gethash)
                   (eq-test ,(ht-probing-should-use-eq std-fn)))
@@ -1351,6 +1340,7 @@ nnnn 1_    any       linear scan
                  (let ((index (hash-search)))
                    (if (not (eql index 0))
                        (let ((key-index (* 2 (truly-the index/2 index))))
+                         (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                          (setf (hash-table-cache hash-table) key-index)
                          (values (aref kv-vector (1+ key-index)) t))
                        (let ((stamp (kv-vector-rehash-stamp kv-vector)))
@@ -1645,13 +1635,11 @@ nnnn 1_    any       linear scan
                                       (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c:verify-arg-count 0)))
      (block done
-       (let ((cache (hash-table-cache hash-table)))
-         ;; Check the cache
-         (when (and (< cache (length kv-vector))
-                    (eq (aref kv-vector cache) key)
-                    (/= cache 0)) ; don't falsely match the metadata cell
-           ;; If cached, just store here
-           (return-from done (setf (aref kv-vector (1+ cache)) value))))
+       (let ((index (hash-table-cache hash-table)))
+         (declare (optimize (sb-c:insert-array-bounds-checks 0)))
+         ;; Check the most-recently-used cell
+         (when (and (< index (length kv-vector)) (eq (aref kv-vector index) key))
+           (return-from done (setf (aref kv-vector (1+ index)) value))))
        (with-pinned-objects (key)
          ;; Read the 'rehash' bit as soon as possible after pinning KEY,
          ;; but not before.  The closer in time we observe the bit vs pinning,
