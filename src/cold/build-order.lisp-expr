@@ -138,7 +138,7 @@
 
  ("src/code/maphash" :not-host)
  ("src/code/sysmacs" :not-host)
- ("src/code/hashset")
+ ("src/code/hashset" :c-headers)
  ("src/code/string-hash" :c-headers)
  ("src/code/xset" :c-headers) ; for representation of MEMBER type
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
