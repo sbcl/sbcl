@@ -1936,6 +1936,16 @@ many elements are copied."
 
 ;;;; REMOVE-DUPLICATES
 
+(defun hash-table-test-p (fun)
+  (or (eq fun #'eq)
+      (eq fun #'eql)
+      (eq fun #'equal)
+      (eq fun #'equalp)
+      (eq fun 'eq)
+      (eq fun 'eql)
+      (eq fun 'equal)
+      (eq fun 'equalp)))
+
 ;;; Remove duplicates from a list. If from-end, remove the later duplicates,
 ;;; not the earlier ones. Thus if we check from-end we don't copy an item
 ;;; if we look into the already copied structure (from after :start) and see

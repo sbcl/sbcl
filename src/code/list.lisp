@@ -19,8 +19,9 @@
 
 (declaim (maybe-inline
           tree-equal %setnth nthcdr nth
-          tailp union
-          nunion intersection nintersection set-difference nset-difference
+          tailp
+          #| union nunion |# ; what the ????
+          intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
           subst subst-if
           ;; NSUBLIS is >400 lines of assembly. How is it helpful to inline?
@@ -931,17 +932,34 @@
 
      ,@body))
 
-(defconstant +list-based-union-limit+ 80)
+(flet ((hashing-p (notp testp test n1 n2)
+         (declare (index n1 n2))
+         ;; If there is no TEST-NOT, and both lists are long enough, and the
+         ;; test function is that of a standard hash-table, then use a hash-table.
+         (and (not notp)
+              ;; no :TEST, or a standard hash-table test
+              (or (not testp)
+                  (eq test #'eql)
+                  (eq test #'eq)
+                  (eq test #'equal)
+                  (eq test #'equalp))
+              (or (and (> n1 20) (> n2 20)) ; both lists are non-short
+                  ;; or one list is very long, and the other is not tiny
+                  (and (>= n1 3) (>= n2 100))
+                  (and (>= n2 3) (>= n1 100)))))
+       (unionize (testp test key n1 n2 set1 set2)
+         (let ((table (make-hash-table :test (if testp test #'eql)
+                                       :size (+ n1 n2))))
+           (dolist (elt set1)
+             (setf (gethash (apply-key key elt) table) elt))
+           (dolist (elt set2)
+             (setf (gethash (apply-key key elt) table) elt))
+           table)))
 
-(defun hash-table-test-p (fun)
-  (or (eq fun #'eq)
-      (eq fun #'eql)
-      (eq fun #'equal)
-      (eq fun #'equalp)
-      (eq fun 'eq)
-      (eq fun 'eql)
-      (eq fun 'equal)
-      (eq fun 'equalp)))
+;;; "If there is a duplication between list-1 and list-2, only one of the duplicate
+;;;  instances will be in the result. If either list-1 or list-2 has duplicate entries
+;;;  within it, the redundant entries might or might not appear in the result."
+;;; Our answer differs based on whether a hash-table is employed or not.
 
 (defun union (list1 list2 &key key (test nil testp) (test-not nil notp))
   "Return the union of LIST1 and LIST2."
@@ -949,39 +967,26 @@
   (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  ;; We have two possibilities here: for shortish lists we pick up the
-  ;; shorter one as the result, and add the other one to it. For long
-  ;; lists we use a hash-table when possible.
-  (let ((n1 (length list1))
-        (n2 (length list2)))
-    (multiple-value-bind (short long n-short)
-        (if (< n1 n2)
-            (values list1 list2 n1)
-            (values list2 list1 n2))
-      (if (or (< n-short +list-based-union-limit+)
-              notp
-              (and testp
-                   (not (hash-table-test-p test))))
-          (with-member-test (member-test)
-            (let ((orig short))
-              (dolist (elt long)
-                (unless (funcall member-test elt orig key test)
-                  (push elt short)))
-              short))
-          (let ((table (make-hash-table :test (if testp
-                                                  test
-                                                  #'eql) :size (+ n1 n2)))
-                (key (and key (%coerce-callable-to-fun key)))
-                (union nil))
-            (dolist (elt long)
-              (setf (gethash (apply-key key elt) table) elt))
-            (dolist (elt short)
-              (setf (gethash (apply-key key elt) table) elt))
-            (maphash (lambda (k v)
-                       (declare (ignore k))
-                       (push v union))
-                     table)
-            union)))))
+  ;; "The result list may be eq to either list-1 or list-2 if appropriate."
+  ;; (and a 1000-element list unioned with NIL should not cons a hash-table)
+  (cond ((null list1) (return-from union list2))
+        ((null list2) (return-from union list1)))
+  (with-member-test (member-test)
+    (let ((n1 (length list1))
+          (n2 (length list2)))
+      (if (hashing-p notp testp test n1 n2)
+          ;; "The order of elements in the result do not have to reflect the ordering
+          ;;  of list-1 or list-2 in any way."
+          (loop for k being the hash-values of (unionize testp test key n1 n2 list1 list2)
+                collect k)
+          ;; Start with the initial result being the shorter of the inputs.
+          ;; Search for each element of the longer in the shorter, adding the missing ones.
+          (multiple-value-bind (short long)
+              (if (< n1 n2) (values list1 list2) (values list2 list1))
+            (let ((result short))
+              (dolist (elt long result)
+                (unless (funcall member-test elt short key test)
+                  (push elt result)))))))))
 
 (defun nunion (list1 list2 &key key (test nil testp) (test-not nil notp))
   "Destructively return the union of LIST1 and LIST2."
@@ -989,45 +994,30 @@
   (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
-  ;; We have two possibilities here: for shortish lists we pick up the
-  ;; shorter one as the result, and add the other one to it. For long
-  ;; lists we use a hash-table when possible.
-  (let ((n1 (length list1))
-        (n2 (length list2)))
-    (multiple-value-bind (short long n-short)
-        (if (< n1 n2)
-            (values list1 list2 n1)
-            (values list2 list1 n2))
-      (if (or (< n-short +list-based-union-limit+)
-              notp
-              (and testp
-                   (not (hash-table-test-p test))))
-          (with-member-test (member-test)
-            (do ((orig short)
-                 (elt (car long) (car long)))
-                ((endp long))
-              (if (funcall member-test elt orig key test)
-                  (pop long)
-                  (shiftf long (cdr long) short long)))
-            short)
-          (let ((table (make-hash-table :test (if testp
-                                                  test
-                                                  #'eql) :size (+ n1 n2)))
-                (key (and key (%coerce-callable-to-fun key))))
-            (dolist (elt long)
-              (setf (gethash (apply-key key elt) table) elt))
-            (dolist (elt short)
-              (setf (gethash (apply-key key elt) table) elt))
-            (let ((union long)
-                  (head long))
-              (maphash (lambda (k v)
-                         (declare (ignore k))
-                         (if head
-                             (setf (car head) v
-                                   head (cdr head))
-                             (push v union)))
-                      table)
-              union))))))
+  (cond ((null list1) (return-from nunion list2))
+        ((null list2) (return-from nunion list1)))
+  (with-member-test (member-test)
+    (binding* ((n1 (length list1))
+               (n2 (length list2))
+               ((short long) (if (< n1 n2) (values list1 list2) (values list2 list1))))
+      (if (hashing-p notp testp test n1 n2)
+          (let ((table (unionize testp test key n1 n2 short long))
+                (union long)
+                (head long))
+            (maphash (lambda (k v)
+                       (declare (ignore k))
+                       (if head
+                           (setf (car head) v
+                                 head (cdr head))
+                           (push v union))) ; easier than re-using cons cells of SHORT
+                     table)
+            union)
+          (do ((orig short)
+               (elt (car long) (car long)))
+              ((endp long) short)
+            (if (funcall member-test elt orig key test)
+                (pop long)
+                (shiftf long (cdr long) short long))))))))
 
 (defun intersection (list1 list2
                      &key key (test nil testp) (test-not nil notp))
