@@ -185,9 +185,13 @@
 
 (with-test (:name (hash-table :parallel-readers-eq-table) :broken-on :win32)
   (test-concurrent-gethash 'eq))
-(with-test (:name (hash-table :parallel-readers-eql-table) :broken-on :win32)
+(with-test (:name (hash-table :parallel-readers-eql-table)
+            :broken-on (or :win32
+                           (not (or :x86 :x86-64)))) ;; memory reordering issues
   (test-concurrent-gethash 'eql))
-(with-test (:name (hash-table :parallel-readers-equal-table) :broken-on :win32)
+(with-test (:name (hash-table :parallel-readers-equal-table)
+            :broken-on (or :win32
+                           (not (or :x86 :x86-64))))
   (test-concurrent-gethash 'equal))
 
 (with-test (:name (hash-table :single-accessor :parallel-gc)
