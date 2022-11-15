@@ -515,9 +515,6 @@ Examples:
            (rehash-size (if (integerp rehash-size)
                             rehash-size
                             (float rehash-size $1.0))) ; always single-float
-           ;; FIXME: Original REHASH-THRESHOLD default should be 1.0,
-           ;; not 1, to make it easier for the compiler to avoid
-           ;; boxing.
            (rehash-threshold (max #.+min-hash-table-rehash-threshold+
                                   (float rehash-threshold $1.0)))) ; always single-float
       (%make-hash-table
