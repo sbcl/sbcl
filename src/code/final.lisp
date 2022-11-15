@@ -92,7 +92,7 @@ Examples:
             ; -> ERROR, caught, WARNING signalled"
   (declare (sb-c::tlab :system))
   (let ((space (heap-allocated-p object)))
-    ;; Rule out stack, arena, readonly, and static objects.
+    ;; Rule out immediate, stack, arena, readonly, and static objects.
     ;; (Is it really an error for a readonly? Maybe a warning? I'll leave it this way unless
     ;; users complain. Surely DX and arena are errors, and NIL was always an error.)
     (unless (member space '(:dynamic :immobile))
