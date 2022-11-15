@@ -1809,7 +1809,7 @@ function to be removed without further warning."
 ;;; Finally, the DISPATCH-FOO macro is defined which does the actual
 ;;; dispatching when called. It expects arguments that match PARAMS.
 ;;;
-(defmacro sb-impl::!define-array-dispatch (style dispatch-name params &body body)
+(defmacro sb-impl::!define-array-dispatch (style dispatch-name params nil-array &body body)
   #-(or x86 x86-64) (setq style :call)
   (let ((table-name (symbolicate "%%" dispatch-name "-FUNS%%"))
         (error-name (symbolicate "HAIRY-" dispatch-name "-ERROR")))
@@ -1846,7 +1846,9 @@ function to be removed without further warning."
                             (defun ,fun-name ,params
                               (declare (type (simple-array ,specifier (*))
                                              ,(first params)))
-                              ,@body)
+                              ,@(if (null specifier)
+                                    nil-array
+                                    body))
                             (setf (svref ,table-name ,typecode) #',fun-name))))
        (defmacro ,dispatch-name (&rest args)
          (check-type (first args) symbol)
