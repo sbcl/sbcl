@@ -243,12 +243,14 @@ evaluated expressions.
 (defmethod inspected-parts ((object vector))
   (let ((length (min (length object) *inspect-length*)))
     (values (format nil
-                    "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
+                    "The object is a ~:[~;displaced ~](VECTOR ~a) of length ~W.~%"
                     (and (array-header-p object)
                          (%array-displaced-p object))
+                    (array-element-type object)
                     (length object))
             nil
-            (coerce (subseq object 0 length) 'list))))
+            (unless (typep object '(simple-array nil))
+             (coerce (subseq object 0 length) 'list)))))
 
 (defun inspected-index-string (index rev-dimensions)
   (if (null rev-dimensions)
@@ -267,12 +269,13 @@ evaluated expressions.
                                       :displaced-to object))
          (dimensions (array-dimensions object))
          (reversed-elements nil))
-    (dotimes (i length)
-      (push (cons (format nil
-                          "~A "
-                          (inspected-index-string i (reverse dimensions)))
-                  (aref reference-array i))
-            reversed-elements))
+    (unless (typep object '(simple-array nil))
+      (dotimes (i length)
+        (push (cons (format nil
+                            "~A "
+                            (inspected-index-string i (reverse dimensions)))
+                    (aref reference-array i))
+              reversed-elements)))
     (values (format nil "The object is ~:[an~;a displaced~] ARRAY of ~A.~%~
                          Its dimensions are ~:S.~%"
                     (and (array-header-p object)
