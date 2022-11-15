@@ -42,6 +42,7 @@ rm -fr sandbox/scratch
  "SUBTYPEP-COMPLEX.8"
  "SUBTYPEP.EQL.1" "SUBTYPEP.EQL.2" "SUBTYPEP.MEMBER.17" "SUBTYPEP.MEMBER.18"
  "SXHASH.17" "SXHASH.18" "SXHASH.19" "PRINT-STRUCTURE.1"
+ "UNION.FOLD.1"
  (append #+win32 (list "EXP.ERROR.7"
                        "EXPT.ERROR.4" "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7"
                        "PROBE-FILE.4")
