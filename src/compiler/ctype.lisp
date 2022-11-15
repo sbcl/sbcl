@@ -368,8 +368,7 @@ and no value was provided for it." name))))))))))
                     (:required (req type))
                     (:optional (opt type))
                     (:keyword
-                     (keys (make-key-info :name (arg-info-key info)
-                                          :type type)))
+                     (keys (make-key-info (arg-info-key info) type)))
                     ((:rest :more-context)
                      (setq rest *universal-type*))
                     (:more-count))
@@ -379,7 +378,7 @@ and no value was provided for it." name))))))))))
            :required (req)
            :optional (opt)
            :rest rest
-           :keywords (keys)
+           :keywords (sb-kernel::intern-key-infos (keys))
            :keyp (optional-dispatch-keyp functional)
            :allowp (optional-dispatch-allowp functional)
            :returns (let ((tail-set (lambda-tail-set

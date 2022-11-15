@@ -342,6 +342,8 @@ sufficiently motivated to do lengthy fixes."
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))
   ;; Clearing the hash caches must be done after coalescing ctype instances
   ;; because coalescing compares by TYPE= which creates more cache entries.
+  (hashset-rehash sb-kernel::*key-info-hashset* nil)
+  (hashset-rehash sb-kernel::*key-info-list-hashset* nil)
   (coalesce-ctypes)
   (drop-all-hash-caches)
   (os-deinit)

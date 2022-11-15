@@ -55,8 +55,8 @@
   (storage (missing-arg) :type robinhood-hashset-storage)
   (hash-function #'error :type (sfunction (t) fixnum))
   (test-function #'error :type function)
-  (count-find-hits 0 :type sb-vm:word)
-  (count-finds 0 :type sb-vm:word)
+  #+hashset-metrics (count-find-hits 0 :type sb-vm:word)
+  #+hashset-metrics (count-finds 0 :type sb-vm:word)
   (mutex nil :type (or null #-sb-xc-host sb-thread:mutex)))
 
 ;;; The last few elements in the cell vector are metadata.
@@ -403,6 +403,7 @@
 ;;; The hashset is single-reader safe without the mutex, but you might or might not
 ;;; get a hit even if KEY is logically present, because a concurrent INSERT is
 ;;; allowed to reorder the physical storage. So we rely on the double-check pattern.
+(declaim (ftype (sfunction (robinhood-hashset t function) t) hashset-insert-if-absent))
 (defun hashset-insert-if-absent (hashset key copier)
   (or (hashset-find hashset key)
       (if (not (hashset-mutex hashset))

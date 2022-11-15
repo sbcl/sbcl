@@ -139,6 +139,7 @@
  ("src/code/maphash" :not-host)
  ("src/code/sysmacs" :not-host)
  ("src/code/hashset")
+ ("src/code/string-hash" :c-headers)
  ("src/code/xset" :c-headers) ; for representation of MEMBER type
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
  ;; accessors and inline functions defined here can be compiled inline
@@ -190,7 +191,6 @@
  ("src/compiler/generic/objdef" :c-headers)
 
  ("src/compiler/generic/vm-array" :c-headers)
- ("src/code/string-hash" :c-headers)
  ("src/code/primordial-type" :c-headers)
  ("src/code/specializable-array" :not-target)
 

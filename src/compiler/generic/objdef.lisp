@@ -668,6 +668,8 @@ during backtrace.
        (* 2 n-word-bytes)
        list-pointer-lowtag))
 
+#+sb-xc-host (defun get-nil-taggedptr () sb-vm:nil-value)
+
 ;;; MIXED-REGION is at the beginning of static space
 ;;; Be sure to update "#define main_thread_mixed_region" etc
 ;;; if these get changed.

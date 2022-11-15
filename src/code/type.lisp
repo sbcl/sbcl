@@ -641,9 +641,9 @@
                   (make-key-info
                    ;; MAKE-KEY-INFO will complain if KWD is not a symbol.
                    ;; That's good enough - we don't need an extra check here.
-                   :name kwd
-                   :type (single-value-specifier-type (second key) context)))))
-             (key-info))))
+                   kwd
+                   (single-value-specifier-type (second key) context)))))
+             (intern-key-infos (key-info)))))
       (multiple-value-bind (required optional rest)
           (canonicalize-args-type-args required optional rest
                                        (ll-kwds-keyp llks))

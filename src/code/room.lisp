@@ -1245,6 +1245,16 @@ We could try a few things to mitigate this:
 ;;; this is a valid test that genesis separated code and data.
 (!ensure-genesis-code/data-separation)
 
+;;; Make sure that every KEY-INFO is in the hashset.
+;;; We don't dump any from genesis, which is a good thing.
+(let ((cache
+       (sb-impl::hss-cells
+        (sb-impl::hashset-storage sb-kernel::*key-info-hashset*)))
+      (list
+       (list-allocated-objects :all :type instance-widetag
+                                    :test #'sb-kernel:key-info-p)))
+  (dolist (x list) (aver (find x cache))))
+
 #+sb-thread
 (defun show-tls-map ()
   (let ((list

@@ -101,6 +101,7 @@
   (etypecase x
     (symbol sb-vm:other-pointer-lowtag)
     (structure-object sb-vm:instance-pointer-lowtag)
+    (list sb-vm:list-pointer-lowtag)
     ((eql 0) 0)))
 
 #-sb-xc-host

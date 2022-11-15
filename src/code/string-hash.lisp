@@ -77,6 +77,17 @@
            (%sxhash-simple-substring x 0 (length x))))
     (declare (notinline trick))
     (trick x)))
+#+sb-xc-host
+(defun symbol-name-hash (x) ; defined in src/code/sxhash for the target
+  (cond ((string= x "NIL") ; :NIL must hash the same as NIL
+         ;; out-of-order with defconstant nil-value
+         (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))
+        (t
+         ;; (STRING X) could be a non-simple string, it's OK.
+         (let ((hash (logxor (sb-impl::%sxhash-simple-string (string x))
+                             most-positive-fixnum)))
+           (aver (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) hash))
+           hash))))
 
 ;;;; mixing hash values
 

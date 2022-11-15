@@ -803,13 +803,44 @@
   (allowp nil :type boolean :read-only t))
 
 ;;; the description of a &KEY argument
+(declaim (inline !make-key-info))
 (defstruct (key-info #-sb-xc-host (:pure t)
+                     (:constructor !make-key-info (name type))
                      (:copier nil))
   ;; the key (not necessarily a keyword in ANSI Common Lisp)
   (name (missing-arg) :type symbol :read-only t)
   ;; the type of the argument value
   (type (missing-arg) :type ctype :read-only t))
 (declaim (freeze-type key-info))
+
+(defun key-info= (a b)
+  (declare (optimize (safety 0)))
+  (and (eq (key-info-name a) (key-info-name b))
+       ;; This will work better once I hash-cons all ctypes
+       (eq (key-info-type a) (key-info-type b))))
+(defun key-info-hash (x)
+  (declare (optimize (safety 0)))
+  (mix (#+sb-xc-host sb-impl::symbol-name-hash #-sb-xc-host sxhash (key-info-name x))
+       (type-hash-value (key-info-type x))))
+
+(defun key-info-list-hash (list)
+  (declare (optimize (safety 0)))
+  (let ((h 0))
+  (dolist (elt list h) (setf h (mix (key-info-hash elt) h)))))
+
+(define-load-time-global *key-info-hashset*
+    (make-hashset 32 #'key-info= #'key-info-hash :weakness t :synchronized t))
+(define-load-time-global *key-info-list-hashset*
+    (make-hashset 32 #'list-elts-eq #'key-info-list-hash :weakness t :synchronized t))
+
+(defun make-key-info (key type)
+  (dx-let ((x (!make-key-info key type)))
+     (hashset-insert-if-absent *key-info-hashset* x
+      (named-lambda "MAKE-KEY-INFO" (x)
+        (!make-key-info (key-info-name x) (key-info-type x))))))
+(defun intern-key-infos (list)
+  (when list
+    (hashset-insert-if-absent *key-info-list-hashset* list #'identity)))
 
 (defstruct (values-type
             (:include args-type (%bits (pack-ctype-bits values)))
