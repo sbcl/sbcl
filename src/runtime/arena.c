@@ -397,6 +397,27 @@ static int record_if_points_to_arena_interior(lispobj ptr) {
     return 0; // Returned value does nothing now.
 }
 
+/* Be aware that reading an arbitrary word and interpreting it is somewhat fragile. */
+static int valid_arena_obj_ptr_p(lispobj ptr)
+{
+    if (listp(ptr)) return is_cons_half(ptr);
+    return is_header(*native_pointer(ptr));
+}
+
+static void __attribute__((unused))
+scan_thread_control_stack(lispobj* start, lispobj* end, lispobj lispthread)
+{
+    gc_assert(arena_chain);
+    lispobj* where = start;
+    for ( ; where < end ; ++where) {
+        lispobj word = *where;
+        if (is_lisp_pointer(word) && interesting_arena_pointer_p(word)
+            && valid_arena_obj_ptr_p(word))
+            printf("lispthread %p, word @ %p -> %p\n",
+                   (void*)lispthread, where, (void*)word);
+    }
+}
+
 static void scan_thread_words(lispobj* start, lispobj* end)
 {
     gc_assert(arena_chain);
@@ -421,15 +442,18 @@ int find_dynspace_to_arena_ptrs(lispobj arena, lispobj result_buffer)
     for_each_thread(th) {
         if (th->state_word.state == STATE_DEAD) continue;
         stray_pointer_source_obj = (lispobj)th;
-        // This produces false positives
-#if 0 /*def LISP_FEATURE_C_STACK_IS_CONTROL_STACK*/
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        /* This produces false positives, don't return potential pointers, but instead print them.
+         * Using the output, you can try to probe the suspect memory with SB-VM:HEXDUMP */
         if (th == get_sb_vm_thread()) {
-          scan_thread_words(&result_buffer, th->control_stack_end);
+          scan_thread_control_stack(&arena, // = the approximate stack pointer
+                                    th->control_stack_end,
+                                    th->lisp_thread);
         } else {
           int ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX, th));
           if (ici != 1) lose("can't find interrupt context");
           lispobj sp = *os_context_register_addr(nth_interrupt_context(0, th), reg_SP);
-          scan_thread_words((lispobj*)sp, th->control_stack_end);
+          scan_thread_control_stack((lispobj*)sp, th->control_stack_end, th->lisp_thread);
         }
 #endif
         scan_thread_words((lispobj*)th->binding_stack_start,
