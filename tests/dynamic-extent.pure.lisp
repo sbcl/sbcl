@@ -1718,3 +1718,12 @@
                                   (cons 1 2))))
                        (declare (dynamic-extent a))
                        (print a)))))
+
+(with-test (:name :dx-propagation-dx-already-exists)
+  (checked-compile '(lambda ()
+                     (let ((x (let ((m (make-array 3)))
+                                (declare (dynamic-extent m))
+                                (fill m 0)
+                                m)))
+                       (declare (dynamic-extent x))
+                       (print x)))))
