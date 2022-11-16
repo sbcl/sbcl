@@ -76,7 +76,8 @@
   (let* ((first  (or (ir2-block-start-vop 2block)
                      (return-from move-value-target)))
          (second (vop-next first)))
-    (when (and (eq (vop-name first) 'move)
+    (when (and (memq (vop-name first) '(move sb-vm::double-move
+                                        sb-vm::single-move))
                (or (not second)
                    (eq (vop-name second) 'branch)))
       (values (tn-ref-tn (vop-args first))
@@ -168,40 +169,42 @@
                     (list* flags info)))
     (t
      (flet ((reuse-if-eq-arg (value-if vop)
-             ;; Most of the time this means:
-             ;; if X is already NIL, don't load it again.
-             (when (and vop
-                        (eq (vop-name vop) 'if-eq)
-                        (constant-tn-p value-if))
-               (let* ((args (vop-args vop))
-                      (x-tn (tn-ref-tn args))
-                      (test (tn-ref-tn (tn-ref-across args))))
-                 (when (and (constant-tn-p test)
-                            (equal (tn-value value-if)
-                                   (tn-value test))
-                            (eq (tn-primitive-type x-tn)
-                                (tn-primitive-type res)))
-                   x-tn))))
+              ;; Most of the time this means:
+              ;; if X is already NIL, don't load it again.
+              (when (and vop
+                         (eq (vop-name vop) 'if-eq)
+                         (constant-tn-p value-if))
+                (let* ((args (vop-args vop))
+                       (x-tn (tn-ref-tn args))
+                       (test (tn-ref-tn (tn-ref-across args))))
+                  (when (and (constant-tn-p test)
+                             (equal (tn-value value-if)
+                                    (tn-value test))
+                             (eq (tn-primitive-type x-tn)
+                                 (tn-primitive-type res)))
+                    x-tn))))
             (load-and-coerce (dst src)
-             (when (and dst (neq dst src))
-               (emit-and-insert-vop node 2block
-                                    (template-or-lose 'move)
-                                    (reference-tn src nil)
-                                    (reference-tn dst t)
-                                    (ir2-block-last-vop 2block)))))
+              (when (and dst (neq dst src))
+                (emit-and-insert-vop node 2block
+                                     (template-or-lose 'move)
+                                     (reference-tn src nil)
+                                     (reference-tn dst t)
+                                     (ir2-block-last-vop 2block)))))
        (let ((reuse (reuse-if-eq-arg value-if prev)))
          (if reuse
              (setf arg-if reuse)
-             (load-and-coerce arg-if   value-if)))
+             (load-and-coerce arg-if value-if)))
        (load-and-coerce arg-else value-else))
      (emit-template node 2block (template-or-lose cmove-vop)
                     (reference-tn-list (remove nil (list arg-if arg-else))
                                        nil)
                     (reference-tn res t)
                     (list* flags info))))
-    (emit-move node 2block res target)
-    (vop branch node 2block label)
-    (update-block-succ 2block (list label)))
+  (emit-move node 2block res target)
+  (when (eq *ir2opt-stage* 'select-representations)
+    (emit-moves-and-coercions 2block))
+  (vop branch node 2block label)
+  (update-block-succ 2block (list label)))
 
 (defun maybe-convert-one-cmov (vop)
   ;; The test and branch-if may be split between two IR1 blocks
@@ -249,7 +252,8 @@
                                 value-b arg-b
                                 target  res
                                 flags info
-                                label vop node (vop-block vop)))))))))
+                                label vop node (vop-block vop))
+              t)))))))
 
 (defun delete-unused-ir2-blocks (component)
   (declare (type component component))
@@ -553,13 +557,15 @@
            args2)))
 
 (defoptimizer (vop-optimize branch-if) (branch-if)
-  (cond ((null *ir2opt-stage*)
-         (maybe-convert-one-cmov branch-if))
+  (cond ((maybe-convert-one-cmov branch-if)
+         nil)
         #+(or arm arm64 x86 x86-64)
-        (t
+        ((eq *ir2opt-stage* 'select-representations)
          ;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
          ;; into CMP X,Y BRANCH-IF M BRANCH-IF N
-         ;; Run it after CMOVs are converted.
+         ;; Run it after SELECT-REPRESENTATIONS, most CMOVs are
+         ;; already converted and :after-sc-selection flags are
+         ;; resolved.
          ;; While it's portable the VOPs are not validated for
          ;; compatibility on other backends yet.
          (let ((prev (vop-prev branch-if)))
@@ -1414,7 +1420,7 @@
        ;; Give the optimizers a second opportunity to alter newly inserted vops
        ;; by looking for patterns that have a shorter expression as a single vop.
        (run-vop-optimizers component)
-
+       (delete-unused-ir2-blocks component)
        ;; Try to combine consecutive uses of %INSTANCE-SET.
        ;; This can't be done prior to selecting representations
        ;; because SELECT-REPRESENTATIONS might insert some

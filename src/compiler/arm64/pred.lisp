@@ -59,8 +59,19 @@
   (declare (ignore node))
   (let* ((ptype (sb-c::tn-primitive-type dst-tn))
          (name  (sb-c:primitive-type-name ptype))
-         (param (cdr (or (assoc name *cmov-ptype-representation-vop*)
-                         '(t descriptor-reg move-if/descriptor)))))
+         (param (case name
+                  ((double-float single-float)
+                   (let ((sc (tn-sc dst-tn)))
+                     (when (and sc
+                                (eq (tn-sc x-tn) sc)
+                                (eq (tn-sc y-tn) sc))
+                       (sc-case dst-tn
+                         (descriptor-reg '(descriptor-reg move-if/descriptor))
+                         (double-reg '(double-reg move-if/double))
+                         (single-reg '(single-reg move-if/single))))))
+                  (t
+                   (cdr (or (assoc name *cmov-ptype-representation-vop*)
+                            '(t descriptor-reg move-if/descriptor)))))))
     (when param
       (destructuring-bind (representation vop) param
         (let ((scn (sc-number-or-lose representation)))
@@ -111,6 +122,32 @@
   (def-move-if move-if/word (:or unsigned-num signed-num) (unsigned-reg signed-reg zero))
   (def-move-if move-if/char character (character-reg zero))
   (def-move-if move-if/sap system-area-pointer (sap-reg zero)))
+
+(define-vop (move-if/double move-if)
+  (:args (then :scs (double-reg)) (else :scs (double-reg)))
+  (:arg-types double-float double-float)
+  (:results (res :scs (double-reg)))
+  (:result-types double-float)
+  (:generator 1
+    (let ((not-p (eq (first flags) 'not)))
+      (when not-p (pop flags))
+      (cond ((null (rest flags))
+             (inst fcsel res then else (if not-p
+                                          (negate-condition (car flags))
+                                          (car flags))))
+            (not-p
+             (dolist (flag flags)
+               (inst fcsel res else then flag)))
+            (t
+             (dolist (flag flags)
+               (inst fcsel res then else flag)))))))
+
+(define-vop (move-if/single move-if/double)
+  (:args (then :scs (single-reg)) (else :scs (single-reg)))
+  (:arg-types single-float single-float)
+  (:results (res :scs (single-reg)))
+  (:result-types single-float))
+
 
 
 ;;;; Conditional VOPs:
