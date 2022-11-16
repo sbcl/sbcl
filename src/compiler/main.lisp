@@ -609,13 +609,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (ir2-optimize component)
 
   (select-representations component)
-    ;; Try to combine consecutive uses of %INSTANCE-SET.
-    ;; This can't be done prior to selecting representations
-    ;; because SELECT-REPRESENTATIONS might insert some
-    ;; things like MOVE-FROM-DOUBLE which makes the
-    ;; "consecutive" vops no longer consecutive.
 
-  (ir2-optimize-stores component)
+  (ir2-optimize component 'select-representations)
 
   (when *check-consistency*
     (maybe-mumble "Check2 ")
@@ -641,7 +636,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (maybe-mumble "CheckP ")
     (check-pack-consistency component))
 
-  (ir2-optimize component 'after-regalloc)
+  (ir2-optimize component 'regalloc)
 
   (when *compiler-trace-output*
     (when (memq :ir1 *compile-trace-targets*)
