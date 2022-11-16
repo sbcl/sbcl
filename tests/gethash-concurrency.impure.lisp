@@ -187,10 +187,10 @@
 (with-test (:name (hash-table :parallel-readers-eq-table) :broken-on :win32)
   (test-concurrent-gethash 'eq))
 (with-test (:name (hash-table :parallel-readers-eql-table)
-            :broken-on (or :win32 :arm64 :riscv)) ;; memory reordering issues
+            :broken-on (or :win32 :riscv)) ;; memory reordering issues
   (test-concurrent-gethash 'eql))
 (with-test (:name (hash-table :parallel-readers-equal-table)
-            :broken-on (or :win32 :arm64 :riscv))
+            :broken-on (or :win32 :riscv))
   (test-concurrent-gethash 'equal))
 
 (with-test (:name (hash-table :single-accessor :parallel-gc)
