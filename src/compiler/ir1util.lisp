@@ -841,16 +841,10 @@
                                          dx))))))))
 
 (defun lvar-good-for-dx-p (lvar dx)
-  (let ((uses (lvar-uses lvar)))
-    (cond
-      ((null uses)
-       nil)
-      ((consp uses)
-       (every (lambda (use)
-                (use-good-for-dx-p use dx))
-              uses))
-      (t
-       (use-good-for-dx-p uses dx)))))
+  (aver (lvar-uses lvar))
+  (do-uses (use lvar t)
+    (unless (use-good-for-dx-p use dx)
+      (return nil))))
 
 (defun ref-good-for-dx-p (ref)
   (let* ((lvar (ref-lvar ref))

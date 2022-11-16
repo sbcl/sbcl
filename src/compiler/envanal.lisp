@@ -433,11 +433,13 @@
                               (let ((other (trivial-lambda-var-ref-lvar use)))
                                 (unless (eq other lvar)
                                   (mark-dx other))))))))
-                (cond ((lvar-good-for-dx-p lvar dx)
-                       (mark-dx lvar))
-                      (t
-                       (note-no-stack-allocation lvar)
-                       (setf (lvar-dynamic-extent lvar) nil))))))))))
+                ;; Check that the LVAR hasn't been flushed somehow.
+                (when (lvar-uses lvar)
+                  (cond ((lvar-good-for-dx-p lvar dx)
+                         (mark-dx lvar))
+                        (t
+                         (note-no-stack-allocation lvar)
+                         (setf (lvar-dynamic-extent lvar) nil)))))))))))
   (values))
 
 ;;;; cleanup emission
