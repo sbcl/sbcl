@@ -3154,6 +3154,43 @@
                                      (reg-offset rd)))))))
   (def movi 0))
 
+(def-emitter fp-cond-select
+  (0 1 31)
+  (0 1 30)
+  (0 1 29)
+  (#b11110 5 24)
+  (ptype 2 22)
+  (#b1 1 21)
+  (rm 5 16)
+  (cond 4 12)
+  (#b11 2 10)
+  (rn 5 5)
+  (rd 5 0))
+
+(define-instruction-format (fp-cond-select 32
+                            :default-printer '(:name :tab rd  ", " rn ", " rm ", " cond))
+  (m :field (byte 1 31) :value #b0)
+  (op1 :field (byte 1 30) :value #b0)
+  (s :field (byte 1 29) :value #b0)
+  (op2 :field (byte 5 24) :value #b11110)
+  (ptype :field (byte 2 22))
+  (rm :fields (list (byte 2 22) (byte 5 16)) :type 'float-reg)
+  (cond :field (byte 4 12) :type 'cond)
+  (op3 :field (byte 2 10) :value #b11)
+  (rn :fields (list (byte 2 22) (byte 5 5)) :type 'float-reg)
+  (rd :fields (list (byte 2 22) (byte 5 0)) :type 'float-reg))
+
+(define-instruction fcsel (segment rd rn rm cond)
+  (:printer fp-cond-select ())
+  (:emitter
+   (emit-fp-cond-select
+    segment
+    (fp-reg-type rd)
+    (reg-offset rm)
+    (conditional-opcode cond)
+    (reg-offset rn)
+    (reg-offset rd))))
+
 ;;; Inline constants
 (defun canonicalize-inline-constant (constant)
   (let ((first (car constant))
