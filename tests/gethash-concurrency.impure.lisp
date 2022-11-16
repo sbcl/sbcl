@@ -94,9 +94,10 @@
          (setf (sb-impl::hash-table-index-vector ,table) (subseq v 0 (/ (length v) 2)))))
      ,@body
      #+hash-table-metrics
-     (format t "~&::: INFO: GC-forced-rehash=~D rehash-invalid=~D~%"
+     (format t "~&::: INFO: GC-forced-rehash=~D rehash-invalid=~D stamp-changed=~D~%"
              (sb-impl::hash-table-n-rehash+find ,table)
-             (sb-impl::hash-table-n-rehash-again ,table))))
+             (sb-impl::hash-table-n-rehash-again ,table)
+             (sb-impl::hash-table-n-stamp-change ,table))))
 
 ;;; Do *NOT* use (gc :full) in the following tests - a full GC causes all objects
 ;;; to be promoted into the highest normal generation, which achieves nothing,
@@ -186,12 +187,10 @@
 (with-test (:name (hash-table :parallel-readers-eq-table) :broken-on :win32)
   (test-concurrent-gethash 'eq))
 (with-test (:name (hash-table :parallel-readers-eql-table)
-            :broken-on (or :win32
-                           (not (or :x86 :x86-64)))) ;; memory reordering issues
+            :broken-on (or :win32 :arm64 :riscv)) ;; memory reordering issues
   (test-concurrent-gethash 'eql))
 (with-test (:name (hash-table :parallel-readers-equal-table)
-            :broken-on (or :win32
-                           (not (or :x86 :x86-64))))
+            :broken-on (or :win32 :arm64 :riscv))
   (test-concurrent-gethash 'equal))
 
 (with-test (:name (hash-table :single-accessor :parallel-gc)

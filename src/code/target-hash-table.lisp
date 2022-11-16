@@ -1253,10 +1253,19 @@ if there is no such entry. Entries can be added using SETF."
             (std-fn `(or ,compare (eql ,pair-index 0)))
             (t `(or (eql ,pair-index 0) ,compare))))))
 
+;;; CAUTION: I think this macro could falsely signal a corrupt chain.
+;;; Consider what would happen if there is a reader (started first),
+;;; and a rehasher. The reader didn't rehash, because if it thought it needed to,
+;;; it would have. But as it's reading, a GC can occur, setting need-to-rehash.
+;;; Then another reader comes along, seeing the flag, so it modifies the chains
+;;; just as the first reader is following 'next' pointers.
+;;; Could this cause the first reader to probe too much? Maybe.
+;;; I think we should terminate probing after a number of tries determined
+;;; by the length of the longest chain, which we can track in PUTHASH.
+;;; If not found, examine the rehash-stamp and maybe restart.
+;;; But don't draw an inference that the chains are bad.
 (defmacro check-excessive-probes (n-probes)
   `(when (minusp (decf (truly-the fixnum probe-limit) ,n-probes))
-     ;; The next-vector chain is circular. This is caused
-     ;; caused by thread-unsafe mutations of the table.
      (signal-corrupt-hash-table-bucket hash-table)))
 
 (defmacro ht-probe-advance (var)
@@ -1264,7 +1273,22 @@ if there is no such entry. Entries can be added using SETF."
 
 
 #|
-bottom 2 bits of kv-vector-rehash-stamp:
+The 'stamp' in our k/v vector is an amalgamation of a fast-read-lock
+(almost like in 'frlock.lisp' but using a different implementation)
+plus a single-bit spinlock protecting the counter from multiple writers.
+As the comments in frlock file explain, it is not required to have a
+counter for before and after writing. You only need 1 counter, which
+the writer bumps up before mutation of the data guarded by the frlock.
+
+The lowest bit of the stamp is atomically set by GC if it moved a key,
+and atomically cleared by Lisp after refreshing the bucket chains.
+The bit at position 1 is the spinlock, which is also equivalent
+to "rehash in progress". (It can be assumed that as soon as the spinlock
+is locked, at least one bucket has been messed up)
+
+An interesting point about this spinlock is that it does not guard the k/v cells,
+it only guards the bucket chains. Waiters do not need to "spin" when they can't
+acquire the lock, because they can still read the k/v cells.
 
 00 = valid hashes
 01 = an address-sensitive key moved
@@ -1278,14 +1302,14 @@ Pre-       Post-     Miss
 loookup    lookup    Action
 -------    -------   ------
 nnnn 00    nnnn 0_   valid (KEY is pinned, so don't care if hashes became invalid)
-nnnn 00    nnnn 1_   linear scan
-nnnn 00    MMMM __   restart
+nnnn 00    nnnn 1_   linear scan (another thread is messsing up the bucket chains)
+nnnn 00    MMMM __   restart (chains are in an indeterminate state)
 
 nnnn 01    nnnn 01   valid if not address-sensitive, otherwise rehash and find
-nnnn 01    nnnn 1_   linear scan
-nnnn 01    MMMM __   restart
+nnnn 01    nnnn 1_   linear scan (another thread is messing up the bucket chains)
+nnnn 01    MMMM __   restart (chains are in an indeterminate state)
 
-nnnn 1_    any       linear scan
+nnnn 1_    any       linear scan (don't try to read when rehash already in progress)
 |#
 
 (defmacro define-ht-getter (name std-fn)
@@ -1334,6 +1358,13 @@ nnnn 1_    any       linear scan
                                  '(loop (probe) (probe) (check-excessive-probes 2))
                                  '(loop (probe) (check-excessive-probes 1))))))))
            (named-let retry ((initial-stamp (kv-vector-rehash-stamp kv-vector)))
+             ;; Taking out either of these barriers will cause failure of
+             ;; PARALLEL-READERS-EQUAL-TABLE on relaxed memory order CPUs.
+             ;; The paired :WRITE barrier is either in the stop-the-world handler
+             ;; (which is effectively a full barrier), or the CAS in the regression test
+             ;; that mocks GC touching the need-to-rehash bit.
+             ;; That's the best explanation I can give.
+             (sb-thread:barrier (:read)) ; barrier 1
              (if (logtest initial-stamp kv-vector-rehashing)
                  (truly-the (values t boolean &optional)
                             (hash-table-lsearch hash-table eq-test key hash default))
@@ -1343,7 +1374,9 @@ nnnn 1_    any       linear scan
                          (declare (optimize (sb-c:insert-array-bounds-checks 0)))
                          (setf (hash-table-cache hash-table) key-index)
                          (values (aref kv-vector (1+ key-index)) t))
-                       (let ((stamp (kv-vector-rehash-stamp kv-vector)))
+                       ;; the BARRIER macro sucks bigly, hence the PROGN
+                       (let ((stamp (progn (sb-thread:barrier (:read)) ; barrier 2
+                                           (kv-vector-rehash-stamp kv-vector))))
                          (cond ((and (evenp initial-stamp) ; valid hashes at start?
                                      (zerop (logandc2 (logxor stamp initial-stamp) 1)))
                                 ;; * address-based hashes were valid on entry
@@ -1365,6 +1398,8 @@ nnnn 1_    any       linear scan
                                             (t
                                              (values (aref kv-vector (1+ key-index)) t))))))
                                (t ; stamp changed
+                                #+hash-table-metrics (atomic-incf
+                                                      (hash-table-n-stamp-change table))
                                 (retry stamp)))))))))))))
 
 ;;;; Weak table variant.
