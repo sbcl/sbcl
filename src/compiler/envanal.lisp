@@ -415,26 +415,24 @@
             (declare (type cons lvar+extent))
             (let ((dx (car lvar+extent))
                   (lvar (cdr lvar+extent)))
-              (labels
-                  ((mark-dx (lvar)
-                     (setf (lvar-dynamic-extent lvar) cleanup)
-                     (push lvar (cleanup-nlx-info cleanup))
-                     (push lvar (component-dx-lvars component))
-                     ;; Now look to see if there are otherwise
-                     ;; inaccessible parts of the value in LVAR.
-                     (do-uses (use lvar)
-                       (when (use-good-for-dx-p use dx)
-                         (etypecase use
-                           (cast (mark-dx (cast-value use)))
-                           (combination
-                            (dolist (arg (combination-args use))
-                              (when (and arg
-                                         (lvar-good-for-dx-p arg dx))
-                                (mark-dx arg))))
-                           (ref
-                            (let ((other (trivial-lambda-var-ref-lvar use)))
-                              (unless (eq other lvar)
-                                (mark-dx other)))))))))
+              (labels ((mark-dx (lvar)
+                         (setf (lvar-dynamic-extent lvar) cleanup)
+                         (push lvar (cleanup-nlx-info cleanup))
+                         (push lvar (component-dx-lvars component))
+                         ;; Now look to see if there are otherwise
+                         ;; inaccessible parts of the value in LVAR.
+                         (do-uses (use lvar)
+                           (etypecase use
+                             (cast (mark-dx (cast-value use)))
+                             (combination
+                              (dolist (arg (combination-args use))
+                                (when (and arg
+                                           (lvar-good-for-dx-p arg dx))
+                                  (mark-dx arg))))
+                             (ref
+                              (let ((other (trivial-lambda-var-ref-lvar use)))
+                                (unless (eq other lvar)
+                                  (mark-dx other))))))))
                 (cond ((lvar-good-for-dx-p lvar dx)
                        (mark-dx lvar))
                       (t
