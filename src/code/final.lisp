@@ -251,7 +251,10 @@ Examples:
 (defvar *in-a-finalizer* nil)
 #+sb-thread (define-alien-variable finalizer-thread-runflag int)
 
+(define-load-time-global *bg-compiler-function* nil)
+
 (defun run-pending-finalizers (&aux (hashtable (finalizer-id-map **finalizer-store**))
+                                    (ran-bg-compile)
                                     (ran-a-system-finalizer)
                                     (system-finalizer-scratchpad (list 0))
                                     (ran-a-user-finalizer))
@@ -260,6 +263,8 @@ Examples:
   (loop
    ;; Perform no further work if trying to stop the thread, even if there is work.
    #+sb-thread (when (zerop finalizer-thread-runflag) (return))
+   ;; Try to run a background compilation task
+   (when *bg-compiler-function* (setq ran-bg-compile (funcall *bg-compiler-function*)))
    ;; Try to run 1 system finalizer
    (setq ran-a-system-finalizer (sb-vm::immobile-code-dealloc-1 system-finalizer-scratchpad))
    ;; Try to run 1 user finalizer
@@ -319,8 +324,10 @@ Examples:
          (cond ((simple-vector-p finalizers) (fill finalizers 0))
                ((consp finalizers) (rplaca finalizers 0))))))
    ;; Did this iteration do anything at all?
-   (unless (or ran-a-system-finalizer ran-a-user-finalizer) (return))
-   (setq ran-a-system-finalizer nil
+   (unless (or ran-bg-compile ran-a-system-finalizer ran-a-user-finalizer)
+     (return))
+   (setq ran-bg-compile nil
+         ran-a-system-finalizer nil
          ran-a-user-finalizer nil)))
 
 (define-load-time-global *finalizer-thread* nil)
