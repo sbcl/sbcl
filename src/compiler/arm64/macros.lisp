@@ -322,7 +322,7 @@
          #+sb-thread
          (progn
            (when ,sync
-            (inst dmb))
+            (inst dmb :ishst))
            (inst str (32-bit-reg zr-tn)
                  (@ thread-tn
                     (* n-word-bytes thread-pseudo-atomic-bits-slot)))
