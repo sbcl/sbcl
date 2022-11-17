@@ -288,7 +288,7 @@
         (format t "~&::: INFO: ~A time = ~F~%" label sec)
         sec)))
 
-  (test-util:with-test (:name :compilation-queue)
+  (test-util:with-test (:name :compilation-queue :skipped-on :sbcl)
     (when (>= *cpus* 2)
       ;; serial execution should take at least .2 + .2 sec = .4 sec
       (assert (>= (seconds-to-call 'test-non-bg-compile "Serial") .39))
