@@ -268,28 +268,30 @@
   (defvar *bigfun*
     '(lambda (arg)
       (macrolet ((foo (x)
-                   (sleep .1) ; brute-force the "slow-to-compile" aspect
+                   (sleep .2) ; brute-force the "slow-to-compile" aspect
                    `(list ,x)))
         (foo arg)))
     "A hypothetical function that is slow to compile")
   (defun test-non-bg-compile ()
     (let ((f (compile nil *bigfun*)))
-      (sleep .1)
+      (sleep .2)
       (funcall f 'x)))
   (defun test-bg-compile ()
     (let ((f (sb-concurrency::promise-compile *bigfun*)))
-      (sleep .1)
+      (sleep .2)
       (funcall f 'x)))
-  (defun seconds-to-call (f)
+  (defun seconds-to-call (f label)
     (let ((before (get-internal-real-time)))
       (funcall f)
       (let* ((after (get-internal-real-time))
              (sec (float (/ (- after before) internal-time-units-per-second))))
+        (format t "~&::: INFO: ~A time = ~F~%" label sec)
         sec)))
 
-
   (test-util:with-test (:name :compilation-queue)
-    ;; serial execution should be .1 + .1 sec
-    (assert (> (seconds-to-call 'test-non-bg-compile) .19))
-    ;; the two sleeps should be concurrent
-    (assert (< (seconds-to-call 'test-bg-compile) .12))))
+    (when (>= *cpus* 2)
+      ;; serial execution should take at least .2 + .2 sec = .4 sec
+      (assert (>= (seconds-to-call 'test-non-bg-compile "Serial") .39))
+      ;; concurrent execution should take about .2 sec
+      ;; but again leave some wiggle room
+      (assert (<= (seconds-to-call 'test-bg-compile "Parallel") .25)))))
