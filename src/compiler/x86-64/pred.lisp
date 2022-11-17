@@ -163,8 +163,7 @@
             #+sb-unicode
             (character character-reg move-if/char)
 
-            ((single-float complex-single-float
-              double-float complex-double-float))
+            ((complex-single-float complex-double-float))
 
             (system-area-pointer sap-reg move-if/sap)))
   "Alist of primitive type -> (storage-class-name VOP-name)
@@ -178,8 +177,18 @@
   (declare (ignore node))
   (let* ((ptype (sb-c::tn-primitive-type dst-tn))
          (name  (sb-c:primitive-type-name ptype))
-         (param (cdr (or (assoc name *cmov-ptype-representation-vop*)
-                         '(t descriptor-reg move-if/t)))))
+         (param (case name
+                  ((double-float single-float)
+                   (let ((sc (tn-sc dst-tn)))
+                     (when (and sc
+                                (eq (tn-sc x-tn) sc)
+                                (eq (tn-sc y-tn) sc))
+                       (sc-case dst-tn
+                         (descriptor-reg '(descriptor-reg move-if/t))
+                         (t)))))
+                  (t
+                   (cdr (or (assoc name *cmov-ptype-representation-vop*)
+                            '(t descriptor-reg move-if/t)))))))
     (when param
       (destructuring-bind (representation vop) param
         (let ((scn (sc-number-or-lose representation)))
