@@ -52,6 +52,7 @@
   (macrolet ((with-open-source-file ((stream pathname direction) &body body)
                `(with-open-file (,stream ,pathname
                                          :direction ,direction
+                                         :if-exists :supersede
                                          :external-format #-clisp :utf-8 #+clisp charset:utf-8)
                   ,@body)))
     (let* ((temporary (make-pathname :type "temp" :defaults file))
