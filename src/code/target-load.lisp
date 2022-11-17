@@ -246,7 +246,7 @@
                    (sb-c::*policy* sb-c::*policy*)
                    (sb-c::*handled-conditions* sb-c::*handled-conditions*))
                (if faslp
-                   (load-as-fasl stream verbose print)
+                   (load-as-fasl stream verbose (if print t nil))
                    ;; FIXME: if *EVALUATOR-MODE* is :INTERPRET,
                    ;; then this should have nothing whatsoever to do with
                    ;; compiler-error-resignaling. That's an artifact
