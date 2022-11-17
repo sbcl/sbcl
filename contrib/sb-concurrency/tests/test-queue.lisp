@@ -261,33 +261,35 @@
                  (= n dc (1+ d)))))))
   t)
 
-(defvar *bigfun*
-  '(lambda (arg)
+;;; I don't remember if funcallable instances with #-immobile-space
+;;; work the way I need them to for this test.
+#+(and sb-thread x86-64 immobile-space)
+(progn
+  (defvar *bigfun*
+    '(lambda (arg)
       (macrolet ((foo (x)
                    (sleep .1) ; brute-force the "slow-to-compile" aspect
                    `(list ,x)))
         (foo arg)))
-  "A hypothetical function that is slow to compile")
-(defun test-non-bg-compile ()
-  (let ((f (compile nil *bigfun*)))
-    (sleep .1)
-    (funcall f 'x)))
-(defun test-bg-compile ()
-  (let ((f (sb-concurrency::promise-compile *bigfun*)))
-    (sleep .1)
-    (funcall f 'x)))
-(defun seconds-to-call (f)
-  (let ((before (get-internal-real-time)))
-    (funcall f)
-    (let* ((after (get-internal-real-time))
-           (sec (float (/ (- after before) internal-time-units-per-second))))
-      sec)))
+    "A hypothetical function that is slow to compile")
+  (defun test-non-bg-compile ()
+    (let ((f (compile nil *bigfun*)))
+      (sleep .1)
+      (funcall f 'x)))
+  (defun test-bg-compile ()
+    (let ((f (sb-concurrency::promise-compile *bigfun*)))
+      (sleep .1)
+      (funcall f 'x)))
+  (defun seconds-to-call (f)
+    (let ((before (get-internal-real-time)))
+      (funcall f)
+      (let* ((after (get-internal-real-time))
+             (sec (float (/ (- after before) internal-time-units-per-second))))
+        sec)))
 
-;;; I don't remember if funcallable instances with #-immobile-space
-;;; work the way I need them to for this test.
-#+(and sb-thread x86-64 immobile-space)
-(test-util:with-test (:name :compilation-queue)
-  ;; serial execution should be .1 + .1 sec
-  (assert (> (seconds-to-call 'test-non-bg-compile) .19))
-  ;; the two sleeps should be concurrent
-  (assert (< (seconds-to-call 'test-bg-compile) .12)))
+
+  (test-util:with-test (:name :compilation-queue)
+    ;; serial execution should be .1 + .1 sec
+    (assert (> (seconds-to-call 'test-non-bg-compile) .19))
+    ;; the two sleeps should be concurrent
+    (assert (< (seconds-to-call 'test-bg-compile) .12))))
