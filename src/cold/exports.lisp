@@ -2946,6 +2946,7 @@ possibly temporarily, because it might be used internally.")
            "MAP-XSET"
            "XSET"
            "XSET-COUNT"
+           "XSET-ELTS-HASH"
            "XSET-EMPTY-P"
            "XSET-INTERSECTION"
            "XSET-MEMBER-P"

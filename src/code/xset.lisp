@@ -157,3 +157,19 @@
 (declaim (inline xset-empty-p))
 (defun xset-empty-p (xset)
   (not (xset-data xset)))
+
+;;; Produce a hash that helps decide whether two xsets could be considered equivalent
+;;; as order-insensitive sets comparing elements by EQL. This shouldn't use EQL-HASH
+;;; because the intent is that it be useful for both host and target. SXHASH is fine
+;;; for SYMBOL, NUMBER, and CHARACTER since EQL and EQUAL are the the same
+;;; (SXHASH being the hash function for EQUAL). The target can include STRUCTURE-OBJECT
+;;; because we have stable hashes that do not depend on the slots. But it's no good
+;;; to mix in STRING, BIT-VECTOR, CONS, or other type where SXHASH reads the contents.
+(defun xset-elts-hash (xset)
+  (let ((h 0))
+    (map-xset (lambda (x)
+                (when (typep x '(or symbol number character
+                                 #-sb-xc-host structure-object))
+                  (setq h (logxor (cl:sxhash x) h))))
+              xset)
+    h))
