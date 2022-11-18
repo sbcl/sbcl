@@ -251,7 +251,7 @@
                                `(cons (find-classoid ',super) ',guard)))
                            specs)) #-sb-xc-host t)))
        (,progn-oid
-        (let ((type-class (type-class-or-lose ',type-class-name)))
+        (let ((type-class (!type-class-or-lose ',type-class-name)))
          (setf (type-class-complex-subtypep-arg1 type-class) #',defun-name)
          (setf (type-class-complex-subtypep-arg2 type-class)
                #'delegate-complex-subtypep-arg2)
@@ -280,8 +280,8 @@
                :hash-bits 8
                :hash-function
                (lambda (req opt rest allowp)
-                 (logxor (type-list-cache-hash req)
-                         (type-list-cache-hash opt)
+                 (logxor (hash-ctype-list req)
+                         (hash-ctype-list opt)
                           (if rest
                               (type-hash-value rest)
                               42)
@@ -297,22 +297,16 @@
      (optional list-elts-eq)
      (rest eq)
      (allowp eq))
-  (%make-values-type :required required
-                     :optional optional
-                     :rest rest
-                     :allowp allowp))
+  (new-ctype values-type required optional rest allowp))
 
 (defun make-values-type (&key required optional rest allowp)
   (multiple-value-bind (required optional rest)
       (canonicalize-args-type-args required optional rest)
-    (cond ((and (null required)
-                (null optional)
-                (eq rest *universal-type*))
+    (cond ((and (null required) (null optional) (eq rest *universal-type*))
            *wild-type*)
           ((memq *empty-type* required)
            *empty-type*)
-          (t (make-values-type-cached required optional
-                                      rest allowp)))))
+          (t (make-values-type-cached required optional rest allowp)))))
 
 (define-type-method (values :simple-subtypep :complex-subtypep-arg1)
                      (type1 type2)
@@ -528,9 +522,9 @@
 #+sb-xc-host
 (defvar *interned-fun-types*
   (flet ((fun-type (n)
-           (!make-interned-fun-type (pack-interned-ctype-bits 'function)
-                                    (make-list n :initial-element *universal-type*)
-                                    nil nil nil nil nil nil *wild-type*)))
+           (!alloc-fun-type (pack-interned-ctype-bits 'function)
+                            (make-list n :initial-element *universal-type*)
+                            nil nil nil nil nil nil *wild-type*)))
     (vector (fun-type 0) (fun-type 1) (fun-type 2) (fun-type 3))))
 
 (defun make-fun-type (&key required optional rest
@@ -540,7 +534,7 @@
   (let ((rest (if (eq rest *empty-type*) nil rest))
         (n (length required)))
     (cond (designator
-           (make-fun-designator-type required optional rest keyp keywords
+           (new-ctype fun-designator-type required optional rest keyp keywords
                                      allowp wild-args returns))
           ((and
             (<= n 3)
@@ -550,7 +544,7 @@
             (not (find *universal-type* required :test #'neq)))
            (svref (literal-ctype-vector *interned-fun-types*) n))
           (t
-           (%make-fun-type required optional rest keyp keywords
+           (new-ctype fun-type required optional rest keyp keywords
                            allowp wild-args returns)))))
 
 ;; This seems to be used only by cltl2, and within 'cross-type',
@@ -573,7 +567,7 @@
   (type= (constant-type-type type1) (constant-type-type type2)))
 
 (def-type-translator constant-arg ((:context context) type)
-  (make-constant-type :type (single-value-specifier-type type context)))
+  (new-ctype constant-type (single-value-specifier-type type context)))
 
 (defun canonicalize-args-type-args (required optional rest &optional keyp)
   (when (eq rest *empty-type*)
@@ -1429,6 +1423,14 @@
        (defun class-classoid (class)
          (wrapper-classoid (sb-pcl::class-wrapper class))))
 
+;;; HAIRY type-class has to be defined prior to defining %PARSE-TYPE.
+;; ENUMERABLE-P is T because a hairy type could be equivalent to a MEMBER type.
+;; e.g. any SATISFIES with a predicate returning T over a finite domain.
+;; But in practice there's nothing that can be done with this information,
+;; because we don't call random predicates when performing operations on types
+;; as objects, only when checking for inclusion of something in the type.
+(define-type-class hairy :enumerable t :might-contain-other-types t)
+
 ;;; Parsing of type specifiers comes in many variations:
 ;;;  SINGLE-VALUE-SPECIFIER-TYPE:
 ;;;    disallow VALUES even if single value, but allow *
@@ -1503,8 +1505,8 @@
                                (when cl:*compile-print*
                                  (format t "~&; NEW UNKNOWN-TYPE ~S~%" spec))
                                (setf (gethash spec table)
-                                     (make-unknown-type :specifier spec))))))
-                (make-unknown-type :specifier spec)))))
+                                     (new-ctype unknown-type spec))))))
+                (make-unknown-type spec)))))
 
 ;;; BASIC-PARSE-TYPESPEC can grok some simple cases that involve turning an object
 ;;; used as a type specifier into an internalized type object (which might be
@@ -1811,9 +1813,13 @@ expansion happened."
         union
         nil)))
 
+(define-type-class intersection
+                    :enumerable #'compound-type-enumerable
+                    :might-contain-other-types t)
+
 (defun type-intersection (&rest input-types)
   (%type-intersection input-types))
-(defun-cached (%type-intersection :hash-bits 10 :hash-function #'type-list-cache-hash)
+(defun-cached (%type-intersection :hash-bits 10 :hash-function #'hash-ctype-list)
     ((input-types equal))
   (let ((simplified-types (simplify-intersections input-types)))
     (declare (type list simplified-types))
@@ -1838,13 +1844,13 @@ expansion happened."
         (cond
           ((null simplified-types) *universal-type*)
           ((null (cdr simplified-types)) (car simplified-types))
-          (t (%make-intersection-type
+          (t (new-ctype intersection-type
               (some #'type-enumerable simplified-types)
               simplified-types))))))
 
 (defun type-union (&rest input-types)
   (%type-union input-types))
-(defun-cached (%type-union :hash-bits 8 :hash-function #'type-list-cache-hash)
+(defun-cached (%type-union :hash-bits 8 :hash-function #'hash-ctype-list)
     ((input-types equal))
   (let ((simplified-types (simplify-unions input-types)))
     (cond
@@ -2109,13 +2115,6 @@ expansion happened."
 
 ;;;; hairy and unknown types
 
-;; ENUMERABLE-P is T because a hairy type could be equivalent to a MEMBER type.
-;; e.g. any SATISFIES with a predicate returning T over a finite domain.
-;; But in practice there's nothing that can be done with this information,
-;; because we don't call random predicates when performing operations on types
-;; as objects, only when checking for inclusion of something in the type.
-(define-type-class hairy :enumerable t :might-contain-other-types t)
-
 ;;; Without some special HAIRY cases, we massively pollute the type caches
 ;;; with objects that are all equivalent to *EMPTY-TYPE*. e.g.
 ;;;  (AND (SATISFIES LEGAL-FUN-NAME-P) (SIMPLE-ARRAY CHARACTER (*))) and
@@ -2129,9 +2128,9 @@ expansion happened."
 #+sb-xc-host
 (progn
   (defvar *satisfies-keywordp-type*
-    (!make-interned-hairy-type '(satisfies keywordp)))
+    (!alloc-hairy-type (pack-interned-ctype-bits 'hairy) '(satisfies keywordp)))
   (defvar *fun-name-type*
-    (!make-interned-hairy-type '(satisfies legal-fun-name-p))))
+    (!alloc-hairy-type (pack-interned-ctype-bits 'hairy) '(satisfies legal-fun-name-p))))
 
 (define-type-method (hairy :negate) (x) (make-negation-type x))
 
@@ -2580,12 +2579,11 @@ expansion happened."
         (values t low)
         (values nil nil))))
 
-(defun interned-numeric-type (specifier &rest args)
-  (apply '%make-numeric-type
-         :%bits (pack-interned-ctype-bits
-                 'number nil
-                 (when specifier (sb-vm::saetp-index-or-lose specifier)))
-         args))
+(defun interned-numeric-type (specifier &key enumerable class format (complexp :real) low high)
+  (!alloc-numeric-type
+   (pack-interned-ctype-bits 'number nil
+                             (when specifier (sb-vm::saetp-index-or-lose specifier)))
+   enumerable class format complexp low high))
 
 #+sb-xc-host
 (progn
@@ -2798,8 +2796,7 @@ expansion happened."
                 (not complexp)
                 (bounds-unbounded-p low high)
                 (literal-ctype (interned-numeric-type nil :complexp nil) number))))
-        (%make-numeric-type :class class :format format :complexp complexp
-                            :low low :high high :enumerable enumerable))))
+        (new-ctype numeric-type enumerable class format complexp low high))))
 
 (defun modified-numeric-type (base
                               &key
@@ -3537,7 +3534,7 @@ used for a COMPLEX component.~:@>"
     (unless (cdr pairs)
       (macrolet ((range (low high &optional saetp-index)
                    `(return-from make-character-set-type
-                      (literal-ctype (!make-interned-character-set-type
+                      (literal-ctype (!alloc-character-set-type
                                       (pack-interned-ctype-bits 'character-set nil ,saetp-index)
                                       '((,low . ,high)))
                                      (character-set ((,low . ,high)))))))
@@ -3568,8 +3565,8 @@ used for a COMPLEX component.~:@>"
 (defvar *interned-array-types*
   (labels ((make-1 (type-index dims complexp type)
              (aver (= (type-saetp-index type) type-index))
-             (!make-interned-array-type (pack-interned-ctype-bits 'array)
-                                        dims complexp type type))
+             (!alloc-array-type (pack-interned-ctype-bits 'array)
+                                dims complexp type type))
            (make-all (element-type type-index array)
              (replace array
                       (list (make-1 type-index '(*) nil    element-type)
@@ -4060,8 +4057,8 @@ used for a COMPLEX component.~:@>"
              (unless unpaired
                (macrolet ((member-type (&rest elts)
                             `(literal-ctype
-                              (!make-interned-member-type
-                               (pack-interned-ctype-bits 'member) (xset-from-list ',elts) nil)
+                              (!alloc-member-type (pack-interned-ctype-bits 'member)
+                                                  (xset-from-list ',elts) nil)
                               (member ,@elts))))
                  (let ((elts (xset-data xset)))
                    (when (singleton-p elts)
@@ -4264,10 +4261,6 @@ used for a COMPLEX component.~:@>"
 ;;;; We still follow the example of CMU CL to some extent, by punting
 ;;;; (to the opaque HAIRY-TYPE) on sufficiently complicated types
 ;;;; involving AND.
-
-(define-type-class intersection
-                    :enumerable #'compound-type-enumerable
-                    :might-contain-other-types t)
 
 (define-type-method (intersection :negate) (type)
   (%type-union
@@ -4824,12 +4817,11 @@ used for a COMPLEX component.~:@>"
         ;; but it improves the hit rate in the function caches.
         ((and (type= car-type *universal-type*)
               (type= cdr-type *universal-type*))
-         (literal-ctype (!make-interned-cons-type (pack-interned-ctype-bits 'cons)
-                                                  *universal-type*
-                                                  *universal-type*)
+         (literal-ctype (!alloc-cons-type (pack-interned-ctype-bits 'cons)
+                                          *universal-type* *universal-type*)
                         cons))
         (t
-         (%make-cons-type car-type cdr-type))))
+         (new-ctype cons-type car-type cdr-type))))
 
 ;;; Return TYPE converted to canonical form for a situation where the
 ;;; "type" '* (which SBCL still represents as a type even though ANSI
