@@ -795,21 +795,6 @@ between the ~A definition and the ~A definition"
 (define-type-class classoid :enumerable #'classoid-enumerable-p
                     :might-contain-other-types nil)
 
-(defmacro classoid-bits (x)
-  ;; HASH-LAYOUT-NAME picks a random number if NAME is NULL
-  `(logior (logand (hash-layout-name ,x) +type-hash-mask+)
-           ,(ctype-class-bits 'classoid)))
-;;; Now that the type-class has an ID, the various constructors can be defined.
-(macrolet ((def-make (name args &aux (allocator (symbolicate "!ALLOC-" name)))
-             `(defun ,(symbolicate "MAKE-" name) ,args
-                (declare (inline ,allocator))
-                (,allocator (classoid-bits name) ,@(remove '&key args)))))
-  (def-make undefined-classoid (name))
-  (def-make condition-classoid (&key name))
-  (def-make structure-classoid (&key name))
-  (def-make standard-classoid (&key name pcl-class))
-  (def-make static-classoid (&key name)))
-
 (defun classoid-inherits-from (sub super-or-name)
   (declare (type classoid sub)
            (type (or symbol classoid) super-or-name))
@@ -1375,7 +1360,7 @@ between the ~A definition and the ~A definition"
                       (setf (classoid-cell-classoid
                              (find-classoid-cell name :create t))
                             (!make-built-in-classoid
-                             :%bits (classoid-bits name)
+                             :%bits (pack-ctype-bits classoid name)
                              :name name
                              :translation #+sb-xc-host (if trans-p :initializing nil)
                                           #-sb-xc-host translation

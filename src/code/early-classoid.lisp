@@ -519,8 +519,9 @@
 ;;; referenced layouts. Users should never see them.
 (def!struct (undefined-classoid
              (:include classoid)
-             (:constructor !alloc-undefined-classoid (%bits name))
-             (:copier nil)))
+             (:copier nil)
+             (:constructor make-undefined-classoid
+                 (name &aux (%bits (pack-ctype-bits classoid name))))))
 
 ;;; BUILT-IN-CLASS is used to represent the standard classes that
 ;;; aren't defined with DEFSTRUCT and other specially implemented
@@ -541,8 +542,9 @@
   (predicate (missing-arg) :type (sfunction (t) boolean) :read-only t))
 
 (def!struct (condition-classoid (:include classoid)
-                                (:constructor !alloc-condition-classoid (%bits name))
-                                (:copier nil))
+                                (:copier nil)
+                                (:constructor make-condition-classoid
+                                    (&key name &aux (%bits (pack-ctype-bits classoid name)))))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class
   (slots nil :type list)
@@ -572,8 +574,9 @@
 ;;; don't have a corresponding class.
 (def!struct (structure-classoid
              (:include classoid)
-             (:constructor !alloc-structure-classoid (%bits name))
-             (:copier nil)))
+             (:copier nil)
+             (:constructor make-structure-classoid
+                           (&key name &aux (%bits (pack-ctype-bits classoid name))))))
 
 ;;;; classoid namespace
 
@@ -603,16 +606,18 @@
 ;;; STANDARD-CLASS and FUNCALLABLE-STANDARD-CLASS.  The type system
 ;;; side does not need to distinguish between STANDARD-CLASS and
 ;;; FUNCALLABLE-STANDARD-CLASS.
-(def!struct (standard-classoid
-             (:include classoid)
-             (:constructor !alloc-standard-classoid (%bits name pcl-class))
-             (:copier nil))
+(def!struct (standard-classoid (:include classoid)
+                               (:copier nil)
+                               (:constructor make-standard-classoid
+                                   (&key name pcl-class
+                                    &aux (%bits (pack-ctype-bits classoid name)))))
   old-layouts)
 ;;; a metaclass for classes which aren't standardlike but will never
 ;;; change either.
 (def!struct (static-classoid (:include classoid)
-                             (:constructor !alloc-static-classoid (%bits name))
-                             (:copier nil)))
+                             (:copier nil)
+                             (:constructor make-static-classoid
+                                 (&key name &aux (%bits (pack-ctype-bits classoid name))))))
 
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))
