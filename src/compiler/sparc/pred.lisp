@@ -34,8 +34,8 @@
   (:generator 0
      (error "BRANCH-IF not yet implemented")))
 
-(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node dst-tn x-tn y-tn))
+(defun convert-conditional-move-p (dst-tn)
+  (declare (ignore dst-tn))
   nil)
 
 

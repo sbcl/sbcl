@@ -146,71 +146,47 @@
 ;; 4. Convert the result from the common representation
 ;; 5. Jump to the successor
 (defun convert-one-cmov (cmove-vop
-                         value-if arg-if
-                         value-else arg-else
-                         target res
-                         flags info
-                         label
-                         vop node 2block
+                         value-if value-else
+                         res flags
+                         label vop node 2block
                          &aux (prev (vop-prev vop)))
   (delete-vop vop)
   (let ((last (ir2-block-last-vop 2block)))
     (when (and last
                (eq (vop-name last) 'branch))
       (delete-vop last)))
-  (flet ((emit-appropriate-move (src dst &optional before)
-           (if (or before
-                   (eq *ir2opt-stage* 'select-representations))
-               (emit-and-insert-vop node 2block
-                                    (if (eq *ir2opt-stage* 'select-representations)
-                                        (find-move-vop src nil (tn-sc dst) (tn-primitive-type dst)
-                                                       #'sc-move-vops)
-                                        (template-or-lose 'move))
-                                    (reference-tn src nil)
-                                    (reference-tn dst t)
-                                    before)
-               (emit-move node 2block src dst))))
-    (cond
-      ((and (constant-tn-p arg-if)
-            (constant-tn-p arg-else)
-            (sb-vm::computable-from-flags-p
-             res (tn-value arg-if) (tn-value arg-else) flags))
-       (emit-template node 2block (template-or-lose 'sb-vm::compute-from-flags)
-                      (reference-tn-list (list arg-if arg-else) nil)
-                      (reference-tn res t)
-                      (list* flags info)))
-      (t
-       (flet ((reuse-if-eq-arg (value-if vop)
-                ;; Most of the time this means:
-                ;; if X is already NIL, don't load it again.
-                (when (and vop
-                           (eq (vop-name vop) 'if-eq)
-                           (constant-tn-p value-if))
-                  (let* ((args (vop-args vop))
-                         (x-tn (tn-ref-tn args))
-                         (test (tn-ref-tn (tn-ref-across args))))
-                    (when (and (constant-tn-p test)
-                               (equal (tn-value value-if)
-                                      (tn-value test))
-                               (eq (tn-primitive-type x-tn)
-                                   (tn-primitive-type res)))
-                      x-tn))))
-              (load-and-coerce (dst src)
-                (when (and dst (neq dst src))
-                  (emit-appropriate-move src dst (ir2-block-last-vop 2block)))))
-         (let ((reuse (reuse-if-eq-arg value-if prev)))
-           (if reuse
-               (setf arg-if reuse)
-               (load-and-coerce arg-if value-if)))
-         (load-and-coerce arg-else value-else))
-       (emit-template node 2block (template-or-lose cmove-vop)
-                      (reference-tn-list (remove nil (list arg-if arg-else))
-                                         nil)
-                      (reference-tn res t)
-                      (list* flags info))))
-    (emit-appropriate-move res target)
-    (vop branch node 2block label)
-    (update-block-succ 2block (list label))))
+  (cond
+    ((and (constant-tn-p value-if)
+          (constant-tn-p value-else)
+          (sb-vm::computable-from-flags-p
+           res (tn-value value-if) (tn-value value-else) flags))
+     (emit-template node 2block (template-or-lose 'sb-vm::compute-from-flags)
+                    (reference-tn-list (list value-if value-else) nil)
+                    (reference-tn res t)
+                    (list flags)))
+    (t
+     (when (and prev
+                (eq (vop-name prev) 'if-eq)
+                (constant-tn-p value-if))
+       ;; Most of the time this means:
+       ;; if X is already NIL don't load it again.
+       (let* ((args (vop-args prev))
+              (x-tn (tn-ref-tn args))
+              (test (tn-ref-tn (tn-ref-across args))))
+         (when (and (constant-tn-p test)
+                    (equal (tn-value value-if)
+                           (tn-value test))
+                    (eq (tn-primitive-type x-tn)
+                        (tn-primitive-type res)))
+           (setf value-if x-tn))))
+     (emit-template node 2block (template-or-lose cmove-vop)
+                    (reference-tn-list (list value-if value-else)
+                                       nil)
+                    (reference-tn res t)
+                    (list flags))))
+
+  (vop branch node 2block label)
+  (update-block-succ 2block (list label)))
 
 (defun maybe-convert-one-cmov (vop)
   ;; The test and branch-if may be split between two IR1 blocks
@@ -219,47 +195,20 @@
          (succ (block-succ (node-block node)))
          (a    (first succ))
          (b    (second succ)))
-
     (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
       (multiple-value-bind (label target value-a value-b)
           (cmovp jump-target a b)
         (unless label
           (return-from maybe-convert-one-cmov))
-        (multiple-value-bind (cmove-vop arg-a arg-b res info)
-            (convert-conditional-move-p node target value-a value-b)
-          (unless cmove-vop
-            (return-from maybe-convert-one-cmov))
-          (when not-p
-            (rotatef value-a value-b)
-            (rotatef arg-a arg-b))
-          (flet ((safe-coercion-p (from to)
-                   (let ((from (tn-primitive-type from))
-                         (to (tn-primitive-type to)))
-                     ;; These moves will be repositioned before the test VOP,
-                     ;; which may be restricting their type.
-                     ;; Avoid the moves that may touch memory and
-                     ;; thus fail on immediate values.
-                     (not (and (eq from *backend-t-primitive-type*)
-                               (memq (primitive-type-name to)
-                                     '(#+64-bit sb-vm::unsigned-byte-64
-                                       #+64-bit sb-vm::unsigned-byte-63
-                                       #+64-bit sb-vm::signed-byte-64
-                                       #-64-bit sb-vm::unsigned-byte-32
-                                       #-64-bit sb-vm::unsigned-byte-31
-                                       #-64-bit sb-vm::signed-byte-32
-                                       #-64-bit single-float
-                                       double-float
-                                       complex-single-float
-                                       complex-double-float
-                                       system-area-pointer)))))))
-            (when (and (safe-coercion-p value-a arg-a)
-                       (safe-coercion-p value-b arg-b))
-              (convert-one-cmov cmove-vop value-a arg-a
-                                value-b arg-b
-                                target  res
-                                flags info
-                                label vop node (vop-block vop))
-              t)))))))
+        (multiple-value-bind (cmove-vop) (convert-conditional-move-p target)
+          (when cmove-vop
+            (when not-p
+              (rotatef value-a value-b))
+            (convert-one-cmov cmove-vop
+                              value-a value-b target
+                              flags
+                              label vop node (vop-block vop))
+            t))))))
 
 (defun delete-unused-ir2-blocks (component)
   (declare (type component component))
@@ -563,15 +512,17 @@
            args2)))
 
 (defoptimizer (vop-optimize branch-if) (branch-if)
-  (cond ((maybe-convert-one-cmov branch-if)
+  (cond ((neq *ir2opt-stage* 'select-representations)
+         ;; cmov conversion needs to know the SCs
+         nil)
+        ((maybe-convert-one-cmov branch-if)
          nil)
         #+(or arm arm64 x86 x86-64)
-        ((eq *ir2opt-stage* 'select-representations)
+        (t
          ;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
          ;; into CMP X,Y BRANCH-IF M BRANCH-IF N
-         ;; Run it after SELECT-REPRESENTATIONS, most CMOVs are
-         ;; already converted and :after-sc-selection flags are
-         ;; resolved.
+         ;; Run it after SELECT-REPRESENTATIONS, after CMOVs are
+         ;; converted and :after-sc-selection flags are resolved.
          ;; While it's portable the VOPs are not validated for
          ;; compatibility on other backends yet.
          (let ((prev (vop-prev branch-if)))

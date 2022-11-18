@@ -141,70 +141,23 @@
            (inst lea table (register-inline-constant :jump-table vector))
            (inst jmp (ea table temp 8)))))))
 
-(define-load-time-global *cmov-ptype-representation-vop*
-  (mapcan (lambda (entry)
-            (destructuring-bind (ptypes &optional sc vop)
-                entry
-              (mapcar (if (and vop sc)
-                          (lambda (ptype)
-                            (list ptype sc vop))
-                          #'list)
-                      (ensure-list ptypes))))
-          '((t descriptor-reg move-if/t)
-
-            ((fixnum positive-fixnum)
-             any-reg move-if/fx)
-            ((unsigned-byte-64 unsigned-byte-63)
-             unsigned-reg move-if/unsigned)
-            (signed-byte-64 signed-reg move-if/signed)
-            ;; FIXME: Can't use CMOV with byte registers, and characters live
-            ;; in such outside of unicode builds. A better solution then just
-            ;; disabling MOVE-IF/CHAR should be possible, though.
-            #+sb-unicode
-            (character character-reg move-if/char)
-
-            ((complex-single-float complex-double-float))
-
-            (system-area-pointer sap-reg move-if/sap)))
-  "Alist of primitive type -> (storage-class-name VOP-name)
-   if values of such a type should be cmoved, and NIL otherwise.
-
-   storage-class-name is the name of the storage class to use for
-   the values, and VOP-name the name of the VOP that will be used
-   to execute the conditional move.")
-
-(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node))
-  (let* ((ptype (sb-c::tn-primitive-type dst-tn))
-         (name  (sb-c:primitive-type-name ptype))
-         (param (case name
-                  ((double-float single-float)
-                   (let ((sc (tn-sc dst-tn)))
-                     (when (and sc
-                                (eq (tn-sc x-tn) sc)
-                                (eq (tn-sc y-tn) sc))
-                       (sc-case dst-tn
-                         (descriptor-reg '(descriptor-reg move-if/t))
-                         (t)))))
-                  (t
-                   (cdr (or (assoc name *cmov-ptype-representation-vop*)
-                            '(t descriptor-reg move-if/t)))))))
-    (when param
-      (destructuring-bind (representation vop) param
-        (let ((scn (sc-number-or-lose representation)))
-          (labels ((make-tn ()
-                     (make-representation-tn ptype scn))
-                   (frob-tn (tn)
-                     ;; Careful not to load constants which require boxing
-                     ;; and may overwrite the flags.
-                     ;; Representation selection should avoid that.
-                     (if (eq (tn-kind tn) :constant)
-                         tn
-                         (make-tn))))
-            (values vop
-                    (frob-tn x-tn) (frob-tn y-tn)
-                    (make-tn)
-                    nil)))))))
+(defun convert-conditional-move-p (dst-tn)
+  (sc-case dst-tn
+    ((descriptor-reg any-reg)
+     'move-if/t)
+    (unsigned-reg
+     'move-if/unsigned)
+    (signed-reg
+     'move-if/signed)
+    ;; FIXME: Can't use CMOV with byte registers, and characters live
+    ;; in such outside of unicode builds. A better solution then just
+    ;; disabling MOVE-IF/CHAR should be possible, though.
+    #+sb-unicode
+    (character-reg
+     'move-if/char)
+    (sap-reg
+     'move-if/sap)
+    (t)))
 
 (define-vop (move-if)
   (:args (then) (else))
@@ -212,69 +165,70 @@
   (:info flags)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 0
-     (let ((not-p (eq (first flags) 'not)))
-       (when not-p (pop flags))
-       (flet ((load-immediate (dst constant-tn
-                               &optional (sc (sc-name (tn-sc dst))))
-                ;; Can't use ZEROIZE, since XOR will affect the flags.
-                (inst mov dst
-                      (encode-value-if-immediate constant-tn
-                                                 (memq sc '(any-reg descriptor-reg))))))
-         (cond ((null (rest flags))
-                (if (sc-is else immediate)
-                    (load-immediate res else)
-                    (move res else))
-                (when (sc-is then immediate)
-                  (load-immediate temp then (sc-name (tn-sc res)))
-                  (setf then temp))
-                (inst cmov (if not-p
-                               (negate-condition (first flags))
-                               (first flags))
-                      res
-                      then))
-               (not-p
-                (cond ((sc-is then immediate)
-                       (when (location= else res)
-                         (inst mov temp else)
-                         (setf else temp))
-                       (load-immediate res then))
-                      ((location= else res)
-                       (inst xchg else then)
-                       (rotatef else then))
-                      (t
-                       (move res then)))
-                (when (sc-is else immediate)
-                  (load-immediate temp else (sc-name (tn-sc res)))
-                  (setf else temp))
-                (dolist (flag flags)
-                  (inst cmov flag res else)))
-               (t
-                (if (sc-is else immediate)
-                    (load-immediate res else)
-                    (move res else))
-                (when (sc-is then immediate)
-                  (load-immediate temp then (sc-name (tn-sc res)))
-                  (setf then temp))
-                (dolist (flag flags)
-                  (inst cmov flag res then))))))))
+    (let ((not-p (eq (first flags) 'not)))
+      (when not-p (pop flags))
+      (when (location= res then)
+        (rotatef then else)
+        (setf not-p (not not-p)))
+      (flet ((load-immediate (dst constant-tn
+                              &optional (sc-reg dst))
+               ;; Can't use ZEROIZE, since XOR will affect the flags.
+               (inst mov dst
+                     (encode-value-if-immediate constant-tn
+                                                (sc-is sc-reg any-reg descriptor-reg)))))
+        (cond ((null (rest flags))
+               (if (sc-is else immediate)
+                   (load-immediate res else)
+                   (move res else))
+               (when (sc-is then immediate)
+                 (load-immediate temp then res)
+                 (setf then temp))
+               (inst cmov (if not-p
+                              (negate-condition (first flags))
+                              (first flags))
+                     res
+                     then))
+              (not-p
+               (cond ((sc-is then immediate)
+                      (when (location= else res)
+                        (inst mov temp else)
+                        (setf else temp))
+                      (load-immediate res then))
+                     ((location= else res)
+                      (inst xchg else then)
+                      (rotatef else then))
+                     (t
+                      (move res then)))
+               (when (sc-is else immediate)
+                 (load-immediate temp else res)
+                 (setf else temp))
+               (dolist (flag flags)
+                 (inst cmov flag res else)))
+              (t
+               (if (sc-is else immediate)
+                   (load-immediate res else)
+                   (move res else))
+               (when (sc-is then immediate)
+                 (load-immediate temp then res)
+                 (setf then temp))
+               (dolist (flag flags)
+                 (inst cmov flag res then))))))))
 
 (macrolet ((def-move-if (name type reg stack)
              `(define-vop (,name move-if)
-                (:args (then :scs (immediate ,reg ,stack) :to :eval
+                (:args (then :scs (immediate ,@(ensure-list reg) ,stack) :to :eval
                              :load-if (not (or (sc-is then immediate)
                                                (and (sc-is then ,stack)
                                                     (not (location= else res))))))
-                       (else :scs (immediate ,reg ,stack) :target res
+                       (else :scs (immediate ,@(ensure-list reg) ,stack) :target res
                              :load-if (not (sc-is else immediate ,stack))))
                 (:arg-types ,type ,type)
-                (:results (res :scs (,reg)
-                               :from (:argument 1)))
+                (:results (res :scs ,(ensure-list reg)))
                 (:result-types ,type))))
-  (def-move-if move-if/t t descriptor-reg control-stack)
-  (def-move-if move-if/fx tagged-num any-reg control-stack)
+  (def-move-if move-if/t t (descriptor-reg any-reg) control-stack)
   (def-move-if move-if/unsigned unsigned-num unsigned-reg unsigned-stack)
   (def-move-if move-if/signed signed-num signed-reg signed-stack)
-  ;; FIXME: See *CMOV-PTYPE-REPRESENTATION-VOP* above.
+  ;; FIXME: See convert-conditional-move-p above.
   #+sb-unicode
   (def-move-if move-if/char character character-reg character-stack)
   (def-move-if move-if/sap system-area-pointer sap-reg sap-stack))

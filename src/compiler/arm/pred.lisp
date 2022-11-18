@@ -37,8 +37,8 @@
                 (first flags))
             dest)))
 
-(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node dst-tn x-tn y-tn))
+(defun convert-conditional-move-p (dst-tn)
+  (declare (ignore dst-tn))
   nil)
 
 

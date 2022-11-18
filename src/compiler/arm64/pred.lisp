@@ -37,61 +37,21 @@
                 (first flags))
             dest)))
 
-(define-load-time-global *cmov-ptype-representation-vop*
-  (mapcan (lambda (entry)
-            (destructuring-bind (ptypes &optional sc vop)
-                entry
-              (mapcar (if (and vop sc)
-                          (lambda (ptype)
-                            (list ptype sc vop))
-                          #'list)
-                      (ensure-list ptypes))))
-          '((t descriptor-reg move-if/descriptor)
-            ((fixnum positive-fixnum) any-reg move-if/descriptor)
-            ((unsigned-byte-64 unsigned-byte-63) unsigned-reg move-if/word)
-            (signed-byte-64 signed-reg move-if/word)
-            (character character-reg move-if/char)
-            ((single-float complex-single-float
-              double-float complex-double-float))
-            (system-area-pointer sap-reg move-if/sap))))
-
-(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
-  (declare (ignore node))
-  (let* ((ptype (sb-c::tn-primitive-type dst-tn))
-         (name  (sb-c:primitive-type-name ptype))
-         (param (case name
-                  ((double-float single-float)
-                   (let ((sc (tn-sc dst-tn)))
-                     (when (and sc
-                                (eq (tn-sc x-tn) sc)
-                                (eq (tn-sc y-tn) sc))
-                       (sc-case dst-tn
-                         (descriptor-reg '(descriptor-reg move-if/descriptor))
-                         (double-reg '(double-reg move-if/double))
-                         (single-reg '(single-reg move-if/single))))))
-                  (t
-                   (cdr (or (assoc name *cmov-ptype-representation-vop*)
-                            '(t descriptor-reg move-if/descriptor)))))))
-    (when param
-      (destructuring-bind (representation vop) param
-        (let ((scn (sc-number-or-lose representation)))
-          (labels ((make-tn (tn)
-                     (cond ((and (tn-sc tn)
-                                 (or
-                                  (and
-                                   (sc-is tn immediate)
-                                   (eq (tn-value tn) 0))
-                                  (and
-                                   (sc-is tn descriptor-reg)
-                                   (eql (tn-offset tn) null-offset))))
-                            tn)
-                           (t
-                            (make-representation-tn ptype scn)))))
-            (values vop
-                    (make-tn x-tn) (make-tn y-tn)
-                    (make-tn dst-tn)
-                    nil)))))))
-
+(defun convert-conditional-move-p (dst-tn)
+  (sc-case dst-tn
+    ((descriptor-reg any-reg)
+     'move-if/descriptor)
+    ((unsigned-reg signed-reg)
+     'move-if/word)
+    (double-reg
+     'move-if/double)
+    (single-reg
+     'move-if/single)
+    (sap-reg
+     'move-if/sap)
+    (character-reg
+     'move-if/char)
+    (t)))
 
 (define-vop (move-if)
   (:args (then) (else))
@@ -147,8 +107,6 @@
   (:arg-types single-float single-float)
   (:results (res :scs (single-reg)))
   (:result-types single-float))
-
-
 
 ;;;; Conditional VOPs:
 
