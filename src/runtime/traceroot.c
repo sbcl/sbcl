@@ -234,7 +234,7 @@ static void compare_pointer(void *addr) {
 /* Figure out which thread's control stack contains 'pointer'
  * and the PC within the active function in the referencing frame  */
 static struct thread* NO_SANITIZE_MEMORY
-deduce_thread(void (*context_scanner)(void(*)(void), os_context_t *),
+deduce_thread(void (*context_scanner)(void*, os_context_t *),
               uword_t pointer, char** pc)
 {
     struct thread *th;
