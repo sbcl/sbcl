@@ -645,11 +645,6 @@
                (new-ctype ,name ,@(cdr private-ctor-args))))))))
 
 (defmacro new-ctype (name &rest initargs)
-  ;; CLASSOIDs have a deterministic hash based on the name,
-  ;; utilizing the same hash calculation as with LAYOUT instances.
-  ;; NUMBER types could compute a stable hash too (but they don't currently)
-  ;; which would mean that HASH-not-equal implies TYPE-not-equal.
-  ;; Most other things would not benefit.
   (let ((allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name)))
     `(let ((bits (logior ,(ctype-class-bits (ctype-instance-type->type-class name))
                          (logand (ctype-random) +type-hash-mask+))))

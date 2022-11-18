@@ -796,7 +796,8 @@ between the ~A definition and the ~A definition"
                     :might-contain-other-types nil)
 
 (defmacro classoid-bits (x)
-  ;; HASH-LAYOUT-NAME picks a random number if NAME is NULL
+  ;; CLASSOIDs have a deterministic hash based on the symbol naming the classoid,
+  ;; but HASH-LAYOUT-NAME will pick a pseudo-random hash if NAME is NIL.
   `(logior (logand (hash-layout-name ,x) +type-hash-mask+)
            ,(ctype-class-bits 'classoid)))
 ;;; Now that the type-class has an ID, the various constructors can be defined.

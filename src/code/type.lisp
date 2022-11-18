@@ -2479,8 +2479,12 @@ expansion happened."
 (define-type-class number :enumerable #'numeric-type-enumerable :might-contain-other-types nil)
 
 (define-type-method (number :simple-=) (type1 type2)
-  ;; TODO: construct the hash bits for NUMBER types using a deterministic hash of
-  ;; the low + high bounds. Then TYPE= can be true only if the hashes are =.
+  ;; Note that EQUALP equates signed zeros of the same precision.
+  ;; In particular all the following are different, but TYPE= to each other:
+  ;;  (specifier-type '(single-float -0s0 -0s0))
+  ;;  (specifier-type '(single-float -0s0 +0s0))
+  ;;  (specifier-type '(single-float +0s0 -0s0))
+  ;;  (specifier-type '(single-float +0s0 +0s0))
   (values
    (and (numeric-type-equal type1 type2)
         (equalp (numeric-type-low type1) (numeric-type-low type2))
@@ -4238,6 +4242,7 @@ used for a COMPLEX component.~:@>"
             (t (push m ms))))
         (apply #'type-union
                (member-type-from-list ms)
+               ;; Constructor asserts that pairs are properly sorted
                (make-character-set-type (mapcar (lambda (x) (cons x x))
                                                 (sort char-codes #'<)))
                (nreverse numbers)))
@@ -4999,6 +5004,13 @@ used for a COMPLEX component.~:@>"
 
 ;;;; CHARACTER-SET types
 
+;; FIXME:
+;; 1. (SPECIFIER-TYPE '(CHARACTER-SET ((20 . 19)))) stores pairs exactly as
+;;    given, and unparses to the rather bogus #<CHARACTER-SET-TYPE (MEMBER)>
+;; 2. (SPECIFIER-TYPE '(CHARACTER-SET ((20 . 20) (15 . 15)))) fails
+;;    because of the pre-sorting requirement.
+;; But since this is not standard syntax I don't think we can ever see those
+;; specifiers unless from an unparse of a valid internal representation.
 (def-type-translator character-set
     (&optional (pairs `((0 . ,(1- char-code-limit)))))
   (make-character-set-type pairs))
