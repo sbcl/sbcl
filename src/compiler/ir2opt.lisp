@@ -158,53 +158,59 @@
     (when (and last
                (eq (vop-name last) 'branch))
       (delete-vop last)))
-  (cond
-    ((and (constant-tn-p arg-if)
-          (constant-tn-p arg-else)
-          (sb-vm::computable-from-flags-p
-           res (tn-value arg-if) (tn-value arg-else) flags))
-     (emit-template node 2block (template-or-lose 'sb-vm::compute-from-flags)
-                    (reference-tn-list (list arg-if arg-else) nil)
-                    (reference-tn res t)
-                    (list* flags info)))
-    (t
-     (flet ((reuse-if-eq-arg (value-if vop)
-              ;; Most of the time this means:
-              ;; if X is already NIL, don't load it again.
-              (when (and vop
-                         (eq (vop-name vop) 'if-eq)
-                         (constant-tn-p value-if))
-                (let* ((args (vop-args vop))
-                       (x-tn (tn-ref-tn args))
-                       (test (tn-ref-tn (tn-ref-across args))))
-                  (when (and (constant-tn-p test)
-                             (equal (tn-value value-if)
-                                    (tn-value test))
-                             (eq (tn-primitive-type x-tn)
-                                 (tn-primitive-type res)))
-                    x-tn))))
-            (load-and-coerce (dst src)
-              (when (and dst (neq dst src))
-                (emit-and-insert-vop node 2block
-                                     (template-or-lose 'move)
-                                     (reference-tn src nil)
-                                     (reference-tn dst t)
-                                     (ir2-block-last-vop 2block)))))
-       (let ((reuse (reuse-if-eq-arg value-if prev)))
-         (if reuse
-             (setf arg-if reuse)
-             (load-and-coerce arg-if value-if)))
-       (load-and-coerce arg-else value-else))
-     (emit-template node 2block (template-or-lose cmove-vop)
-                    (reference-tn-list (remove nil (list arg-if arg-else))
-                                       nil)
-                    (reference-tn res t)
-                    (list* flags info))))
-  (emit-move node 2block res target)
-  (when (eq *ir2opt-stage* 'select-representations)
-    (emit-moves-and-coercions 2block))
-  (vop branch node 2block label)
-  (update-block-succ 2block (list label)))
+  (flet ((emit-appropriate-move (src dst &optional before)
+           (if (or before
+                   (eq *ir2opt-stage* 'select-representations))
+               (emit-and-insert-vop node 2block
+                                    (if (eq *ir2opt-stage* 'select-representations)
+                                        (find-move-vop src nil (tn-sc dst) (tn-primitive-type dst)
+                                                       #'sc-move-vops)
+                                        (template-or-lose 'move))
+                                    (reference-tn src nil)
+                                    (reference-tn dst t)
+                                    before)
+               (emit-move node 2block src dst))))
+    (cond
+      ((and (constant-tn-p arg-if)
+            (constant-tn-p arg-else)
+            (sb-vm::computable-from-flags-p
+             res (tn-value arg-if) (tn-value arg-else) flags))
+       (emit-template node 2block (template-or-lose 'sb-vm::compute-from-flags)
+                      (reference-tn-list (list arg-if arg-else) nil)
+                      (reference-tn res t)
+                      (list* flags info)))
+      (t
+       (flet ((reuse-if-eq-arg (value-if vop)
+                ;; Most of the time this means:
+                ;; if X is already NIL, don't load it again.
+                (when (and vop
+                           (eq (vop-name vop) 'if-eq)
+                           (constant-tn-p value-if))
+                  (let* ((args (vop-args vop))
+                         (x-tn (tn-ref-tn args))
+                         (test (tn-ref-tn (tn-ref-across args))))
+                    (when (and (constant-tn-p test)
+                               (equal (tn-value value-if)
+                                      (tn-value test))
+                               (eq (tn-primitive-type x-tn)
+                                   (tn-primitive-type res)))
+                      x-tn))))
+              (load-and-coerce (dst src)
+                (when (and dst (neq dst src))
+                  (emit-appropriate-move src dst (ir2-block-last-vop 2block)))))
+         (let ((reuse (reuse-if-eq-arg value-if prev)))
+           (if reuse
+               (setf arg-if reuse)
+               (load-and-coerce arg-if value-if)))
+         (load-and-coerce arg-else value-else))
+       (emit-template node 2block (template-or-lose cmove-vop)
+                      (reference-tn-list (remove nil (list arg-if arg-else))
+                                         nil)
+                      (reference-tn res t)
+                      (list* flags info))))
+    (emit-appropriate-move res target)
+    (vop branch node 2block label)
+    (update-block-succ 2block (list label))))
 
 (defun maybe-convert-one-cmov (vop)
   ;; The test and branch-if may be split between two IR1 blocks
