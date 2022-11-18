@@ -670,14 +670,6 @@ during backtrace.
 
 #+sb-xc-host (defun get-nil-taggedptr () sb-vm:nil-value)
 
-;;; MIXED-REGION is at the beginning of static space
-;;; Be sure to update "#define main_thread_mixed_region" etc
-;;; if these get changed.
-#-sb-thread
-(progn (defconstant mixed-region static-space-start)
-       (defconstant cons-region (+ mixed-region (* 3 n-word-bytes)))
-       (defconstant boxed-region (+ cons-region (* 3 n-word-bytes))))
-
 ;;; Start of static objects:
 ;;;
 ;;;   32-bit w/threads     |   32-bit no threads     |      64-bit

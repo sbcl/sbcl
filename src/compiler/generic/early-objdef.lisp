@@ -451,6 +451,14 @@
   #-sb-thread
   (defglobal function-layout 0))        ; set by genesis
 
+;;; MIXED-REGION is at the beginning of static space
+;;; Be sure to update "#define main_thread_mixed_region" etc
+;;; if these get changed.
+#-sb-thread
+(progn (defconstant mixed-region static-space-start)
+       (defconstant cons-region (+ mixed-region (* 3 n-word-bytes)))
+       (defconstant boxed-region (+ cons-region (* 3 n-word-bytes))))
+
 #|
 ;; Run this in the SB-VM package once for each target feature combo.
 (defun rewrite-widetag-comments ()
