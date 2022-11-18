@@ -27,7 +27,7 @@
        (defvar *ctype-hash-state* (make-random-state))
        ;; There are 5 bits in a type-class index, so at most 32 type-classes
        ;; of which about 17 are currently defined.
-       (defvar *type-classes* (make-array 32 :fill-pointer 0))
+       (defvar *type-classes* (make-array 32 :initial-element nil))
        ;; We track for each type-class whether it has any descendant class.
        ;; Inheritance is implemented by copying the vtable from an ancestor
        ;; to the descendant at the time the descendant is defined.
@@ -58,27 +58,6 @@
   ;; their stored nonce to the current nonce. Additionally the observers
   ;; can detect whether function definitions have occurred.
   (def *type-cache-nonce* 0))
-
-#-sb-xc-host
-(define-compiler-macro type-class-or-lose (&whole form name)
-  ;; If NAME is a quoted constant, the resultant form should be
-  ;; a fixed index into *TYPE-CLASSES* except that during the building
-  ;; of the cross-compiler the array hasn't been populated yet.
-  ;; One solution to that, which I favored, is that DEFINE-TYPE-CLASS
-  ;; appear before the structure definition that uses the corresponding
-  ;; type-class in its slot initializer. That posed a problem for
-  ;; the :INHERITS option, because the constructor of a descendant
-  ;; grabs all the methods [sic] from its ancestor at the time the
-  ;; descendant is defined, which means the methods of the ancestor
-  ;; should have been filled in, which means at least one DEFINE-TYPE-CLASS
-  ;; wants to appear _after_ a structure definition that uses it.
-  (declare (notinline position)) ; out-of-order use of #'type-class-name
-  (if (constantp name)
-      (let ((name (constant-form-value name)))
-        `(aref *type-classes*
-               ,(or (position name *type-classes* :key #'type-class-name)
-                    (error "~S is not a defined type class." name))))
-      form))
 
 (defun must-supply-this (&rest foo)
   (/show0 "failing in MUST-SUPPLY-THIS")
@@ -202,30 +181,11 @@
   )
 (declaim (freeze-type type-class))
 
-(defun type-class-or-lose (name)
-  (or (find name *type-classes* :key #'type-class-name)
+(defun !type-class-or-lose (name)
+  ;; Careful about NIL elements since they aren't populated strictly in order
+  (or (find-if (lambda (x) (and x (eq (type-class-name x) name)))
+               *type-classes*)
       (error "~S is not a defined type class." name)))
-
-(defun type-class-name->id (name)
-  (or (position name *type-classes* :key #'type-class-name)
-      (error "~S is not a defined type class." name)))
-
-;;; DEFINE-TYPE-METHOD, DEFINE-TYPE-CLASS, and DEFSTRUCT forms for each
-;;; type class can appear in a random order. To allow this, we have to delay
-;;; lookup of the index into *TYPE-CLASSES*. It would be inefficient to scan
-;;; *TYPE-CLASSES* on every call of a constructor of an instance though,
-;;; so we cache the index in a cons cell.
-;;; make-host-2 has an easier time at this - it just looks at the vector
-;;; of *TYPE-CLASSES* built up in make-host-1. No caching necessary.
-(defmacro memoized-type-class-name->id (class-name)
-  #+sb-xc-host
-  `(let* ((cell (load-time-value (list ',class-name)))
-          (value (car cell)))
-     (if (integerp value)
-         value
-         (setf (car cell) (type-class-name->id ',class-name))))
-  #-sb-xc-host
-  (position class-name *type-classes* :key #'type-class-name))
 
 (defun ctype-random ()
   #+sb-xc-host
@@ -276,11 +236,49 @@
 ;;; if applicable. For types which are not array specializations,
 ;;; the bits are arbitrary.
 (defmacro type-saetp-index (ctype) `(ldb (byte 5 22) (type-%bits ,ctype)))
-
-(defconstant +type-internedp+ (ash 1 20))
-(defconstant +type-admits-type=-optimization+ (ash 1 21))
 (defmacro type-bits-internedp (bits) `(logbitp 20 ,bits))
 (defmacro type-bits-admit-type=-optimization (bits) `(logbitp 21 ,bits))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +type-internedp+ (ash 1 20))
+  (defconstant +type-admits-type=-optimization+ (ash 1 21))
+  (defun ctype-class-bits (type-class)
+    (logior (ash (type-class-name->id type-class) 27)
+            ;; NUMBER, MEMBER, and CLASSOID admit TYPE= optimization.
+            ;; Other type classes might, but this is the conservative assumption.
+            (if (member type-class '(number member classoid))
+                +type-admits-type=-optimization+ 0)
+            ;; The mapping from name to a CLASSOID type is unique,
+            ;; therefore all CLASSOIDs have the "interned" bit on.
+            (if (eq type-class 'classoid) +type-internedp+ 0)))
+  (defparameter *def-type-model-forms* nil)
+  (defvar *type-class-list*
+    ;; type-class and ctype instance types in that class
+    '((named         named-type)
+      (classoid      classoid)
+      (values        values-type)
+      (function      fun-type fun-designator-type)
+      (constant      constant-type)
+      (hairy         hairy-type unknown-type)
+      (intersection  intersection-type)
+      (union         union-type)
+      (negation      negation-type)
+      (number        numeric-type)
+      (array         array-type)
+      (character-set character-set-type)
+      (member        member-type)
+      (cons          cons-type)
+      (simd-pack     simd-pack-type)
+      (simd-pack-256 simd-pack-256-type)
+      ;; clearly alien-type-type is not consistent with the (FOO FOO-TYPE) theme
+      (alien         alien-type-type)))
+  (defun ctype-instance-type->type-class (name)
+    (car (the (not null)
+              (find name *type-class-list* :key #'cdr :test #'member))))
+  (defun type-class-name->id (name)
+    (or #+sb-xc-host (position name *type-class-list* :key #'car)
+        #-sb-xc-host (position name *type-classes* :key #'type-class-name)
+        (error "~S is not a defined type class." name))))
 
 ;;; For system build-time only
 (defun pack-interned-ctype-bits (type-class &optional hash saetp-index)
@@ -292,28 +290,6 @@
             ;; type= optimization is valid if not an array-type
             (if (eq type-class 'array) 0 +type-admits-type=-optimization+)
             +type-internedp+)))
-
-;;; For runtime
-;;; CLASSOIDs have a deterministic hash based on the name,
-;;; utilizing the same hash calculation as with LAYOUT instances.
-;;; NUMBER types could compute a stable hash too (but they don't currently)
-;;; which would mean that HASH-not-equal implies TYPE-not-equal.
-;;; Most other things would not benefit.
-(defmacro pack-ctype-bits (type-class &optional name)
- ;;; TYPE-CLASS is an unevaluated argument
-  (when (eq type-class 'classoid)
-    (aver name))
-  (let ((hash (if name `(hash-layout-name ,name) '(ctype-random))))
-    `(logior (ash (memoized-type-class-name->id ,type-class) 27)
-             (logand ,hash +type-hash-mask+)
-             ;; NUMBER, MEMBER, and CLASSOID admit TYPE= optimization.
-             ;; Other type classes might, but this is the conservative assumption.
-             ,@(when (member type-class '(number member classoid))
-                 '(+type-admits-type=-optimization+))
-             ;; The mapping from name to a CLASSOID type is unique,
-             ;; therefore all CLASSOIDs have the "interned" bit on.
-             ,@(when (eq type-class 'classoid)
-                 '(+type-internedp+)))))
 
 (declaim (inline type-might-contain-other-types-p))
 (defun type-might-contain-other-types-p (ctype)
@@ -394,7 +370,7 @@
        (!cold-init-forms
         ,@(mapcar (lambda (method)
                     `(setf (,(type-class-fun-slot method)
-                            (type-class-or-lose ',class))
+                            (svref *type-classes* ,(type-class-name->id class)))
                            #',name))
                   (cons method more-methods)))
        ',name)))
@@ -429,17 +405,16 @@
        ;; Careful: type-classes are very complicated things to redefine.
        ;; For the sake of parallelized make-host-1 we have to allow
        ;; redefinition, but it has to be a no-op.
-       (unless (find ',name *type-classes* :key #'type-class-name)
-         (vector-push ,make-it *type-classes*))
+       (let ((index ,(type-class-name->id name)))
+         (unless (aref *type-classes* index)
+           (setf (aref *type-classes* index) ,make-it)))
        ;; I have no idea what compiler bug could be worked around by adding a form here,
        ;; but this certainly achieves something, somehow.
        #+host-quirks-cmu (print (aref *type-classes* (1- (length *type-classes*)))))
 
     #+sb-xc
-    (let ((type-class-index
-           (position name *type-classes* :key #'type-class-name)))
-      `(!cold-init-forms
-        (setf (svref *type-classes* ,type-class-index) ,make-it)))))
+    `(!cold-init-forms (setf (svref *type-classes* ,(type-class-name->id name))
+                             ,make-it))))
 
 ;;; Define the translation from a type-specifier to a type structure for
 ;;; some particular type. Syntax is identical to DEFTYPE.
@@ -584,16 +559,70 @@
 (defun type-cache-hash (type1 type2)
   (logxor (ash (type-hash-value type1) -3) (type-hash-value type2)))
 
-(declaim (inline type-list-cache-hash))
+(declaim (inline hash-ctype-list))
 (declaim (ftype (function (list) (signed-byte #.sb-vm:n-fixnum-bits))
-                type-list-cache-hash))
-(defun type-list-cache-hash (types)
+                hash-ctype-list))
+(defun hash-ctype-list (types)
   (loop with res of-type (signed-byte #.sb-vm:n-fixnum-bits) = 0
         for type in types
         do (setq res (logxor (ash res -1) (type-hash-value type)))
         finally (return res)))
 
 ;;;; representations of types
+
+;;; DEF-TYPE-MODEL is like DEFSTRUCT, with the following differences:
+;;;  1. it inserts (:INCLUDE CTYPE) unless otherwise expressed
+;;;  2. it inserts (:COPIER NIL)
+;;;  3. it adds :READ-ONLY T to all slots
+;;;  4. it has slot options to help with hash-consing
+(defmacro def-type-model ((name &rest options) &rest direct-slots)
+  ;; :CONSTRUCTOR* reminds you that it's not a direct translation to defstruct.
+  (aver (<= (count :constructor* options :key #'car) 1))
+  ;; The private constructor is always positional.
+  ;; (:CONSTRUCTOR* NAME (arg1 arg2)) has a private constructor
+  ;;   and a public constructor. The latter will eventually
+  ;;   become a caching constructor when that change is completed.
+  ;; (:CONSTRUCTOR* NIL (arg1 arg2)) specifies the argument order
+  ;;   but asks for no automatically-defined public constructor.
+  ;;   You might hand-define one which takes &KEY args if desired.
+  (let* ((public-ctor (assoc :constructor* options))
+         (public-ctor-args (third public-ctor))
+         (private-ctor (unless (member name '(compound-type args-type))
+                          (symbolicate "!ALLOC-" name)))
+         (private-ctor-args (cons '%bits public-ctor-args)))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (push ',(cons name direct-slots) *def-type-model-forms*))
+       ,@(when private-ctor `((declaim (inline ,private-ctor))))
+       (defstruct (,name ,@(unless (assoc :include options) '((:include ctype)))
+                         ,@(remove :constructor* options :key #'car)
+                         ,(if private-ctor
+                              `(:constructor ,private-ctor ,private-ctor-args)
+                              '(:constructor nil))
+                         (:copier nil))
+         ,@(mapcar (lambda (slot &aux (copy (copy-list slot)))
+                     (remf copy :hasher)
+                     (remf copy :test)
+                     (append copy '(:read-only t)))
+                   direct-slots))
+       ;; If we're going to wrap the internal constructor with a hand-written one,
+       ;; then don't also define a caching constructor. (Extra layers are confusing).
+       ,@(when (second public-ctor)
+           `((declaim (ftype (sfunction * ,name) ,(second public-ctor)))
+             (defun ,(second public-ctor) ,public-ctor-args
+               (new-ctype ,name ,@(cdr private-ctor-args))))))))
+
+(defmacro new-ctype (name &rest initargs)
+  ;; CLASSOIDs have a deterministic hash based on the name,
+  ;; utilizing the same hash calculation as with LAYOUT instances.
+  ;; NUMBER types could compute a stable hash too (but they don't currently)
+  ;; which would mean that HASH-not-equal implies TYPE-not-equal.
+  ;; Most other things would not benefit.
+  (let ((allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name)))
+    `(let ((bits (logior ,(ctype-class-bits (ctype-instance-type->type-class name))
+                         (logand (ctype-random) +type-hash-mask+))))
+       (declare (inline ,allocator))
+       (,allocator bits ,@initargs))))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
 ;;; special cases, as well as other special cases needed to
@@ -624,66 +653,49 @@
 ;;; On the other hand, either of these points may not be sources of
 ;;; inefficiency, and the latter if implemented might have undesirable
 ;;; user-visible ramifications, though it seems unlikely.
-(defstruct (hairy-type (:include ctype)
-                       (:constructor %make-hairy-type
-                           (specifier &aux (%bits (pack-ctype-bits hairy))))
-                       (:constructor !make-interned-hairy-type
-                           (specifier &aux (%bits (pack-interned-ctype-bits 'hairy))))
-                       (:copier nil))
+(def-type-model (hairy-type (:constructor* %make-hairy-type (specifier)))
   ;; the Common Lisp type-specifier of the type we represent.
   ;; For other than an unknown type, this must be a (SATISFIES f) expression.
-  (specifier nil :type t :read-only t))
+  (specifier nil :type t :test equal))
 
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
-(defstruct (member-type (:include ctype (%bits (pack-ctype-bits member)))
-                        (:copier nil)
-                        (:constructor %make-member-type (xset fp-zeroes))
-                        (:constructor !make-interned-member-type (%bits xset fp-zeroes))
-                        #-sb-xc-host (:pure nil))
-  (xset nil :type xset :read-only t)
-  (fp-zeroes nil :type list :read-only t))
+(def-type-model (member-type (:constructor* %make-member-type (xset fp-zeroes)))
+  (xset nil :type xset :hasher xset-elts-hash :test xset=)
+  (fp-zeroes nil :type list :hasher hash-fp-zeros :test fp-zeros=))
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
-(defstruct (array-type (:include ctype (%bits (pack-ctype-bits array)))
-                       (:constructor %make-array-type
-                        (dimensions complexp element-type
-                                    specialized-element-type))
-                       (:constructor !make-interned-array-type
-                        (%bits dimensions complexp element-type
-                         specialized-element-type))
-                       (:copier nil))
+(def-type-model (array-type
+                 (:constructor* %make-array-type
+                                (dimensions complexp element-type
+                                            specialized-element-type)))
   ;; the dimensions of the array, or * if unspecified. If a dimension
   ;; is unspecified, it is *.
-  (dimensions '* :type (or list (member *)) :read-only t)
+  (dimensions '* :type (or list (eql *)) :test equal)
   ;; Is this not a simple array type? (:MAYBE means that we don't know.)
-  (complexp :maybe :type (member t nil :maybe) :read-only t)
+  (complexp :maybe :type (member t nil :maybe))
   ;; the element type as originally specified
-  (element-type nil :type ctype :read-only t)
+  (element-type nil :type ctype)
   ;; the element type as it is specialized in this implementation
-  (specialized-element-type nil :type ctype :read-only t))
+  (specialized-element-type nil :type ctype))
 
-(defstruct (character-set-type
-            (:include ctype (%bits (pack-ctype-bits character-set)))
-            (:constructor %make-character-set-type (pairs))
-            (:constructor !make-interned-character-set-type (%bits pairs))
-            (:copier nil))
-  (pairs (missing-arg) :type list :read-only t))
+(def-type-model (character-set-type
+                 (:constructor* %make-character-set-type (pairs)))
+  ;; these get canonically ordered by the parser
+  (pairs (missing-arg) :type list :test equal))
 
 ;;; A COMPOUND-TYPE is a type defined out of a set of types, the
 ;;; common parent of UNION-TYPE and INTERSECTION-TYPE.
-(defstruct (compound-type (:include ctype)
-                          (:constructor nil)
-                          (:copier nil))
+(def-type-model (compound-type) ; no direct instances
   ;; Formerly defined in every CTYPE, but now just in the ones
   ;; for which enumerability is variable.
-  (enumerable nil :read-only t)
+  (enumerable nil :type boolean)
   ;; This list must have at least 2 items in it.
   ;; A singleton would not be a compound type.
   ;; An empty OR is the type NIL, and an empty AND is type T.
-  (types nil :type (cons t cons) :read-only t))
+  (types nil :type (cons t cons) :hasher hash-ctype-list :test list-elts-eq))
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which we
 ;;; couldn't canonicalize to something simpler. Canonical form:
@@ -702,9 +714,9 @@
 ;;;          (specifier-type 'simple-string)) => T and T
 ;;; even though (MEMBER #\A) is not TYPE= to BASE-CHAR.
 ;;;
-(defstruct (union-type (:include compound-type (%bits (pack-ctype-bits union)))
-                       (:constructor make-union-type (enumerable types))
-                       (:copier nil)))
+(def-type-model (union-type
+                 (:constructor* make-union-type (enumerable types))
+                 (:include compound-type)))
 
 ;;; An INTERSECTION-TYPE represents a use of the AND type specifier
 ;;; which we couldn't canonicalize to something simpler. Canonical form:
@@ -717,28 +729,26 @@
 ;;;      use the distributive rule to rearrange things so that
 ;;;      unions contain intersections and not vice versa, or we
 ;;;      should just punt to using a HAIRY-TYPE.
-(defstruct (intersection-type (:include compound-type
-                               (%bits (pack-ctype-bits intersection)))
-                              (:constructor %make-intersection-type
-                                            (enumerable types))
-                              (:copier nil)))
+(def-type-model (intersection-type
+                 (:constructor* nil (enumerable types))
+                 (:include compound-type)))
 
-(defstruct (alien-type-type
-            (:include ctype (%bits (pack-ctype-bits alien)))
-            (:constructor %make-alien-type-type (alien-type))
-            (:copier nil))
-  (alien-type nil :type alien-type :read-only t))
+(def-type-model (alien-type-type (:constructor* %make-alien-type-type (alien-type)))
+  ;; FIXME: this forward-references ALIEN-TYPE, and silently we're suppressing
+  ;;   "can't open-code test of unknown type ALIEN-TYPE".
+  ;; It might be OK, because the "real" constructor is defined later,
+  ;; and it inlines the private constructor, perhaps in time to have
+  ;; ALIEN-TYPE be known. I'm not sure though.
+  (alien-type nil :type alien-type :hasher sxhash :test eq))
 
-(defstruct (negation-type (:include ctype (%bits (pack-ctype-bits negation)))
-                          (:copier nil)
-                          (:constructor make-negation-type (type)))
-  (type (missing-arg) :type ctype :read-only t))
+(def-type-model (negation-type (:constructor* make-negation-type (type)))
+  (type (missing-arg) :type ctype))
 
 ;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
 ;;; defined). We make this distinction since we don't want to complain
 ;;; about types that are hairy but defined.
-(defstruct (unknown-type (:include hairy-type (%bits (pack-ctype-bits hairy)))
-                         (:copier nil)))
+(def-type-model (unknown-type (:constructor* make-unknown-type (specifier))
+                              (:include hairy-type)))
 
 ;;; a list of all the float "formats" (i.e. internal representations;
 ;;; nothing to do with #'FORMAT), in order of decreasing precision
@@ -750,57 +760,53 @@
 
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
-(defstruct (numeric-type (:include ctype (%bits (pack-ctype-bits number)))
-                         (:constructor %make-numeric-type)
-                         (:copier nil))
+(def-type-model (numeric-type
+                 (:constructor* nil (enumerable class format complexp low high)))
   ;; Formerly defined in every CTYPE, but now just in the ones
   ;; for which enumerability is variable.
-  (enumerable nil :type boolean :read-only t)
+  (enumerable nil :type boolean)
   ;; the kind of numeric type we have, or NIL if not specified (just
   ;; NUMBER or COMPLEX)
-  (class nil :type (member integer rational float nil) :read-only t)
+  (class nil :type (member integer rational float nil))
   ;; "format" for a float type (i.e. type specifier for a CPU
   ;; representation of floating point, e.g. 'SINGLE-FLOAT -- nothing
   ;; to do with #'FORMAT), or NIL if not specified or not a float.
   ;; Formats which don't exist in a given implementation don't appear
   ;; here.
-  (format nil :type (or float-format null) :read-only t)
+  (format nil :type (or float-format null) :test eq)
   ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
   ;;
-  (complexp :real :type (member :real :complex nil) :read-only t)
+  (complexp :real :type (member :real :complex nil) :test eq)
   ;; The upper and lower bounds on the value, or NIL if there is no
   ;; bound. If a list of a number, the bound is exclusive. Integer
   ;; types never have exclusive bounds, i.e. they may have them on
   ;; input, but they're canonicalized to inclusive bounds before we
   ;; store them here.
-  (low nil :type (or real (cons real null) null) :read-only t)
-  (high nil :type (or real (cons real null) null) :read-only t))
+  (low nil :type (or real (cons real null) null) :test equal)
+  (high nil :type (or real (cons real null) null) :test equal))
 
 ;;; A CONS-TYPE is used to represent a CONS type.
-(defstruct (cons-type (:include ctype (%bits (pack-ctype-bits cons)))
-                      (:constructor %make-cons-type (car-type cdr-type))
-                      (:constructor !make-interned-cons-type (%bits car-type cdr-type))
-                      (:copier nil))
+(def-type-model (cons-type (:constructor* nil (car-type cdr-type)))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
-  (car-type (missing-arg) :type ctype :read-only t)
-  (cdr-type (missing-arg) :type ctype :read-only t))
+  (car-type (missing-arg) :type ctype)
+  (cdr-type (missing-arg) :type ctype))
+
+(defmacro hash-ctype-or-null (x) `(let ((x ,x)) (if x (type-hash-value x) 0)))
 
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.
-(defstruct (args-type (:include ctype)
-                      (:constructor nil)
-                      (:copier nil))
+(def-type-model (args-type) ; no direct instances
   ;; Lists of the type for each required and optional argument.
-  (required nil :type list :read-only t)
-  (optional nil :type list :read-only t)
+  (required nil :type list :hasher hash-ctype-list :test list-elts-eq)
+  (optional nil :type list :hasher hash-ctype-list :test list-elts-eq)
   ;; The type for the rest arg. NIL if there is no &REST arg.
-  (rest nil :type (or ctype null) :read-only t)
+  (rest nil :type (or ctype null) :hasher hash-ctype-or-null :test eq)
   ;; true if &KEY arguments are specified
-  (keyp nil :type boolean :read-only t)
+  (keyp nil :type boolean)
   ;; list of KEY-INFO structures describing the &KEY arguments
-  (keywords nil :type list :read-only t)
+  (keywords nil :type list :hasher key-info-list-hash :test eq) ; hash-consed already
   ;; true if other &KEY arguments are allowed
-  (allowp nil :type boolean :read-only t))
+  (allowp nil :type boolean))
 
 ;;; the description of a &KEY argument
 (declaim (inline !make-key-info))
@@ -842,66 +848,48 @@
   (when list
     (hashset-insert-if-absent *key-info-list-hashset* list #'identity)))
 
-(defstruct (values-type
-            (:include args-type (%bits (pack-ctype-bits values)))
-            (:constructor %make-values-type)
-            (:copier nil)))
-
+(def-type-model (values-type (:constructor* nil (required optional rest allowp))
+                             (:include args-type)))
 (declaim (freeze-type values-type))
 
 ;;; (SPECIFIER-TYPE 'FUNCTION) and its subtypes
-(defstruct (fun-type (:include args-type (%bits (pack-ctype-bits function)))
-                     (:copier nil)
-                     (:constructor
-                      %make-fun-type (required optional rest
-                                      keyp keywords allowp wild-args returns))
-                     (:constructor !make-interned-fun-type
-                         (%bits required optional rest keyp keywords
-                          allowp wild-args returns)))
+(def-type-model (fun-type
+                 (:constructor* nil (required optional rest keyp keywords allowp
+                                     wild-args returns))
+                 (:include args-type))
   ;; true if the arguments are unrestrictive, i.e. *
-  (wild-args nil :type boolean :read-only t)
+  (wild-args nil :type boolean)
   ;; type describing the return values. This is a values type
   ;; when multiple values were specified for the return.
-  (returns (missing-arg) :type ctype :read-only t))
+  (returns (missing-arg) :type ctype))
 
-(defstruct (fun-designator-type
-            (:include fun-type)
-            (:copier nil)
-            (:conc-name fun-type-)
-            (:constructor make-fun-designator-type
-                (required optional rest
-                 keyp keywords allowp wild-args returns))))
+(def-type-model (fun-designator-type
+                 (:constructor* nil (required optional rest keyp keywords allowp
+                                     wild-args returns))
+                 (:include fun-type)))
 
 ;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG
 ;;; "type specifier", which is only meaningful in function argument
 ;;; type specifiers used within the compiler. (It represents something
 ;;; that the compiler knows to be a constant.)
-(defstruct (constant-type
-            (:include ctype (%bits (pack-ctype-bits constant)))
-            (:copier nil))
+(def-type-model (constant-type (:constructor* nil (type)))
   ;; The type which the argument must be a constant instance of for this type
   ;; specifier to win.
-  (type (missing-arg) :type ctype :read-only t))
+  (type (missing-arg) :type ctype))
 
 
 ;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
 #+sb-simd-pack
-(defstruct (simd-pack-type
-            (:include ctype (%bits (pack-ctype-bits simd-pack)))
-            (:constructor %make-simd-pack-type (element-type))
-            (:copier nil))
+(def-type-model (simd-pack-type
+                 (:constructor* %make-simd-pack-type (element-type)))
   (element-type (missing-arg)
-   :type (simple-bit-vector #.(length *simd-pack-element-types*))
-   :read-only t))
+   :type (simple-bit-vector #.(length *simd-pack-element-types*))))
 
 #+sb-simd-pack-256
-(defstruct (simd-pack-256-type
-            (:include ctype (%bits (pack-ctype-bits simd-pack-256)))
-            (:constructor %make-simd-pack-256-type (element-type))
-            (:copier nil))
+(def-type-model (simd-pack-256-type
+                 (:constructor* %make-simd-pack-256-type (element-type)))
   (element-type (missing-arg)
-   :type (simple-bit-vector #.(length *simd-pack-element-types*))
-   :read-only t))
+   :type (simple-bit-vector #.(length *simd-pack-element-types*))))
 
 (declaim (ftype (sfunction (ctype ctype) (values t t)) csubtypep))
 ;;; Look for nice relationships for types that have nice relationships
@@ -926,6 +914,11 @@
         (t nil)))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)
+
+;;; *TYPE-CLASS-LIST* is defined only in the host. When the cross-compiler
+;;; expands TYPEP-IMPL-MACRO it get the value of this symbol from the host's
+;;; value. This function avoids a warning about a missing symbol.
+(defun type-class-name-list () (mapcar 'car (symbol-value '*type-class-list*)))
 
 ;;; CAUTION: unhygienic macro specifically designed to expand into body code
 ;;; for TYPEP, CTYPEP (compiler-typep), or CROSS-TYPEP (cross-compiler-[c]typep)
@@ -1011,10 +1004,9 @@
            #-sb-xc-host
            (case (truly-the (mod ,(length *type-classes*)) (type-class-id type))
              ,@(let ((clauses (mapcar #'convert-clause clauses)))
-                 (let ((absent (loop for class across *type-classes*
-                                     unless (or (member (type-class-name class)
-                                                        '(values constant))
-                                                (member (type-class-name class) seen))
+                 (let ((absent (loop for class in (type-class-name-list)
+                                     unless (or (member class '(values constant))
+                                                (member class seen))
                                      collect class)))
                    (when absent
                      (error "Unhandled type-classes: ~S" absent)))
