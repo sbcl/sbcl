@@ -78,7 +78,7 @@
     (declare (notinline trick))
     (trick x)))
 #+sb-xc-host
-(defun symbol-name-hash (x) ; defined in src/code/sxhash for the target
+(defun symbol-name-hash (x)
   (cond ((string= x "NIL") ; :NIL must hash the same as NIL
          ;; out-of-order with defconstant nil-value
          (ash (sb-vm::get-nil-taggedptr) (- sb-vm:n-fixnum-tag-bits)))

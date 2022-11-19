@@ -203,19 +203,10 @@
 #+sb-xc-host
 (progn
   (defvar *sxhash-crosscheck* nil)
-  (defun symbol-name-hash (x)
-    (cond ((string= x "NIL") ; :NIL must hash the same as NIL
-           (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
-          (t
-           ;; (STRING X) could be a non-simple string, it's OK.
-           (let ((hash (logxor (sb-impl::%sxhash-simple-string (string x))
-                               most-positive-fixnum)))
-             (aver (ldb-test (byte (- 32 sb-vm:n-fixnum-tag-bits) 0) hash))
-             hash))))
   (defun sxhash (x)
     (let ((answer
            (etypecase x ; croak on anything but these
-            (symbol (symbol-name-hash x))
+            (symbol (sb-impl::symbol-name-hash x))
             (sb-xc:fixnum #.+sxhash-fixnum-expr+)
             (single-float #.+sxhash-single-float-expr+)
             (double-float #.+sxhash-double-float-expr+))))

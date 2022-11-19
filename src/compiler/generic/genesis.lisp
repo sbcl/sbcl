@@ -1165,7 +1165,7 @@ core and return a descriptor to it."
                          (descriptor-fixnum (read-slot cold-package :id))
                          sb-impl::+package-id-none+))
              (hash (make-fixnum-descriptor
-                    (if core-file-name (sb-c::symbol-name-hash name) 0))))
+                    (if core-file-name (sb-impl::symbol-name-hash name) 0))))
         (write-wordindexed symbol sb-vm:symbol-value-slot *unbound-marker*)
         (write-wordindexed symbol sb-vm:symbol-hash-slot hash)
         (write-wordindexed symbol sb-vm:symbol-info-slot *nil-descriptor*)
