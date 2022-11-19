@@ -123,48 +123,13 @@
 
 ;;; SXHASH of FLOAT values is defined directly in terms of DEFTRANSFORM in
 ;;; order to avoid boxing.
-(defglobal +sxhash-single-float-expr+
-  `(let ((bits (logand (single-float-bits x) ,(1- (ash 1 32)))))
-     (logxor 66194023
-             (sxhash (the sb-xc:fixnum
-                          (logand most-positive-fixnum
-                                  (logxor bits (ash bits -7))))))))
-(deftransform sxhash ((x) (single-float)) '#.+sxhash-single-float-expr+)
-
-#-64-bit
-(defglobal +sxhash-double-float-expr+
-  `(let* ((hi (logand (double-float-high-bits x) ,(1- (ash 1 32))))
-          (lo (double-float-low-bits x))
-          (hilo (logxor hi lo)))
-     (logxor 475038542
-             (sxhash (the fixnum
-                          (logand most-positive-fixnum
-                                  (logxor hilo
-                                          (ash hilo -7))))))))
+(deftransform sxhash ((x) (single-float)) '#.(sb-impl::sxhash-single-float-xform 'x))
 
 ;;; SXHASH of FIXNUM values is defined as a DEFTRANSFORM because it's so
 ;;; simple.
-(defglobal +sxhash-fixnum-expr+
-  (let ((c (logand 1193941380939624010 most-positive-fixnum)))
-    ;; shift by -1 to get sign bit into hash
-    `(logand (logxor (ash x 4) (ash x -1) ,c) most-positive-fixnum)))
-(deftransform sxhash ((x) (fixnum)) '#.+sxhash-fixnum-expr+)
+(deftransform sxhash ((x) (fixnum)) '#.(sb-impl::sxhash-fixnum-xform 'x))
 
-;;; Treat double-float essentially the same as a fixnum if words are 64 bits.
-#+64-bit
-(defglobal +sxhash-double-float-expr+
-  `(let ((x (double-float-bits x)))
-     ;; ensure we mix the sign bit into the hash
-     (logand (logxor (ash x 4)
-                     (ash x (- (1+ sb-vm:n-fixnum-tag-bits)))
-                     ;; logical negation of magic constant ensures
-                     ;; that 0.0d0 hashes to something other than what
-                     ;; the fixnum 0 hashes to (as tested in
-                     ;; hash.impure.lisp)
-                     #.(logandc1 1193941380939624010 most-positive-fixnum))
-             most-positive-fixnum)))
-
-(deftransform sxhash ((x) (double-float)) '#.+sxhash-double-float-expr+)
+(deftransform sxhash ((x) (double-float)) '#.(sb-impl::sxhash-double-float-xform 'x))
 
 (deftransform sxhash ((x) (symbol))
   (cond ((csubtypep (lvar-type x) (specifier-type 'keyword))
@@ -196,21 +161,3 @@
                              (constant-arg (member nil symbolp)))
                             * :important nil)
   `(symbol-hash* object 'non-null-symbol-p)) ; etc
-
-;;; To define SXHASH compatibly without repeating the logic in the transforms
-;;; that define the numeric cases, we do some monkey business involving #. to paste
-;;; in the expressions that the transforms would return.
-#+sb-xc-host
-(progn
-  (defvar *sxhash-crosscheck* nil)
-  (defun sxhash (x)
-    (let ((answer
-           (etypecase x ; croak on anything but these
-            (symbol (sb-impl::symbol-name-hash x))
-            (sb-xc:fixnum #.+sxhash-fixnum-expr+)
-            (single-float #.+sxhash-single-float-expr+)
-            (double-float #.+sxhash-double-float-expr+))))
-      ;; Symbol hashes are cross-checked during cold-init
-      (unless (symbolp x)
-        (push (cons x answer) *sxhash-crosscheck*))
-      answer)))

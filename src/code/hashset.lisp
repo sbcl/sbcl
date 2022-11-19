@@ -421,3 +421,63 @@
             (hashset-test-function self)
             (hashset-count self)
             (hs-cells-capacity (hss-cells (hashset-storage self))))))
+
+;;; We need to avoid dependence on the host's SXHASH function when producing
+;;; hash values for hashset lookup, so that elements end up in an order
+;;; that is host-lisp-insensitive. But the logic for our SXHASH is used here
+;;; and also in the compiler transforms (which defines the ordinary function).
+;;; Spewing it all over would lead invariably to getting it wrong,
+;;; so we define the expression that the compiler will use, and then
+;;; we paste the expressions into the cross-compilers emulation of our SXHASH.
+
+(eval-when (#+sb-xc-host :compile-toplevel :load-toplevel :execute)
+(defun sxhash-fixnum-xform (x)
+  (let ((c (logand 1193941380939624010 most-positive-fixnum)))
+    ;; shift by -1 to get sign bit into hash
+    `(logand (logxor (ash ,x 4) (ash ,x -1) ,c) most-positive-fixnum)))
+
+(defun sxhash-single-float-xform (x)
+  `(let ((bits (logand (single-float-bits ,x) ,(1- (ash 1 32)))))
+     (logxor 66194023
+             (sxhash (the sb-xc:fixnum
+                          (logand most-positive-fixnum
+                                  (logxor bits (ash bits -7))))))))
+
+(defun sxhash-double-float-xform (x)
+  #-64-bit
+  `(let* ((hi (logand (double-float-high-bits ,x) ,(1- (ash 1 32))))
+          (lo (double-float-low-bits ,x))
+          (hilo (logxor hi lo)))
+     (logxor 475038542
+             (sxhash (the fixnum
+                          (logand most-positive-fixnum
+                                  (logxor hilo
+                                          (ash hilo -7)))))))
+  ;; Treat double-float essentially the same as a fixnum if words are 64 bits.
+  #+64-bit
+  `(let ((x (double-float-bits ,x)))
+     ;; ensure we mix the sign bit into the hash
+     (logand (logxor (ash x 4)
+                     (ash x (- (1+ sb-vm:n-fixnum-tag-bits)))
+                     ;; logical negation of magic constant ensures
+                     ;; that 0.0d0 hashes to something other than what
+                     ;; the fixnum 0 hashes to (as tested in
+                     ;; hash.impure.lisp)
+                     #.(logandc1 1193941380939624010 most-positive-fixnum))
+             most-positive-fixnum)))
+)
+
+#+sb-xc-host
+(progn
+  (defvar *sxhash-crosscheck* nil)
+  (defun sb-xc:sxhash (obj)
+    (let ((answer
+           (etypecase obj ; croak on anything but these
+            (symbol (sb-impl::symbol-name-hash obj))
+            (sb-xc:fixnum #.(sxhash-fixnum-xform 'obj))
+            (single-float #.(sxhash-single-float-xform 'obj))
+            (double-float #.(sxhash-double-float-xform 'obj)))))
+      ;; Symbol hashes are verified by CHECK-HASH-SLOT in !PACKAGE-COLD-INIT
+      (unless (symbolp obj)
+        (push (cons obj answer) *sxhash-crosscheck*))
+      answer)))
