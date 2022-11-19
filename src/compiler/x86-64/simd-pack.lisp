@@ -100,7 +100,7 @@
                             (inst movdqa ea x)))))
                   (define-move-vop ,name :move
                     ,scs (descriptor-reg))))))
-  ;; see *simd-pack-element-types*
+  ;; see +simd-pack-element-types+
   (define-move-from-sse simd-pack-single 0 single-sse-reg)
   (define-move-from-sse simd-pack-double 1 double-sse-reg)
   (define-move-from-sse simd-pack-ub8 2 int-sse-reg)
@@ -199,7 +199,7 @@
   (:node-var node)
   (:generator 13
     (alloc-other simd-pack-widetag simd-pack-size dst node nil thread-tn)
-      ;; see *simd-pack-element-types*
+      ;; see +simd-pack-element-types+
     (storew tag dst simd-pack-tag-slot other-pointer-lowtag)
     (storew lo dst simd-pack-lo-value-slot other-pointer-lowtag)
     (storew hi dst simd-pack-hi-value-slot other-pointer-lowtag)))
@@ -222,9 +222,9 @@
   (check-type pack symbol)
   `(let ((,pack ,pack))
      (etypecase ,pack
-       ,@(mapcar (lambda (eltype)
+       ,@(map 'list (lambda (eltype)
                    `((simd-pack ,eltype) ,@body))
-          *simd-pack-element-types*))))
+          +simd-pack-element-types+))))
 
 #-sb-xc-host
 (macrolet ((unpack-unsigned (pack bits)
@@ -299,7 +299,7 @@
   (defun %make-simd-pack-ub32 (w x y z)
     (declare (type (unsigned-byte 32) w x y z))
     (%make-simd-pack
-     #.(position '(unsigned-byte 32) *simd-pack-element-types* :test #'equal)
+     #.(position '(unsigned-byte 32) +simd-pack-element-types+ :test #'equal)
      (logior w (ash x 32))
      (logior y (ash z 32)))))
 

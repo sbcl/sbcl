@@ -908,15 +908,17 @@
 ;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
 #+sb-simd-pack
 (def-type-model (simd-pack-type
-                 (:constructor* %make-simd-pack-type (element-type)))
-  (element-type (missing-arg)
-   :type (simple-bit-vector #.(length *simd-pack-element-types*))))
+                 (:constructor* %make-simd-pack-type (tag-mask)))
+  (tag-mask (missing-arg) ; bitmask over possible simd-pack-tag values
+   :type (and (unsigned-byte #.(length +simd-pack-element-types+))
+              (not (eql 0)))))
 
 #+sb-simd-pack-256
 (def-type-model (simd-pack-256-type
-                 (:constructor* %make-simd-pack-256-type (element-type)))
-  (element-type (missing-arg)
-   :type (simple-bit-vector #.(length *simd-pack-element-types*))))
+                 (:constructor* %make-simd-pack-256-type (tag-mask)))
+  (tag-mask (missing-arg)
+   :type (and (unsigned-byte #.(length +simd-pack-element-types+))
+              (not (eql 0)))))
 
 (declaim (ftype (sfunction (ctype ctype) (values t t)) csubtypep))
 ;;; Look for nice relationships for types that have nice relationships

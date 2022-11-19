@@ -5190,44 +5190,32 @@ used for a COMPLEX component.~:@>"
 ;;;; SIMD-PACK types
 
 #+sb-simd-pack
-(defun make-simd-pack-type (element-type)
-  (aver (neq element-type *wild-type*))
-  (if (eq element-type *empty-type*)
-      *empty-type*
-      (%make-simd-pack-type
-       (do* ((i 0 (1+ i))
-             (pack-types *simd-pack-element-types* (cdr pack-types))
-             (pack-type (car pack-types) (car pack-types)))
-            ((null pack-types)
-             (error "~S element type must be a subtype of ~
-                         ~{~/sb-impl:print-type-specifier/~#[~;, or ~
-                         ~:;, ~]~}."
-                    'simd-pack *simd-pack-element-types*))
-         (when (csubtypep element-type (specifier-type pack-type))
-           (let ((bv (make-array (length *simd-pack-element-types*)
-                                 :element-type 'bit :initial-element 0)))
-             (setf (sbit bv i) 1)
-             (return bv)))))))
+(progn
+;;; FIXME: the pretty-print of this error message is just ghastly. How about:
+;;;  "must be a subtype of ({SIGNED-BYTE|UNSIGNED-BYTE} {8|16|32|64}) or {SINGLE|DOUBLE}-FLOAT"
+;;; Users sophisticated enough to code with simd-packs will understand what it means.
+(defun simd-type-parser-helper (element-type-spec type-name ctor)
+  (when (eq element-type-spec '*)
+    (return-from simd-type-parser-helper (funcall ctor +simd-pack-wild+)))
+  (let ((element-type (single-value-specifier-type element-type-spec)))
+    (when (eq element-type *empty-type*)
+      (return-from simd-type-parser-helper *empty-type*))
+    (dotimes (i (length +simd-pack-element-types+)
+                (error "~S element type must be a subtype of ~
+                        ~{~/sb-impl:print-type-specifier/~#[~;, or ~
+                        ~:;, ~]~}."
+                     type-name (coerce +simd-pack-element-types+ 'list)))
+      (when (csubtypep element-type (specifier-type (aref +simd-pack-element-types+ i)))
+        (return (funcall ctor (ash 1 i)))))))
 
-#+sb-simd-pack-256
-(defun make-simd-pack-256-type (element-type)
-  (aver (neq element-type *wild-type*))
-  (if (eq element-type *empty-type*)
-      *empty-type*
-      (%make-simd-pack-256-type
-       (do* ((i 0 (1+ i))
-             (pack-types *simd-pack-element-types* (cdr pack-types))
-             (pack-type (car pack-types) (car pack-types)))
-            ((null pack-types)
-             (error "~S element type must be a subtype of ~
-                         ~{~/sb-impl:print-type-specifier/~#[~;, or ~
-                         ~:;, ~]~}."
-                    'simd-pack-256 *simd-pack-element-types*))
-         (when (csubtypep element-type (specifier-type pack-type))
-           (let ((bv (make-array (length *simd-pack-element-types*)
-                                 :element-type 'bit :initial-element 0)))
-             (setf (sbit bv i) 1)
-             (return bv)))))))
+(defun simd-type-unparser-helper (base-type mask)
+  (cond ((= mask +simd-pack-wild+) base-type)
+        ((= (logcount mask) 1)
+         `(,base-type ,(elt +simd-pack-element-types+ (sb-vm::simd-pack-mask->tag mask))))
+        (t
+         `(or ,@(loop for et across +simd-pack-element-types+ for i from 0
+                      when (logbitp i mask)
+                      collect `(,base-type ,et)))))))
 
 #+sb-simd-pack
 (progn
@@ -5236,61 +5224,39 @@ used for a COMPLEX component.~:@>"
   ;; Though this involves a recursive call to parser, parsing context need not
   ;; be passed down, because an unknown-type condition is an immediate failure.
   (def-type-translator simd-pack (&optional (element-type-spec '*))
-    (if (eql element-type-spec '*)
-        (%make-simd-pack-type (make-array (length *simd-pack-element-types*)
-                                          :element-type 'bit :initial-element 1))
-        (make-simd-pack-type (single-value-specifier-type element-type-spec))))
+    (simd-type-parser-helper element-type-spec 'simd-pack #'%make-simd-pack-type))
 
   (define-type-method (simd-pack :negate) (type)
-    (let* ((element-type (simd-pack-type-element-type type))
-           (remaining (and (/= (count 0 element-type) 0) (bit-not element-type)))
-           (not-simd-pack (make-negation-type (specifier-type 'simd-pack))))
-      (if remaining
-          (type-union not-simd-pack (%make-simd-pack-type remaining))
-          not-simd-pack)))
+    (let ((not-pack (make-negation-type (specifier-type 'simd-pack)))
+          (mask (logxor (simd-pack-type-tag-mask type) +simd-pack-wild+)))
+      (if (eql mask 0)
+          not-pack
+          (type-union not-pack (%make-simd-pack-type mask)))))
 
   (define-type-method (simd-pack :unparse) (type)
-    (let* ((eltypes (simd-pack-type-element-type type)))
-      (cond
-        ((= (count 0 eltypes) 0) 'simd-pack)
-        ((= (count 1 eltypes) 1)
-         (let ((pos (position 1 eltypes)))
-           (if pos
-               `(simd-pack ,(elt *simd-pack-element-types* pos))
-               (bug "bad simd-pack"))))
-        (t
-         `(or
-           ,@(loop for x from 0
-                   for bit across eltypes
-                   if (= bit 1)
-                     collect `(simd-pack ,(elt *simd-pack-element-types* x))))))))
+    (simd-type-unparser-helper 'simd-pack (simd-pack-type-tag-mask type)))
 
   (define-type-method (simd-pack :simple-=) (type1 type2)
     (declare (type simd-pack-type type1 type2))
-    (values
-     (= 0 (count 1 (bit-xor (simd-pack-type-element-type type1)
-                            (simd-pack-type-element-type type2))))
-     t))
+    (values (= (simd-pack-type-tag-mask type1) (simd-pack-type-tag-mask type2))
+            t))
 
   (define-type-method (simd-pack :simple-subtypep) (type1 type2)
     (declare (type simd-pack-type type1 type2))
-    (values
-     (= 0 (count 1 (bit-andc2 (simd-pack-type-element-type type1)
-                              (simd-pack-type-element-type type2))))
-     t))
+    (values (zerop (logandc2 (simd-pack-type-tag-mask type1)
+                             (simd-pack-type-tag-mask type2)))
+            t))
 
   (define-type-method (simd-pack :simple-union2) (type1 type2)
     (declare (type simd-pack-type type1 type2))
-    (%make-simd-pack-type (bit-ior (simd-pack-type-element-type type1)
-                                   (simd-pack-type-element-type type2))))
+    (%make-simd-pack-type (logior (simd-pack-type-tag-mask type1)
+                                  (simd-pack-type-tag-mask type2))))
 
   (define-type-method (simd-pack :simple-intersection2) (type1 type2)
     (declare (type simd-pack-type type1 type2))
-    (let ((intersection (bit-and (simd-pack-type-element-type type1)
-                                 (simd-pack-type-element-type type2))))
-      (if (find 1 intersection)
-          (%make-simd-pack-type intersection)
-          *empty-type*)))
+    (let ((intersection (logand (simd-pack-type-tag-mask type1)
+                                (simd-pack-type-tag-mask type2))))
+      (if (eql intersection 0) *empty-type* (%make-simd-pack-type intersection))))
 
   (!define-superclasses simd-pack ((simd-pack)) !cold-init-forms))
 
@@ -5301,61 +5267,39 @@ used for a COMPLEX component.~:@>"
   ;; Though this involves a recursive call to parser, parsing context need not
   ;; be passed down, because an unknown-type condition is an immediate failure.
   (def-type-translator simd-pack-256 (&optional (element-type-spec '*))
-    (if (eql element-type-spec '*)
-        (%make-simd-pack-256-type (make-array (length *simd-pack-element-types*)
-                                              :element-type 'bit :initial-element 1))
-        (make-simd-pack-256-type (single-value-specifier-type element-type-spec))))
+    (simd-type-parser-helper element-type-spec 'simd-pack-256 #'%make-simd-pack-256-type))
 
   (define-type-method (simd-pack-256 :negate) (type)
-    (let* ((element-type (simd-pack-256-type-element-type type))
-           (remaining (and (/= (count 0 element-type) 0) (bit-not element-type)))
-           (not-simd-pack-256 (make-negation-type (specifier-type 'simd-pack-256))))
-      (if remaining
-          (type-union not-simd-pack-256 (%make-simd-pack-256-type remaining))
-          not-simd-pack-256)))
+    (let ((not-pack (make-negation-type (specifier-type 'simd-pack-256)))
+          (mask (logxor (simd-pack-256-type-tag-mask type) +simd-pack-wild+)))
+      (if (eql mask 0)
+          not-pack
+          (type-union not-pack (%make-simd-pack-256-type mask)))))
 
   (define-type-method (simd-pack-256 :unparse) (type)
-    (let* ((eltypes (simd-pack-256-type-element-type type)))
-      (cond
-        ((= (count 0 eltypes) 0) 'simd-pack-256)
-        ((= (count 1 eltypes) 1)
-         (let ((pos (position 1 eltypes)))
-           (if pos
-               `(simd-pack-256 ,(elt *simd-pack-element-types* pos))
-               (bug "bad simd-pack-256"))))
-        (t
-         `(or
-           ,@(loop for x from 0
-                   for bit across eltypes
-                   if (= bit 1)
-                   collect `(simd-pack-256 ,(elt *simd-pack-element-types* x))))))))
+    (simd-type-unparser-helper 'simd-pack-256 (simd-pack-256-type-tag-mask type)))
 
   (define-type-method (simd-pack-256 :simple-=) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
-    (values
-     (= 0 (count 1 (bit-xor (simd-pack-256-type-element-type type1)
-                            (simd-pack-256-type-element-type type2))))
-     t))
+    (values (= (simd-pack-256-type-tag-mask type1) (simd-pack-256-type-tag-mask type2))
+            t))
 
   (define-type-method (simd-pack-256 :simple-subtypep) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
-    (values
-     (= 0 (count 1 (bit-andc2 (simd-pack-256-type-element-type type1)
-                              (simd-pack-256-type-element-type type2))))
-     t))
+    (values (zerop (logandc2 (simd-pack-256-type-tag-mask type1)
+                             (simd-pack-256-type-tag-mask type2)))
+            t))
 
   (define-type-method (simd-pack-256 :simple-union2) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
-    (%make-simd-pack-256-type (bit-ior (simd-pack-256-type-element-type type1)
-                                       (simd-pack-256-type-element-type type2))))
+    (%make-simd-pack-256-type (logior (simd-pack-256-type-tag-mask type1)
+                                      (simd-pack-256-type-tag-mask type2))))
 
   (define-type-method (simd-pack-256 :simple-intersection2) (type1 type2)
     (declare (type simd-pack-256-type type1 type2))
-    (let ((intersection (bit-and (simd-pack-256-type-element-type type1)
-                                 (simd-pack-256-type-element-type type2))))
-      (if (find 1 intersection)
-          (%make-simd-pack-256-type intersection)
-          *empty-type*)))
+    (let ((intersection (logand (simd-pack-256-type-tag-mask type1)
+                                (simd-pack-256-type-tag-mask type2))))
+      (if (eql intersection 0) *empty-type* (%make-simd-pack-256-type intersection))))
 
   (!define-superclasses simd-pack-256 ((simd-pack-256)) !cold-init-forms))
 
@@ -5711,11 +5655,11 @@ used for a COMPLEX component.~:@>"
        (let ((tag (%simd-pack-tag x)))
          (svref (load-time-value
                  (coerce (cons (specifier-type 'simd-pack)
-                               (mapcar (lambda (x) (specifier-type `(simd-pack ,x)))
-                                       *simd-pack-element-types*))
+                               (map 'list (lambda (x) (specifier-type `(simd-pack ,x)))
+                                    +simd-pack-element-types+))
                          'vector)
                  t)
-                (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
+                (if (<= 0 tag (1- (length +simd-pack-element-types+)))
                     (1+ tag)
                     0))))
       #+sb-simd-pack-256
@@ -5723,11 +5667,11 @@ used for a COMPLEX component.~:@>"
        (let ((tag (%simd-pack-256-tag x)))
          (svref (load-time-value
                  (coerce (cons (specifier-type 'simd-pack-256)
-                               (mapcar (lambda (x) (specifier-type `(simd-pack-256 ,x)))
-                                       *simd-pack-element-types*))
+                               (map 'list (lambda (x) (specifier-type `(simd-pack-256 ,x)))
+                                    +simd-pack-element-types+))
                          'vector)
                  t)
-                (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
+                (if (<= 0 tag (1- (length +simd-pack-element-types+)))
                     (1+ tag)
                     0))))
       (t

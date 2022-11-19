@@ -2694,14 +2694,14 @@ is a good idea, but see SB-SYS re. blurring of boundaries.")
            "SIMD-PACK-DOUBLE"
            "SIMD-PACK-INT"
            "SIMD-PACK-TYPE"
-           "SIMD-PACK-TYPE-ELEMENT-TYPE"
-           "*SIMD-PACK-ELEMENT-TYPES*")
+           "SIMD-PACK-TYPE-TAG-MASK"
+           "+SIMD-PACK-ELEMENT-TYPES+")
   #+sb-simd-pack-256
   (:export "SIMD-PACK-256-SINGLE"
            "SIMD-PACK-256-DOUBLE"
            "SIMD-PACK-256-INT"
            "SIMD-PACK-256-TYPE"
-           "SIMD-PACK-256-TYPE-ELEMENT-TYPE")
+           "SIMD-PACK-256-TYPE-TAG-MASK")
   #+long-float
   (:export "LONG-FLOAT-EXPONENT" "LONG-FLOAT-EXP-BITS"
            "LONG-FLOAT-HIGH-BITS" "LONG-FLOAT-LOW-BITS"

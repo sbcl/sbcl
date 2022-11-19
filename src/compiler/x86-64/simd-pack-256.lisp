@@ -107,7 +107,7 @@
                             (inst vmovdqu ea x)))))
                   (define-move-vop ,name :move
                     ,scs (descriptor-reg))))))
-  ;; see *simd-pack-element-types*
+  ;; see +simd-pack-element-types+
   (define-move-from-avx2 simd-pack-256-single 0 single-avx2-reg)
   (define-move-from-avx2 simd-pack-256-double 1 double-avx2-reg)
   (define-move-from-avx2 simd-pack-256-ub8 2 int-avx2-reg)
@@ -200,7 +200,7 @@
   (:node-var node)
   (:generator 13
     (alloc-other simd-pack-256-widetag simd-pack-256-size dst node nil thread-tn)
-    ;; see *simd-pack-element-types*
+    ;; see +simd-pack-element-types+
     (storew tag dst simd-pack-256-tag-slot other-pointer-lowtag)
     (storew p0 dst simd-pack-256-p0-slot other-pointer-lowtag)
     (storew p1 dst simd-pack-256-p1-slot other-pointer-lowtag)
@@ -229,9 +229,9 @@
   (check-type pack symbol)
   `(let ((,pack ,pack))
      (etypecase ,pack
-       ,@(mapcar (lambda (eltype)
+       ,@(map 'list (lambda (eltype)
                    `((simd-pack-256 ,eltype) ,@body))
-          *simd-pack-element-types*))))
+          +simd-pack-element-types+))))
 
 #-sb-xc-host
 (macrolet ((unpack-unsigned (pack bits)
@@ -317,7 +317,7 @@
   (defun %make-simd-pack-256-ub32 (p0 p1 p2 p3 p4 p5 p6 p7)
     (declare (type (unsigned-byte 32) p0 p1 p2 p3 p4 p5 p6 p7))
     (%make-simd-pack-256
-     #.(position '(unsigned-byte 32) *simd-pack-element-types* :test #'equal)
+     #.(position '(unsigned-byte 32) +simd-pack-element-types+ :test #'equal)
      (logior p0 (ash p1 32))
      (logior p2 (ash p3 32))
      (logior p4 (ash p5 32))

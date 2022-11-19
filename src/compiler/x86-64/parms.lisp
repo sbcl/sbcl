@@ -172,17 +172,24 @@
   #'equalp)
 
 #+sb-simd-pack
-(defglobal *simd-pack-element-types*
-    '(single-float
-      double-float
-      (unsigned-byte 8)
-      (unsigned-byte 16)
-      (unsigned-byte 32)
-      (unsigned-byte 64)
-      (signed-byte 8)
-      (signed-byte 16)
-      (signed-byte 32)
-      (signed-byte 64)))
+(progn
+  (defconstant-eqx +simd-pack-element-types+
+      #(single-float double-float
+        (unsigned-byte 8) (unsigned-byte 16) (unsigned-byte 32) (unsigned-byte 64)
+        (signed-byte 8) (signed-byte 16) (signed-byte 32) (signed-byte 64))
+    #'equalp)
+  (defconstant sb-kernel::+simd-pack-wild+
+    (ldb (byte (length +simd-pack-element-types+) 0) -1))
+  (defconstant-eqx +simd-pack-128-primtypes+
+      #(simd-pack-single simd-pack-double
+        simd-pack-ub8 simd-pack-ub16 simd-pack-ub32 simd-pack-ub64
+        simd-pack-sb8 simd-pack-sb16 simd-pack-sb32 simd-pack-sb64)
+    #'equalp)
+  (defconstant-eqx +simd-pack-256-primtypes+
+      #(simd-pack-256-single simd-pack-256-double
+        simd-pack-256-ub8 simd-pack-256-ub16 simd-pack-256-ub32 simd-pack-256-ub64
+        simd-pack-256-sb8 simd-pack-256-sb16 simd-pack-256-sb32 simd-pack-256-sb64)
+    #'equalp))
 
 (defconstant undefined-fdefn-header
   ;; This constant is constructed as follows: Take the INT opcode

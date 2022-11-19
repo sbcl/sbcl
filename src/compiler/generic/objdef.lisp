@@ -439,7 +439,7 @@ during backtrace.
                           :widetag simd-pack-widetag)
   (tag :ref-trans %simd-pack-tag
        :attributes (movable flushable)
-       :type fixnum)
+       :type (unsigned-byte 4))
   (lo-value :c-type "long" :type (unsigned-byte 64))
   (hi-value :c-type "long" :type (unsigned-byte 64)))
 
@@ -449,7 +449,7 @@ during backtrace.
                           :widetag simd-pack-256-widetag)
   (tag :ref-trans %simd-pack-256-tag
        :attributes (movable flushable)
-       :type fixnum)
+       :type (unsigned-byte 4))
   (p0 :c-type "long" :type (unsigned-byte 64))
   (p1 :c-type "long" :type (unsigned-byte 64))
   (p2 :c-type "long" :type (unsigned-byte 64))
