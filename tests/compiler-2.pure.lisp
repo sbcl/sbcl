@@ -3808,3 +3808,10 @@
                  (x)
                  10)))))
     (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :ir2opt-tns-without-sc)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (boole boole-set (the rational a) a))
+    ((1) -1)))
