@@ -1040,7 +1040,8 @@
   ;; a more useful type, don't propagate their negation except for NIL
   ;; unless SPEED > COMPILATION-SPEED.
   (let ((res (single-value-type (node-derived-type ref)))
-        (constrain-symbols (policy ref (> speed compilation-speed)))
+        (constrain-symbols (policy ref (or (> speed compilation-speed)
+                                           (> debug 1))))
         (not-set (alloc-xset))
         (not-numeric (alloc-xset))
         (not-fpz nil)
@@ -1208,7 +1209,8 @@
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
                   (nil (lambda-var-constraints var) :exit-if-null))
-         (when (policy node (and (= speed 3) (> speed compilation-speed)))
+         (when (policy node (or (and (= speed 3) (> speed compilation-speed))
+                                (> debug 1)))
            (let ((type (lambda-var-type var)))
              (unless (eq *universal-type* type)
                (do-eql-vars (other (var gen))
