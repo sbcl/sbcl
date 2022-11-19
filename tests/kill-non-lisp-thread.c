@@ -18,8 +18,8 @@ void
 kill_non_lisp_thread(void)
 {
     pthread_t kid;
-    sem_init(&sem, 0, 0); 
-    sem_init(&sem2, 0, 0); 
+    sem_init(&sem, 0, 0);
+    sem_init(&sem2, 0, 0);
     if (pthread_create(&kid, 0, (void *(*)(void *))wait_a_bit, 0) < 0) {
         perror("pthread_create");
         exit(1);
