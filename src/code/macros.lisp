@@ -503,12 +503,13 @@ evaluated as a PROGN."
       ;; Certainly for the evaluator it's preferable.
       `(let ((,(car vars) ,value-form))
          ,@body)
-      (let ((ignore (gensym)))
-        `(multiple-value-call #'(lambda (&optional ,@(mapcar #'list vars)
+      (flet ((maybe-list (x) (if (member x lambda-list-keywords) (list x) x)))
+        (let ((ignore '#:ignore))
+          `(multiple-value-call #'(lambda (&optional ,@(mapcar #'maybe-list vars)
                                          &rest ,ignore)
                                   (declare (ignore ,ignore))
                                   ,@body)
-                              ,value-form))))
+                              ,value-form)))))
 
 (sb-xc:defmacro multiple-value-setq (vars value-form)
   (validate-vars vars)
