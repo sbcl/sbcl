@@ -471,10 +471,17 @@ necessary, since type inference may take arbitrarily long to converge.")
      again
        (loop
         (ir1-optimize-until-done component)
-        (when (or (component-new-functionals component)
-                  (component-reanalyze-functionals component))
-          (maybe-mumble "Locall ")
-          (locall-analyze-component component))
+        (cond ((or (component-new-functionals component)
+                   (component-reanalyze-functionals component))
+               (maybe-mumble "Locall ")
+               (locall-analyze-component component))
+              ((and (>= loop-count 1)
+                    (not (or (component-reoptimize component)
+                             (component-reanalyze component))))
+               ;; Constraint propagation did something but that
+               ;; information didn't lead to any new optimizations.
+               ;; Don't run constraint-propagate again.
+               (return)))
         (eliminate-dead-code component)
         (dfo-as-needed component)
         (when *constraint-propagate*
