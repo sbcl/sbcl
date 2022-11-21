@@ -1829,8 +1829,10 @@ expansion happened."
                                                         other-types)))
           (if distributed
               (%type-union distributed)
+              #+nil
               (%make-hairy-type `(and ,@(map 'list #'type-specifier
-                                             simplified-types)))))
+                                             simplified-types)))
+              (bug "Unexpected %MAKE-HAIRY-TYPE")))
         (cond
           ((null simplified-types) *universal-type*)
           ((null (cdr simplified-types)) (car simplified-types))

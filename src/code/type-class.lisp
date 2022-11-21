@@ -665,14 +665,9 @@
                        (:copier nil))
   (name nil :type symbol :read-only t))
 
-;;; A HAIRY-TYPE represents anything too weird to be described
-;;; reasonably or to be useful, such as NOT, SATISFIES, unknown types,
-;;; and unreasonably complicated types involving AND. We just remember
-;;; the original type spec.
-;;; A possible improvement would be for HAIRY-TYPE to have a subtype
-;;; named SATISFIES-TYPE for the hairy types which are specifically
-;;; of the form (SATISFIES pred) so that we don't have to examine
-;;; the sexpr repeatedly to decide whether it takes that form.
+;;; A HAIRY-TYPE represents a SATISFIES type or UNKNOWN type.
+;;; FIXME: those should be two distinct things (in HAIRY type-class)
+;;; so that we don't have to examine the sexpr repeatedly to decide its form.
 ;;; And as a further improvement, we might want a table that maps
 ;;; predicates to their exactly recognized type when possible.
 ;;; We have such a table in fact - *BACKEND-PREDICATE-TYPES*
@@ -682,7 +677,13 @@
 ;;; user-visible ramifications, though it seems unlikely.
 (def-type-model (hairy-type (:constructor* %make-hairy-type (specifier)))
   ;; the Common Lisp type-specifier of the type we represent.
+  ;; In UNKNOWN types this can only be a symbol.
   ;; For other than an unknown type, this must be a (SATISFIES f) expression.
+  ;; Unfortunately, this can not currently be constrained to
+  ;;  (OR SYMBOL (CONS (EQL SATISFIES) (CONS SYMBOL NULL)))
+  ;; because somewhere in cold-init there is an UNKNOWN-TYPE constructed
+  ;; which has (UNSIGNED-BYTE 8) as the expression, and I  haven't sifted through
+  ;; that logic enough yet to understand why.
   (specifier nil :type t :test equal))
 
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
