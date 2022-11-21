@@ -2537,7 +2537,7 @@
                                   collect it)))
                      (setf (combination-args use) new-args)
                      (derive-node-type use
-                                       (make-values-type :required (mapcar #'lvar-type new-args))
+                                       (make-values-type (mapcar #'lvar-type new-args))
                                        :from-scratch t)
                      (reoptimize-node use)))
                   ;; Doesn't return a single value, nothing can be done about that

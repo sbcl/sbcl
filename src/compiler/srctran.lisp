@@ -1705,7 +1705,7 @@
         (rem (two-arg-derive-type number divisor
                                   #'truncate-derive-type-rem-aux #'rem)))
     (when (and quot rem)
-      (make-values-type :required (list quot rem)))))
+      (make-values-type (list quot rem)))))
 
 (defun %unary-truncate-derive-type-aux (number)
   (truncate-derive-type-quot number (specifier-type '(integer 1 1))))
@@ -1735,7 +1735,7 @@
                                    (lambda (x) (truncate-derive-type-rem-aux x one nil))
                                    #'rem)))
     (when (and quot rem)
-      (make-values-type :required (list quot rem)))))
+      (make-values-type (list quot rem)))))
 
 (deftransform unary-truncate ((number) (integer))
   '(values number 0))
@@ -1768,7 +1768,7 @@
           (rem (two-arg-derive-type number divisor
                                     #'truncate-derive-type-rem-aux #'rem)))
       (when (and quot rem)
-        (make-values-type :required (list quot rem)))))
+        (make-values-type (list quot rem)))))
 
 
   (defoptimizer (%unary-ftruncate derive-type) ((number))
@@ -1894,7 +1894,7 @@
                      (rem (two-arg-derive-type
                            number divisor #'derive-r #'mod)))
                  (when (and quot rem)
-                   (make-values-type :required (list quot rem))))))))))
+                   (make-values-type (list quot rem))))))))))
 
   (def floor floor-quotient-bound floor-rem-bound)
   (def ceiling ceiling-quotient-bound ceiling-rem-bound))
@@ -2343,7 +2343,7 @@
              #-sb-xc-host type))))))
 
 (defoptimizer (values derive-type) ((&rest values))
-  (make-values-type :required (mapcar #'lvar-type values)))
+  (make-values-type (mapcar #'lvar-type values)))
 
 (defun signum-derive-type-aux (type)
   (if (eq (numeric-type-complexp type) :complex)

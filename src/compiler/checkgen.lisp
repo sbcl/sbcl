@@ -177,12 +177,9 @@
         ((not (values-type-p type))
          (weaken-type type))
         (t
-         (make-values-type :required (mapcar #'weaken-type
-                                             (values-type-required type))
-                           :optional (mapcar #'weaken-type
-                                             (values-type-optional type))
-                           :rest (acond ((values-type-rest type)
-                                         (weaken-type it)))))))
+         (make-values-type (mapcar #'weaken-type (values-type-required type))
+                           (mapcar #'weaken-type (values-type-optional type))
+                           (acond ((values-type-rest type) (weaken-type it)))))))
 
 ;;;; checking strategy determination
 
@@ -613,14 +610,14 @@
                            (format nil
                                    "~%It allows an unknown number of values, consider using~@
                                     ~/sb-impl:print-type/."
-                                   (make-values-type :required (values-type-required value-type)
-                                                     :optional (values-type-optional value-type))))
+                                   (make-values-type (values-type-required value-type)
+                                                     (values-type-optional value-type))))
                           ((values-type-optional value-type)
                            (format nil
                                    "~%It allows a variable number of values, consider using~@
                                     ~/sb-impl:print-type/."
-                                   (make-values-type :required (append (values-type-required value-type)
-                                                                       (values-type-optional value-type)))))
+                                   (make-values-type (append (values-type-required value-type)
+                                                             (values-type-optional value-type)))))
                           ("")))))
                (setf (cast-type-to-check cast) *wild-type*)
                (setf (cast-%type-check cast) nil)))))))

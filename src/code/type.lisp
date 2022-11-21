@@ -290,7 +290,7 @@
      (rest eq))
   (new-ctype values-type required optional rest))
 
-(defun make-values-type (&key required optional rest)
+(defun make-values-type (required &optional optional rest)
   (multiple-value-bind (required optional rest)
       (canonicalize-args-type-args required optional rest)
     (cond ((and (null required) (null optional) (eq rest *universal-type*))
@@ -710,7 +710,7 @@
   (multiple-value-bind (llks required optional rest)
       (parse-args-types context values :values-type)
     (if (plusp llks)
-        (make-values-type :required required :optional optional :rest rest)
+        (make-values-type required optional rest)
         (make-short-values-type required))))
 
 ;;;; VALUES types interfaces
@@ -880,9 +880,9 @@
              (csubtypep (specifier-type 'null) type)
            (and (not res) sure))
          ;; FIXME: What should we do with (NOT SURE)?
-         (make-values-type :required (list type) :rest *universal-type*))
+         (make-values-type (list type) nil *universal-type*))
         (t
-         (make-values-type :optional (list type) :rest *universal-type*))))
+         (make-values-type nil (list type) *universal-type*))))
 
 (defun coerce-to-values (type)
   (declare (type ctype type))
@@ -903,13 +903,13 @@
                         types
                         :from-end t)))
     (if last-required
-        (make-values-type :required (subseq types 0 (1+ last-required))
-                          :optional (subseq types (1+ last-required))
-                          :rest *universal-type*)
-        (make-values-type :optional types :rest *universal-type*))))
+        (make-values-type (subseq types 0 (1+ last-required))
+                          (subseq types (1+ last-required))
+                          *universal-type*)
+        (make-values-type nil types *universal-type*))))
 
 (defun make-single-value-type (type)
-  (make-values-type :required (list type)))
+  (make-values-type (list type)))
 
 ;;; Do the specified OPERATION on TYPE1 and TYPE2, which may be any
 ;;; type, including VALUES types. With VALUES types such as:
@@ -960,9 +960,7 @@
 (defun values-type-op (type1 type2 operation nreq)
   (multiple-value-bind (required optional rest exactp)
       (args-type-op type1 type2 operation nreq)
-    (values (make-values-type :required required
-                              :optional optional
-                              :rest rest)
+    (values (make-values-type required optional rest)
             exactp)))
 
 (defun compare-key-args (type1 type2)
@@ -1025,10 +1023,9 @@
         ((and (not (values-type-p type2))
               (values-type-required type1))
          (let ((req1 (values-type-required type1)))
-           (make-values-type :required (cons (type-intersection (first req1) type2)
-                                             (rest req1))
-                             :optional (values-type-optional type1)
-                             :rest (values-type-rest type1))))
+           (make-values-type (cons (type-intersection (first req1) type2) (rest req1))
+                             (values-type-optional type1)
+                             (values-type-rest type1))))
         (t
          (values (values-type-op type1 (coerce-to-values type2)
                                  #'type-intersection

@@ -239,7 +239,7 @@
                               (let ((lvar (node-lvar node)))
                                 (setf (lvar-%derived-type lvar)
                                       (and (lvar-has-single-use-p lvar)
-                                           (make-values-type :required (list (ctype-of new-value))))))
+                                           (make-values-type (list (ctype-of new-value))))))
                               (setf (block-reoptimize (node-block node)) t)
                               (reoptimize-component (node-component node) :maybe)
                               (values t t)))))))

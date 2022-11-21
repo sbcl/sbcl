@@ -88,9 +88,7 @@
                        (every #'eq old-opt new-opt)
                        (eq old-rest new-rest))
                   type
-                  (make-values-type :required new-req
-                                    :optional new-opt
-                                    :rest new-rest))))
+                  (make-values-type new-req new-opt new-rest))))
            (array-type
             (let* ((original (array-type-element-type type))
                    (new (simplify original)))

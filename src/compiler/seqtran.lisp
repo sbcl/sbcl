@@ -1158,8 +1158,7 @@
             (if (and equality length1 length2
                      (/= length1 length2))
                 (if (eq equality '%sp-string-compare)
-                    (make-values-type :required
-                                      (list type
+                    (make-values-type (list type
                                             (specifier-type '(and integer (not (eql 0))))))
                     type)
                 (type-union type
@@ -1963,24 +1962,21 @@
   (let ((find (find-derive-type item sequence key test start end from-end))
         (position (position-derive-type item sequence start end key test nil)))
     (when (or find position)
-      (make-values-type :required
-                        (list (or find *universal-type*)
+      (make-values-type (list (or find *universal-type*)
                               (or position *universal-type*))))))
 
 (defoptimizer (%find-position-if derive-type) ((predicate sequence from-end start end key))
   (let ((find (find-derive-type nil sequence key predicate start end from-end))
         (position (position-derive-type nil sequence start end key predicate nil)))
     (when (or find position)
-      (make-values-type :required
-                        (list (or find *universal-type*)
+      (make-values-type (list (or find *universal-type*)
                               (or position *universal-type*))))))
 
 (defoptimizer (%find-position-if-not derive-type) ((predicate sequence from-end start end key))
   (let ((find (find-derive-type nil sequence key predicate start end from-end))
         (position (position-derive-type nil sequence start end key predicate nil)))
     (when (or find position)
-      (make-values-type :required
-                        (list (or find *universal-type*)
+      (make-values-type (list (or find *universal-type*)
                               (or position *universal-type*))))))
 
 (defoptimizer (count derive-type) ((item sequence
