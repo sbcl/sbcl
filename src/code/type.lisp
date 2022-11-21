@@ -279,34 +279,25 @@
 (defun-cached (make-values-type-cached
                :hash-bits 8
                :hash-function
-               (lambda (req opt rest allowp)
+               (lambda (req opt rest)
                  (logxor (hash-ctype-list req)
                          (hash-ctype-list opt)
                           (if rest
                               (type-hash-value rest)
-                              42)
-                          ;; Results (logand #xFF (sxhash t/nil))
-                          ;; hardcoded to avoid relying on the xc host.
-                          ;; [but (logand (sxhash nil) #xff) => 2
-                          ;;  for me, so the code and comment disagree,
-                          ;;  but not in a way that matters.]
-                          (if allowp
-                              194
-                              11))))
+                              42))))
     ((required list-elts-eq) ; always compare ctype instances by EQ
      (optional list-elts-eq)
-     (rest eq)
-     (allowp eq))
-  (new-ctype values-type required optional rest allowp))
+     (rest eq))
+  (new-ctype values-type required optional rest))
 
-(defun make-values-type (&key required optional rest allowp)
+(defun make-values-type (&key required optional rest)
   (multiple-value-bind (required optional rest)
       (canonicalize-args-type-args required optional rest)
     (cond ((and (null required) (null optional) (eq rest *universal-type*))
            *wild-type*)
           ((memq *empty-type* required)
            *empty-type*)
-          (t (make-values-type-cached required optional rest allowp)))))
+          (t (make-values-type-cached required optional rest)))))
 
 (define-type-method (values :simple-subtypep :complex-subtypep-arg1)
                      (type1 type2)
@@ -326,8 +317,7 @@
   (cons 'values
         (let ((unparsed (unparse-args-types type)))
           (if (or (values-type-optional type)
-                  (values-type-rest type)
-                  (values-type-allowp type))
+                  (values-type-rest type))
               unparsed
               (nconc unparsed '(&optional))))))
 
@@ -713,6 +703,10 @@
   (translate-fun-type context args result :designator t))
 
 (def-type-translator values :list ((:context context) &rest values)
+  ;; comment from CMUCL:
+  ;; "Signal an error if the spec has &KEY or &ALLOW-OTHER-KEYS.
+  ;;  Actually, CLHS lists &ALLOW-OTHER-KEYS without listing &KEYS,
+  ;;  but keys clearly don't make any sense."
   (multiple-value-bind (llks required optional rest)
       (parse-args-types context values :values-type)
     (if (plusp llks)
@@ -1034,8 +1028,7 @@
            (make-values-type :required (cons (type-intersection (first req1) type2)
                                              (rest req1))
                              :optional (values-type-optional type1)
-                             :rest (values-type-rest type1)
-                             :allowp (values-type-allowp type1))))
+                             :rest (values-type-rest type1))))
         (t
          (values (values-type-op type1 (coerce-to-values type2)
                                  #'type-intersection

@@ -84,10 +84,6 @@
                    (new-opt (mapcar #'simplify old-opt))
                    (old-rest (values-type-rest type))
                    (new-rest (when old-rest (simplify old-rest))))
-              ;; VALUES types that are not fun-types can't have &KEY.
-              (aver (and (null (sb-kernel::values-type-keyp type))
-                         (null (sb-kernel::values-type-keywords type))
-                         (null (sb-kernel::values-type-allowp type))))
               (if (and (every #'eq old-req new-req)
                        (every #'eq old-opt new-opt)
                        (eq old-rest new-rest))
