@@ -287,6 +287,7 @@
         (when (target-featurep '(:and :sb-thread (:or :linux :freebsd)))
           (pushnew :sb-futex sb-xc:*features*))
         (when (target-featurep :immobile-space)
+          (pushnew :system-tlabs sb-xc:*features*)
           (pushnew :compact-instance-header sb-xc:*features*)
           (pushnew :immobile-code sb-xc:*features*))
         (when (target-featurep :64-bit)
