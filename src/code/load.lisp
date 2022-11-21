@@ -722,7 +722,9 @@
                      byte
                      n-operands arg1 arg2 arg3)
              (when (functionp function)
-               (format *trace-output* " ~35t~(~a~)" (%fun-name function))))))))))
+               (format *trace-output* " ~35t~(~a~)" (%fun-name function))
+               (when (eql (%fun-name function) 'fop-push)
+                 (format *trace-output* " ~(~A~)" (ref-fop-table fasl-input arg1)))))))))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))
