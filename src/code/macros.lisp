@@ -278,7 +278,7 @@ tree structure resulting from the evaluation of EXPRESSION."
   ;; value is used when cross-compiling for :COMPILE-TOPLEVEL contexts
   ;; which reference the constant.
   #+sb-xc-host
-  (eval `(defconstant ,name ',value))
+  (eval `(unless (boundp ',name) (defconstant ,name ',value)))
   (setf (info :variable :kind name) :constant)
   name)
 

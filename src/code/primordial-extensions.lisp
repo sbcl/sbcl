@@ -302,12 +302,12 @@
 ;;;
 #+sb-xc-host
 (defmacro defconstant-eqx (symbol expr eqx &optional doc)
-  ;; CLISP needs the EVAL-WHEN here, or else the symbol defined is
-  ;; unavailable for later uses within the same file. For instance, in
-  ;; x86-64/vm, defining TEMP-REG-TN as R11-TN would get an error that
-  ;; R11-TN is unbound.  We don't want that junk in our expansion.
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
+     ;; We use DEFVAR rather than DEFCONSTANT as a host effect in
+     ;; order to avoid differences in host decisions about inlining
+     ;; the value of the constant, with knock-on effects on EQLity
+     ;; of references to internal parts of the constant.
+     (defvar ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
        ,@(when doc (list doc)))))
 
 #-sb-xc-host

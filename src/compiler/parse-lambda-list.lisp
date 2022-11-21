@@ -11,11 +11,10 @@
 
 (declaim (special *lexenv*))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant-eqx lambda-list-parser-states
     #(:required &optional &rest &more &key &aux &environment &whole
       &allow-other-keys &body :post-env :post-rest :post-more)
-  #'equalp))
+  #'equalp)
 
 ;; Return a bitmask representing the LIST of lambda list keywords.
 (defmacro lambda-list-keyword-mask (list)
