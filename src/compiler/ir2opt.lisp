@@ -21,7 +21,6 @@
 (defvar *2block-info*)
 (defmacro ir2block-predecessors (x) `(car (gethash (the ir2-block ,x) *2block-info*)))
 (defmacro ir2block-successors (x) `(cdr (gethash (the ir2-block ,x) *2block-info*)))
-(defvar *ir2opt-stage*)
 
 (defun initialize-ir2-blocks-flow-info (component)
   (labels ((block-last-2block (block)
@@ -511,11 +510,9 @@
                args1)
            args2)))
 
-(defoptimizer (vop-optimize branch-if) (branch-if)
-  (cond ((neq *ir2opt-stage* 'select-representations)
-         ;; cmov conversion needs to know the SCs
-         nil)
-        ((maybe-convert-one-cmov branch-if)
+;; cmov conversion needs to know the SCs
+(defoptimizer (vop-optimize branch-if select-representations) (branch-if)
+  (cond ((maybe-convert-one-cmov branch-if)
          nil)
         #+(or arm arm64 x86 x86-64)
         (t
@@ -1304,10 +1301,11 @@
           (delete-vop first)
           new))))) ; return suitable value for RUN-VOP-OPTIMIZERS
 
-(defun run-vop-optimizers (component &optional stage)
+(defun run-vop-optimizers (component &optional stage (without-stage (not stage)))
   (do-ir2-blocks (block component)
     (let ((vop (ir2-block-start-vop block)))
-      (loop (unless vop (return))
+      (loop while vop
+            do
             ;; Avoid following the NEXT pointer of a deleted vop, which despite
             ;; possibly being accidentally correct, is dubious.
             ;; Optimizer must return NIL or a VOP whence to resume scanning.
@@ -1315,7 +1313,7 @@
                             (if (consp it)
                                 (and (eq (cdr it) stage)
                                      (funcall (car it) vop))
-                                (and (not stage)
+                                (and without-stage
                                      (funcall it vop))))
                           (vop-next vop)))))))
 
@@ -1366,8 +1364,7 @@
                             (vop-next vop))))))))
 
 (defun ir2-optimize (component &optional stage)
-  (let ((*2block-info* (make-hash-table :test #'eq))
-        (*ir2opt-stage* stage))
+  (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
     (case stage
       (regalloc
@@ -1378,7 +1375,7 @@
       (select-representations
        ;; Give the optimizers a second opportunity to alter newly inserted vops
        ;; by looking for patterns that have a shorter expression as a single vop.
-       (run-vop-optimizers component)
+       (run-vop-optimizers component stage t)
        (delete-unused-ir2-blocks component)
        ;; Try to combine consecutive uses of %INSTANCE-SET.
        ;; This can't be done prior to selecting representations
