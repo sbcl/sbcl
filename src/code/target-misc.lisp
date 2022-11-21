@@ -175,7 +175,9 @@ the file system."
 (macrolet
     ((cast-it ()
        #-sb-unicode
-       '(if (and (simple-base-string-p s) (ok-space)) s (copy-seq s))
+       '(if (and (simple-base-string-p s) (ok-space))
+           s
+           (replace (make-string (length s)) s))
        #+sb-unicode
        ;; whether a copy is needed depends both on contents and simplicity
        '(let* ((base-p (base-string-p s))

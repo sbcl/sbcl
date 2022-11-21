@@ -1768,6 +1768,9 @@ session."
   (bug "This and many other things will crash on MIPS/ARM either
   until they do linkage tables like everyone else, or until all those
   things can deal with either way of doing linkage.")
+  ;; New thread's arena starts out as this thread's arena.
+  (setf (sap-ref-sap thread-sap (ash sb-vm::thread-arena-slot sb-vm:word-shift))
+        (sb-vm::current-thread-offset-sap sb-vm::thread-arena-slot))
   #+win32
   (/= 0 (alien-funcall (extern-alien "create_thread"
                                      (function unsigned system-area-pointer))
@@ -1777,9 +1780,6 @@ session."
         (c-tramp
           (foreign-symbol-sap #+os-thread-stack "new_thread_trampoline_switch_stack"
                               #-os-thread-stack "new_thread_trampoline")))
-    ;; New thread's arena starts out as this thread's arena.
-    (setf (sap-ref-sap thread-sap (ash sb-vm::thread-arena-slot sb-vm:word-shift))
-          (sb-vm::current-thread-offset-sap sb-vm::thread-arena-slot))
     (and (= 0 #+os-thread-stack
               (alien-funcall (extern-alien "pthread_attr_setstacksize"
                                            (function int system-area-pointer unsigned))
