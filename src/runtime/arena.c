@@ -50,6 +50,8 @@ lispobj sbcl_new_arena(size_t size)
 #endif
     block->freeptr = (char*)block + sizeof *block;
     block->limit = (char*)arena + size;
+    block->next = NULL;
+    block->padding = 0;
     arena->uw_length = size;
     arena->uw_current_block = arena->uw_first_block = (uword_t)block;
     return make_lispobj(arena, INSTANCE_POINTER_LOWTAG);
@@ -59,7 +61,30 @@ static inline void* arena_mutex(struct arena* a) {
     return (void*)((char*)a + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
 }
 
-void arena_release_memblks(lispobj arena_taggedptr);
+#define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire(arena_mutex(a)))
+#define ARENA_MUTEX_RELEASE(a) ignore_value(mutex_release(arena_mutex(a)))
+
+/* Release successor blocks of this arena, keeping only the first */
+/* TODO: in debug mode, assert that no threads are using the arena */
+void arena_release_memblks(lispobj arena_taggedptr)
+{
+    struct arena* arena = (void*)native_pointer(arena_taggedptr);
+    ARENA_MUTEX_ACQUIRE(arena);
+    struct arena_memblk* first = (void*)arena->uw_first_block;
+    struct arena_memblk* block = first->next;
+    while (block) {
+        struct arena_memblk* next = block->next;
+        free(block);
+        block = next;
+    }
+    arena->uw_current_block = arena->uw_first_block;
+    first->freeptr = (char*)first + sizeof (struct arena_memblk);
+    first->next = NULL;
+    arena->uw_extension_count = 0;
+    arena->uw_length = first->limit - (char*)arena;
+    ARENA_MUTEX_RELEASE(arena);
+}
+
 void AMD64_SYSV_ABI sbcl_delete_arena(lispobj arena_taggedptr)
 {
     arena_release_memblks(arena_taggedptr);
@@ -158,9 +183,6 @@ void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
     }
     th->arena = arena_taggedptr;
 }
-
-#define ARENA_MUTEX_ACQUIRE(a) ignore_value(mutex_acquire(arena_mutex(a)))
-#define ARENA_MUTEX_RELEASE(a) ignore_value(mutex_release(arena_mutex(a)))
 
 static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                                    sword_t nbytes, int filler)
@@ -263,26 +285,6 @@ long arena_bytes_used(lispobj arena_taggedptr)
     } while ((block = block->next) != NULL);
     ARENA_MUTEX_RELEASE(arena);
     return sum;
-}
-/* Release successor blocks of this arena, keeping only the first */
-/* TODO: in debug mode, assert that no threads are using the arena */
-void arena_release_memblks(lispobj arena_taggedptr)
-{
-    struct arena* arena = (void*)native_pointer(arena_taggedptr);
-    ARENA_MUTEX_ACQUIRE(arena);
-    struct arena_memblk* first = (void*)arena->uw_first_block;
-    struct arena_memblk* block = first->next;
-    while (block) {
-        struct arena_memblk* next = block->next;
-        free(block);
-        block = next;
-    }
-    arena->uw_current_block = arena->uw_first_block;
-    first->freeptr = (char*)first + sizeof (struct arena_memblk);
-    first->next = NULL;
-    arena->uw_extension_count = 0;
-    arena->uw_length = first->limit - (char*)arena;
-    ARENA_MUTEX_RELEASE(arena);
 }
 
 // theoretically want a mutex guarding the global, but will we do this in real life?

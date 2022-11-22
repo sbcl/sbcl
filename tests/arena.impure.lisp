@@ -240,10 +240,7 @@
                  ((null a) (output))
                (output (get-lisp-obj-address a))))))))
 
-(test-util:with-test (:name destroy-arena
-                            ;; this crashes on win32,
-                            ;; and allegedly on macOS though it passes for me there
-                            :skipped-on (or :win32 :darwin))
+(test-util:with-test (:name destroy-arena)
   (macrolet ((exit-if-no-arenas ()
                '(progn (incf n-deleted)
                        (when (zerop (extern-alien "arena_chain" unsigned)) (return)))))
