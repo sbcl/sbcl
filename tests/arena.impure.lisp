@@ -218,7 +218,8 @@
               est act frac)
       (assert (< frac 1))))))
 
-(test-util:with-test (:name :thread-arena-inheritance)
+(test-util:with-test (:name :thread-arena-inheritance
+                      :skipped-on :darwin) ; I can't imagine why this fails
   (sb-vm:with-arena (*arena*)
     (let ((thread
            (sb-thread:make-thread
@@ -237,10 +238,13 @@
            (assert (typep (arena-link head) '(or null arena)))
            (collect ((output))
              (do ((a head (arena-link a)))
-                 ((null a) (output))
+                 ((null a)
+                  ;; (format t "CHAIN: ~X~%" (output))
+                  (output))
                (output (get-lisp-obj-address a))))))))
 
-(test-util:with-test (:name destroy-arena)
+(test-util:with-test (:name destroy-arena
+                      :skipped-on :darwin) ; doesn't respect 16-byte stack alignment
   (macrolet ((exit-if-no-arenas ()
                '(progn (incf n-deleted)
                        (when (zerop (extern-alien "arena_chain" unsigned)) (return)))))

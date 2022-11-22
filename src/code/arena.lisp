@@ -95,6 +95,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
   (:generator 1
     (move rdi x)
     #-immobile-space (inst break halt-trap)
+    ;; FIXME: potentially violates stack-alignment requirement
     #+immobile-space
     (pseudo-atomic ()
       (inst call (make-fixup "sbcl_delete_arena" :foreign))))))

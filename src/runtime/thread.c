@@ -388,6 +388,8 @@ void create_main_lisp_thread(lispobj function) {
 
 void free_thread_struct(struct thread *th)
 {
+    struct extra_thread_data *extra_data = thread_extra_data(th);
+    if (extra_data->arena_savearea) free(extra_data->arena_savearea);
     os_deallocate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
 }
 

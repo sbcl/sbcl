@@ -26,13 +26,33 @@ struct arena_memblk {
     uword_t padding; // always 0
 };
 
+#if 1
+# define ARENA_GET_OS_MEMORY(size) malloc(size)
+# define ARENA_DISPOSE_MEMORY(addr,size) free(addr)
+#else
+/* The use-case for this is to reliably detect access to deleted arenas
+ * instead of "possibly" depending on what free() did.
+ * But malloc() + free() generally give you more control over the
+ * release rate back to the OS if you use TCMalloc */
+void* ARENA_GET_OS_MEMORY(size_t size) {
+    void* result = os_allocate(size);
+    fprintf(stderr, "os_allocate -> %p\n", result);
+    return result;
+}
+void ARENA_DISPOSE_MEMORY(void* addr, size_t size)
+{
+    fprintf(stderr, "about to os_deallocate %p + %lx\n", addr, size);
+    os_deallocate(addr,size);
+}
+#endif
+
 lispobj sbcl_new_arena(size_t size)
 {
     // First 3 objects in the arena:
     //   Arena
     //   Mutex
     //   Memblk
-    struct arena* arena = malloc(size);
+    struct arena* arena = ARENA_GET_OS_MEMORY(size);
     memset(arena, 0, sizeof *arena);
     struct arena_memblk* block =
       (void*)((char*)arena + ALIGN_UP(sizeof (struct arena), 2*N_WORD_BYTES));
@@ -74,7 +94,7 @@ void arena_release_memblks(lispobj arena_taggedptr)
     struct arena_memblk* block = first->next;
     while (block) {
         struct arena_memblk* next = block->next;
-        free(block);
+        ARENA_DISPOSE_MEMORY(block, arena->uw_growth_amount);
         block = next;
     }
     arena->uw_current_block = arena->uw_first_block;
@@ -111,7 +131,7 @@ void AMD64_SYSV_ABI sbcl_delete_arena(lispobj arena_taggedptr)
         }
         release_gc_page_table_lock();
     }
-    free(arena);
+    ARENA_DISPOSE_MEMORY(arena, arena->uw_length);
 }
 
 void AMD64_SYSV_ABI switch_to_arena(lispobj arena_taggedptr,
@@ -204,7 +224,7 @@ static void* memblk_claim_subrange(struct arena* a, struct arena_memblk* mem,
                     ARENA_MUTEX_RELEASE(a);
                     lose("Fatal: arena memory exhausted");
                 }
-                char* new_mem = malloc(a->uw_growth_amount);
+                char* new_mem = ARENA_GET_OS_MEMORY(a->uw_growth_amount);
                 if (new_mem == 0) {
                     ARENA_MUTEX_RELEASE(a);
                     lose("Fatal: arena memory exhausted and could not obtain more memory");
@@ -285,30 +305,6 @@ long arena_bytes_used(lispobj arena_taggedptr)
     } while ((block = block->next) != NULL);
     ARENA_MUTEX_RELEASE(arena);
     return sum;
-}
-
-// theoretically want a mutex guarding the global, but will we do this in real life?
-// FIXME: need to munmap all blocks and free() the arena-growth mutex
-void unlink_gc_arena(lispobj arena) // arena is a tagged pointer
-{
-    struct arena* prev = 0;
-    lispobj current = arena_chain;
-    if (!current) return;
-    do {
-        struct arena* this = (struct arena*)(current-INSTANCE_POINTER_LOWTAG);
-        lispobj next = this->link;
-        if (arena == current) {
-            if (!prev) { // assign into the global var
-              // the global never takes on the value NIL though
-              arena_chain = (next == NIL) ? 0 : next;
-            } else {
-              prev->link = next;
-            }
-            return;
-        }
-        prev = this;
-        current = next;
-    } while (arena != NIL);
 }
 
 int scavenge_arenas = 1;
