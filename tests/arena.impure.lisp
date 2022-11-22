@@ -243,8 +243,7 @@
                   (output))
                (output (get-lisp-obj-address a))))))))
 
-(test-util:with-test (:name destroy-arena
-                      :skipped-on :darwin) ; doesn't respect 16-byte stack alignment
+(test-util:with-test (:name destroy-arena)
   (macrolet ((exit-if-no-arenas ()
                '(progn (incf n-deleted)
                        (when (zerop (extern-alien "arena_chain" unsigned)) (return)))))
