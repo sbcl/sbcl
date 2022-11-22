@@ -1,4 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-2.2.10:
+  * enhancement: improvements to constraint propagation around comparison
+    functions.
+  * optimization: conditional move VOPs can work on boxed values and
+    produce less consing.
+  * bug fix: slot-makunbound-using-class can be redefined without redefining
+    the other slot methods (lp#1956621)
 
 changes in sbcl-2.2.10 relative to sbcl-2.2.9:
   * platform support:
