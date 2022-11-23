@@ -3815,3 +3815,11 @@
       `(lambda (a)
          (boole boole-set (the rational a) a))
     ((1) -1)))
+(with-test (:name set-slot-old-p-optionals)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x &key)
+         (let ((list (list 1)))
+           (setf (car list) x)
+           list))
+    ((2) '(2) :test #'equal)))
