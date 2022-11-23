@@ -4,8 +4,13 @@ changes relative to sbcl-2.2.10:
     functions.
   * optimization: conditional move VOPs can work on boxed values and
     produce less consing.
+  * optimization: NUNION and UNION are generally faster.
   * bug fix: slot-makunbound-using-class can be redefined without redefining
     the other slot methods (lp#1956621)
+  * bug fix: GETHASH on a table created without ":synchronized t" when run
+    concurrently in multiple threads could have returned incorrect results.
+  * bug fix: build of contributed modules assumed that 'cat' was always
+    in /bin/cat on POSIX systems (lp#1995224)
 
 changes in sbcl-2.2.10 relative to sbcl-2.2.9:
   * platform support:
