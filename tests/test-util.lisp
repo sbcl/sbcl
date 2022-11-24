@@ -9,6 +9,7 @@
            #:random-type
            #:type-evidently-=
            #:ctype=
+           #:type-specifiers-equal
            #:assert-tri-eq
            #:random-type
 
@@ -81,7 +82,7 @@
 (defun type-evidently-= (x y)
   (and (subtypep x y) (subtypep y x)))
 
-(defun ctype= (left right)
+(defun type-specifiers-equal (left right)
   (let ((a (sb-kernel:values-specifier-type left)))
     ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
     ;; operation if A and B are EQ.
@@ -89,6 +90,8 @@
     (sb-int:drop-all-hash-caches)
     (let ((b (sb-kernel:values-specifier-type right)))
       (sb-kernel:type= a b))))
+;;; This isn't a great name. Prefer to use TYPE-SPECIFIERS-EQUAL instead
+(defun ctype= (a b) (type-specifiers-equal a b))
 
 (defmacro assert-tri-eq (expected-result expected-certainp form)
   (sb-int:with-unique-names (result certainp)

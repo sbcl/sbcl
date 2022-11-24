@@ -1428,7 +1428,7 @@ core and return a descriptor to it."
                    (xset (struct-to-core obj nil))
                    (ctype (ctype-to-core (type-specifier obj) obj)))))))
     (if (classoid-p obj)
-        ;; Place this classoid into its clasoid-cell.
+        ;; Place this classoid into its classoid-cell.
         (let ((cell (cold-find-classoid-cell (classoid-name obj) :create t)))
           (write-slots cell :classoid result))
         ;; Otherwise put it in the general cache

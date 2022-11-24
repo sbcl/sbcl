@@ -659,7 +659,8 @@
   (macrolet
       ((check (fun expected)
          `(assert
-           (equal (second
+           (type-specifiers-equal
+            (second
                    (third
                     (sb-kernel:%simple-fun-type
                      (checked-compile '(lambda (x y)

@@ -222,9 +222,10 @@
   (let ((x 3)) (declare (type (or integer blurf) x)) x)
 
   ;; This fails because the unknown type is tested first
+  ;; (though that is subject to change)
   (handler-case (let ((x 3)) (declare (type (or blurf integer) x)) x)
     (simple-error ()) ; "unknown type"
-    (:no-error () "Expected an ERROR")))
+    (:no-error (&rest ignore) (error "Expected an ERROR"))))
 
 (test-util:with-test (:name :tagbody-if-optimizer)
   (assert
