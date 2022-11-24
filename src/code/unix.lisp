@@ -182,7 +182,9 @@ corresponds to NAME, or NIL if there is none."
     (locally
         (declare (optimize (sb-c::float-accuracy 0)))
       (let ((result (alien-funcall (extern-alien "open" (function int c-string int &optional int))
-                                   path (logior flags) mode)))
+                                   path (logior flags
+                                                #+largefile o_largefile)
+                                   mode)))
         (if (minusp result)
             (values nil (get-errno))
             (values result 0))))))
