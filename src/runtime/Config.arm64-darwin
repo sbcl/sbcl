@@ -11,10 +11,6 @@
 
 CFLAGS += -g -Wall -fdollars-in-identifiers
 
-# ifdef LISP_FEATURE_INODE64
-# CFLAGS += -D_DARWIN_USE_64_BIT_INODE
-# endif 
-
 OS_SRC = bsd-os.c arm64-bsd-os.c darwin-os.c arm64-darwin-os.c
 
 OS_LIBS = -lSystem -lc -ldl
