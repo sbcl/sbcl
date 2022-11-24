@@ -417,10 +417,12 @@
             cells :end (hs-cells-capacity cells)))
 (defmethod print-object ((self robinhood-hashset) stream)
   (print-unreadable-object (self stream :type t :identity t)
-    (format stream "~S ~D/~D keys"
-            (hashset-test-function self)
-            (hashset-count self)
-            (hs-cells-capacity (hss-cells (hashset-storage self))))))
+    (let ((cells (hss-cells (hashset-storage self))))
+      (format stream "~S ~D/~D keys, psl=~D"
+              (%fun-name (hashset-test-function self))
+              (hashset-count self)
+              (hs-cells-capacity cells)
+              (hs-cells-max-psl cells)))))
 
 ;;; We need to avoid dependence on the host's SXHASH function when producing
 ;;; hash values for hashset lookup, so that elements end up in an order
