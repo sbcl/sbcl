@@ -376,6 +376,7 @@ distinct from the global value. Can also be SETF."
 
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
+  (declare (sb-c::tlab :system))
   ;; Avoid writing to the string header if it's already flagged as readonly, or off-heap.
   (when (and (not (logtest (ash sb-vm:+vector-shareable+ 8) (get-header-data name)))
              (dynamic-space-obj-p name))

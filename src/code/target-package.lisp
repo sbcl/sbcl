@@ -312,14 +312,13 @@ of :INHERITED :EXTERNAL :INTERNAL."
 (defconstant +package-hashtable-image-load-factor+ 1/2)
 
 ;;; Make a package hashtable having a prime number of entries at least
-;;; as great as (/ SIZE +PACKAGE-REHASH-THRESHOLD+). If RES is supplied,
-;;; then it is destructively modified to produce the result. This is
-;;; useful when changing the size, since there are many pointers to
-;;; the hashtable.
-;;; Actually, the smallest table built here has three entries. This
+;;; as great as (/ SIZE +PACKAGE-REHASH-THRESHOLD+).
+;;; The smallest table built here has three entries. This
 ;;; is necessary because the double hashing step size is calculated
 ;;; using a division by the table size minus two.
 (defun make-package-hashtable (size)
+  (declare (sb-c::tlab :system)
+           (inline %make-package-hashtable))
   (flet ((actual-package-hashtable-size (size)
            (loop for n of-type fixnum
               from (logior (ceiling size #.+package-rehash-threshold+) 1)

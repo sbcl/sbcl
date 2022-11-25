@@ -231,6 +231,24 @@
               (unuse-arena)))))
       (sb-thread:join-thread thread))))
 
+(defvar *newpkg* (make-package "PACKAGE-GROWTH-TEST"))
+(defun addalottasymbols ()
+  (sb-vm:with-arena (*arena*)
+    (dotimes (i 200)
+      (let ((str (concatenate 'string "S" (write-to-string i))))
+        (assert (not (heap-allocated-p str)))
+        (let ((sym (intern str *newpkg*)))
+          (assert (heap-allocated-p sym))
+          (assert (heap-allocated-p (symbol-name sym))))))))
+(test-util:with-test (:name :intern-a-bunch)
+  (let ((old-n-cells
+         (length (sb-impl::package-hashtable-cells
+                  (sb-impl::package-internal-symbols *newpkg*)))))
+    (addalottasymbols)
+    (let* ((cells (sb-impl::package-hashtable-cells
+                   (sb-impl::package-internal-symbols *newpkg*))))
+      (assert (> (length cells) old-n-cells)))))
+
 (defun all-arenas ()
   (let ((head (sb-kernel:%make-lisp-obj (extern-alien "arena_chain" unsigned))))
     (cond ((eql head 0) nil)
