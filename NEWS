@@ -3,6 +3,8 @@
 changes relative to sbcl-2.2.11:
   * enhancement: support for SLOT-VALUE and friends has been extended to
     structure and condition instances.
+  * bug fix: type intersections of RATIONAL ranges with (NOT INTEGER) are
+    computed more consistently.  (lp#1998008)
 
 changes in sbcl-2.2.11 relative to sbcl-2.2.10:
   * platform support:

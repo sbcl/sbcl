@@ -775,6 +775,10 @@
   (let ((type '(or (integer * -1) (rational -1/2 1/2) (integer 1) (not integer))))
     (assert-tri-eq t t (subtypep t type))))
 
+(with-test (:name (:rational-union :wider-equivalent-to-t))
+  (let ((type '(or (integer * -2) (rational -3/2 3/2) (integer 2) (not integer))))
+    (assert-tri-eq t t (subtypep t type))))
+
 (with-test (:name (:rational-union :no-integers-in-rational))
   (let ((type '(or (integer 1 1) (rational 1/2 1/2))))
     (assert-tri-eq t t (subtypep type 'rational))
@@ -797,7 +801,8 @@
                  (t2 '(or (not (cons t (real -1 1)))
                        (not (cons sequence (eql 2))))))
              (assert-tri-eq t t (subtypep t1 t2))
-             (assert-tri-eq t t (subtypep `(not ,t2) `(not ,t1))))))))
+             (assert-tri-eq t t (subtypep `(not ,t2) `(not ,t1))))))
+    (bug039)))
 
 (with-test (:name (:rational-union :lp1912863 :bug041))
   (flet ((bug041 ()
@@ -806,7 +811,8 @@
                  (t3 '(cons simple-array t)))
              (assert-tri-eq t t (subtypep t1 t2))
              (assert-tri-eq t t (subtypep `(not (or ,t2 ,t3)) `(not ,t1)))
-             (assert-tri-eq t t (subtypep `(and (not ,t2) (not ,t3)) `(not ,t1))))))))
+             (assert-tri-eq t t (subtypep `(and (not ,t2) (not ,t3)) `(not ,t1))))))
+    (bug041)))
 
 (with-test (:name (:lp1916040 :answer))
   (let* ((t1 '(cons sequence short-float))
@@ -833,3 +839,18 @@
              (checked-compile
               `(lambda (a) (array-rank (the (not (array t)) a))))))
            `(values array-rank &optional))))
+
+(with-test (:name (:rational-intersection :lp1998008))
+  (flet ((bug101 ()
+           (let ((t1 '(or (not (real 1 3)) (eql 2))))
+             (assert-tri-eq t t (subtypep `(not (not ,t1)) t1))
+             (assert-tri-eq t t (subtypep t1 `(not (not ,t1)))))))
+    (bug101)))
+
+(with-test (:name (:rational-intersection :integer-bounds))
+  (let ((t1 '(and (not integer) (rational 3 5)))
+        (t2 '(and (not integer) (rational (3) (5)))))
+    (assert-tri-eq t t (subtypep t1 t2))
+    (assert-tri-eq t t (subtypep t2 t1))
+    (assert-tri-eq t t (subtypep `(not ,t1) `(not ,t2)))
+    (assert-tri-eq t t (subtypep `(not ,t2) `(not ,t1)))))

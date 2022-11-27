@@ -2425,6 +2425,17 @@ expansion happened."
                        :specialized-element-type (array-type-specialized-element-type type1)
                        :element-type (array-type-element-type type1)))))
 
+(defun remove-integer-bounds (type)
+  (let ((low (numeric-type-low type))
+        (high (numeric-type-high type)))
+    (make-numeric-type
+     :class (numeric-type-class type)
+     :format (numeric-type-format type)
+     :complexp (numeric-type-complexp type)
+     :low (if (integerp low) (list low) low)
+     :high (if (integerp high) (list high) high)
+     :enumerable (numeric-type-enumerable type))))
+
 (define-type-method (negation :complex-intersection2) (type1 type2)
   (cond
     ((csubtypep type1 (negation-type-type type2)) *empty-type*)
@@ -2432,6 +2443,11 @@ expansion happened."
      type1)
     ((and (array-type-p type1) (array-type-p (negation-type-type type2)))
      (maybe-complex-array-refinement type1 type2))
+    ((and (numeric-type-p type1)
+          (eql (numeric-type-class type1) 'rational)
+          (csubtypep (sb-kernel:specifier-type 'integer) (negation-type-type type2))
+          (or (integerp (numeric-type-low type1)) (integerp (numeric-type-high type1))))
+     (type-intersection (remove-integer-bounds type1) type2))
     (t nil)))
 
 (define-type-method (negation :simple-union2) (type1 type2)
