@@ -217,7 +217,10 @@
                 (when (and (>= (length name) 3) (string= name "DEF" :end1 3))
                   (context (source-form-context form))))))
           (when (null current) (return))
-          (setq form (nth (pop current) form)))
+         (let ((cons (sb-impl::dotted-nthcdr (pop current) form)))
+           (setq form (if (comma-p cons)
+                          (comma-expr cons)
+                          (car cons)))))
 
         (cond ((context)
                (values form (context)))

@@ -543,7 +543,10 @@
       (declare (fixnum pos))
       (macrolet ((frob ()
                    `(progn
-                      (when (atom subform) (return))
+                      (when (comma-p subform)
+                        (setf subform (comma-expr subform)))
+                      (when (atom subform)
+                        (return))
                       (let ((fm (car subform)))
                         (when (comma-p fm)
                           (setf fm (comma-expr fm)))
@@ -567,6 +570,8 @@
         (loop
          (frob)
          (frob)
+         (when (comma-p trail)
+           (return))
          (setq trail (cdr trail)))))))
 
 
