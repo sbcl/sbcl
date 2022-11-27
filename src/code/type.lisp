@@ -4390,7 +4390,7 @@ used for a COMPLEX component.~:@>"
               (csubtypep type2
                          (make-numeric-type
                           :class 'rational
-                          :complexp nil
+                          :complexp :real
                           :low (if (null (numeric-type-low type1))
                                    nil
                                    (list (1- (numeric-type-low type1))))
