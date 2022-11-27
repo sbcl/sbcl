@@ -293,3 +293,28 @@
           (assert (equal (all-arenas) (butlast chain))))
         (exit-if-no-arenas))
       (assert (= n-deleted n-arenas)))))
+
+(test-util:with-test (:name :disassemble-pcl-stuff)
+  (let ((stream (make-string-output-stream)))
+    (with-package-iterator (iter "SB-PCL" :internal :external)
+      (loop
+        (multiple-value-bind (got symbol) (iter)
+          (unless got (return))
+          (when (and (fboundp symbol)
+                     (not (closurep (symbol-function symbol)))
+                     (not (sb-pcl::generic-function-p
+                           (symbol-function symbol))))
+            (disassemble (sb-kernel:fun-code-header
+                          (or (macro-function symbol)
+                              (symbol-function symbol)))
+                         :stream stream)
+            (let ((lines (test-util:split-string
+                          (get-output-stream-string stream)
+                          #\newline)))
+              (dolist (line lines)
+                (cond ((search "LIST-ALLOC-TRAMP" line)
+                       (assert (search "SYS-LIST-ALLOC-TRAMP" line)))
+                      ((search "ALLOC-TRAMP" line)
+                       (assert (search "SYS-ALLOC-TRAMP" line)))
+                      ((search "LISTIFY-&REST" line)
+                       (assert (search "SYS-LISTIFY-&REST" line))))))))))))
