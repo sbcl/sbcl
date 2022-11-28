@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.2.10:
+changes in sbcl-2.2.11 relative to sbcl-2.2.10:
   * platform support:
     ** arm64: allow the use of CLISP as a build host.  (lp#1996942, reported
        by Andrew Patterson)
