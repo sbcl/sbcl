@@ -1,16 +1,24 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
 changes relative to sbcl-2.2.10:
+  * platform support:
+    ** arm64: allow the use of CLISP as a build host.  (lp#1996942, reported
+       by Andrew Patterson)
   * enhancement: improvements to constraint propagation around comparison
     functions.
   * optimization: conditional move VOPs can work on boxed values and
     produce less consing.
   * optimization: NUNION and UNION are generally faster.
   * bug fix: slot-makunbound-using-class can be redefined without redefining
-    the other slot methods (lp#1956621)
+    the other slot methods.  (lp#1956621, reported by Michał Herda)
   * bug fix: GETHASH on a table created without ":synchronized t" when run
     concurrently in multiple threads could have returned incorrect results.
   * bug fix: build of contributed modules assumed that 'cat' was always
-    in /bin/cat on POSIX systems (lp#1995224)
+    in /bin/cat on POSIX systems.  (lp#1995224, reported by Kasper Gałkowski)
+  * bug fix: INSPECT on an (ARRAY NIL) no longer hangs.  (lp#1995639, reported
+    by Michał Herda)
+  * bug fix: Fix miscompilation of FILE-STRING-LENGTH when the first argument
+    has a known FILE-STREAM type.  (lp#1995881)
 
 changes in sbcl-2.2.10 relative to sbcl-2.2.9:
   * platform support:
