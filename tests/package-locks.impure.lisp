@@ -11,7 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+sb-devel (invoke-restart 'run-tests::skip-file) ; packages are not locked for devs
+#+(and sb-devel (not sb-devel-lock-packages))
+(invoke-restart 'run-tests::skip-file) ; packages are not locked for devs
 
 (load "compiler-test-util.lisp")
 
@@ -365,7 +366,7 @@
                                          *illegal-double-forms*)
                         :key #'first))
     (with-error-info ("locked illegal runtime form: ~S~%" form)
-      (let ((fun (checked-compile `(lambda () ,form))))
+      (let ((fun (checked-compile `(lambda () ,form) :allow-style-warnings t)))
         (assert-error (funcall fun) sb-ext:package-lock-violation))
       (assert-error (eval form) sb-ext:package-lock-violation))))
 
