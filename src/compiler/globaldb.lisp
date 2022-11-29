@@ -115,34 +115,30 @@
 (push '("SB-INT" define-info-type) *!removable-symbols*)
 
 
-(macrolet ((meta-info-or-lose (category kind)
-             ;; don't need to type-check META-INFO's result, since it
-             ;; defaults to signaling an error if no meta-info found.
-             `(truly-the meta-info (meta-info ,category ,kind))))
 ;;; INFO is the standard way to access the database. It's settable.
 ;;;
 ;;; Return the information of the specified CATEGORY and KIND for NAME.
 ;;; The second value returned is true if there is any such information
 ;;; recorded. If there is no information, the first value returned is
 ;;; the default and the second value returned is NIL.
-  (defun info (category kind name)
-    (let ((info (meta-info category kind)))
-      (get-info-value name (meta-info-number info))))
+(defun info (category kind name)
+  (let ((info (meta-info category kind)))
+    (get-info-value name (meta-info-number info))))
 
-  (defun (setf info) (new-value category kind name)
-    (let ((info (meta-info category kind)))
-      (funcall (meta-info-type-checker info) new-value)
-      (awhen (meta-info-validate-function info)
-        (funcall it name new-value))
-      (set-info-value name (meta-info-number info) new-value)))
+(defun (setf info) (new-value category kind name)
+  (let ((info (meta-info category kind)))
+    (funcall (meta-info-type-checker info) new-value)
+    (awhen (meta-info-validate-function info)
+      (funcall it name new-value))
+    (set-info-value name (meta-info-number info) new-value)))
 
-  ;; Clear the information of the specified CATEGORY and KIND for NAME in
-  ;; the current environment. Return true if there was any info.
-  (defun clear-info (category kind name)
-    (let* ((info (meta-info category kind))
-           (info-number-list (list (meta-info-number info))))
-      (declare (dynamic-extent info-number-list))
-      (clear-info-values name info-number-list))))
+;; Clear the information of the specified CATEGORY and KIND for NAME in
+;; the current environment. Return true if there was any info.
+(defun clear-info (category kind name)
+  (let* ((info (meta-info category kind))
+         (info-number-list (list (meta-info-number info))))
+    (declare (dynamic-extent info-number-list))
+    (clear-info-values name info-number-list)))
 
 (defun clear-info-values (name info-numbers)
   (dolist (type info-numbers)
