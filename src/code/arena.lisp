@@ -91,7 +91,8 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 (define-vop (delete-arena)
   (:args (x :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
-  (:temporary (:sc unsigned-reg) rsp-save)
+  #+immobile-space
+  (:temporary (:sc unsigned-reg :offset rbx-offset) rsp-save)
   (:vop-var vop)
   (:generator 1
     (move rdi x)

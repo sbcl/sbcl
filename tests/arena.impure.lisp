@@ -218,8 +218,7 @@
               est act frac)
       (assert (< frac 1))))))
 
-(test-util:with-test (:name :thread-arena-inheritance
-                      :skipped-on :darwin) ; I can't imagine why this fails
+(test-util:with-test (:name :thread-arena-inheritance)
   (sb-vm:with-arena (*arena*)
     (let ((thread
            (sb-thread:make-thread
