@@ -1230,6 +1230,11 @@
                ,new-ll (,accessor ,ll-whole)
                #-sb-xc-host
                (declare (constant-value ,@variables))
+               ;; Avoid warnings about emitted full calls
+               ;; inside the body of a compiler macro itself.
+               ,@(and (eq kind 'define-compiler-macro)
+                      (not (memq (info :function :kind name) '(:macro :special-form)))
+                      `((declare (notinline ,name))))
                ,@decls
                ,@(if wrap-block
                      `((block ,(fun-name-block-name name) ,@forms))

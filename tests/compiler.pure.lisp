@@ -588,7 +588,8 @@
                    (declare (ignore x))))))
     (dolist (form forms)
       (assert (nth-value
-               1 (checked-compile `(lambda () ,form) :allow-failure t))))))
+               1 (checked-compile `(lambda () ,form) :allow-failure t
+                                  :allow-style-warnings t))))))
 
 (with-test (:name (compile make-array svref :derive-type))
   (multiple-value-bind (fun failurep warnings)
