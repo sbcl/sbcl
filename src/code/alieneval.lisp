@@ -607,32 +607,62 @@
                                :include-args (signed))
   name          ; name of this enum (if any)
   from          ; alist from symbols to integers
+  hash          ; for hash-consing
   to            ; alist or vector from integers to symbols
   kind          ; kind of from mapping, :VECTOR or :ALIST
   offset)       ; offset to add to value for :VECTOR from mapping
+
+(define-alien-type-method (enum :type=) (type1 type2)
+  (and (eq (alien-enum-type-name type1) (alien-enum-type-name type2))
+       (= (alien-enum-type-hash type1) (alien-enum-type-hash type2))
+       (equal (alien-enum-type-from type1)
+              (alien-enum-type-from type2))))
+
+;;; Anonymous enums are hash-consed. Named ones don't need to be hash-consed,
+;;; because there is at most one instance of the named enum in any environment.
+(define-load-time-global *enum-type-cache*
+  (make-hashset 32 #'enum-type=-method #'alien-enum-type-hash
+                :weakness t :synchronized t))
 
 (define-alien-type-translator enum (&whole
                                  type name
                                  &rest mappings
                                  &environment env)
+  (declare (inline make-alien-enum-type))
   (cond (mappings
-         (let ((result (parse-enum name mappings)))
-           (when name
-             (multiple-value-bind (old old-p)
-                 (auxiliary-alien-type :enum name env)
-               (when old-p
-                 (unless (alien-type-= result old)
+         (dx-let ((result (make-alien-enum-type :name name)))
+           (%parse-enum mappings result)
+           ;; Slots which are pure functions of the mapping need not be mixed in:
+           ;; * KIND is based on density of the numeric range
+           ;; * SIGNED is true if and only if the minimum value is negative
+           ;; * OFFSET is based on the minimum value if and only if the
+           ;;   inverse map is stored as is a vector
+           (let ((h (sb-xc:sxhash name)))
+             (dolist (elt (alien-enum-type-from result))
+               ;; Mix by hand since our SXHASH has a cutoff on length, not to
+               ;; mention that this potentially runs on either the host or the target,
+               ;; and the host does't emulate the target's hashing of lists.
+               (setf h (mix (mix (sb-xc:sxhash (car elt)) (sb-xc:sxhash (cdr elt)))
+                            h)))
+             (setf (alien-enum-type-hash result) h))
+           (unless name
+             (return-from alien-enum-type-translator
+               (hashset-insert-if-absent *enum-type-cache* result #'copy-structure)))
+           (multiple-value-bind (old old-p) (auxiliary-alien-type :enum name env)
+             (cond
+               (old-p
+                (unless (alien-type-= result old)
                    (cerror "Continue, clobbering the old definition"
                            "Incompatible alien enum type definition: ~S" name)
                    (setf (alien-enum-type-from old) (alien-enum-type-from result)
+                         (alien-enum-type-hash old) (alien-enum-type-hash result)
                          (alien-enum-type-to old) (alien-enum-type-to result)
                          (alien-enum-type-kind old) (alien-enum-type-kind result)
                          (alien-enum-type-offset old) (alien-enum-type-offset result)
                          (alien-enum-type-signed old) (alien-enum-type-signed result)))
-                 (setf result old))
-               (unless old-p
-                 (setf (auxiliary-alien-type :enum name env) result))))
-           result))
+                old)
+               (t
+                (setf (auxiliary-alien-type :enum name env) (copy-structure result)))))))
         (name
          (multiple-value-bind (result found)
              (auxiliary-alien-type :enum name env)
@@ -642,7 +672,7 @@
         (t
          (error "empty enum type: ~S" type))))
 
-(defun parse-enum (name elements)
+(defun %parse-enum (elements result)
   (when (null elements)
     (error "An enumeration must contain at least one element."))
   (let ((min nil)
@@ -674,6 +704,7 @@
                          (integer-length max))))
       (when (> min-bits 32)
         (error "can't represent enums needing more than 32 bits"))
+      (setf (alien-enum-type-signed result) signed)
       (setf from-alist (sort from-alist #'< :key #'cdr))
       (cond
        ;; If range is at least 20% dense, use vector mapping. Crossover
@@ -685,15 +716,15 @@
         (let ((to (make-array (1+ (- max min)))))
           (dolist (el from-alist)
             (setf (svref to (- (cdr el) min)) (car el)))
-          (make-alien-enum-type :name name :signed signed
-                                :from from-alist :to to :kind
-                                :vector :offset (- min))))
+          (setf (alien-enum-type-to result) to))
+        (setf (alien-enum-type-offset result) (- min)
+              (alien-enum-type-kind result) :vector))
        (t
-        (make-alien-enum-type :name name :signed signed
-                              :from from-alist
-                              :to (mapcar (lambda (x) (cons (cdr x) (car x)))
-                                          from-alist)
-                              :kind :alist))))))
+        (setf (alien-enum-type-to result) (mapcar (lambda (x) (cons (cdr x) (car x)))
+                                                  from-alist)
+              (alien-enum-type-offset result) nil
+              (alien-enum-type-kind result) :alist)))
+      (setf (alien-enum-type-from result) from-alist))))
 
 (define-alien-type-method (enum :unparse) (type)
   `(enum ,(alien-enum-type-name type)
@@ -707,12 +738,6 @@
                                  `(,sym ,value))
                            (setf prev value))))
                      (alien-enum-type-from type)))))
-
-(define-alien-type-method (enum :type=) (type1 type2)
-  (and (eq (alien-enum-type-name type1)
-           (alien-enum-type-name type2))
-       (equal (alien-enum-type-from type1)
-              (alien-enum-type-from type2))))
 
 (define-alien-type-method (enum :lisp-rep) (type)
   `(member ,@(mapcar #'car (alien-enum-type-from type))))
