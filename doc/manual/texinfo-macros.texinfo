@@ -3,6 +3,9 @@
 @macro earmuffs{name}
 *\name\*
 @end macro
+@macro earstuds{name}
++\name\+
+@end macro
 @macro setf{name}
 (setf \name\)
 @end macro

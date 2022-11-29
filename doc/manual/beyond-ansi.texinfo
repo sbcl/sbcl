@@ -308,6 +308,7 @@ the symbol used as the slot-name in the slot-description in the
 @findex @cl{slot-unbound}
 @findex @cl{slot-value}
 @findex @cl{slot-boundp}
+@cindex Unbound slots
 @code{slot-value} and @code{slot-boundp} function as expected,
 including (for @code{slot-value}) calling and respecting the return
 value of @code{slot-unbound} if the slot is unbound;
@@ -320,6 +321,7 @@ the slot;
 
 @item
 @findex @cl{slot-makunbound}
+@cindex Unbound slots
 @code{slot-makunbound} makes the slot be unbound only when the slot
 corresponds to an @code{&aux} argument with no default in a
 by-order-of-arguments (BOA) constructor.  In all other cases calling
@@ -581,9 +583,10 @@ between classes and proper names and between lists of the form
 @code{(eql @var{x})} and interned eql specializer objects.
 
 @item
-@vindex @sbpcl{+slot-unbound+}
+@vindex @sbpcl{@earstuds{slot-unbound}}
 @findex @sbmop{standard-instance-access}
 @findex @sbmop{funcallable-standard-instance-access}
+@cindex Unbound slots
 distinguishing unbound instance allocated slots from bound ones when
 using @code{standard-instance-access} and
 @code{funcallable-standard-instance-access} is possible by comparison
