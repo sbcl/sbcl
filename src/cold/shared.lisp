@@ -560,7 +560,8 @@
          (tmp-obj
            (concatenate 'string obj
                         (if *compile-for-effect-only* "-scratch" "-tmp")))
-         (compile-file (ecase mode
+         (compilation-fn
+                       (ecase mode
                          (:host-compile
                           #+abcl ; ABCL complains about its own deficiency and then returns T
                           ;; for warnings and failure. "Unable to compile function" is not our problem,
@@ -590,7 +591,7 @@
                                               *target-compile-file*))))
          (trace-file (if (find :trace-file flags) t nil))
          (block-compile (if (find :block-compile flags) t :specified)))
-    (declare (type function compile-file))
+    (declare (type function compilation-fn))
 
     (ensure-directories-exist obj :verbose cl:*compile-print*) ; host's value
 
@@ -637,10 +638,10 @@
            (report-continue-restart (stream)
              (format stream "Continue, using possibly bogus file ~S" obj)))
       (tagbody
-       retry-compile-file
+       retry-compile
          (multiple-value-bind (output-truename warnings-p failure-p)
              (restart-case
-                 (apply compile-file src
+                 (apply compilation-fn src
                         :output-file tmp-obj
                         :block-compile (and
                                         ;; Block compilation was
@@ -663,7 +664,7 @@
                           '(:trace-file t :print t)))
                (recompile ()
                  :report report-recompile-restart
-                 (go retry-compile-file)))
+                 (go retry-compile)))
            (declare (ignore warnings-p))
            (cond ((not output-truename)
                   (error "couldn't compile ~S" src))
@@ -674,7 +675,7 @@
                                   obj)
                          (recompile ()
                            :report report-recompile-restart
-                           (go retry-compile-file))
+                           (go retry-compile))
                          (continue ()
                            :report report-continue-restart
                            (setf failure-p nil)))
