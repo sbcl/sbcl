@@ -12,9 +12,9 @@
 ;;;; C string support.
 
 (define-alien-type-class (c-string :include pointer :include-args (to))
-  (external-format :default :type keyword)
-  (element-type 'character :type (member character base-char))
-  (not-null nil :type boolean))
+  (external-format :default :type keyword :read-only t)
+  (element-type 'character :type (member character base-char) :read-only t)
+  (not-null nil :type boolean :read-only t))
 
 (define-alien-type-translator c-string
     (&key (external-format :default)

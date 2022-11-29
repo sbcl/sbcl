@@ -499,6 +499,7 @@
 ;;;; the INTEGER type
 
 (define-alien-type-class (integer)
+  ;; -SIGNED is mutable because of redefined ENUMs.
   (signed t :type (member t nil)))
 
 (define-alien-type-translator signed (&optional (bits sb-vm:n-word-bits))
@@ -736,7 +737,7 @@
 ;;;; the FLOAT types
 
 (define-alien-type-class (float)
-  (type (missing-arg) :type symbol))
+  (type (missing-arg) :type symbol :read-only t))
 
 (define-alien-type-method (float :unparse) (type)
   (alien-float-type-type type))
@@ -832,7 +833,7 @@
 
 (define-alien-type-class (pointer :include (alien-value (bits
                                                          sb-vm:n-machine-word-bits)))
-  (to nil :type (or alien-type null)))
+  (to nil :type (or alien-type null) :read-only t))
 
 (define-alien-type-translator * (to &environment env)
   (make-alien-pointer-type :to (if (eq to t) nil (parse-alien-type to env))))
@@ -903,8 +904,8 @@
 ;;;; the ARRAY type
 
 (define-alien-type-class (array :include mem-block)
-  (element-type (missing-arg) :type alien-type)
-  (dimensions (missing-arg) :type list))
+  (element-type (missing-arg) :type alien-type :read-only t)
+  (dimensions (missing-arg) :type list :read-only t))
 
 (define-alien-type-translator array (ele-type &rest dims &environment env)
 
@@ -967,9 +968,9 @@
 (!set-load-form-method alien-record-field (:xc :target))
 
 (define-alien-type-class (record :include mem-block)
-  (kind :struct :type (member :struct :union))
-  (name nil :type (or symbol null))
-  (fields nil :type list))
+  (kind :struct :type (member :struct :union) :read-only t)
+  (name nil :type (or symbol null) :read-only t)
+  (fields nil :type list)) ; mutable because of structural recursion and parser
 
 (define-alien-type-translator struct (name &rest fields &environment env)
   (parse-alien-record-type :struct name fields env))
@@ -1145,13 +1146,13 @@
 ;;; translation as well.
 
 (define-alien-type-class (fun :include mem-block)
-  (result-type (missing-arg) :type alien-type)
-  (arg-types (missing-arg) :type list)
+  (result-type (missing-arg) :type alien-type :read-only t)
+  (arg-types (missing-arg) :type list :read-only t)
   ;; The 3rd-party CFFI library uses presence of &REST in an argument list
   ;; as indicative of "..." in the C prototype. We can record that too.
-  (varargs nil :type (or boolean fixnum (eql :unspecified)))
+  (varargs nil :type (or boolean fixnum (eql :unspecified)) :read-only t)
   (stub nil :type (or null function))
-  (convention nil :type calling-convention))
+  (convention nil :type calling-convention :read-only t))
 ;;; The safe default is to assume that everything is varargs.
 ;;; On x86-64 we have to emit a spurious instruction because of it.
 ;;; So until all users fix their lambda lists to be explicit about &REST
@@ -1214,7 +1215,7 @@
               (alien-fun-type-arg-types type2))))
 
 (define-alien-type-class (values)
-  (values (missing-arg) :type list))
+  (values (missing-arg) :type list :read-only t))
 
 (define-alien-type-translator values (&rest values &environment env)
   (unless *values-type-okay*

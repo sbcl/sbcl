@@ -262,9 +262,12 @@ Examples:
                    (error
                     "cannot override the size of zero-dimensional arrays"))
                  (when (constantp size)
-                   (setf alien-type (copy-structure alien-type))
-                   (setf (alien-array-type-dimensions alien-type)
-                         (cons (constant-form-value size) (cdr dims)))))
+                   (setf alien-type
+                         (make-alien-array-type
+                          :dimensions (cons (constant-form-value size) (cdr dims))
+                          :element-type (alien-array-type-element-type alien-type)
+                          :bits (alien-type-bits alien-type)
+                          :alignment (alien-type-alignment alien-type)))))
                 (dims
                  (setf size (car dims)))
                 (t
