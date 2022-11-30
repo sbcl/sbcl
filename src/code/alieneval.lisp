@@ -785,18 +785,12 @@
 (define-alien-type-class (single-float :include (float (bits 32))
                                        :include-args (type)))
 
-(define-alien-type-translator single-float ()
-  (load-time-value (make-alien-single-float-type :type 'single-float) t))
-
 (define-alien-type-method (single-float :extract-gen) (type sap offset)
   (declare (ignore type))
   `(sap-ref-single ,sap (/ ,offset sb-vm:n-byte-bits)))
 
 (define-alien-type-class (double-float :include (float (bits 64))
                                        :include-args (type)))
-
-(define-alien-type-translator double-float ()
-  (load-time-value (make-alien-double-float-type :type 'double-float) t))
 
 (define-alien-type-method (double-float :extract-gen) (type sap offset)
   (declare (ignore type))
@@ -806,9 +800,6 @@
 ;;;; the SAP type
 
 (define-alien-type-class (system-area-pointer))
-
-(define-alien-type-translator system-area-pointer ()
-  (load-time-value (make-alien-system-area-pointer-type :bits sb-vm:n-machine-word-bits) t))
 
 (define-alien-type-method (system-area-pointer :unparse) (type)
   (declare (ignore type))
@@ -835,6 +826,19 @@
   (declare (ignore type))
   `(sap-ref-sap ,sap (/ ,offset sb-vm:n-byte-bits)))
 
+;; CMUCL (sometimes/always?) does not permit using a structure constructor from
+;; earlier in this file within a LOAD-TIME-VALUE form later in the file.
+(macrolet ((def-singleton-type (type ctor)
+             #+sb-xc-host
+             (let ((pseudo-const (symbolicate "*" type "-TYPE*")))
+               `(progn (defvar ,pseudo-const ,ctor)
+                       (define-alien-type-translator ,type () ,pseudo-const)))
+             #-sb-xc-host
+             `(define-alien-type-translator ,type () '(load-time-value ,ctor t))))
+  (def-singleton-type single-float (make-alien-single-float-type :type 'single-float))
+  (def-singleton-type double-float (make-alien-double-float-type :type 'double-float))
+  (def-singleton-type system-area-pointer
+      (make-alien-system-area-pointer-type :bits sb-vm:n-machine-word-bits)))
 
 ;;;; the ALIEN-VALUE type
 
