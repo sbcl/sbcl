@@ -72,18 +72,23 @@
   ;; The block may end up being deleted due to cast optimization
   ;; caused by USE-GOOD-FOR-DX-P
   (unless (node-to-be-deleted-p call)
-    (let* ((dx-lvars
+    (let* (no-notes
+           (dx-lvars
              (loop for arg in (basic-combination-args call)
                    for var in (lambda-vars fun)
                    for dx = (leaf-dynamic-extent var)
                    when (and dx arg (not (lvar-dynamic-extent arg)))
-                     collect (cons dx arg))))
+                   collect (cons dx arg)
+                   do
+                   (when (eq dx 'dynamic-extent-no-note)
+                     (setf no-notes dx)))))
       (when dx-lvars
         (let* ((entry (with-ir1-environment-from-node call
                         (make-entry)))
                (cleanup (make-cleanup :kind :dynamic-extent
                                       :mess-up entry
-                                      :nlx-info dx-lvars)))
+                                      :nlx-info dx-lvars
+                                      :dx-kind no-notes)))
           (setf (entry-cleanup entry) cleanup)
           (insert-node-before call entry)
           (setf (node-lexenv call)

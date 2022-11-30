@@ -773,6 +773,8 @@
                                   (principal-lvar-use (cast-value use))
                                   use)))
       (unless (or
+               (eq (cleanup-dx-kind  (lvar-dynamic-extent lvar))
+                   'dynamic-extent-no-note)
                ;; If we're flushing, don't complain if we can flush the combination.
                (and flush
                     (or

@@ -1472,7 +1472,7 @@ the stack without triggering overflow protection.")
 (defun process-extent-decl (names vars fvars kind)
   (let ((extent
           (ecase kind
-            (dynamic-extent
+            ((dynamic-extent dynamic-extent-no-note)
              (when *stack-allocate-dynamic-extent*
                kind))
             ((indefinite-extent truly-dynamic-extent)
@@ -1583,7 +1583,7 @@ the stack without triggering overflow protection.")
          :default res
          :handled-conditions (process-unmuffle-conditions-decl
                               spec (lexenv-handled-conditions res))))
-       ((dynamic-extent truly-dynamic-extent indefinite-extent)
+       ((dynamic-extent truly-dynamic-extent indefinite-extent dynamic-extent-no-note)
         (process-extent-decl (cdr spec) vars fvars (first spec))
         res)
        ((disable-package-locks enable-package-locks)

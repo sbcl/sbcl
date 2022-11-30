@@ -697,7 +697,8 @@
   ;; locall call analysis) and is rechecked by environment
   ;; analysis. (For closures this is a list of the LVAR of the enclose
   ;; after environment analysis.)
-  (nlx-info nil :type list))
+  (nlx-info nil :type list)
+  (dx-kind nil))
 (defprinter (cleanup :identity t)
   kind
   mess-up
@@ -851,7 +852,8 @@
   ;; This may be non-nil when REFS and SETS are null, since code can be deleted.
   (ever-used nil :type (member nil set t))
   ;; is it declared dynamic-extent, or truly-dynamic-extent?
-  (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent))
+  (extent nil :type (member nil truly-dynamic-extent dynamic-extent indefinite-extent
+                            dynamic-extent-no-note))
   ;; some kind of info used by the back end
   (info nil))
 (!set-load-form-method leaf (:xc :target) :ignore-it)

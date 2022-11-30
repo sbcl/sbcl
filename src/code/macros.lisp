@@ -1899,25 +1899,24 @@ symbol-case giving up: case=((V U) (F))
   ;; this macro exists for a reason.
   (let* ((initial-buffer '#:buf)
          (dummy '#:stream)
-         (string-let (or #+c-stack-is-control-stack 'dx-let 'let))
          (string-ctor
-           (cond ((and (sb-xc:constantp element-type)
-                       (let ((ctype (sb-c::careful-specifier-type
-                                     (constant-form-value element-type))))
-                         (and ctype
-                              (csubtypep ctype (specifier-type 'character))
-                              (neq ctype *empty-type*))))
-                  ;; Using MAKE-ARRAY avoids a style-warning if et is 'STANDARD-CHAR:
-                  ;; "The default initial element #\Nul is not a STANDARD-CHAR."
-                  'make-array) ; hooray! it's known be a valid string type
-                 (t
-                  ;; Force a runtime STRINGP check unless futher transforms
-                  ;; deduce a known type.
-                  (setf string-let 'let)
-                  'make-string))))
+           (if (and (sb-xc:constantp element-type)
+                    (let ((ctype (sb-c::careful-specifier-type
+                                  (constant-form-value element-type))))
+                      (and ctype
+                           (csubtypep ctype (specifier-type 'character))
+                           (neq ctype *empty-type*))))
+               ;; Using MAKE-ARRAY avoids a style-warning if et is 'STANDARD-CHAR:
+               ;; "The default initial element #\Nul is not a STANDARD-CHAR."
+               'make-array ; hooray! it's known be a valid string type
+               ;; Force a runtime STRINGP check unless futher transforms
+               ;; deduce a known type.
+               'make-string)))
     ;; A full call to MAKE-STRING-OUTPUT-STREAM uses a larger initial buffer
     ;; if BASE-CHAR but I really don't care to think about that here.
-    `(,string-let ((,initial-buffer (,string-ctor 31 :element-type ,element-type)))
+    `(let ((,initial-buffer (,string-ctor 31 :element-type ,element-type)))
+       #+c-stack-is-control-stack
+       (declare (sb-c::dynamic-extent-no-note ,initial-buffer))
        (dx-let ((,dummy (%allocate-string-ostream)))
          (let ((,var (%init-string-output-stream ,dummy ,initial-buffer
                                                  ,wild-result-type)))
