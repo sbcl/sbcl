@@ -23,9 +23,6 @@
       (+ (eval x) 19)
       form))
 
-(defun foo-expander (x)
-  x)
-
 (defun way1 (x)
   (fruitbat x))
 

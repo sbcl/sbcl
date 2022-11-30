@@ -366,7 +366,7 @@
                                          *illegal-double-forms*)
                         :key #'first))
     (with-error-info ("locked illegal runtime form: ~S~%" form)
-      (let ((fun (checked-compile `(lambda () ,form) :allow-style-warnings t)))
+      (let ((fun (checked-compile `(lambda () ,form))))
         (assert-error (funcall fun) sb-ext:package-lock-violation))
       (assert-error (eval form) sb-ext:package-lock-violation))))
 

@@ -164,7 +164,13 @@
               ;; FIXME: this seems to omit FUNCTIONAL
               (when (defined-fun-p fun)
                 (return-from fun-lexically-notinline-p
-                  (eq (defined-fun-inlinep fun) 'notinline))))))))
+                  (eq (defined-fun-inlinep fun) 'notinline)))
+              (loop for data in (lexenv-user-data env)
+                    when (and (eq (car data) 'no-compiler-macro)
+                              (eq (cdr data) name))
+                    do
+                    (return-from fun-lexically-notinline-p
+                      t)))))))
     ;; If ANSWER is NIL, go for the global value
     (eq (or answer (info :function :inlinep name)) 'notinline)))
 
@@ -1557,6 +1563,11 @@ the stack without triggering overflow protection.")
         (process-ftype-decl (second spec) res (cddr spec) fvars context))
        ((inline notinline maybe-inline)
         (process-inline-decl spec res fvars))
+       (no-compiler-macro
+        (make-lexenv :default res
+                     :user-data (list*
+                                 (cons 'no-compiler-macro (second spec))
+                                 (lexenv-user-data res))))
        (optimize
         (multiple-value-bind (new-policy specified-qualities)
             (process-optimize-decl spec (lexenv-policy res))

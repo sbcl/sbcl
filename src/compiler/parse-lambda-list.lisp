@@ -1233,8 +1233,7 @@
                         ;; Avoid warnings about emitted full calls
                         ;; inside the body of a compiler macro itself.
                         ,@(and (eq kind 'define-compiler-macro)
-                               (not (memq (info :function :kind name) '(:macro :special-form)))
-                               `((notinline ,name))))
+                               `((no-compiler-macro ,name))))
 
                ,@decls
                ,@(if wrap-block
