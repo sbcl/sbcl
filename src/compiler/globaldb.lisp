@@ -113,7 +113,7 @@
                  *info-types*
                  :start (length *info-priority-order*))))))))
 
-(eval-when (:compile-toplevel) ; no load-time definition
+(eval-when (:compile-toplevel :execute) ; no load-time definition
 (#+sb-xc-host cl:defmacro
  #-sb-xc-host sb-xc:defmacro
  define-info-type ((category kind)
