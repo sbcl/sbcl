@@ -981,15 +981,13 @@
 (def!struct (alien-record-field (:copier nil))
   (name (missing-arg) :type symbol)
   (type (missing-arg) :type alien-type)
-  (bits nil :type (or unsigned-byte null))
   (offset 0 :type unsigned-byte))
 (defmethod print-object ((field alien-record-field) stream)
   (print-unreadable-object (field stream :type t)
     (format stream
-            "~S ~S~@[:~D~]"
+            "~S ~S"
             (alien-record-field-type field)
-            (alien-record-field-name field)
-            (alien-record-field-bits field))))
+            (alien-record-field-name field))))
 (!set-load-form-method alien-record-field (:xc :target))
 
 (define-alien-type-class (record :include mem-block)
@@ -1098,8 +1096,6 @@
 (defun unparse-alien-record-field (field)
   `(,(alien-record-field-name field)
      ,(%unparse-alien-type (alien-record-field-type field))
-     ,@(when (alien-record-field-bits field)
-             (list :bits (alien-record-field-bits field)))
      ,@(when (alien-record-field-offset field)
              (list :offset (alien-record-field-offset field)))))
 
@@ -1108,8 +1104,6 @@
 (defun record-fields-match-p (field1 field2)
   (and (eq (alien-record-field-name field1)
            (alien-record-field-name field2))
-       (eql (alien-record-field-bits field1)
-            (alien-record-field-bits field2))
        (eql (alien-record-field-offset field1)
             (alien-record-field-offset field2))
        (alien-type-= (alien-record-field-type field1)
