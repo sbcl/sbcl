@@ -834,7 +834,7 @@
                `(progn (defvar ,pseudo-const ,ctor)
                        (define-alien-type-translator ,type () ,pseudo-const)))
              #-sb-xc-host
-             `(define-alien-type-translator ,type () '(load-time-value ,ctor t))))
+             `(define-alien-type-translator ,type () (load-time-value ,ctor t))))
   (def-singleton-type single-float (make-alien-single-float-type :type 'single-float))
   (def-singleton-type double-float (make-alien-double-float-type :type 'double-float))
   (def-singleton-type system-area-pointer
