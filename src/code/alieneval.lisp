@@ -786,7 +786,7 @@
                                        :include-args (type)))
 
 (define-alien-type-translator single-float ()
-  (make-alien-single-float-type :type 'single-float))
+  (load-time-value (make-alien-single-float-type :type 'single-float) t))
 
 (define-alien-type-method (single-float :extract-gen) (type sap offset)
   (declare (ignore type))
@@ -796,7 +796,7 @@
                                        :include-args (type)))
 
 (define-alien-type-translator double-float ()
-  (make-alien-double-float-type :type 'double-float))
+  (load-time-value (make-alien-double-float-type :type 'double-float) t))
 
 (define-alien-type-method (double-float :extract-gen) (type sap offset)
   (declare (ignore type))
@@ -808,8 +808,7 @@
 (define-alien-type-class (system-area-pointer))
 
 (define-alien-type-translator system-area-pointer ()
-  (make-alien-system-area-pointer-type
-   :bits sb-vm:n-machine-word-bits))
+  (load-time-value (make-alien-system-area-pointer-type :bits sb-vm:n-machine-word-bits) t))
 
 (define-alien-type-method (system-area-pointer :unparse) (type)
   (declare (ignore type))
