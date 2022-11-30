@@ -59,18 +59,15 @@
                           ((listp list) (cons metainfo list)) ; prepend to the list
                           (t (list metainfo list)))))) ; convert atom to a list
 
-(defun !%define-info-type (category kind type-spec type-checker
-                           validate-function default &optional id)
+(defun !%define-info-type
+    (id category kind type-spec type-checker validate-function default)
   (awhen (meta-info category kind nil) ; if found
-    (when id
-      (aver (= (meta-info-number it) id)))
+    (aver (= (meta-info-number it) id))
     (return-from !%define-info-type it)) ; do nothing
-  (let ((id (or id (position nil *info-types* :start 1)
-                   (error "no more INFO type numbers available"))))
-    (register-meta-info
-     (setf (aref *info-types* id)
-           (!make-meta-info id category kind type-spec type-checker
-                            validate-function default)))))
+  (register-meta-info
+   (setf (aref *info-types* id)
+         (!make-meta-info id category kind type-spec type-checker
+                          validate-function default))))
 
 
 ;;;; info types, and type numbers, part II: what's
@@ -92,25 +89,50 @@
 ;;;  :DEFAULT (CONSTANTLY #'<a-function-name>) to adhere to the convention
 ;;; that default objects satisfying FUNCTIONP will always be funcalled.
 ;;;
-(defmacro define-info-type ((category kind)
+(eval-when (:compile-toplevel :execute)
+(defun pick-info-number (category kind)
+  (let ((pos (position (cons category kind) *info-priority-order* :test 'equal)))
+    (cond (pos
+           (let ((info (aref *info-types* pos)))
+             (when info
+               (aver (eq (meta-info-category info) category))
+               (aver (eq (meta-info-kind info) kind)))
+             pos))
+          ((and (eq category :function) (eq kind :definition))
+           +fdefn-info-num+)
+          (t
+           ;; find an existing index or available index. Since the unused cells get populated
+           ;; in order, we can stop searching at the first NULL.
+           (the fixnum
+                (position-if
+                 (lambda (x)
+                   (cond ((null x) t)
+                         ((listp x) (and (eq (car x) category) (eq (cdr x) kind)))
+                         (t (and (eq (meta-info-category x) category)
+                                 (eq (meta-info-kind x) kind)))))
+                 *info-types*
+                 :start (length *info-priority-order*))))))))
+
+(eval-when (:compile-toplevel) ; no load-time definition
+(#+sb-xc-host cl:defmacro
+ #-sb-xc-host sb-xc:defmacro
+ define-info-type ((category kind)
                             &key (type-spec (missing-arg))
                                  (validate-function)
                                  default)
   (declare (type keyword category kind))
-  ;; There was formerly a remark that (COPY-TREE TYPE-SPEC) ensures repeatable
-  ;; fasls. That's not true now, probably never was. A compiler is permitted to
-  ;; coalesce EQUAL quoted lists and there's no defense against it, so why try?
-  `(!cold-init-forms
-    (!%define-info-type
-     ,category ,kind ',type-spec
-     ,(if (eq type-spec 't)
-          '#'identity
-          `(named-lambda "check-type" (x) (the ,type-spec x)))
-     ,validate-function ,default
-     ,(or (and (eq category :function)
-               (case kind
-                 (:definition +fdefn-info-num+)))
-          #+sb-xc (meta-info-number (meta-info category kind))))))
+  (let ((num (pick-info-number category kind)))
+    `(progn
+       #+sb-xc-host ; don't mess up the *INFO-TYPES* in make-host-2
+       (eval-when (:compile-toplevel)
+         (setf (aref *info-types* ,num) (cons ,category ,kind)))
+       (!cold-init-forms
+        (!%define-info-type
+         ,num ,category ,kind ',type-spec
+         ,(if (eq type-spec 't)
+              '#'identity
+              `(named-lambda "check-type" (x) (the ,type-spec x)))
+         ,validate-function ,default))))))
 ;; It's an external symbol of SB-INT so wouldn't be removed automatically
 (push '("SB-INT" define-info-type) *!removable-symbols*)
 
@@ -196,6 +218,7 @@
 (declaim (ftype (sfunction (t info-number) (values t boolean))
                 get-info-value))
 (defun get-info-value (name info-number)
+  ;; #+sb-xc-host (incf (aref *get-info-value-histo* info-number))
   (let* ((hook *globaldb-observer*)
          (hookp (and (and hook
                           (not (eql 0 (car hook)))

@@ -122,24 +122,14 @@
       (setf (%info-ref v 0) 0)
       v))
 
-;;; %SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
-;;; But in the host Lisp, there is no such thing. Instead, SYMBOL-%INFO
-;;; is kept as a property on the host symbol.
-;;; The compatible "primitive" accessor must be a SETFable place.
-#+sb-xc-host
-(progn
-  (declaim (inline symbol-%info))
-  (defun symbol-%info (symbol)
-    (get symbol :sb-xc-globaldb-info))
-  (defun symbol-dbinfo (symbol) (symbol-%info symbol))
-  ;; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
-  (defun update-symbol-info (symbol update-fn)
-    ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
-    ;; a vector describing 0 infos and 0 auxiliary keys.
-    (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
-      (when newval
-        (setf (get symbol :sb-xc-globaldb-info) newval))
-      (values))))
+#+sb-xc-host ; In the target, UPDATE-SYMBOL-INFO is defined in 'symbol.lisp'.
+(defun update-symbol-info (symbol update-fn)
+  ;; Never pass NIL to an update-fn. Pass the minimal info-vector instead,
+  ;; a vector describing 0 infos and 0 auxiliary keys.
+  (let ((newval (funcall update-fn (or (symbol-%info symbol) +nil-packed-infos+))))
+    (when newval
+      (setf (get symbol :sb-xc-globaldb-info) newval))
+    (values)))
 
 ;;; :DEFINITION has an info-number that admits slightly clever logic.
 ;;; * SB-INTERPRETER:SPECIAL-FORM-HANDLER only needs to decode the first
@@ -390,7 +380,7 @@
 ;; This is done by unpacking/repacking - it's easy enough and fairly
 ;; efficient since the temporary vector is stack-allocated.
 ;;
-(defun %packed-info-insert (input aux-key info-number value)
+(defun packed-info-insert (input aux-key info-number value)
   (declare (type packed-info input) (type info-number info-number))
   (let* ((n-extra-elts
           ;; Test if the aux-key has been seen before or needs to be added.
@@ -407,8 +397,7 @@
     (flet ((insert-at (point v0 v1)
              (unless (eql point old-size) ; slide right
                (replace new new :start1 (+ point n-extra-elts) :start2 point))
-             (setf (svref new point) v0
-                   (svref new (+ point 1)) v1)))
+             (setf (svref new point) v0 (svref new (1+ point)) v1)))
       (cond ((= n-extra-elts 4)
              ;; creating a new aux key. SETF immediately follows the data
              ;; for the primary Name. All other aux-keys go to the end.
@@ -417,67 +406,31 @@
                (setf (svref new (+ point 2)) info-number
                      (svref new (+ point 3)) value)))
             (t
-             (let ((data-start (info-find-aux-key/unpacked
-                                aux-key new old-size)))
-               ;; it had better be found - it was in the packed vector
-               (aver data-start)
-               ;; :DEFINITION must be the first piece of info for any name.
-               (insert-at (+ data-start (if (eql info-number +fdefn-info-num+)
-                                            1 (svref new data-start)))
-                          info-number value)
+             (let* ((data-start (info-find-aux-key/unpacked aux-key new old-size))
+                    (data-length (svref new data-start))
+                    ;; Scan for the insertion point that preserves ascending order
+                    ;; by info number, except that fdefn-info-num is always first.
+                    (insertion-point
+                     (cond ((eql info-number +fdefn-info-num+) (1+ data-start))
+                           ((and (eq aux-key +no-auxiliary-key+)
+                                 (loop for index from (1+ data-start) by 2
+                                       repeat (ash data-length -1)
+                                       when (and (/= (aref new index) +fdefn-info-num+)
+                                                 (< info-number (aref new index)))
+                                       return index)))
+                           (t (+ data-start data-length)))))
+               (insert-at insertion-point info-number value)
                ;; add 2 cells, and verify that re-packing won't
                ;; overflow the 'count' for this info group.
                (aver (typep (ash (incf (svref new data-start) 2) -1)
                             'info-number))))))
     (packify-infos new)))
 
-;; Return T if INFO-VECTOR admits quicker insertion logic - it must have
-;; exactly one descriptor for the root name, space for >= 1 more field,
-;; and no aux-keys.
-(declaim (inline info-quickly-insertable-p))
-(defun info-quickly-insertable-p (packed-info)
-  (let ((n-infos (packed-info-field packed-info 0 0)))
-    ;; We can easily determine if the no-aux-keys constraint is satisfied,
-    ;; because a secondary name's info occupies at least two cells,
-    ;; one for its aux-key and >= 1 for info values.
-    (and (< n-infos (1- +infos-per-word+))
-         (eql n-infos (1- (packed-info-len packed-info))))))
-
-;; Take a packed-info INPUT and return a new one with INFO-NUMBER/VALUE
-;; added for the root name. The vector must satisfy INFO-QUICKLY-INSERTABLE-P.
-;; This code is separate from PACKED-INFO-INSERT to facilitate writing
-;; a unit test of this logic against the complete logic.
-;;
-(defun quick-packed-info-insert (input info-number value)
-  (declare (type info-number info-number))
-  ;; Because INPUT contains 1 descriptor and its corresponding values,
-  ;; the current length is exactly NEW-N, the new number of fields.
-  (let* ((descriptor (%info-ref input 0))
-         (new-n (truly-the info-number (packed-info-len input)))
-         (output (make-packed-info (1+ new-n))))
-    ;; Add a field on the high end and increment the count.
-    (setf (%info-ref output 0)
-          (logior (make-info-descriptor info-number (* info-number-bits new-n))
-                  (1+ descriptor))
-          (%info-ref output 1) value)
-    ;; Slide the old data up 1 cell.
-    (loop for i from 2 to new-n
-          do (setf (%info-ref output i) (%info-ref input (1- i))))
-    output))
-
-(declaim (maybe-inline packed-info-insert))
-(defun packed-info-insert (packed-info aux-key info-number newval)
-  (if (and (eql aux-key +no-auxiliary-key+)
-           (not (eql info-number +fdefn-info-num+))
-           (info-quickly-insertable-p packed-info))
-      (quick-packed-info-insert packed-info info-number newval)
-      (%packed-info-insert packed-info aux-key info-number newval)))
-
 ;; Search packed VECTOR for AUX-KEY and INFO-NUMBER, returning
 ;; the index of the data if found, or NIL if not found.
 ;;
 (defun packed-info-value-index (packed-info aux-key type-num)
-  ;;(declare (optimize (safetya 0))) ; bounds are AVERed
+  (declare (optimize (safety 0))) ; bounds are AVERed
   (let ((data-idx (packed-info-len packed-info)) (descriptor-idx 0) (field-idx 0))
     (declare (type index descriptor-idx)
              (type (mod #.+infos-per-word+) field-idx))

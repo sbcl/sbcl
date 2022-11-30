@@ -18,10 +18,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(with-test (:name :no-meta-info)
- (assert-signal (compile nil '(lambda (x) (sb-int:info :type :nokind x)))
-                style-warning))
-
 (defun foo (a) (list a))
 (let ((x 1)) (foo x))
 
@@ -159,28 +155,6 @@
     (do-all-symbols (s)
       (try `(setf ,s))
       (try `(cas ,s)))))
-
-(test-util:with-test (:name :quick-packed-info-insert)
-  ;; Exercise some bit patterns that touch the sign bit on 32-bit machines.
-  (loop repeat 10
-        do
-    (let ((iv1 +nil-packed-infos+)
-          (iv2 +nil-packed-infos+)
-          (type-nums
-           (cons 1 (subseq '(#b100000 #b110000 #b010000 #b011000
-                             #b000100 #b000010 #b000011 #b000001)
-                           0 (- +infos-per-word+ 2)))))
-      ;; Randomize because maybe there's an ordering constraint more
-      ;; complicated than fdefn always getting to be first.
-      ;; (there isn't, but could be)
-      (dolist (num (coerce (test-util:shuffle (coerce type-nums 'vector)) 'list))
-        (let ((val (format nil "value for ~D" num)))
-          (setq iv1 (quick-packed-info-insert iv1 num val)
-                iv2 (%packed-info-insert ; not PACKED-INFO-INSERT
-                     iv2 +no-auxiliary-key+ num val))
-          (assert (equalp iv1 iv2))))
-      ;; the first and only info descriptor should be full
-      (assert (not (info-quickly-insertable-p iv1))))))
 
 (defun crossprod (a b)
   (mapcan (lambda (x) (mapcar (lambda (y) (cons x y)) b))

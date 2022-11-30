@@ -389,3 +389,10 @@
   `(with-output-to-string (,var) ,@body))
 
 (defun source-location ())
+
+;;; %SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
+;;; But in the host Lisp, there is no such thing. Instead, SYMBOL-%INFO
+;;; is kept as a property on the host symbol.
+(declaim (inline symbol-%info))
+(defun symbol-%info (symbol) (get symbol :sb-xc-globaldb-info))
+(defun symbol-dbinfo (symbol) (symbol-%info symbol))
