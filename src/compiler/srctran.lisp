@@ -2752,7 +2752,7 @@
 (macrolet ((def (name fun type &optional (types `(,type ,type)))
              `(when-vop-existsp (:translate ,name)
                 (defun ,name (x y type)
-                  (declare (,type x y))
+                  (declare (type ,type x y))
                   (let ((r (,fun x y)))
                     (unless (typep r type)
                       (error 'type-error :expected-type type :datum r))

@@ -290,7 +290,7 @@ and no value was provided for it." name))))))))))
 ;;; type. If the key isn't a constant, then we can't tell, so we can
 ;;; complain about absence of manifest winnage.
 (defun check-key-args (name args pre-key type)
-  (declare (list args) (fixnum pre-key) (fun-type type))
+  (declare (list args) (fixnum pre-key) (type fun-type type))
   (declare (ignorable name))
   (let (lossages allow-other-keys
         unknown-keys)
