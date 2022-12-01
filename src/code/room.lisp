@@ -1025,6 +1025,27 @@ We could try a few things to mitigate this:
      win
        (return-from references-p t))))
 
+;;; If OBJ points (directly or indirectly) to something in some arena,
+;;; then return the pointed-to arena-allocated thing.
+;;; Cribbed from DEEP-SIZE in tests/do-refs.impure
+#+system-tlabs
+(defun points-to-arena (obj)
+  (flet ((leafp (x) (typep x '(or package symbol fdefn wrapper classoid))))
+    (let ((worklist (list obj))
+          (seen (make-hash-table :test 'eq)))
+      (setf (gethash obj seen) t)
+      (flet ((visit (thing)
+               (when (is-lisp-pointer (get-lisp-obj-address thing))
+                 (unless (or (leafp thing) (gethash thing seen))
+                   (when (find-containing-arena (get-lisp-obj-address thing))
+                     (return-from points-to-arena thing))
+                   (push thing worklist)
+                   (setf (gethash thing seen) t)))))
+        (loop
+          (unless worklist (return))
+          (let ((x (pop worklist)))
+            (do-referenced-object (x visit))))))))
+
 ;;; This interface allows one either to be agnostic of the referencing space,
 ;;; or specify exactly one space, but not specify a list of spaces.
 ;;; An upward-compatible change would be to assume a list, and call ENSURE-LIST.

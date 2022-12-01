@@ -32,6 +32,21 @@
 
 ;;;
 
+(test-util:with-test (:name :points-to-arena)
+  (let (tests)
+    (dotimes (i 20)
+      (let ((randomly-arena-thing (if (evenp i)
+                                      (with-arena (*arena*) (cons 1 2))
+                                      (cons 3 4))))
+        (push (make-array 1 :initial-element randomly-arena-thing) tests)))
+    (setq tests (nreverse tests))
+    (dolist (x tests)
+      (let* ((arena-ref-p (points-to-arena x))
+             (item (aref x 0)))
+        (if (find-containing-arena (get-lisp-obj-address item))
+            (assert arena-ref-p)
+            (assert (not arena-ref-p)))))))
+
 (defun test-with-open-file ()
   (with-open-file (stream (format nil "/proc/~A/stat" (sb-unix:unix-getpid))
                           :if-does-not-exist nil)
@@ -39,20 +54,6 @@
         (let ((pn (pathname stream)))
           (values pn (namestring pn) (read-line stream nil)))
         (values nil nil nil))))
-(defun pathname-parts-heap-p (pathname)
-  (labels ((scan (piece)
-             (etypecase piece
-               (fixnum t) ; pathname-version
-               ((or string symbol bignum) (heap-allocated-p piece))
-               (sb-impl::pattern (every #'scan (sb-impl::pattern-pieces piece)))
-               (cons (and (scan (car piece)) (scan (cdr piece)))))))
-    ;; just access the slots, don't "coerce" the arg to a pathname
-    (and (scan (sb-impl::%pathname-namestring pathname))
-         (scan (sb-impl::%pathname-device pathname))
-         (scan (sb-impl::%pathname-dir+hash pathname))
-         (scan (sb-impl::%pathname-name pathname))
-         (scan (sb-impl::%pathname-type pathname))
-         (scan (sb-impl::%pathname-version pathname)))))
 
 (defvar *answerstring*)
 (test-util:with-test (:name :with-open-stream :skipped-on (:not :linux))
@@ -61,7 +62,7 @@
     (when pathname
       (assert (heap-allocated-p pathname))
       (assert (heap-allocated-p namestring))
-      (assert (pathname-parts-heap-p pathname))
+      (assert (not (sb-vm:points-to-arena pathname)))
       (assert (not (heap-allocated-p answer)))
       ;; 1. check that a global symbol value can be found
       (unwind-protect

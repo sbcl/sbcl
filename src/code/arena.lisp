@@ -15,6 +15,7 @@
           in-same-arena
           dump-arena-objects
           c-find-heap->arena
+          points-to-arena
           show-heap->arena))
 
 ;;; A contiguous block is described by 'struct arena_memblk' in C.
@@ -175,7 +176,7 @@ one or more times, not to exceed MAX-EXTENSIONS times"
           ((not arena))
         (do-arena-blocks (memblk arena)
           (when (< (sap-int memblk) addr (sap-int (arena-memblk-freeptr memblk)))
-            (return arena)))))))
+            (return-from find-containing-arena arena)))))))
 
 (defun maybe-show-arena-switch (direction reason)
   (declare (ignore direction reason)))
