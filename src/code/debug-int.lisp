@@ -463,7 +463,7 @@
 ;;; of the slot in the SB-DI:: version of the structure.
 (defun make-compiled-debug-fun (compiler-debug-fun component)
   (declare (code-component component))
-  #+gencgc
+  #+gencgc ; TODO: can we make this hang off the code via a weak-pointer?
   (let ((memo-cell
          (let* ((info (sb-vm::%%code-debug-info component))
                 (val (sb-c::compiled-debug-info-memo-cell info)))

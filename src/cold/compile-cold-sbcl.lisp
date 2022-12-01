@@ -214,7 +214,7 @@
                 (let ((sb-c::*force-system-tlab*
                        (or (search "src/pcl" stem)
                            (search "src/code/arena" stem)
-                           (search "src/code/debug-int" stem)
+                           (search "src/code/debug" stem)
                            (search "src/code/early-defmethod" stem)
                            (search "src/code/format" stem)
                            (search "src/code/brothertree" stem)

@@ -173,6 +173,11 @@ Other commands:
 (defvar *backtrace-frame-count* 1000
   "Default number of frames to backtrace. Defaults to 1000.")
 
+(declaim (boolean *backtrace-print-pc*))
+(defvar *backtrace-print-pc* t)
+(declaim (unsigned-byte *default-argument-limit*))
+(defvar *default-argument-limit* call-arguments-limit)
+
 (declaim (type (member :minimal :normal :full) *method-frame-style*))
 (defvar *method-frame-style* :normal
   "Determines how frames corresponding to method functions are represented in
@@ -283,6 +288,8 @@ is :DEBUGGER-FRAME.
                         (from :debugger-frame)
                         (count *backtrace-frame-count*)
                         (print-thread t)
+                        (print-pc *backtrace-print-pc*)
+                        (argument-limit *default-argument-limit*)
                         (print-frame-source nil)
                         (method-frame-style *method-frame-style*)
                         (emergency-best-effort (> *debug-command-level* 1)))
@@ -337,6 +344,7 @@ possible while navigating and ignoring possible errors."
             ((print-frame (frame stream)
                (print-frame-call frame stream
                                  :number frame-index
+                                 :print-pc print-pc :argument-limit argument-limit
                                  :method-frame-style method-frame-style
                                  :print-frame-source print-frame-source
                                  :emergency-best-effort emergency-best-effort))
@@ -376,6 +384,7 @@ possible while navigating and ignoring possible errors."
 
 (defun list-backtrace (&key
                        (count *backtrace-frame-count*)
+                       (argument-limit *default-argument-limit*)
                        (start 0)
                        (from :debugger-frame)
                        (method-frame-style *method-frame-style*))
@@ -420,16 +429,17 @@ information."
   (let (rbacktrace)
      (map-backtrace
       (lambda (frame)
-        (push (frame-call-as-list frame :method-frame-style method-frame-style)
+        (push (frame-call-as-list frame argument-limit :method-frame-style method-frame-style)
               rbacktrace))
       :count count
       :start start
       :from (backtrace-start-frame from))
      (nreverse rbacktrace)))
 
-(defun frame-call-as-list (frame &key (method-frame-style *method-frame-style*))
+(defun frame-call-as-list (frame argument-limit &key (method-frame-style *method-frame-style*))
   (multiple-value-bind (name args info)
       (frame-call frame :method-frame-style method-frame-style
+                        :argument-limit argument-limit
                         :replace-dynamic-extent-objects t)
     (values (cons name args) info)))
 
@@ -517,10 +527,13 @@ information."
 ) ; EVAL-WHEN
 
 ;;; Extract the function argument values for a debug frame.
-(defun map-frame-args (thunk frame)
-  (let ((debug-fun (frame-debug-fun frame)))
-    (dolist (element (debug-fun-lambda-list debug-fun))
-      (funcall thunk element))))
+(defun map-frame-args (thunk frame limit)
+  (unless (zerop limit)
+    (let ((debug-fun (frame-debug-fun frame)))
+      (dolist (element (debug-fun-lambda-list debug-fun))
+        (funcall thunk element)
+        (when (zerop (decf limit))
+          (return))))))
 
 ;;; When the frame is interrupted before any of the function code is called
 ;;; we can recover all the arguments, include the extra ones.
@@ -539,21 +552,28 @@ information."
          escaped)
         (error "Index ~a out of bounds for ~a supplied argument~:p." n arg-count))))
 
-(defun early-frame-args (frame)
-  (let* ((escaped (sb-di::compiled-frame-escaped frame))
-         (pointer (sb-di::frame-pointer frame))
-         (arg-count (sb-di::sub-access-debug-var-slot
-                     pointer sb-c:arg-count-sc escaped)))
-    (loop for i below arg-count
-          collect (sb-di::sub-access-debug-var-slot
-                   pointer
-                   (sb-c:standard-arg-location-sc i)
-                   escaped))))
+;;; Return no more than LIMIT args. Aside from the default value of "no limit",
+;;; the other most useful possibility is 0, if you're just going to discard the args.
+;;; Any smaller value is OK too, but "be careful what you wish for" if you're going
+;;; to use the argument list to restart the frame.
+(defun early-frame-args (frame limit)
+  (unless (zerop limit)
+    (let* ((escaped (sb-di::compiled-frame-escaped frame))
+           (pointer (sb-di::frame-pointer frame))
+           (arg-count (sb-di::sub-access-debug-var-slot
+                       pointer sb-c:arg-count-sc escaped)))
+      (loop for i below (min arg-count limit)
+            collect (sb-di::sub-access-debug-var-slot
+                     pointer
+                     (sb-c:standard-arg-location-sc i)
+                     escaped)))))
 
-(defun frame-args-as-list (frame)
+(defun frame-args-as-list (frame limit)
+  (declare (unsigned-byte limit))
+  ;;; All args are available if the function has not proceeded beyond its external
+  ;;; entry point, so every imcoming value is in its argument-passing location.
   (when (sb-di::all-args-available-p frame)
-    (return-from frame-args-as-list
-      (early-frame-args frame)))
+    (return-from frame-args-as-list (early-frame-args frame limit)))
   (handler-case
       (let ((location (frame-code-location frame))
             (reversed-result nil))
@@ -591,7 +611,7 @@ information."
                         (return-from enumerating))
                       (push (make-unprintable-object "unavailable &MORE argument")
                             reversed-result)))))
-           frame))
+           frame limit))
         (nreverse reversed-result))
     (lambda-list-unavailable ()
       (make-unprintable-object "unavailable lambda list"))))
@@ -639,8 +659,8 @@ information."
                 (values (cons :method (cdr name)) real-args))))
     (values cname cargs (cons :fast-method info))))
 
-(defun clean-frame-call (frame name method-frame-style info)
-  (let ((args (frame-args-as-list frame)))
+(defun clean-frame-call (frame argument-limit name method-frame-style info)
+  (let ((args (frame-args-as-list frame argument-limit)))
     (cond ((typep name '(cons (eql sb-pcl::fast-method)))
            (clean-fast-method name args method-frame-style info))
           ((memq :external info)
@@ -650,7 +670,11 @@ information."
           (t
            (values name args info)))))
 
+;;; This is an *internal* symbol of SB-DI. Tell me people don't use it directly???
+;;; Otherwise why have such a verbose docstring. And why take &KEY args?
+;;; We should pass in the parameters positionally. But I fear people must be using it.
 (defun frame-call (frame &key (method-frame-style *method-frame-style*)
+                              (argument-limit call-arguments-limit)
                               replace-dynamic-extent-objects)
   "Returns as multiple values a descriptive name for the function responsible
 for FRAME, arguments that that function, and a list providing additional
@@ -670,6 +694,7 @@ the current thread are replaced with dummy objects which can safely escape."
          (kind (debug-fun-kind debug-fun)))
     (multiple-value-bind (name args info)
         (clean-frame-call frame
+                          argument-limit
                           (or (debug-fun-closure-name debug-fun frame)
                               (debug-fun-name debug-fun))
                           method-frame-style
@@ -708,14 +733,25 @@ the current thread are replaced with dummy objects which can safely escape."
 (defun print-frame-call (frame stream
                          &key print-frame-source
                               number
+                              (print-pc *backtrace-print-pc*)
+                              (argument-limit *default-argument-limit*)
                               (method-frame-style *method-frame-style*)
                               (emergency-best-effort (> *debug-command-level* 1)))
   (when number
     (format stream "~&~S: " (if (integerp number)
                                 number
                                 (frame-number frame))))
+  (when print-pc
+    (let ((debug-fun (frame-debug-fun frame)))
+      (when (typep debug-fun 'sb-di::compiled-debug-fun)
+        (format stream "#x~x "
+                (sap-int (sap+ (code-instructions
+                                (sb-di::compiled-debug-fun-component debug-fun))
+                               (sb-di::compiled-code-location-pc
+                                (frame-code-location frame))))))))
   (multiple-value-bind (name args info)
-      (frame-call frame :method-frame-style method-frame-style)
+      (frame-call frame :argument-limit argument-limit
+                        :method-frame-style method-frame-style)
     (pprint-logical-block (stream nil :prefix "(" :suffix ")")
       (let ((*print-pretty* nil)
             (*print-circle* t))
@@ -1904,7 +1940,7 @@ forms that explicitly control this kind of evaluation.")
             (if (and (legal-fun-name-p fname) (fboundp fname))
                 (values (fdefinition fname) args t)
                 (values (debug-fun-fun (frame-debug-fun *current-frame*))
-                        (frame-args-as-list *current-frame*)
+                        (frame-args-as-list *current-frame* call-arguments-limit)
                         nil))
           (when (and fun
                      (or ok
