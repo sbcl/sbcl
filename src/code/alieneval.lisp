@@ -826,15 +826,15 @@
   (declare (ignore type))
   `(sap-ref-sap ,sap (/ ,offset sb-vm:n-byte-bits)))
 
-;; CMUCL (sometimes/always?) does not permit using a structure constructor from
-;; earlier in this file within a LOAD-TIME-VALUE form later in the file.
 (macrolet ((def-singleton-type (type ctor)
-             #+sb-xc-host
-             (let ((pseudo-const (symbolicate "*" type "-TYPE*")))
-               `(progn (defvar ,pseudo-const ,ctor)
-                       (define-alien-type-translator ,type () ,pseudo-const)))
-             #-sb-xc-host
-             `(define-alien-type-translator ,type () (load-time-value ,ctor t))))
+             `(define-alien-type-translator ,type ()
+                (load-time-value
+                 ;; If the host lisp takes liberties (as permitted) with ordering ordering of
+                 ;; L-T-V and toplevel forms, then it's quite likely clever enough to inline
+                 ;; the structure constructor here, thus avoiding reliance on the DEFUN
+                 ;; which might not be installed yet.
+                 (locally (declare (inline ,(car ctor))) ,ctor)
+                 t))))
   (def-singleton-type single-float (make-alien-single-float-type :type 'single-float))
   (def-singleton-type double-float (make-alien-double-float-type :type 'double-float))
   (def-singleton-type system-area-pointer
