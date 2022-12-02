@@ -549,11 +549,12 @@
       (declare (fixnum pos))
       (macrolet ((frob ()
                    `(progn
-                      (when (comma-p subform)
-                        (setf subform (comma-expr subform)))
-                      (when (atom subform)
-                        (return))
-                      (let ((fm (car subform)))
+                      (let ((fm (cond ((comma-p subform)
+                                       (comma-expr subform))
+                                      ((atom subform)
+                                       (return))
+                                      (t
+                                       (car subform)))))
                         (when (comma-p fm)
                           (setf fm (comma-expr fm)))
                         (cond ((consp fm)
@@ -571,13 +572,13 @@
                                ;; perfect, but better than nothing.
                                (note-source-path subform pos path)))
                         (incf pos))
+                      (when (comma-p subform)
+                        (return))
                       (setq subform (cdr subform))
                       (when (eq subform trail) (return)))))
         (loop
          (frob)
          (frob)
-         (when (comma-p trail)
-           (return))
          (setq trail (cdr trail)))))))
 
 

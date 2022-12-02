@@ -262,6 +262,16 @@
               (fast-nthcdr (mod n i) r-i))
            (declare (type fixnum i))))))))
 
+;;; For [n]butlast
+(defun dotted-nthcdr (n list)
+  (declare (fixnum n))
+  (do ((i n (1- i))
+       (result list (cdr result)))
+      ((not (plusp i)) result)
+    (declare (type fixnum i))
+    (when (atom result)
+      (return))))
+
 ;;; LAST
 ;;;
 ;;; Transforms in src/compiler/srctran.lisp pick the most specific

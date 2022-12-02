@@ -314,13 +314,3 @@
 (defmacro defconstant-eqx (symbol expr eqx &optional doc)
   `(defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
      ,@(when doc (list doc))))
-
-;;; For [n]butlast
-(defun dotted-nthcdr (n list)
-  (declare (fixnum n))
-  (do ((i n (1- i))
-       (result list (cdr result)))
-      ((not (plusp i)) result)
-    (declare (type fixnum i))
-    (when (atom result)
-      (return))))
