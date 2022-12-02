@@ -240,19 +240,19 @@
                                (ir2-block-popped 2block))))
                (setq new-end (merge-uvl-live-sets
                               new-end
-                              (ir2-block-pushed-before lvar 2block)))))))))
+                              (ir2-block-pushed-before lvar 2block))))))
+         ;; We need to back-propagate the DX LVARs from the start of
+         ;; their environments to their allocation sites. The
+         ;; %CLEANUP-POINT funny function combination ensures the
+         ;; mess-up node's block will end with an enclosing
+         ;; cleanup. We need to be clever about this because some code
+         ;; paths may not allocate all of the DX LVARs.
+         (let ((mess-up (cleanup-mess-up cleanup)))
+           (when (and (eq (node-block mess-up) block)
+                      (entry-p mess-up))
+             (back-propagate-dx-lvars block (cleanup-nlx-info cleanup)))))))
 
     (setf (ir2-block-end-stack 2block) new-end)
-
-    ;; If a block has a "entry DX" node (the start of a DX
-    ;; environment) then we need to back-propagate the DX LVARs to
-    ;; their allocation sites.  We need to be clever about this
-    ;; because some code paths may not allocate all of the DX LVARs.
-    (do-nodes (node nil block)
-      (when (entry-p node)
-        (let ((cleanup (entry-cleanup node)))
-          (when (eq (cleanup-kind cleanup) :dynamic-extent)
-            (back-propagate-dx-lvars block (cleanup-nlx-info cleanup))))))
 
     (let ((start new-end))
       (setq start (set-difference start (ir2-block-pushed 2block)))
