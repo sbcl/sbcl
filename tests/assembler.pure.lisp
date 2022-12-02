@@ -297,3 +297,58 @@
                  "8AF5             MOV DH, CH")
   ;; can not use legacy high byte reg in a REX-prefixed instruction
   (check-does-not-assemble `(movsx (:byte :qword) ,rax-tn (,rbx-tn . :high-byte))))
+
+(defun try (inst)
+  (let ((segment (sb-assem:make-segment)))
+    (sb-assem:assemble (segment 'nil)
+        (apply #'sb-assem:inst* (car inst) (cdr inst)))
+    (let* ((buf (sb-assem:segment-buffer segment))
+           (string
+             (with-output-to-string (stream)
+               (with-pinned-objects (buf)
+                 (let ((sb-disassem:*disassem-location-column-width* 0))
+                   (sb-disassem:disassemble-memory
+                    (sap-int (vector-sap buf))
+                    (sb-assem::segment-current-posn segment)
+                    :stream stream)))))
+           (line (string-left-trim'(#\; #\ )
+                                  (subseq string (1+ (position #\newline string))
+                                          (1- (length string)))))) ; chop final newline
+      (declare (ignorable line))
+      (print line)
+      )))
+
+#+x86-64
+(test-util:with-test (:name :muldiv)
+  ;; This just assserts that we can assemble. It doesn't check
+  ;; against the expected encoding or disassembly.
+  (dolist (size '(:byte :word :dword :qword nil))
+    (dolist (op '(mul div idiv))
+      (if size
+          (try `(,op ,size ,rax-tn ,rbx-tn))
+          (try `(,op ,rax-tn ,rbx-tn))))))
+
+#+x86-64
+(test-util:with-test (:name :imul)
+  (dolist (reg `(,r9-tn)) ;
+    ;; 1-operand form yielding a double-width result into rAX:rDX
+    (dolist (size '(:byte :word :dword :qword))
+      (try `(imul ,size ,reg))
+      (try `(imul ,size ,(ea reg)))
+      (try `(imul ,size ,(ea #x1000))))
+    (try `(imul ,reg)) ; default to :QWORD
+    ;; 2-operand form. There is no :BYTE size
+    (dolist (size '(:word :dword :qword))
+      (try `(imul ,size ,reg ,reg))
+      (try `(imul ,size ,reg ,(ea reg)))
+      (try `(imul ,size ,reg ,(ea #x1000))))
+    (try `(imul ,reg ,r10-tn)) ; default to :QWORD
+    ;; 3-operand form with 8-bit signed imm
+    (try `(imul :word ,rbx-tn ,(ea rdx-tn) -128))
+    (try `(imul :dword ,rbx-tn ,(ea rdx-tn) -128))
+    (try `(imul :qword ,rbx-tn ,(ea rdx-tn) -128))
+    ;; 3-operand form with 16-bit signed imm
+    (try `(imul :word ,rbx-tn ,(ea rdx-tn) -32768))
+    ;; 3-operand form with 32-bit signed imm
+    (try `(imul :dword ,rbx-tn ,(ea rdx-tn) #xbaba))
+    (try `(imul :qword ,rbx-tn ,(ea rdx-tn) #xbaba))))
