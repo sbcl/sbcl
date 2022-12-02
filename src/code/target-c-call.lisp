@@ -53,22 +53,21 @@
       (setf *default-c-string-external-format*
             (sb-impl::default-external-format))))
 
-;;; FIXME: %NATURALIZE-C-STRING (and the UTF8 siblings below) would
-;;; appear to be vulnerable to the lisp string moving from underneath
-;;; them if the world undergoes a GC, possibly triggered by another
-;;; thread.  Ugh.
-;;;
-;;; Actually the above shouldn't happen; x86 and x86-64 use GENCGC,
-;;; so the string can't move by virtue of pointers to it from
-;;; outside the heap. Other platforms will access the lisp string
-;;; through the GC-safe interior pointer. -- JES, 2006-01-13
 (defun %naturalize-c-string (sap)
   (declare (type system-area-pointer sap))
-  (locally
-      (declare (optimize (speed 3) (safety 0)))
-    (let ((length (loop for offset of-type fixnum upfrom 0
-                        until (zerop (sap-ref-8 sap offset))
-                        finally (return offset))))
-      (let ((result (make-string length :element-type 'base-char)))
-        (sb-kernel:copy-ub8-from-system-area sap 0 result 0 length)
-        result))))
+  ;; It can be assumed that any modern implementation of strlen() reads 4, 8, 16,
+  ;; or possibly even 32 bytes at a time when searching for the '\0' terminator.
+  ;; As such, we expect it to be on average much faster than a loop over SAP-REF-8.
+  ;; And much to my surprise, the foreign call overhead on x86-64 is so small that
+  ;; there is not a minimum threshold length below which the foreign call costs too much.
+  ;; With as few as 5 characters in the string, I saw 2x speedup.
+  ;; Below that, it's about the same to do a foreign call versus staying in lisp.
+  ;; The limiting case of a 0 length string would be faster without the foreign call,
+  ;; but pre-checking would slow down every other case.
+  (let* ((length (alien-funcall
+                 (extern-alien "strlen" (function size-t system-area-pointer))
+                 sap))
+         (result (make-string length :element-type 'base-char)))
+    ;; COPY-UB8 pins the lisp string, no need to do it here
+    (sb-kernel:copy-ub8-from-system-area sap 0 result 0 length)
+    result))
