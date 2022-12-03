@@ -319,17 +319,18 @@ of :INHERITED :EXTERNAL :INTERNAL."
 (defun make-package-hashtable (size)
   (declare (sb-c::tlab :system)
            (inline %make-package-hashtable))
-  (flet ((actual-package-hashtable-size (size)
+  (flet ((choose-good-size (size)
            (loop for n of-type fixnum
               from (logior (ceiling size #.+package-rehash-threshold+) 1)
               by 2
-              when (positive-primep n) return n)))
-    (let* ((n (actual-package-hashtable-size size))
-           ;; SIZE is how many symbols we'd like to be able to store,
-           ;; but the number of physical cells is N, chosen for its primality.
+              when (positive-primep n)
+              return n)))
+    ;; SIZE is how many symbols we'd like to be able to store,
+    ;; but the number of physical cells is N, chosen for its primality.
+    (let* ((n (choose-good-size size))
            (size (truncate (* n #.+package-rehash-threshold+)))
-           (table (make-array n :initial-element 0)))
-      (%make-package-hashtable table size))))
+           (cells (make-array n :initial-element 0)))
+      (%make-package-hashtable cells size))))
 
 (declaim (inline pkg-symbol-valid-p))
 (defun pkg-symbol-valid-p (x) (not (fixnump x)))
@@ -802,6 +803,20 @@ Experimental: interface subject to change."
 
 ;;;; operations on package hashtables
 
+;;; A symbol's name hash is the bitwise negation of the SXHASH
+;;; of its print-name. I'm trying to be clearer with local variable naming
+;;; as to whether a hash is the SXHASH of the symbol or its name.
+;;; Additionally, on 64-bit architectures I want each symbol to have 2
+;;; independent pieces to the hash:
+;;; * 32 pseudo-random bits which will give better behavior for SXHASH.
+;;;      Currently an EQUAL or EQUALP hash-table of same-named gensyms
+;;;      will degenerate to a list.
+;;; * 32 bits of name-based hash, essential for package operations
+;;;      and also useful for compiling CASE expressions.
+(defmacro sym-name-hash-to-index (name-hash vector-length)
+  `(rem (truly-the hash-code ,name-hash)
+        (truly-the (not (eql 0)) ,vector-length)))
+
 ;;; Add a symbol to a package hashtable. The symbol MUST NOT be present.
 (defun add-symbol (table symbol)
   (setf (package-hashtable-modified table) t)
@@ -816,10 +831,11 @@ Experimental: interface subject to change."
                                  2)))
   (let* ((symvec (package-hashtable-cells table))
          (len (length symvec))
-         (sxhash (truly-the fixnum (ensure-symbol-hash symbol)))
-         (h2 (1+ (rem sxhash (- len 2)))))
-    (declare (fixnum sxhash h2))
-    (do ((i (rem sxhash len) (rem (+ i h2) len)))
+         (name-hash (truly-the fixnum (ensure-symbol-hash symbol)))
+         (h1 (sym-name-hash-to-index name-hash len))
+         (h2 (1+ (rem name-hash (- len 2)))))
+    (declare (fixnum name-hash h2))
+    (do ((i h1 (rem (+ i h2) len)))
         ((fixnump (svref symvec i))
          ;; Interning has to pre-check whether the symbol existed in any
          ;; package used by the package in which intern is happening,
@@ -917,38 +933,63 @@ Experimental: interface subject to change."
       (tune-table-size (package-internal-symbols package))
       (tune-table-size (package-external-symbols package)))))
 
-;;; Find where the symbol named STRING is stored in TABLE. INDEX-VAR
-;;; is bound to the index, or NIL if it is not present. SYMBOL-VAR
-;;; is bound to the symbol. LENGTH and HASH are the length and sxhash
-;;; of STRING. ENTRY-HASH is the entry-hash of the string and length.
+;;; Find where the symbol named STRING is stored in TABLE.
+;;; INDEX-VAR is bound to the vector index if found, or -1 if not.
+;;; LENGTH bounds the string, and NAME-HASH should be precomputed by
+;;; calling COMPUTE-SYMBOL-HASH.
 ;;; If the symbol is found, then FORMS are executed; otherwise not.
+(defmacro with-symbol (((symbol-var &optional index-var) table
+                        string length name-hash) &body forms)
+  (let ((lookup `(%lookup-symbol ,table ,string ,length ,name-hash)))
+    `(,@(if index-var
+            `(multiple-value-bind (,symbol-var ,index-var) ,lookup)
+            `(let ((,symbol-var ,lookup))))
+      (unless (eql ,symbol-var 0) ,@forms))))
+#|
+(declaim (fixnum *sym-lookups* *sym-hit-1st-try*))
+(define-load-time-global *sym-lookups* 0)
+(define-load-time-global *sym-hit-1st-try* 0)
+|#
 
-(defmacro with-symbol (((symbol-var &optional (index-var (gensym))) table
-                       string length sxhash) &body forms)
-  (with-unique-names (vec len h2 probed-thing name)
-    `(let* ((,vec (package-hashtable-cells ,table))
-            (,len (length ,vec))
-            (,index-var (rem (the hash-code ,sxhash) ,len))
-            (,h2 (1+ (the index (rem ,sxhash (the index (- ,len 2)))))))
-       (declare (type index ,len ,h2 ,index-var))
-       (loop
-        (let ((,probed-thing (svref ,vec ,index-var)))
-          (cond ((not (fixnump ,probed-thing))
-                 (let ((,symbol-var (truly-the symbol ,probed-thing)))
-                   (when (eq (symbol-hash ,symbol-var) ,sxhash)
-                     (let ((,name (symbol-name ,symbol-var)))
-                  ;; The pre-test for length is kind of an unimportant
-                  ;; optimization, but passing it for both :end arguments
-                  ;; requires that it be within bounds for the probed symbol.
-                       (when (and (= (length ,name) ,length)
-                                  (string= ,string ,name
-                                           :end1 ,length :end2 ,length))
-                         (return (progn ,@forms)))))))
-              ;; either a never used cell or a tombstone left by UNINTERN
-                ((eql ,probed-thing 0) ; really never used
-                 (return))))
-        (when (>= (incf ,index-var ,h2) ,len)
-          (decf ,index-var ,len))))))
+(defun %lookup-symbol (table string name-length name-hash)
+  (declare (optimize (sb-c::verify-arg-count 0)
+                     (sb-c::insert-array-bounds-checks 0)))
+  (declare (index name-length))
+  #+nil (atomic-incf *sym-lookups*)
+  (let* ((vec (package-hashtable-cells table))
+         (len (length vec))
+         (index (sym-name-hash-to-index name-hash len)))
+    (declare (index len index))
+    (macrolet
+        ((probe (metric)
+           (declare (ignorable metric))
+           `(let ((item (svref vec index)))
+             (cond ((not (fixnump item))
+                    (let ((symbol (truly-the symbol item)))
+                      (when (eq (symbol-hash symbol) name-hash)
+                        (let ((name (symbol-name symbol)))
+                          ;; The pre-test for length is kind of an unimportant
+                          ;; optimization, but passing it for both :end arguments
+                          ;; requires that it be within bounds for the probed symbol.
+                          (when (and (= (length name) name-length)
+                                     (string= string name
+                                              :end1 name-length :end2 name-length))
+                            (return-from %lookup-symbol (values symbol index)))))))
+                   ;; either a never used cell or a tombstone left by UNINTERN
+                   ((eql item 0) ; never used
+                    (return-from %lookup-symbol (values 0 -1)))))))
+      (probe (atomic-incf *sym-hit-1st-try*))
+      ;; Compute a secondary hash H2, and add it successively to INDEX,
+      ;; treating the vector as a ring. This loop is guaranteed to terminate
+      ;; because there has to be at least one cell with a 0 in it.
+      ;; Whenever we change a cell containing 0 to a symbol, the FREE count
+      ;; is decremented. And FREE starts as a smaller number than the vector length.
+      (let ((h2 (1+ (the index (rem name-hash
+                                    (truly-the (and index (not (eql 0)))
+                                               (- len 2)))))))
+        (declare (index h2))
+        (loop (when (>= (incf index h2) len) (decf index len))
+              (probe nil))))))
 
 ;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
 ;;;
@@ -1637,6 +1678,7 @@ PACKAGE."
 
 (defun pkg-name= (a b) (and (not (eql a 0)) (string= a b)))
 (defun !package-cold-init (&aux (specs (cdr *!initial-symbols*)))
+  ;; (setq *sym-lookups* 0 *sym-hit-1st-try* 0)
   (setf *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock"))
   (setf *package-names* (make-info-hashtable :comparator #'pkg-name=
                                              :hash-function #'sxhash))

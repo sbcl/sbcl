@@ -59,11 +59,11 @@
   ;; The general-vector of symbols
   (cells (missing-arg) :type simple-vector)
   (modified nil :type boolean)
-  ;; The total number of entries allowed before resizing.
-  ;;
-  ;; FIXME: CAPACITY would be a more descriptive name. (This is
-  ;; related to but not quite the same as HASH-TABLE-SIZE, so calling
-  ;; it SIZE seems somewhat misleading.)
+  ;; SIZE is roughly related to the number of symbols the client code asked to be
+  ;; able to store. We increase that to a prime number, then scale it down to compute
+  ;; a rehash trigger level. The only reason we need to remember this number is that
+  ;; computing the count of things in the table has to be done by subtracting FREE
+  ;; and DELETED from the originally computed size.
   (size (missing-arg) :type index)
   ;; The remaining number of entries that can be made before we have to rehash.
   (free (missing-arg) :type index)
