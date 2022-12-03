@@ -627,7 +627,8 @@
   "src/code/warm-error"
   "src/code/icf"
   "src/code/defpackage"
-  "src/code/target-lflist")
+  "src/code/target-lflist"
+  "src/code/solist")
 
  #+sb-fasteval
  ("src/interpreter/macros"
