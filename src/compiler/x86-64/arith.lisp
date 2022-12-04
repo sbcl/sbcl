@@ -1334,6 +1334,73 @@
   (:variant t t)
   (:translate ash-mod64))
 
+;;; Given an unsigned 32-bit dividend and magic numbers, compute the truncated quotient.
+;;; The 2nd through 4th args are 'magic', 'add', 'shift'.
+(defknown udiv32-via-multiply ((unsigned-byte 32)
+                               (unsigned-byte 32) bit (integer 0 31))
+  (unsigned-byte 32)
+  (flushable))
+(define-vop ()
+  (:translate udiv32-via-multiply)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (magic :scs (unsigned-reg))
+         (add :scs (unsigned-reg))
+         (shift :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num)
+  (:results (quotient :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 6
+    (move temp dividend)
+    (inst imul temp magic)
+    (inst test :byte add add)
+    (inst jmp :z no-add)
+    (inst shr temp 32) ; temp is now the quotient 'q'
+    (inst mov :dword rcx dividend)
+    (inst sub :dword rcx temp) ; compute (n - quotient)
+    (inst shr :dword rcx 1)
+    (inst lea :dword temp (ea rcx temp)) ; add 'q'
+    (inst lea :dword rcx (ea -1 shift))
+    (inst shr :dword temp :cl) ; shift by s-1
+    (inst jmp OUT)
+    NO-ADD
+    (inst lea :dword rcx (ea 32 shift))
+    (inst shr temp :cl)
+    OUT
+    (inst mov quotient temp)))
+
+;;; Given an unsigned 32-bit dividend and divisor, compute the remainder
+;;; using only multiplications. There is an even better algorithm for this,
+;;; which we don't implement. The newer technique, published in 2019 says:
+;;; "Currently, the remainder of the division by a constant is computed from the quotient
+;;;  by a multiplication and a subtraction. But if just the remainder is desired and the
+;;;  quotient is unneeded, this may be suboptimal."
+;;; See https://github.com/bmkessler/fastdiv for that coded in Go.
+;;;
+;;; The inputs to this vop are the dividend, the divisor, the "magic number", and the "shift".
+;;; It does not handle the situation where the magic parameters have 'a=1'
+(defknown urem32-via-multiply ((unsigned-byte 32) (unsigned-byte 32)
+                               (unsigned-byte 32) (integer 32 64))
+  (unsigned-byte 32)
+  (flushable))
+#+nil
+(define-vop ()
+  (:translate urem32-via-multiply)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg))
+         (magic :scs (unsigned-reg))
+         (shift :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset sb-vm::rcx-offset) rcx)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 6
+    ))
+
 (in-package "SB-C")
 
 (defknown %lea (integer integer (member 1 2 4 8 16) (signed-byte 64))

@@ -413,3 +413,17 @@
 (defmacro id-bits-offset ()
   (let ((slot (get-dsd-index layout sb-kernel::id-word0)))
     (ash (+ sb-vm:instance-slots-offset slot) sb-vm:word-shift)))
+
+;;; I'd like the division-by-constant-integer optimization to work
+;;; during cross-compilation, but the algorithm to compute the magic
+;;; parameters is expressed in C, not Lisp. I need to translate it.
+#-sb-xc-host
+(defun sb-c:compute-udiv32-magic (divisor)
+  (with-alien ((mag (struct magu
+                            (m unsigned-int)
+                            (a int)
+                            (s int)))
+               (compute-udiv-magic32 (function void int (* (struct magu)))
+                                     :extern))
+    (alien-funcall compute-udiv-magic32 divisor (addr mag))
+    (values (slot mag 'm) (slot mag 'a) (slot mag 's))))
