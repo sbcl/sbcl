@@ -398,7 +398,6 @@
 ;;; we are done, then another iteration would be beneficial.
 (defun ir1-optimize (component fastp)
   (declare (type component component))
-  (setf (component-reoptimize component) nil)
   (loop with block = (block-next (component-head component))
         with tail = (component-tail component)
         for last-block = block
@@ -1777,8 +1776,7 @@
     ;; This is mainly to call PROPAGATE-LET-ARGS so that the
     ;; newly converted code gets to better types sooner.
     (setf (node-reoptimize call) nil)
-    (ir1-optimize-combination call))
-  (values))
+    (ir1-optimize-combination call)))
 
 (defun constant-fold-arg-p (name)
   (typecase name
