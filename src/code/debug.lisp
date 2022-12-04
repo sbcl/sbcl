@@ -174,7 +174,7 @@ Other commands:
   "Default number of frames to backtrace. Defaults to 1000.")
 
 (declaim (boolean *backtrace-print-pc*))
-(defvar *backtrace-print-pc* t)
+(defvar *backtrace-print-pc* nil)
 (declaim (unsigned-byte *default-argument-limit*))
 (defvar *default-argument-limit* call-arguments-limit)
 
