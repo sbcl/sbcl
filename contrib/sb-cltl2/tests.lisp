@@ -14,14 +14,14 @@
 
 (in-package :sb-cltl2-tests)
 
-(defmacro *x*-value ()
-  (declare (special *x*))
-  *x*)
+(defmacro x-value ()
+  (declare (special x))
+  x)
 
 (deftest compiler-let.1
-    (let ((*x* :outer))
-      (compiler-let ((*x* :inner))
-        (list *x* (*x*-value))))
+    (let ((x :outer))
+      (compiler-let ((x :inner))
+        (list x (x-value))))
   ;; See the X3J13 writeup for why the interpreter
   ;; might return (and does return) a different answer.
   #.(if (eq sb-ext:*evaluator-mode* :compile)
@@ -104,6 +104,7 @@
   t)
 (deftest macroexpand-all.9
     (let ((global-symbol-macro 3))
+      (declare (ignore global-symbol-macro))
       (macrolet ((frob (&environment env form)
                    `',(macroexpand-all form env)))
         (equalp (frob global-symbol-macro) 'global-symbol-macro)))
@@ -283,6 +284,7 @@
 
 (deftest variable-info.local-special/shadows-lexical
     (let ((x 3))
+      (declare (ignore x))
       (let ((x 3))
         (declare (special x))
         (var-info x)))
@@ -290,12 +292,14 @@
 
 (deftest variable-info.lexical
     (let ((x 8))
+      x
       (var-info x))
   (:lexical t nil))
 
 (deftest variable-info.lexical.type
     (let ((x 42))
       (declare (fixnum x))
+      x
       (var-info x))
   (:lexical t ((type . fixnum))))
 
@@ -309,6 +313,7 @@
 
 (deftest variable-info.lexical.type.3
     (let ((x 42))
+      x
       (locally (declare (fixnum x))
         (var-info x)))
   (:lexical t ((type . fixnum))))
@@ -532,10 +537,10 @@
      'foo
      (augment-environment nil
                           :function '(foo)
-                          :declare  '((ftype (sfunction (integer) integer) foo))))
+                          :declare  '((ftype (sfunction () integer) foo))))
   :function
   t
-  ((ftype function (integer) (values integer &optional))))
+  ((ftype function () (values integer &optional))))
 
 
 (deftest augment-environment.macro
@@ -566,6 +571,7 @@
 
 (deftest augment-environment.nest
     (let ((x 1))
+      (declare (ignore x))
       (ct
        (let* ((e (augment-environment lexenv :variable '(y))))
          (list
@@ -659,8 +665,10 @@
 (deftest define-declaration.variable.mask
     (progn
       (let (x)
-        (declare (vogon x))
+        (declare (vogon x)
+                 (ignore x))
         (let (x)
+          (declare (ignore x))
           (ct
            (assoc
             'vogon-key
@@ -670,7 +678,8 @@
 (deftest define-declaration.variable.macromask
     (progn
       (let (x)
-        (declare (vogon x))
+        (declare (vogon x)
+                 (ignore x))
         (symbol-macrolet ((x 42))
           (ct
            (assoc
@@ -681,9 +690,11 @@
 (deftest define-declaration.variable.macromask2
     (progn
       (symbol-macrolet ((x 42))
-        (declare (vogon x))
+        (declare (vogon x)
+                 (ignore x))
         (list
          (let (x)
+           (declare (ignore x))
            (ct
             (assoc
              'vogon-key
@@ -704,9 +715,11 @@
 (deftest define-declaration.variable.mask2
     (progn
       (let (x)
-        (declare (vogon-a x))
+        (declare (vogon-a x)
+                 (ignore x))
         (let (x)
-          (declare (vogon-b x)))
+          (declare (vogon-b x)
+                   (ignore x)))
         (ct
          (assoc
           'vogon-key
