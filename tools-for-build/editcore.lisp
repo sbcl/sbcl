@@ -34,8 +34,8 @@
   (:import-from "SB-X86-64-ASM" #:near-jump-displacement
                 #:near-cond-jump-displacement #:mov #:call #:jmp
                 #:get-gpr #:reg-name)
-  (:import-from "SB-IMPL" #:package-hashtable #:package-%name
-                #:package-hashtable-cells
+  (:import-from "SB-IMPL" #:symbol-hashset #:package-%name
+                #:symtbl-cells
                 #:hash-table-pairs #:hash-table-%count))
 
 (in-package "SB-EDITCORE")
@@ -209,8 +209,8 @@
   (let ((spaces (core-spaces core))
         (nil-object (core-nil-object core)))
     (dovector (x (translate
-                  (package-hashtable-cells
-                   (truly-the package-hashtable (translate table spaces)))
+                  (symtbl-cells
+                   (truly-the symbol-hashset (translate table spaces)))
                   spaces))
       (unless (fixnump x)
         (funcall function

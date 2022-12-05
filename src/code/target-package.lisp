@@ -290,13 +290,21 @@ of :INHERITED :EXTERNAL :INTERNAL."
 
 ;;;; PACKAGE-HASHTABLE stuff
 
-(defmethod print-object ((table package-hashtable) stream)
+(defmacro package-hashtable-cells (table)
+  `(symtbl-cells ,table))
+
+(defun %symtbl-count (table)
+  (the fixnum (- (symtbl-size table)
+                 (the fixnum (+ (symtbl-deleted table)
+                                (symtbl-free table))))))
+
+(defmethod print-object ((table symbol-hashset) stream)
   (declare (type stream stream))
   (print-unreadable-object (table stream :type t :identity t)
-    (let* ((n-live (%package-hashtable-symbol-count table))
-           (n-deleted (package-hashtable-deleted table))
+    (let* ((n-live (%symtbl-count table))
+           (n-deleted (symtbl-deleted table))
            (n-filled (+ n-live n-deleted))
-           (n-cells (length (package-hashtable-cells table))))
+           (n-cells (length (symtbl-cells table))))
       (format stream
               "(~D+~D)/~D [~@[~,3f words/sym,~]load=~,1f%]"
               n-live n-deleted n-cells
@@ -304,48 +312,85 @@ of :INHERITED :EXTERNAL :INTERNAL."
                 (/ (* (1+ (/ sb-vm:n-word-bytes)) n-cells) n-live))
               (* 100 (/ n-filled n-cells))))))
 
-;;; the maximum load factor we allow in a package hashtable
-(defconstant +package-rehash-threshold+ 3/4)
-
-;;; the load factor desired for a package hashtable when writing a
-;;; core image
-(defconstant +package-hashtable-image-load-factor+ 1/2)
-
-;;; Make a package hashtable having a prime number of entries at least
+;;; Make a hashset having a prime number of entries at least
 ;;; as great as (/ SIZE +PACKAGE-REHASH-THRESHOLD+).
 ;;; The smallest table built here has three entries. This
 ;;; is necessary because the double hashing step size is calculated
 ;;; using a division by the table size minus two.
-(defun make-package-hashtable (size)
+(defun make-package-hashtable (size &optional (load-factor 3/4))
   (declare (sb-c::tlab :system)
-           (inline %make-package-hashtable))
+           (inline %make-symbol-hashset))
   (flet ((choose-good-size (size)
            (loop for n of-type fixnum
-              from (logior (ceiling size #.+package-rehash-threshold+) 1)
+              from (logior (ceiling size load-factor) 1)
               by 2
               when (positive-primep n)
               return n)))
     ;; SIZE is how many symbols we'd like to be able to store,
     ;; but the number of physical cells is N, chosen for its primality.
     (let* ((n (choose-good-size size))
-           (size (truncate (* n #.+package-rehash-threshold+)))
-           (cells (make-array n :initial-element 0)))
-      (%make-package-hashtable cells size))))
+           (size (truncate (* n load-factor)))
+           (symbols (make-array n :initial-element 0)))
+      (%make-symbol-hashset symbols size))))
 
 (declaim (inline pkg-symbol-valid-p))
 (defun pkg-symbol-valid-p (x) (not (fixnump x)))
 
 ;;; Destructively resize TABLE to have room for at least SIZE entries
 ;;; and rehash its existing entries.
-(defun resize-package-hashtable (table size)
-  (let ((temp-table (make-package-hashtable size)))
-    (dovector (sym (package-hashtable-cells table))
-      (when (pkg-symbol-valid-p sym)
-        (add-symbol temp-table sym)))
-    (setf (package-hashtable-cells table) (package-hashtable-cells temp-table)
-          (package-hashtable-size table) (package-hashtable-size temp-table)
-          (package-hashtable-free table) (package-hashtable-free temp-table)
-          (package-hashtable-deleted table) 0)))
+;;; When rehashing, use the Robinhood insertion algorithm, though subsequent
+;;; calls to ADD-SYMBOL make no attempt to preserve Robinhood's minimization
+;;; of the maximum probe sequence length. We can do it now because the
+;;; entire vector will be swapped, which is concurrent reader safe.
+(defun resize-package-hashtable (table size &optional (load-factor 3/4))
+  (let* ((temp-table (make-package-hashtable size load-factor))
+         (cells (symtbl-cells temp-table))
+         (ncells (length cells))
+         (h2-modulus (- ncells 2))
+         (psp-vector (make-array ncells :initial-element nil)))
+    (labels ((ins (probe-sequence-pos symbol)
+               ;; CAREFUL: probe-sequence-pos is 0-based, whereas the same thing
+               ;; in 'hashset.lisp' is 1-based like in the reference algorithm.
+               ;; It could be chalked up to the difference
+               ;; between using LENGTH versus POSITION.
+               (let* ((name-hash (sxhash symbol))
+                      (h1 (rem name-hash ncells))
+                      (h2 (1+ (rem name-hash h2-modulus)))
+                      (index (rem (+ h1 (* probe-sequence-pos h2)) ncells))
+                      (cell-psp (aref psp-vector index)))
+                 (cond ((> probe-sequence-pos (or cell-psp -1))
+                        (let ((occupant (aref cells index)))
+                          (setf (aref psp-vector index) probe-sequence-pos
+                                (aref cells index) symbol)
+                          (unless (eql occupant 0)
+                            #+nil
+                            (format t "~&Symbol ~A @ psp ~D displaces ~A @ psp ~D~%"
+                                    symbol probe-sequence-pos occupant cell-psp)
+                            (ins (1+ cell-psp) occupant))))
+                       (t
+                        (ins (1+ probe-sequence-pos) symbol)))))
+             (calculate-psp (symbol &aux (pos 0))
+               (let ((h (rem (sxhash symbol) ncells))
+                     (h2 (1+ (rem (sxhash symbol) h2-modulus))))
+                 (loop (if (eq (svref cells h) symbol) (return (values pos h)))
+                       (incf pos)
+                       (setq h (rem (+ h h2) ncells)))))
+             (verify-all-psps (&aux (max -1))
+               (dovector (symbol cells max)
+                 (when (symbolp symbol)
+                   (binding* (((actual-psp index) (calculate-psp symbol))
+                              (stored (aref psp-vector index)))
+                     (setq max (max stored max))
+                     (unless (= stored actual-psp)
+                       (error "Messup @ ~A: ~D ~D~%" symbol actual-psp stored)))))))
+      (dovector (sym (package-hashtable-cells table))
+        (when (pkg-symbol-valid-p sym)
+          (ins 0 sym)
+          (decf (symtbl-free temp-table)))))
+    (setf (symtbl-cells table) (symtbl-cells temp-table)
+          (symtbl-size table) (symtbl-size temp-table)
+          (symtbl-free table) (symtbl-free temp-table)
+          (symtbl-deleted table) 0)))
 
 ;;;; package locking operations, built unconditionally now
 
@@ -765,18 +810,11 @@ Experimental: interface subject to change."
       (atomic-incf *package-names-cookie*)
       t)))
 
-(defun %package-hashtable-symbol-count (table)
-  (let ((size (the fixnum
-                (- (package-hashtable-size table)
-                   (package-hashtable-deleted table)))))
-    (the fixnum
-      (- size (package-hashtable-free table)))))
-
 (defun package-internal-symbol-count (package)
-  (%package-hashtable-symbol-count (package-internal-symbols package)))
+  (%symtbl-count (package-internal-symbols package)))
 
 (defun package-external-symbol-count (package)
-  (%package-hashtable-symbol-count (package-external-symbols package)))
+  (%symtbl-count (package-external-symbols package)))
 
 (defvar *package* (error "*PACKAGE* should be initialized in cold load!")
   "the current package")
@@ -801,7 +839,7 @@ Experimental: interface subject to change."
 (defun package-name (package-designator)
   (package-%name (%find-package-or-lose package-designator)))
 
-;;;; operations on package hashtables
+;;;; operations on symbol hashsets
 
 ;;; A symbol's name hash is the bitwise negation of the SXHASH
 ;;; of its print-name. I'm trying to be clearer with local variable naming
@@ -817,17 +855,20 @@ Experimental: interface subject to change."
   `(rem (truly-the hash-code ,name-hash)
         (truly-the (not (eql 0)) ,vector-length)))
 
-;;; Add a symbol to a package hashtable. The symbol MUST NOT be present.
+;;; Add a symbol to a hashset. The symbol MUST NOT be present.
+;;; This operation is under the WITH-PACKAGE-GRAPH lock if called by %INTERN.
 (defun add-symbol (table symbol)
-  (setf (package-hashtable-modified table) t)
-  (when (zerop (package-hashtable-free table))
+  (setf (symtbl-modified table) t)
+  (when (zerop (symtbl-free table))
     ;; The hashtable is full. Resize it to be able to hold twice the
     ;; amount of symbols than it currently contains. The actual new size
     ;; can be smaller than twice the current size if the table contained
     ;; deleted entries.
+    ;; We'd like to nuke the old vector, but that can't be done threadsafely
+    ;; for readers. We need something like an frlock which forces readers to
+    ;; retry if a concurrent ADD-SYMBOL caused the old vector to get wiped.
     (resize-package-hashtable table
-                              (* (- (package-hashtable-size table)
-                                    (package-hashtable-deleted table))
+                              (* (- (symtbl-size table) (symtbl-deleted table))
                                  2)))
   (let* ((symvec (package-hashtable-cells table))
          (len (length symvec))
@@ -835,17 +876,15 @@ Experimental: interface subject to change."
          (h1 (sym-name-hash-to-index name-hash len))
          (h2 (1+ (rem name-hash (- len 2)))))
     (declare (fixnum name-hash h2))
+    ;; This REM could easily be changed to a test for wraparound and possible subtraction.
+    ;; But ADD-SYMBOL isn't as performance critical as FIND-SYMBOL.
     (do ((i h1 (rem (+ i h2) len)))
-        ((fixnump (svref symvec i))
-         ;; Interning has to pre-check whether the symbol existed in any
-         ;; package used by the package in which intern is happening,
-         ;; so it's not really useful to be lock-free here,
-         ;; even though we could be. (We're already inside a mutex)
+        ((fixnump (svref symvec i)) ; encountered an unoccupied cell
          (let ((old (svref symvec i)))
            (setf (svref symvec i) symbol)
            (if (eql old 0)
-               (decf (package-hashtable-free table)) ; unused
-               (decf (package-hashtable-deleted table))))) ; tombstone
+               (decf (symtbl-free table)) ; unused
+               (decf (symtbl-deleted table))))) ; tombstone
       (declare (fixnum i)))))
 
 ;;; Insert a mapping from NAME (a string) to OBJECT (a package or singleton
@@ -902,36 +941,42 @@ Experimental: interface subject to change."
           (info-env-tombstones old) 0)
     old))
 
-;;; Resize the package hashtables of all packages so that their load
-;;; factor is +PACKAGE-HASHTABLE-IMAGE-LOAD-FACTOR+. Called from
-;;; SAVE-LISP-AND-DIE to optimize space usage in the image.
+;;; Resize and optimize both hashsets of all packages.
+;;; Called from SAVE-LISP-AND-DIE to optimize space usage in the image.
+;;; A better approach may be to dump all SYMTBLs as plain vectors
+;;; and always rebuild them in start-lisp. This would not only unify COLD-INIT
+;;; with the general case, but would ensure that enlarging a table could
+;;; actually clobber old cells while minimizing the number of pseudostatic vectors
+;;; that can't ever be freed.
 (defun tune-hashtable-sizes-of-all-packages ()
   (with-package-names (table)
     (when (plusp (info-env-tombstones table))
       (%rebuild-package-names table)))
-  (flet ((tune-table-size (table)
+  (flet ((tune-table-size (desired-lf table)
            ;; The APROPOS-LIST R/O scan optimization is inadmissible if no R/O space
-           #-darwin-jit (setf (package-hashtable-modified table) nil)
-           ;; This is some cringeworthy logic but it solves a problem that has baffled
-           ;; me so many times that I can't even. See the test 'unintern.impure.lisp'
-           (let ((ct (- (package-hashtable-size table)
-                        (package-hashtable-free table)
-                        (package-hashtable-deleted table))))
+           #-darwin-jit (setf (symtbl-modified table) nil)
+           (let ((ct (%symtbl-count table)))
              (cond ((zerop ct)
+                    ;; This is some cringeworthy logic but it solves a problem that has baffled
+                    ;; me so many times that I can't even. See the test 'unintern.impure.lisp'
                     (aver (notany #'symbolp (package-hashtable-cells table)))
-                    (setf (package-hashtable-cells table) #(0 0 0) ; literal is OK !
+                    (setf (symtbl-cells table) #(0 0 0) ; literal is OK !
                           ;; the secret to reconstructing on next use: it has 0 free cells
-                          (package-hashtable-free table) 0
-                          (package-hashtable-size table) 2
-                          (package-hashtable-deleted table) 0))
+                          (symtbl-free table) 0
+                          (symtbl-size table) 2
+                          (symtbl-deleted table) 0))
                    (t
-                    (resize-package-hashtable
-                     table
-                     (round (* (/ +package-rehash-threshold+
-                                  +package-hashtable-image-load-factor+) ct))))))))
+                    (resize-package-hashtable table ct desired-lf))))))
     (dolist (package (list-all-packages))
-      (tune-table-size (package-internal-symbols package))
-      (tune-table-size (package-external-symbols package)))))
+      ;; Choose load factor based on whether INTERN is expected at runtime
+      (let ((lf (cond ((eq (the package package) *keyword-package*) 60/100)
+                      ;; Despite being unalterable, give a slightly better average
+                      ;; probe sequence length to the CL package
+                      ((eq package *cl-package*) 90/100)
+                      ((or (system-package-p package) (eq package *cl-package*)) 95/100)
+                      (t 8/10))))
+      (tune-table-size lf (package-internal-symbols (truly-the package package)))
+      (tune-table-size lf (package-external-symbols package))))))
 
 ;;; Find where the symbol named STRING is stored in TABLE.
 ;;; INDEX-VAR is bound to the vector index if found, or -1 if not.
@@ -1004,15 +1049,11 @@ Experimental: interface subject to change."
       ;; because we have exclusive use of the table for writing.
       (let ((symvec (package-hashtable-cells table)))
         (setf (aref symvec index) -1))
-      (incf (package-hashtable-deleted table))))
+      (incf (symtbl-deleted table))))
   ;; If the table is less than one quarter full, halve its size and
   ;; rehash the entries.
-  (let* ((size (package-hashtable-size table))
-         (deleted (package-hashtable-deleted table))
-         (used (- size
-                  (package-hashtable-free table)
-                  deleted)))
-    (declare (type fixnum size deleted used))
+  (let ((size (symtbl-size table))
+        (used (%symtbl-count table)))
     (when (< used (truncate size 4))
       (resize-package-hashtable table (* used 2)))))
 

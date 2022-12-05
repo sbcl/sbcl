@@ -68,7 +68,7 @@ run_sbcl <<EOF
                    (string= name "KEYWORD"))
          (push (make-weak-pointer name) *weak-ptrs*)
          (rename-package name (concatenate 'string "HIDDEN-" name))))))
-  ;; The package hashtable lazily removes keys. Force it do to do so now.
+  ;; The package name hashtable lazily removes keys. Force it do to do so now.
   (sb-impl::%rebuild-package-names sb-kernel::*package-names*))
 
 (gc :gen 7)
@@ -113,7 +113,7 @@ run_sbcl <<EOF
    (dolist (package (list-all-packages))
      (let ((name (package-name package)))
        (rename-package name (concatenate 'string "HIDDEN-" name)))))
-  ;; The package hashtable lazily removes keys. Force it do to do so now.
+  ;; The package name hashtable lazily removes keys. Force it do to do so now.
   (sb-impl::%rebuild-package-names sb-kernel::*package-names*)
   (sb-sys:scrub-control-stack))
 

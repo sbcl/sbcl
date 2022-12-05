@@ -52,8 +52,10 @@
 (defconstant +package-id-user+     3)
 (defconstant +package-id-kernel+   4)
 
-(sb-xc:defstruct (package-hashtable
-                  (:constructor %make-package-hashtable
+(sb-xc:defstruct (symbol-hashset
+                  (:conc-name "SYMTBL-")
+                  (:predicate nil)
+                  (:constructor %make-symbol-hashset
                                 (cells size &aux (free size)))
                   (:copier nil))
   ;; The general-vector of symbols
@@ -96,10 +98,10 @@
   ;; packages that use this package
   (%used-by-list () :type list)
   ;; PACKAGE-HASHTABLEs of internal & external symbols
-  (internal-symbols nil :type package-hashtable)
-  (external-symbols nil :type package-hashtable)
+  (internal-symbols nil :type symbol-hashset)
+  (external-symbols nil :type symbol-hashset)
   ;; shadowing symbols
-  ;; Todo: dynamically changeover to a PACKAGE-HASHTABLE if list gets long
+  ;; Todo: dynamically changeover to a SYMBOL-HASHSET if list gets long
   (%shadowing-symbols () :type list)
   ;; documentation string for this package
   (doc-string nil :type (or simple-string null))
