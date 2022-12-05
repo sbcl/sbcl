@@ -827,3 +827,14 @@
       (list (eval form)
             (eval (sb-cltl2:macroexpand-all form))))
   (:good :good))
+
+(deftest with-a-compiler-macro
+    (multiple-value-bind (fun w f)
+        (compile nil '(lambda ()
+                       (define-compiler-macro #1=#:cm ()
+                        (macrolet ((env (&environment env)
+                                     (sb-cltl2:function-information '#1# env)))
+                          (env)))))
+      (declare (ignore fun))
+      (or w f))
+  nil)

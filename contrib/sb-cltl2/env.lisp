@@ -123,22 +123,21 @@
   (when env
     (let ((ret nil))
       (dolist (entry (sb-c::lexenv-user-data env))
-        (destructuring-bind
-              (entry-keyword entry-var entry-binding &rest entry-cons)
-            entry
-          (when (and (eq keyword entry-keyword)
-                     (typecase binding
-                       (sb-c::global-var
-                        (and (eq var entry-var)
-                             (typecase entry-binding
-                               (sb-c::global-var t)
-                               (sb-c::lambda-var
-                                (sb-c::lambda-var-specvar entry-binding))
-                               (null t)
-                               (t nil))))
-                       (t
-                        (eq binding entry-binding))))
-            (push entry-cons ret))))
+        (when (eq (car entry) keyword)
+         (destructuring-bind (entry-var entry-binding &rest entry-cons)
+             (cdr entry)
+           (when (typecase binding
+                   (sb-c::global-var
+                    (and (eq var entry-var)
+                         (typecase entry-binding
+                           (sb-c::global-var t)
+                           (sb-c::lambda-var
+                            (sb-c::lambda-var-specvar entry-binding))
+                           (null t)
+                           (t nil))))
+                   (t
+                    (eq binding entry-binding)))
+             (push entry-cons ret)))))
       (nreverse ret))))
 
 (defun maybe-deprecation-entry (info)
