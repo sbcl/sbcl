@@ -17,7 +17,7 @@
 ;;;; the expected reference to the one and only thread.
 ;;;; And also sb-safepoint gets a crash in C.
 #-(and gencgc sb-thread (not sb-safepoint)
-       (or (and arm64 (not darwin)) ppc64 x86-64))
+       (or arm64 ppc64 x86-64))
 (invoke-restart 'run-tests::skip-file)
 
 (setq sb-ext:*evaluator-mode* :compile)

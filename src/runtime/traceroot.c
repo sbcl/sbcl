@@ -51,6 +51,13 @@ typedef struct hopscotch_table* inverted_heap_t;
 
 int heap_trace_verbose = 0;
 
+#ifdef LISP_FEATURE_DARWIN_JIT
+typedef uint64_t traceroot_pointer;
+#else
+typedef uint32_t traceroot_pointer;
+#endif
+
+
 extern generation_index_t gencgc_oldest_gen_to_gc;
 
 /// Each "layer" is a set of objects reachable by tracing one reverse pointer
@@ -404,9 +411,19 @@ static struct node* find_node(struct layer* layer, lispobj ptr)
     return 0;
 }
 
+#ifdef LISP_FEATURE_DARWIN_JIT
+static inline traceroot_pointer encode_pointer(lispobj pointer)
+{
+    return pointer;
+}
+static inline lispobj decode_pointer(traceroot_pointer encoding)
+{
+    return encoding;
+}
+#else
 /// "Compressed" pointers are a huge win - they halve the amount
 /// of space required to invert the heap.
-static inline uint32_t encode_pointer(lispobj pointer)
+static inline traceroot_pointer encode_pointer(lispobj pointer)
 {
     uword_t encoding;
     if (find_page_index((void*)pointer) >= 0) {
@@ -434,7 +451,7 @@ static inline uint32_t encode_pointer(lispobj pointer)
     }
 }
 
-static inline lispobj decode_pointer(uint32_t encoding)
+static inline lispobj decode_pointer(traceroot_pointer encoding)
 {
     if (encoding & 1)  // Compressed ptr to dynamic space
         return (encoding>>1)*(2*N_WORD_BYTES) + DYNAMIC_SPACE_START;
@@ -445,6 +462,7 @@ static inline lispobj decode_pointer(uint32_t encoding)
     else
         return encoding; // Literal pointer
 }
+#endif
 
 static void maybe_show_object_name(lispobj obj, FILE* stream)
 {
@@ -535,12 +553,12 @@ static lispobj trace1(lispobj object,
         if (heap_trace_verbose)
             printf("Next layer: Looking for %d object(s)\n", targets->count);
         for_each_hopscotch_key(i, target, (*targets)) {
-            uint32_t list = inverted_heap_get(graph, target);
+            traceroot_pointer list = inverted_heap_get(graph, target);
             if (heap_trace_verbose>1) {
-                uint32_t list1 = list;
+                traceroot_pointer list1 = list;
                 fprintf(stderr, "target=%p srcs=", (void*)target);
                 while (list1) {
-                    uint32_t* cell = (uint32_t*)(scratchpad->base + list1);
+                    traceroot_pointer* cell = (traceroot_pointer*)(scratchpad->base + list1);
                     lispobj* ptr = (lispobj*)decode_pointer(cell[0]);
                     if (hopscotch_containsp(visited, (lispobj)ptr))
                         fprintf(stderr, "%p ", ptr);
@@ -553,7 +571,7 @@ static lispobj trace1(lispobj object,
                 putc('\n',stderr);
             }
             while (list && !anchor) {
-                uint32_t* cell = (uint32_t*)(scratchpad->base + list);
+                traceroot_pointer* cell = (traceroot_pointer*)(scratchpad->base + list);
                 lispobj ptr = decode_pointer(cell[0]);
                 list = cell[1];
                 if (hopscotch_containsp(visited, ptr))
@@ -695,15 +713,15 @@ static boolean record_ptr(lispobj* source, lispobj target,
             leaf_obj_widetag_p(widetag_of(native_pointer(target)))) return 0;
     }
     target = canonical_obj(target);
-    uint32_t* new_cell = (uint32_t*)ss->scratchpad.free;
-    uint32_t* next = new_cell + 2;
+    traceroot_pointer* new_cell = (traceroot_pointer*)ss->scratchpad.free;
+    traceroot_pointer* next = new_cell + 2;
     gc_assert((char*)next <= ss->scratchpad.end);
     ss->scratchpad.free = (char*)next;
     if (ss->scratchpad.free > ss->scratchpad.end) lose("undersized scratchpad");
     new_cell[0] = encode_pointer((lispobj)source);
-    uint32_t* valref = inverted_heap_get_ref(ss->inverted_heap, target);
+    traceroot_pointer* valref = inverted_heap_get_ref(ss->inverted_heap, target);
     new_cell[1] = *valref;
-    *valref = (uint32_t)((char*)new_cell - ss->scratchpad.base);
+    *valref = (traceroot_pointer)((char*)new_cell - ss->scratchpad.base);
     return 1;
 }
 
@@ -893,17 +911,17 @@ static void* compute_heap_inverse(boolean keep_leaves,
 #else
     ss.inverted_heap = malloc(sizeof(struct hopscotch_table));
     hopscotch_create(ss.inverted_heap, HASH_FUNCTION,
-                     4, // XXX: half the word size if 64-bit
+                     sizeof(traceroot_pointer),
                      size /* initial size */, 0 /* default hop range */);
 #endif
     // Add one pointer due to inability to use the first
     // two words of the scratchpad.
-    uword_t scratchpad_min_size = (1 + ss.n_pointers) * 2 * sizeof (uint32_t);
+    uword_t scratchpad_min_size = (1 + ss.n_pointers) * 2 * sizeof (traceroot_pointer);
     int pagesize = os_reported_page_size;
     uword_t scratchpad_size = ALIGN_UP(scratchpad_min_size, pagesize);
     ss.scratchpad.base = os_allocate(scratchpad_size);
     gc_assert(ss.scratchpad.base);
-    ss.scratchpad.free = ss.scratchpad.base + 2 * sizeof(uint32_t);
+    ss.scratchpad.free = ss.scratchpad.base + 2 * sizeof(traceroot_pointer);
     ss.scratchpad.end  = ss.scratchpad.base + scratchpad_size;
     if (heap_trace_verbose) {
         fprintf(stderr, "Scratchpad: %lu bytes\n", (long unsigned)scratchpad_size);
