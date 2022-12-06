@@ -1353,7 +1353,7 @@
   (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
   (:temporary (:sc unsigned-reg) temp)
   (:generator 6
-    (move temp dividend)
+    (inst mov :dword temp dividend)
     (inst imul temp magic)
     (inst test :byte add add)
     (inst jmp :z no-add)
@@ -1369,37 +1369,80 @@
     (inst lea :dword rcx (ea 32 shift))
     (inst shr temp :cl)
     OUT
-    (inst mov quotient temp)))
+    (inst mov :dword quotient temp)))
 
 ;;; Given an unsigned 32-bit dividend and divisor, compute the remainder
-;;; using only multiplications. There is an even better algorithm for this,
-;;; which we don't implement. The newer technique, published in 2019 says:
-;;; "Currently, the remainder of the division by a constant is computed from the quotient
-;;;  by a multiplication and a subtraction. But if just the remainder is desired and the
-;;;  quotient is unneeded, this may be suboptimal."
-;;; See https://github.com/bmkessler/fastdiv for that coded in Go.
-;;;
-;;; The inputs to this vop are the dividend, the divisor, the "magic number", and the "shift".
-;;; It does not handle the situation where the magic parameters have 'a=1'
+;;; using the Granlund & Montgomery approach.
+;;; The inputs to this vop are the dividend, the divisor, and the <m,a,s>
+;;; components of the magic.
 (defknown urem32-via-multiply ((unsigned-byte 32) (unsigned-byte 32)
-                               (unsigned-byte 32) (integer 32 64))
+                               (unsigned-byte 32) bit (integer 0 31))
   (unsigned-byte 32)
   (flushable))
-#+nil
 (define-vop ()
   (:translate urem32-via-multiply)
   (:policy :fast-safe)
   (:args (dividend :scs (unsigned-reg))
          (divisor :scs (unsigned-reg))
          (magic :scs (unsigned-reg))
+         (add :scs (unsigned-reg immediate))
          (shift :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num)
+  (:arg-types unsigned-num unsigned-num unsigned-num unsigned-num unsigned-num)
   (:results (remainder :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset sb-vm::rcx-offset) rcx)
-  (:temporary (:sc unsigned-reg) temp)
-  (:generator 6
-    ))
+  (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:temporary (:sc unsigned-reg :offset rdx-offset) rdx)
+  (:ignore rdx)
+  (:generator 10
+    (inst mov :dword rax dividend)
+    (inst imul rax magic)
+    (cond ((sc-is add immediate)
+           (aver (= (tn-value add) 0))) ; for now I only need add=0
+          (t
+           (inst test :byte add add)
+           (inst jmp :z no-add)
+           (inst shr rax 32) ; rax is now the quotient 'q'
+           (inst mov :dword rcx dividend)
+           (inst sub :dword rcx rax) ; compute (n - quotient)
+           (inst shr :dword rcx 1)
+           (inst lea :dword rax (ea rcx rax)) ; add 'q'
+           (inst lea :dword rcx (ea -1 shift))
+           (inst shr :dword rax :cl) ; shift by s-1
+           (inst jmp CALC-REMAINDER)))
+    NO-ADD
+    (inst lea :dword rcx (ea 32 shift))
+    (inst shr rax :cl)
+    CALC-REMAINDER
+    ;; EAX is the quotient. Multiply it by the divisor, and then take
+    ;; the difference of that and the divisor.
+    (inst mul :dword rax divisor) ; clobbers EDX too
+    (inst neg rax)
+    (inst lea remainder (ea dividend rax))))
+
+;;; Given a dividend, scaled reciprocal-of-divisor, and divisor (in that order)
+;;; compute a remainder using the approach of Lemire, Kaser, Kurz.
+;;;
+(defknown fastrem-32 ((unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32))
+  (unsigned-byte 32)
+  (flushable))
+(define-vop ()
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  ;; TODO: The lifetime specs can be improved to avoid some physical moves
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:temporary (:sc unsigned-reg :offset rdx-offset) rdx)
+  (:generator 10
+    (inst mov :dword rax dividend)
+    (inst mul :dword rax c) ; result to EDX:EAX (but we expressly drop all bits from EDX)
+    (inst mul :dword rax divisor) ; new we want _only_ bits from EDX
+    (inst mov :dword remainder rdx)))
 
 (in-package "SB-C")
 

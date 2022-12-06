@@ -427,3 +427,40 @@
                                      :extern))
     (alien-funcall compute-udiv-magic32 divisor (addr mag))
     (values (slot mag 'm) (slot mag 'a) (slot mag 's))))
+
+;;; "Algorithm 2: Algorithm to select the number of fractional bits and the scaled
+;;; approximate reciprocal in the case of unsigned integers."
+;;; from https://r-libre.teluq.ca/1633/1/Faster_Remainder_of_the_Division_by_a_Constant.pdf
+;;; See also https://github.com/bmkessler/fastdiv for that coded in Go.
+;;; D = divisor
+;;; N = number of bits of precision in numerator
+;;; FRACTION-BITS is what you want, or :VARIABLE for the smallest
+;;;
+;;; Note that for 32 fraction bits, the divisor can *not* use all 32 bits of precision.
+;;; It can only have about 27 or 28 significant bits. This function will figure it out.
+(defun compute-fastrem-coefficient (d n fraction-bits)
+  (multiple-value-bind (smallest-f c)
+      (flet ((is-pow2 (n)
+               (declare (unsigned-byte n))
+               (let ((l (integer-length n)))
+                 (= n (ash 1 (1- l))))))
+        (if (is-pow2 d)
+            (values (1- (integer-length d)) 1)
+            (loop for L from 0
+                  do (let* ((F (+ N L))
+                            (2^F (expt 2 F)))
+                       (when (<= d (+ (mod 2^F d) (expt 2 L)))
+                         (let ((c (ceiling (expt 2 F) d)))
+                           (return (values F c))))))))
+    (cond ((eq fraction-bits :variable) ; return the smallest F
+           (values c smallest-f))
+          (t
+           ;; Otherwise hardwire F to 32 so the algorithm can use :DWORD
+           ;; register moves to perform the shifting and masking.
+           ;; But make sure the smallest-f is not more than 32, or else
+           ;; this can't work.
+           (when (> smallest-f fraction-bits)
+             (error "Need ~D fraction bits for divisor ~D and ~D bit dividend"
+                    smallest-f d n))
+           (values (ceiling (expt 2 fraction-bits) d) fraction-bits)))))
+
