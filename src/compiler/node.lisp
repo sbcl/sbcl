@@ -85,7 +85,7 @@
   ;; (:variable name key . value), or (:function name key . value)
   ;; The NO-COMPILER-MACRO declartion is also stored here (because it
   ;; can't be attached to a function, as compiler macros can be
-  ;; defined on macros). 
+  ;; defined on macros).
   (user-data nil :type list)
   (parent nil)
   ;; Cache of all visible variables, including the ones coming from
