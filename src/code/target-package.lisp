@@ -999,7 +999,7 @@ Experimental: interface subject to change."
 (defun %lookup-symbol (table string name-length name-hash)
   (declare (optimize (sb-c::verify-arg-count 0)
                      (sb-c::insert-array-bounds-checks 0)))
-  (declare (index name-length))
+  (declare (symbol-hashset table) (simple-string string) (index name-length))
   #+nil (atomic-incf *sym-lookups*)
   (macrolet
       ((probe (metric)
@@ -1022,7 +1022,7 @@ Experimental: interface subject to change."
     (let* ((vec (symtbl-cells table))
            (len (length vec))
            (index (symbol-table-hash 1 name-hash len)))
-      (declare (index len index))
+      (declare (index index))
       (probe (atomic-incf *sym-hit-1st-try*))
       ;; Compute a secondary hash H2, and add it successively to INDEX,
       ;; treating the vector as a ring. This loop is guaranteed to terminate
@@ -1031,7 +1031,8 @@ Experimental: interface subject to change."
       ;; is decremented. And FREE starts as a smaller number than the vector length.
       (let ((h2 (symbol-table-hash 2 name-hash len)))
         (declare (index h2))
-        (loop (when (>= (incf index h2) len) (decf index len))
+        (loop (when (>= (incf (truly-the index index) h2) len)
+                (decf (truly-the index index) len))
               (probe nil))))))
 
 ;;; Almost like %lookup-symbol but compare by EQ, not by name.
