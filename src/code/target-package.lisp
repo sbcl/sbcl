@@ -1032,6 +1032,25 @@ Experimental: interface subject to change."
         (loop (when (>= (incf index h2) len) (decf index len))
               (probe nil))))))
 
+;;; Almost like %lookup-symbol but compare by EQ, not by name.
+(defun symbol-externalp (symbol package)
+  (declare (symbol symbol))
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (macrolet ((probe ()
+               `(let ((item (svref vec index)))
+                  (when (eq item symbol) (return-from symbol-externalp t))
+                  (when (eql item 0) (return-from symbol-externalp nil)))))
+    (let* ((table (package-external-symbols package))
+           (vec (symtbl-cells table))
+           (name-hash (sxhash symbol))
+           (len (length vec))
+           (index (symbol-table-hash 1 name-hash len)))
+      (declare (index index))
+      (probe)
+      (let ((h2 (symbol-table-hash 2 name-hash len)))
+        (loop (when (>= (incf index h2) len) (decf index len))
+              (probe))))))
+
 ;;; Delete SYMBOL from TABLE, storing -1 in its place. SYMBOL must exist.
 ;;;
 (defun nuke-symbol (table symbol)
@@ -1231,10 +1250,7 @@ Experimental: interface subject to change."
 
 ;;; Similar to FIND-SYMBOL, but only looks for an external symbol.
 ;;; Return the symbol if found, otherwise 0.
-;;; This is used for fast name-conflict checking in this file and symbol
-;;; printing in the printer.
-;;; An optimization is possible here: by accepting either a string or symbol,
-;;; if the symbol's hash slot is nonzero, we can avoid COMPUTE-SYMBOL-HASH.
+;;; This is used for fast name-conflict checking in this file.
 (defun find-external-symbol (string package)
   (declare (simple-string string))
   (let* ((length (length string))

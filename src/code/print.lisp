@@ -660,7 +660,7 @@ variable: an unreadable object representing the error is printed instead.")
             (unless (and accessible (eq found symbol))
               (output-token (or (package-local-nickname package current)
                                 (package-name package)))
-              (write-string (if (eql (find-external-symbol name package) 0) "::" ":")
+              (write-string (if (symbol-externalp symbol package) ":" "::")
                             stream)))))
         (output-token name)))))
 
