@@ -1026,6 +1026,31 @@
       `(if (string=* str1 str2 start1 end1 start2 end2) nil 0)
       (give-up-ir1-transform)))
 
+(defun check-sequence-test (item test node)
+  (when (constant-lvar-p item)
+    (let ((item (lvar-value item))
+          (test (if test
+                    (lvar-fun-name test)
+                    'eql)))
+      (when
+          (case test
+            (eq
+             (not (typep item '(or fixnum #+64-bit single-float symbol character))))
+            (eql
+             (not (typep item '(or number symbol character))))
+            (equal
+             (not (typep item '(or number symbol character
+                                list string bit-vector pathname)))))
+        (let ((*compiler-error-context* node))
+          (compiler-style-warn "A literal ~a is unlikely to be found with :test '~a"
+                               (typecase item
+                                 (list "list")
+                                 (string "string")
+                                 (sequence "sequence")
+                                 (array "array")
+                                 (t item))
+                               test))))))
+
 (defun check-sequence-ranges (string start end node &optional (suffix "") sequence-name)
   (let* ((type (lvar-type string))
          (length (vector-type-length type))
@@ -1090,12 +1115,20 @@
   (check-sequence-ranges string start end node))
 
 (defoptimizers ir2-hook
-    (find find-if find-if-not position position-if position-if-not
-     remove remove-if remove-if-not delete delete-if delete-if-not
-     count count-if count-if-not reduce
-     remove-duplicates delete-duplicates)
+    (find-if find-if-not position-if position-if-not
+     remove-if remove-if-not delete-if delete-if-not
+     count-if count-if-not
+     reduce remove-duplicates delete-duplicates)
     ((x sequence &key start end &allow-other-keys) node)
   (check-sequence-ranges sequence start end node))
+
+(defoptimizers ir2-hook
+    (find position
+     remove delete
+     count)
+    ((item sequence &key test start end &allow-other-keys) node)
+  (check-sequence-ranges sequence start end node)
+  (check-sequence-test item test node))
 
 (defoptimizers ir2-hook
     (remove-duplicates delete-duplicates)
@@ -1103,7 +1136,8 @@
   (check-sequence-ranges sequence start end node))
 
 (defoptimizer (%find-position ir2-hook) ((item sequence from-end start end key test) node)
-  (check-sequence-ranges sequence start end node))
+  (check-sequence-ranges sequence start end node)
+  (check-sequence-test item test node))
 
 (defoptimizers ir2-hook
     (%find-position-if %find-position-if-not)

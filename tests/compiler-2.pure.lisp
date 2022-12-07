@@ -3248,12 +3248,7 @@
    `(lambda (a d)
       (eql (svref a d) -276932090860495638))
    ((#(1 0) 0) nil)
-   ((#(-276932090860495638) 0) t))
-  (checked-compile-and-assert
-   ()
-   `(lambda (n)
-      (position #c(1.0 2.0) #(nil nil nil) :start n))
-   ((0) nil)))
+   ((#(-276932090860495638) 0) t)))
 
 (with-test (:name :zeroize-stack-tns)
   (checked-compile-and-assert
