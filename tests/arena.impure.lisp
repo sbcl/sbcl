@@ -1,5 +1,4 @@
 #-system-tlabs (invoke-restart 'run-tests::skip-file)
-#+parallel-test-runner (invoke-restart 'run-tests::skip-file) ; crashes and hangs
 #+interpreter (invoke-restart 'run-tests::skip-file)
 (in-package sb-vm)
 
