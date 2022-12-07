@@ -1423,26 +1423,29 @@
 ;;; Given a dividend, scaled reciprocal-of-divisor, and divisor (in that order)
 ;;; compute a remainder using the approach of Lemire, Kaser, Kurz.
 ;;;
-(defknown fastrem-32 ((unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32))
-  (unsigned-byte 32)
-  (flushable))
-(define-vop ()
-  (:translate fastrem-32)
-  (:policy :fast-safe)
-  ;; TODO: The lifetime specs can be improved to avoid some physical moves
-  (:args (dividend :scs (unsigned-reg))
-         (c :scs (unsigned-reg))
-         (divisor :scs (unsigned-reg)))
-  (:arg-types unsigned-num unsigned-num unsigned-num)
-  (:results (remainder :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
-  (:temporary (:sc unsigned-reg :offset rdx-offset) rdx)
-  (:generator 10
-    (inst mov :dword rax dividend)
-    (inst mul :dword rax c) ; result to EDX:EAX (but we expressly drop all bits from EDX)
-    (inst mul :dword rax divisor) ; new we want _only_ bits from EDX
-    (inst mov :dword remainder rdx)))
+(macrolet
+    ((define-fastrem (bits opsize
+                           &aux (name (symbolicate "FASTREM-" (write-to-string bits))))
+       `(define-vop (,name)
+          (:translate ,name)
+          (:policy :fast-safe)
+          (:args (dividend :scs (unsigned-reg) :target rax)
+                 (c :scs (unsigned-reg))
+                 (divisor :scs (unsigned-reg)))
+          (:arg-types unsigned-num unsigned-num unsigned-num)
+          (:results (remainder :scs (unsigned-reg)))
+          (:result-types unsigned-num)
+          (:temporary (:sc unsigned-reg :offset rax-offset
+                       :from (:argument 0) :to (:result 0)) rax)
+          (:temporary (:sc unsigned-reg :offset rdx-offset
+                       :from (:argument 0) :to (:result 0)) rdx)
+          (:generator 10
+            (move rax dividend ,opsize)
+            (inst mul ,opsize rax c) ; result to rDX:rAX (but we expressly drop all bits from rDX)
+            (inst mul ,opsize rax divisor) ; new we want _only_ bits from rDX
+            (move remainder rdx ,opsize)))))
+  (define-fastrem 32 :dword)
+  (define-fastrem 64 :qword))
 
 (in-package "SB-C")
 

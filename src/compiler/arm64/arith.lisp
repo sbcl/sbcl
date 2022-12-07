@@ -1883,3 +1883,32 @@
   (:generator 3
     (inst cmp x 0)
     (inst cset res :ne)))
+
+(define-vop ()
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mul temp dividend c)
+    (inst and temp temp #xFFFFFFFF) ; drop the high 32 bits, keep the low 32 bits
+    (inst mul temp temp divisor)
+    (inst lsr remainder temp 32))) ; take the high 32 bits
+(define-vop ()
+  (:translate fastrem-64)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mul temp dividend c) ; want only the low 64 bits
+    (inst umulh remainder temp divisor))) ; want only the high 64 bits

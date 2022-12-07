@@ -391,22 +391,25 @@ of :INHERITED :EXTERNAL :INTERNAL."
                              &aux (reciprocals 'reciprocals)) ; KLUDGE, unhygienic
   (declare (type (member 1 2) selector)) ; primary or secondary hash function
   (declare (ignorable reciprocals))
-  (let ((remainder
+  (binding*
+      (((get-mask get-c)
+        (case selector
+          (1 (values 'symtbl-hash1-mask 'symtbl-hash1-c))
+          (2 (values 'symtbl-hash2-mask 'symtbl-hash2-c))))
+       (remainder
          `(let* ((dividend
                   (logand (truly-the hash-code ,name-hash)
-                          (,(case selector (1 'symtbl-hash1-mask) (2 'symtbl-hash2-mask))
-                           (truly-the symtbl-magic ,reciprocals))))
+                          (,get-mask (truly-the symtbl-magic ,reciprocals))))
                  (divisor
                   (truly-the (and index (not (eql 0)))
                              ,(if (eq selector 2) `(- ,ncells 2) ncells))))
-            #+x86-64
-            (let ((c (,(case selector (1 'symtbl-hash1-c) (2 'symtbl-hash2-c))
-                      (truly-the symtbl-magic ,reciprocals))))
-              (if (= c 0)
-                  (truly-the index (rem dividend divisor))
-                  (sb-vm::fastrem-32 dividend c
-                                     (truly-the (unsigned-byte 32) divisor))))
-            #-x86-64 (truly-the index (rem dividend divisor)))))
+            ,(if (sb-c::vop-existsp :translate sb-vm::fastrem-32)
+                 `(let ((c (,get-c (truly-the symtbl-magic ,reciprocals))))
+                    (if (= c 0)
+                        (truly-the index (rem dividend divisor))
+                        (sb-vm::fastrem-32 dividend c
+                                           (truly-the (unsigned-byte 32) divisor))))
+                 `(truly-the index (rem dividend divisor))))))
     (if (eq selector 1)
         remainder
         `(truly-the index (1+ ,remainder)))))

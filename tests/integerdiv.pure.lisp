@@ -8,16 +8,11 @@
      (multiple-value-bind (mask c) (sb-impl::optimized-symtbl-remainder-params divisor)
        (assert (and (plusp c) (plusp mask))))))
 
-#+(or (not x86-64) interpreter) (invoke-restart 'run-tests::skip-file)
-
-;;; Theoretiacally some of our hash-table-like structures,
-;;; most notably SYMBOL-HASHSET, which use a prime-number-sized
-;;; storage vector could utilize precomputed magic numbers
-;;; to perform the REM operation by computing the magic parameters
-;;; whenever the table is resized.
+#-(and (or arm64 ppc64 x86-64) (not interpreter)) (invoke-restart 'run-tests::skip-file)
 
 (defvar *rs* (make-random-state t)) ; get a random random-state
 
+#+x86-64
 (with-test (:name :udiv-magic)
   (dotimes (i 1000)
     (let ((divisor (+ 5 (random #xfffffff *rs*))))
@@ -28,6 +23,7 @@
                  (expected (truncate dividend divisor)))
             (assert (= quotient expected))))))))
 
+#+x86-64
 (with-test (:name :urem-magic)
   (dotimes (i 1000)
     (let ((divisor (+ 5 (random #xfffffff *rs*))))
@@ -38,7 +34,7 @@
                  (expected (rem dividend divisor)))
             (assert (= remainder expected))))))))
 
-(with-test (:name :urem-ultrafast)
+(with-test (:name :urem32-ultrafast)
   (dotimes (i 1000)
     ;; The 32-bit algorithm can only handle random 16-bit inputs (or some inputs
     ;; with more than 16 bits, but it's random which inputs are OK)
@@ -51,11 +47,21 @@
                (expected (rem dividend divisor)))
           (assert (= remainder expected)))))))
 
-;;;; Thee assembly code for the benchmarks contains no full calls.
+(with-test (:name :urem64-ultrafast)
+  (dotimes (i 1000)
+    (let* ((divisor (+ 5 (random #xfffffff *rs*)))
+           (c (sb-c:compute-fastrem-coefficient divisor 32 64)))
+      (dotimes (i 20000)
+        (let* ((dividend (random (ash 1 32) *rs*))
+               (remainder (sb-vm::fastrem-64 dividend c divisor))
+               (expected (rem dividend divisor)))
+          (assert (= remainder expected)))))))
+
+;;;; The assembly code for the benchmarks contains no full calls.
 ;;;; Therefore we're measuring the speed of the vops as accurately as possible.
 
 ;;; These loops show the advantage of division by using multiplication
-;;; even when the CPU directlly implements division.
+;;; even when the CPU directly implements division.
 ;;; BASIC-WAY takes about 4 to 6 times as many CPU cycles as TRICKY-WAY.
 ;;; But these loops are too time-consuming for a regression test.
 (defun div-basic-way (&aux (result 0))
@@ -66,6 +72,7 @@
                (setq result (logxor result ans)))))
   result)
 
+#+x86-64
 (defun div-tricky-way (&aux (result 0))
   (declare (fixnum result))
   (loop for divisor from 3 to 1000
@@ -89,12 +96,13 @@
                (setq result (logxor result ans)))))
   result)
 
-;;; * (time(rem-tricky-way))
+;;; * (time (rem-tricky-way))
 ;;; Evaluation took:
 ;;;   9.999 seconds of real time
 ;;;   9.998409 seconds of total run time (9.994458 user, 0.003951 system)
 ;;;   99.99% CPU
 ;;;   27,938,111,662 processor cycles
+#+x86-64
 (defun rem-tricky-way (&aux (result 0)) ; about 11 CPU cycles per operation
   (declare (fixnum result))
   (loop for divisor from 3 to 10000

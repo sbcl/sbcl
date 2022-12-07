@@ -1105,6 +1105,35 @@
   (:translate sb-bignum:%ashl)
   (:generator 1
     (inst sld result digit count)))
+
+(define-vop ()
+  (:translate fastrem-32)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mulld temp dividend c)
+    (inst rldicl temp temp 0 32) ; drop the high 32 bits, keep the low 32 bits
+    (inst mulld temp temp divisor)
+    (inst srdi remainder temp 32))) ; take the high 32 bits
+(define-vop ()
+  (:translate fastrem-64)
+  (:policy :fast-safe)
+  (:args (dividend :scs (unsigned-reg))
+         (c :scs (unsigned-reg))
+         (divisor :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num unsigned-num)
+  (:results (remainder :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
+  (:generator 10
+    (inst mulld temp dividend c) ; want only the low 64 bits
+    (inst mulhdu remainder temp divisor))) ; want only the high 64 bits
 
 (in-package "SB-C")
 

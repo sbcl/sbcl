@@ -1,7 +1,6 @@
 (in-package sb-impl)
 
 (defun find-sym-timing (niter &aux (res 0))
-
   (let* ((pkg (find-package "KEYWORD"))
          (externals (package-external-symbols pkg))
          (vect (remove-if-not #'symbolp (symtbl-cells externals))))
