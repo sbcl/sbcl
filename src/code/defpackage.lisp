@@ -36,8 +36,8 @@ implementation it is ~S." *!default-package-use-list*)
          (package
           (or (resolve-deferred-package name)
               (resolve-rehoming-package name)
-              (%make-package (make-package-hashtable internal-symbols)
-                             (make-package-hashtable external-symbols))))
+              (%make-package (make-symbol-hashset internal-symbols)
+                             (make-symbol-hashset external-symbols))))
          clobber)
    :restart
      (when (find-package name)
@@ -205,7 +205,7 @@ implementation it is ~S." *!default-package-use-list*)
                   (setf (package-%local-nicknames package) nil)
                   (let ((rehoming-package (make-rehoming-package package)))
                     (flet ((nullify-home (symbols)
-                             (dovector (x (package-hashtable-cells symbols))
+                             (dovector (x (symtbl-cells symbols))
                                (when (and (symbolp x)
                                           (eq (symbol-package x) package))
                                  (%set-symbol-package x rehoming-package)))))
@@ -219,7 +219,7 @@ implementation it is ~S." *!default-package-use-list*)
                           ;; Setting PACKAGE-%NAME to NIL is required in order to
                           ;; make PACKAGE-NAME return NIL for a deleted package as
                           ;; ANSI requires. Setting the other slots to NIL
-                          ;; and blowing away the PACKAGE-HASHTABLES is just done
+                          ;; and blowing away the SYMBOL-HASHSETs is just done
                           ;; for tidiness and to help the GC.
                           (package-%nicknames package) nil))
                   (atomic-incf *package-names-cookie*)
@@ -229,9 +229,9 @@ implementation it is ~S." *!default-package-use-list*)
                         (package-tables package) #()
                         (package-%shadowing-symbols package) nil
                         (package-internal-symbols package)
-                        (make-package-hashtable 0)
+                        (make-symbol-hashset 0)
                         (package-external-symbols package)
-                        (make-package-hashtable 0)))
+                        (make-symbol-hashset 0)))
                 (return-from delete-package t)))))))
 ) ; end FLET
 
@@ -721,7 +721,7 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                             (string (the simple-string (cdr candidate)))
                             (length (length string)))
                        (add-to-bag-if-found table string length hash result)))
-                   (dovector (entry (package-hashtable-cells table))
+                   (dovector (entry (symtbl-cells table))
                      ;; I would have guessed that GETHASH is faster than SEARCH, but if
                      ;; interposed between SYMBOLP and SEARCH, it slows down this loop.
                      ;; That's because almost always the symbol is NOT yet in the result,
@@ -752,18 +752,18 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
 
 (export 'show-package-utilization)
 (defun show-package-utilization (&aux (tot-ncells 0))
-  (flet ((symtbl-metrics (table &aux (vec (package-hashtable-cells table))
+  (flet ((symtbl-metrics (table &aux (vec (symtbl-cells table))
                                      (nslots (length vec)))
            (flet ((probe-seq-len (symbol)
                     (let* ((name-hash (sxhash symbol))
-                           (index (sym-name-hash-to-index name-hash nslots))
-                           (h2 (1+ (rem name-hash (- nslots 2))))
+                           (index (symbol-table-hash 1 name-hash nslots))
+                           (h2 (symbol-table-hash 2 name-hash nslots))
                            (nprobes 1))
                       (loop (if (eq (svref vec index) symbol) (return nprobes))
                             (setq index (rem (+ index h2) nslots))
                             (incf nprobes)))))
              (let ((nsymbols 0) (max-nprobes 0) (sum-nprobes 0))
-               (dovector (symbol (package-hashtable-cells table))
+               (dovector (symbol (symtbl-cells table))
                  (when (symbolp symbol)
                    (incf nsymbols)
                    (let ((n (probe-seq-len symbol)))
@@ -778,8 +778,8 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
                (int (package-internal-symbols pkg))
                ((ext-max ext-psl ext-lf) (symtbl-metrics ext))
                ((int-max int-psl int-lf) (symtbl-metrics int))
-               (ncells (+ (length (package-hashtable-cells int))
-                          (length (package-hashtable-cells ext)))))
+               (ncells (+ (length (symtbl-cells int))
+                          (length (symtbl-cells ext)))))
       (incf tot-ncells ncells)
       (format t "~8d ~:{~:[~2*~18@t~;~:* ~2d ~6,2f  ~5,1,2f%~] |~} ~a~%"
               ncells

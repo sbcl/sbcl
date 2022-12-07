@@ -304,7 +304,7 @@ sufficiently motivated to do lengthy fixes."
   #-cheneygc (sb-c::coalesce-debug-info) ; Share even more things
 
   #+sb-fasteval (sb-interpreter::flush-everything)
-  (tune-hashtable-sizes-of-all-packages))
+  (tune-hashset-sizes-of-all-packages))
 
 (defun deinit ()
   (call-hooks "save" *save-hooks*)

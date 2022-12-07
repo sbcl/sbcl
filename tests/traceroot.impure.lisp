@@ -88,7 +88,7 @@
 
 ;;; Sample output:
 ;;; Path to "hi":
-;;;  6       1000209AB3 [   1] a package-hashtable
+;;;  6       1000209AB3 [   1] a symbol-hashset
 ;;;  1       10048F145F [  29] a (simple-vector 37)
 ;;;  1         503B403F [   2] COMMON-LISP-USER::*TOP*
 ;;;  0       1004B885B7 [   6] a cons = (P Q R ...) ; = (NTHCDR 6 object)

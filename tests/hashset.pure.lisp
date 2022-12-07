@@ -76,7 +76,7 @@
   (let ((h (make-hash-table :test #'equal)))
     (dolist (p (list-all-packages))
       (flet ((add-symbols (table)
-               (sb-int:dovector (symbol (sb-impl::package-hashtable-cells table))
+               (sb-int:dovector (symbol (sb-impl::symtbl-cells table))
                  (when (symbolp symbol)
                    (setf (gethash (string symbol) h) t)
                    (setf (gethash (string-downcase symbol) h) t)

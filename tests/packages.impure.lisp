@@ -801,14 +801,14 @@ if a restart was invoked."
           (assert (equal (length (intersection answer expect :test #'equal))
                          (length expect))))))))
 
-;; Assert that changes in size of a package-hashtable's symbol vector
+;; Assert that changes in size of a symbo-hashset's symbol vector
 ;; do not cause WITH-PACKAGE-ITERATOR to crash. The vector shouldn't grow,
 ;; because it is not permitted to INTERN new symbols, but it can shrink
 ;; because it is expressly permitted to UNINTERN the current symbol.
 ;; (In fact we allow INTERN, but that's beside the point)
 (with-test (:name :with-package-iterator-and-mutation)
   (flet ((table-size (pkg)
-           (length (sb-impl::package-hashtable-cells
+           (length (sb-impl::symtbl-cells
                     (sb-impl::package-internal-symbols pkg)))))
     (let* ((p (make-package (string (gensym))))
            (initial-table-size (table-size p))

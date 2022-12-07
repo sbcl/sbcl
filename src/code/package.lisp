@@ -12,7 +12,7 @@
 
 (in-package "SB-IMPL")
 
-;;;; the PACKAGE-HASHTABLE structure
+;;;; the SYMBOL-HASHSET structure
 
 ;;; Packages are implemented using a special kind of hashtable -
 ;;; the storage is a single vector in which each cell is both key and value.
@@ -97,7 +97,7 @@
   (mru-table-index 0 :type index)
   ;; packages that use this package
   (%used-by-list () :type list)
-  ;; PACKAGE-HASHTABLEs of internal & external symbols
+  ;; SYMBOL-HASHSETs of internal & external symbols
   (internal-symbols nil :type symbol-hashset)
   (external-symbols nil :type symbol-hashset)
   ;; shadowing symbols
@@ -114,7 +114,7 @@
   (%local-nicknames nil :type (or null (cons simple-vector simple-vector)))
   ;; Definition source location
   (source-location nil :type (or null sb-c:definition-source-location)))
-(proclaim '(freeze-type package-hashtable package))
+(proclaim '(freeze-type symbol-hashset package))
 
 (defconstant +initial-package-bits+ 2) ; for genesis
 

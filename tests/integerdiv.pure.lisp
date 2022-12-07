@@ -1,7 +1,7 @@
 #+(or (not x86-64) interpreter) (invoke-restart 'run-tests::skip-file)
 
 ;;; Theoretiacally some of our hash-table-like structures,
-;;; most notably PACKAGE-HASHTABLE, which use a prime-number-sized
+;;; most notably SYMBOL-HASHSET, which use a prime-number-sized
 ;;; storage vector could utilize precomputed magic numbers
 ;;; to perform the REM operation by computing the magic parameters
 ;;; whenever the table is resized.

@@ -242,10 +242,10 @@
           (assert (heap-allocated-p (symbol-name sym))))))))
 (test-util:with-test (:name :intern-a-bunch)
   (let ((old-n-cells
-         (length (sb-impl::package-hashtable-cells
+         (length (sb-impl::symtbl-cells
                   (sb-impl::package-internal-symbols *newpkg*)))))
     (addalottasymbols)
-    (let* ((cells (sb-impl::package-hashtable-cells
+    (let* ((cells (sb-impl::symtbl-cells
                    (sb-impl::package-internal-symbols *newpkg*))))
       (assert (> (length cells) old-n-cells)))))
 

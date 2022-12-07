@@ -205,7 +205,7 @@
     (dolist (string contents hs)
       (sb-int:hashset-insert hs string))))
 
-(defun scan-package-hashtable (function table core)
+(defun scan-symbol-hashset (function table core)
   (let ((spaces (core-spaces core))
         (nil-object (core-nil-object core)))
     (dovector (x (translate
@@ -264,7 +264,7 @@
              (let ((externals (gethash package-name packages))
                    (n 0))
                (unless externals
-                 (scan-package-hashtable
+                 (scan-symbol-hashset
                   (lambda (string symbol)
                     (declare (ignore symbol))
                     (incf n)
@@ -477,7 +477,7 @@
       (dovector (x (translate (%instance-ref (translate package-table spaces) 0) spaces))
         (when (%instancep x) ; package
           (flet ((scan (table)
-                   (scan-package-hashtable
+                   (scan-symbol-hashset
                     (lambda (str sym)
                       (pushnew (get-lisp-obj-address sym) (gethash str symbols)))
                     table core)))
