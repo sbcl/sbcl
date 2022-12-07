@@ -35,7 +35,7 @@
                 #:near-cond-jump-displacement #:mov #:call #:jmp
                 #:get-gpr #:reg-name)
   (:import-from "SB-IMPL" #:symbol-hashset #:package-%name
-                #:symtbl-cells
+                #:symtbl-%cells
                 #:hash-table-pairs #:hash-table-%count))
 
 (in-package "SB-EDITCORE")
@@ -206,12 +206,12 @@
       (sb-int:hashset-insert hs string))))
 
 (defun scan-symbol-hashset (function table core)
-  (let ((spaces (core-spaces core))
-        (nil-object (core-nil-object core)))
-    (dovector (x (translate
-                  (symtbl-cells
-                   (truly-the symbol-hashset (translate table spaces)))
-                  spaces))
+  (let* ((spaces (core-spaces core))
+         (nil-object (core-nil-object core))
+         (cells (translate (symtbl-%cells (truly-the symbol-hashset
+                                                     (translate table spaces)))
+                           spaces)))
+    (dovector (x (translate (cdr cells) spaces))
       (unless (fixnump x)
         (funcall function
                  (if (eq x nil-object) ; any random package can export NIL. wow.

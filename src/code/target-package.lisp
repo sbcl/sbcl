@@ -290,6 +290,19 @@ of :INHERITED :EXTERNAL :INTERNAL."
 
 ;;;; SYMBOL-HASHSET stuff
 
+(defstruct (symtbl-magic (:conc-name "SYMTBL-")
+                         (:copier nil)
+                         (:predicate nil)
+                         (:constructor make-symtbl-magic (hash1-mask hash1-c
+                                                          hash2-mask hash2-c)))
+  (hash1-mask 0 :type (unsigned-byte 32))
+  (hash1-c    0 :type (unsigned-byte 32))
+  (hash2-mask 0 :type (unsigned-byte 32))
+  (hash2-c    0 :type (unsigned-byte 32)))
+
+(declaim (inline symtbl-cells))
+(defun symtbl-cells (table) (truly-the simple-vector (cdr (symtbl-%cells table))))
+
 (defun %symtbl-count (table)
   (the fixnum (- (symtbl-size table)
                  (the fixnum (+ (symtbl-deleted table)
@@ -309,6 +322,29 @@ of :INHERITED :EXTERNAL :INTERNAL."
                 (/ (* (1+ (/ sb-vm:n-word-bytes)) n-cells) n-live))
               (* 100 (/ n-filled n-cells))))))
 
+(defun optimized-symtbl-remainder-params (denominator)
+  (when (<= denominator 2)
+    (return-from optimized-symtbl-remainder-params (values 0 0)))
+  ;; Get the number of bits neeeded to represent the denominator.
+  ;; We want at least that many bits in the numerator, plus a couple.
+  (let* ((min-numerator-bits (+ (integer-length denominator) 2))
+         (n min-numerator-bits))
+    (loop
+     (multiple-value-bind (c frac-bits)
+         (sb-c:compute-fastrem-coefficient denominator n :variable)
+       (cond ((= frac-bits 32)
+              (return (values (ldb (byte n 0) -1) c)))
+             ((> frac-bits 32)
+              (return (if (> n min-numerator-bits)
+                          (values (ldb (byte (1- n) 0) -1)
+                                  (sb-c:compute-fastrem-coefficient denominator (1- n) 32))
+                          ;; Can't do fast algorithm, so set c=0
+                          ;; which says to call REM. And use 32 bits
+                          ;; in the dividend.
+                          (values (ldb (byte 32 0) -1) 0))))
+             (t
+              (incf n)))))))
+
 ;;; Make a hashset having a prime number of entries at least
 ;;; as great as (/ SIZE +PACKAGE-REHASH-THRESHOLD+).
 ;;; The smallest table built here has three entries. This
@@ -325,10 +361,18 @@ of :INHERITED :EXTERNAL :INTERNAL."
               return n)))
     ;; SIZE is how many symbols we'd like to be able to store,
     ;; but the number of physical cells is N, chosen for its primality.
-    (let* ((n (choose-good-size size))
-           (size (truncate (* n load-factor)))
-           (symbols (make-array n :initial-element 0)))
-      (%make-symbol-hashset symbols size))))
+    (binding* ((n (choose-good-size size))
+               ((h1-mask h1-c) (optimized-symtbl-remainder-params n))
+               ((h2-mask h2-c) (optimized-symtbl-remainder-params (- n 2)))
+               (size (truncate (* n load-factor)))
+               (reciprocals
+                (if (= n 3) ; minimal table
+                    (make-symtbl-magic 0 0 0 0)
+                    (make-symtbl-magic h1-mask h1-c h2-mask h2-c))))
+      ;; Store optimized remainder parameters unles either reciprocal
+      ;; (for H1 or H2) can't work using the fast REM algorithm in 32 bits.
+      (%make-symbol-hashset (cons reciprocals (make-array n :initial-element 0))
+                            size))))
 
 (declaim (inline pkg-symbol-valid-p))
 (defun pkg-symbol-valid-p (x) (not (fixnump x)))
@@ -343,14 +387,26 @@ of :INHERITED :EXTERNAL :INTERNAL."
 ;;;      will degenerate to a list.
 ;;; * 32 bits of name-based hash, essential for package operations
 ;;;      and also useful for compiling CASE expressions.
-(defmacro symbol-table-hash (selector name-hash ncells)
+(defmacro symbol-table-hash (selector name-hash ncells
+                             &aux (reciprocals 'reciprocals)) ; KLUDGE, unhygienic
   (declare (type (member 1 2) selector)) ; primary or secondary hash function
+  (declare (ignorable reciprocals))
   (let ((remainder
-         `(let ((dividend (truly-the hash-code ,name-hash))
-                (divisor
-                 (truly-the (and index (not (eql 0)))
-                            ,(if (eq selector 2) `(- ,ncells 2) ncells))))
-            (truly-the index (rem dividend divisor)))))
+         `(let* ((dividend
+                  (logand (truly-the hash-code ,name-hash)
+                          (,(case selector (1 'symtbl-hash1-mask) (2 'symtbl-hash2-mask))
+                           (truly-the symtbl-magic ,reciprocals))))
+                 (divisor
+                  (truly-the (and index (not (eql 0)))
+                             ,(if (eq selector 2) `(- ,ncells 2) ncells))))
+            #+x86-64
+            (let ((c (,(case selector (1 'symtbl-hash1-c) (2 'symtbl-hash2-c))
+                      (truly-the symtbl-magic ,reciprocals))))
+              (if (= c 0)
+                  (truly-the index (rem dividend divisor))
+                  (sb-vm::fastrem-32 dividend c
+                                     (truly-the (unsigned-byte 32) divisor))))
+            #-x86-64 (truly-the index (rem dividend divisor)))))
     (if (eq selector 1)
         remainder
         `(truly-the index (1+ ,remainder)))))
@@ -364,12 +420,15 @@ of :INHERITED :EXTERNAL :INTERNAL."
 (defun resize-symbol-hashset (table size &optional (load-factor 3/4))
   (when (zerop size)
     (return-from resize-symbol-hashset
-      (setf (symtbl-cells table) #(0 0 0)
+      (setf (symtbl-%cells table)
+            (load-time-value (cons (make-symtbl-magic 0 0 0 0) #(0 0 0)) t)
             (symtbl-free table) 0
             (symtbl-size table) 2
             (symtbl-deleted table) 0)))
   (let* ((temp-table (make-symbol-hashset size load-factor))
-         (vec (symtbl-cells temp-table))
+         (cells (symtbl-%cells temp-table))
+         (reciprocals (car cells))
+         (vec (truly-the simple-vector (cdr cells)))
          (ncells (length vec))
          (psp-vector (make-array ncells :initial-element nil)))
     (labels ((ins (probe-sequence-pos symbol)
@@ -411,7 +470,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
         (when (pkg-symbol-valid-p sym)
           (ins 0 sym)
           (decf (symtbl-free temp-table)))))
-    (setf (symtbl-cells table) (symtbl-cells temp-table)
+    (setf (symtbl-%cells table) (symtbl-%cells temp-table)
           (symtbl-size table) (symtbl-size temp-table)
           (symtbl-free table) (symtbl-free temp-table)
           (symtbl-deleted table) 0)))
@@ -881,7 +940,9 @@ Experimental: interface subject to change."
     ;; constant read-only vector #(0 0 0) into the cells.
     (let ((new-size (max 1 (* (- (symtbl-size table) (symtbl-deleted table)) 2))))
       (resize-symbol-hashset table new-size)))
-  (let* ((vec (symtbl-cells table))
+  (let* ((cells (symtbl-%cells table))
+         (reciprocals (car cells))
+         (vec (truly-the simple-vector (cdr cells)))
          (len (length vec))
          (name-hash (truly-the fixnum (ensure-symbol-hash symbol)))
          (h1 (symbol-table-hash 1 name-hash len))
@@ -1019,7 +1080,9 @@ Experimental: interface subject to change."
                   ;; either a never used cell or a tombstone left by UNINTERN
                   ((eql item 0) ; never used
                    (return-from %lookup-symbol (values 0 -1)))))))
-    (let* ((vec (symtbl-cells table))
+    (let* ((cells (symtbl-%cells table))
+           (reciprocals (car cells))
+           (vec (truly-the simple-vector (cdr cells)))
            (len (length vec))
            (index (symbol-table-hash 1 name-hash len)))
       (declare (index index))
@@ -1044,7 +1107,9 @@ Experimental: interface subject to change."
                   (when (eq item symbol) (return-from symbol-externalp t))
                   (when (eql item 0) (return-from symbol-externalp nil)))))
     (let* ((table (package-external-symbols package))
-           (vec (symtbl-cells table))
+           (cells (symtbl-%cells table))
+           (reciprocals (car cells))
+           (vec (truly-the simple-vector (cdr cells)))
            (name-hash (sxhash symbol))
            (len (length vec))
            (index (symbol-table-hash 1 name-hash len)))

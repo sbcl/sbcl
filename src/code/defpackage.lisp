@@ -752,7 +752,9 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
 
 (export 'show-package-utilization)
 (defun show-package-utilization (&aux (tot-ncells 0))
-  (flet ((symtbl-metrics (table &aux (vec (symtbl-cells table))
+  (flet ((symtbl-metrics (table &aux (cells (symtbl-%cells table))
+                                     (reciprocals (car cells))
+                                     (vec (cdr cells))
                                      (nslots (length vec)))
            (flet ((probe-seq-len (symbol)
                     (let* ((name-hash (sxhash symbol))

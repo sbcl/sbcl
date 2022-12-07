@@ -173,26 +173,28 @@ static lispobj* search_package_symbols(lispobj package, char* symbol_name,
     struct package* pkg = (struct package*)(package - INSTANCE_POINTER_LOWTAG);
     int table_selector = *hint & 1, iteration;
     for (iteration = 1; iteration <= 2; ++iteration) {
-        struct instance* symbols = (struct instance*)
+        struct instance* table = (struct instance*)
           native_pointer(table_selector ? pkg->external_symbols : pkg->internal_symbols);
-        gc_assert(widetag_of(&symbols->header) == INSTANCE_WIDETAG);
-        struct vector* cells = VECTOR(symbols->slots[INSTANCE_DATA_START]);
-        gc_assert(widetag_of(&cells->header) == SIMPLE_VECTOR_WIDETAG);
+        gc_assert(widetag_of(&table->header) == INSTANCE_WIDETAG);
+        gc_assert(listp(table->slots[INSTANCE_DATA_START]));
+        struct cons* cells = (void*)native_pointer(table->slots[INSTANCE_DATA_START]);
+        gc_assert(simple_vector_p(cells->cdr));
+        struct vector* v = VECTOR(cells->cdr);
         lispobj namelen = strlen(symbol_name);
-        int cells_length = vector_len(cells);
+        int vector_length = vector_len(v);
         int index = *hint >> 1;
-        if (index >= cells_length)
+        if (index >= vector_length)
             index = 0; // safeguard against vector shrinkage
         int initial_index = index;
         do {
-            lispobj thing = cells->data[index];
+            lispobj thing = v->data[index];
             if (lowtag_of(thing) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(thing)->header) == SYMBOL_WIDETAG
                 && sym_stringeq(thing, symbol_name, namelen)) {
                 *hint = (index << 1) | table_selector;
                 return (lispobj*)SYMBOL(thing);
             }
-            index = (index + 1) % cells_length;
+            index = (index + 1) % vector_length;
         } while (index != initial_index);
         table_selector = table_selector ^ 1;
     }

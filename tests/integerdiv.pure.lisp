@@ -1,3 +1,13 @@
+;;; Assert that all odd divisors less than 32769 have an optimized
+;;; remainder coefficient using 32-bit operations.
+;;; Symbol hashsets with fewer than that many cells can use fast remainder.
+;;; (I could/should implement the 64-bit algorithm I suppose)
+(with-test (:name :optimized-remainder-exists)
+  (loop for divisor from 3 below 32769 by 2
+        do
+     (multiple-value-bind (mask c) (sb-impl::optimized-symtbl-remainder-params divisor)
+       (assert (and (plusp c) (plusp mask))))))
+
 #+(or (not x86-64) interpreter) (invoke-restart 'run-tests::skip-file)
 
 ;;; Theoretiacally some of our hash-table-like structures,

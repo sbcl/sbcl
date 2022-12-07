@@ -56,10 +56,11 @@
                   (:conc-name "SYMTBL-")
                   (:predicate nil)
                   (:constructor %make-symbol-hashset
-                                (cells size &aux (free size)))
+                                (%cells size &aux (free size)))
                   (:copier nil))
-  ;; The general-vector of symbols
-  (cells (missing-arg) :type simple-vector)
+  ;; An extra indirection to the symbol vector allows atomically changing the symbols
+  ;; and the division magic parameters.
+  (%cells (missing-arg) :type (cons t simple-vector))
   (modified nil :type boolean)
   ;; SIZE is roughly related to the number of symbols the client code asked to be
   ;; able to store. We increase that to a prime number, then scale it down to compute
