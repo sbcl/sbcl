@@ -1035,12 +1035,14 @@
       (when
           (case test
             (eq
-             (not (typep item '(or fixnum #+64-bit single-float symbol character))))
+             (not (typep item '(or fixnum #+64-bit single-float symbol character
+                                ctype classoid))))
             (eql
-             (not (typep item '(or number symbol character))))
+             (not (typep item '(or number symbol character ctype classoid))))
             (equal
              (not (typep item '(or number symbol character
-                                list string bit-vector pathname)))))
+                                list string bit-vector pathname
+                                ctype classoid)))))
         (let ((*compiler-error-context* node))
           (compiler-style-warn "A literal ~a is unlikely to be found with :test '~a"
                                (typecase item
