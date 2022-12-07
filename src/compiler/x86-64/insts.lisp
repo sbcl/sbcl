@@ -1785,16 +1785,6 @@
     (:printer reg/mem ((op '(#b1111111 #b001))))
     (:emitter (emit* segment prefix dst #b1111111 #b001))))
 
-;;; Why do we require specifying the accumulator if it's the only legal DST?
-(define-instruction mul (segment &prefix prefix dst src)
-  (:printer accum-reg/mem ((op '(#b1111011 #b100))))
-  (:emitter
-   (let ((size (pick-operand-size prefix dst src)))
-     (aver (accumulator-p dst))
-     (emit-prefixes segment src nil size)
-     (emit-byte segment (opcode+size-bit #xF6 size))
-     (emit-ea segment src #b100))))
-
 (define-instruction-format (imul-3-operand 16 :include reg-reg/mem)
   (op    :fields (list (byte 6 2) (byte 1 0)) :value '(#b011010 1))
   (width :field (byte 1 1)
@@ -1841,10 +1831,13 @@
 
 (flet ((emit* (segment prefix dst src subcode)
          (let ((size (pick-operand-size prefix dst src)))
-           (aver (accumulator-p dst)) ; this is terrible! It's AL:AH or rAX:rDX
+           (aver (accumulator-p dst)) ; why why why ? Don't take this operand.
            (emit-prefixes segment src nil size)
            (emit-byte segment (opcode+size-bit #xF6 size))
            (emit-ea segment src subcode))))
+  (define-instruction mul (segment &prefix prefix dst src)
+    (:printer accum-reg/mem ((op '(#b1111011 #b100))))
+    (:emitter (emit* segment prefix dst src #b100)))
   (define-instruction div (segment &prefix prefix dst src)
     (:printer accum-reg/mem ((op '(#b1111011 #b110))))
     (:emitter (emit* segment prefix dst src #b110)))
