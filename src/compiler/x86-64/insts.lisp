@@ -1829,21 +1829,24 @@
               (if imm
                   (emit-imm-operand segment imm imm-size))))))))
 
-(flet ((emit* (segment prefix dst src subcode)
-         (let ((size (pick-operand-size prefix dst src)))
-           (aver (accumulator-p dst)) ; why why why ? Don't take this operand.
+(flet ((emit* (segment subcode prefix src junk)
+         (when junk
+           (warn "Do not supply 2 operands to 1-operand MUL,DIV")
+           (aver (accumulator-p src))
+           (setq src junk))
+         (let ((size (pick-operand-size prefix src)))
            (emit-prefixes segment src nil size)
            (emit-byte segment (opcode+size-bit #xF6 size))
            (emit-ea segment src subcode))))
-  (define-instruction mul (segment &prefix prefix dst src)
+  (define-instruction mul (segment &prefix prefix src &optional junk)
     (:printer accum-reg/mem ((op '(#b1111011 #b100))))
-    (:emitter (emit* segment prefix dst src #b100)))
-  (define-instruction div (segment &prefix prefix dst src)
+    (:emitter (emit* segment #b100 prefix src junk)))
+  (define-instruction div (segment &prefix prefix src &optional junk)
     (:printer accum-reg/mem ((op '(#b1111011 #b110))))
-    (:emitter (emit* segment prefix dst src #b110)))
-  (define-instruction idiv (segment &prefix prefix dst src)
+    (:emitter (emit* segment #b110 prefix src junk)))
+  (define-instruction idiv (segment &prefix prefix src &optional junk)
     (:printer accum-reg/mem ((op '(#b1111011 #b111))))
-    (:emitter (emit* segment prefix dst src #b111))))
+    (:emitter (emit* segment #b111 prefix src junk))))
 
 (define-instruction bswap (segment &prefix prefix dst)
   (:printer ext-reg-no-width ((op #b11001)))

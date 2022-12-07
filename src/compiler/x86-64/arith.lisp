@@ -514,7 +514,7 @@
   (:save-p :compute-only)
   (:generator 6
     (move eax x)
-    (inst mul eax y)
+    (inst mul y)
     (move r eax)))
 
 (define-vop (fast-*-c/unsigned=>unsigned fast-safe-arith-op)
@@ -534,7 +534,7 @@
   (:save-p :compute-only)
   (:generator 6
     (move eax x)
-    (inst mul eax (register-inline-constant :qword y))
+    (inst mul (register-inline-constant :qword y))
     (move r eax)))
 
 (define-vop ()
@@ -847,7 +847,7 @@
       (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
     (move eax x)
     (inst cqo)
-    (inst idiv eax y)
+    (inst idiv y)
     (if (location= quo eax)
         (inst shl eax n-fixnum-tag-bits)
         (if (= n-fixnum-tag-bits 1)
@@ -875,7 +875,7 @@
     (move eax x)
     (inst cqo)
     (inst mov y-arg (fixnumize y))
-    (inst idiv eax y-arg)
+    (inst idiv y-arg)
     (if (location= quo eax)
         (inst shl eax n-fixnum-tag-bits)
         (if (= n-fixnum-tag-bits 1)
@@ -908,7 +908,7 @@
       (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
     (move eax x)
     (zeroize edx)
-    (inst div eax y)
+    (inst div y)
     (move quo eax)
     (move rem edx)))
 
@@ -932,7 +932,7 @@
     (move eax x)
     (zeroize edx)
     (inst mov y-arg y)
-    (inst div eax y-arg)
+    (inst div y-arg)
     (move quo eax)
     (move rem edx)))
 
@@ -961,7 +961,7 @@
       (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
     (move eax x)
     (inst cqo)
-    (inst idiv eax y)
+    (inst idiv y)
     (move quo eax)
     (move rem edx)))
 
@@ -985,7 +985,7 @@
     (move eax x)
     (inst cqo)
     (inst mov y-arg y)
-    (inst idiv eax y-arg)
+    (inst idiv y-arg)
     (move quo eax)
     (move rem edx)))
 
@@ -1416,7 +1416,7 @@
     CALC-REMAINDER
     ;; EAX is the quotient. Multiply it by the divisor, and then take
     ;; the difference of that and the divisor.
-    (inst mul :dword rax divisor) ; clobbers EDX too
+    (inst mul :dword divisor) ; clobbers EDX too
     (inst neg rax)
     (inst lea remainder (ea dividend rax))))
 
@@ -1441,8 +1441,8 @@
                        :from (:argument 0) :to (:result 0)) rdx)
           (:generator 10
             (move rax dividend ,opsize)
-            (inst mul ,opsize rax c) ; result to rDX:rAX (but we expressly drop all bits from rDX)
-            (inst mul ,opsize rax divisor) ; new we want _only_ bits from rDX
+            (inst mul ,opsize c) ; result to rDX:rAX (but we expressly drop all bits from rDX)
+            (inst mul ,opsize divisor) ; new we want _only_ bits from rDX
             (move remainder rdx ,opsize)))))
   (define-fastrem 32 :dword)
   (define-fastrem 64 :qword))
@@ -2503,7 +2503,7 @@
   (:result-types unsigned-num unsigned-num)
   (:generator 20
     (move eax x)
-    (inst mul eax y)
+    (inst mul y)
     (inst add eax carry-in)
     (inst adc edx 0)
     (move hi edx)
@@ -2526,7 +2526,7 @@
   (:result-types unsigned-num unsigned-num)
   (:generator 20
     (move eax x)
-    (inst mul eax y)
+    (inst mul y)
     (inst add eax prev)
     (inst adc edx 0)
     (inst add eax carry-in)
@@ -2550,7 +2550,7 @@
   (:result-types unsigned-num unsigned-num)
   (:generator 20
     (move eax x)
-    (inst mul eax y)
+    (inst mul y)
     (move hi edx)
     (move lo eax)))
 
@@ -2568,7 +2568,7 @@
   (:result-types unsigned-num)
   (:generator 20
     (move eax x)
-    (inst mul eax y)
+    (inst mul y)
     (move hi edx)))
 
 (define-vop (mulhi/fx)
@@ -2584,7 +2584,7 @@
   (:result-types positive-fixnum)
   (:generator 15
     (move eax x)
-    (inst mul eax y)
+    (inst mul y)
     (move hi edx)
     (inst and hi (lognot fixnum-tag-mask))))
 
@@ -2639,7 +2639,7 @@
   (:generator 300
     (move edx div-high)
     (move eax div-low)
-    (inst div eax divisor)
+    (inst div divisor)
     (move quo eax)
     (move rem edx)))
 
