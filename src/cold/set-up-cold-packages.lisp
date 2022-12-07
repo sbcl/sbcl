@@ -336,6 +336,10 @@
 ;;
 (let ((package-name "SB-XC"))
   (dolist (name (append *undefineds* *dual-personality-math-symbols*))
+    ;; FIXME: this triggers some pathological behavior in our implementation
+    ;; of EXPORT. For each symbol, we're adding it to the internals, then
+    ;; removing that to add to the externals, each time shrinking the hashset
+    ;; of internals back to nothing. Is there way to not do that?
     (export (intern name package-name) package-name))
   (dolist (name '("*READ-DEFAULT-FLOAT-FORMAT*"
                   "ARRAY-ELEMENT-TYPE"

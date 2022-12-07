@@ -877,8 +877,10 @@ Experimental: interface subject to change."
     ;; We'd like to nuke the old vector, but that can't be done threadsafely
     ;; for readers. We need something like an frlock which forces readers to
     ;; retry if a concurrent ADD-SYMBOL caused the old vector to get wiped.
-    (resize-symbol-hashset table
-                           (* (- (symtbl-size table) (symtbl-deleted table)) 2)))
+    ;; N.B.: Never pass 0 for the new size, as that will assign the
+    ;; constant read-only vector #(0 0 0) into the cells.
+    (let ((new-size (max 1 (* (- (symtbl-size table) (symtbl-deleted table)) 2))))
+      (resize-symbol-hashset table new-size)))
   (let* ((vec (symtbl-cells table))
          (len (length vec))
          (name-hash (truly-the fixnum (ensure-symbol-hash symbol)))
