@@ -8,7 +8,11 @@
      (multiple-value-bind (mask c) (sb-impl::optimized-symtbl-remainder-params divisor)
        (assert (and (plusp c) (plusp mask))))))
 
-#-(and (or arm64 ppc64 x86-64) (not interpreter)) (invoke-restart 'run-tests::skip-file)
+(defvar *have-fastrem* (let ((s (find-symbol "FASTREM-32" "SB-VM")))
+                         (and s (gethash s sb-c::*backend-parsed-vops*))))
+
+(when (or (not *have-fastrem*) (member :interpreter *features*))
+  (invoke-restart 'run-tests::skip-file))
 
 (defvar *rs* (make-random-state t)) ; get a random random-state
 
@@ -47,6 +51,7 @@
                (expected (rem dividend divisor)))
           (assert (= remainder expected)))))))
 
+#+64-bit
 (with-test (:name :urem64-ultrafast)
   (dotimes (i 1000)
     (let* ((divisor (+ 5 (random #xfffffff *rs*)))

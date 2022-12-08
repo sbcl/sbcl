@@ -829,12 +829,9 @@
 #+(or arm64 x86-64)
 (defknown sb-lockless::get-next (sb-lockless::list-node) (values sb-lockless::list-node t))
 
-#+(or arm64 ppc64 x86-64)
-(progn
 (defknown sb-vm::fastrem-32 ((unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32))
   (unsigned-byte 32)
   (flushable))
 (defknown sb-vm::fastrem-64 ((unsigned-byte 64) (unsigned-byte 64) (unsigned-byte 64))
   (unsigned-byte 64)
   (flushable))
-)
