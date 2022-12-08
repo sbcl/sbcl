@@ -363,12 +363,13 @@ of :INHERITED :EXTERNAL :INTERNAL."
     ;; but the number of physical cells is N, chosen for its primality.
     (binding* ((n (choose-good-size size))
                ((h1-mask h1-c) (optimized-symtbl-remainder-params n))
-               ((h2-mask h2-c) (optimized-symtbl-remainder-params (- n 2)))
+               ;;((h2-mask h2-c) (optimized-symtbl-remainder-params (- n 2)))
+               (h2-mask (ldb (byte (1- (integer-length n)) 0) -1))
                (size (truncate (* n load-factor)))
                (reciprocals
                 (if (= n 3) ; minimal table
                     (make-symtbl-magic 0 0 0 0)
-                    (make-symtbl-magic h1-mask h1-c h2-mask h2-c))))
+                    (make-symtbl-magic h1-mask h1-c h2-mask 0))))
       ;; Store optimized remainder parameters unles either reciprocal
       ;; (for H1 or H2) can't work using the fast REM algorithm in 32 bits.
       (%make-symbol-hashset (cons reciprocals (make-array n :initial-element 0))
@@ -391,6 +392,11 @@ of :INHERITED :EXTERNAL :INTERNAL."
                              &aux (reciprocals 'reciprocals)) ; KLUDGE, unhygienic
   (declare (type (member 1 2) selector)) ; primary or secondary hash function
   (declare (ignorable reciprocals))
+  (when (eql selector 2)
+    (return-from symbol-table-hash
+      `(truly-the index
+        (1+ (logand (symtbl-hash2-mask (truly-the symtbl-magic reciprocals))
+                    ,name-hash)))))
   (binding*
       (((get-mask get-c)
         (case selector
