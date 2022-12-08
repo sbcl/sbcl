@@ -534,7 +534,7 @@
   (:save-p :compute-only)
   (:generator 6
     (move eax x)
-    (inst mul (register-inline-constant :qword y))
+    (inst mul :qword (register-inline-constant :qword y))
     (move r eax)))
 
 (define-vop ()
