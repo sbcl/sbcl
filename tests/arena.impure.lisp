@@ -293,6 +293,10 @@
         (exit-if-no-arenas))
       (assert (= n-deleted n-arenas)))))
 
+;; #+sb-devel preserves some symbols that the test doesn't care about
+;; as the associated function will never be called.
+(defvar *ignore* '("!EARLY-LOAD-METHOD"))
+
 (test-util:with-test (:name :disassemble-pcl-stuff)
   (let ((stream (make-string-output-stream)))
     (with-package-iterator (iter "SB-PCL" :internal :external)
@@ -300,6 +304,7 @@
         (multiple-value-bind (got symbol) (iter)
           (unless got (return))
           (when (and (fboundp symbol)
+                     (not (member (string symbol) *ignore* :test 'string=))
                      (not (closurep (symbol-function symbol)))
                      (not (sb-pcl::generic-function-p
                            (symbol-function symbol))))
