@@ -1756,8 +1756,7 @@
       (let* ((*transforming* (1+ *transforming*))
              (new-fun (ir1-convert-inline-lambda
                        res
-                       :debug-name (debug-name 'lambda-inlined source-name)
-                       :system-lambda t))
+                       :debug-name (debug-name 'lambda-inlined source-name)))
              (type (node-derived-type call))
              (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)

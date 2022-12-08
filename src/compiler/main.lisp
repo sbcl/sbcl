@@ -1197,8 +1197,7 @@ necessary, since type inference may take arbitrarily long to converge.")
            (*lexenv* (make-lexenv :policy (lexenv-policy (functional-lexenv fun))))
            (xep (ir1-convert-lambda (make-xep-lambda-expression fun)
                                     :source-name source-name
-                                    :debug-name (debug-name 'tl-xep debug-name-tail)
-                                    :system-lambda t)))
+                                    :debug-name (debug-name 'tl-xep debug-name-tail))))
       (when name
         (assert-global-function-definition-type name fun))
       (setf (functional-kind xep) :external

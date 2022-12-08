@@ -1240,11 +1240,7 @@
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
   (call-lexenv nil :type (or lexenv null))
-  (allow-instrumenting *allow-instrumenting* :type boolean)
-  ;; True if this is a system introduced lambda: it may contain user code, but
-  ;; the lambda itself is not, and the bindings introduced by it are considered
-  ;; transparent by the nested DX analysis.
-  (system-lambda-p nil :type boolean))
+  (allow-instrumenting *allow-instrumenting* :type boolean))
 (defprinter (clambda :conc-name lambda- :identity t
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name

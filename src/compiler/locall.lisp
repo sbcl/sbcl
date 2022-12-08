@@ -310,8 +310,7 @@
                          *lexenv*))
            (xep (ir1-convert-lambda (make-xep-lambda-expression fun)
                                     :debug-name (debug-name
-                                                 'xep (leaf-debug-name fun))
-                                    :system-lambda t)))
+                                                 'xep (leaf-debug-name fun)))))
       (setf (functional-kind xep) :external
             (leaf-ever-used xep) t
             (functional-entry-fun xep) fun
@@ -711,8 +710,7 @@
                (%funcall ,entry ,@args))
             :debug-name (debug-name 'hairy-function-entry
                                     (lvar-fun-debug-name
-                                     (basic-combination-fun call)))
-            :system-lambda t))))
+                                     (basic-combination-fun call)))))))
     (convert-call ref call new-fun)
     (dolist (ref (leaf-refs entry))
       (convert-call-if-possible ref (lvar-dest (node-lvar ref))))))

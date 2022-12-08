@@ -876,8 +876,7 @@
              ;; bound by a non-XEP lambda, no other REFS that aren't
              ;; DX-SAFE, or are result-args when the result is discarded.
              (when (and (neq :external (lambda-kind home))
-                        (or (lambda-system-lambda-p home)
-                            (lexenv-contains-lambda home *dx-lexenv*))
+                        (lexenv-contains-lambda home *dx-lexenv*)
                         (dolist (ref refs t)
                           (unless (or (eq use ref)
                                       (ref-good-for-dx-p ref))
@@ -2810,14 +2809,15 @@ is :ANY, the function name is not checked."
       (when (eq :rest kind)
         (return t)))))
 
-;;; Don't substitute single-ref variables on high-debug / low speed, to
-;;; improve the debugging experience. ...but don't bother keeping those
-;;; from system lambdas.
-(defun preserve-single-use-debug-var-p (call var)
-  (and (policy call (eql preserve-single-use-debug-variables 3))
+;;; Don't substitute single-ref variables on high-debug / low speed,
+;;; to improve the debugging experience, unless it is a special
+;;; variable or a temporary variable used for hairy function entries.
+(defun preserve-single-use-debug-var-p (node var)
+  (and (policy node (eql preserve-single-use-debug-variables 3))
        (not (lambda-var-specvar var))
-       (or (not (lambda-var-p var))
-           (not (lambda-system-lambda-p (lambda-var-home var))))))
+       (not (and (combination-p node)
+                 (typep (leaf-debug-name (combination-lambda node))
+                        '(cons (member hairy-function-entry) t))))))
 
 ;;; Call (lambda (arg lambda-var type)), for a mv-combination ARG can
 ;;; be NIL when it produces multiple values.
