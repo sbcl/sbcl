@@ -310,10 +310,15 @@
             (let ((lines (test-util:split-string
                           (get-output-stream-string stream)
                           #\newline)))
-              (dolist (line lines)
-                (cond ((search "LIST-ALLOC-TRAMP" line)
-                       (assert (search "SYS-LIST-ALLOC-TRAMP" line)))
-                      ((search "ALLOC-TRAMP" line)
-                       (assert (search "SYS-ALLOC-TRAMP" line)))
-                      ((search "LISTIFY-&REST" line)
-                       (assert (search "SYS-LISTIFY-&REST" line))))))))))))
+              ;; Each alloc-tramp call should be the SYS- variant
+              (flet ((line-ok (line)
+                       (cond ((search "LIST-ALLOC-TRAMP" line)
+                              (search "SYS-LIST-ALLOC-TRAMP" line))
+                             ((search "ALLOC-TRAMP" line)
+                              (search "SYS-ALLOC-TRAMP" line))
+                             ((search "LISTIFY-&REST" line)
+                              (search "SYS-LISTIFY-&REST" line))
+                             (t t))))
+                (unless (every #'line-ok lines)
+                  (format *error-output* "Failure:~{~%~A~}~%" lines)
+                  (error  "Bad result for ~S" symbol))))))))))
