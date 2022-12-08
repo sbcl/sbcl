@@ -746,13 +746,23 @@
 ;;; Run the cross-compiler on a file in the source directory tree to
 ;;; produce a corresponding file in the target object directory tree.
 (defun target-compile-stem (stem flags)
-  (funcall *in-target-compilation-mode-fn*
+  (let ((system-tlab-p
+         (or (search "src/pcl" stem)
+             (search "src/code/arena" stem)
+             (search "src/code/debug" stem)
+             (search "src/code/early-defmethod" stem)
+             (search "src/code/format" stem)
+             (search "src/code/brothertree" stem)
+             (search "src/code/avltree" stem))))
+    (funcall *in-target-compilation-mode-fn*
            (lambda ()
-             (progv (list (intern "*SOURCE-NAMESTRING*" "SB-C"))
-                    (list (lpnify-stem stem))
+             (progv (list (intern "*SOURCE-NAMESTRING*" "SB-C")
+                          (intern "*FORCE-SYSTEM-TLAB*" "SB-C"))
+                    (list (lpnify-stem stem)
+                          system-tlab-p)
                (loop
                 (with-simple-restart (recompile "Recompile")
-                  (return (compile-stem stem flags :target-compile))))))))
+                  (return (compile-stem stem flags :target-compile)))))))))
 (compile 'target-compile-stem)
 
 ;;; (This function is not used by the build process, but is intended
