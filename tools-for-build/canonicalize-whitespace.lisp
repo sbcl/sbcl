@@ -14,6 +14,8 @@
 
 ;;; Stream and single-file functions
 
+#+ecl (ext:quit) ; avoids 'Unexpected end of file on #<input file "stdin">.'
+
 (progn
 (defun whitespace-p (character)
   (member character '(#\Space #\Tab) :test #'char=))
