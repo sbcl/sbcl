@@ -1029,16 +1029,17 @@
                  (cmp (ir2-block-start-vop target-block)))
             (when (and cmp
                        (singleton-p (ir2block-predecessors target-block)))
-              (let ((integer (tn-ref-tn (vop-args vop)))
+              (let ((integer (vop-args vop))
                     (args (vop-args cmp))
-                    tns)
+                    tn-refs)
                 (when (case (vop-name cmp)
                         ((sb-vm::>-integer-fixnum sb-vm::<-integer-fixnum)
-                         (when (eq (tn-ref-tn args) integer)
-                           (setf tns (list integer (tn-ref-tn (tn-ref-across args))))))
+                         (when (eq (tn-ref-tn args) (tn-ref-tn integer))
+                           (setf tn-refs (list integer (tn-ref-across args)))))
                         ((sb-vm::>-fixnum-integer sb-vm::<-fixnum-integer)
-                         (when (eq (tn-ref-tn (tn-ref-across args)) integer)
-                           (setf tns (list (tn-ref-tn args) integer)))))
+                         (when (eq (tn-ref-tn (tn-ref-across args))
+                                   (tn-ref-tn integer))
+                           (setf tn-refs (list args integer)))))
                   (destructuring-bind (cmp-target cmp-not-p) (vop-codegen-info cmp)
                     (let* ((cmp-next-block (ir2-block-next (vop-block cmp)))
                            (cmp-target-block (gethash cmp-target *2block-info*)))
@@ -1075,7 +1076,7 @@
                           (prog1
                               (emit-and-insert-vop (vop-node vop) (vop-block vop)
                                                    new-vop
-                                                   (reference-tn-list tns nil)
+                                                   (reference-tn-ref-list tn-refs nil)
                                                    nil vop
                                                    (list new-target new-not-p))
                             (delete-vop vop)

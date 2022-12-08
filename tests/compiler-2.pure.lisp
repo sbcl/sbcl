@@ -3821,3 +3821,11 @@
            (setf (car list) x)
            list))
     ((2) '(2) :test #'equal)))
+
+(with-test (:name :tn-ref-type-ir2opt)
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (the unsigned-byte
+           (the (or (array * (1)) real) p)))
+   ((5) 5)))

@@ -388,6 +388,22 @@
         first)
       more))
 
+;;; Copy the tn-ref-type of the TNs.
+(defun reference-tn-ref-list (tn-refs write-p &optional more)
+  (declare (list tn-refs) (type boolean write-p) (type (or tn-ref null) more))
+  (if tn-refs
+      (let* ((first (reference-tn (tn-ref-tn (first tn-refs)) write-p))
+             (prev first))
+        (setf (tn-ref-type first) (tn-ref-type (first tn-refs)))
+        (dolist (tn-ref (rest tn-refs))
+          (let ((res (reference-tn (tn-ref-tn tn-ref) write-p)))
+            (setf (tn-ref-across prev) res
+                  (tn-ref-type res) (tn-ref-type tn-ref))
+            (setq prev res)))
+        (setf (tn-ref-across prev) more)
+        first)
+      more))
+
 ;;; Remove Ref from the references for its associated TN.
 (defun delete-tn-ref (ref)
   (declare (type tn-ref ref))
