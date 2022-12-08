@@ -1032,17 +1032,15 @@
           (test (if test
                     (lvar-fun-name test)
                     'eql)))
-      (when
-          (case test
-            (eq
-             (not (typep item '(or fixnum #+64-bit single-float symbol character
-                                ctype classoid))))
-            (eql
-             (not (typep item '(or number symbol character ctype classoid))))
-            (equal
-             (not (typep item '(or number symbol character
-                                list string bit-vector pathname
-                                ctype classoid)))))
+      (when (case test
+              (eq
+               (typep item '(or array cons pathname
+                             (and number (not (or fixnum #+64-bit single-float))))))
+              (eql
+               (typep item '(or array cons pathname)))
+              (equal
+               (typep item '(and array
+                             (not (or string bit-vector))))))
         (let ((*compiler-error-context* node))
           (compiler-style-warn "A literal ~a is unlikely to be found with :test '~a"
                                (typecase item
