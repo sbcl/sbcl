@@ -464,7 +464,7 @@
   (collect ((code)
             (reanalyze-funs))
     (let ((succ-cleanup (block-start-cleanup succ-block)))
-      (do-nested-cleanups (cleanup (block-end-lexenv (car pred-blocks)))
+      (do-nested-cleanups (cleanup (car pred-blocks))
         (when (eq cleanup succ-cleanup)
           (return))
         (let* ((node (cleanup-mess-up cleanup))

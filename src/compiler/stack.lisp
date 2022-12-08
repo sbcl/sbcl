@@ -128,7 +128,7 @@
                  (when (eq (block-flag succ) cycle)
                    (mark succ)))
                (when (eq (block-out block) nlx)
-                 (do-nested-cleanups (cleanup (block-end-lexenv block))
+                 (do-nested-cleanups (cleanup block)
                    (case (cleanup-kind cleanup)
                      ((:block :tagbody :catch :unwind-protect)
                       (dolist (nlx-info (cleanup-nlx-info cleanup))
@@ -207,7 +207,7 @@
                                          ;; they're handled specially.
                                          (remove-if #'lvar-dynamic-extent
                                                     (ir2-block-start-stack (block-info succ))))))
-    (do-nested-cleanups (cleanup (block-end-lexenv block))
+    (do-nested-cleanups (cleanup block)
       (case (cleanup-kind cleanup)
         ((:block :tagbody :catch :unwind-protect)
          (dolist (nlx-info (cleanup-nlx-info cleanup))

@@ -5213,7 +5213,7 @@
                        (block-start succ)
                        (let ((start-cleanup (block-start-cleanup succ)))
                          (and (neq (node-enclosing-cleanup node) start-cleanup)
-                              (do-nested-cleanups (cleanup (node-lexenv node) t)
+                              (do-nested-cleanups (cleanup (node-block node) t)
                                 (when (eq cleanup start-cleanup)
                                   (return t))
                                 (when (eq (cleanup-kind cleanup) :dynamic-extent)

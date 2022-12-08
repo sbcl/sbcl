@@ -1358,7 +1358,7 @@
   (declare (type cblock block1 block2))
   (or (eq block1 block2)
       (let ((cleanup2 (block-start-cleanup block2)))
-        (do-nested-cleanups (cleanup (block-end-lexenv block1) t)
+        (do-nested-cleanups (cleanup block1 t)
           (when (eq cleanup cleanup2)
             (return t))
           (case (cleanup-kind cleanup)

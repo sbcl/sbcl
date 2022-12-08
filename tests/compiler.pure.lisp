@@ -5789,16 +5789,6 @@
                   `(lambda ()
                      (car (describe 1 (make-broadcast-stream)))))))))
 
-;; To check the :EXIT-DELETION tests below, enable the following form,
-;; which allows the compiler to delete all vestigial exits, even if it
-;; "shouldn't", which should case the :EXIT-DELETION tests to fail in
-;; various ways.
-#+(or)
-(without-package-locks
-    (defun sb-c::may-delete-vestigial-exit (cast)
-      (declare (ignore cast))
-      t))
-
 ;; Vestigial exit deletion was a bit too aggressive, causing stack
 ;; analysis to decide that the value of (BAR 10) in both cases below
 ;; needed to be nipped out from under the dynamic-extent allocation of

@@ -22,24 +22,20 @@
     (when (lexenv-cleanup lexenv2)
       (setf (lexenv-cleanup lexenv2) nil))))
 
-(defun lexenv-enclosing-cleanup (lexenv)
-  (declare (type lexenv lexenv))
-  (do ((lexenv2 lexenv
-                (lambda-call-lexenv (lexenv-lambda lexenv2))))
-      ((null lexenv2) nil)
-    (awhen (lexenv-cleanup lexenv2)
-      (return it))))
-
 ;;; Return the innermost cleanup enclosing NODE, or NIL if there is
 ;;; none in its function. If NODE has no cleanup, but is in a LET,
 ;;; then we must still check the environment that the call is in.
 (defun node-enclosing-cleanup (node)
   (declare (type node node))
-  (lexenv-enclosing-cleanup (node-lexenv node)))
+  (do ((lexenv (node-lexenv node)
+               (lambda-call-lexenv (lexenv-lambda lexenv))))
+      ((null lexenv) nil)
+    (let ((cup (lexenv-cleanup lexenv)))
+      (when cup (return cup)))))
 
-(defun map-nested-cleanups (function lexenv &optional return-value)
-  (declare (type lexenv lexenv))
-  (do ((cleanup (lexenv-enclosing-cleanup lexenv)
+(defun map-nested-cleanups (function block &optional return-value)
+  (declare (type cblock block))
+  (do ((cleanup (block-end-cleanup block)
                 (node-enclosing-cleanup (cleanup-mess-up cleanup))))
       ((not cleanup) return-value)
     (funcall function cleanup)))
@@ -315,9 +311,6 @@
 (defun block-end-cleanup (block)
   (node-enclosing-cleanup (block-last block)))
 
-;;; Return the lexenv of the last node in BLOCK.
-(defun block-end-lexenv (block)
-  (node-lexenv (block-last block)))
 
 ;;;; lvar substitution
 
@@ -395,7 +388,7 @@
         thereis
         (loop for parent = lexenv then (lexenv-parent parent)
               while parent
-              thereis (and (eq parent parent-lexenv)))))
+              thereis (eq parent parent-lexenv))))
 
 ;;; Handle
 ;;; (dx-let ((x (let ((m (make-array)))
