@@ -445,6 +445,18 @@
 ;;; the macro-expansion for symbol-macros
 (define-info-type (:variable :macro-expansion) :type-spec t)
 
+(in-package "SB-ALIEN")
+;;; Information describing a heap-allocated alien.
+(defstruct (heap-alien-info (:copier nil))
+  ;; The type of this alien.
+  (type (missing-arg) :type alien-type)
+  ;; Its name.
+  (alien-name (missing-arg) :type simple-string)
+  ;; Data or code?
+  (datap (missing-arg) :type boolean))
+(!set-load-form-method heap-alien-info (:xc :target))
+
+(in-package "SB-IMPL")
 (define-info-type (:variable :alien-info)
   :type-spec (or null sb-alien-internals:heap-alien-info))
 

@@ -1301,16 +1301,6 @@
 
 ;;;; alien variables
 
-;;; Information describing a heap-allocated alien.
-(def!struct (heap-alien-info (:copier nil))
-  ;; The type of this alien.
-  (type (missing-arg) :type alien-type)
-  ;; Its name.
-  (alien-name (missing-arg) :type simple-string)
-  ;; Data or code?
-  (datap (missing-arg) :type boolean))
-(!set-load-form-method heap-alien-info (:xc :target))
-
 (defmethod print-object ((info heap-alien-info) stream)
   (print-unreadable-object (info stream :type t)
     (format stream "~S ~S~@[ (data)~]"
@@ -1332,7 +1322,7 @@
 ;;; information about local aliens. The WITH-ALIEN macro builds one of
 ;;; these structures and LOCAL-ALIEN and friends communicate
 ;;; information about how that local alien is represented.
-(def!struct (local-alien-info
+(defstruct (local-alien-info
              (:copier nil)
              (:constructor make-local-alien-info
                            (&key type force-to-memory-p
@@ -1375,14 +1365,10 @@
                    `(funcall #'(cas ,(alien-integer->sap-ref-fun signed bits))
                              ,old ,new ,sap-form 0)))))))))
 
-(in-package "SB-IMPL")
-
-(defun extern-alien-name (name)
+(defun sb-sys:extern-alien-name (name)
   (handler-case (cl:coerce name 'base-string)
     (error ()
       (error "invalid external alien name: ~S" name))))
-
-(in-package "SB-ALIEN")
 
 #+sb-xc
 (defmacro maybe-with-pinned-objects (variables types &body body)
