@@ -324,7 +324,7 @@
     ;; Clear up the type we're about to define from the toplevel
     ;; *new-auxiliary-types* (local scopes take care of themselves).
     ;; Unless this is done we never actually get back the full type
-    ;; from INFO, since the *new-auxiliary-types* have precendence.
+    ;; from INFO, since the *new-auxiliary-types* have precedence.
     (setf *new-auxiliary-types*
           (remove info *new-auxiliary-types*
                   :test (lambda (a b)
@@ -443,12 +443,12 @@
   (error "Cannot ~A aliens of type ~/sb-impl:print-type-specifier/."
          operation type))
 
-(define-alien-type-method (root :unparse) (type)
+(define-alien-type-method (root :unparse) (type) ; why does ROOT have any methods at all?
   `(<unknown-alien-type> ,(type-of type)))
 
 (define-alien-type-method (root :type=) (type1 type2)
   (declare (ignore type1 type2))
-  t)
+  (bug "unreachable"))
 
 (define-alien-type-method (root :subtypep) (type1 type2)
   (alien-type-= type1 type2))
@@ -579,8 +579,6 @@
 
 (define-alien-type-class (boolean :include integer :include-args (signed)))
 
-;;; FIXME: Check to make sure that we aren't attaching user-readable
-;;; stuff to CL:BOOLEAN in any way which impairs ANSI compliance.
 (define-alien-type-translator boolean (&optional (bits sb-vm:n-word-bits))
   (make-alien-boolean-type :bits bits :signed nil))
 
@@ -826,15 +824,21 @@
   (declare (ignore type))
   `(sap-ref-sap ,sap (/ ,offset sb-vm:n-byte-bits)))
 
-(macrolet ((def-singleton-type (type ctor)
-             `(define-alien-type-translator ,type ()
-                (load-time-value
+(macrolet
+    ((def-singleton-type (type (ctor &rest rest))
+       `(progn
+          ;; Two alien-type instances can be TYPE= only if in the same type-class,
+          ;; which is ascertained by the API. So the method on singletons can
+          ;; always return T.
+          (setf (alien-type-class-type= (alien-type-class-or-lose ',type)) #'constantly-t)
+          (define-alien-type-translator ,type ()
                  ;; If the host lisp takes liberties (as permitted) with ordering ordering of
                  ;; L-T-V and toplevel forms, then it's quite likely clever enough to inline
                  ;; the structure constructor here, thus avoiding reliance on the DEFUN
                  ;; which might not be installed yet.
-                 (locally (declare (inline ,(car ctor))) ,ctor)
-                 t))))
+            (load-time-value
+             (locally (declare (inline ,ctor)) (,ctor ,@rest))
+             t)))))
   (def-singleton-type single-float (make-alien-single-float-type :type 'single-float))
   (def-singleton-type double-float (make-alien-double-float-type :type 'double-float))
   (def-singleton-type system-area-pointer
