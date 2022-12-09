@@ -778,10 +778,7 @@
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (def-type-model (numeric-type
-                 (:constructor* nil (enumerable class format complexp low high)))
-  ;; Formerly defined in every CTYPE, but now just in the ones
-  ;; for which enumerability is variable.
-  (enumerable nil :type boolean)
+                 (:constructor* nil (class format complexp low high)))
   ;; the kind of numeric type we have, or NIL if not specified (just
   ;; NUMBER or COMPLEX)
   (class nil :type (member integer rational float nil))

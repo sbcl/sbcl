@@ -2055,8 +2055,7 @@
             (*
              (values nil nil)))
         (modified-numeric-type initial-type :low low
-                                            :high high
-                                            :enumerable nil)))))
+                                            :high high)))))
 
 (deftransform + ((x y) * * :result result)
   "check for iteration variable reoptimization"

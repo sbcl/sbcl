@@ -515,3 +515,13 @@
 (assert (sb-int:list-elements-eql '($1.0d0 x y) '($1.0d0 x y)))
 (assert (not (sb-int:list-elements-eql '(foo) '(foo bar))))
 (assert (not (sb-int:list-elements-eql '(foo bar) '(foo))))
+
+;;; I frankly have no idea whether we really care about the enumerable bit any more,
+;;; because while what it's supposed to mean is "could _this_ type which is not a MEMBER
+;;; type be internally represented as a MEMBER type?" Wwhat makes it questionable
+;;; is that we seldom or never represent numerics as MEMBER. I do not know if this is a
+;;; relic of days long past.
+(assert (sb-kernel::type-enumerable
+         (sb-kernel:specifier-type '(and integer (integer 1 5)))))
+(assert (sb-kernel::type-enumerable
+         (sb-kernel:specifier-type '(single-float $1.0 $1.0))))

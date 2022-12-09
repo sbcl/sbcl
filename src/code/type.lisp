@@ -2433,8 +2433,7 @@ expansion happened."
      :format (numeric-type-format type)
      :complexp (numeric-type-complexp type)
      :low (if (integerp low) (list low) low)
-     :high (if (integerp high) (list high) high)
-     :enumerable (numeric-type-enumerable type))))
+     :high (if (integerp high) (list high) high))))
 
 (define-type-method (negation :complex-intersection2) (type1 type2)
   (cond
@@ -2483,6 +2482,18 @@ expansion happened."
   (and (eq (numeric-type-class type1) (numeric-type-class type2))
        (eq (numeric-type-format type1) (numeric-type-format type2))
        (eq (numeric-type-complexp type1) (numeric-type-complexp type2))))
+
+(defun numeric-type-enumerable (type)
+  (let* ((class (numeric-type-class type))
+         (low (numeric-type-low type))
+         (high (numeric-type-high type)))
+    (cond ((and (eq class 'integer) low high) t) ; finite integer range
+          ((and (typep low '(and atom (not null))) ; inclusive bound
+                (eql low high)
+                ;; In the absence of thorough regression tests around infinity/nan handling
+                ;; as part of MEMBER types, I'm not sure what to do here. Just guessing.
+                (not (and (floatp low) (float-nan-p low))))
+           t))))
 
 (define-type-class number :enumerable #'numeric-type-enumerable :might-contain-other-types nil)
 
@@ -2591,11 +2602,11 @@ expansion happened."
         (values t low)
         (values nil nil))))
 
-(defun interned-numeric-type (specifier &key enumerable class format (complexp :real) low high)
+(defun interned-numeric-type (specifier &key class format (complexp :real) low high)
   (!alloc-numeric-type
    (pack-interned-ctype-bits 'number nil
                              (when specifier (sb-vm::saetp-index-or-lose specifier)))
-   enumerable class format complexp low high))
+   class format complexp low high))
 
 #+sb-xc-host
 (progn
@@ -2605,7 +2616,7 @@ expansion happened."
   (defvar *interned-unsigned-byte-types*)
   (macrolet ((int-type (low high)
                `(interned-numeric-type (when (sb-c::find-saetp spec) spec)
-                                       :class 'integer :enumerable t
+                                       :class 'integer
                                        :low ,low :high ,high)))
     (setq *interned-signed-byte-types*
           (do ((v (make-array sb-vm:n-word-bits))
@@ -2651,7 +2662,7 @@ expansion happened."
           (list (c (car bound)))
           (c bound)))))
 
-(defun %make-union-numeric-type (class format complexp low high enumerable)
+(defun %make-union-numeric-type (class format complexp low high)
   (declare (type (member integer rational float nil) class))
   (macrolet ((unionize (&rest specs)
                `(type-union
@@ -2665,8 +2676,7 @@ expansion happened."
                                              `(coerce-numeric-bound low ',coerce))
                                    :high ,(if simple-coerce
                                               `(coerce high ',coerce)
-                                              `(coerce-numeric-bound high ',coerce))
-                                   :enumerable enumerable)))))
+                                              `(coerce-numeric-bound high ',coerce)))))))
     (cond ((and (null class) (member complexp '(:real :complex)))
            (cond ((not (bounds-unbounded-p low high))
                   (cond ((and (floatp low) (float-infinity-p low)
@@ -2704,29 +2714,17 @@ expansion happened."
           ((and (null complexp)
                 (or class format low high))
            (type-union (make-numeric-type :class class :format format :complexp :complex
-                                          :low low :high high :enumerable enumerable)
+                                          :low low :high high)
                        (make-numeric-type :class class :format format :complexp :real
-                                          :low low :high high :enumerable enumerable))))))
+                                          :low low :high high))))))
 
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
 ;;; cases, despite the name, we return *EMPTY-TYPE* or a UNION-TYPE instead of a
 ;;; NUMERIC-TYPE.
-;;;
-;;; FIXME: The ENUMERABLE flag is unexpectedly NIL for types that
-;;; come from parsing MEMBER. But bounded integer ranges,
-;;; however large, are enumerable:
-;;;  (TYPE-ENUMERABLE (SPECIFIER-TYPE '(SIGNED-BYTE 99))) => T
-;;;  (TYPE-ENUMERABLE (SPECIFIER-TYPE '(COMPLEX (SIGNED-BYTE 99)))) => T
-;;; but, in contrast,
-;;;  (TYPE-ENUMERABLE (SPECIFIER-TYPE '(EQL 5))) => NIL.
-;;; I can't figure out whether this is supposed to matter.
-;;; Moreover, it seems like this function should be responsible
-;;; for figuring out the right value so that callers don't have to.
-(defun make-numeric-type (&key class format (complexp :real) low high
-                               enumerable)
+(defun make-numeric-type (&key class format (complexp :real) low high)
   (declare (type (member integer rational float nil) class))
   (let ((union-type (%make-union-numeric-type
-                     class format complexp low high enumerable)))
+                     class format complexp low high)))
     (when union-type (return-from make-numeric-type union-type)))
   (multiple-value-bind (low high)
       (case class
@@ -2755,7 +2753,7 @@ expansion happened."
                                                   `(complex ,fmt) fmt)))
                         `(literal-ctype (interned-numeric-type ',spec
                                                                :class 'float :complexp ,complexp
-                                                               :format ',fmt :enumerable nil)
+                                                               :format ',fmt)
                              ,spec)))
              (when (bounds-unbounded-p low high)
                (ecase format
@@ -2771,8 +2769,7 @@ expansion happened."
            (macrolet ((int-type (low high)
                         `(literal-ctype
                              (interned-numeric-type nil
-                                                    :class 'integer :low ,low :high ,high
-                                                    :enumerable (if (and ,low ,high) t nil))
+                                                    :class 'integer :low ,low :high ,high)
                              (integer ,(or low '*) ,(or high '*)))))
              (cond ((neq complexp :real) nil)
                    ((and (eql low 0) (eql high (1- array-dimension-limit)))
@@ -2808,7 +2805,7 @@ expansion happened."
                 (not complexp)
                 (bounds-unbounded-p low high)
                 (literal-ctype (interned-numeric-type nil :complexp nil) number))))
-        (new-ctype numeric-type enumerable class format complexp low high))))
+        (new-ctype numeric-type class format complexp low high))))
 
 (defun modified-numeric-type (base
                               &key
@@ -2816,14 +2813,12 @@ expansion happened."
                               (format     (numeric-type-format     base))
                               (complexp   (numeric-type-complexp   base))
                               (low        (numeric-type-low        base))
-                              (high       (numeric-type-high       base))
-                              (enumerable (type-enumerable         base)))
+                              (high       (numeric-type-high       base)))
   (make-numeric-type :class class
                      :format format
                      :complexp complexp
                      :low low
-                     :high high
-                     :enumerable enumerable))
+                     :high high))
 
 ;;; Return true if X is "less than or equal" to Y, taking open bounds
 ;;; into consideration. CLOSED is the predicate used to test the bound
@@ -3174,16 +3169,13 @@ used for a COMPLEX component.~:@>"
 (def-type-translator integer (&optional (low '*) (high '*))
   (let ((lb (valid-bound low integer))
         (hb (valid-bound high integer)))
-    (make-numeric-type :class 'integer :complexp :real
-                       :enumerable (not (null (and lb hb)))
-                       :low lb :high hb)))
+    (make-numeric-type :class 'integer :complexp :real :low lb :high hb)))
 
 (defmacro !def-bounded-type (type class format)
   `(def-type-translator ,type (&optional (low '*) (high '*))
      (let ((lb (valid-bound low ,type))
            (hb (valid-bound high ,type)))
-       (make-numeric-type :class ',class :format ',format
-                          :low lb :high hb))))
+       (make-numeric-type :class ',class :format ',format :low lb :high hb))))
 
 (!def-bounded-type rational rational nil)
 
@@ -3589,7 +3581,7 @@ used for a COMPLEX component.~:@>"
                       :start1 (* type-index 5)))
            (integer-range (low high)
              (make-numeric-type :class 'integer :complexp :real
-                                :enumerable t :low low :high high)))
+                                :low low :high high)))
     (let ((array (make-array (* 32 5)))
           (index 0))
       ;; Index 31 is available to store *WILD-TYPE*
