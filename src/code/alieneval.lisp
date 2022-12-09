@@ -998,89 +998,125 @@
   (name nil :type (or symbol null) :read-only t)
   (fields nil :type list)) ; mutable because of structural recursion and parser
 
-(define-alien-type-translator struct (name &rest fields &environment env)
-  (parse-alien-record-type :struct name fields env))
+;;; TODOs:
+;;; * add alien-record-field-type to the mixing function, but first we need to add
+;;;   a hash value to every instance of an alien-type
+;;; * named ("tagged") record types that do not involve structural recursion can
+;;;   and should be hash-consed.  As they are currently not, the pristine core
+;;;   has about 6 separate instances of OS-CONTEXT-T-STRUCT and 2 of POLLFD.
+;;;   Real-world applications are even worse about making redundant types.
+(defun hash-alien-record-fields (r &aux (fields (alien-record-type-fields r)))
+  (declare (notinline sb-xc:sxhash))
+  (let ((h (length fields)))
+    (dolist (field fields h)
+      (setq h (mix h (mix (sb-xc:sxhash (alien-record-field-name field))
+                          (sb-xc:sxhash (alien-record-field-offset field))))))))
+(defun alien-record-type-equiv (a b)
+  (let ((fields1 (alien-record-type-fields a))
+        (fields2 (alien-record-type-fields b)))
+    (and (= (length fields1) (length fields2))
+         (every (lambda (f1 f2)
+                  (and (eq (alien-record-field-name f1) (alien-record-field-name f2))
+                       (eq (alien-record-field-type f1) (alien-record-field-type f2))
+                       (= (alien-record-field-offset f1) (alien-record-field-offset f2))))
+                fields1 fields2))))
 
-(define-alien-type-translator union (name &rest fields &environment env)
-  (parse-alien-record-type :union name fields env))
-
-;;; FIXME: This is really pretty horrible: we avoid creating new
-;;; ALIEN-RECORD-TYPE objects when a live one is flitting around the
-;;; system already. This way forward-references sans fields get
-;;; "updated" for free to contain the field info. Maybe rename
-;;; MAKE-ALIEN-RECORD-TYPE to %MAKE-ALIEN-RECORD-TYPE and use
-;;; ENSURE-ALIEN-RECORD-TYPE instead. --NS 20040729
-(defun parse-alien-record-type (kind name fields env)
-  (declare (type sb-kernel:lexenv-designator env))
-  (flet ((frob-type (type new-fields alignment bits)
-           (setf (alien-record-type-fields type) new-fields
-                 (alien-record-type-alignment type) alignment
-                 (alien-record-type-bits type) bits)))
-      (cond (fields
-             (multiple-value-bind (new-fields alignment bits)
-                 (parse-alien-record-fields kind fields env)
-               (let* ((old (and name (auxiliary-alien-type kind name env)))
-                      (old-fields (and old (alien-record-type-fields old))))
-                 (when (and old-fields
-                            (notevery #'record-fields-match-p old-fields new-fields))
-                   (cerror "Continue, clobbering the old definition."
-                           "Incompatible alien record type definition~%Old: ~S~%New: ~S"
-                           (unparse-alien-type old)
-                           `(,(unparse-alien-record-kind kind)
-                              ,name
-                             ,@(let ((*record-types-already-unparsed* '()))
-                                 (mapcar #'unparse-alien-record-field new-fields))))
-                   (frob-type old new-fields alignment bits))
-                 (if old-fields
-                     old
-                     (let ((type (or old (make-alien-record-type :name name :kind kind))))
-                       (when (and name (not old))
-                         (setf (auxiliary-alien-type kind name env) type))
-                       (frob-type type new-fields alignment bits)
-                       type)))))
-            (name
-             (or (auxiliary-alien-type kind name env)
-                 (setf (auxiliary-alien-type kind name env)
-                       (make-alien-record-type :name name :kind kind))))
-            (t
-             (make-alien-record-type :kind kind)))))
-
-;;; This is used by PARSE-ALIEN-TYPE to parse the fields of struct and union
-;;; types. KIND is the kind we are paring the fields of, and FIELDS is the
-;;; list of field specifications.
-;;;
-;;; Result is a list of field objects, overall alignment, and number of bits
-(defun parse-alien-record-fields (kind fields env)
-  (declare (type list fields))
-  (let ((total-bits 0)
-        (overall-alignment 1)
-        (parsed-fields nil))
-    (dolist (field fields)
-      (destructuring-bind (var type &key alignment bits offset) field
-        (declare (ignore bits))
-        (let* ((field-type (parse-alien-type type env))
-               (bits (alien-type-bits field-type))
-               (parsed-field
-                (make-alien-record-field :type field-type
-                                         :name var)))
-          (unless alignment
-            (setf alignment (alien-type-alignment field-type)))
-          (push parsed-field parsed-fields)
-          (when (null bits)
-            (error "unknown size: ~S" (unparse-alien-type field-type)))
-          (when (null alignment)
-            (error "unknown alignment: ~S" (unparse-alien-type field-type)))
-          (setf overall-alignment (max overall-alignment alignment))
-          (ecase kind
-            (:struct
-             (let ((offset (or offset (align-offset total-bits alignment))))
-               (setf (alien-record-field-offset parsed-field) offset)
-               (setf total-bits (+ offset bits))))
-            (:union
-             (setf total-bits (max total-bits bits)))))))
-    (values (nreverse parsed-fields)
-            overall-alignment
-            (align-offset total-bits overall-alignment))))
+(define-load-time-global *struct-type-cache*
+  (make-hashset 32 #'alien-record-type-equiv #'hash-alien-record-fields
+                :weakness t :synchronized t))
+(define-load-time-global *union-type-cache*
+  (make-hashset 32 #'alien-record-type-equiv #'hash-alien-record-fields
+                :weakness t :synchronized t))
+(labels
+    ((make (kind name bits alignment fields)
+       (let ((new (make-alien-record-type
+                   :bits bits :alignment alignment
+                   :name name :kind kind :fields fields)))
+         (if name
+             ;; named ("tagged") alien record types hang off a hook in the
+             ;; lexenv (or possibly global env)
+             new
+             ;; unnamed ones are hash-consed. These seem fairly rare.
+             (hashset-insert-if-absent
+              (if (eq kind :union) *union-type-cache* *struct-type-cache*)
+              new
+              #'identity))))
+     (parse-alien-record-fields (kind fields env)
+       ;; This is used by PARSE-ALIEN-TYPE to parse the fields of struct and union
+       ;; types. KIND is the kind we are paring the fields of, and FIELDS is the
+       ;; list of field specifications.
+       ;;
+       ;; Result is a list of field objects, overall alignment, and number of bits
+       (declare (type list fields))
+       (let ((total-bits 0)
+             (overall-alignment 1)
+             (parsed-fields nil))
+         (dolist (field fields)
+           (destructuring-bind (var type &key alignment bits offset) field
+             (declare (ignore bits))
+             (let* ((field-type (parse-alien-type type env))
+                    (bits (alien-type-bits field-type))
+                    (parsed-field
+                     (make-alien-record-field :type field-type
+                                              :name var)))
+               (unless alignment
+                 (setf alignment (alien-type-alignment field-type)))
+               (push parsed-field parsed-fields)
+               (when (null bits)
+                 (error "unknown size: ~S" (unparse-alien-type field-type)))
+               (when (null alignment)
+                 (error "unknown alignment: ~S" (unparse-alien-type field-type)))
+               (setf overall-alignment (max overall-alignment alignment))
+               (ecase kind
+                 (:struct
+                  (let ((offset (or offset (align-offset total-bits alignment))))
+                    (setf (alien-record-field-offset parsed-field) offset)
+                    (setf total-bits (+ offset bits))))
+                 (:union
+                  (setf total-bits (max total-bits bits)))))))
+         (values (nreverse parsed-fields)
+                 overall-alignment
+                 (align-offset total-bits overall-alignment))))
+     (parse-alien-record-type (kind name fields env)
+       (declare (type sb-kernel:lexenv-designator env))
+       (cond
+         (fields
+          (binding* (((new-fields alignment bits)
+                      (parse-alien-record-fields kind fields env))
+                     (old (and name (auxiliary-alien-type kind name env)))
+                     (old-fields (and old (alien-record-type-fields old)))
+                     (redefined (and old (not old-fields))))
+            (when (and old-fields (notevery #'record-fields-match-p old-fields new-fields))
+              (cerror "Continue, clobbering the old definition."
+                      "Incompatible alien record type definition~%Old: ~S~%New: ~S"
+                      (unparse-alien-type old)
+                      `(,(unparse-alien-record-kind kind) ,name
+                        ,@(let ((*record-types-already-unparsed* '()))
+                            (mapcar #'unparse-alien-record-field new-fields))))
+              (setq redefined t))
+            (when redefined
+              ;; Assert that we're not mutating a cache entry - unnamed types
+              ;; are hash-consed but named ones aren't.
+              (aver name)
+              (setf (alien-record-type-fields old) new-fields
+                    (alien-record-type-alignment old) alignment
+                    (alien-record-type-bits old) bits))
+            (or old
+                (let ((type (make kind name bits alignment new-fields)))
+                  (when name
+                    (setf (auxiliary-alien-type kind name env) type))
+                  type))))
+         (name
+          (or (auxiliary-alien-type kind name env)
+              (setf (auxiliary-alien-type kind name env)
+                    (make-alien-record-type :name name :kind kind))))
+         (t
+          (make-alien-record-type :kind kind)))))
+  (define-alien-type-translator union (name &rest fields &environment env)
+    (parse-alien-record-type :union name fields env))
+  (define-alien-type-translator struct (name &rest fields &environment env)
+    (parse-alien-record-type :struct name fields env))
+)
 
 (define-alien-type-method (record :unparse) (type)
   `(,(unparse-alien-record-kind (alien-record-type-kind type))
