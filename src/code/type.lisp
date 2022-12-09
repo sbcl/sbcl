@@ -1110,7 +1110,7 @@
          (values nil t))
         (t
          (memoize
-          (!invoke-type-method :simple-subtypep :complex-subtypep-arg2
+          (invoke-type-method :simple-subtypep :complex-subtypep-arg2
                                type1 type2
                                :complex-arg1 :complex-subtypep-arg1)))))
 
@@ -1172,7 +1172,7 @@
                        (logand (type-hash-value type1) (type-hash-value type2))))
          (values nil t))
         (t
-         (memoize (!invoke-type-method :simple-= :complex-= type1 type2)))))
+         (memoize (invoke-type-method :simple-= :complex-= type1 type2)))))
 
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
@@ -1195,7 +1195,7 @@
   ;; %TYPE-INTERSECTION2, there seems to be no need to distinguish
   ;; between not finding a method and having a method return NIL.
   (flet ((1way (x y)
-           (!invoke-type-method :simple-union2 :complex-union2
+           (invoke-type-method :simple-union2 :complex-union2
                                 x y
                                 :default nil)))
     (declare (inline 1way))
@@ -1257,7 +1257,7 @@
   ;;
   ;; (Why yes, CLOS probably *would* be nicer..)
   (flet ((1way (x y)
-           (!invoke-type-method :simple-intersection2 :complex-intersection2
+           (invoke-type-method :simple-intersection2 :complex-intersection2
                                 x y
                                 :default :call-other-method)))
     (declare (inline 1way))

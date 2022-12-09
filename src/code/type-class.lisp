@@ -255,8 +255,8 @@
   #.(cl:logandc2 (cl:ldb (cl:byte 27 0) -1) (cl:mask-field (cl:byte 2 20) -1)))
 
 (defmacro type-class-id (ctype) `(ldb (byte 5 27) (type-%bits ,ctype)))
-(defmacro type-class (ctype)
-  `(truly-the type-class (aref *type-classes* (type-class-id ,ctype))))
+(defmacro type-id->type-class (id) `(truly-the type-class (aref *type-classes* ,id)))
+(defmacro type-class (ctype) `(type-id->type-class (type-class-id ,ctype)))
 
 (declaim (inline type-hash-value))
 (defun type-hash-value (ctype) (ldb (byte 27 0) (type-%bits ctype)))
@@ -485,34 +485,23 @@
 ;;; complex method. If there isn't a distinct COMPLEX-ARG1 method,
 ;;; then swap the arguments when calling TYPE1's method. If no
 ;;; applicable method, return DEFAULT.
-;;;
-;;; KLUDGE: It might be a lot easier to understand this and the rest
-;;; of the type system code if we used CLOS to express it instead of
-;;; trying to maintain this squirrely hand-crufted object system.
-;;; Unfortunately that'd require reworking PCL bootstrapping so that
-;;; all the compilation can get done by the cross-compiler, which I
-;;; suspect is hard, so we'll bear with the old system for the time
-;;; being. -- WHN 2001-03-11
-(defmacro !invoke-type-method (simple complex-arg2 type1 type2 &key
+(defmacro invoke-type-method (simple complex-arg2 type1 type2 &key
                                       (default '(values nil t))
                                         ; assume complex fn is symmetric
                                         ; unless told otherwise.
                                       (complex-arg1 complex-arg2 complex-arg1-p))
   (declare (type keyword simple complex-arg1 complex-arg2))
-  (once-only ((left type1)
-              (right type2))
-    (once-only ((class1 `(type-class ,left))
-                (class2 `(type-class ,right)))
-      `(if (eq ,class1 ,class2)
-           (funcall (,(type-class-fun-slot simple) ,class1) ,left ,right)
-           (acond ((,(type-class-fun-slot complex-arg2) ,class2)
-                   (funcall it ,left ,right))
-                  ((,(type-class-fun-slot complex-arg1) ,class1)
+   `(let* ((.L ,type1) (id1 (type-class-id .L))
+           (.R ,type2) (id2 (type-class-id .R)))
+      (if (= id1 id2)
+          (funcall (,(type-class-fun-slot simple) (type-id->type-class id1)) .L .R)
+          (acond ((,(type-class-fun-slot complex-arg2) (type-id->type-class id2))
+                  (funcall it .L .R))
+                 ((,(type-class-fun-slot complex-arg1) (type-id->type-class id1))
                    ;; if COMPLEX-ARG1 method was provided, the method accepts
                    ;; the arguments exactly as given. Otherwise, flip them.
-                   (funcall it ,@(if complex-arg1-p
-                                     `(,left ,right) `(,right ,left))))
-                  (t ,default))))))
+                  (funcall it ,@(if complex-arg1-p `(.L .R) `(.R .L))))
+                 (t ,default)))))
 
 ;;; This is a very specialized implementation of CLOS-style
 ;;; CALL-NEXT-METHOD within our twisty little type class object
