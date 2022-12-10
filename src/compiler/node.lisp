@@ -951,15 +951,13 @@
   ;; was semi-inline, or because it was defined in this block). If
   ;; this function is not an entry point, then this may be deleted or
   ;; LET-converted. NULL if we haven't converted the expansion yet.
-  ;; Note: We need separate functionals for each policy in which
-  ;; the function is used.
-  (functionals nil :type list))
+  (functional nil :type (or functional null)))
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
   inlinep
   same-block-p
-  (functionals :test functionals))
+  (functional :test functional))
 
 ;;;; function stuff
 

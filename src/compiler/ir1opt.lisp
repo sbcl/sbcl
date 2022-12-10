@@ -1432,8 +1432,8 @@
                                (info :function :info name))))
 
                     ;; Allow backward references to this function from following
-                    ;; forms. (Reused only if policy matches.)
-                    (push res (defined-fun-functionals leaf))
+                    ;; forms.
+                    (setf (defined-fun-functional leaf) res)
                     (change-ref-leaf ref res)
                     (unless ir1-converting-not-optimizing-p
                       (locall-analyze-component *current-component*))))

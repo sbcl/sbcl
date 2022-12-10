@@ -463,7 +463,17 @@
               (with-ir1-environment-from-node call
                 (let* ((*inline-expansions*
                          (register-inline-expansion original-functional call))
-                       (*lexenv* (functional-lexenv original-functional)))
+                       (functional-lexenv (functional-lexenv original-functional))
+                       (call-policy (lexenv-policy (node-lexenv call)))
+                       ;; The inline expansion should be converted
+                       ;; with the policy in effect at this call site,
+                       ;; not the policy saved in the original
+                       ;; functional.
+                       (*lexenv*
+                         (if (eq (lexenv-policy functional-lexenv)
+                                  call-policy)
+                             functional-lexenv
+                             (make-lexenv :policy call-policy))))
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)

@@ -1036,7 +1036,7 @@
              ;; backward references to this function from following
              ;; top-level forms.
              (when simple-lexenv-p
-               (push res (defined-fun-functionals defined-fun-res)))
+               (setf (defined-fun-functional defined-fun-res) res))
              (unless (or
                       (eq (defined-fun-inlinep defined-fun-res) 'notinline)
                       ;; Don't treat recursive stubs like CAR as self-calls
@@ -1260,7 +1260,7 @@
              (setf (gethash name free-funs) res)))
           ;; If FREE-FUNS has a previously converted definition
           ;; for this name, then blow it away and try again.
-          ((defined-fun-functionals found)
+          ((defined-fun-functional found)
            (remhash name free-funs)
            (get-defined-fun name lambda-list))
           (t found))))
@@ -1357,7 +1357,7 @@
       ;; references to this function from following top-level
       ;; forms.
       (when (simple-lexical-environment-p *lexenv*)
-        (push fun (defined-fun-functionals var))))
+        (setf (defined-fun-functional var) fun)))
     fun))
 
 
