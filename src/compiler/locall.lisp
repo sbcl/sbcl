@@ -473,7 +473,8 @@
                          (if (eq (lexenv-policy functional-lexenv)
                                   call-policy)
                              functional-lexenv
-                             (make-lexenv :policy call-policy))))
+                             (make-lexenv :default functional-lexenv
+                                          :policy call-policy))))
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)
