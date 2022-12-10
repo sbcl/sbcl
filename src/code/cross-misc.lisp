@@ -396,3 +396,5 @@
 (declaim (inline symbol-%info))
 (defun symbol-%info (symbol) (get symbol :sb-xc-globaldb-info))
 (defun symbol-dbinfo (symbol) (symbol-%info symbol))
+
+(defun sys-copy-struct (x) (copy-structure x))

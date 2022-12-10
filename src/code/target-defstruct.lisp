@@ -320,6 +320,25 @@
   t)
 
 ;;; Copy any old kind of structure.
+
+;; The finicky backends disallow loading and storing raw words
+;; using %INSTANCE-REF. The robust backends allow it.
+;; MIPS is probably robust, but I don't care to try it.
+(macrolet ((fast-loop (result)
+             `(do ((i sb-vm:instance-data-start (1+ i)))
+                  ((>= i len) ,result)
+                (declare (index i))
+                (%instance-set ,result i (%instance-ref structure i)))))
+
+(defun sys-copy-struct (structure)
+  (declare (sb-c::tlab :system))
+  #-system-tlabs (copy-structure structure)
+  #+system-tlabs ; KISS by allocating to sys-mixed-tlab in all cases
+  (let* ((len (%instance-length structure))
+         (copy (%make-instance/mixed len)))
+    (%set-instance-layout copy (%instance-layout structure))
+    (fast-loop copy)))
+
 (defun copy-structure (structure)
   "Return a copy of STRUCTURE with the same (EQL) slot values."
   (declare (type structure-object structure))
@@ -328,21 +347,13 @@
   ;; Variable-length structure types are allowed.
   (let* ((layout (%instance-layout structure))
          (len (%instance-length structure)))
-    ;; The finicky backends disallow loading and storing raw words
-    ;; using %INSTANCE-REF. The robust backends allow it.
-    ;; MIPS is probably robust, but I don't care to try it.
-    (macrolet ((fast-loop ()
-                 `(do ((i sb-vm:instance-data-start (1+ i)))
-                      ((>= i len) res)
-                    (declare (index i))
-                    (%instance-set res i (%instance-ref structure i)))))
       #+(or x86 x86-64) ; Two allocators, but same loop either way
       (let ((res (%new-instance* layout len)))
-        (fast-loop))
+        (fast-loop res))
       #-(or x86 x86-64) ; Different loops
       (if (logtest (layout-flags layout) sb-vm::+strictly-boxed-flag+)
           (let ((res (%new-instance layout len)))
-            (fast-loop))
+            (fast-loop res))
           (let ((res (%make-instance/mixed len)))
             (%set-instance-layout res layout)
             ;; DO-LAYOUT-BITMAP does not visit the LAYOUT itself
