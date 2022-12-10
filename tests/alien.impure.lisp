@@ -563,3 +563,10 @@
 
 (with-test (:name :no-vector-sap-of-array-nil)
   (assert-error (sb-sys:vector-sap (opaque-identity (make-array 5 :element-type nil)))))
+
+(cl:in-package "SB-KERNEL")
+(test-util:with-test (:name :hash-consing)
+  (assert (eq (parse-alien-type '(integer 9) nil)
+              (parse-alien-type '(integer 9) nil)))
+  (assert (eq (parse-alien-type '(* (struct nil (x int) (y int))) nil)
+              (parse-alien-type '(* (struct nil (x int) (y int))) nil))))

@@ -748,6 +748,7 @@
 (defun target-compile-stem (stem flags)
   (let ((system-tlab-p
          (or (search "src/pcl" stem)
+             (search "src/code/alieneval" stem)
              (search "src/code/arena" stem)
              (search "src/code/debug" stem)
              (search "src/code/early-defmethod" stem)

@@ -14,6 +14,29 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
+(in-package "SB-ALIEN")
+
+(defstruct (alien-type
+             (:copier nil)
+             (:constructor make-alien-type
+                           (&key hash bits alignment
+                            &aux (alignment
+                                  (or alignment (guess-alignment bits))))))
+  ;; HASH is a derived from the contents, not just a pseudo-random number.
+  ;; The highest 5 bits of it imply the alien-type-class.
+  ;; (There are curretly 16 type-classes with room for expansion)
+  ;; These slots should be read-only, but alas they get modified by
+  ;; the parsers for ENUM and RECORD types.
+  ;; Maybe the sign bit could be used to indicate hash-consed versus non-hash-consed
+  ;; and so we can know whether it is a safe operation to mutate the thing?
+  (hash 0 :type (and sb-xc:fixnum unsigned-byte))
+  ;; It's quasi-bogus that these can be NULL - it occurs when and only when parsing
+  ;; a structure type that involves self-recursion I think. The :type option is inadequate
+  ;; to enforce that atoms like {SINGLE,DOUBLE-}FLOAT always have an integer here.
+  (bits nil :type (or null unsigned-byte))
+  (alignment nil :type (or null unsigned-byte)))
+(!set-load-form-method alien-type (:xc :target))
+
 (in-package "SB-KERNEL")
 
 (!begin-collecting-cold-init-forms)
@@ -751,11 +774,6 @@
                  (:include compound-type)))
 
 (def-type-model (alien-type-type (:constructor* %make-alien-type-type (alien-type)))
-  ;; FIXME: this forward-references ALIEN-TYPE, and silently we're suppressing
-  ;;   "can't open-code test of unknown type ALIEN-TYPE".
-  ;; It might be OK, because the "real" constructor is defined later,
-  ;; and it inlines the private constructor, perhaps in time to have
-  ;; ALIEN-TYPE be known. I'm not sure though.
   (alien-type nil :type alien-type :hasher sxhash :test eq))
 
 (def-type-model (negation-type (:constructor* make-negation-type (type)))
