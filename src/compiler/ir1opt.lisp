@@ -2231,22 +2231,22 @@
 ;;; any unreferenced variables. Note that FLUSH-DEAD-CODE will come
 ;;; along right away and delete the REF and then the lambda, since we
 ;;; flush the FUN lvar.
-(defun delete-let (clambda)
-  (declare (type clambda clambda))
-  (aver (functional-letlike-p clambda))
-  (note-unreferenced-fun-vars clambda)
-  (let ((call (let-combination clambda))
-        (bind (lambda-bind clambda)))
+(defun delete-let (fun)
+  (declare (type clambda fun))
+  (aver (functional-letlike-p fun))
+  (note-unreferenced-fun-vars fun)
+  (let ((call (let-combination fun))
+        (bind (lambda-bind fun)))
     (flush-dest (basic-combination-fun call))
     (when (eq (car (node-source-path bind)) 'original-source-start)
-      (setf (ctran-source-path (node-prev (car (leaf-refs clambda))))
+      (setf (ctran-source-path (node-prev (car (leaf-refs fun))))
             (node-source-path bind)))
     (unlink-node call)
     (unlink-node bind)
-    (setf (lambda-bind clambda) nil))
-  (setf (functional-kind clambda) :zombie)
-  (let ((home (lambda-home clambda)))
-    (setf (lambda-lets home) (delq1 clambda (lambda-lets home))))
+    (setf (lambda-bind fun) nil))
+  (setf (functional-kind fun) :zombie)
+  (let ((home (lambda-home fun)))
+    (setf (lambda-lets home) (delq1 fun (lambda-lets home))))
   (values))
 
 ;;; This function is called when one of the arguments to a LET
