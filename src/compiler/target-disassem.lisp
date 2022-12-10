@@ -2713,5 +2713,6 @@
 
 ;; Remove macros that only make sense with metadata available.
 ;; Tree shaker will remove everything that the macros depended on.
-(push '("SB-DISASSEM" define-arg-type define-instruction-format)
+(push '("SB-DISASSEM" define-arg-type define-instruction-format
+        gen-arg-forms %gen-arg-forms)
       *!removable-symbols*)

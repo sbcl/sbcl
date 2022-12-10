@@ -6,6 +6,8 @@
 (defvar *compile-files-p* nil)
 (load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
 
+(sb-impl::!recompile-globaldb-checkfuns)
+
 ;;; Users don't want to know if there are multiple TLABs per se, but they do want
 ;;; to know if NEW-ARENA returns an arena, so give them a sensible feature name.
 #+system-tlabs (push :arena-allocator *features*)
