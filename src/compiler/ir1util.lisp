@@ -2291,67 +2291,32 @@ is :ANY, the function name is not checked."
         (sb-xc:typep object '(or (unboxed-array (*)) number)))))
 
 ;;; Return a LEAF which represents the specified constant object.
-;;;
-;;; We are allowed to coalesce things like EQUAL strings and bit-vectors
-;;; when file-compiling, but not when using COMPILE.
-;;; FIXME:
-;;;  - EQUAL (the comparator in the similarity hash-table) is both too strict
-;;;    and not strict enough. Too strict because it won't compare simple-vector;
-;;;    not strict enough because base-string and character-string can't coalesce.
-;;;    We deal with this fine, but a real SIMILAR kind of hash-table would be nice.
-;;;  - arrays other than the handled kinds can be similar.
-(defun find-constant (object &optional name
-                             &aux (namespace (if (boundp '*ir1-namespace*) *ir1-namespace*)))
-  (cond
-    ((not (producing-fasl-file))
-     ;;  "The consequences are undefined if literal objects are destructively modified
-     ;;   For this purpose, the following operations are considered destructive:
-     ;;   array - Storing a new value into some element of the array ..."
-     ;; so a string, once used as a literal in source, becomes logically immutable.
-     #-sb-xc-host
-     (when (sb-xc:typep object '(simple-array * (*)))
-       (logically-readonlyize object nil))
-     ;;  "The functions eval and compile are required to ensure that literal objects
-     ;;   referenced within the resulting interpreted or compiled code objects are
-     ;;   the _same_ as the corresponding objects in the source code.
-     ;;   ...
-     ;;   The constraints on literal objects described in this section apply only to
-     ;;   compile-file; eval and compile do not copy or coalesce constants."
-     ;;   (http://www.lispworks.com/documentation/HyperSpec/Body/03_bd.htm)
-     ;; The preceding notwithstanding, numbers are always freely copyable and coalescible.
-     (if namespace
-         (values (ensure-gethash object (eql-constants namespace) (make-constant object)))
-         (make-constant object)))
-    ((if name
-         ;; Git rev eded4f76 added an assertion that a named non-fixnum is referenced
-         ;; via its name at (defconstant +share-me-4+ (* 2 most-positive-fixnum))
-         ;; I'm not sure that test makes any sense, but whatever...
-         (sb-xc:typep object '(or fixnum character symbol))
-         (sb-xc:typep object '(or number character symbol)))
-     (values (ensure-gethash object (eql-constants namespace) (make-constant object))))
-    (t
-     ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when
-     ;; file-compiling.
-     (let ((coalescep (coalescible-object-p object)))
-       ;; When COALESCEP is true, the similarity table is "useful" for
-       ;; this object.
-       (if name
-           ;; If the constant is named, always look in the named-constants table first.
-           ;; This ensure that there is no chance of referring to the constant at load-time
-           ;; through an access path other than `(SYMBOL-GLOBAL-VALUE ,name).
-           (ensure-gethash name
-                           (named-constants namespace)
-                           (make-constant object (ctype-of object) name))
-           ;; If the constant is anonymous, just make a new constant
-           ;; unless it is EQL or similar to an existing leaf.
-           (or (gethash object (eql-constants namespace))
-               (and coalescep
-                    (get-similar object (similar-constants namespace)))
-               (let ((new (make-constant object)))
-                 (setf (gethash object (eql-constants namespace)) new)
-                 (when coalescep
-                   (setf (get-similar object (similar-constants namespace)) new))
-                 new)))))))
+(defun find-constant (object)
+  (let* ((namespace *ir1-namespace*)
+         (eql-constants (eql-constants namespace))
+         (file-compile-p (producing-fasl-file)))
+    (cond
+      ;; CLHS 3.2.4.2.2: We are allowed to coalesce by similarity when
+      ;; file-compiling.
+      ((and file-compile-p (coalescible-object-p object))
+       (let ((similar-constants (similar-constants namespace)))
+         (or (gethash object eql-constants)
+             (get-similar object similar-constants)
+             (let ((new (make-constant object)))
+               (setf (gethash object eql-constants) new)
+               (setf (gethash object similar-constants) new)))))
+      (t
+       ;;  "The consequences are undefined if literal objects are destructively modified
+       ;;   For this purpose, the following operations are considered destructive:
+       ;;   array - Storing a new value into some element of the array ..."
+       ;; so a string, once used as a literal in source, becomes logically immutable.
+       #-sb-xc-host
+       (when (and (not file-compile-p)
+                  (sb-xc:typep object '(simple-array * (*))))
+         (logically-readonlyize object nil))
+       (or (gethash object eql-constants)
+           (setf (gethash object eql-constants)
+                 (make-constant object)))))))
 
 ;;; Return true if X and Y are lvars whose only use is a
 ;;; reference to the same leaf, and the value of the leaf cannot

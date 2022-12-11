@@ -2256,9 +2256,13 @@
 (assert (not (sneak-set-dont-set-me2 13)))
 (assert (typep dont-set-me2 'some-constant-thing))
 
-;;; check that non-trivial constants are EQ across different files: this is
-;;; not something ANSI either guarantees or requires, but we want to do it
-;;; anyways.
+;;; Check that non-trivial constants are EQL across different files, as required by the spec:
+;;; From the CLHS glossary (note that `same' without any qualifiers
+;;; means EQL):
+;;; named constant n. a variable that is defined by Common Lisp, by
+;;; the implementation, or by user code (see the macro defconstant) to
+;;; always yield the same value when evaluated. ``The value of a named
+;;; constant may not be changed by assignment or by binding.''
 (defconstant +share-me-1+ 123.456d0)
 (defconstant +share-me-2+ "a string to share")
 (defconstant +share-me-3+ (vector 1 2 3))
@@ -2275,7 +2279,7 @@
                                                              pi)))
     (flet ((test (fa fb)
              (mapc (lambda (a b)
-                     (assert (eq a b)))
+                     (assert (eql a b)))
                    (multiple-value-list (funcall fa))
                    (multiple-value-list (funcall fb)))))
       (test f1 c1)

@@ -41,32 +41,28 @@
   (expansion nil :read-only t))
 (declaim (freeze-type dxable-args))
 
-;;; FREE-VARS translates from the names of variables referenced
-;;; globally to the LEAF structures for them. FREE-FUNS is like
-;;; FREE-VARS, only it deals with function names.
-;;;
-;;; We must preserve the property that a proclamation for a global
-;;; thing only affects the code after it. This takes some work, since
-;;; a proclamation may appear in the middle of a block being
-;;; compiled. If there are references before the proclaim, then we
-;;; copy the current entry before modifying it. Code converted before
-;;; the proclaim sees the old Leaf, while code after it sees the new
-;;; LEAF.
 (defstruct (ir1-namespace (:conc-name "") (:copier nil) (:predicate nil))
+  ;; FREE-VARS translates from the names of variables referenced
+  ;; globally to the LEAF structures for them. FREE-FUNS is like
+  ;; FREE-VARS, only it deals with function names.
+  ;;
+  ;; We must preserve the property that a proclamation for a global
+  ;; thing only affects the code after it. This takes some work, since
+  ;; a proclamation may appear in the middle of a block being
+  ;; compiled. If there are references before the proclaim, then we
+  ;; copy the current entry before modifying it. Code converted before
+  ;; the proclaim sees the old Leaf, while code after it sees the new
+  ;; LEAF.
   (free-vars (make-hash-table :test 'eq) :read-only t :type hash-table)
   (free-funs (make-hash-table :test #'equal) :read-only t :type hash-table)
-  ;; These hashtables translate from constants to the LEAFs that
-  ;; represent them.
-  ;; Table 1: one entry per named constant
-  (named-constants (make-hash-table :test 'eq) :read-only t :type hash-table)
-  ;; Table 2: one entry for each unnamed constant as compared by EQL
+  ;; We use the same CONSTANT structure to represent all EQL anonymous
+  ;; constants. This hashtable translates from constants to the LEAFs
+  ;; that represent them.
   (eql-constants (make-hash-table :test 'eql) :read-only t :type hash-table)
-  ;; Table 3: one key per EQUAL constant,
-  ;; with the caveat that lookups must discriminate amongst constants that
-  ;; are EQUAL but not similar.  The value in the hash-table is a list of candidates
-  ;; (#<constant1> #<constant2> ... #<constantN>) such that CONSTANT-VALUE
-  ;; of each is EQUAL to the key for the hash-table entry, but dissimilar
-  ;; from each other. Notably, strings of different element types can't be similar.
+  ;; During file compilation we are allowed to coalesce similar
+  ;; constants. This coalescing is distinct from the coalescing done
+  ;; in the dumper, since the effect here is to reduce the number of
+  ;; boxed constants appearing in a code component.
   (similar-constants (sb-fasl::make-similarity-table) :read-only t :type hash-table))
 (declaim (freeze-type ir1-namespace))
 
