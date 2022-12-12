@@ -409,9 +409,3 @@
     (abort-build ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1))))
-
-;;; Remember where cold artifacts went, and put the warm ones there too
-;;; because it looks nicer not to scatter them throughout the source tree.
-;;; *t-o-prefix* isn't known to the compiler, and we need it to be
-;;; initialized from a constant, so use read-time eval.
-(defvar *!target-obj-prefix* #.sb-cold::*target-obj-prefix*)

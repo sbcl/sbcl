@@ -13,6 +13,8 @@
 
 ;;;; general warm init compilation policy
 
+(defvar *objfile-prefix* "obj/from-self/")
+
 ;;; First things first, bootstrap the WARNING handler.
 sb-kernel::
 (setq **initial-handler-clusters**
@@ -157,8 +159,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
                    (concatenate 'string *sbclroot* stem)
                    :output-file
                    (merge-pathnames
-                    (concatenate
-                     'string sb-fasl::*!target-obj-prefix*
+                    (concatenate 'string *objfile-prefix*
                      (subseq stem 0 (1+ (position #\/ stem :from-end t))))))))
            (flet ((report-recompile-restart (stream)
                     (format stream "Recompile file ~S" stem))
