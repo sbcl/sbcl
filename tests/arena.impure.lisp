@@ -31,6 +31,22 @@
 
 ;;;
 
+(test-util:with-test (:name :copy-numbers-to-heap)
+  (let (list1 list2)
+    (sb-vm:with-arena (*arena*)
+      (setq list1 (let ((r (ash #xf00 (+ 60 (random 10)))))
+                    (list r
+                          (coerce r 'double-float)
+                          (coerce r '(complex single-float))
+                          (coerce r '(complex double-float))
+                          (complex 1 (1+ (random 40)))
+                          (/ 1 r)))
+            ;; still inside the WITH-ARENA or else the test is not useful!
+            list2 (mapcar 'sb-vm:copy-number-to-heap list1)))
+    (assert (not (heap-allocated-p list1)))
+    (assert (notany #'heap-allocated-p list1))
+    (assert (every #'heap-allocated-p list2))))
+
 (test-util:with-test (:name :points-to-arena)
   (let (tests)
     (dotimes (i 20)
