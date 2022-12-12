@@ -53,7 +53,9 @@
   ;; It _doesn't_ mean that FIND returns the right answer if writes occur while reading.
   ;; It _does_ mean that the algorithm won't crash.
   (storage (missing-arg) :type robinhood-hashset-storage)
-  (hash-function #'error :type (sfunction (t) fixnum))
+  ;; need to allow maximum number of bits in either host or target fixnum
+  ;; because the code runs on either. Will be efficient in the target at least.
+  (hash-function #'error :type (sfunction (t) (or fixnum sb-xc:fixnum)))
   (test-function #'error :type function)
   #+hashset-metrics (count-find-hits 0 :type sb-vm:word)
   #+hashset-metrics (count-finds 0 :type sb-vm:word)
