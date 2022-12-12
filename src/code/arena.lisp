@@ -13,7 +13,6 @@
           unuse-arena
           thread-current-arena
           in-same-arena
-          copy-number-to-heap
           dump-arena-objects
           c-find-heap->arena
           points-to-arena

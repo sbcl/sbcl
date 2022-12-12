@@ -398,3 +398,4 @@
 (defun symbol-dbinfo (symbol) (symbol-%info symbol))
 
 (defun sys-copy-struct (x) (copy-structure x))
+(defun ensure-heap-list (x) (copy-list x))

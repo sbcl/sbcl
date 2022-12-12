@@ -1808,9 +1808,10 @@ expansion happened."
                     :might-contain-other-types t)
 
 (defun type-intersection (&rest input-types)
+  (declare (dynamic-extent input-types))
   (%type-intersection input-types))
 (defun-cached (%type-intersection :hash-bits 10 :hash-function #'hash-ctype-list)
-    ((input-types equal))
+    ((input-types list-elts-eq (ensure-heap-list input-types)))
   (let ((simplified-types (simplify-intersections input-types)))
     (declare (type list simplified-types))
     ;; We want to have a canonical representation of types (or failing
@@ -1841,9 +1842,10 @@ expansion happened."
               simplified-types))))))
 
 (defun type-union (&rest input-types)
+  (declare (dynamic-extent input-types))
   (%type-union input-types))
 (defun-cached (%type-union :hash-bits 8 :hash-function #'hash-ctype-list)
-    ((input-types equal))
+    ((input-types list-elts-eq (ensure-heap-list input-types)))
   (let ((simplified-types (simplify-unions input-types)))
     (cond
       ((null simplified-types) *empty-type*)
@@ -4038,6 +4040,7 @@ used for a COMPLEX component.~:@>"
   ;; canonicalize to (DOUBLE-FLOAT 0.0d0 0.0d0), because numeric
   ;; ranges are compared by arithmetic operators (while MEMBERship is
   ;; compared by EQL).  -- CSR, 2003-04-23
+  (declare (sb-c::tlab :system))
   (let ((presence 0)
         (unpaired nil)
         (float-types nil))
@@ -5075,7 +5078,7 @@ used for a COMPLEX component.~:@>"
 
 (define-type-method (character-set :simple-=) (type1 type2)
   (let ((pairs1 (character-set-type-pairs type1))
-       (pairs2 (character-set-type-pairs type2)))
+        (pairs2 (character-set-type-pairs type2)))
     (values (equal pairs1 pairs2) t)))
 
 (define-type-method (character-set :simple-subtypep) (type1 type2)
@@ -5707,6 +5710,7 @@ used for a COMPLEX component.~:@>"
                                            sb-vm:n-widetag-bits)
                                       (array-underlying-widetag array)))))
   ;; The value computed on cache miss.
+  ;; FIXME: don't cache if ARRAY is not heap-allocated
   (let ((etype (sb-vm::array-element-ctype array)))
     (make-array-type (array-dimensions array)
                      :complexp (not (simple-array-p array))

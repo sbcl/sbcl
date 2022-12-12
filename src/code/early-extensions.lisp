@@ -463,6 +463,7 @@ NOTE: This interface is experimental and subject to change."
 (define-load-time-global *cache-vector-symbols* nil)
 
 (defun drop-all-hash-caches ()
+  #+sb-xc-host (values-specifier-type-cache-clear) ; it's not like the rest
   (dolist (name *cache-vector-symbols*)
     (set name nil)))
 
@@ -537,6 +538,9 @@ NOTE: This interface is experimental and subject to change."
                               flush-function (values 1))
   (declare (ignore memoizer))
   (dolist (arg args)
+    ;; Each arg is (VARNAME EQUIVALENCE-TEST &OPTIONAL EXPR-TO-CACHE)
+    ;; EXPR-TO-CACHE says how to copy a dynamic-extent arg into the cache line
+    ;; (the default is to store each argument as-is)
     (unless (<= 2 (length arg) 3)
       (error "bad argument spec: ~S" arg)))
   (assert (typep hash-bits '(integer 5 14))) ; reasonable bounds
@@ -584,10 +588,6 @@ NOTE: This interface is experimental and subject to change."
                               (svref ,cache
                                      (ldb (byte ,hash-bits 0) ,hashval))))
                          (unless (eql ,entry 0)
-                           ;; This barrier is a no-op on all multi-threaded SBCL
-                           ;; architectures. No CPU except Alpha will move a
-                           ;; load prior to a load on which it depends.
-                           (sb-thread:barrier (:data-dependency))
                            (locally (declare (type ,line-type ,entry))
                              (let* ,(case (length temps)
                                      (2 `((,(first temps) (car ,entry))

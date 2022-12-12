@@ -438,6 +438,15 @@
   "Return a new list which is EQUAL to LIST. LIST may be improper."
   (copy-list-macro list))
 
+(defun ensure-heap-list (list)
+  (declare (sb-c::tlab :system))
+  ;; If some cons is not on the heap then copy the whole list
+  (if (do ((cons list (cdr cons)))
+          ((null cons) nil)
+        (unless (dynamic-space-obj-p cons) (return t)))
+      (copy-list-macro list)
+      list))
+
 (defun copy-alist (alist)
   "Return a new association list which is EQUAL to ALIST."
   (if (endp alist)

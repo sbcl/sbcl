@@ -392,6 +392,7 @@ structure representations")
            "CONTEXT-FLOATING-POINT-MODES" "CONTEXT-FLOAT-REGISTER"
            "CONTEXT-PC" "CONTEXT-REGISTER" "BOXED-CONTEXT-REGISTER"
            "CONTROL-STACK-SC-NUMBER"
+           "COPY-NUMBER-TO-HEAP"
            #+sb-safepoint "CSP-SAFEPOINT-TRAP"
            "*CURRENT-CATCH-BLOCK*"
            "CURRENT-FLOAT-TRAP"
@@ -2972,6 +2973,7 @@ possibly temporarily, because it might be used internally.")
            "HASHSET-INSERT-IF-ABSENT" "HASHSET-COUNT"
            ;; useful for DX keys that should persist to the heap
            "SYS-COPY-STRUCT"
+           "ENSURE-HEAP-LIST"
 
             ;; communication between the runtime and Lisp
 
