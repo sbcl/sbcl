@@ -2179,7 +2179,7 @@ maybe_gc(os_context_t *context)
      */
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     check_gc_signals_unblocked_or_lose(os_context_sigmask_addr(context));
-    unblock_gc_signals();
+    unblock_gc_stop_signal();
 #endif
     FSHOW((stderr, "/maybe_gc: calling SUB_GC\n"));
     /* FIXME: Nothing must go wrong during GC else we end up running

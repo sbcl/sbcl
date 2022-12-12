@@ -57,9 +57,9 @@
 ;;; down to C wrapper functions.)
 
 #-sb-safepoint
-(defun unblock-gc-signals ()
-  (with-alien ((%unblock-gc-signals (function void) :extern "unblock_gc_signals"))
-    (alien-funcall %unblock-gc-signals)
+(defun unblock-stop-for-gc-signal ()
+  (with-alien ((%unblock (function void) :extern "unblock_gc_stop_signal"))
+    (alien-funcall %unblock)
     nil))
 
 ;;;; interface to installing signal handlers
@@ -90,7 +90,7 @@
     #-sb-safepoint
     (flet ((run-handler (signo info-sap context-sap)
              #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
-             (unblock-gc-signals)
+             (unblock-stop-for-gc-signal)
              (in-interruption () (funcall handler signo info-sap context-sap))))
       (with-pinned-objects (#'run-handler)
         (alien-funcall %sigaction signal

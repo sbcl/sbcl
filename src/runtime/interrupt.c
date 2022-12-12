@@ -103,13 +103,11 @@ int n_logevents;
 #define OS_SA_NODEFER SA_NODEFER
 #endif
 
-static inline void
-sigcopyset(sigset_t *new, sigset_t *old)
-{
+static inline void sigcopyset(sigset_t *to, sigset_t *from) {
 #ifdef ADDRESS_SANITIZER
-    sigemptyset(new);
+    sigemptyset(to);
 #endif
-    memcpy(new, old, REAL_SIGSET_SIZE_BYTES);
+    memcpy(to, from, REAL_SIGSET_SIZE_BYTES);
 }
 
 /* When we catch an internal error, should we pass it back to Lisp to
@@ -658,7 +656,7 @@ unblock_deferrable_signals(sigset_t *where)
 #ifndef LISP_FEATURE_SB_SAFEPOINT
 // This function previously had an #ifdef guard precluding doing anything for
 // win32, which was redundant because SB_SAFEPOINT is always defined for win32.
-void unblock_gc_signals(void) {
+void unblock_gc_stop_signal(void) {
     thread_sigmask(SIG_UNBLOCK, &gc_sigset, 0);
 }
 #endif
@@ -692,16 +690,18 @@ check_interrupts_enabled_or_lose(os_context_t *context)
         lose ("in pseudo atomic section");
 }
 
+/* Note that the comment from rev aa0ed5a420 seems back-ass-wards.
+ * "if there is no pending signal .. because that means deferrable are blocked"?
+ * How would NO pending signal imply that deferrables are blocked? */
+
 /* Save sigset (or the current sigmask if 0) if there is no pending
  * handler, because that means that deferabbles are already blocked.
  * The purpose is to avoid losing the pending gc signal if a
  * deferrable interrupt async unwinds between clearing the pseudo
  * atomic and trapping to GC.*/
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-void
-maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
+void maybe_save_gc_mask_and_block_deferrables(os_context_t *context)
 {
-#ifndef LISP_FEATURE_WIN32
     struct thread *thread = get_sb_vm_thread();
     struct interrupt_data *data = &thread_interrupt_data(thread);
     sigset_t oldset;
@@ -717,8 +717,13 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
     if ((!data->pending_handler) &&
         (!data->gc_blocked_deferrables)) {
         data->gc_blocked_deferrables = 1;
-        if (sigset) {
-            /* This is the sigmask of some context. */
+        if (context) {
+            /* When there is a sigcontext, do the following:
+             * - 'pending_mask' stores the mask from just prior to receipt of the signal
+             * - On return to the interrupt point, the signal mask is restored
+             *   to what it was PLUS all deferrable signals
+             * - On return from this function, no change to the current mask */
+            sigset_t *sigset = os_context_sigmask_addr(context);
             sigcopyset(&data->pending_mask, sigset);
             sigaddset_deferrable(sigset);
             thread_sigmask(SIG_SETMASK,&oldset,0);
@@ -726,14 +731,14 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
         } else {
             /* Operating on the current sigmask. Save oldset and
              * unblock gc signals. In the end, this is equivalent to
-             * blocking the deferrables. */
+             * blocking the deferrables and also SIGPIPE and SIGPROF neither of which
+             * is usually deferred, for reasons cited in sigaddset_blockable */
             sigcopyset(&data->pending_mask, &oldset);
-            unblock_gc_signals();
+            unblock_gc_stop_signal();
             return;
         }
     }
     thread_sigmask(SIG_SETMASK,&oldset,0);
-#endif
 }
 #endif
 
@@ -1263,7 +1268,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * allow signals again when it sees fit. */
         /* handler.lisp will hide from the GC, will be enabled in the handler itself.
          * Not a problem for the conservative GC. */
-        unblock_gc_signals();
+        unblock_gc_stop_signal();
 #endif
 
         WITH_GC_AT_SAFEPOINTS_ONLY()
@@ -1435,8 +1440,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
         event0("stop_for_gc deferred for PA");
         write_TLS(STOP_FOR_GC_PENDING, LISP_T, thread);
         arch_set_pseudo_atomic_interrupted(context);
-        maybe_save_gc_mask_and_block_deferrables
-            (os_context_sigmask_addr(context));
+        maybe_save_gc_mask_and_block_deferrables(context);
         return;
     }
 

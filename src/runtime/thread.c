@@ -342,7 +342,7 @@ void create_main_lisp_thread(lispobj function) {
 #if defined THREADS_USING_GCSIGNAL && \
     (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
-    unblock_gc_signals();
+    unblock_gc_stop_signal();
 #endif
     link_thread(th);
     th->os_kernel_tid = get_nonzero_tid();
@@ -672,7 +672,7 @@ static void attach_os_thread(init_thread_data *scribble)
     /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
     /* FIXME: could be done using a single call to pthread_sigmask
        together with blocking the deferrable signals above. */
-    unblock_gc_signals();
+    unblock_gc_stop_signal();
 #endif
 
     th->os_kernel_tid = get_nonzero_tid();

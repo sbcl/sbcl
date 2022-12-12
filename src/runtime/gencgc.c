@@ -5022,16 +5022,12 @@ lisp_alloc(int flags, struct alloc_region *region, sword_t nbytes,
                 thread_register_gc_trigger();
 #else
                 set_pseudo_atomic_interrupted(thread);
-#if HAVE_ALLOCATION_TRAP_CONTEXT
-                {
-                    os_context_t *context =
-                        thread_interrupt_data(thread).allocation_trap_context;
-                    maybe_save_gc_mask_and_block_deferrables
-                        (context ? os_context_sigmask_addr(context) : NULL);
-                }
-#else
-                maybe_save_gc_mask_and_block_deferrables(NULL);
-#endif
+                maybe_save_gc_mask_and_block_deferrables
+# if HAVE_ALLOCATION_TRAP_CONTEXT
+                    (thread_interrupt_data(thread).allocation_trap_context);
+# else
+                    (0);
+# endif
 #endif
             }
         }
