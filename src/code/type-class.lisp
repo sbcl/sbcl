@@ -290,9 +290,12 @@
 ;;; if applicable. For types which are not array specializations,
 ;;; the bits are arbitrary.
 (defmacro type-saetp-index (ctype) `(ldb (byte 5 22) (type-%bits ,ctype)))
+;;; TODO: remove the "interned" bit. No two internal representations can exist
+;;; for the same structures that are EQUALP. Except for ALIEN-TYPE-TYPE (FIXME)
 (defmacro type-bits-internedp (bits) `(logbitp 20 ,bits))
 (defmacro type-bits-admit-type=-optimization (bits) `(logbitp 21 ,bits))
 
+(defvar *ctype-hashsets* nil)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +type-internedp+ (ash 1 20))
   (defconstant +type-admits-type=-optimization+ (ash 1 21))
@@ -305,15 +308,16 @@
             ;; The mapping from name to a CLASSOID type is unique,
             ;; therefore all CLASSOIDs have the "interned" bit on.
             (if (eq type-class 'classoid) +type-internedp+ 0)))
-  (defparameter *def-type-model-forms* nil)
   (defvar *type-class-list*
     ;; type-class and ctype instance types in that class
+    ;; The instance types MUST be list in descending order of DEPTHOID.
+    ;; See CTYPE->HASHSET-NAME for the rationale for this constraint.
     '((named         named-type)
       (classoid      classoid)
       (values        values-type)
-      (function      fun-type fun-designator-type)
+      (function      fun-designator-type fun-type)
       (constant      constant-type)
-      (hairy         hairy-type unknown-type)
+      (hairy         unknown-type hairy-type)
       (intersection  intersection-type)
       (union         union-type)
       (negation      negation-type)
@@ -328,7 +332,7 @@
       (simd-pack-256 simd-pack-256-type)
       ;; clearly alien-type-type is not consistent with the (FOO FOO-TYPE) theme
       (alien         alien-type-type)))
-  (defun ctype-instance-type->type-class (name)
+  (defun ctype-instance->type-class (name)
     (car (the (not null)
               (find name *type-class-list* :key #'cdr :test #'member)))))
 (eval-when (#+sb-xc-host :compile-toplevel :load-toplevel :execute)
@@ -616,6 +620,36 @@
 
 ;;;; representations of types
 
+(defun hash-ctype-set (types) ; ctype list hashed order-insensitively
+  (let ((hash (type-hash-value (car types)))
+        (n 1))
+    (dolist (type (cdr types) (mix (the (integer 2) n) hash))
+      (incf n)
+      (setq hash (logxor (type-hash-value type) hash)))))
+(defun ctype-set= (a b)
+  ;; We could order ctype sets deterministically by the TYPE-HASH-VALUE of
+  ;; the items, but there would also have to be a provision made for hash
+  ;; collisions, which entails the comparator doing one thing or another
+  ;; depending on whether the set had collisions.
+  ;; However, it might also be nice to canonicalize putting any type containing
+  ;; SATISFIES to the right of any type that does not. This order would tend to have
+  ;; a beneficial effect of making TYPEP tests pass or fail "sooner" without calling
+  ;; a random predicate. It's just as well to compare sets elementwise for now
+  ;; rather than sorting them by some complicated set of criteria.
+  (and (= (length a) (length b)) (every (lambda (x) (memq x b)) a)))
+
+(define-load-time-global *ctype-list-hashset*
+  (make-hashset 32 #'list-elts-eq #'hash-ctype-list :weakness t :synchronized t))
+(define-load-time-global *ctype-set-hashset*
+  (make-hashset 32 #'ctype-set= #'hash-ctype-set :weakness t :synchronized t))
+
+(defun intern-ctype-list (list)
+  (when list
+    (hashset-insert-if-absent *ctype-list-hashset* list #'ensure-heap-list)))
+(defun intern-ctype-set (set)
+  (aver set) ; Sets of ctypes (as used by COMPOUND-TYPE) are nonempty lists
+  (hashset-insert-if-absent *ctype-set-hashset* set #'ensure-heap-list))
+
 ;;; DEF-TYPE-MODEL is like DEFSTRUCT, with the following differences:
 ;;;  1. it inserts (:INCLUDE CTYPE) unless otherwise expressed
 ;;;  2. it inserts (:COPIER NIL)
@@ -635,12 +669,29 @@
          (public-ctor-args (third public-ctor))
          (private-ctor (unless (member name '(compound-type args-type))
                           (symbolicate "!ALLOC-" name)))
-         (private-ctor-args (cons '%bits public-ctor-args)))
+         (private-ctor-args (cons '%bits public-ctor-args))
+         (conc-name (symbolicate name "-"))
+         (include (awhen (assoc :include options) (cadr it)))
+         ;; list of triples #(SLOT-NAME HASHER COMPARATOR) of direct slots only.
+         ;; Inherited slots are mixed in by calling the supertype's hash function.
+         (hashed-slots
+          (mapcan (lambda (slot &aux (type (getf (cddr slot) :type))
+                                     (hasher (getf (cddr slot) :hasher 'clipped-sxhash))
+                                     (comparator (getf (cddr slot) :test)))
+                    (cond ((or comparator (null hasher))) ; ok
+                          ((eq type 'ctype)
+                           (setq comparator 'eq hasher 'type-hash-value))
+                          ((or (and (typep type '(cons (eql member)))
+                                    (every #'symbolp (cdr type)))
+                               (eq type 'boolean))
+                           (setq comparator 'eq))
+                          (t (bug "Underspecified slot: ~S.~S type ~S~%"
+                                  name (car slot) type)))
+                    (when hasher (list (vector (car slot) hasher comparator))))
+                  direct-slots)))
     `(progn
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-         (push ',(cons name direct-slots) *def-type-model-forms*))
        ,@(when private-ctor `((declaim (inline ,private-ctor))))
-       (defstruct (,name ,@(unless (assoc :include options) '((:include ctype)))
+       (defstruct (,name ,@(unless include '((:include ctype)))
                          ,@(remove :constructor* options :key #'car)
                          ,(if private-ctor
                               `(:constructor ,private-ctor ,private-ctor-args)
@@ -651,19 +702,108 @@
                      (remf copy :test)
                      (append copy '(:read-only t)))
                    direct-slots))
-       ;; If we're going to wrap the internal constructor with a hand-written one,
-       ;; then don't also define a caching constructor. (Extra layers are confusing).
+       ;; Always define hash-consing functions if any new slots, even if abstract.
+       ,@(when direct-slots
+           (let ((hashfn (symbolicate "CALC-" name "-HASH"))
+                 (compare (symbolicate name "-EQUIV")))
+             `((defun ,hashfn (x)
+                 #-sb-xc-host (declare (optimize (safety 0)))
+                 (type-hash-mix
+                  ,@(when include `((,(symbolicate "CALC-" include "-HASH") x)))
+                  ,@(mapcar (lambda (slot &aux (reader
+                                                (symbolicate conc-name (svref slot 0))))
+                              `(,(svref slot 1) (,reader x)))
+                            hashed-slots)))
+               (defun ,compare (a b)
+                 #-sb-xc-host (declare (optimize (safety 0)))
+                 (and ,@(mapcar (lambda (slot &aux (reader
+                                                    (symbolicate conc-name (svref slot 0))))
+                                  `(,(elt slot 2) (,reader a) (,reader b)))
+                                hashed-slots)
+                      ,@(when include `((,(symbolicate include "-EQUIV") a b))))))))
+       ;; Define a hashset unless this is an abstract type
+       ,@(unless (member name '(compound-type args-type))
+           (let* ((stem (if direct-slots name include))
+                  (hashfn (symbolicate "CALC-" stem "-HASH"))
+                  (test (symbolicate stem "-EQUIV"))
+                  (hashset (symbolicate "*" name "-HASHSET*")))
+             `((pushnew ',hashset *ctype-hashsets*)
+               (define-load-time-global ,hashset
+                   (make-hashset 32 #',test #',hashfn :synchronized t :weakness t)))))
+       ;; If the internal constructor is wrapped in a hand-written constructor, then
+       ;; that other constructor invokes the cachine lookup macro. Don't do it here.
+       ;; See e.g. MAKE-CONS-TYPE which picks off 2 cases and then uses the cache.
        ,@(when (second public-ctor)
            `((declaim (ftype (sfunction * ,name) ,(second public-ctor)))
              (defun ,(second public-ctor) ,public-ctor-args
                (new-ctype ,name ,@(cdr private-ctor-args))))))))
 
-(defmacro new-ctype (name &rest initargs)
-  (let ((allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name)))
-    `(let ((bits (logior ,(ctype-class-bits (ctype-instance-type->type-class name))
-                         (logand (ctype-random) +type-hash-mask+))))
-       (declare (inline ,allocator))
-       (,allocator bits ,@initargs))))
+;;; The "clipped hash" is just the host's SXHASH but ensuring that the result
+;;; is an unsigned fixnum for the target. This ensures that it is legal to use MIX
+;;; on the value. We don't really care what the hash is, so we don't need to use
+;;; SB-XC:SXHASH. It's needlyly tedious to fully emulate our SXHASH on BIGNUM
+;;; and RATIONAL (which can appear in numeric bounds)
+(defmacro clipped-sxhash (x)
+  #+sb-xc-host `(logand (cl:sxhash ,x) ,sb-xc:most-positive-fixnum)
+  #-sb-xc-host `(sxhash ,x))
+
+(defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
+
+;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
+;; * (MEMBER THING) might lack an address-insensitive hash for THING
+;;   but src/code/hashset can not use address-based hashes. This limitation is unique
+;;   to MEMBER types because other CTYPE instances are compositions of CTYPES
+;;   where all subparts have assigned hashes.
+;; * Symbols have slightly bad SXHASH values (by language requirement):
+;;    "For any two objects, x and y which are symbols and which are similar
+;;    (sxhash x) and (sxhash y) yield the same mathematical value even if x and y exist
+;;    in different Lisp images of the same implementation."
+;;   This seems to imply that pseudorandom hashes are disallowed for symbols,
+;;   and that any two gensyms spelled the same hash the same.
+;;   Consequently, a thousand occurrences of (MEMBER #:DUMMY) for different gensyms,
+;;   will cause the hashset to exceed its probe sequence length limit.
+;;   This isn't to say we couldn't assign some bits of SYMBOL-HASH pseudorandomly,
+;;   and mask them out in the value returned by CL:SXHASH.
+
+(define-load-time-global *eql-type-cache* ; like EQL-SPECIALIZER-TABLE in PCL
+    (sb-impl::make-system-hash-table :test 'eql :weakness :value :synchronized nil))
+
+(defmacro safe-member-type-elt-p (obj)
+  `(or (not (sb-vm:is-lisp-pointer (get-lisp-obj-address ,obj)))
+       (heap-allocated-p ,obj)))
+
+(defmacro new-ctype (pseudonym &rest initargs)
+  (let* ((name (if (eq pseudonym 'eql) 'member-type pseudonym))
+         (allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name))
+         (hashset (package-symbolicate "SB-KERNEL" "*" name "-HASHSET*"))
+         (bits (ctype-class-bits (ctype-instance->type-class name))))
+    #+sb-xc-host ; allocate permanent data, and insert into cache if not found
+    `(let ((temp (,allocator (logior (logand (ctype-random) +type-hash-mask+) ,bits)
+                             ,@initargs)))
+       (hashset-insert-if-absent ,hashset temp #'identity))
+    ;; allocate temporary key, copy it if and only if not found.
+    ;; COPY-CTYPE can copy subparts like the numeric bound if arena-allocated
+    #-sb-xc-host
+    `(let ((temp (,allocator ,bits ,@initargs)))
+       ;; Too many "can't stack-allocate" warnings for most
+       #+c-stack-is-control-stack (declare (truly-dynamic-extent temp))
+       ,(if (eq pseudonym 'eql) ; as per above remarks: use hash-table, not hashset
+            `(let* ((xset ,(first initargs))
+                    (zeros ,(second initargs))
+                    (key (first (or zeros (xset-data xset))))
+                    (table *eql-type-cache*))
+               (with-system-mutex ((hash-table-lock table))
+                ;; This is like ENSURE-GETHASH but it potentially copies the key
+                (or (gethash key table)
+                    ;; hope no off-heap pointers buried within KEY
+                    (let ((key (cond ((numberp key) (sb-vm:copy-number-to-heap key))
+                                     ((safe-member-type-elt-p key) key)
+                                     (t
+                                      (warn "Off-heap hash-table key @ ~X"
+                                            (get-lisp-obj-address key))
+                                      key))))
+                      (setf (gethash key table) (copy-ctype temp))))))
+            `(hashset-insert-if-absent ,hashset temp #'copy-ctype)))))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
 ;;; special cases, as well as other special cases needed to
@@ -700,12 +840,19 @@
   ;; that logic enough yet to understand why.
   (specifier nil :type t :test equal))
 
+(macrolet ((hash-fp-zeros (x) ; order-insensitive
+             `(let ((h 0))
+                (dolist (x ,x h) (setq h (logxor (sb-xc:sxhash x) h)))))
+           (fp-zeros= (a b)
+             `(let ((a ,a) (b ,b))
+                (and (= (length a) (length b))
+                     (every (lambda (x) (member x b)) a)))))
 ;;; A MEMBER-TYPE represent a use of the MEMBER type specifier. We
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
-(def-type-model (member-type (:constructor* %make-member-type (xset fp-zeroes)))
+(def-type-model (member-type (:constructor* nil (xset fp-zeroes)))
   (xset nil :type xset :hasher xset-elts-hash :test xset=)
-  (fp-zeroes nil :type list :hasher hash-fp-zeros :test fp-zeros=))
+  (fp-zeroes nil :type list :hasher hash-fp-zeros :test fp-zeros=)))
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
@@ -723,8 +870,7 @@
   ;; the element type as it is specialized in this implementation
   (specialized-element-type nil :type ctype))
 
-(def-type-model (character-set-type
-                 (:constructor* %make-character-set-type (pairs)))
+(def-type-model (character-set-type (:constructor* nil (pairs)))
   ;; these get canonically ordered by the parser
   (pairs (missing-arg) :type list :test equal))
 
@@ -733,11 +879,12 @@
 (def-type-model (compound-type) ; no direct instances
   ;; Formerly defined in every CTYPE, but now just in the ones
   ;; for which enumerability is variable.
-  (enumerable nil :type boolean)
+  ;; This is a pure function of TYPES and need not be part of the hash
+  (enumerable nil :type boolean :hasher nil)
   ;; This list must have at least 2 items in it.
   ;; A singleton would not be a compound type.
   ;; An empty OR is the type NIL, and an empty AND is type T.
-  (types nil :type (cons t cons) :hasher hash-ctype-list :test list-elts-eq))
+  (types nil :type (cons t cons) :hasher hash-ctype-set :test eq)) ; list is hash-consed
 
 ;;; A UNION-TYPE represents a use of the OR type specifier which we
 ;;; couldn't canonicalize to something simpler. Canonical form:
@@ -757,7 +904,7 @@
 ;;; even though (MEMBER #\A) is not TYPE= to BASE-CHAR.
 ;;;
 (def-type-model (union-type
-                 (:constructor* make-union-type (enumerable types))
+                 (:constructor* nil (enumerable types))
                  (:include compound-type)))
 
 ;;; An INTERSECTION-TYPE represents a use of the AND type specifier
@@ -776,7 +923,7 @@
                  (:include compound-type)))
 
 (def-type-model (alien-type-type (:constructor* %make-alien-type-type (alien-type)))
-  (alien-type nil :type alien-type :hasher sxhash :test eq))
+  (alien-type nil :type alien-type :hasher sb-alien::alien-type-hash :test eq))
 
 (def-type-model (negation-type (:constructor* make-negation-type (type)))
   (type (missing-arg) :type ctype))
@@ -795,6 +942,24 @@
 ;;; The type of a float format.
 (deftype float-format () `(member ,@*float-formats*))
 
+(macrolet ((numbound-hash (b)
+             #+sb-xc-host `(clipped-sxhash ,b)
+             #-sb-xc-host `(let ((x ,b))
+                             (block nil
+                               (multiple-value-bind (h v)
+                                   (if (listp x)
+                                       (if x (values #x55AA55 (car x)) (return 0))
+                                       (values 0 x))
+                                 (logxor h (sb-impl::number-sxhash v))))))
+           (numbound-eql (a b)
+             ;; Determine whether the 'low' and 'high' slots of two NUMERIC-TYPE instances
+             ;; are "the same". It is a stricter test than in the SIMPLE-= method, because
+             ;; the cache preserves distinctions that the type algebra does not,
+             ;; specifically in regard to signed zeros.
+             `(let ((a ,a) (b ,b))
+                (if (listp a)
+                    (and (listp b) (eql (car a) (car b)))
+                    (eql a b)))))
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (def-type-model (numeric-type
@@ -816,16 +981,16 @@
   ;; types never have exclusive bounds, i.e. they may have them on
   ;; input, but they're canonicalized to inclusive bounds before we
   ;; store them here.
-  (low nil :type (or real (cons real null) null) :test equal)
-  (high nil :type (or real (cons real null) null) :test equal))
+  (low nil :type (or real (cons real null) null)
+       :hasher numbound-hash :test numbound-eql)
+  (high nil :type (or real (cons real null) null)
+        :hasher numbound-hash :test numbound-eql)))
 
 ;;; A CONS-TYPE is used to represent a CONS type.
 (def-type-model (cons-type (:constructor* nil (car-type cdr-type)))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   (car-type (missing-arg) :type ctype)
   (cdr-type (missing-arg) :type ctype))
-
-(defmacro hash-ctype-or-null (x) `(let ((x ,x)) (if x (type-hash-value x) 0)))
 
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.
@@ -834,12 +999,14 @@
 ;;; CMUCL rev 2e8488e0ace2d21a3d7af217037bcb445cc93496 said
 ;;; "(values) <type translator>: Disallow &key and &allow-other-keys"
 ;;; but they kept all the slots in ARGS-TYPE.
-(def-type-model (args-type) ; no direct instances
+(macrolet ((hash-ctype-or-null (x)
+             `(let ((x ,x)) (if x (type-hash-value x) 0))))
+(def-type-model (args-type (:constructor* nil (required optional rest)))
   ;; Lists of the type for each required and optional argument.
-  (required nil :type list :hasher hash-ctype-list :test list-elts-eq)
-  (optional nil :type list :hasher hash-ctype-list :test list-elts-eq)
+  (required nil :type list :hasher hash-ctype-list :test eq) ; hash-consed list
+  (optional nil :type list :hasher hash-ctype-list :test eq) ; hash-consed list
   ;; The type for the rest arg. NIL if there is no &REST arg.
-  (rest nil :type (or ctype null) :hasher hash-ctype-or-null :test eq))
+  (rest nil :type (or ctype null) :hasher hash-ctype-or-null :test eq)))
 
 ;;; the description of a &KEY argument
 (declaim (inline !make-key-info))
@@ -927,6 +1094,7 @@
 (def-type-model (simd-pack-type
                  (:constructor* %make-simd-pack-type (tag-mask)))
   (tag-mask (missing-arg) ; bitmask over possible simd-pack-tag values
+   :test =
    :type (and (unsigned-byte #.(length +simd-pack-element-types+))
               (not (eql 0)))))
 
@@ -934,6 +1102,7 @@
 (def-type-model (simd-pack-256-type
                  (:constructor* %make-simd-pack-256-type (tag-mask)))
   (tag-mask (missing-arg)
+   :test =
    :type (and (unsigned-byte #.(length +simd-pack-element-types+))
               (not (eql 0)))))
 
@@ -960,6 +1129,106 @@
         (t nil)))
 
 (!defun-from-collected-cold-init-forms !type-class-cold-init)
+
+;;; Return the name of the global hashset that OBJ (a CTYPE instance)
+;;; would be stored in, if it were stored in one.
+(defun ctype->hashset-sym (obj)
+  (macrolet ((generate  ()
+               (collect ((clauses))
+                 (dolist (type-class *type-class-list*
+                                     `(etypecase obj ,@(clauses)))
+                   (dolist (instance-type (cdr type-class))
+                     (clauses
+                      (list instance-type
+                            (unless (member instance-type '(classoid named-type))
+                              `',(symbolicate "*" instance-type "-HASHSET*")))))))))
+    (generate)))
+
+(export 'show-ctype-ctor-cache-metrics)
+(defun show-ctype-ctor-cache-metrics ()
+  (let (caches (total 0))
+    (push (cons "List" *ctype-list-hashset*) caches)
+    (push (cons "Set" *ctype-set-hashset*) caches)
+    (push (cons "Key-Info" *key-info-hashset*) caches)
+    (push (cons "Key-Info-List" *key-info-list-hashset*) caches)
+    (dolist (symbol *ctype-hashsets*)
+      (push (cons (subseq (string symbol) 1
+                          (- (length (string symbol)) (length "-TYPE-HASHSET*")))
+                  (symbol-value symbol))
+            caches))
+    (setq caches
+          (delete 0 caches :key (lambda (x) (sb-impl::hashset-count (cdr x)))))
+    (format t "~&ctype cache metrics:  Count     Seek    Hit~%")
+    #-hashset-metrics ; just show the counts in decreasing order
+    ; and also include the EQL table
+    (format t "~:{  ~16a: ~7D~%~}"
+            (sort (cons (list "EQL" (hash-table-count *eql-type-cache*))
+                        (mapcar (lambda (x) (list (car x) (sb-impl::hashset-count (cdr x))))
+                                caches))
+                  #'> :key #'second))
+    #+hashset-metrics
+    (dolist (cache (sort caches #'> ; decreasing order of lookup frequency
+                         :key (lambda (x) (sb-impl::hashset-count-finds (cdr x)))))
+      (let* ((name (car cache))
+             (hs (cdr cache))
+             (count (sb-impl::hashset-count hs))
+             (seeks (sb-impl::hashset-count-finds hs))
+             (hit (/ (sb-impl::hashset-count-find-hits hs) seeks)))
+        (incf total count)
+        (format t "  ~16a: ~7D ~8D  ~4,1,2f%~%" name count seeks hit)))
+    (format t "  ~16A: ~7D~%" "Total" total)))
+
+#-sb-xc-host
+(progn
+(defglobal *!initial-ctypes* nil)
+(defun preload-ctype-hashsets (&aux permtypes)
+  (declare (ignorable permtypes))
+  (dolist (pair (nreverse *!initial-ctypes*))
+    (destructuring-bind (instance . hashset-symbol) pair
+      (cond ((not hashset-symbol)
+             (push instance permtypes))
+            (t
+             (let ((hashset (symbol-value hashset-symbol)))
+               (aver (not (hashset-find hashset instance))) ; instances are dumped bottom-up
+               (hashset-insert hashset instance))))
+      (labels ((ensure-interned-list (list hashset)
+                 (let ((found (hashset-find hashset list)))
+                   (when (and found (neq found list))
+                     (bug "genesis failed to uniquify list-of-ctype in ~X"
+                          (get-lisp-obj-address instance)))
+                   (when (and list (not found))
+                     (hashset-insert hashset list)))
+                 (mapc #'check list))
+               ;; Assert that looking for SUBPART finds nothing or finds itself
+               (check (subpart &aux (hashset-symbol (ctype->hashset-sym subpart)))
+                 (when hashset-symbol
+                   (let* ((hashset (symbol-value hashset-symbol))
+                          (found (hashset-find hashset subpart)))
+                     (when (and found (neq found subpart))
+                       (bug "genesis dumped bad instance within ~X"
+                            (get-lisp-obj-address instance)))))))
+        (etypecase instance
+          ((or named-type numeric-type member-type character-set-type ; nothing extra to do
+           #+sb-simd-pack simd-pack-type #+sb-simd-pack-256 simd-pack-256-type
+           hairy-type))
+          (args-type
+           (ensure-interned-list (args-type-required instance) *ctype-list-hashset*)
+           (ensure-interned-list (args-type-optional instance) *ctype-list-hashset*)
+           (awhen (args-type-rest instance) (check it))
+           (when (fun-type-p instance)
+             (aver (null (fun-type-keywords instance)))
+             (check (fun-type-returns instance))))
+          (cons-type
+           (check (cons-type-car-type instance))
+           (check (cons-type-cdr-type instance)))
+          (array-type
+           (check (array-type-element-type instance))
+           (check (array-type-specialized-element-type instance)))
+          (compound-type
+           (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
+          (negation-type
+           (check (negation-type-type instance))))))))
+(preload-ctype-hashsets))
 
 ;;; *TYPE-CLASS-LIST* is defined only in the host. When the cross-compiler
 ;;; expands TYPEP-IMPL-MACRO it get the value of this symbol from the host's
@@ -1097,3 +1366,108 @@
               (:real
                (and (not (complexp object))
                     (bound-test object))))))))
+
+;;; Copy X to the heap, give it a random hash, and if it is a MEMBER type
+;;; then assert that all members are cacheable.
+#-sb-xc-host
+(defun copy-ctype (x)
+  (declare (type ctype x))
+  (declare (sb-c::tlab :system) (inline !copy-xset))
+  #+c-stack-is-control-stack (aver (stack-allocated-p x))
+  (labels ((copy (x)
+             ;; Return a heap copy of X if X was arena or stack-allocated.
+             ;; I suspect it's quicker to copy always rather than conditionally.
+             ;; The use for this is that supposing the user constructs a type specifier
+             ;; like (DOUBLE-FLOAT (2.0) 4.0) where those numbers and the inner list
+             ;; were constructed on an arena, they need to be copied.
+             (etypecase x
+               (number (sb-vm:copy-number-to-heap x))
+               (cons (cons (copy (car x)) (copy (cdr x))))
+               (symbol x)))
+           (copy-xset (xset &aux (data (xset-data xset)))
+             ;; MEMBER-TYPE is a problem because the members could be arena-allocated.
+             ;; It would be easy enough to avoid entering some instances in a hashset, though
+             ;; the larger issue is that it may be inserted into any number of other caches.
+             ;; CLHS never says whether DX objects are or aren't legal in type specifiers.
+             ;; I consider this "user error" as it seems to push the boundary of what should
+             ;; be permissible, but we can do better than to cache data that are on the stack.
+             ;; If the XSET is represented as a hash-table, we may have another issue
+             ;; which is not dealt with here (hash-table in the arena)
+             (cond ((listp data)
+                    ;; the XSET can be empty if a MEMBER type contains only FP zeros.
+                    ;; While we could use (load-time-value) to referece a constant empty xset
+                    ;; there's really no point to doing that.
+                    (collect ((elts))
+                      (dolist (x data (!copy-xset (xset-list-size xset) (elts)))
+                        (elts (cond ((numberp x) (sb-vm:copy-number-to-heap x))
+                                    ((safe-member-type-elt-p x) x)
+                                    ;; surely things will go haywire if this occurs
+                                    (t (error "Off-heap MEMBER type member @ ~X"
+                                              (get-lisp-obj-address x))))))))
+                   ;; Huge MEMBER types are rare so I'm not going to worry too much,
+                   ;; just check whether it's OK or not
+                   ((and (loop for k being each hash-key of data
+                               always (safe-member-type-elt-p k))
+                         (heap-allocated-p data))
+                    xset)
+                   (t ; This could certainly be improved
+                    (error "Off-heap MEMBER type members")))))
+    (let ((bits (logior (logand (ctype-random) +type-hash-mask+)
+                        (type-%bits x))))
+      ;; These cases are in descending order of frequency of seek in the hashsets.
+      ;; It matters only for backends that don't convert TYPECASE to a jump table.
+      (etypecase x
+        (values-type
+         (!alloc-values-type bits (values-type-required x) (values-type-optional x)
+                             (values-type-rest x)))
+        (fun-type ; or FUN-DESIGNATOR-TYPE
+         (let ((copy (!alloc-fun-type
+                      bits (fun-type-required x) (fun-type-optional x) (fun-type-rest x)
+                      (fun-type-keyp x) (fun-type-keywords x) (fun-type-allowp x)
+                      (fun-type-wild-args x) (fun-type-returns x))))
+           (%set-instance-layout copy (%instance-layout x))
+           copy))
+        (numeric-type
+         (!alloc-numeric-type bits (numeric-type-class x) (numeric-type-format x)
+                              (numeric-type-complexp x)
+                              (copy (numeric-type-low x))
+                              (copy (numeric-type-high x))))
+        (compound-type ; UNION or INTERSECTION
+         (let ((copy (!alloc-union-type bits (compound-type-enumerable x)
+                                        (compound-type-types x))))
+           (%set-instance-layout copy (%instance-layout x))
+           copy))
+        (member-type
+         (!alloc-member-type bits (copy-xset (member-type-xset x))
+          (mapcar 'sb-vm:copy-number-to-heap (member-type-fp-zeroes x))))
+        (array-type
+         (!alloc-array-type bits (copy (array-type-dimensions x))
+                            (array-type-complexp x) (array-type-element-type x)
+                            (array-type-specialized-element-type x)))
+        (hairy-type ; SATISFIES or UNKNOWN
+         (let ((copy (!alloc-hairy-type bits (copy (hairy-type-specifier x)))))
+           (%set-instance-layout copy (%instance-layout x))
+           copy))
+        (negation-type (!alloc-negation-type bits (negation-type-type x)))
+        (constant-type (!alloc-constant-type bits (constant-type-type x)))
+        (cons-type (!alloc-cons-type bits (cons-type-car-type x) (cons-type-cdr-type x)))
+        (character-set-type
+         (!alloc-character-set-type bits (copy (character-set-type-pairs x))))
+        #+sb-simd-pack
+        (simd-pack-type (!alloc-simd-pack-type bits (simd-pack-type-tag-mask x)))
+        #+sb-simd-pack-256
+        (simd-pack-256-type (!alloc-simd-pack-256-type bits (simd-pack-256-type-tag-mask x)))
+        (alien-type-type (!alloc-alien-type-type bits (alien-type-type-alien-type x)))))))
+
+;;; Drop NILs, possibly reducing the storage vector length
+(defun rebuild-ctype-hashsets ()
+  (dolist (sym (list* '*key-info-hashset* '*key-info-list-hashset*
+                      *ctype-hashsets*))
+    (flet ((len (hs)
+             (length (sb-impl::hss-cells (sb-impl::hashset-storage hs)))))
+      (let* ((hs (symbol-value sym))
+             (before (len hs)))
+        (sb-impl::hashset-rehash hs nil)
+        (let ((after (len hs)))
+          (when (> before after)
+            (format t "~5d ~s~%" (- after before) sym)))))))

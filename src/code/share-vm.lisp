@@ -187,6 +187,10 @@
         do (setf (%symbol-function symbol) fun))
   (setf *previous-cpu-routines* nil))
 
+;;; Unless using an arena there is really no way to get a number
+;;; allocated off the heap
+#-x86-64 (defun copy-number-to-heap (n) n)
+
 (defun hexdump (thing &optional (n-words nil wordsp)
                             ;; pass NIL explicitly if T crashes on you
                         (decode t))

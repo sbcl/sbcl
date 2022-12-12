@@ -276,20 +276,6 @@
 
 (define-type-class values :enumerable nil :might-contain-other-types nil)
 
-(defun-cached (make-values-type-cached
-               :hash-bits 8
-               :hash-function
-               (lambda (req opt rest)
-                 (logxor (hash-ctype-list req)
-                         (hash-ctype-list opt)
-                          (if rest
-                              (type-hash-value rest)
-                              42))))
-    ((required list-elts-eq) ; always compare ctype instances by EQ
-     (optional list-elts-eq)
-     (rest eq))
-  (new-ctype values-type required optional rest))
-
 (defun make-values-type (required &optional optional rest)
   (multiple-value-bind (required optional rest)
       (canonicalize-args-type-args required optional rest)
@@ -297,7 +283,10 @@
            *wild-type*)
           ((memq *empty-type* required)
            *empty-type*)
-          (t (make-values-type-cached required optional rest)))))
+          (t
+           (let ((required (intern-ctype-list required))
+                 (optional (intern-ctype-list optional)))
+             (new-ctype values-type required optional rest))))))
 
 (define-type-method (values :simple-subtypep :complex-subtypep-arg1)
                      (type1 type2)
@@ -509,33 +498,18 @@
                          (values t t))
                         (t (type=-args type1 type2)))))))
 
-#+sb-xc-host
-(defvar *interned-fun-types*
-  (flet ((fun-type (n)
-           (!alloc-fun-type (pack-interned-ctype-bits 'function)
-                            (make-list n :initial-element *universal-type*)
-                            nil nil nil nil nil nil *wild-type*)))
-    (vector (fun-type 0) (fun-type 1) (fun-type 2) (fun-type 3))))
-
 (defun make-fun-type (&key required optional rest
                            keyp keywords allowp
                            wild-args returns
                            designator)
   (let ((rest (if (eq rest *empty-type*) nil rest))
-        (n (length required)))
-    (cond (designator
-           (new-ctype fun-designator-type required optional rest keyp keywords
-                                     allowp wild-args returns))
-          ((and
-            (<= n 3)
-            (not optional) (not rest) (not keyp)
-            (not keywords) (not allowp) (not wild-args)
-            (eq returns *wild-type*)
-            (not (find *universal-type* required :test #'neq)))
-           (svref (literal-ctype-vector *interned-fun-types*) n))
-          (t
-           (new-ctype fun-type required optional rest keyp keywords
-                           allowp wild-args returns)))))
+        (required (intern-ctype-list required))
+        (optional (intern-ctype-list optional)))
+    (if designator
+        (new-ctype fun-designator-type required optional rest keyp keywords
+                   allowp wild-args returns)
+        (new-ctype fun-type required optional rest keyp keywords
+                   allowp wild-args returns))))
 
 ;; This seems to be used only by cltl2, and within 'cross-type',
 ;; where it is never used, which makes sense, since pretty much we
@@ -1398,16 +1372,6 @@
 (defmacro type-context-cacheable (x)
   `(not (logtest (type-context-options ,x) +type-parse-cache-inhibit+)))
 
-;;; Maintain a table of symbols designating unknown types that have any references
-;;; to them, making it easy to inquire whether such things exist. This is at a lower
-;;; layer than the parser cache - it's a cache of the constructor itself - so we'll
-;;; sitll signal that an unknown specifier is unknown on each reparse of the same.
-;;; But as long as any reference enlivens the relevant CTYPE, we'll return that object.
-(defglobal **unknown-type-atoms**
-    ;; This table is specified as unsynchronized because we need to wrap the lock
-    ;; around a read/modify/write. GETHASH and PUTHASH can't do that themselves.
-    (sb-impl::make-system-hash-table :test 'eq :weakness :value :synchronized nil))
-
 #-sb-xc-host
 (progn (declaim (inline class-classoid))
        (defun class-classoid (class)
@@ -1487,16 +1451,7 @@
   UNKNOWN
     (setf (type-context-options context)
           (logior (type-context-options context) +type-parse-cache-inhibit+))
-    (return (if (atom spec)
-                (let ((table **unknown-type-atoms**))
-                  (with-system-mutex ((hash-table-lock table))
-                    (or (gethash spec table)
-                        (progn #+sb-xc-host
-                               (when cl:*compile-print*
-                                 (format t "~&; NEW UNKNOWN-TYPE ~S~%" spec))
-                               (setf (gethash spec table)
-                                     (new-ctype unknown-type spec))))))
-                (make-unknown-type spec)))))
+    (return (make-unknown-type spec))))
 
 ;;; BASIC-PARSE-TYPESPEC can grok some simple cases that involve turning an object
 ;;; used as a type specifier into an internalized type object (which might be
@@ -1565,7 +1520,8 @@
       (!values-specifier-type-memo-wrapper
        (lambda ()
          (let ((answer (%parse-type (uncross type-specifier) context)))
-           (if (type-context-cacheable context)
+           (if (and (type-context-cacheable context)
+                    #-sb-xc-host (heap-allocated-p type-specifier))
                answer
                  ;; Lookup was cacheable, but result isn't.
                  ;; Non-caching ensures that we see every occurrence of an unknown
@@ -1839,8 +1795,10 @@ expansion happened."
           ((null (cdr simplified-types)) (car simplified-types))
           (t (new-ctype intersection-type
               (some #'type-enumerable simplified-types)
-              simplified-types))))))
+              (intern-ctype-set simplified-types)))))))
 
+(defun make-union-type (enumerable types)
+  (new-ctype union-type enumerable (intern-ctype-set types)))
 (defun type-union (&rest input-types)
   (declare (dynamic-extent input-types))
   (%type-union input-types))
@@ -3559,7 +3517,7 @@ used for a COMPLEX component.~:@>"
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
                  (range 0 #.(1- base-char-code-limit)
                         (sb-vm::saetp-index-or-lose 'base-char)))))))
-    (%make-character-set-type pairs)))
+    (new-ctype character-set-type pairs)))
 
 ;; For all ctypes which are the element types of specialized arrays,
 ;; 3 ctype objects are stored for the rank-1 arrays of that specialization,
@@ -4064,25 +4022,14 @@ used for a COMPLEX component.~:@>"
                       (push (ctype-of z) float-types))
                     (push z unpaired)))))))
     (let ((member-type
-           (block nil
-             (unless unpaired
-               (macrolet ((member-type (&rest elts)
-                            `(literal-ctype
-                              (!alloc-member-type (pack-interned-ctype-bits 'member)
-                                                  (xset-from-list ',elts) nil)
-                              (member ,@elts))))
-                 (let ((elts (xset-data xset)))
-                   (when (singleton-p elts)
-                     (case (first elts)
-                       ((nil) (return (member-type nil)))
-                       ((t) (return (member-type t)))))
-                   (when (or (equal elts '(t nil)) (equal elts '(nil t)))
-                     ;; Semantically this is fine - XSETs
-                     ;; are not order-preserving except by accident
-                     ;; (when not represented as a hash-table).
-                     (return (member-type t nil))))))
-             (when (or unpaired (not (xset-empty-p xset)))
-               (%make-member-type xset unpaired)))))
+           (case (+ (length unpaired) (xset-count xset))
+             (0 nil) ; nil
+             ;; It's slightly suboptimal to use two DX-lets, but to remedy that,
+             ;; a single macro invocation would need to select which hash collection
+             ;; to look in. More easy would be to paste the macro guts here
+             ;; with suitable alteration, which I don't want to do.
+             (1 (new-ctype eql xset unpaired)) ; most common case
+             (t (new-ctype member-type xset unpaired)))))
       ;; The actual member-type contains the XSET (with no FP zeroes),
       ;; and a list of unpaired zeroes.
       (if (not float-types)
@@ -5081,6 +5028,9 @@ used for a COMPLEX component.~:@>"
         (values nil nil))))
 
 (define-type-method (character-set :simple-=) (type1 type2)
+  ;; FIXME: Do we actually call the SIMPLE-= method on instances that are EQ?
+  ;; I can't recall if that's done at a higher level. If it is, then this method
+  ;; should return (VALUES NIL T) because two different instances are not TYPE=
   (let ((pairs1 (character-set-type-pairs type1))
         (pairs2 (character-set-type-pairs type2)))
     (values (equal pairs1 pairs2) t)))
@@ -5722,3 +5672,13 @@ used for a COMPLEX component.~:@>"
                      :specialized-element-type etype)))
 
 (!defun-from-collected-cold-init-forms !type-cold-init)
+
+;;; Ensure that the type CALLABLE gets interned with its constituent types
+;;; in exactly the expected order. If flipped, there will be a complaint from
+;;; compiler/generic/interr because we expect OBJECT-NOT-CALLABLE to unparse
+;;; in a certain way. This DEFVAR is performed solely for side-effect.
+(defvar *preload-type*
+  (list (intern-ctype-set (list (specifier-type 'function)
+                                (specifier-type 'symbol)))
+        ;; .. any others as required
+        ))

@@ -62,6 +62,35 @@
             (assert arena-ref-p)
             (assert (not arena-ref-p)))))))
 
+(test-util:with-test (:name :ctype-cache-force-to-heap)
+  (drop-all-hash-caches)
+  (test-util:opaque-identity
+   (with-arena (*arena*)
+     ;; for each test, the type specifier itself can not be cached because
+     ;; it is a list in the arena. And the internal representation has to
+     ;; take care to copy arena-allocated numbers back to dynamic space.
+     (list (let* ((n (- (test-util:opaque-identity 0d0)))
+                  (spec `(member ,n)))
+             (assert (not (heap-allocated-p (second spec)))) ; -0d0 is off-heap
+             (typep (random 2) spec))
+           (let* ((n (+ 5.0d0 (random 10)))
+                  (bound (list n))
+                  (spec `(or (double-float ,bound) (integer ,(random 4)))))
+             ;; should not cache the type specifier
+             (typep 'foo spec)))))
+  (dolist (symbol sb-impl::*cache-vector-symbols*)
+    (let ((cache (symbol-value symbol)))
+      ; (format t "~&Checking cache ~S~%" symbol)
+      (when cache
+        (assert (heap-allocated-p cache))
+        (dovector (line cache)
+          (unless (eql line 0)
+            (unless (and (heap-allocated-p line) (not (points-to-arena line)))
+              (hexdump line 2 nil)
+              (error "~S has ~S" symbol line)))))))
+  (let ((finder-result (c-find-heap->arena)))
+    (assert (null finder-result))))
+
 (defun test-with-open-file ()
   (with-open-file (stream (format nil "/proc/~A/stat" (sb-unix:unix-getpid))
                           :if-does-not-exist nil)

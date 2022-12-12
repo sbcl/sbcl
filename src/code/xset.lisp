@@ -29,7 +29,10 @@
 
 (in-package "SB-KERNEL")
 
-(defstruct (xset (:constructor alloc-xset) (:copier nil) (:predicate nil))
+(defstruct (xset (:constructor alloc-xset)
+                 (:constructor !copy-xset (list-size data))
+                 (:copier nil)
+                 (:predicate nil))
   (list-size 0 :type index)
   (data nil :type (or list hash-table)))
 (declaim (freeze-type xset))
@@ -170,6 +173,6 @@
     (map-xset (lambda (x)
                 (when (typep x '(or symbol number character
                                  #-sb-xc-host structure-object))
-                  (setq h (logxor (cl:sxhash x) h))))
+                  (setq h (logxor (sb-xc:sxhash x) h))))
               xset)
     h))

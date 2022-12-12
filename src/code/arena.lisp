@@ -279,8 +279,6 @@ one or more times, not to exceed MAX-EXTENSIONS times"
 
 (defun copy-number-to-heap (n)
   (declare (sb-c::tlab :system))
-  #-system-tlabs n
-  #+system-tlabs
   (named-let copy ((n n))
     (if (or (typep n '(or fixnum single-float))
             (and (typep n '(or bignum double-float (complex float)))
