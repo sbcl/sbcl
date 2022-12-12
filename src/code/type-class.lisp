@@ -272,17 +272,19 @@
   (print-unreadable-object (ctype stream :type t)
     (prin1 (type-specifier ctype) stream)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant ctype-hash-nbits 27))
 ;;; take 27 low bits but exclude bits 20 and 21
 ;;; [Our MASK-FIELD can't be folded, and I didn't feel like fixing that.]
 (defconstant +type-hash-mask+
   #.(cl:logandc2 (cl:ldb (cl:byte 27 0) -1) (cl:mask-field (cl:byte 2 20) -1)))
 
-(defmacro type-class-id (ctype) `(ldb (byte 5 27) (type-%bits ,ctype)))
+(defmacro type-class-id (ctype) `(ldb (byte 5 ,ctype-hash-nbits) (type-%bits ,ctype)))
 (defmacro type-id->type-class (id) `(truly-the type-class (aref *type-classes* ,id)))
 (defmacro type-class (ctype) `(type-id->type-class (type-class-id ,ctype)))
 
 (declaim (inline type-hash-value))
-(defun type-hash-value (ctype) (ldb (byte 27 0) (type-%bits ctype)))
+(defun type-hash-value (ctype) (ldb (byte ctype-hash-nbits 0) (type-%bits ctype)))
 
 ;;; Represent an index into *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*
 ;;; if applicable. For types which are not array specializations,
@@ -295,7 +297,7 @@
   (defconstant +type-internedp+ (ash 1 20))
   (defconstant +type-admits-type=-optimization+ (ash 1 21))
   (defun ctype-class-bits (type-class)
-    (logior (ash (type-class-name->id type-class) 27)
+    (logior (ash (type-class-name->id type-class) ctype-hash-nbits)
             ;; NUMBER, MEMBER, and CLASSOID admit TYPE= optimization.
             ;; Other type classes might, but this is the conservative assumption.
             (if (member type-class '(number member classoid))
@@ -338,7 +340,7 @@
 ;;; For system build-time only
 (defun pack-interned-ctype-bits (type-class &optional hash saetp-index)
   (let ((hash (or hash (ctype-random))))
-    (logior (ash (type-class-name->id type-class) 27)
+    (logior (ash (type-class-name->id type-class) ctype-hash-nbits)
             (if saetp-index
                 (logior (ash saetp-index 22) (ldb (byte 20 0) hash))
                 (logand hash +type-hash-mask+))

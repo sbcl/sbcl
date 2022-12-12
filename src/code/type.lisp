@@ -4057,6 +4057,10 @@ used for a COMPLEX component.~:@>"
                 (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
                 (if (= (ldb (byte 2 pair-idx) presence) #b11)
                     (when (= sign 0)
+                      ;; FIXME: CTYPE-OF is heavyweight for all of what, 2 cases?
+                      ;; Just a typecase would be better.
+                      ;; ('Sup Dawg, I heard you like caches so I put a cache lookup
+                      ;; in your cache lookup so you can cache while you cache.)
                       (push (ctype-of z) float-types))
                     (push z unpaired)))))))
     (let ((member-type
