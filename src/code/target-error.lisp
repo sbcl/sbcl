@@ -1455,15 +1455,18 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    (axis :initarg :axis :reader invalid-array-index-error-axis))
   (:report
    (lambda (condition stream)
-     (let ((array (invalid-array-index-error-array condition)))
-       (format stream "Invalid index ~W for ~@[axis ~W of ~]~S, ~
-                       should be a non-negative integer below ~W."
-               (type-error-datum condition)
-               (when (> (array-rank array) 1)
-                 (invalid-array-index-error-axis condition))
-               (type-of array)
-               ;; Extract the bound from (INTEGER 0 (BOUND))
-               (caaddr (type-error-expected-type condition)))))))
+     (let ((array (invalid-array-index-error-array condition))
+           (index (type-error-datum condition)))
+       (if (integerp index)
+           (format stream "Invalid index ~S for ~@[axis ~W of ~]~S, ~
+                           should be a non-negative integer below ~W."
+                   (type-error-datum condition)
+                   (when (> (array-rank array) 1)
+                     (invalid-array-index-error-axis condition))
+                   (type-of array)
+                   ;; Extract the bound from (INTEGER 0 (BOUND))
+                   (caaddr (type-error-expected-type condition)))
+           (format stream "~s is not of type INTEGER." index))))))
 
 (define-condition invalid-array-error (reference-condition type-error) ()
   (:report
