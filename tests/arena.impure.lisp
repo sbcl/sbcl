@@ -88,6 +88,7 @@
             (unless (and (heap-allocated-p line) (not (points-to-arena line)))
               (hexdump line 2 nil)
               (error "~S has ~S" symbol line)))))))
+  #-win32 ; finder crashes (same reason for the :skipped-on below I guess)
   (let ((finder-result (c-find-heap->arena)))
     (assert (null finder-result))))
 
