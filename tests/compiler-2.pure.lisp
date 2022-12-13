@@ -3840,3 +3840,20 @@
        (lognor (setq a -336272099380508247)
                (shiftf b (logorc1 1073741832 a)))
        (the (integer -504635362412860905 -99686857090873309) (lognand b 11))))))
+
+(with-test (:name :not-folded-vops)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (floor
+       (dpb 42
+            (byte 15 7)
+            (block b
+              (loop for lv below 1 count
+                    (floor
+                     (flet ((%f (f1)
+                              (- (floor f1 f1) (return-from b -9))))
+                       (multiple-value-call #'%f (values (block b3 lv))))
+                     42))))
+       42))
+   (() (values -99734 19))))
