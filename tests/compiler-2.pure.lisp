@@ -3813,14 +3813,15 @@
       `(lambda (a)
          (boole boole-set (the rational a) a))
     ((1) -1)))
+
 (with-test (:name set-slot-old-p-optionals)
   (checked-compile-and-assert
-      ()
-      `(lambda (x &key)
-         (let ((list (list 1)))
-           (setf (car list) x)
-           list))
-    ((2) '(2) :test #'equal)))
+   ()
+   `(lambda (x &key)
+      (let ((list (list 1)))
+        (setf (car list) x)
+        list))
+   ((2) '(2) :test #'equal)))
 
 (with-test (:name :tn-ref-type-ir2opt)
   (checked-compile-and-assert
@@ -3829,3 +3830,13 @@
       (the unsigned-byte
            (the (or (array * (1)) real) p)))
    ((5) 5)))
+
+(with-test (:name :qword-to-dword-cut)
+  (checked-compile-and-assert
+   (:allow-warnings t)
+   `(lambda (a b)
+      (declare (fixnum b))
+      (logxor
+       (lognor (setq a -336272099380508247)
+               (shiftf b (logorc1 1073741832 a)))
+       (the (integer -504635362412860905 -99686857090873309) (lognand b 11))))))

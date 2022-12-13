@@ -3422,7 +3422,9 @@
                (location= dst2 dst1)
                (eq size1 :qword)
                (eq size2 :dword))
-      (setf (stmt-operands stmt) `(,+dword-size-prefix+ ,dst1 ,src1))
+      (setf (stmt-operands stmt) `(,+dword-size-prefix+ ,dst1 ,(if (integerp src1)
+                                                                   (ldb (byte 32 0) src1)
+                                                                   src1)))
       next)))
 
 ;;; "AND r, imm1" + "AND r, imm2" -> "AND r, (imm1 & imm2)"
