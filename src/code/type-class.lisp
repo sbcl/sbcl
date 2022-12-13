@@ -708,12 +708,13 @@
                  (compare (symbolicate name "-EQUIV")))
              `((defun ,hashfn (x)
                  #-sb-xc-host (declare (optimize (safety 0)))
-                 (type-hash-mix
-                  ,@(when include `((,(symbolicate "CALC-" include "-HASH") x)))
-                  ,@(mapcar (lambda (slot &aux (reader
-                                                (symbolicate conc-name (svref slot 0))))
-                              `(,(svref slot 1) (,reader x)))
-                            hashed-slots)))
+                 (,(if (eq name 'numeric-type) 'type-hash-final-mix 'progn)
+                  (type-hash-mix
+                   ,@(when include `((,(symbolicate "CALC-" include "-HASH") x)))
+                   ,@(mapcar (lambda (slot &aux (reader
+                                                 (symbolicate conc-name (svref slot 0))))
+                               `(,(svref slot 1) (,reader x)))
+                             hashed-slots))))
                (defun ,compare (a b)
                  #-sb-xc-host (declare (optimize (safety 0)))
                  (and ,@(mapcar (lambda (slot &aux (reader
@@ -748,6 +749,11 @@
   #-sb-xc-host `(sxhash ,x))
 
 (defmacro type-hash-mix (&rest args) (reduce (lambda (a b) `(mix ,a ,b)) args))
+;;; The final mix ensures that all bits affect the masked hash.
+;;; Since it takes non-zero time, only do it for NUMERIC where it seems to make
+;;; a large difference in the maximum probe sequence
+(defmacro type-hash-final-mix (val)
+  `(ldb (byte ctype-hash-nbits 0) (sb-impl::murmur-fmix-word ,val)))
 
 ;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
 ;; * (MEMBER THING) might lack an address-insensitive hash for THING
@@ -1147,35 +1153,44 @@
 (export 'show-ctype-ctor-cache-metrics)
 (defun show-ctype-ctor-cache-metrics ()
   (let (caches (total 0))
-    (push (cons "List" *ctype-list-hashset*) caches)
-    (push (cons "Set" *ctype-set-hashset*) caches)
-    (push (cons "Key-Info" *key-info-hashset*) caches)
-    (push (cons "Key-Info-List" *key-info-list-hashset*) caches)
+    (push (list "List" *ctype-list-hashset*) caches)
+    (push (list "Set" *ctype-set-hashset*) caches)
+    (push (list "Key-Info" *key-info-hashset*) caches)
+    (push (list "Key-Info-List" *key-info-list-hashset*) caches)
+    (push (list "EQL" *eql-type-cache*) caches)
     (dolist (symbol *ctype-hashsets*)
-      (push (cons (subseq (string symbol) 1
+      (push (list (subseq (string symbol) 1
                           (- (length (string symbol)) (length "-TYPE-HASHSET*")))
                   (symbol-value symbol))
             caches))
-    (setq caches
-          (delete 0 caches :key (lambda (x) (sb-impl::hashset-count (cdr x)))))
-    (format t "~&ctype cache metrics:  Count     Seek    Hit~%")
-    #-hashset-metrics ; just show the counts in decreasing order
-    ; and also include the EQL table
-    (format t "~:{  ~16a: ~7D~%~}"
-            (sort (cons (list "EQL" (hash-table-count *eql-type-cache*))
-                        (mapcar (lambda (x) (list (car x) (sb-impl::hashset-count (cdr x))))
-                                caches))
-                  #'> :key #'second))
-    #+hashset-metrics
-    (dolist (cache (sort caches #'> ; decreasing order of lookup frequency
-                         :key (lambda (x) (sb-impl::hashset-count-finds (cdr x)))))
-      (let* ((name (car cache))
-             (hs (cdr cache))
-             (count (sb-impl::hashset-count hs))
-             (seeks (sb-impl::hashset-count-finds hs))
-             (hit (/ (sb-impl::hashset-count-find-hits hs) seeks)))
-        (incf total count)
-        (format t "  ~16a: ~7D ~8D  ~4,1,2f%~%" name count seeks hit)))
+    (flet ((tablecount (x)
+             (if (hash-table-p x) (hash-table-count x) (sb-impl::hashset-count x))))
+      (setq caches
+            (delete 0 caches :key (lambda (x) (tablecount (second x)))))
+      (format t "~&ctype cache metrics:  Count     Seek    Hit maxPSL  Mask~%")
+      (dolist (cache (sort caches #'> ; decreasing cout
+                           :key (lambda (x) (tablecount (second x)))))
+        (binding*
+            ((name (first cache))
+             (table (second cache))
+             (count (tablecount table))
+             ((seeks hit psl mask)
+              (if (hash-table-p table)
+                  (values nil nil nil nil nil)
+                  (let* ((cells (sb-impl::hss-cells (sb-impl::hashset-storage table)))
+                         (psl (sb-impl::hs-cells-max-psl cells))
+                         (mask (sb-impl::hs-cells-mask cells)))
+                    #-hashset-metrics (values nil nil psl mask)
+                    #+hashset-metrics
+                    (let ((seeks (sb-impl::hashset-count-finds table)))
+                      (values seeks
+                              (/ (sb-impl::hashset-count-find-hits table) seeks)
+                              psl mask))))))
+          (incf total count)
+          (apply #'format t
+                 "  ~16a: ~7D~#[~:; ~:[        ~;~:*~8D~]  ~:[     ~;~:*~4,1,2f%~]~
+ ~6D ~6X~]~%" name count
+              (unless (hash-table-p table) (list seeks hit psl mask))))))
     (format t "  ~16A: ~7D~%" "Total" total)))
 
 #-sb-xc-host
