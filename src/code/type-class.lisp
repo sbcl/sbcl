@@ -1478,11 +1478,4 @@
 (defun rebuild-ctype-hashsets ()
   (dolist (sym (list* '*key-info-hashset* '*key-info-list-hashset*
                       *ctype-hashsets*))
-    (flet ((len (hs)
-             (length (sb-impl::hss-cells (sb-impl::hashset-storage hs)))))
-      (let* ((hs (symbol-value sym))
-             (before (len hs)))
-        (sb-impl::hashset-rehash hs nil)
-        (let ((after (len hs)))
-          (when (> before after)
-            (format t "~5d ~s~%" (- after before) sym)))))))
+    (sb-impl::hashset-rehash (symbol-value sym) nil)))
