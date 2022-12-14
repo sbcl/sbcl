@@ -973,14 +973,15 @@
              (:copier nil))
   ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
   (complexp :real :type (member :real :complex nil))
-  ;; the kind of numeric type we have, or NIL if not specified (just
-  ;; NUMBER or COMPLEX)
+  ;; the kind of numeric type we have, or NIL if the type is NUMBER.
+  ;; The types corresponding to all of REAL or all of COMPLEX are UNION types,
+  ;; and no constituent type thereof will have a NIL here.
   (class nil :type (member integer rational float nil))
   ;; "precision" for a float type (i.e. type specifier for a CPU
-  ;; representation of floating point, e.g. 'SINGLE-FLOAT), or NIL if not specified
-  ;; or not a float.
+  ;; representation of floating point, e.g. 'SINGLE-FLOAT).
+  ;; NIL if and only if CLASS is not FLOAT
   (precision nil :type (member single-float double-float nil))
-  ;; a value that uniquely identifies this triple of <class,format,complexp>
+  ;; a value that uniquely identifies this triple of <complexp,class,precision>
   (id 0 :type (unsigned-byte 8)))
 
 ;;; There legal combinations of (COMPLEXP CLASS PRECISION) are as follows:
@@ -1217,6 +1218,13 @@
     (generate)))
 
 (export 'show-ctype-ctor-cache-metrics)
+;;; The minimum hashset storage size is 64 elements, so a bunch of the caches
+;;; start out with too-low load-factor, being somewhat oversized.
+;;; The EQL table never sizes down (because our hash-tables don't)
+;;; so it may operate at a fairly low load factor.
+;;; Other than that we should expect load factors between 50% and 75%.
+;;; So it's extremely unexpected that List starts out with a load-factor of 12%.
+;;; Probably should investigate, though it's harmless.
 (defun show-ctype-ctor-cache-metrics ()
   (let (caches (total 0))
     (push (list "List" *ctype-list-hashset*) caches)
@@ -1233,29 +1241,31 @@
              (if (hash-table-p x) (hash-table-count x) (sb-impl::hashset-count x))))
       (setq caches
             (delete 0 caches :key (lambda (x) (tablecount (second x)))))
-      (format t "~&ctype cache metrics:  Count     Seek    Hit maxPSL  Mask~%")
+      (format t "~&ctype cache metrics:  Count     LF     Seek    Hit maxPSL  Mask~%")
       (dolist (cache (sort caches #'> ; decreasing cout
                            :key (lambda (x) (tablecount (second x)))))
         (binding*
             ((name (first cache))
              (table (second cache))
              (count (tablecount table))
-             ((seeks hit psl mask)
+             ((load seeks hit psl mask)
               (if (hash-table-p table)
-                  (values nil nil nil nil nil)
+                  (values (/ count (ash (length (sb-impl::hash-table-pairs table)) -1))
+                          nil nil nil nil nil) ; FIXME: compute PSL and mask
                   (let* ((cells (sb-impl::hss-cells (sb-impl::hashset-storage table)))
                          (psl (sb-impl::hs-cells-max-psl cells))
-                         (mask (sb-impl::hs-cells-mask cells)))
-                    #-hashset-metrics (values nil nil psl mask)
+                         (mask (sb-impl::hs-cells-mask cells))
+                         (lf (/ count (1+ mask))))
+                    #-hashset-metrics (values lf nil nil psl mask)
                     #+hashset-metrics
                     (let ((seeks (sb-impl::hashset-count-finds table)))
-                      (values seeks
+                      (values lf seeks
                               (/ (sb-impl::hashset-count-find-hits table) seeks)
                               psl mask))))))
           (incf total count)
           (apply #'format t
-                 "  ~16a: ~7D~#[~:; ~:[        ~;~:*~8D~]  ~:[     ~;~:*~4,1,2f%~]~
- ~6D ~6X~]~%" name count
+                 "  ~16a: ~7D ~5,1,2F%~#[~:; ~:[        ~;~:*~8D~]  ~:[     ~;~:*~4,1,2f%~]~
+ ~6D ~6X~]~%" name count load
               (unless (hash-table-p table) (list seeks hit psl mask))))))
     (format t "  ~16A: ~7D~%" "Total" total)))
 

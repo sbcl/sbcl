@@ -321,7 +321,7 @@
 (with-test (:name :array-type-hash-mixer)
   (let* ((hs sb-kernel::*array-type-hashset*)
          (pre (compute-max-psl hs)))
-    (assert (<= pre 5))
+    (assert (<= pre 6))
     (dolist (spec *specifiers*)
       (test-util:opaque-identity (sb-kernel:specifier-type spec)))
     (let ((post (compute-max-psl hs)))
