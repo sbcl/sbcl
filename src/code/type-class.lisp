@@ -889,8 +889,25 @@
   ;; the element type as originally specified
   (element-type nil :type ctype)
   ;; the element type as it is specialized in this implementation
-  ;; this is function of element-type, no need to mix it in.
-  (specialized-element-type nil :type ctype :hasher nil)))
+  ;; Strangely, this is *NOT* a pure function of ELEMENT-TYPE.
+  ;;
+  ;; The :unparse-safely test in 'type.pure' produces the following result:
+  ;; (describe (type-intersection (specifier-type '(vector (or bit character)))
+  ;;                              (specifier-type `(vector (or bit symbol)))))
+  ;;
+  ;; #<ARRAY-TYPE (VECTOR T)>
+  ;;   [structure-object]
+  ;; Slots with :INSTANCE allocation:
+  ;;   %BITS                          = 1443812512
+  ;;   DIMENSIONS                     = (*)
+  ;;   COMPLEXP                       = :MAYBE
+  ;;   ELEMENT-TYPE                   = #<NUMERIC-TYPE BIT>
+  ;;   SPECIALIZED-ELEMENT-TYPE       = #<NAMED-TYPE T>
+  ;;
+  ;; Frankly I'm somewhat disinclined to believe this result
+  ;; because intuitively the specialization is what you would get if you
+  ;; asked the question "how would an array of <x> be specialized?"
+  (specialized-element-type nil :type ctype)))
 
 (def-type-model (character-set-type (:constructor* nil (pairs)))
   ;; these get canonically ordered by the parser
