@@ -161,6 +161,13 @@
 (defun xset-empty-p (xset)
   (not (xset-data xset)))
 
+(defun xset-every (predicate xset)
+  (map-xset (lambda (elt)
+              (unless (funcall predicate elt)
+                (return-from xset-every nil)))
+            xset)
+  t)
+
 ;;; Produce a hash that helps decide whether two xsets could be considered equivalent
 ;;; as order-insensitive sets comparing elements by EQL. This shouldn't use EQL-HASH
 ;;; because the intent is that it be useful for both host and target. SXHASH is fine

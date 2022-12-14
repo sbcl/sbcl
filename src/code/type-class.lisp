@@ -1006,7 +1006,7 @@
 (declaim (notinline !compute-numtype-aspect-id))
 
 (defglobal *numeric-aspects-v* (make-array 9))
-(declaim (simple-vector *numeric-aspects-v*))
+(declaim (type (simple-vector 9) *numeric-aspects-v*))
 (loop for (complexp class precision)
       in '((nil nil nil)
            (:real float single-float) (:real float double-float)

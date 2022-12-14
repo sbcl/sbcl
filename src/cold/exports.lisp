@@ -2952,6 +2952,7 @@ possibly temporarily, because it might be used internally.")
            "XSET-COUNT"
            "XSET-ELTS-HASH"
            "XSET-EMPTY-P"
+           "XSET-EVERY"
            "XSET-INTERSECTION"
            "XSET-MEMBER-P"
            "XSET-MEMBERS"

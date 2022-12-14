@@ -325,7 +325,7 @@
     (dolist (spec *specifiers*)
       (test-util:opaque-identity (sb-kernel:specifier-type spec)))
     (let ((post (compute-max-psl hs)))
-      (assert (<= (- post pre) 2)))))
+      (assert (<= (- post pre) 3)))))
 
 (with-test (:name :numeric-type-hash-mixer)
   (let* ((hs sb-kernel::*numeric-type-hashset*)

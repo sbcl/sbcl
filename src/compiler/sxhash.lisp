@@ -132,11 +132,18 @@
 (deftransform sxhash ((x) (double-float)) '#.(sb-impl::sxhash-double-float-xform 'x))
 
 (deftransform sxhash ((x) (symbol))
-  (cond ((csubtypep (lvar-type x) (specifier-type 'keyword))
-         ;; All interned symbols have a precomputed hash.
-         ;; There's no way to ask the type system whether a symbol is known to
-         ;; be interned, but we *can* test for the specific case of keywords.
-         ;; Even if it gets uninterned, this shortcut remains valid.
+  ;; All interned symbols have a precomputed hash.
+  ;; The types for which interned-ness can be conveyed via type constraints
+  ;; are KEYWORD and MEMBER. Despite the existence of UNINTERN, the optimization
+  ;; here is admissible. If the user uninterns a symbol, the hash is still there.
+  ;; TBH I think we should just precompute the hash of all symbols.
+  (cond ((or (csubtypep (lvar-type x) (specifier-type 'keyword))
+             (and (member-type-p (lvar-type x))
+                  (progn
+                    ;; can't be a subtype of SYMBOL with fp-zeroes in it
+                    (aver (null (sb-kernel::member-type-fp-zeroes (lvar-type x))))
+                    (xset-every #'cl:symbol-package
+                                (sb-kernel::member-type-xset (lvar-type x))))))
          `(symbol-hash x)) ; Never need to lazily compute and memoize
         ((gethash 'ensure-symbol-hash *backend-parsed-vops*)
          ;; A vop might emit slightly better code than the expression below
