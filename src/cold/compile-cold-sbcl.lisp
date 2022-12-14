@@ -181,6 +181,20 @@
       (values))))
 
 (sb-kernel::show-ctype-ctor-cache-metrics)
+
+(defun write-sxhash-xcheck-data (pathname)
+  (with-open-file (stream pathname :direction :output
+                                   :if-exists :supersede :if-does-not-exist :create)
+    (format stream ";;; SXHASH test data~%(~%")
+    (let ((seen (make-hash-table)))
+      (dolist (pair sb-impl::*sxhash-crosscheck*)
+        (let ((prev (gethash (car pair) seen)))
+          (if prev
+              (assert (= prev (cdr pair))) ; be self-consistent at least
+              (format stream "(~S #x~X)~%" (car pair) (cdr pair))))
+        (setf (gethash (car pair) seen) (cdr pair))))
+    (format stream ")~%")))
+
 ;;; See whether we're in individual file mode
 (cond
   ((boundp 'cl-user::*compile-files*)
@@ -225,6 +239,8 @@
                 (clear-specialized-array-registry)))
              (format t "~&~50t ~f~%" total-time))
            (sb-c::dump/restore-interesting-types 'write)))
+     (write-sxhash-xcheck-data
+      (sb-cold:find-bootstrap-file "output/sxhash-calls.lisp-expr" t))
      (sb-kernel::write-structure-definitions-as-text
       (sb-cold:find-bootstrap-file "output/defstructs.lisp-expr" t)))))
 (sb-kernel::show-ctype-ctor-cache-metrics)

@@ -115,21 +115,18 @@
   ;; side effect of data recording when invoking compile-time
   ;; functions aren't propagated back to process that forked the
   ;; children doing the grunt work.
-  (let ((sxhash-crosscheck
-          '#.(let (pairs)
-               ;; De-duplicate, which reduces the list from ~8000 entries to ~1000 entries.
-               ;; But make sure that any key which is repeated has the same value
-               ;; at each repetition.
-               (dolist (pair *sxhash-crosscheck* (coerce pairs 'simple-vector))
-                 (let ((found (assoc (car pair) pairs)))
-                   (if found
-                       (aver (= (cdr found) (cdr pair)))
-                       (push pair pairs)))))))
-    (loop for (object . hash) across sxhash-crosscheck
-          unless (= (sxhash object) hash)
-            do (error "SXHASH computed wrong answer for ~S. Got ~x should be ~x"
-                      object hash (sxhash object))))
-  (format t "~&cross-compiler SXHASH tests passed~%"))
+  (let ((list (with-open-file (stream "output/sxhash-calls.lisp-expr"
+                                      :if-does-not-exist nil)
+                (when stream
+                  (let ((*package* (find-package "SB-KERNEL"))) (read stream))))))
+    (when list
+      (dolist (item list)
+        (destructuring-bind (object hash) item
+          (unless (= (sxhash object) hash)
+            (error "SXHASH computed wrong answer for ~S. Got ~x should be ~x"
+                   object hash (sxhash object)))))
+      (format t "~&cross-compiler SXHASH tests passed: ~D cases~%"
+              (length list)))))
 
 ;;; called when a cold system starts up
 (defun !cold-init ()
