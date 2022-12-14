@@ -1239,8 +1239,6 @@
             caches))
     (flet ((tablecount (x)
              (if (hash-table-p x) (hash-table-count x) (sb-impl::hashset-count x))))
-      (setq caches
-            (delete 0 caches :key (lambda (x) (tablecount (second x)))))
       (format t "~&ctype cache metrics:  Count     LF     Seek    Hit maxPSL  Mask~%")
       (dolist (cache (sort caches #'> ; decreasing cout
                            :key (lambda (x) (tablecount (second x)))))
@@ -1250,7 +1248,10 @@
              (count (tablecount table))
              ((load seeks hit psl mask)
               (if (hash-table-p table)
-                  (values (/ count (ash (length (sb-impl::hash-table-pairs table)) -1))
+                  (values #+sb-xc-host nil
+                          #-sb-xc-host
+                          (/ count
+                             (ash (length (sb-impl::hash-table-pairs table)) -1))
                           nil nil nil nil nil) ; FIXME: compute PSL and mask
                   (let* ((cells (sb-impl::hss-cells (sb-impl::hashset-storage table)))
                          (psl (sb-impl::hs-cells-max-psl cells))
@@ -1260,7 +1261,8 @@
                     #+hashset-metrics
                     (let ((seeks (sb-impl::hashset-count-finds table)))
                       (values lf seeks
-                              (/ (sb-impl::hashset-count-find-hits table) seeks)
+                              (when (plusp seeks)
+                                (/ (sb-impl::hashset-count-find-hits table) seeks))
                               psl mask))))))
           (incf total count)
           (apply #'format t
