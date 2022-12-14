@@ -67,6 +67,7 @@ sb-kernel::(rplaca (last *handler-clusters*) (car **initial-handler-clusters**))
   (assert (null (set-difference
                  result
                  '(sb-c::conset sb-kernel:args-type
+                   sb-kernel:array-type
                    sb-kernel:numeric-type
                    sb-kernel:member-type)))))
 

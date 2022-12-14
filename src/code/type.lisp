@@ -2435,13 +2435,9 @@ expansion happened."
 
 ;;;; numeric types
 
-(declaim (inline numeric-type-equal))
-(defun numeric-type-equal (type1 type2)
-  ;; TODO: these 3 can be packed into an integer which makes for just 1 comparison.
-  ;; (Maybe if 64-bit words use the %BITS slot which has plenty of unused bits)
-  (and (eq (numeric-type-class type1) (numeric-type-class type2))
-       (eq (numeric-type-format type1) (numeric-type-format type2))
-       (eq (numeric-type-complexp type1) (numeric-type-complexp type2))))
+(declaim (inline numtype-aspects-eq))
+(defun numtype-aspects-eq (type1 type2)
+  (eq (numeric-type-aspects type1) (numeric-type-aspects type2)))
 
 (defun numeric-type-enumerable (type)
   (let* ((class (numeric-type-class type))
@@ -2465,7 +2461,7 @@ expansion happened."
   ;;  (specifier-type '(single-float +0s0 -0s0))
   ;;  (specifier-type '(single-float +0s0 +0s0))
   (values
-   (and (numeric-type-equal type1 type2)
+   (and (numtype-aspects-eq type1 type2)
         (equalp (numeric-type-low type1) (numeric-type-low type2))
         (equalp (numeric-type-high type1) (numeric-type-high type2)))
    t))
@@ -2566,7 +2562,8 @@ expansion happened."
   (!alloc-numeric-type
    (pack-interned-ctype-bits 'number nil
                              (when specifier (sb-vm::saetp-index-or-lose specifier)))
-   class format complexp low high))
+   (get-numtype-aspects complexp class format)
+   low high))
 
 #+sb-xc-host
 (progn
@@ -2683,6 +2680,7 @@ expansion happened."
 ;;; NUMERIC-TYPE.
 (defun make-numeric-type (&key class format (complexp :real) low high)
   (declare (type (member integer rational float nil) class))
+  (declare (inline !compute-numtype-aspect-id))
   (let ((union-type (%make-union-numeric-type
                      class format complexp low high)))
     (when union-type (return-from make-numeric-type union-type)))
@@ -2765,7 +2763,8 @@ expansion happened."
                 (not complexp)
                 (bounds-unbounded-p low high)
                 (literal-ctype (interned-numeric-type nil :complexp nil) number))))
-        (new-ctype numeric-type class format complexp low high))))
+        (let ((aspects (get-numtype-aspects complexp class format)))
+          (new-ctype numeric-type aspects low high)))))
 
 (defun modified-numeric-type (base
                               &key

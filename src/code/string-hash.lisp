@@ -175,7 +175,7 @@
   (logxor k (ash k -33)))
 (defmacro murmur3-fmix-word (x) `(murmur3-fmix64 ,x)))
 
-(defun murmur-fmix-word (x)
+(defun murmur-fmix-word (x) ; FIXME: this is not a very distinctive name
   (murmur3-fmix-word (truly-the sb-vm:word x)))
 (export 'murmur-fmix-word) ; for unit testing vs C code
 

@@ -1984,7 +1984,7 @@
             ;; In ({+,-} VAR STEP), the type of STEP must be a numeric
             ;; type matching INITIAL-TYPE.
             (unless (and (numeric-type-p step-type)
-                         (or (numeric-type-equal initial-type step-type)
+                         (or (numtype-aspects-eq initial-type step-type)
                              ;; Detect cases like (LOOP FOR 1.0 to 5.0
                              ;; ...), where the initial and the step
                              ;; are of different types, and the step
@@ -1992,7 +1992,7 @@
                              (let ((contagion-type (numeric-contagion initial-type
                                                                       step-type)))
                                (and (numeric-type-p contagion-type)
-                                    (numeric-type-equal initial-type contagion-type)))))
+                                    (numtype-aspects-eq initial-type contagion-type)))))
               (return-from %analyze-set-uses nil))
             ;; Track the directions of the increments/decrements.
             (let ((non-negative-p (csubtypep step-type (specifier-type '(real 0 *))))
@@ -2008,7 +2008,7 @@
             ;; Ultimately, the derived types of the sets must match
             ;; INITIAL-TYPE if we are going to derive new bounds.
             (unless (and (numeric-type-p set-type)
-                         (numeric-type-equal set-type initial-type))
+                         (numtype-aspects-eq set-type initial-type))
               (setf every-set-type-suitable-p nil))
             (push set-type set-types)))))
     (values (cond ((and some-plusp (not some-minusp)) '+)

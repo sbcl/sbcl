@@ -692,7 +692,9 @@
     `(progn
        ,@(when private-ctor `((declaim (inline ,private-ctor))))
        (defstruct (,name ,@(unless include '((:include ctype)))
-                         ,@(remove :constructor* options :key #'car)
+                         ,@(remove-if (lambda (x)
+                                        (member (car x) '(:constructor* :extra-mix-step)))
+                                      options)
                          ,(if private-ctor
                               `(:constructor ,private-ctor ,private-ctor-args)
                               '(:constructor nil))
@@ -708,7 +710,7 @@
                  (compare (symbolicate name "-EQUIV")))
              `((defun ,hashfn (x)
                  #-sb-xc-host (declare (optimize (safety 0)))
-                 (,(if (eq name 'numeric-type) 'type-hash-final-mix 'progn)
+                 (,(if (assoc :extra-mix-step options) 'type-hash-final-mix 'progn)
                   (type-hash-mix
                    ,@(when include `((,(symbolicate "CALC-" include "-HASH") x)))
                    ,@(mapcar (lambda (slot &aux (reader
@@ -753,7 +755,7 @@
 ;;; Since it takes non-zero time, only do it for NUMERIC where it seems to make
 ;;; a large difference in the maximum probe sequence
 (defmacro type-hash-final-mix (val)
-  `(ldb (byte ctype-hash-nbits 0) (sb-impl::murmur-fmix-word ,val)))
+  `(ldb (byte ctype-hash-nbits 0) (sb-impl::murmur3-fmix-word ,val)))
 
 ;; Singleton MEMBER types are best dealt with via a weak-value hash-table because:
 ;; * (MEMBER THING) might lack an address-insensitive hash for THING
@@ -862,19 +864,33 @@
 
 ;;; An ARRAY-TYPE is used to represent any array type, including
 ;;; things such as SIMPLE-BASE-STRING.
+(macrolet ((hash-dims (list)
+;; We should not use our SXHASH on ARRAY-TYPE-DIMENSIONS because it cuts off at 5 items:
+;; * (loop for i from 4 to 7 do (format t "~d ~x~%" i (sxhash (make-list i))))
+;; 4 75FA4FC28C64CC
+;; 5 75FA4A37B3E5CD
+;; 6 75FA4A37B3E5CD
+;; 7 75FA4A37B3E5CD
+             `(if (eql ,list '*)
+                  #x1980B71D ; = (ldb (byte 29 0) (sxhash '*)) not that it matters
+                  (let ((h 0))
+                    (dolist (dim ,list h)
+                      (setq h (mix (sb-xc:sxhash dim) h)))))))
 (def-type-model (array-type
+                 (:extra-mix-step)
                  (:constructor* %make-array-type
                                 (dimensions complexp element-type
                                             specialized-element-type)))
   ;; the dimensions of the array, or * if unspecified. If a dimension
   ;; is unspecified, it is *.
-  (dimensions '* :type (or list (eql *)) :test equal)
+  (dimensions '* :type (or list (eql *)) :test equal :hasher hash-dims)
   ;; Is this not a simple array type? (:MAYBE means that we don't know.)
   (complexp :maybe :type (member t nil :maybe))
   ;; the element type as originally specified
   (element-type nil :type ctype)
   ;; the element type as it is specialized in this implementation
-  (specialized-element-type nil :type ctype))
+  ;; this is function of element-type, no need to mix it in.
+  (specialized-element-type nil :type ctype :hasher nil)))
 
 (def-type-model (character-set-type (:constructor* nil (pairs)))
   ;; these get canonically ordered by the parser
@@ -948,6 +964,64 @@
 ;;; The type of a float format.
 (deftype float-format () `(member ,@*float-formats*))
 
+;;; Using 3 separate fields to represent information with fewer than 4 bits
+;;; of entropy is a terribly wasteful representation choice.
+;;; (4 bits = 16 possibilities but in fact there are only 9 valid combinations)
+(defstruct (numtype-aspects
+             (:constructor !make-numeric-aspects (complexp class precision id))
+             (:predicate nil)
+             (:copier nil))
+  ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
+  (complexp :real :type (member :real :complex nil))
+  ;; the kind of numeric type we have, or NIL if not specified (just
+  ;; NUMBER or COMPLEX)
+  (class nil :type (member integer rational float nil))
+  ;; "precision" for a float type (i.e. type specifier for a CPU
+  ;; representation of floating point, e.g. 'SINGLE-FLOAT), or NIL if not specified
+  ;; or not a float.
+  (precision nil :type (member single-float double-float nil))
+  ;; a value that uniquely identifies this triple of <class,format,complexp>
+  (id 0 :type (unsigned-byte 8)))
+
+;;; There legal combinations of (COMPLEXP CLASS PRECISION) are as follows:
+;;; 0. (NIL NIL NIL)
+;;; 1. (:REAL FLOAT SINGLE-FLOAT) and 2. (:REAL FLOAT DOUBLE-FLOAT)
+;;; 3. (:COMPLEX FLOAT SINGLE-FLOAT) and 4. (:COMPLEX FLOAT DOUBLE-FLOAT)
+;;; 5. (:REAL INTEGER) 6. (:COMPLEX INTEGER)
+;;; 7. (:REAL RATIONAL) 8. (:COMPLEX RATIONAL)
+;;; any other combination that would attempt to carve out a subset
+;;; of the numeric type space will instead be a UNION type.
+(declaim (inline !compute-numtype-aspect-id))
+(defun !compute-numtype-aspect-id (complexp class precision)
+  (declare (type (member :real :complex nil) complexp)
+           (type (member integer rational float nil) class)
+           (type (member single-float double-float nil) precision))
+  (unless (eq class 'float) (aver (not precision)))
+  (case class
+    ((nil) (aver (not complexp)) 0)
+    (float (+ (if (eq complexp :real) 1 3)
+              (if (eq precision 'single-float) 0 1)))
+    (integer (if (eq complexp :real) 5 6))
+    (rational (if (eq complexp :real) 7 8))))
+(declaim (notinline !compute-numtype-aspect-id))
+
+(defglobal *numeric-aspects-v* (make-array 9))
+(declaim (simple-vector *numeric-aspects-v*))
+(loop for (complexp class precision)
+      in '((nil nil nil)
+           (:real float single-float) (:real float double-float)
+           (:complex float single-float) (:complex float double-float)
+           (:real integer nil) (:complex integer nil)
+           (:real rational nil) (:complex rational nil))
+      do (let ((index (!compute-numtype-aspect-id complexp class precision)))
+           (when (eql (aref *numeric-aspects-v* index) 0)
+             (setf (aref *numeric-aspects-v* index)
+                   (!make-numeric-aspects complexp class precision index)))))
+
+(defmacro get-numtype-aspects (&rest rest)
+  `(the (not null)
+        (aref *numeric-aspects-v* (!compute-numtype-aspect-id ,@rest))))
+
 (macrolet ((numbound-hash (b)
              #+sb-xc-host `(clipped-sxhash ,b)
              #-sb-xc-host `(let ((x ,b))
@@ -969,28 +1043,17 @@
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (def-type-model (numeric-type
-                 (:constructor* nil (class format complexp low high)))
-  ;; the kind of numeric type we have, or NIL if not specified (just
-  ;; NUMBER or COMPLEX)
-  (class nil :type (member integer rational float nil))
-  ;; "format" for a float type (i.e. type specifier for a CPU
-  ;; representation of floating point, e.g. 'SINGLE-FLOAT -- nothing
-  ;; to do with #'FORMAT), or NIL if not specified or not a float.
-  ;; Formats which don't exist in a given implementation don't appear
-  ;; here.
-  (format nil :type (or float-format null) :test eq)
-  ;; Is this a complex numeric type?  Null if unknown (only in NUMBER).
-  ;;
-  (complexp :real :type (member :real :complex nil) :test eq)
-  ;; The upper and lower bounds on the value, or NIL if there is no
-  ;; bound. If a list of a number, the bound is exclusive. Integer
-  ;; types never have exclusive bounds, i.e. they may have them on
-  ;; input, but they're canonicalized to inclusive bounds before we
-  ;; store them here.
+                 (:extra-mix-step)
+                 (:constructor* nil (aspects low high)))
+  (aspects (missing-arg) :type numtype-aspects :hasher numtype-aspects-id :test eq)
   (low nil :type (or real (cons real null) null)
        :hasher numbound-hash :test numbound-eql)
   (high nil :type (or real (cons real null) null)
         :hasher numbound-hash :test numbound-eql)))
+(declaim (inline numeric-type-complexp numeric-type-class numeric-type-format))
+(defun numeric-type-complexp (x) (numtype-aspects-complexp (numeric-type-aspects x)))
+(defun numeric-type-class (x) (numtype-aspects-class (numeric-type-aspects x)))
+(defun numeric-type-format (x) (numtype-aspects-precision (numeric-type-aspects x)))
 
 ;;; A CONS-TYPE is used to represent a CONS type.
 (def-type-model (cons-type (:constructor* nil (car-type cdr-type)))
@@ -1443,10 +1506,8 @@
            (%set-instance-layout copy (%instance-layout x))
            copy))
         (numeric-type
-         (!alloc-numeric-type bits (numeric-type-class x) (numeric-type-format x)
-                              (numeric-type-complexp x)
-                              (copy (numeric-type-low x))
-                              (copy (numeric-type-high x))))
+         (!alloc-numeric-type bits (numeric-type-aspects x)
+                              (copy (numeric-type-low x)) (copy (numeric-type-high x))))
         (compound-type ; UNION or INTERSECTION
          (let ((copy (!alloc-union-type bits (compound-type-enumerable x)
                                         (compound-type-types x))))

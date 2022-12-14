@@ -1105,7 +1105,8 @@ core and return a descriptor to it."
 
 (defun cold-svset (vector index value)
   (let ((i (if (integerp index) index (descriptor-fixnum index))))
-    (write-wordindexed vector (+ i sb-vm:vector-data-offset) value)))
+    (write-wordindexed vector (+ i sb-vm:vector-data-offset) value))
+  value)
 
 (declaim (inline cold-svref))
 (defun cold-svref (vector i)
@@ -1406,6 +1407,22 @@ core and return a descriptor to it."
 ;;; Map from host object to target object
 (defvar *host->cold-ctype*)
 
+;;; NUMTYPE-ASPECTS are stored in a fixed-size vector.
+;;; During genesis they are created on demand.
+;;; (I'm not sure whether all or only some are created)
+(defun numtype-aspects-to-core (val)
+  (let* ((index (sb-kernel::numtype-aspects-id val))
+         (vector (cold-symbol-value 'sb-kernel::*numeric-aspects-v*))
+         (cold-obj (cold-svref vector index)))
+    (if (eql (descriptor-bits cold-obj) 0)
+        (write-slots (cold-svset vector index
+                                 (allocate-struct-of-type (type-of val)))
+                     :id (make-fixnum-descriptor (sb-kernel::numtype-aspects-id val))
+                     :complexp (sb-kernel::numtype-aspects-complexp val)
+                     :class (sb-kernel::numtype-aspects-class val)
+                     :precision (sb-kernel::numtype-aspects-precision val))
+        cold-obj)))
+
 (defun ctype-to-core (obj)
   (declare (type (or ctype xset list) obj))
   (cond
@@ -1459,8 +1476,11 @@ core and return a descriptor to it."
                (if override
                    (or (cdr override) *nil-descriptor*)
                    (let ((val (funcall reader obj)))
-                     (funcall (if (typep val '(or ctype xset list)) #'ctype-to-core
-                                  #'host-constant-to-core) val)))))
+                     (funcall (typecase val
+                                ((or ctype xset list) #'ctype-to-core)
+                                (sb-kernel::numtype-aspects #'numtype-aspects-to-core)
+                                (t #'host-constant-to-core))
+                              val)))))
              ((word sb-vm:signed-word)
               (write-wordindexed/raw result (+ sb-vm:instance-slots-offset index)
                                      (or (cdr override) (funcall reader obj)))))))
@@ -3946,6 +3966,9 @@ III. initially undefined function references (alphabetically):
       (initialize-layouts)
       (initialize-static-space tls-init)
       (cold-set 'sb-c::*!cold-allocation-patch-point* *nil-descriptor*)
+      (let ((n (length sb-kernel::*numeric-aspects-v*)))
+        (cold-set 'sb-kernel::*numeric-aspects-v*
+                  (allocate-vector sb-vm:simple-vector-widetag n n)))
       (cold-set 'sb-kernel::*!initial-ctypes* *nil-descriptor*)
 
       ;; Load all assembler code
