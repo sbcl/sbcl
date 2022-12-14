@@ -87,7 +87,9 @@ image."
           (loop
            (let ((cell (cdr predecessor)))
              (unless cell (return ,result))
-             (let ((,var (sb-ext:weak-pointer-value (car cell))))
+             (let ((,var (if (sb-ext:weak-pointer-p (car cell))
+                             (sb-ext:weak-pointer-value (car cell))
+                             (car cell))))
                (if ,var
                    (progn ,@body (setq predecessor cell))
                    (rplacd predecessor (cdr cell))))))))
