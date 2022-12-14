@@ -106,7 +106,7 @@
                (:charpos ; impart just enough smarts to make FRESH-LINE dtrt
                 (if (eql (char buf 0) #\newline) 0 1)))))))
 
-(defun xc-sanity-checks ()
+(defun !xc-sanity-checks ()
   ;; Verify on startup that some constants were dumped reflecting the
   ;; correct action of our vanilla-host-compatible functions.  For
   ;; now, just SXHASH is checked.
@@ -323,7 +323,7 @@
       (logically-readonlyize (sb-c::sc-move-vops sc))
       (logically-readonlyize (sb-c::sc-move-costs sc))))
 
-  (show-and-call xc-sanity-checks)
+  (show-and-call !xc-sanity-checks)
 
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
