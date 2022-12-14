@@ -100,6 +100,7 @@
 
 (defvar *exceptions* '("compile-file-pos-utf16be"))
 
+#+sbcl ; don't warn about illegal DIRECTORY keywords in other lisps
 (defun canonicalize-whitespace/directory
     (&optional (directory *default-pathname-defaults*) (report t))
   (let ((stamp-date (read-stamp-file)) (n-files 0) (n-newer 0) (n-changed 0))
