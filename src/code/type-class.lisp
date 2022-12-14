@@ -998,14 +998,17 @@
            (type (member single-float double-float nil) precision))
   (unless (eq class 'float) (aver (not precision)))
   (case class
-    ((nil) (aver (not complexp)) 0)
     (float (+ (if (eq complexp :real) 1 3)
               (if (eq precision 'single-float) 0 1)))
     (integer (if (eq complexp :real) 5 6))
-    (rational (if (eq complexp :real) 7 8))))
+    (rational (if (eq complexp :real) 7 8))
+    (t (aver (not class))
+       (aver (not complexp))
+       0)))
 (declaim (notinline !compute-numtype-aspect-id))
 
-(defglobal *numeric-aspects-v* (make-array 9))
+;;; force the SBCL-default initial value, because genesis also 0-fills it
+(defglobal *numeric-aspects-v* (make-array 9 :initial-element 0))
 (declaim (type (simple-vector 9) *numeric-aspects-v*))
 (loop for (complexp class precision)
       in '((nil nil nil)
