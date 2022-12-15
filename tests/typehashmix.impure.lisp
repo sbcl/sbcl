@@ -2,6 +2,15 @@
 ;;; from other tests- I don't want the type caches to have many extra lines
 ;;; in them at the start of the test.
 
+(with-test (:name :exactly-one-null-type-instance)
+  (let ((null-instances))
+    (dolist (x (sb-vm:list-allocated-objects :all :test #'sb-kernel:member-type-p))
+      (let ((m (sb-kernel:member-type-members x)))
+        (when (and (sb-int:singleton-p m)
+                   (eq nil (car m)))
+          (push x null-instances))))
+    (assert (sb-int:singleton-p null-instances))))
+
 (defparameter *allstrings*
   (map 'vector #'string
        (remove 0 (sb-impl::symtbl-cells

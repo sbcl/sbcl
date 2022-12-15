@@ -566,13 +566,9 @@
 ;; if building the cross-compiler, or forms which reference
 ;; previously constructed objects, if running the cross-compiler.
 #+sb-xc-host
-(progn
-  (defmacro literal-ctype (constructor &optional specifier)
-    (declare (ignore specifier))
-    `(load-time-value ,constructor))
-
-  (defmacro literal-ctype-vector (var)
-    `(load-time-value ,var nil)))
+(defmacro literal-ctype (constructor &optional specifier)
+  (declare (ignore specifier))
+  `(load-time-value ,constructor))
 
 ;; Omitting the specifier works only if the unparser method has been
 ;; defined in time to use it, and you're sure that constructor's result
@@ -580,12 +576,8 @@
 ;; non-canonical object, such as an instance of (CONS T T) that is
 ;; not EQ to the interned instance.
 #-sb-xc-host
-(progn
-  (defmacro literal-ctype (constructor &optional (specifier nil specifier-p))
-    (if specifier-p (specifier-type specifier) (symbol-value constructor)))
-
-  (defmacro literal-ctype-vector (var)
-    (symbol-value var)))
+(defmacro literal-ctype (constructor &optional (specifier nil specifier-p))
+  (if specifier-p (specifier-type specifier) (symbol-value constructor)))
 
 ;;;; miscellany
 
@@ -791,6 +783,10 @@
 ;; system operations. So you'd have created a permanent mapping of every object to
 ;; a random hash for no good reason.
 
+;; Why the singleton table is so important is that any time the compiler asks itself
+;; the ctype-of a constant leaf, it might yield `(MEMBER ,the-constant).
+;; So then you end up with an assortment of random objects that don't hash
+;; nicely in a ctype hashset, but are OK in a hash-table.
 (define-load-time-global *eql-type-cache* ; like EQL-SPECIALIZER-TABLE in PCL
     (sb-impl::make-system-hash-table :test 'eql :weakness :value :synchronized nil))
 
@@ -798,6 +794,7 @@
   `(or (not (sb-vm:is-lisp-pointer (get-lisp-obj-address ,obj)))
        (heap-allocated-p ,obj)))
 
+(defvar *hashsets-preloaded* nil)
 (defmacro new-ctype (pseudonym &rest initargs)
   (let* ((name (if (eq pseudonym 'eql) 'member-type pseudonym))
          (allocator (package-symbolicate "SB-KERNEL" "!ALLOC-" name))
@@ -813,6 +810,10 @@
     `(let ((temp (,allocator ,bits ,@initargs)))
        ;; Too many "can't stack-allocate" warnings for most
        #+c-stack-is-control-stack (declare (truly-dynamic-extent temp))
+       #+nil ; or #+sb-devel as you see fit
+       (unless *hashsets-preloaded*
+         (write-string "CTYPE hashset preload failure")
+         (sb-vm:ldb-monitor))
        ,(case pseudonym
           (eql ; as per above remarks: use hash-table, not hashset
             `(let* ((xset ,(first initargs))
@@ -1323,7 +1324,17 @@
   (dolist (pair (nreverse *!initial-ctypes*))
     (destructuring-bind (instance . hashset-symbol) pair
       (cond ((not hashset-symbol)
+             ;; There are very few which aren't in a hashset:
+             ;; - (6) NAMED-TYPEs
+             ;; - (3) BASE-CHAR, EXTENDED-CHAR, CHARACTER
+             ;; - (1) CONS
+             ;; - (1) NUMBER
+             ;; - (2) SATISFIES
              (push instance permtypes))
+            ;; Mandatory special-case for singleton MEMBER types
+            ((and (member-type-p instance) (not (cdr (member-type-members instance))))
+             (setf (gethash (car (member-type-members instance)) *eql-type-cache*)
+                   instance))
             (t
              (let ((hashset (symbol-value hashset-symbol)))
                (aver (not (hashset-find hashset instance))) ; instances are dumped bottom-up
@@ -1364,7 +1375,9 @@
           (compound-type
            (ensure-interned-list (compound-type-types instance) *ctype-set-hashset*))
           (negation-type
-           (check (negation-type-type instance))))))))
+           (check (negation-type-type instance)))))))
+  (assert (= (length permtypes) 13))
+  #+sb-devel (setq *hashsets-preloaded* t))
 (preload-ctype-hashsets))
 
 ;;; *TYPE-CLASS-LIST* is defined only in the host. When the cross-compiler
