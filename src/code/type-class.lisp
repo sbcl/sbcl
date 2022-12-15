@@ -772,6 +772,30 @@
 ;;   will cause the hashset to exceed its probe sequence length limit.
 ;;   This isn't to say we couldn't assign some bits of SYMBOL-HASH pseudorandomly,
 ;;   and mask them out in the value returned by CL:SXHASH.
+;;
+;; Also: XSETs containing arbitrary objects such as strings and lists don't have
+;; a good hash at all. There is not really a way to compute a mixed hash
+;; other than by pinning all objects in the XSET and taking their addresses.
+;; Then we'd need to figure out that GC happened, and it becomes a pain.
+;; This seems more complicated than the situation warrants.
+;; So we'll just give up on hash-consing which should fix lp#1999687
+;;
+;; An outline of a better design would be as follows:
+;; - create a global hash-table of objects which were placed in an XSET
+;;   other than the nicely hashable object types. Call this xset-key->hash-mapping.
+;;   This mapping does not need to be weak, because it will have a way of purging it.
+;;   Each value in the table is a cons of a random hash and the number of XSETs
+;;   using the key. Increment the refcount when making a new XSET with that key.
+;; - when hashing the XSET, look up its keys (other than EQL hashable) in the global table
+;; - attach a finalizer to the XSET. The finalizer's job is to decrement the refcount
+;;   on each key in the global mappping. When the count reaches zero there are no
+;;   XSETs that refer to the key, and the random hash can be removed.
+;; Why make a refcounted table? Because otherwise there is no way to remove mapping
+;; entries for objects that outlive the MEMBER-TYPE's use of the object but where the
+;; MEMBER type itself is dead. Worst-case, every object in the lisp image could at some
+;; point appear in a MEMBER type but then never be needed again with regard to type
+;; system operations. So you'd have created a permanent mapping of every object to
+;; a random hash for no good reason.
 
 (define-load-time-global *eql-type-cache* ; like EQL-SPECIALIZER-TABLE in PCL
     (sb-impl::make-system-hash-table :test 'eql :weakness :value :synchronized nil))
@@ -795,7 +819,8 @@
     `(let ((temp (,allocator ,bits ,@initargs)))
        ;; Too many "can't stack-allocate" warnings for most
        #+c-stack-is-control-stack (declare (truly-dynamic-extent temp))
-       ,(if (eq pseudonym 'eql) ; as per above remarks: use hash-table, not hashset
+       ,(case pseudonym
+          (eql ; as per above remarks: use hash-table, not hashset
             `(let* ((xset ,(first initargs))
                     (zeros ,(second initargs))
                     (key (first (or zeros (xset-data xset))))
@@ -810,8 +835,16 @@
                                       (warn "Off-heap hash-table key @ ~X"
                                             (get-lisp-obj-address key))
                                       key))))
-                      (setf (gethash key table) (copy-ctype temp))))))
-            `(hashset-insert-if-absent ,hashset temp #'copy-ctype)))))
+                      (setf (gethash key table) (copy-ctype temp)))))))
+          (member-type ; problem case: don't always know how to hash well
+           `(let ((xset ,(first initargs)))
+              (flet ((hashable (x) (typep x '(or symbol number character instance))))
+                (if (xset-every #'hashable xset)
+                    (hashset-insert-if-absent ,hashset temp #'copy-ctype)
+                    ;; otherwise just copy it always (for now)
+                    (copy-ctype temp)))))
+          (t
+            `(hashset-insert-if-absent ,hashset temp #'copy-ctype))))))
 
 ;;; The NAMED-TYPE is used to represent *, T and NIL, the standard
 ;;; special cases, as well as other special cases needed to

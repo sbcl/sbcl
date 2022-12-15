@@ -178,8 +178,11 @@
 (defun xset-elts-hash (xset)
   (let ((h 0))
     (map-xset (lambda (x)
-                (when (typep x '(or symbol number character
-                                 #-sb-xc-host structure-object))
-                  (setq h (logxor (sb-xc:sxhash x) h))))
+                (when (typep x '(or symbol number character #-sb-xc-host instance))
+                  ;; Addition is commutative and associative, and the low bits come out
+                  ;; the same no matter the order of operations. XORing would also work
+                  ;; but I think adding has a greater degree of randomness.
+                  (setq h (logand (+ h (sb-xc:sxhash x))
+                                  sb-xc:most-positive-fixnum))))
               xset)
     h))

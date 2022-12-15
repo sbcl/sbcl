@@ -2,6 +2,27 @@
 ;;; from other tests- I don't want the type caches to have many extra lines
 ;;; in them at the start of the test.
 
+(defparameter *allstrings*
+  (map 'vector #'string
+       (remove 0 (sb-impl::symtbl-cells
+                  (sb-impl::package-internal-symbols
+                   (find-package "SB-C"))))))
+
+(with-test (:name :member-type-hash-mixer)
+  ;; not really a test of the mixer, just that we don't try
+  ;; to hash-cons and then blow up on MEMBER types that contain
+  ;; other than numbers and symbols.
+  (let ((nstrings (length *allstrings*))
+        (foo 0))
+    (dotimes (i 10000)
+      (let ((n (+ 2 (random 10)))
+            (strings))
+        (dotimes (i n)
+          (push (elt *allstrings* (random nstrings)) strings))
+        (let ((spec `(member ,@strings)))
+          (when (typep (elt *allstrings* (random nstrings)) spec)
+            (incf foo)))))))
+
 (defvar *specifiers* '(
 (ARRAY * (0 0 0 0 0 0 0 0))
 (SIMPLE-BIT-VECTOR 16)
@@ -321,7 +342,7 @@
 (with-test (:name :array-type-hash-mixer)
   (let* ((hs sb-kernel::*array-type-hashset*)
          (pre (compute-max-psl hs)))
-    (assert (<= pre 6))
+    (assert (<= pre 7))
     (dolist (spec *specifiers*)
       (test-util:opaque-identity (sb-kernel:specifier-type spec)))
     (let ((post (compute-max-psl hs)))
