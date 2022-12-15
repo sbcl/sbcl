@@ -509,7 +509,7 @@
              (if (and (>= error-number (length **internal-error-handlers**))
                       (< error-number (length sb-c:+backend-internal-errors+)))
                  (let ((context (sb-di:error-context)))
-                   (if (typep context '(cons (eql :struct-read)))
+                   (if (typep context '(cons (eql struct-read-context)))
                        ;; This was shoehorned into being a "type error"
                        ;; which isn't the best way to explain it to the user.
                        ;; However, from an API stance, it makes some sense to signal

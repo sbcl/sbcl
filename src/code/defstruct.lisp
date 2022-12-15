@@ -1274,7 +1274,7 @@ unless :NAMED is also specified.")))
                   (unless (or (dsd-always-boundp dsd) external-unbound-handling)
                     (setf place
                           `(the* ((not (satisfies sb-vm::unbound-marker-p))
-                                  :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
+                                  :context (struct-read-context ,(dd-name dd) . ,(dsd-name dsd)))
                                  ,place)))
                   (cond
                     ((eq type-spec t) place)
@@ -1304,7 +1304,7 @@ unless :NAMED is also specified.")))
                               (t
                                (unless (or (dsd-always-boundp dsd) (not external-unbound-handling))
                                  (setq type-spec `(or ,type-spec (satisfies sb-vm::unbound-marker-p))))
-                               `(the* (,type-spec :context (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                               `(the* (,type-spec :context (struct-context ,(dd-name dd) . ,(dsd-name dsd)))
                                       ,newval-form))))
                       (#1=#:instance #3=(the ,(dd-name dd) ,instance-form)))
                   (,writer #1# ,index #2#)
@@ -2058,7 +2058,7 @@ or they must be declared locally notinline at each call site.~@:>"
                                   (if (eq type t)
                                       var
                                       `(the* (,type :context
-                                              (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                                              (struct-context ,(dd-name dd) . ,(dsd-name dsd)))
                                              ,var))))
                               (dd-slots dd) lambda-list))))))
     (destructuring-bind (llks &optional req opt rest keys aux) args

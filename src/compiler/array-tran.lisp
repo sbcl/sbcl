@@ -135,7 +135,7 @@
        new-value
        (array-type-specialized-element-type type)
        (lexenv-policy (node-lexenv (lvar-dest new-value)))
-       :aref)))
+       'aref-context)))
   (lvar-type new-value))
 
 (defun supplied-and-true (arg)

@@ -899,15 +899,15 @@ with that condition (or with no condition) will be returned."
   (typecase context
     (cons
      (case (car context)
-       (:struct
+       (struct-context
         (format nil "when setting slot ~s of structure ~s"
                 (cddr context) (cadr context)))
        (t context)))
-    ((eql :aref)
+    ((eql sb-c::aref-context)
      (let (*print-circle*)
        (format nil "when setting an element of (ARRAY ~s)"
                type)))
-    ((eql :ftype)
+    ((eql sb-c::ftype-context)
      "from the function type declaration.")
     ((and symbol
           (not null))

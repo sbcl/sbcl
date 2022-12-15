@@ -44,7 +44,9 @@
   (loop with policy = (lexenv-policy (node-lexenv call))
         for args on (basic-combination-args call)
         for var in (lambda-vars fun)
-        for name = (lambda-var-%source-name var)
+        for name = (or (and (lambda-var-arg-info var )
+                            (arg-info-key (lambda-var-arg-info var )))
+                       (lambda-var-%source-name var))
         do (assert-lvar-type (car args) (leaf-type var) policy
                              (if (eq (functional-kind fun) :optional)
                                  (make-local-call-context fun name)

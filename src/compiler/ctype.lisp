@@ -836,7 +836,7 @@ and no value was provided for it." name))))))))))
                             (not (member :result (cdr really-assert)))))
                (assert-lvar-type (return-result return) type-returns
                                  policy
-                                 :ftype)))
+                                 'ftype-context)))
            (loop for var in vars
                  for type in types do
                  (cond ((basic-var-sets var)
@@ -1081,7 +1081,7 @@ and no value was provided for it." name))))))))))
 
 (defun %compile-time-type-error (values atype dtype detail code-context cast-context)
   (declare (ignore dtype))
-  (cond ((eq cast-context :ftype)
+  (cond ((eq cast-context 'ftype-context)
          (error 'simple-type-error
                 :datum (car values)
                 :expected-type atype
@@ -1143,7 +1143,7 @@ and no value was provided for it." name))))))))))
                                            (condition 'type-warning))
   (let ((*compiler-error-context* node))
     (cond ((eq atype nil))
-          ((eq cast-context :ftype)
+          ((eq cast-context 'ftype-context)
            (warn condition
                  :format-control
                  "~@<Derived type of ~/sb-impl:print-type-specifier/ is ~
